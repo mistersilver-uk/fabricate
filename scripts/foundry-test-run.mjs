@@ -7049,7 +7049,7 @@ async function main() {
           craftingCheck: {
             enabled: true,
             // Per-recipe check-modifier catalogue + default policy (issue 770). A
-            // crafting-owned aggregate feeding the `@craftingmod` formula placeholder,
+            // crafting-owned aggregate appended to the crafting-check roll,
             // authored at the top level of the crafting check (sibling of `routed`), so
             // the Checks → Crafting tab renders the populated CraftingModifierCatalogueCard
             // beside the failure-consumption card (screenshot evidence). Each expression
@@ -7088,10 +7088,12 @@ async function main() {
             maxModifierPicks: 2,
             routed: {
               type: 'relative',
-              // `1d20 + 20 + @craftingmod` (base total 21-40, plus a small ability mod) always
-              // meets the Masterwork threshold, so the Phase-E Brew Healing Potion craft
-              // deterministically succeeds. `@craftingmod` resolves to a scalar BEFORE the
-              // formula reaches Foundry's Roll (issue 770): the SYSTEM's `playerPicks` rule
+              // `1d20 + 20` (base total 21-40, plus a small ability mod) always meets the
+              // Masterwork threshold, so the Phase-E Brew Healing Potion craft deterministically
+              // succeeds. The DETERMINISM ARGUMENT SURVIVES issue 1094's retirement of the
+              // roll-formula placeholder this formula used to carry: the resolved modifier
+              // scalar is now APPENDED as a flavoured term BEFORE the formula reaches Foundry's
+              // Roll, so the same numbers land in the same place. The SYSTEM's `playerPicks` rule
               // offers the `med` and `herb` modifiers (starter-hero WIS and DEX mods, roughly
               // -1..+3 each), and whatever the player leaves ticked the +20 base absorbs — which
               // is what makes the choice photographable without making the craft flaky.
@@ -7101,7 +7103,7 @@ async function main() {
               // rolled); now that it is engine-evaluated a bare `1d20` vs dc 12 would fail the
               // craft ~55% of the time (flaky smoke). The named tiers below are unchanged so
               // the routed-check and validation-tab captures still render their authored outcomes.
-              rollFormula: '1d20 + 20 + @craftingmod',
+              rollFormula: '1d20 + 20',
               dc: 12,
               thresholdMode: 'meet',
               relativeOutcomes: [
@@ -7268,13 +7270,14 @@ async function main() {
           // The eligible modifiers ('med', 'herb') are therefore the system defaults, matching WIS
           // (Medicine) and DEX (Herbalism), which resolve to different ability scores on the
           // smoke's dnd5e Starter Hero so the frame shows two distinct value chips. The
-          // `1d20 + 20 + @craftingmod` formula has large margin vs dc 5 Masterwork, so the craft
+          // `1d20 + 20` formula (plus the appended modifier term) has large margin vs dc 5
+          // Masterwork, so the craft
           // succeeds whichever boxes the player leaves ticked. This recipe is the one selected by
           // Phase-E's `selectCraftingRecipeByMode('routedByCheck')` (first in DOM order,
           // alphabetically before Forge Iron Sword), making it the evidence frame for the
           // multi-pick prompt.
           // Single result group → produced on any non-failure outcome. The Phase-E
-          // craft rolls `1d20 + 20 + @craftingmod` (always Masterwork), so this craft
+          // craft rolls `1d20 + 20` plus the appended modifier term (always Masterwork), so this craft
           // deterministically succeeds and yields the single "Brewed Potion" group.
           ingredientSets: [{
             ingredientGroups: [

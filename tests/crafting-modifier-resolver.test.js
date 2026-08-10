@@ -5,7 +5,6 @@ import assert from 'node:assert/strict';
 const RESOLVER_MODULE = '../src/systems/craftingModifierResolver.js';
 
 const {
-  CRAFTING_MOD_TOKEN,
   MODIFIER_POLICIES,
   normalizeModifierPolicy,
   policyDefersSelection,
@@ -16,7 +15,6 @@ const {
   resolveEligibleModifierIds,
   resolveCraftingModifierScalar,
   buildCraftingModifierChoice,
-  substituteCraftingModifier,
   evaluateNumericExpression,
   makeRollDataExpressionEvaluator,
   applyCraftingModifier,
@@ -479,7 +477,11 @@ test('buildCraftingModifierChoice maps eligible modifiers + pre-selects the best
     { catalogue: ICON_CATALOGUE, defaultModifierIds: ['med', 'alch', 'herb'], maxModifierPicks: 1 },
     evaluatorFor({ '@med': 3, '@alch': 2, '@herb': 4 })
   );
-  assert.equal(choice.token, CRAFTING_MOD_TOKEN);
+  assert.equal(
+    Object.hasOwn(choice, 'token'),
+    false,
+    'the descriptor carries no token field: there is no placeholder left to name (issue 1094)'
+  );
   assert.deepEqual(choice.modifiers, [
     { id: 'med', label: 'Medicine', icon: 'fa-med', value: 3 },
     { id: 'alch', label: 'Alchemy', icon: 'fa-alch', value: 2 },
@@ -672,17 +674,17 @@ test('buildCraftingModifierChoice defaults absent label/icon to empty strings', 
   assert.deepEqual(choice.modifiers[0], { id: 'bare', label: '', icon: '', value: 1 });
 });
 
-// ── token substitution ───────────────────────────────────────────────────────
+// ── the retired substitution surface ─────────────────────────────────────────
 
-test('substituteCraftingModifier wraps the scalar in parens (negative stays valid)', () => {
-  assert.equal(substituteCraftingModifier('1d20 + @craftingmod', 3), '1d20 + (3)');
-  assert.equal(substituteCraftingModifier('1d20 + @craftingmod', -2), '1d20 + (-2)');
-  assert.equal(substituteCraftingModifier('1d20', 5), '1d20', 'no token → unchanged');
-  assert.equal(substituteCraftingModifier('@craftingmod + @craftingmod', 4), '(4) + (4)');
-});
-
-test('CRAFTING_MOD_TOKEN is the documented placeholder', () => {
-  assert.equal(CRAFTING_MOD_TOKEN, '@craftingmod');
+// Deleted, not weakened. `substituteCraftingModifier` and `CRAFTING_MOD_TOKEN` were the
+// whole placeholder mechanism; issue 1094 retires it and the scalar APPENDS instead, so
+// their absence from the module surface IS the behaviour under test. Asserted rather than
+// merely un-imported, because an accidental re-export would otherwise pass unnoticed and
+// hand a future caller a second, substituting path to the same arithmetic.
+test('the placeholder substitution surface is GONE from the resolver (issue 1094)', async () => {
+  const module = await import(RESOLVER_MODULE);
+  assert.equal(module.substituteCraftingModifier, undefined);
+  assert.equal(module.CRAFTING_MOD_TOKEN, undefined);
 });
 
 // ── arithmetic evaluator ─────────────────────────────────────────────────────
@@ -730,7 +732,7 @@ test('makeRollDataExpressionEvaluator resolves @-paths then reduces to a number'
 
 // ── applyCraftingModifier (the seam checkRoll uses) ──────────────────────────
 
-test('applyCraftingModifier substitutes the resolved scalar before Foundry sees it', () => {
+test('applyCraftingModifier APPENDS the resolved scalar before Foundry sees it', () => {
   const Roll = stubReplaceRoll();
   const actor = { getRollData: () => ({ med: 3, alch: 2, herb: 4 }) };
   const context = {
@@ -743,33 +745,84 @@ test('applyCraftingModifier substitutes the resolved scalar before Foundry sees 
     defaultModifierIds: ['med', 'alch', 'herb'],
   };
   assert.equal(
-    applyCraftingModifier('1d20 + @craftingmod', actor, context, Roll),
-    '1d20 + (4)',
-    'highest of 3/2/4'
+    applyCraftingModifier('1d20', actor, context, Roll),
+    '1d20 + 4[Modifiers]',
+    'highest of 3/2/4, appended as one flavoured term'
   );
 });
 
-test('applyCraftingModifier leaves a formula without the token unchanged', () => {
+// The append is unconditional: there is no token to look for, so the only thing that can
+// leave a formula unchanged is a scalar of zero.
+test('applyCraftingModifier appends a NEGATIVE scalar with the sign split, not a parenthesis', () => {
+  const Roll = stubReplaceRoll();
+  const actor = { getRollData: () => ({ pen: -3 }) };
+  const context = {
+    catalogue: [{ id: 'pen', expression: '@pen' }],
+    systemPolicy: 'addAll',
+    defaultModifierIds: ['pen'],
+  };
+  // `Constant` is unsigned in the dice grammar, so `+ -3[Modifiers]` would not parse.
+  assert.equal(applyCraftingModifier('1d20', actor, context, Roll), '1d20 - 3[Modifiers]');
+});
+
+test('applyCraftingModifier appends NOTHING when the eligible set resolves to 0', () => {
   const Roll = stubReplaceRoll();
   const actor = { getRollData: () => ({}) };
   assert.equal(
     applyCraftingModifier('1d20 + @prof', actor, { catalogue: [] }, Roll),
-    '1d20 + @prof'
+    '1d20 + @prof',
+    'an empty catalogue contributes nothing and the authored formula survives verbatim'
   );
 });
 
-test('applyCraftingModifier substitutes 0 when the token appears without a context', () => {
+test('applyCraftingModifier appends nothing with no context at all (salvage/gathering)', () => {
   const Roll = stubReplaceRoll();
   const actor = { getRollData: () => ({}) };
-  assert.equal(applyCraftingModifier('1d20 + @craftingmod', actor, null, Roll), '1d20 + (0)');
+  assert.equal(applyCraftingModifier('1d20 + 4', actor, null, Roll), '1d20 + 4');
+});
+
+// A7, at THIS layer: a scalar that survives the roll-data evaluator as a plain decimal is
+// appended verbatim, however extreme, because the dice grammar's `Constant` accepts it.
+//
+// The exponent-notation REFUSAL is asserted where the formatter lives
+// (`tests/tool-check-bonus.test.js`), not here, and that split is deliberate rather than a
+// gap: `makeRollDataExpressionEvaluator` cannot produce an exponent value at all. Foundry
+// stringifies `1e-7` into the formula as the literal `1e-7`, and
+// `evaluateNumericExpression`'s `parseNumber` consumes only `[0-9.]`, so it stops at the
+// `e` and returns 1. The exposure is through an INJECTED evaluator and, from issue 1095,
+// through summing N clamped values — both of which reach `appendCheckModifierTerm`
+// directly.
+test('applyCraftingModifier appends an extreme but plain-decimal scalar verbatim', () => {
+  const Roll = stubReplaceRoll();
+  const actor = { getRollData: () => ({ big: 1000000000000000 }) };
+  const context = {
+    catalogue: [{ id: 'big', expression: '@big' }],
+    systemPolicy: 'addAll',
+    defaultModifierIds: ['big'],
+  };
+  assert.equal(
+    applyCraftingModifier('1d20', actor, context, Roll),
+    '1d20 + 1000000000000000[Modifiers]'
+  );
+});
+
+test('applyCraftingModifier appends a FRACTIONAL scalar, which the grammar does accept', () => {
+  const Roll = stubReplaceRoll();
+  const actor = { getRollData: () => ({ half: 2.5 }) };
+  const context = {
+    catalogue: [{ id: 'half', expression: '@half' }],
+    systemPolicy: 'addAll',
+    defaultModifierIds: ['half'],
+  };
+  assert.equal(applyCraftingModifier('1d20', actor, context, Roll), '1d20 + 2.5[Modifiers]');
 });
 
 // ── which check a resolution mode ACTUALLY rolls (issue 1055) ────────────────
 //
 // The five-mode table this selector owns is a hand-maintained mirror of the engine's own
 // slot choices, and three surfaces (the Checks card, the recipe Overview tab, the admin
-// store) now read it to decide whether a `@craftingmod` reference is live. Drift here is
-// silent: a mode routed to the wrong slot reports a formula the engine never rolls.
+// store) read it to decide whether the check-modifier catalogue reaches a roll. Drift here
+// is silent: a mode routed to the wrong slot reports a formula the engine never rolls.
 
 const MODE_TABLE = [
   { mode: 'simple', slot: 'simple', requiresCheck: false },
@@ -779,9 +832,9 @@ const MODE_TABLE = [
 ];
 
 const CHECK_SLOTS = {
-  simple: { rollFormula: '1d20 + @craftingmod' },
-  routed: { rollFormula: '2d6 + @craftingmod' },
-  progressive: { rollFormula: '1d100 + @craftingmod' },
+  simple: { rollFormula: '1d20 + 2' },
+  routed: { rollFormula: '2d6 + 1' },
+  progressive: { rollFormula: '1d100' },
 };
 
 test('resolveActiveCraftingCheckFormula routes each non-alchemy mode to its own slot', () => {
@@ -794,7 +847,6 @@ test('resolveActiveCraftingCheckFormula routes each non-alchemy mode to its own 
     assert.equal(active.rollFormula, CHECK_SLOTS[slot].rollFormula, `${mode} formula`);
     assert.equal(active.config, CHECK_SLOTS[slot]);
     assert.equal(active.checkUsable, true);
-    assert.equal(active.referencesModifier, true);
     assert.equal(active.requiresCheck, requiresCheck, `${mode} requiresCheck`);
     assert.equal(active.alchemyCheckMode, null, 'never mistaken for an authored alchemy none');
   }
@@ -824,7 +876,6 @@ test('resolveActiveCraftingCheckFormula selects the alchemy slot from alchemy.ch
     assert.equal(active.alchemyCheckMode, checkMode);
     assert.equal(active.requiresCheck, slot !== null, `alchemy/${checkMode} requiresCheck`);
     assert.equal(active.checkUsable, slot !== null);
-    assert.equal(active.referencesModifier, slot !== null);
   }
   // An absent alchemy block is `none`, not a coerced simple.
   assert.equal(
@@ -834,7 +885,7 @@ test('resolveActiveCraftingCheckFormula selects the alchemy slot from alchemy.ch
   );
 });
 
-test('resolveActiveCraftingCheckFormula distinguishes the three inert causes', () => {
+test('resolveActiveCraftingCheckFormula distinguishes the two inert causes', () => {
   // 1. No check at all.
   const noCheck = resolveActiveCraftingCheckFormula({
     resolutionMode: 'alchemy',
@@ -852,13 +903,61 @@ test('resolveActiveCraftingCheckFormula distinguishes the three inert causes', (
   assert.equal(noFormula.rollFormula, '', 'the formula is TRIMMED');
   assert.equal(noFormula.checkUsable, false);
 
-  // 3. A formula is authored but never spends the placeholder.
-  const noPlaceholder = resolveActiveCraftingCheckFormula({
+  // There is no third cause. A formula that never spent the retired placeholder is now an
+  // ordinary live check — the scalar appends to it — so this reports LIVE, and the
+  // `noPlaceholder` value the two notice surfaces rendered has nowhere left to come from.
+  const live = resolveActiveCraftingCheckFormula({
     resolutionMode: 'simple',
     craftingCheck: { simple: { rollFormula: '1d20 + 4' } },
   });
-  assert.equal(noPlaceholder.checkUsable, true);
-  assert.equal(noPlaceholder.referencesModifier, false);
+  assert.equal(live.checkUsable, true);
+  assert.equal(
+    Object.hasOwn(live, 'referencesModifier'),
+    false,
+    'the retired fact is not merely false, it is gone from the shape (issue 1094)'
+  );
+});
+
+// THE SHIM RUNS BEFORE THE EMPTINESS TEST, asserted with a real `Roll.validate` double.
+// A formula whose only content was the retired placeholder must NOT report usable, reach
+// `evaluateCheckRoll` and throw inside `new Roll('')` as a rolled — consuming — failure.
+//
+// This assertion FAILS against the pre-change reader, which read the raw stored field and
+// reported `checkUsable: true` for exactly this input.
+test('resolveActiveCraftingCheckFormula reports noFormula for a placeholder-only formula', () => {
+  const previous = globalThis.Roll;
+  globalThis.Roll = class {
+    static validate(formula) {
+      const text = String(formula);
+      return text.trim() !== '' && !/@/.test(text) && !/[*/+-]\s*$/.test(text);
+    }
+  };
+  try {
+    const active = resolveActiveCraftingCheckFormula({
+      resolutionMode: 'simple',
+      craftingCheck: { simple: { rollFormula: '@craftingmod' } },
+    });
+    assert.equal(active.slot, 'simple', 'the mode still rolls the simple slot');
+    assert.equal(active.rollFormula, '');
+    assert.equal(active.checkUsable, false, 'reported as noFormula, never as a usable check');
+
+    // A non-additive placement is covered by the same residue check.
+    const multiplicative = resolveActiveCraftingCheckFormula({
+      resolutionMode: 'simple',
+      craftingCheck: { simple: { rollFormula: '1d20 * @craftingmod' } },
+    });
+    assert.equal(multiplicative.checkUsable, false);
+
+    // …and a token in an ADDITIVE position leaves a real formula standing.
+    const additive = resolveActiveCraftingCheckFormula({
+      resolutionMode: 'simple',
+      craftingCheck: { simple: { rollFormula: '1d20 + @craftingmod' } },
+    });
+    assert.equal(additive.rollFormula, '1d20');
+    assert.equal(additive.checkUsable, true);
+  } finally {
+    globalThis.Roll = previous;
+  }
 });
 
 test('resolveActiveCraftingCheckFormula reports no check for an unrecognized mode', () => {
@@ -871,7 +970,6 @@ test('resolveActiveCraftingCheckFormula reports no check for an unrecognized mod
   assert.equal(active.slot, null);
   assert.equal(active.config, null);
   assert.equal(active.checkUsable, false);
-  assert.equal(active.referencesModifier, false);
 });
 
 test('resolveActiveCraftingCheckFormula defaults an absent mode to simple and tolerates no system', () => {

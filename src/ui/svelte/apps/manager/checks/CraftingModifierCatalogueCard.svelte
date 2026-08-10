@@ -13,7 +13,7 @@
   The card authors three things:
 
     1. The COMBINATION RULE (`defaultModifierPolicy`) — who selects the eligible
-       modifiers, and how they reduce to the one number that replaces `@craftingmod`:
+       modifiers, and how they reduce to the one number appended to the check roll:
          - Add all:      sum the system's default set. Nobody selects.
          - Highest:      the single largest of it (a deterministic max, not a pool).
          - Recipe picks: the RECIPE author selects, at recipe-edit time; the picks sum.
@@ -31,7 +31,8 @@
   Sibling of the failure-consumption card, rendered for every crafting sub-tab —
   INCLUDING the ones where the catalogue cannot reach a roll, because a catalogue that
   silently does nothing is the defect this card must report rather than hide. `inertCause`
-  names which of the three reasons applies.
+  names which of the two reasons applies (there were three until issue 1094 retired the
+  roll-formula placeholder and, with it, the "you forgot to reference it" cause).
 
   Controlled component: it renders the passed props and emits a partial patch via
   `onChange` — the store spreads the patch onto the existing `craftingCheck` (preserving
@@ -69,9 +70,8 @@
     // means, and it must decide the same thing here as it does in the engine.
     maxModifierPicks = null,
     // Why the catalogue reaches no roll, or '' when it does: 'noCheck' (this resolution
-    // mode rolls no crafting check at all), 'noFormula' (a check slot exists but has no
-    // authored roll formula) or 'noPlaceholder' (a formula is authored but never spends
-    // `@craftingmod`). One boolean cannot carry this, and the three need different
+    // mode rolls no crafting check at all) or 'noFormula' (a check slot exists but has no
+    // authored roll formula). One boolean cannot carry this, and the two need different
     // remedies, so the cause is passed rather than derived from a flag.
     inertCause = '',
     onChange = () => {},
@@ -126,7 +126,7 @@
       fallback: 'Player picks',
       descKey: 'FABRICATE.Admin.Manager.Checks.Crafting.ModifierPolicyPlayerPicksDesc',
       descFallback:
-        'The player picks from the default set at roll time on an interactive craft whose formula uses @craftingmod; the picks are summed. Other crafts pick the best legal selection.',
+        'The player picks from the default set at roll time on an interactive craft; the picks are summed and added to the roll. Other crafts pick the best legal selection.',
     },
   ];
 
@@ -171,22 +171,20 @@
   };
 
   // Why the catalogue reaches no roll. Each cause has its own remedy, so each has its
-  // own sentence — "the modifiers do nothing" with no reason is not actionable.
+  // own sentence — "the modifiers do nothing" with no reason is not actionable. Both
+  // sentences name the REAL remaining cause and, per issue 1094, neither names a
+  // placeholder: modifiers are added to the check roll automatically, so a GM told to
+  // reference one would be told to do something that does nothing.
   const INERT_COPY = {
     noCheck: {
       key: 'FABRICATE.Admin.Manager.Checks.Crafting.ModifierInertNoCheck',
       fallback:
-        'This system resolves without a crafting check, so nothing here is rolled. Check modifiers only apply through @craftingmod in a crafting-check formula.',
+        'This system resolves without a crafting check, so nothing here is rolled. Check modifiers only apply to a crafting check that rolls.',
     },
     noFormula: {
       key: 'FABRICATE.Admin.Manager.Checks.Crafting.ModifierInertNoFormula',
       fallback:
-        'The crafting check for this resolution mode has no roll formula yet, so nothing here is rolled. Author one above and reference @craftingmod in it.',
-    },
-    noPlaceholder: {
-      key: 'FABRICATE.Admin.Manager.Checks.Crafting.ModifierInertNoPlaceholder',
-      fallback:
-        'The crafting check’s roll formula never references @craftingmod, so every modifier below contributes nothing. Add @craftingmod to the formula to apply them.',
+        'The crafting check for this resolution mode has no roll formula yet, so nothing here is rolled. Author one above and these modifiers are added to it automatically.',
     },
   };
 
@@ -281,7 +279,7 @@
   <p class="manager-muted">
     {text(
       'FABRICATE.Admin.Manager.Checks.Crafting.ModifierCatalogueIntro',
-      'Named character modifiers a recipe can draw on through the @craftingmod placeholder in the roll formula. Each expression resolves against the crafter (e.g. @abilities.med.mod).'
+      'Named character modifiers added to the crafting-check roll automatically, as a single flavoured term. Each expression resolves against the crafter (e.g. @abilities.med.mod).'
     )}
   </p>
 
@@ -305,7 +303,7 @@
       <p class="manager-muted" data-crafting-modifier-empty>
         {text(
           'FABRICATE.Admin.Manager.Checks.Crafting.ModifierCatalogueEmpty',
-          'No check modifiers yet. Add one to let recipes reference @craftingmod.'
+          'No check modifiers yet. Add one and it is applied to the crafting-check roll.'
         )}
       </p>
     {/if}

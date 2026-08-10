@@ -993,6 +993,52 @@ class Fabricate {
       }) || `Fabricate disabled ${essenceCollisionDisabledRecipes.length} alchemy recipe(s) whose essence requirements now collide: ${recipeList}. Rework their ingredients and re-enable them.`;
       ui.notifications?.warn?.(message);
     }
+
+    // One-time GM-facing notice: the 1.21.0 migration retired the check-modifier
+    // roll-formula placeholder, and BOTH of its consequences are behaviour changes rather
+    // than no-ops. `inert` counts systems whose active check formula never spent the
+    // placeholder, so their catalogue silently starts applying to every roll; the remedy
+    // is spelled out below because there is no other way for a GM to restore the previous
+    // total. `subtractive` counts formulas that SUBTRACTED it, which now ADD it — a
+    // 2x-scalar swing in the crafter's favour. `repeated` counts formulas that spent it
+    // more than once, which now count it once. `untouched` counts formulas left exactly
+    // as authored because the placeholder sat in a multiplicative, function or
+    // lone-parenthetical position no strip could repair; those checks will not roll until
+    // the GM edits them, so they need naming most of all. Only fired when something was
+    // actually found.
+    const retiredCraftingModCounts = Array.isArray(summary?.retiredCraftingModCounts)
+      ? summary.retiredCraftingModCounts : [];
+    if (retiredCraftingModCounts.length > 0 && game.user?.isGM) {
+      const totals = retiredCraftingModCounts.reduce((sum, entry) => ({
+        inert: sum.inert + Number(entry?.inert || 0),
+        subtractive: sum.subtractive + Number(entry?.subtractive || 0),
+        repeated: sum.repeated + Number(entry?.repeated || 0),
+        untouched: sum.untouched + Number(entry?.untouched || 0)
+      }), { inert: 0, subtractive: 0, repeated: 0, untouched: 0 });
+      const systemList = retiredCraftingModCounts
+        .map((entry) => String(entry?.system ?? ''))
+        .filter((name) => name !== '')
+        .join(', ');
+      const message = game.i18n?.format?.('FABRICATE.Migration.RetireCheckModifierPlaceholder.Notice', {
+        systems: systemList,
+        inert: totals.inert,
+        subtractive: totals.subtractive,
+        repeated: totals.repeated,
+        untouched: totals.untouched
+      }) || `Fabricate now adds check modifiers to every crafting roll automatically. Affected systems: ${systemList}. `
+        + `${totals.inert} check(s) had modifiers that never reached the roll and now apply — to keep the old total, clear the default modifiers or choose a rule whose set resolves to 0. `
+        + `${totals.subtractive} subtracted the modifier and now add it; ${totals.repeated} counted it more than once and now count it once; `
+        + `${totals.untouched} formula(s) were left unchanged and need editing by hand.`;
+      // SEVERITY IS PER FINDING, not blanket. `untouched` is the only count that leaves a
+      // BROKEN world: those checks do not roll at all until the GM edits them by hand, so
+      // that is a warning. Everything else describes a behaviour change the GM should know
+      // about but need not repair, which is exactly the `info` channel the 0.6.0 catalyst
+      // and 0.9.0 realm notices use — and this block follows their shape. Warning on the
+      // whole notice would also cry wolf on every world that merely authored a catalogue
+      // and never spent the placeholder, which is the common case this change exists for.
+      if (totals.untouched > 0) ui.notifications?.warn?.(message);
+      else ui.notifications?.info?.(message);
+    }
   }
 
   /**

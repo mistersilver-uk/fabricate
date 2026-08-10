@@ -1202,99 +1202,22 @@ export const VIEW_LAB_CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/recipe\//,
     ],
   }),
-  // ── The inert catalogue (issue 1055) ──────────────────────────────────────────────────────────
+  // ── The inert catalogue, TWO cases retired (issue 1094) ──────────────────────────
   //
-  // A catalogue whose modifiers reach no roll is the defect this change reports rather than hides,
-  // and it is reported TWICE — as a notice on the Checks card that says how to fix it, and as a
-  // warning banner on the recipe Overview that says what the GM loses. Two surfaces, two frames:
-  // they are in different views, so no single photograph holds both.
+  // `manager-checks-crafting-modifier-inert` and `manager-recipe-edit-crafting-modifier-inert`
+  // are DELETED rather than re-aimed, because the state they photographed no longer exists.
+  // Both showed the `noPlaceholder` inert cause — a formula authored but never spending the
+  // check-modifier roll-formula placeholder — and issue 1094 retires that placeholder: the
+  // resolved scalar is APPENDED to whatever the GM authored, so an authored formula always
+  // carries it and there is no third cause left to reach. Both cases got there by FILLING the
+  // formula field with a placeholder-free formula and saving; after this change that same fill
+  // produces a perfectly live check, so the cases would photograph a card with no notice on it.
   //
-  // `noPlaceholder` of the three causes, because it is the only one that is invisible without the
-  // notice. `noCheck` and `noFormula` are both legible from the check editor directly above the
-  // card — no mode, or an empty formula field — whereas a formula that simply never spends
-  // `@craftingmod` looks exactly like a working one.
-  //
-  // Reached by EDITING the formula rather than by authoring an inert system, and by editing the
-  // one system that has a catalogue rather than by giving a catalogue to one of the four systems
-  // whose formulas are already `@craftingmod`-free. Authoring would cost what the `byRecipe` cases
-  // above record, and would additionally have to keep an inert system permanently inert, which is
-  // the state every other herbalism frame is evidence AGAINST.
-  //
-  // Both cases SAVE. `RecipeOverviewTab`'s cause is resolved from the PERSISTED system
-  // (`CraftingSystemManagerRoot`'s `recipeCraftingModifierInertCause`), and the Checks editor stages
-  // into a draft, so an unsaved fill would leave both surfaces reading the old formula —
-  // `manager-recipes-no-check` records the same trap and the same remedy.
-  managerCase({
-    id: 'manager-checks-crafting-modifier-inert',
-    label: 'Manager — Checks crafting modifiers inert',
-    // BEYOND the smoke. Its seeded formula spends `@craftingmod`, and the walk never edits one, so
-    // no counterpart frame of the notice exists.
-    reaches: 'beyond',
-    smokeLabels: [],
-    query: { system: 'lab-herbalism' },
-    steps: [
-      'Checks',
-      { selector: '#checks-tab-crafting' },
-      // A formula that is present and VALID but spends no `@craftingmod`. Clearing the field
-      // instead would reach `noFormula`, which is a different notice with a different remedy.
-      { selector: '[data-check-roll-formula]', fill: '1d20 + @abilities.int.mod' },
-      { selector: '[data-checks-save]' },
-      { selector: '[data-crafting-modifier-inert]', scroll: true },
-    ],
-    expectView: 'checks',
-    // The CAUSE, not just the notice. All three causes render through the same element with the
-    // same chrome, so a frame that reached `noFormula` — one stray character in the fill — would
-    // satisfy a presence-only assertion while photographing the wrong sentence.
-    expectSelector: '.fabricate-manager [data-crafting-modifier-inert="noPlaceholder"]',
-    kinds: ['manager', 'checks'],
-    sourceMatches: [
-      /^src\/ui\/svelte\/apps\/manager\/checks\//,
-      /^src\/ui\/svelte\/apps\/manager\/.*Check/,
-    ],
-  }),
-  managerCase({
-    id: 'manager-recipe-edit-crafting-modifier-inert',
-    label: 'Manager — Recipe edit crafting modifier inert',
-    // BEYOND the smoke, for the same reason as the sibling above.
-    reaches: 'beyond',
-    smokeLabels: [],
-    // The recipe end of the same fact, and the ONLY check-modifier banner this tab has left. It
-    // earns its interruption because it reports a genuine CONTRADICTION: the system's rule handed
-    // the pick to this recipe, and the check it will roll never spends `@craftingmod`, so the
-    // picks would reach no roll. The banner BEATS the picker — a pick the engine cannot honour is
-    // not worth authoring — so this frame is also the only evidence that the control is withdrawn
-    // rather than left live-but-useless, and the only one showing `RecipeModeBanner`'s warning
-    // tone at all.
-    //
-    // The `byRecipe` click is what makes the contradiction reachable: under a non-selecting rule
-    // there are no picks to warn about and the tab says nothing.
-    //
-    // `hb-r-kiln` again, so the inherit frame and this state are two pictures of one screen.
-    query: { system: 'lab-herbalism' },
-    steps: [
-      'Checks',
-      { selector: '#checks-tab-crafting' },
-      { selector: '[data-crafting-modifier-policy-option="byRecipe"] input' },
-      { selector: '[data-check-roll-formula]', fill: '1d20 + @abilities.int.mod' },
-      { selector: '[data-checks-save]' },
-      'Crafting',
-      { selector: '[data-recipe-edit="hb-r-kiln"]' },
-      { selector: '#recipe-tab-overview' },
-      { selector: '[data-recipe-modifier-inert]', scroll: true },
-    ],
-    expectView: 'recipe-edit',
-    // The cause, and the withdrawal. The rule click puts this system on `byRecipe`, so an inert
-    // state that failed to suppress the control would still render the picker cell — which is
-    // exactly what this frame claims cannot happen.
-    expectSelector:
-      '.fabricate-manager [data-recipe-editor]:has([data-recipe-modifier-inert="noPlaceholder"])' +
-      ':not(:has([data-recipe-crafting-modifier-picker]))',
-    kinds: ['manager', 'recipes'],
-    sourceMatches: [
-      /^src\/ui\/svelte\/apps\/manager\/RecipeEditView\.svelte$/,
-      /^src\/ui\/svelte\/apps\/manager\/recipe\//,
-    ],
-  }),
+  // The two surviving causes keep the coverage they always had: `noCheck` and `noFormula` are
+  // both legible from the check editor directly above the card — no mode, or an empty formula
+  // field — which is why neither ever earned a case of its own. `manager-checks-crafting-modifiers`
+  // and `manager-recipe-edit-crafting-modifier-inherit` are the frames that carry the rewritten
+  // catalogue copy, and both are re-recorded by this change.
   managerCase({
     id: 'manager-recipe-edit-books-scrolls',
     label: 'Manager — Recipe edit books scrolls',
@@ -3868,11 +3791,15 @@ export const VIEW_LAB_CASES = Object.freeze([
     // mid-craft crafting tab, which is the honest picture of this state rather than a contrivance.
     //
     // `hb-r-stillroom` belongs to the world's only system on the `playerPicks` combination rule,
-    // over a formula that actually spends `@craftingmod` —
-    // `CraftingEngine._buildInteractiveModifierChoice` requires all of interactive, token-present,
-    // `playerPicks` and a two-or-more eligible set, so no other fixture reaches the fieldset. The
-    // formula line reads `1d20 + 3 + (modifier)`: the deferred branch substitutes a neutral
-    // placeholder rather than a number, because the value is a selection nobody has made.
+    // over a check that actually rolls a formula — `CraftingEngine._buildInteractiveModifierChoice`
+    // requires all of interactive, an authored (post-shim) formula, `playerPicks` and a
+    // two-or-more eligible set, so no other fixture reaches the fieldset. The formula line reads
+    // `1d20 + 3 + (modifier)[Modifiers]`: the deferred branch appends a neutral trailing slot
+    // rather than a number, because the value is a selection nobody has made.
+    //
+    // RE-AIMED AGAIN by issue 1094. The gate above used to require the retired roll-formula
+    // placeholder to be PRESENT in the formula, which is why this fixture carried one; the
+    // placeholder is gone and the gate now asks whether the check has a formula at all.
     //
     // RE-AIMED by issue 1055, and the aim moved for a reason worth recording. The rule used to be
     // a per-RECIPE override on this recipe; a recipe can no longer override the system's rule at

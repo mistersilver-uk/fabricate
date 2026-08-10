@@ -1,6 +1,7 @@
 /**
- * Ownership of the Fabricate `@craftingmod` placeholder (issues 770, 1055): where it
- * may be spent, who decides what it reduces to, and how it is substituted.
+ * Ownership of the crafting check-modifier catalogue (issues 770, 1055, 1094): who
+ * decides which modifiers apply, what they reduce to, and how that number reaches the
+ * roll.
  *
  * A crafting system may carry a named catalogue of check modifiers on its
  * `craftingCheck` config (`checkModifiers: {id,label,icon?,expression}[]`), a
@@ -16,26 +17,28 @@
  * what was picked — which is why a bound of 1 reproduces the historical single-pick
  * behaviour exactly.
  *
- * The catalogue feeds a Fabricate-owned `@craftingmod` formula placeholder, and this
- * module serves the two modes that placeholder resolves through:
+ * THE SCALAR APPENDS; IT DOES NOT SUBSTITUTE (issue 1094). There is no placeholder to
+ * spend and no token a GM can forget: the resolved number is appended as one flavoured
+ * `+ N[Modifiers]` term, exactly the way `appendToolBonusTerms` appends tool bonuses,
+ * so a catalogue that reaches a rolled check always contributes. The retired
+ * placeholder is stripped from stored formulas by the `1.21.0` migration and
+ * from any survivor by `stripRetiredModifierPlaceholder`, so it can never double-count.
+ *
+ * This module serves the two modes the catalogue reduces through:
  *
  * - DETERMINISTIC SCALAR ({@link resolveCraftingModifierScalar}) — `addAll` and
  *   `highest` always, and `playerPicks` on every non-interactive path (API, headless,
- *   automated), where it resolves identically to `highest`. The scalar is substituted
- *   into the check roll formula BEFORE the string reaches Foundry's `Roll` (an
- *   unresolved `@craftingmod` would otherwise be silently treated as 0 by Foundry).
+ *   automated), where it resolves to the best legal selection. {@link applyCraftingModifier}
+ *   appends it before the string reaches Foundry's `Roll`.
  * - INTERACTIVE CHOICE ({@link buildCraftingModifierChoice}) — an interactive
- *   `playerPicks` craft over a `@craftingmod` formula with at least TWO eligible
- *   modifiers. This module only DESCRIBES the options (and the highest-valued
- *   pre-selection); `@craftingmod` stays unsubstituted until the roll prompt returns the
- *   player's pick, which `evaluateCheckRoll` then substitutes through the same
- *   {@link substituteCraftingModifier} the scalar path uses.
+ *   `playerPicks` craft over an authored formula with at least TWO eligible modifiers.
+ *   This module only DESCRIBES the options (and the highest-valued pre-selection); the
+ *   term is appended by `evaluateCheckRoll` once the roll prompt returns the player's
+ *   pick, through the same {@link appendCheckModifierTerm} the scalar path uses.
  *
  * {@link resolveActiveCraftingCheckFormula} completes the ownership at the other end:
  * it answers WHICH of the `craftingCheck` sub-configs the system's resolution mode
- * actually rolls, and therefore whether a `@craftingmod` reference is live or inert.
- * Every consumer of that selector asks it in order to answer a `@craftingmod` question,
- * and {@link CRAFTING_MOD_TOKEN} — the other half of each of those answers — is here.
+ * actually rolls, and therefore whether the catalogue reaches a roll at all.
  *
  * This module is intentionally free of Foundry globals: the numeric evaluation of a
  * modifier expression is INJECTED (`evaluateExpression`), so the reduction is a pure,
@@ -43,13 +46,9 @@
  * by `Roll.replaceFormulaData` + a deterministic arithmetic reducer).
  */
 
-/** The Fabricate-owned placeholder resolved to a scalar before Foundry sees the roll. */
-export const CRAFTING_MOD_TOKEN = '@craftingmod';
+import { stripRetiredModifierPlaceholder } from '../utils/craftingCheckExpression.js';
 
-// Word-boundary match so `@craftingmodifier` (a hypothetical longer token) is NOT
-// clobbered; `\b` after `d` fails against a following word char. Global so every
-// occurrence is substituted; `String#replace` resets `lastIndex` on each call.
-const CRAFTING_MOD_TOKEN_RE = /@craftingmod\b/g;
+import { appendCheckModifierTerm } from './toolCheckBonus.js';
 
 /**
  * The combination rules a system may choose, in authoring-surface order. Each states
@@ -123,8 +122,8 @@ export function resolveMaxModifierPicks(context) {
 }
 
 /**
- * Build the `@craftingmod` modifier context for a system/recipe pair — the ONE bag both
- * the evaluation path (`CraftingEngine`) and the display path (`CraftingListingBuilder`)
+ * Build the check-modifier context for a system/recipe pair — the ONE bag both the
+ * evaluation path (`CraftingEngine`) and the display path (`CraftingListingBuilder`)
  * resolve through, so a displayed formula can never disagree with the rolled one.
  *
  * `maxModifierPicks` is read straight off the persisted `craftingCheck` and is
@@ -171,8 +170,8 @@ const ALCHEMY_CHECK_SLOTS = new Map([
 const REQUIRED_CHECK_MODES = new Set(['routedByCheck', 'progressive']);
 
 /**
- * Resolve the crafting check a system's resolution mode ACTUALLY rolls, and whether a
- * `@craftingmod` reference in it is live.
+ * Resolve the crafting check a system's resolution mode ACTUALLY rolls, and whether it
+ * carries an authored roll formula.
  *
  * | Resolution mode       | Check config              | Notes                                   |
  * |-----------------------|---------------------------|-----------------------------------------|
@@ -182,11 +181,11 @@ const REQUIRED_CHECK_MODES = new Set(['routedByCheck', 'progressive']);
  * | `progressive`         | `craftingCheck.progressive` | required                              |
  * | `alchemy`             | per `alchemy.checkMode`   | `none` → no check, `simple` → `simple`, `tiered` → `routed` |
  *
- * The return distinguishes the three reasons a catalogue of check modifiers can be
- * INERT, which no single boolean can: `slot === null` (this mode rolls no check at all),
- * `slot && !checkUsable` (a slot exists but no formula is authored) and
- * `checkUsable && !referencesModifier` (a formula is authored but never spends
- * `@craftingmod`, so every modifier silently contributes nothing).
+ * The return distinguishes the TWO reasons a catalogue of check modifiers can be INERT,
+ * which no single boolean can: `slot === null` (this mode rolls no check at all) and
+ * `slot && !checkUsable` (a slot exists but no formula is authored). The third cause —
+ * "a formula is authored but never spends the placeholder" — retired with the placeholder
+ * (issue 1094): the scalar now APPENDS, so an authored formula always carries it.
  *
  * An unrecognized `resolutionMode` reports `slot: null` rather than coercing to
  * `simple` — a token outside the canonical set is a config defect the manager's
@@ -205,7 +204,6 @@ const REQUIRED_CHECK_MODES = new Set(['routedByCheck', 'progressive']);
  *   rollFormula: string,
  *   checkUsable: boolean,
  *   requiresCheck: boolean,
- *   referencesModifier: boolean,
  * }}
  *
  * - `alchemyCheckMode` is `null` for every non-alchemy mode, so it can never be
@@ -214,6 +212,13 @@ const REQUIRED_CHECK_MODES = new Set(['routedByCheck', 'progressive']);
  *   check, matching `ResolutionModeService._hasRollFormula` and `hasCheckFormula`.
  * - `requiresCheck` marks the modes that fail the craft without a rolled outcome —
  *   `routedByCheck`, `progressive`, and alchemy at `simple`/`tiered`.
+ *
+ * THE RETIREMENT SHIM RUNS BEFORE THE EMPTINESS TEST (issue 1094), so readiness and the
+ * roll path can never disagree. A formula whose only content was the retired
+ * placeholder would otherwise report
+ * USABLE here, pass the `requiresCheck && !checkUsable` abort, reach `evaluateCheckRoll`,
+ * strip to `''` and throw inside `new Roll('')` — a rolled, and therefore CONSUMING,
+ * failure. Reported as `noFormula` instead.
  */
 export function resolveActiveCraftingCheckFormula(system) {
   const mode = system?.resolutionMode || 'simple';
@@ -223,7 +228,8 @@ export function resolveActiveCraftingCheckFormula(system) {
       ? ALCHEMY_CHECK_SLOTS.get(alchemyCheckMode)
       : CRAFTING_CHECK_SLOTS.get(mode)) ?? null;
   const config = slot ? ((system?.craftingCheck ?? {})[slot] ?? null) : null;
-  const rollFormula = typeof config?.rollFormula === 'string' ? config.rollFormula.trim() : '';
+  const authored = typeof config?.rollFormula === 'string' ? config.rollFormula.trim() : '';
+  const rollFormula = stripRetiredModifierPlaceholder(authored).trim();
   return {
     mode,
     alchemyCheckMode,
@@ -232,7 +238,6 @@ export function resolveActiveCraftingCheckFormula(system) {
     rollFormula,
     checkUsable: rollFormula.length > 0,
     requiresCheck: REQUIRED_CHECK_MODES.has(mode) || (mode === 'alchemy' && slot !== null),
-    referencesModifier: rollFormula.includes(CRAFTING_MOD_TOKEN),
   };
 }
 
@@ -271,9 +276,9 @@ export function resolveModifierPolicy(context = {}) {
  * it, which {@link buildCraftingModifierChoice} carries.
  *
  * An AUTHORED EMPTY array is an override, not an absence: a recipe carrying
- * `modifierIds: []` under `byRecipe` resolves to no eligible modifiers, so
- * `@craftingmod` reduces to 0. `Recipe._normalizeCraftingModifier` preserves that shape
- * on the way in, keyed on `Array.isArray` at entry.
+ * `modifierIds: []` under `byRecipe` resolves to no eligible modifiers, so the scalar is
+ * 0 and no term appends. `Recipe._normalizeCraftingModifier` preserves that shape on the
+ * way in, keyed on `Array.isArray` at entry.
  *
  * @param {{ catalogue?: Array, systemPolicy?: unknown, defaultModifierIds?: Array,
  *   recipeModifier?: { modifierIds?: Array }|null, maxModifierPicks?: unknown }|null|undefined} context
@@ -306,7 +311,7 @@ export function resolveEligibleModifierIds(context = {}) {
 }
 
 /**
- * Resolve the `@craftingmod` scalar for a modifier context.
+ * Resolve the check-modifier scalar for a modifier context.
  *
  * Reduction semantics:
  * - `highest`  → the deterministic `max(...)` of the eligible expression values (a
@@ -395,14 +400,14 @@ function sumOf(values) {
  * only possible pick, so the deterministic path produces identical arithmetic without
  * rendering a choice-less "Check modifier" panel.
  *
- * This does NOT substitute `@craftingmod`; it only surfaces the options for the
- * interactive roll prompt. The chosen value is substituted downstream in
- * `evaluateCheckRoll` once the player confirms.
+ * This appends NOTHING; it only surfaces the options for the interactive roll prompt.
+ * The chosen value is appended downstream in `evaluateCheckRoll` once the player
+ * confirms.
  *
  * @param {object} context The modifier context ({@link buildCraftingModifierContext}'s bag).
  * @param {(expression: string|undefined) => number} evaluateExpression Injected
  *   numeric evaluator (roll-data resolution + arithmetic).
- * @returns {{ token: string, modifiers: Array<{id:string,label:string,icon:string,value:number}>,
+ * @returns {{ modifiers: Array<{id:string,label:string,icon:string,value:number}>,
  *   maxPicks: number, defaultSelectedIds: string[], defaultSelectedId: string }|null}
  */
 export function buildCraftingModifierChoice(context = {}, evaluateExpression) {
@@ -440,27 +445,11 @@ export function buildCraftingModifierChoice(context = {}, evaluateExpression) {
     .sort((a, b) => a.index - b.index)
     .map(({ modifier }) => modifier.id);
   return {
-    token: CRAFTING_MOD_TOKEN,
     modifiers,
     maxPicks,
     defaultSelectedIds,
     defaultSelectedId: defaultSelectedIds[0],
   };
-}
-
-/**
- * Substitute a resolved scalar for every `@craftingmod` token in a formula. The
- * scalar is wrapped in parentheses so a negative modifier stays valid arithmetic
- * (`1d20 + (-2)`). A formula with no token is returned unchanged; a non-finite scalar
- * substitutes 0.
- * @param {string} formula
- * @param {number} scalar
- * @returns {string}
- */
-export function substituteCraftingModifier(formula, scalar) {
-  if (typeof formula !== 'string' || !formula.includes(CRAFTING_MOD_TOKEN)) return formula;
-  const value = Number.isFinite(Number(scalar)) ? Number(scalar) : 0;
-  return formula.replaceAll(CRAFTING_MOD_TOKEN_RE, `(${value})`);
 }
 
 /**
@@ -632,11 +621,21 @@ export function makeRollDataExpressionEvaluator(actor, Roll = globalThis.Roll) {
 }
 
 /**
- * Apply a crafting modifier context to a formula: resolve `@craftingmod` to a scalar
- * against the crafter's roll data and substitute it, BEFORE the string reaches
- * Foundry's `Roll`. A formula without the token (or with no context) is returned
- * unchanged — full back-compat with single-formula checks. A present token with no
- * context substitutes 0 (defensive; salvage/gathering never author `@craftingmod`).
+ * Apply a check-modifier context to a formula: resolve the eligible modifiers to a
+ * scalar against the crafter's roll data and APPEND it as one flavoured
+ * `+ N[Modifiers]` term, BEFORE the string reaches Foundry's `Roll` (issue 1094).
+ *
+ * There is no placeholder and no back-compat branch: a GM authors no token and cannot
+ * forget one, so a catalogue that reaches a rolled check always contributes. A ZERO
+ * scalar — an empty eligible set, a recipe's authored-empty pick, or no context at all
+ * (salvage/gathering, which supply none) — appends nothing, so those formulas are
+ * byte-identical to their authored form apart from the trim `appendToolBonusTerms`
+ * applies. A non-finite or exponent-notation scalar also appends nothing rather than
+ * emitting a term the dice grammar cannot parse.
+ *
+ * The name and signature are unchanged from the substitution era on purpose: every call
+ * site keeps its shape, and only the arithmetic moved.
+ *
  * @param {string} formula
  * @param {object|null} actor
  * @param {object|null} craftingModifier The modifier context
@@ -645,9 +644,9 @@ export function makeRollDataExpressionEvaluator(actor, Roll = globalThis.Roll) {
  * @returns {string}
  */
 export function applyCraftingModifier(formula, actor, craftingModifier, Roll = globalThis.Roll) {
-  if (typeof formula !== 'string' || !formula.includes(CRAFTING_MOD_TOKEN)) return formula;
+  if (typeof formula !== 'string') return formula;
   const scalar = craftingModifier
     ? resolveCraftingModifierScalar(craftingModifier, makeRollDataExpressionEvaluator(actor, Roll))
     : 0;
-  return substituteCraftingModifier(formula, scalar);
+  return appendCheckModifierTerm(formula, { value: scalar });
 }

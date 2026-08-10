@@ -1382,7 +1382,10 @@ Under `addAll`, `highest` and `playerPicks` the tab is **silent** — no control
 
 Under `byRecipe` with a catalogue, exactly one of two mutually exclusive dispositions renders, in this priority order:
 
-1. **Inert banner** — shown when the system's active check cannot spend `@craftingmod`, for one of three causes: `noCheck` (this resolution mode rolls no crafting check at all), `noFormula` (a check slot exists but has no authored roll formula), or `noPlaceholder` (a formula is authored but never references `@craftingmod`).
+1. **Inert banner** — shown when the system's active check applies no check modifiers, for one of TWO causes: `noCheck` (this resolution mode rolls no crafting check at all) or `noFormula` (a check slot exists but has no authored roll formula).
+The third cause, `noPlaceholder`, is REMOVED together with the roll-formula placeholder it named: the resolved scalar is appended to whatever the GM authored, so "a formula is authored but never references it" is not a reachable state.
+`noCheck` and `noFormula` remain, and their copy states the real remaining cause **without naming any placeholder**, because a GM told to reference one would be told to do something that does nothing.
+The control gains no new state.
    The control is replaced entirely — nothing authored here could change a roll — and the banner names which cause applies from the recipe's point of view (distinct copy from the Checks card's equivalent notice).
    The banner wins the priority order precisely BECAUSE the rule delegates here: the system asked this recipe to pick, and its picks would reach no roll.
 2. **Controls** — the grid renders a picker cell for the eligible-id subset.
@@ -1390,7 +1393,7 @@ Under `byRecipe` with a catalogue, exactly one of two mutually exclusive disposi
 
 The per-recipe select-row grid's worst case is **three** cells — Category, the picker cell, and _at most one_ of Check tier / Minimum success tier — because the picker cell hosts its own tri-state select (**Inherit system default** / **Custom set** / **No modifiers**) rather than adding a further grid cell.
 Check tier and Minimum success tier are mutually exclusive by construction and never render together: `resolveRecipeFixedOutcomeTierOptions` offers a minimum tier only for `routedByCheck` + `fixed`, while `resolveRecipeCheckTierOptions` under that same mode offers tiers only when the routed type is **not** `fixed`.
-Selecting **Custom set** seeds the pill row from the recipe's own eligible ids (falling back to the system default set, so "customize" starts from what the recipe was inheriting), TRUNCATED to `craftingCheck.maxModifierPicks` so the seed never shows picks the engine would not roll; selecting **No modifiers** writes an authored empty `modifierIds` array (`@craftingmod` resolves to 0 for that recipe); selecting **Inherit system default** drops the `modifierIds` key.
+Selecting **Custom set** seeds the pill row from the recipe's own eligible ids (falling back to the system default set, so "customize" starts from what the recipe was inheriting), TRUNCATED to `craftingCheck.maxModifierPicks` so the seed never shows picks the engine would not roll; selecting **No modifiers** writes an authored empty `modifierIds` array (nothing is appended to that recipe's check roll); selecting **Inherit system default** drops the `modifierIds` key.
 Clearing the LAST selected pill under **Custom set** posts an authored empty array (`{ modifierIds: [] }`), never `null` — posting `null` would silently become _Inherit_, which is the pre-1055 defect this control replaces (a GM could not express "this recipe gets no check modifiers" at all).
 Under **Inherit system default** the pill row is replaced by a read-only line naming the inherited set through the active language's list formatting (or stating that the system default set is empty, so no check modifier applies to this recipe).
 
@@ -1404,7 +1407,7 @@ This surface no longer authors a rule and must not silently delete one either �
 The inert banner reuses the resolution-mode banner's chrome (`RecipeModeBanner`, prop-ified with a `tone` and a `dataAttr` name so it can render alongside its sibling on one tab without colliding) rather than inventing a second visual language for "this is set elsewhere".
 It renders full-bleed below the grid, replacing the control the grid would otherwise hold, rather than squeezing into a single grid cell.
 
-**Five-mode active-check-formula table.** Whether a system's active check can spend `@craftingmod` at all — the precondition for every disposition above — is resolved by `resolveActiveCraftingCheckFormula(system)` (`craftingModifierResolver.js`), which maps `resolutionMode` (and, for `alchemy`, the system's `alchemy.checkMode`) to the `craftingCheck` sub-config that mode actually rolls:
+**Five-mode active-check-formula table.** WHICH `craftingCheck` sub-config the active resolution mode actually rolls — the precondition for every disposition above — is resolved by `resolveActiveCraftingCheckFormula(system)` (`craftingModifierResolver.js`), which maps `resolutionMode` (and, for `alchemy`, the system's `alchemy.checkMode`) to that sub-config:
 
 | Resolution mode       | Check config                 | Notes                                                        |
 |------------------------|-------------------------------|---------------------------------------------------------------|
@@ -1414,7 +1417,9 @@ It renders full-bleed below the grid, replacing the control the grid would other
 | `progressive`          | `craftingCheck.progressive`   | required                                                       |
 | `alchemy`              | per `alchemy.checkMode`       | `none` → no check, `simple` → `simple`, `tiered` → `routed`   |
 
-A catalogue can be inert for three DISTINCT reasons this selector distinguishes rather than collapsing into one boolean: the mode rolls no check slot at all (`noCheck`), a slot exists but carries no authored roll formula (`noFormula`), or a formula is authored but never contains the `@craftingmod` token (`noPlaceholder`) — each renders its own remedy-specific copy, both on this tab and on the Checks card.
+A catalogue can be inert for TWO DISTINCT reasons this selector distinguishes rather than collapsing into one boolean: the mode rolls no check slot at all (`noCheck`), or a slot exists but carries no authored roll formula (`noFormula`) — each renders its own remedy-specific copy, both on this tab and on the Checks card.
+The third cause is REMOVED with the placeholder, together with the remedy-specific copy it drove on both surfaces.
+The selector reports `rollFormula` and `checkUsable` POST-shim, so a stored formula whose only content was the retired placeholder reports `noFormula` rather than reporting usable.
 The catalogue card renders in **every** crafting sub-tab, including alchemy: it is no longer gated on a single "check usable" boolean, because that gate made two of the three inert causes unreachable on the sub-tabs it hid the card from entirely.
 
 **Checks tab — combination rule and pick cap.** `CraftingModifierCatalogueCard.svelte` authors everything the SYSTEM owns here, and the system owns all of it: there is no authority axis and no per-recipe rule override.
@@ -1759,11 +1764,12 @@ The best legal selection is pre-checked, and the confirmed choice returns the ch
 Above 1, the dialog disables the unchecked inputs once `maxPicks` are ticked and releases them again when one is cleared.
 That is a UI affordance only: `evaluateCheckRoll` re-imposes the same cap on the returned selection, since a UI control's constraint is never the invariant.
 A descriptor carrying no usable `maxPicks` renders — and is reduced as — a single pick, so a descriptor built before the field existed cannot silently widen.
-This group is only the presentation of the crafting-check `playerPicks` combination rule: which modifiers are eligible, when the group is offered at all, the pre-selection and its tie-break, and how the picks SUM into `@craftingmod` are normative in `resolution-modes/spec.md` §Check Source, not here.
-Only crafting ever supplies `modifierChoice`; salvage and gathering never author `@craftingmod` and never pass it, so their dialog is unchanged, as is a crafting roll under any other combination rule — including `byRecipe`, whose selection was already made at recipe-edit time — so no `modifierChoice`, no fieldset.
+This group is only the presentation of the crafting-check `playerPicks` combination rule: which modifiers are eligible, when the group is offered at all, the pre-selection and its tie-break, and how the picks SUM into the appended modifier term are normative in `resolution-modes/spec.md` §Check Source, not here.
+Only crafting ever supplies `modifierChoice`; salvage and gathering pass no modifier context and never pass it, so their dialog is unchanged, as is a crafting roll under any other combination rule — including `byRecipe`, whose selection was already made at recipe-edit time — so no `modifierChoice`, no fieldset.
+The dialog's formula line ends in a trailing `+ (modifier)[Modifiers]` slot while the choice is unanswered.
 - **Pre-resolved roll decisions.**
 A caller MAY supply a `rollDecision` (`{ bonus, rollMode, advantage }` — the prompt's own return shape minus `confirmed`).
-The evaluator then treats it as an already-answered choice and **never opens the modal**, running the identical downstream code: `@craftingmod` substitution, the advantage transform, the situational-bonus append, the formula-validity net and the effective roll mode.
+The evaluator then treats it as an already-answered choice and **never opens the modal**, running the identical downstream code: the check-modifier append, the advantage transform, the situational-bonus append, the formula-validity net and the effective roll mode.
 With no decision supplied every existing path builds a byte-identical options bag, so single-item salvage, crafting, alchemy and gathering are unchanged.
 A decision carries **no `confirmed` key** and MUST NOT be read as a cancellation; only an explicit `confirmed === false` is one.
 A decision supplied without a prompt function must still apply, or the base formula rolls and the player's answer is silently discarded.

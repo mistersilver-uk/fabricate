@@ -2461,18 +2461,22 @@ function _descriptionTextCandidate(value, seen = new Set()) {
 }
 
 /**
- * Which of the three reasons a `@craftingmod` catalogue is INERT applies, or `null` when
- * it is live. Discriminated rather than collapsed to one boolean because each cause needs
+ * Which of the TWO reasons a check-modifier catalogue is INERT applies, or `null` when it
+ * is live. Discriminated rather than collapsed to one boolean because each cause needs
  * different GM-facing copy — "this mode rolls no check" is a different fix from "this
- * formula never spends `@craftingmod`". The order matters: a mode with no check slot has
- * no formula to inspect, and an unauthored formula cannot reference the token.
+ * check has no formula yet". The order matters: a mode with no check slot has no formula
+ * to inspect.
+ *
+ * There were THREE causes until issue 1094. The third — "a formula is authored but never
+ * spends the placeholder" — retired with the placeholder itself: the resolved scalar is
+ * appended to whatever the GM authored, so an authored formula always carries it and the
+ * state is no longer reachable.
  * @param {ReturnType<typeof resolveActiveCraftingCheckFormula>} formula
- * @returns {'noCheck'|'noFormula'|'noPlaceholder'|null}
+ * @returns {'noCheck'|'noFormula'|null}
  */
 function _craftingModifierInertCause(formula) {
   if (formula.slot === null) return 'noCheck';
   if (!formula.checkUsable) return 'noFormula';
-  if (!formula.referencesModifier) return 'noPlaceholder';
   return null;
 }
 

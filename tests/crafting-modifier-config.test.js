@@ -78,8 +78,12 @@ test('_normalizeCraftingCheck accepts every one of the four combination rules', 
 // Retargeted for issue 1055: the card authors TWO axes, so the option table is the FOUR
 // COMBINATION RULES — four options, eight label/description pairs — and it carries three
 // further hand-maintained mirrors in the `key`/`fallback` shape (the two per-rule pick-cap
-// hints, the three default-set intros, and the three inert causes), pinned for the same
-// reason.
+// hints, the three default-set intros, and the inert causes), pinned for the same reason.
+//
+// The inert-cause count dropped from three to TWO in issue 1094: `noPlaceholder` retired
+// with the roll-formula placeholder, so the second mirror expects seven pairs, not eight.
+// The count is asserted rather than merely iterated because a DELETED block is exactly
+// what an "every pair matches" loop cannot see.
 test('the modifier card fallbacks match lang/en.json exactly', () => {
   const root = join(dirname(fileURLToPath(import.meta.url)), '..');
   const source = readFileSync(
@@ -109,8 +113,8 @@ test('the modifier card fallbacks match lang/en.json exactly', () => {
   // this picks up only the MAX_PICKS_COPY, DEFAULTS_INTRO_COPY and INERT_COPY tables.
   assertMirrored(
     [...source.matchAll(/\bkey:\s*'([^']+)',\s*fallback:\s*'((?:[^'\\]|\\.)*)'/g)],
-    8,
-    'pick-cap hint, default-set intro and inert-cause sentences'
+    7,
+    'pick-cap hint, default-set intro and the TWO surviving inert-cause sentences'
   );
 });
 
@@ -233,10 +237,10 @@ test('_normalizeSystem preserves cap absence, and an authored cap, through a who
 
 test('_normalizeCraftingCheck preserves sibling check fields alongside the catalogue', () => {
   const result = makeManager()._normalizeCraftingCheck({
-    simple: { rollFormula: '1d20 + @craftingmod', dc: 12 },
+    simple: { rollFormula: '1d20 + @abilities.med.mod', dc: 12 },
     checkModifiers: [{ id: 'med', label: 'Medicine', expression: '@med' }],
   });
-  assert.equal(result.simple.rollFormula, '1d20 + @craftingmod');
+  assert.equal(result.simple.rollFormula, '1d20 + @abilities.med.mod');
   assert.equal(result.simple.dc, 12);
   assert.equal(result.checkModifiers.length, 1);
 });
@@ -298,7 +302,7 @@ test('Recipe.craftingModifier preserves an AUTHORED empty modifier set as a real
   assert.deepEqual(
     new Recipe({ name: 'r', craftingModifier: { modifierIds: [] } }).craftingModifier,
     { modifierIds: [] },
-    'an authored empty array means "no modifiers", which resolves @craftingmod to 0'
+    'an authored empty array means "no modifiers", which appends nothing to the roll'
   );
   // Keyed at ENTRY, not on the post-filter length: junk ids are still an authored array,
   // and flipping this to "inherit" would be the unsafe direction for malformed imports.

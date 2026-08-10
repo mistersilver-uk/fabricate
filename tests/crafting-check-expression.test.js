@@ -1,5 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
+import { evaluateNumericExpression } from '../src/systems/craftingModifierResolver.js';
 import {
   parseDiceGroups,
   isPlainDieTerm,
@@ -8,6 +9,9 @@ import {
   applyD20Advantage,
   rangesOverlap,
   findRangeConflicts,
+  describeRetiredModifierPlaceholder,
+  stripRetiredModifierPlaceholder,
+  RETIRED_MODIFIER_TOKEN,
 } from '../src/utils/craftingCheckExpression.js';
 
 describe('parseDiceGroups', () => {
@@ -175,5 +179,322 @@ describe('findRangeConflicts', () => {
     ]);
     assert.deepEqual([...invalid], [0]);
     assert.equal(overlapping.size, 0);
+  });
+});
+
+// ── the retired check-modifier placeholder (issue 1094) ──────────────────────
+//
+// THE DOUBLES ARE LOOSER THAN FOUNDRY, AND THAT IS STATED RATHER THAN ASSUMED (AF8). The
+// View Lab's `Roll.validate` is `!/NaN|@/.test(formula)`, which ACCEPTS `1d20 * `, and the
+// headless suites install a `FakeRoll` with no `parse` at all. A double that agrees with
+// the implementer by construction grades nothing, so `recordedFoundryRoll` below encodes
+// the ACCEPT/REJECT sets RECORDED by compiling Foundry's own `client/dice/grammar.pegjs`
+// with the bundled peggy and executing it (14.361):
+//
+//   - `1d20 +`, `1d20 + (`, `max(1d20,`, `()` and `1d20 * ` all THROW `peg$SyntaxError`,
+//     so `Roll.validate` answers false;
+//   - the empty string is REJECTED (`Roll.parse('')` returns `[]`, `RollParser.toAST([])`
+//     pops an empty array and `_evaluateASTAsync` dereferences `node.class`);
+//   - **`max(, 2)` and `max( , 2)` are ACCEPTED.** `FunctionTerm`'s head is `Expression?`
+//     — OPTIONAL — so they parse to a `FunctionTerm` with ZERO argument terms;
+//     `isDeterministic` is `terms.every(...)` over `[]` and answers true; `_evaluateSync`
+//     calls `Math.max()` with no arguments and yields `-Infinity`; and `Roll#total` is
+//     `Number(this._total) || 0`, which lets `-Infinity` survive;
+//   - an unresolved `@` placeholder is ACCEPTED (it is roll data, resolved later), which
+//     is why the residue check cannot lean on the `@` test the lab uses;
+//   - `1d20`, `1d20 + 3`, `2` and `1d20 + @prof` are ACCEPTED.
+//
+// The `max(, 2)` row is why the shim decides the non-additive case POSITIONALLY instead of
+// asking `Roll.validate` about the residue: a validate-driven rule hands that formula
+// straight through and every craft on that system rolls `-Infinity` against its DC — a
+// rolled, and therefore CONSUMING, automatic failure, forever, with no notice.
+const RECORDED_ACCEPTANCES = ['max(, 2)', 'max( , 2)'];
+const RECORDED_REJECTIONS = ['', '()', '()d6', '1d20 +', '1d20 + (', 'max(1d20,', '1d20 *'];
+
+function recordedFoundryRoll(calls = []) {
+  return class {
+    static validate(formula) {
+      calls.push(formula);
+      const text = String(formula).trim();
+      if (RECORDED_ACCEPTANCES.includes(text)) return true;
+      if (RECORDED_REJECTIONS.includes(text)) return false;
+      // A dangling binary operator at either end, and an empty parenthetical.
+      if (/^[*/]/.test(text) || /[+\-*/]$/.test(text)) return false;
+      if (/\(\s*\)/.test(text)) return false;
+      return true;
+    }
+  };
+}
+
+describe('describeRetiredModifierPlaceholder', () => {
+  it('names the retired token exactly', () => {
+    assert.equal(RETIRED_MODIFIER_TOKEN, '@craftingmod');
+  });
+
+  it('reports absence for a formula that never carried it', () => {
+    assert.deepEqual(describeRetiredModifierPlaceholder('1d20 + @prof'), {
+      present: false,
+      occurrences: 0,
+      subtractive: false,
+      nonAdditive: false,
+    });
+  });
+
+  it('is word-boundary matched, so a longer token is NOT a match', () => {
+    assert.equal(describeRetiredModifierPlaceholder('1d20 + @craftingmodifier').present, false);
+  });
+
+  it('classifies an additive placement as additive, and counts it', () => {
+    assert.deepEqual(describeRetiredModifierPlaceholder('1d20 + @craftingmod'), {
+      present: true,
+      occurrences: 1,
+      subtractive: false,
+      nonAdditive: false,
+    });
+  });
+
+  it('flags a SUBTRACTIVE placement — the sign the retirement inverts', () => {
+    const placement = describeRetiredModifierPlaceholder('1d20 - @craftingmod');
+    assert.equal(placement.subtractive, true);
+    assert.equal(placement.nonAdditive, false, 'subtractive is still strippable');
+  });
+
+  it('counts a repeated placement', () => {
+    assert.equal(
+      describeRetiredModifierPlaceholder('@craftingmod + 1d20 + @craftingmod').occurrences,
+      2
+    );
+  });
+
+  for (const [label, formula] of [
+    ['multiplicative', '1d20 * @craftingmod'],
+    ['divisive', '1d20 / @craftingmod'],
+    ['dice-count', '(@craftingmod)d6'],
+    ['function argument', 'max(@craftingmod, 2)'],
+    ['lone parenthetical', '(@craftingmod)'],
+    ['parenthesised addend', '1d20 + (@craftingmod)'],
+    ['followed by a multiplication', '1d20 + @craftingmod * 2'],
+  ]) {
+    it(`flags a ${label} placement as NON-additive`, () => {
+      assert.equal(describeRetiredModifierPlaceholder(formula).nonAdditive, true);
+    });
+  }
+});
+
+describe('stripRetiredModifierPlaceholder', () => {
+  // THE NO-TOKEN SHORT-CIRCUIT, asserted by SPY rather than by output. Returning the input
+  // is only half the contract; the other half is that the majority path takes on no Foundry
+  // dependency at all, which only a call count can prove.
+  it('returns a token-free formula untouched WITHOUT calling Roll.validate', () => {
+    const calls = [];
+    const Roll = recordedFoundryRoll(calls);
+    assert.equal(stripRetiredModifierPlaceholder('1d20 + @prof', Roll), '1d20 + @prof');
+    assert.deepEqual(calls, [], 'Roll.validate was never consulted');
+  });
+
+  it('leaves @craftingmodifier alone (word boundary)', () => {
+    const Roll = recordedFoundryRoll();
+    assert.equal(
+      stripRetiredModifierPlaceholder('1d20 + @craftingmodifier', Roll),
+      '1d20 + @craftingmodifier'
+    );
+  });
+
+  // Every placement the acceptance names, each asserting the residue is something
+  // `Roll.validate` ACCEPTS or is `''` — never a dangling operator.
+  for (const [label, formula, expected] of [
+    ['token alone', '@craftingmod', ''],
+    ['trailing', '1d20 + @craftingmod', '1d20'],
+    ['trailing subtractive', '1d20 - @craftingmod', '1d20'],
+    ['leading additive', '@craftingmod + 1d20', '+ 1d20'],
+    ['leading subtractive', '@craftingmod - 2', '- 2'],
+    ['interior', '1d20 + @craftingmod + 3', '1d20 + 3'],
+    ['repeated', '@craftingmod + 1d20 + @craftingmod', '+ 1d20'],
+    ['multiplicative', '1d20 * @craftingmod', ''],
+    ['dice-count', '(@craftingmod)d6', ''],
+    ['function argument', 'max(@craftingmod, 2)', ''],
+    ['lone parenthetical', '(@craftingmod)', ''],
+  ]) {
+    it(`strips a ${label} placement to a formula Roll accepts, or to ''`, () => {
+      const Roll = recordedFoundryRoll();
+      const residue = stripRetiredModifierPlaceholder(formula, Roll);
+      assert.equal(residue, expected);
+      if (residue !== '') {
+        assert.equal(Roll.validate(residue), true, 'the residue is a formula Foundry accepts');
+      }
+    });
+  }
+
+  // THE LEADING-TOKEN ARITHMETIC, pinned by TOTAL rather than by string.
+  //
+  // A leading token has no preceding operator, so the one that FOLLOWS it is the only
+  // thing carrying the sign of the next term — and it must survive the strip. Foundry's
+  // `Expression` is `_ leading:(_ @Additive)* _ head:Term tail:(…)*`
+  // (`client/dice/grammar.pegjs:17`) with `Additive = "+" / "-"` (`:89`), and `leading` is
+  // plucked and forwarded to `parser._onExpression(head, tail, leading, …)`, so `- 2`
+  // parses as -2.
+  //
+  // The oracle here is deliberately NOT the residue string: it is the total the retired
+  // `(scalar)` SUBSTITUTION produced, recomputed independently. A string assertion would
+  // have happily locked in the wrong answer — stripping the operator too yields `2`, which
+  // is a perfectly valid formula and a silently doubled modifier.
+  const substitutedTotal = (formula, scalar) =>
+    evaluateNumericExpression(formula.replaceAll('@craftingmod', `(${scalar})`));
+  const appendedTotal = (formula, scalar) => {
+    const residue = stripRetiredModifierPlaceholder(formula, recordedFoundryRoll());
+    const sign = scalar < 0 ? '-' : '+';
+    return evaluateNumericExpression(`${residue} ${sign} ${Math.abs(scalar)}`);
+  };
+
+  for (const [label, formula, scalar, expected] of [
+    ['@craftingmod - 2 keeps the minus, so the total is unchanged', '@craftingmod - 2', 3, 1],
+    ['@craftingmod - 2 with a negative scalar', '@craftingmod - 2', -3, -5],
+    ['@craftingmod + 4 is unchanged either way', '@craftingmod + 4', 3, 7],
+    ['@craftingmod - 1 - 2 keeps every following operator', '@craftingmod - 1 - 2', 3, 0],
+  ]) {
+    it(`preserves the pre-retirement total: ${label}`, () => {
+      assert.equal(
+        appendedTotal(formula, scalar),
+        substitutedTotal(formula, scalar),
+        'the appended form must total exactly what the retired substitution totalled'
+      );
+      assert.equal(appendedTotal(formula, scalar), expected, 'and that total is this');
+    });
+  }
+
+  // A formula spending the token TWICE is the ONE case where the total deliberately does
+  // NOT survive, so it is asserted here rather than left to look like a gap in the table
+  // above. `@craftingmod - 2 + @craftingmod` substituted to `(3) - 2 + (3)` = 4 and now
+  // totals 1, because the scalar is appended ONCE however many times the formula spent it.
+  // That is the accepted multiple-occurrence collapse, and the `1.21.0` migration counts
+  // the formula under `repeated` precisely so the GM is told.
+  it('COLLAPSES a doubled placeholder to one contribution, and that is the contract', () => {
+    const formula = '@craftingmod - 2 + @craftingmod';
+    assert.equal(substitutedTotal(formula, 3), 4, 'the retired substitution double-counted');
+    assert.equal(appendedTotal(formula, 3), 1, 'the append counts it once');
+    assert.equal(
+      appendedTotal(formula, 3),
+      substitutedTotal('@craftingmod - 2', 3),
+      'and lands exactly where a single-occurrence formula always did'
+    );
+  });
+
+  // The dice case, asserted on the residue because a die has no fixed total. `- 1d4` is a
+  // legal Expression for the same reason `- 2` is.
+  it('keeps the following operator on a leading token before a DIE term', () => {
+    const Roll = recordedFoundryRoll();
+    const residue = stripRetiredModifierPlaceholder('@craftingmod - 1d4', Roll);
+    assert.equal(residue, '- 1d4', 'the minus that negates the die survives');
+    assert.equal(Roll.validate(residue), true);
+  });
+
+  // The counter-case that proves the rule is not vacuous: a NON-leading token drops its
+  // PRECEDING operator, which is the operator that belonged to it.
+  it('drops the PRECEDING operator on a non-leading token, and only that one', () => {
+    const Roll = recordedFoundryRoll();
+    assert.equal(stripRetiredModifierPlaceholder('1d20 - @craftingmod - 2', Roll), '1d20 - 2');
+    assert.equal(stripRetiredModifierPlaceholder('1d20 + @craftingmod - 2', Roll), '1d20 - 2');
+  });
+
+  // Prove the negative can FAIL. A "never a dangling operator" claim graded by a permissive
+  // double is vacuous, so this asserts the double actually rejects the residues a naive
+  // strip would produce — AND that it accepts the one that makes `Roll.validate` an unsafe
+  // oracle, so the positional rule below is doing real work rather than agreeing with a
+  // predicate that was written to agree with it.
+  it('the recorded double matches real Foundry on the residues that decide this rule', () => {
+    const Roll = recordedFoundryRoll();
+    assert.equal(Roll.validate('1d20 * '), false);
+    assert.equal(Roll.validate('()'), false);
+    assert.equal(Roll.validate(''), false);
+    assert.equal(Roll.validate('1d20'), true, 'and still accepts a real formula');
+    assert.equal(
+      Roll.validate('max(, 2)'),
+      true,
+      'the FunctionTerm head is optional, so Foundry ACCEPTS this and rolls -Infinity'
+    );
+  });
+
+  // THE CORRECTION, asserted as behaviour rather than as prose. A function-argument
+  // placement must answer `''` even though `Roll.validate` would accept its residue, and
+  // it must do so WITHOUT consulting `Roll.validate` at all — a validate-driven rule would
+  // return `max(, 2)` here and disagree with this test by construction.
+  it('answers "" for a function-argument placement WITHOUT asking Roll.validate', () => {
+    for (const formula of ['max(@craftingmod, 2)', 'max( @craftingmod , 2)']) {
+      const calls = [];
+      const Roll = recordedFoundryRoll(calls);
+      assert.equal(stripRetiredModifierPlaceholder(formula, Roll), '', formula);
+      assert.deepEqual(calls, [], `${formula}: the decision is positional, not delegated`);
+    }
+  });
+
+  // The same for every other non-additive position, so the rule is uniform rather than a
+  // special case bolted on for `max()`.
+  it('answers "" for every non-additive placement, positionally', () => {
+    for (const formula of [
+      '1d20 * @craftingmod',
+      '1d20 / @craftingmod',
+      '(@craftingmod)',
+      '(@craftingmod)d6',
+      '1d20 + (@craftingmod)',
+      '1d20 + @craftingmod * 2',
+      'floor(@craftingmod / 2)',
+    ]) {
+      const calls = [];
+      const Roll = recordedFoundryRoll(calls);
+      assert.equal(stripRetiredModifierPlaceholder(formula, Roll), '', formula);
+      assert.deepEqual(calls, [], `${formula}: no residue was validated`);
+    }
+  });
+
+  // FAIL OPEN when the dice engine is absent (headless, tests), for the ADDITIVE residue
+  // only. Returning `''` there would report `noFormula` and silently disable an authored
+  // check, which is the worse error. The non-additive answer is positional, so it is
+  // engine-independent and identical with or without a `Roll`.
+  it('KEEPS an additive residue when Roll.validate is unavailable', () => {
+    const previous = globalThis.Roll;
+    delete globalThis.Roll;
+    try {
+      assert.equal(stripRetiredModifierPlaceholder('1d20 + @craftingmod'), '1d20');
+      assert.equal(
+        stripRetiredModifierPlaceholder('max(@craftingmod, 2)'),
+        '',
+        'a non-additive placement still answers "" with no dice engine at all'
+      );
+      assert.equal(stripRetiredModifierPlaceholder('1d20 * @craftingmod'), '');
+    } finally {
+      if (previous === undefined) delete globalThis.Roll;
+      else globalThis.Roll = previous;
+    }
+  });
+
+  it('reads globalThis.Roll by default, not only an injected one', () => {
+    const previous = globalThis.Roll;
+    const calls = [];
+    globalThis.Roll = recordedFoundryRoll(calls);
+    try {
+      // An ADDITIVE placement, so the residue check runs — against `globalThis.Roll`
+      // rather than an injected one, which is the point of this test.
+      assert.equal(stripRetiredModifierPlaceholder('1d20 + @craftingmod'), '1d20');
+      assert.deepEqual(calls, ['1d20']);
+    } finally {
+      if (previous === undefined) delete globalThis.Roll;
+      else globalThis.Roll = previous;
+    }
+  });
+
+  // `Roll.validate` is a static that does `new this(formula)` internally, so it MUST be
+  // invoked as a method. This asserts the shim never detaches it: a detached reference
+  // leaves `this` undefined and returns false for EVERY formula, which would empty every
+  // authored check that ever carried the token.
+  it('calls Roll.validate as a METHOD, with Roll as its receiver', () => {
+    const receivers = [];
+    const Roll = class {
+      static validate(formula) {
+        receivers.push(this);
+        return String(formula).trim() !== '';
+      }
+    };
+    assert.equal(stripRetiredModifierPlaceholder('1d20 + @craftingmod', Roll), '1d20');
+    assert.deepEqual(receivers, [Roll]);
   });
 });

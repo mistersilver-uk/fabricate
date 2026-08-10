@@ -176,7 +176,7 @@ test('runs through MigrationRunner from 1.7.0, strips the fields, and lands at t
 
   await runner.run();
 
-  assert.equal(settings.store.get('migrationVersion'), '1.20.0', 'advances to the new highest version');
+  assert.equal(settings.store.get('migrationVersion'), '1.21.0', 'advances to the new highest version');
   const system = settings.store.get('craftingSystems')[0];
   assert.equal('macroUuid' in system.craftingCheck, false);
   assert.equal('builtIn' in system.salvageCraftingCheck, false);
@@ -221,5 +221,5 @@ test('runner: craftingSystems left untouched (no write) when no deprecated field
     'a non-deprecated check source is left exactly as authored'
   );
   assert.equal(persisted.visibilityMode, 'knowledge', 'no unrelated field is rewritten');
-  assert.equal(settings.store.get('migrationVersion'), '1.20.0');
+  assert.equal(settings.store.get('migrationVersion'), '1.21.0');
 });

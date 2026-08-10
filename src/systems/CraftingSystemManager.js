@@ -597,7 +597,7 @@ export class CraftingSystemManager {
       simple: this._normalizeSimpleCraftingCheck(check?.simple),
       // Per-recipe check-modifier catalogue + default policy (issue 770). A crafting-
       // owned aggregate (NOT gathering's `characterModifiers`), feeding the
-      // `@craftingmod` formula placeholder. Absent → an empty catalogue with the
+      // check roll. Absent → an empty catalogue with the
       // `addAll` default, a no-op for a single-formula check (full back-compat).
       ...this._normalizeCheckModifierConfig(check),
     };
@@ -606,7 +606,7 @@ export class CraftingSystemManager {
   /**
    * Normalize the crafting check-modifier catalogue, combination rule and pick cap
    * (issues 770, 1055): `checkModifiers` is a named catalogue of
-   * `{id,label,icon?,expression}` entries feeding the `@craftingmod` placeholder;
+   * `{id,label,icon?,expression}` entries appended to the check roll;
    * `defaultModifierPolicy` is the COMBINATION RULE, one of the four
    * {@link MODIFIER_POLICIES} — `addAll`/`highest`/`byRecipe`/`playerPicks`, default
    * `addAll`; `defaultModifierIds` names the catalogue entries applied by default.

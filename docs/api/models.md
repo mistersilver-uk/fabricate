@@ -67,7 +67,7 @@ new Recipe({
 > See [CraftingSystemManager]({% link api/system-manager.md %}#createsystemdata).
 > `null` (the default) picks nothing and inherits the system's `defaultModifierIds`.
 > `modifierIds` is authored or absent, not merely non-empty or empty.
-> An authored empty array (`[]`) is a real pick meaning "no eligible modifiers" (`@craftingmod` resolves to `0`), distinct from an absent `modifierIds`, which inherits.
+> An authored empty array (`[]`) is a real pick meaning "no eligible modifiers" (nothing is added to the check roll), distinct from an absent `modifierIds`, which inherits.
 > A pick is honoured **only** under the system's `"byRecipe"` rule, and is then truncated to `craftingCheck.maxModifierPicks`; under `"addAll"`, `"highest"`, and `"playerPicks"` it stays on disk unread.
 > Neither switching the rule away nor lowering the cap deletes anything, and restoring either applies the picks again with nothing to re-author.
 > A legacy `policy` key from before issue 1055 is dropped by the normaliser, never round-trips through `toJSON()`, and is never consulted wherever it survives unnormalised.

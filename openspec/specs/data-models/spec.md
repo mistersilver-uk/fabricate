@@ -159,7 +159,7 @@ CraftingSystem = {
 
     // Per-recipe check-modifier catalogue (issues 770, 1055). A crafting-owned named
     // catalogue (NOT gathering's characterModifiers — a different aggregate) feeding
-    // the `@craftingmod` roll-formula placeholder. Each `expression` is a roll-data
+    // the check roll automatically. Each `expression` is a roll-data
     // fragment evaluated against the crafter (missing/failed → 0). Absent = empty
     // catalogue + addAll rule = a no-op for a single-formula check (back-compat).
     checkModifiers?: { id: string, label: string, icon?: string, expression: string }[], // default []
@@ -975,7 +975,7 @@ Recipe = {
 
   // The recipe author's PICK of crafting-check modifiers (issues 770, 1055). Absent
   // (null) = picked nothing; inherit the system's `defaultModifierIds`. Present = names
-  // the eligible id subset resolved into the `@craftingmod` placeholder (unknown ids
+  // the eligible id subset reduced to the scalar appended to the check roll (unknown ids
   // dropped at resolution against the live catalogue, and the survivors truncated to
   // `craftingCheck.maxModifierPicks`). It is honoured ONLY under the system's `byRecipe`
   // ("Recipe picks") combination rule; under `addAll`, `highest` and `playerPicks` a
@@ -987,7 +987,7 @@ Recipe = {
   // `resolveModifierPolicy` never reads it wherever it survives unnormalized on disk.
   // `modifierIds` is keyed on `Array.isArray` AT THE POINT OF ENTRY, not on the
   // filtered array's length: an authored `[]` is preserved as an authored EMPTY set
-  // (0 eligible modifiers, `@craftingmod` → 0), distinct from an absent `modifierIds`,
+  // (0 eligible modifiers, so nothing is appended), distinct from an absent `modifierIds`,
   // which inherits. The normalizer drops a malformed value, and an object carrying no
   // authored `modifierIds` array, to null (nothing picked). Semantics in
   // resolution-modes/spec.md §Check Source.
@@ -1078,7 +1078,7 @@ Recipe = {
     The normalizer keeps a de-duplicated non-empty string `modifierIds` list; a malformed value, or an object carrying no AUTHORED `modifierIds` array, round-trips to `null`.
     A legacy `policy` key — persisted when a recipe could still override the rule — is DROPPED by the normalizer, so it never round-trips out through `toJSON()`, and an object carrying only a `policy` normalizes to `null` because it holds no pick.
     That drop is a normalizer-level erasure, not a migration: the `1.20.0` migration deliberately leaves the raw key on disk (see `destructive-changes-and-migrations/spec.md`), and it is inert either way because `resolveModifierPolicy` reads only the system field.
-    `modifierIds` authoredness is keyed on `Array.isArray(input.modifierIds)` AT THE POINT OF ENTRY, before de-duplication/filtering — so an authored `[]`, or an authored array whose only entries are malformed (e.g. `[123, '']`), still round-trips as `{ modifierIds: [] }` (an authored EMPTY set: 0 eligible modifiers, `@craftingmod` → 0), never collapsing to `null` (inherit).
+    `modifierIds` authoredness is keyed on `Array.isArray(input.modifierIds)` AT THE POINT OF ENTRY, before de-duplication/filtering — so an authored `[]`, or an authored array whose only entries are malformed (e.g. `[123, '']`), still round-trips as `{ modifierIds: [] }` (an authored EMPTY set: 0 eligible modifiers, so nothing is appended to the roll), never collapsing to `null` (inherit).
     Keying on the filtered length instead would flip malformed import data from _inherit_ to _no modifiers_, which is the unsafe direction.
     Whether the pick is actually honoured — rather than merely stored — is decided at the resolver, not by this normalizer: under any rule other than `byRecipe` it is ignored outright, and under `byRecipe` it is truncated to `craftingCheck.maxModifierPicks`.
     See resolution-modes/spec.md §Check Source.

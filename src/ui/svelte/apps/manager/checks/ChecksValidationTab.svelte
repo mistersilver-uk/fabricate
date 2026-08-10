@@ -51,6 +51,10 @@
       'IssueNoRollFormula',
       'This check has no roll formula; it will not resolve until one is set.',
     ],
+    retiredPlaceholderInFormula: [
+      'IssueRetiredPlaceholderInFormula',
+      'This formula contains a retired placeholder; it is ignored and removed before the roll. Check modifiers are added automatically now, so delete it.',
+    ],
     unnamedOutcome: [
       'IssueUnnamedOutcome',
       'Name every outcome tier — an unnamed tier cannot be routed to a result group.',

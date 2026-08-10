@@ -11,6 +11,7 @@ import { resolveRecipeImage } from '../ui/svelte/util/craftingImageDefaults.js';
 import { canonicalSignatureKey } from '../utils/alchemySignatureKey.js';
 import { resolveAlchemySubmissionComponent } from '../utils/alchemySubmissions.js';
 import { matchComponentByName } from '../utils/componentNameMatch.js';
+import { stripRetiredModifierPlaceholder } from '../utils/craftingCheckExpression.js';
 import {
   accumulateSubmissionEssences,
   findMatchingComponent,
@@ -32,7 +33,6 @@ import { buildCraftingChatContent } from './CraftingChatCard.js';
 import {
   buildCraftingModifierChoice,
   buildCraftingModifierContext,
-  CRAFTING_MOD_TOKEN,
   makeRollDataExpressionEvaluator,
   resolveModifierPolicy,
 } from './craftingModifierResolver.js';
@@ -4336,14 +4336,25 @@ export class CraftingEngine {
 
   /**
    * Build the deferred interactive `playerPicks` modifier-choice descriptor (issues 770,
-   * 1055) for an interactive craft. Returns the descriptor ONLY when the effective
-   * combination rule is `playerPicks` AND this is an interactive roll AND the formula
-   * references `@craftingmod` AND at least TWO modifiers are eligible (the two-option
-   * rule is enforced by {@link buildCraftingModifierChoice}); otherwise `null`, so every
-   * other rule and every non-interactive craft threads a byte-identical `rollOptions`
-   * bag (no `modifierChoice` key). The descriptor is threaded onto
-   * `rollOptions.modifierChoice`; the player picks UP TO `maxPicks` of its options in
-   * the roll prompt and `evaluateCheckRoll` substitutes their SUM.
+   * 1055, 1094) for an interactive craft. Returns the descriptor ONLY when this is an
+   * interactive roll AND the active mode carries an authored (post-shim) roll formula
+   * AND the effective combination rule is `playerPicks` AND at least TWO modifiers are
+   * eligible (the two-option rule is enforced by {@link buildCraftingModifierChoice});
+   * otherwise `null`, so every other rule and every non-interactive craft threads a
+   * byte-identical `rollOptions` bag (no `modifierChoice` key). The descriptor is
+   * threaded onto `rollOptions.modifierChoice`; the player picks UP TO `maxPicks` of its
+   * options in the roll prompt and `evaluateCheckRoll` APPENDS their SUM.
+   *
+   * THE FORMULA CONDITION IS USABILITY, NOT TOKEN PRESENCE (issue 1094). It used to read
+   * a presence test for the retired roll-formula placeholder, which was the real gate on
+   * this whole feature —
+   * not `evaluateCheckRoll`'s `useDeferredChoice`, which only ever keyed on the
+   * descriptor being present. Retiring the token without replacing THIS test would have
+   * left every interactive `playerPicks` craft silently offering no modifier fieldset,
+   * because the migration strips the token every such system used to carry. The
+   * replacement asks the question that still has an answer: does the check this craft is
+   * about to roll have a formula at all? A formula that strips to empty is not a check,
+   * so there is nothing to modify and nothing to ask the player about.
    *
    * `playerPicks` is the ONLY rule that defers to roll time. `byRecipe` also defers
    * selection, but to the RECIPE AUTHOR at recipe-edit time, so by the time the engine
@@ -4353,21 +4364,20 @@ export class CraftingEngine {
    * answered, which is why the gate below tests for `playerPicks` specifically rather
    * than for "some rule defers selection".
    *
-   * The non-interactive `playerPicks` path resolves `@craftingmod` deterministically as
+   * The non-interactive `playerPicks` path resolves the modifier scalar deterministically as
    * the BEST LEGAL selection — the sum of the highest `maxModifierPicks` values, which is
    * `highest` at a cap of 1 — so an API/headless craft matches what an optimally-playing
    * player would have picked here.
    * @private
-   * @returns {{token: string, modifiers: Array<{id: string, label: string, icon: string,
+   * @returns {{modifiers: Array<{id: string, label: string, icon: string,
    *   value: number}>, maxPicks: number, defaultSelectedIds: string[],
    *   defaultSelectedId: string}|null}
    */
   _buildInteractiveModifierChoice(formula, craftingModifierContext, craftingActor, interactive) {
     if (interactive !== true) return null;
-    // A formula that never references `@craftingmod` has nowhere to spend the picked
-    // modifiers, so offering the player a choice would be meaningless (the
-    // non-selecting rules silently no-op the same case). Gate on token presence.
-    if (!String(formula ?? '').includes(CRAFTING_MOD_TOKEN)) return null;
+    // No authored (post-shim) roll formula means no check to modify, so a choice would be
+    // meaningless — and `evaluateCheckRoll` would short-circuit that roll anyway.
+    if (stripRetiredModifierPlaceholder(String(formula ?? '')).trim() === '') return null;
     if (resolveModifierPolicy(craftingModifierContext) !== 'playerPicks') return null;
     // Returns the descriptor, or null when fewer than two modifiers are eligible (a
     // one-option group is not a choice — the deterministic scalar IS the only possible

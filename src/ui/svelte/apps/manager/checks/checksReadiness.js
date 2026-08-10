@@ -1,4 +1,7 @@
-import { findRangeConflicts } from '../../../../../utils/craftingCheckExpression.js';
+import {
+  describeRetiredModifierPlaceholder,
+  findRangeConflicts,
+} from '../../../../../utils/craftingCheckExpression.js';
 
 /**
  * Pure readiness evaluator for a single subsystem check (crafting, salvage, or
@@ -96,6 +99,15 @@ export function evaluateCheckReadiness(check = {}, options = {}) {
   checks.push({ id: 'hasRollFormula', satisfied: hasRollFormula });
   if (!hasRollFormula) {
     issues.push({ id: 'noRollFormula', severity: 'warning' });
+  }
+
+  // The retired check-modifier placeholder, typed after its retirement (issue 1094). The
+  // formula field is free text, so nothing stops a GM who read an old guide from typing
+  // it — and `stripRetiredModifierPlaceholder` would then delete it SILENTLY on the way
+  // to the roll. A warning rather than a critical: the check still resolves, and the
+  // modifiers still apply; what the GM believes about WHY is what is wrong.
+  if (describeRetiredModifierPlaceholder(check?.rollFormula).present) {
+    issues.push({ id: 'retiredPlaceholderInFormula', severity: 'warning' });
   }
 
   // Routed checks route an outcome tier to a result set by tier NAME, and only

@@ -410,7 +410,7 @@ describe('createAdminStore', () => {
       const sys = services._getSystemsMutable().find((s) => s.id === 'sys1');
       sys.craftingCheck = {
         mode: 'passFail',
-        simple: { rollFormula: '1d20 + @craftingmod' },
+        simple: { rollFormula: '1d20 + 4' },
         checkModifiers: [
           { id: 'med', label: 'Medicine', expression: '@abilities.med.mod' },
           { id: 'alch', label: 'Alchemy', expression: '@abilities.alch.mod' },
@@ -523,9 +523,9 @@ describe('createAdminStore', () => {
       }
     });
 
-    // `@craftingmod` reaching no roll has three distinct causes with three distinct
+    // A catalogue reaching no roll has two distinct causes with two distinct
     // remedies, so the projection discriminates them rather than collapsing to a boolean.
-    it('projects which of the three inert causes applies to the active check (issue 1055)', async () => {
+    it('projects which of the two inert causes applies to the active check (issues 1055, 1094)', async () => {
       const services = createMockServices();
       const sys = services._getSystemsMutable().find((s) => s.id === 'sys1');
       const store = createAdminStore(services);
@@ -539,7 +539,7 @@ describe('createAdminStore', () => {
         await projectCause({
           resolutionMode: 'alchemy',
           alchemy: { checkMode: 'none' },
-          craftingCheck: { simple: { rollFormula: '1d20 + @craftingmod' } },
+          craftingCheck: { simple: { rollFormula: '1d20 + 4' } },
         }),
         'noCheck',
         'a mode that rolls no check at all'
@@ -553,21 +553,16 @@ describe('createAdminStore', () => {
         'noFormula',
         'a slot with no authored formula'
       );
+      // The THIRD cause is gone with the placeholder (issue 1094). This is the exact
+      // input that projected `noPlaceholder` before, and it now projects LIVE — which is
+      // the assertion that fails if the retired branch is left in the store.
       assert.equal(
         await projectCause({
           resolutionMode: 'simple',
           craftingCheck: { simple: { rollFormula: '1d20 + 4' } },
         }),
-        'noPlaceholder',
-        'a formula that never spends the placeholder'
-      );
-      assert.equal(
-        await projectCause({
-          resolutionMode: 'simple',
-          craftingCheck: { simple: { rollFormula: '1d20 + @craftingmod' } },
-        }),
         null,
-        'a live @craftingmod formula is not inert'
+        'an authored formula is never inert: the modifiers are appended to it'
       );
     });
 
@@ -581,7 +576,7 @@ describe('createAdminStore', () => {
       const sys = services._getSystemsMutable().find((s) => s.id === 'sys1');
       sys.craftingCheck = {
         mode: 'passFail',
-        simple: { rollFormula: '1d20 + @craftingmod', dc: 12 },
+        simple: { rollFormula: '1d20 + 4', dc: 12 },
         routed: { type: 'relative', rollFormula: '1d20' },
         progressive: { rollFormula: '2d6' },
         consumption: { consumeIngredientsOnFail: false, breakToolsOnFail: true },
@@ -610,7 +605,7 @@ describe('createAdminStore', () => {
 
       const persisted = updateArgs.updates.craftingCheck;
       // Every sibling check field survives the nested write (would vanish without ...existing).
-      assert.equal(persisted.simple.rollFormula, '1d20 + @craftingmod');
+      assert.equal(persisted.simple.rollFormula, '1d20 + 4');
       assert.equal(persisted.simple.dc, 12);
       assert.equal(persisted.routed.type, 'relative');
       assert.equal(persisted.progressive.rollFormula, '2d6');
