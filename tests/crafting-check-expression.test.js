@@ -560,3 +560,87 @@ describe('the retirement shim module placement (AF1)', () => {
     );
   });
 });
+
+// ── the leading-multiplicative residue guard is BELT AND BRACES, and this proves it ──
+//
+// `isStructurallyWholeResidue` refuses two shapes: a residue that ENDS in a binary operator
+// and one that OPENS with `*`, `/` or `%`. Only the first is live. The second was claimed
+// as protection in four places and is unreachable: a residue can only open with a
+// multiplicative operator if the placeholder was LEADING and the nearest non-whitespace
+// character AFTER it was one of those operators, which clause 4 of the additive predicate
+// has already refused before any residue exists.
+//
+// Neutering the pattern to one that matches nothing leaves the whole suite green, so the
+// unreachability is asserted directly instead — over a generated sweep of placement shapes,
+// with an INDEPENDENT residue derivation that is itself cross-checked against the module's
+// own answer on every stripped row, so it cannot drift into agreement.
+describe('the leading-multiplicative residue guard (belt and braces)', () => {
+  const LEADS_WITH_MULTIPLICATIVE = /^\s*[*/%]/;
+  const TRAILS_WITH_OPERATOR = /[+\-*/%]\s*$/;
+
+  // The strip rule, derived here rather than imported: remove the token together with its
+  // PRECEDING additive operator, else the bare token. Cross-checked below.
+  const residueOf = (formula) =>
+    formula.replaceAll(/\s*[+-]\s*@craftingmod\b|@craftingmod\b/g, '').trim();
+
+  const PREFIXES = ['', '1d20 ', '1d20 + ', '1d20 - ', '1d20 * ', '1d20 / ', '1d20 % ',
+    '(1d20 + ', 'max(', '2 + ', '(', '{2 + ', 'floor((1d20 + '];
+  const BEFORE = ['', ' ', '+', '- ', '+ ', '- -', '--', '+-'];
+  const AFTER = ['', ' + 2', ' - 2', ' * 2', ' / 2', ' + 1d6', ')', ') * 2', ', 2)', ')d6',
+    ' +', ' -', '}kh1', ' % 3'];
+
+  const SWEEP = [];
+  for (const prefix of PREFIXES) {
+    for (const before of BEFORE) {
+      for (const after of AFTER) {
+        SWEEP.push(`${prefix}${before}${RETIRED_MODIFIER_TOKEN}${after}`);
+      }
+    }
+  }
+
+  it('sweeps a real number of placement shapes', () => {
+    assert.ok(SWEEP.length >= 1000, `the sweep is ${SWEEP.length} shapes, not a stub`);
+  });
+
+  it('never produces an additive placement whose residue opens with * / or %', () => {
+    let additive = 0;
+    for (const formula of SWEEP) {
+      if (describeRetiredModifierPlaceholder(formula).nonAdditive) continue;
+      additive += 1;
+      assert.equal(
+        LEADS_WITH_MULTIPLICATIVE.test(residueOf(formula)),
+        false,
+        `${formula}: clause 4 should already have refused any shape that could produce this`
+      );
+    }
+    assert.ok(additive >= 100, `${additive} additive placements were reached, so this is not vacuous`);
+  });
+
+  // The counter-case, so "never fires" is not read as "the structural check does nothing":
+  // the TRAILING half fires on real, ordinary authoring.
+  it('DOES produce additive placements whose residue trails an operator, which is the live half', () => {
+    const trailing = SWEEP.filter(
+      (formula) =>
+        !describeRetiredModifierPlaceholder(formula).nonAdditive &&
+        TRAILS_WITH_OPERATOR.test(residueOf(formula))
+    );
+    assert.ok(trailing.length > 0, 'the trailing-operator guard has real inputs');
+    for (const formula of trailing) {
+      assert.equal(
+        stripRetiredModifierPlaceholder(formula, null),
+        '',
+        `${formula}: refused rather than persisted`
+      );
+    }
+  });
+
+  // The independent derivation is pinned to the module's own answer, so it cannot silently
+  // stop describing the same strip.
+  it('agrees with the module on every residue the module actually returns', () => {
+    for (const formula of SWEEP) {
+      const stripped = stripRetiredModifierPlaceholder(formula, null);
+      if (stripped === '') continue;
+      assert.equal(stripped, residueOf(formula), formula);
+    }
+  });
+});

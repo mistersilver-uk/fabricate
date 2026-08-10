@@ -98,7 +98,7 @@ function groupDepthBefore(text, index) {
  * migration reason from, so the two can never disagree about what a placement is.
  *
  * A placement is ADDITIVE — and therefore liftable out of the formula and re-appended as
- * a trailing term — only when ALL THREE hold:
+ * a trailing term — only when ALL FOUR hold:
  *
  * 1. **It sits at bracket depth 0.** The appended `+ N[Modifiers]` term always lands at
  *    the END of the WHOLE formula, so lifting the placeholder out is sound only where the
@@ -107,7 +107,16 @@ function groupDepthBefore(text, index) {
  * 2. **The run of additive operators immediately before it is at most ONE.** A longer run
  *    (`1d20 - -@craftingmod`) cannot be consumed by taking "the adjacent operator": the
  *    strip would take the nearest one and leave `1d20 -` dangling on disk.
- * 3. **The nearest non-whitespace character after it is absent or `+`/`-`.** Anything else
+ * 3. **That run is EMPTY only when the placeholder is LEADING** — equivalently, the nearest
+ *    non-whitespace character BEFORE it is absent or a single `+`/`-`. An empty run after a
+ *    preceding term means that term binds the placeholder multiplicatively or opens a group
+ *    (`1d20 * @craftingmod`, `(@craftingmod)`), so there is no operator for the strip to
+ *    consume and the two positions are not interchangeable.
+ *    THIS CLAUSE IS NOT IMPLIED BY 2, and leaving it out of the prose statement of the rule
+ *    made that statement FALSE wherever it was repeated: `*` is not an additive operator,
+ *    so `1d20 * @craftingmod` has an EMPTY run before the placeholder and satisfies 1, 2
+ *    and 4.
+ * 4. **The nearest non-whitespace character after it is absent or `+`/`-`.** Anything else
  *    (`1d20 + @craftingmod * 2`) means the placeholder binds tighter than addition, so
  *    removing it re-associates the arithmetic.
  *
@@ -187,14 +196,14 @@ export function describeRetiredModifierPlaceholder(formula) {
       nonAdditive = true;
       continue;
     }
-    // No operator at all is only legal when nothing precedes the placeholder; otherwise
+    // 3. No operator at all is only legal when nothing precedes the placeholder; otherwise
     // the previous term binds it multiplicatively or opens a group.
     if (operators.length === 0 && head.trim() !== '') {
       nonAdditive = true;
       continue;
     }
 
-    // 3. What follows must be the end of the formula, or another additive term.
+    // 4. What follows must be the end of the formula, or another additive term.
     const nextCharacter = after.charAt(0);
     if (nextCharacter !== '' && !ADDITIVE_OPERATORS.has(nextCharacter)) {
       nonAdditive = true;
@@ -206,10 +215,27 @@ export function describeRetiredModifierPlaceholder(formula) {
   return { present: true, occurrences, subtractive, nonAdditive };
 }
 
-/** A residue opening with a MULTIPLICATIVE operator has lost its left operand. */
+/**
+ * BELT AND BRACES, NOT DESCRIBED BEHAVIOUR — and it is labelled that way because it was
+ * claimed as live protection in four places and is not.
+ *
+ * A residue can only OPEN with `*`, `/` or `%` if the placeholder was LEADING (nothing but
+ * whitespace before it) and the nearest non-whitespace character AFTER it was one of those
+ * operators — which condition 3 of the classifier already refuses, before any residue
+ * exists. Neutering this pattern to one that matches nothing leaves the whole suite green,
+ * and a sweep over every generated placement shape finds no additive placement whose
+ * residue can reach it. It is kept as a cheap invariant against a future loosening of
+ * condition 3, not because any input reaches it today; the sweep in
+ * `crafting-check-expression.test.js` asserts that unreachability rather than asserting the
+ * guard fires.
+ */
 const RESIDUE_LEADS_WITH_MULTIPLICATIVE_RE = /^\s*[*/%]/;
 
-/** A residue ending in ANY binary operator has lost its right operand. */
+/**
+ * A residue ending in ANY binary operator has lost its right operand. THIS one is live: an
+ * authored `1d20 - @craftingmod -` is an ADDITIVE placement by every clause of the
+ * classifier, and its residue `1d20 -` is what the migration would otherwise persist.
+ */
 const RESIDUE_TRAILS_WITH_OPERATOR_RE = /[+\-*/%]\s*$/;
 
 /**
@@ -219,8 +245,10 @@ const RESIDUE_TRAILS_WITH_OPERATOR_RE = /[+\-*/%]\s*$/;
  * a question no dice engine is needed for, and is therefore safe to enforce on the
  * engine-free migration path that writes to disk.
  *
- * A LEADING `+`/`-` passes, because `Expression = _ leading:(_ @Additive)* _ head:Term …`
- * admits one and the leading-token strip rule depends on it.
+ * The TRAILING-operator half is the one that does the work; the leading-multiplicative half
+ * is belt and braces (see its own note). A LEADING `+`/`-` passes, because
+ * `Expression = _ leading:(_ @Additive)* _ head:Term …` admits one and the leading-token
+ * strip rule depends on it.
  */
 function isStructurallyWholeResidue(residue) {
   return (
@@ -255,8 +283,10 @@ function isStructurallyWholeResidue(residue) {
  *    Word-boundary matched, so a hypothetical `@craftingmodifier` is untouched. A residue
  *    reducing to empty returns `''`.
  * 4. **A STRUCTURAL residue check, before any dice engine is consulted.** A residue that
- *    starts with `*`, `/` or `%`, or ends with any binary operator, returns `''`. This is
- *    an INVARIANT, not a validation, and the distinction is what makes it correct: the
+ *    ends with any binary operator returns `''` (a residue OPENING with `*`, `/` or `%` is
+ *    refused too, but that half is belt and braces — see its own note; condition 3 of the
+ *    classifier has already refused every placement that could produce one). This is an
+ *    INVARIANT, not a validation, and the distinction is what makes it correct: the
  *    only caller that WRITES TO DISK — the `1.21.0` migration — deliberately passes
  *    `Roll = null`, so it takes the fail-open branch at step 6 and would otherwise have no
  *    residue check whatever. An authored formula can end in an operator
