@@ -238,9 +238,15 @@ export const CRAFTING_APP_RAW_MODULES = Object.freeze([
   'src/ui/svelte/util/recipeDuration.js',
   'src/systems/CraftingListingBuilder.js',
   // Same rule, issue 1055: the builder resolves the displayed check formula through the
-  // SAME `@craftingmod` context the engine rolls, so it now imports the resolver. One
-  // entry suffices — the resolver is a pure, import-free module by design.
+  // SAME check-modifier context the engine rolls, so it imports the resolver.
   'src/systems/craftingModifierResolver.js',
+  // …and issue 1094 gave that resolver its first two imports, so one entry no longer
+  // suffices. It appends the resolved scalar through `toolCheckBonus.js` (so the sign
+  // split, the bracketing and the zero-skip stay ONE implementation) and reads the
+  // retirement shim from `craftingCheckExpression.js`. Both are import-free leaves, so
+  // these two entries close the graph.
+  'src/systems/toolCheckBonus.js',
+  'src/utils/craftingCheckExpression.js',
   // Same rule, issue 917: the builder now shares its step->recipe view projection and
   // its active-run step read with CraftingEngine through this import-free leaf, so it
   // must be copied alongside the builder.

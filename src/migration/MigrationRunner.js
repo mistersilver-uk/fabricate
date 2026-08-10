@@ -32,6 +32,7 @@ import { migrateRemoveSystemProvider } from './migrateRemoveSystemProvider.js';
 import { migrateRenameGatheringHazardsToEvents } from './migrateRenameGatheringHazardsToEvents.js';
 import { migrateRenameGatheringRegionsToRealms } from './migrateRenameGatheringRegionsToRealms.js';
 import { migrateRenameSourceUuidFields } from './migrateRenameSourceUuidFields.js';
+import { migrateRetireCraftingModToken } from './migrateRetireCraftingModToken.js';
 import { migrateRetireProgressiveAllowPlayerReorder } from './migrateRetireProgressiveAllowPlayerReorder.js';
 import { migrateSplitRoutedResolutionModes } from './migrateSplitRoutedResolutionModes.js';
 import { migrateStaminaRegenPolicy } from './migrateStaminaRegenPolicy.js';
@@ -83,6 +84,29 @@ function _isRemovedProvidersPayload(value) {
     !Array.isArray(value) &&
     (Array.isArray(value.droppedRollTableRecipes) || Array.isArray(value.strippedGatheringTasks))
   );
+}
+
+/** The per-system count keys the 1.21.0 report carries, coerced to finite integers. */
+const RETIRED_CRAFTING_MOD_COUNT_KEYS = ['inert', 'subtractive', 'repeated', 'untouched'];
+
+/**
+ * Normalize one entry of the transient `_retiredCraftingModCounts` report (1.21.0) into a
+ * fixed `{ system, inert, subtractive, repeated, untouched }` shape.
+ *
+ * Coerced rather than passed through, so the GM notice can format the numbers without
+ * re-guarding each one, and so a hand-built or partially-written entry cannot put `NaN`
+ * or an object into a notification string.
+ * @param {*} entry
+ * @returns {{ system: string, inert: number, subtractive: number, repeated: number, untouched: number }|null}
+ */
+function _normalizeRetiredCraftingModEntry(entry) {
+  if (entry == null || typeof entry !== 'object' || Array.isArray(entry)) return null;
+  const normalized = { system: String(entry.system ?? '') };
+  for (const key of RETIRED_CRAFTING_MOD_COUNT_KEYS) {
+    const value = Number(entry[key]);
+    normalized[key] = Number.isFinite(value) && value > 0 ? Math.trunc(value) : 0;
+  }
+  return normalized;
 }
 
 // ---------------------------------------------------------------------------
@@ -336,6 +360,24 @@ const MIGRATIONS = [
     // returned unchanged so the deliberate recipe-level no-op is explicit.
     migrate: (data) => migrateMaxModifierPicks(data),
   },
+  {
+    version: '1.21.0',
+    label:
+      'Retire the check-modifier roll-formula placeholder: strip it from every stored ' +
+      'crafting, salvage and gathering check formula, because the resolved modifier ' +
+      'scalar is now appended automatically as a flavoured term',
+    // DATA-lossless but BEHAVIOUR-lossy, and deliberately NOT described as "lands on that
+    // release's own schema" the way every entry above it can be. A world downgraded to
+    // 1.20.0 finds its formulas intact and its catalogue intact — nothing was deleted but
+    // a token that release no longer needs — yet that build resolves check modifiers ONLY
+    // through the placeholder it now lacks, so they stop contributing to any roll until a
+    // GM types the placeholder back into each formula by hand. No previous entry in this
+    // registry carries that shape of caveat.
+    downgradeTo: '1.20.0',
+    // Reports the per-system counts through the transient `_retiredCraftingModCounts`
+    // field (captured and deleted by the runner below for the GM notice).
+    migrate: (data) => migrateRetireCraftingModToken(data),
+  },
   // Future migrations added here in version order
 ];
 
@@ -392,6 +434,7 @@ export class MigrationRunner {
           strippedGatheringTasks: [],
         },
         essenceCollisionDisabledRecipes: [],
+        retiredCraftingModCounts: [],
       };
     }
 
@@ -471,6 +514,7 @@ export class MigrationRunner {
               strippedGatheringTasks: [],
             },
             essenceCollisionDisabledRecipes: [],
+            retiredCraftingModCounts: [],
           };
         }
         console.warn(`Fabricate | Migration "${migration.label}" failed: ${error.message}`);
@@ -516,6 +560,21 @@ export class MigrationRunner {
     }
     delete data._essenceCollisionDisabledRecipes;
 
+    // The 1.21.0 placeholder-retirement migration reports, per system, how many formulas
+    // were inert for want of the placeholder (their modifiers go live now), how many
+    // placed it subtractively (a 2x-scalar sign swing), how many carried it more than
+    // once (double-counting collapses to one) and how many were left untouched in a
+    // non-additive context. Capture it for the GM notice and strip the transient field so
+    // it is never persisted — a migration cannot report through the return value, which
+    // the loop above spread-merges into the DATA payload rather than into this summary.
+    let retiredCraftingModCounts = [];
+    if (Array.isArray(data._retiredCraftingModCounts)) {
+      retiredCraftingModCounts = data._retiredCraftingModCounts
+        .map((entry) => _normalizeRetiredCraftingModEntry(entry))
+        .filter(Boolean);
+    }
+    delete data._retiredCraftingModCounts;
+
     const recipesChanged = JSON.stringify(data.recipes) !== originalRecipesJson;
     const systemsChanged = JSON.stringify(data.systems) !== originalSystemsJson;
     const gatheringConfigChanged =
@@ -551,6 +610,7 @@ export class MigrationRunner {
       unifiedRegionSystems,
       removedResultSelectionProviders,
       essenceCollisionDisabledRecipes,
+      retiredCraftingModCounts,
     };
   }
 

@@ -11,7 +11,7 @@
  * UNLIMITED. Every system already on `playerPicks` carries no cap — the field did not
  * exist when it was authored — so without this stamp the upgrade would silently widen
  * every one of those systems from "pick one" to "pick everything", and their
- * `@craftingmod` would jump from `max(...)` to the full sum. This migration writes back
+ * check-modifier scalar would jump from `max(...)` to the full sum. This migration writes back
  * the bound those systems always had, exactly once.
  *
  * ONLY `playerPicks` IS STAMPED. The other three rules are deliberately left absent, i.e.

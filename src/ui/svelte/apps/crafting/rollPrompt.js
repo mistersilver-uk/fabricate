@@ -440,8 +440,8 @@ export async function promptCheckRoll({
     defaultSelectedIds,
   } = planModifierChoice(modifierChoice);
   // Headless / no dialog API (tests): do not block the roll. When a `playerPicks`
-  // choice was offered, confirm with the pre-selected default so `@craftingmod` still
-  // resolves to a concrete value (never leaks unresolved to Foundry's Roll).
+  // choice was offered, confirm with the pre-selected default so the deferred modifier
+  // term still resolves to the value an optimally-playing player would have picked.
   if (!DialogV2?.wait) {
     return modifierChoice
       ? {
@@ -488,11 +488,10 @@ export async function promptCheckRoll({
   // Interactive `playerPicks` (issues 770, 1055): a fieldset of the eligible modifiers
   // (icon + label + signed value chip), opened on the best legal pre-selection. Only
   // rendered when a `modifierChoice` descriptor is supplied — every other roll leaves
-  // this empty, so the dialog is byte-identical. The formula line shows a NEUTRAL
-  // `(modifier)` placeholder in the `@craftingmod` slot (substituted by
-  // `evaluateCheckRoll`), not a default number a non-default pick would contradict; the
-  // per-option chips carry each option's value and the posted roll reflects the SUM of
-  // the player's final selection.
+  // this empty, so the dialog is byte-identical. The formula line ends in a NEUTRAL
+  // trailing `+ (modifier)[Modifiers]` term (appended by `evaluateCheckRoll`), not a
+  // default number a non-default pick would contradict; the per-option chips carry each
+  // option's value and the posted roll reflects the SUM of the player's final selection.
   const modifierChoiceHtml = renderModifierFieldset({
     options: modifierOptions,
     maxPicks,

@@ -359,11 +359,11 @@ test('the shim installs a Roll CONSTRUCTOR, so evaluateCheckRoll reaches the pro
 });
 
 // The `player-crafting-roll-prompt` frame's PREMISE, read from the fixtures rather than
-// assumed (issue 1055). That case is the world's only picture of the interactive modifier
-// fieldset, and every input it depends on lives in `labContent.js`:
+// assumed (issues 1055, 1094). That case is the world's only picture of the interactive
+// modifier fieldset, and every input it depends on lives in `labContent.js`:
 // `CraftingEngine._buildInteractiveModifierChoice` returns a descriptor only when the
-// EFFECTIVE combination rule is `playerPicks`, the rolled formula spends `@craftingmod`,
-// and at least TWO modifiers are eligible.
+// EFFECTIVE combination rule is `playerPicks`, the active mode carries an authored
+// (post-shim) roll formula, and at least TWO modifiers are eligible.
 //
 // It rotted exactly once and cost a whole capture run to find. The rule used to be a
 // per-RECIPE override on `hb-r-stillroom`; issue 1055 removed a recipe's ability to
@@ -372,7 +372,13 @@ test('the shim installs a Roll CONSTRUCTOR, so evaluateCheckRoll reaches the pro
 // matches `.fabricate-roll-prompt__modifiers`", which reads like a deleted CSS class
 // rather than like a fixture that stopped reaching the state. Nothing in `npm test`
 // noticed, because no unit test asserted the fixture could still get there.
-test('the lab fixtures still reach the interactive modifier fieldset (issue 1055)', () => {
+//
+// RE-POINTED, not deleted, by issue 1094. The formula condition used to be "the rolled
+// check still spends the retired placeholder", and the fixture carried one for exactly
+// that reason. The placeholder is gone and the gate now asks whether the check has an
+// authored formula at all — so this assertion follows the gate rather than being dropped,
+// which would have left that capture case with no `npm test` guard again.
+test('the lab fixtures still reach the interactive modifier fieldset (issues 1055, 1094)', () => {
   const content = buildLabContent();
   const herbalism = content.systems.find((system) => system.id === 'lab-herbalism');
   assert.ok(herbalism, 'the herbalism fixture system exists');
@@ -382,8 +388,19 @@ test('the lab fixtures still reach the interactive modifier fieldset (issue 1055
   // The rule is the SYSTEM's, full stop. A recipe may carry a pick, never a rule.
   const active = resolveActiveCraftingCheckFormula(herbalism);
   assert.ok(
-    active.referencesModifier,
-    'the rolled check still spends @craftingmod — without the token the engine offers no choice'
+    active.checkUsable,
+    'the active mode still carries an authored roll formula — without one the engine offers no choice'
+  );
+  // Read the AUTHORED field, not `active.rollFormula`. That value is POST-shim, so the
+  // shim has already removed any placeholder by the time it is returned and only the
+  // never-matched `@craftingmodifier` could ever turn this red — the assertion would pass
+  // over a fixture that still seeded the token, which is exactly what it exists to catch.
+  const authoredFormula = herbalism?.craftingCheck?.[active.slot]?.rollFormula ?? '';
+  assert.ok(authoredFormula.trim() !== '', 'the fixture authors a formula on the active slot');
+  assert.equal(
+    authoredFormula.includes('@craftingmod'),
+    false,
+    'and the FIXTURE seeds no retired placeholder, so the capture case does not depend on one'
   );
   const context = buildCraftingModifierContext(herbalism, stillroom);
   assert.equal(

@@ -46,7 +46,6 @@ const RAW_MODULES = [
   'src/utils/objectPath.js',
   'src/models/IngredientGroup.js',
   'src/models/Result.js',
-  'src/systems/toolCheckBonus.js',
   'src/utils/recipeCategories.js',
   'src/utils/routedOutcomeKeywords.js',
   'src/config/flags.js',
@@ -68,6 +67,12 @@ const RAW_MODULES = [
   // throws a named "add it to rawModules" error rather than hanging — unlike the manager
   // harness, whose inline list has no validator.
   'src/systems/craftingModifierResolver.js',
+  // …and issue 1094 gave that resolver its first two imports: it appends the resolved
+  // scalar through `toolCheckBonus.js` and reads the retirement shim from
+  // `craftingCheckExpression.js`. Both are import-free leaves, so these two entries close
+  // the graph the validator walks.
+  'src/systems/toolCheckBonus.js',
+  'src/utils/craftingCheckExpression.js',
   // The Overview tab resolves the recipe's category label for its Category select.
   // RecipeToolsSection embeds SearchablePopover for the Tools picker; the harness
   // must copy its supporting raw modules (portal/dismiss/layout helpers).
@@ -608,7 +613,7 @@ describe('RecipeEditView (mounted)', () => {
   });
 
   it('replaces the modifier controls with the inert banner naming the cause (issue 1055 criterion 10)', async () => {
-    for (const cause of ['noCheck', 'noFormula', 'noPlaceholder']) {
+    for (const cause of ['noCheck', 'noFormula']) {
       const target = await editHarness.mount(
         ruleProps({
           craftingModifierInertCause: cause,
@@ -627,7 +632,7 @@ describe('RecipeEditView (mounted)', () => {
       );
       // This is the tab's ONLY check-modifier banner now, and it earns the interruption:
       // the system's rule DID hand the pick to this recipe, and the check it will roll
-      // never spends `@craftingmod`, so the picks would reach no roll.
+      // rolls no check at all, so the picks would reach no roll.
       assert.ok(
         !target.querySelector('[data-recipe-modifier-banner]'),
         `${cause}: the retired neutral summary banner does not co-render with it`
@@ -637,7 +642,7 @@ describe('RecipeEditView (mounted)', () => {
     // …and under a rule that does not defer, an inert catalogue says nothing at all:
     // there are no picks to warn about.
     const quiet = await editHarness.mount(
-      ruleProps({ craftingModifierPolicy: 'addAll', craftingModifierInertCause: 'noPlaceholder' })
+      ruleProps({ craftingModifierPolicy: 'addAll', craftingModifierInertCause: 'noFormula' })
     );
     assert.ok(
       !quiet.querySelector('[data-recipe-modifier-inert]'),
@@ -668,7 +673,7 @@ describe('RecipeEditView (mounted)', () => {
     assert.deepEqual(
       patches.at(-1),
       { craftingModifier: { modifierIds: [] } },
-      'No modifiers authors an EMPTY array — @craftingmod resolves to 0, not inherit'
+      'No modifiers authors an EMPTY array — nothing is added to the roll, not inherit'
     );
 
     setSelect.value = 'inherit';

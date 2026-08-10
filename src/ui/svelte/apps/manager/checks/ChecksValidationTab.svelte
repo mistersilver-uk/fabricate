@@ -51,6 +51,14 @@
       'IssueNoRollFormula',
       'This check has no roll formula; it will not resolve until one is set.',
     ],
+    retiredPlaceholderInFormula: [
+      'IssueRetiredPlaceholderInFormula',
+      'This formula contains the retired @craftingmod placeholder. It is ignored and removed before the roll — check modifiers are added automatically now — so delete it.',
+    ],
+    retiredPlaceholderBreaksFormula: [
+      'IssueRetiredPlaceholderBreaksFormula',
+      'This formula uses the retired @craftingmod placeholder somewhere it cannot be removed safely, so the whole formula is discarded and this check will not roll. Rewrite it by hand without the placeholder — check modifiers are added automatically now.',
+    ],
     unnamedOutcome: [
       'IssueUnnamedOutcome',
       'Name every outcome tier — an unnamed tier cannot be routed to a result group.',

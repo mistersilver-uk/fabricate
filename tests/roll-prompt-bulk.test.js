@@ -115,7 +115,7 @@ describe('promptBulkCheckRoll: what it deliberately does NOT show', () => {
   });
 
   it('renders no playerPicks modifier fieldset', async () => {
-    // `@craftingmod` / `playerPicks` is crafting-only, so a salvage batch never carries a
+    // `playerPicks` is crafting-only, so a salvage batch never carries a
     // `modifierChoice` at all.
     const { captured } = await open({ allowAdvantage: true, subjects: subjects(2) });
     assert.doesNotMatch(captured.content, /craftingModifier/);

@@ -5,7 +5,7 @@
  * change generalizes it to a bounded multi-pick governed by `craftingCheck.maxModifierPicks`,
  * and `resolveMaxModifierPicks` reads an ABSENT cap as UNLIMITED — so without this stamp
  * the upgrade would silently widen every existing `playerPicks` system from "pick one" to
- * "pick everything" and jump its `@craftingmod` from `max(...)` to the full sum.
+ * "pick everything" and jump its check-modifier scalar from `max(...)` to the full sum.
  *
  * This covers the per-rule stamp (and the three rules deliberately left unbounded),
  * purity, idempotence, the no-throw guarantee, the runner registration and downgrade
@@ -267,7 +267,7 @@ test('the runner applies 1.20.0 to craftingSystems and bumps the migration versi
   const result = await runner.run();
 
   assert.equal(result.aborted, false);
-  assert.equal(store.get('migrationVersion'), '1.20.0');
+  assert.equal(store.get('migrationVersion'), '1.21.0');
   assert.equal(store.get('craftingSystems')[0].craftingCheck[MAX_PICKS], 1);
   assert.deepEqual(
     store.get('recipes')[0].craftingModifier,
@@ -278,7 +278,7 @@ test('the runner applies 1.20.0 to craftingSystems and bumps the migration versi
 
 test('the runner does not re-run 1.20.0 once the world is at that version', async () => {
   const store = new Map([
-    ['migrationVersion', '1.20.0'],
+    ['migrationVersion', '1.21.0'],
     ['craftingSystems', [system({ defaultModifierPolicy: 'playerPicks' })]],
     ['recipes', []],
   ]);

@@ -2995,11 +2995,12 @@ const PROGRESSIVE_CHECK = Object.freeze({
   enabled: true,
   consumption: { consumeIngredientsOnFail: false, breakToolsOnFail: false },
   progressive: {
-    // `@craftingmod` (issue 770) is the world's ONLY reference to the placeholder, and it is
-    // load-bearing rather than decorative: `CraftingEngine._buildInteractiveModifierChoice` gates
-    // the `playerPicks` prompt on the token being PRESENT in the rolled formula, so without it the
-    // modifier fieldset is unreachable no matter what the policy says.
-    rollFormula: '1d20 + @abilities.int.mod + @craftingmod',
+    // The formula carried the retired check-modifier placeholder until issue 1094, because
+    // `CraftingEngine._buildInteractiveModifierChoice` used to gate the `playerPicks` prompt on
+    // that token being PRESENT. The gate now asks whether the check has an authored formula at
+    // all, and the resolved scalar APPENDS, so the plain formula below reaches the same fieldset
+    // and rolls the same total.
+    rollFormula: '1d20 + @abilities.int.mod',
     thresholds: { success: 12 },
     stageAdvanceOnSuccess: 1,
   },

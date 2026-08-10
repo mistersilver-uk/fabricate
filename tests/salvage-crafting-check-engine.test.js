@@ -430,7 +430,7 @@ test('salvage routed: the SUCCESS path threads the runtime tier-step evidence in
 //
 // `rollDecision` is `promptCheckRoll`'s return shape MINUS `confirmed`, so
 // `evaluateCheckRoll` treats it as a pre-resolved `choice` and runs the identical
-// downstream code (`@craftingmod` substitution, `applyD20Advantage`, the `Roll.validate`
+// downstream code (the check-modifier append, `applyD20Advantage`, the `Roll.validate`
 // net, `effectiveRollMode`). One prompt answer therefore drives N rolls of a bulk run.
 //
 // It is attached by `CraftingEngine._salvageRollOptions` — NOT by
