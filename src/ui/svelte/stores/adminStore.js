@@ -3357,14 +3357,39 @@ export function createAdminStore(services) {
     }
   }
 
-  async function _confirmDiscardDirtyDraft(contentKey, contentFallback) {
+  /**
+   * The ONE route-exit prompt shape, shared by every Svelte-layer draft kind.
+   *
+   * It returns `'save' | 'discard' | 'cancel'` BY CONSTRUCTION — including on the
+   * no-`choiceDialog` fallback path, which returns `'discard' | 'cancel'` — so a caller
+   * built on it gets the three-way "save and continue / discard / cancel" prompt without
+   * choosing to. The boolean `confirmDiscardDirtyToolsDraft` above is the one prompt that
+   * does NOT use this helper, and it must not be copied.
+   *
+   * `replacements` (issue 1096) substitutes `{name}` placeholders into the resolved
+   * content. It exists because a prompt that says "the checks have unsaved changes" cannot
+   * tell a GM standing on Gathering that the unsaved edit is on Crafting — and this prompt
+   * is the last thing they see before that edit is discarded. Substitution happens after
+   * localization, so a translated string carries the same slots.
+   *
+   * @param {string} contentKey
+   * @param {string} contentFallback
+   * @param {Record<string, string>} [replacements]
+   * @returns {Promise<'save'|'discard'|'cancel'>}
+   */
+  async function _confirmDiscardDirtyDraft(contentKey, contentFallback, replacements = {}) {
     const localizeFn = services.localize;
+    const _content = () =>
+      Object.entries(replacements).reduce(
+        (text, [token, value]) => text.replaceAll(`{${token}}`, value),
+        localizeFn?.(contentKey) || contentFallback
+      );
     if (typeof services.choiceDialog !== 'function') {
       // Fall back to the two-way confirm when no three-way dialog is available.
       const confirmed = await services.confirmDialog?.({
         title:
           localizeFn?.('FABRICATE.Admin.Manager.DiscardDirtyTitle') || 'Discard unsaved changes?',
-        content: `<p>${localizeFn?.(contentKey) || contentFallback}</p>`,
+        content: `<p>${_content()}</p>`,
         yes: {
           label: localizeFn?.('FABRICATE.Admin.Manager.DiscardDirtyConfirm') || 'Discard Changes',
           callback: () => true,
@@ -3379,7 +3404,7 @@ export function createAdminStore(services) {
     const action = await services.choiceDialog({
       title:
         localizeFn?.('FABRICATE.Admin.Manager.NavigationDirty.Title') || 'Save unsaved changes?',
-      content: `<p>${localizeFn?.(contentKey) || contentFallback}</p>`,
+      content: `<p>${_content()}</p>`,
       choices: [
         {
           action: 'save',
@@ -3430,6 +3455,28 @@ export function createAdminStore(services) {
     return _confirmDiscardDirtyDraft(
       'FABRICATE.Admin.Manager.SystemEdit.DiscardDirtyContent',
       'The system details have unsaved changes. Save them and continue, or discard them?'
+    );
+  }
+
+  /**
+   * Route-exit prompt for the GM Checks Studio (issue 1096).
+   *
+   * The four activity drafts live ABOVE the four routes, so leaving the studio while any of
+   * them is dirty is one decision about all of them — which is why there is one prompt
+   * rather than three, and why it NAMES the dirty activities: the GM may be standing on
+   * Gathering while the unsaved edit is on Crafting, and a prompt that only said "the
+   * checks" would discard work on a route they never opened.
+   *
+   * Built on the shared helper, so it is the three-way variant by construction.
+   *
+   * @param {string[]} [activities] Localized names of the dirty activities.
+   * @returns {Promise<'save'|'discard'|'cancel'>}
+   */
+  function confirmDiscardDirtyChecksDraft(activities = []) {
+    return _confirmDiscardDirtyDraft(
+      'FABRICATE.Admin.Manager.Checks.DiscardDirtyContent',
+      'These checks have unsaved changes: {activities}. Save them and continue, or discard them?',
+      { activities: activities.join(', ') }
     );
   }
 
@@ -9686,6 +9733,7 @@ export function createAdminStore(services) {
     confirmDiscardDirtyComponentDraft,
     confirmDiscardDirtyEssenceDraft,
     confirmDiscardDirtySystemDetailsDraft,
+    confirmDiscardDirtyChecksDraft,
     confirmDiscardDirtyRecipeDraft,
     confirmRecipeAction,
     confirmDiscardDirtyGatheringTaskDraft,

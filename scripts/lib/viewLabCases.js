@@ -642,7 +642,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     query: {},
     steps: [
       'Checks',
-      { selector: '#checks-tab-crafting' },
+      { selector: '#manager-checks-nav-crafting' },
       { selector: '[data-check-roll-formula]', fill: '' },
       // The Checks view is a STAGED editor: typing only marks the draft dirty, and the browser's
       // check pills read the PERSISTED system. Without this the case cleared the field, navigated
@@ -1032,7 +1032,8 @@ export const VIEW_LAB_CASES = Object.freeze([
     query: { system: 'lab-herbalism' },
     steps: [
       'Checks',
-      { selector: '#checks-tab-crafting' },
+      { selector: '#manager-checks-nav-crafting' },
+      { selector: '#checks-section-modifiers' },
       { selector: '[data-crafting-modifier-policy-option="bySubject"] input' },
       'Crafting',
       { selector: '[data-recipe-edit="hb-r-kiln"]' },
@@ -1082,7 +1083,8 @@ export const VIEW_LAB_CASES = Object.freeze([
     query: { system: 'lab-herbalism' },
     steps: [
       'Checks',
-      { selector: '#checks-tab-crafting' },
+      { selector: '#manager-checks-nav-crafting' },
+      { selector: '#checks-section-modifiers' },
       { selector: '[data-crafting-modifier-policy-option="bySubject"] input' },
       { selector: '[data-crafting-modifier-max-picks-input]', fill: '' },
       'Crafting',
@@ -1123,7 +1125,8 @@ export const VIEW_LAB_CASES = Object.freeze([
     query: { system: 'lab-herbalism' },
     steps: [
       'Checks',
-      { selector: '#checks-tab-crafting' },
+      { selector: '#manager-checks-nav-crafting' },
+      { selector: '#checks-section-modifiers' },
       { selector: '[data-crafting-modifier-policy-option="bySubject"] input' },
       { selector: '[data-crafting-modifier-max-picks-input]', fill: '5' },
       'Crafting',
@@ -1149,7 +1152,8 @@ export const VIEW_LAB_CASES = Object.freeze([
     query: { system: 'lab-herbalism' },
     steps: [
       'Checks',
-      { selector: '#checks-tab-crafting' },
+      { selector: '#manager-checks-nav-crafting' },
+      { selector: '#checks-section-modifiers' },
       { selector: '[data-crafting-modifier-policy-option="bySubject"] input' },
       { selector: '[data-crafting-modifier-max-picks-input]', fill: '3' },
       'Crafting',
@@ -1228,13 +1232,14 @@ export const VIEW_LAB_CASES = Object.freeze([
     query: { system: 'lab-herbalism' },
     steps: [
       'Checks',
-      { selector: '#checks-tab-crafting' },
+      { selector: '#manager-checks-nav-crafting' },
       // Clearing the field reaches `noFormula`: a check slot that exists and rolls nothing.
       { selector: '[data-check-roll-formula]', fill: '' },
       { selector: '[data-checks-save]' },
+      { selector: '#checks-section-modifiers' },
       { selector: '[data-crafting-modifier-inert]', scroll: true },
     ],
-    expectView: 'checks',
+    expectView: 'checks-crafting',
     // The CAUSE, not just the notice. Both causes render through the same element with the
     // same chrome, so a presence-only assertion would photograph the wrong sentence.
     expectSelector: '.fabricate-manager [data-crafting-modifier-inert="noFormula"]',
@@ -1262,8 +1267,13 @@ export const VIEW_LAB_CASES = Object.freeze([
     query: { system: 'lab-herbalism' },
     steps: [
       'Checks',
-      { selector: '#checks-tab-crafting' },
+      { selector: '#manager-checks-nav-crafting' },
+      { selector: '#checks-section-modifiers' },
       { selector: '[data-crafting-modifier-policy-option="bySubject"] input' },
+      // Back to The roll to clear the formula: the field and the catalogue it makes inert
+      // are two SECTIONS apart now (issue 1096), and a step that stayed on Modifiers would
+      // find no formula field and abort the case.
+      { selector: '#checks-section-roll' },
       { selector: '[data-check-roll-formula]', fill: '' },
       { selector: '[data-checks-save]' },
       'Crafting',
@@ -1770,8 +1780,8 @@ export const VIEW_LAB_CASES = Object.freeze([
     smokeLabels: ['manager-checks-gathering'],
     reaches: 'exact',
     query: {},
-    steps: ['Checks', { selector: '#checks-tab-gathering' }],
-    expectView: 'checks',
+    steps: ['Checks', { selector: '#manager-checks-nav-gathering' }],
+    expectView: 'checks-gathering',
     kinds: ['manager', 'checks'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/checks\//,
@@ -1784,8 +1794,8 @@ export const VIEW_LAB_CASES = Object.freeze([
     smokeLabels: ['manager-checks-validation'],
     reaches: 'exact',
     query: {},
-    steps: ['Checks', { selector: '#checks-tab-validation' }],
-    expectView: 'checks',
+    steps: ['Checks', { selector: '#manager-checks-nav-validation' }],
+    expectView: 'checks-validation',
     kinds: ['manager', 'checks'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/checks\//,
@@ -1811,14 +1821,14 @@ export const VIEW_LAB_CASES = Object.freeze([
     query: { system: 'lab-herbalism' },
     steps: [
       'Checks',
-      { selector: '#checks-tab-crafting' },
+      { selector: '#manager-checks-nav-crafting' },
       // A placement the shim REFUSES, so the whole formula is discarded: critical, not the
       // ignorable warning an additive placement raises.
       { selector: '[data-check-roll-formula]', fill: '1d20 * @craftingmod' },
-      { selector: '#checks-tab-validation' },
+      { selector: '#manager-checks-nav-validation' },
       { selector: '[data-issue="retiredPlaceholderBreaksFormula"]', scroll: true },
     ],
-    expectView: 'checks',
+    expectView: 'checks-validation',
     // The CRITICAL id specifically. A presence-only assertion would be satisfied by the
     // warning, which is the other half of the split and says the opposite thing.
     expectSelector: '.fabricate-manager [data-issue="retiredPlaceholderBreaksFormula"]',
@@ -1828,14 +1838,134 @@ export const VIEW_LAB_CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/.*Check/,
     ],
   }),
+  // ── The GM Checks Studio IA (issue 1096) ──────────────────────────────────────────────
+  //
+  // Six states the old four-tab surface had no shape for, and every one of them is a claim
+  // this change makes that only a photograph settles.
+  managerCase({
+    id: 'manager-checks-rail-group',
+    label: 'Manager — Checks rail group expanded',
+    reaches: 'beyond',
+    smokeLabels: [],
+    // Jewelry is the system whose SALVAGE is routed with no authored check, so salvage
+    // carries a real readiness issue: the parent badge, the salvage child badge and the
+    // Validation child badge are all visible together, which is the whole rule the frame
+    // has to settle (the parent sums the ACTIVITY children only, and Validation restates
+    // that total rather than adding to it).
+    query: { system: 'lab-jewelry' },
+    steps: ['Checks'],
+    expectView: 'checks-crafting',
+    expectSelector: '.fabricate-manager [data-checks-nav-issues="checks"]',
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/checks\//,
+      /^src\/ui\/svelte\/apps\/manager\/.*Check/,
+    ],
+    kinds: ['manager', 'checks'],
+  }),
+  managerCase({
+    id: 'manager-checks-rail-dirty',
+    label: 'Manager — Checks rail dirty marker beside an issue badge',
+    reaches: 'beyond',
+    smokeLabels: [],
+    // THE THREE-MARKER COLUMN. An unsaved edit is staged on Crafting, then the GM moves to
+    // Salvage — so the rail shows a DIRTY marker on a route they are not standing on, an
+    // ISSUE badge on another, and the record-count numerals of every non-Checks entry above.
+    // The drafts living above the route is what makes this state reachable at all; under the
+    // old per-tab model the edit would have been abandoned by the move.
+    query: { system: 'lab-jewelry' },
+    steps: [
+      'Checks',
+      { selector: '#manager-checks-nav-crafting' },
+      { selector: '[data-check-roll-formula]', fill: '1d20 + @prof + 2' },
+      { selector: '#manager-checks-nav-salvage' },
+    ],
+    expectView: 'checks-salvage',
+    expectSelector: '.fabricate-manager [data-checks-nav-dirty="crafting"]',
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/checks\//,
+      /^src\/ui\/svelte\/apps\/manager\/.*Check/,
+    ],
+    kinds: ['manager', 'checks'],
+  }),
+  managerCase({
+    id: 'manager-checks-section-badged-and-dotted',
+    label: 'Manager — Checks section with a count AND a warning dot',
+    reaches: 'beyond',
+    smokeLabels: [],
+    // No frame in the prototype shows a section carrying BOTH markers, and they occupy the
+    // same slot, so this is the one that proves they do not collide. Runework is routed by
+    // check with five authored tiers; blanking one tier's NAME raises `unnamedOutcome`,
+    // which buckets to Outcomes — the section that already carries the tier count.
+    query: { system: 'lab-runework' },
+    steps: [
+      'Checks',
+      { selector: '#manager-checks-nav-crafting' },
+      { selector: '#checks-section-outcomes' },
+      { selector: '[data-outcome-name]', fill: '' },
+    ],
+    expectView: 'checks-crafting',
+    expectSelector: '.fabricate-manager [data-checks-section-dot="outcomes"]',
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/checks\//,
+      /^src\/ui\/svelte\/apps\/manager\/.*Check/,
+    ],
+    kinds: ['manager', 'checks'],
+  }),
+  managerCase({
+    id: 'manager-checks-off',
+    label: 'Manager — Checks crafting switched off',
+    reaches: 'beyond',
+    smokeLabels: [],
+    // Reached by TURNING THE CHECK OFF rather than by a fixture whose check is already off:
+    // every lab system authors an enabled check, and a seventh system carrying a disabled one
+    // would change the system count every other manager frame is composed against. Jewelry's
+    // `routedByIngredients` check is the optional one, so its rail toggle is live.
+    query: { system: 'lab-jewelry' },
+    steps: [
+      'Checks',
+      { selector: '#manager-checks-nav-crafting' },
+      { selector: '[data-checks-active-toggle]' },
+    ],
+    expectView: 'checks-crafting',
+    expectSelector: '.fabricate-manager [data-checks-off-empty]',
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/checks\//,
+      /^src\/ui\/svelte\/apps\/manager\/.*Check/,
+    ],
+    kinds: ['manager', 'checks'],
+  }),
+  managerCase({
+    id: 'manager-checks-stacked-floor',
+    label: 'Manager — Checks stacked at the declared floor',
+    reaches: 'beyond',
+    smokeLabels: [],
+    // THE 1024x640 DECLARED FLOOR, and it is STACKED there rather than a side rail: the
+    // shipped `fabricate-manager` container ladder restacks `.manager-body` to one column at
+    // 1120, so at the floor every panel is reached by scrolling the body. An acceptance that
+    // described a side rail at this width would have been read as a defect in the frame.
+    query: { system: 'lab-runework' },
+    steps: ['Checks', { selector: '#manager-checks-nav-crafting' }],
+    expectView: 'checks-crafting',
+    expectSelector: '.fabricate-manager [data-checks-rail="crafting"]',
+    position: { width: 1024, height: 640 },
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/checks\//,
+      /^src\/ui\/svelte\/apps\/manager\/.*Check/,
+    ],
+    kinds: ['manager', 'checks', 'responsive'],
+  }),
   managerCase({
     id: 'manager-checks-crafting-consumption',
     label: 'Manager — Checks crafting consumption',
     smokeLabels: ['manager-checks-crafting-consumption'],
     reaches: 'exact',
     query: {},
-    steps: ['Checks', { selector: '#checks-tab-crafting' }],
-    expectView: 'checks',
+    steps: [
+      'Checks',
+      { selector: '#manager-checks-nav-crafting' },
+      { selector: '#checks-section-on-failure' },
+    ],
+    expectView: 'checks-crafting',
     kinds: ['manager', 'checks'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/checks\//,
@@ -1874,7 +2004,8 @@ export const VIEW_LAB_CASES = Object.freeze([
     query: { system: 'lab-herbalism' },
     steps: [
       'Checks',
-      { selector: '#checks-tab-crafting' },
+      { selector: '#manager-checks-nav-crafting' },
+      { selector: '#checks-section-modifiers' },
       { selector: '[data-crafting-modifier-max-picks-input]', fill: '' },
       // RE-ANCHORED (issue 1095 review). `[data-crafting-modifier-defaults]` was the anchor while
       // it was the pill row directly under "Default modifiers"; this change turned it into the
@@ -1893,7 +2024,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       // the entry editor's own frame.
       { selector: '[data-crafting-modifier-max-picks]', scroll: true },
     ],
-    expectView: 'checks',
+    expectView: 'checks-crafting',
     // Two things at once, on the one card. `bySubject` is the FOURTH option — the one the redesign
     // restored, the one that makes the row count even, and the only one whose absence would
     // silently turn the 2x2 this frame is evidence for back into a three-across row. The
@@ -1927,7 +2058,8 @@ export const VIEW_LAB_CASES = Object.freeze([
     query: { system: 'lab-herbalism' },
     steps: [
       'Checks',
-      { selector: '#checks-tab-crafting' },
+      { selector: '#manager-checks-nav-crafting' },
+      { selector: '#checks-section-modifiers' },
       { selector: '[data-crafting-modifier-policy-option="bySubject"] input' },
       { selector: '[data-crafting-modifier-max-picks-input]', fill: '1' },
       // The CAP FIELD, which is this case's whole subject and the card's last element, so the
@@ -1937,7 +2069,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       // The entries have their own case (`manager-checks-crafting-modifier-entries`).
       { selector: '[data-crafting-modifier-max-picks]', scroll: true },
     ],
-    expectView: 'checks',
+    expectView: 'checks-crafting',
     // The VALUE, not the presence of a field: a fill that silently did not land leaves the field
     // rendered and blank, which is the sibling frame published under this name.
     expectSelector: '.fabricate-manager [data-crafting-modifier-max-picks="1"]',
@@ -1968,10 +2100,11 @@ export const VIEW_LAB_CASES = Object.freeze([
     query: { system: 'lab-herbalism' },
     steps: [
       'Checks',
-      { selector: '#checks-tab-crafting' },
+      { selector: '#manager-checks-nav-crafting' },
+      { selector: '#checks-section-modifiers' },
       { selector: '[data-crafting-modifier-row="hb-mod-medicine"]', scroll: true },
     ],
-    expectView: 'checks',
+    expectView: 'checks-crafting',
     // The eligibility sentence ABOVE the rows, and a row carrying the bounds pair. Asserting the
     // sentence's own hook is what would catch it moving back below the rule grid, which is where
     // it sat until this change and where it read as a footnote about the pick cap.
@@ -2008,10 +2141,11 @@ export const VIEW_LAB_CASES = Object.freeze([
     query: { system: 'lab-herbalism' },
     steps: [
       'Checks',
-      { selector: '#checks-tab-salvage' },
+      { selector: '#manager-checks-nav-salvage' },
+      { selector: '#checks-section-modifiers' },
       { selector: '[data-crafting-modifier-rows]', scroll: true },
     ],
-    expectView: 'checks',
+    expectView: 'checks-salvage',
     // THE READ-ONLY ROW, asserted through the one element the editable branch cannot draw. The
     // `has(...bounds-chip)` clause is the bounds chip's only assertion anywhere: it renders for a
     // bounded entry alone, and `hb-mod-medicine` is the world's only bounded one.
@@ -2037,10 +2171,11 @@ export const VIEW_LAB_CASES = Object.freeze([
     query: { system: 'lab-herbalism' },
     steps: [
       'Checks',
-      { selector: '#checks-tab-gathering' },
+      { selector: '#manager-checks-nav-gathering' },
+      { selector: '#checks-section-modifiers' },
       { selector: '[data-crafting-modifier-rows]', scroll: true },
     ],
-    expectView: 'checks',
+    expectView: 'checks-gathering',
     // The gathering card carries TWO notices no other activity's does — the check-vs-character
     // modifier disambiguation and the issue-683 dormancy note — and both are stated against real
     // rows here rather than against an empty catalogue.
@@ -2084,7 +2219,8 @@ export const VIEW_LAB_CASES = Object.freeze([
     query: { system: 'lab-herbalism' },
     steps: [
       'Checks',
-      { selector: '#checks-tab-salvage' },
+      { selector: '#manager-checks-nav-salvage' },
+      { selector: '#checks-section-modifiers' },
       { selector: '[data-crafting-modifier-policy-option="bySubject"] input' },
       'Components',
       {
@@ -2117,7 +2253,8 @@ export const VIEW_LAB_CASES = Object.freeze([
     // the same route `manager-gathering-task-editor-normal` takes, after the rule click.
     steps: [
       'Checks',
-      { selector: '#checks-tab-gathering' },
+      { selector: '#manager-checks-nav-gathering' },
+      { selector: '#checks-section-modifiers' },
       { selector: '[data-crafting-modifier-policy-option="bySubject"] input' },
       'Gathering',
       { selector: '#manager-gathering-nav-tasks' },
@@ -2156,10 +2293,11 @@ export const VIEW_LAB_CASES = Object.freeze([
     query: { system: 'lab-herbalism' },
     steps: [
       'Checks',
-      { selector: '#checks-tab-crafting' },
+      { selector: '#manager-checks-nav-crafting' },
+      { selector: '#checks-section-modifiers' },
       { selector: '[data-crafting-modifier-policy]', scroll: true },
     ],
-    expectView: 'checks',
+    expectView: 'checks-crafting',
     expectSelector:
       '.fabricate-manager [data-crafting-modifier-catalogue="crafting"] ' +
       '[data-crafting-modifier-policy]',
@@ -4655,10 +4793,11 @@ export const VIEW_LAB_CASES = Object.freeze([
     // table sits above it in frame.
     steps: [
       'Checks',
-      { selector: '#checks-tab-crafting' },
+      { selector: '#manager-checks-nav-crafting' },
+      { selector: '#checks-section-outcomes' },
       { selector: '[data-outcome-row="rw-ruined"]', scroll: true },
     ],
-    expectView: 'checks',
+    expectView: 'checks-crafting',
     kinds: ['manager', 'checks', 'resolution-mode'],
     sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/checks\//],
   }),
@@ -4682,11 +4821,11 @@ export const VIEW_LAB_CASES = Object.freeze([
     query: { system: 'lab-alchemy' },
     steps: [
       'Checks',
-      { selector: '#checks-tab-crafting' },
+      { selector: '#manager-checks-nav-crafting' },
       { selector: '[data-dc-mode-option="dynamic"] input' },
       { selector: '[data-check-macro-dropzone]', scroll: true },
     ],
-    expectView: 'checks',
+    expectView: 'checks-crafting',
     kinds: ['manager', 'checks'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/checks\/SimpleCraftingCheckEditor\.svelte$/,
@@ -4710,7 +4849,8 @@ export const VIEW_LAB_CASES = Object.freeze([
     query: { system: 'lab-runework' },
     steps: [
       'Checks',
-      { selector: '#checks-tab-crafting' },
+      { selector: '#manager-checks-nav-crafting' },
+      { selector: '#checks-section-triggers' },
       // Anchored on a NAMED trigger's own tier-step row, never on "the row's last control":
       // which control that is depends on the mode, so a mode change would silently move the
       // anchor. `scrollIntoViewIfNeeded` lands it near the bottom edge, so anchoring the
@@ -4718,7 +4858,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       // above and this one's step count — rather than one card and a fold.
       { selector: '[data-trigger="rw-trig-step-up"] [data-trigger-tier-step]', scroll: true },
     ],
-    expectView: 'checks',
+    expectView: 'checks-crafting',
     kinds: ['manager', 'checks'],
     sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/checks\/CheckTriggers\.svelte$/],
   }),

@@ -61,6 +61,99 @@ export const CHECK_READINESS_ISSUE_IDS = Object.freeze([
 const REGISTERED_ISSUE_IDS = new Set(CHECK_READINESS_ISSUE_IDS);
 
 /**
+ * The five sections an activity route renders, in reading order (issue 1096).
+ *
+ * These are the `data-checks-section` values the section strip emits and the ids the
+ * Validation route deep-links to, so they are declared once here beside the issue registry
+ * that buckets into them rather than as string literals in two components.
+ * @type {ReadonlyArray<string>}
+ */
+export const CHECK_SECTION_IDS = Object.freeze([
+  'roll',
+  'outcomes',
+  'triggers',
+  'modifiers',
+  'on-failure',
+]);
+
+/**
+ * Which SECTION owns each readiness issue (issue 1096).
+ *
+ * The section strip's warning dots, the rail's per-activity badge and the Validation
+ * route's deep links are all fed from this one map, so the three cannot disagree about
+ * where a problem lives.
+ *
+ * IT IS PROVEN EXHAUSTIVE, not merely kept in step by convention.
+ * `tests/checks-readiness.test.js` asserts this object's key set EQUALS
+ * {@link CHECK_READINESS_ISSUE_IDS} — the registry `pushIssue` refuses to emit outside — in
+ * BOTH directions: an id added to the registry without a bucket fails, and a bucket naming
+ * an id the registry does not carry fails too. Bucketing "by issue id" against a
+ * hand-copied second list is exactly how a new id (issue 1095 added three) comes to bucket
+ * nowhere and silently stops raising a dot.
+ *
+ * `rangeGap` buckets to Outcomes rather than to The roll: the hole is between two authored
+ * TIERS, and the tier rows that close it are on Outcomes.
+ * @type {Readonly<Record<string, string>>}
+ */
+export const CHECK_ISSUE_SECTIONS = Object.freeze({
+  noRollFormula: 'roll',
+  retiredPlaceholderBreaksFormula: 'roll',
+  retiredPlaceholderInFormula: 'roll',
+  unnamedOutcome: 'outcomes',
+  noSuccessOutcome: 'outcomes',
+  rangeInvalid: 'outcomes',
+  rangeOverlap: 'outcomes',
+  rangeGap: 'outcomes',
+  danglingTierStepTarget: 'triggers',
+  multipleTierStepTargets: 'triggers',
+  modifierBoundsInverted: 'modifiers',
+  modifierBoundsUnsafe: 'modifiers',
+  modifiersInertNoCheck: 'modifiers',
+  modifiersInertNoFormula: 'modifiers',
+});
+
+/**
+ * The CRAFTING resolution mode, translated into the vocabulary this evaluator dispatches on
+ * (issue 1096).
+ *
+ * `evaluateCheckReadiness` branches on `mode === 'routed'`, but the system-level crafting
+ * resolution mode is never that string: it is `routedByCheck`, `routedByIngredients`,
+ * `simple`, `progressive` or `alchemy`. Handing the raw mode through therefore SKIPPED every
+ * outcome-tier rule for the one mode that has outcome tiers — a `routedByCheck` system with
+ * an unnamed tier, no success tier, an overlapping range or a gap reported clean, on the one
+ * surface a GM consults to find out whether a check works.
+ *
+ * It is a translation and not a widening of the branch above, because the two vocabularies
+ * are genuinely different: `routedByIngredients` routes on the INGREDIENT SET and authors
+ * its optional pass/fail check on the shared simple slot, so it must NOT reach the routed
+ * rules, and alchemy's shape is its `checkMode` rather than its resolution mode.
+ *
+ * @param {string} resolutionMode The system's crafting resolution mode.
+ * @param {string} [alchemyCheckMode] `none` | `simple` | `tiered`, read only under alchemy.
+ * @returns {'routed'|'simple'|'progressive'} The mode {@link evaluateCheckReadiness} takes.
+ */
+export function craftingReadinessMode(resolutionMode, alchemyCheckMode = 'none') {
+  if (resolutionMode === 'routedByCheck') return 'routed';
+  if (resolutionMode === 'progressive') return 'progressive';
+  if (resolutionMode === 'alchemy') return alchemyCheckMode === 'tiered' ? 'routed' : 'simple';
+  return 'simple';
+}
+
+/**
+ * The section that owns an issue id, or `null` for an id no bucket claims.
+ *
+ * Returning `null` rather than a default section is deliberate: an unbucketed id is a
+ * defect the test above catches at build time, and silently filing it under "The roll"
+ * would put a dot on a section whose controls cannot clear it.
+ *
+ * @param {string} id A {@link CHECK_READINESS_ISSUE_IDS} member.
+ * @returns {string|null}
+ */
+export function sectionForIssue(id) {
+  return CHECK_ISSUE_SECTIONS[id] ?? null;
+}
+
+/**
  * Append one issue, refusing any id not in {@link CHECK_READINESS_ISSUE_IDS}.
  *
  * The throw is the mechanism. A frozen exported array is only a convention — nothing stops

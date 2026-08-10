@@ -19,6 +19,15 @@
     warn: 'fas fa-triangle-exclamation',
     block: 'fas fa-circle-exclamation',
   };
+
+  // A group or a row may carry its OWN extra attributes through `dataAttrs` (issue 1096).
+  // `rowDataAttr` says "put this one attribute, holding the row id, on every row" and is
+  // right for a studio whose rows are homogeneous; the Checks Studio's are not — a check
+  // TICK and an ISSUE are two kinds of row that existing selectors, the smoke harness and
+  // four suites already tell apart by attribute. Spread so an absent bag adds nothing
+  // rather than an empty attribute a selector would still match.
+  const attributesOf = (source) =>
+    source && typeof source === 'object' && source.dataAttrs ? source.dataAttrs : {};
 </script>
 
 <section
@@ -62,7 +71,7 @@
     </ul>
   </section>
   {#each groups as group (group.id)}
-    <div class="manager-recipe-val-group" data-validation-group={group.id}>
+    <div class="manager-recipe-val-group" data-validation-group={group.id} {...attributesOf(group)}>
       <p class="manager-recipe-val-group-label">
         <i class={group.icon} aria-hidden="true"></i><span>{group.label}</span>
       </p>
@@ -73,6 +82,7 @@
             class:is-invalid={row.status === 'block'}
             data-check={row.id || undefined}
             {...{ [rowDataAttr]: rowDataAttr ? row.id : undefined }}
+            {...attributesOf(row)}
           >
             <i
               class={`manager-recipe-val-status ${statusIcons[row.status] || statusIcons.pass}`}

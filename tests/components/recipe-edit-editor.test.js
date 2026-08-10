@@ -716,7 +716,12 @@ describe('CraftingSystemManagerRoot recipe-edit machinery', () => {
     );
     // The aside's suppression list no longer names recipe-edit at all.
     const asideGuard = rootSource.slice(
-      rootSource.indexOf("{#if currentView !== 'environment-edit' && currentView !== 'checks'"),
+      // The Checks half of this guard became the route PREDICATE when issue 1096 split
+      // `checks` into four child routes, so the anchor moved with it. Retargeted rather
+      // than relaxed: a stale `indexOf` returns -1, the slice below then reads from the end
+      // of the file, and the guard assertion passes over an EMPTY string — green, and
+      // checking nothing at all.
+      rootSource.indexOf("{#if currentView !== 'environment-edit' && !isChecksRoute"),
       rootSource.indexOf('<aside class="manager-inspector"')
     );
     // Issue 676: the aside IS suppressed on recipe-edit now. This guard and the

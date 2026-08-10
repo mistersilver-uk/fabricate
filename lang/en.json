@@ -1743,7 +1743,9 @@
           "Graph": "Graph",
           "Access": "Access",
           "Knowledge": "Knowledge",
-          "SectionLabel": "GM management"
+          "SectionLabel": "GM management",
+          "CollapseChecks": "Collapse checks menu",
+          "ExpandChecks": "Expand checks menu"
         },
         "Titlebar": {
           "Label": "Crafting manager",
@@ -4549,7 +4551,7 @@
           "Configuration": "Configuration",
           "PageKicker": "One per system",
           "Dirty": "Unsaved",
-          "Save": "Save check",
+          "Save": "Save checks",
           "Active": {
             "Title": "Active",
             "OptionalHint": "Turn this check on to require a roll for the activity, or off to resolve it without one.",
@@ -4719,7 +4721,17 @@
             "MacroHint": "The macro is run with the selected ingredient set, the recipe, and the actor, and must return the DC.",
             "MacroDropHint": "Drag a macro here to compute the DC.",
             "MacroMissing": "Linked macro not found",
-            "MacroUnlink": "Unlink macro"
+            "MacroUnlink": "Unlink macro",
+            "TwoOutcomesTitle": "Two outcomes",
+            "TwoOutcomesLead": "A simple check either clears the difficulty or it does not.",
+            "OutcomeSuccessDesc": "The roll reaches the DC, and the recipe’s result group is produced in full.",
+            "OutcomeFailureDesc": "The roll misses the DC; nothing is produced, and the failure policy decides the cost.",
+            "BandsTitle": "Outcome bands",
+            "BandsLead": "Transition points between the tiers below. Anything under the first band or over the last clamps into the end band.",
+            "BandsBoundary": "Threshold between {from} and {to}",
+            "BandsFallback": "These tiers leave a gap or overlap, so they cannot be drawn as one continuous strip. Edit the numbers in the rows below; the strip returns once the ranges meet.",
+            "BandsHint": "Drag or arrow-key a band edge to move its threshold, or type the numbers below. The numbers are the authority.",
+            "OutcomeFailure": "Failure"
           },
           "Salvage": {
             "PageTitle": "Salvage check",
@@ -4779,7 +4791,25 @@
             "IssueModifiersInertNoCheck": "This resolution mode rolls no check, so the check modifiers selected here are never applied.",
             "IssueModifiersInertNoFormula": "This check has no roll formula yet, so the check modifiers selected here are never applied.",
             "IssueDanglingTierStepTarget": "A trigger's target tier is not set, or names a tier this check does not have; that step does nothing until you pick one of this check's outcome tiers.",
-            "IssueMultipleTierStepTargets": "Two or more triggers set a target tier; if more than one matches, the lowest-ranked wins."
+            "IssueMultipleTierStepTargets": "Two or more triggers set a target tier; if more than one matches, the lowest-ranked wins.",
+            "Intro": "A crafting system saves even while incomplete, but only enables when every blocking issue is cleared.",
+            "CountPassing": "Passing",
+            "CountWarnings": "Warnings",
+            "CountBlocking": "Blocking",
+            "StatusPass": "Pass",
+            "StatusWarn": "Warning",
+            "StatusBlock": "Blocks enable",
+            "HeroReady": "Ready to enable",
+            "HeroReadySub": "Every activity check in this system is complete and consistent.",
+            "HeroUnsaved": "Clean, but not saved yet",
+            "HeroUnsavedSub": "These results describe your unsaved edits to {activities}. Enabling the system reads what is saved, so save the checks before enabling.",
+            "HeroBlocked": "Blocking issues",
+            "HeroBlockedSub": "This system saves while incomplete, but it will not enable until every blocking issue is cleared.",
+            "AllChecks": "All checks",
+            "RailClean": "Clean",
+            "RailIssues": "{count} to review",
+            "HelpTitle": "About check validation",
+            "HelpDesc": "Every activity check is evaluated against the same rules. A crafting system saves while incomplete, but it only enables once every blocking issue is cleared."
           },
           "Breakage": {
             "Title": "Check triggers",
@@ -4822,6 +4852,52 @@
             "TierStepChoose": "Choose a tier…",
             "TierStepMissingTier": "Missing tier",
             "TierStepNoTiers": "Add named outcome tiers to step to one."
+          },
+          "DiscardDirtyContent": "These checks have unsaved changes: {activities}. Save them and continue, or discard them?",
+          "Nav": {
+            "Unsaved": "Unsaved changes"
+          },
+          "Sections": {
+            "Roll": "The roll",
+            "Outcomes": "Outcomes",
+            "Triggers": "Triggers",
+            "Modifiers": "Modifiers",
+            "OnFailure": "On failure",
+            "IssueCountOne": "{count} issue",
+            "IssueCountOther": "{count} issues",
+            "InapplicableTitle": "Nothing to set here",
+            "InapplicableHint": "{section} does not apply in {mode} mode."
+          },
+          "Off": {
+            "Title": "This activity needs no check",
+            "Lead": "This system can roll a check here, but it is switched off. Every attempt that meets its requirements succeeds outright — no formula, no DC, no failure policy.",
+            "TurnOn": "Turn this check on"
+          },
+          "PreviewAs": {
+            "Title": "Preview as",
+            "Hint": "Choose an actor and a record to read this check against. Nothing here changes the system.",
+            "Actor": "Actor",
+            "Record": "Against",
+            "NoActors": "No actors",
+            "NoRecords": "No records"
+          },
+          "Simulator": {
+            "Title": "Outcome preview",
+            "Hint": "Roll a test check to see exactly which outcome a record lands on and what it costs the character."
+          },
+          "Odds": {
+            "Title": "Chance per outcome",
+            "Hint": "Once this check has a formula and its outcome bands are set, the chance of landing on each one is listed here."
+          },
+          "Digest": {
+            "Title": "This check",
+            "Ok": "OK",
+            "Off": "This activity resolves without a roll while the check is off.",
+            "Formula": "Formula",
+            "NoFormula": "No roll formula yet",
+            "Outcomes": "{count} outcome tiers, {success} count as success",
+            "Triggers": "{count} triggers active",
+            "Modifiers": "{count} check modifiers apply"
           }
         },
         "Access": {

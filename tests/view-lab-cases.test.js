@@ -35,6 +35,11 @@ import {
 } from '../scripts/lib/viewLabCases.js';
 
 import { MODIFIER_POLICY_OPTION_ATTR } from '../src/ui/svelte/apps/manager/checks/modifierPolicyAttrs.js';
+import { CHECK_SECTION_IDS } from '../src/ui/svelte/apps/manager/checks/checksReadiness.js';
+import {
+  CHECKS_VIEWS,
+  buildChecksNavItems,
+} from '../src/ui/svelte/apps/manager/checks/checksNav.js';
 import { MODIFIER_POLICIES } from '../src/systems/checkModifierResolver.js';
 
 import { collectWorkingTreeSources } from './helpers/sourceScan.js';
@@ -354,7 +359,23 @@ test('every interaction step names text that exists in the manager UI', () => {
       // `CraftingSystemManagerRoot.svelte` left the guard green, because `id: 'tasks'` also occurs in
       // `GatheringDetailTabs.svelte`, which is a PLAYER-app component that has nothing to do with the
       // manager rail. Three nav ids were in that state: tasks, encounters, travel.
-      const navId = /^#manager-(crafting|gathering)-nav-(.+)$/.exec(step.selector);
+      // The Checks section STRIP builds `checks-section-${section.id}` (issue 1096), so the
+      // literal never appears in source either — and unlike a rail subitem the ids do not
+      // live in a component at all: they are `CHECK_SECTION_IDS`, declared beside the issue
+      // registry that buckets into them. Checking membership of the imported constant is
+      // stronger than a source scan, because a section renamed in one place and not the
+      // other cannot satisfy it.
+      const sectionId = /^#checks-section-(.+)$/.exec(step.selector);
+      if (sectionId) {
+        if (!CHECK_SECTION_IDS.includes(sectionId[1])) {
+          missing.push(
+            `${viewCase.id}: selector "${step.selector}" names no CHECK_SECTION_IDS member ` +
+              `(${CHECK_SECTION_IDS.join(', ')})`
+          );
+        }
+        continue;
+      }
+      const navId = /^#manager-(crafting|gathering|checks)-nav-(.+)$/.exec(step.selector);
       if (navId) {
         const [, group, id] = navId;
         // The scope is the builder PLUS what it imports: the gathering items are declared inline in
@@ -830,7 +851,19 @@ const NEW_CHECKS_MODULES = [
   ],
   [
     'src/ui/svelte/apps/manager/checks/checksReadiness.js',
-    ['manager-checks-crafting-modifiers'],
+    ['manager-checks-crafting-modifiers', 'manager-checks-validation'],
+  ],
+  // The Checks rail GROUP model (issue 1096). It determines the entire rail and the four
+  // route ids, so a change confined to it must select the frames that show them.
+  //
+  // Stated as the same POSITIVE pin its two siblings are, and for the reason recorded
+  // above rather than a new one: the `/^src\/ui\/svelte\/apps\/manager\/checks\//`
+  // directory prefix nine cases already claim admits any `.js` under that directory, so a
+  // change confined to this module can never reach `FALLBACK_CASE_ID` and a
+  // "proven to fail before the entry exists" clause would be vacuous here too.
+  [
+    'src/ui/svelte/apps/manager/checks/checksNav.js',
+    ['manager-checks-rail-group', 'manager-checks-rail-dirty'],
   ],
 ];
 
@@ -2263,4 +2296,101 @@ test('the capture workflow renders and publishes the one id list it computed', (
     !/view-lab-screenshots\.mjs apps[^\n]*--clean/.test(workflow),
     'the workflow wipes the frame directory before a scoped render, so unrendered frames are lost'
   );
+});
+
+// ── `expectView` is otherwise unguarded by `npm test` (issue 1096, B10 / BM8) ──────────
+//
+// `tests/view-lab-cases.test.js` asserted only that a case DECLARING `expectView` is a
+// manager case; the VALUE was never matched against any route id. Splitting `checks` into
+// four routes left eight cases comparing `'checks'` against `'checks-crafting'`, and that
+// failure surfaces at CAPTURE time — where it fails the job whole and publishes nothing.
+//
+// The pin states its scope and its vocabulary, because an unscoped one is unimplementable:
+// the registry carries 21 distinct `expectView` values, `expectView` is compared against
+// `data-manager-view`, and that attribute is bound from a free-form `currentView` string
+// with no declared registry. `craftingNav.js` is the worked counter-example — it declares a
+// nav item `settings` whose VIEW is `crafting-settings`, so a pin written against nav ids
+// would compare the wrong vocabulary entirely.
+//
+//   1. every value beginning `checks` is a member of `CHECKS_VIEWS`;
+//   2. `CHECKS_VIEWS` values ARE the `data-manager-view` strings the root renders — asserted
+//      as `currentView === '<id>'` literals, not as nav-item ids;
+//   3. every remaining value is one of those same literals.
+//
+// (3) closes the set rather than sampling it: the root declares exactly the literals the
+// registry uses, so the pin covers the whole registry instead of the checks subset.
+test('every expectView value names a route the manager root actually renders', () => {
+  const rootSource = readFileSync(
+    resolve(ROOT, 'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte'),
+    'utf8'
+  );
+  const rendered = new Set(
+    [...rootSource.matchAll(/currentView === '([a-z-]+)'/g)].map((match) => match[1])
+  );
+  assert.ok(rendered.size > 10, "the scan must find the manager root route literals at all");
+
+  // (2) — and it is the assertion that makes (1) worth anything. `CHECKS_VIEWS` is the set
+  // the checks half is pinned against, so if those strings were nav-item IDS rather than
+  // VIEW ids the pin would be checking a vocabulary nothing renders.
+  //
+  // The four values appear in no `currentView === '…'` literal, deliberately: the root
+  // routes the whole group through the `isChecksRoute` predicate rather than four branches.
+  // So the chain is asserted where it actually runs — `data-manager-view` is bound from
+  // `currentView`; the rail routes with `setView(checksItem.view)` over `checksNavItems`;
+  // and `buildChecksNavItems` puts exactly the `CHECKS_VIEWS` strings on `item.view`. Every
+  // link is checked, because breaking any one of them is what would make the checks half
+  // vacuous.
+  assert.match(rootSource, /data-manager-view=\{currentView\}/);
+  assert.match(rootSource, /setView\(checksItem\.view\)/);
+  assert.match(rootSource, /const checksNavItems = \$derived\(buildChecksNavItems\(/);
+  assert.deepEqual(
+    buildChecksNavItems({ features: { salvage: true, gathering: true } }).map(
+      (item) => item.view
+    ),
+    [...CHECKS_VIEWS],
+    'the rail routes to exactly the CHECKS_VIEWS strings, and to nothing else'
+  );
+
+  const declared = VIEW_LAB_CASES.filter((viewCase) => viewCase.expectView);
+  assert.ok(declared.length > 20, 'the registry declares expectView broadly enough to pin');
+  const offenders = [];
+  for (const viewCase of declared) {
+    const value = viewCase.expectView;
+    if (value.startsWith('checks')) {
+      // (1)
+      if (!CHECKS_VIEWS.includes(value)) {
+        offenders.push(`${viewCase.id}: "${value}" is not a CHECKS_VIEWS member`);
+      }
+      continue;
+    }
+    // (3)
+    if (!rendered.has(value)) {
+      offenders.push(`${viewCase.id}: "${value}" is no route literal in the manager root`);
+    }
+  }
+  assert.deepEqual(offenders, [], offenders.join(`
+`));
+});
+
+test('the expectView pin FAILS against the pre-split value, and against a nav id', () => {
+  // The capability proof, run against the two mistakes the pin exists to catch rather than
+  // against an arbitrary bad string. Both are what the registry ACTUALLY contained before
+  // this change, or what a plausible edit would put back.
+  const rootSource = readFileSync(
+    resolve(ROOT, 'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte'),
+    'utf8'
+  );
+  const rendered = new Set(
+    [...rootSource.matchAll(/currentView === '([a-z-]+)'/g)].map((match) => match[1])
+  );
+  const accepts = (value) =>
+    value.startsWith('checks') ? CHECKS_VIEWS.includes(value) : rendered.has(value);
+
+  assert.equal(accepts('checks'), false, 'the PRE-SPLIT value must be rejected');
+  assert.equal(accepts('crafting'), false, 'a bare nav-item id must be rejected');
+  assert.equal(accepts('settings'), false, "craftingNav's `settings` nav id is not a view");
+  // …and the pin is not simply rejecting everything.
+  assert.equal(accepts('checks-crafting'), true);
+  assert.equal(accepts('crafting-settings'), true, 'the VIEW that nav id maps to is accepted');
+  assert.equal(accepts('recipe-edit'), true);
 });

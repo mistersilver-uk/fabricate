@@ -4,7 +4,14 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-import { CHECK_READINESS_ISSUE_IDS, evaluateCheckReadiness } from '../src/ui/svelte/apps/manager/checks/checksReadiness.js';
+import {
+  CHECK_ISSUE_SECTIONS,
+  CHECK_READINESS_ISSUE_IDS,
+  CHECK_SECTION_IDS,
+  craftingReadinessMode,
+  evaluateCheckReadiness,
+  sectionForIssue,
+} from '../src/ui/svelte/apps/manager/checks/checksReadiness.js';
 import { planRetiredPlaceholderStrip } from '../src/utils/craftingCheckExpression.js';
 import { RETIRED_PLACEMENT_CORPUS } from './helpers/retiredPlaceholderOracle.js';
 
@@ -745,5 +752,131 @@ describe('check-modifier readiness', () => {
         `${JSON.stringify(options.mode)}: an empty selection reports no modifier issue`
       );
     }
+  });
+});
+
+// ── The issue-id → SECTION map (issue 1096) ──────────────────────────────────────────
+//
+// Three surfaces read this map: the section strip's warning dots, the rail's per-activity
+// badge and the Validation route's deep links. Bucketing "by issue id" is exactly the shape
+// that rots silently — issue 1095 added three ids at once — so the map is held to SET
+// EQUALITY against the frozen registry the evaluator itself pushes from, in both
+// directions, and each direction is proven able to fail.
+describe('the issue-to-section map is exhaustive against the frozen registry', () => {
+  const mapPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/checks/checksReadiness.js');
+  const mapSource = readFileSync(mapPath, 'utf8');
+  // The two anchors, hoisted so each mutation is one substitution against a line that is
+  // asserted to exist rather than a quoted fragment repeated inline.
+  const REGISTRY_ANCHOR = `  'noRollFormula',\n`;
+  const BUCKET_ANCHOR = `  noRollFormula: 'roll',\n`;
+
+  it('buckets every registered id, and nothing else', () => {
+    assert.deepEqual(
+      Object.keys(CHECK_ISSUE_SECTIONS).sort(),
+      [...CHECK_READINESS_ISSUE_IDS].sort(),
+      'the map key set must EQUAL the registry, not merely be contained in it'
+    );
+  });
+
+  it('names only real sections, and rangeGap belongs to Outcomes', () => {
+    for (const [id, section] of Object.entries(CHECK_ISSUE_SECTIONS)) {
+      assert.ok(
+        CHECK_SECTION_IDS.includes(section),
+        `${id} buckets to "${section}", which is not one of the five sections`
+      );
+    }
+    // The hole is between two authored TIERS, and the rows that close it are on Outcomes.
+    assert.equal(sectionForIssue('rangeGap'), 'outcomes');
+    // An id no bucket claims answers `null` rather than defaulting to a section whose
+    // controls could not clear it.
+    assert.equal(sectionForIssue('notAnIssueId'), null);
+  });
+
+  // BOTH NEGATIVE CONTROLS, because the assertion above can fail for two different reasons
+  // and a guard that only proves one of them is half a guard. Each mutation is applied to a
+  // COPY of the module loaded as a data: URL, and each is checked to have actually changed
+  // the source before it is trusted — a replacement that matched nothing would leave the
+  // suite green and read as "the map is fine".
+  async function loadMutated(mutated) {
+    assert.notEqual(mutated, mapSource, 'the mutation must actually change the module');
+    return import(
+      `data:text/javascript;base64,${Buffer.from(rewriteImports(mutated)).toString('base64')}`
+    );
+  }
+
+  it('FAILS when an id is added to the registry with no bucket', async () => {
+    const module = await loadMutated(
+      mapSource.replace(
+        REGISTRY_ANCHOR,
+        `${REGISTRY_ANCHOR}  'brandNewIssue',
+`
+      )
+    );
+    assert.notDeepEqual(
+      Object.keys(module.CHECK_ISSUE_SECTIONS).sort(),
+      [...module.CHECK_READINESS_ISSUE_IDS].sort(),
+      'an unbucketed registered id must break set equality'
+    );
+    assert.equal(module.sectionForIssue('brandNewIssue'), null);
+  });
+
+  it('FAILS when a bucket names an id the registry does not carry', async () => {
+    const module = await loadMutated(
+      mapSource.replace(BUCKET_ANCHOR, `${BUCKET_ANCHOR}  ghostIssue: 'roll',
+`)
+    );
+    assert.notDeepEqual(
+      Object.keys(module.CHECK_ISSUE_SECTIONS).sort(),
+      [...module.CHECK_READINESS_ISSUE_IDS].sort(),
+      'a bucket for an unregistered id must break set equality'
+    );
+  });
+});
+
+// ── The crafting resolution mode is TRANSLATED, not passed through (issue 1096) ────────
+//
+// `evaluateCheckReadiness` branches on `mode === 'routed'`, and the system-level crafting
+// resolution mode is NEVER that string. Handing it through raw therefore skipped every
+// outcome-tier rule for `routedByCheck` — the one crafting mode that HAS outcome tiers — so
+// an unnamed tier, a missing success tier, an overlapping range and a gap all reported clean
+// on the surface a GM consults to find out whether a check works.
+describe('craftingReadinessMode', () => {
+  it('translates every crafting resolution mode into the evaluator vocabulary', () => {
+    assert.equal(craftingReadinessMode('routedByCheck'), 'routed');
+    assert.equal(craftingReadinessMode('progressive'), 'progressive');
+    assert.equal(craftingReadinessMode('simple'), 'simple');
+    // NOT routed: `routedByIngredients` routes on the ingredient set and authors its
+    // optional pass/fail check on the shared simple slot, so it must not reach the tier
+    // rules at all.
+    assert.equal(craftingReadinessMode('routedByIngredients'), 'simple');
+    assert.equal(craftingReadinessMode('alchemy', 'tiered'), 'routed');
+    assert.equal(craftingReadinessMode('alchemy', 'simple'), 'simple');
+    assert.equal(craftingReadinessMode('alchemy', 'none'), 'simple');
+    assert.equal(craftingReadinessMode('alchemy'), 'simple', 'the checkMode defaults to none');
+    assert.equal(craftingReadinessMode('somethingNew'), 'simple', 'an unknown mode is simple');
+  });
+
+  it('is what makes a routedByCheck tier fault reportable AT ALL', () => {
+    // The whole point, asserted end to end rather than as a string mapping: the same broken
+    // tier list is silent under the raw mode and critical under the translated one.
+    const broken = {
+      rollFormula: '1d20',
+      type: 'relative',
+      relativeOutcomes: [{ id: 'a', name: '   ', success: false, dc: 0 }],
+    };
+    const raw = evaluateCheckReadiness(broken, { mode: 'routedByCheck' });
+    assert.deepEqual(
+      raw.issues.map((issue) => issue.id),
+      [],
+      'the RAW mode reports nothing — this is the defect the translation removes'
+    );
+    const translated = evaluateCheckReadiness(broken, {
+      mode: craftingReadinessMode('routedByCheck'),
+    });
+    assert.deepEqual(
+      translated.issues.map((issue) => issue.id).sort(),
+      ['noSuccessOutcome', 'unnamedOutcome'],
+      'and the translated one reports both faults'
+    );
   });
 });

@@ -4274,7 +4274,7 @@
    input` and `.manager-toolbar .manager-button`, but not `select`.
 
    The essence library (issue 1036) is the THIRD studio on this bar and joins it for the
-   same reason. It had re-derived the bar in its own scoped `<style>`, which looked
+   same reason. It had re-derived the bar in its own scoped `\3c style>`, which looked
    equivalent and was not, in two ways a source read cannot show:
 
     - a SCOPED rule cannot reach `BulkSelectionToolbar`'s root. That primitive renders
@@ -7897,7 +7897,7 @@
    reason: it renders OUTSIDE a `.manager-field`, in the Category panel's heading row. */
 
 /* `:not(.fab-stepper-input)` — the shared `Stepper` supplies its OWN borderless chrome
-   (48px wide, 22px tall, transparent) from its component-scoped <style>. This rule is
+   (48px wide, 22px tall, transparent) from its component-scoped \3c style>. This rule is
    `.fabricate-manager .manager-field input`, which OUT-SPECIFIES that scoped rule, so a
    Stepper placed inside any `.manager-field` was silently stretched to 100% width and
    36px tall and re-bordered — the stepper stopped looking like a stepper. The recipe's
@@ -8395,7 +8395,7 @@
 
 /* ── The Validation tab's aggregate header (issue 676) ────────────────────────────
    Rehomed from the deleted RecipeContextRail, which showed it only while this tab was
-   open. It lives in the GLOBAL sheet, not a scoped Svelte <style>, for two reasons: the
+   open. It lives in the GLOBAL sheet, not a scoped Svelte \3c style>, for two reasons: the
    rest of the recipe studio's chrome already does (`.manager-recipe-tab`,
    `.manager-recipe-val-*`), and a component-scoped
    block is INVISIBLE to `recipe-studio-font-size.test.js`, which renders raw markup
@@ -10085,7 +10085,11 @@
   appearance: none;
   -webkit-appearance: none;
   display: grid;
-  grid-template-columns: 20px minmax(0, 1fr) auto;
+
+  /* FOUR tracks, not three (issue 1096): a Checks child can carry an unsaved marker AND an
+     issue badge beside its label, and a three-track grid put the second one into the icon
+     cell of the row below it. Every other rail group leaves the extra track empty. */
+  grid-template-columns: 20px minmax(0, 1fr) auto auto;
   align-items: center;
   gap: var(--fab-space-2);
   width: 100%;
@@ -10177,6 +10181,125 @@
 .fabricate-manager .manager-nav-subitem.is-active .manager-nav-count {
   color: var(--fab-mv2-accent);
   font-weight: 700;
+}
+
+/*
+  THREE distinguishable markers share the rail's trailing column (issue 1096), and the
+  whole point is that a GM must be able to tell them apart at a glance and a screen reader
+  must be able to tell them apart at all:
+
+    1. a RECORD COUNT — `.manager-nav-count` above, a bare mono numeral ("Gathering 69");
+    2. an ISSUE COUNT — this pill, which is a filled, bordered shape rather than a bare
+       numeral, and whose `aria-label` names its unit ("1 issue");
+    3. an UNSAVED marker — a small filled dot, a different SHAPE with its own accessible
+       name, not the issue pill in another colour.
+
+  Distinguishing 2 from 3 by colour alone would fail every GM who cannot separate them, so
+  the difference is carried by shape and by name and only reinforced by colour.
+*/
+.fabricate-manager .manager-nav-issue-badge {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 16px;
+  padding: 0 var(--fab-space-1);
+  border: 1px solid var(--fab-warning-border);
+  border-radius: 999px;
+  color: var(--fab-warning-text);
+  background: var(--fab-warning-soft);
+  font-family: var(--fab-font-mono);
+  font-size: 0.58rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+/*
+  Drawn as a BOX rather than as a bullet glyph, and that is not a style preference: an
+  HTML entity for a filled circle is a numeric character reference, which
+  `tests/components/theme-colour-contract.test.js` reads as a hex colour literal and fails.
+*/
+.fabricate-manager .manager-nav-dirty-marker {
+  flex: 0 0 auto;
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--fab-mv2-accent);
+}
+
+/*
+  A collapsed rail keeps the group's parent icon AND its issue badge — that badge is the
+  only signal left once the labels and the children are hidden, so it is deliberately not
+  in the `.manager-nav-count` hide rule above. The per-child markers go with their
+  children.
+*/
+.fabricate-manager .manager-body.is-rail-collapsed .manager-nav-dirty-marker {
+  display: none;
+}
+
+/*
+  The Checks section strip's two markers, on the same rule as the rail's: a count is a bare
+  mono numeral and an issue is a dot with a text accessible name. The dot is a `role="img"`
+  span, so it needs its own box.
+*/
+.fabricate-manager .manager-checks-section-count {
+  flex: 0 0 auto;
+  color: var(--fab-mv2-text-muted);
+  font-family: var(--fab-font-mono);
+  font-size: 0.625rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.fabricate-manager .manager-environment-tab-button.is-active .manager-checks-section-count {
+  color: var(--fab-mv2-accent);
+}
+
+/*
+  The formula token quick-add row (issue 1096): a wrap of small mono chips under the formula
+  field. They are real buttons, so the Foundry `<button>` reset is carried here — the host
+  sheet centres button content and pins a fixed height, which would otherwise make each chip
+  a full-height control in a five-across row.
+*/
+.fabricate-manager .manager-checks-formula-tokens {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--fab-space-chip);
+  min-width: 0;
+  margin-top: var(--fab-space-chip);
+}
+
+.fabricate-manager .manager-checks-formula-token {
+  flex: 0 0 auto;
+  width: auto;
+  height: auto;
+  min-height: 22px;
+  padding: 0 var(--fab-space-2);
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 6px;
+  color: var(--fab-mv2-text-muted);
+  background: transparent;
+  font-family: var(--fab-font-mono);
+  font-size: 0.66rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.fabricate-manager .manager-checks-formula-token:hover {
+  border-color: var(--fab-mv2-accent);
+  color: var(--fab-mv2-text);
+}
+
+.fabricate-manager .manager-checks-section-dot {
+  flex: 0 0 auto;
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--fab-warning);
 }
 
 .fabricate-manager .manager-inspector-card {
@@ -19863,7 +19986,7 @@
    so the body drops the formula and the DC — a batch has no single subject — and
    replaces them with a subject strip and a note saying the answer lands on every roll.
 
-   These rules live HERE rather than in a scoped `<style>` block because the dialog body
+   These rules live HERE rather than in a scoped `\3c style>` block because the dialog body
    is an HTML STRING handed to DialogV2, which renders outside every Svelte component's
    scope: a scoped selector would compile to a `.svelte-xxxx` attribute no element in the
    dialog carries. They reuse the `.fabricate-roll-prompt` root so the die row, the

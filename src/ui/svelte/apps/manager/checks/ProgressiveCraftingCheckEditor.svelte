@@ -19,9 +19,19 @@
   import CheckAwardMode from './CheckAwardMode.svelte';
   import CheckTriggers from './CheckTriggers.svelte';
 
-  let { value = null, breakageAuthority = 'toolSpecific', onChange = () => {} } = $props();
+  // `section` (issue 1096) selects which of this editor's cards render, so the Checks
+  // Studio's five-section strip can host the SAME editor rather than a per-section fork.
+  // Empty renders every card, which is what the characterization suites and any caller
+  // outside the studio still get.
+  let {
+    value = null,
+    breakageAuthority = 'toolSpecific',
+    section = '',
+    onChange = () => {},
+  } = $props();
 
   const checkDriven = $derived(breakageAuthority === 'checkDriven');
+  const shows = (id) => !section || section === id;
 
   function text(key, fallback) {
     const translated = localize(key);
@@ -34,35 +44,45 @@
 </script>
 
 <div class="manager-checks-editor" data-progressive-check-editor>
-  <section class="manager-inspector-card">
-    <h3 class="manager-card-title">
-      {text('FABRICATE.Admin.Manager.Checks.Crafting.FormulaTitle', 'Roll formula')}
-    </h3>
-    <p class="manager-muted">
-      {text(
-        'FABRICATE.Admin.Manager.Checks.Crafting.ProgressiveLead',
-        'Roll a formula for a numeric value. Results are awarded in order, each spending its difficulty from the value, until the value can no longer cover the next. Per-die crits force award-all or award-none.'
-      )}
-    </p>
-    <CheckFormulaFields rollFormula={value?.rollFormula || ''} showDc={false} onChange={emit} />
-  </section>
+  {#if shows('roll')}
+    <section class="manager-inspector-card">
+      <h3 class="manager-card-title">
+        {text('FABRICATE.Admin.Manager.Checks.Crafting.FormulaTitle', 'Roll formula')}
+      </h3>
+      <p class="manager-muted">
+        {text(
+          'FABRICATE.Admin.Manager.Checks.Crafting.ProgressiveLead',
+          'Roll a formula for a numeric value. Results are awarded in order, each spending its difficulty from the value, until the value can no longer cover the next. Per-die crits force award-all or award-none.'
+        )}
+      </p>
+      <CheckFormulaFields rollFormula={value?.rollFormula || ''} showDc={false} onChange={emit} />
+    </section>
+  {/if}
 
-  <CheckTriggers
-    value={value?.checkBreakage || null}
-    rollFormula={value?.rollFormula || ''}
-    kind="progressive"
-    showBreakTools={checkDriven}
-    onChange={(checkBreakage) => emit({ checkBreakage })}
-  />
-
-  <section class="manager-inspector-card" data-award-mode>
-    <h3 class="manager-card-title">
-      {text('FABRICATE.Admin.Manager.Checks.Crafting.AwardModeTitle', 'Award mode')}
-    </h3>
-    <CheckAwardMode
-      value={value?.awardMode || 'equal'}
-      name="crafting-progressive-award-mode"
-      onChange={(awardMode) => emit({ awardMode })}
+  {#if shows('triggers')}
+    <CheckTriggers
+      value={value?.checkBreakage || null}
+      rollFormula={value?.rollFormula || ''}
+      kind="progressive"
+      showBreakTools={checkDriven}
+      onChange={(checkBreakage) => emit({ checkBreakage })}
     />
-  </section>
+  {/if}
+
+  <!-- Award mode is a progressive check's OUTCOME model, and it is the only authoring
+       control a progressive check has beyond the formula. That is why the studio renders
+       Outcomes in every mode: hiding it here would remove this control from the UI
+       entirely, which no test would have seen. -->
+  {#if shows('outcomes')}
+    <section class="manager-inspector-card" data-award-mode>
+      <h3 class="manager-card-title">
+        {text('FABRICATE.Admin.Manager.Checks.Crafting.AwardModeTitle', 'Award mode')}
+      </h3>
+      <CheckAwardMode
+        value={value?.awardMode || 'equal'}
+        name="crafting-progressive-award-mode"
+        onChange={(awardMode) => emit({ awardMode })}
+      />
+    </section>
+  {/if}
 </div>

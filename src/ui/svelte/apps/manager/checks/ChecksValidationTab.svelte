@@ -1,29 +1,33 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  Validation tab for the Checks editor: a per-subsystem readiness checklist plus
-  severity-grouped issues for the crafting, salvage, and gathering checks. Mirrors
-  RecipeValidationTab — the pure `evaluateCheckReadiness` evaluator returns stable
-  check/issue ids, which this tab maps to localized copy. This is the canonical
-  place a GM sees what is wrong with a check; the individual editors no longer
-  print these messages inline. Uses the shared generic `.manager-editor-*`
-  validation classes.
+  The Checks Studio's Validation ROUTE (issue 1096; it was a tab).
+
+  It renders through the shared `EditorValidationSurface` rather than its own markup: that
+  primitive's props are already exactly this surface's needs — a summary medallion, three
+  counters, and severity-tagged rows grouped by owner — and the recipe editor's validation
+  tab has been on it since issue 883. Selecting an issue deep-links to the owning ACTIVITY
+  route AND the section that owns the control, through the one
+  `CHECK_ISSUE_SECTIONS` map the section dots and the rail badge also read.
+
+  ## The hero states the unsaved condition (DN4)
+
+  The badges, dots and counters on this screen are a DRAFT PREVIEW: they are computed on
+  the live draft so a GM sees the consequence of an edit before saving. The ENABLE gate is
+  not — it reads committed state. So a draft that clears every blocking issue must NOT be
+  reported as "Ready to enable", because enabling would act on a system that still carries
+  the old, unsaved state. The hero says so explicitly instead of claiming readiness for
+  state that is not persisted.
 
   `sections` is the list of in-play subsystem checks resolved by ChecksView:
-  `[{ subsystem: 'crafting'|'salvage'|'gathering', mode, check }]`. Subsystems that
-  are switched off (or the read-only gathering d100 roll) are omitted upstream.
+  `[{ subsystem, mode, check, modifierContext }]`. A subsystem that is switched off is
+  omitted upstream.
 -->
 <script>
-  import Chip from '../Chip.svelte';
+  import EditorValidationSurface from '../EditorValidationSurface.svelte';
   import { localize } from '../../../util/foundryBridge.js';
-  import { evaluateCheckReadiness } from './checksReadiness.js';
+  import { evaluateCheckReadiness, sectionForIssue } from './checksReadiness.js';
 
-  let { sections = [] } = $props();
-
-  function severityTone(severity) {
-    if (severity === 'critical') return 'danger';
-    if (severity === 'warning') return 'warning';
-    return 'neutral';
-  }
+  let { sections = [], dirty = false, dirtyActivities = [], onSelectIssue = () => {} } = $props();
 
   function text(key, fallback) {
     const translated = localize(key);
@@ -34,6 +38,11 @@
     crafting: ['SubsystemCrafting', 'Crafting check'],
     salvage: ['SubsystemSalvage', 'Salvage check'],
     gathering: ['SubsystemGathering', 'Gathering check'],
+  };
+  const SUBSYSTEM_ICONS = {
+    crafting: 'fas fa-hammer',
+    salvage: 'fas fa-recycle',
+    gathering: 'fas fa-seedling',
   };
   const CHECK_LABELS = {
     hasRollFormula: ['CheckHasRollFormula', 'Has a roll formula'],
@@ -129,76 +138,110 @@
       }),
     }))
   );
+
+  const counts = $derived.by(() => {
+    let passing = 0;
+    let warnings = 0;
+    let blocking = 0;
+    for (const { readiness } of evaluated) {
+      passing += readiness.checks.filter((check) => check.satisfied).length;
+      warnings += readiness.issues.filter((issue) => issue.severity !== 'critical').length;
+      blocking += readiness.issues.filter((issue) => issue.severity === 'critical').length;
+    }
+    return { passing, warnings, blocking };
+  });
+
+  // ONE row per check tick and per issue, in that order, so a group reads as "what holds"
+  // followed by "what does not". An issue's row carries the deep-link target; a satisfied
+  // tick has nowhere to go.
+  const groups = $derived(
+    evaluated.map(({ subsystem, readiness }) => ({
+      id: subsystem,
+      icon: SUBSYSTEM_ICONS[subsystem] || 'fas fa-dice-d20',
+      label: subsystemLabel(subsystem),
+      dataAttrs: { 'data-checks-validation-section': subsystem },
+      rows: [
+        ...readiness.checks.map((check) => ({
+          id: check.id,
+          title: checkLabel(check.id),
+          status: check.satisfied ? 'pass' : 'warn',
+          dataAttrs: { 'data-subsystem': subsystem, 'data-satisfied': String(check.satisfied) },
+        })),
+        ...readiness.issues.map((issue) => ({
+          id: issue.id,
+          title: issueTitle(issue.id),
+          status: issue.severity === 'critical' ? 'block' : 'warn',
+          target: { activity: subsystem, section: sectionForIssue(issue.id) },
+          dataAttrs: {
+            'data-subsystem': subsystem,
+            'data-issue': issue.id,
+            'data-issue-severity': issue.severity,
+          },
+        })),
+      ],
+    }))
+  );
+
+  // The hero. Three states, and the UNSAVED one is not a decoration: `evaluateCheckReadiness`
+  // above ran against the live DRAFT, while enabling the system reads what is committed, so
+  // a clean draft is not evidence that the system may be enabled.
+  const summary = $derived.by(() => {
+    if (counts.blocking > 0) {
+      return {
+        status: 'block',
+        title: text('FABRICATE.Admin.Manager.Checks.Validation.HeroBlocked', 'Blocking issues'),
+        sub: text(
+          'FABRICATE.Admin.Manager.Checks.Validation.HeroBlockedSub',
+          'This system saves while incomplete, but it will not enable until every blocking issue is cleared.'
+        ),
+      };
+    }
+    if (dirty) {
+      const names = dirtyActivities.map((id) => subsystemLabel(id)).join(', ');
+      return {
+        status: 'warn',
+        title: text(
+          'FABRICATE.Admin.Manager.Checks.Validation.HeroUnsaved',
+          'Clean, but not saved yet'
+        ),
+        sub: text(
+          'FABRICATE.Admin.Manager.Checks.Validation.HeroUnsavedSub',
+          'These results describe your unsaved edits to {activities}. Enabling the system reads what is saved, so save the checks before enabling.'
+        ).replace('{activities}', names),
+      };
+    }
+    return {
+      status: 'pass',
+      title: text('FABRICATE.Admin.Manager.Checks.Validation.HeroReady', 'Ready to enable'),
+      sub: text(
+        'FABRICATE.Admin.Manager.Checks.Validation.HeroReadySub',
+        'Every activity check in this system is complete and consistent.'
+      ),
+    };
+  });
 </script>
 
-<section
-  class="manager-recipe-tab manager-checks-validation-tab"
-  data-checks-panel="validation"
-  data-recipe-tab="validation"
-  aria-label={text('FABRICATE.Admin.Manager.Checks.Validation.Title', 'Validation')}
->
-  {#if evaluated.length === 0}
-    <p class="manager-muted">
-      {text(
-        'FABRICATE.Admin.Manager.Checks.Validation.EmptyHint',
-        'Issues across the crafting, salvage, and gathering checks will be listed here.'
-      )}
-    </p>
-  {:else}
-    {#each evaluated as { subsystem, readiness } (subsystem)}
-      {@const issuesBy = {
-        critical: readiness.issues.filter((issue) => issue.severity === 'critical'),
-        warning: readiness.issues.filter((issue) => issue.severity === 'warning'),
-        info: readiness.issues.filter((issue) => issue.severity === 'info'),
-      }}
-      <section class="manager-task-core-card" data-checks-validation-section={subsystem}>
-        <h3 class="manager-card-title">{subsystemLabel(subsystem)}</h3>
-
-        <ul class="manager-editor-check-list">
-          {#each readiness.checks as check (check.id)}
-            <li
-              class={`manager-editor-check ${check.satisfied ? 'is-satisfied' : 'is-unsatisfied'}`}
-              data-subsystem={subsystem}
-              data-check={check.id}
-              data-satisfied={check.satisfied}
-            >
-              <i
-                class={check.satisfied ? 'fas fa-circle-check' : 'fas fa-circle-xmark'}
-                aria-hidden="true"
-              ></i>
-              <span>{checkLabel(check.id)}</span>
-            </li>
-          {/each}
-        </ul>
-
-        {#if readiness.issues.length === 0}
-          <p class="manager-muted" data-checks-no-issues={subsystem}>
-            {text('FABRICATE.Admin.Manager.Checks.Validation.NoIssues', 'No issues detected.')}
-          </p>
-        {:else}
-          {#each ['critical', 'warning', 'info'] as severity (severity)}
-            {#if issuesBy[severity].length > 0}
-              <ul class="manager-recipe-issue-list" data-issue-severity={severity}>
-                {#each issuesBy[severity] as issue, index (issue.id + index)}
-                  <li
-                    class={`manager-editor-issue is-${severity}`}
-                    data-subsystem={subsystem}
-                    data-issue={issue.id}
-                  >
-                    <Chip tone={severityTone(severity)}>
-                      {text(
-                        `FABRICATE.Admin.Manager.Checks.Validation.Severity.${severity}`,
-                        severity
-                      )}
-                    </Chip>
-                    <span class="manager-recipe-issue-title">{issueTitle(issue.id)}</span>
-                  </li>
-                {/each}
-              </ul>
-            {/if}
-          {/each}
-        {/if}
-      </section>
-    {/each}
-  {/if}
-</section>
+<div class="manager-checks-validation-route" data-checks-panel="validation">
+  <EditorValidationSurface
+    title={text('FABRICATE.Admin.Manager.Checks.Validation.Title', 'Validation')}
+    intro={text(
+      'FABRICATE.Admin.Manager.Checks.Validation.Intro',
+      'A crafting system saves even while incomplete, but only enables when every blocking issue is cleared.'
+    )}
+    {summary}
+    {counts}
+    countLabels={{
+      passing: text('FABRICATE.Admin.Manager.Checks.Validation.CountPassing', 'Passing'),
+      warnings: text('FABRICATE.Admin.Manager.Checks.Validation.CountWarnings', 'Warnings'),
+      blocking: text('FABRICATE.Admin.Manager.Checks.Validation.CountBlocking', 'Blocking'),
+    }}
+    {groups}
+    statusLabels={{
+      pass: text('FABRICATE.Admin.Manager.Checks.Validation.StatusPass', 'Pass'),
+      warn: text('FABRICATE.Admin.Manager.Checks.Validation.StatusWarn', 'Warning'),
+      block: text('FABRICATE.Admin.Manager.Checks.Validation.StatusBlock', 'Blocks enable'),
+    }}
+    rowDataAttr="data-checks-validation-check"
+    {onSelectIssue}
+  />
+</div>

@@ -28,6 +28,7 @@
   // editor's property-macro card resolves names the same way rather than re-deriving the
   // `globalThis.fromUuid` indirection and the stale-resolution latch.
   import { resolveMacroName } from '../../../../../utils/macroReference.js';
+  import IconFactRow from '../IconFactRow.svelte';
   import ItemDropZone from '../ItemDropZone.svelte';
   import RadioCardGroup from '../RadioCardGroup.svelte';
   import CheckFormulaFields from './CheckFormulaFields.svelte';
@@ -36,14 +37,19 @@
 
   // `breakageAuthority` (issue 419): the unified CheckTriggers editor is always
   // rendered; under `checkDriven` it also exposes the per-trigger break-tools toggle.
+  // `section` (issue 1096) selects which of this editor's cards render, so the Checks
+  // Studio's five-section strip hosts the SAME editor rather than a per-section fork.
+  // Empty renders every card.
   let {
     value = null,
     showDcSource = true,
     breakageAuthority = 'toolSpecific',
+    section = '',
     onChange = () => {},
   } = $props();
 
   const checkDriven = $derived(breakageAuthority === 'checkDriven');
+  const shows = (id) => !section || section === id;
 
   function text(key, fallback) {
     const translated = localize(key);
@@ -119,27 +125,72 @@
 </script>
 
 <div class="manager-checks-editor" data-simple-check-editor>
-  <section class="manager-inspector-card">
-    <h3 class="manager-card-title">
-      {text('FABRICATE.Admin.Manager.Checks.Crafting.FormulaTitle', 'Roll formula')}
-    </h3>
-    <CheckFormulaFields
+  {#if shows('roll')}
+    <section class="manager-inspector-card">
+      <h3 class="manager-card-title">
+        {text('FABRICATE.Admin.Manager.Checks.Crafting.FormulaTitle', 'Roll formula')}
+      </h3>
+      <CheckFormulaFields
+        rollFormula={value?.rollFormula || ''}
+        dc={value?.dc ?? 15}
+        thresholdMode={value?.thresholdMode || 'meet'}
+        onChange={emit}
+      />
+    </section>
+  {/if}
+
+  <!-- A simple check's OUTCOME model: exactly two, and neither is authored. It is a
+       statement rather than an editor, which is why it renders through the shared icon
+       fact row instead of a bespoke pair of cards — and why the section carries no count
+       badge. It renders in every mode precisely because it is the mode's outcome model;
+       hiding it would leave the section blank on the one mode that has nothing else. -->
+  {#if shows('outcomes')}
+    <section class="manager-inspector-card" data-simple-outcomes>
+      <h3 class="manager-card-title">
+        {text('FABRICATE.Admin.Manager.Checks.Crafting.TwoOutcomesTitle', 'Two outcomes')}
+      </h3>
+      <p class="manager-muted">
+        {text(
+          'FABRICATE.Admin.Manager.Checks.Crafting.TwoOutcomesLead',
+          'A simple check either clears the difficulty or it does not.'
+        )}
+      </p>
+      <div class="manager-checks-flag-list">
+        <IconFactRow
+          icon="fas fa-circle-check"
+          dataAttr="data-simple-outcome"
+          dataValue="success"
+          title={text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeSuccess', 'Success')}
+          subtitle={text(
+            'FABRICATE.Admin.Manager.Checks.Crafting.OutcomeSuccessDesc',
+            'The roll reaches the DC, and the recipe’s result group is produced in full.'
+          )}
+        />
+        <IconFactRow
+          icon="fas fa-circle-xmark"
+          dataAttr="data-simple-outcome"
+          dataValue="failure"
+          title={text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeFailure', 'Failure')}
+          subtitle={text(
+            'FABRICATE.Admin.Manager.Checks.Crafting.OutcomeFailureDesc',
+            'The roll misses the DC; nothing is produced, and the failure policy decides the cost.'
+          )}
+        />
+      </div>
+    </section>
+  {/if}
+
+  {#if shows('triggers')}
+    <CheckTriggers
+      value={value?.checkBreakage || null}
       rollFormula={value?.rollFormula || ''}
-      dc={value?.dc ?? 15}
-      thresholdMode={value?.thresholdMode || 'meet'}
-      onChange={emit}
+      kind="simple"
+      showBreakTools={checkDriven}
+      onChange={(checkBreakage) => emit({ checkBreakage })}
     />
-  </section>
+  {/if}
 
-  <CheckTriggers
-    value={value?.checkBreakage || null}
-    rollFormula={value?.rollFormula || ''}
-    kind="simple"
-    showBreakTools={checkDriven}
-    onChange={(checkBreakage) => emit({ checkBreakage })}
-  />
-
-  {#if showDcSource}
+  {#if showDcSource && shows('roll')}
     <section class="manager-inspector-card">
       <h3 class="manager-card-title">
         {text('FABRICATE.Admin.Manager.Checks.Crafting.DcTitle', 'DC source')}

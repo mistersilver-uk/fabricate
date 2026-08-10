@@ -103,6 +103,16 @@
     activeCraftingTab as resolveActiveCraftingTab,
     isCraftingRoute as isCraftingView,
   } from './crafting/craftingNav.js';
+  import {
+    CHECKS_VIEWS,
+    activeChecksTab as resolveActiveChecksTab,
+    buildChecksNavItems,
+    checksNavIssueTotal,
+    isChecksRoute as isChecksView,
+    resolveChecksRedirect,
+  } from './checks/checksNav.js';
+  import { craftingReadinessMode, evaluateCheckReadiness } from './checks/checksReadiness.js';
+  import { buildCheckModifierContext } from '../../../../systems/checkModifierResolver.js';
   import RecipeEditView from './RecipeEditView.svelte';
   import { craftingEffect } from './crafting/craftingVisibility.js';
   import SystemEditView from './SystemEditView.svelte';
@@ -421,9 +431,15 @@
   const gatheringRoutedDirty = $derived(
     JSON.stringify(gatheringRoutedDraft) !== JSON.stringify(gatheringRoutedBaseline)
   );
-  // Which Checks sub-tab is active (crafting | salvage | gathering | validation),
-  // so the shared header Save persists the right draft.
-  let checksActiveTab = $state('crafting');
+  // Which Checks child route is open (crafting | salvage | gathering | validation).
+  // It is DERIVED from the route now (issue 1096), not held: the four activities became
+  // rail routes, so a second copy of "which one is open" would be a source of truth the
+  // rail highlight and the breadcrumb could disagree with.
+  // Which section of that route is open, for a Validation deep link.
+  // Empty until the router asks for one, so the very first deep link TO the roll section is
+  // still a new request rather than one the view has already honoured at mount.
+  let checksActiveSection = $state('');
+  let checksMenuExpanded = $state(false);
   // The Graph surface (issue 442) is unimplemented; it stays a disabled placeholder
   // and, as of issue 745, renders only when experimental features are enabled.
   const placeholderViews = [
@@ -579,22 +595,26 @@
   );
   const gatheringCheckSaving = $derived(gatheringProgressiveSaving || gatheringRoutedSaving);
 
-  // Tab-aware Checks dirty/saving/save: the single header Save button persists
-  // whichever check sub-tab is active.
-  const checksDirty = $derived(
-    checksActiveTab === 'salvage'
-      ? salvageCheckDirty
-      : checksActiveTab === 'gathering'
-        ? gatheringCheckDirty
-        : craftingCheckDirty
+  // THE DRAFT MODEL LIVES ABOVE THE ROUTE (issue 1096).
+  //
+  // It used to be tab-aware: `checksDirty` reported only the ACTIVE sub-tab, and the header
+  // Save persisted only that one. That was safe while the four activities were tabs inside
+  // one view, because a switch between them never left the surface. They are ROUTES now, and
+  // one click on `Components` leaves it — so a per-route dirty flag would have let an unsaved
+  // crafting edit walk out of the building while the GM stood on Gathering, with the Unsaved
+  // chip already gone.
+  //
+  // So: ONE dirty set across the four activities, and one plural `Save checks` that persists
+  // every dirty one. The per-activity flags survive as the rail's own markers.
+  const checksDirtyActivities = $derived(
+    [
+      craftingCheckDirty ? 'crafting' : '',
+      salvageCheckDirty ? 'salvage' : '',
+      gatheringCheckDirty ? 'gathering' : '',
+    ].filter(Boolean)
   );
-  const checksSaving = $derived(
-    checksActiveTab === 'salvage'
-      ? salvageCheckSaving
-      : checksActiveTab === 'gathering'
-        ? gatheringCheckSaving
-        : craftingCheckSaving
-  );
+  const checksDirty = $derived(checksDirtyActivities.length > 0);
+  const checksSaving = $derived(craftingCheckSaving || salvageCheckSaving || gatheringCheckSaving);
 
   // Recipe tiers offered to the recipe editor's "Check tier" dropdown, resolved
   // from the active crafting-check mode. Recipe tiers are authored on a RELATIVE
@@ -851,11 +871,14 @@
     // d100 mode has no editable config — nothing to persist.
   }
 
-  // The shared Checks header Save persists whichever sub-tab is active.
+  // The shared Checks header Save persists EVERY dirty activity (issue 1096), not just the
+  // route in view. Sequential rather than concurrent: each of the three saves through the
+  // store and re-baselines its own draft, and the store's publish is a two-phase projection
+  // rebuild that three overlapping writers would race.
   async function saveChecks() {
-    if (checksActiveTab === 'salvage') return saveSalvageCheck();
-    if (checksActiveTab === 'gathering') return saveGatheringCheck();
-    return saveCraftingCheck();
+    if (craftingCheckDirty) await saveCraftingCheck();
+    if (salvageCheckDirty) await saveSalvageCheck();
+    if (gatheringCheckDirty) await saveGatheringCheck();
   }
 
   function onToggleCheckActive(kind, enabled) {
@@ -1868,6 +1891,75 @@
   );
   const isCraftingRoute = $derived(isCraftingView(currentView));
   const activeCraftingTab = $derived(resolveActiveCraftingTab(currentView));
+
+  // ── The Checks rail GROUP (issue 1096) ───────────────────────────────────────────────
+  //
+  // `Checks` was one flat rail button holding four tabs; it is an expandable group whose
+  // children are routes, exactly like the Gathering group above.
+  //
+  // The badges are a DRAFT PREVIEW: readiness is evaluated against the live drafts the GM
+  // is editing, so a badge clears the moment the edit that clears it is made rather than
+  // when it is saved. The ENABLE gate is a different question and reads committed state —
+  // see the Validation hero, which says so rather than claiming "Ready to enable" for
+  // unsaved work.
+  const checksDraftSystem = $derived({
+    checkModifiers: selectedSystem?.checkModifiers || [],
+    craftingCheck: selectedSystem?.craftingCheck || {},
+    salvageCraftingCheck: selectedSystem?.salvageCraftingCheck || {},
+    gatheringCraftingCheck: selectedSystem?.gatheringCraftingCheck || {},
+  });
+  function checksIssueCount(activity, check, mode) {
+    return evaluateCheckReadiness(check || {}, {
+      mode,
+      modifierContext: buildCheckModifierContext(checksDraftSystem, activity, null),
+    }).issues.length;
+  }
+  const checksIssueCounts = $derived({
+    crafting: checksIssueCount(
+      'crafting',
+      craftingCheckMode === 'routed'
+        ? checkRoutedDraft
+        : craftingCheckMode === 'progressive'
+          ? checkProgressiveDraft
+          : checkSimpleDraft,
+      craftingReadinessMode(
+        selectedSystem?.resolutionMode || 'simple',
+        selectedSystem?.alchemy?.checkMode || 'none'
+      )
+    ),
+    salvage: checksIssueCount(
+      'salvage',
+      salvageResolutionMode === 'routed'
+        ? salvageRoutedDraft
+        : salvageResolutionMode === 'progressive'
+          ? salvageProgressiveDraft
+          : salvageSimpleDraft,
+      salvageResolutionMode
+    ),
+    gathering: checksIssueCount(
+      'gathering',
+      gatheringResolutionMode === 'progressive' ? gatheringProgressiveDraft : gatheringRoutedDraft,
+      gatheringResolutionMode
+    ),
+  });
+  const checksNavArgs = $derived({
+    features: selectedSystem?.features || {},
+    resolutionMode: selectedSystem?.resolutionMode || 'simple',
+    salvageResolutionMode,
+    gatheringResolutionMode,
+    issueCounts: checksIssueCounts,
+    dirtyActivities: {
+      crafting: craftingCheckDirty,
+      salvage: salvageCheckDirty,
+      gathering: gatheringCheckDirty,
+    },
+  });
+  const checksNavItems = $derived(buildChecksNavItems(checksNavArgs));
+  // The PARENT badge sums the three ACTIVITY children only. Validation's badge is that
+  // same total restated, so adding it in would report every issue twice.
+  const checksNavCount = $derived(checksNavIssueTotal(checksNavItems));
+  const isChecksRoute = $derived(isChecksView(currentView));
+  const checksActiveTab = $derived(resolveActiveChecksTab(currentView) || 'crafting');
   // The Knowledge surface's projection is published TOP-LEVEL, never hung off
   // `selectedSystem` (issue 785): hanging it there would force a `selectedSystem`
   // reference rebuild on every knowledge publish and let a late phase-2 publish
@@ -2185,6 +2277,11 @@
   });
 
   $effect(() => {
+    if (!isChecksRoute || checksMenuExpanded) return;
+    checksMenuExpanded = true;
+  });
+
+  $effect(() => {
     if (!canShowEnvironments) {
       selectedGatheringTaskId = '';
       selectedGatheringDropId = '';
@@ -2459,6 +2556,16 @@
   }
 
   function normalizedActiveView(view, system, environmentsAvailable, essencesAvailable) {
+    // `checks` is RETAINED as a redirect to the first available child (issue 1096), so
+    // existing deep links, the salvage editor's "Manage presets" link and every View Lab
+    // `expectView: 'checks'` still have a defined answer after the split. The target is
+    // resolved from the same nav model the rail renders, so "first available" cannot mean
+    // two different things.
+    if (system && view === 'checks') return resolveChecksRedirect(checksNavArgs);
+    // A child whose feature was switched off while it was open falls back to the same
+    // redirect rather than rendering a route the rail no longer offers.
+    if (system && CHECKS_VIEWS.includes(view) && !checksNavItems.some((item) => item.view === view))
+      return resolveChecksRedirect(checksNavArgs);
     // The standalone `system-overview` route was folded into the `system-edit`
     // page's Validation tab; a stale value (no system selected) falls through to
     // the `systems` library here.
@@ -2539,7 +2646,13 @@
     if (currentView === 'tools') return text('FABRICATE.Admin.Manager.Tools.Title', 'Tools');
     if (currentView === 'tool-edit')
       return text('FABRICATE.Admin.Manager.Tools.EditTitle', 'Edit Tool');
-    if (currentView === 'checks') return text('FABRICATE.Admin.Manager.Checks.Title', 'Checks');
+    // Written as a LOOKUP over four whole keys rather than one interpolated template ending
+    // at the `Checks` segment: `tests/lang-keys-no-orphans.test.js` credits an interpolation
+    // base as a covering PREFIX over its whole subtree, so that single template would have
+    // silently un-orphaned every dead key under the Checks namespace — including the
+    // nineteen this repo tracks deliberately in `tests/lang-known-orphans.js`. The scan reads
+    // COMMENTS too, so this note must not spell that prefix out either.
+    if (isChecksRoute) return text(CHECKS_ROUTE_TITLE_KEYS[checksActiveTab], 'Checks');
     if (currentView === 'environments')
       return text('FABRICATE.Admin.Manager.Environment.Title', 'Environments');
     if (currentView === 'environment-edit')
@@ -2646,7 +2759,7 @@
         'FABRICATE.Admin.Manager.Tools.EditSubtitle',
         'Configure Tool identity, breakage, requirements, and validation.'
       );
-    if (currentView === 'checks')
+    if (isChecksRoute)
       return text(
         'FABRICATE.Admin.Manager.Checks.Subtitle',
         'Configure how crafting, salvage, and gathering attempts are checked for the selected crafting system.'
@@ -2724,8 +2837,7 @@
       return text('FABRICATE.Admin.Manager.Tools.Actions', 'Tools actions');
     if (currentView === 'knowledge')
       return text('FABRICATE.Admin.Manager.Knowledge.Actions', 'Knowledge actions');
-    if (currentView === 'checks')
-      return text('FABRICATE.Admin.Manager.Checks.Actions', 'Checks actions');
+    if (isChecksRoute) return text('FABRICATE.Admin.Manager.Checks.Actions', 'Checks actions');
     if (
       currentView === 'environments' ||
       currentView === 'environment-edit' ||
@@ -3090,11 +3202,69 @@
     const toolsResult = confirmToolsRouteExit(nextView);
     if (isPromise(toolsResult)) {
       return toolsResult.then((value) =>
-        value === false ? false : confirmSystemDetailsRouteExit(nextView)
+        value === false ? false : continueRouteExitAfterChecks(nextView)
       );
     }
     if (toolsResult === false) return false;
+    return continueRouteExitAfterChecks(nextView);
+  }
+
+  function continueRouteExitAfterChecks(nextView) {
+    const checksResult = confirmChecksRouteExit(nextView);
+    if (isPromise(checksResult)) {
+      return checksResult.then((value) =>
+        value === false ? false : confirmSystemDetailsRouteExit(nextView)
+      );
+    }
+    if (checksResult === false) return false;
     return confirmSystemDetailsRouteExit(nextView);
+  }
+
+  /** Reset every check draft to its last saved baseline. */
+  function discardChecksDrafts() {
+    checkRoutedDraft = cloneRoutedCheck(checkRoutedBaseline);
+    checkSimpleDraft = cloneSimpleCheck(checkSimpleBaseline);
+    checkProgressiveDraft = cloneProgressiveCheck(checkProgressiveBaseline);
+    salvageSimpleDraft = cloneSimpleCheck(salvageSimpleBaseline);
+    salvageRoutedDraft = cloneRoutedCheck(salvageRoutedBaseline);
+    salvageProgressiveDraft = cloneProgressiveCheck(salvageProgressiveBaseline);
+    gatheringProgressiveDraft = cloneProgressiveCheck(gatheringProgressiveBaseline);
+    gatheringRoutedDraft = cloneRoutedCheck(gatheringRoutedBaseline);
+  }
+
+  async function finishChecksRouteExit(action) {
+    if (action === 'save') {
+      await saveChecks();
+      return true;
+    }
+    if (action === 'discard' || action === true) {
+      discardChecksDrafts();
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * The Checks Studio's route-exit prompt (issue 1096).
+   *
+   * Navigating BETWEEN Checks children never prompts: the drafts live above the route, so
+   * moving from Crafting to Salvage and back preserves them. Leaving the studio for a
+   * non-Checks route with any activity dirty raises the three-way prompt, which names the
+   * dirty activities — the GM may be standing on Gathering while the unsaved edit is on
+   * Crafting.
+   */
+  function confirmChecksRouteExit(nextView) {
+    if (!isChecksRoute || isChecksView(nextView)) return true;
+    if (!checksDirty) return true;
+    const names = checksDirtyActivities.map((activity) =>
+      text(
+        `FABRICATE.Admin.Manager.Checks.Tabs.${activity[0].toUpperCase()}${activity.slice(1)}`,
+        activity
+      )
+    );
+    const confirmation = store?.confirmDiscardDirtyChecksDraft?.(names);
+    if (isPromise(confirmation)) return confirmation.then(finishChecksRouteExit);
+    return finishChecksRouteExit(confirmation);
   }
 
   function surfaceToolsSaveValidationError() {
@@ -3146,6 +3316,7 @@
         view === 'tools' ||
         view === 'tool-edit' ||
         view === 'checks' ||
+        isChecksView(view) ||
         view === 'knowledge') &&
       !selectedSystem
     )
@@ -3300,6 +3471,35 @@
     const id = target.targetId(issue);
     if (!id) return;
     target.open(id);
+  }
+
+  // "{count} issue" / "{count} issues" — the badge must NAME its unit, because a bare
+  // numeral in this column is the record count every other rail entry renders there.
+  const CHECKS_ROUTE_TITLE_KEYS = {
+    crafting: 'FABRICATE.Admin.Manager.Checks.Crafting.PageTitle',
+    salvage: 'FABRICATE.Admin.Manager.Checks.Salvage.PageTitle',
+    gathering: 'FABRICATE.Admin.Manager.Checks.Gathering.PageTitle',
+    validation: 'FABRICATE.Admin.Manager.Checks.Validation.Title',
+  };
+
+  function checksIssueName(count) {
+    const key = count === 1 ? 'IssueCountOne' : 'IssueCountOther';
+    const fallback = count === 1 ? '{count} issue' : '{count} issues';
+    return text(`FABRICATE.Admin.Manager.Checks.Sections.${key}`, fallback).replace(
+      '{count}',
+      String(count)
+    );
+  }
+
+  function toggleChecksMenu() {
+    checksMenuExpanded = !checksMenuExpanded;
+  }
+
+  // Activating the PARENT opens the group and routes to the first available child, which is
+  // what makes the retained `checks` id a redirect rather than a dead route.
+  function activateChecksParent() {
+    checksMenuExpanded = true;
+    setView(resolveChecksRedirect(checksNavArgs));
   }
 
   function backToSystemsBrowser() {
@@ -6057,9 +6257,16 @@
                 text('FABRICATE.Admin.Manager.Tools.Untitled', 'Untitled tool')}</span
             >
           {/if}
-          {#if currentView === 'checks'}
+          {#if isChecksRoute}
             <i class="fas fa-chevron-right" aria-hidden="true"></i>
             <span>{text('FABRICATE.Admin.Manager.Nav.Checks', 'Checks')}</span>
+            <i class="fas fa-chevron-right" aria-hidden="true"></i>
+            <span
+              >{text(
+                `FABRICATE.Admin.Manager.Checks.Tabs.${checksActiveTab[0].toUpperCase()}${checksActiveTab.slice(1)}`,
+                checksActiveTab
+              )}</span
+            >
           {/if}
           {#if currentView === 'system-edit'}
             <i class="fas fa-chevron-right" aria-hidden="true"></i>
@@ -6255,7 +6462,7 @@
             />
           {:else if currentView === 'tags'}
             <!-- no header actions for the tags view -->
-          {:else if currentView === 'checks'}
+          {:else if isChecksRoute}
             {#if checksDirty}
               <Chip tone="warning">{text('FABRICATE.Admin.Manager.Checks.Dirty', 'Unsaved')}</Chip>
             {/if}
@@ -6268,7 +6475,7 @@
             >
               <i class={checksSaving ? 'fas fa-spinner fa-spin' : 'fas fa-save'} aria-hidden="true"
               ></i>
-              <span>{text('FABRICATE.Admin.Manager.Checks.Save', 'Save check')}</span>
+              <span>{text('FABRICATE.Admin.Manager.Checks.Save', 'Save checks')}</span>
             </button>
           {:else if currentView === 'essences'}
             <button type="button" class="manager-button is-primary" onclick={createEssenceDraft}>
@@ -6857,17 +7064,93 @@
             >
             <span class="manager-nav-count">{toolsNavCount}</span>
           </button>
-          <button
-            type="button"
-            class={`manager-nav-button ${currentView === 'checks' ? 'is-active' : ''}`}
-            aria-current={currentView === 'checks' ? 'page' : undefined}
-            onclick={() => setView('checks')}
-          >
-            <i class="fas fa-dice-d20" aria-hidden="true"></i>
-            <span class="manager-nav-label"
-              >{text('FABRICATE.Admin.Manager.Nav.Checks', 'Checks')}</span
+          <div class={`manager-nav-group ${checksMenuExpanded ? 'is-expanded' : ''}`}>
+            <button
+              type="button"
+              class={`manager-nav-button manager-nav-parent ${isChecksRoute ? 'is-active' : ''}`}
+              id="manager-nav-checks"
+              aria-current={isChecksRoute ? 'page' : undefined}
+              aria-expanded={checksMenuExpanded}
+              onclick={activateChecksParent}
             >
-          </button>
+              <i class="fas fa-dice-d20" aria-hidden="true"></i>
+              <span class="manager-nav-label"
+                >{text('FABRICATE.Admin.Manager.Nav.Checks', 'Checks')}</span
+              >
+              <!-- The parent badge is an ISSUE COUNT, not a record count, so it wears the
+                   pill treatment and names its unit. A collapsed rail still renders it —
+                   that is the only signal left when the children are hidden. -->
+              {#if checksNavCount > 0}
+                <span
+                  class="manager-nav-issue-badge"
+                  data-checks-nav-issues="checks"
+                  aria-label={checksIssueName(checksNavCount)}>{checksNavCount}</span
+                >
+              {/if}
+            </button>
+            <button
+              type="button"
+              class="manager-nav-toggle"
+              aria-label={checksMenuExpanded
+                ? text('FABRICATE.Admin.Manager.Nav.CollapseChecks', 'Collapse checks menu')
+                : text('FABRICATE.Admin.Manager.Nav.ExpandChecks', 'Expand checks menu')}
+              aria-controls="manager-checks-submenu"
+              aria-expanded={checksMenuExpanded}
+              onclick={toggleChecksMenu}
+            >
+              <i
+                class={checksMenuExpanded ? 'fas fa-chevron-up' : 'fas fa-chevron-down'}
+                aria-hidden="true"
+              ></i>
+            </button>
+            {#if checksMenuExpanded}
+              <div
+                class="manager-nav-submenu"
+                id="manager-checks-submenu"
+                aria-label={text('FABRICATE.Admin.Manager.Checks.Tabs.Label', 'Checks sections')}
+              >
+                {#each checksNavItems as checksItem (checksItem.id)}
+                  <button
+                    type="button"
+                    class={`manager-nav-subitem ${currentView === checksItem.view ? 'is-active' : ''}`}
+                    id={`manager-checks-nav-${checksItem.id}`}
+                    data-checks-nav-item={checksItem.id}
+                    aria-current={currentView === checksItem.view ? 'page' : undefined}
+                    onclick={() => setView(checksItem.view)}
+                  >
+                    <i class={checksItem.icon} aria-hidden="true"></i>
+                    <span class="manager-nav-label"
+                      >{text(checksItem.labelKey, checksItem.labelFallback)}</span
+                    >
+                    <!-- THREE distinguishable markers can land in this column, and they must
+                         not be confusable: a record-count numeral (`.manager-nav-count`,
+                         which Checks never has), an ISSUE badge (a pill naming its unit),
+                         and an UNSAVED marker (a different SHAPE with its own name, not the
+                         same dot in another colour). -->
+                    {#if checksItem.dirty}
+                      <span
+                        class="manager-nav-dirty-marker"
+                        data-checks-nav-dirty={checksItem.id}
+                        role="img"
+                        aria-label={text(
+                          'FABRICATE.Admin.Manager.Checks.Nav.Unsaved',
+                          'Unsaved changes'
+                        )}
+                      ></span>
+                    {/if}
+                    {#if checksItem.issueCount > 0}
+                      <span
+                        class="manager-nav-issue-badge"
+                        data-checks-nav-issues={checksItem.id}
+                        aria-label={checksIssueName(checksItem.issueCount)}
+                        >{checksItem.issueCount}</span
+                      >
+                    {/if}
+                  </button>
+                {/each}
+              </div>
+            {/if}
+          </div>
           {#if canShowEnvironments}
             <div class={`manager-nav-group ${gatheringMenuExpanded ? 'is-expanded' : ''}`}>
               <button
@@ -7074,7 +7357,7 @@
           />
         </section>
       </main>
-    {:else if currentView === 'checks' && selectedSystem}
+    {:else if isChecksRoute && selectedSystem}
       <main
         class="manager-main manager-environment-edit-main"
         aria-label={text('FABRICATE.Admin.Manager.Checks.Title', 'Checks')}
@@ -7117,6 +7400,10 @@
             breakageAuthority={selectedSystem?.toolBreakage?.authority || 'toolSpecific'}
             features={selectedSystem?.features || {}}
             activation={checkActivation}
+            activity={checksActiveTab}
+            requestedSection={checksActiveSection}
+            dirty={checksDirty}
+            dirtyActivities={checksDirtyActivities}
             {onUpdateCraftingCheck}
             {onUpdateCraftingCheckSimple}
             {onUpdateCraftingCheckProgressive}
@@ -7131,8 +7418,9 @@
             onUpdateSalvageCheckModifiers={(patch) => store.saveSalvageCheckModifiers?.(patch)}
             onUpdateGatheringCheckModifiers={(patch) => store.saveGatheringCheckModifiers?.(patch)}
             {onUpdateAlchemyFlags}
-            onTabChange={(tab) => {
-              checksActiveTab = tab;
+            onOpenActivity={(activity, section) => {
+              checksActiveSection = section || 'roll';
+              setView(`checks-${activity}`);
             }}
             {onToggleCheckActive}
           />
@@ -7562,7 +7850,7 @@
          `knowledge` joined it in issue 785 for the opposite reason: the surface OWNS
          its third column (roster · detail), so a fourth would clip the detail pane's
          action cluster at the 1024px minimum with no scrollbar. -->
-    {#if currentView !== 'environment-edit' && currentView !== 'checks' && currentView !== 'system-edit' && currentView !== 'crafting-settings' && currentView !== 'recipe-item-edit' && currentView !== 'component-edit' && currentView !== 'recipe-edit' && currentView !== 'tool-edit' && currentView !== 'knowledge'}
+    {#if currentView !== 'environment-edit' && !isChecksRoute && currentView !== 'system-edit' && currentView !== 'crafting-settings' && currentView !== 'recipe-item-edit' && currentView !== 'component-edit' && currentView !== 'recipe-edit' && currentView !== 'tool-edit' && currentView !== 'knowledge'}
       <aside class="manager-inspector" aria-label={inspectorLabel()}>
         {#if currentView === 'tags' && selectedSystem}
           <section class="manager-inspector-card" data-tags-evidence="at-a-glance">

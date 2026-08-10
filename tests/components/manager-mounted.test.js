@@ -118,6 +118,11 @@ function compileManagerRoot() {
   ]) {
     writeCompiledSvelte(`src/ui/svelte/apps/manager/${bulkPrimitive}.svelte`);
   }
+  // The three primitives issue 1096 extracted, which the checks tree now renders: the
+  // band strip on a routed Outcomes section, the row disclosure in the right rail's
+  // collapsible panels. Omitting either HANGS this suite (# cancelled), never fails it.
+  writeCompiledSvelte('src/ui/svelte/components/ThresholdBandStrip.svelte');
+  writeCompiledSvelte('src/ui/svelte/components/RowDisclosure.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/checks/ChecksView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/checks/ChecksEditorTabs.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/checks/ChecksRightMenu.svelte');
@@ -564,6 +569,12 @@ function compileManagerRoot() {
     // resolves dropped source documents for the Tool Studio.
     'src/utils/plainTextDescription.js',
     'src/ui/svelte/apps/manager/checks/checksReadiness.js',
+    // The Checks rail GROUP model (issue 1096). The root imports it to build the four child
+    // routes, their badges and the `checks` redirect, so it is in the tree from the first
+    // render. This list has NO dependency validator: omitting it does not fail the suite,
+    // it reports all 241 mounted manager tests as `# cancelled` behind one
+    // ERR_MODULE_NOT_FOUND in the hook.
+    'src/ui/svelte/apps/manager/checks/checksNav.js',
     'src/config/flags.js',
     // CharacterPrerequisitesCard imports the pure prerequisite engine (issue 544).
     'src/systems/characterPrerequisites.js',
@@ -635,6 +646,29 @@ function navButton(labelText) {
   return Array.from(target.querySelectorAll('.manager-nav-button')).find((button) =>
     button.textContent.includes(labelText)
   );
+}
+
+// ── Checks Studio navigation (issue 1096) ────────────────────────────────────────────
+//
+// The four activities stopped being TABS inside one view and became rail ROUTES, and the
+// five SECTIONS of each route are what the strip across the pane switches now. So reaching
+// a control here is two moves, not one, and both are asserted rather than optional-chained:
+// a silently missing rail child or section button would leave every assertion below reading
+// the previous screen and passing for the wrong reason.
+async function openChecksActivity(activity) {
+  const child = target.querySelector(`[data-checks-nav-item="${activity}"]`);
+  assert.ok(child, `the Checks rail should offer a ${activity} child`);
+  child.click();
+  await tick();
+  flushSync();
+}
+
+async function openChecksSection(section) {
+  const button = target.querySelector(`#checks-section-${section}`);
+  assert.ok(button, `the section strip should offer "${section}"`);
+  button.click();
+  await tick();
+  flushSync();
 }
 
 // Set a control's value and fire the input event Svelte's bind:value listens for.
@@ -845,7 +879,13 @@ function createStore(calls = [], options = {}) {
         consumeOnFail: true,
         showAttemptHistoryToPlayers: false,
       },
-      craftingCheck: options.craftingCheck,
+      // `enabled` defaults ON in this fixture (issue 1096), and a test that supplies its own
+      // still wins. It has to be stated now because it became LOAD-BEARING: an optional
+      // check that is off collapses its route to the "turn this check on" empty state, so a
+      // fixture that left `enabled` absent would have silently stopped rendering the editor
+      // every assertion below is about. The persisted default is still `=== true` — this is
+      // a fixture choice, not a change to the normalizer.
+      craftingCheck: { enabled: true, ...(options.craftingCheck || {}) },
       // The ONE system-level check-modifier catalogue (issue 1095). It moved out of
       // `craftingCheck` so salvage and gathering can select over the same entries, and the
       // store's projection is an ALLOWLIST — an unforwarded key here renders an empty
@@ -853,8 +893,8 @@ function createStore(calls = [], options = {}) {
       // to make reachable.
       checkModifiers: options.checkModifiers,
       salvageResolutionMode: options.salvageResolutionMode || 'simple',
-      salvageCraftingCheck: options.salvageCraftingCheck,
-      gatheringCraftingCheck: options.gatheringCraftingCheck,
+      salvageCraftingCheck: { enabled: true, ...(options.salvageCraftingCheck || {}) },
+      gatheringCraftingCheck: { enabled: true, ...(options.gatheringCraftingCheck || {}) },
       features: selectedFeatures,
       // Overridable so a test can supply its own component set (the Tool display
       // precedence cases resolve `componentId` against their own fixtures); defaults to
@@ -2608,15 +2648,22 @@ describe('CraftingSystemManager mounted behavior', () => {
     await tick();
     flushSync();
 
-    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'checks');
+    // Activating the group PARENT redirects to the first available child (issue 1096), so
+    // the route id names the activity rather than the studio.
+    assert.equal(
+      target.querySelector('.fabricate-manager').dataset.managerView,
+      'checks-crafting'
+    );
     assert.deepEqual(
-      Array.from(target.querySelectorAll('[data-checks-tab-button]')).map((button) =>
-        button.textContent.trim()
+      Array.from(target.querySelectorAll('[data-checks-nav-item]')).map((button) =>
+        // The rail's badge column can carry an issue count and a dirty marker beside the
+        // label, so the label is read off its own span rather than off the whole button.
+        button.querySelector('.manager-nav-label').textContent.trim()
       ),
       ['Crafting', 'Salvage', 'Gathering', 'Validation']
     );
 
-    // The Crafting tab renders a single editor (the default fixture is alchemy mode,
+    // The Crafting route renders a single editor (the default fixture is alchemy mode,
     // which authors a simple pass/fail check) — not a create-a-list surface — and its
     // docs help card sits in the right menu.
     const craftingPanel = target.querySelector('[data-checks-panel="crafting"]');
@@ -2643,16 +2690,13 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(craftingDocs, 'crafting help card links to the crafting-checks docs page');
     assert.equal(craftingDocs.getAttribute('target'), '_blank');
     assert.equal(craftingDocs.getAttribute('rel'), 'noreferrer');
-    assert.equal(
-      target.querySelector('.manager-environment-workspace.is-inspector-hidden'),
-      null,
-      'the context menu column should be visible on the Crafting tab'
+    assert.ok(
+      !target.querySelector('.manager-environment-workspace.is-inspector-hidden'),
+      'the context menu column should be visible on the Crafting route'
     );
 
     // Salvage is its own singleton page with its own docs link.
-    target.querySelector('[data-checks-tab-button="salvage"]').click();
-    await tick();
-    flushSync();
+    await openChecksActivity('salvage');
     const salvagePanel = target.querySelector('[data-checks-panel="salvage"]');
     // Salvage (simple resolution mode by default) now renders the shared simple
     // check editor with the recipe-specific DC source hidden.
@@ -2674,9 +2718,7 @@ describe('CraftingSystemManager mounted behavior', () => {
 
     // Gathering page (default fixture economy is d100) renders the read-only card
     // reflecting the d100-is-the-roll framing and links to its docs.
-    target.querySelector('[data-checks-tab-button="gathering"]').click();
-    await tick();
-    flushSync();
+    await openChecksActivity('gathering');
     const gatheringPanel = target.querySelector('[data-checks-panel="gathering"]');
     assert.ok(
       gatheringPanel.hasAttribute('data-gathering-d100-readonly'),
@@ -2700,9 +2742,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     );
 
     // Validation spans the full width with no context menu.
-    target.querySelector('[data-checks-tab-button="validation"]').click();
-    await tick();
-    flushSync();
+    await openChecksActivity('validation');
     const validationPanel = target.querySelector('[data-checks-panel="validation"]');
     assert.ok(validationPanel);
     // The Validation tab now renders a per-check readiness section for every
@@ -2718,21 +2758,37 @@ describe('CraftingSystemManager mounted behavior', () => {
       ),
       'the crafting section lists the roll-formula readiness check'
     );
-    assert.equal(
-      target.querySelector('[data-checks-help]'),
-      null,
-      'Validation tab should not render a context menu'
+    // The Validation route DOES have a rail now (issue 1096) — but it is not the activity
+    // stack. It carries the documentation/quickstart pair and the "All checks" summary and
+    // NOTHING else: no activation toggle, no Preview-as, no simulator, no odds and no
+    // This-check digest, because none of them has a subject on a route that validates all
+    // three checks at once. It also renders no section strip.
+    assert.ok(
+      target.querySelector('[data-checks-help="validation"]'),
+      'Validation keeps the documentation pair'
     );
     assert.ok(
-      target.querySelector('.manager-environment-workspace.is-inspector-hidden'),
-      'Validation tab should collapse the context-menu column'
+      target.querySelector('[data-checks-all-checks]'),
+      'Validation renders the All-checks summary'
     );
+    for (const absent of [
+      '[data-checks-active]',
+      '[data-checks-preview-as]',
+      '[data-checks-simulator]',
+      '[data-checks-odds]',
+      '[data-checks-digest]',
+      '[data-checks-sections]',
+    ]) {
+      assert.ok(
+        !target.querySelector(absent),
+        `the Validation route must not render ${absent}`
+      );
+    }
 
     // The shared manager inspector is not rendered for the Checks view.
-    assert.equal(
-      target.querySelector('.manager-body > .manager-inspector'),
-      null,
-      'Checks view owns its own context menu, so the shared inspector is skipped'
+    assert.ok(
+      !target.querySelector('.manager-body > .manager-inspector'),
+      'the Checks routes own their context menu, so the shared inspector is skipped'
     );
   });
 
@@ -2760,16 +2816,116 @@ describe('CraftingSystemManager mounted behavior', () => {
     flushSync();
 
     assert.deepEqual(
-      Array.from(target.querySelectorAll('[data-checks-tab-button]')).map((button) =>
-        button.textContent.trim()
+      Array.from(target.querySelectorAll('[data-checks-nav-item]')).map((button) =>
+        button.querySelector('.manager-nav-label').textContent.trim()
       ),
       ['Crafting', 'Gathering', 'Validation'],
       'the Salvage tab is dropped when salvage is off'
     );
     assert.equal(
-      target.querySelector('[data-checks-tab-button="salvage"]'),
+      target.querySelector('[data-checks-nav-item="salvage"]'),
       null,
       'no salvage tab button renders'
+    );
+  });
+
+  it('keeps the rail’s THREE badge-column markers pairwise distinguishable (issue 1096)', async () => {
+    // A record count, an issue count and an unsaved marker share one column, and the rule is
+    // that a GM must be able to tell them apart at a glance AND a screen reader must be able
+    // to tell them apart at all. Colour alone does neither, so each is asserted on a
+    // NON-COLOUR attribute plus its accessible name.
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore([], {
+          alchemyResolutionMode: 'simple',
+          // No salvage check at all under ROUTED salvage: the mode requires an authored
+          // formula, so salvage carries a real readiness issue and its child gets a badge.
+          salvageResolutionMode: 'routed',
+        }),
+        services: { openCurrentAdmin: () => {} },
+      },
+    });
+    flushSync();
+    navButton('Checks').click();
+    await tick();
+    flushSync();
+
+    // 1. The ISSUE badge names its unit, so a bare numeral cannot be mistaken for it.
+    const salvageBadge = target.querySelector('[data-checks-nav-issues="salvage"]');
+    assert.ok(salvageBadge, 'a salvage readiness issue badges its rail child');
+    assert.match(salvageBadge.getAttribute('aria-label'), /issue/i);
+    assert.match(salvageBadge.textContent.trim(), /^\d+$/);
+
+    // 2. The parent badge restates the same unit, and is the marker a COLLAPSED rail keeps.
+    const parentBadge = target.querySelector('[data-checks-nav-issues="checks"]');
+    assert.ok(parentBadge, 'the group parent carries the total');
+    assert.match(parentBadge.getAttribute('aria-label'), /issue/i);
+
+    // 3. The RECORD count is a different attribute entirely and names no unit — which is why
+    //    the issue badge has to.
+    const recordCount = target.querySelector('.manager-nav-button .manager-nav-count');
+    assert.ok(recordCount, 'the rail still renders record-count numerals');
+    assert.ok(
+      !recordCount.hasAttribute('aria-label'),
+      'a record count is a bare numeral; it is the issue badge that must name its unit'
+    );
+
+    // 4. The DIRTY marker is a third attribute with its own name, and it is reachable only
+    //    once something is unsaved — so its absence here is part of the claim.
+    assert.ok(
+      !target.querySelector('[data-checks-nav-dirty]'),
+      'nothing is dirty yet, so no unsaved marker renders'
+    );
+    setInputValue(target.querySelector('[data-check-roll-formula]'), '1d20 + 3');
+    await tick();
+    flushSync();
+    const dirtyMarker = target.querySelector('[data-checks-nav-dirty="crafting"]');
+    assert.ok(dirtyMarker, 'an unsaved crafting edit marks its own rail child');
+    assert.match(dirtyMarker.getAttribute('aria-label'), /unsaved/i);
+    assert.notEqual(
+      dirtyMarker.getAttribute('aria-label'),
+      salvageBadge.getAttribute('aria-label'),
+      'the two markers must not announce the same thing'
+    );
+    assert.notEqual(
+      dirtyMarker.className,
+      salvageBadge.className,
+      'and they must not render as the same shape'
+    );
+  });
+
+  it('gives the section strip’s warning dot a TEXT accessible name (issue 1096)', async () => {
+    // The frames show "The roll ●" — a colour-and-shape-only signal, which is no signal at
+    // all to a screen reader. The dot therefore carries a name stating the UNIT, and a
+    // section may carry a count and a dot at once without either being lost.
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore([], { alchemyResolutionMode: 'routedByCheck' }),
+        services: { openCurrentAdmin: () => {} },
+      },
+    });
+    flushSync();
+    navButton('Checks').click();
+    await tick();
+    flushSync();
+
+    // A routed check with no authored formula raises `noRollFormula`, which buckets to The
+    // roll — the section dot, the rail badge and the Validation route all read the same map.
+    const dot = target.querySelector('[data-checks-section-dot="roll"]');
+    assert.ok(dot, 'the roll section carries a warning dot');
+    assert.match(dot.getAttribute('aria-label'), /issue/i);
+    assert.equal(dot.getAttribute('role'), 'img', 'a decorative span announces nothing');
+
+    // A count of zero renders NO badge: five sections each wearing a `0` is chrome.
+    assert.ok(
+      !target.querySelector('[data-checks-section-count="triggers"]'),
+      'a zero count renders unbadged'
     );
   });
 
@@ -2893,6 +3049,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     navButton('Checks').click();
     await tick();
     flushSync();
+    await openChecksSection('on-failure');
 
     const behaviour = target.querySelector(
       '[data-checks-panel="crafting"] [data-alchemy-behaviour]'
@@ -2950,6 +3107,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     navButton('Checks').click();
     await tick();
     flushSync();
+    await openChecksSection('on-failure');
 
     const policy = target.querySelector(
       '[data-checks-panel="crafting"] [data-failure-consumption]'
@@ -3079,26 +3237,33 @@ describe('CraftingSystemManager mounted behavior', () => {
     navButton('Checks').click();
     await tick();
     flushSync();
+    await openChecksSection('outcomes');
 
-    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'checks');
+    assert.equal(
+      target.querySelector('.fabricate-manager').dataset.managerView,
+      'checks-crafting'
+    );
     assert.ok(
       target.querySelector('[data-crafting-check-editor]'),
       'routed mode shows the crafting check editor'
     );
-    assert.equal(
-      target.querySelector('.manager-checks-page'),
-      null,
+    assert.ok(
+      !target.querySelector('.manager-checks-page'),
       'the singleton placeholder page is replaced by the editor'
     );
     assert.equal(target.querySelectorAll('[data-check-type-option]').length, 2);
-    // The editor is seeded from the selected system's persisted routed config
-    // (legacy `rollExpression` migrates to the shared `rollFormula` field).
-    const expressionInput = target.querySelector('[data-check-roll-formula]');
-    assert.equal(expressionInput.value, '2d6');
     const rows = target.querySelectorAll('[data-outcome-row]');
     assert.equal(rows.length, 1, 'the persisted tier is rendered');
     assert.equal(rows[0].getAttribute('data-outcome-id'), 'seed1');
     assert.equal(rows[0].querySelector('[data-outcome-name]').value, 'Hit');
+
+    // The formula field lives on The roll, the tier rows on Outcomes (issue 1096), so the
+    // rest of this test reads the roll section.
+    await openChecksSection('roll');
+    // The editor is seeded from the selected system's persisted routed config
+    // (legacy `rollExpression` migrates to the shared `rollFormula` field).
+    const expressionInput = target.querySelector('[data-check-roll-formula]');
+    assert.equal(expressionInput.value, '2d6');
 
     // Routed mode requires the check, so the Active card shows the required hint
     // (no on/off toggle).
@@ -3106,7 +3271,7 @@ describe('CraftingSystemManager mounted behavior', () => {
       target.querySelector('[data-checks-active="crafting"] [data-checks-active-required]'),
       'routed crafting check shows the required hint'
     );
-    assert.equal(target.querySelector('[data-checks-active-toggle]'), null);
+    assert.ok(!target.querySelector('[data-checks-active-toggle]'));
 
     // The Save button is always present, disabled until there are unsaved edits.
     const saveButtonInitial = target.querySelector('[data-checks-save]');
@@ -3295,9 +3460,8 @@ describe('CraftingSystemManager mounted behavior', () => {
 
     // Switch to the Salvage sub-tab; progressive salvage reuses the crafting
     // progressive editor (formula + crits + award mode).
-    target.querySelector('[data-checks-tab-button="salvage"]').click();
-    await tick();
-    flushSync();
+    await openChecksActivity('salvage');
+    await openChecksSection('outcomes');
 
     const salvageEditor = target.querySelector('[data-progressive-check-editor]');
     assert.ok(salvageEditor, 'progressive salvage shows the progressive editor');
@@ -3370,9 +3534,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     navButton('Checks').click();
     await tick();
     flushSync();
-    target.querySelector('[data-checks-tab-button="gathering"]').click();
-    await tick();
-    flushSync();
+    await openChecksActivity('gathering');
 
     const panel = target.querySelector('[data-checks-panel="gathering"]');
     assert.ok(
@@ -3423,9 +3585,8 @@ describe('CraftingSystemManager mounted behavior', () => {
     navButton('Checks').click();
     await tick();
     flushSync();
-    target.querySelector('[data-checks-tab-button="gathering"]').click();
-    await tick();
-    flushSync();
+    await openChecksActivity('gathering');
+    await openChecksSection('outcomes');
 
     const panel = target.querySelector('[data-checks-panel="gathering"]');
     assert.ok(
@@ -3507,9 +3668,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     navButton('Checks').click();
     await tick();
     flushSync();
-    target.querySelector('[data-checks-tab-button="gathering"]').click();
-    await tick();
-    flushSync();
+    await openChecksActivity('gathering');
 
     const panel = target.querySelector('[data-checks-panel="gathering"]');
     const editor = panel.querySelector('[data-crafting-check-editor]');
@@ -4205,13 +4364,30 @@ describe('CraftingSystemManager mounted behavior', () => {
     );
   });
 
-  function mountChecksView(props) {
+  // `activity` is a PROP now (issue 1096): the four activities became rail routes, so the
+  // view no longer owns which one is open. `section` selects one of the five sections the
+  // strip switches between, and it is clicked rather than passed because the strip is what
+  // owns that state — a test that set it directly would stop noticing if the strip broke.
+  function mountChecksView(props, section = '') {
     target = document.createElement('div');
     document.body.appendChild(target);
     mounted = mount(ChecksViewComponent, {
       target,
-      props: { resolutionMode: 'simple', craftingCheckSimple: simpleBreakageValue, ...props },
+      props: {
+        activity: 'crafting',
+        resolutionMode: 'simple',
+        craftingCheckSimple: simpleBreakageValue,
+        ...props,
+      },
     });
+    flushSync();
+    if (section) selectChecksSection(section);
+  }
+
+  function selectChecksSection(section) {
+    const button = target.querySelector(`#checks-section-${section}`);
+    assert.ok(button, `the section strip should offer "${section}"`);
+    button.click();
     flushSync();
   }
 
@@ -4221,7 +4397,7 @@ describe('CraftingSystemManager mounted behavior', () => {
       features: { gathering: false },
       gatheringResolutionMode: 'routed',
       gatheringCheckRouted: routedBreakageValue,
-    });
+    }, 'triggers');
     // Crafting (always on) honours the system authority and shows the break pill.
     const craftingTriggers = target.querySelector('[data-check-triggers]');
     assert.ok(craftingTriggers, 'crafting editor renders the unified triggers');
@@ -4233,7 +4409,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     // Gathering is an opt-in feature: with it off, its Checks tab is not offered at
     // all (so there is no disabled gathering editor to reach).
     assert.equal(
-      target.querySelector('[data-checks-tab-button="gathering"]'),
+      target.querySelector('[data-checks-nav-item="gathering"]'),
       null,
       'the gathering tab is hidden when the gathering feature is off'
     );
@@ -4246,13 +4422,30 @@ describe('CraftingSystemManager mounted behavior', () => {
       gatheringResolutionMode: 'routed',
       gatheringCheckRouted: routedBreakageValue,
     });
-    const gatheringTab = target.querySelector('[data-checks-tab-button="gathering"]');
-    assert.ok(gatheringTab, 'the gathering tab renders when gathering is enabled');
-    gatheringTab.click();
-    flushSync();
+    // The feature GATE moved out of this view and into the rail model (issue 1096), so the
+    // question "is gathering offered" is asked of `buildChecksNavItems` — asserted directly
+    // in `tests/checks-nav.test.js` — and what remains for the view is that it renders the
+    // gathering route when the router hands it one.
+    // `assert.ok(!el)`, never `assert.equal(el, null)`: on failure `node:assert` serialises
+    // the actual value to build its diff and walks a mounted happy-dom element's circular
+    // tree until the heap dies, which surfaces as a cancelled suite with no message.
+    assert.ok(
+      !target.querySelector('[data-checks-nav-item="gathering"]'),
+      'the four activities are rail children now; this view renders one of them'
+    );
+    unmount(mounted);
+    mounted = null;
+    target.remove();
+    mountChecksView({
+      activity: 'gathering',
+      breakageAuthority: 'toolSpecific',
+      features: { gathering: true },
+      gatheringResolutionMode: 'routed',
+      gatheringCheckRouted: routedBreakageValue,
+    });
     assert.ok(
       target.querySelector('[data-checks-panel="gathering"]'),
-      'the gathering panel is shown when the tab is selected'
+      'the gathering panel renders when the router opens the gathering route'
     );
   });
 
@@ -4265,7 +4458,7 @@ describe('CraftingSystemManager mounted behavior', () => {
       craftingDefaultModifierPolicy: 'highest',
       craftingDefaultModifierIds: ['med'],
       onUpdateCraftingCheckModifiers: (patch) => patches.push(patch),
-    });
+    }, 'modifiers');
     const card = target.querySelector('[data-crafting-modifier-catalogue]');
     assert.ok(card, 'the catalogue card renders in the crafting stack when a formula is authored');
     // The policy radio-cards reflect the passed default policy.
@@ -4374,11 +4567,13 @@ describe('CraftingSystemManager mounted behavior', () => {
       {
         props: { resolutionMode: 'routedByCheck', craftingCheck: routedBreakageValue },
         attr: 'data-check-type-option',
+        section: 'outcomes',
         values: ['relative', 'fixed'],
       },
       {
         props: { resolutionMode: 'simple', craftingCheckSimple: simpleBreakageValue },
         attr: 'data-dc-mode-option',
+        section: 'roll',
         values: ['static', 'dynamic'],
       },
       {
@@ -4387,16 +4582,18 @@ describe('CraftingSystemManager mounted behavior', () => {
           craftingCheckProgressive: { rollFormula: '1d20', awardMode: 'equal' },
         },
         attr: 'data-award-mode-option',
+        section: 'outcomes',
         values: ['equal', 'partial', 'exceed'],
       },
       {
         props: { resolutionMode: 'alchemy', alchemyCheckMode: 'none' },
         attr: 'data-crafting-alchemy-checkmode-option',
+        section: 'roll',
         values: ['none', 'simple', 'tiered'],
       },
     ];
     for (const group of groups) {
-      mountChecksView(group.props);
+      mountChecksView(group.props, group.section);
       const options = [...target.querySelectorAll(`[${group.attr}]`)];
       assert.deepEqual(
         options.map((option) => option.getAttribute(group.attr)),
@@ -4432,7 +4629,7 @@ describe('CraftingSystemManager mounted behavior', () => {
       craftingCheckSimple: { rollFormula: '1d20 + 4' },
       checkModifiers: [{ id: 'med', label: 'Medicine', expression: '@abilities.med.mod' }],
       craftingDefaultModifierPolicy: 'bySubject',
-    });
+    }, 'modifiers');
     const group = target.querySelector(
       '[data-crafting-modifier-catalogue] [data-crafting-modifier-policy]'
     );
@@ -4483,14 +4680,14 @@ describe('CraftingSystemManager mounted behavior', () => {
     // A cap on a selection nobody makes is a control with no effect, so the two
     // non-selecting rules do not render it at all.
     for (const craftingDefaultModifierPolicy of ['addAll', 'highest']) {
-      mountChecksView({ ...props, craftingDefaultModifierPolicy, craftingMaxModifierPicks: 2 });
+      mountChecksView({ ...props, craftingDefaultModifierPolicy, craftingMaxModifierPicks: 2 }, 'modifiers');
       assert.ok(
         !target.querySelector('[data-crafting-modifier-max-picks]'),
         `${craftingDefaultModifierPolicy} selects nothing, so it shows no cap field`
       );
     }
     for (const craftingDefaultModifierPolicy of ['bySubject', 'playerPicks']) {
-      mountChecksView({ ...props, craftingDefaultModifierPolicy, craftingMaxModifierPicks: null });
+      mountChecksView({ ...props, craftingDefaultModifierPolicy, craftingMaxModifierPicks: null }, 'modifiers');
       const field = target.querySelector('[data-crafting-modifier-max-picks]');
       assert.ok(
         Boolean(field),
@@ -4528,7 +4725,7 @@ describe('CraftingSystemManager mounted behavior', () => {
       craftingDefaultModifierPolicy: 'playerPicks',
       craftingMaxModifierPicks: 3,
       onUpdateCraftingCheckModifiers: (patch) => patches.push(patch),
-    });
+    }, 'modifiers');
     const input = target.querySelector('[data-crafting-modifier-max-picks-input]');
     assert.equal(input.value, '3', 'the authored cap is in the field before it is cleared');
     input.value = '';
@@ -4550,7 +4747,7 @@ describe('CraftingSystemManager mounted behavior', () => {
       checkModifiers: [{ id: 'med', label: 'Medicine', expression: '@abilities.med.mod' }],
       craftingDefaultModifierPolicy: 'playerPicks',
       craftingMaxModifierPicks: 1,
-    });
+    }, 'modifiers');
     const field = target.querySelector('[data-crafting-modifier-max-picks]');
     assert.equal(field.getAttribute('data-crafting-modifier-max-picks'), '1');
     assert.equal(field.querySelector('[data-crafting-modifier-max-picks-input]').value, '1');
@@ -4564,7 +4761,7 @@ describe('CraftingSystemManager mounted behavior', () => {
         checkModifiers: [{ id: 'med', label: 'Medicine', expression: '@med' }],
         craftingDefaultModifierPolicy: 'playerPicks',
         craftingMaxModifierPicks: junk,
-      });
+      }, 'modifiers');
       assert.equal(
         target
           .querySelector('[data-crafting-modifier-max-picks]')
@@ -4587,7 +4784,7 @@ describe('CraftingSystemManager mounted behavior', () => {
       resolutionMode: 'simple',
       craftingCheckSimple: { rollFormula: '' },
       checkModifiers: [{ id: 'med', label: 'Medicine', expression: '@abilities.med.mod' }],
-    });
+    }, 'modifiers');
     const card = target.querySelector('[data-crafting-modifier-catalogue]');
     assert.ok(Boolean(card), 'a formula-less check still shows the catalogue, with a warning');
     const notice = card.querySelector('[data-crafting-modifier-inert]');
@@ -4607,7 +4804,7 @@ describe('CraftingSystemManager mounted behavior', () => {
   // some incidental difference in the check.
   it('checks view: an EMPTY catalogue shows no inert notice even when the cause applies (issue 1055)', () => {
     const props = { resolutionMode: 'simple', craftingCheckSimple: { rollFormula: '' } };
-    mountChecksView({ ...props, checkModifiers: [] });
+    mountChecksView({ ...props, checkModifiers: [] }, 'modifiers');
     assert.ok(
       Boolean(target.querySelector('[data-crafting-modifier-empty]')),
       'the empty catalogue renders its empty state'
@@ -4624,7 +4821,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     mountChecksView({
       ...props,
       checkModifiers: [{ id: 'med', label: 'Medicine', expression: '@abilities.med.mod' }],
-    });
+    }, 'modifiers');
     const notice = target.querySelector('[data-crafting-modifier-inert]');
     assert.ok(Boolean(notice), 'one authored modifier is enough to make the notice worth showing');
     assert.equal(
@@ -4659,7 +4856,7 @@ describe('CraftingSystemManager mounted behavior', () => {
         cause: 'noFormula',
       },
     ]) {
-      mountChecksView({ ...props, checkModifiers: catalogue });
+      mountChecksView({ ...props, checkModifiers: catalogue }, 'modifiers');
       const notice = target.querySelector('[data-crafting-modifier-inert]');
       assert.ok(Boolean(notice), `${cause}: an inert notice renders`);
       assert.equal(notice.getAttribute('data-crafting-modifier-inert'), cause);
@@ -4673,7 +4870,7 @@ describe('CraftingSystemManager mounted behavior', () => {
       resolutionMode: 'simple',
       craftingCheckSimple: { rollFormula: '1d20 + 4' },
       checkModifiers: catalogue,
-    });
+    }, 'modifiers');
     assert.ok(
       !target.querySelector('[data-crafting-modifier-inert]'),
       'an authored formula is never inert: the modifiers are appended to it'
@@ -4686,7 +4883,7 @@ describe('CraftingSystemManager mounted behavior', () => {
       craftingCheckSimple: { rollFormula: '1d20 + 4' },
       checkModifiers: [{ id: 'med', label: 'Medicine', expression: '@abilities.med.mod' }],
       // No `craftingDefaultModifierPolicy` at all — the never-authored state.
-    });
+    }, 'modifiers');
     const checked = [...target.querySelectorAll('[data-crafting-modifier-policy-option]')].filter(
       (option) => option.querySelector('input').checked
     );
@@ -4703,14 +4900,15 @@ describe('CraftingSystemManager mounted behavior', () => {
   // inherits until it picks its own, or the menu the player chooses from at roll time.
   it('checks view: the default-set intro follows the combination rule (issue 1055)', () => {
     const introText = (craftingDefaultModifierPolicy) => {
-      mountChecksView({
-        resolutionMode: 'simple',
-        craftingCheckSimple: { rollFormula: '1d20 + 4' },
-        checkModifiers: [
-          { id: 'med', label: 'Medicine', expression: '@abilities.med.mod' },
-        ],
-        craftingDefaultModifierPolicy,
-      });
+      mountChecksView(
+        {
+          resolutionMode: 'simple',
+          craftingCheckSimple: { rollFormula: '1d20 + 4' },
+          checkModifiers: [{ id: 'med', label: 'Medicine', expression: '@abilities.med.mod' }],
+          craftingDefaultModifierPolicy,
+        },
+        'modifiers'
+      );
       const text = target.querySelector('#manager-crafting-modifier-eligibility-intro').textContent;
       unmount(mounted);
       mounted = null;
@@ -4759,24 +4957,31 @@ describe('CraftingSystemManager mounted behavior', () => {
 
   it('offers tier stepping on routed crafting, salvage AND gathering', () => {
     // The old toggle was absent for gathering entirely; the per-trigger effect is not.
-    mountChecksView({
-      resolutionMode: 'routedByCheck',
-      craftingCheck: routedBreakageValue,
-      salvageResolutionMode: 'routed',
-      salvageCheckRouted: routedBreakageValue,
-      gatheringResolutionMode: 'routed',
-      gatheringCheckRouted: routedBreakageValue,
-      features: { salvage: true, gathering: true },
-    });
-    assert.ok(target.querySelector('[data-checks-panel="crafting"] [data-trigger-tier-step]'));
-
-    target.querySelector('[data-checks-tab-button="salvage"]').click();
-    flushSync();
-    assert.ok(target.querySelector('[data-checks-panel="salvage"] [data-trigger-tier-step]'));
-
-    target.querySelector('[data-checks-tab-button="gathering"]').click();
-    flushSync();
-    assert.ok(target.querySelector('[data-checks-panel="gathering"] [data-trigger-tier-step]'));
+    // One ROUTE at a time now (issue 1096): the view renders the activity the router hands
+    // it, so the three activities are three mounts rather than three clicks. The claim is
+    // unchanged — every one of them offers the per-trigger tier step.
+    for (const activity of ['crafting', 'salvage', 'gathering']) {
+      mountChecksView(
+        {
+          activity,
+          resolutionMode: 'routedByCheck',
+          craftingCheck: routedBreakageValue,
+          salvageResolutionMode: 'routed',
+          salvageCheckRouted: routedBreakageValue,
+          gatheringResolutionMode: 'routed',
+          gatheringCheckRouted: routedBreakageValue,
+          features: { salvage: true, gathering: true },
+        },
+        'triggers'
+      );
+      assert.ok(
+        target.querySelector(`[data-checks-panel="${activity}"] [data-trigger-tier-step]`),
+        `${activity} offers the per-trigger tier step`
+      );
+      unmount(mounted);
+      mounted = null;
+      target.remove();
+    }
   });
 
   it('carries an authored tierStep through the root draft and into the Save payload', async () => {
@@ -4812,6 +5017,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     navButton('Checks').click();
     await tick();
     flushSync();
+    await openChecksSection('triggers');
 
     const card = target.querySelector('[data-trigger="c1"]');
     assert.ok(
@@ -6195,6 +6401,7 @@ describe('CraftingSystemManager mounted behavior', () => {
       navButton('Checks').click();
       await tick();
       flushSync();
+      await openChecksSection('modifiers');
       const checked = [...target.querySelectorAll('[data-crafting-modifier-policy-option]')]
         .filter((option) => option.querySelector('input').checked)
         .map((option) => option.getAttribute('data-crafting-modifier-policy-option'));
@@ -6219,6 +6426,7 @@ describe('CraftingSystemManager mounted behavior', () => {
       navButton('Checks').click();
       await tick();
       flushSync();
+      await openChecksSection('modifiers');
       assert.equal(
         target
           .querySelector('[data-crafting-modifier-max-picks]')
@@ -6318,6 +6526,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     navButton('Checks').click();
     await tick();
     flushSync();
+    await openChecksSection('modifiers');
     assert.ok(
       Boolean(target.querySelector(selector)),
       'a selecting rule with no cap must put BOTH the bySubject option and the unlimited cap ' +

@@ -51,6 +51,13 @@ const harness = createMountedComponentHarness({
     // The shared numeric stepper the DC, tier-DC and trigger fields are built on
     // (issue 1050). Omitting it HANGS this suite (# cancelled) rather than failing it.
     'src/ui/svelte/components/Stepper.svelte',
+    // The shared icon fact row, which joined this tree when issue 1096 gave the simple
+    // check its Outcomes section (the two-outcome pass/fail statement). ONLY the dependency
+    // manifest changed for it: no assertion below was added, edited, weakened, skipped or
+    // deleted — this suite's whole value is that it did not move while the tree around it
+    // did. `tests/components/mounted-harness-primitive-allowlist.test.js` is what turned
+    // the omission into a failure here rather than a hung suite.
+    'src/ui/svelte/apps/manager/IconFactRow.svelte',
     'src/ui/svelte/apps/manager/checks/CheckFormulaFields.svelte',
     'src/ui/svelte/apps/manager/checks/CheckRecipeTiers.svelte',
     'src/ui/svelte/apps/manager/checks/CheckTriggers.svelte',

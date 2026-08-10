@@ -31,6 +31,19 @@
 
   const comparison = $derived(thresholdMode === 'exceed' ? 'exceed' : 'meet');
 
+  // The formula token quick-add row (issue 1096). A FIXED LITERAL LIST, deliberately: the
+  // formula-DERIVED variant — offering the tokens this actor or this system actually has —
+  // is explicitly out of scope on the epic, and a list that looked derived but was not would
+  // be worse than one that plainly is not. Each chip appends its token to whatever the GM
+  // has typed, joined with ` + `, so it is an accelerator for the field beside it rather
+  // than a second authoring model.
+  const QUICK_TOKENS = ['@prof', '@abilities.wis.mod', '@ingredients', '@level', '1d4'];
+
+  function appendToken(token) {
+    const current = String(rollFormula || '').trim();
+    onChange({ rollFormula: current ? `${current} + ${token}` : token });
+  }
+
   // Visible field label, stepper accessible name, and the `{label}` slot in the shared
   // `Decrease {label}` / `Increase {label}` adjunct strings — one string, three readers.
   const dcLabel = $derived(text('FABRICATE.Admin.Manager.Checks.Crafting.Dc', 'DC'));
@@ -45,6 +58,21 @@
       {placeholder}
       oninput={(event) => onChange({ rollFormula: event.currentTarget.value })}
     />
+    <!-- Real `<button>`s, never the prototype's click-handled bare spans: this row is five
+         controls a GM operates, and a span with an `onclick` is reachable by neither the
+         keyboard nor a screen reader. -->
+    <span class="manager-checks-formula-tokens" data-check-formula-tokens>
+      {#each QUICK_TOKENS as token (token)}
+        <button
+          type="button"
+          class="manager-checks-formula-token"
+          data-check-formula-token={token}
+          onclick={() => appendToken(token)}
+        >
+          + {token}
+        </button>
+      {/each}
+    </span>
   </label>
   {#if showDc}
     <!-- A `<div>`, not the `<label>` it was: see the NAMING contract in `Stepper.svelte`. -->

@@ -102,13 +102,36 @@ function routedCheck(overrides = {}) {
   };
 }
 
-function mountChecks(props) {
-  return harness.mount({
+// ── NAVIGATION ONLY (issue 1096) ──
+//
+// The dependency-manifest-only rule could not survive this change LITERALLY, and the
+// contradiction is mechanical rather than a matter of taste: issue 1096 replaces the four
+// ACTIVITY tabs with four rail ROUTES and a five-SECTION strip, so the
+// `[data-checks-tab-button="gathering"]` click this file used to reach the gathering panel
+// selects a control that no longer exists anywhere in the product. A suite cannot both
+// require that hook be removed and require the line clicking it stay.
+//
+// So the rule is honoured where it carries the value and stated where it cannot be:
+// **no assertion in this file is added, edited, weakened, skipped or deleted** — every
+// `assert.*` below is byte-identical to the version issue 1095 landed. What changed is
+// only HOW a test reaches the state it then asserts on: an `activity` prop instead of a
+// tab click, and a `section` argument instead of nothing. That is the route, not the
+// characterization, and the route is precisely what this change is.
+function mountChecks(props, section = '') {
+  const mounted = harness.mount({
+    activity: 'crafting',
     resolutionMode: 'simple',
     craftingCheckSimple: SIMPLE_CHECK,
     features: { salvage: true, gathering: true },
     activation: {},
     ...props,
+  });
+  if (!section) return mounted;
+  return mounted.then((target) => {
+    const button = target.querySelector('#checks-section-' + section);
+    if (!button) throw new Error('the section strip should offer "' + section + '"');
+    button.click();
+    return Promise.resolve().then(() => target);
   });
 }
 
@@ -141,13 +164,16 @@ describe('1093 must-not-regress — the states the prototype never depicts', () 
   });
 
   it('renders all THREE alchemy behaviour flags as real controls', async () => {
-    const target = await mountChecks({
-      resolutionMode: 'alchemy',
-      alchemyCheckMode: 'simple',
-      alchemyLearnOnCraft: true,
-      alchemyConsumeOnFail: false,
-      alchemyShowAttemptHistory: true,
-    });
+    const target = await mountChecks(
+      {
+        resolutionMode: 'alchemy',
+        alchemyCheckMode: 'simple',
+        alchemyLearnOnCraft: true,
+        alchemyConsumeOnFail: false,
+        alchemyShowAttemptHistory: true,
+      },
+      'on-failure'
+    );
     const behaviour = target.querySelector('[data-alchemy-behaviour]');
     assert.ok(behaviour, 'the alchemy behaviour card renders');
     for (const [field, expected] of [
@@ -193,11 +219,10 @@ describe('1093 must-not-regress — the states the prototype never depicts', () 
   // `data-gathering-d100-readonly` hook and the assertion reds immediately.
   it('renders the gathering d100 explanation panel, read-only', async () => {
     const target = await mountChecks({
+      activity: 'gathering',
       features: { salvage: true, gathering: true },
       gatheringResolutionMode: 'd100',
     });
-    target.querySelector('[data-checks-tab-button="gathering"]').click();
-    await Promise.resolve();
     assert.ok(
       target.querySelector('[data-gathering-d100-readonly]'),
       'd100 explains itself rather than rendering an editor for a roll nobody authors'
@@ -215,11 +240,14 @@ describe('1093 must-not-regress — the states the prototype never depicts', () 
   // PROVEN CAPABLE OF FAILING: coercing the prop with `?? 1` or `|| 0` anywhere on the way
   // to the Stepper renders `1`/`0` in the field and reds both halves of this assertion.
   it('renders an ABSENT pick cap as a BLANK field behind an Unlimited placeholder', async () => {
-    const target = await mountChecks({
-      checkModifiers: [{ id: 'med', label: 'Medicine', expression: '@med' }],
-      craftingDefaultModifierPolicy: 'playerPicks',
-      craftingMaxModifierPicks: null,
-    });
+    const target = await mountChecks(
+      {
+        checkModifiers: [{ id: 'med', label: 'Medicine', expression: '@med' }],
+        craftingDefaultModifierPolicy: 'playerPicks',
+        craftingMaxModifierPicks: null,
+      },
+      'modifiers'
+    );
     const field = target.querySelector('[data-crafting-modifier-max-picks]');
     assert.ok(field, 'the cap renders under a selecting rule');
     assert.equal(
@@ -239,22 +267,28 @@ describe('1093 must-not-regress — the states the prototype never depicts', () 
   // hard-coding it to `false` reds the checkDriven half. Only asserting one direction
   // would pass against a gate that had been removed entirely.
   it('gates per-trigger break-tools on breakageAuthority, in BOTH directions', async () => {
-    const withGate = await mountChecks({
-      resolutionMode: 'routedByCheck',
-      craftingCheck: routedCheck(),
-      breakageAuthority: 'checkDriven',
-    });
+    const withGate = await mountChecks(
+      {
+        resolutionMode: 'routedByCheck',
+        craftingCheck: routedCheck(),
+        breakageAuthority: 'checkDriven',
+      },
+      'triggers'
+    );
     assert.ok(
       withGate.querySelector('[data-trigger="trg-1"] [data-trigger-break]'),
       'checkDriven exposes the per-trigger break-tools toggle'
     );
     harness.remount();
 
-    const withoutGate = await mountChecks({
-      resolutionMode: 'routedByCheck',
-      craftingCheck: routedCheck(),
-      breakageAuthority: 'toolSpecific',
-    });
+    const withoutGate = await mountChecks(
+      {
+        resolutionMode: 'routedByCheck',
+        craftingCheck: routedCheck(),
+        breakageAuthority: 'toolSpecific',
+      },
+      'triggers'
+    );
     assert.equal(
       withoutGate.querySelector('[data-trigger="trg-1"] [data-trigger-break]'),
       null,
@@ -264,22 +298,28 @@ describe('1093 must-not-regress — the states the prototype never depicts', () 
   });
 
   it('gates the routed PER-TIER break-tools column on breakageAuthority', async () => {
-    const withGate = await mountChecks({
-      resolutionMode: 'routedByCheck',
-      craftingCheck: routedCheck(),
-      breakageAuthority: 'checkDriven',
-    });
+    const withGate = await mountChecks(
+      {
+        resolutionMode: 'routedByCheck',
+        craftingCheck: routedCheck(),
+        breakageAuthority: 'checkDriven',
+      },
+      'outcomes'
+    );
     assert.ok(
       withGate.querySelector('[data-outcome-row="tier-ruined"] [data-outcome-break]'),
       'checkDriven exposes the per-tier break-tools column'
     );
     harness.remount();
 
-    const withoutGate = await mountChecks({
-      resolutionMode: 'routedByCheck',
-      craftingCheck: routedCheck(),
-      breakageAuthority: 'toolSpecific',
-    });
+    const withoutGate = await mountChecks(
+      {
+        resolutionMode: 'routedByCheck',
+        craftingCheck: routedCheck(),
+        breakageAuthority: 'toolSpecific',
+      },
+      'outcomes'
+    );
     assert.equal(
       withoutGate.querySelector('[data-outcome-row="tier-ruined"] [data-outcome-break]'),
       null,
@@ -294,11 +334,14 @@ describe('1093 must-not-regress — the states the prototype never depicts', () 
   // the whole list rather than a membership test — a two-segment control would otherwise
   // satisfy "success is offered".
   it('offers ALL THREE force-outcome segments on a trigger', async () => {
-    const target = await mountChecks({
-      resolutionMode: 'routedByCheck',
-      craftingCheck: routedCheck(),
-      breakageAuthority: 'checkDriven',
-    });
+    const target = await mountChecks(
+      {
+        resolutionMode: 'routedByCheck',
+        craftingCheck: routedCheck(),
+        breakageAuthority: 'checkDriven',
+      },
+      'triggers'
+    );
     const segments = [
       ...target.querySelectorAll('[data-trigger="trg-1"] [data-trigger-outcome]'),
     ].map((segment) => segment.getAttribute('data-trigger-outcome'));
@@ -317,11 +360,14 @@ describe('1093 must-not-regress — the states the prototype never depicts', () 
   // PROVEN CAPABLE OF FAILING: removing the `outcomeTier` option from the WHEN vocabulary
   // reds the membership assertion.
   it('offers outcomeTier in the trigger WHEN vocabulary', async () => {
-    const target = await mountChecks({
-      resolutionMode: 'routedByCheck',
-      craftingCheck: routedCheck(),
-      breakageAuthority: 'checkDriven',
-    });
+    const target = await mountChecks(
+      {
+        resolutionMode: 'routedByCheck',
+        craftingCheck: routedCheck(),
+        breakageAuthority: 'checkDriven',
+      },
+      'triggers'
+    );
     const select = target.querySelector('[data-trigger="trg-1"] [data-trigger-condition-type]');
     assert.ok(select, 'the condition-type control renders');
     const values = [...select.querySelectorAll('option')].map((option) => option.value);

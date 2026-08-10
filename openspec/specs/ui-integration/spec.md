@@ -90,11 +90,40 @@ The player crafting app's requirement rail, requirement tile, essence pool, cons
 
 Two live non-conformances are recorded here rather than left to be discovered, because a rule whose exceptions are unwritten is a rule nobody can rely on.
 
-- The repo carries five hand-rolled horizontal fill bars: `src/ui/svelte/apps/gathering/ChanceBar.svelte`, `src/ui/svelte/apps/gathering/GatheringTaskDrops.svelte`, `src/ui/svelte/apps/journal/RunCard.svelte`, `src/ui/svelte/components/ActorSelectTopBar.svelte`, and now `src/ui/svelte/apps/crafting/detail/EssencePoolPanel.svelte`.
-  The primitive that should exist is a shared `FillBar` leaf that `ChanceBar` is itself rebuilt on: `ChanceBar` is a percentage instrument and does not own the have/need meaning, so widening it in place would make it the second component owning half a meaning rather than the primitive that owns one.
-  Conversion is deferred because converting the other four would drag their screenshot-label sets into a single evidence run.
-- `tests/components/mounted-harness-primitive-allowlist.test.js` requires every `SHARED_PRIMITIVES` entry to be reachable from `src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte`, so the allowlist that encodes "this is a shared primitive" is structurally manager-scoped in exactly the way this rule is not.
-  Only its second test carries that assumption; the fix is to widen it to a declared root set rather than one root.
+- `FillBar` now EXISTS at `src/ui/svelte/components/FillBar.svelte`, and `src/ui/svelte/apps/gathering/ChanceBar.svelte` is REBUILT on it rather than widened: `ChanceBar` is a percentage instrument and does not own the have/need meaning, so widening it in place would have made it the second component owning half a meaning rather than the primitive that owns one.
+  `FillBar` is a LEAF — it renders the track and the value-width fill and declares no `role` or `aria-*`, because the accessible semantics differ per site (`ChanceBar` is a `meter` with its own `aria-valuenow`; an odds row's bar is decorative).
+  A caller whose colour is authored DATA, or whose scale is its own domain meaning rather than one of the semantic tones, passes it inline through `color`; `ChanceBar`'s reversed four-step event scale travels that way as ONE inherited custom property, so the tier colours stay in the stylesheet that owns them.
+  FOUR unconverted sites remain and are a debt with a named owner rather than an accepted state: `GatheringTaskDrops.svelte`, `RunCard.svelte`, `ActorSelectTopBar.svelte`, and `EssencePoolPanel.svelte`.
+  Conversion of those four stays deferred because it would drag their screenshot-label sets into a single evidence run.
+- `CollapsibleGroupHeader` is explicitly NOT the primitive for a collapsed ROW disclosure; it is a GROUP header, owning a heading, a count and the header band above a set of rows.
+  A single purpose-built row disclosure exists instead at `src/ui/svelte/components/RowDisclosure.svelte`, with `aria-expanded`, `aria-controls` and an accessible name, and it is the ONE implementation every such site uses — two "labelled regions that expand" landing in one change must share an implementation or name the behavioural mismatch that forbids it.
+  It renders a real `<button>`, so a caller nests it beside a row's content and never converts a `role="button"` wrapper around it into a `<button>`, which would nest buttons and land invalid DOM.
+
+#### Threshold band strip
+
+A shared primitive rendering N ordered, named bands over a value track with draggable boundaries, at `src/ui/svelte/components/ThresholdBandStrip.svelte`.
+The numeric steppers in the tier rows remain AUTHORITATIVE; the strip is a visualisation bound to the same state.
+
+It uses NO gradient.
+Each band is a solid fill from that band's own runtime colour applied inline via `style=` (authored data, never a source literal), and it claims NO §Product UI Visual Style exemption — the exemption's own rule (a gradient across the complete track, fill kept full-width) conflicts with per-band identity, which is the whole point of the control.
+
+Every boundary renders a VISIBLE handle with a hit area of at least 24x24 CSS pixels, satisfying WCAG 2.5.8; a ~2px band seam is not a target, so the visible grip is deliberately narrower than the box around it.
+Every handle is keyboard-operable: `role="slider"` with `aria-valuenow`, `aria-valuemin`, `aria-valuemax` and an `aria-label` naming the boundary, driven by Arrow, Home, End, PageUp and PageDown.
+
+N bands yield N-1 handles, so the band-to-boundary mapping is stated rather than inferred.
+In `relative` mode handle _i_ writes `outcomes[i+1].dc`; in `fixed` mode handle _i_ writes the coupled pair `outcomes[i].end` and `outcomes[i+1].start` as ONE update; in the two-band `simple` binding the single handle writes `simple.dc`.
+The outermost authored values carry no handle and are edited by `Stepper` only — the first band's lower bound and the last band's upper bound.
+Bands are DRAWN in value order and WRITTEN through each band's authored index, because a routed tier list authored high-to-low is valid data and sorting the authored array instead would reorder a GM's rows from a drag.
+`aria-valuemin` and `aria-valuemax` are the NEIGHBOURING boundaries, and at the outermost handles they are the TRACK DOMAIN: the authored range extended one TIER interval past the outermost tier in `relative`, the authored `[min(start), max(end)]` span in `fixed`, and the DC field's own stepper range in `simple`.
+A handle dragged or keyed past a neighbour CLAMPS rather than swapping or reordering.
+
+In `relative` mode the strip renders and announces ABSOLUTE values against the previewed record's DC — `aria-valuenow` carries the absolute number, not the offset — and converts back to offsets on write, because the tier rows' steppers show offsets over the same state.
+Since that absolute number is a function of the previewed record and changes with no data change when the GM switches records, `aria-valuetext` carries BOTH readings ("17 — DC +5 against Uncommon Craft") and the previewed record is named in the strip's group label.
+
+A gapped, overlapping or inverted authored set is reachable and a contiguous strip cannot render it, so the strip falls back to the tier rows alone with a stated note.
+An ABSENT upper edge is distinguished from an authored zero: `Number(null)` is `0` and finite, so a bare coercion reads every omitted edge as an authored `0` and reports a perfectly contiguous set as gapped.
+
+Click handlers on bare non-interactive elements are forbidden, and a `role="button"` wrapper is never converted into a `<button>`.
 
 #### Right-inspector actions
 
@@ -437,7 +466,42 @@ Routed keeps its multi-group list and Add group; progressive is unchanged.
 - Salvage toggle (`features.salvage`, default on)
 - Chat output toggle (`features.chatOutput`, default on)
 
-#### Crafting Check Controls
+#### GM Checks Studio
+
+`Checks` is an EXPANDABLE left-rail group whose children are Crafting / Salvage / Gathering / Validation; salvage and gathering appear only under their feature flags.
+Each activity child carries an issue-count badge derived from `evaluateCheckReadiness`; the parent badge sums the three ACTIVITY children only, and Validation's badge is that same total restated and is never added to it.
+The rail's badge column carries THREE distinguishable things and they must not be confusable: a record-count numeral (`Gathering 69`), an issue badge in a distinct pill treatment with an accessible name naming the unit ("1 issue"), and a per-activity DIRTY marker distinguished from the issue badge by shape and accessible name, not by colour alone.
+The shipped Essences rail item and the `.manager-rail-toggle` collapse control both survive; a collapsed rail renders the group's parent icon with its issue badge and expands on activation.
+`checks` is retained as a redirect to the first available child so existing deep links and every View Lab `expectView` assertion have a defined answer.
+`CHECKS_VIEWS` values ARE the `data-manager-view` strings the root renders, not nav-item ids.
+
+Each activity route renders FIVE sections — The roll / Outcomes / Triggers / Modifiers / On failure — each with a count badge and a warning dot fed from the same readiness evaluation that feeds the rail badge and the Validation route, so the three can never disagree.
+The warning dot carries a text accessible name, and a section carrying both a count and an issue renders both; a count of zero renders unbadged, because five sections each wearing a `0` is chrome rather than information.
+Outcomes renders in EVERY mode and hosts that mode's own outcome model: the two-outcome pass/fail statement on `simple`, the `awardMode` selector on `progressive`, the band strip plus the tier rows on `routed`.
+Its count badge is emitted only where there is a tier list to count, so `simple` and `progressive` render it unbadged.
+Modifiers renders in every mode too, INCLUDING the two that roll nothing — gathering `d100` and alchemy `none` — because the check-modifier catalogue card is the one owned path for reporting that a selection reaches no roll, and hiding the section it lives in would take that report away from the two states that need it.
+Any section that cannot apply renders the shared `EmptyState` naming the mode, preserving the shipped d100 explanation rather than blanking the route.
+
+A check that is switched off — the route has a LIVE Active toggle and it is not on — collapses the strip to a single section and renders the shared `EmptyState` with a "Turn this check on" action; its right rail keeps the documentation/quickstart pair, the activation card and an `OFF` digest.
+"Switched off" is not `optional && !enabled`: `optional` does not mean the same thing per activity (on gathering it is `mode === 'd100'`, the one mode with no toggle at all), so the predicate is stated per activity and alchemy `none` and gathering `d100` are INERT rather than off.
+
+The right rail is an INDEPENDENTLY SCROLLABLE container in the SIDE-COLUMN STATE ONLY, never a pinned column that clips.
+On an activity route it carries, in order: the documentation/quickstart pair, the activation toggle with its locked-mode hint, a "Preview as" actor and record selector, an outcome-preview simulator, a per-outcome odds histogram, and a "This check" digest whose status chip reads `OK` / `OFF` / a count pill.
+Its responsive behaviour reuses the SHIPPED `fabricate-manager` container ladder and introduces no new breakpoint: `styles/fabricate.css` already declares that container with blocks at 1320 / 1120 / 960 / 900 / 831 / 680, and `.fabricate-manager .manager-inspector` already carries `overflow-y: auto; max-height: 100%`.
+At the existing 1320 breakpoint and below, the odds histogram and the simulator readout become collapsed disclosures, headers and counts retained.
+At the existing 1120 breakpoint and below, the shipped rule already restacks `.manager-body` to one column with `grid-auto-rows: max-content` and hands scrolling to the body; the rail's own `overflow-y` / `max-height` is LEFT ALONE there, because that block unsets neither and a `max-content` track cannot be squeezed.
+The constraint is instead that `grid-auto-rows: max-content` MUST NOT be defeated and no `.manager-body` child may carry a definite height — that is the measured regression recorded above that block (issue 643: rail 225px, main 200px, inspector 179px, `.manager-table-scroll` squeezed to 24px), caused by zero-min-content children under implicit `auto` rows.
+At the 1024x640 declared floor the layout is therefore STACKED, not a side rail, and every panel is reachable by scrolling `.manager-body`.
+
+The Validation route renders the documentation pair and the "All checks" summary ONLY — no activation toggle, no Preview-as, no simulator, no histogram, no This-check digest — and renders no section strip.
+Validation renders through the shared `EditorValidationSurface`, selecting an issue deep-links to the owning activity AND section, and the issue-id to section map is proven exhaustive against the frozen `CHECK_READINESS_ISSUE_IDS` registry `evaluateCheckReadiness` pushes from — never a hand-copied list.
+
+The draft model lives ABOVE the route: one dirty set across the four activities, one plural `Save checks` that persists every dirty activity, one system-wide `Unsaved` chip plus the per-activity rail markers, drafts preserved across Checks child routes, and a discard confirmation on leaving a dirty Checks route for a non-Checks route.
+That confirmation is `confirmDiscardDirtyChecksDraft`, built on the shared `_confirmDiscardDirtyDraft(contentKey, contentFallback, replacements)` helper seven of the nine existing draft prompts use, which returns `'save' | 'discard' | 'cancel'` by construction; it takes the three-way "save and continue / discard / cancel" shape the system-details variant uses, and it NAMES which activities are dirty.
+The rail badges, the section dots and the Validation counters read the LIVE draft and are a draft PREVIEW; the ENABLE gate reads COMMITTED state, and the Validation hero renders the unsaved condition explicitly rather than claiming "Ready to enable" for state that is not persisted.
+
+The crafting resolution mode is TRANSLATED into the readiness evaluator's own vocabulary before it is evaluated (`routedByCheck` to `routed`, `progressive` to `progressive`, alchemy per its `checkMode`, everything else to `simple`).
+The evaluator branches on `'routed'`, which the system-level crafting mode never is, so passing the raw mode through skipped every outcome-tier rule for the one mode that has outcome tiers.
 
 A check is usable iff its mode carries an authored `rollFormula`; the legacy check-source/macro layer (`macroUuid` / `successMacroUuid` / `failureMacroUuid` / `checkSource` / `builtIn`) was removed by migration 1.8.0 and is not authored.
 
@@ -1645,6 +1709,11 @@ The routing basis is the system **mode**, not a per-recipe provider: the recipe 
   The failure-consumption toggles of §Crafting Check Controls are the distinct, non-alchemy `craftingCheck.consumption` policy and are NOT shown in alchemy mode.
 
 ### Checks tab per-mode behaviour (issue 554)
+
+Which of the five sections renders in each mode.
+Crafting: `simple` and `routedByIngredients` render all five with Outcomes as the two-outcome statement; `routedByCheck` renders all five with the band strip and the tier rows; `progressive` renders all five with Outcomes as the `awardMode` selector; `alchemy` follows its `checkMode`, and `none` keeps the read-only "resolves without a check" notice with no editor and no Active card.
+Salvage follows the same three-mode pattern.
+Gathering: `progressive` and `routed` render all five; `d100` renders Modifiers with the `noCheck` inert notice, the check-modifier and character-modifier disambiguation copy and the dormancy notice, and renders the remaining inapplicable sections as `EmptyState`s naming the mode.
 
 - alchemy + `simple` → the simple pass/fail editor rendered below the selector; alchemy + `tiered` → the routed editor below the selector; BOTH cannot be disabled (the Active card shows the requiredHint, ungated by `checksEnabled`).
 - alchemy + `none` → a read-only "resolves without a check" notice below the selector (no editor, no Active card, a distinct "no check" hint that points back to the selector above — NOT the requiredHint).

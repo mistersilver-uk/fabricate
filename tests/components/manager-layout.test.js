@@ -874,7 +874,11 @@ test('manager gathering rail submenu controls clear host mouse focus and keep gr
     'gathering submenu entries should be nested inside the group'
   );
   assert.ok(
-    subitemBlock.includes('grid-template-columns: 20px minmax(0, 1fr) auto;'),
+    // FOUR tracks since issue 1096: a Checks child can carry an unsaved marker AND an issue
+    // badge beside its label, and the three-track grid put the second one into the ICON cell
+    // of the row below it. The claim is unchanged — a submenu entry's trailing markers stay
+    // inside its own row — and the extra track is simply empty for every other rail group.
+    subitemBlock.includes('grid-template-columns: 20px minmax(0, 1fr) auto auto;'),
     'gathering submenu entries should keep count chips inside their rows'
   );
   // Issue 643: the rail's selected state is an IDENTITY cue ("you are here"), so it

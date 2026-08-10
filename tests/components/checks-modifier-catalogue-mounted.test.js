@@ -71,8 +71,12 @@ const CATALOGUE = [
   { id: 'huge', label: 'Huge', expression: '@abilities.her.mod', min: 1e21 },
 ];
 
-function mountChecks(props = {}) {
-  return harness.mount({
+// The four activities became rail ROUTES and the five sections became the strip
+// (issue 1096), so `activity` is a prop and the catalogue card lives on the Modifiers
+// section. Every mount here is about the catalogue, so the default lands on it.
+async function mountChecks(props = {}) {
+  const target = await harness.mount({
+    activity: 'crafting',
     resolutionMode: 'simple',
     craftingCheckSimple: SIMPLE_CHECK,
     salvageCheckSimple: SIMPLE_CHECK,
@@ -88,11 +92,15 @@ function mountChecks(props = {}) {
     gatheringDefaultModifierIds: ['huge'],
     ...props,
   });
+  if (target.querySelector('#checks-section-modifiers')) await openSection(target, 'modifiers');
+  return target;
 }
 
-/** Click a checks sub-tab by id and let the panel render. */
-async function openTab(target, tab) {
-  target.querySelector(`[data-checks-tab-button="${tab}"]`).click();
+/** Click one of the five section-strip buttons and let the panel render. */
+async function openSection(target, section) {
+  const button = target.querySelector(`#checks-section-${section}`);
+  assert.ok(button, `the section strip should offer "${section}"`);
+  button.click();
   await new Promise((done) => setTimeout(done, 0));
   return target;
 }
@@ -156,8 +164,11 @@ describe('the check-modifier catalogue card (mounted)', () => {
     assert.equal(crafting.dataset.craftingModifierEmpty, 'editable');
     assert.match(crafting.textContent, /Add one/, 'crafting has the add button this names');
 
-    await openTab(target, 'salvage');
-    const salvage = target.querySelector(
+    // Salvage is its own ROUTE now (issue 1096), so its card is reached by mounting that
+    // route rather than by clicking a sibling tab.
+    harness.remount();
+    const salvageTarget = await mountChecks({ activity: 'salvage', checkModifiers: [] });
+    const salvage = salvageTarget.querySelector(
       '[data-crafting-modifier-catalogue="salvage"] [data-crafting-modifier-empty]'
     );
     assert.equal(salvage.dataset.craftingModifierEmpty, 'linked');
@@ -250,7 +261,7 @@ describe('the Validation tab reads each activity’s OWN modifier context', () =
   }
 
   it('reports each activity’s own broken entry, in its own section', async () => {
-    const target = await openTab(await mountChecks(), 'validation');
+    const target = await mountChecks({ activity: 'validation' });
     assert.ok(
       Boolean(target.querySelector('[data-checks-validation-section="crafting"]')),
       'the crafting section renders'
@@ -282,7 +293,7 @@ describe('the Validation tab reads each activity’s OWN modifier context', () =
   });
 
   it('reports the gathering d100 selection as reaching no roll at all', async () => {
-    const target = await openTab(await mountChecks(), 'validation');
+    const target = await mountChecks({ activity: 'validation' });
     assert.ok(
       issuesIn(target, 'gathering').includes('modifiersInertNoCheck'),
       'the fixed d100 roll has no formula, so a gathering selection applies to nothing — ' +
@@ -296,10 +307,11 @@ describe('the Validation tab reads each activity’s OWN modifier context', () =
   });
 
   it('says nothing about modifiers when an activity selects none', async () => {
-    const target = await openTab(
-      await mountChecks({ salvageDefaultModifierIds: [], gatheringDefaultModifierIds: [] }),
-      'validation'
-    );
+    const target = await mountChecks({
+      activity: 'validation',
+      salvageDefaultModifierIds: [],
+      gatheringDefaultModifierIds: [],
+    });
     for (const subsystem of ['salvage', 'gathering']) {
       assert.deepEqual(
         issuesIn(target, subsystem).filter((id) => id.startsWith('modifier')),
