@@ -62,37 +62,100 @@ const RETIRED_MODIFIER_STRIP_RE = /\s*[+-]\s*@craftingmod\b|@craftingmod\b/g;
 /** The additive operators either side of the token may carry and still be strippable. */
 const ADDITIVE_OPERATORS = new Set(['+', '-']);
 
+/** The run of additive operators and whitespace immediately BEFORE a placement. */
+const TRAILING_ADDITIVE_RUN_RE = /[+\-\s]*$/;
+
+/**
+ * The bracket pairs that open a fresh `Expression` scope in Foundry's grammar.
+ *
+ * `Parenthetical`, `FunctionTerm`, `PoolTerm` and a `DiceTerm`'s number each parse their
+ * contents as a nested `Expression`, so a term inside one is NOT additively commutable
+ * with the top level. `[`/`]` is deliberately absent: those delimit `Flavor`, which is
+ * text, not an expression scope.
+ */
+const GROUP_OPENERS = new Set(['(', '{']);
+const GROUP_CLOSERS = new Set([')', '}']);
+
+/**
+ * The bracket nesting depth at an offset. Anything other than 0 means the placement sits
+ * inside a nested expression scope.
+ *
+ * A malformed formula can drive this negative (a stray `)`); that is reported as non-zero
+ * like any other depth, so it is refused rather than guessed at.
+ */
+function groupDepthBefore(text, index) {
+  let depth = 0;
+  for (const character of text.slice(0, index)) {
+    if (GROUP_OPENERS.has(character)) depth += 1;
+    else if (GROUP_CLOSERS.has(character)) depth -= 1;
+  }
+  return depth;
+}
+
 /**
  * Classify every occurrence of the retired placeholder in a formula, WITHOUT a dice
  * engine — the fact base both the runtime shim and the Foundry-free `1.21.0`
  * migration reason from, so the two can never disagree about what a placement is.
  *
- * A placement is ADDITIVE — and therefore strippable without wrecking the arithmetic —
- * only when the non-whitespace character on each side is either absent (start/end of
- * the formula) or an additive operator. Everything else is reported as NON-ADDITIVE:
- * `1d20 * @craftingmod` strips to `1d20 * `, `max(@craftingmod, 2)` to `max(, 2)`,
- * `(@craftingmod)` to `()` and `(@craftingmod)d6` to `()d6`.
+ * A placement is ADDITIVE — and therefore liftable out of the formula and re-appended as
+ * a trailing term — only when ALL THREE hold:
  *
- * THIS CLASSIFIER IS THE DECISION, NOT `Roll.validate` — a correction, and the reason it
- * is stated here at length. Most of those residues DO throw in Foundry's grammar
- * (`Expression` requires a `Term` after each operator; `Constant` requires digits), but
- * **`max(, 2)` does not**: `FunctionTerm`'s head is `Expression?` — OPTIONAL — so it
- * parses to a `FunctionTerm` carrying ZERO argument terms, `isDeterministic` is
- * `terms.every(...)` over an empty array and answers `true`, `_evaluateSync` calls
- * `Math.max()` with no arguments and yields **`-Infinity`**, and `Roll#total` is
- * `Number(this._total) || 0`, which lets `-Infinity` through. `Roll.validate('max(, 2)')`
- * therefore returns TRUE, and a residue check that trusted it would hand every craft on
- * that system a permanent, silent `-Infinity` against its DC: a rolled — and therefore
- * CONSUMING — automatic failure, which is strictly worse than refusing to roll.
+ * 1. **It sits at bracket depth 0.** The appended `+ N[Modifiers]` term always lands at
+ *    the END of the WHOLE formula, so lifting the placeholder out is sound only where the
+ *    two positions are additively interchangeable. Inside a `Parenthetical`,
+ *    `FunctionTerm`, `PoolTerm` or a `DiceTerm`'s number, they are not.
+ * 2. **The run of additive operators immediately before it is at most ONE.** A longer run
+ *    (`1d20 - -@craftingmod`) cannot be consumed by taking "the adjacent operator": the
+ *    strip would take the nearest one and leave `1d20 -` dangling on disk.
+ * 3. **The nearest non-whitespace character after it is absent or `+`/`-`.** Anything else
+ *    (`1d20 + @craftingmod * 2`) means the placeholder binds tighter than addition, so
+ *    removing it re-associates the arithmetic.
+ *
+ * EVERY OTHER PLACEMENT IS REFUSED, and the reason is arithmetic, not syntax. This was
+ * stated wrongly at first and the correction matters: it is NOT that stripping "yields a
+ * formula the grammar refuses". Sometimes it does (`1d20 * ` dangles, `()` is empty), but
+ * often it does not — `(1d20 + @craftingmod) * 2` strips to `(1d20 ) * 2`, which parses
+ * perfectly and is simply WRONG: the modifier was inside a sub-expression being scaled, so
+ * it contributed `3 * 2 = 6`, and an appended top-level `+ 3[Modifiers]` contributes `3`.
+ * Silently halving it is worse than refusing. Refusal is the only lossless answer, and the
+ * predicate above — not the list of shapes below — is the rule.
+ *
+ * Worked examples of the refused shapes, each measured at scalar 3:
+ *
+ * | authored | if it were stripped | old total | new total |
+ * |---|---|---|---|
+ * | `1d20 * @craftingmod` | `1d20 * ` | — | throws |
+ * | `max(@craftingmod, 2)` | `max(, 2)` | 3 | `-Infinity` |
+ * | `(@craftingmod)d6` | `()d6` | 3d6 | throws |
+ * | `(2 + @craftingmod + 4) * 3` | `(2 + 4) * 3` | 27 | 21 |
+ * | `max(2 + @craftingmod + 4, 10)` | `max(2 + 4, 10)` | 10 | 13 |
+ * | `(2 + @craftingmod + 4)d6` | `(2 + 4)d6` | 9d6 | 6d6 + 3 |
+ *
+ * The last three are the dangerous ones: a VALID formula with a WRONG total. They are the
+ * reason condition 1 is a depth scan rather than a check of the two adjacent characters —
+ * an INTERIOR placement has `+` on both sides and no adjacent bracket to notice.
+ *
+ * THIS CLASSIFIER IS THE DECISION, NOT `Roll.validate`. `Roll.validate('max(, 2)')` returns
+ * TRUE: `FunctionTerm`'s head is `Expression?` — OPTIONAL — so it parses to a
+ * `FunctionTerm` carrying ZERO argument terms, `isDeterministic` is `terms.every(...)` over
+ * an empty array and answers `true`, `_evaluateSync` calls `Math.max()` with no arguments
+ * and yields `-Infinity`, and `Roll#total` is `Number(this._total) || 0`, which lets that
+ * through. A residue check that trusted `Roll.validate` would hand that world a permanent,
+ * silent `-Infinity` against its DC on every craft — a rolled, and therefore CONSUMING,
+ * automatic failure.
  *
  * So a non-additive placement is never stripped and never validated. The migration leaves
  * such a formula untouched on disk and REPORTS it; the runtime shim answers `''` for it,
  * so the usability readers report "no formula" and the check is disabled until a GM edits
  * it. Silently disabling beats silently mis-rolling.
  *
- * SUBTRACTIVE is keyed on the operator IMMEDIATELY BEFORE the token, which is the
- * only position whose sign the retirement inverts: `1d20 - @craftingmod` rolled
- * `1d20 - (3)` and now rolls `1d20 + 3[Modifiers]`, a 2×scalar swing.
+ * SUBTRACTIVE is reported only for placements that are actually ADDITIVE, because it names
+ * a sign inversion that can only happen where the strip-and-append runs: `1d20 - @craftingmod`
+ * rolled `1d20 - (3)` and now rolls `1d20 + 3[Modifiers]`, a 2×scalar swing. Condition 2
+ * is what keeps this a single-character test — Foundry collapses an additive run by PARITY
+ * of `-` (`RollParser#_collapseOperators`), so `2 - +@craftingmod` is effectively negative
+ * and `2 - -@craftingmod` effectively positive; refusing runs longer than one means no
+ * surviving placement has a parity to compute.
  *
  * @param {string} formula
  * @returns {{ present: boolean, occurrences: number, subtractive: boolean, nonAdditive: boolean }}
@@ -107,17 +170,63 @@ export function describeRetiredModifierPlaceholder(formula) {
   let nonAdditive = false;
   for (const match of text.matchAll(RETIRED_MODIFIER_TOKEN_GLOBAL_RE)) {
     occurrences += 1;
-    const before = text.slice(0, match.index).trimEnd();
+    const before = text.slice(0, match.index);
     const after = text.slice(match.index + RETIRED_MODIFIER_TOKEN.length).trimStart();
-    const previousCharacter = before.at(-1) ?? '';
+
+    // 1. Nested inside a bracket group: the appended term cannot reproduce it.
+    if (groupDepthBefore(text, match.index) !== 0) {
+      nonAdditive = true;
+      continue;
+    }
+
+    // 2. The operator run this strip would have to consume.
+    const operatorRun = TRAILING_ADDITIVE_RUN_RE.exec(before)[0];
+    const operators = operatorRun.replaceAll(/\s+/g, '');
+    const head = before.slice(0, before.length - operatorRun.length);
+    if (operators.length > 1) {
+      nonAdditive = true;
+      continue;
+    }
+    // No operator at all is only legal when nothing precedes the placeholder; otherwise
+    // the previous term binds it multiplicatively or opens a group.
+    if (operators.length === 0 && head.trim() !== '') {
+      nonAdditive = true;
+      continue;
+    }
+
+    // 3. What follows must be the end of the formula, or another additive term.
     const nextCharacter = after.charAt(0);
-    if (previousCharacter === '-') subtractive = true;
-    const additive =
-      (previousCharacter === '' || ADDITIVE_OPERATORS.has(previousCharacter)) &&
-      (nextCharacter === '' || ADDITIVE_OPERATORS.has(nextCharacter));
-    if (!additive) nonAdditive = true;
+    if (nextCharacter !== '' && !ADDITIVE_OPERATORS.has(nextCharacter)) {
+      nonAdditive = true;
+      continue;
+    }
+
+    if (operators === '-') subtractive = true;
   }
   return { present: true, occurrences, subtractive, nonAdditive };
+}
+
+/** A residue opening with a MULTIPLICATIVE operator has lost its left operand. */
+const RESIDUE_LEADS_WITH_MULTIPLICATIVE_RE = /^\s*[*/%]/;
+
+/** A residue ending in ANY binary operator has lost its right operand. */
+const RESIDUE_TRAILS_WITH_OPERATOR_RE = /[+\-*/%]\s*$/;
+
+/**
+ * Whether a residue is a whole expression rather than one missing an operand.
+ *
+ * Structural, not semantic: it answers "could this ever be a complete formula", which is
+ * a question no dice engine is needed for, and is therefore safe to enforce on the
+ * engine-free migration path that writes to disk.
+ *
+ * A LEADING `+`/`-` passes, because `Expression = _ leading:(_ @Additive)* _ head:Term …`
+ * admits one and the leading-token strip rule depends on it.
+ */
+function isStructurallyWholeResidue(residue) {
+  return (
+    !RESIDUE_LEADS_WITH_MULTIPLICATIVE_RE.test(residue) &&
+    !RESIDUE_TRAILS_WITH_OPERATOR_RE.test(residue)
+  );
 }
 
 /**
@@ -145,31 +254,73 @@ export function describeRetiredModifierPlaceholder(formula) {
  *    to `- 2` and not to `2` (see the note on the strip pattern for the arithmetic).
  *    Word-boundary matched, so a hypothetical `@craftingmodifier` is untouched. A residue
  *    reducing to empty returns `''`.
- * 4. **Belt and braces on the additive residue only**: validate it with `Roll.validate`
- *    called as a METHOD, and return `''` if it is rejected. `Roll.validate` is a static
- *    that does `new this(formula)` internally, so a DETACHED reference leaves `this`
- *    undefined and returns `false` for EVERY formula — the trap documented at
- *    `checkRoll.js`'s situational-bonus net.
- * 5. **Fail OPEN when the global is absent** (headless, tests), following the shipped
- *    precedent in `evaluateCheckRoll`'s situational-bonus net: the additive residue is
- *    KEPT rather than emptied. The direction matters more than usual — returning `''` when
- *    the global is missing would report `noFormula` and silently disable an authored
- *    check. It applies to step 4 ONLY: step 2's answer is positional, deterministic and
- *    engine-independent, so it is the same with or without a dice engine.
+ * 4. **A STRUCTURAL residue check, before any dice engine is consulted.** A residue that
+ *    starts with `*`, `/` or `%`, or ends with any binary operator, returns `''`. This is
+ *    an INVARIANT, not a validation, and the distinction is what makes it correct: the
+ *    only caller that WRITES TO DISK — the `1.21.0` migration — deliberately passes
+ *    `Roll = null`, so it takes the fail-open branch at step 6 and would otherwise have no
+ *    residue check whatever. An authored formula can end in an operator
+ *    (`1d20 - @craftingmod -`), and persisting `1d20 -` makes every later craft throw
+ *    inside `new Roll(...)` as a rolled — therefore CONSUMING — permanent failure, with
+ *    the shim short-circuiting because there is no token left to notice.
+ *    A LEADING `+`/`-` is deliberately NOT rejected: `Expression` admits a leading
+ *    `Additive`, and step 3 relies on that.
+ * 5. **Belt and braces on top**: validate the residue with `Roll.validate` called as a
+ *    METHOD, and return `''` if it is rejected. `Roll.validate` is a static that does
+ *    `new this(formula)` internally, so a DETACHED reference leaves `this` undefined and
+ *    returns `false` for EVERY formula — the trap documented at `checkRoll.js`'s
+ *    situational-bonus net.
+ * 6. **Fail OPEN when the global is absent** (headless, tests), following the shipped
+ *    precedent in `evaluateCheckRoll`'s situational-bonus net: the residue is KEPT rather
+ *    than emptied. The direction matters more than usual — returning `''` when the global
+ *    is missing would report `noFormula` and silently disable an authored check. It
+ *    relaxes step 5 ONLY. Steps 2 and 4 are positional and structural, so they hold
+ *    identically with or without a dice engine; fail-open must never relax an invariant.
  *
  * @param {string} formula
  * @param {typeof globalThis.Roll} [Roll]
  * @returns {string}
  */
 export function stripRetiredModifierPlaceholder(formula, Roll = globalThis.Roll) {
+  const plan = planRetiredPlaceholderStrip(formula, Roll);
+  return plan.outcome === 'refused' ? '' : plan.formula;
+}
+
+/**
+ * The full decision behind {@link stripRetiredModifierPlaceholder}, for the ONE caller
+ * that needs to tell its two `''` answers apart.
+ *
+ * The shim collapses "this formula was ONLY the placeholder, so it is now empty"
+ * (`stripped` with `formula: ''`) and "this formula cannot be rewritten, so treat it as
+ * unusable" (`refused`) into the same `''`, because every RUNTIME reader wants the same
+ * thing from both: report no formula, roll nothing. The `1.21.0` migration is the
+ * exception — it WRITES — and the two demand opposite actions: persist the empty string
+ * for the first, and leave the field exactly as authored while counting it for the second.
+ *
+ * Sharing this rather than re-deriving the strip in the migration is what keeps the
+ * runtime and the on-disk rewrite from ever disagreeing about a placement.
+ *
+ * @param {string} formula
+ * @param {typeof globalThis.Roll} [Roll]
+ * @returns {{ placement: ReturnType<typeof describeRetiredModifierPlaceholder>,
+ *   outcome: 'absent'|'stripped'|'refused', formula: string }}
+ *   `formula` is the value to hand on for `absent`/`stripped`, and the UNCHANGED input for
+ *   `refused`.
+ */
+export function planRetiredPlaceholderStrip(formula, Roll = globalThis.Roll) {
   const text = String(formula ?? '');
   const placement = describeRetiredModifierPlaceholder(text);
-  if (!placement.present) return text;
-  if (placement.nonAdditive) return '';
+  if (!placement.present) return { placement, outcome: 'absent', formula: text };
+  if (placement.nonAdditive) return { placement, outcome: 'refused', formula: text };
+
   const residue = text.replaceAll(RETIRED_MODIFIER_STRIP_RE, '').trim();
-  if (residue === '') return '';
-  if (typeof Roll?.validate !== 'function') return residue;
-  return Roll.validate(residue) === false ? '' : residue;
+  if (residue === '') return { placement, outcome: 'stripped', formula: '' };
+  if (!isStructurallyWholeResidue(residue)) return { placement, outcome: 'refused', formula: text };
+  if (typeof Roll?.validate !== 'function') {
+    return { placement, outcome: 'stripped', formula: residue };
+  }
+  if (Roll.validate(residue) === false) return { placement, outcome: 'refused', formula: text };
+  return { placement, outcome: 'stripped', formula: residue };
 }
 
 /**

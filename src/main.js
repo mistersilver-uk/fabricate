@@ -995,17 +995,16 @@ class Fabricate {
     }
 
     // One-time GM-facing notice: the 1.21.0 migration retired the check-modifier
-    // roll-formula placeholder, and BOTH of its consequences are behaviour changes rather
-    // than no-ops. `inert` counts systems whose active check formula never spent the
-    // placeholder, so their catalogue silently starts applying to every roll; the remedy
-    // is spelled out below because there is no other way for a GM to restore the previous
-    // total. `subtractive` counts formulas that SUBTRACTED it, which now ADD it — a
-    // 2x-scalar swing in the crafter's favour. `repeated` counts formulas that spent it
-    // more than once, which now count it once. `untouched` counts formulas left exactly
-    // as authored because the placeholder sat in a multiplicative, function or
-    // lone-parenthetical position no strip could repair; those checks will not roll until
-    // the GM edits them, so they need naming most of all. Only fired when something was
-    // actually found.
+    // roll-formula placeholder, and its consequences are behaviour changes rather than
+    // no-ops. PRIMARY-GM ONLY, not merely GM-only: `_runMigrations` returns early unless
+    // `game.users?.activeGM?.id === game.user?.id`, so exactly one client in a multi-GM
+    // world posts this and an assistant GM (who holds `isGM`) never does.
+    //
+    // THE CLAUSES ARE SEPARATE KEYS, JOINED ONLY WHEN NON-ZERO. One sentence carrying all
+    // four counts made the common single-cause world read "…0 formula(s) subtracted the
+    // modifier and now add it. 0 counted it more than once… 0 formula(s) were left exactly
+    // as authored — edit those by hand", which buries the one clause that applies in three
+    // that do not and invites the GM to skim the whole thing.
     const retiredCraftingModCounts = Array.isArray(summary?.retiredCraftingModCounts)
       ? summary.retiredCraftingModCounts : [];
     if (retiredCraftingModCounts.length > 0 && game.user?.isGM) {
@@ -1019,24 +1018,35 @@ class Fabricate {
         .map((entry) => String(entry?.system ?? ''))
         .filter((name) => name !== '')
         .join(', ');
-      const message = game.i18n?.format?.('FABRICATE.Migration.RetireCheckModifierPlaceholder.Notice', {
-        systems: systemList,
-        inert: totals.inert,
-        subtractive: totals.subtractive,
-        repeated: totals.repeated,
-        untouched: totals.untouched
-      }) || `Fabricate now adds check modifiers to every crafting roll automatically. Affected systems: ${systemList}. `
-        + `${totals.inert} check(s) had modifiers that never reached the roll and now apply — to keep the old total, clear the default modifiers or choose a rule whose set resolves to 0. `
-        + `${totals.subtractive} subtracted the modifier and now add it; ${totals.repeated} counted it more than once and now count it once; `
-        + `${totals.untouched} formula(s) were left unchanged and need editing by hand.`;
+      const clause = (key, fallback, count) => {
+        if (count <= 0) return null;
+        return game.i18n?.format?.(`FABRICATE.Migration.RetireCheckModifierPlaceholder.${key}`, { count })
+          || fallback.replace('{count}', String(count));
+      };
+      const lead = game.i18n?.format?.('FABRICATE.Migration.RetireCheckModifierPlaceholder.Lead', { systems: systemList })
+        || `Fabricate now adds check modifiers to every crafting-check roll automatically, so the roll-formula placeholder they used to need has been removed from these systems: ${systemList}.`;
+      const clauses = [
+        // The remedy names CLEARING THE DEFAULT SET, and nothing else. An earlier draft
+        // offered "choose a combination rule whose set resolves to 0", which names no rule
+        // that does that: every rule reduces the same eligible set, so switching between
+        // them cannot zero it.
+        clause('Inert', '{count} check(s) had modifiers that never reached the roll and now apply — to keep the previous total, clear the Default modifiers set on those systems.', totals.inert),
+        clause('Subtractive', '{count} formula(s) subtracted the modifier and now add it.', totals.subtractive),
+        clause('Repeated', '{count} formula(s) counted it more than once and now count it once.', totals.repeated),
+        clause('Untouched', '{count} formula(s) were left exactly as authored because the placeholder sat where it could not be removed safely; those checks will not roll until you rewrite them.', totals.untouched)
+      ].filter(Boolean);
+      const message = [lead, ...clauses].join(' ');
       // SEVERITY IS PER FINDING, not blanket. `untouched` is the only count that leaves a
       // BROKEN world: those checks do not roll at all until the GM edits them by hand, so
-      // that is a warning. Everything else describes a behaviour change the GM should know
-      // about but need not repair, which is exactly the `info` channel the 0.6.0 catalyst
-      // and 0.9.0 realm notices use — and this block follows their shape. Warning on the
-      // whole notice would also cry wolf on every world that merely authored a catalogue
-      // and never spent the placeholder, which is the common case this change exists for.
-      if (totals.untouched > 0) ui.notifications?.warn?.(message);
+      // that is a PERMANENT warning — the rule `configureItemStackQuantityPath` states
+      // above, and this is strictly more actionable than the misconfiguration it was
+      // written for, because the remedy is a specific formula on a named system.
+      // Everything else describes a behaviour change the GM should know about but need not
+      // repair, which is the `info` channel the 0.6.0 catalyst and 0.9.0 realm notices this
+      // block follows already use. It also matters mechanically: `installFoundryShim`
+      // routes `warn` to a console error that FAILS a View Lab capture, and one failed
+      // case fails the whole capture job.
+      if (totals.untouched > 0) ui.notifications?.warn?.(message, { permanent: true });
       else ui.notifications?.info?.(message);
     }
   }

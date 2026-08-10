@@ -46,7 +46,6 @@ const RAW_MODULES = [
   'src/utils/objectPath.js',
   'src/models/IngredientGroup.js',
   'src/models/Result.js',
-  'src/systems/toolCheckBonus.js',
   'src/utils/recipeCategories.js',
   'src/utils/routedOutcomeKeywords.js',
   'src/config/flags.js',

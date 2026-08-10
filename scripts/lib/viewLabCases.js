@@ -1202,22 +1202,88 @@ export const VIEW_LAB_CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/recipe\//,
     ],
   }),
-  // ── The inert catalogue, TWO cases retired (issue 1094) ──────────────────────────
+  // ── The inert catalogue, RE-AIMED rather than retired (issue 1094) ─────────────────
   //
-  // `manager-checks-crafting-modifier-inert` and `manager-recipe-edit-crafting-modifier-inert`
-  // are DELETED rather than re-aimed, because the state they photographed no longer exists.
-  // Both showed the `noPlaceholder` inert cause — a formula authored but never spending the
-  // check-modifier roll-formula placeholder — and issue 1094 retires that placeholder: the
-  // resolved scalar is APPENDED to whatever the GM authored, so an authored formula always
-  // carries it and there is no third cause left to reach. Both cases got there by FILLING the
-  // formula field with a placeholder-free formula and saving; after this change that same fill
-  // produces a perfectly live check, so the cases would photograph a card with no notice on it.
+  // Both cases used to photograph the `noPlaceholder` inert cause — a formula authored but
+  // never spending the check-modifier roll-formula placeholder — and that cause retires with
+  // the placeholder: the scalar is appended to whatever the GM authored, so the state is
+  // unreachable.
   //
-  // The two surviving causes keep the coverage they always had: `noCheck` and `noFormula` are
-  // both legible from the check editor directly above the card — no mode, or an empty formula
-  // field — which is why neither ever earned a case of its own. `manager-checks-crafting-modifiers`
-  // and `manager-recipe-edit-crafting-modifier-inherit` are the frames that carry the rewritten
-  // catalogue copy, and both are re-recorded by this change.
+  // An earlier draft DELETED them. That was wrong, and the reason is worth recording: after
+  // the deletions NO case reached `ModifierInertNoCheck`, `ModifierInertNoFormula`,
+  // `ModifierCatalogueEmpty`, `ModifierCatalogueIntro`, `CraftingModifierEmptySet` or
+  // `CraftingModifierInertHint` — six of the strings this change rewrites — so the copy
+  // shipped unphotographed while `check-screenshots` stayed green. Re-aiming at `noFormula`
+  // costs one changed step per case and restores the whole inert surface to evidence.
+  //
+  // `fill: ''` rather than a placeholder-free formula: an empty formula is now the ONLY way
+  // to make an authored check inert, which is exactly what makes it worth a frame.
+  managerCase({
+    id: 'manager-checks-crafting-modifier-inert',
+    label: 'Manager — Checks crafting modifiers inert',
+    // BEYOND the smoke. The walk never empties a check formula, so no counterpart frame of
+    // the notice exists.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-herbalism' },
+    steps: [
+      'Checks',
+      { selector: '#checks-tab-crafting' },
+      // Clearing the field reaches `noFormula`: a check slot that exists and rolls nothing.
+      { selector: '[data-check-roll-formula]', fill: '' },
+      { selector: '[data-checks-save]' },
+      { selector: '[data-crafting-modifier-inert]', scroll: true },
+    ],
+    expectView: 'checks',
+    // The CAUSE, not just the notice. Both causes render through the same element with the
+    // same chrome, so a presence-only assertion would photograph the wrong sentence.
+    expectSelector: '.fabricate-manager [data-crafting-modifier-inert="noFormula"]',
+    kinds: ['manager', 'checks'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/checks\//,
+      /^src\/ui\/svelte\/apps\/manager\/.*Check/,
+    ],
+  }),
+  managerCase({
+    id: 'manager-recipe-edit-crafting-modifier-inert',
+    label: 'Manager — Recipe edit crafting modifier inert',
+    // BEYOND the smoke, for the same reason as the sibling above.
+    reaches: 'beyond',
+    smokeLabels: [],
+    // The recipe end of the same fact, and the ONLY check-modifier banner this tab has left.
+    // It earns its interruption because it reports a genuine CONTRADICTION: the system's rule
+    // handed the pick to this recipe, and the system rolls no check for the picks to reach.
+    // The banner BEATS the picker — a pick the engine cannot honour is not worth authoring —
+    // so this frame is also the only evidence that the control is withdrawn rather than left
+    // live-but-useless, and the only one showing `RecipeModeBanner`'s warning tone at all.
+    //
+    // The `byRecipe` click is what makes the contradiction reachable: under a non-selecting
+    // rule there are no picks to warn about and the tab says nothing.
+    query: { system: 'lab-herbalism' },
+    steps: [
+      'Checks',
+      { selector: '#checks-tab-crafting' },
+      { selector: '[data-crafting-modifier-policy-option="byRecipe"] input' },
+      { selector: '[data-check-roll-formula]', fill: '' },
+      { selector: '[data-checks-save]' },
+      'Crafting',
+      { selector: '[data-recipe-edit="hb-r-kiln"]' },
+      { selector: '#recipe-tab-overview' },
+      { selector: '[data-recipe-modifier-inert]', scroll: true },
+    ],
+    expectView: 'recipe-edit',
+    // The cause, and the withdrawal. The rule click puts this system on `byRecipe`, so an
+    // inert state that failed to suppress the control would still render the picker cell —
+    // which is exactly what this frame claims cannot happen.
+    expectSelector:
+      '.fabricate-manager [data-recipe-editor]:has([data-recipe-modifier-inert="noFormula"])' +
+      ':not(:has([data-recipe-crafting-modifier-picker]))',
+    kinds: ['manager', 'recipes'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/RecipeEditView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/recipe\//,
+    ],
+  }),
   managerCase({
     id: 'manager-recipe-edit-books-scrolls',
     label: 'Manager — Recipe edit books scrolls',
@@ -1714,6 +1780,42 @@ export const VIEW_LAB_CASES = Object.freeze([
     query: {},
     steps: ['Checks', { selector: '#checks-tab-validation' }],
     expectView: 'checks',
+    kinds: ['manager', 'checks'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/checks\//,
+      /^src\/ui\/svelte\/apps\/manager\/.*Check/,
+    ],
+  }),
+  // The retired-placeholder readiness SPLIT (issue 1094). Two issues share one surface and
+  // differ only by severity and copy, so a frame is the only thing that shows a GM which one
+  // they are looking at — and the critical is the one whose advice ("rewrite it by hand")
+  // contradicts the warning's ("delete the placeholder").
+  //
+  // Reached by FILLING the formula rather than by seeding the token in `labContent.js`, and
+  // that is load-bearing: the lab boots the real migration runner on every build, so a
+  // fixture carrying `1d20 * @craftingmod` would be counted `untouched: 1` and post a
+  // PERMANENT warning — which `installFoundryShim` routes to a console error that fails the
+  // capture job whole. Typing it into the draft reproduces exactly the GM behaviour the
+  // readiness warning exists to catch, after the migration has already run.
+  managerCase({
+    id: 'manager-checks-validation-retired-placeholder',
+    label: 'Manager — Checks validation retired placeholder',
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-herbalism' },
+    steps: [
+      'Checks',
+      { selector: '#checks-tab-crafting' },
+      // A placement the shim REFUSES, so the whole formula is discarded: critical, not the
+      // ignorable warning an additive placement raises.
+      { selector: '[data-check-roll-formula]', fill: '1d20 * @craftingmod' },
+      { selector: '#checks-tab-validation' },
+      { selector: '[data-issue="retiredPlaceholderBreaksFormula"]', scroll: true },
+    ],
+    expectView: 'checks',
+    // The CRITICAL id specifically. A presence-only assertion would be satisfied by the
+    // warning, which is the other half of the split and says the opposite thing.
+    expectSelector: '.fabricate-manager [data-issue="retiredPlaceholderBreaksFormula"]',
     kinds: ['manager', 'checks'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/checks\//,

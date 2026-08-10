@@ -25,13 +25,22 @@
  *    −3 becomes +3, a 2×scalar swing in the crafter's favour. A formula carrying the token
  *    TWICE moves from double-counting to counting once.
  *
- * A TOKEN IN A MULTIPLICATIVE, FUNCTION OR LONE-PARENTHETICAL CONTEXT IS LEFT UNTOUCHED ON
- * DISK AND REPORTED. Stripping it there yields `1d20 * `, `max(, 2)` or `()`, each of which
- * the dice grammar refuses, and no arithmetic intent can be guessed from the text. The
- * runtime shim's `Roll.validate` residue check covers those formulas at roll time — they
- * report "no formula" rather than throwing inside `Roll` — so this migration's job is to
- * TELL THE GM, not to repair. `describeRetiredModifierPlaceholder` is the one classifier
- * both sides read, so the migration and the shim cannot disagree about what a placement is.
+ * A TOKEN THAT IS NOT TOP-LEVEL ADDITIVE IS LEFT UNTOUCHED ON DISK AND REPORTED. The rule is
+ * the PREDICATE `describeRetiredModifierPlaceholder` states — bracket depth 0, an operator
+ * run of at most one, and an additive or absent successor — not a list of shapes, and the
+ * reason is ARITHMETIC rather than syntax. An appended `+ N[Modifiers]` term lands at the
+ * end of the WHOLE formula, so lifting the token out is only sound where the two positions
+ * are interchangeable. `(2 + <token> + 4) * 3` strips to a perfectly VALID `(2 + 4) * 3`
+ * that totals 21 where it used to total 27; refusing is the only lossless answer, and this
+ * migration's job is to TELL THE GM, not to repair.
+ *
+ * THE STRUCTURAL RESIDUE CHECK IS PART OF THAT REFUSAL, and it is why the strip goes
+ * through `planRetiredPlaceholderStrip` rather than a local rewrite. An authored formula may
+ * end in an operator (`1d20 - <token> -`), and persisting `1d20 -` would make every later
+ * craft throw inside `new Roll(...)` as a rolled — therefore CONSUMING — permanent failure,
+ * with the shim unable to notice because no token remains. The shim rejects such a residue
+ * BEFORE consulting any dice engine, so the rejection still holds on this path, which
+ * passes no engine at all.
  *
  * SALVAGE AND GATHERING ARE SWEPT DEFENSIVELY. Neither ever authored the token and neither
  * passes a modifier context to its runner, so stripping changes no total there. But an
@@ -64,10 +73,13 @@
  * contributing until a GM re-adds it by hand.
  */
 
-import { resolveActiveCraftingCheckFormula } from '../systems/craftingModifierResolver.js';
+import {
+  resolveActiveCraftingCheckFormula,
+  resolveEligibleModifierIds,
+} from '../systems/craftingModifierResolver.js';
 import {
   describeRetiredModifierPlaceholder,
-  stripRetiredModifierPlaceholder,
+  planRetiredPlaceholderStrip,
 } from '../utils/craftingCheckExpression.js';
 
 /**
@@ -118,24 +130,29 @@ export function hasRetiredCraftingModFindings(counts) {
  * counted is described by its PRE-strip text, and a non-additive placement returns before
  * any write.
  *
- * The strip is called with an explicitly NULL dice engine. The residue check exists to
- * catch a placement this function has already refused to strip, so consulting
- * `globalThis.Roll` here would make a data migration's output depend on whether a Foundry
- * global happened to be installed — which it IS in the View Lab, where every migration
- * runs on every build.
+ * The strip is called with an explicitly NULL dice engine, so a data migration's output can
+ * never depend on whether a Foundry global happened to be installed — which it IS in the
+ * View Lab, where every migration runs on every build. That makes the shim's STRUCTURAL
+ * residue check, which runs before any engine is consulted, the only guard on what this
+ * function writes; it is an invariant rather than a validation for exactly that reason.
  */
 function retireFormulaField(config, key, counts) {
   const authored = config?.[key];
   if (typeof authored !== 'string') return;
-  const placement = describeRetiredModifierPlaceholder(authored);
-  if (!placement.present) return;
-  if (placement.nonAdditive) {
+  const plan = planRetiredPlaceholderStrip(authored, null);
+  if (plan.outcome === 'absent') return;
+  // REFUSED covers both the non-additive placements and a residue that would be
+  // structurally incomplete. Both leave the field exactly as authored and are counted, so
+  // the GM is told about a check that will not roll until they rewrite it.
+  if (plan.outcome === 'refused') {
     counts.untouched += 1;
     return;
   }
-  if (placement.subtractive) counts.subtractive += 1;
-  if (placement.occurrences > 1) counts.repeated += 1;
-  config[key] = stripRetiredModifierPlaceholder(authored, null);
+  if (plan.placement.subtractive) counts.subtractive += 1;
+  if (plan.placement.occurrences > 1) counts.repeated += 1;
+  // `plan.formula` is `''` for a placeholder-only formula, which is the correct thing to
+  // persist: the readers report "no formula" for it rather than rolling `new Roll('')`.
+  config[key] = plan.formula;
 }
 
 /**
@@ -145,15 +162,31 @@ function retireFormulaField(config, key, counts) {
  *
  * Scoped to the ACTIVE slot rather than all three, because the inert-goes-live change is a
  * statement about what this world will now roll — a token-free `progressive` formula on a
- * `simple` system changes nothing and would only inflate the notice. Gated on a non-empty
- * catalogue for the same reason: with no entries there is nothing to start adding.
+ * `simple` system changes nothing and would only inflate the notice.
+ *
+ * Gated on a non-empty RESOLVED ELIGIBLE SET, not merely a non-empty catalogue. The notice
+ * this count drives tells the GM their modifiers have started applying and offers a remedy
+ * (clear the default set); a system whose set already resolves to nothing has had nothing
+ * start applying, so counting it would state a change that did not happen and prescribe a
+ * remedy already in force. `resolveEligibleModifierIds` is asked rather than
+ * `defaultModifierIds.length` so the answer matches what the engine will actually roll:
+ * ids absent from the catalogue are dropped, and under `byRecipe` the source is the
+ * recipe's pick — which no migration can see, so that rule is counted on the system set it
+ * falls back to.
  *
  * Must run BEFORE the strip, or a formula that DID spend the token would be counted as
  * having never spent one.
  */
 function countInertActiveCraftingCheck(system) {
-  const catalogue = system?.craftingCheck?.checkModifiers;
-  if (!Array.isArray(catalogue) || catalogue.length === 0) return 0;
+  const check = _isPlainObject(system?.craftingCheck) ? system.craftingCheck : null;
+  if (!check) return 0;
+  const eligible = resolveEligibleModifierIds({
+    catalogue: check.checkModifiers,
+    systemPolicy: check.defaultModifierPolicy,
+    defaultModifierIds: check.defaultModifierIds,
+    maxModifierPicks: check.maxModifierPicks,
+  });
+  if (eligible.length === 0) return 0;
   const active = resolveActiveCraftingCheckFormula(system);
   if (active.slot === null) return 0;
   const authored =

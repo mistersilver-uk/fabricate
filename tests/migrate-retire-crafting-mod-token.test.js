@@ -23,6 +23,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { MigrationRunner } from '../src/migration/MigrationRunner.js';
+import { RETIRED_PLACEMENT_CORPUS } from './helpers/retiredPlaceholderOracle.js';
 import { migrateExportPayload } from '../src/migration/migrateExportPayload.js';
 import {
   applyRetireCraftingModToken,
@@ -32,15 +33,20 @@ import {
 
 const TOKEN = '@craftingmod';
 
-/** A catalogue is what makes an inert formula a BEHAVIOUR CHANGE rather than a no-op. */
+/**
+ * A catalogue that RESOLVES to a non-empty eligible set is what makes an inert formula a
+ * BEHAVIOUR CHANGE rather than a no-op — the entries alone are not enough, because a
+ * system whose default set is empty has had nothing start applying.
+ */
 const CATALOGUE = [{ id: 'med', label: 'Medicine', expression: '@abilities.med.mod' }];
+const ELIGIBLE = { checkModifiers: CATALOGUE, defaultModifierIds: ['med'] };
 
 function system(overrides = {}) {
   return {
     id: 'sys-1',
     name: 'Herbalism',
     resolutionMode: 'simple',
-    craftingCheck: { checkModifiers: CATALOGUE, simple: { rollFormula: '1d20 + 4' } },
+    craftingCheck: { ...ELIGIBLE, simple: { rollFormula: '1d20 + 4' } },
     ...overrides,
   };
 }
@@ -72,7 +78,7 @@ function everyFormula(migrated) {
 
 test('1.21.0 strips an ADDITIVE placement together with its operator', () => {
   const target = system({
-    craftingCheck: { checkModifiers: CATALOGUE, simple: { rollFormula: `1d20 + ${TOKEN}` } },
+    craftingCheck: { ...ELIGIBLE, simple: { rollFormula: `1d20 + ${TOKEN}` } },
   });
   applyRetireCraftingModToken(target);
   assert.equal(target.craftingCheck.simple.rollFormula, '1d20');
@@ -89,7 +95,7 @@ test('1.21.0 strips a LEADING placement but KEEPS the operator after it', () => 
     [`${TOKEN} - 1d4`, '- 1d4'],
   ]) {
     const target = system({
-      craftingCheck: { checkModifiers: CATALOGUE, simple: { rollFormula: authored } },
+      craftingCheck: { ...ELIGIBLE, simple: { rollFormula: authored } },
     });
     applyRetireCraftingModToken(target);
     assert.equal(target.craftingCheck.simple.rollFormula, expected, authored);
@@ -98,7 +104,7 @@ test('1.21.0 strips a LEADING placement but KEEPS the operator after it', () => 
 
 test('1.21.0 strips a placeholder-only formula to the empty string', () => {
   const target = system({
-    craftingCheck: { checkModifiers: CATALOGUE, simple: { rollFormula: TOKEN } },
+    craftingCheck: { ...ELIGIBLE, simple: { rollFormula: TOKEN } },
   });
   applyRetireCraftingModToken(target);
   assert.equal(
@@ -132,7 +138,7 @@ test('1.21.0 leaves a NON-ADDITIVE placement exactly as authored and reports it'
     `1d20 + (${TOKEN})`,
   ]) {
     const target = system({
-      craftingCheck: { checkModifiers: CATALOGUE, simple: { rollFormula } },
+      craftingCheck: { ...ELIGIBLE, simple: { rollFormula } },
     });
     const counts = applyRetireCraftingModToken(target);
     assert.equal(target.craftingCheck.simple.rollFormula, rollFormula, rollFormula);
@@ -154,6 +160,32 @@ test('1.21.0 counts NO inert formula when the system has no catalogue to contrib
   assert.equal(counts.inert, 0, 'with no entries there is nothing to start adding');
 });
 
+// The catalogue is not the gate; the RESOLVED eligible set is. A system with entries but
+// an empty default set has had nothing start applying, so reporting it would state a
+// change that did not happen and prescribe a remedy ("clear the default set") already in
+// force.
+test('1.21.0 counts NO inert formula when the catalogue resolves to an EMPTY set', () => {
+  for (const defaultModifierIds of [[], undefined, ['not-in-the-catalogue']]) {
+    const counts = applyRetireCraftingModToken(
+      system({
+        craftingCheck: {
+          checkModifiers: CATALOGUE,
+          defaultModifierIds,
+          simple: { rollFormula: '1d20 + 4' },
+        },
+      })
+    );
+    assert.equal(counts.inert, 0, JSON.stringify(defaultModifierIds));
+  }
+  // …and the positive control, so the gate is not simply always false.
+  assert.equal(
+    applyRetireCraftingModToken(
+      system({ craftingCheck: { ...ELIGIBLE, simple: { rollFormula: '1d20 + 4' } } })
+    ).inert,
+    1
+  );
+});
+
 test('1.21.0 counts inert against the ACTIVE slot only, not every authored slot', () => {
   // A `simple` system whose PROGRESSIVE slot is placeholder-free changes nothing, because
   // the progressive slot is never rolled. Counting it would only inflate the notice.
@@ -161,7 +193,7 @@ test('1.21.0 counts inert against the ACTIVE slot only, not every authored slot'
     system({
       resolutionMode: 'simple',
       craftingCheck: {
-        checkModifiers: CATALOGUE,
+        ...ELIGIBLE,
         simple: { rollFormula: `1d20 + ${TOKEN}` },
         progressive: { rollFormula: '2d6' },
       },
@@ -173,7 +205,7 @@ test('1.21.0 counts inert against the ACTIVE slot only, not every authored slot'
 test('1.21.0 counts a SUBTRACTIVE placement — the 2x-scalar sign swing', () => {
   const counts = applyRetireCraftingModToken(
     system({
-      craftingCheck: { checkModifiers: CATALOGUE, simple: { rollFormula: `1d20 - ${TOKEN}` } },
+      craftingCheck: { ...ELIGIBLE, simple: { rollFormula: `1d20 - ${TOKEN}` } },
     })
   );
   assert.equal(counts.subtractive, 1);
@@ -184,7 +216,7 @@ test('1.21.0 counts a REPEATED placement — double-counting collapses to one', 
   const counts = applyRetireCraftingModToken(
     system({
       craftingCheck: {
-        checkModifiers: CATALOGUE,
+        ...ELIGIBLE,
         simple: { rollFormula: `${TOKEN} + 1d20 + ${TOKEN}` },
       },
     })
@@ -230,7 +262,7 @@ test('1.21.0 sweeps salvage and gathering, including the legacy routed.rollExpre
 test('1.21.0 is pure and clone-first — the input payload is never touched', () => {
   const input = [
     system({
-      craftingCheck: { checkModifiers: CATALOGUE, simple: { rollFormula: `1d20 + ${TOKEN}` } },
+      craftingCheck: { ...ELIGIBLE, simple: { rollFormula: `1d20 + ${TOKEN}` } },
     }),
   ];
   const snapshot = JSON.stringify(input);
@@ -243,7 +275,7 @@ test('1.21.0 is idempotent under re-run', () => {
   const first = runMigration([
     system({
       craftingCheck: {
-        checkModifiers: CATALOGUE,
+        ...ELIGIBLE,
         simple: { rollFormula: `1d20 - ${TOKEN}` },
         routed: { rollFormula: `max(${TOKEN}, 2)` },
       },
@@ -290,13 +322,13 @@ test('1.21.0 reports only the systems that had a finding, named for the GM', () 
     system({
       id: 'dirty',
       name: 'Dirty',
-      craftingCheck: { checkModifiers: CATALOGUE, simple: { rollFormula: `1d20 - ${TOKEN}` } },
+      craftingCheck: { ...ELIGIBLE, simple: { rollFormula: `1d20 - ${TOKEN}` } },
     }),
     // No name: the id stands in rather than an empty string in a notification.
     system({
       id: 'unnamed-sys',
       name: '',
-      craftingCheck: { checkModifiers: CATALOGUE, simple: { rollFormula: `1d20 * ${TOKEN}` } },
+      craftingCheck: { ...ELIGIBLE, simple: { rollFormula: `1d20 * ${TOKEN}` } },
     }),
   ]);
   assert.deepEqual(
@@ -374,7 +406,7 @@ test('the runner applies 1.21.0 to craftingSystems and bumps the migration versi
       'craftingSystems',
       [
         system({
-          craftingCheck: { checkModifiers: CATALOGUE, simple: { rollFormula: `1d20 + ${TOKEN}` } },
+          craftingCheck: { ...ELIGIBLE, simple: { rollFormula: `1d20 + ${TOKEN}` } },
         }),
       ],
     ],
@@ -399,13 +431,13 @@ test('runner: the per-system counts surface on the summary and are NEVER persist
       [
         system({
           name: 'Inert world',
-          craftingCheck: { checkModifiers: CATALOGUE, simple: { rollFormula: '1d20 + 4' } },
+          craftingCheck: { ...ELIGIBLE, simple: { rollFormula: '1d20 + 4' } },
         }),
         system({
           id: 'sys-2',
           name: 'Subtractive world',
           craftingCheck: {
-            checkModifiers: CATALOGUE,
+            ...ELIGIBLE,
             simple: { rollFormula: `1d20 - ${TOKEN} + ${TOKEN}` },
             routed: { rollFormula: `max(${TOKEN}, 2)` },
           },
@@ -548,12 +580,14 @@ test('main.js fires the notice GM-only and only when a count is non-zero', () =>
 // fails the capture job whole and publishes NOTHING. `untouched` is the only count that
 // leaves a world needing hand repair, so it alone warns; everything else takes the `info`
 // channel the 0.6.0 and 0.9.0 notices this block is modelled on use.
-test('main.js warns only for the untouched count, and informs otherwise', () => {
+test('main.js warns PERMANENTLY for the untouched count, and informs otherwise', () => {
   const block = MAIN_SOURCE.slice(MAIN_SOURCE.indexOf('const retiredCraftingModCounts'));
   const dispatch = block.slice(0, block.indexOf('\n  }'));
   assert.ok(
-    /if \(totals\.untouched > 0\) ui\.notifications\?\.warn\?\.\(message\);/.test(dispatch),
-    'a formula left unrepairable on disk is a warning'
+    /if \(totals\.untouched > 0\)\s*ui\.notifications\?\.warn\?\.\(message, \{ permanent: true \}\);/.test(
+      dispatch
+    ),
+    'a check that will not roll until rewritten must not scroll away unread'
   );
   assert.ok(
     /else ui\.notifications\?\.info\?\.\(message\);/.test(dispatch),
@@ -561,28 +595,113 @@ test('main.js warns only for the untouched count, and informs otherwise', () => 
   );
 });
 
-test('main.js formats the notice through a localized key that exists in en.json', () => {
-  const match = /game\.i18n\?\.format\?\.\('(FABRICATE\.Migration\.RetireCheckModifierPlaceholder\.Notice)'/.exec(
-    MAIN_SOURCE
-  );
-  assert.ok(match, 'the notice is localized rather than English-only');
+// The clauses are separate keys joined only when non-zero, so the common single-cause
+// world does not read three sentences reporting zero.
+test('main.js joins only the non-zero clauses', () => {
+  const block = MAIN_SOURCE.slice(MAIN_SOURCE.indexOf('const retiredCraftingModCounts'));
+  assert.ok(/if \(count <= 0\) return null;/.test(block), 'a zero clause is dropped entirely');
+  assert.ok(/\.filter\(Boolean\)/.test(block), 'and the survivors are joined');
+  for (const key of ['Inert', 'Subtractive', 'Repeated', 'Untouched']) {
+    assert.ok(block.includes(`clause('${key}'`), `${key} is its own clause`);
+  }
+});
+
+test('main.js formats every notice clause through a localized key that exists in en.json', () => {
   const lang = JSON.parse(
-    readFileSync(
-      resolve(dirname(fileURLToPath(import.meta.url)), '../lang/en.json'),
-      'utf8'
-    )
+    readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), '../lang/en.json'), 'utf8')
   );
-  const copy = match[1]
-    .split('.')
-    .reduce((node, segment) => (node == null ? undefined : node[segment]), lang);
-  assert.equal(typeof copy, 'string', 'the key resolves');
-  // THE REMEDY IS SPELLED OUT. A GM who authored a catalogue and deliberately never spent
-  // the placeholder has no other way to learn how to preserve their previous total.
+  const copyFor = (key) =>
+    `FABRICATE.Migration.RetireCheckModifierPlaceholder.${key}`
+      .split('.')
+      .reduce((node, segment) => (node == null ? undefined : node[segment]), lang);
+
   assert.ok(
-    /clear the default modifiers/i.test(copy) && /resolves to 0/i.test(copy),
-    'the copy names both remedies: clear the default set, or pick a rule resolving to 0'
+    MAIN_SOURCE.includes("'FABRICATE.Migration.RetireCheckModifierPlaceholder.Lead'"),
+    'the lead sentence is localized rather than English-only'
   );
-  for (const parameter of ['{systems}', '{inert}', '{subtractive}', '{repeated}', '{untouched}']) {
-    assert.ok(copy.includes(parameter), `${parameter} is interpolated`);
+  assert.ok(copyFor('Lead').includes('{systems}'), 'and names the affected systems');
+
+  for (const key of ['Inert', 'Subtractive', 'Repeated', 'Untouched']) {
+    const copy = copyFor(key);
+    assert.equal(typeof copy, 'string', `${key} resolves`);
+    assert.ok(copy.includes('{count}'), `${key} interpolates its own count`);
+  }
+
+  // THE REMEDY IS SPELLED OUT, and it names ONE action. An earlier draft also offered
+  // "choose a combination rule whose set resolves to 0", which names no rule that does
+  // that: every rule reduces the same eligible set, so switching cannot zero it.
+  const inert = copyFor('Inert');
+  assert.ok(/clear the Default modifiers set/i.test(inert), 'the real remedy is named');
+  assert.equal(/resolves to 0/i.test(inert), false, 'and the remedy that does not exist is gone');
+
+  // The untouched clause states the CONSEQUENCE, not just the fact, because that is the
+  // one clause whose world is broken until the GM acts.
+  assert.ok(/will not roll until you rewrite them/i.test(copyFor('Untouched')));
+});
+
+// ── the on-disk invariant, over the whole refusal corpus ────────────────────
+//
+// The migration is the ONLY caller that writes, and it passes no dice engine, so the
+// shim's structural check is the sole guard on what lands in the setting. This drives the
+// same corpus the shim tests drive: a shape refused there but written here is exactly how
+// a formula reaches disk in a state the shim would refuse at roll time — and, because the
+// token is gone by then, the shim short-circuits and `new Roll(...)` throws as a rolled,
+// consuming, permanent failure.
+
+const OPERATOR_BOUNDED_RE = /^\s*[*/%]|[+\-*/%]\s*$/;
+
+test('1.21.0 never writes a residue bounded by a binary operator, over the whole corpus', () => {
+  assert.ok(RETIRED_PLACEMENT_CORPUS.length >= 20, 'the corpus is the shared one, not a stub');
+
+  for (const [label, rollFormula] of RETIRED_PLACEMENT_CORPUS) {
+    const target = system({
+      craftingCheck: { ...ELIGIBLE, simple: { rollFormula } },
+    });
+    const counts = applyRetireCraftingModToken(target);
+    const persisted = target.craftingCheck.simple.rollFormula;
+
+    assert.equal(persisted, rollFormula, `${label}: left EXACTLY as authored`);
+    assert.equal(counts.untouched, 1, `${label}: reported for GM attention`);
+    assert.equal(
+      OPERATOR_BOUNDED_RE.test(persisted),
+      OPERATOR_BOUNDED_RE.test(rollFormula),
+      `${label}: the migration introduced no new dangling operator`
+    );
+  }
+});
+
+// The positive half, so the invariant above cannot pass by refusing everything.
+test('1.21.0 DOES rewrite a top-level additive placement, and what it writes is whole', () => {
+  for (const [authored, expected] of [
+    ['1d20 + @craftingmod', '1d20'],
+    ['1d20 - @craftingmod', '1d20'],
+    ['2 + @craftingmod + 4', '2 + 4'],
+    ['@craftingmod - 2', '- 2'],
+    ['@craftingmod', ''],
+  ]) {
+    const target = system({
+      craftingCheck: { ...ELIGIBLE, simple: { rollFormula: authored } },
+    });
+    const counts = applyRetireCraftingModToken(target);
+    const persisted = target.craftingCheck.simple.rollFormula;
+    assert.equal(persisted, expected, authored);
+    assert.equal(counts.untouched, 0, `${authored}: rewritten, not refused`);
+    if (persisted !== '') {
+      assert.equal(OPERATOR_BOUNDED_RE.test(persisted), false, `${authored}: whole residue`);
+    }
+  }
+});
+
+// The reproduction that started this: a formula whose residue would dangle is left alone
+// rather than persisted, so the next craft rolls the authored formula (and fails the
+// readiness check) instead of throwing inside `Roll` and consuming the ingredients.
+test('1.21.0 leaves a formula whose residue would DANGLE exactly as authored', () => {
+  for (const rollFormula of ['1d20 - -@craftingmod', '1d20 - @craftingmod -', '@craftingmod +']) {
+    const target = system({
+      craftingCheck: { ...ELIGIBLE, simple: { rollFormula } },
+    });
+    const counts = applyRetireCraftingModToken(target);
+    assert.equal(target.craftingCheck.simple.rollFormula, rollFormula, rollFormula);
+    assert.equal(counts.untouched, 1);
   }
 });

@@ -1,6 +1,7 @@
 import {
   describeRetiredModifierPlaceholder,
   findRangeConflicts,
+  stripRetiredModifierPlaceholder,
 } from '../../../../../utils/craftingCheckExpression.js';
 
 /**
@@ -95,7 +96,17 @@ export function evaluateCheckReadiness(check = {}, options = {}) {
 
   // Every authored check needs a roll formula to resolve. Mirrors the
   // system-level "warn always" rule for a missing routed/progressive formula.
-  const hasRollFormula = Boolean(trimmed(check?.rollFormula));
+  //
+  // READ POST-SHIM (issue 1094), and this is the whole point of the derivation rather than
+  // a `trimmed(check?.rollFormula)`. `checkUsable` — the value the engine, the inert-cause
+  // projection and the recipe editor all dispatch on — is post-shim, so reading the RAW
+  // field here made this tab tick "Has a roll formula" green for `@craftingmod`,
+  // `1d20 * @craftingmod` and `max(@craftingmod, 2)`: a check that cannot roll at all,
+  // reported as ready, inside the module named `checksReadiness`. That falsified the
+  // invariant `resolution-modes/spec.md` asserts, on the one surface a GM consults to find
+  // out whether a check works.
+  const authoredFormula = trimmed(check?.rollFormula);
+  const hasRollFormula = Boolean(trimmed(stripRetiredModifierPlaceholder(authoredFormula)));
   checks.push({ id: 'hasRollFormula', satisfied: hasRollFormula });
   if (!hasRollFormula) {
     issues.push({ id: 'noRollFormula', severity: 'warning' });
@@ -103,10 +114,23 @@ export function evaluateCheckReadiness(check = {}, options = {}) {
 
   // The retired check-modifier placeholder, typed after its retirement (issue 1094). The
   // formula field is free text, so nothing stops a GM who read an old guide from typing
-  // it — and `stripRetiredModifierPlaceholder` would then delete it SILENTLY on the way
-  // to the roll. A warning rather than a critical: the check still resolves, and the
-  // modifiers still apply; what the GM believes about WHY is what is wrong.
-  if (describeRetiredModifierPlaceholder(check?.rollFormula).present) {
+  // it, and the shim would then remove it SILENTLY on the way to the roll.
+  //
+  // THE SEVERITY SPLITS ON THE PLACEMENT, because the two cases need opposite advice.
+  // An ADDITIVE placement is genuinely ignorable: the check still rolls, the modifiers
+  // still apply, and only what the GM believes about WHY is wrong — so "it is ignored and
+  // removed before the roll, delete it" is true and a warning is proportionate. A
+  // NON-ADDITIVE one is not: the whole formula is discarded and the check does not roll at
+  // all, and telling that GM to "just delete the placeholder" is actively wrong, because
+  // deleting it out of `1d20 * @craftingmod` or `max(@craftingmod, 2)` leaves `1d20 * ` or
+  // `max(, 2)` — still broken. That one is critical and says the formula must be rewritten.
+  // The legacy `routed.rollExpression` alias is inspected too: the migration sweeps it, so
+  // a placeholder can live there, and readiness would otherwise never see it.
+  const placement = describeRetiredModifierPlaceholder(authoredFormula);
+  const legacyPlacement = describeRetiredModifierPlaceholder(trimmed(check?.rollExpression));
+  if (placement.nonAdditive || legacyPlacement.nonAdditive) {
+    issues.push({ id: 'retiredPlaceholderBreaksFormula', severity: 'critical' });
+  } else if (placement.present || legacyPlacement.present) {
     issues.push({ id: 'retiredPlaceholderInFormula', severity: 'warning' });
   }
 
@@ -116,7 +140,7 @@ export function evaluateCheckReadiness(check = {}, options = {}) {
   if (mode === 'routed') {
     const { type, outcomes } = routedOutcomes(check);
     if (outcomes.length > 0) {
-      const allNamed = outcomes.every((outcome) => Boolean(trimmed(outcome?.name)));
+      const allNamed = outcomes.every((outcome) => trimmed(outcome?.name) !== '');
       checks.push({ id: 'outcomesNamed', satisfied: allNamed });
       if (!allNamed) {
         issues.push({ id: 'unnamedOutcome', severity: 'critical' });

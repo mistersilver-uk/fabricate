@@ -1420,6 +1420,18 @@ It renders full-bleed below the grid, replacing the control the grid would other
 A catalogue can be inert for TWO DISTINCT reasons this selector distinguishes rather than collapsing into one boolean: the mode rolls no check slot at all (`noCheck`), or a slot exists but carries no authored roll formula (`noFormula`) — each renders its own remedy-specific copy, both on this tab and on the Checks card.
 The third cause is REMOVED with the placeholder, together with the remedy-specific copy it drove on both surfaces.
 The selector reports `rollFormula` and `checkUsable` POST-shim, so a stored formula whose only content was the retired placeholder reports `noFormula` rather than reporting usable.
+**Checks tab — Validation, the retired-placeholder readiness split.** `checksReadiness.js` derives `hasRollFormula` from the POST-shim formula, not the raw field, so the Validation tab cannot tick "Has a roll formula" green for a check `checkUsable` reports as unusable — the invariant `resolution-modes/spec.md` states, on the one surface a GM consults to find out whether a check works.
+A typed retired placeholder raises one of TWO mutually exclusive issues, split on whether the placement is additive, because the two need opposite advice:
+
+- `retiredPlaceholderInFormula` (**warning**) for an ADDITIVE placement.
+The check still rolls and the modifiers still apply; only what the GM believes about WHY is wrong, so the copy says the placeholder is ignored and removed before the roll and to delete it.
+- `retiredPlaceholderBreaksFormula` (**critical**) for a placement the shim refuses.
+The WHOLE formula is discarded and the check does not roll at all, so the copy says it must be rewritten by hand — echoing the migration notice's `{untouched}` sentence, which is what this GM already read.
+Telling them to "delete the placeholder" would be actively wrong: deleting it out of `1d20 * @craftingmod` leaves a dangling `1d20 *`, and out of `max(@craftingmod, 2)` leaves `max(, 2)`.
+
+Both predicates also inspect the legacy `routed.rollExpression` alias, which the `1.21.0` migration sweeps and which readiness would otherwise never see.
+Both strings NAME `@craftingmod` explicitly; the no-placeholder prohibition applies to the two INERT-CAUSE strings, where a GM would be told to ADD one, and not here, where they are told to remove one and "a retired placeholder" is unidentifiable in a formula carrying several `@` tokens.
+
 The catalogue card renders in **every** crafting sub-tab, including alchemy: it is no longer gated on a single "check usable" boolean, because that gate made two of the three inert causes unreachable on the sub-tabs it hid the card from entirely.
 
 **Checks tab — combination rule and pick cap.** `CraftingModifierCatalogueCard.svelte` authors everything the SYSTEM owns here, and the system owns all of it: there is no authority axis and no per-recipe rule override.

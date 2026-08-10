@@ -34,6 +34,7 @@ import {
   buildCraftingModifierChoice,
   buildCraftingModifierContext,
   makeRollDataExpressionEvaluator,
+  resolveActiveCraftingCheckFormula,
   resolveModifierPolicy,
 } from './craftingModifierResolver.js';
 import {
@@ -50,7 +51,7 @@ import {
   updateStackQuantity,
 } from './itemStackQuantity.js';
 import { buildSalvageChatContent } from './SalvageChatCard.js';
-import { hasCheckFormula, resolveSalvageCheck } from './salvageCheckUsability.js';
+import { resolveSalvageCheck } from './salvageCheckUsability.js';
 import { SignatureValidator, signatureDominates } from './SignatureValidator.js';
 import { buildStepRecipeView } from './stepRecipeView.js';
 import {
@@ -4011,6 +4012,25 @@ export class CraftingEngine {
 
     const mode = resolutionService?.getMode(recipe) || system?.resolutionMode || 'simple';
 
+    // WHETHER THE ACTIVE CHECK CAN ROLL AT ALL, asked ONCE, of the same selector every GM
+    // surface asks (issue 1094). Each gate below used to test its own slot's RAW
+    // `rollFormula`, which diverged the moment the retirement shim landed: a stored
+    // `@craftingmod`, `1d20 * @craftingmod` or `max(@craftingmod, 2)` reports `noFormula`
+    // on the Checks card, the recipe editor and the Validation tab, while the engine still
+    // entered the runner. The consequences were not symmetric, and both were silent:
+    //
+    //   - on alchemy `simple`, `evaluateCheckRoll` short-circuits to `engine: false`, which
+    //     `runFormulaPassFail` reports as a non-blocking `success: true` — so the brew
+    //     succeeded UNCONDITIONALLY, DC ignored;
+    //   - on `routedByCheck` / `progressive` the `requiresCheck` misconfiguration abort
+    //     never fired, so the craft consumed its ingredients and routed to nothing.
+    //
+    // Reading `checkUsable` makes a strip-to-empty formula take exactly the path a blank
+    // one takes, which is the only reading under which the engine and the GM's screen can
+    // agree. `resolveActiveCraftingCheckFormula` already owns the mode→slot table, so this
+    // also deletes five hand-maintained mirrors of it.
+    const activeCheck = resolveActiveCraftingCheckFormula({ ...system, resolutionMode: mode });
+
     // Alchemy: routing + check-ness are driven by the SYSTEM-level `alchemy.checkMode`
     // (the retired per-recipe provider is gone), NOT the generic `checksEnabled`
     // master toggle. Dispatch alchemy entirely here so the shared non-alchemy logic
@@ -4028,7 +4048,7 @@ export class CraftingEngine {
         return { success: true, outcome: null, value: null, data: {} };
       }
       if (alchemyCheckMode === 'simple') {
-        if (!hasCheckFormula(system?.craftingCheck?.simple)) {
+        if (!activeCheck.checkUsable) {
           return {
             success: false,
             misconfigured: true,
@@ -4044,7 +4064,7 @@ export class CraftingEngine {
         });
       }
       // tiered
-      if (!hasCheckFormula(system?.craftingCheck?.routed)) {
+      if (!activeCheck.checkUsable) {
         return {
           success: false,
           misconfigured: true,
@@ -4082,21 +4102,20 @@ export class CraftingEngine {
     // by ingredient set, so its check never gates routing — it stays an optional
     // pass/fail layer that runs on an authored formula alone, with no `checksEnabled`
     // requirement).
-    const simpleConfig = system?.craftingCheck?.simple;
-    // With an EMPTY `simple.rollFormula` the simple pass/fail check is not usable,
-    // so `useSimpleCheck` is false and (in optional simple / routedByIngredients
-    // mode) the attempt proceeds with no check.
+    // With an unusable `simple` check the pass/fail check is not run, so `useSimpleCheck`
+    // is false and (in optional simple / routedByIngredients mode) the attempt proceeds
+    // with no check. "Unusable" is `activeCheck.checkUsable`, which covers both an empty
+    // formula and one the retirement shim strips to empty.
     const useSimpleCheck =
       ['simple', 'routedByIngredients'].includes(mode) &&
-      !!simpleConfig?.rollFormula &&
+      activeCheck.checkUsable &&
       (mode === 'routedByIngredients' || checksEnabled);
 
     // Progressive check (Checks editor) for progressive mode: rolls a formula
     // whose total becomes the numeric `value` the progressive result-awarding
     // spends against result difficulties. Usable only when a roll formula is
     // configured; with no formula the required-check guard below fails the attempt.
-    const progressiveConfig = system?.craftingCheck?.progressive;
-    const useProgressiveCheck = mode === 'progressive' && !!progressiveConfig?.rollFormula;
+    const useProgressiveCheck = mode === 'progressive' && activeCheck.checkUsable;
 
     // Routed check (Checks editor) for `routedByCheck` ONLY: rolls the routed
     // formula and maps the total to an outcome tier whose NAME drives the
@@ -4104,8 +4123,7 @@ export class CraftingEngine {
     // check is required, so a missing formula fails via the required-check guard
     // below. `routedByIngredients` no longer reads `craftingCheck.routed` — its
     // optional pass/fail check lives on `craftingCheck.simple` (see `useSimpleCheck`).
-    const routedConfig = system?.craftingCheck?.routed;
-    const useRoutedCheck = mode === 'routedByCheck' && !!routedConfig?.rollFormula;
+    const useRoutedCheck = mode === 'routedByCheck' && activeCheck.checkUsable;
 
     if (
       !checksEnabled &&

@@ -278,3 +278,100 @@ describe('checks readiness label maps do not drift', () => {
     });
   }
 });
+
+// ── the retired check-modifier placeholder (issue 1094) ────────────────────
+//
+// The whole block exists because MUTATION found it missing. Changing the predicate from
+// `.present` to `.nonAdditive` left every test in this file green — killing the warning for
+// exactly the case task 6 exists to prevent, which is a GM who reads an old guide, types
+// the placeholder, and has it removed silently on the way to the roll.
+describe('retired placeholder readiness', () => {
+  const issue = (issues, id) => issues.find((entry) => entry.id === id);
+
+  it('WARNS on an additive placement, which is genuinely ignorable', () => {
+    const { issues } = evaluateCheckReadiness({ rollFormula: '1d20 + @craftingmod' });
+    const warning = issue(issues, 'retiredPlaceholderInFormula');
+    assert.ok(warning, 'the strip is never silent at the authoring surface');
+    assert.equal(warning.severity, 'warning');
+    assert.equal(issue(issues, 'retiredPlaceholderBreaksFormula'), undefined);
+  });
+
+  it('does NOT warn on a formula that merely looks similar', () => {
+    // The negative control the mutation exposed: without it, a predicate that never fires
+    // passes this file. `@craftingmodifier` is a different token and is left alone.
+    const { issues } = evaluateCheckReadiness({ rollFormula: '1d20 + @craftingmodifier' });
+    assert.equal(issue(issues, 'retiredPlaceholderInFormula'), undefined);
+    assert.equal(issue(issues, 'retiredPlaceholderBreaksFormula'), undefined);
+  });
+
+  it('does NOT warn on an ordinary formula', () => {
+    const { issues } = evaluateCheckReadiness({ rollFormula: '1d20 + @abilities.med.mod' });
+    assert.equal(issue(issues, 'retiredPlaceholderInFormula'), undefined);
+  });
+
+  // The SPLIT. A non-additive placement discards the whole formula, so "delete the
+  // placeholder" is actively wrong advice — deleting it out of `1d20 * @craftingmod`
+  // leaves `1d20 * `, still broken — and the check does not roll at all.
+  it('raises a CRITICAL, not a warning, when the placement breaks the whole formula', () => {
+    for (const rollFormula of [
+      '1d20 * @craftingmod',
+      'max(@craftingmod, 2)',
+      '(2 + @craftingmod + 4) * 3',
+      '1d20 - -@craftingmod',
+    ]) {
+      const { issues } = evaluateCheckReadiness({ rollFormula });
+      const critical = issue(issues, 'retiredPlaceholderBreaksFormula');
+      assert.ok(critical, rollFormula);
+      assert.equal(critical.severity, 'critical', rollFormula);
+      assert.equal(
+        issue(issues, 'retiredPlaceholderInFormula'),
+        undefined,
+        `${rollFormula}: the two are mutually exclusive, so a GM gets ONE instruction`
+      );
+    }
+  });
+
+  // THE INVARIANT THIS TAB EXISTS TO REPORT. `hasRollFormula` must agree with the
+  // `checkUsable` every other surface dispatches on, or the Validation tab ticks
+  // "Has a roll formula" green next to a check that cannot roll.
+  it('reads hasRollFormula POST-shim, so it cannot disagree with checkUsable', () => {
+    for (const rollFormula of ['@craftingmod', '1d20 * @craftingmod', 'max(@craftingmod, 2)']) {
+      const { checks, issues } = evaluateCheckReadiness({ rollFormula });
+      assert.equal(
+        check(checks, 'hasRollFormula').satisfied,
+        false,
+        `${rollFormula}: authored, but it cannot roll`
+      );
+      assert.ok(issue(issues, 'noRollFormula'), rollFormula);
+    }
+    // …and an additive placement still leaves a real formula standing.
+    const { checks } = evaluateCheckReadiness({ rollFormula: '1d20 + @craftingmod' });
+    assert.equal(check(checks, 'hasRollFormula').satisfied, true);
+  });
+
+  // The legacy routed alias the `1.21.0` migration sweeps. Readiness reads `rollFormula`,
+  // so without this the one field the migration can rewrite is the one the GM is never
+  // told about.
+  it('inspects the legacy routed.rollExpression alias too', () => {
+    const warned = evaluateCheckReadiness({
+      rollFormula: '1d20',
+      rollExpression: '1d20 + @craftingmod',
+    });
+    assert.ok(issue(warned.issues, 'retiredPlaceholderInFormula'), 'the alias is inspected');
+
+    const broken = evaluateCheckReadiness({
+      rollFormula: '1d20',
+      rollExpression: 'max(@craftingmod, 2)',
+    });
+    assert.ok(issue(broken.issues, 'retiredPlaceholderBreaksFormula'), 'and split the same way');
+  });
+
+  it('says nothing at all for the gathering d100 mode, which authors no formula', () => {
+    const { checks, issues } = evaluateCheckReadiness(
+      { rollFormula: '1d20 * @craftingmod' },
+      { mode: 'd100' }
+    );
+    assert.deepEqual(checks, []);
+    assert.deepEqual(issues, []);
+  });
+});

@@ -53,7 +53,11 @@
     ],
     retiredPlaceholderInFormula: [
       'IssueRetiredPlaceholderInFormula',
-      'This formula contains a retired placeholder; it is ignored and removed before the roll. Check modifiers are added automatically now, so delete it.',
+      'This formula contains the retired @craftingmod placeholder. It is ignored and removed before the roll — check modifiers are added automatically now — so delete it.',
+    ],
+    retiredPlaceholderBreaksFormula: [
+      'IssueRetiredPlaceholderBreaksFormula',
+      'This formula uses the retired @craftingmod placeholder somewhere it cannot be removed safely, so the whole formula is discarded and this check will not roll. Rewrite it by hand without the placeholder — check modifiers are added automatically now.',
     ],
     unnamedOutcome: [
       'IssueUnnamedOutcome',

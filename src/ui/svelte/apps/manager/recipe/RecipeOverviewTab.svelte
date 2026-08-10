@@ -664,7 +664,7 @@
       actionLabel={text('FABRICATE.Admin.Manager.Recipe.CraftingModifierOpenChecks', 'Checks tab')}
       actionHint={text(
         'FABRICATE.Admin.Manager.Recipe.CraftingModifierInertHint',
-        'The crafting check these modifiers are added to is authored for the whole crafting system on the Checks tab.'
+        'These modifiers are added to the crafting check, which is authored for the whole crafting system on the Checks tab.'
       )}
       onAction={onOpenChecks}
     />

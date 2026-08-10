@@ -179,7 +179,7 @@
     noCheck: {
       key: 'FABRICATE.Admin.Manager.Checks.Crafting.ModifierInertNoCheck',
       fallback:
-        'This system resolves without a crafting check, so nothing here is rolled. Check modifiers only apply to a crafting check that rolls.',
+        'This resolution mode rolls no crafting check, so nothing here is applied. Change the resolution mode on System settings to one that rolls a check, or use the alchemy tiered or simple check mode.',
     },
     noFormula: {
       key: 'FABRICATE.Admin.Manager.Checks.Crafting.ModifierInertNoFormula',
@@ -279,7 +279,7 @@
   <p class="manager-muted">
     {text(
       'FABRICATE.Admin.Manager.Checks.Crafting.ModifierCatalogueIntro',
-      'Named character modifiers added to the crafting-check roll automatically, as a single flavoured term. Each expression resolves against the crafter (e.g. @abilities.med.mod).'
+      'Named character modifiers added to the crafting-check roll automatically, as one + N[Modifiers] term. Each expression resolves against the crafter (e.g. @abilities.med.mod).'
     )}
   </p>
 
@@ -303,7 +303,7 @@
       <p class="manager-muted" data-crafting-modifier-empty>
         {text(
           'FABRICATE.Admin.Manager.Checks.Crafting.ModifierCatalogueEmpty',
-          'No check modifiers yet. Add one and it is applied to the crafting-check roll.'
+          'No check modifiers yet. Add one to make it available to the checks in this system.'
         )}
       </p>
     {/if}

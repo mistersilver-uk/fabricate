@@ -391,10 +391,16 @@ test('the lab fixtures still reach the interactive modifier fieldset (issues 105
     active.checkUsable,
     'the active mode still carries an authored roll formula — without one the engine offers no choice'
   );
+  // Read the AUTHORED field, not `active.rollFormula`. That value is POST-shim, so the
+  // shim has already removed any placeholder by the time it is returned and only the
+  // never-matched `@craftingmodifier` could ever turn this red — the assertion would pass
+  // over a fixture that still seeded the token, which is exactly what it exists to catch.
+  const authoredFormula = herbalism?.craftingCheck?.[active.slot]?.rollFormula ?? '';
+  assert.ok(authoredFormula.trim() !== '', 'the fixture authors a formula on the active slot');
   assert.equal(
-    active.rollFormula.includes('@craftingmod'),
+    authoredFormula.includes('@craftingmod'),
     false,
-    'and it carries no retired placeholder, which the runtime shim would strip anyway'
+    'and the FIXTURE seeds no retired placeholder, so the capture case does not depend on one'
   );
   const context = buildCraftingModifierContext(herbalism, stillroom);
   assert.equal(
