@@ -29,6 +29,7 @@ import {
   ACTOR_TYPE_FIELD_NAME,
   actorTypeLabel,
   buildActorTypeDialogContent,
+  DIALOG_WIDTH,
   enumerateActorTypes,
   openPlayerCharacterTypesDialog,
   readSelectedActorTypes,
@@ -374,6 +375,54 @@ describe('buildActorTypeDialogContent', () => {
     assert.match(label.textContent, /quest-pages\.quest/, 'and renders with its raw id');
   });
 
+  it('renders a raw type id in a typeface the friendly label does not use', () => {
+    // The two are adjacent on one row ("Player Character" then `character`), so nothing
+    // but their presentation says which is the human name and which is the literal the
+    // world declares. Asserting the DECLARATIONS rather than a class name, because a
+    // class alone styles nothing: this dialog is core-chromed and the rule would have to
+    // live in `styles/fabricate.css`, which the module docblock explains it cannot.
+    const cleaned = cleanLikeClient(content());
+    const row = cleaned.querySelector('input[value="robot"]').closest('label');
+    const rawId = row.querySelector('.fabricate-actor-type-id');
+    const friendly = row.querySelector('.fabricate-actor-type-label');
+    assert.equal(rawId.textContent, 'robot');
+    assert.equal(friendly.textContent, 'Robot');
+    assert.match(rawId.getAttribute('style'), /font-family:[^;]*monospace/);
+    assert.doesNotMatch(friendly.getAttribute('style') || '', /font-family/);
+  });
+
+  it('gives a label-less type the RAW treatment, not the friendly one', () => {
+    // `quest-pages.quest` has no `CONFIG.Actor.typeLabels` entry, so `actorTypeLabel`
+    // fell back to the id and label === id. Rendering that fallback in the friendly
+    // typeface would make the one row a GM most needs to recognise — a type this world
+    // does not translate — the only row that lies about which kind of string it is.
+    const cleaned = cleanLikeClient(content());
+    const row = cleaned.querySelector('input[value="quest-pages.quest"]').closest('label');
+    assert.equal(row.querySelector('.fabricate-actor-type-label'), null);
+    const rawId = row.querySelector('.fabricate-actor-type-id');
+    assert.equal(rawId.textContent, 'quest-pages.quest');
+    assert.match(rawId.getAttribute('style'), /font-family:[^;]*monospace/);
+    // And it still reads ONCE, not as a friendly name followed by its own id.
+    assert.equal(row.querySelectorAll('.fabricate-actor-type-id').length, 1);
+  });
+
+  it('does not read a `--fab-*` COLOUR token, which would be the dark theme against Foundry light', () => {
+    // The colour tokens are declared on bare `:root` and unconditionally carry the dark
+    // "fabricate" theme. This dialog wears core chrome and follows FOUNDRY's theme, so a
+    // parchment-on-dark token here is unreadable in a light-themed world. Font family is
+    // theme-independent and stays allowed.
+    const tokens = [...content().matchAll(/var\(\s*(--fab-[a-z0-9-]+)/gi)].map((m) => m[1]);
+    assert.deepEqual([...new Set(tokens)], ['--fab-font-mono']);
+  });
+
+  it('keeps a space between the label spans so the accessible name is not run together', () => {
+    // `display:flex` drops a whitespace-only text node from the LAYOUT, so the visible
+    // separation is the `gap` — but the accessible name is computed from text content.
+    const cleaned = cleanLikeClient(content());
+    const row = cleaned.querySelector('input[value="robot"]').closest('label');
+    assert.match(row.textContent, /Robot\s+robot/);
+  });
+
   it('escapes a hostile id and label rather than emitting markup', () => {
     // An actor type id is module-supplied, so it is not trusted input. We escape our own
     // interpolations rather than relying on the sanitizer downstream of us.
@@ -527,6 +576,7 @@ describe('openPlayerCharacterTypesDialog', () => {
   function runDialog({ stored = [], declared = [], tick = [], action = 'save' } = {}) {
     const writes = [];
     let renderedContent = '';
+    let renderedConfig = null;
     globalThis.CONST = { BASE_DOCUMENT_TYPE: 'base' };
     globalThis.CONFIG = { Actor: { typeLabels: {} } };
     globalThis.game = {
@@ -545,6 +595,7 @@ describe('openPlayerCharacterTypesDialog', () => {
         api: {
           DialogV2: {
             wait: async (config) => {
+              renderedConfig = config;
               renderedContent = config.content;
               const form = document.createElement('form');
               form.innerHTML = config.content;
@@ -559,8 +610,26 @@ describe('openPlayerCharacterTypesDialog', () => {
         },
       },
     };
-    return { writes, content: () => renderedContent, run: () => openPlayerCharacterTypesDialog() };
+    return {
+      writes,
+      content: () => renderedContent,
+      config: () => renderedConfig,
+      run: () => openPlayerCharacterTypesDialog(),
+    };
   }
+
+  it('asks for an explicit pixel width instead of inheriting `width: "auto"`', async () => {
+    // `ApplicationV2.DEFAULT_OPTIONS.position` is `{width: "auto"}` and DialogV2 does not
+    // override it; `_updatePosition` then skips its clamp and leaves the <dialog> at its
+    // `fit-content` default, so the window grew to the intro paragraph's ONE-LINE
+    // max-content width — near the full viewport, to hold five short checkbox rows.
+    // A number is what engages `Math.clamp(targetWidth, minWidth, maxWidth)`.
+    const harness = runDialog({ declared: ['character', 'robot'] });
+    await harness.run();
+    assert.equal(typeof harness.config().position?.width, 'number');
+    assert.equal(harness.config().position.width, DIALOG_WIDTH);
+    assert.ok(DIALOG_WIDTH > 0 && DIALOG_WIDTH <= 640, 'and it is a dialog, not a window');
+  });
 
   it('persists the ticked types under the module namespace and key', async () => {
     const harness = runDialog({ declared: ['character', 'robot'], tick: ['robot'] });
@@ -748,9 +817,7 @@ describe('player-write guardrail for the actor-types key', () => {
 // GM is looking at three robots.
 
 describe('empty-state copy', () => {
-  const lang = JSON.parse(
-    readFileSync(resolve(import.meta.dirname, '../lang/en.json'), 'utf8')
-  );
+  const lang = JSON.parse(readFileSync(resolve(import.meta.dirname, '../lang/en.json'), 'utf8'));
   const barEmpty = lang.FABRICATE.App.ActorBar.NoActors;
   const partyEmpty = lang.FABRICATE.Admin.Manager.Travel.Members.NoActors;
   const menu = lang.FABRICATE.Settings.PlayerCharacterActorTypes;
@@ -852,7 +919,10 @@ describe('the player-character-types hook is wired at every consuming edge', () 
     // The GM who ticks the box is the one GUARANTEED to be looking at stale data: the
     // settings sidebar sits over an open manager.
     const app = read('src/ui/SvelteCraftingSystemManagerApp.svelte.js');
-    assert.match(app, /hooks\.on\('fabricate\.playerCharacterTypesChanged', playerCharacterTypeListener\);/);
+    assert.match(
+      app,
+      /hooks\.on\('fabricate\.playerCharacterTypesChanged', playerCharacterTypeListener\);/
+    );
     assert.match(
       app,
       /hooks\?\.off\?\.\('fabricate\.playerCharacterTypesChanged', playerCharacterTypeListener\);/
