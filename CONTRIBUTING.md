@@ -1206,10 +1206,15 @@ A pure-stable channel like `public` can never stall this way.
 The sources target is what the tooling reads; on a private channel nothing installs from it, and a cohort is only ever given an unguessable tester URL.
 That separation is what makes the bucket policy safe — denying the derivable sources path locks out anonymous readers without defecting any cohort, because no cohort is pinned to it (the **Channel isolation** requirement).
 
-**Tester path secret (effectively immutable).**
+**Tester path secret (rotation freezes a cohort, not a lockout).**
 The tester feed lives at an unguessable path: `testers/<group>/<segment>/<moduleId>/…`, where `<segment>` comes from a per-channel repository **secret** (`S3_TESTER_PATH_SECRET` for beta, a separate `S3_EARLY_ACCESS_PATH_SECRET` for early access, referred to abstractly here — never paste the value) — never the committed config.
 Generate each once and set it before publishing; the publish **refuses to run** when a channel declares tester groups but its secret is unset, so the feed can never fall back to a guessable URL.
-Treat the secret as immutable once a cohort exists: rotating it 404s every distributed manifest URL, and because Foundry's `checkPackage` suppresses that 404 and shows only an offer to switch the client to the public registry, a rotation is a **cohort migration, not hygiene** — you would hand the whole cohort to the registry.
+Treat rotation as a **cohort migration, not hygiene**: it starts a new segment for future publishes, and the superseded segment keeps serving its last pre-rotation manifest, because the publisher only ever writes the current segment and nothing in the release path deletes, prunes, or expires an old one.
+No update is ever offered to that superseded cohort and no error is surfaced — it silently stops receiving updates rather than failing.
+Rotation is not a lockout: every artefact already published to the superseded segment stays reachable to anyone holding its URL, including a lapsed patron.
+Deliberately deleting a superseded segment, by contrast, makes its manifest URL genuinely unreachable and returns a 404 to `checkPackage` — Foundry's own internal, server-side setup route, not documented client API — which suppresses that 404 and shows the client only an offer to switch to the public registry.
+This module never deletes a tester segment, for exactly that reason.
+After rotating a secret, uninstall and reinstall the affected cohort from the new manifest URL, because it will never be offered an update on its own.
 `release-s3.js` withholds all S3 keys and install URLs from CI logs (they print only on local/`--dry-run` runs); GitHub also masks the secret value.
 
 **`--overwrite`.**
