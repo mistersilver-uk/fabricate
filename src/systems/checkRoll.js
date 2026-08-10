@@ -246,11 +246,12 @@ export async function evaluateCheckRoll(formula, actor, options = {}) {
   const authoredFormula = stripRetiredModifierPlaceholder(String(formula));
   // A formula the shim emptied is NOT a check. The usability readers
   // (`resolveActiveCraftingCheckFormula`, `resolveSalvageCheck`) report it as
-  // "no formula" so it normally never gets here, but the crafting engine gates its
-  // runners on the RAW `rollFormula` string, so this is the seam that keeps
-  // `new Roll('')` — which throws, and would surface as a rolled and therefore
-  // CONSUMING failure — unreachable. Reported as "no engine", the shape every runner
-  // already treats as non-blocking.
+  // "no formula", and `_runCraftingCheck` now gates all five of its runner decisions on
+  // that same POST-SHIM `checkUsable`, so this is a BACKSTOP rather than the only guard:
+  // it keeps `new Roll('')` — which throws, and would surface as a rolled and therefore
+  // CONSUMING failure — unreachable from any caller that reaches this function by another
+  // route (a hand-built config, a runner called directly). Reported as "no engine", the
+  // shape every runner already treats as non-blocking.
   if (authoredFormula.trim() === '')
     return { engine: false, total: 0, diceGroups: [], resolvedFormula: null };
   const rollData = actor?.getRollData?.() ?? actor?.system ?? {};

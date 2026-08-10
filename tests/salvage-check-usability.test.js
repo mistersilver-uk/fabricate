@@ -105,35 +105,37 @@ describe('resolveSalvageCheck: the builder tuple, unchanged, for every mode', ()
   });
 });
 
-describe('hasCheckFormula: the promoted predicate answers identically at its OWN call sites', () => {
-  // The predicate was promoted out of `CraftingEngine._hasCheckFormula`, whose ONLY two
-  // call sites are the `mode === 'alchemy'` guards of `_runCraftingCheck` — the alchemy
-  // `simple` and `tiered` sub-configs of `system.craftingCheck`. Those are the shapes it
-  // has to keep answering identically for the promotion to be a pure move; the mainline
-  // crafting readers use raw truthiness and are NOT covered by it.
-  const ALCHEMY_CONFIGS = [
+describe('hasCheckFormula: the promoted predicate answers identically on every sub-config shape', () => {
+  // The predicate was promoted out of `CraftingEngine._hasCheckFormula`, and its call
+  // sites have MOVED since: issue 1094 replaced the `mode === 'alchemy'` guards of
+  // `_runCraftingCheck` with `resolveActiveCraftingCheckFormula(...).checkUsable`, so the
+  // only remaining caller in `src/` is `resolveSalvageCheck` — the mainline crafting
+  // readers now share the POST-SHIM selector rather than raw truthiness.
+  // The sub-config shapes below are kept as the predicate's own contract table (authored /
+  // empty / absent key / null / undefined), which is what a caller anywhere depends on.
+  const CHECK_CONFIGS = [
     {
-      label: 'alchemy simple, authored',
+      label: 'simple slot, authored',
       config: { rollFormula: '1d20 + @abilities.int.mod' },
       expected: true,
     },
-    { label: 'alchemy simple, empty', config: { rollFormula: '' }, expected: false },
-    { label: 'alchemy simple, absent key', config: {}, expected: false },
+    { label: 'simple slot, empty', config: { rollFormula: '' }, expected: false },
+    { label: 'simple slot, absent key', config: {}, expected: false },
     {
-      label: 'alchemy tiered, authored',
+      label: 'routed slot, authored',
       config: { rollFormula: '1d20', type: 'relative' },
       expected: true,
     },
     {
-      label: 'alchemy tiered, empty',
+      label: 'routed slot, empty',
       config: { rollFormula: '', type: 'relative' },
       expected: false,
     },
-    { label: 'alchemy tiered, null sub-config', config: null, expected: false },
-    { label: 'alchemy tiered, undefined sub-config', config: undefined, expected: false },
+    { label: 'routed slot, null sub-config', config: null, expected: false },
+    { label: 'routed slot, undefined sub-config', config: undefined, expected: false },
   ];
 
-  for (const testCase of ALCHEMY_CONFIGS) {
+  for (const testCase of CHECK_CONFIGS) {
     it(`${testCase.label} -> ${testCase.expected}`, () => {
       assert.equal(hasCheckFormula(testCase.config), testCase.expected);
     });
