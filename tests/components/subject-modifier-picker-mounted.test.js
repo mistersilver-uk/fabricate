@@ -222,6 +222,29 @@ describe('SubjectModifierPicker (mounted)', () => {
     );
   });
 
+  // ONE OF THE TWO, NEVER BOTH — the same rule the catalogue card's eligibility pill follows, and
+  // the same defect on the sibling surface: the checkbox carries the whole accessible name, so the
+  // visible copy of those exact words beside it is a SECOND reading of one control and a reader
+  // hears "Pick check modifiers for this component" twice.
+  it('hides the visible toggle copy from assistive tech, because the checkbox already says it', async () => {
+    const { target } = await mount();
+    const input = authorToggle(target);
+    assert.match(
+      input.getAttribute('aria-label'),
+      /Pick check modifiers for this component/,
+      'the CHECKBOX carries the accessible name'
+    );
+    const visible = [...target.querySelectorAll('.manager-subject-modifier-mode span')].find(
+      (node) => node.textContent.includes('Pick check modifiers')
+    );
+    assert.ok(Boolean(visible), 'the sentence still renders for sighted users');
+    assert.notEqual(
+      visible.closest('[aria-hidden="true"]'),
+      null,
+      'and is out of the accessibility tree, so the control is announced once'
+    );
+  });
+
   // THE CAP SENTENCE CARRIES A NUMBER, and the FALLBACK has to substitute it.
   //
   // The cap copy is the one string on this surface with an interpolation placeholder, so it is
