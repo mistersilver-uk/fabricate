@@ -237,10 +237,8 @@ async function fetchSystem({ id, version, url }) {
 
 async function main() {
   mkdirSync(SYSTEMS_DIR, { recursive: true });
-  process.stdout.write(
-    `Smoke arm ${ARM.id} (Foundry ${ARM.foundryVersion}): ` +
-      `${SYSTEMS.map((system) => `${system.id}@${system.version}`).join(', ')}\n`
-  );
+  const pinnedSystems = SYSTEMS.map((system) => `${system.id}@${system.version}`).join(', ');
+  process.stdout.write(`Smoke arm ${ARM.id} (Foundry ${ARM.foundryVersion}): ${pinnedSystems}\n`);
 
   for (const system of SYSTEMS) {
     await fetchSystem(system);

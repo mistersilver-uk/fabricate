@@ -105,9 +105,12 @@ test('each arm pins a game system verified for the generation it boots', () => {
     const arm = resolveSmokeArm(id, { root: ROOT });
     assert.ok(arm.systems.length > 0, `the "${id}" arm pins no game system`);
     for (const system of arm.systems) {
+      // Hoisted rather than inlined into the pattern: a template literal nested inside another is
+      // the S4624 smell, and this one reads better named anyway.
+      const escapedVersion = system.version.replaceAll('.', String.raw`\.`);
       assert.match(
         system.url,
-        new RegExp(`release-${system.version.replaceAll('.', String.raw`\.`)}/`),
+        new RegExp(`release-${escapedVersion}/`),
         `the "${id}" arm's ${system.id} URL does not name version ${system.version}`
       );
     }
