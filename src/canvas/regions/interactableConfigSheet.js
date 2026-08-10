@@ -33,7 +33,10 @@ import {
  * INJECTED, so a fake records the call. Defensive + idempotent + no-throw.
  *
  * Tracks registration on the registrar via a private marker so a repeat call is a
- * clean no-op (V13 throws if the same sheet is registered twice).
+ * clean no-op. Foundry's `registerSheet` simply overwrites the prior registration,
+ * but we avoid redundant `makeDefault` re-shuffling of every sibling sheet's default
+ * flag by guarding locally. V14 adds a validation throw for non-sheet classes; we
+ * defensively catch any throw to remain robust across versions.
  *
  * @param {object} deps
  * @param {object} deps.registrar  A `DocumentSheetConfig`-shaped object exposing
@@ -56,7 +59,7 @@ export function assignInteractableConfigSheet({
   if (typeof RegionBehavior !== 'function') return false;
   if (typeof SheetClass !== 'function') return false;
 
-  // Idempotent guard: a second register would throw in V13.
+  // Idempotent guard: avoid redundant `makeDefault` re-shuffle on repeat calls.
   const marker = '_fabricateInteractableConfigSheetRegistered';
   if (registrar[marker] === true) return false;
 

@@ -64,9 +64,9 @@ describe('assignInteractableConfigSheet', () => {
     assert.equal(assignInteractableConfigSheet({ registrar: fakeRegistrar(), RegionBehavior: FakeRegionBehavior, SheetClass: null }), false);
   });
 
-  it('does not throw when registerSheet itself throws (double-register race)', () => {
+  it('is defensive when registerSheet itself throws (e.g., V14 class validation)', () => {
     const registrar = {
-      registerSheet() { throw new Error('already registered'); }
+      registerSheet() { throw new Error('Sheet class must be an Application or DocumentSheetV2'); }
     };
     assert.equal(assignInteractableConfigSheet({ registrar, RegionBehavior: FakeRegionBehavior, SheetClass: FakeSheet }), false);
   });
