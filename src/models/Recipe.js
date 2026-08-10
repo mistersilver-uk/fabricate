@@ -99,7 +99,7 @@ export class Recipe {
     // The recipe author's PICK of crafting-check modifiers (issues 770, 1055), honoured
     // only under the system's `byRecipe` ("Recipe picks") combination rule. Absent → the
     // recipe inherits the system's default eligible modifier ids. Present → names the
-    // eligible id subset resolved into the `@craftingmod` formula placeholder. It carries
+    // eligible id subset reduced to the scalar appended to the check roll. It carries
     // NO rule: a recipe chooses WHICH modifiers apply, never HOW they combine, so the
     // combination rule is the system's alone and is never persisted here. Unknown
     // catalogue ids are dropped at resolution time (the resolver validates against the
@@ -144,7 +144,7 @@ export class Recipe {
    *
    * `modifierIds` is keyed on `Array.isArray(input.modifierIds)` **at the point of
    * entry**: an authored array is an authored array, so an authored EMPTY set survives
-   * as `{ modifierIds: [] }` and resolves `@craftingmod` to 0, distinct from an absent
+   * as `{ modifierIds: [] }` and contributes 0 to the check roll, distinct from an absent
    * one which inherits. That is deliberately NOT keyed on the post-filter length —
    * `{ modifierIds: [123, ''] }`, whose junk the filter below removes, is still an
    * authored array and must resolve as an authored empty set. Keying on the filtered

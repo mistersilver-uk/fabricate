@@ -172,8 +172,8 @@
   );
   const craftingProgressive = $derived(resolutionMode === 'progressive');
 
-  // Which crafting check this system's resolution mode actually rolls, and whether a
-  // `@craftingmod` in it is live. Resolved through the shared five-mode selector rather
+  // Which crafting check this system's resolution mode actually rolls, and whether it
+  // carries an authored formula. Resolved through the shared five-mode selector rather
   // than the local rollFormula ternary that stood here (issue 1055): that copy had no
   // case for alchemy at `checkMode: 'none'`, which rolls nothing at all, so it reported
   // the tiered/simple slot's formula for a mode that never reaches it.
@@ -192,10 +192,12 @@
     })
   );
 
-  // The three reasons a check-modifier catalogue reaches no roll, in the order they
-  // become answerable: no check at all, then no formula, then no `@craftingmod` in it.
-  // Written as a guard chain rather than nested ternaries — the SonarCloud gate fails
-  // those, and the ordering is the point.
+  // The TWO reasons a check-modifier catalogue reaches no roll, in the order they become
+  // answerable: no check at all, then no formula. Written as a guard chain rather than
+  // nested ternaries — the SonarCloud gate fails those, and the ordering is the point.
+  // The third cause retired with the roll-formula placeholder (issue 1094): the resolved
+  // scalar is appended to whatever the GM authored, so "a formula that never spends it"
+  // is no longer a reachable state.
   // This derivation reads the DRAFT inputs because the GM is editing these formulas on
   // this very tab. The store's separate projection reads the PERSISTED system and is
   // consumed by the recipe editor and overview surfaces, which reflect only saved state.
@@ -204,7 +206,6 @@
   function inertCauseFor(active) {
     if (!active.slot) return 'noCheck';
     if (!active.checkUsable) return 'noFormula';
-    if (!active.referencesModifier) return 'noPlaceholder';
     return '';
   }
 

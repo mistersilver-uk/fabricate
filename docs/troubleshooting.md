@@ -120,7 +120,7 @@ Recipes resolve immediately with no skill check, even though the Routed by check
   Under **Add all**, **Highest**, and **Player picks** the system decides, and the tab shows nothing rather than a control the system would ignore.
 - The system has no check modifiers in its catalogue yet, so there is nothing to pick from.
 - The system's active crafting check cannot use a modifier right now.
-  Either the resolution mode rolls no check at all, the check has no roll formula authored yet, or its formula does not reference `@craftingmod`.
+  Either the resolution mode rolls no check at all, or the check has no roll formula authored yet.
   Under **Recipe picks** the recipe's Overview tab shows a banner naming which of these applies in place of the control.
 
 **Related symptom:** The control is there, but the **Add modifier** button is greyed out.
@@ -139,7 +139,7 @@ A lowered limit rolls only the first few picks, up to the limit, and keeps the r
 3. Check the **Combination rule**.
    If it is anything other than **Recipe picks**, that is why no recipe has a control; choose **Recipe picks** to hand the selection to your recipes.
 4. If the rule is already **Recipe picks**, open the recipe's **Overview** tab and read the banner in place of the control.
-   It names whether the system's active check has no roll formula, rolls no check at all for the current resolution mode, or has a formula that does not reference `@craftingmod`.
+   It names whether the system's active check has no roll formula, or rolls no check at all for the current resolution mode.
 5. Fix whichever of those applies on the **Crafting check** page, then return to the recipe's Overview tab.
 
 **See also:** [Check modifiers]({% link crafting-checks.md %}#check-modifiers) covers the catalogue, the four combination rules, and the pick limit in full.

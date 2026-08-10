@@ -105,35 +105,37 @@ describe('resolveSalvageCheck: the builder tuple, unchanged, for every mode', ()
   });
 });
 
-describe('hasCheckFormula: the promoted predicate answers identically at its OWN call sites', () => {
-  // The predicate was promoted out of `CraftingEngine._hasCheckFormula`, whose ONLY two
-  // call sites are the `mode === 'alchemy'` guards of `_runCraftingCheck` — the alchemy
-  // `simple` and `tiered` sub-configs of `system.craftingCheck`. Those are the shapes it
-  // has to keep answering identically for the promotion to be a pure move; the mainline
-  // crafting readers use raw truthiness and are NOT covered by it.
-  const ALCHEMY_CONFIGS = [
+describe('hasCheckFormula: the promoted predicate answers identically on every sub-config shape', () => {
+  // The predicate was promoted out of `CraftingEngine._hasCheckFormula`, and its call
+  // sites have MOVED since: issue 1094 replaced the `mode === 'alchemy'` guards of
+  // `_runCraftingCheck` with `resolveActiveCraftingCheckFormula(...).checkUsable`, so the
+  // only remaining caller in `src/` is `resolveSalvageCheck` — the mainline crafting
+  // readers now share the POST-SHIM selector rather than raw truthiness.
+  // The sub-config shapes below are kept as the predicate's own contract table (authored /
+  // empty / absent key / null / undefined), which is what a caller anywhere depends on.
+  const CHECK_CONFIGS = [
     {
-      label: 'alchemy simple, authored',
+      label: 'simple slot, authored',
       config: { rollFormula: '1d20 + @abilities.int.mod' },
       expected: true,
     },
-    { label: 'alchemy simple, empty', config: { rollFormula: '' }, expected: false },
-    { label: 'alchemy simple, absent key', config: {}, expected: false },
+    { label: 'simple slot, empty', config: { rollFormula: '' }, expected: false },
+    { label: 'simple slot, absent key', config: {}, expected: false },
     {
-      label: 'alchemy tiered, authored',
+      label: 'routed slot, authored',
       config: { rollFormula: '1d20', type: 'relative' },
       expected: true,
     },
     {
-      label: 'alchemy tiered, empty',
+      label: 'routed slot, empty',
       config: { rollFormula: '', type: 'relative' },
       expected: false,
     },
-    { label: 'alchemy tiered, null sub-config', config: null, expected: false },
-    { label: 'alchemy tiered, undefined sub-config', config: undefined, expected: false },
+    { label: 'routed slot, null sub-config', config: null, expected: false },
+    { label: 'routed slot, undefined sub-config', config: undefined, expected: false },
   ];
 
-  for (const testCase of ALCHEMY_CONFIGS) {
+  for (const testCase of CHECK_CONFIGS) {
     it(`${testCase.label} -> ${testCase.expected}`, () => {
       assert.equal(hasCheckFormula(testCase.config), testCase.expected);
     });
@@ -281,5 +283,60 @@ describe('resolveSalvageCheck is pure', () => {
     const first = resolveSalvageCheck(system);
     first.checkUsable = false;
     assert.equal(resolveSalvageCheck(system).checkUsable, true);
+  });
+});
+
+// ── the retirement shim, applied BEFORE the emptiness test (issue 1094) ─────
+//
+// These exist because rewriting `resolveSalvageCheck` to skip the shim entirely left the
+// whole 622-test file green. Salvage never AUTHORED the retired placeholder, so nothing
+// else in this suite could notice — but an imported bundle can carry one, and the whole
+// point of the shim here is that readiness and the roll path cannot disagree about it.
+describe('resolveSalvageCheck applies the retirement shim before its emptiness test', () => {
+  it('reports a placeholder-only formula as NOT usable', () => {
+    const resolved = resolveSalvageCheck(systemFor('simple', '@craftingmod'));
+    assert.equal(resolved.rollFormula, '');
+    assert.equal(
+      resolved.checkUsable,
+      false,
+      'otherwise it reports usable, reaches evaluateCheckRoll and throws inside new Roll("")'
+    );
+  });
+
+  it('reports the POST-shim formula, not the authored one', () => {
+    const resolved = resolveSalvageCheck(systemFor('simple', '1d20 + @craftingmod'));
+    assert.equal(resolved.rollFormula, '1d20', 'the placeholder and its operator are gone');
+    assert.equal(resolved.checkUsable, true);
+  });
+
+  it('reports a placement the shim refuses as NOT usable', () => {
+    for (const formula of ['1d20 * @craftingmod', 'max(@craftingmod, 2)', '(2 + @craftingmod)d6']) {
+      assert.equal(resolveSalvageCheck(systemFor('simple', formula)).checkUsable, false, formula);
+    }
+  });
+
+  // The pair that MUTATES on this answer: `requiresCheck && !checkUsable` is the
+  // misconfiguration the engine aborts on with zero mutation, so a shim-emptied formula
+  // has to reach it exactly as a blank one does.
+  for (const mode of ['routed', 'progressive']) {
+    it(`pairs requiresCheck with the post-shim usability on ${mode}`, () => {
+      const resolved = resolveSalvageCheck(systemFor(mode, '@craftingmod'));
+      assert.equal(resolved.mode, mode);
+      assert.equal(resolved.requiresCheck, true, `${mode} cannot resolve without a rolled outcome`);
+      assert.equal(resolved.checkUsable, false);
+      assert.equal(
+        resolved.requiresCheck && !resolved.checkUsable,
+        true,
+        'so the engine takes its zero-mutation abort rather than rolling'
+      );
+    });
+  }
+
+  // `hasCheckFormula` is the RAW predicate and stays raw on purpose: it answers "did the
+  // GM author anything", which the shim must not repaint, and `resolveSalvageCheck` is
+  // where the post-shim reading is composed.
+  it('leaves hasCheckFormula reading the authored field', () => {
+    assert.equal(hasCheckFormula({ rollFormula: '@craftingmod' }), true, 'authored, but unusable');
+    assert.equal(resolveSalvageCheck(systemFor('simple', '@craftingmod')).checkUsable, false);
   });
 });

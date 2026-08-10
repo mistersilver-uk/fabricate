@@ -78,8 +78,8 @@
     //
     // The control writes `recipe.craftingModifier` ({ modifierIds? } | null) and authors
     // ONE axis: WHICH modifiers apply. An absent `modifierIds` inherits the system set,
-    // and an AUTHORED EMPTY `modifierIds` is "no modifiers" — a real choice that resolves
-    // `@craftingmod` to 0, not an absence.
+    // and an AUTHORED EMPTY `modifierIds` is "no modifiers" — a real choice that adds
+    // nothing to the roll, not an absence.
     craftingModifierOptions = [],
     // The SYSTEM's combination rule, and the whole gate on this surface: only `byRecipe`
     // ("Recipe picks") defers the selection to the recipe author, so only `byRecipe`
@@ -92,10 +92,10 @@
     // what absence means (unlimited), and it must mean the same thing here as in the
     // engine.
     craftingModifierMaxPicks = null,
-    // Why the system's active crafting check reaches no `@craftingmod` ('' when it does):
-    // 'noCheck' | 'noFormula' | 'noPlaceholder'. Any of the three makes this recipe's
-    // picks inert, so the control is replaced by a banner that says which — the Checks
-    // tab explaining it is no use to a GM looking at this tab.
+    // Why the system's active crafting check applies no check modifiers ('' when it
+    // does): 'noCheck' | 'noFormula'. Either makes this recipe's picks inert, so the
+    // control is replaced by a banner that says which — the Checks tab explaining it is
+    // no use to a GM looking at this tab.
     craftingModifierInertCause = '',
     // Deep link to the Checks tab, where the catalogue and the combination rule live.
     onOpenChecks = () => {},
@@ -140,8 +140,10 @@
   const MODIFIER_SET_LABEL_ID = 'manager-recipe-crafting-modifier-label';
   const MODIFIER_CAP_HINT_ID = 'manager-recipe-crafting-modifier-cap';
 
-  // The banner copy for each inert cause. Same three causes the Checks card names, said
-  // from this tab's point of view: what the GM loses here, not what to fix there.
+  // The banner copy for each inert cause. Same two causes the Checks card names, said
+  // from this tab's point of view: what the GM loses here, not what to fix there. There
+  // were three until issue 1094 retired the roll-formula placeholder, taking the "the
+  // formula never references it" cause with it.
   //
   // Each sentence closes on "check modifiers change nothing for this recipe" rather than
   // on "the picks below would change nothing", because the sentence is about the RECIPE's
@@ -156,11 +158,6 @@
       key: 'FABRICATE.Admin.Manager.Recipe.CraftingModifierInertNoFormula',
       fallback:
         'The system’s crafting check has no roll formula yet, so check modifiers change nothing for this recipe.',
-    },
-    noPlaceholder: {
-      key: 'FABRICATE.Admin.Manager.Recipe.CraftingModifierInertNoPlaceholder',
-      fallback:
-        'The system’s crafting-check formula never references @craftingmod, so check modifiers change nothing for this recipe.',
     },
   };
 
@@ -178,9 +175,8 @@
     hasModifierCatalogue && craftingModifierPolicy === 'byRecipe'
   );
   // Two dispositions under that rule, mutually exclusive. The inert banner wins: the
-  // system asked this recipe to pick, but its check never spends `@craftingmod`, so the
-  // picks would reach no roll — that contradiction is worth a warning precisely BECAUSE
-  // the rule delegates here.
+  // system asked this recipe to pick, but it rolls no check for the picks to reach —
+  // that contradiction is worth a warning precisely BECAUSE the rule delegates here.
   const showModifierInert = $derived(modifierDeferredToRecipe && !!modifierInert);
   const showModifierControls = $derived(modifierDeferredToRecipe && !modifierInert);
 
@@ -529,8 +525,8 @@
       </label>
     {/if}
     <!-- Check-modifier picks (issue 1055). Rendered only under the system's `byRecipe`
-         ("Recipe picks") rule, and only when its check formula actually spends
-         `@craftingmod`; every other rule leaves this grid at its pre-1055 shape. There is
+         ("Recipe picks") rule, and only when the system actually rolls a check for the
+         picks to reach; every other rule leaves this grid at its pre-1055 shape. There is
          no rule select: a recipe may choose WHICH modifiers apply, never HOW they
          combine.
 
@@ -616,7 +612,7 @@
             )}
             noneSelectedLabel={text(
               'FABRICATE.Admin.Manager.Recipe.CraftingModifierEmptySet',
-              'No modifiers — @craftingmod resolves to 0 for this recipe.'
+              'No modifiers — nothing is added to this recipe’s check roll.'
             )}
             onToggle={toggleModifierId}
           />
@@ -648,8 +644,8 @@
        went with it: under `addAll`/`highest`/`playerPicks` this tab now renders nothing at
        all rather than a banner on every recipe of every system that never chose to
        delegate. What remains is a genuine contradiction and earns the interruption: the
-       system's rule DID hand the pick to this recipe, and the check it will roll never
-       spends `@craftingmod`, so the picks would reach no roll. -->
+       system's rule DID hand the pick to this recipe, and the system rolls no check for
+       those picks to reach. -->
   {#if showModifierInert}
     <RecipeModeBanner
       tone="warning"
@@ -668,7 +664,7 @@
       actionLabel={text('FABRICATE.Admin.Manager.Recipe.CraftingModifierOpenChecks', 'Checks tab')}
       actionHint={text(
         'FABRICATE.Admin.Manager.Recipe.CraftingModifierInertHint',
-        'The crafting check and its @craftingmod placeholder are authored for the whole crafting system on the Checks tab.'
+        'These modifiers are added to the crafting check, which is authored for the whole crafting system on the Checks tab.'
       )}
       onAction={onOpenChecks}
     />

@@ -90,6 +90,7 @@ import { FABRICATE_HOOKS } from './config/hooks.js';
 import { MigrationRunner } from './migration/MigrationRunner.js';
 import { restampOwnedItemComponentIdentity } from './migration/restampOwnedItemComponentIdentity.js';
 import { buildMigrationRecoveryPrompt } from './migration/migrationRecoveryPrompt.js';
+import { buildRetiredCraftingModNotice } from './migration/migrateRetireCraftingModToken.js';
 import { ItemPilesIntegration } from './integrations/ItemPilesIntegration.js';
 import {
   ActorInventoryCoinSpender,
@@ -992,6 +993,29 @@ class Fabricate {
         recipes: recipeList,
       }) || `Fabricate disabled ${essenceCollisionDisabledRecipes.length} alchemy recipe(s) whose essence requirements now collide: ${recipeList}. Rework their ingredients and re-enable them.`;
       ui.notifications?.warn?.(message);
+    }
+
+    // One-time GM-facing notice: the 1.21.0 migration retired the check-modifier
+    // roll-formula placeholder, and its consequences are behaviour changes rather than
+    // no-ops. PRIMARY-GM ONLY, not merely GM-only: `_runMigrations` returns early unless
+    // `game.users?.activeGM?.id === game.user?.id`, so exactly one client in a multi-GM
+    // world posts this and an assistant GM (who holds `isGM`) never does.
+    //
+    // THE COMPOSITION IS NOT HERE. Totals, clause selection, the systems list and the
+    // severity all live in `buildRetiredCraftingModNotice`, because nothing in this file
+    // can be executed by a unit test and a source-text grep can pin a DISPATCH but never a
+    // SUM — three semantic mutations to that arithmetic survived a green suite while it
+    // lived inline. What remains here is the Foundry edge: the GM gate, the localizer, and
+    // which notification channel the composed severity selects.
+    const retiredCraftingModCounts = Array.isArray(summary?.retiredCraftingModCounts)
+      ? summary.retiredCraftingModCounts : [];
+    if (retiredCraftingModCounts.length > 0 && game.user?.isGM) {
+      const notice = buildRetiredCraftingModNotice(
+        retiredCraftingModCounts,
+        (key, data) => game.i18n?.format?.(key, data)
+      );
+      if (notice.severity === 'warn') ui.notifications?.warn?.(notice.message, { permanent: true });
+      else ui.notifications?.info?.(notice.message);
     }
   }
 

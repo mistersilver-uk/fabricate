@@ -709,7 +709,7 @@ export class CraftingListingBuilder {
     // false when the formula does not reduce to a number for this actor (error state).
     const resolution =
       rollFormula.length > 0 && craftingActor
-        ? // The `@craftingmod` context (issues 770, 1055): the SAME builder the engine
+        ? // The check-modifier context (issues 770, 1055): the SAME builder the engine
           // threads to its check runners, not a second literal of the same shape. The
           // display path and the evaluation path must agree on every axis the context
           // carries — the combination rule, the system's default eligible set, the

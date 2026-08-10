@@ -41,7 +41,7 @@ const OPTIONS = Object.freeze([
   Object.freeze({ id: 'herb', label: 'Herbalism' }),
 ]);
 
-const NONE_LABEL = 'No modifiers — @craftingmod resolves to 0 for this recipe.';
+const NONE_LABEL = 'No modifiers — nothing is added to this recipe’s check roll.';
 
 before(async () => {
   await harness.setup();

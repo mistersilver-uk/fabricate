@@ -590,7 +590,7 @@ function compileManagerRoot() {
     // Folder-aware import mapping (issue 771): the modal's match-by-name pre-fill leaf.
     // Omitting it HANGS the mounted manager suite (the modal is always in the tree).
     'src/utils/matchFolderVocabulary.js',
-    // The `@craftingmod` ownership module (issues 770, 1055). The root, the Checks
+    // The check-modifier ownership module (issues 770, 1055, 1094). The root, the Checks
     // card and the recipe Overview tab all import it — the root to pick the check its
     // resolution mode actually rolls, the two cards to normalize the combination rule,
     // ask whether it defers the selection, and resolve what an ABSENT
@@ -4238,7 +4238,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     const patches = [];
     mountChecksView({
       resolutionMode: 'simple',
-      craftingCheckSimple: { rollFormula: '1d20 + @craftingmod' },
+      craftingCheckSimple: { rollFormula: '1d20 + 4' },
       craftingCheckModifiers: [{ id: 'med', label: 'Medicine', expression: '@abilities.med.mod' }],
       craftingDefaultModifierPolicy: 'highest',
       craftingDefaultModifierIds: ['med'],
@@ -4395,7 +4395,7 @@ describe('CraftingSystemManager mounted behavior', () => {
   it('checks view: the modifier rule group keeps its capture-harness hooks and shows an icon per option (issues 855, 1055)', () => {
     mountChecksView({
       resolutionMode: 'simple',
-      craftingCheckSimple: { rollFormula: '1d20 + @craftingmod' },
+      craftingCheckSimple: { rollFormula: '1d20 + 4' },
       craftingCheckModifiers: [{ id: 'med', label: 'Medicine', expression: '@abilities.med.mod' }],
       craftingDefaultModifierPolicy: 'byRecipe',
     });
@@ -4443,7 +4443,7 @@ describe('CraftingSystemManager mounted behavior', () => {
   it('checks view: the pick cap renders only under a SELECTING rule, and states unlimited as a blank field', () => {
     const props = {
       resolutionMode: 'simple',
-      craftingCheckSimple: { rollFormula: '1d20 + @craftingmod' },
+      craftingCheckSimple: { rollFormula: '1d20 + 4' },
       craftingCheckModifiers: [{ id: 'med', label: 'Medicine', expression: '@abilities.med.mod' }],
     };
     // A cap on a selection nobody makes is a control with no effect, so the two
@@ -4489,7 +4489,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     const patches = [];
     mountChecksView({
       resolutionMode: 'simple',
-      craftingCheckSimple: { rollFormula: '1d20 + @craftingmod' },
+      craftingCheckSimple: { rollFormula: '1d20 + 4' },
       craftingCheckModifiers: [{ id: 'med', label: 'Medicine', expression: '@abilities.med.mod' }],
       craftingDefaultModifierPolicy: 'playerPicks',
       craftingMaxModifierPicks: 3,
@@ -4512,7 +4512,7 @@ describe('CraftingSystemManager mounted behavior', () => {
   it('checks view: an authored cap is rendered on the hook and in the Stepper', () => {
     mountChecksView({
       resolutionMode: 'simple',
-      craftingCheckSimple: { rollFormula: '1d20 + @craftingmod' },
+      craftingCheckSimple: { rollFormula: '1d20 + 4' },
       craftingCheckModifiers: [{ id: 'med', label: 'Medicine', expression: '@abilities.med.mod' }],
       craftingDefaultModifierPolicy: 'playerPicks',
       craftingMaxModifierPicks: 1,
@@ -4526,7 +4526,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     for (const junk of [0, -2, 2.5]) {
       mountChecksView({
         resolutionMode: 'simple',
-        craftingCheckSimple: { rollFormula: '1d20 + @craftingmod' },
+        craftingCheckSimple: { rollFormula: '1d20 + 4' },
         craftingCheckModifiers: [{ id: 'med', label: 'Medicine', expression: '@med' }],
         craftingDefaultModifierPolicy: 'playerPicks',
         craftingMaxModifierPicks: junk,
@@ -4600,9 +4600,14 @@ describe('CraftingSystemManager mounted behavior', () => {
     );
   });
 
-  it('checks view: the inert cause discriminates no-check, no-formula and no-placeholder (issue 1055)', () => {
+  // Issue 1094 retired the THIRD cause. `noPlaceholder` — "a formula is authored but
+  // never spends the check-modifier placeholder" — is not merely unreachable, it is not a
+  // value this surface can produce: the resolved scalar is appended to whatever the GM
+  // authored. The negative half below is what pins that, and it FAILS against the
+  // pre-change component, which rendered a `noPlaceholder` notice for exactly that input.
+  it('checks view: the inert cause discriminates no-check from no-formula (issues 1055, 1094)', () => {
     // Every case below carries a non-empty catalogue: the notice is gated on one, so an
-    // empty catalogue would make all four assertions read the same silent card.
+    // empty catalogue would make all the assertions read the same silent card.
     const catalogue = [{ id: 'med', label: 'Medicine', expression: '@abilities.med.mod' }];
     for (const { props, cause } of [
       // Alchemy at checkMode `none` rolls no crafting check at all. The pre-1055 local
@@ -4611,17 +4616,13 @@ describe('CraftingSystemManager mounted behavior', () => {
         props: {
           resolutionMode: 'alchemy',
           alchemyCheckMode: 'none',
-          craftingCheckSimple: { rollFormula: '1d20 + @craftingmod' },
+          craftingCheckSimple: { rollFormula: '1d20 + 4' },
         },
         cause: 'noCheck',
       },
       {
         props: { resolutionMode: 'simple', craftingCheckSimple: { rollFormula: '  ' } },
         cause: 'noFormula',
-      },
-      {
-        props: { resolutionMode: 'simple', craftingCheckSimple: { rollFormula: '1d20 + 4' } },
-        cause: 'noPlaceholder',
       },
     ]) {
       mountChecksView({ ...props, craftingCheckModifiers: catalogue });
@@ -4632,22 +4633,23 @@ describe('CraftingSystemManager mounted behavior', () => {
       mounted = null;
       target.remove();
     }
-    // …and a live `@craftingmod` formula shows no notice at all.
+    // …and an ORDINARY authored formula — the exact input that used to raise
+    // `noPlaceholder` — shows no notice at all.
     mountChecksView({
       resolutionMode: 'simple',
-      craftingCheckSimple: { rollFormula: '1d20 + @craftingmod' },
+      craftingCheckSimple: { rollFormula: '1d20 + 4' },
       craftingCheckModifiers: catalogue,
     });
     assert.ok(
       !target.querySelector('[data-crafting-modifier-inert]'),
-      'a formula that spends @craftingmod is not inert'
+      'an authored formula is never inert: the modifiers are appended to it'
     );
   });
 
   it('checks view: an unstamped system shows the rule the ENGINE would apply, not a blank group (issue 1055)', () => {
     mountChecksView({
       resolutionMode: 'simple',
-      craftingCheckSimple: { rollFormula: '1d20 + @craftingmod' },
+      craftingCheckSimple: { rollFormula: '1d20 + 4' },
       craftingCheckModifiers: [{ id: 'med', label: 'Medicine', expression: '@abilities.med.mod' }],
       // No `craftingDefaultModifierPolicy` at all — the never-authored state.
     });
@@ -4669,7 +4671,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     const introText = (craftingDefaultModifierPolicy) => {
       mountChecksView({
         resolutionMode: 'simple',
-        craftingCheckSimple: { rollFormula: '1d20 + @craftingmod' },
+        craftingCheckSimple: { rollFormula: '1d20 + 4' },
         craftingCheckModifiers: [
           { id: 'med', label: 'Medicine', expression: '@abilities.med.mod' },
         ],
@@ -6131,7 +6133,7 @@ describe('CraftingSystemManager mounted behavior', () => {
   // cannot pass by rendering nothing.
   const modifierRuleSystemCheck = (defaultModifierPolicy, maxModifierPicks) => ({
     simple: {
-      rollFormula: '1d20 + @craftingmod',
+      rollFormula: '1d20 + 4',
       dc: 12,
       thresholdMode: 'meet',
       dcMode: 'static',

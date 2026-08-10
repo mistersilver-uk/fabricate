@@ -620,14 +620,14 @@
     )
   );
 
-  // Why the system's active crafting check reaches no `@craftingmod`, or '' when it does
-  // reach one. Consumes the inert-cause derivation from the store's `craftingCheck`
+  // Why the system's active crafting check applies no check modifiers, or '' when it
+  // does. Consumes the inert-cause derivation from the store's `craftingCheck`
   // projection (issue 1055), which resolves it from the PERSISTED system through the
   // shared five-mode selector. The recipe editor is not the surface authoring those formulas,
   // so the Checks-tab drafts are not in play here and the saved state is the truthful
-  // one. Any of the three causes makes a per-recipe override inert, so the Overview
-  // tab replaces its control with a banner naming which; a bare boolean cannot say
-  // which. See ChecksView.svelte's separate derivation for the draft-based consumer.
+  // one. Either cause makes a per-recipe override inert, so the Overview tab replaces
+  // its control with a banner naming which; a bare boolean cannot say which. See
+  // ChecksView.svelte's separate derivation for the draft-based consumer.
   const recipeCraftingModifierInertCause = $derived(
     selectedSystem?.craftingCheck?.modifierFormulaInertCause || ''
   );

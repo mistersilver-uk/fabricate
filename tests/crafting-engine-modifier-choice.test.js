@@ -1,8 +1,8 @@
 // Engine gating for the interactive `playerPicks` modifier-choice descriptor (#855).
 // The resolver (builds the descriptor) and the roll prompt (consumes it) are unit
 // tested elsewhere; this pins the ENGINE glue that decides WHEN to build one, so a
-// regression that widened the guard (e.g. to include `highest`, or dropped the
-// `@craftingmod`-token gate) would fail here rather than ship green.
+// regression that widened the guard (e.g. to include `highest`) or NARROWED it back to a
+// placeholder-presence test would fail here rather than ship green.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { CraftingEngine } from '../src/systems/CraftingEngine.js';
@@ -53,7 +53,7 @@ const context = (overrides = {}) => ({
 
 test('engine gating: a non-interactive craft threads no modifierChoice', () => {
   withRoll({ med: 2, herb: 5 }, () => {
-    assert.equal(build('1d20 + @craftingmod', context(), false), null);
+    assert.equal(build('1d20', context(), false), null);
   });
 });
 
@@ -66,7 +66,7 @@ test('engine gating: an interactive non-playerPicks rule threads no modifierChoi
   withRoll({ med: 2, herb: 5 }, () => {
     for (const systemPolicy of ['addAll', 'highest', 'byRecipe']) {
       assert.equal(
-        build('1d20 + @craftingmod', context({ systemPolicy }), true),
+        build('1d20', context({ systemPolicy }), true),
         null,
         systemPolicy
       );
@@ -75,7 +75,7 @@ test('engine gating: an interactive non-playerPicks rule threads no modifierChoi
     // there is still nothing to prompt for.
     assert.equal(
       build(
-        '1d20 + @craftingmod',
+        '1d20',
         context({ systemPolicy: 'byRecipe', recipeModifier: { modifierIds: ['med', 'herb'] } }),
         true
       ),
@@ -85,9 +85,9 @@ test('engine gating: an interactive non-playerPicks rule threads no modifierChoi
   });
 });
 
-test('engine gating: interactive playerPicks with a @craftingmod formula builds the descriptor', () => {
+test('engine gating: interactive playerPicks over an authored formula builds the descriptor', () => {
   withRoll({ med: 2, herb: 5 }, () => {
-    const choice = build('1d20 + @craftingmod', context({ maxModifierPicks: 1 }), true);
+    const choice = build('1d20', context({ maxModifierPicks: 1 }), true);
     assert.ok(choice, 'a descriptor is built');
     assert.equal(choice.maxPicks, 1, 'the system cap rides the descriptor');
     assert.deepEqual(choice.defaultSelectedIds, ['herb'], 'pre-selects the highest (herb +5)');
@@ -102,8 +102,8 @@ test('engine gating: interactive playerPicks with a @craftingmod formula builds 
 // never offer a wider selection than the engine would honour.
 test('engine gating: the descriptor carries the system cap, clamped to the option count', () => {
   withRoll({ med: 2, herb: 5 }, () => {
-    assert.equal(build('1d20 + @craftingmod', context({ maxModifierPicks: 2 }), true).maxPicks, 2);
-    const unbounded = build('1d20 + @craftingmod', context(), true);
+    assert.equal(build('1d20', context({ maxModifierPicks: 2 }), true).maxPicks, 2);
+    const unbounded = build('1d20', context(), true);
     assert.equal(unbounded.maxPicks, 2, 'unlimited over two options is two');
     assert.deepEqual(
       unbounded.defaultSelectedIds,
@@ -113,15 +113,72 @@ test('engine gating: the descriptor carries the system cap, clamped to the optio
   });
 });
 
-test('engine gating: a formula without @craftingmod threads no modifierChoice (issue F3)', () => {
+// THE B1 GATE, re-pointed rather than deleted (issue 1094). This test used to assert the
+// OPPOSITE: that a formula without the retired placeholder threads NO descriptor. That was
+// the real gate on the whole interactive `playerPicks` feature — not `evaluateCheckRoll`'s
+// `useDeferredChoice`, which only ever keyed on the descriptor being present — so retiring
+// the placeholder without replacing this condition would have left every interactive
+// `playerPicks` craft silently offering no modifier fieldset, with `npm test` green.
+//
+// It is also the assertion that FAILS if `_buildInteractiveModifierChoice` is mutated to
+// `return null`: mutate it and this test flips red, which is what makes the gate proven
+// live rather than merely described.
+test('engine gating: a PLACEHOLDER-FREE formula still offers the modifier fieldset (B1)', () => {
   withRoll({ med: 2, herb: 5 }, () => {
-    assert.equal(build('1d20 + @abilities.int.mod', context(), true), null);
+    const choice = build('1d20 + @abilities.int.mod', context(), true);
+    assert.ok(choice, 'the migrated, placeholder-free formula still reaches the prompt');
+    assert.deepEqual(
+      choice.modifiers.map((modifier) => modifier.id),
+      ['med', 'herb']
+    );
   });
+});
+
+// The condition that REPLACED it: the active mode must carry an authored (post-shim) roll
+// formula. There is nothing to modify on a check that rolls nothing.
+test('engine gating: an unauthored formula threads no modifierChoice', () => {
+  withRoll({ med: 2, herb: 5 }, () => {
+    for (const formula of ['', '   ', null, undefined]) {
+      assert.equal(build(formula, context(), true), null, String(formula));
+    }
+  });
+});
+
+// …and a formula whose only content was the retired placeholder is unauthored too, once
+// the shim has stripped it. Asserted with a `Roll.validate` double, because the residue
+// check is what makes the non-additive placements answer "no formula" as well.
+test('engine gating: a formula that strips to empty threads no modifierChoice', () => {
+  const previousRoll = globalThis.Roll;
+  globalThis.Roll = {
+    replaceFormulaData: (expression) =>
+      String(expression).replace(/@([a-z]+)/gi, (_match, key) =>
+        ({ med: '2', herb: '5' })[key] ?? `@${key}`
+      ),
+    validate(formula) {
+      const text = String(formula).trim();
+      return text !== '' && !/[+\-*/]$/.test(text);
+    },
+  };
+  try {
+    assert.equal(build('@craftingmod', context(), true), null, 'placeholder alone');
+    assert.equal(build('1d20 * @craftingmod', context(), true), null, 'multiplicative');
+    // The residue of this one — `max(, 2)` — is a formula real Foundry ACCEPTS (and rolls
+    // as `-Infinity`), so a gate that leaned on `Roll.validate` would still offer a
+    // fieldset for a check that can never succeed.
+    assert.equal(build('max(@craftingmod, 2)', context(), true), null, 'function argument');
+    assert.equal(build('(@craftingmod)d6', context(), true), null, 'dice count');
+    assert.ok(
+      build('1d20 + @craftingmod', context(), true),
+      'but an ADDITIVE placement leaves a real formula standing, so the fieldset is offered'
+    );
+  } finally {
+    globalThis.Roll = previousRoll;
+  }
 });
 
 test('engine gating: an empty eligible set threads no modifierChoice', () => {
   withRoll({ med: 2, herb: 5 }, () => {
-    assert.equal(build('1d20 + @craftingmod', context({ defaultModifierIds: [] }), true), null);
+    assert.equal(build('1d20', context({ defaultModifierIds: [] }), true), null);
   });
 });
 
@@ -130,11 +187,11 @@ test('engine gating: fewer than two eligible modifiers threads no modifierChoice
     // One eligible modifier is not a choice: the radio could not be changed, and
     // `highest` over a single value substitutes that very modifier anyway.
     assert.equal(
-      build('1d20 + @craftingmod', context({ defaultModifierIds: ['med'] }), true),
+      build('1d20', context({ defaultModifierIds: ['med'] }), true),
       null
     );
     assert.ok(
-      build('1d20 + @craftingmod', context({ defaultModifierIds: ['med', 'herb'] }), true),
+      build('1d20', context({ defaultModifierIds: ['med', 'herb'] }), true),
       'two eligible modifiers still build a descriptor'
     );
   });
@@ -149,7 +206,7 @@ test('engine gating: a stored recipe policy can neither add nor remove the descr
     for (const stale of ['playerPicks', 'byRecipe', 'highest', 'addAll']) {
       assert.equal(
         build(
-          '1d20 + @craftingmod',
+          '1d20',
           context({ systemPolicy: 'addAll', recipeModifier: { policy: stale } }),
           true
         ),
@@ -158,7 +215,7 @@ test('engine gating: a stored recipe policy can neither add nor remove the descr
       );
       assert.ok(
         build(
-          '1d20 + @craftingmod',
+          '1d20',
           context({ systemPolicy: 'playerPicks', recipeModifier: { policy: stale } }),
           true
         ),
@@ -184,9 +241,10 @@ const PICK_CATALOGUE = [
   { id: 'herb', label: 'Herbalism', icon: 'fa-b', expression: '@herb' },
 ];
 // Medicine (2) is the player's pick; Herbalism (5) is the pre-selected highest AND the
-// value the deterministic fallback would substitute — hence `(2)` vs `(5)` discriminates.
+// value the deterministic fallback would append — hence `+ 2[Modifiers]` vs
+// `+ 5[Modifiers]` discriminates.
 const PICK_ACTOR = { getRollData: () => ({ med: 2, herb: 5 }) };
-const PICK_FORMULA = '1d20 + @craftingmod';
+const PICK_FORMULA = '1d20';
 const PICK_RECIPE = { name: 'Healing Salve', craftingSystemId: 'sys-1' };
 
 /** A crafting system whose modifier catalogue is `playerPicks` over both entries. */
@@ -247,12 +305,12 @@ for (const runnerCase of RUNNER_CASES) {
       );
       assert.equal(
         stub.rolled.at(-1),
-        '1d20 + (2)',
-        'the runner threaded the descriptor: the PICKED Medicine (+2) substituted, not the pre-selected highest (+5)'
+        '1d20 + 2[Modifiers]',
+        'the runner threaded the descriptor: the PICKED Medicine (+2) appended, not the pre-selected highest (+5)'
       );
       assert.equal(
         result.data.resolvedFormula,
-        '1d20 + (2)',
+        '1d20 + 2[Modifiers]',
         'the surfaced display formula equals what evaluated'
       );
     } finally {
@@ -448,12 +506,12 @@ test('engine rules: the SYSTEM rule decides the arithmetic, whatever a recipe st
   const recipe = modifierRecipe({ policy: 'addAll', modifierIds: ['med'] }, 'r-rule');
   assertRolled(
     await rollThrough(ruleSystem({ policy: 'highest' }), recipe),
-    '1d20 + (5)',
+    '1d20 + 5[Modifiers]',
     'highest stands: the stored addAll cannot flip max→sum'
   );
   assertRolled(
     await rollThrough(ruleSystem({ policy: 'addAll' }), recipe),
-    '1d20 + (7)',
+    '1d20 + 7[Modifiers]',
     'addAll sums the SYSTEM default set — the stored {med} pick is not a byRecipe pick'
   );
 });
@@ -462,17 +520,17 @@ test('engine rules: byRecipe rolls the recipe author’s pick', async () => {
   const system = ruleSystem({ policy: 'byRecipe' });
   assertRolled(
     await rollThrough(system, modifierRecipe({ modifierIds: ['med'] }, 'r-pick')),
-    '1d20 + (2)',
+    '1d20 + 2[Modifiers]',
     'the recipe picked Medicine alone, so Medicine alone reaches the roll'
   );
   assertRolled(
     await rollThrough(system, modifierRecipe({ modifierIds: ['med', 'herb'] }, 'r-both')),
-    '1d20 + (7)',
+    '1d20 + 7[Modifiers]',
     'two picks SUM — byRecipe is a sum over what was picked'
   );
   assertRolled(
     await rollThrough(system, modifierRecipe(null, 'r-none')),
-    '1d20 + (7)',
+    '1d20 + 7[Modifiers]',
     'nothing picked → the system default set'
   );
 });
@@ -484,17 +542,17 @@ test('engine rules: a lowered cap TRUNCATES a byRecipe pick already on disk', as
   const recipe = modifierRecipe({ modifierIds: ['med', 'herb'] }, 'r-capped');
   assertRolled(
     await rollThrough(ruleSystem({ policy: 'byRecipe' }), recipe),
-    '1d20 + (7)',
+    '1d20 + 7[Modifiers]',
     'unbounded, both picks reach the roll'
   );
   assertRolled(
     await rollThrough(ruleSystem({ policy: 'byRecipe', maxPicks: 1 }), recipe),
-    '1d20 + (2)',
+    '1d20 + 2[Modifiers]',
     'a cap of 1 keeps the FIRST pick in authored order (Medicine 2), never the best one'
   );
 });
 
-test('engine rules: an AUTHORED EMPTY pick resolves @craftingmod to 0 under byRecipe', async () => {
+test('engine rules: an AUTHORED EMPTY pick appends nothing under byRecipe', async () => {
   // Built through the MODEL, never as a literal: the preservation of the empty array is
   // `Recipe._normalizeCraftingModifier`'s job, and a bare literal would bypass it and
   // prove nothing about the shape that actually persists.
@@ -506,12 +564,12 @@ test('engine rules: an AUTHORED EMPTY pick resolves @craftingmod to 0 under byRe
   );
   assertRolled(
     await rollThrough(ruleSystem({ policy: 'byRecipe' }), recipe),
-    '1d20 + (0)',
+    '1d20',
     'no modifier is eligible, so the placeholder reduces to 0 — not to the system default'
   );
   assertRolled(
     await rollThrough(ruleSystem({ policy: 'addAll' }), recipe),
-    '1d20 + (7)',
+    '1d20 + 7[Modifiers]',
     'and it is ignored like any other pick under a rule that does not defer'
   );
 });
@@ -535,8 +593,8 @@ test('engine rules: non-interactive playerPicks at cap 1 rolls the historical hi
       PICK_ACTOR,
       { interactive: false }
     );
-    assert.equal(stub.rolled.at(-1), '1d20 + (5)', 'max(2,5) — the pre-1055 behaviour');
-    assert.equal(result.data.resolvedFormula, '1d20 + (5)');
+    assert.equal(stub.rolled.at(-1), '1d20 + 5[Modifiers]', 'max(2,5) — the pre-1055 behaviour');
+    assert.equal(result.data.resolvedFormula, '1d20 + 5[Modifiers]');
   } finally {
     stub.restore();
   }
@@ -558,10 +616,10 @@ test('engine rules: non-interactive playerPicks UNBOUNDED sums the best legal se
     );
     assert.equal(
       stub.rolled.at(-1),
-      '1d20 + (7)',
+      '1d20 + 7[Modifiers]',
       'picking everything is legal and optimal when nothing bounds the selection'
     );
-    assert.equal(result.data.resolvedFormula, '1d20 + (7)');
+    assert.equal(result.data.resolvedFormula, '1d20 + 7[Modifiers]');
   } finally {
     stub.restore();
   }
@@ -577,33 +635,33 @@ test('engine rules: an interactive multi-pick selection SUMS what the player tic
     await rollThrough(system, recipe, {
       multiPick: { offered: ['med', 'herb'], checkedIds: ['med', 'herb'] },
     }),
-    '1d20 + (7)',
+    '1d20 + 7[Modifiers]',
     'both boxes ticked → Medicine 2 + Herbalism 5'
   );
   assertRolled(
     await rollThrough(system, recipe, {
       multiPick: { offered: ['med', 'herb'], checkedIds: ['med'] },
     }),
-    '1d20 + (2)',
+    '1d20 + 2[Modifiers]',
     'one box ticked → that modifier alone, not the pre-selected pair'
   );
   assertRolled(
     await rollThrough(system, recipe, {
       multiPick: { offered: ['med', 'herb'], checkedIds: [] },
     }),
-    '1d20 + (0)',
+    '1d20',
     'NO box ticked is an answer — it reduces to 0 rather than falling back to the default'
   );
 });
 
-test('engine rules: a single-pick radio answer still substitutes that one modifier', async () => {
+test('engine rules: a single-pick radio answer still appends that one modifier', async () => {
   assertRolled(
     await rollThrough(
       ruleSystem({ policy: 'playerPicks', maxPicks: 1 }),
       modifierRecipe(null, 'r-single'),
       { pickedId: 'med' }
     ),
-    '1d20 + (2)',
+    '1d20 + 2[Modifiers]',
     'the PICKED Medicine (+2) substituted, not the pre-selected highest (+5)'
   );
 });
@@ -619,7 +677,7 @@ test('engine rules: a one-modifier eligible set collapses a playerPicks system',
       modifierRecipe(null, 'r-one'),
       { pickedId: 'med' }
     ),
-    '1d20 + (5)',
+    '1d20 + 5[Modifiers]',
     'a one-element eligible set rolls deterministically'
   );
   // Negative control for the line above: with TWO eligible the very same pick channel
@@ -630,7 +688,7 @@ test('engine rules: a one-modifier eligible set collapses a playerPicks system',
       modifierRecipe(null, 'r-two'),
       { pickedId: 'med' }
     ),
-    '1d20 + (2)',
+    '1d20 + 2[Modifiers]',
     'two eligible modifiers still build a descriptor and honour the pick'
   );
 });
@@ -644,7 +702,7 @@ test('engine rules: the listing DISPLAYS exactly what the engine rolls (parity)'
   const engineRoll = await rollThrough(system, recipe);
   assert.equal(
     engineRoll.rolled,
-    '1d20 + (2)',
+    '1d20 + 2[Modifiers]',
     'the engine honours the rule, the pick and the cap'
   );
 

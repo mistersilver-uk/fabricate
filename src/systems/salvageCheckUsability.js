@@ -21,8 +21,12 @@
  * resolver is aligned to, not a consumer of it.
  *
  * This module is pure — no `game`, no Foundry globals, no I/O — so every consumer can
- * be tested against a plain system object.
+ * be tested against a plain system object. The one Foundry TOUCH is the retirement
+ * shim's optional `Roll.validate` residue check, which fails open when the global is
+ * absent, so the headless posture is unchanged.
  */
+
+import { stripRetiredModifierPlaceholder } from '../utils/craftingCheckExpression.js';
 
 /** The canonical salvage resolution modes. Legacy tokens (`tiered`/`mapped`) are
  * rewritten to these by the manager's salvage token normalizer and the 1.4.0
@@ -68,8 +72,10 @@ export function hasCheckFormula(config) {
  *   Acting on the coerced `simple` would award `resultGroups[0]` for a configuration
  *   `ResolutionModeService.validateSalvage` already reports as invalid.
  * - `config` is `system.salvageCraftingCheck[mode]` (null when absent).
- * - `rollFormula` is that config's TRIMMED formula (`''` when there is none).
- * - `checkUsable` is `hasCheckFormula(config)` — the only gate. "No check" and
+ * - `rollFormula` is that config's TRIMMED formula, with the retired modifier
+ *   placeholder stripped (`''` when there is none). Salvage never AUTHORED that token,
+ *   but an imported bundle can carry one, so the shim runs here too (issue 1094).
+ * - `checkUsable` is that post-shim formula's emptiness test — the only gate. "No check" and
  *   "pass/fail" are not two modes; they are one `simple` mode read at two usability
  *   states, so callers dispatch on the PAIR `(mode, checkUsable)`.
  * - `requiresCheck` marks the modes that CANNOT resolve without a rolled outcome:
@@ -79,17 +85,25 @@ export function hasCheckFormula(config) {
  * - `unsupportedMode` is a defensive guard, not a fix — the same posture
  *   `validateSalvage` takes, which guards the identical case despite the normalizer
  *   claiming to have removed it.
+ *
+ * THE RETIREMENT SHIM RUNS BEFORE THE EMPTINESS TEST (issue 1094). A formula whose only
+ * content was the retired placeholder would otherwise report USABLE, pass the
+ * `requiresCheck && !checkUsable` abort, reach `evaluateCheckRoll`, strip to `''` and
+ * throw inside `new Roll('')` — a rolled, and therefore CONSUMING, failure. Reported as
+ * "no formula" instead, so readiness and the roll path cannot disagree.
  */
 export function resolveSalvageCheck(system) {
   const authoredMode = system?.salvageResolutionMode || 'simple';
   const unsupportedMode = !SALVAGE_MODES.includes(authoredMode);
   const mode = unsupportedMode ? 'simple' : authoredMode;
   const config = (system?.salvageCraftingCheck ?? {})[mode] ?? null;
+  const authored = hasCheckFormula(config) ? config.rollFormula.trim() : '';
+  const rollFormula = stripRetiredModifierPlaceholder(authored).trim();
   return {
     mode,
     config,
-    rollFormula: hasCheckFormula(config) ? config.rollFormula.trim() : '',
-    checkUsable: hasCheckFormula(config),
+    rollFormula,
+    checkUsable: rollFormula.length > 0,
     requiresCheck: mode === 'routed' || mode === 'progressive',
     unsupportedMode,
   };
