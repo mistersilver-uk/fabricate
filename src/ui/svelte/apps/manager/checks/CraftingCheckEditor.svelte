@@ -128,7 +128,7 @@
     },
     {
       value: 'fixed',
-      icon: 'fas fa-ruler-horizontal',
+      icon: 'fas fa-ruler',
       labelKey: 'FABRICATE.Admin.Manager.Checks.Crafting.TypeFixed',
       fallback: 'Fixed',
       descKey: 'FABRICATE.Admin.Manager.Checks.Crafting.TypeFixedDesc',
@@ -553,6 +553,10 @@
           onChange={applyBandStripChange}
         />
         <p class="manager-muted" data-outcome-band-strip-hint>
+          <!-- The pointer glyph leads the sentence, as the prototype draws it: the hint is
+               about a DIRECT-MANIPULATION affordance, and a glyph naming the pointer is what
+               separates it from the paragraphs of prose elsewhere on the screen. -->
+          <i class="fas fa-arrow-pointer" aria-hidden="true"></i>
           {text(
             'FABRICATE.Admin.Manager.Checks.Crafting.BandsHint',
             'Drag or arrow-key a band edge to move its threshold, or type the numbers below. The numbers are the authority.'

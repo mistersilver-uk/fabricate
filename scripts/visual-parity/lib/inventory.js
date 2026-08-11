@@ -62,11 +62,11 @@ export const MINIMUM_REASON_LENGTH = 40;
  * Both sides are enumerated by this one function, which is what makes "the prototype and the
  * subject were read the same way" a fact rather than a hope.
  */
-/* eslint-disable unicorn/no-incorrect-template-string-interpolation, unicorn/prefer-string-raw --
-   This template literal is SOURCE CODE crossing into `page.evaluate`, not a message. Every
-   `{L}` / `{N}` below is a Unicode property escape inside a regular expression, and every `\\`
-   is an escape the in-page parser has to receive; `String.raw` would hand the page a literal
-   backslash pair and the regexes would stop matching. */
+/* eslint-disable unicorn/no-incorrect-template-string-interpolation --
+   This template literal is SOURCE CODE crossing into `page.evaluate`, not a message, and
+   every `{L}` / `{N}` below is a Unicode property escape inside a regular expression rather
+   than an interpolation missing its `$`. `String.raw` is not an option for it either: the
+   block carries escaped backticks, which a raw string cannot express. */
 export const COLLECT_INVENTORY_SOURCE = `
 function collectInventory(root, limits) {
   const MAX_LABEL = limits.maxLabelLength;
@@ -152,6 +152,14 @@ function collectInventory(root, limits) {
   const loose = { labels: [], glyphs: [] };
 
   const walk = (el, cardStack) => {
+    // A landmark NOBODY CAN SEE is not a landmark. A mockup routinely carries a hidden
+    // branch of an alternative state — this one hides a second hint sentence behind
+    // \`display: none\` — and a walk that read it would demand the subject build a control
+    // the prototype does not draw. \`visibility: hidden\` goes with it; the clip-path
+    // visually-hidden idiom deliberately does NOT, because that content is announced.
+    const display = getComputedStyle(el);
+    if (display.display === 'none' || display.visibility === 'hidden') return;
+
     let ownCard = null;
     if (el !== root && isCard(el)) {
       // Provisional: a candidate with no title of its own is not a card, and its contents

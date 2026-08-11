@@ -2626,6 +2626,13 @@
   cursor: grabbing;
 }
 
+/* The band strip's hint sentence, glyph-led. The glyph is a decoration on prose rather
+   than a control, so it takes the sentence's own ink at its own size. */
+.fabricate-manager [data-outcome-band-strip-hint] > i {
+  margin-right: var(--fab-space-chip);
+  font-size: 9px;
+}
+
 /* A 12px ROUNDED SQUARE, which is what the prototype draws. The 50% dot this replaces was
    the same 12px key in a different shape. */
 .fabricate-manager .manager-checks-tier-swatch {
