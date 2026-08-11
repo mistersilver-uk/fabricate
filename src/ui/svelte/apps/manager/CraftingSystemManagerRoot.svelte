@@ -7487,6 +7487,7 @@
              the padding belongs to the shell and a child cannot remove it. -->
         <section class="manager-environment-editor-shell" data-checks-shell>
           <ChecksView
+            {foundrySystemId}
             resolutionMode={selectedSystem?.resolutionMode || 'simple'}
             alchemyCheckMode={selectedSystem?.alchemy?.checkMode || 'none'}
             craftingCheck={checkRoutedDraft}

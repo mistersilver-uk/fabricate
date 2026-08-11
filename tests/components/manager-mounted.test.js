@@ -24,6 +24,7 @@ import { setupDOM, teardownDOM } from '../helpers/svelte-dom.js';
 // The capture registry, so the two cases pinned below assert their OWN selectors rather
 // than a copy of them that is free to drift from the case it claims to guard.
 import { VIEW_LAB_CASES } from '../../scripts/lib/viewLabCases.js';
+import { getModifierExpressionSuggestions } from '../../src/config/modifierExpressionSuggestions.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 const sharedComponentNames = [
@@ -17073,6 +17074,39 @@ describe('CraftingSystemManager mounted behavior', () => {
       !off.querySelector('.manager-checks-rail-row-chevron'),
       'so it carries no chevron either'
     );
+  });
+
+  it('offers only formula tokens the active world can resolve', async () => {
+    // `@ingredients` resolved against NOTHING. A GM clicked the chip, it wrote
+    // `… + @ingredients` into the roll formula, and the check was broken by the control that
+    // offered it — a one-click path to a broken check, which is worse than no chip. It sat in
+    // a hard-coded list beside `@prof` and `@level`, two more dnd5e-shaped guesses in a
+    // system-agnostic module that nothing had ever proved either.
+    //
+    // The row is derived from the world now, through the same preset bundles the modifier
+    // chips read, so this asserts the DERIVATION rather than a replacement literal list: a
+    // chip may only offer an expression the product would itself author for this system.
+    await mountChecks([], routedCraftingOptions('1d20'));
+    await openChecksActivity('crafting');
+    const chips = [...target.querySelectorAll('[data-check-formula-token]')];
+    assert.ok(chips.length > 0, 'the formula field offers quick-add chips');
+    const offered = chips.map((chip) => chip.getAttribute('data-check-formula-token'));
+    assert.ok(
+      !offered.includes('@ingredients'),
+      `@ingredients resolves against nothing and must never be offered again: ${offered.join(', ')}`
+    );
+
+    // Every offered term is one the shipped derivation produces for this world. That is what
+    // makes the assertion above a property rather than one blocked string: a new invented
+    // token fails here even though it is not `@ingredients`.
+    const allowed = new Set(
+      getModifierExpressionSuggestions(game.system?.id || '').map(
+        (suggestion) => suggestion.expression
+      )
+    );
+    for (const token of offered) {
+      assert.ok(allowed.has(token), `"${token}" is not a term this world's presets produce`);
+    }
   });
 
   it('names the die domain the odds panel will enumerate, from the check’s own formula', async () => {

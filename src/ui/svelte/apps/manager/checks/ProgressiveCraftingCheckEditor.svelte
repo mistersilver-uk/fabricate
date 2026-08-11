@@ -27,6 +27,7 @@
     value = null,
     breakageAuthority = 'toolSpecific',
     section = '',
+    foundrySystemId = '',
     onChange = () => {},
   } = $props();
 
@@ -60,7 +61,12 @@
         </div>
       </div>
       <div class="manager-checks-card-body">
-        <CheckFormulaFields rollFormula={value?.rollFormula || ''} showDc={false} onChange={emit} />
+        <CheckFormulaFields
+          rollFormula={value?.rollFormula || ''}
+          showDc={false}
+          {foundrySystemId}
+          onChange={emit}
+        />
       </div>
     </section>
   {/if}

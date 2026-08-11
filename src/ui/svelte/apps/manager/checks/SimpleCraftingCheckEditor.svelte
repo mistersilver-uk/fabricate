@@ -45,6 +45,7 @@
     showDcSource = true,
     breakageAuthority = 'toolSpecific',
     section = '',
+    foundrySystemId = '',
     onChange = () => {},
   } = $props();
 
@@ -137,6 +138,7 @@
           rollFormula={value?.rollFormula || ''}
           dc={value?.dc ?? 15}
           thresholdMode={value?.thresholdMode || 'meet'}
+          {foundrySystemId}
           onChange={emit}
         />
       </div>

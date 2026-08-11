@@ -11,6 +11,7 @@
   `showDc={false}` to render the formula field alone.
 -->
 <script>
+  import { getModifierExpressionSuggestions } from '../../../../../config/modifierExpressionSuggestions.js';
   import { localize } from '../../../util/foundryBridge.js';
   import Stepper from '../../../components/Stepper.svelte';
   import { stepperLabels } from '../../../components/stepperLabels.js';
@@ -21,6 +22,7 @@
     thresholdMode = 'meet',
     placeholder = '1d20+@abilities.int.mod',
     showDc = true,
+    foundrySystemId = '',
     onChange = () => {},
   } = $props();
 
@@ -31,13 +33,24 @@
 
   const comparison = $derived(thresholdMode === 'exceed' ? 'exceed' : 'meet');
 
-  // The formula token quick-add row (issue 1096). A FIXED LITERAL LIST, deliberately: the
-  // formula-DERIVED variant — offering the tokens this actor or this system actually has —
-  // is explicitly out of scope on the epic, and a list that looked derived but was not would
-  // be worse than one that plainly is not. Each chip appends its token to whatever the GM
-  // has typed, joined with ` + `, so it is an accelerator for the field beside it rather
-  // than a second authoring model.
-  const QUICK_TOKENS = ['@prof', '@abilities.wis.mod', '@ingredients', '@level', '1d4'];
+  // The formula token quick-add row (issue 1096). DERIVED FROM THE ACTIVE WORLD, never a
+  // literal list.
+  //
+  // It WAS a literal list, and it shipped `@ingredients` — a term that resolves against
+  // nothing, so one click on the chip wrote it into the formula and BROKE the check. A
+  // one-click path to a broken check is worse than no chip at all, and the other four were
+  // no better evidenced: `@prof` and `@level` are dnd5e-shaped guesses in a system-agnostic
+  // module, and nothing anywhere proved any of the five against a real actor's roll data.
+  //
+  // `getModifierExpressionSuggestions` is the derivation the modifier chips already use: its
+  // system-specific half comes from the shipped preset bundles
+  // (`getCharacterModifierPresetsForFoundrySystem`), so a chip can only ever offer a path the
+  // product would itself author for this world, and an UNSUPPORTED world degrades to the
+  // system-agnostic terms rather than offering a dnd5e path it does not have. That removes
+  // the whole class of defect rather than the one instance of it.
+  const quickTokens = $derived(
+    getModifierExpressionSuggestions(foundrySystemId).map((suggestion) => suggestion.expression)
+  );
 
   function appendToken(token) {
     const current = String(rollFormula || '').trim();
@@ -62,7 +75,7 @@
          controls a GM operates, and a span with an `onclick` is reachable by neither the
          keyboard nor a screen reader. -->
     <span class="manager-checks-formula-tokens" data-check-formula-tokens>
-      {#each QUICK_TOKENS as token (token)}
+      {#each quickTokens as token (token)}
         <button
           type="button"
           class="manager-checks-formula-token"

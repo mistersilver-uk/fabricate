@@ -167,6 +167,7 @@
     requestedSectionNonce = 0,
     // Route to another activity — used by the read-only catalogue's "edit the catalogue"
     // link and by the Validation route's deep links.
+    foundrySystemId = '',
     onOpenActivity = () => {},
     // Navigate to the system editor's Modifiers section — the one surface that authors the
     // library. Every activity's card links here now (issue 1117), so there is no
@@ -1053,6 +1054,7 @@
               value={craftingCheck}
               {resolutionMode}
               section={activeSection}
+              {foundrySystemId}
               breakageAuthority={craftingBreakageAuthority}
               onChange={onUpdateCraftingCheck}
             />
@@ -1060,6 +1062,7 @@
             <SimpleCraftingCheckEditor
               value={craftingCheckSimple}
               section={activeSection}
+              {foundrySystemId}
               breakageAuthority={craftingBreakageAuthority}
               onChange={onUpdateCraftingCheckSimple}
             />
@@ -1080,6 +1083,7 @@
               value={craftingCheck}
               {resolutionMode}
               section={activeSection}
+              {foundrySystemId}
               breakageAuthority={craftingBreakageAuthority}
               onChange={onUpdateCraftingCheck}
             />
@@ -1087,6 +1091,7 @@
             <SimpleCraftingCheckEditor
               value={craftingCheckSimple}
               section={activeSection}
+              {foundrySystemId}
               breakageAuthority={craftingBreakageAuthority}
               onChange={onUpdateCraftingCheckSimple}
             />
@@ -1094,6 +1099,7 @@
             <ProgressiveCraftingCheckEditor
               value={craftingCheckProgressive}
               section={activeSection}
+              {foundrySystemId}
               breakageAuthority={craftingBreakageAuthority}
               onChange={onUpdateCraftingCheckProgressive}
             />
@@ -1170,6 +1176,7 @@
               value={salvageCheckRouted}
               showTiers={false}
               section={activeSection}
+              {foundrySystemId}
               breakageAuthority={salvageBreakageAuthority}
               onChange={onUpdateSalvageCheckRouted}
             />
@@ -1177,6 +1184,7 @@
             <ProgressiveCraftingCheckEditor
               value={salvageCheckProgressive}
               section={activeSection}
+              {foundrySystemId}
               breakageAuthority={salvageBreakageAuthority}
               onChange={onUpdateSalvageCheckProgressive}
             />
@@ -1185,6 +1193,7 @@
               value={salvageCheckSimple}
               showDcSource={false}
               section={activeSection}
+              {foundrySystemId}
               breakageAuthority={salvageBreakageAuthority}
               onChange={onUpdateSalvageCheckSimple}
             />
@@ -1243,6 +1252,7 @@
             <ProgressiveCraftingCheckEditor
               value={gatheringCheckProgressive}
               section={activeSection}
+              {foundrySystemId}
               breakageAuthority={gatheringBreakageAuthority}
               onChange={onUpdateGatheringCheckProgressive}
             />
@@ -1251,6 +1261,7 @@
               value={gatheringCheckRouted}
               showTiers={false}
               section={activeSection}
+              {foundrySystemId}
               breakageAuthority={gatheringBreakageAuthority}
               onChange={onUpdateGatheringCheckRouted}
             />

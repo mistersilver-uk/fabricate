@@ -61,6 +61,7 @@
     breakageAuthority = 'toolSpecific',
     resolutionMode = null,
     section = '',
+    foundrySystemId = '',
     onChange = () => {},
   } = $props();
 
@@ -396,18 +397,23 @@
   {/if}
 
   {#if shows('roll')}
-    <section class="manager-inspector-card">
-      <h3 class="manager-card-title">
-        {text('FABRICATE.Admin.Manager.Checks.Crafting.FormulaTitle', 'Roll formula')}
-      </h3>
-      <CheckFormulaFields
-        rollFormula={value?.rollFormula || ''}
-        dc={value?.dc ?? 15}
-        thresholdMode={value?.thresholdMode || 'meet'}
-        showDc={!hideDc}
-        placeholder="1d20"
-        onChange={emit}
-      />
+    <section class="manager-inspector-card manager-checks-card" data-roll-formula-card>
+      <div class="manager-checks-card-head">
+        <h3 class="manager-checks-card-title">
+          {text('FABRICATE.Admin.Manager.Checks.Crafting.FormulaTitle', 'Roll formula')}
+        </h3>
+      </div>
+      <div class="manager-checks-card-body">
+        <CheckFormulaFields
+          rollFormula={value?.rollFormula || ''}
+          dc={value?.dc ?? 15}
+          thresholdMode={value?.thresholdMode || 'meet'}
+          showDc={!hideDc}
+          placeholder="1d20"
+          {foundrySystemId}
+          onChange={emit}
+        />
+      </div>
     </section>
   {/if}
 
