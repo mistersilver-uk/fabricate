@@ -124,6 +124,9 @@ function compileManagerRoot() {
   // collapsible panels. Omitting either HANGS this suite (# cancelled), never fails it.
   writeCompiledSvelte('src/ui/svelte/components/ThresholdBandStrip.svelte');
   writeCompiledSvelte('src/ui/svelte/components/RowDisclosure.svelte');
+  // The odds histogram's bars are the shipped fill bar (issue 1097) rather than a sixth
+  // hand-rolled copy of the shape `ui-integration/spec.md` records as debt.
+  writeCompiledSvelte('src/ui/svelte/components/FillBar.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/checks/ChecksView.svelte');
   // The roll section's mode callout (issue 1096). `ChecksView` imports it STATICALLY, so
   // omitting it does not skip a branch — it fails module resolution for the whole suite.
@@ -132,6 +135,10 @@ function compileManagerRoot() {
   writeCompiledSvelte('src/ui/svelte/apps/manager/checks/ChecksRightMenu.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/checks/CheckDcMacroCard.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/checks/CheckDifficultyCard.svelte');
+  // The two panels issue 1096 shipped as SLOTS and issue 1097 filled: the rail renders
+  // both, so omitting either HANGS this suite rather than failing it.
+  writeCompiledSvelte('src/ui/svelte/apps/manager/checks/CheckOutcomePreview.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/checks/CheckOddsPanel.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/checks/CheckFormulaFields.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/checks/CheckTriggers.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/checks/CheckRecipeTiers.svelte');
@@ -653,6 +660,18 @@ function compileManagerRoot() {
     // is always in the mounted manager tree, so omitting this reports every mounted manager
     // test as `# cancelled` behind one ERR_MODULE_NOT_FOUND.
     'src/ui/svelte/apps/manager/checks/modifierPolicyAttrs.js',
+    // The outcome simulator and the odds enumerator (issue 1097), plus the engine modules
+    // they DRIVE rather than reimplement: `checkPreview.js` calls the same three runners
+    // the engines call and `checkOdds.js` buckets through the same classifier
+    // `runFormulaRouted` uses, so `checkRoll.js` — and the breakage-condition evaluator it
+    // evaluates triggers with, and the shared progressive-award loop — are genuinely in
+    // this root's static graph. Everything below `toolBreakageRuntime.js` is that module's
+    // own closure; the ones already listed above are not repeated.
+    'src/ui/svelte/apps/manager/checks/checkPreview.js',
+    'src/ui/svelte/apps/manager/checks/checkOdds.js',
+    'src/systems/checkRoll.js',
+    'src/utils/progressiveAward.js',
+    'src/toolBreakageRuntime.js',
   ]) {
     const rawDestination = join(tempRoot, rawPath);
     mkdirSync(dirname(rawDestination), { recursive: true });
@@ -17424,14 +17443,20 @@ describe('CraftingSystemManager mounted behavior', () => {
     ]) {
       assert.ok(target.querySelector(present), `an activity route renders ${present}`);
     }
-    // Preview-as is a PRE-ROLL slot: a stated sentence and no control. Two enabled-looking
-    // selects reading "No actors" / "No records" invited a choice nothing consumed.
+    // Preview-as was a PRE-ROLL SLOT under issue 1096 — a stated sentence and no control —
+    // because two enabled-looking selects reading "No actors" / "No records" would have
+    // invited a choice nothing consumed. Issue 1097 supplies the thing behind them, so the
+    // assertion inverts rather than relaxes: BOTH selectors are real, and the actor one
+    // carries the explicit "No actor" option the readout's unresolved warning depends on.
     const previewAs = target.querySelector('[data-checks-preview-as]');
+    const actorSelect = previewAs.querySelector('[data-checks-preview-actor]');
+    const recordSelect = previewAs.querySelector('[data-checks-preview-record]');
+    assert.ok(actorSelect, 'the actor selector is a real control now that a simulator reads it');
+    assert.ok(recordSelect, 'so is the record selector');
     assert.ok(
-      !previewAs.querySelector('select'),
-      'the panel offers no control until there is something behind it'
+      [...actorSelect.options].some((option) => option.value === ''),
+      '"No actor" is an explicit option, not an absence'
     );
-    assert.ok(previewAs.querySelector('.manager-muted'), 'it states what it will do instead');
   });
 
   it('keeps the gathering d100 route on its own explanation, not the check-OFF empty state', async () => {

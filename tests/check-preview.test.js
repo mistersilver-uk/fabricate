@@ -1,0 +1,400 @@
+/**
+ * The Checks Studio's outcome-preview simulator (issue 1097).
+ *
+ * The load-bearing claims here are all NEGATIVE — the preview posts no chat message,
+ * shows no prompt and runs no macro — and a negative assertion is worth exactly as much
+ * as the proof that it could have failed. So every spy below is FIRST shown to fire on a
+ * path that really does call it, and only then asserted silent across a preview. A spy
+ * that never fires proves nothing at all, and a "the preview posts nothing" test built on
+ * one reads identically from the PR.
+ *
+ * The macro case is the sharpest of the three, and it is a safety property rather than a
+ * limitation. The engine reaches a `dcMode: 'dynamic'` DC by RUNNING the linked macro
+ * through `MacroExecutor.run`, which compiles `macro.command` into an `AsyncFunction` and
+ * executes it with the current user's authority — guarded only by
+ * `typeof command !== 'string'`, which is not a script-type check, because Foundry
+ * declares `command` as `required: true, blank: true` on a CHAT macro too. A DC macro
+ * that creates a `ChatMessage`, updates an Actor or writes a flag must not be able to do
+ * any of that from a preview button.
+ */
+import { describe, it, beforeEach, afterEach } from 'node:test';
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+
+import {
+  DEFAULT_RECORD_ID,
+  NO_ACTOR_ID,
+  buildPreviewCheckArgs,
+  buildPreviewRecords,
+  cloneRollData,
+  listPreviewActors,
+  resolvePreviewActor,
+  runCheckPreview,
+  terseBreakdown,
+} from '../src/ui/svelte/apps/manager/checks/checkPreview.js';
+import { runFormulaPassFail, runFormulaRouted } from '../src/systems/checkRoll.js';
+import { MacroExecutor } from '../src/utils/MacroExecutor.js';
+
+const repoRoot = resolve(import.meta.dirname, '..');
+
+/** A `Roll` that evaluates a resolved formula deterministically — no entropy anywhere. */
+function installRoll({ face = 9 } = {}) {
+  const posted = [];
+  globalThis.Roll = class {
+    static replaceFormulaData(formula, data = {}, { missing = 'NaN' } = {}) {
+      return String(formula).replaceAll(/@([\w.]+)/g, (_match, path) => {
+        const value = String(path)
+          .split('.')
+          .reduce((current, part) => (current == null ? undefined : current[part]), data);
+        return value === undefined || value === null ? missing : String(value);
+      });
+    }
+
+    static validate(formula) {
+      return !/NaN|@/.test(String(formula));
+    }
+
+    constructor(formula, data = {}) {
+      this.formula = String(formula);
+      this.data = data;
+      this.dice = [];
+      this.terms = [];
+    }
+
+    async evaluate() {
+      const resolved = Roll.replaceFormulaData(this.formula, this.data, { missing: '0' });
+      const masked = resolved.replaceAll(/\[[^\]]*]/g, '');
+      let total = 0;
+      const rolled = masked.replaceAll(/(\d*)d(\d+)/gi, (_match, count) => {
+        const number = count === '' ? 1 : Number(count);
+        const results = Array.from({ length: number }, () => ({ result: face, active: true }));
+        this.dice.push({ number, faces: 20, results, total: face * number });
+        return String(face * number);
+      });
+      for (const [, sign, value] of rolled.matchAll(/([+-]?)\s*(\d+)/g)) {
+        total += (sign === '-' ? -1 : 1) * Number(value);
+      }
+      this.total = total;
+      return this;
+    }
+
+    async toMessage(data) {
+      posted.push(data);
+      return data;
+    }
+  };
+  globalThis.Roll.posted = posted;
+  return posted;
+}
+
+const ACTOR = {
+  id: 'actor-sera',
+  name: 'Sera Vane',
+  getRollData: () => ({ prof: 3, abilities: { str: { mod: 2 } } }),
+};
+const ACTOR_WITHOUT_PROF = { id: 'actor-bare', name: 'Bare', getRollData: () => ({}) };
+
+const ROUTED_DRAFT = {
+  rollFormula: '1d20 + @prof',
+  dc: 12,
+  thresholdMode: 'meet',
+  type: 'relative',
+  relativeOutcomes: [
+    { id: 'ruined', name: 'Ruined', dc: -10, success: false },
+    { id: 'success', name: 'Success', dc: 0, success: true },
+    { id: 'fine', name: 'Fine', dc: 5, success: true },
+  ],
+  fixedOutcomes: [],
+  checkBreakage: { triggers: [] },
+  tiers: [
+    { id: 'uncommon', name: 'Uncommon Craft', dc: 12 },
+    { id: 'rare', name: 'Rare Craft', dc: 18 },
+  ],
+};
+
+let chatSpy;
+
+beforeEach(() => {
+  chatSpy = [];
+  installRoll();
+  globalThis.ChatMessage = {
+    create: (data) => {
+      chatSpy.push(data);
+      return data;
+    },
+  };
+});
+
+afterEach(() => {
+  delete globalThis.Roll;
+  delete globalThis.ChatMessage;
+  delete globalThis.fromUuid;
+});
+
+describe('checkPreview: it drives the engine runners rather than reimplementing them', () => {
+  it('assembles the routed arg bag with rollOptions explicitly null', () => {
+    const plan = buildPreviewCheckArgs({
+      activity: 'crafting',
+      mode: 'routed',
+      draft: ROUTED_DRAFT,
+      system: null,
+      actor: ACTOR,
+      record: { id: 'rare', name: 'Rare Craft', dc: 18 },
+    });
+    assert.equal(plan.kind, 'routed');
+    assert.equal(plan.dc, 18, 'the PREVIEWED RECORD supplies the DC, not the check default');
+    assert.equal(plan.args.rollOptions, null);
+    assert.equal(plan.args.clampToNearest, true, 'every routed caller in the product opts in');
+    assert.equal(plan.args.minOutcomeId, null);
+    assert.deepEqual(plan.args.relativeOutcomes, ROUTED_DRAFT.relativeOutcomes);
+  });
+
+  it('produces the SAME result object the engine runner produces for the same bag', async () => {
+    const plan = buildPreviewCheckArgs({
+      activity: 'crafting',
+      mode: 'routed',
+      draft: ROUTED_DRAFT,
+      system: null,
+      actor: ACTOR,
+      record: { id: 'uncommon', name: 'Uncommon Craft', dc: 12 },
+    });
+    const previewed = await runCheckPreview(plan);
+    const direct = await runFormulaRouted(plan.args);
+    assert.deepEqual(previewed, direct, 'field for field, because it IS the same call');
+    assert.equal(previewed.outcome, 'Success', '9 + 3 = 12 meets the Success threshold');
+  });
+
+  it('returns null when the mode rolls nothing, or when no formula is authored', async () => {
+    const noCheck = buildPreviewCheckArgs({
+      activity: 'crafting',
+      mode: 'none',
+      draft: ROUTED_DRAFT,
+      system: null,
+    });
+    assert.equal(noCheck.kind, null);
+    assert.equal(await runCheckPreview(noCheck), null);
+
+    const noFormula = buildPreviewCheckArgs({
+      activity: 'crafting',
+      mode: 'simple',
+      draft: { rollFormula: '   ', dc: 12 },
+      system: null,
+    });
+    assert.equal(await runCheckPreview(noFormula), null);
+  });
+
+  it('appends tool bonus terms for crafting and salvage, and NOT for gathering', () => {
+    const terms = [{ value: 3, label: 'Rune Stylus' }];
+    const shared = { mode: 'simple', draft: { rollFormula: '1d20', dc: 10 }, system: null };
+    assert.equal(
+      buildPreviewCheckArgs({ ...shared, activity: 'crafting', toolTerms: terms }).formula,
+      '1d20 + 3[Rune Stylus]'
+    );
+    assert.equal(
+      buildPreviewCheckArgs({ ...shared, activity: 'salvage', toolTerms: terms }).formula,
+      '1d20 + 3[Rune Stylus]'
+    );
+    assert.equal(
+      buildPreviewCheckArgs({ ...shared, activity: 'gathering', toolTerms: terms }).formula,
+      '1d20',
+      'gathering has no tool-bonus seam at all'
+    );
+  });
+});
+
+describe('checkPreview: it posts nothing and prompts for nothing', () => {
+  it('SPY CHECK — the same runner DOES post to chat on an interactive roll', async () => {
+    // Non-vacuity, proven rather than asserted. If this ever stops firing, the negative
+    // assertion below is measuring nothing.
+    let prompted = 0;
+    await runFormulaPassFail({
+      formula: '1d20 + @prof',
+      dc: 10,
+      thresholdMode: 'meet',
+      triggers: [],
+      actor: ACTOR,
+      rollOptions: {
+        interactive: true,
+        prompt: async () => {
+          prompted += 1;
+          return { confirmed: true };
+        },
+      },
+    });
+    assert.equal(prompted, 1, 'the interactive path opens the prompt');
+    assert.equal(chatSpy.length, 0, 'ChatMessage.create is reached through roll.toMessage');
+    assert.equal(globalThis.Roll.posted.length, 1, 'and toMessage IS called on that path');
+  });
+
+  it('the preview reaches neither the prompt nor toMessage', async () => {
+    globalThis.Roll.posted.length = 0;
+    const plan = buildPreviewCheckArgs({
+      activity: 'crafting',
+      mode: 'routed',
+      draft: ROUTED_DRAFT,
+      system: null,
+      actor: ACTOR,
+      record: { id: 'uncommon', dc: 12 },
+    });
+    // A prompt on the bag would be a prompt on screen. `rollOptions: null` spreads to `{}`,
+    // so there is no `interactive`, no `prompt` and no `speaker` for one to be built from.
+    assert.equal(plan.args.rollOptions, null);
+    await runCheckPreview(plan);
+    assert.equal(globalThis.Roll.posted.length, 0, 'no chat card');
+    assert.equal(chatSpy.length, 0, 'and nothing created directly either');
+  });
+});
+
+describe('checkPreview: it NEVER executes a DC macro', () => {
+  it('SPY CHECK — a real DC macro path resolves the uuid and runs the command', async () => {
+    let resolved = 0;
+    let ran = 0;
+    globalThis.fromUuid = async (uuid) => {
+      resolved += 1;
+      assert.equal(uuid, 'Macro.dc-macro');
+      return { type: 'script', command: 'globalThis.__previewMacroRan = (globalThis.__previewMacroRan ?? 0) + 1; return 19;' };
+    };
+    const dc = await MacroExecutor.run('Macro.dc-macro', {});
+    ran = globalThis.__previewMacroRan ?? 0;
+    delete globalThis.__previewMacroRan;
+    assert.equal(resolved, 1, 'the spy fires when a macro really is resolved');
+    assert.equal(ran, 1, 'and the command really does execute');
+    assert.equal(dc, 19);
+  });
+
+  it('previews a dynamic DC against the STATIC fallback and never touches the macro', async () => {
+    globalThis.fromUuid = () => {
+      assert.fail('the preview resolved a macro uuid');
+    };
+    const draft = {
+      ...ROUTED_DRAFT,
+      dcMode: 'dynamic',
+      macroUuid: 'Macro.dc-macro',
+      dc: 14,
+      tiers: [],
+    };
+    const plan = buildPreviewCheckArgs({
+      activity: 'crafting',
+      mode: 'simple',
+      draft,
+      system: null,
+      actor: ACTOR,
+      record: null,
+    });
+    assert.equal(plan.dynamicDc, true, 'the readout is told to state that it did not run it');
+    assert.equal(plan.dc, 14, 'the authored static fallback, which is what the engine falls back to');
+    const result = await runCheckPreview(plan);
+    assert.equal(result.data.dc, 14);
+  });
+
+  it('names no macro machinery at all, so there is no path for one to be added down', () => {
+    const source = readFileSync(
+      resolve(repoRoot, 'src/ui/svelte/apps/manager/checks/checkPreview.js'),
+      'utf8'
+    );
+    // The SOURCE contract, because the spy above can only cover the paths a test drives.
+    const code = source.slice(source.indexOf('import '));
+    assert.ok(!code.includes('MacroExecutor'), 'no MacroExecutor import or call');
+    assert.ok(!code.includes('fromUuid'), 'and no uuid resolution of its own');
+  });
+});
+
+describe('checkPreview: unresolved roll data is surfaced, never silently zeroed', () => {
+  it('reports resolved:false for an @ key the previewed actor lacks', async () => {
+    const { resolveCheckFormulaDisplay } = await import('../src/systems/checkRoll.js');
+    assert.equal(resolveCheckFormulaDisplay('1d20 + @prof', ACTOR).resolved, true);
+    assert.equal(resolveCheckFormulaDisplay('1d20 + @prof', ACTOR_WITHOUT_PROF).resolved, false);
+    assert.equal(resolveCheckFormulaDisplay('1d20 + @prof', null).resolved, false, 'no actor too');
+  });
+
+  it('still ROLLS a total for that formula, which is exactly why the warning is needed', async () => {
+    const plan = buildPreviewCheckArgs({
+      activity: 'crafting',
+      mode: 'simple',
+      draft: { rollFormula: '1d20 + @prof', dc: 10, thresholdMode: 'meet', checkBreakage: null },
+      system: null,
+      actor: ACTOR_WITHOUT_PROF,
+    });
+    const result = await runCheckPreview(plan);
+    assert.equal(result.data.total, 9, 'the missing key contributed 0 and the total is plausible');
+    assert.equal(result.success, false, 'and the wrong number is ON the result object');
+  });
+});
+
+describe('checkPreview: the actor and record selection', () => {
+  it('lists game.actors UNFILTERED, because the Studio is GM-only', () => {
+    const actors = listPreviewActors({
+      getActors: () => [
+        { id: 'a', name: 'Owned' },
+        { id: 'b', name: 'Unowned', isOwner: false },
+        { id: 'c', name: 'Someone else’s', ownership: { default: 0 } },
+      ],
+    });
+    assert.deepEqual(
+      actors.map((actor) => actor.id),
+      ['a', 'b', 'c'],
+      'a player-side "assigned character OR owner" union would be the wrong shape here'
+    );
+  });
+
+  it('resolves "No actor" to null rather than to a lookup', () => {
+    const lookup = () => assert.fail('the empty selection reached the actor lookup');
+    assert.equal(resolvePreviewActor(NO_ACTOR_ID, { getActor: lookup }), null);
+    assert.equal(resolvePreviewActor('', { getActor: lookup }), null);
+    assert.equal(resolvePreviewActor('a', { getActor: () => ({ id: 'a' }) }).id, 'a');
+  });
+
+  it('offers the check DEFAULT first and then every authored recipe tier', () => {
+    const records = buildPreviewRecords({ check: ROUTED_DRAFT, defaultLabel: 'Default' });
+    assert.deepEqual(
+      records.map((record) => [record.id, record.dc]),
+      [
+        [DEFAULT_RECORD_ID, 12],
+        ['uncommon', 12],
+        ['rare', 18],
+      ]
+    );
+  });
+
+  it('still offers a record when the check has authored no tiers at all', () => {
+    const records = buildPreviewRecords({ check: { dc: 15 }, defaultLabel: 'Default' });
+    assert.equal(records.length, 1);
+    assert.equal(records[0].dc, 15);
+  });
+
+  it('treats the actor roll data as read-only by cloning before any augmentation', () => {
+    const live = { prof: 3, abilities: { str: { mod: 2 } } };
+    const actor = { getRollData: () => live };
+    const clone = cloneRollData(actor);
+    clone.prof = 99;
+    clone.abilities.str.mod = 99;
+    assert.equal(live.prof, 3, 'Foundry returns the LIVE system object; nothing here writes to it');
+    assert.equal(live.abilities.str.mod, 2, 'and the clone is deep enough to say so');
+  });
+});
+
+describe('checkPreview: the terse breakdown line', () => {
+  it('reads the faces and the signed remainder, not the full resolved formula', () => {
+    const result = {
+      data: {
+        total: 19,
+        resolvedFormula: '1d20 + 3 + 7[Modifiers]',
+        diceGroups: [{ groupId: 0, group: '1d20', sum: 9, results: [9] }],
+      },
+    };
+    assert.equal(terseBreakdown(result, 'Sera Vane'), 'd20 9 +10 · Sera Vane');
+    assert.equal(terseBreakdown(result), 'd20 9 +10', 'the actor name is optional');
+  });
+
+  it('omits a zero remainder rather than printing "+0"', () => {
+    const result = {
+      data: { total: 9, diceGroups: [{ groupId: 0, group: '1d20', sum: 9, results: [9] }] },
+    };
+    assert.equal(terseBreakdown(result), 'd20 9');
+  });
+
+  it('says nothing at all when there is no result to describe', () => {
+    assert.equal(terseBreakdown(null), '');
+  });
+});

@@ -68,6 +68,29 @@ export const CHECKS_TREE_RAW_MODULES = Object.freeze([
   // module rather than hard-coded (issue 1096), so the whole checks tree now imports it.
   'src/config/modifierExpressionSuggestions.js',
   'src/config/gatheringCharacterModifierPresets.js',
+  // The outcome simulator and the odds enumerator (issue 1097), plus the engine modules
+  // they drive. `checkPreview.js` calls the SAME three runners the engines call and
+  // `checkOdds.js` buckets through the SAME classifier `runFormulaRouted` uses, so
+  // `checkRoll.js` — and its own `toolBreakageRuntime.js` condition evaluator and the
+  // shared `progressiveAward.js` loop — are genuinely in the checks tree's import graph
+  // now rather than being defensive entries.
+  'src/ui/svelte/apps/manager/checks/checkPreview.js',
+  'src/ui/svelte/apps/manager/checks/checkOdds.js',
+  'src/systems/checkRoll.js',
+  'src/utils/progressiveAward.js',
+  // `checkRoll.js` evaluates a trigger's condition through the shared breakage evaluator,
+  // and that module's own closure is the rest of this block. Eight modules for one
+  // evaluator reads like over-filling; it is not, and the check is mechanical — drop any
+  // one of them and the checks suites HANG rather than fail.
+  'src/toolBreakageRuntime.js',
+  'src/config/flags.js',
+  'src/config/stackQuantityPathPresets.js',
+  'src/models/Ingredient.js',
+  'src/models/IngredientGroup.js',
+  'src/models/Tool.js',
+  'src/models/match/matchTypes.js',
+  'src/systems/itemStackQuantity.js',
+  'src/utils/objectPath.js',
 ]);
 
 /**
@@ -86,6 +109,7 @@ export const CHECKS_TREE_COMPILED_MODULES = Object.freeze([
   // reports a MISSING module loudly, so re-adding one is a one-line fix if a tree grows back
   // into it.
   'src/ui/svelte/components/FillBar.svelte',
+  'src/ui/svelte/components/Medallion.svelte',
   'src/ui/svelte/components/RowDisclosure.svelte',
   'src/ui/svelte/components/ThresholdBandStrip.svelte',
   'src/ui/svelte/components/Stepper.svelte',
@@ -102,6 +126,8 @@ export const CHECKS_TREE_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/apps/manager/RadioCardGroup.svelte',
   'src/ui/svelte/apps/manager/RollDataExpressionInput.svelte',
   'src/ui/svelte/apps/manager/ToggleCard.svelte',
+  'src/ui/svelte/apps/manager/checks/CheckOddsPanel.svelte',
+  'src/ui/svelte/apps/manager/checks/CheckOutcomePreview.svelte',
   'src/ui/svelte/apps/manager/checks/ChecksEditorTabs.svelte',
   'src/ui/svelte/apps/manager/checks/ChecksRightMenu.svelte',
   'src/ui/svelte/apps/manager/checks/ChecksValidationTab.svelte',

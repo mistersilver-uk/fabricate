@@ -1624,3 +1624,188 @@ test('runFormulaRouted: a throwing roll fails with a labelled message', async ()
   assert.equal(r.outcome, null);
   assert.match(r.message, /Salvage check roll failed/);
 });
+
+// ── classifyCheckTotal (issue 1097) ─────────────────────────────────────────
+//
+// The Checks Studio's odds histogram buckets every enumerated face through this
+// function, and `runFormulaRouted` resolves a real roll through it too. That makes
+// "they cannot drift" a property of the code rather than a promise — but only if the
+// EXTRACTION was faithful, and a differential test over the two REAL functions is the
+// only thing that shows it was. Two hand-written models agreeing proves nothing about
+// either.
+
+const { classifyCheckTotal } = await import('../src/systems/checkRoll.js');
+
+/** The fixed-range tier set, with a recipe minimum to gate against. */
+const FIXED_TIERS = [
+  { id: 'slag', name: 'Slag', start: 1, end: 9, success: false },
+  { id: 'rough', name: 'Rough', start: 10, end: 17, success: true, breakTools: true },
+  { id: 'fine', name: 'Fine', start: 18, end: 26, success: true },
+];
+
+// A total of 12 lands in Rough, the MIDDLE fixed tier, so a step up is a real move rather
+// than a clamped no-op — and a no-op would make the parity case below vacuous while still
+// passing, because both sides would report `tierStepApplied: null`.
+const STEP_TOTAL = 12;
+
+/** Step a rolled tier up one whenever the group total is exactly 12. */
+const STEP_UP_ONE = {
+  id: 'step-up',
+  condition: {
+    type: 'diceGroup',
+    groupId: 0,
+    aggregate: 'total',
+    operator: '==',
+    value: STEP_TOTAL,
+  },
+  outcome: 'none',
+  tierStep: { mode: 'up', steps: 1 },
+};
+
+/** Ask for FOUR steps up from a three-tier list, so the clamp is exercised. */
+const STEP_UP_FOUR = { ...STEP_UP_ONE, id: 'step-four', tierStep: { mode: 'up', steps: 4 } };
+
+const CLASSIFIER_CASES = [
+  ['relative, mid-range', { type: 'relative', relativeOutcomes: RELATIVE, dc: 15 }, 15],
+  ['relative, below every threshold', { type: 'relative', relativeOutcomes: RELATIVE, dc: 15 }, 1],
+  [
+    'relative, below every threshold with the clamp',
+    { type: 'relative', relativeOutcomes: RELATIVE, dc: 15, clampToNearest: true },
+    1,
+  ],
+  ['relative, exceed comparison', { type: 'relative', relativeOutcomes: RELATIVE, dc: 15 }, 15],
+  ['fixed, inside a range', { type: 'fixed', fixedOutcomes: FIXED_TIERS }, 12],
+  ['fixed, outside every range', { type: 'fixed', fixedOutcomes: FIXED_TIERS }, 99],
+  [
+    'fixed, blocked by the recipe minimum',
+    { type: 'fixed', fixedOutcomes: FIXED_TIERS, minOutcomeId: 'fine' },
+    12,
+  ],
+  [
+    'forced success reroutes to the best succeeding tier',
+    {
+      type: 'relative',
+      relativeOutcomes: RELATIVE,
+      dc: 15,
+      triggers: [totalTrigger({ value: 20, outcome: 'success' })],
+    },
+    20,
+  ],
+  [
+    'forced failure reroutes to the worst failing tier',
+    {
+      type: 'relative',
+      relativeOutcomes: RELATIVE,
+      dc: 15,
+      triggers: [totalTrigger({ value: 1, outcome: 'failure' })],
+    },
+    1,
+  ],
+  [
+    'a tier step moves the rolled tier',
+    { type: 'fixed', fixedOutcomes: FIXED_TIERS, triggers: [STEP_UP_ONE] },
+    STEP_TOTAL,
+  ],
+  [
+    'a CLAMPED tier step reports the realized magnitude',
+    { type: 'fixed', fixedOutcomes: FIXED_TIERS, triggers: [STEP_UP_FOUR] },
+    STEP_TOTAL,
+  ],
+];
+
+for (const [name, config, total] of CLASSIFIER_CASES) {
+  test(`classifyCheckTotal agrees with runFormulaRouted: ${name}`, async () => {
+    const thresholdMode = name.includes('exceed') ? 'exceed' : 'meet';
+    const comparison = thresholdMode === 'exceed' ? 'exceed' : 'meet';
+    const diceGroups = [{ groupId: 0, group: '1d20', sum: total, results: [total] }];
+    stubRoll(total, [
+      { number: 1, faces: 20, total, results: [{ result: total, active: true }] },
+    ]);
+
+    const runner = await runFormulaRouted({
+      formula: '1d20',
+      dc: config.dc,
+      thresholdMode,
+      type: config.type,
+      relativeOutcomes: config.relativeOutcomes,
+      fixedOutcomes: config.fixedOutcomes,
+      triggers: config.triggers,
+      actor: ACTOR,
+      clampToNearest: config.clampToNearest === true,
+      minOutcomeId: config.minOutcomeId ?? null,
+    });
+
+    const classified = classifyCheckTotal({
+      type: config.type,
+      total,
+      dc: config.dc,
+      comparison,
+      relativeOutcomes: config.relativeOutcomes,
+      fixedOutcomes: config.fixedOutcomes,
+      triggers: config.triggers,
+      diceGroups,
+      clampToNearest: config.clampToNearest === true,
+      minOutcomeId: config.minOutcomeId ?? null,
+    });
+
+    assert.equal(classified.success, runner.success, 'success');
+    assert.equal(classified.matched?.name ?? null, runner.outcome, 'the routed outcome NAME');
+    assert.equal(classified.matched?.id ?? null, runner.data.outcomeId, 'and its id');
+    assert.equal(classified.breakTools, runner.data.breakTools, 'the per-tier breakage bridge');
+    assert.deepEqual(
+      classified.tierStepApplied,
+      runner.data.tierStepApplied ?? null,
+      'the tier-step evidence, present only on a REAL tier change'
+    );
+    assert.equal(classified.minTierFailed, runner.data.minTierFailed === true, 'the minimum gate');
+    assert.equal(
+      classified.blockedOutcomeId,
+      runner.data.blockedOutcomeId ?? null,
+      'and the tier that gate blocked'
+    );
+  });
+}
+
+test('classifyCheckTotal: the clamped step reports the REALIZED magnitude, not the request', async () => {
+  const classified = classifyCheckTotal({
+    type: 'fixed',
+    total: STEP_TOTAL,
+    dc: 0,
+    comparison: 'meet',
+    relativeOutcomes: [],
+    fixedOutcomes: FIXED_TIERS,
+    triggers: [STEP_UP_FOUR],
+    diceGroups: [{ groupId: 0, group: '1d20', sum: STEP_TOTAL, results: [STEP_TOTAL] }],
+  });
+  assert.equal(classified.tierStepApplied.steps, 1, 'Fine is one step above Rough, not four');
+  assert.equal(classified.tierStepApplied.stepClamped, true, 'and the author asked for more');
+});
+
+test('classifyCheckTotal: a per-die trigger is INVISIBLE without `results` on the bag', () => {
+  const nat20 = {
+    id: 'nat20',
+    condition: { type: 'diceGroup', groupId: 0, aggregate: 'anyDie', operator: '==', value: 20 },
+    outcome: 'success',
+  };
+  const args = {
+    type: 'relative',
+    total: 20,
+    dc: 15,
+    comparison: 'meet',
+    relativeOutcomes: RELATIVE,
+    fixedOutcomes: [],
+    triggers: [nat20],
+  };
+  const withResults = classifyCheckTotal({
+    ...args,
+    diceGroups: rolledDiceGroups({
+      dice: [{ number: 1, faces: 20, total: 20, results: [{ result: 20, active: true }] }],
+    }),
+  });
+  const withoutResults = classifyCheckTotal({
+    ...args,
+    diceGroups: [{ groupId: 0, group: '1d20', sum: 20 }],
+  });
+  assert.equal(withResults.forcedDisposition, 'success', 'the production bag carries the faces');
+  assert.equal(withoutResults.forcedDisposition, null, 'a hand-shaped bag silently drops them');
+});

@@ -25,6 +25,7 @@
 <script>
   import { localize } from '../../../util/foundryBridge.js';
   import IconFactRow from '../IconFactRow.svelte';
+  import ThresholdBandStrip from '../../../components/ThresholdBandStrip.svelte';
   import CheckDcMacroCard from './CheckDcMacroCard.svelte';
   import CheckDifficultyCard from './CheckDifficultyCard.svelte';
   import CheckFormulaFields from './CheckFormulaFields.svelte';
@@ -50,6 +51,17 @@
     // section counts from — an editor re-deriving it would be a second opinion.
     appliedModifiers = [],
     modifierPolicy = 'addAll',
+    // The PREVIEW AGAINST binding (issue 1097), and the third `ThresholdBandStrip` binding.
+    // A simple check's single boundary IS the DC, so the handle writes `dc` — the same field
+    // the Difficulty card's stepper writes — and `trackMin`/`trackMax` scale the track to the
+    // reachable total range the route computes from the formula, which is what
+    // `simple-outcomes.png`'s "scaled to the dice plus the modifier bounds you set" reads.
+    previewRecords = [],
+    previewRecordId = '',
+    previewLabel = '',
+    trackMin = null,
+    trackMax = null,
+    onSelectPreviewRecord = () => {},
     onChange = () => {},
   } = $props();
 
@@ -65,6 +77,67 @@
 
   function emit(patch) {
     onChange({ ...value, ...patch });
+  }
+
+  const dc = $derived(Number(value?.dc ?? 0) || 0);
+
+  const failureLabel = $derived(
+    text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeFailure', 'Failure')
+  );
+  const successLabel = $derived(
+    text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeSuccess', 'Success')
+  );
+
+  // The strip's domain. It defaults to a symmetric window around the DC when the route
+  // supplies nothing — a track with no width cannot be dragged, and an editor rendered
+  // outside the studio (the characterization suites, any future caller) supplies neither
+  // bound. `min` is additionally clamped BELOW the DC so a DC at or under the reachable
+  // floor still leaves the failure band a band rather than collapsing the strip into its
+  // non-contiguous fallback.
+  // `null` and `''` are ABSENT, not zero — the same guard `ThresholdBandStrip` records for
+  // its own `to` edge, and for the same reason: `Number(null)` is 0 and `Number.isFinite(0)`
+  // is true, so a bare coercion read "no track supplied" as a track ending at zero and
+  // collapsed the domain to `[0, dc + 1]`. The handle then had nowhere to move to and the
+  // strip silently stopped being draggable.
+  const suppliedBound = (bound) => {
+    if (bound === null || bound === undefined || bound === '') return null;
+    const parsed = Number(bound);
+    return Number.isFinite(parsed) ? parsed : null;
+  };
+
+  const stripMin = $derived(Math.min(suppliedBound(trackMin) ?? dc - 10, dc - 1));
+  const stripMax = $derived(Math.max(suppliedBound(trackMax) ?? dc + 10, dc + 1));
+
+  // TWO bands and therefore ONE handle, which is the whole outcome model of a simple
+  // check: it either clears the difficulty or it does not.
+  const bandStripBands = $derived([
+    {
+      id: 'failure',
+      index: 0,
+      name: failureLabel,
+      from: stripMin,
+      color: 'color-mix(in srgb, var(--fab-danger) 22%, var(--fab-bg-0))',
+    },
+    {
+      id: 'success',
+      index: 1,
+      name: successLabel,
+      from: dc,
+      color: 'color-mix(in srgb, var(--fab-success) 22%, var(--fab-bg-0))',
+    },
+  ]);
+
+  /**
+   * Apply the single boundary move. The strip has already clamped the value inside the
+   * track, so this only persists the DC — the same field the Difficulty card's stepper
+   * writes, which is what makes the strip a visualisation of that number rather than a
+   * second authority over it.
+   *
+   * @param {{binding: string, dc: number}} patch The strip's own patch.
+   */
+  function applyBandStripChange(patch) {
+    if (patch?.binding !== 'simple') return;
+    emit({ dc: patch.dc });
   }
 </script>
 
@@ -130,6 +203,55 @@
         </div>
       </div>
       <div class="manager-checks-card-body">
+        <!-- PREVIEW AGAINST: the SAME selection the rail's "Preview as" card offers, reported
+             upward rather than held here, so the simulator and the strip can never be reading
+             different records. -->
+        {#if previewRecords.length > 1}
+          <label class="manager-field manager-checks-band-record">
+            <span
+              >{text(
+                'FABRICATE.Admin.Manager.Checks.Crafting.PreviewAgainst',
+                'Preview against'
+              )}</span
+            >
+            <select
+              data-simple-band-record
+              value={previewRecordId}
+              onchange={(event) => onSelectPreviewRecord(event.currentTarget.value)}
+            >
+              {#each previewRecords as record (record.id)}
+                <option value={record.id}>{record.label}</option>
+              {/each}
+            </select>
+          </label>
+        {/if}
+
+        <ThresholdBandStrip
+          binding="simple"
+          bands={bandStripBands}
+          {previewLabel}
+          min={stripMin}
+          max={stripMax}
+          groupLabel={text(
+            'FABRICATE.Admin.Manager.Checks.Crafting.TwoOutcomesTitle',
+            'Two outcomes'
+          )}
+          boundaryLabel={() =>
+            text('FABRICATE.Admin.Manager.Checks.Crafting.SimpleBoundary', 'Difficulty class')}
+          fallbackNote={text(
+            'FABRICATE.Admin.Manager.Checks.Crafting.SimpleBandsFallback',
+            'This check has no reachable range to draw against yet. Set a roll formula and a DC.'
+          )}
+          dataAttr="data-simple-band-strip"
+          onChange={applyBandStripChange}
+        />
+        <p class="manager-muted" data-simple-band-strip-hint>
+          {text(
+            'FABRICATE.Admin.Manager.Checks.Crafting.SimpleBandsHint',
+            'A total of {dc} or more succeeds; anything lower fails. Drag the edge or type the DC on the Difficulty card — the number is the authority.'
+          ).replace('{dc}', String(dc))}
+        </p>
+
         <div class="manager-checks-flag-list">
           <IconFactRow
             icon="fas fa-circle-check"
