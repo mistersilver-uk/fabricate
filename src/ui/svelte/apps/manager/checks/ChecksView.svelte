@@ -951,18 +951,27 @@
     })
   );
   const previewFormula = $derived(String(previewPlan.formula ?? '').trim());
+  // THE SAME CONTEXT THE RUNNER IS HANDED, threaded to the two derivations that describe
+  // the roll rather than perform it. `buildPreviewCheckArgs` gives the runner an authored
+  // formula plus this context and the runner appends the resolved scalar itself, so a
+  // histogram or an `avg` computed without it describes a formula nothing rolls.
+  const previewModifier = $derived(previewPlan.args?.craftingModifier ?? null);
 
   const enumeration = $derived(
     previewFormula === ''
       ? { enumerable: false, reason: 'no-dice' }
-      : describeFormulaEnumerability(previewFormula, previewActor)
+      : describeFormulaEnumerability(previewFormula, previewActor, {
+          craftingModifier: previewModifier,
+        })
   );
   // `resolved === false` is EXACTLY the unresolved-roll-data refusal: the enumerability
   // check reads that signal first, so the two can never disagree about whether this
   // formula reduces to a number for this actor.
   const previewResolved = $derived(enumeration.reason !== 'unresolved-roll-data');
   const formulaAverage = $derived(
-    previewFormula === '' ? null : expectedFormulaValue(previewFormula, previewActor)
+    previewFormula === ''
+      ? null
+      : expectedFormulaValue(previewFormula, previewActor, { craftingModifier: previewModifier })
   );
 
   // The reachable total range, which is what the simple check's two-band strip is drawn

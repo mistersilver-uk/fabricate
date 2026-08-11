@@ -63,6 +63,7 @@ import {
   classifyCheckTotal,
   resolveCheckFormulaDisplay,
   resolveForcedOutcome,
+  resolveRolledFormula,
   rolledDiceGroups,
 } from '../../../../../systems/checkRoll.js';
 import { resolveProgressiveAward } from '../../../../../utils/progressiveAward.js';
@@ -214,25 +215,41 @@ function resolveRemainder(display) {
  * Decide whether a formula's outcome space can be enumerated for a previewed actor, and
  * with what remainder.
  *
- * The modifier context is deliberately NOT a parameter. After issue 1094
- * {@link resolveCheckFormulaDisplay} APPENDS the resolved modifier term itself, and the
- * formula handed here has already been through `buildPreviewCheckArgs` — which appends
- * it too. Re-passing the context would shift every bucket by the scalar, and a system
- * with an empty catalogue would pass the test vacuously because a zero scalar appends
- * nothing at all.
+ * IT ENUMERATES THE FORMULA THE RUNNER WILL ACTUALLY ROLL, not the one the GM authored,
+ * and the difference is a whole check-modifier scalar. `buildPreviewCheckArgs` hands the
+ * runner an AUTHORED formula plus a `craftingModifier` context, and `evaluateCheckRoll`
+ * appends the resolved scalar itself — so a histogram built on the authored string spans
+ * `1..20` while the readout beside it rolls `5..24`, on the same screen, for the same
+ * check. Issue 1097 shipped exactly that, and nothing published was wrong only because
+ * every View Lab check resolved a zero scalar.
  *
- * @param {string} formula The PREVIEW formula (modifier term already appended).
+ * So the context IS a parameter, and the append is {@link resolveRolledFormula} — the
+ * SAME derivation `evaluateCheckRoll` composes its rolled formula from, and the same one
+ * {@link resolveCheckFormulaDisplay} resolves. There is one implementation of "what this
+ * check rolls"; a second would be free to drift, which is the defect above.
+ *
+ * There is no double application: the appended string is resolved for DISPLAY with the
+ * context omitted, exactly as `evaluateCheckRoll` does, so the scalar lands once.
+ *
+ * @param {string} formula The AUTHORED preview formula.
  * @param {object|null} actor The previewed actor, or null for "No actor".
  * @param {object} [options] Options.
  * @param {*} [options.Roll] The `Roll` class; defaults to `globalThis.Roll`.
+ * @param {object|null} [options.craftingModifier] The check-modifier context the runner
+ *   is being handed. Omit only where the runner is handed none.
  * @returns {{enumerable: true, faces: number, remainder: number, display: string}
  *   | {enumerable: false, reason: string}} The verdict.
  */
-export function describeFormulaEnumerability(formula, actor, { Roll = globalThis.Roll } = {}) {
+export function describeFormulaEnumerability(
+  formula,
+  actor,
+  { Roll = globalThis.Roll, craftingModifier = null } = {}
+) {
+  const rolledFormula = resolveRolledFormula(formula, actor, craftingModifier, Roll);
   // The SAME `Roll` drives the display resolution and the parse. Two engines here would
   // let a test grade the predicate against recorded real-Foundry output while the
   // unresolved-key signal came from somewhere else entirely.
-  const display = resolveCheckFormulaDisplay(formula, actor, null, Roll);
+  const display = resolveCheckFormulaDisplay(rolledFormula, actor, null, Roll);
   if (!display) return refuse(ODDS_REASONS.noDice);
   // (2) above: the parse cannot see an unresolved `@` key, so this signal — and only
   // this signal — is what detects one.
@@ -242,7 +259,7 @@ export function describeFormulaEnumerability(formula, actor, { Roll = globalThis
   let terms;
   try {
     if (typeof Roll?.parse !== 'function') return refuse(ODDS_REASONS.parseThrew);
-    terms = Roll.parse(String(formula), rollData);
+    terms = Roll.parse(String(rolledFormula), rollData);
   } catch {
     // (1) above. A mid-edit formula is a not-enumerable OUTCOME, never an escaped throw.
     return refuse(ODDS_REASONS.parseThrew);
@@ -445,14 +462,29 @@ export function enumerateProgressiveOdds({ faces, remainder, difficulties, award
  * Returns null whenever the formula does not resolve for this actor, which is the same
  * `resolved === false` signal the readout's own warning uses.
  *
- * @param {string} formula The PREVIEW formula (modifier term already appended).
+ * It answers about the formula the runner will ROLL, so it takes the same modifier
+ * context the histogram does: an `avg` computed off the authored string would sit on the
+ * field claiming a number the check cannot produce, which is the histogram's own defect
+ * in a smaller font.
+ *
+ * @param {string} formula The AUTHORED preview formula.
  * @param {object|null} actor The previewed actor.
  * @param {object} [options] Options.
  * @param {*} [options.Roll] The `Roll` class; defaults to `globalThis.Roll`.
+ * @param {object|null} [options.craftingModifier] The check-modifier context.
  * @returns {?number} The floored expected value, or null.
  */
-export function expectedFormulaValue(formula, actor, { Roll = globalThis.Roll } = {}) {
-  const display = resolveCheckFormulaDisplay(formula, actor, null, Roll);
+export function expectedFormulaValue(
+  formula,
+  actor,
+  { Roll = globalThis.Roll, craftingModifier = null } = {}
+) {
+  const display = resolveCheckFormulaDisplay(
+    resolveRolledFormula(formula, actor, craftingModifier, Roll),
+    actor,
+    null,
+    Roll
+  );
   if (!display || display.resolved === false) return null;
   const masked = display.display.replaceAll(FLAVOUR_SPAN, '');
   const averaged = masked.replaceAll(DIE_SUBSTRING_ALL, (match, rawCount, rawFaces) => {

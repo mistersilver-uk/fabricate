@@ -33,8 +33,17 @@ import {
   runCheckPreview,
   terseBreakdown,
 } from '../src/ui/svelte/apps/manager/checks/checkPreview.js';
-import { runFormulaPassFail, runFormulaRouted } from '../src/systems/checkRoll.js';
+import {
+  resolveRolledFormula,
+  runFormulaPassFail,
+  runFormulaRouted,
+} from '../src/systems/checkRoll.js';
+import {
+  describeFormulaEnumerability,
+  enumeratePassFailOdds,
+} from '../src/ui/svelte/apps/manager/checks/checkOdds.js';
 import { MacroExecutor } from '../src/utils/MacroExecutor.js';
+import { recordedRollDouble } from './helpers/recordedRollParse.js';
 
 const repoRoot = resolve(import.meta.dirname, '..');
 
@@ -53,6 +62,14 @@ function installRoll({ face = 9 } = {}) {
 
     static validate(formula) {
       return !/NaN|@/.test(String(formula));
+    }
+
+    // Delegated to the RECORDING rather than modelled here (issue 1097): the joint
+    // histogram/simulator case below asks the enumerator's predicate a question, and a
+    // second hand-written parse would grade it against this branch's own beliefs. One
+    // engine serves both halves, which is also the point of that case.
+    static parse(formula, data) {
+      return recordedRollDouble().parse(formula, data);
     }
 
     constructor(formula, data = {}) {
@@ -415,5 +432,149 @@ describe('checkPreview: the terse breakdown line', () => {
 
   it('says nothing at all when there is no result to describe', () => {
     assert.equal(terseBreakdown(null), '');
+  });
+});
+
+// ── The histogram and the simulator must describe ONE formula (issue 1097) ─────────────
+//
+// THIS IS THE CASE WHOSE ABSENCE LET THE DEFECT SHIP. `buildPreviewCheckArgs` hands the
+// runner an AUTHORED formula plus a `craftingModifier` context, and `evaluateCheckRoll`
+// appends the resolved scalar itself — so an enumerator that charted the authored string
+// drew `1..20` beside a readout rolling `5..24`, for the same check, at the same moment.
+// Every existing case used an EMPTY catalogue, under which the scalar is `0` and the
+// append is a no-op, so all of them passed on both sides of the bug. Nothing published was
+// wrong only because every View Lab check also resolved a zero scalar, which is luck.
+//
+// So the fixture below is deliberately the opposite: a NON-EMPTY catalogue with a NON-ZERO
+// resolved scalar, asserted to be non-zero before anything else is claimed.
+describe('checkPreview: the histogram enumerates the formula the simulator rolls', () => {
+  /** A system whose crafting check applies one catalogued modifier worth a flat +2. */
+  const SYSTEM_WITH_CATALOGUE = {
+    checkModifiers: [{ id: 'mod-kit', label: 'Kit', expression: '2' }],
+    craftingCheck: { defaultModifierPolicy: 'addAll', defaultModifierIds: ['mod-kit'] },
+  };
+
+  /** The plan every case here previews: `1d20`, one tool term, one catalogue modifier. */
+  function planWithCatalogue() {
+    return buildPreviewCheckArgs({
+      activity: 'crafting',
+      mode: 'simple',
+      draft: { rollFormula: '1d20', dc: 12, thresholdMode: 'meet' },
+      system: SYSTEM_WITH_CATALOGUE,
+      actor: ACTOR,
+      toolTerms: [{ value: 3, label: 'Tools' }],
+    });
+  }
+
+  it('NON-VACUITY: the catalogue resolves a non-zero scalar the arg bag does NOT carry', () => {
+    installRoll({ face: 9 });
+    const plan = planWithCatalogue();
+    assert.equal(plan.formula, '1d20 + 3[Tools]', 'the arg bag carries the TOOL append only');
+    assert.equal(
+      resolveRolledFormula(plan.formula, ACTOR, plan.args.craftingModifier),
+      '1d20 + 3[Tools] + 2[Modifiers]',
+      'and the runner appends a real, non-zero modifier term on top of it'
+    );
+  });
+
+  it('enumerates the SIMULATOR’S OWN resolved formula, field for field', async () => {
+    installRoll({ face: 9 });
+    const plan = planWithCatalogue();
+    const result = await runCheckPreview(plan);
+    const verdict = describeFormulaEnumerability(plan.formula, ACTOR, {
+      craftingModifier: plan.args.craftingModifier,
+    });
+    assert.equal(verdict.enumerable, true, `enumerable (got ${verdict.reason})`);
+    assert.equal(
+      verdict.display,
+      result.data.resolvedFormula,
+      'the enumerated formula IS the one the runner resolved and rolled'
+    );
+    assert.equal(verdict.remainder, 5, '3 from the tool term and 2 from the catalogue');
+  });
+
+  it('puts the simulator’s rolled total INSIDE the enumerated domain', async () => {
+    installRoll({ face: 9 });
+    const plan = planWithCatalogue();
+    const result = await runCheckPreview(plan);
+    const verdict = describeFormulaEnumerability(plan.formula, ACTOR, {
+      craftingModifier: plan.args.craftingModifier,
+    });
+    const domain = { min: 1 + verdict.remainder, max: verdict.faces + verdict.remainder };
+    assert.deepEqual(domain, { min: 6, max: 25 });
+    assert.equal(result.data.total, 14, 'a natural 9 plus the two appended terms');
+    assert.ok(
+      result.data.total >= domain.min && result.data.total <= domain.max,
+      `the rolled total ${result.data.total} must be a total the histogram counted`
+    );
+  });
+
+  it('and the BUCKETS move with the scalar, not merely the domain', () => {
+    installRoll({ face: 9 });
+    const plan = planWithCatalogue();
+    const withCatalogue = enumeratePassFailOdds({
+      faces: 20,
+      remainder: describeFormulaEnumerability(plan.formula, ACTOR, {
+        craftingModifier: plan.args.craftingModifier,
+      }).remainder,
+      args: { dc: 12, comparison: 'meet', triggers: [] },
+    });
+    const withoutIt = enumeratePassFailOdds({
+      faces: 20,
+      remainder: describeFormulaEnumerability(plan.formula, ACTOR).remainder,
+      args: { dc: 12, comparison: 'meet', triggers: [] },
+    });
+    assert.notDeepEqual(
+      withCatalogue.map((row) => [row.id, row.count]),
+      withoutIt.map((row) => [row.id, row.count]),
+      'a histogram blind to the scalar reports a different chance of success'
+    );
+  });
+
+  it('does NOT double-apply it: the tool term is appended ONCE, above the runner', async () => {
+    // The mirror risk, and the reason this is asserted rather than assumed.
+    // `CraftingEngine._appendToolCheckBonuses` rewrites the formula BEFORE calling
+    // `evaluateCheckRoll`, and the runner appends no tool term of its own — so the
+    // preview appending them in `buildPreviewCheckArgs` is the engine's own shape, and
+    // the enumerator layering only the MODIFIER on top matches it exactly. A runner that
+    // also appended tools would show up here as a `+ 3[Tools]` twice over.
+    installRoll({ face: 9 });
+    const plan = planWithCatalogue();
+    const result = await runCheckPreview(plan);
+    assert.equal(
+      [...result.data.resolvedFormula.matchAll(/\[Tools]/g)].length,
+      1,
+      'exactly one tool term reaches the roll'
+    );
+    assert.equal([...result.data.resolvedFormula.matchAll(/\[Modifiers]/g)].length, 1);
+  });
+
+  it('appends NO situational bonus, because a preview is never interactive', async () => {
+    // The third append the runner knows about. It lives inside `options.interactive ===
+    // true`, and `rollOptions: null` spreads to `{}` — so the preview cannot reach it and
+    // the enumerator has nothing to mirror. Proved by a prompt that WOULD add +100 and is
+    // never called, with the same prompt then shown to fire on an interactive roll.
+    installRoll({ face: 9 });
+    let prompted = 0;
+    const prompt = async () => {
+      prompted += 1;
+      return { confirmed: true, bonus: '+100' };
+    };
+    const plan = planWithCatalogue();
+    plan.args.prompt = prompt;
+    const preview = await runCheckPreview(plan);
+    assert.equal(prompted, 0, 'the preview never prompts');
+    assert.equal(preview.data.total, 14, 'so no situational bonus can be in the total');
+
+    const interactive = await runFormulaPassFail({
+      ...plan.args,
+      rollOptions: { interactive: true, prompt },
+    });
+    assert.equal(prompted, 1, 'the same prompt DOES fire on an interactive roll');
+    assert.equal(
+      interactive.data.total,
+      114,
+      'so the silence above is a fact about the preview, not about a dead prompt'
+    );
   });
 });

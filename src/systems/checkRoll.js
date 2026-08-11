@@ -34,6 +34,45 @@ import {
 const DEFERRED_MODIFIER_SLOT = `(modifier)[${CHECK_MODIFIER_TERM_LABEL}]`;
 
 /**
+ * THE FORMULA THIS MODULE ACTUALLY ROLLS, for an authored formula and a modifier context.
+ *
+ * Two transforms stand between what a GM typed and what Foundry evaluates, and both are
+ * unconditional: the retired-placeholder shim (issue 1094) removes a `@craftingmod` token
+ * that survived the `1.21.0` migration, and {@link appendResolvedCheckModifier} resolves
+ * the eligible check modifiers to a scalar and appends ONE `+ N[Modifiers]` term.
+ *
+ * IT IS ONE DERIVATION BECAUSE THREE CALLERS NEED THE SAME ANSWER, and issue 1097 shipped
+ * the defect that proves it. {@link evaluateCheckRoll} and {@link resolveCheckFormulaDisplay}
+ * each carried their own copy of this pair, and the Checks Studio's odds enumerator carried
+ * neither: it charted the AUTHORED formula while the simulator beside it rolled the
+ * appended one, so a system with a non-empty check-modifier catalogue drew a histogram
+ * spanning `1..20` next to a readout rolling `5..24` — on the same screen, at the same
+ * time. Nothing published was wrong only because every View Lab check happened to resolve a
+ * zero scalar, which is luck rather than coverage. A preview that disagrees with the engine
+ * is worse than no preview, so the append has exactly one implementation and exactly one
+ * composition, and this is it.
+ *
+ * @param {string} formula The AUTHORED formula.
+ * @param {object|null} actor The actor whose roll data resolves it.
+ * @param {object|null} [craftingModifier] The check-modifier context, or null where no
+ *   modifier term should be appended (salvage/gathering, and the deferred `playerPicks`
+ *   path, which appends after the prompt returns instead).
+ * @param {*} [Roll] The `Roll` class; a parameter so an injected engine drives both the
+ *   shim's validity net and the append.
+ * @returns {string} The formula that will be rolled, or `''` when the shim emptied it.
+ */
+export function resolveRolledFormula(
+  formula,
+  actor,
+  craftingModifier = null,
+  Roll = globalThis.Roll
+) {
+  const authored = stripRetiredModifierPlaceholder(String(formula ?? ''), Roll);
+  if (authored.trim() === '') return '';
+  return appendResolvedCheckModifier(authored, actor, craftingModifier, Roll);
+}
+
+/**
  * Summarise an evaluated Roll's dice as
  * `{ groupId, group: "NdS", sum, results: number[] }` entries.
  *
@@ -295,9 +334,15 @@ export async function evaluateCheckRoll(formula, actor, options = {}) {
   // Append the resolved check-modifier scalar (issues 770, 1094) BEFORE anything
   // downstream reads the formula, so the dialog, roll, and journal all agree
   // (eval == display). A zero scalar — or no modifier context at all — appends nothing.
+  //
+  // Through {@link resolveRolledFormula} rather than inline (issue 1097): the shim above
+  // has already run, so this composition is a no-op re-strip, and routing it here is what
+  // makes "the formula this module rolls" a thing OTHER modules can ask for instead of
+  // rebuild. The Checks Studio's odds enumerator asks; before it could, it charted the
+  // authored formula while the simulator rolled the appended one.
   const baseFormula = useDeferredChoice
     ? authoredFormula
-    : appendResolvedCheckModifier(authoredFormula, actor, options?.craftingModifier);
+    : resolveRolledFormula(authoredFormula, actor, options?.craftingModifier);
   // Capture the @-resolved formula (e.g. "1d20 + 3") so the dialog and run journal
   // can show the actual modifiers, not the authored `@abilities…` placeholders.
   // Recomputed from the COMBINED formula below when a valid situational bonus is
@@ -509,13 +554,13 @@ export function resolveCheckFormulaDisplay(
 ) {
   if (typeof formula !== 'string' || formula.trim() === '') return null;
   if (typeof Roll?.replaceFormulaData !== 'function') return null;
-  // The retirement shim runs unconditionally here too (issue 1094), so a display can
-  // never render a token the roll path has already stripped — and a formula that strips
-  // to empty reports "no formula" rather than a dangling operator.
-  const authored = stripRetiredModifierPlaceholder(String(formula), Roll);
-  if (authored.trim() === '') return null;
+  // The retirement shim and the modifier append are BOTH the roll path's, asked for
+  // rather than restated (issue 1097): a display can never render a token the roll path
+  // strips, nor omit a term the roll path adds, and a formula that strips to empty
+  // reports "no formula" rather than a dangling operator.
+  const substituted = resolveRolledFormula(formula, actor, craftingModifier, Roll);
+  if (substituted.trim() === '') return null;
   const rollData = actor?.getRollData?.() ?? actor?.system ?? {};
-  const substituted = appendResolvedCheckModifier(authored, actor, craftingModifier, Roll);
   const display = Roll.replaceFormulaData(substituted, rollData, {
     missing: 'NaN',
     warn: false,

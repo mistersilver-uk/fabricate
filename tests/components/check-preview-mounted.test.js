@@ -451,6 +451,25 @@ describe('the `avg` annotation on the formula field', () => {
       'an average is a claim about a number, and there is no number to make it about'
     );
   });
+
+  it('COUNTS the check-modifier catalogue, because the runner appends it (issue 1097)', async () => {
+    // The ROUTE-level half of the "one formula" fix. `buildPreviewCheckArgs` hands the
+    // runner an authored formula plus a modifier context and `evaluateCheckRoll` appends
+    // the resolved scalar itself, so every derivation that DESCRIBES the roll has to be
+    // handed that context too. This is the cheapest observable of the threading: an `avg`
+    // blind to the catalogue reads 13 where the check will actually roll an average of 15.
+    const root = await mountChecks({
+      checkModifiers: [{ id: 'mod-kit', label: 'Kit', expression: '2' }],
+      craftingDefaultModifierPolicy: 'addAll',
+      craftingDefaultModifierIds: ['mod-kit'],
+    });
+    await choose(root.querySelector('[data-checks-preview-actor]'), 'sera');
+    assert.equal(
+      root.querySelector('[data-check-formula-average]').textContent.trim(),
+      'avg 15',
+      '10.5 + 3 from @prof + 2 from the catalogue, floored'
+    );
+  });
 });
 
 describe('the progressive PREVIEW SANDBOX', () => {
