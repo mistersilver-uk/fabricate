@@ -58,6 +58,16 @@
     optionDataAttr = '',
     fill = false,
     iconOnly = false,
+    // 'default': the manager's existing track. 'compact': the Checks Studio's per-row
+    // scale, taken from the prototype and pinned by the Checks Studio parity fixture's
+    // `segmented-toggle` / `segmented-option-*` regions.
+    //
+    // It is a VARIANT ON THE PRIMITIVE rather than an override written from the tier
+    // row, because the design system forbids a layout-context rule restyling a
+    // primitive's `font-*`, `border`, `border-radius` and `background` — and those four
+    // are exactly what the compact track changes. A SIZE taken from the layout context
+    // is still permitted, so the tier row supplies the 158px width and nothing else.
+    density = 'default',
   } = $props();
 
   function text(key, fallback) {
@@ -81,7 +91,7 @@
 </script>
 
 <div
-  class={`manager-segmented${fill ? ' is-fill' : ''}${iconOnly ? ' is-icon-only' : ''}`}
+  class={`manager-segmented${fill ? ' is-fill' : ''}${iconOnly ? ' is-icon-only' : ''}${density === 'compact' ? ' is-compact' : ''}`}
   role="radiogroup"
   aria-label={ariaLabel || undefined}
   {...dataAttr ? { [dataAttr]: true } : {}}
@@ -134,6 +144,34 @@
 
   .manager-segmented.is-fill .manager-segment {
     flex: 1 1 0;
+  }
+
+  /* COMPACT variant (issue 1096): the Checks Studio's in-row scale, measured from the
+     prototype. Authored in px, as the prototype authors it, because the exact value is what the parity
+     fixture's `segmented-option-selected.fontSize` asserts. Declared BEFORE `.is-active`
+     below so the active tile's own weight still wins at equal specificity. */
+  .manager-segmented.is-compact {
+    gap: 3px;
+    padding: 3px;
+    border-radius: 8px;
+    background: var(--fab-bg-1);
+  }
+
+  .manager-segmented.is-compact .manager-segment {
+    flex: 1 1 0;
+    height: 26px;
+    padding: 0 10px;
+    border-radius: 6px;
+    font-size: 10.5px;
+  }
+
+  /* `:not(.is-active)` is load-bearing, not tidiness: this rule is (0,3,0) and
+     `.manager-segment.is-active` is (0,2,0), so an unqualified `color` / `font-weight`
+     here would out-specify the ACTIVE tile's own and paint the lit segment as the
+     resting one. */
+  .manager-segmented.is-compact .manager-segment:not(.is-active) {
+    color: var(--fab-text-subtle);
+    font-weight: 500;
   }
 
   /* ICON-ONLY variant (issue 1036): a square glyph tile per segment. `min-width: 32px`

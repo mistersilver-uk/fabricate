@@ -276,7 +276,13 @@ export default [
   //     Scoped to the two files that actually do this rather than to `scripts/**`: over-declaring
   //     browser globals across the whole harness would hide a real `document` typo in Node code.
   {
-    files: ['scripts/lib/foundryBrowserBoot.js', 'scripts/foundry-version-assert.mjs'],
+    files: [
+      'scripts/lib/foundryBrowserBoot.js',
+      'scripts/foundry-version-assert.mjs',
+      // The Checks Studio parity extractor (issue 1096): its whole measurement pass is one
+      // `page.evaluate` body reading `getComputedStyle` inside the prototype's page.
+      'scripts/checks-studio-parity-extract.mjs',
+    ],
     languageOptions: {
       globals: { ...globals.browser, ...foundryGlobals },
     },

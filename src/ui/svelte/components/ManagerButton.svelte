@@ -89,15 +89,26 @@
     disabled = false,
     onclick = () => {},
     children = undefined,
+    // An EXTRA class, appended to the primitive's own — never a replacement for it. It has
+    // to be a named prop rather than a rest key: the rest spread lands after `class={…}` in
+    // the markup, so a `class` passed through it would REPLACE `manager-button
+    // fab-manager-button is-<role>` outright and silently unstyle the button while every
+    // `data-*` selector in the tests kept resolving.
+    class: extraClass = '',
     ...rest
   } = $props();
 
   // An unrecognised role renders the neutral treatment rather than emitting an unstyled
   // `is-*` class, so a typo shows up as the default button instead of silently doing
   // nothing. `neutral` is in no way absent from the set — it is the empty modifier.
-  const ROLES = new Set(['primary', 'ghost', 'danger']);
+  // `dashed` is the FULL-WIDTH ADD action that sits at the foot of a list it appends to —
+  // the Checks Studio's "Add outcome tier", the prototype's own treatment for every
+  // add-a-row verb. It is a role rather than a per-screen class because the shape is a
+  // statement about the verb (append to the list above me), not about one card: a dashed
+  // outline reads as an empty slot waiting to be filled, which a solid button does not.
+  const ROLES = new Set(['primary', 'ghost', 'danger', 'dashed']);
   const classes = $derived(
-    ['manager-button', 'fab-manager-button', ROLES.has(role) ? `is-${role}` : '']
+    ['manager-button', 'fab-manager-button', ROLES.has(role) ? `is-${role}` : '', extraClass]
       .filter(Boolean)
       .join(' ')
   );

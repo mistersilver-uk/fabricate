@@ -301,18 +301,45 @@
     commit(index, next);
   }
 
+  /**
+   * The scale a drag maps against, FROZEN at pointerdown.
+   *
+   * This is the fix for a drag that ran away to absurd numbers within a few pixels, and the
+   * cause is a feedback loop rather than a sensitivity constant. `domain` is `$derived` from
+   * the tier list, and the track's upper extent is derived from the OUTERMOST tier — so
+   * dragging the last handle right raised `domain.max`, which stretched `span`, which made
+   * the very same pointer position resolve to a larger value, which raised `domain.max`
+   * again. Each `pointermove` re-entered the loop, so the value diverged geometrically
+   * rather than tracking the pointer.
+   *
+   * The standalone prototype does not have the defect because it captures both the track
+   * rectangle and the domain into the drag's closure at pointerdown and never re-reads them
+   * — the pixels-per-step mapping is constant for the whole gesture. This reproduces exactly
+   * that: one snapshot per gesture, cleared on pointerup. The mapping itself is unchanged
+   * (absolute pointer position across the track, not an accumulated delta), so a handle
+   * still lands where the pointer is.
+   */
+  let dragScale = null;
+
   function valueAtClientX(clientX) {
-    const rect = trackElement?.getBoundingClientRect?.();
-    if (!rect || !rect.width) return null;
-    const ratio = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
+    const scale = dragScale ?? {
+      left: trackElement?.getBoundingClientRect?.()?.left,
+      width: trackElement?.getBoundingClientRect?.()?.width,
+      min: domain.min,
+      span,
+    };
+    if (!scale.width) return null;
+    const ratio = Math.min(1, Math.max(0, (clientX - scale.left) / scale.width));
     // Against the DRAWN extent, so the pointer maps onto the same scale the bands are
     // painted with — a `fixed` strip's last band reaches `to + 1`.
-    return domain.min + ratio * span;
+    return scale.min + ratio * scale.span;
   }
 
   function onHandlePointerdown(event, index) {
     if (disabled) return;
     dragIndex = index;
+    const rect = trackElement?.getBoundingClientRect?.();
+    dragScale = rect?.width ? { left: rect.left, width: rect.width, min: domain.min, span } : null;
     event.currentTarget.setPointerCapture?.(event.pointerId);
     event.currentTarget.focus?.();
   }
@@ -328,6 +355,7 @@
     if (dragIndex < 0) return;
     event.currentTarget.releasePointerCapture?.(event.pointerId);
     dragIndex = -1;
+    dragScale = null;
   }
 
   /**
@@ -428,11 +456,16 @@
     position: relative;
     box-sizing: border-box;
     width: 100%;
-    height: 44px;
+
+    /* 46px / 9px / `--fab-bg-0`, measured from the prototype and pinned by the Checks
+       Studio parity fixture's `band-strip` region. The previous 44 / 8 / `--fab-surface-raised`
+       were chosen values, and the translucent raised surface let whatever the strip was
+       stacked on show through an unfilled gap. */
+    height: 46px;
     overflow: hidden;
     border: 1px solid var(--fab-border);
-    border-radius: 8px;
-    background: var(--fab-surface-raised);
+    border-radius: 9px;
+    background: var(--fab-bg-0);
   }
 
   /* SOLID fills with hard edges — no gradient, and no visual-style exemption claimed.

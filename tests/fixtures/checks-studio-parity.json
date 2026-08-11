@@ -1,0 +1,584 @@
+{
+  "provenance": {
+    "prototype": "tmp/GM Checks Studio (standalone).html",
+    "prototypeAppWidth": 1480,
+    "prototypeAppInteriorWidth": 1478,
+    "viewport": {
+      "width": 1600,
+      "height": 1500
+    },
+    "screen": "Checks · Crafting · Outcomes",
+    "generator": "scripts/checks-studio-parity-extract.mjs",
+    "command": "node scripts/checks-studio-parity-extract.mjs",
+    "engine": "chromium (playwright)",
+    "note": "Computed styles, never screenshots. The prototype is a FIXED 1480px app and is measured at its own natural width; Fabricate is measured at its own. Only width-invariant properties are recorded, so the two widths never enter the comparison. `tmp/` is gitignored, so this fixture is the checked-in artefact and the gate reads it, not the prototype."
+  },
+  "propertyGroups": {
+    "surface": [
+      "backgroundColor"
+    ],
+    "border": [
+      "borderTopWidth",
+      "borderTopStyle",
+      "borderTopColor",
+      "borderTopLeftRadius"
+    ],
+    "type": [
+      "color",
+      "fontSize",
+      "fontWeight",
+      "textTransform"
+    ],
+    "tracking": [
+      "letterSpacing"
+    ],
+    "box": [
+      "paddingTop",
+      "paddingRight",
+      "paddingBottom",
+      "paddingLeft"
+    ],
+    "gap": [
+      "columnGap"
+    ],
+    "size": [
+      "width",
+      "height"
+    ],
+    "blockSize": [
+      "height"
+    ],
+    "scroll": [
+      "scrollbarColor",
+      "scrollbarWidth"
+    ]
+  },
+  "regions": {
+    "pane-background": {
+      "groups": [
+        "surface",
+        "box",
+        "border",
+        "scroll"
+      ],
+      "prototypeLocator": "pane()",
+      "tag": "div",
+      "properties": {
+        "backgroundColor": "rgb(21, 33, 43)",
+        "paddingTop": "20px",
+        "paddingRight": "22px",
+        "paddingBottom": "26px",
+        "paddingLeft": "22px",
+        "borderTopWidth": "0px",
+        "borderTopStyle": "none",
+        "borderTopColor": "rgb(241, 209, 181)",
+        "borderTopLeftRadius": "0px",
+        "scrollbarColor": "rgb(44, 59, 73) rgba(0, 0, 0, 0)",
+        "scrollbarWidth": "thin"
+      },
+      "effectiveBackground": true
+    },
+    "pane-container": {
+      "groups": [
+        "box",
+        "gap"
+      ],
+      "prototypeLocator": "pane().parentElement",
+      "tag": "div",
+      "properties": {
+        "paddingTop": "0px",
+        "paddingRight": "0px",
+        "paddingBottom": "0px",
+        "paddingLeft": "0px",
+        "columnGap": "normal"
+      }
+    },
+    "studio-shell": {
+      "groups": [
+        "box"
+      ],
+      "prototypeLocator": "pane().parentElement.parentElement",
+      "tag": "div",
+      "properties": {
+        "paddingTop": "0px",
+        "paddingRight": "0px",
+        "paddingBottom": "0px",
+        "paddingLeft": "0px"
+      }
+    },
+    "pane-heading": {
+      "groups": [
+        "type"
+      ],
+      "prototypeLocator": "paneHeading()",
+      "tag": "h2",
+      "properties": {
+        "color": "rgb(241, 209, 181)",
+        "fontSize": "18px",
+        "fontWeight": "600",
+        "textTransform": "none"
+      }
+    },
+    "pane-description": {
+      "groups": [
+        "type"
+      ],
+      "prototypeLocator": "paneHeading().nextElementSibling",
+      "tag": "p",
+      "properties": {
+        "color": "rgba(217, 184, 156, 0.74)",
+        "fontSize": "12px",
+        "fontWeight": "400",
+        "textTransform": "none"
+      }
+    },
+    "card-surface": {
+      "groups": [
+        "surface",
+        "border",
+        "box"
+      ],
+      "prototypeLocator": "bandsCard()",
+      "tag": "div",
+      "properties": {
+        "backgroundColor": "rgb(27, 40, 51)",
+        "borderTopWidth": "1px",
+        "borderTopStyle": "solid",
+        "borderTopColor": "rgba(217, 184, 156, 0.18)",
+        "borderTopLeftRadius": "11px",
+        "paddingTop": "0px",
+        "paddingRight": "0px",
+        "paddingBottom": "0px",
+        "paddingLeft": "0px"
+      }
+    },
+    "card-title": {
+      "groups": [
+        "type"
+      ],
+      "prototypeLocator": "cardTitle(bandsCard())",
+      "tag": "div",
+      "properties": {
+        "color": "rgb(241, 209, 181)",
+        "fontSize": "13px",
+        "fontWeight": "600",
+        "textTransform": "none"
+      }
+    },
+    "card-description": {
+      "groups": [
+        "type"
+      ],
+      "prototypeLocator": "cardTitle(checkTypeCard()).parentElement.nextElementSibling",
+      "tag": "div",
+      "properties": {
+        "color": "rgba(217, 184, 156, 0.74)",
+        "fontSize": "10.5px",
+        "fontWeight": "400",
+        "textTransform": "none"
+      }
+    },
+    "check-type-card": {
+      "groups": [
+        "surface",
+        "border",
+        "box"
+      ],
+      "prototypeLocator": "optionCard(1)",
+      "tag": "div",
+      "properties": {
+        "backgroundColor": "rgb(17, 26, 35)",
+        "borderTopWidth": "1px",
+        "borderTopStyle": "solid",
+        "borderTopColor": "rgba(217, 184, 156, 0.18)",
+        "borderTopLeftRadius": "10px",
+        "paddingTop": "12px",
+        "paddingRight": "13px",
+        "paddingBottom": "12px",
+        "paddingLeft": "13px"
+      }
+    },
+    "check-type-card-selected": {
+      "groups": [
+        "surface",
+        "border",
+        "box"
+      ],
+      "prototypeLocator": "optionCard(0)",
+      "tag": "div",
+      "properties": {
+        "backgroundColor": "rgba(232, 198, 167, 0.16)",
+        "borderTopWidth": "1px",
+        "borderTopStyle": "solid",
+        "borderTopColor": "rgba(232, 198, 167, 0.48)",
+        "borderTopLeftRadius": "10px",
+        "paddingTop": "12px",
+        "paddingRight": "13px",
+        "paddingBottom": "12px",
+        "paddingLeft": "13px"
+      }
+    },
+    "check-type-icon-tile": {
+      "groups": [
+        "surface",
+        "size",
+        "border"
+      ],
+      "prototypeLocator": "optionCard(0).firstElementChild",
+      "tag": "span",
+      "properties": {
+        "backgroundColor": "rgb(21, 33, 43)",
+        "width": "28px",
+        "height": "28px",
+        "borderTopWidth": "0px",
+        "borderTopStyle": "none",
+        "borderTopColor": "rgb(232, 198, 167)",
+        "borderTopLeftRadius": "8px"
+      }
+    },
+    "check-type-title": {
+      "groups": [
+        "type"
+      ],
+      "prototypeLocator": "optionCard(0).children[1].firstElementChild",
+      "tag": "div",
+      "properties": {
+        "color": "rgb(232, 198, 167)",
+        "fontSize": "12.5px",
+        "fontWeight": "600",
+        "textTransform": "none"
+      }
+    },
+    "check-type-description": {
+      "groups": [
+        "type"
+      ],
+      "prototypeLocator": "optionCard(0).children[1].children[1]",
+      "tag": "div",
+      "properties": {
+        "color": "rgba(217, 184, 156, 0.74)",
+        "fontSize": "11px",
+        "fontWeight": "400",
+        "textTransform": "none"
+      }
+    },
+    "preview-against-label": {
+      "groups": [
+        "type",
+        "tracking"
+      ],
+      "prototypeLocator": "previewAgainstLabel()",
+      "tag": "span",
+      "properties": {
+        "color": "rgba(217, 184, 156, 0.56)",
+        "fontSize": "8.5px",
+        "fontWeight": "700",
+        "textTransform": "uppercase",
+        "letterSpacing": "0.68px"
+      }
+    },
+    "preview-against-select": {
+      "groups": [
+        "surface",
+        "border",
+        "blockSize"
+      ],
+      "prototypeLocator": "previewAgainstLabel().nextElementSibling",
+      "tag": "select",
+      "properties": {
+        "backgroundColor": "rgb(21, 33, 43)",
+        "borderTopWidth": "1px",
+        "borderTopStyle": "solid",
+        "borderTopColor": "rgba(217, 184, 156, 0.18)",
+        "borderTopLeftRadius": "8px",
+        "height": "30px"
+      }
+    },
+    "band-strip": {
+      "groups": [
+        "surface",
+        "border",
+        "blockSize"
+      ],
+      "prototypeLocator": "bandStrip()",
+      "tag": "div",
+      "properties": {
+        "backgroundColor": "rgb(17, 26, 35)",
+        "borderTopWidth": "1px",
+        "borderTopStyle": "solid",
+        "borderTopColor": "rgba(217, 184, 156, 0.18)",
+        "borderTopLeftRadius": "9px",
+        "height": "46px"
+      }
+    },
+    "tier-row": {
+      "groups": [
+        "surface",
+        "border",
+        "box",
+        "gap"
+      ],
+      "prototypeLocator": "tierRow(0)",
+      "tag": "div",
+      "properties": {
+        "backgroundColor": "rgb(17, 26, 35)",
+        "borderTopWidth": "1px",
+        "borderTopStyle": "solid",
+        "borderTopColor": "rgba(217, 184, 156, 0.18)",
+        "borderTopLeftRadius": "9px",
+        "paddingTop": "8px",
+        "paddingRight": "11px",
+        "paddingBottom": "8px",
+        "paddingLeft": "11px",
+        "columnGap": "10px"
+      }
+    },
+    "tier-swatch": {
+      "groups": [
+        "size",
+        "border"
+      ],
+      "prototypeLocator": "tierRow(0).children[0]",
+      "tag": "span",
+      "properties": {
+        "width": "12px",
+        "height": "12px",
+        "borderTopWidth": "0px",
+        "borderTopStyle": "none",
+        "borderTopColor": "rgb(241, 209, 181)",
+        "borderTopLeftRadius": "4px"
+      }
+    },
+    "tier-name-input": {
+      "groups": [
+        "type",
+        "surface",
+        "border",
+        "blockSize"
+      ],
+      "prototypeLocator": "tierRow(0).children[1]",
+      "tag": "input",
+      "properties": {
+        "color": "rgb(241, 209, 181)",
+        "fontSize": "12.5px",
+        "fontWeight": "500",
+        "textTransform": "none",
+        "backgroundColor": "rgba(0, 0, 0, 0)",
+        "borderTopWidth": "0px",
+        "borderTopStyle": "none",
+        "borderTopColor": "rgb(241, 209, 181)",
+        "borderTopLeftRadius": "0px",
+        "height": "18px"
+      },
+      "exemptions": {
+        "backgroundColor": "MAINTAINER INSTRUCTION OVERRIDES THE PROTOTYPE. The prototype draws the tier name as a borderless, transparent, 18px-tall input with no box at all; the maintainer asked for a text input styled to match the prototype’s stepper pill (28px, 1px --fab-border, 7px radius, --fab-bg-2). The TYPE of that input — 12.5px / 500 / --fab-text — is still asserted against the prototype, so only the box is exempt.",
+        "borderTopWidth": "MAINTAINER INSTRUCTION OVERRIDES THE PROTOTYPE. The prototype draws the tier name as a borderless, transparent, 18px-tall input with no box at all; the maintainer asked for a text input styled to match the prototype’s stepper pill (28px, 1px --fab-border, 7px radius, --fab-bg-2). The TYPE of that input — 12.5px / 500 / --fab-text — is still asserted against the prototype, so only the box is exempt.",
+        "borderTopStyle": "MAINTAINER INSTRUCTION OVERRIDES THE PROTOTYPE. The prototype draws the tier name as a borderless, transparent, 18px-tall input with no box at all; the maintainer asked for a text input styled to match the prototype’s stepper pill (28px, 1px --fab-border, 7px radius, --fab-bg-2). The TYPE of that input — 12.5px / 500 / --fab-text — is still asserted against the prototype, so only the box is exempt.",
+        "borderTopColor": "MAINTAINER INSTRUCTION OVERRIDES THE PROTOTYPE. The prototype draws the tier name as a borderless, transparent, 18px-tall input with no box at all; the maintainer asked for a text input styled to match the prototype’s stepper pill (28px, 1px --fab-border, 7px radius, --fab-bg-2). The TYPE of that input — 12.5px / 500 / --fab-text — is still asserted against the prototype, so only the box is exempt.",
+        "borderTopLeftRadius": "MAINTAINER INSTRUCTION OVERRIDES THE PROTOTYPE. The prototype draws the tier name as a borderless, transparent, 18px-tall input with no box at all; the maintainer asked for a text input styled to match the prototype’s stepper pill (28px, 1px --fab-border, 7px radius, --fab-bg-2). The TYPE of that input — 12.5px / 500 / --fab-text — is still asserted against the prototype, so only the box is exempt.",
+        "height": "MAINTAINER INSTRUCTION OVERRIDES THE PROTOTYPE. The prototype draws the tier name as a borderless, transparent, 18px-tall input with no box at all; the maintainer asked for a text input styled to match the prototype’s stepper pill (28px, 1px --fab-border, 7px radius, --fab-bg-2). The TYPE of that input — 12.5px / 500 / --fab-text — is still asserted against the prototype, so only the box is exempt."
+      }
+    },
+    "stepper": {
+      "groups": [
+        "surface",
+        "border",
+        "blockSize"
+      ],
+      "prototypeLocator": "stepper()",
+      "tag": "div",
+      "properties": {
+        "backgroundColor": "rgb(27, 40, 51)",
+        "borderTopWidth": "1px",
+        "borderTopStyle": "solid",
+        "borderTopColor": "rgba(217, 184, 156, 0.18)",
+        "borderTopLeftRadius": "7px",
+        "height": "28px"
+      },
+      "exemptions": {
+        "backgroundColor": "SHARED PRIMITIVE. The stepper is `src/ui/svelte/components/Stepper.svelte`, used across the whole manager, and it owns its own border, radius, background and type in a scoped block. The design system permits a layout context to take a SIZE from a primitive and forbids it restyling `font-*`, `border`, `border-radius` and `background` — so the tier row pins the 28px height (asserted) and leaves these alone. Matching them would require changing every stepper in the app, which is outside this change.",
+        "borderTopLeftRadius": "SHARED PRIMITIVE. The stepper is `src/ui/svelte/components/Stepper.svelte`, used across the whole manager, and it owns its own border, radius, background and type in a scoped block. The design system permits a layout context to take a SIZE from a primitive and forbids it restyling `font-*`, `border`, `border-radius` and `background` — so the tier row pins the 28px height (asserted) and leaves these alone. Matching them would require changing every stepper in the app, which is outside this change."
+      }
+    },
+    "stepper-value": {
+      "groups": [
+        "type"
+      ],
+      "prototypeLocator": "stepper().children[1]",
+      "tag": "div",
+      "properties": {
+        "color": "rgb(241, 209, 181)",
+        "fontSize": "12.5px",
+        "fontWeight": "600",
+        "textTransform": "none"
+      },
+      "exemptions": {
+        "fontSize": "SHARED PRIMITIVE. The stepper is `src/ui/svelte/components/Stepper.svelte`, used across the whole manager, and it owns its own border, radius, background and type in a scoped block. The design system permits a layout context to take a SIZE from a primitive and forbids it restyling `font-*`, `border`, `border-radius` and `background` — so the tier row pins the 28px height (asserted) and leaves these alone. Matching them would require changing every stepper in the app, which is outside this change.",
+        "fontWeight": "SHARED PRIMITIVE. The stepper is `src/ui/svelte/components/Stepper.svelte`, used across the whole manager, and it owns its own border, radius, background and type in a scoped block. The design system permits a layout context to take a SIZE from a primitive and forbids it restyling `font-*`, `border`, `border-radius` and `background` — so the tier row pins the 28px height (asserted) and leaves these alone. Matching them would require changing every stepper in the app, which is outside this change."
+      }
+    },
+    "segmented-toggle": {
+      "groups": [
+        "surface",
+        "border",
+        "box",
+        "gap",
+        "size"
+      ],
+      "prototypeLocator": "segmented()",
+      "tag": "div",
+      "properties": {
+        "backgroundColor": "rgb(21, 33, 43)",
+        "borderTopWidth": "1px",
+        "borderTopStyle": "solid",
+        "borderTopColor": "rgba(217, 184, 156, 0.18)",
+        "borderTopLeftRadius": "8px",
+        "paddingTop": "3px",
+        "paddingRight": "3px",
+        "paddingBottom": "3px",
+        "paddingLeft": "3px",
+        "columnGap": "3px",
+        "width": "158px",
+        "height": "34px"
+      }
+    },
+    "segmented-option-selected": {
+      "groups": [
+        "surface",
+        "border",
+        "type",
+        "blockSize"
+      ],
+      "prototypeLocator": "segmentedOption(true)",
+      "tag": "div",
+      "properties": {
+        "backgroundColor": "rgba(185, 124, 120, 0.16)",
+        "borderTopWidth": "1px",
+        "borderTopStyle": "solid",
+        "borderTopColor": "rgba(185, 124, 120, 0.54)",
+        "borderTopLeftRadius": "6px",
+        "color": "rgb(231, 189, 186)",
+        "fontSize": "10.5px",
+        "fontWeight": "600",
+        "textTransform": "none",
+        "height": "26px"
+      }
+    },
+    "segmented-option-unselected": {
+      "groups": [
+        "surface",
+        "border",
+        "type",
+        "blockSize"
+      ],
+      "prototypeLocator": "segmentedOption(false)",
+      "tag": "div",
+      "properties": {
+        "backgroundColor": "rgba(0, 0, 0, 0)",
+        "borderTopWidth": "1px",
+        "borderTopStyle": "solid",
+        "borderTopColor": "rgba(0, 0, 0, 0)",
+        "borderTopLeftRadius": "6px",
+        "color": "rgba(217, 184, 156, 0.56)",
+        "fontSize": "10.5px",
+        "fontWeight": "500",
+        "textTransform": "none",
+        "height": "26px"
+      }
+    },
+    "tier-delete-button": {
+      "groups": [
+        "surface",
+        "border",
+        "size"
+      ],
+      "prototypeLocator": "tierRow(0).lastElementChild",
+      "tag": "div",
+      "properties": {
+        "backgroundColor": "rgba(185, 124, 120, 0.16)",
+        "borderTopWidth": "1px",
+        "borderTopStyle": "solid",
+        "borderTopColor": "rgba(185, 124, 120, 0.54)",
+        "borderTopLeftRadius": "7px",
+        "width": "28px",
+        "height": "28px"
+      }
+    },
+    "add-tier-button": {
+      "groups": [
+        "surface",
+        "border",
+        "type",
+        "blockSize"
+      ],
+      "prototypeLocator": "addTierButton()",
+      "tag": "div",
+      "properties": {
+        "backgroundColor": "rgba(0, 0, 0, 0)",
+        "borderTopWidth": "1px",
+        "borderTopStyle": "dashed",
+        "borderTopColor": "rgba(217, 184, 156, 0.32)",
+        "borderTopLeftRadius": "9px",
+        "color": "rgba(217, 184, 156, 0.74)",
+        "fontSize": "11px",
+        "fontWeight": "600",
+        "textTransform": "none",
+        "height": "34px"
+      }
+    },
+    "inspector-surface": {
+      "groups": [
+        "surface",
+        "box",
+        "border",
+        "scroll"
+      ],
+      "prototypeLocator": "inspector()",
+      "tag": "div",
+      "properties": {
+        "backgroundColor": "rgb(17, 26, 35)",
+        "paddingTop": "16px",
+        "paddingRight": "15px",
+        "paddingBottom": "20px",
+        "paddingLeft": "15px",
+        "borderTopWidth": "0px",
+        "borderTopStyle": "none",
+        "borderTopColor": "rgb(241, 209, 181)",
+        "borderTopLeftRadius": "0px",
+        "scrollbarColor": "rgb(44, 59, 73) rgba(0, 0, 0, 0)",
+        "scrollbarWidth": "thin"
+      },
+      "effectiveBackground": true
+    },
+    "inspector-card": {
+      "groups": [
+        "surface",
+        "border"
+      ],
+      "prototypeLocator": "inspectorCard()",
+      "tag": "div",
+      "properties": {
+        "backgroundColor": "rgb(21, 33, 43)",
+        "borderTopWidth": "1px",
+        "borderTopStyle": "solid",
+        "borderTopColor": "rgba(217, 184, 156, 0.18)",
+        "borderTopLeftRadius": "11px"
+      }
+    },
+    "inspector-section-heading": {
+      "groups": [
+        "type",
+        "tracking"
+      ],
+      "prototypeLocator": "inspectorSectionHeading()",
+      "tag": "span",
+      "properties": {
+        "color": "rgba(217, 184, 156, 0.56)",
+        "fontSize": "9px",
+        "fontWeight": "700",
+        "textTransform": "uppercase",
+        "letterSpacing": "1.26px"
+      }
+    }
+  }
+}

@@ -2701,11 +2701,19 @@ describe('CraftingSystemManager mounted behavior', () => {
       'a singleton check has no create action'
     );
     const craftingHelp = target.querySelector('[data-checks-help="crafting"]');
-    assert.ok(craftingHelp, 'Crafting tab shows its docs help card');
+    assert.ok(craftingHelp, 'Crafting tab shows its docs links');
+    // NOT an explainer card any more (issue 1096). The maintainer removed the
+    // `ABOUT CRAFTING CHECKS` card outright — the prototype's rail opens on a
+    // documentation / quickstart PAIR and nothing else — so what this hook now names is
+    // that pair. The links themselves are what the assertions below are really about.
     assert.ok(
-      craftingHelp.classList.contains('manager-explainer-card') &&
-        craftingHelp.classList.contains('manager-inspector-card'),
-      'help card renders through the shared explainer primitive on the shared card shell'
+      craftingHelp.classList.contains('manager-checks-rail-links'),
+      'the rail opens on the documentation/quickstart link pair'
+    );
+    assert.equal(
+      craftingHelp.querySelectorAll('a').length,
+      2,
+      'both the docs link and the Quickstart survive'
     );
     const craftingDocs = craftingHelp.querySelector(
       'a[href="https://mistersilver-uk.github.io/fabricate/crafting-checks"]'
@@ -3184,45 +3192,37 @@ describe('CraftingSystemManager mounted behavior', () => {
       });
       flushSync();
 
-      const card = target.querySelector(`[data-checks-help="${activeTab}"]`);
-      assert.ok(card, `${activeTab} menu renders a help card`);
-      assert.ok(
-        card.classList.contains('manager-explainer-card'),
-        'help card renders through the shared explainer primitive'
-      );
-      assert.ok(card.querySelector(`a[href="${href}"]`), `${activeTab} help card links to ${href}`);
-
-      // Two links is the reason `ExplainerCard` grew a link LIST (issue 883). They share
-      // one `.manager-setup-links` row and both wear the primitive's one ghost treatment,
-      // so a regression to a single-link primitive drops the Quickstart silently.
-      const linkRow = card.querySelector('.manager-setup-links');
-      assert.ok(linkRow, `${activeTab} help card renders its links as one card-link row`);
-      const linkHrefs = Array.from(linkRow.querySelectorAll('a.manager-explainer-card-docs')).map(
-        (anchor) => anchor.getAttribute('href')
+      // The DESTINATIONS are what this row is for, and they survive the explainer card's
+      // removal (issue 1096): the per-route docs page and the shared Quickstart, in that
+      // order, still both reachable from the top of the rail.
+      const linkRow = target.querySelector(`[data-checks-help="${activeTab}"]`);
+      assert.ok(linkRow, `${activeTab} menu renders its documentation link pair`);
+      const linkHrefs = Array.from(linkRow.querySelectorAll('a')).map((anchor) =>
+        anchor.getAttribute('href')
       );
       assert.deepEqual(
         linkHrefs,
         [href, 'https://mistersilver-uk.github.io/fabricate/quickstart'],
-        `${activeTab} help card keeps both its docs page and the Quickstart`
+        `${activeTab} rail keeps both its docs page and the Quickstart`
       );
       for (const anchor of linkRow.querySelectorAll('a')) {
-        assert.ok(
-          anchor.classList.contains('is-ghost'),
-          'explainer links keep the primitive ghost treatment'
-        );
+        assert.equal(anchor.getAttribute('target'), '_blank');
+        assert.equal(anchor.getAttribute('rel'), 'noreferrer');
       }
 
-      // The Active card is a plain inspector card under the manager's one card-title
-      // contract — not the `.manager-kicker` micro-label this rail used to use alone.
+      // FLAT HEADING, CARD BENEATH — the Tool Studio's inspector convention, which the
+      // maintainer made the authority for this rail's structure. This block asserted the
+      // opposite (a `.manager-card-title` inside the card, no kicker anywhere) until that
+      // ruling; the assertion moves with it rather than being deleted.
       const activeCard = target.querySelector(`[data-checks-active="${activeTab}"]`);
       assert.ok(activeCard, `${activeTab} menu renders its Active card`);
       assert.ok(
-        activeCard.querySelector('h3.manager-card-title'),
-        'the Active card titles itself with the shared card-title contract'
+        !activeCard.querySelector('.manager-card-title'),
+        'a card-title inside a rail card is the convention the Tool Studio replaced'
       );
       assert.ok(
-        !activeCard.querySelector('.manager-kicker'),
-        'the Active card no longer carries a second heading treatment'
+        Boolean(activeCard.previousElementSibling?.classList.contains('manager-kicker')),
+        'the Active section is named by a flat kicker directly above its card'
       );
 
       unmount(mounted);
@@ -3794,13 +3794,23 @@ describe('CraftingSystemManager mounted behavior', () => {
       'relative mode shows the recipe tiers card'
     );
 
-    // Column labels live in the table header, not on every row. Under toolSpecific
-    // authority (the default here) the per-outcome Break tools column is hidden.
-    assert.deepEqual(
-      [...target.querySelectorAll('.manager-checks-outcome-head [role="columnheader"]')]
-        .map((cell) => cell.textContent.trim())
-        .filter(Boolean),
-      ['Name', 'DC ±', 'Outcome']
+    // NO COLUMN HEADER ROW (issue 1096). The tier list is the prototype's flex list, not a
+    // subgrid table: every control on the row states its own subject through its accessible
+    // name, so a header row of three words was a second, weaker copy of that. What replaces
+    // the assertion is the naming it was standing in for.
+    assert.equal(
+      target.querySelector('.manager-checks-outcome-head'),
+      null,
+      'the tier list carries no column-header row'
+    );
+    assert.ok(
+      Boolean(target.querySelector('.manager-checks-tier-list')),
+      'tiers render as the prototype flex list'
+    );
+    assert.equal(
+      target.querySelector('[data-outcome-name]').getAttribute('aria-label'),
+      'Name',
+      'the name field names itself'
     );
     assert.ok(target.querySelector('[data-outcome-dc]'), 'relative tiers expose a DC field');
     assert.equal(
@@ -3814,30 +3824,46 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.equal(row.getAttribute('data-outcome-id'), 'a1b2c3d4ef');
     assert.ok(!row.textContent.includes('a1b2c3'), 'the secret id is not displayed');
 
-    // State controls are red/green pills, not raw checkboxes, and flip on click.
+    // A SEGMENTED TOGGLE, not a pill that swaps its own label on click (issue 1096). The
+    // pill showed only the state the tier was IN, so a GM could not tell whether the word
+    // was a reading or the verb that would change it. Both options are on screen now, and
+    // the lit one is the current state.
     const successToggle = target.querySelector('[data-outcome-success]');
-    assert.equal(successToggle.tagName, 'BUTTON');
     assert.ok(
-      successToggle.classList.contains('manager-checks-state-pill'),
-      'the state control is a coloured pill button'
+      successToggle.classList.contains('manager-segmented'),
+      'the outcome control is the shared segmented track'
     );
-    assert.equal(target.querySelector('[data-outcome-success] input'), null, 'no default checkbox');
+    assert.deepEqual(
+      [...successToggle.querySelectorAll('.manager-segment-label')].map((el) =>
+        el.textContent.trim()
+      ),
+      ['Success', 'Failure'],
+      'both outcomes are visible, not just the current one'
+    );
+    const litSegment = successToggle.querySelector('.manager-segment.is-active');
     assert.ok(
-      successToggle.textContent.includes('Failure'),
-      'the pill shows the state value (Failure), not Off'
+      litSegment.textContent.includes('Failure'),
+      'the lit segment is the tier’s current state'
     );
-    assert.ok(
-      successToggle.classList.contains('is-negative'),
-      'the failure state is the red/negative pill'
-    );
+    assert.ok(litSegment.classList.contains('is-danger'), 'the failure segment takes the red tint');
     // The per-outcome break-tools pill is hidden under toolSpecific authority.
     assert.equal(
       target.querySelector('[data-outcome-break]'),
       null,
       'the per-outcome break column is hidden under toolSpecific'
     );
-    successToggle.click();
-    assert.equal(emitted.at(-1).relativeOutcomes[0].success, true, 'clicking flips success state');
+    // The radio, not the label: `SegmentedControl` renders real radios and commits on their
+    // `change`, which is what makes the track keyboard-operable.
+    const successRadio = successToggle.querySelector(
+      '[data-outcome-success-option="success"] input'
+    );
+    successRadio.checked = true;
+    successRadio.dispatchEvent(new window.Event('change', { bubbles: true }));
+    assert.equal(
+      emitted.at(-1).relativeOutcomes[0].success,
+      true,
+      'choosing the Success segment flips the tier'
+    );
 
     // The type selector reuses the resolution radio-option styling.
     target.querySelector('[data-check-type-option="fixed"] input').click();
@@ -3886,7 +3912,7 @@ describe('CraftingSystemManager mounted behavior', () => {
       'the editor no longer renders inline validation messages'
     );
     assert.equal(
-      target.querySelectorAll('.manager-checks-outcome-row.is-invalid').length,
+      target.querySelectorAll('.manager-checks-tier-row.is-invalid').length,
       2,
       'both overlapping tiers still get the per-row invalid highlight'
     );

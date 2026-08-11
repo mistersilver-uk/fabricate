@@ -705,6 +705,74 @@
   // Tone splits on the severity the Validation route already splits on: a `critical` issue
   // BLOCKS enabling the system, which is the hazard `warning` is for; a non-blocking one is
   // guidance about how this check will behave, which is `info`.
+  // ── The PANE heading (issue 1096) ───────────────────────────────────────────────────
+  //
+  // The studio opened straight onto a card: nothing on the screen said what the section
+  // was for, so a GM arriving on Outcomes read `Check type` as the page. The prototype
+  // heads every section pane with a title and one sentence, and this is that pair.
+  //
+  // Keyed on the SECTION, not the activity, because the section is what the pane shows;
+  // the activity is already named by the rail, the breadcrumb and the route title. The
+  // Outcomes sentence varies with the mode, which is the one place the two meet: a routed
+  // check routes result groups to tiers, a simple one has exactly two outcomes, and a
+  // progressive one spends a value down a list.
+  const outcomesLead = $derived.by(() => {
+    if (routeIsRouted)
+      return text(
+        'FABRICATE.Admin.Manager.Checks.Sections.OutcomesLeadRouted',
+        'What each result of the roll produces. A record binds its result groups to the tiers set here.'
+      );
+    if (activeMode === 'progressive')
+      return text(
+        'FABRICATE.Admin.Manager.Checks.Sections.OutcomesLeadProgressive',
+        'How the rolled value is spent down an ordered list of results.'
+      );
+    return text(
+      'FABRICATE.Admin.Manager.Checks.Sections.OutcomesLeadSimple',
+      'A simple check has exactly two outcomes.'
+    );
+  });
+
+  const paneHead = $derived.by(() => {
+    if (activity === 'validation') return null;
+    const HEADS = {
+      roll: [
+        text('FABRICATE.Admin.Manager.Checks.Sections.Roll', 'The roll'),
+        text(
+          'FABRICATE.Admin.Manager.Checks.Sections.RollLead',
+          'How this system turns an attempt into a result — the formula that is rolled and the difficulty it is measured against. Any modifier set on the Modifiers section is added to this roll automatically; it does not appear in the formula.'
+        ),
+      ],
+      outcomes: [
+        text('FABRICATE.Admin.Manager.Checks.Sections.Outcomes', 'Outcomes'),
+        outcomesLead,
+      ],
+      triggers: [
+        text('FABRICATE.Admin.Manager.Checks.Sections.Triggers', 'Triggers'),
+        text(
+          'FABRICATE.Admin.Manager.Checks.Sections.TriggersLead',
+          'Conditions that override what the roll would otherwise produce. Each one watches a die group, the roll total or the applied modifier.'
+        ),
+      ],
+      modifiers: [
+        text('FABRICATE.Admin.Manager.Checks.Sections.Modifiers', 'Modifiers'),
+        text(
+          'FABRICATE.Admin.Manager.Checks.Sections.ModifiersLead',
+          'Named character values that are added to the roll automatically, whenever the crafter has them. Nothing needs to be written into the formula.'
+        ),
+      ],
+      'on-failure': [
+        text('FABRICATE.Admin.Manager.Checks.Sections.OnFailure', 'On failure'),
+        text(
+          'FABRICATE.Admin.Manager.Checks.Sections.OnFailureLead',
+          'What a failed check costs the character.'
+        ),
+      ],
+    };
+    const entry = HEADS[activeSection];
+    return entry ? { title: entry[0], lead: entry[1] } : null;
+  });
+
   const activeSectionIssues = $derived(
     activeReadiness.issues
       .filter((issue) => sectionForIssue(issue.id) === activeSection)
@@ -802,6 +870,13 @@
       id={`checks-panel-${activity === 'validation' ? 'validation' : activeSection}`}
       aria-labelledby={activity === 'validation' ? undefined : `checks-section-${activeSection}`}
     >
+      {#if paneHead && !routeIsOff}
+        <header class="manager-checks-pane-head" data-checks-pane-head={activeSection}>
+          <h2 class="manager-checks-pane-title">{paneHead.title}</h2>
+          <p class="manager-checks-pane-lead">{paneHead.lead}</p>
+        </header>
+      {/if}
+
       <!-- The section's own warning dot, explained IN the panel (DN8). It sits above the
            section content rather than inside each branch: every activity route, every mode
            and every section reaches this one insertion point, and a per-branch copy would be

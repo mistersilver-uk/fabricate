@@ -538,3 +538,118 @@ describe('ThresholdBandStrip: colour, gradients and the fallback', () => {
     assert.ok(root.querySelector('[data-band-strip-fallback]'));
   });
 });
+
+/**
+ * ── The runaway drag (issue 1096, maintainer report) ─────────────────────────────────
+ *
+ * "Band drag is far too sensitive — it scales to absurd numbers almost immediately."
+ *
+ * The cause was never a sensitivity constant: the pointer mapping is, and always was,
+ * absolute position across the track. It was a FEEDBACK LOOP. `domain` is derived from the
+ * tier list and its upper extent comes from the OUTERMOST tier, so moving the last handle
+ * right raised `domain.max`, which stretched the span, which made the SAME pointer position
+ * resolve to a larger value, which raised `domain.max` again — once per `pointermove`.
+ *
+ * The prototype does not have the defect because it captures the track rectangle and the
+ * domain into the drag's closure at pointerdown and never re-reads them, and the fix
+ * reproduces exactly that. So the test is the shape of the loop rather than a number: hold
+ * the pointer STILL and dispatch repeatedly. A frozen scale reports one value however many
+ * times it is asked; a live one climbs.
+ */
+function pointer(type, clientX) {
+  const event = new globalThis.Event(type, { bubbles: true });
+  event.clientX = clientX;
+  event.pointerId = 1;
+  return event;
+}
+
+describe('ThresholdBandStrip: the drag scale is frozen for the gesture', () => {
+  /** A track whose measured geometry can be swapped mid-gesture. */
+  function measurableTrack(root) {
+    const track = root.querySelector('[data-band-strip-track]');
+    // happy-dom measures everything as zero, so the track is given the geometry a browser
+    // would report. Without it `valueAtClientX` bails and the gesture proves nothing.
+    let rect = { left: 0, width: 400, right: 400, top: 0, bottom: 46 };
+    track.getBoundingClientRect = () => rect;
+    return {
+      resizeTo(width) {
+        rect = { left: 0, width, right: width, top: 0, bottom: 46 };
+      },
+    };
+  }
+
+  it('maps the pointer against the scale captured at pointerdown, not the live one', async () => {
+    const emitted = [];
+    const root = await harness.mount({
+      bands: RELATIVE_BANDS,
+      previewDc: 12,
+      onChange: (patch) => emitted.push(patch),
+    });
+    const track = measurableTrack(root);
+    const handle = handles(root)[1];
+
+    handle.dispatchEvent(pointer('pointerdown', 100));
+    // The whole gesture is driven while the strip's measured width CHANGES underneath it —
+    // which is what the runaway did through the domain, and what a resizing card does
+    // through the rectangle. Both come out of one snapshot, so one probe covers both.
+    track.resizeTo(40);
+    handle.dispatchEvent(pointer('pointermove', 100));
+
+    assert.equal(emitted.length, 1, 'the drag committed');
+    // 100/400 of the 2..27 track is 8.25, snapped to 8; against the live 40px width the
+    // pointer would clamp far right and report the handle's own upper bound instead.
+    assert.deepEqual(
+      emitted[0],
+      { binding: 'relative', index: 2, dc: -4 },
+      'the frozen 400px scale is what the move resolves against'
+    );
+  });
+
+  it('holds the mapping steady while the pointer is still', async () => {
+    const emitted = [];
+    const root = await harness.mount({
+      bands: RELATIVE_BANDS,
+      previewDc: 12,
+      onChange: (patch) => emitted.push(patch),
+    });
+    const track = measurableTrack(root);
+    const handle = handles(root).at(-1);
+
+    handle.dispatchEvent(pointer('pointerdown', 360));
+    for (let i = 0; i < 8; i += 1) {
+      // A live scale re-reads the strip on every event, so anything that moves the strip
+      // between two identical pointer positions moves the value too.
+      track.resizeTo(400 - i * 20);
+      handle.dispatchEvent(pointer('pointermove', 360));
+    }
+
+    assert.ok(emitted.length > 0, 'the drag committed at least once');
+    const values = emitted.map((patch) => patch.dc);
+    assert.deepEqual(
+      [...new Set(values)],
+      [values[0]],
+      `a stationary pointer must resolve to ONE value; got ${values.join(', ')}`
+    );
+  });
+
+  it('releases the snapshot on pointerup, so the next gesture measures afresh', async () => {
+    const emitted = [];
+    const root = await harness.mount({
+      bands: RELATIVE_BANDS,
+      previewDc: 12,
+      onChange: (patch) => emitted.push(patch),
+    });
+    const track = measurableTrack(root);
+    const handle = handles(root)[1];
+
+    handle.dispatchEvent(pointer('pointerdown', 100));
+    handle.dispatchEvent(pointer('pointerup', 100));
+    track.resizeTo(200);
+    handle.dispatchEvent(pointer('pointerdown', 100));
+    handle.dispatchEvent(pointer('pointermove', 100));
+
+    // 100/200 of the same 2..27 track lands on 15 — a different answer from the first
+    // gesture's 8, which is the point: the freeze lasts one gesture, not forever.
+    assert.deepEqual(emitted.at(-1), { binding: 'relative', index: 2, dc: 3 });
+  });
+});

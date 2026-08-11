@@ -1364,7 +1364,13 @@ test('every explainer and fact-row site renders through the primitive, not by ha
     ['tools/ToolBehaviorPreview.svelte', ['ExplainerCard', 'IconFactRow']],
     ['tools/ToolBrowserInspector.svelte', ['IconFactRow']],
     ['CraftingSystemManagerRoot.svelte', ['ExplainerCard']],
-    ['checks/ChecksRightMenu.svelte', ['ExplainerCard']],
+    // `checks/ChecksRightMenu.svelte` is NOT on this list any more (issue 1096). The
+    // maintainer removed the `ABOUT CRAFTING CHECKS` explainer outright: the prototype's
+    // rail has no such card, and it pushed every panel with a subject below the fold. This
+    // row asserted the card was rendered through the primitive rather than by hand, which
+    // is a different question from whether it should be rendered at all — the rail now
+    // renders no explainer, and `the checks rail follows the Tool Studio's inspector
+    // convention` below is what holds that.
   ]) {
     const source = readFileSync(resolve(managerComponentDir, componentPath), 'utf8');
     for (const primitive of imports) {
@@ -1382,7 +1388,7 @@ test('every explainer and fact-row site renders through the primitive, not by ha
 // and a 0.98rem heading no other inspector had, sitting directly beside a `.manager-inspector-card`.
 // `.manager-setup-card` itself is NOT dead: the first-run procedures still use it, which is
 // exactly why the rail could not simply be left alone.
-test('the checks rail builds no card of its own', () => {
+test("the checks rail follows the Tool Studio's inspector convention", () => {
   const rightMenu = withoutComments(
     readFileSync(resolve(managerComponentDir, 'checks/ChecksRightMenu.svelte'), 'utf8')
   );
@@ -1400,21 +1406,39 @@ test('the checks rail builds no card of its own', () => {
     );
   }
 
-  // Both cards on the rail wear the shared shell, and the Active card titles itself with
-  // the manager's one card-title contract rather than a second heading treatment.
+  // ── The heading convention INVERTED (issue 1096) ────────────────────────────────────
+  //
+  // This block used to assert the opposite: a `.manager-card-title` inside each card and
+  // NO `.manager-kicker` anywhere on the rail. The maintainer made the Tool Studio's
+  // inspector the authority for this rail's structure, and the Tool Studio's
+  // (`ToolBehaviorPreview.svelte`) is a flat uppercase `.manager-kicker` naming the
+  // section with its card directly beneath — never a card wrapping the section with a
+  // title inside it. Two studios cannot both be right, so the assertion moves with the
+  // ruling rather than being deleted.
   assert.ok(
     rightMenu.includes('<section class="manager-inspector-card" data-checks-active={activeTab}>'),
     'the Active card wears the shared inspector-card shell'
   );
   assert.ok(
-    rightMenu.includes('<h3 class="manager-card-title">{activeTitle}</h3>'),
-    'the Active card titles itself with the shared card-title contract'
+    rightMenu.includes('<p class="manager-kicker">{activeTitle}</p>'),
+    'the Active section is named by a flat kicker above its card, as the Tool Studio does'
   );
   assert.equal(
-    rightMenu.includes('manager-kicker'),
+    rightMenu.includes('manager-card-title'),
     false,
-    'the rail should carry no second heading treatment'
+    'a card-title inside a rail card is the convention the Tool Studio replaced'
   );
+
+  // The two collapsibles are gone with it. The prototype has no disclosure anywhere in
+  // this rail, and a panel whose whole content is one sentence of pre-roll copy has
+  // nothing to collapse.
+  for (const dead of ['RowDisclosure', 'manager-checks-rail-body', 'ExplainerCard']) {
+    assert.equal(
+      rightMenu.includes(dead),
+      false,
+      `${dead} was removed from the checks rail (issue 1096); it must not come back`
+    );
+  }
 
   // The procedure format stays available to the surfaces it belongs to, so this is a
   // conversion rather than a deletion.

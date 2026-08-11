@@ -72,14 +72,16 @@ const SHARED_PRIMITIVES = [
   // five hand-rolled copies of that shape as a live non-conformance, so every future
   // conversion drops it into another mounted tree — the gathering player suites already
   // pulled it in through `ChanceBar`'s rebuild, and four more sites are named debt.
-  // `RowDisclosure` is here for the same forward-looking reason, and its justification is
-  // stated as it actually is rather than as it was planned: ONE consumer today, the Checks
-  // right rail, which collapses two panels through it. The collapsed TRIGGER card that was
-  // to be its second site is not built, and the prototype's summary row is named debt in
-  // `ui-integration/spec.md`. When it lands it adopts this control and drops it into another
-  // mounted tree — which is exactly the shape that hangs a third suite later.
+  // `RowDisclosure` is NO LONGER ON THIS LIST (issue 1096, maintainer parity round). Its
+  // one consumer was the Checks right rail's two collapsible panels, and the maintainer
+  // removed those: the prototype has no disclosure anywhere in that rail. It therefore has
+  // ZERO consumers today, which is precisely the state the reachability guard below exists
+  // to report — so it comes off the list rather than the guard being loosened for it. The
+  // component and `row-disclosure-mounted.test.js` are left in place: the collapsed TRIGGER
+  // card named in `ui-integration/spec.md` is still its intended second site, and it goes
+  // back on this list the moment something renders it. If that site is abandoned, the
+  // component is dead code and should be deleted outright.
   'src/ui/svelte/components/FillBar.svelte',
-  'src/ui/svelte/components/RowDisclosure.svelte',
   'src/ui/svelte/components/ThresholdBandStrip.svelte',
   // THE manager's labelled push-button (issue 1096). It is the sharpest entry on this list
   // after `Chip`: `manager-button` is a CSS convention repeated across more than sixty

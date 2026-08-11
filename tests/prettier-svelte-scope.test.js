@@ -107,6 +107,7 @@ const GATE_TARGETS = [
   'scripts/lib/foundrySmokeArms.js',
   'scripts/lib/foundryBrowserBoot.js',
   'scripts/foundry-version-assert.mjs',
+  'scripts/checks-studio-parity-extract.mjs',
   'eslint.config.js',
 ];
 const FORMAT_ARGV = ['prettier', '--write', ...GATE_TARGETS];

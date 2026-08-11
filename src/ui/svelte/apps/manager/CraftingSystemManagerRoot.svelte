@@ -7479,7 +7479,13 @@
         class="manager-main manager-environment-edit-main"
         aria-label={text('FABRICATE.Admin.Manager.Checks.Title', 'Checks')}
       >
-        <section class="manager-environment-editor-shell">
+        <!-- `data-checks-shell` drops the shared editor shell's 12px padding for this route
+             only (issue 1096). The prototype's studio runs edge to edge inside the app
+             window and puts every inset on the pane itself; the shell's padding, the
+             workspace gap and the panel's own inset were stacking into dead space at the
+             body's edges. Marked on the SHELL rather than styled from a descendant, because
+             the padding belongs to the shell and a child cannot remove it. -->
+        <section class="manager-environment-editor-shell" data-checks-shell>
           <ChecksView
             resolutionMode={selectedSystem?.resolutionMode || 'simple'}
             alchemyCheckMode={selectedSystem?.alchemy?.checkMode || 'none'}

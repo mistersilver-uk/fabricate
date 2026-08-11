@@ -8,9 +8,9 @@
   reads `OK` / `OFF` / a count pill.
 
   The two preview slots render their PRE-ROLL copy only. issue 1097 fills them with the real
-  simulator and the odds enumerator; the slots exist here because the rail's shape, its
-  scroll behaviour and its collapse ladder are what this change is for, and a rail missing
-  two of its six panels cannot be photographed as evidence of either.
+  simulator and the odds enumerator; the slots exist here because the rail's shape and its
+  scroll behaviour are what this change is for, and a rail missing two of its six panels
+  cannot be photographed as evidence of either.
 
   ## The Validation route's rail is NOT this stack
 
@@ -19,6 +19,15 @@
   has a subject there. That is a real difference in what the screen is about, not an
   omission.
 
+  ## Structure: FLAT HEADINGS, cards beneath
+
+  Every section is a `.manager-kicker` naming it, followed by the card it labels — the Tool
+  Studio's inspector convention (`ToolBehaviorPreview.svelte`), which the maintainer made
+  the authority for this rail's structure (issue 1096). No card wraps a section, and no
+  panel is a disclosure: the `OUTCOME PREVIEW` and `CHANCE PER OUTCOME` collapsibles and
+  the `ABOUT CRAFTING CHECKS` explainer card that stood at the top are all gone, because
+  the prototype has none of them.
+
   ## Responsive behaviour reuses the SHIPPED container ladder
 
   `styles/fabricate.css` declares `container-name: fabricate-manager` with blocks at
@@ -26,11 +35,6 @@
   carries `overflow-y: auto; max-height: 100%`. This component introduces NO new breakpoint
   and does not touch either of those declarations:
 
-  - **At ≤1320** the odds and simulator panels become collapsed DISCLOSURES, headers and
-    counts retained. The disclosure control is hidden above that width and the body is
-    shown unconditionally, so the wide state is a plain panel and the narrow state is a
-    real `aria-expanded` widget — one markup tree, no JavaScript measurement, and no
-    second breakpoint value.
   - **At ≤1120** the shipped rule already restacks `.manager-body` to one column with
     `grid-auto-rows: max-content` and hands scrolling to the body. The rail's own
     `overflow-y` / `max-height` are LEFT ALONE there: that block unsets neither, and against
@@ -44,9 +48,7 @@
 -->
 <script>
   import Chip from '../Chip.svelte';
-  import ExplainerCard from '../ExplainerCard.svelte';
   import IconFactRow from '../IconFactRow.svelte';
-  import RowDisclosure from '../../../components/RowDisclosure.svelte';
   import { localize } from '../../../util/foundryBridge.js';
 
   let {
@@ -121,101 +123,19 @@
 
   const DOCS_BASE = 'https://mistersilver-uk.github.io/fabricate';
 
-  // The Quickstart is the second way out of every one of these cards, so it is built once
-  // rather than restated per route.
-  const quickstartLink = {
-    href: `${DOCS_BASE}/quickstart`,
-    label: text('FABRICATE.Admin.Manager.Checks.Quickstart', 'Quickstart'),
-    icon: 'fas fa-circle-question',
+  // The prototype's rail opens with a documentation / quickstart PAIR, not an explainer
+  // card. The `ABOUT CRAFTING CHECKS` card that used to stand here is gone (issue 1096
+  // parity): the prototype has no such card, and it pushed every panel with a subject —
+  // the activation switch, the preview, the digest — below the fold.
+  const DOCS_LINKS = {
+    crafting: `${DOCS_BASE}/crafting-checks`,
+    salvage: `${DOCS_BASE}/salvage`,
+    gathering: `${DOCS_BASE}/gathering-environments`,
+    validation: `${DOCS_BASE}/crafting-checks`,
   };
-
-  // The description stays ONE explainer row rather than being split into a row per rule:
-  // these are already-authored, already-translated sentences, and rewriting them into a
-  // list would be a content change wearing a consistency change's clothes.
-  const MENUS = {
-    crafting: {
-      icon: 'fas fa-hammer',
-      title: text('FABRICATE.Admin.Manager.Checks.Crafting.HelpTitle', 'About crafting checks'),
-      items: [
-        {
-          text: text(
-            'FABRICATE.Admin.Manager.Checks.Crafting.HelpDesc',
-            'The crafting check is shaped by the system resolution mode: simple authors a pass/fail check, routed authors outcome tiers, and progressive requires a check. Alchemy is driven by its check mode — none has no check, simple authors a mandatory pass/fail check, and tiered authors a mandatory routed check.'
-          ),
-        },
-      ],
-      links: [
-        {
-          href: `${DOCS_BASE}/crafting-checks`,
-          label: text('FABRICATE.Admin.Manager.Checks.Crafting.Docs', 'Crafting checks docs'),
-          icon: 'fas fa-book-open',
-        },
-        quickstartLink,
-      ],
-    },
-    salvage: {
-      icon: 'fas fa-recycle',
-      title: text('FABRICATE.Admin.Manager.Checks.Salvage.HelpTitle', 'About salvage checks'),
-      items: [
-        {
-          text: text(
-            'FABRICATE.Admin.Manager.Checks.Salvage.HelpDesc',
-            'The salvage check is shaped by the salvage resolution mode. Simple mode makes it optional; routed and progressive modes require it.'
-          ),
-        },
-      ],
-      links: [
-        {
-          href: `${DOCS_BASE}/salvage`,
-          label: text('FABRICATE.Admin.Manager.Checks.Salvage.Docs', 'Salvage docs'),
-          icon: 'fas fa-book-open',
-        },
-        quickstartLink,
-      ],
-    },
-    gathering: {
-      icon: 'fas fa-seedling',
-      title: text('FABRICATE.Admin.Manager.Checks.Gathering.HelpTitle', 'About gathering checks'),
-      items: [
-        {
-          text: text(
-            'FABRICATE.Admin.Manager.Checks.Gathering.HelpDesc',
-            'The gathering check is shaped by the task resolution mode. In d100 mode it is the fixed d100 roll; progressive and routed modes let you define it.'
-          ),
-        },
-      ],
-      links: [
-        {
-          href: `${DOCS_BASE}/gathering-environments`,
-          label: text('FABRICATE.Admin.Manager.Checks.Gathering.Docs', 'Gathering docs'),
-          icon: 'fas fa-book-open',
-        },
-        quickstartLink,
-      ],
-    },
-    validation: {
-      icon: 'fas fa-clipboard-check',
-      title: text('FABRICATE.Admin.Manager.Checks.Validation.HelpTitle', 'About check validation'),
-      items: [
-        {
-          text: text(
-            'FABRICATE.Admin.Manager.Checks.Validation.HelpDesc',
-            'Every activity check is evaluated against the same rules. A crafting system saves while incomplete, but it only enables once every blocking issue is cleared.'
-          ),
-        },
-      ],
-      links: [
-        {
-          href: `${DOCS_BASE}/crafting-checks`,
-          label: text('FABRICATE.Admin.Manager.Checks.Crafting.Docs', 'Crafting checks docs'),
-          icon: 'fas fa-book-open',
-        },
-        quickstartLink,
-      ],
-    },
-  };
-
-  const menu = $derived(MENUS[activeTab] || MENUS.crafting);
+  const docsHref = $derived(DOCS_LINKS[activeTab] || DOCS_LINKS.crafting);
+  const docsLabel = text('FABRICATE.Admin.Manager.Checks.Documentation', 'Documentation');
+  const quickstartLabel = text('FABRICATE.Admin.Manager.Checks.Quickstart', 'Quickstart');
 
   // The digest's status chip. THREE states, and they are not interchangeable: `OFF` is a
   // GM's own choice and says nothing about correctness, while `OK` is a claim that the
@@ -244,9 +164,6 @@
       ? `${text('FABRICATE.Admin.Manager.Checks.Digest.Formula', 'Formula')} · ${activeCheck.rollFormula}`
       : text('FABRICATE.Admin.Manager.Checks.Digest.NoFormula', 'No roll formula yet')
   );
-
-  let oddsExpanded = $state(false);
-  let simulatorExpanded = $state(false);
 </script>
 
 <aside
@@ -254,22 +171,35 @@
   data-checks-rail={activeTab}
   aria-label={text('FABRICATE.Admin.Manager.Checks.Menu.Label', 'Checks context menu')}
 >
-  <ExplainerCard
-    icon={menu.icon}
-    title={menu.title}
-    items={menu.items}
-    links={menu.links}
-    dataAttr="data-checks-help"
-    dataValue={activeTab}
-  />
+  <!-- The prototype's own first row: two quiet links, side by side. -->
+  <div class="manager-checks-rail-links" data-checks-help={activeTab}>
+    <a
+      class="manager-checks-rail-link"
+      href={docsHref}
+      target="_blank"
+      rel="noreferrer"
+      data-checks-docs-link
+    >
+      <i class="fas fa-book-open" aria-hidden="true"></i><span>{docsLabel}</span>
+    </a>
+    <a
+      class="manager-checks-rail-link"
+      href={`${DOCS_BASE}/quickstart`}
+      target="_blank"
+      rel="noreferrer"
+      data-checks-quickstart-link
+    >
+      <i class="fas fa-circle-question" aria-hidden="true"></i><span>{quickstartLabel}</span>
+    </a>
+  </div>
 
   {#if isValidation}
     <!-- The Validation rail: the docs pair above, and this. Nothing else has a subject
          on a route that validates all three checks at once. -->
+    <p class="manager-kicker">
+      {text('FABRICATE.Admin.Manager.Checks.Validation.AllChecks', 'All checks')}
+    </p>
     <section class="manager-inspector-card" data-checks-all-checks>
-      <h3 class="manager-card-title">
-        {text('FABRICATE.Admin.Manager.Checks.Validation.AllChecks', 'All checks')}
-      </h3>
       {#each allChecks as row (row.id)}
         <IconFactRow
           icon={row.icon}
@@ -282,8 +212,12 @@
     </section>
   {:else}
     {#if activation}
+      <!-- FLAT HEADING, CARD BENEATH — the Tool Studio's inspector convention, which is the
+           assigned authority for the rail's STRUCTURE. Every section here reads the same
+           way: an uppercase `.manager-kicker` naming the section, then the card it labels,
+           never a card wrapping each section with a title inside it. -->
+      <p class="manager-kicker">{activeTitle}</p>
       <section class="manager-inspector-card" data-checks-active={activeTab}>
-        <h3 class="manager-card-title">{activeTitle}</h3>
         {#if showActiveToggle}
           <button
             type="button"
@@ -332,10 +266,10 @@
            reading "No actors" / "No records" invite a GM to make a choice nothing consumes,
            which is worse than a stated absence — so this panel says what it will do and
            offers no control until there is something behind it. -->
+      <p class="manager-kicker">
+        {text('FABRICATE.Admin.Manager.Checks.PreviewAs.Title', 'Preview as')}
+      </p>
       <section class="manager-inspector-card" data-checks-preview-as>
-        <h3 class="manager-card-title">
-          {text('FABRICATE.Admin.Manager.Checks.PreviewAs.Title', 'Preview as')}
-        </h3>
         <p class="manager-muted">
           {text(
             'FABRICATE.Admin.Manager.Checks.PreviewAs.Hint',
@@ -344,72 +278,42 @@
         </p>
       </section>
 
-      <section class="manager-checks-rail-panel manager-inspector-card" data-checks-simulator>
-        <div class="manager-checks-rail-head">
-          <h3 class="manager-card-title">
-            {text('FABRICATE.Admin.Manager.Checks.Simulator.Title', 'Outcome preview')}
-          </h3>
-          <span class="manager-checks-rail-disclosure">
-            <RowDisclosure
-              expanded={simulatorExpanded}
-              controls="checks-rail-simulator-body"
-              label={text('FABRICATE.Admin.Manager.Checks.Simulator.Title', 'Outcome preview')}
-              dataAttr="data-checks-simulator-disclosure"
-              onToggle={(next) => (simulatorExpanded = next)}
-            />
-          </span>
-        </div>
-        <div
-          class="manager-checks-rail-body"
-          class:is-collapsed={!simulatorExpanded}
-          id="checks-rail-simulator-body"
-        >
-          <p class="manager-muted">
-            {text(
-              'FABRICATE.Admin.Manager.Checks.Simulator.Hint',
-              'Roll a test check to see exactly which outcome a record lands on and what it costs the character.'
-            )}
-          </p>
-        </div>
+      <!-- NOT DISCLOSURES. These two panels were collapsible, and the prototype has no
+           disclosure anywhere in this rail: a panel whose whole content is one sentence of
+           pre-roll copy has nothing to collapse, and hiding it behind a control made the
+           rail read as if two features were missing rather than pending (issue 1097). -->
+      <p class="manager-kicker">
+        {text('FABRICATE.Admin.Manager.Checks.Simulator.Title', 'Outcome preview')}
+      </p>
+      <section class="manager-inspector-card" data-checks-simulator>
+        <p class="manager-muted">
+          {text(
+            'FABRICATE.Admin.Manager.Checks.Simulator.Hint',
+            'Roll a test check to see exactly which outcome a record lands on and what it costs the character.'
+          )}
+        </p>
       </section>
 
-      <section class="manager-checks-rail-panel manager-inspector-card" data-checks-odds>
-        <div class="manager-checks-rail-head">
-          <h3 class="manager-card-title">
-            {text('FABRICATE.Admin.Manager.Checks.Odds.Title', 'Chance per outcome')}
-          </h3>
-          <span class="manager-checks-rail-disclosure">
-            <RowDisclosure
-              expanded={oddsExpanded}
-              controls="checks-rail-odds-body"
-              label={text('FABRICATE.Admin.Manager.Checks.Odds.Title', 'Chance per outcome')}
-              dataAttr="data-checks-odds-disclosure"
-              onToggle={(next) => (oddsExpanded = next)}
-            />
-          </span>
-        </div>
-        <div
-          class="manager-checks-rail-body"
-          class:is-collapsed={!oddsExpanded}
-          id="checks-rail-odds-body"
-        >
-          <p class="manager-muted">
-            {text(
-              'FABRICATE.Admin.Manager.Checks.Odds.Hint',
-              'Once this check has a formula and its outcome bands are set, the chance of landing on each one is listed here.'
-            )}
-          </p>
-        </div>
+      <p class="manager-kicker">
+        {text('FABRICATE.Admin.Manager.Checks.Odds.Title', 'Chance per outcome')}
+      </p>
+      <section class="manager-inspector-card" data-checks-odds>
+        <p class="manager-muted">
+          {text(
+            'FABRICATE.Admin.Manager.Checks.Odds.Hint',
+            'Once this check has a formula and its outcome bands are set, the chance of landing on each one is listed here.'
+          )}
+        </p>
       </section>
     {/if}
 
+    <div class="manager-checks-rail-head">
+      <p class="manager-kicker">
+        {text('FABRICATE.Admin.Manager.Checks.Digest.Title', 'This check')}
+      </p>
+      <Chip tone={digestStatus.tone}>{digestStatus.label}</Chip>
+    </div>
     <section class="manager-inspector-card" data-checks-digest>
-      <div class="manager-checks-rail-head">
-        <h3 class="manager-card-title">
-          {text('FABRICATE.Admin.Manager.Checks.Digest.Title', 'This check')}
-        </h3>
-        <Chip tone={digestStatus.tone}>{digestStatus.label}</Chip>
-      </div>
       {#if checkOff}
         <IconFactRow
           icon="fas fa-ban"
@@ -476,8 +380,36 @@
     min-width: 0;
   }
 
-  .manager-checks-rail-head > :global(.manager-card-title) {
+  .manager-checks-rail-head > :global(.manager-kicker) {
     min-width: 0;
+  }
+
+  /* The documentation / quickstart pair the prototype opens the rail with. */
+  .manager-checks-rail-links {
+    display: flex;
+    gap: var(--fab-space-2);
+  }
+
+  .manager-checks-rail-link {
+    display: flex;
+    flex: 1 1 0;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    min-width: 0;
+    height: 30px;
+    border: 1px solid var(--fab-border);
+    border-radius: 8px;
+    color: var(--fab-text-muted);
+    background: var(--fab-bg-1);
+    font-size: 10.5px;
+    font-weight: 600;
+    text-decoration: none;
+  }
+
+  .manager-checks-rail-link:hover {
+    border-color: var(--fab-accent-border);
+    color: var(--fab-text);
   }
 
   /* The LOCKED reading of the activation switch. It reuses the shipped switch's own track
@@ -496,22 +428,6 @@
     font-size: 0.72rem;
   }
 
-  /* Above the shipped 1320 breakpoint these two panels are plain panels: the body shows
-     unconditionally and the disclosure control is removed from the tree entirely, so no
-     `aria-expanded` is exposed for a region that is not actually collapsible there. This
-     is the ONLY breakpoint this component names, and it is one of the six the manager
-     container already declares. */
-  .manager-checks-rail-body.is-collapsed {
-    display: none;
-  }
-
-  @container fabricate-manager (min-width: 1321px) {
-    .manager-checks-rail-disclosure {
-      display: none;
-    }
-
-    .manager-checks-rail-body.is-collapsed {
-      display: block;
-    }
-  }
+  /* The 1320 disclosure ladder is gone with the disclosures themselves. The rail names no
+     breakpoint of its own now; the manager container's own six still apply to it. */
 </style>
