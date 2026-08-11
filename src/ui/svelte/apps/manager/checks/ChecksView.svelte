@@ -396,6 +396,59 @@
     },
   };
 
+  // The AUTHORED mode, for the "{section} does not apply in {mode} mode" copy and for the
+  // Validation rail's `ALL CHECKS` rows — not the readiness mode. Those are different
+  // vocabularies on purpose (`readinessModeForSlot` collapses every no-check mode to `none`),
+  // and naming the readiness one here would tell a GM standing on the gathering route that
+  // Triggers "does not apply in none mode" when the mode they selected is called d100.
+  //
+  // IT IS LOCALIZED, and through the SAME strings the rest of the manager already uses
+  // (issue 1096). The authored token is an internal identifier, and the three subsystems
+  // spell one concept three ways: crafting stores `routedByCheck`, salvage stores `routed`
+  // and gathering stores `routed`. Printing those raw put `Crafting · Clean routedByCheck`
+  // directly above `Salvage · Clean routed` in one rail card — two camelCase tokens for one
+  // mode — while the window's own header badge two panels away said "Routed by check".
+  // Reusing the mode pickers' own labels is what makes those three surfaces one vocabulary.
+  const SUBSYSTEM_MODE_LABELS = {
+    crafting: {
+      simple: ['FABRICATE.Admin.SystemSettings.ResolutionSimple', 'Simple'],
+      routedByIngredients: [
+        'FABRICATE.Admin.Manager.ResolutionRoutedByIngredients',
+        'Routed by ingredients',
+      ],
+      routedByCheck: ['FABRICATE.Admin.Manager.ResolutionRoutedByCheck', 'Routed by check'],
+      progressive: ['FABRICATE.Admin.SystemSettings.ResolutionProgressive', 'Progressive'],
+      alchemy: ['FABRICATE.Admin.SystemSettings.ResolutionAlchemy', 'Alchemy'],
+    },
+    // Alchemy's row names the ALCHEMY CHECK MODE, because that is the choice which decides
+    // what alchemy rolls; `alchemy` alone would say nothing about the check being validated.
+    alchemy: {
+      none: ['FABRICATE.Admin.SystemSettings.Alchemy.CheckModeNone', 'No check'],
+      simple: ['FABRICATE.Admin.SystemSettings.Alchemy.CheckModeSimple', 'Simple check'],
+      tiered: ['FABRICATE.Admin.SystemSettings.Alchemy.CheckModeTiered', 'Tiered check'],
+    },
+    salvage: {
+      simple: ['FABRICATE.Admin.SystemSettings.SalvageResolutionSimple', 'Simple'],
+      progressive: ['FABRICATE.Admin.SystemSettings.SalvageResolutionProgressive', 'Progressive'],
+      routed: ['FABRICATE.Admin.SystemSettings.SalvageResolutionRouted', 'Routed by check'],
+    },
+    gathering: {
+      d100: ['FABRICATE.Admin.Manager.Economy.Resolution.D100', 'd100 roll'],
+      progressive: ['FABRICATE.Admin.Manager.Economy.Resolution.Progressive', 'Progressive'],
+      routed: ['FABRICATE.Admin.Manager.Economy.Resolution.Routed', 'Routed by check'],
+    },
+  };
+
+  /**
+   * The GM-facing name of an authored mode. An unmapped token falls back to the token
+   * itself rather than to a wrong label, so a mode added to a picker without a row here
+   * reads as unfinished instead of as another mode.
+   */
+  function subsystemModeLabel(vocabulary, mode) {
+    const entry = SUBSYSTEM_MODE_LABELS[vocabulary]?.[mode];
+    return entry ? text(entry[0], entry[1]) : String(mode || '');
+  }
+
   // The Validation route aggregates per-check validation: one group per in-play
   // subsystem, each evaluated against its active draft and resolution mode. Salvage
   // is omitted when its feature is off. GATHERING IS NOT OMITTED UNDER d100
@@ -410,10 +463,13 @@
         // evaluated under are BOTH chosen by `resolveActiveCraftingCheckFormula` — see
         // `readinessModeForSlot` for what a second mapping cost here.
         mode: readinessModeForSlot(activeCraftingCheck.slot),
-        // What the GM SELECTED, for display. It is a different vocabulary from the readiness
-        // mode on purpose — that one collapses every no-check mode to `none`, and a rail row
-        // reading "Gathering · none" names a mode no economy editor offers.
-        authoredMode: craftingAlchemy ? alchemyCheckMode : resolutionMode,
+        // What the GM SELECTED, for display, in the mode picker's OWN words. It is a
+        // different vocabulary from the readiness mode on purpose — that one collapses every
+        // no-check mode to `none`, and a rail row reading "Gathering · none" names a mode no
+        // economy editor offers.
+        authoredMode: craftingAlchemy
+          ? subsystemModeLabel('alchemy', alchemyCheckMode)
+          : subsystemModeLabel('crafting', resolutionMode),
         check: craftingRouted
           ? craftingCheck
           : craftingProgressive
@@ -426,7 +482,7 @@
       list.push({
         subsystem: 'salvage',
         mode: readinessModeForSlot(activeSalvageCheck.slot),
-        authoredMode: salvageResolutionMode,
+        authoredMode: subsystemModeLabel('salvage', salvageResolutionMode),
         check: salvageRouted
           ? salvageCheckRouted
           : salvageProgressive
@@ -439,7 +495,7 @@
       list.push({
         subsystem: 'gathering',
         mode: readinessModeForSlot(activeGatheringCheck.slot),
-        authoredMode: gatheringResolutionMode,
+        authoredMode: subsystemModeLabel('gathering', gatheringResolutionMode),
         check: gatheringProgressive ? gatheringCheckProgressive : gatheringCheckRouted,
         modifierContext: buildCheckModifierContext(draftSystem, 'gathering', null),
       });
@@ -630,18 +686,13 @@
   const pageKicker = text('FABRICATE.Admin.Manager.Checks.PageKicker', 'One per system');
   const page = $derived(PAGES[activity] || PAGES.crafting);
 
-  // The AUTHORED mode, for the "{section} does not apply in {mode} mode" copy — not the
-  // readiness mode. Those are different vocabularies on purpose (`readinessModeForSlot`
-  // collapses every no-check mode to `none`), and naming the readiness one here would tell a
-  // GM standing on the gathering route that Triggers "does not apply in none mode" when the
-  // mode they selected is called d100.
   const routeModeLabel = $derived.by(() => {
-    if (activity === 'salvage') return salvageResolutionMode;
-    if (activity === 'gathering') return gatheringResolutionMode;
-    if (craftingAlchemy) return alchemyCheckMode;
-    return resolutionMode;
+    if (activity === 'salvage') return subsystemModeLabel('salvage', salvageResolutionMode);
+    if (activity === 'gathering') return subsystemModeLabel('gathering', gatheringResolutionMode);
+    if (craftingAlchemy) return subsystemModeLabel('alchemy', alchemyCheckMode);
+    return subsystemModeLabel('crafting', resolutionMode);
   });
-  const modeLabel = $derived(routeModeLabel || resolutionMode);
+  const modeLabel = $derived(routeModeLabel || subsystemModeLabel('crafting', resolutionMode));
 
   // ── The section-level Callout (issue 1096, DN8) ─────────────────────────────────────
   //

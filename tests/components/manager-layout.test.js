@@ -644,7 +644,7 @@ test('manager systems status cells use stable interactive on-off toggles', () =>
   // the button is inert. The hover affordance has to live on the TRACK, which is the
   // part with an edge — otherwise every switch in the manager has no hover state at all.
   const toggleHoverBlock = blockFor(
-    '.fabricate-manager .manager-status-toggle:not(:disabled, .is-disabled):hover .manager-status-toggle-track'
+    '.fabricate-manager .manager-status-toggle:not(:disabled, .is-disabled, .is-locked):hover .manager-status-toggle-track'
   );
   assert.ok(
     toggleHoverBlock.includes('border-color:') && toggleHoverBlock.includes('background:'),
@@ -6590,4 +6590,243 @@ test('the environment, tags and system studios restack at the same floor', async
     const floor = await readWorkspaceGrid(1024, view);
     assert.equal(floor.workspaceColumns, 1, `${view} stacks its workspace at the floor`);
   }
+});
+
+test('the Checks Studio really renders into the classes those measurements measure', () => {
+  // `readWorkspaceGrid` builds its DOM from CLASS LITERALS and measures the stylesheet, so
+  // every assertion above survives ChecksView renaming its own wrapper — the measurement
+  // would keep proving a fact about a shell the studio no longer uses. This is the join.
+  const checksView = readFileSync(
+    resolve(__dirname, '../../src/ui/svelte/apps/manager/checks/ChecksView.svelte'),
+    'utf8'
+  );
+  for (const className of ['manager-environment-workspace', 'manager-environment-tab-panel']) {
+    assert.match(
+      withoutComments(checksView),
+      new RegExp(`class="${className}"`),
+      `ChecksView must render into .${className} for the restack measurements to be about it`
+    );
+  }
+});
+
+test('the locked activation indicator offers no hover affordance', async () => {
+  // `.manager-status-toggle.is-locked` is a `<span role="img">`: an indicator, not a control.
+  // The hover rule excluded `:disabled` and `.is-disabled`, and a span can be neither, so the
+  // pointer brightened a thing nothing happens when you press — a false affordance measurable
+  // only in a browser, since the rule is a `:hover` over a `color-mix()`.
+  const browser = await chromium.launch();
+  const page = await browser.newPage({ viewport: { width: 600, height: 300 } });
+  try {
+    await page.setContent(
+      `<style>${css}</style><div class="fabricate-manager">` +
+        `<button type="button" class="manager-status-toggle is-on" id="live">` +
+        `<span class="manager-status-toggle-track"><span class="manager-status-toggle-knob"></span></span>` +
+        `<span class="manager-status-toggle-label">On</span></button>` +
+        `<span class="manager-status-toggle is-locked is-on" role="img" aria-label="Check is on" id="locked">` +
+        `<span class="manager-status-toggle-track"><span class="manager-status-toggle-knob"></span></span>` +
+        `<span class="manager-status-toggle-label">On</span></span>` +
+        `</div>`
+    );
+    const trackStyle = (id) =>
+      page.evaluate((selector) => {
+        const track = document.querySelector(selector);
+        const style = getComputedStyle(track);
+        return `${style.backgroundColor}|${style.borderColor}`;
+      }, `#${id} .manager-status-toggle-track`);
+
+    const liveResting = await trackStyle('live');
+    const lockedResting = await trackStyle('locked');
+    await page.hover('#live');
+    const liveHovered = await trackStyle('live');
+    await page.hover('#locked');
+    const lockedHovered = await trackStyle('locked');
+
+    // The positive control: the real switch DOES respond, so the negative below means something.
+    assert.notEqual(liveHovered, liveResting, 'an actionable switch still lifts under the pointer');
+    assert.equal(lockedHovered, lockedResting, 'the locked indicator does not');
+  } finally {
+    await browser.close();
+  }
+});
+
+// ── The outcome band strip's fill, its swatch key, and the AA the names need (issue 1096) ──
+//
+// Everything below is measured in a real browser, and the reason is that NOTHING else in the
+// repo can see these facts. The mounted suites assert the inline custom property the editor
+// emits, which stays true after the rule that CONSUMES it is renamed or deleted: renaming
+// `.fab-band-strip-band` to `.fab-band-strip-band-unused` — a total visual break, since that
+// rule carries `position`, `width`, `overflow` AND the background — left the mounted suite
+// green. And `color-mix()` cannot be evaluated at all outside a browser, so the contrast the
+// band names actually get was invisible to every gate here until this one.
+const bandStripPath = resolve(__dirname, '../../src/ui/svelte/components/ThresholdBandStrip.svelte');
+const checkEditorPath = resolve(
+  __dirname,
+  '../../src/ui/svelte/apps/manager/checks/CraftingCheckEditor.svelte'
+);
+const bandStripScoped = scopedComponentCss(bandStripPath);
+const checkEditorSource = readFileSync(checkEditorPath, 'utf8');
+
+/** Renders a fixture against the real sheet plus the strip's own scoped CSS, in one browser. */
+async function withBandStripPage(run) {
+  const browser = await chromium.launch();
+  const page = await browser.newPage({ viewport: { width: 900, height: 400 } });
+  try {
+    return await run(page);
+  } finally {
+    await browser.close();
+  }
+}
+
+function bandStripFixture(body) {
+  return (
+    `<style>${css}</style><style>${bandStripScoped.css}</style>` +
+    withScopeHash(body, 'fab-band-strip-band', bandStripScoped.hashClass)
+  );
+}
+
+test('the band fill and the tier-row swatch are painted by rules that still match', async () => {
+  const painted = await withBandStripPage(async (page) => {
+    await page.setContent(
+      bandStripFixture(
+        `<div class="fabricate-manager"><div class="fab-band-strip-track">` +
+          `<span class="fab-band-strip-band" id="tinted" style="--fab-band-strip-fill: rgb(20, 90, 40);">` +
+          `<span class="fab-band-strip-band-name">Masterwork</span></span>` +
+          `<span class="fab-band-strip-band" id="plain"><span class="fab-band-strip-band-name">Ruined</span></span>` +
+          `</div>` +
+          `<div class="manager-checks-outcome-table is-relative">` +
+          `<span class="manager-checks-outcome-swatch" id="keyed" style="--fab-outcome-swatch: rgb(20, 90, 40);"></span>` +
+          `<span class="manager-checks-outcome-swatch" id="unkeyed"></span>` +
+          `</div></div>`
+      )
+    );
+    return page.evaluate(() => {
+      const read = (id) => {
+        const node = document.getElementById(id);
+        const style = getComputedStyle(node);
+        return {
+          background: style.backgroundColor,
+          width: node.getBoundingClientRect().width,
+          position: style.position,
+          overflow: style.overflow,
+        };
+      };
+      return {
+        tinted: read('tinted'),
+        plain: read('plain'),
+        keyed: read('keyed'),
+        unkeyed: read('unkeyed'),
+        tableTracks: getComputedStyle(
+          document.querySelector('.manager-checks-outcome-table.is-relative')
+        ).gridTemplateColumns.split(' '),
+      };
+    });
+  });
+
+  // The consuming rule exists AND reads the inline property: the same element with and
+  // without it must not paint the same colour.
+  assert.equal(painted.tinted.background, 'rgb(20, 90, 40)', 'the band paints its inline fill');
+  assert.notEqual(
+    painted.plain.background,
+    painted.tinted.background,
+    'an unset fill falls back to the declared neutral rather than to the tinted colour'
+  );
+  // The rest of the rule the mounted assertion also cannot see.
+  assert.equal(painted.tinted.position, 'absolute', 'the band is placed against the track');
+  assert.equal(painted.tinted.overflow, 'hidden', 'a long band name truncates rather than wraps');
+
+  // The swatch key, whose whole rule could be deleted without a red before this (issue 1096
+  // made it normative in `ui-integration`).
+  assert.equal(painted.keyed.background, 'rgb(20, 90, 40)', 'the swatch repeats its band colour');
+  assert.notEqual(painted.unkeyed.background, painted.keyed.background, 'unkeyed paints neutral');
+  assert.ok(
+    Math.abs(painted.keyed.width - 10) < 0.5,
+    `the swatch is the table's 10px leading track, got ${painted.keyed.width}`
+  );
+  assert.equal(painted.tableTracks[0], '10px', 'and the table still declares that track first');
+});
+
+test('every outcome band name clears WCAG AA in every shipped theme', async () => {
+  // The ramp is READ OUT OF the editor rather than restated, so widening it without
+  // re-checking contrast fails here. `bandColour`'s expression is pinned too — otherwise this
+  // could go on measuring a formula the component no longer uses.
+  const toneMin = Number(/const BAND_TONE_MIN = (\d+);/.exec(checkEditorSource)?.[1]);
+  const toneMax = Number(/const BAND_TONE_MAX = (\d+);/.exec(checkEditorSource)?.[1]);
+  const toneBase = /const BAND_TONE_BASE = '([^']+)';/.exec(checkEditorSource)?.[1];
+  assert.ok(toneMin > 0 && toneMax > toneMin, 'the ramp constants are readable');
+  assert.match(
+    checkEditorSource,
+    /color-mix\(in srgb, \$\{family\} \$\{bandTonePercent\(rank, count\)\}%, \$\{BAND_TONE_BASE\}\)/,
+    'bandColour still composes exactly the expression measured here'
+  );
+  // An OPAQUE base is what makes this measurable at all: mixed into a translucent surface the
+  // fill's painted colour depends on whatever the strip is stacked on, so no fixture could
+  // state the contrast a GM actually sees.
+  assert.equal(toneBase, 'var(--fab-bg-0)', 'the ramp is mixed into an opaque base');
+
+  const themes = [...css.matchAll(/:root\[data-fabricate-theme="([\w-]+)"\]/g)].map((m) => m[1]);
+  assert.ok(themes.length >= 6, `every palette is measured, found ${themes.length}`);
+
+  const tones = [];
+  for (const count of [1, 2, 3, 5]) {
+    for (let rank = 0; rank < count; rank += 1) {
+      tones.push(count <= 1 ? toneMax : Math.round(toneMin + ((toneMax - toneMin) * rank) / (count - 1)));
+    }
+  }
+
+  const failures = await withBandStripPage(async (page) => {
+    const cells = themes
+      .map((theme) =>
+        ['success', 'danger']
+          .map((family) =>
+            tones
+              .map(
+                (tone) =>
+                  `<span class="fab-band-strip-band" data-probe="${theme}|${family}|${tone}" ` +
+                  `style="--fab-band-strip-fill: color-mix(in srgb, var(--fab-${family}) ${tone}%, ${toneBase});">` +
+                  `<span class="fab-band-strip-band-name">Masterwork</span></span>`
+              )
+              .join('')
+          )
+          .join('')
+      )
+      .map(
+        (row, index) =>
+          `<div class="fabricate" data-fabricate-theme="${themes[index]}">` +
+          `<div class="fab-band-strip-track">${row}</div></div>`
+      )
+      .join('');
+    await page.setContent(bandStripFixture(`<div class="fabricate-manager">${cells}</div>`));
+    return page.evaluate(() => {
+      const channel = (value) => {
+        const s = value / 255;
+        return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+      };
+      const luminance = (colour) => {
+        const [r, g, b] = colour.match(/[\d.]+/g).map(Number);
+        return 0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b);
+      };
+      const bad = [];
+      for (const band of document.querySelectorAll('[data-probe]')) {
+        const name = band.querySelector('.fab-band-strip-band-name');
+        const fill = getComputedStyle(band).backgroundColor;
+        // A translucent fill would make this measurement a lie, so it is refused outright.
+        if (/rgba\([^)]*,\s*(0|0?\.\d+)\)\s*$/.test(fill)) {
+          bad.push(`${band.dataset.probe}: translucent fill ${fill}`);
+          continue;
+        }
+        const [light, dark] = [luminance(getComputedStyle(name).color), luminance(fill)].sort(
+          (a, b) => b - a
+        );
+        const ratio = (light + 0.05) / (dark + 0.05);
+        if (ratio < 4.5) bad.push(`${band.dataset.probe}: ${ratio.toFixed(2)}:1 on ${fill}`);
+      }
+      return bad;
+    });
+  });
+
+  assert.deepEqual(
+    failures,
+    [],
+    `a band name at 0.72rem/600 is normal-size text and needs 4.5:1:\n- ${failures.join('\n- ')}`
+  );
 });

@@ -93,13 +93,14 @@
   // check runs whatever the persisted `enabled` flag happens to say, and showing a locked OFF
   // beside a check the engine rolls would be a worse lie than showing no state at all.
   const lockedOn = $derived(!craftingNone);
-  const lockedReading = $derived(
-    lockedOn
-      ? text('FABRICATE.Admin.Manager.Checks.Active.LockedOn', 'Check is on')
-      : text('FABRICATE.Admin.Manager.Checks.Active.LockedOff', 'Check is off')
-  );
+  // THE SAME TWO WORDS THE LIVE SWITCH USES (issue 1096). This read `Check is on` / `Check is
+  // off` while the switch one mode over read `On` / `Off` — two vocabularies for one state,
+  // side by side in the same card slot, which reads as two different facts rather than one
+  // fact in two modes. The padlock and the hint below carry the "locked" meaning visually and
+  // in prose, and the `aria-label` still says it in words.
+  const lockedReading = $derived(lockedOn ? onLabel : offLabel);
   const lockedLabel = $derived(
-    `${lockedReading} — ${text('FABRICATE.Admin.Manager.Checks.Active.LockedSuffix', 'locked by the resolution mode')}`
+    `${lockedOn ? text('FABRICATE.Admin.Manager.Checks.Active.LockedOn', 'Check is on') : text('FABRICATE.Admin.Manager.Checks.Active.LockedOff', 'Check is off')} — ${text('FABRICATE.Admin.Manager.Checks.Active.LockedSuffix', 'locked by the resolution mode')}`
   );
   const requiredHint = $derived(
     craftingNone
@@ -338,7 +339,7 @@
         <p class="manager-muted">
           {text(
             'FABRICATE.Admin.Manager.Checks.PreviewAs.Hint',
-            'Once the outcome preview is in place you can read this check against a chosen actor and record here. Nothing selected here will change the system.'
+            'Reading this check against an actor and record arrives with the outcome preview. Nothing chosen here will ever change the system.'
           )}
         </p>
       </section>

@@ -69,6 +69,12 @@ const {
 const { Recipe } = await import('../src/models/Recipe.js');
 const { RecipeManager } = await import('../src/systems/RecipeManager.js');
 const { CraftingSystemManager } = await import('../src/systems/CraftingSystemManager.js');
+// The PANEL side of the offer/accept pair, imported so the parity guard below compares the
+// write against the real producer of the dropdown rather than against a restated list.
+const { resolveRecipeCheckTierOptions } = await import('../src/utils/routedOutcomeKeywords.js');
+const { resolveActiveCraftingCheckFormula } = await import(
+  '../src/systems/checkModifierResolver.js'
+);
 
 const SYSTEM_ID = 'sys1';
 const TIER_EASY = 't-easy';
@@ -146,11 +152,12 @@ function bookDefinition(id, recipeIds = []) {
   };
 }
 
-function systemData({ definitions, marker = true, resolutionMode = 'simple' } = {}) {
+function systemData({ definitions, marker = true, resolutionMode = 'simple', alchemy } = {}) {
   const system = {
     id: SYSTEM_ID,
     name: 'Arcana',
     resolutionMode,
+    ...(alchemy ? { alchemy } : {}),
     categories: ['Potions', 'Scrolls'],
     items: [{ id: 'comp-a', name: 'Aqua Vitae', tags: [] }],
     craftingCheck: {
@@ -494,23 +501,40 @@ describe('applyBulkEditToRecipes — the check tier axis', () => {
 });
 
 describe('applyBulkEditToRecipes — which tiers a resolution mode offers', () => {
-  // The manager derives the active CRAFTING-CHECK mode from the system's resolution mode,
-  // mirroring the manager root's own `_craftingCheckMode`. If the two ever disagree, the
-  // panel offers a tier the write then refuses, so each arm is pinned by behaviour rather
-  // than by reading the private back.
+  // The manager resolves the active crafting-check SLOT with the SAME helper the manager
+  // root's panel resolves it with (`resolveActiveCraftingCheckFormula`), so the offer and
+  // the write cannot disagree. Each arm is pinned by behaviour rather than by reading a
+  // private back — and the three alchemy rows are the ones that caught the drift: alchemy
+  // rolls whichever slot its OWN `checkMode` names, not the simple slot a hand-rolled
+  // manager-side mode map assumed for every alchemy system.
   const MODES = [
     { resolutionMode: 'simple', accepts: TIER_HARD, refuses: 'routed-tier' },
-    { resolutionMode: 'alchemy', accepts: TIER_HARD, refuses: 'routed-tier' },
     { resolutionMode: 'routedByIngredients', accepts: TIER_HARD, refuses: 'routed-tier' },
     { resolutionMode: 'routedByCheck', accepts: 'routed-tier', refuses: TIER_HARD },
     { resolutionMode: 'progressive', accepts: null, refuses: TIER_HARD },
+    {
+      resolutionMode: 'alchemy',
+      alchemy: { checkMode: 'simple' },
+      accepts: TIER_HARD,
+      refuses: 'routed-tier',
+    },
+    {
+      resolutionMode: 'alchemy',
+      alchemy: { checkMode: 'tiered' },
+      accepts: 'routed-tier',
+      refuses: TIER_HARD,
+    },
+    { resolutionMode: 'alchemy', alchemy: { checkMode: 'none' }, accepts: null, refuses: TIER_HARD },
   ];
 
   for (const mode of MODES) {
-    it(`${mode.resolutionMode} refuses "${mode.refuses}"`, async () => {
+    const label = mode.alchemy
+      ? `${mode.resolutionMode}/${mode.alchemy.checkMode}`
+      : mode.resolutionMode;
+    it(`${label} refuses "${mode.refuses}"`, async () => {
       const fixture = makeFixture({
         recipes: [completeRecipe('r1')],
-        system: systemData({ resolutionMode: mode.resolutionMode }),
+        system: systemData({ resolutionMode: mode.resolutionMode, alchemy: mode.alchemy }),
       });
 
       await assert.rejects(
@@ -535,6 +559,48 @@ describe('applyBulkEditToRecipes — which tiers a resolution mode offers', () =
       }
     });
   }
+
+  // THE PARITY GUARD the "kept structurally identical" comment always needed and never had.
+  //
+  // The manager root offers the bulk panel exactly
+  // `resolveRecipeCheckTierOptions(craftingCheck, resolveActiveCraftingCheckFormula(system).slot)`
+  // (`CraftingSystemManagerRoot.svelte`'s `recipeCheckTierOptions`). This asserts the WRITE
+  // accepts every id that offer contains and nothing else, over the same mode matrix — so a
+  // second hand-rolled slot derivation on either side fails here rather than at a GM's apply.
+  it('accepts exactly the tier ids the panel would have offered, in every mode', async () => {
+    for (const mode of MODES) {
+      const system = systemData({
+        resolutionMode: mode.resolutionMode,
+        alchemy: mode.alchemy,
+      });
+      const offered = resolveRecipeCheckTierOptions(
+        system.craftingCheck,
+        resolveActiveCraftingCheckFormula(system).slot
+      ).map((tier) => String(tier.id));
+      const label = mode.alchemy
+        ? `${mode.resolutionMode}/${mode.alchemy.checkMode}`
+        : mode.resolutionMode;
+
+      // Every AUTHORED tier on either slot, so the complement is a real refusal rather than
+      // an id no system anywhere declares.
+      const authored = [TIER_EASY, TIER_HARD, 'routed-tier'];
+      for (const tierId of authored) {
+        const fixture = makeFixture({ recipes: [completeRecipe('r1')], system });
+        const apply = () =>
+          fixture.manager.applyBulkEditToRecipes(SYSTEM_ID, ['r1'], { checkTierId: tierId });
+        if (offered.includes(tierId)) {
+          await apply();
+          assert.equal(
+            recipeOf(fixture, 'r1').checkTierId,
+            tierId,
+            `${label} must accept the offered tier ${tierId}`
+          );
+        } else {
+          await assert.rejects(apply, /Check tier not authored/, `${label} must refuse ${tierId}`);
+        }
+      }
+    }
+  });
 });
 
 describe('applyBulkEditToRecipes — a refused enable', () => {

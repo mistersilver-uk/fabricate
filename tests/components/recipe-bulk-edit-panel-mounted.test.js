@@ -839,6 +839,7 @@ describe('RecipeBulkEditPanel check-tier axis (issue 1010)', () => {
     ['progressive', /difficulty lives on each result component/],
     ['dynamic', /resolves its DC dynamically at craft time/],
     ['fixed', /comes from its minimum success tier/],
+    ['noCheck', /rolls no crafting check, so there are no check tiers to assign/],
     ['unrecognisedMode', /doesn't recognise this system's resolution mode/],
     ['noTiers', /authors no tiers, so every recipe uses its default DC/]
   ]) {

@@ -200,11 +200,33 @@
   // mistakable for a failure one.
   const previewDc = $derived(Number(value?.dc ?? 0) || 0);
 
-  // The mix range. The floor stays clear of the surface it is mixed into (a band at 8% is
-  // not a colour, it is a smudge) and the ceiling stops short of the raw token so a
-  // full-strength band is not confusable with the `is-invalid` row highlight.
-  const BAND_TONE_MIN = 32;
-  const BAND_TONE_MAX = 88;
+  // THE RAMP IS BOUNDED BY THE BAND NAME'S CONTRAST, and it is mixed into an OPAQUE base
+  // for exactly that reason.
+  //
+  // Each band carries its tier's NAME, in `--fab-text` at 0.72rem/600 — normal-size text, so
+  // WCAG AA wants 4.5:1 against whatever the band paints. The first version of this ramp
+  // mixed into `--fab-surface-raised`, which is TRANSLUCENT in every theme, so the mix
+  // percentage doubled as an opacity: the fill got lighter as the ramp climbed and the cream
+  // ink fell to 2.63:1 on a failure band and 1.74:1 on the top success band (measured from
+  // the rendered `coverage-mode-routed-check-checks` frame).
+  //
+  // Shipping a per-band INK alongside the fill does not rescue that. The two inks available
+  // are `--fab-text` (which needs a fill luminance <= 0.111) and `--fab-on-success` /
+  // `--fab-on-danger` (which need >= 0.219), and a monotone ramp from one side to the other
+  // must cross the gap between them: at 32-88% into `--fab-surface-raised`, a five-band
+  // family lands two to four of its bands inside it, where NEITHER ink reaches 4.5:1.
+  //
+  // So the fill is mixed into `--fab-bg-0`, which is opaque. That makes the painted colour a
+  // pure function of the theme's own tokens — independent of whatever the strip is stacked
+  // on — and lets the whole ramp sit below the `--fab-text` ceiling. The measured ceiling is
+  // 45% (binding case: the `fabricate` theme's `--fab-success`); 44% keeps a band of margin.
+  // At 10-44% every band of every family in all seven shipped palettes clears 4.5:1 with at
+  // least 5.1:1, and the ends of a five-band family are still 2.19:1 (success) and 1.76:1
+  // (danger) apart, which is WIDER separation than any AA-clean ramp into the translucent
+  // surface could give.
+  const BAND_TONE_MIN = 10;
+  const BAND_TONE_MAX = 44;
+  const BAND_TONE_BASE = 'var(--fab-bg-0)';
 
   function bandTonePercent(rank, count) {
     if (count <= 1) return BAND_TONE_MAX;
@@ -213,7 +235,7 @@
 
   function bandColour(success, rank, count) {
     const family = success ? 'var(--fab-success)' : 'var(--fab-danger)';
-    return `color-mix(in srgb, ${family} ${bandTonePercent(rank, count)}%, var(--fab-surface-raised))`;
+    return `color-mix(in srgb, ${family} ${bandTonePercent(rank, count)}%, ${BAND_TONE_BASE})`;
   }
 
   const bandStripBands = $derived.by(() => {

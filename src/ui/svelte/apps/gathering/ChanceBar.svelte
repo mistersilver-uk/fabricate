@@ -52,23 +52,18 @@
   // Only the event scale recolours the fill by tier; the success scale stays a
   // flat green (FillBar's `success` tone).
   const rootClass = $derived(isEvent ? `chance-bar tier-${tier}` : 'chance-bar');
-  // The tier custom property is set by `.chance-bar.tier-*` in the global sheet. It carries
-  // its own FALLBACK because `var()` with none resolves to the guaranteed-invalid value and
-  // `background` then falls back to `transparent` — a fill that paints NOTHING, which is
-  // indistinguishable from 0% at any value. Any state where the tier rule has not applied
-  // (a bar rendered outside `.fabricate`, an unscoped mount in a test harness) would draw an
-  // empty track under a caption reading "78%".
-  // The tier custom property, which the scoped block below declares a DEFAULT for as well as
-  // four tier values — an unset `var()` resolves to the guaranteed-invalid value and
+  // The tier custom property, which the scoped block below declares a neutral DEFAULT for as
+  // well as four tier values — an unset `var()` resolves to the guaranteed-invalid value and
   // `background` then falls back to `transparent`, painting NOTHING, which is
   // indistinguishable from 0% under a caption reading "78%".
   //
-  // The fallback lives in the STYLESHEET rather than inline as `var(--x, var(--y))` for a
-  // reason worth stating: happy-dom's CSS value parser silently DISCARDS a nested `var()`
-  // from `cssText`, so the whole `background` declaration vanishes from the mounted DOM — and
-  // the mounted assertion that proves the FillBar child actually consumes this property would
-  // then be asserting on an element that carries no background at all. A declared default in
-  // the block that owns the tiers guarantees the same thing without blinding the test.
+  // The fallback lives in the STYLESHEET rather than inline as `var(--x, var(--y))` because
+  // that is where the four tier values live: one block owns the whole scale, and a second
+  // copy of the last-resort colour in a script is a second place for it to drift. (An earlier
+  // note here justified the same choice by claiming happy-dom's parser would discard a nested
+  // `var()` and blind the mounted test. That is true of `.style.cssText`, but the assertion
+  // below reads `getAttribute('style')`, which happy-dom returns verbatim — so the inline
+  // form was never untestable, and the reason it is not used is cohesion, not tooling.)
   const fillColour = $derived(isEvent ? 'var(--chance-bar-fill)' : '');
   const captionKey = $derived(
     isEvent
@@ -114,8 +109,15 @@
   .chance-bar {
     /* The DEFAULT for the property the FillBar child paints from. Every tier rule below is
        more specific and overrides it; it exists so that a bar whose tier rule somehow did not
-       apply still paints a fill rather than nothing at all. */
-    --chance-bar-fill: var(--fab-danger);
+       apply still paints a fill rather than nothing at all.
+
+       It is deliberately NEUTRAL, and not `--fab-danger`. This is the fill of LAST RESORT —
+       it can only paint when none of the four tier rules matched — so it must not be
+       byte-identical to one of them: `var(--fab-danger)` here made an unstyled bar
+       indistinguishable from a genuine `tier-red` reading, which is the most alarming thing
+       the event scale can say. A subtle neutral says "no tier resolved" instead of naming a
+       hazard the value never claimed. */
+    --chance-bar-fill: var(--fab-text-subtle);
 
     display: flex;
     flex-direction: column;

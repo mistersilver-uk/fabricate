@@ -2281,6 +2281,7 @@
             "CheckTierProgressive": "This system resolves progressively — difficulty lives on each result component, not on the recipe, so there is no recipe-level check tier to bulk edit.",
             "CheckTierDynamic": "This system's crafting check resolves its DC dynamically at craft time, so recipes carry no tier to select.",
             "CheckTierFixed": "This system's routed check uses fixed outcome tiers, so a recipe's difficulty comes from its minimum success tier rather than a check tier.",
+            "CheckTierNoCheck": "This system rolls no crafting check, so there are no check tiers to assign. Give it a check under Checks if you want recipes to carry a difficulty.",
             "CheckTierUnrecognisedMode": "Fabricate doesn't recognise this system's resolution mode, so it can't tell which check tiers apply. Check the system's Crafting settings.",
             "CheckTierNoTiers": "This system's crafting check authors no tiers, so every recipe uses its default DC. Add tiers under Checks to assign them here.",
             "Books": "Books & scrolls",
@@ -4879,7 +4880,7 @@
           },
           "PreviewAs": {
             "Title": "Preview as",
-            "Hint": "Once the outcome preview is in place you can read this check against a chosen actor and record here. Nothing selected here will change the system."
+            "Hint": "Reading this check against an actor and record arrives with the outcome preview. Nothing chosen here will ever change the system."
           },
           "Simulator": {
             "Title": "Outcome preview",

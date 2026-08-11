@@ -5267,8 +5267,15 @@
    had no hover response at all. The affordance belongs on the TRACK,
    which is the part that actually has an edge: its border and fill lift toward the
    text colour, so the switch responds identically in the on, off and danger states
-   and in every theme. A disabled switch does not respond. */
-.fabricate-manager .manager-status-toggle:not(:disabled, .is-disabled):hover .manager-status-toggle-track {
+   and in every theme. A disabled switch does not respond.
+
+   Neither does a LOCKED one (issue 1096). `.manager-status-toggle.is-locked` is the Checks
+   Studio's read-only activation INDICATOR — a `<span role="img">`, not a control — so
+   `:not(:disabled, .is-disabled)` was satisfied and the pointer lit it up like a switch a GM
+   could throw. `:disabled` cannot match a span and `.is-disabled` would be the wrong claim
+   about it (nothing is disabled; there is nothing to press), so the state is excluded by
+   name. */
+.fabricate-manager .manager-status-toggle:not(:disabled, .is-disabled, .is-locked):hover .manager-status-toggle-track {
   border-color: color-mix(in srgb, var(--fab-toggle-track-border) 55%, var(--fab-text));
   background: color-mix(in srgb, var(--fab-toggle-track) 88%, var(--fab-text));
 }

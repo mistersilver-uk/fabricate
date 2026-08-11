@@ -123,10 +123,18 @@ describe('ChanceBar (mounted)', () => {
     // guaranteed-invalid value, so `background` falls back to `transparent` — a fill that
     // paints nothing, under a caption reading a real percentage. The default is declared at
     // lower specificity than the four tiers, so it can only ever apply when none of them does.
-    assert.match(
-      source,
-      /\.chance-bar\s*\{\s*(?:\/\*[\s\S]*?\*\/\s*)?--chance-bar-fill:\s*var\(--fab-[\w-]+\);/,
-      'the base .chance-bar rule declares a fallback fill'
+    const base = /\.chance-bar\s*\{\s*(?:\/\*[\s\S]*?\*\/\s*)?--chance-bar-fill:\s*(var\(--fab-[\w-]+\));/.exec(
+      source
+    );
+    assert.ok(Boolean(base), 'the base .chance-bar rule declares a fallback fill');
+    // And it is a NAMED neutral, not "any theme token". Accepting any `--fab-*` let the fill
+    // of last resort be `--fab-danger` — byte-identical to `tier-red`, so a bar whose tier
+    // rule never applied was indistinguishable from the scale's most alarming reading — and
+    // would equally accept `--fab-success` under a danger caption.
+    assert.equal(base[1], 'var(--fab-text-subtle)', 'the last-resort fill is a subtle neutral');
+    assert.ok(
+      !declared.includes(base[1]),
+      `the fallback must not be one of the four tier colours, got ${base[1]}`
     );
   });
 

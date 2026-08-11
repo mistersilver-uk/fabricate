@@ -45,6 +45,7 @@ import {
 import { normalizeCharacterPrerequisiteList } from './characterPrerequisites.js';
 import {
   normalizeModifierPolicy,
+  resolveActiveCraftingCheckFormula,
   resolveMaxModifierPicks,
   resolveModifierBounds,
 } from './checkModifierResolver.js';
@@ -5103,9 +5104,20 @@ export class CraftingSystemManager {
    *
    * `null`/empty is the real instruction "Default DC" and resolves to `null`. Anything else
    * must name a tier the panel could have offered, which is exactly
-   * `resolveRecipeCheckTierOptions` over the system's active crafting-check mode — the same
+   * `resolveRecipeCheckTierOptions` over the system's active crafting-check SLOT — the same
    * helper the recipe editor's dropdown and the bulk panel's own gate read, so the three
    * cannot disagree about which tiers exist.
+   *
+   * THE SLOT IS THE RESOLVER'S OWN ANSWER (issue 1096), not a manager-side twin of it. A
+   * hand-rolled copy of the mode map stood here and was documented as "kept structurally
+   * identical" to `CraftingSystemManagerRoot`'s, which nothing pinned; the moment the root
+   * moved onto `resolveActiveCraftingCheckFormula` the two disagreed for alchemy, and the
+   * panel listed a routed tier that this method then threw on. One derivation is the only
+   * shape in which the offer and the write cannot drift.
+   *
+   * A `null` slot — alchemy at `checkMode: 'none'`, or a resolution mode outside the
+   * canonical set — yields `resolveRecipeCheckTierOptions(check, null) === []`, so a system
+   * that rolls no crafting check accepts Default DC and nothing else.
    *
    * @param {object} system
    * @param {?string} rawTierId
@@ -5118,35 +5130,13 @@ export class CraftingSystemManager {
 
     const options = resolveRecipeCheckTierOptions(
       system?.craftingCheck,
-      this._craftingCheckModeFor(system)
+      resolveActiveCraftingCheckFormula(system).slot
     );
     const known = options.some((tier) => String(tier?.id ?? '') === tierId);
     if (!known) {
       throw new Error(`Check tier not authored by crafting system ${system?.id}: ${tierId}`);
     }
     return tierId;
-  }
-
-  /**
-   * The active CRAFTING-CHECK mode for a system's resolution mode — the manager-side twin
-   * of `CraftingSystemManagerRoot`'s `_craftingCheckMode`, kept structurally identical so
-   * the write and the panel that stages for it resolve the same tier list.
-   *
-   * `null` for an unrecognised mode is deliberately preserved from that original even
-   * though `_normalizeSystem` coerces every persisted `resolutionMode` to one of five
-   * tokens: `resolveRecipeCheckTierOptions(check, null)` is `[]`, so an unnormalized system
-   * offers no tier rather than silently accepting one.
-   *
-   * @param {object} system
-   * @returns {'simple'|'routed'|'progressive'|null}
-   * @private
-   */
-  _craftingCheckModeFor(system) {
-    const resolution = system?.resolutionMode || 'simple';
-    if (resolution === 'routedByCheck') return 'routed';
-    if (resolution === 'progressive') return 'progressive';
-    if (['simple', 'alchemy', 'routedByIngredients'].includes(resolution)) return 'simple';
-    return null;
   }
 
   /**

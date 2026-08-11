@@ -49,7 +49,7 @@
   single-recipe editor gives `''` the OPPOSITE meaning); this component only renders them.
 
   When the system's crafting check carries no recipe-level tier at all, the panel STATES
-  which of the five cases it is, in place of the control, rather than hiding the section —
+  which of the six cases it is, in place of the control, rather than hiding the section —
   a hidden axis reads as a missing feature. That is not the same fact as the system having
   no usable check at all, which the row's own `No check` pill already reports.
 
@@ -214,7 +214,7 @@
     segmentOptions(RECIPE_BULK_LOCK_VALUES, LOCK_SEGMENT_LABELS, inert)
   );
 
-  // Five cases, five messages, keyed by the model's own `reason`. A table rather than a
+  // Six cases, six messages, keyed by the model's own `reason`. A table rather than a
   // chain of `{:else if}` blocks, so adding a reason to the model without a message here
   // renders an empty strip instead of silently falling through to the wrong one.
   const CHECK_TIER_REASON_MESSAGES = {
@@ -229,6 +229,10 @@
     fixed: [
       'FABRICATE.Admin.Manager.Recipe.BulkEdit.CheckTierFixed',
       "This system's routed check uses fixed outcome tiers, so a recipe's difficulty comes from its minimum success tier rather than a check tier.",
+    ],
+    noCheck: [
+      'FABRICATE.Admin.Manager.Recipe.BulkEdit.CheckTierNoCheck',
+      'This system rolls no crafting check, so there are no check tiers to assign. Give it a check under Checks if you want recipes to carry a difficulty.',
     ],
     unrecognisedMode: [
       'FABRICATE.Admin.Manager.Recipe.BulkEdit.CheckTierUnrecognisedMode',

@@ -16780,6 +16780,25 @@ describe('CraftingSystemManager mounted behavior', () => {
     return target;
   }
 
+  /**
+   * The routed crafting system these Checks cases share, in its two arms. `rollFormula: ''`
+   * is the BROKEN one — it raises `noRollFormula`, which is what gives the Validation route a
+   * deep-linkable row — and `'1d20'` the clean one. Hoisted because four cases carried
+   * byte-identical copies of it, and a fixture restated once per case is a fixture that can
+   * silently stop being the same fixture.
+   */
+  const routedCraftingOptions = (rollFormula) => ({
+    alchemyResolutionMode: 'routedByCheck',
+    craftingCheck: {
+      enabled: true,
+      routed: {
+        rollFormula,
+        type: 'relative',
+        relativeOutcomes: [{ id: 'x', name: 'Success', success: true, dc: 0 }],
+      },
+    },
+  });
+
   it('evaluates the check the ENGINE rolls, for the one mode the two mappings disagreed on', async () => {
     // ALCHEMY + TIERED. The route renders the ROUTED editor (its own derivation reads
     // `alchemy.checkMode`), so the routed draft is the one a GM edits — but the rail badge
@@ -16898,17 +16917,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     // The latch was on the section VALUE, so the second request equalled it and was
     // swallowed: deep-link to `roll`, click Triggers, deep-link to `roll` again, and the GM
     // landed on Triggers. Cross-activity deep-linking makes that the ordinary path.
-    await mountChecks([], {
-      alchemyResolutionMode: 'routedByCheck',
-      craftingCheck: {
-        enabled: true,
-        routed: {
-          rollFormula: '',
-          type: 'relative',
-          relativeOutcomes: [{ id: 'x', name: 'Success', success: true, dc: 0 }],
-        },
-      },
-    });
+    await mountChecks([], routedCraftingOptions(''));
     await openChecksActivity('validation');
 
     const deepLink = () => {
@@ -16945,40 +16954,130 @@ describe('CraftingSystemManager mounted behavior', () => {
     );
   });
 
-  it('does not re-apply a standing deep link when the GM picks another section', async () => {
-    // The mirror defect, which is why the latch cannot simply be removed: a request treated
-    // as a standing instruction drags the strip back on every recomputation.
+  it('reads the locked activation state in the SAME words the live switch uses', async () => {
+    // The locked indicator said `Check is on` where the switch one mode over says `On` — two
+    // vocabularies for one state, in the same card slot. The padlock, the hint and the
+    // `aria-label` carry the locked meaning; the reading itself should not restate it.
+    await mountChecks([], { alchemyResolutionMode: 'simple' });
+    await openChecksActivity('crafting');
+    const live = target.querySelector('[data-checks-active-toggle] .manager-status-toggle-label');
+    assert.ok(Boolean(live), 'a simple crafting check offers the live switch');
+    const liveReading = live.textContent.trim();
+    assert.equal(liveReading, 'On', 'the live switch reads On');
+
+    // routedByCheck REQUIRES its check, so the same slot renders the locked indicator.
+    await mountChecks([], routedCraftingOptions('1d20'));
+    await openChecksActivity('crafting');
+    const locked = target.querySelector('[data-checks-active-locked]');
+    assert.ok(Boolean(locked), 'a mandatory check renders the locked indicator instead');
+    assert.ok(
+      !target.querySelector('[data-checks-active-toggle]'),
+      'and the two never render together, so this really is the same slot'
+    );
+    assert.equal(
+      locked.querySelector('.manager-status-toggle-label').textContent.trim(),
+      liveReading,
+      'the locked reading is the live switch’s own word'
+    );
+    // The locked MEANING still reaches assistive tech, which is why the reading can drop it.
+    assert.match(locked.getAttribute('aria-label'), /Check is on — locked by the resolution mode/);
+  });
+
+  it('names each mode in the ALL CHECKS rail the way its own picker names it', async () => {
+    // The rail read the AUTHORED tokens straight out of the system, and the three subsystems
+    // spell one concept three ways — so the card printed `routedByCheck` on the crafting row
+    // directly above `routed` on the salvage row, two camelCase identifiers for one mode,
+    // while the window header two panels away said "Routed by check".
     await mountChecks([], {
-      alchemyResolutionMode: 'routedByCheck',
-      craftingCheck: {
+      ...routedCraftingOptions('1d20'),
+      salvageResolutionMode: 'routed',
+      salvageCraftingCheck: {
         enabled: true,
         routed: {
-          rollFormula: '',
+          rollFormula: '1d20',
           type: 'relative',
-          relativeOutcomes: [{ id: 'x', name: 'Success', success: true, dc: 0 }],
+          relativeOutcomes: [{ id: 's1', name: 'Scrap', success: true, dc: 0 }],
+        },
+      },
+    });
+    await openChecksActivity('validation');
+
+    // `IconFactRow` renders its `subtitle` — the mode + formula line — in a `<small>`.
+    const detailOf = (id) =>
+      target.querySelector(`[data-checks-all-checks-row="${id}"] small`)?.textContent || '';
+    const card = target.querySelector('[data-checks-all-checks]');
+    assert.ok(Boolean(card), 'the Validation rail renders the All checks card');
+    const cardText = card.textContent;
+
+    // The GM-facing name, on BOTH rows, and it is the SAME words for the same mode.
+    assert.match(cardText, /Routed by check/, 'the routed modes are named as the pickers name them');
+    assert.ok(
+      !/routedByCheck/.test(cardText),
+      `no internal identifier reaches the card:\n${cardText}`
+    );
+    assert.ok(
+      !/\brouted\b/.test(cardText),
+      `and the salvage row does not print its raw token either:\n${cardText}`
+    );
+    assert.match(detailOf('crafting'), /Routed by check/, 'the crafting row names its mode');
+    assert.match(detailOf('salvage'), /Routed by check/, 'and the salvage row the same one');
+  });
+
+  it('does not re-apply a standing deep link when the GM changes ACTIVITY', async () => {
+    // The mirror defect, which is why the latch cannot simply be removed: a request treated
+    // as a standing instruction drags the strip back on every recomputation.
+    //
+    // THE PROBE HAS TO CHANGE THE ACTIVITY, not just the section. Under Svelte 5's
+    // fine-grained reactivity the adoption effect reads `activity`, `requestedSection`,
+    // `requestedSectionNonce`, `adoptedSectionNonce` and `sections` — it never reads
+    // `activeSection`, so a section click writes a value the effect does not depend on and
+    // the effect does not re-run at all. An earlier version of this test clicked two further
+    // sections and asserted the strip stayed put; that is true whether or not the latch
+    // works, and breaking the latch (`requestedSectionNonce !== adoptedSectionNonce` →
+    // a constant) left the suite green. A rail click to another activity DOES re-run it,
+    // and `checksActiveSection` on the root is never cleared, so the standing request is
+    // still there to be wrongly re-applied.
+    await mountChecks([], {
+      salvageResolutionMode: 'routed',
+      salvageCraftingCheck: {
+        enabled: true,
+        routed: {
+          rollFormula: '1d20',
+          type: 'relative',
+          relativeOutcomes: [{ id: 's1', name: 'Scrap', success: false, dc: 0 }],
         },
       },
     });
     await openChecksActivity('validation');
     target
-      .querySelector('[data-checks-validation-section="crafting"] [data-issue="noRollFormula"]')
+      .querySelector('[data-checks-validation-section="salvage"] [data-issue="noSuccessOutcome"]')
       .querySelector('.manager-recipe-val-view')
       .click();
     await tick();
     flushSync();
-    // Two further section clicks, each of which re-runs the adoption effect. A latch that
-    // never fired would drag the strip back to the standing `roll` request on every one.
-    await openChecksSection('outcomes');
-    await openChecksSection('modifiers');
     assert.equal(
-      target.querySelector('#checks-section-modifiers').getAttribute('aria-selected'),
+      target.querySelector('#checks-section-outcomes').getAttribute('aria-selected'),
+      'true',
+      'the deep link opens Outcomes on salvage'
+    );
+
+    // The GM moves off the requested section, then leaves the activity entirely.
+    await openChecksSection('triggers');
+    await openChecksActivity('crafting');
+    assert.equal(
+      target.querySelector('.fabricate-manager').dataset.managerView,
+      'checks-crafting',
+      'the rail click changed route, so the adoption effect really did re-run'
+    );
+    assert.equal(
+      target.querySelector('#checks-section-triggers').getAttribute('aria-selected'),
       'true',
       'the GM stays where they clicked'
     );
     assert.equal(
-      target.querySelector('#checks-section-roll').getAttribute('aria-selected'),
+      target.querySelector('#checks-section-outcomes').getAttribute('aria-selected'),
       'false',
-      'and the honoured request does not re-apply itself'
+      'and the honoured request does not re-apply itself on the new activity'
     );
   });
 
@@ -17022,17 +17121,7 @@ describe('CraftingSystemManager mounted behavior', () => {
   it('explains the open section’s warning dot IN the panel', async () => {
     // The dot's legend (DN8). Without it the only route to the sentence is to leave for
     // Validation and deep-link back.
-    await mountChecks([], {
-      alchemyResolutionMode: 'routedByCheck',
-      craftingCheck: {
-        enabled: true,
-        routed: {
-          rollFormula: '',
-          type: 'relative',
-          relativeOutcomes: [{ id: 'x', name: 'Success', success: true, dc: 0 }],
-        },
-      },
-    });
+    await mountChecks([], routedCraftingOptions(''));
     await openChecksActivity('crafting');
     const callout = target.querySelector('[data-checks-section-callout="noRollFormula"]');
     assert.ok(callout, 'the roll section explains its own dot');

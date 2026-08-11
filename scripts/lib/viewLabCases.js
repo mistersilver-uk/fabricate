@@ -1894,8 +1894,13 @@ export const VIEW_LAB_CASES = Object.freeze([
     smokeLabels: [],
     // No frame in the prototype shows a section carrying BOTH markers, and they occupy the
     // same slot, so this is the one that proves they do not collide. Runework is routed by
-    // check with five authored tiers; blanking one tier's NAME raises `unnamedOutcome`,
-    // which buckets to Outcomes — the section that already carries the tier count.
+    // check with THREE authored tiers — the count the header badge reads — and blanking the
+    // first one's NAME raises `unnamedOutcome`, which buckets to Outcomes, the section that
+    // already carries the tier count.
+    //
+    // The tier it blanks is the TOP one, so this frame's strongest band is captioned with
+    // nothing. That is correct for what this case photographs and wrong for anything about
+    // band NAMES: `coverage-mode-routed-check-checks` is the frame that shows those.
     query: { system: 'lab-runework' },
     steps: [
       'Checks',
@@ -4791,6 +4796,12 @@ export const VIEW_LAB_CASES = Object.freeze([
     // `rw-ruined` is the LAST tier in Runework's `relativeOutcomes`, and
     // `scrollIntoViewIfNeeded` lands its anchor near the BOTTOM edge, so the whole
     // table sits above it in frame.
+    //
+    // IT IS ALSO THE BAND STRIP'S ONLY EVIDENCE, and the only frame in the registry that
+    // shows a NAMED label on the strongest band (issue 1096). Its sibling
+    // `manager-checks-section-badged-and-dotted` blanks the top tier's name to raise
+    // `unnamedOutcome`, so its top band is captioned with nothing — which is how a band-name
+    // contrast regression on exactly that band reached a published frame set unseen.
     steps: [
       'Checks',
       { selector: '#manager-checks-nav-crafting' },
@@ -4798,7 +4809,16 @@ export const VIEW_LAB_CASES = Object.freeze([
       { selector: '[data-outcome-row="rw-ruined"]', scroll: true },
     ],
     expectView: 'checks-crafting',
+    // Anchored on the strip's own `<span>` band, so a case that stopped drawing the strip
+    // fails here rather than publishing a frame of the table alone.
+    expectSelector: '.fabricate-manager [data-band-strip-band]',
     kinds: ['manager', 'checks', 'resolution-mode'],
+    // Deliberately NO pattern for `components/ThresholdBandStrip.svelte`, for the reason
+    // `manager-gathering-stamina-rolls` records about `Stepper`: `BROAD_SIGNAL_PATTERN`
+    // matches `^src/ui/svelte/components/` and `selectRenderFileCases` `continue`s on a
+    // broad-signal file BEFORE consulting any case's `sourceMatches`, so such an entry would
+    // be unreachable. A change to the strip PRIMITIVE therefore publishes the representative
+    // set, and a change to this editor — where the band colours are chosen — publishes this.
     sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/checks\//],
   }),
   managerCase({
