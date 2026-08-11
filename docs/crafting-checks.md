@@ -59,20 +59,26 @@ Macros and automation that call Fabricate directly keep the original silent beha
 
 A crafting check can add in named modifiers read from the crafter — a Medicine bonus, a Herbalism kit — without you writing anything into the roll formula.
 Fabricate resolves the eligible modifiers to one number and adds it to the roll as a single flavoured term, so a roll of `1d20 + 2` with a `+3` modifier is rolled and reported as `1d20 + 2 + 3[Modifiers]`.
-The **Check modifiers** card on the **Crafting check** page defines the catalogue of modifiers a system's checks can draw on, which of them apply by default, and how they combine.
+The modifiers themselves live in **one library per crafting system**, on the **Modifiers** card of the system's **System settings** page.
+The **Check modifiers** card on each Checks page then decides which of them that activity applies and how they combine.
 Everything on that card is a system-level decision.
 A recipe never overrides it; the most a recipe can do is pick which modifiers apply, and only when the system's combination rule asks it to.
-The card appears on every crafting sub-tab once the catalogue has at least one entry, whether or not the system's active check can use it yet.
+The card appears in every mode once the library has at least one entry, whether or not the system's active check can use it yet.
 When it cannot, the card explains why instead of hiding, so a modifier you authored is never silently doing nothing with no indication.
 Check modifiers are **not** a crafting-only feature.
-Salvage and Gathering select over the same catalogue, each with its own rule, its own default set and its own pick cap — see [One catalogue, three activities](#one-catalogue-three-activities).
-The catalogue itself is only ever *edited* on the Crafting check.
+Crafting, Salvage and Gathering select over the same library, each with its own rule, its own default set and its own pick cap — see [One library, three activities](#one-library-three-activities).
+**No Checks page edits an entry**, Crafting included: each shows the library read-only and links to System settings › Modifiers.
 
-### Defining check modifiers
+### Defining modifiers
 
-On the **Check modifiers** card, choose **Add modifier** to add an entry.
-Each entry has an **Icon**, a **Label** such as Medicine or Herbalism, and an **Expression**, a roll-data path resolved against the crafter, for example `abilities.med.mod`.
+Open **System settings** for the crafting system and find the **Modifiers** card, then choose **Add modifier**.
+Each entry has an **Icon**, a **Label** such as Medicine or Herbalism, and an **Expression**, a roll-data path resolved against the acting character, for example `abilities.med.mod`.
 There is nothing to add to the roll formula: an entry that is eligible applies automatically.
+
+This is the same library gathering drop rows and events reference for their d100 chances, so a modifier is defined once and used wherever it makes sense.
+The two READ it differently, and one difference is a rule rather than a preference: **an expression that rolls dice cannot be used by a check**.
+A drop row can — it works the expression out and shifts the chance by the result — but a check adds a single settled number to its roll, and a rolled expression is not one.
+The row says so where you author it, and any check that applies such a modifier reports a blocking issue naming the entry.
 
 ### Upgrading from a version before 1.21.0
 
@@ -82,24 +88,24 @@ On first load after upgrading, Fabricate removes it from every stored crafting, 
 
 Three things are worth knowing before you upgrade.
 
-- **A catalogue you authored but never referenced now applies.** If you built a catalogue and deliberately never spent the placeholder, those modifiers were doing nothing and now add to every crafting roll.
+- **A library you authored but never referenced now applies.** If you built one and deliberately never spent the placeholder, those modifiers were doing nothing and now add to every crafting roll.
 To keep the previous total, switch every entry off on that system, or choose a combination rule whose set resolves to 0.
 - **A formula that SUBTRACTED the placeholder now adds it.** A check written as `1d20 - <placeholder>` rolled `1d20 - 3` with a `+3` modifier; it now rolls `1d20 + 3[Modifiers]`.
 A formula that spent the placeholder twice counted it twice and now counts it once.
 - **A placeholder written somewhere it cannot simply be removed is left alone and reported.** If you wrote it inside a multiplication, a function argument such as `max(...)`, a dice count, or its own parentheses, Fabricate cannot guess what you meant, so it leaves the formula exactly as you authored it, names the system in the upgrade notice, and treats that check as having no roll formula until you edit it.
-The Validation tab also flags any formula still containing the retired placeholder, so a placeholder typed after the upgrade is never removed silently.
+Fabricate's Checks **Validation** section also flags any formula still containing the retired placeholder, so a placeholder typed after the upgrade is never removed silently.
 
-Downgrading back to 1.20.0 loses no data — your formulas and catalogues are intact — but that version resolves check modifiers only through the placeholder it no longer finds, so they stop contributing until you type it back in by hand.
+Downgrading back to 1.20.0 loses no data — your formulas and libraries are intact — but that version resolves check modifiers only through the placeholder it no longer finds, so they stop contributing until you type it back in by hand.
 
 ### When check modifiers do nothing
 
-The catalogue only changes a roll when the system's active crafting check actually rolls something.
+The library only changes a roll when the system's active crafting check actually rolls something.
 When it cannot, the **Check modifiers** card keeps its controls but adds a notice naming which of these applies:
 
 - The current resolution mode rolls no crafting check at all, so there is nothing for a modifier to add to.
 - The active check has no roll formula authored yet.
 
-Author (or fix) a roll formula on the relevant check to make the catalogue count.
+Author (or fix) a roll formula on the relevant check to make the library count.
 
 ### Combination rule
 
@@ -121,13 +127,13 @@ The combination rule is always the system's.
 Neither a recipe nor a player can change it, and neither can pick modifiers under a rule that does not ask them to.
 Choosing the by-record rule or **Player picks** hands out the *selection*, never the rule.
 
-Each of the three activities — Crafting, Salvage and Gathering — carries its **own** combination rule, default set and pick cap, over **one shared catalogue**.
-The catalogue is authored once, on the Crafting check; the Salvage and Gathering cards show the same entries read-only and let you decide which of them apply there and how they combine.
+Each of the three activities — Crafting, Salvage and Gathering — carries its **own** combination rule, default set and pick cap, over **one shared library**.
+The library is authored once, in System settings › Modifiers; all three Checks cards show the same entries read-only and let you decide which of them apply there and how they combine.
 The by-record rule is one rule with three labels: it reads **By recipe** on Crafting, **By component** on Salvage and **By gathering task** on Gathering, because the record doing the picking is different on each.
 
 ### The default eligible set
 
-There is no separate "Default modifiers" picker: each catalogue entry carries its own switch, on its own row, and the entries you switch on ARE the activity's default set.
+There is no separate "Default modifiers" picker: each library entry carries its own switch, on its own row, and the entries you switch on ARE the activity's default set.
 The switch's word changes with the combination rule, because the rule is what "on" means, and its off word answers it:
 
 - Under **Add all** an entry reads **Applied** or **Not applied** — the set that applies, to every attempt in the system.
@@ -139,22 +145,22 @@ A sentence above the entries states which of those four readings is in force, an
 
 ### Least and most a modifier may add
 
-Each catalogue entry may carry a **Minimum** and a **Maximum**, on the Crafting check where the catalogue is authored.
+Each library entry may carry a **Minimum** and a **Maximum**, in System settings › Modifiers where the library is authored.
 They clamp what **that one modifier** contributes, after its expression is worked out and before the modifiers are combined — so a maximum of `+5` caps that entry at `+5` whether the rule sums the eligible set or takes the largest of it.
 
 **Leave either field empty for no bound on that side.**
 An empty field is a real setting, not an unanswered question, exactly as **Maximum picks** is; a bound of `0` is a real bound and is kept.
 
-If you set a minimum **above** the maximum, that modifier contributes **nothing at all** until you fix the two values, and the Validation tab reports it as a blocking issue.
+If you set a minimum **above** the maximum, that modifier contributes **nothing at all** until you fix the two values, and the **Validation** section of Checks reports it as a blocking issue.
 Fabricate deliberately does not quietly swap them round: that would roll a number you never asked for.
 
 A bound that is too large or too small to appear in a dice formula — anything Foundry would have to write in exponent notation, such as `1e21` — is blocked the same way, with its own message, and the row says so where you typed it.
 Only that entry is refused; the other modifiers on the roll are unaffected.
 
-### One catalogue, three activities
+### One library, three activities
 
-Salvage and Gathering select over the same catalogue the Crafting check authors.
-Their cards show each entry read-only — its name, its expression and a bounds chip such as `-1 to +6` — with a link back to the Crafting check to edit them.
+Crafting, Salvage and Gathering all select over the same library.
+Each card shows every entry read-only — its name, its expression and a bounds chip such as `-1 to +6` — with a link to System settings › Modifiers to edit them.
 What each activity *does* own is fully editable there: which entries apply, how they combine, and the pick cap.
 
 **Gathering is not switched on yet.**
@@ -162,8 +168,8 @@ Progressive and routed gathering are still disabled (issue 683), and the d100 mo
 The card says so.
 Anything you set is saved and starts applying when those gathering modes ship.
 
-The gathering **check** modifiers here are a different thing from the gathering library's **character** modifiers.
-Character modifiers shift a drop's percentage chance in d100 gathering; check modifiers add to a rolled formula in progressive and routed gathering.
+A gathering **check** modifier and a gathering **character** modifier now come from the same library, but they are applied differently and one does not stand in for the other.
+A character modifier is attached to a drop row or an event and shifts that drop's percentage chance in d100 gathering; a check modifier is selected here and adds to a rolled formula in progressive and routed gathering.
 Neither applies where the other does.
 
 ### Maximum picks
@@ -201,10 +207,10 @@ It is a deliberate choice, distinct from inheriting an empty set.
 The picks are summed at roll time, and nothing is asked of the player.
 
 **If a recipe's Eligible modifiers control is not on its Overview tab**, this section is almost always why.
-The control appears only when the system's combination rule is **By recipe** and the system has at least one check modifier in its catalogue.
+The control appears only when the system's combination rule is **By recipe** and the system has at least one entry in its Modifiers library.
 Salvage and Gathering have the same control on the component editor's Salvage section and in the gathering task editor, under their own activity's rule.
 Under **Add all**, **Highest**, or **Player picks** the recipe has nothing to choose, so the tab shows nothing at all rather than a control the system would ignore.
-Open the **Crafting check** page for that recipe's system and look at the **Combination rule** on the **Check modifiers** card.
+Open the **Checks** page for that recipe's system and look at the **Combination rule** on its **Check modifiers** section.
 If the rule is already **By recipe** and the control is still missing, the recipe's Overview tab shows a banner in its place naming one of the two causes in [When check modifiers do nothing](#when-check-modifiers-do-nothing).
 
 Switching the system away from the by-record rule does not delete anything a record picked.
@@ -293,7 +299,7 @@ A step that would run off the end of the tier list stops at the highest or lowes
 
 A **Target tier** naming a tier the check no longer has does nothing at all.
 This is easy to reach by accident, because switching a check between Relative and Fixed tiers replaces the whole tier list.
-The trigger shows the missing tier and the check's **Validation** tab warns you about it, so pick one of the check's current tiers to fix it.
+The trigger shows the missing tier and the Checks **Validation** section warns you about it, so pick one of the check's current tiers to fix it.
 
 A trigger's condition always looks at the tier the dice landed on, never at the tier a step produced.
 That means an outcome-tier condition can drive a step, and steps can never chain into each other.

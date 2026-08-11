@@ -35,8 +35,19 @@ export function makeFakeActor(overrides = {}) {
   };
 }
 
+/**
+ * @param {object} [options]
+ * @param {object} [options.config] The raw `gatheringConfig` setting.
+ * @param {Array<object>|null} [options.modifiers] The crafting system's ONE modifier library
+ *   (issue 1117). It is a SYSTEM field, not a gathering-config one, so it is declared here
+ *   and returned as `system` — the second argument `composeEnvironment` takes — rather than
+ *   seeded into `config`, which no longer carries a library at all.
+ * @param {string} [options.systemId] The crafting system id the returned `system` carries.
+ */
 export function makeRichState({
   config = {},
+  modifiers = null,
+  systemId = 'system-test',
   rolls = [100],
   evaluateExpression = null,
   runMacro = null,
@@ -72,7 +83,16 @@ export function makeRichState({
       : null,
     secondsPerUnit
   });
-  return { service, settings, writes, hooks, rollCalls, evaluateCalls, macroCalls };
+  // A REAL system shape, not a bare `{ id }`: the same object is handed to
+  // `composeEnvironment` (which reads `tools` and `modifiers`) and to `makeEngine` (which
+  // gates on `enabled` and `features.gathering`), so a stub carrying only an id made every
+  // engine-level attempt refuse rather than resolve.
+  const system = {
+    ...DEFAULT_TEST_SYSTEM,
+    id: systemId,
+    ...(Array.isArray(modifiers) ? { modifiers } : {}),
+  };
+  return { service, system, settings, writes, hooks, rollCalls, evaluateCalls, macroCalls };
 }
 
 export function environment(overrides = {}) {
@@ -221,21 +241,4 @@ export function routedRoll(success = true) {
   stubRoll(total, [{ number: 1, faces: 20, total }]);
 }
 
-/**
- * Build a per-system character modifier library descriptor that the test rich
- * state can absorb directly via `makeRichState({ config })`.
- *
- * @param {object} options
- * @param {Array<object>} [options.entries] Library entries.
- * @param {string} [options.system] Crafting system id.
- * @returns {object} A `config` payload with the modifiers seeded.
- */
-export function makeCharacterModifierLibrary({ entries = [], system = 'system-test' } = {}) {
-  return {
-    systems: {
-      [system]: {
-        characterModifiers: entries
-      }
-    }
-  };
-}
+

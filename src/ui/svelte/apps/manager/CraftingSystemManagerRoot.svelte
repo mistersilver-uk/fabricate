@@ -136,6 +136,10 @@
   // blocker banner) force the Validation tab open even when the page is already shown.
   let requestedSystemTab = $state('settings');
   let requestedSystemTabNonce = $state(0);
+  // Deep link into the System Overview page's Modifiers section (issue 1117). The Checks
+  // screen renders the modifier library read-only for every activity and links here, which
+  // is the one navigation that replaces the authoring the Checks card used to do.
+  let requestedSystemModifierSectionNonce = $state(0);
   let selectedRecipeId = $state('');
   let selectedComponentId = $state('');
   let selectedEssenceId = $state('');
@@ -1126,10 +1130,12 @@
   const selectedGatheringConditionShortcuts = $derived(
     buildSelectedGatheringConditionShortcuts(selectedSystem, $viewState.gatheringConfig)
   );
-  const selectedGatheringCharacterModifiers = $derived(
-    Array.isArray($viewState.gatheringConfig?.systems?.[selectedSystemId]?.characterModifiers)
-      ? $viewState.gatheringConfig.systems[selectedSystemId].characterModifiers
-      : []
+  // The ONE authored modifier library (issue 1117). It is projected off the SYSTEM, not
+  // the gathering config: crafting, salvage and gathering checks select over it, and the
+  // gathering d100 drop rows, events and stamina costs reference it. Every surface that
+  // reads a modifier reads this one derivation.
+  const selectedSystemModifiers = $derived(
+    Array.isArray(selectedSystem?.modifiers) ? selectedSystem.modifiers : []
   );
   const selectedCurrencyUnits = $derived(
     Array.isArray(selectedSystem?.requirements?.currency?.units)
@@ -1171,23 +1177,23 @@
   );
   async function onAddCharacterModifier(partial) {
     if (!selectedSystemId) return null;
-    return await store.addGatheringCharacterModifier(selectedSystemId, partial);
+    return await store.addSystemModifier(selectedSystemId, partial);
   }
   async function onSeedCharacterModifierPresets() {
     if (!selectedSystemId || !characterModifierPresetsSupported) return;
-    await store.seedGatheringCharacterModifierPresets(selectedSystemId);
+    await store.seedSystemModifierPresets(selectedSystemId);
   }
   async function onUpdateCharacterModifier(modifierId, patch) {
     if (!selectedSystemId) return;
-    await store.updateGatheringCharacterModifier(selectedSystemId, modifierId, patch);
+    await store.updateSystemModifier(selectedSystemId, modifierId, patch);
   }
   async function onDeleteCharacterModifier(modifierId) {
     if (!selectedSystemId) return;
-    await store.deleteGatheringCharacterModifier(selectedSystemId, modifierId);
+    await store.deleteSystemModifier(selectedSystemId, modifierId);
   }
   async function onReorderCharacterModifier(fromIndex, toIndex) {
     if (!selectedSystemId) return;
-    await store.reorderGatheringCharacterModifier(fromIndex, toIndex, selectedSystemId);
+    await store.reorderSystemModifier(fromIndex, toIndex, selectedSystemId);
   }
 
   // Character prerequisites (issue 544) — system-owned pass/fail learning gates.
@@ -1271,7 +1277,7 @@
 
   function characterModifierLibraryEntry(modifierId) {
     if (!modifierId) return null;
-    return selectedGatheringCharacterModifiers.find((entry) => entry.id === modifierId) || null;
+    return selectedSystemModifiers.find((entry) => entry.id === modifierId) || null;
   }
 
   function characterModifierLabelForRef(ref) {
@@ -1298,7 +1304,7 @@
 
   async function onAddDropCharacterModifier(rowId, modifierId = null) {
     if (!editingGatheringTask?.id || !rowId) return;
-    const id = modifierId ?? selectedGatheringCharacterModifiers[0]?.id ?? '';
+    const id = modifierId ?? selectedSystemModifiers[0]?.id ?? '';
     if (!id) return;
     const rows = gatheringTaskDropRows(editingGatheringTask);
     const row = rows.find((entry) => entry.id === rowId);
@@ -1322,7 +1328,7 @@
     const attached = new Set(
       (selectedGatheringDrop?.characterModifiers || []).map((ref) => ref.modifierId).filter(Boolean)
     );
-    return selectedGatheringCharacterModifiers.filter((entry) => {
+    return selectedSystemModifiers.filter((entry) => {
       if (attached.has(entry.id)) return false;
       const label = String(entry.label || '').toLowerCase();
       const id = String(entry.id || '').toLowerCase();
@@ -1341,7 +1347,7 @@
     const attached = new Set(
       (editingGatheringEvent?.characterModifiers || []).map((ref) => ref.modifierId).filter(Boolean)
     );
-    return selectedGatheringCharacterModifiers.filter((entry) => {
+    return selectedSystemModifiers.filter((entry) => {
       if (attached.has(entry.id)) return false;
       const label = String(entry.label || '').toLowerCase();
       const id = String(entry.id || '').toLowerCase();
@@ -1981,7 +1987,7 @@
   // see the Validation hero, which says so rather than claiming "Ready to enable" for
   // unsaved work.
   const checksDraftSystem = $derived({
-    checkModifiers: selectedSystem?.checkModifiers || [],
+    modifiers: selectedSystem?.modifiers || [],
     craftingCheck: selectedSystem?.craftingCheck || {},
     salvageCraftingCheck: selectedSystem?.salvageCraftingCheck || {},
     gatheringCraftingCheck: selectedSystem?.gatheringCraftingCheck || {},
@@ -3507,6 +3513,18 @@
     if (!systemId) return;
     afterTruthyResult(selectSystem(systemId, 'system-edit'), () => {
       requestSystemTab('settings');
+      activeView = 'system-edit';
+    });
+  }
+
+  // Open the System Overview page on its Settings tab with the Modifiers section expanded
+  // and scrolled to (issue 1117). It goes through the SAME route-exit guard every other
+  // navigation here does, so leaving a dirty Checks draft still prompts.
+  function showSystemModifiers() {
+    if (!selectedSystem) return;
+    afterTruthyResult(confirmRouteExit('system-edit'), () => {
+      requestSystemTab('settings');
+      requestedSystemModifierSectionNonce += 1;
       activeView = 'system-edit';
     });
   }
@@ -7469,7 +7487,7 @@
             craftingCheckSimple={checkSimpleDraft}
             craftingCheckProgressive={checkProgressiveDraft}
             craftingConsumption={selectedSystem?.craftingCheck?.consumption || null}
-            checkModifiers={selectedSystem?.checkModifiers || []}
+            modifiers={selectedSystem?.modifiers || []}
             craftingDefaultModifierPolicy={selectedSystem?.craftingCheck?.defaultModifierPolicy ||
               'addAll'}
             craftingDefaultModifierIds={selectedSystem?.craftingCheck?.defaultModifierIds || []}
@@ -7523,6 +7541,7 @@
               checksSectionRequestNonce += 1;
               setView(`checks-${activity}`);
             }}
+            onOpenModifierLibrary={showSystemModifiers}
             {onToggleCheckActive}
           />
         </section>
@@ -7540,8 +7559,8 @@
         biomeOptions={gatheringVocabularyOptions('biomes')}
         selectedDropId={selectedGatheringDrop?.id || selectedGatheringDropId}
         rewardRules={selectedGatheringRules}
-        characterModifierLibrary={selectedGatheringCharacterModifiers}
-        checkModifierOptions={selectedSystem?.checkModifiers || []}
+        characterModifierLibrary={selectedSystemModifiers}
+        checkModifierOptions={selectedSystem?.modifiers || []}
         gatheringModifierPolicy={selectedSystem?.gatheringCraftingCheck?.defaultModifierPolicy ||
           'addAll'}
         gatheringModifierMaxPicks={selectedSystem?.gatheringCraftingCheck?.maxModifierPicks ?? null}
@@ -7680,7 +7699,7 @@
           {salvageOutcomeNames}
           {salvageCheckEnabled}
           {salvageCheckTiers}
-          checkModifierOptions={selectedSystem?.checkModifiers || []}
+          checkModifierOptions={selectedSystem?.modifiers || []}
           salvageModifierPolicy={selectedSystem?.salvageCraftingCheck?.defaultModifierPolicy ||
             'addAll'}
           salvageModifierMaxPicks={selectedSystem?.salvageCraftingCheck?.maxModifierPicks ?? null}
@@ -7757,7 +7776,7 @@
         itemTags={selectedSystem?.itemTags || []}
         checkTierOptions={recipeCheckTierOptions}
         minSuccessTierOptions={recipeMinSuccessTierOptions}
-        craftingModifierOptions={selectedSystem?.checkModifiers || []}
+        craftingModifierOptions={selectedSystem?.modifiers || []}
         craftingModifierPolicy={selectedSystem?.craftingCheck?.defaultModifierPolicy || 'addAll'}
         craftingModifierDefaultIds={selectedSystem?.craftingCheck?.defaultModifierIds || []}
         craftingModifierMaxPicks={selectedSystem?.craftingCheck?.maxModifierPicks ?? null}
@@ -7887,13 +7906,14 @@
             }}
             reseedNonce={systemDetailsReseedNonce}
             onToggleFeature={(storeKey, checked) => store.toggleFeature?.(storeKey, checked)}
-            characterModifierLibrary={selectedGatheringCharacterModifiers}
-            {characterModifierPresetsSupported}
-            {onAddCharacterModifier}
-            {onUpdateCharacterModifier}
-            {onDeleteCharacterModifier}
-            {onReorderCharacterModifier}
-            {onSeedCharacterModifierPresets}
+            modifierLibrary={selectedSystemModifiers}
+            modifierPresetsSupported={characterModifierPresetsSupported}
+            onAddModifier={onAddCharacterModifier}
+            onUpdateModifier={onUpdateCharacterModifier}
+            onDeleteModifier={onDeleteCharacterModifier}
+            onReorderModifier={onReorderCharacterModifier}
+            onSeedModifierPresets={onSeedCharacterModifierPresets}
+            requestedSectionNonce={requestedSystemModifierSectionNonce}
             characterPrerequisiteLibrary={selectedCharacterPrerequisites}
             {characterPrerequisitePresetsSupported}
             {onAddCharacterPrerequisite}
@@ -8540,8 +8560,8 @@
                                 'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.AddSearchLabel',
                                 'Search character modifiers to add'
                               )}
-                              disabled={selectedGatheringCharacterModifiers.length === 0}
-                              data-tooltip={selectedGatheringCharacterModifiers.length === 0
+                              disabled={selectedSystemModifiers.length === 0}
+                              data-tooltip={selectedSystemModifiers.length === 0
                                 ? text(
                                     'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.LibraryEmptyHint',
                                     'Add a modifier to the system library first to reference it here.'
@@ -8949,8 +8969,8 @@
                             'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.AddSearchLabel',
                             'Search character modifiers to add'
                           )}
-                          disabled={selectedGatheringCharacterModifiers.length === 0}
-                          data-tooltip={selectedGatheringCharacterModifiers.length === 0
+                          disabled={selectedSystemModifiers.length === 0}
+                          data-tooltip={selectedSystemModifiers.length === 0
                             ? text(
                                 'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.LibraryEmptyHint',
                                 'Add a modifier to the system library first to reference it here.'

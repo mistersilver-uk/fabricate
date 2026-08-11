@@ -16,6 +16,9 @@
   import { dragDrop } from '../../actions/dragDrop.js';
   import { resolveDropData } from '../../util/dropUtils.js';
   import IconPicker from '../../components/IconPicker.svelte';
+  import Stepper from '../../components/Stepper.svelte';
+  import { stepperLabels } from '../../components/stepperLabels.js';
+  import RollDataExpressionInput from './RollDataExpressionInput.svelte';
   import SystemEditorTabs from './system/SystemEditorTabs.svelte';
   import CharacterPrerequisitesCard from './system/CharacterPrerequisitesCard.svelte';
   import SystemOverviewView from './SystemOverviewView.svelte';
@@ -24,6 +27,10 @@
     mapPrerequisiteToModifier,
     stripExpressionSigil,
   } from '../../../../systems/characterModifierPrerequisiteCopy.js';
+  import {
+    isRollExpression,
+    resolveModifierBounds,
+  } from '../../../../systems/checkModifierResolver.js';
 
   let {
     selectedSystem = null,
@@ -64,13 +71,23 @@
     // registers as a change (the `requestedTabNonce` idiom above).
     reseedNonce = 0,
     onToggleFeature = async () => true,
-    characterModifierLibrary = [],
-    characterModifierPresetsSupported = false,
-    onAddCharacterModifier = async () => null,
-    onUpdateCharacterModifier = async () => {},
-    onDeleteCharacterModifier = async () => {},
-    onReorderCharacterModifier = async () => {},
-    onSeedCharacterModifierPresets = async () => {},
+    // The ONE authored modifier library for this system (issue 1117). It absorbed the
+    // check-modifier catalogue that used to be authored on the Checks screen, so this
+    // section is now the only surface that adds, edits, reorders or deletes an entry, and
+    // it renders for EVERY system rather than only a gathering-enabled one — a check
+    // modifier has nothing to do with the gathering feature flag.
+    modifierLibrary = [],
+    modifierPresetsSupported = false,
+    onAddModifier = async () => null,
+    onUpdateModifier = async () => {},
+    onDeleteModifier = async () => {},
+    onReorderModifier = async () => {},
+    onSeedModifierPresets = async () => {},
+    // Bumped by the parent to deep-link into this section — the Checks screen's read-only
+    // modifier card links here, and a link that lands on a collapsed section the GM then
+    // has to find is not a deep link. A nonce for the `requestedTabNonce` reason: the same
+    // request has to re-apply.
+    requestedSectionNonce = 0,
     characterPrerequisiteLibrary = [],
     characterPrerequisitePresetsSupported = false,
     onAddCharacterPrerequisite = async () => null,
@@ -246,10 +263,9 @@
     await onSetCurrencyMacro(key, uuid);
   }
 
-  let characterModifierEditingId = $state('');
+  let modifierEditingId = $state('');
   let currencyExpandedUnitId = $state('');
   let currencySubUnitSelections = $state({});
-  const ROLL_EXPRESSION_PATTERN_UI = /\bd\d|[*/()]/;
 
   // Whole-section collapse (issue 768) — a session-local Set keyed by section name
   // ('modifiers' | 'prerequisites' | 'currency'), mirroring ComponentsBrowserView's
@@ -363,15 +379,39 @@
   }
 
   async function handleCopyPrerequisiteToModifier(entry) {
-    const created = await onAddCharacterModifier(mapPrerequisiteToModifier(entry));
+    const created = await onAddModifier(mapPrerequisiteToModifier(entry));
     if (!created?.id) return;
     expandSection('modifiers');
-    characterModifierEditingId = created.id;
+    modifierEditingId = created.id;
     announceCopy(entry?.name);
-    await revealCopiedEntry(`[data-system-character-modifier="${created.id}"]`);
+    await revealCopiedEntry(`[data-system-modifier="${created.id}"]`);
   }
 
-  const gatheringEnabled = $derived(selectedSystem?.features?.gathering === true);
+  // The Checks screen's read-only modifier card links here. Expanding the section and
+  // scrolling it into view is the whole of the deep link: without it the GM arrives on a
+  // long Settings tab with the section they asked for possibly collapsed and certainly
+  // off-screen, which is a navigation that lands nowhere in particular.
+  let appliedSectionNonce = $state(-1);
+  $effect(() => {
+    if (requestedSectionNonce === appliedSectionNonce) return;
+    appliedSectionNonce = requestedSectionNonce;
+    if (requestedSectionNonce <= 0) return;
+    activeTab = 'settings';
+    expandSection('modifiers');
+    void revealCopiedEntry('[data-system-modifiers]');
+  });
+
+  // The bounds field labels, derived once: `stepperLabels` composes the two adjunct names
+  // from the input's own name, so the three must come from one string rather than three
+  // call-site literals that could drift.
+  const modifierMinLabel = $derived(text('FABRICATE.Admin.Manager.Modifiers.Min', 'Minimum'));
+  const modifierMaxLabel = $derived(text('FABRICATE.Admin.Manager.Modifiers.Max', 'Maximum'));
+  const modifierUnboundedLabel = $derived(
+    text('FABRICATE.Admin.Manager.Modifiers.BoundsUnbounded', 'Unbounded')
+  );
+  // A `$derived` rather than a template `{@const}`: the Modifiers section is no longer
+  // wrapped in an `{#if}`, and `{@const}` is only legal as the immediate child of a block.
+  const modifiersCollapsed = $derived(isSectionCollapsed('modifiers'));
   const currencyEnabled = $derived(selectedSystem?.requirements?.currency?.enabled === true);
   // Time requirements default ON (issue 714): an absent flag reads as enabled, so only
   // an explicit GM opt-out (`enabled === false`) turns the toggle off.
@@ -428,25 +468,68 @@
     return text(option.hintKey, option.hintFallback);
   }
 
-  function characterModifierIsRoll(entry) {
-    return Boolean(entry?.expression) && ROLL_EXPRESSION_PATTERN_UI.test(entry.expression);
+  // Asked of the SHARED predicate (issue 1117), not of a local pattern. Two patterns lived
+  // in the repo while two libraries did, and they were complementary rather than
+  // duplicates — one matched `1d6` and missed `d20`, the other the reverse — so one library
+  // with two readers would have disagreed about whether the same entry rolls. The
+  // normalizer derives `isRollExpression` from the same function, so the chip below and the
+  // persisted flag can never differ.
+  function modifierIsRoll(entry) {
+    return Boolean(entry?.expression) && isRollExpression(entry.expression);
+  }
+
+  // The read-only bounds chip, e.g. `-1 to +5`. Signed on BOTH ends: a modifier is a signed
+  // contribution, so a bare `5` reads as a value rather than as a bonus. The two
+  // half-bounded readings are separate sentences because "at most" and "at least" are not
+  // the same promise, and an unbounded entry renders no chip rather than the word
+  // "unbounded" on every row of a library that mostly is.
+  function modifierBoundsChip(entry) {
+    const { min, max } = resolveModifierBounds(entry);
+    if (min === null && max === null) return '';
+    const signed = (value) => (value < 0 ? `${value}` : `+${value}`);
+    if (min !== null && max !== null) return `${signed(min)} to ${signed(max)}`;
+    if (max !== null) {
+      return `${text('FABRICATE.Admin.Manager.Modifiers.BoundsAtMost', 'At most')} ${signed(max)}`;
+    }
+    return `${text('FABRICATE.Admin.Manager.Modifiers.BoundsAtLeast', 'At least')} ${signed(min)}`;
+  }
+
+  // Which BLOCKING bounds fault this entry has, or `''`. Both make the entry contribute 0 to
+  // a check until repaired, matching the refuse posture gathering's drop modifiers already
+  // take; the Checks Validation section reports the same two facts as
+  // `modifierBoundsInverted` / `modifierBoundsUnsafe`, both `critical`. TWO CAUSES, TWO
+  // SENTENCES: "your minimum is above your maximum" and "this number cannot appear in a roll
+  // formula" need different repairs, and `1e21` is not an inversion.
+  function modifierBoundsFault(entry) {
+    const bounds = resolveModifierBounds(entry);
+    if (bounds.inverted) return 'inverted';
+    return bounds.unsafe ? 'unsafe' : '';
   }
 
   // The collapsed summary row shows the expression with its leading `@` sigil
   // stripped for a cleaner inline read (the raw `@`-prefixed value stays in the
   // editor's Expression field — only the DISPLAY strips it).
-  function characterModifierExpressionDisplay(entry) {
+  function modifierExpressionDisplay(entry) {
     return stripExpressionSigil(entry?.expression);
   }
 
-  async function handleAddCharacterModifier() {
-    const entry = await onAddCharacterModifier();
-    if (entry?.id) characterModifierEditingId = entry.id;
+  async function handleAddModifier() {
+    const entry = await onAddModifier();
+    if (entry?.id) modifierEditingId = entry.id;
   }
 
-  async function handleDeleteCharacterModifier(modifierId) {
-    await onDeleteCharacterModifier(modifierId);
-    if (characterModifierEditingId === modifierId) characterModifierEditingId = '';
+  async function handleDeleteModifier(modifierId) {
+    await onDeleteModifier(modifierId);
+    if (modifierEditingId === modifierId) modifierEditingId = '';
+  }
+
+  // `Stepper` reports a clamped number, or `null` when an `allowUnset` field is cleared.
+  // `null` is written as an EXPLICIT key rather than dropped, because absence IS the
+  // "unbounded" value: clearing the field has to be able to REMOVE an existing bound, and a
+  // patch that omitted the key would leave the old one in place. The normalizer attaches the
+  // key only for a finite number, so a `null` round-trips to key-absent.
+  function handleModifierBound(modifierId, key, next) {
+    onUpdateModifier(modifierId, { [key]: next });
   }
 
   async function handleAddCurrencyUnit() {
@@ -994,301 +1077,388 @@
                 </div>
               </section>
 
-              {#if gatheringEnabled}
-                {@const modifiersCollapsed = isSectionCollapsed('modifiers')}
-                <section
-                  class="manager-edit-card manager-character-modifier-card"
-                  class:is-section-collapsed={modifiersCollapsed}
-                  data-system-character-modifiers
-                  aria-label={text(
-                    'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.Title',
-                    'Character modifiers'
-                  )}
-                >
-                  <header class="manager-character-modifier-card-header">
+              <!-- ── The ONE modifier library (issue 1117) ──────────────────────────────
+                   Until this change a system authored modifiers TWICE: here, gated on the
+                   gathering feature, and again on the Checks screen. The two shapes were
+                   near-identical and the split was an accident of where each feature landed
+                   rather than a distinction in the domain, so they merged. This section is
+                   now the only surface that adds, edits, reorders, seeds or deletes an
+                   entry, and the Checks screen selects over what is authored here.
+
+                   IT IS NOT GATED ON GATHERING. The old gate was correct while the library
+                   only fed d100 drop rows; a check modifier feeds a crafting or salvage
+                   roll, so gating the only authoring surface on an unrelated feature flag
+                   would make those unauthorable. -->
+              <section
+                class="manager-edit-card manager-character-modifier-card"
+                class:is-section-collapsed={modifiersCollapsed}
+                data-system-modifiers
+                aria-label={text('FABRICATE.Admin.Manager.Modifiers.Title', 'Modifiers')}
+              >
+                <header class="manager-character-modifier-card-header">
+                  <button
+                    type="button"
+                    class="manager-section-collapse-toggle"
+                    aria-expanded={!modifiersCollapsed}
+                    aria-controls="manager-section-body-modifiers"
+                    aria-label={text(
+                      'FABRICATE.Admin.Manager.ListErgonomics.ToggleSection',
+                      'Collapse or expand this section'
+                    )}
+                    data-section-collapse="modifiers"
+                    onclick={() => toggleSectionCollapsed('modifiers')}
+                  >
+                    <i
+                      class={`fa-solid ${modifiersCollapsed ? 'fa-chevron-right' : 'fa-chevron-down'}`}
+                      aria-hidden="true"
+                    ></i>
+                  </button>
+                  <div class="manager-character-modifier-card-header-copy">
+                    <h3 class="manager-card-title">
+                      <i class="fa-solid fa-user-gear" aria-hidden="true"></i>
+                      {text('FABRICATE.Admin.Manager.Modifiers.Title', 'Modifiers')}
+                    </h3>
+                    <p class="manager-muted">
+                      {text(
+                        'FABRICATE.Admin.Manager.Modifiers.Hint',
+                        'Reusable actor-driven modifiers for this system. Each expression resolves against the acting character (e.g. @abilities.med.mod). Checks add them to the roll; gathering drop rows and events shift the drop chance.'
+                      )}
+                    </p>
+                  </div>
+                  <div class="manager-character-modifier-card-header-actions">
                     <button
                       type="button"
-                      class="manager-section-collapse-toggle"
-                      aria-expanded={!modifiersCollapsed}
-                      aria-controls="manager-section-body-modifiers"
-                      aria-label={text(
-                        'FABRICATE.Admin.Manager.ListErgonomics.ToggleSection',
-                        'Collapse or expand this section'
-                      )}
-                      data-section-collapse="modifiers"
-                      onclick={() => toggleSectionCollapsed('modifiers')}
+                      class="manager-button is-primary"
+                      onclick={handleAddModifier}
                     >
-                      <i
-                        class={`fa-solid ${modifiersCollapsed ? 'fa-chevron-right' : 'fa-chevron-down'}`}
-                        aria-hidden="true"
-                      ></i>
+                      <i class="fa-solid fa-plus" aria-hidden="true"></i>
+                      {text('FABRICATE.Admin.Manager.Modifiers.Add', 'Add modifier')}
                     </button>
-                    <div class="manager-character-modifier-card-header-copy">
-                      <h3 class="manager-card-title">
-                        <i class="fa-solid fa-user-gear" aria-hidden="true"></i>
-                        {text(
-                          'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.Title',
-                          'Character modifiers'
-                        )}
-                      </h3>
-                      <p class="manager-muted">
-                        {text(
-                          'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.Hint',
-                          "Define reusable actor-driven modifiers for this system's d100 gathering rows and events."
-                        )}
-                      </p>
-                    </div>
-                    <div class="manager-character-modifier-card-header-actions">
-                      <button
-                        type="button"
-                        class="manager-button is-primary"
-                        onclick={handleAddCharacterModifier}
-                      >
-                        <i class="fa-solid fa-plus" aria-hidden="true"></i>
-                        {text(
-                          'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.Add',
-                          'Add character modifier'
-                        )}
-                      </button>
-                      <button
-                        type="button"
-                        class="manager-button"
-                        disabled={!characterModifierPresetsSupported}
-                        data-tooltip={!characterModifierPresetsSupported
-                          ? text(
-                              'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.SeedPresetsUnsupported',
-                              'Preset seeding is only available for dnd5e or pf2e worlds.'
-                            )
-                          : null}
-                        onclick={onSeedCharacterModifierPresets}
-                      >
-                        <i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i>
-                        {text(
-                          'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.SeedPresets',
-                          'Seed presets'
-                        )}
-                      </button>
-                    </div>
-                  </header>
-                  {#if !modifiersCollapsed}
-                    <div id="manager-section-body-modifiers" class="manager-section-body">
-                      {#if characterModifierLibrary.length === 0}
-                        <EmptyState
-                          compact
-                          icon="fas fa-sliders"
-                          title={text(
-                            'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.Empty',
-                            'No character modifiers yet.'
-                          )}
-                        />
-                      {:else}
-                        <ul class="manager-character-modifier-list">
-                          {#each characterModifierLibrary as entry, index (entry.id)}
-                            {@const modifierOpen = characterModifierEditingId === entry.id}
-                            {@const modifierExpression = characterModifierExpressionDisplay(entry)}
-                            <li
-                              class="manager-modifier-item"
-                              class:is-open={modifierOpen}
-                              data-system-character-modifier={entry.id}
-                            >
-                              <div class="manager-modifier-header">
-                                <button
-                                  type="button"
-                                  class="manager-modifier-summary"
-                                  aria-expanded={modifierOpen}
-                                  aria-controls={`character-modifier-body-${entry.id}`}
-                                  data-toggle-character-modifier
-                                  onclick={() =>
-                                    (characterModifierEditingId = modifierOpen ? '' : entry.id)}
+                    <button
+                      type="button"
+                      class="manager-button"
+                      disabled={!modifierPresetsSupported}
+                      data-tooltip={!modifierPresetsSupported
+                        ? text(
+                            'FABRICATE.Admin.Manager.Modifiers.SeedPresetsUnsupported',
+                            'Preset seeding is only available for dnd5e or pf2e worlds.'
+                          )
+                        : null}
+                      onclick={onSeedModifierPresets}
+                    >
+                      <i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i>
+                      {text('FABRICATE.Admin.Manager.Modifiers.SeedPresets', 'Seed presets')}
+                    </button>
+                  </div>
+                </header>
+                {#if !modifiersCollapsed}
+                  <div id="manager-section-body-modifiers" class="manager-section-body">
+                    {#if modifierLibrary.length === 0}
+                      <EmptyState
+                        compact
+                        icon="fas fa-sliders"
+                        title={text('FABRICATE.Admin.Manager.Modifiers.Empty', 'No modifiers yet.')}
+                      />
+                    {:else}
+                      <ul class="manager-character-modifier-list">
+                        {#each modifierLibrary as entry, index (entry.id)}
+                          {@const modifierOpen = modifierEditingId === entry.id}
+                          {@const modifierExpression = modifierExpressionDisplay(entry)}
+                          {@const boundsChip = modifierBoundsChip(entry)}
+                          {@const boundsFault = modifierBoundsFault(entry)}
+                          <li
+                            class="manager-modifier-item"
+                            class:is-open={modifierOpen}
+                            data-system-modifier={entry.id}
+                          >
+                            <div class="manager-modifier-header">
+                              <button
+                                type="button"
+                                class="manager-modifier-summary"
+                                aria-expanded={modifierOpen}
+                                aria-controls={`system-modifier-body-${entry.id}`}
+                                data-toggle-modifier
+                                onclick={() => (modifierEditingId = modifierOpen ? '' : entry.id)}
+                              >
+                                <i
+                                  class={`fa-solid ${modifierOpen ? 'fa-chevron-down' : 'fa-chevron-right'} manager-modifier-chevron`}
+                                  aria-hidden="true"
+                                ></i>
+                                <span class="manager-modifier-icon"
+                                  ><i class={entry.icon || 'fa-solid fa-user'} aria-hidden="true"
+                                  ></i></span
                                 >
-                                  <i
-                                    class={`fa-solid ${modifierOpen ? 'fa-chevron-down' : 'fa-chevron-right'} manager-modifier-chevron`}
-                                    aria-hidden="true"
-                                  ></i>
-                                  <span class="manager-modifier-icon"
-                                    ><i class={entry.icon || 'fa-solid fa-user'} aria-hidden="true"
-                                    ></i></span
+                                <span class="manager-modifier-label">{entry.label}</span>
+                                {#if modifierIsRoll(entry)}
+                                  <Chip class="manager-character-modifier-roll-tag"
+                                    >{text(
+                                      'FABRICATE.Admin.Manager.Modifiers.RollTag',
+                                      'Roll'
+                                    )}</Chip
                                   >
-                                  <span class="manager-modifier-label">{entry.label}</span>
-                                  {#if characterModifierIsRoll(entry)}
-                                    <Chip class="manager-character-modifier-roll-tag"
-                                      >{text(
-                                        'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.RollTag',
-                                        'Roll'
-                                      )}</Chip
-                                    >
-                                  {/if}
-                                  {#if modifierExpression}
-                                    <span
-                                      class="manager-modifier-expression"
-                                      data-character-modifier-expression
-                                    >
-                                      <i class="fa-solid fa-arrow-right-long" aria-hidden="true"
-                                      ></i>
-                                      {modifierExpression}
-                                    </span>
-                                  {/if}
-                                </button>
-                                <button
-                                  type="button"
-                                  class="manager-icon-button"
-                                  aria-label={text(
-                                    'FABRICATE.Admin.Manager.ListErgonomics.MoveUp',
-                                    'Move up'
+                                {/if}
+                                {#if boundsChip}
+                                  <Chip tone="neutral" mono class="manager-modifier-bounds-chip"
+                                    >{boundsChip}</Chip
+                                  >
+                                {/if}
+                                {#if modifierExpression}
+                                  <span
+                                    class="manager-modifier-expression"
+                                    data-modifier-expression
+                                  >
+                                    <i class="fa-solid fa-arrow-right-long" aria-hidden="true"></i>
+                                    {modifierExpression}
+                                  </span>
+                                {/if}
+                              </button>
+                              <button
+                                type="button"
+                                class="manager-icon-button"
+                                aria-label={text(
+                                  'FABRICATE.Admin.Manager.ListErgonomics.MoveUp',
+                                  'Move up'
+                                )}
+                                data-tooltip={text(
+                                  'FABRICATE.Admin.Manager.ListErgonomics.MoveUp',
+                                  'Move up'
+                                )}
+                                data-move-modifier-up={entry.id}
+                                disabled={index === 0}
+                                onclick={() =>
+                                  reorderList(
+                                    onReorderModifier,
+                                    index,
+                                    -1,
+                                    entry.label,
+                                    modifierLibrary.length
                                   )}
-                                  data-tooltip={text(
-                                    'FABRICATE.Admin.Manager.ListErgonomics.MoveUp',
-                                    'Move up'
+                              >
+                                <i class="fa-solid fa-chevron-up" aria-hidden="true"></i>
+                              </button>
+                              <button
+                                type="button"
+                                class="manager-icon-button"
+                                aria-label={text(
+                                  'FABRICATE.Admin.Manager.ListErgonomics.MoveDown',
+                                  'Move down'
+                                )}
+                                data-tooltip={text(
+                                  'FABRICATE.Admin.Manager.ListErgonomics.MoveDown',
+                                  'Move down'
+                                )}
+                                data-move-modifier-down={entry.id}
+                                disabled={index === modifierLibrary.length - 1}
+                                onclick={() =>
+                                  reorderList(
+                                    onReorderModifier,
+                                    index,
+                                    1,
+                                    entry.label,
+                                    modifierLibrary.length
                                   )}
-                                  data-move-modifier-up={entry.id}
-                                  disabled={index === 0}
-                                  onclick={() =>
-                                    reorderList(
-                                      onReorderCharacterModifier,
-                                      index,
-                                      -1,
-                                      entry.label,
-                                      characterModifierLibrary.length
-                                    )}
-                                >
-                                  <i class="fa-solid fa-chevron-up" aria-hidden="true"></i>
-                                </button>
-                                <button
-                                  type="button"
-                                  class="manager-icon-button"
-                                  aria-label={text(
-                                    'FABRICATE.Admin.Manager.ListErgonomics.MoveDown',
-                                    'Move down'
-                                  )}
-                                  data-tooltip={text(
-                                    'FABRICATE.Admin.Manager.ListErgonomics.MoveDown',
-                                    'Move down'
-                                  )}
-                                  data-move-modifier-down={entry.id}
-                                  disabled={index === characterModifierLibrary.length - 1}
-                                  onclick={() =>
-                                    reorderList(
-                                      onReorderCharacterModifier,
-                                      index,
-                                      1,
-                                      entry.label,
-                                      characterModifierLibrary.length
-                                    )}
-                                >
-                                  <i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
-                                </button>
-                                <button
-                                  type="button"
-                                  class="manager-icon-button"
-                                  aria-label={text(
-                                    'FABRICATE.Admin.Manager.ListErgonomics.CopyToPrerequisites',
-                                    'Copy to prerequisites'
-                                  )}
-                                  data-tooltip={text(
-                                    'FABRICATE.Admin.Manager.ListErgonomics.CopyToPrerequisites',
-                                    'Copy to prerequisites'
-                                  )}
-                                  data-copy-to-prerequisite={entry.id}
-                                  onclick={() => handleCopyModifierToPrerequisite(entry)}
-                                >
-                                  <i class="fa-solid fa-user-shield" aria-hidden="true"></i>
-                                </button>
-                                <button
-                                  type="button"
-                                  class="manager-icon-button is-danger"
-                                  aria-label={text(
-                                    'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.Delete',
-                                    'Delete character modifier'
-                                  )}
-                                  onclick={() => handleDeleteCharacterModifier(entry.id)}
-                                >
-                                  <i class="fa-solid fa-trash" aria-hidden="true"></i>
-                                </button>
-                              </div>
+                              >
+                                <i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
+                              </button>
+                              <button
+                                type="button"
+                                class="manager-icon-button"
+                                aria-label={text(
+                                  'FABRICATE.Admin.Manager.ListErgonomics.CopyToPrerequisites',
+                                  'Copy to prerequisites'
+                                )}
+                                data-tooltip={text(
+                                  'FABRICATE.Admin.Manager.ListErgonomics.CopyToPrerequisites',
+                                  'Copy to prerequisites'
+                                )}
+                                data-copy-to-prerequisite={entry.id}
+                                onclick={() => handleCopyModifierToPrerequisite(entry)}
+                              >
+                                <i class="fa-solid fa-user-shield" aria-hidden="true"></i>
+                              </button>
+                              <button
+                                type="button"
+                                class="manager-icon-button is-danger"
+                                aria-label={text(
+                                  'FABRICATE.Admin.Manager.Modifiers.Delete',
+                                  'Delete modifier'
+                                )}
+                                onclick={() => handleDeleteModifier(entry.id)}
+                              >
+                                <i class="fa-solid fa-trash" aria-hidden="true"></i>
+                              </button>
+                            </div>
 
-                              {#if modifierOpen}
-                                <div
-                                  class="manager-modifier-body manager-character-modifier-editor"
-                                  id={`character-modifier-body-${entry.id}`}
-                                >
-                                  <div class="manager-modifier-name-row">
-                                    <div class="manager-field manager-modifier-icon-field">
-                                      <span
-                                        >{text(
-                                          'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.Icon',
-                                          'Icon'
-                                        )}</span
-                                      >
-                                      <IconPicker
-                                        value={entry.icon || 'fa-solid fa-user'}
-                                        buttonTitle={text(
-                                          'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.ChangeIcon',
-                                          'Change icon'
-                                        )}
-                                        onChange={(iconClass) =>
-                                          onUpdateCharacterModifier(entry.id, { icon: iconClass })}
-                                      />
-                                    </div>
-                                    <label class="manager-field manager-modifier-label-field">
-                                      <span
-                                        >{text(
-                                          'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.Label',
-                                          'Label'
-                                        )}</span
-                                      >
-                                      <input
-                                        type="text"
-                                        value={entry.label}
-                                        oninput={(event) =>
-                                          onUpdateCharacterModifier(entry.id, {
-                                            label: event.currentTarget.value,
-                                          })}
-                                      />
-                                    </label>
-                                  </div>
-                                  <label class="manager-field">
+                            {#if boundsFault}
+                              <!-- Reported on the COLLAPSED row too, not only inside the open
+                                   editor: an entry that contributes nothing is a fault the GM
+                                   has to be able to see while scanning the list, and the
+                                   Checks Validation section reports the same two ids. -->
+                              <p
+                                class="manager-modifier-bounds-error"
+                                role="note"
+                                data-system-modifier-bounds-invalid={entry.id}
+                                data-system-modifier-bounds-cause={boundsFault}
+                              >
+                                {#if boundsFault === 'inverted'}
+                                  {text(
+                                    'FABRICATE.Admin.Manager.Modifiers.BoundsInverted',
+                                    'This modifier’s minimum is above its maximum, so it contributes nothing at all until you fix the two values.'
+                                  )}
+                                {:else}
+                                  {text(
+                                    'FABRICATE.Admin.Manager.Modifiers.BoundsUnsafe',
+                                    'This modifier’s bound is too large or too small to appear in a roll formula, so it contributes nothing until you fix it.'
+                                  )}
+                                {/if}
+                              </p>
+                            {/if}
+
+                            {#if modifierOpen}
+                              <div
+                                class="manager-modifier-body manager-character-modifier-editor"
+                                id={`system-modifier-body-${entry.id}`}
+                              >
+                                <div class="manager-modifier-name-row">
+                                  <div class="manager-field manager-modifier-icon-field">
                                     <span
                                       >{text(
-                                        'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.Expression',
-                                        'Expression'
+                                        'FABRICATE.Admin.Manager.Modifiers.Icon',
+                                        'Icon'
+                                      )}</span
+                                    >
+                                    <IconPicker
+                                      value={entry.icon || 'fa-solid fa-user'}
+                                      buttonTitle={text(
+                                        'FABRICATE.Admin.Manager.Modifiers.ChangeIcon',
+                                        'Change icon'
+                                      )}
+                                      onChange={(iconClass) =>
+                                        onUpdateModifier(entry.id, { icon: iconClass })}
+                                    />
+                                  </div>
+                                  <label class="manager-field manager-modifier-label-field">
+                                    <span
+                                      >{text(
+                                        'FABRICATE.Admin.Manager.Modifiers.Label',
+                                        'Label'
                                       )}</span
                                     >
                                     <input
                                       type="text"
-                                      value={entry.expression}
+                                      data-system-modifier-field="label"
+                                      value={entry.label}
                                       oninput={(event) =>
-                                        onUpdateCharacterModifier(entry.id, {
-                                          expression: event.currentTarget.value,
+                                        onUpdateModifier(entry.id, {
+                                          label: event.currentTarget.value,
                                         })}
                                     />
                                   </label>
-                                  <div class="manager-character-modifier-actions">
-                                    <button
-                                      type="button"
-                                      class="manager-button"
-                                      onclick={() => (characterModifierEditingId = '')}
-                                      >{text('FABRICATE.Admin.Manager.Done', 'Done')}</button
+                                </div>
+                                <label class="manager-field">
+                                  <span
+                                    >{text(
+                                      'FABRICATE.Admin.Manager.Modifiers.Expression',
+                                      'Expression'
+                                    )}</span
+                                  >
+                                  <RollDataExpressionInput
+                                    dataField="system-modifier"
+                                    inputAttrs={{ 'data-system-modifier-field': 'expression' }}
+                                    value={entry.expression}
+                                    placeholder="abilities.med.mod"
+                                    onChange={(expression) =>
+                                      onUpdateModifier(entry.id, { expression })}
+                                  />
+                                </label>
+                                <!-- The bounds pair sits on its OWN row, after the expression,
+                                     rather than beside it: at a real pane width a third field
+                                     on the expression line compresses the one field whose
+                                     content is long and whose truncation is silent. -->
+                                <div
+                                  class="manager-modifier-bounds-row"
+                                  data-system-modifier-bounds={entry.id}
+                                >
+                                  <div class="manager-field manager-modifier-bound-field">
+                                    <span class="manager-recipe-micro-label"
+                                      >{modifierMinLabel}</span
                                     >
-                                    <button
-                                      type="button"
-                                      class="manager-button is-danger"
-                                      onclick={() => handleDeleteCharacterModifier(entry.id)}
-                                      >{text(
-                                        'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.Delete',
-                                        'Delete character modifier'
-                                      )}</button
+                                    <Stepper
+                                      value={resolveModifierBounds(entry).min}
+                                      allowUnset
+                                      fill
+                                      placeholder={modifierUnboundedLabel}
+                                      {...stepperLabels(modifierMinLabel)}
+                                      inputProps={{ 'data-system-modifier-field': 'min' }}
+                                      onChange={(next) =>
+                                        handleModifierBound(entry.id, 'min', next)}
+                                    />
+                                  </div>
+                                  <div class="manager-field manager-modifier-bound-field">
+                                    <span class="manager-recipe-micro-label"
+                                      >{modifierMaxLabel}</span
                                     >
+                                    <Stepper
+                                      value={resolveModifierBounds(entry).max}
+                                      allowUnset
+                                      fill
+                                      placeholder={modifierUnboundedLabel}
+                                      {...stepperLabels(modifierMaxLabel)}
+                                      inputProps={{ 'data-system-modifier-field': 'max' }}
+                                      onChange={(next) =>
+                                        handleModifierBound(entry.id, 'max', next)}
+                                    />
                                   </div>
                                 </div>
-                              {/if}
-                            </li>
-                          {/each}
-                        </ul>
-                      {/if}
-                    </div>
-                  {/if}
-                </section>
-              {/if}
+                                <p class="manager-muted manager-modifier-bounds-hint">
+                                  {text(
+                                    'FABRICATE.Admin.Manager.Modifiers.BoundsHint',
+                                    'Optional. These clamp the resolved value when a check uses this modifier. Leave them empty for no limit — empty is not zero.'
+                                  )}
+                                </p>
+                                {#if modifierIsRoll(entry)}
+                                  <!-- A roll-shaped expression is legal on a gathering drop row
+                                       and NOT on a check: a check appends one resolved scalar,
+                                       so it is stated here where the expression is authored
+                                       rather than only in Validation, which the GM reaches
+                                       from somewhere else. -->
+                                  <p
+                                    class="manager-modifier-bounds-error"
+                                    role="note"
+                                    data-system-modifier-roll-note={entry.id}
+                                  >
+                                    {text(
+                                      'FABRICATE.Admin.Manager.Modifiers.RollNote',
+                                      'This expression rolls dice. Gathering drop rows and events can use it, but a check cannot — a check adds one resolved number to its roll. Any check that selects this modifier reports a blocking issue.'
+                                    )}
+                                  </p>
+                                {/if}
+                                <div class="manager-character-modifier-actions">
+                                  <button
+                                    type="button"
+                                    class="manager-button"
+                                    onclick={() => (modifierEditingId = '')}
+                                    >{text('FABRICATE.Admin.Manager.Done', 'Done')}</button
+                                  >
+                                  <button
+                                    type="button"
+                                    class="manager-button is-danger"
+                                    onclick={() => handleDeleteModifier(entry.id)}
+                                    >{text(
+                                      'FABRICATE.Admin.Manager.Modifiers.Delete',
+                                      'Delete modifier'
+                                    )}</button
+                                  >
+                                </div>
+                              </div>
+                            {/if}
+                          </li>
+                        {/each}
+                      </ul>
+                    {/if}
+                  </div>
+                {/if}
+              </section>
 
               <CharacterPrerequisitesCard
                 library={characterPrerequisiteLibrary}
@@ -1303,7 +1473,7 @@
                 onSeedPresets={onSeedCharacterPrerequisitePresets}
                 collapsed={isSectionCollapsed('prerequisites')}
                 onToggleCollapsed={() => toggleSectionCollapsed('prerequisites')}
-                onCopyToModifier={gatheringEnabled ? handleCopyPrerequisiteToModifier : null}
+                onCopyToModifier={handleCopyPrerequisiteToModifier}
                 requestOpenId={prereqRequestOpenId}
                 requestOpenNonce={prereqRequestOpenNonce}
               />

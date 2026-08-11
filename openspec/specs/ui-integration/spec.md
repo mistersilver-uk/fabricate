@@ -492,7 +492,7 @@ A dot whose only explanation is on another route is a signal with no legend, and
 The section strip is a real ARIA tablist driven by Arrow, Home and End, and only the SELECTED tab carries `aria-controls`, because only the selected section's panel is in the document.
 Outcomes renders in EVERY mode and hosts that mode's own outcome model: the two-outcome pass/fail statement on `simple`, the `awardMode` selector on `progressive`, the band strip plus the tier rows on `routed`.
 Its count badge is emitted only where there is a tier list to count, so `simple` and `progressive` render it unbadged.
-Modifiers renders in every mode too, INCLUDING the two that roll nothing — gathering `d100` and alchemy `none` — because the check-modifier catalogue card is the one owned path for reporting that a selection reaches no roll, and hiding the section it lives in would take that report away from the two states that need it.
+Modifiers renders in every mode too, INCLUDING the two that roll nothing — gathering `d100` and alchemy `none` — because the modifier card is the one owned path for reporting that a selection reaches no roll, and hiding the section it lives in would take that report away from the two states that need it.
 Any section that cannot apply renders the shared `EmptyState` naming the mode, preserving the shipped d100 explanation rather than blanking the route.
 
 A check that is switched off — the route has a LIVE Active toggle and it is not on — collapses the strip to a single section and renders the shared `EmptyState` with a "Turn this check on" action; its right rail keeps the documentation/quickstart pair, the activation card and an `OFF` digest.
@@ -1469,7 +1469,7 @@ The change persists immediately (like `enabled`), outside the recipe draft's Sav
 
 ### Recipe crafting-check modifier control (issue 1055)
 
-The Overview tab's per-recipe crafting-check modifier control (`RecipeOverviewTab.svelte`) is shown **only** under the system's `bySubject` combination rule — rendered "By recipe" on this activity — and only when the system carries a non-empty `CraftingSystem.checkModifiers` catalogue.
+The Overview tab's per-recipe crafting-check modifier control (`RecipeOverviewTab.svelte`) is shown **only** under the system's `bySubject` combination rule — rendered "By recipe" on this activity — and only when the system carries a non-empty `CraftingSystem.modifiers` library.
 `bySubject` is the one rule that defers the selection to the recipe author, so it is the only rule under which this tab has anything to say about check modifiers.
 Under `addAll`, `highest` and `playerPicks` the tab is **silent** — no control and no banner: a control the engine will ignore is worse than no control, and a banner explaining its absence would appear on every recipe of every system that never chose `bySubject`.
 
@@ -1510,7 +1510,7 @@ It renders full-bleed below the grid, replacing the control the grid would other
 | `progressive`          | `craftingCheck.progressive`   | required                                                       |
 | `alchemy`              | per `alchemy.checkMode`       | `none` → no check, `simple` → `simple`, `tiered` → `routed`   |
 
-A catalogue can be inert for TWO DISTINCT reasons this selector distinguishes rather than collapsing into one boolean: the mode rolls no check slot at all (`noCheck`), or a slot exists but carries no authored roll formula (`noFormula`) — each renders its own remedy-specific copy, both on this tab and on the Checks card.
+A library selection can be inert for TWO DISTINCT reasons this selector distinguishes rather than collapsing into one boolean: the mode rolls no check slot at all (`noCheck`), or a slot exists but carries no authored roll formula (`noFormula`) — each renders its own remedy-specific copy, both on this tab and on the Checks card.
 The third cause is REMOVED with the placeholder, together with the remedy-specific copy it drove on both surfaces.
 The selector reports `rollFormula` and `checkUsable` POST-shim, so a stored formula whose only content was the retired placeholder reports `noFormula` rather than reporting usable.
 **Checks tab — Validation, the retired-placeholder readiness split.** `checksReadiness.js` derives `hasRollFormula` from the POST-shim formula, not the raw field, so the Validation tab cannot tick "Has a roll formula" green for a check `checkUsable` reports as unusable — the invariant `resolution-modes/spec.md` states, on the one surface a GM consults to find out whether a check works.
@@ -1539,9 +1539,10 @@ It renders the **Combination rule** as one `RadioCardGroup` of four options in `
 `MODIFIER_POLICIES` remains the source of that list and its order, and `normalizeModifierPolicy` validates the selection; neither is re-declared as a local literal, and the latter is what makes a world still carrying the pre-1095 `byRecipe` select the right card.
 The 2x2 grid MUST reflow to 1x4 under the container query rather than overflow the real ~700–760px pane: the card declares itself a container (`container-type: inline-size`), so the shipped `@container (max-width: 620px)` rule for `.is-config-cards` measures the CARD rather than the whole manager shell.
 
-**The catalogue's ENTRY editor renders on CRAFTING only.** The icon picker, label field, `@`-prefixed `RollDataExpressionInput`, delete and `+ Add modifier` are the shipped crafting editor and are retained; it GAINS a paired absence-preserving `min`/`max` `Stepper` set with an `Unbounded` placeholder, on its OWN row after the expression input so the row reflows to two lines at a narrow pane rather than compressing the expression field.
-Salvage and gathering render each entry READ-ONLY — identity, expression and a signed bounds chip (`-1 to +6`) — with a link back to the crafting sub-tab where the catalogue is authored.
+**NO ACTIVITY AUTHORS AN ENTRY (issue 1117).** The card renders each entry READ-ONLY on all three — identity, expression, a signed bounds chip (`-1 to +6`) and a `Rolls dice` chip on a roll-shaped one — with ONE deep link to the surface that does author it, System settings › Modifiers.
+Crafting used to carry an entry editor here, which made the Checks screen a second editor for a system-level library and made salvage and gathering second-class states of that asymmetry; two editors for one array is how two screens come to disagree about which wrote last.
 **Read-only applies to the ENTRIES alone**: the per-entry eligibility control and the combination-rule grid stay fully editable on all three activities, because deciding which entries apply and how they combine is exactly what each activity owns.
+The Checks saver carries no library half at all, so the removal is structural rather than a hidden control.
 
 **The eligibility control carries EIGHT labels, not five**: one selected word per rule — `Applied` (`addAll`), `Considered` (`highest`), `Selectable` (`playerPicks`), `Picked per subject` (`bySubject`) — and one NOT-selected word per rule to answer it (`Not applied`, `Not considered`, `Not selectable`, `Not picked by default`).
 A single off word is the negation of ONE of the four and of no other, so a row reading "Selectable" when on and "Not applied" when off states the two ends of two different sentences.
@@ -1553,7 +1554,8 @@ The checkbox is `aria-describedby` the ACTIVE RULE's eligibility sentence, which
 The two are adjacent and are NEVER nested — an interactive control inside an interactive pill lands invalid DOM.
 The not-selected state differs by more than colour: the checkbox is unchecked and the pill's word AND glyph both change, so the distinction survives a monochrome render.
 
-The section is labelled **"Check modifiers"** on all three activities — an explicit, recorded deviation from the prototype's bare "Modifiers" — so it is never confused with gathering's "Character modifiers" library, and the **gathering section additionally renders the dormancy notice** naming issue 683.
+The section is labelled **"Check modifiers"** on all three activities — an explicit, recorded deviation from the prototype's bare "Modifiers" — because what THIS section authors is a selection, told apart by name from the drop-row and event sections' "Character modifiers" references and from the one authoring surface's plain "Modifiers".
+The **gathering section additionally renders the dormancy notice** naming issue 683.
 
 Beneath it, a **Maximum picks** stepper authors `maxModifierPicks`.
 It renders **only** under a rule `policyDefersSelection` admits (`bySubject`, `playerPicks`), asked of the resolver live against the radio group the GM is clicking rather than re-derived from a local membership test or projected from the last persisted rule.
@@ -1565,7 +1567,24 @@ There is no longer a **"Default modifiers"** sub-heading and no standing intro s
 The intro sits **ABOVE the rows it governs**, not below the rule grid.
 It states what switching an entry on MEANS under the rule the GM just chose, so it belongs where that switching happens; below the grid it landed far under the controls it explains and read as a footnote about the pick cap.
 The rule grid re-renders it the moment the rule changes, so its position cannot leave it describing a rule the GM is about to change.
-The **empty-catalogue state branches on who owns the entries**: crafting says "Add one", which is an instruction with a button directly below it, and salvage and gathering say the catalogue is defined once on the Crafting check, because neither has an add button at all.
+The **empty-library state is ONE sentence on all three activities** (issue 1117): it names System settings › Modifiers, because no activity here has an add button and "Add one" would be an instruction this screen cannot carry out.
+
+### The system Modifiers library — the ONE authoring surface (issue 1117)
+
+`SystemEditView.svelte`'s settings-list section, internally keyed `'modifiers'` and hooked `data-system-modifiers`, is renamed **Modifiers** and is the ONLY surface that adds, edits, reorders, seeds or deletes a modifier.
+
+**It is NOT gated on the gathering feature.** The old gate was correct while the library only fed d100 drop rows; the same library now carries every CHECK modifier, so gating the only authoring surface on an unrelated feature flag would make a crafting or salvage check modifier unauthorable.
+The Character Prerequisites card's **Copy to Modifiers** action loses the same gate for the same reason.
+
+It keeps every convention the settings-list cards already have and the Checks card never had — add, update, delete, whole-section collapse, accessible **Move up / Move down** reorder, opt-in preset seeding, and the row-level **Copy to prerequisites** cross-list copy — and it ABSORBS the check-only fields the Checks card used to own:
+
+- a paired absence-preserving `min` / `max` `Stepper` set with an `Unbounded` placeholder, on its OWN row after the expression input so the row reflows to two lines at a narrow pane rather than compressing the expression field, plus a hint stating that empty is not zero;
+- the `@`-prefixed `RollDataExpressionInput`, adopted from the retired Checks editor because this is now the one surface that authors an expression: it renders the sigil as a separate prefix glyph, keeps the input's own value sigil-free and re-adds the sigil on write for a bare roll-data path, storing a function or compound expression verbatim;
+- the two BLOCKING bounds faults, reported on the COLLAPSED row and named by cause (`inverted` / `unsafe`), because an entry that contributes nothing is a fault a GM scanning the list must be able to see;
+- a **roll-shaped expression** warning on the open editor, stating that gathering rows may use it and a check may not, and that any check selecting it reports a blocking issue.
+
+The summary row keeps its `@`-stripped inline expression and its `Roll` chip, and gains the signed bounds chip.
+The Checks screens' read-only modifier cards deep-link here, expanding the section and scrolling it into view; the link goes through the same route-exit guard every other manager navigation does, so leaving a dirty Checks draft still prompts.
 
 ### Subject check-modifier picker — salvage and gathering (issue 1095)
 

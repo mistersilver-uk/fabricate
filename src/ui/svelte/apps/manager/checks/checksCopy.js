@@ -30,6 +30,10 @@ export const CHECK_TICK_LABELS = Object.freeze({
     'CheckModifierBoundsValid',
     'Every applied check modifier has usable bounds',
   ],
+  modifierExpressionsResolveToScalars: [
+    'CheckModifierExpressionsResolveToScalars',
+    'Every applied check modifier resolves to a single number',
+  ],
   tierStepTargetsResolve: [
     'CheckTierStepTargetsResolve',
     'Tier-step targets name exactly one existing tier',
@@ -72,6 +76,10 @@ export const CHECK_ISSUE_LABELS = Object.freeze({
     'IssueModifierBoundsUnsafe',
     'A check modifier this check applies has a minimum or maximum too large or too small to appear in a roll formula, so it contributes nothing. Use a whole number a die roll could plausibly reach.',
   ],
+  modifierRollExpression: [
+    'IssueModifierRollExpression',
+    'This check applies a modifier whose expression rolls dice ({names}). A check adds ONE resolved number to its roll, so a rolled expression cannot be used — and it would drop every other modifier from this roll with it. Either stop applying it here, or rewrite its expression as a flat value in System settings › Modifiers.',
+  ],
   modifiersInertNoCheck: [
     'IssueModifiersInertNoCheck',
     'This resolution mode rolls no check, so the check modifiers selected here are never applied.',
@@ -113,4 +121,28 @@ export function checkIssueCopy(id) {
  */
 export function checkTickCopy(id) {
   return copyFor(CHECK_TICK_LABELS, id);
+}
+
+/**
+ * Interpolate `{name}` placeholders into an already-resolved sentence (issue 1117).
+ *
+ * Foundry's `i18n.format` does this for a LOCALIZED string, but the fallbacks above are
+ * plain module constants that never reach it — a world with no `lang/` entry for a new key
+ * would otherwise render a literal `{names}` to the GM. This is deliberately the same
+ * `{key}` syntax Foundry uses, so one sentence serves both paths, and it lives here rather
+ * than in the two components that need it because a second copy is a duplication-gate
+ * finding and a drift risk at once.
+ *
+ * A sentence with no placeholders, or a call with no data, returns the input unchanged.
+ *
+ * @param {string} sentence The resolved sentence.
+ * @param {object} [data] Interpolation values.
+ * @returns {string}
+ */
+export function interpolate(sentence, data) {
+  const text = typeof sentence === 'string' ? sentence : '';
+  if (!data || typeof data !== 'object') return text;
+  return text.replaceAll(/\{(\w+)\}/g, (match, key) =>
+    Object.hasOwn(data, key) ? String(data[key]) : match
+  );
 }

@@ -123,7 +123,6 @@ const STAMINA_REGEN_POLICIES = new Set(['none', 'overTime']);
 const LEGACY_STAMINA_REGEN_POLICY_MAP = Object.freeze({ elapsedTime: 'overTime' });
 const STAMINA_REGEN_UNITS = new Set(['minutes', 'hours', 'days', 'weeks']);
 const SECONDS_PER_UNIT = Object.freeze({ minutes: 60, hours: 3600, days: 86_400, weeks: 604_800 });
-const ROLL_EXPRESSION_PATTERN = /\d\s*d\s*\d|[*/()]/i;
 const DEFAULT_GATHERING_RULES = Object.freeze({
   rewardSelectionMode: 'highestRankedDrop',
   rewardLimit: 1,
@@ -356,8 +355,15 @@ export class GatheringRichStateService {
       environment?.eventOrder
     ).map((event) => applyEventDropRateAdjustment(normalizeEvent(event), environment));
 
+    // Modifiers are now system-owned (issue 1117), exactly as tools are below: the ONE
+    // authored library is `system.modifiers`, populated by
+    // `CraftingSystemManager._normalizeSystem`, and it serves the check modifiers on all
+    // three activities AND these d100 drop/event/stamina references. The gathering
+    // config's `characterModifiers` copy is no longer the source (the 1.23.0 migration
+    // merges it up and retires the key), and no read-alias is kept for it — a silent
+    // fallback would make the relocation unobservable.
     const libraryCharacterModifiers = new Map();
-    for (const entry of normalizeList(libraries.characterModifiers)) {
+    for (const entry of normalizeList(this._systemModifierLibrary(system, systemId))) {
       if (entry?.id) libraryCharacterModifiers.set(String(entry.id), cloneJson(entry));
     }
 
@@ -1702,17 +1708,39 @@ export class GatheringRichStateService {
    * @param {object} payload
    * @returns {Map<string, object>}
    */
-  _modifierLibrary({ environment = null, systemId = null } = {}) {
+  _modifierLibrary({ environment = null, system = null, systemId = null } = {}) {
     if (
       environment?.__libraryCharacterModifiers instanceof Map &&
       environment.__libraryCharacterModifiers.size > 0
     ) {
       return environment.__libraryCharacterModifiers;
     }
-    const entries =
-      this._config().systems?.[String(systemId || environment?.craftingSystemId || '')]
-        ?.characterModifiers || [];
+    const entries = this._systemModifierLibrary(
+      system,
+      systemId || environment?.craftingSystemId || ''
+    );
     return new Map(entries.map((entry) => [String(entry.id), entry]));
+  }
+
+  /**
+   * The ONE authored modifier library for a crafting system (issue 1117).
+   *
+   * Prefers the normalized system the caller already holds and falls back to a live
+   * registry lookup by id, the identical two-step the tool library uses in
+   * {@link composeEnvironment} — a caller that has the system must not pay for a global
+   * lookup, and one that only has an id (stamina regen has no environment and no system)
+   * must still resolve.
+   *
+   * @param {object|null} system The normalized crafting system, when the caller has it.
+   * @param {string} systemId Its id, used for the registry fallback.
+   * @returns {Array<object>} The library entries, possibly empty.
+   */
+  _systemModifierLibrary(system, systemId) {
+    if (Array.isArray(system?.modifiers)) return system.modifiers;
+    const resolved = globalThis.game?.fabricate
+      ?.getCraftingSystemManager?.()
+      ?.getSystem?.(String(systemId || ''));
+    return Array.isArray(resolved?.modifiers) ? resolved.modifiers : [];
   }
 
   /**
@@ -1732,6 +1760,7 @@ export class GatheringRichStateService {
     if (references.length === 0) return Math.max(0, Math.round(base));
     const library = this._modifierLibrary({
       environment,
+      system,
       systemId: system?.id || environment?.craftingSystemId,
     });
     let total = base;
@@ -1909,9 +1938,9 @@ function normalizeGatheringConfig(raw = {}) {
       tasks: normalizeList(config?.tasks).map(normalizeLibraryTask),
       tools: normalizeList(config?.tools).map(normalizeLibraryTool).filter(Boolean),
       events: normalizeList(config?.events).map(normalizeEvent),
-      characterModifiers: normalizeList(config?.characterModifiers)
-        .map((entry) => normalizeCharacterModifierLibraryEntry(entry))
-        .filter(Boolean),
+      // `characterModifiers` is DELIBERATELY not emitted (issue 1117): the modifier
+      // library moved onto the crafting system as `system.modifiers`. This is an allowlist
+      // rebuild, so not emitting the key is what retires it from every world that saves.
       economy: normalizeGatheringEconomy(config?.economy),
     };
   }
@@ -2188,29 +2217,6 @@ function applyEventDropRateAdjustment(event, environment) {
   const adjustments = dropRateAdjustmentMap(environment?.eventDropRateAdjustments);
   const adjustment = adjustments[id] || 0;
   return applyDropRateAdjustment(event, adjustment);
-}
-
-/**
- * Normalize a per-system character modifier library entry. Returns null when
- * the entry lacks a resolvable id or an expression (an entry that cannot
- * resolve to a number is dropped).
- *
- * @param {object} entry Raw library entry.
- * @returns {object|null} Normalized entry or null when invalid.
- */
-function normalizeCharacterModifierLibraryEntry(entry = {}) {
-  if (!entry || typeof entry !== 'object') return null;
-  const id = stringOrFallback(entry.id, '');
-  if (!id) return null;
-  const expression = stringOrFallback(entry.expression, '');
-  if (!expression) return null;
-  return {
-    id,
-    label: stringOrFallback(entry.label, id),
-    icon: stringOrFallback(entry.icon, 'fa-solid fa-user'),
-    expression,
-    isRollExpression: ROLL_EXPRESSION_PATTERN.test(expression || ''),
-  };
 }
 
 /**

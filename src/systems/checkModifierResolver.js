@@ -1,12 +1,13 @@
 /**
- * Ownership of the SYSTEM-LEVEL check-modifier catalogue (issues 770, 1055, 1094, 1095):
+ * Ownership of the SYSTEM-LEVEL modifier library (issues 770, 1055, 1094, 1095, 1117):
  * who decides which modifiers apply, what they reduce to, and how that number reaches
  * the roll — on all THREE activities.
  *
- * A crafting system carries ONE named catalogue at the system level
- * (`CraftingSystem.checkModifiers: {id,label,expression,icon?,min?,max?}[]`, issue 1095).
+ * A crafting system carries ONE named library at the system level
+ * (`CraftingSystem.modifiers: {id,label,icon?,expression,isRollExpression,min?,max?}[]`,
+ * issue 1117 — `checkModifiers` between 1.22.0 and 1.23.0).
  * Each of the three activity checks — `craftingCheck`, `salvageCraftingCheck` and
- * `gatheringCraftingCheck` — carries its OWN selection over that one catalogue: a
+ * `gatheringCraftingCheck` — carries its OWN selection over that one library: a
  * COMBINATION RULE (`defaultModifierPolicy`), a default eligible id set
  * (`defaultModifierIds`) and an optional pick cap (`maxModifierPicks`). The catalogue is
  * defined once; each activity decides which entries apply and how they combine.
@@ -93,6 +94,28 @@ import { appendCheckModifierTerm, isDecimalSafeTermValue } from './toolCheckBonu
 export const MODIFIER_POLICIES = Object.freeze(['addAll', 'highest', 'bySubject', 'playerPicks']);
 
 const VALID_POLICIES = new Set(MODIFIER_POLICIES);
+
+/**
+ * Whether an authored modifier expression is a ROLL rather than a flat lookup (issue 1117).
+ *
+ * ONE PATTERN, because there is now ONE library. Before unification two lived in the repo
+ * and they were COMPLEMENTARY, not duplicates: `GatheringRichStateService`'s
+ * `/\d\s*d\s*\d|[*\/()]/i` requires a digit before the `d`, so it matched `1d6` and missed a
+ * bare `d20`; `SystemEditView`'s `/\bd\d|[*\/()]/` requires a word boundary before the `d`,
+ * so it matched `d20` and — because `1` and `d` are both word characters, leaving no
+ * boundary between them — missed `1d6`. Neither was a superset of the other, so one library
+ * with two readers would have disagreed about whether the same entry rolls. This is the
+ * union of the two, which is the only merge that loses no detection either had.
+ *
+ * The classification is DERIVED and never authored: it is a fact about the expression, and
+ * a persisted flag a GM could contradict would be a second source of truth for it.
+ *
+ * @param {unknown} expression The authored expression.
+ * @returns {boolean} True when the expression rolls dice or uses arithmetic grouping.
+ */
+export function isRollExpression(expression) {
+  return /\d\s*d\s*\d|\bd\s*\d|[*/()]/i.test(typeof expression === 'string' ? expression : '');
+}
 
 /**
  * The absence-preserving ATTACH every subject normalizer spreads, RE-EXPORTED here so the
@@ -234,7 +257,7 @@ function readSubjectModifierIds(activity, subject) {
  * `undefined` when it has never been asked; the key is always present on the bag
  * so the shape is fixed, and {@link resolveMaxModifierPicks} owns what absence means.
  *
- * @param {object|null|undefined} system The crafting system (owner of `checkModifiers`).
+ * @param {object|null|undefined} system The crafting system (owner of `modifiers`).
  * @param {'crafting'|'salvage'|'gathering'} activity Which activity's selection to read.
  * @param {object|null|undefined} subject The record being resolved: a recipe, a component
  *   or a gathering task.
@@ -246,7 +269,12 @@ export function buildCheckModifierContext(system, activity, subject) {
   const check = system?.[ACTIVITY_CHECK_KEYS.get(activity) ?? ''] ?? {};
   return {
     activity,
-    catalogue: system?.checkModifiers,
+    // The ONE authored modifier library (issue 1117). It was `system.checkModifiers`
+    // between 1.22.0 and 1.23.0, and `craftingCheck.checkModifiers` before that; the
+    // 1.23.0 migration and the export upcast are the only two paths a legacy payload
+    // arrives through, and no read-alias is kept here for the same reason 1.22.0 kept
+    // none — a silent alias makes the relocation unobservable.
+    catalogue: system?.modifiers,
     systemPolicy: check.defaultModifierPolicy,
     defaultModifierIds: check.defaultModifierIds,
     subjectModifierIds: readSubjectModifierIds(activity, subject),
@@ -353,9 +381,10 @@ export function resolveActiveCraftingCheckFormula(system) {
  * The gathering resolution modes and the `gatheringCraftingCheck` sub-config each rolls.
  * `d100` is deliberately absent: it rolls the fixed d100 against each drop's chance and
  * authors no formula, so it has no slot and the check-modifier catalogue is inert under
- * it with cause `noCheck`. Gathering's separate d100 `characterModifiers` library is a
- * DIFFERENT concept (percentage-point / multiplicative) and does not participate in
- * `progressive` or `routed`.
+ * it with cause `noCheck`. Gathering's d100 drop and event rows REFERENCE the same unified
+ * library (issue 1117) but consume it differently — as a percentage-point delta or a
+ * multiplicative factor on a drop chance, never as a term appended to a rolled formula —
+ * so a `d100` system's references do not participate in `progressive` or `routed`.
  */
 const GATHERING_CHECK_SLOTS = new Map([
   ['progressive', 'progressive'],

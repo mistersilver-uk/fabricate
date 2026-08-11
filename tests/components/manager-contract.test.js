@@ -550,29 +550,30 @@ describe('CraftingSystemManager source contract', () => {
     ]) {
       assert.ok(systemEditSource.includes(snippet), `SystemEditView should include ${snippet}`);
     }
-    // The character-modifier editor is formula-only: a plain labelled expression
-    // input, with no provider chip, provider-label helper, or macro UUID field.
+    // The modifier editor is formula-only: one labelled expression field, with no provider
+    // chip, provider-label helper, or macro UUID field. Since issue 1117 that field is
+    // `RollDataExpressionInput` — the control the retired Checks-tab editor used, adopted
+    // here because this is now the ONE surface that authors an expression — so the binding
+    // pinned is its `onChange`, not a raw `event.currentTarget.value` read.
     assert.ok(
       !systemEditSource.includes('ProviderExpressionInput'),
-      'character-modifier editor should not import the deleted provider/expression component'
+      'modifier editor should not import the deleted provider/expression component'
     );
     assert.ok(
       !systemEditSource.includes('characterModifierProviderLabel'),
-      'character-modifier editor should not render a provider label'
+      'modifier editor should not render a provider label'
     );
     assert.ok(
       !systemEditSource.includes('manager-character-modifier-provider'),
-      'character-modifier summary should not render a provider chip'
+      'modifier summary should not render a provider chip'
     );
     assert.ok(
-      /onUpdateCharacterModifier\(entry\.id, \{\s*expression: event\.currentTarget\.value,?\s*\}\)/.test(
-        systemEditSource
-      ),
-      'character-modifier editor should bind a plain expression input'
+      /onUpdateModifier\(entry\.id, \{ expression \}\)/.test(systemEditSource),
+      'modifier editor should bind the expression field through RollDataExpressionInput'
     );
     assert.ok(
-      systemEditSource.includes('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.Expression'),
-      'character-modifier editor should keep the localized Expression label'
+      systemEditSource.includes('FABRICATE.Admin.Manager.Modifiers.Expression'),
+      'modifier editor should keep the localized Expression label'
     );
     for (const snippet of [
       'data-system-currency-units',

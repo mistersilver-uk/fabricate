@@ -16,6 +16,7 @@ import { applyMaxModifierPicks } from './migrateMaxModifierPicks.js';
 import { applyRetireCraftingModToken } from './migrateRetireCraftingModToken.js';
 import { applySystemCheckModifierCatalogue } from './migrateSystemCheckModifierCatalogue.js';
 import { deriveToolSourceFromComponents } from './migrateToolsToFirstClass.js';
+import { applyUnifiedModifierLibrary } from './migrateUnifyModifierLibraries.js';
 
 /**
  * Upcast every legacy componentId-only Tool in an export payload's system to a first-class
@@ -116,6 +117,41 @@ function liftCheckModifierCatalogue(migrated) {
 }
 
 /**
+ * Merge an imported bundle's two modifier libraries — the check-modifier catalogue on the
+ * system and the gathering character-modifier library in the bundle's gathering slice —
+ * into one `system.modifiers` (issue 1117), mirroring the world-side 1.23.0 migration so
+ * an imported system behaves exactly like a migrated one. An export bundle carries exactly
+ * one system and exactly one gathering-config slice, so the shared per-system transform is
+ * applied directly with no grouping.
+ *
+ * BRANCH-INDEPENDENT for the reason all four siblings above are: `migrateExportPayload`
+ * returns early once `payload.schemaVersion` is already current, and every bundle written
+ * by the shipping build carries the current schema, so a derivation reachable only from
+ * the legacy branch would never run on a real bundle. The libraries' LOCATION is orthogonal
+ * to the envelope version.
+ *
+ * IT RUNS AFTER `liftCheckModifierCatalogue`, and here the ordering IS observable rather
+ * than merely symmetrical: a pre-1.22.0 bundle carries its catalogue at
+ * `craftingCheck.checkModifiers`, and this transform reads only the system-level key — so
+ * running it first would merge an empty catalogue and then retire it, silently dropping
+ * every check modifier in the bundle.
+ *
+ * The collision count is discarded here on purpose, for the reason
+ * `retireCraftingModToken` discards its counts: the GM notice reports what a WORLD
+ * migration changed under the GM's feet, whereas an import is an act the GM just performed
+ * against a bundle they chose. Idempotent — a bundle already carrying `system.modifiers`
+ * keeps it (the merge is guarded) and a second pass finds no legacy key.
+ * @private
+ */
+function unifyModifierLibraries(migrated) {
+  const system = migrated?.system;
+  if (!system || typeof system !== 'object' || Array.isArray(system)) return;
+  const slice = migrated?.gatheringConfig?.system;
+  const systemConfig = slice && typeof slice === 'object' && !Array.isArray(slice) ? slice : null;
+  applyUnifiedModifierLibrary(system, systemConfig);
+}
+
+/**
  * @param {*} payload - Parsed export JSON of any prior schema
  * @returns {object} Upcast payload at the current schema version
  */
@@ -133,6 +169,7 @@ export function migrateExportPayload(payload) {
     deriveMaxModifierPicks(current);
     retireCraftingModToken(current);
     liftCheckModifierCatalogue(current);
+    unifyModifierLibraries(current);
     return current;
   }
 
@@ -166,6 +203,7 @@ export function migrateExportPayload(payload) {
   deriveMaxModifierPicks(migrated);
   retireCraftingModToken(migrated);
   liftCheckModifierCatalogue(migrated);
+  unifyModifierLibraries(migrated);
 
   return migrated;
 }

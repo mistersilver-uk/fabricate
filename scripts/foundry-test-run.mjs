@@ -8583,14 +8583,14 @@ async function main() {
           .catch(() => {});
 
         // --- Settings-list ergonomics (issue 768) ---
-        // The seeded system carries two Character Modifiers, two Character
+        // The seeded system carries two Modifiers, two Character
         // Prerequisites and two Currency Units. Capture the three lists together
         // proving the three increment-1 features: (a) the shared IconPicker open on
         // a modifier (icon-picker parity), (b) a whole-section collapse on the
         // Currency Units card, and (c) the row-level copy buttons on the summary
         // rows. Reset afterwards so the Currency captures below start expanded.
         await setManagerWindowSize(page, { width: 1280, height: 980 });
-        const modifierCard = page.locator('.fabricate-manager [data-system-character-modifiers]').first();
+        const modifierCard = page.locator('.fabricate-manager [data-system-modifiers]').first();
         await modifierCard.waitFor({ state: 'visible', timeout: 5_000 });
         await modifierCard.evaluate((el) => el.scrollIntoView({ block: 'start' }));
         await page.waitForTimeout(200);
@@ -8604,8 +8604,8 @@ async function main() {
 
         // Open the first modifier in edit mode and open its IconPicker so the icon
         // dropdown is visible (parity with Currency Units / Character Prerequisites).
-        const firstModifierRow = modifierCard.locator('[data-system-character-modifier]').first();
-        await firstModifierRow.locator('[data-toggle-character-modifier]').first().click();
+        const firstModifierRow = modifierCard.locator('[data-system-modifier]').first();
+        await firstModifierRow.locator('[data-toggle-modifier]').first().click();
         await page.waitForTimeout(150);
         const modifierIconTrigger = firstModifierRow.locator('.essence-icon-picker-trigger').first();
         if (await modifierIconTrigger.count() > 0) {

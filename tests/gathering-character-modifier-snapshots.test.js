@@ -4,12 +4,13 @@ import assert from 'node:assert/strict';
 import { makeRichState, makeEngine, makeFakeActor, environment, DEFAULT_TEST_SYSTEM } from './helpers/gathering.js';
 import { GatheringRunManager } from '../src/systems/GatheringRunManager.js';
 
-function configFor({ entries = [], tasks = [], events = [] } = {}) {
+// The modifier library moved onto the crafting SYSTEM (issue 1117); the gathering config
+// no longer carries one, so `makeRichState({ modifiers })` builds it and returns `system`.
+function configFor({ tasks = [], events = [] } = {}) {
   return {
     systems: {
       'system-test': {
         rules: { rewardSelectionMode: 'allDrops', eventSelectionMode: 'allDrops' },
-        characterModifiers: entries,
         tasks,
         events
       }
@@ -19,24 +20,25 @@ function configFor({ entries = [], tasks = [], events = [] } = {}) {
 
 const STR_LIB = [{ id: 'strength', label: 'Strength', icon: 'fa-solid fa-dumbbell', expression: '@abilities.str.mod' }];
 
-function envWithLibrary(service, { events = [] } = {}) {
+function envWithLibrary(service, system, { events = [] } = {}) {
   const composed = service.composeEnvironment({
     id: 'env-test',
     craftingSystemId: 'system-test',
     tasks: []
-  }, { id: 'system-test' });
+  }, system);
   if (events.length > 0) composed.events = events;
   composed.rules = { rewardSelectionMode: 'allDrops', eventSelectionMode: 'allDrops', rewardLimit: 99, eventLimit: 99, eventPolicy: 'successWithEvent' };
   return composed;
 }
 
 test('terminal run records characterModifierSnapshot evidence per row and event', async () => {
-  const { service } = makeRichState({
-    config: configFor({ entries: STR_LIB }),
+  const { service, system } = makeRichState({
+    config: configFor(),
+    modifiers: STR_LIB,
     rolls: [100, 100],
     evaluateExpression: () => 3
   });
-  const env = envWithLibrary(service, {
+  const env = envWithLibrary(service, system, {
     events: [{ id: 'h1', name: 'Trap', dropRate: 50, characterModifiers: [{ id: 'rh', modifierId: 'strength', operator: '-' }] }]
   });
   const result = await service.resolveD100Attempt({
@@ -56,12 +58,13 @@ test('terminal run records characterModifierSnapshot evidence per row and event'
 
 test('dice term rolled total is captured in evidence', async () => {
   let evaluatedExpression;
-  const { service } = makeRichState({
-    config: configFor({ entries: [{ id: 'roll-d6', label: 'Roll d6', expression: '1d6 + @abilities.str.mod' }] }),
+  const { service, system } = makeRichState({
+    config: configFor(),
+    modifiers: [{ id: 'roll-d6', label: 'Roll d6', expression: '1d6 + @abilities.str.mod' }],
     rolls: [100],
     evaluateExpression: ({ expression }) => { evaluatedExpression = expression; return 7; }
   });
-  const env = envWithLibrary(service);
+  const env = envWithLibrary(service, system);
   const result = await service.resolveD100Attempt({
     task: { id: 't', dropRows: [{ id: 'd1', componentId: 'herb', quantity: 1, dropRate: 50, characterModifiers: [{ id: 'r', modifierId: 'roll-d6', operator: '+' }] }] },
     environment: env,
@@ -74,12 +77,13 @@ test('dice term rolled total is captured in evidence', async () => {
 });
 
 test('replay invariance: terminal payload is snapshot-driven not library-driven', async () => {
-  const { service } = makeRichState({
-    config: configFor({ entries: STR_LIB }),
+  const { service, system } = makeRichState({
+    config: configFor(),
+    modifiers: STR_LIB,
     rolls: [100],
     evaluateExpression: () => 5
   });
-  const env = envWithLibrary(service);
+  const env = envWithLibrary(service, system);
   const result = await service.resolveD100Attempt({
     task: { id: 't', dropRows: [{ id: 'd1', componentId: 'herb', quantity: 1, dropRate: 50, characterModifiers: [{ id: 'r', modifierId: 'strength', operator: '+' }] }] },
     environment: env,
@@ -119,13 +123,14 @@ test('GatheringRunManager preserves characterModifierSnapshot on terminal runs',
 });
 
 test('commitAcceptedAttempt records snapshot in evidence', async () => {
-  const { service } = makeRichState({
-    config: configFor({ entries: STR_LIB }),
+  const { service, system } = makeRichState({
+    config: configFor(),
+    modifiers: STR_LIB,
     rolls: [100],
     evaluateExpression: () => 4
   });
   const actor = makeFakeActor();
-  const env = envWithLibrary(service);
+  const env = envWithLibrary(service, system);
   const result = await service.resolveD100Attempt({
     task: { id: 't', dropRows: [{ id: 'd1', componentId: 'herb', quantity: 1, dropRate: 50, characterModifiers: [{ id: 'r', modifierId: 'strength', operator: '+' }] }] },
     environment: env,

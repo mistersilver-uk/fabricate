@@ -1023,6 +1023,25 @@ class Fabricate {
       if (notice.severity === 'warn') ui.notifications?.warn?.(notice.message, { permanent: true });
       else ui.notifications?.info?.(notice.message);
     }
+
+    // One-time GM-facing notice: the 1.23.0 migration merged each system's two modifier
+    // libraries into one, and where the same id was authored in BOTH the gathering entry
+    // was RE-KEYED. That is a visible rename in the authoring surface — the GM opens
+    // Modifiers and finds `strength-gathering` beside `strength` — so it is reported
+    // rather than left to be discovered. Only systems that actually collided are listed;
+    // a clean merge is silent. PRIMARY-GM ONLY, like every notice above it, because
+    // `_runMigrations` returns early unless this client is the active GM.
+    const unifiedModifierCollisions = Array.isArray(summary?.unifiedModifierCollisions)
+      ? summary.unifiedModifierCollisions : [];
+    if (unifiedModifierCollisions.length > 0 && game.user?.isGM) {
+      const total = unifiedModifierCollisions.reduce((sum, entry) => sum + entry.collisions, 0);
+      const systemList = unifiedModifierCollisions.map((entry) => entry.system).join(', ');
+      const message = game.i18n?.format?.('FABRICATE.Migration.UnifyModifiers.CollisionNotice', {
+        count: total,
+        systems: systemList,
+      }) || `Fabricate merged each system's check modifiers and gathering character modifiers into one Modifiers library. ${total} gathering modifier(s) in ${systemList} shared an id with a check modifier and were renamed with a "-gathering" suffix; every reference to them was updated. Review them under System settings › Modifiers.`;
+      ui.notifications?.warn?.(message, { permanent: true });
+    }
   }
 
   /**

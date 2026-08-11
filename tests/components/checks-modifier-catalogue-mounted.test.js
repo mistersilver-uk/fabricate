@@ -1,14 +1,16 @@
 /**
- * The check-modifier CATALOGUE card and the Validation tab's per-activity wiring, MOUNTED
- * (issue 1095).
+ * The modifier SELECTION card and the Validation tab's per-activity wiring, MOUNTED
+ * (issues 1095, 1117).
  *
  * Two things shipped unpinned and are pinned here:
  *
- *  1. THE BOUNDS AUTHORING UI. `data-crafting-modifier-bounds` and
- *     `data-crafting-modifier-bounds-invalid` could both be deleted with the suite green, and
- *     neither selector appeared anywhere in `tests/` or `scripts/`. The bounds pair is the
- *     whole of the new per-entry clamp's authoring surface, and the invalid note is the only
- *     place a GM is told, where they authored it, that the entry now contributes nothing.
+ *  1. THE READ-ONLY LIBRARY ROWS. Issue 1117 removed the entry editor from this card on
+ *     EVERY activity, crafting included: the library has one authoring surface (System
+ *     settings › Modifiers) and this screen selects over it. What is pinned is that no
+ *     activity renders an editor, that every activity renders the identity/expression/bounds
+ *     read-out, and that each carries the deep link to the surface that does author it. The
+ *     per-row bounds FAULT note stays — it is the only place a GM is told, on the screen that
+ *     applies the entry, that it now contributes nothing.
  *  2. THE `modifierContext` WIRING. `ChecksView` builds one context per activity and hands it
  *     to that activity's readiness section. The three rules are proven as RULES in
  *     `checks-readiness.test.js`, but the seam that delivers them was not: setting any of the
@@ -83,7 +85,7 @@ async function mountChecks(props = {}) {
     gatheringResolutionMode: 'd100',
     features: { salvage: true, gathering: true },
     activation: {},
-    checkModifiers: CATALOGUE,
+    modifiers: CATALOGUE,
     craftingDefaultModifierPolicy: 'addAll',
     craftingDefaultModifierIds: ['med'],
     salvageDefaultModifierPolicy: 'addAll',
@@ -109,29 +111,46 @@ describe('the check-modifier catalogue card (mounted)', () => {
   before(() => harness.setup());
   after(() => harness.teardown());
 
-  it('renders a min/max stepper pair per entry, on the activity that OWNS the catalogue', async () => {
-    const target = await mountChecks();
-    const rows = target.querySelectorAll(
-      '[data-crafting-modifier-catalogue="crafting"] [data-crafting-modifier-bounds]'
-    );
-    assert.equal(rows.length, CATALOGUE.length, 'every entry gets the bounds pair');
-    const first = rows[0];
-    assert.equal(first.dataset.craftingModifierBounds, 'med', 'the row is keyed by entry id');
-    assert.ok(
-      Boolean(first.querySelector('[data-crafting-modifier-field="min"]')),
-      'the minimum is authorable'
-    );
-    assert.ok(
-      Boolean(first.querySelector('[data-crafting-modifier-field="max"]')),
-      'and so is the maximum'
-    );
-    assert.equal(
-      first.querySelector('[data-crafting-modifier-field="min"]').value,
-      '-1',
-      'a stored bound renders as its value, not as a blank'
-    );
-    harness.remount();
-  });
+  // ISSUE 1117 — NO ACTIVITY AUTHORS AN ENTRY, and the assertion runs over all three so
+  // "crafting is special" cannot come back on one of them. The editor's absence is asserted
+  // by its own hooks, not by the presence of the read-only row: a card rendering BOTH would
+  // pass a read-only-row-only check.
+  for (const activity of ['crafting', 'salvage', 'gathering']) {
+    it(`renders the library READ-ONLY on ${activity}, with no entry editor at all`, async () => {
+      const target = await mountChecks({ activity });
+      const card = target.querySelector(`[data-crafting-modifier-catalogue="${activity}"]`);
+      assert.ok(Boolean(card), `${activity} renders the modifier card`);
+
+      const rows = card.querySelectorAll('[data-crafting-modifier-readonly="label"]');
+      assert.equal(rows.length, CATALOGUE.length, 'every entry is read out');
+      assert.equal(rows[0].textContent.trim(), 'Medicine');
+      assert.equal(
+        card.querySelector('[data-crafting-modifier-readonly="expression"]').textContent.trim(),
+        '@abilities.med.mod'
+      );
+
+      for (const editorHook of [
+        '[data-crafting-modifier-field="label"]',
+        '[data-crafting-modifier-field="expression"]',
+        '[data-crafting-modifier-field="min"]',
+        '[data-crafting-modifier-field="max"]',
+        '[data-crafting-modifier-bounds]',
+        '[data-crafting-modifier-remove]',
+        '[data-crafting-modifier-add]',
+      ]) {
+        assert.ok(
+          !card.querySelector(editorHook),
+          `${activity}: ${editorHook} is authoring, and this screen no longer authors`
+        );
+      }
+
+      assert.ok(
+        Boolean(card.querySelector('[data-crafting-modifier-edit-link]')),
+        `${activity}: the deep link to the one authoring surface is what replaces the editor`
+      );
+      harness.remount();
+    });
+  }
 
   it('says at the ROW which entries are blocked, and names the right fault for each', async () => {
     const target = await mountChecks();
@@ -156,27 +175,25 @@ describe('the check-modifier catalogue card (mounted)', () => {
     harness.remount();
   });
 
-  it('branches its empty state on who owns the entries', async () => {
-    const target = await mountChecks({ checkModifiers: [] });
-    const crafting = target.querySelector(
-      '[data-crafting-modifier-catalogue="crafting"] [data-crafting-modifier-empty]'
-    );
-    assert.equal(crafting.dataset.craftingModifierEmpty, 'editable');
-    assert.match(crafting.textContent, /Add one/, 'crafting has the add button this names');
-
-    // Salvage is its own ROUTE now (issue 1096), so its card is reached by mounting that
-    // route rather than by clicking a sibling tab.
-    harness.remount();
-    const salvageTarget = await mountChecks({ activity: 'salvage', checkModifiers: [] });
-    const salvage = salvageTarget.querySelector(
-      '[data-crafting-modifier-catalogue="salvage"] [data-crafting-modifier-empty]'
-    );
-    assert.equal(salvage.dataset.craftingModifierEmpty, 'linked');
-    assert.ok(
-      !/Add one/.test(salvage.textContent),
-      'salvage has no add button at all, so "Add one" told the GM to do something this ' +
-        'screen cannot do — directly above a button offering the crafting tab instead'
-    );
+  // ONE empty state, on every activity (issue 1117). It branched while crafting owned the
+  // entries — "Add one" was true there and false on the other two, directly above a button
+  // offering the crafting tab instead. Nothing on this screen adds one now, so the sentence
+  // is the same everywhere and it names the surface that does.
+  it('gives every activity the same empty state, naming the one authoring surface', async () => {
+    for (const activity of ['crafting', 'salvage', 'gathering']) {
+      harness.remount();
+      const target = await mountChecks({ activity, modifiers: [] });
+      const empty = target.querySelector(
+        `[data-crafting-modifier-catalogue="${activity}"] [data-crafting-modifier-empty]`
+      );
+      assert.equal(empty.dataset.craftingModifierEmpty, 'linked');
+      assert.match(empty.textContent, /System settings/, `${activity}: it names where to go`);
+      assert.ok(
+        !/Add one/.test(empty.textContent),
+        `${activity}: no screen here adds one, so "Add one" would be an instruction it ` +
+          'cannot carry out'
+      );
+    }
     harness.remount();
   });
 

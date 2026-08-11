@@ -57,7 +57,7 @@
     sectionForIssue,
   } from './checksReadiness.js';
   import Callout from '../Callout.svelte';
-  import { checkIssueCopy } from './checksCopy.js';
+  import { checkIssueCopy, interpolate } from './checksCopy.js';
   import {
     buildCheckModifierContext,
     resolveActiveCraftingCheckFormula,
@@ -89,10 +89,11 @@
     // crafting check (and mirrors it for salvage); alchemy resolves consumption through its
     // own `consumeOnFail` flag instead, so these toggles are hidden in alchemy mode.
     craftingConsumption = null,
-    // The ONE system-level check-modifier catalogue (issue 770, reshaped by 1055 and
-    // moved up by 1095). It is shared by all three activities and edited on the crafting
-    // route only; salvage and gathering render its entries read-only.
-    checkModifiers = [],
+    // The ONE system-level modifier library (issue 770, reshaped by 1055, moved up by 1095,
+    // unified with the gathering character-modifier library by 1117). This screen renders it
+    // READ-ONLY for every activity, crafting included, and links to the one surface that
+    // authors it: System settings > Modifiers. What Checks owns is the SELECTION.
+    modifiers = [],
     // Crafting's own SELECTION over that catalogue: which entries it applies
     // (`defaultModifierIds`), how they combine (`defaultModifierPolicy`) and how many a
     // selecting rule may pick (`maxModifierPicks`). Persisted live via
@@ -167,18 +168,22 @@
     // Route to another activity — used by the read-only catalogue's "edit the catalogue"
     // link and by the Validation route's deep links.
     onOpenActivity = () => {},
+    // Navigate to the system editor's Modifiers section — the one surface that authors the
+    // library. Every activity's card links here now (issue 1117), so there is no
+    // crafting-only branch left for it to be absent on.
+    onOpenModifierLibrary = () => {},
     onToggleCheckActive = () => {},
   } = $props();
 
-  function text(key, fallback) {
-    const translated = localize(key);
+  function text(key, fallback, data) {
+    const translated = localize(key, data);
     return translated && translated !== key ? translated : fallback;
   }
 
   /** The Validation route's own sentence for a readiness issue — the same one, not a copy. */
-  function issueSentence(id) {
+  function issueSentence(id, data) {
     const copy = checkIssueCopy(id);
-    return text(copy.key, copy.fallback);
+    return interpolate(text(copy.key, copy.fallback, data), data);
   }
 
   // The system-level alchemy check-mode selector (issue 554). For an alchemy
@@ -316,7 +321,7 @@
   // same shape (issue 1095). The subject is `null`: this route validates the SYSTEM's
   // selection, and no individual recipe, component or task is in scope here.
   const draftSystem = $derived({
-    checkModifiers,
+    modifiers,
     craftingCheck: {
       defaultModifierPolicy: craftingDefaultModifierPolicy,
       defaultModifierIds: craftingDefaultModifierIds,
@@ -675,13 +680,6 @@
     onOpenActivity(target.activity, target.section || 'roll');
   }
 
-  // The read-only catalogue rows on salvage and gathering link back to the ONE route that
-  // authors them. It routes rather than opening a second editor: two editors for one
-  // catalogue is how two screens come to disagree about which wrote last.
-  function goToCraftingCatalogue() {
-    onOpenActivity('crafting', 'modifiers');
-  }
-
   const configTitle = text('FABRICATE.Admin.Manager.Checks.Configuration', 'Configuration');
   const pageKicker = text('FABRICATE.Admin.Manager.Checks.PageKicker', 'One per system');
   const page = $derived(PAGES[activity] || PAGES.crafting);
@@ -713,42 +711,44 @@
       .map((issue) => ({
         id: issue.id,
         tone: issue.severity === 'critical' ? 'warning' : 'info',
-        text: issueSentence(issue.id),
+        text: issueSentence(issue.id, issue.data),
       }))
   );
 </script>
 
 <!-- Rendered in BOTH crafting branches (alchemy and non-alchemy) from one definition.
      The card renders wherever the crafting route's Modifiers section does, including the
-     two states where the catalogue reaches no roll — a catalogue that reaches no roll is
+     two states where the library reaches no roll — a library that reaches no roll is
      the defect, and a card that disappears reports nothing. A snippet rather than a second
      call site: the prop list is the contract, and two copies of it drift (and count
      against the new-code duplication gate). -->
 {#snippet craftingModifierCard()}
   <CraftingModifierCatalogueCard
     activity="crafting"
-    {checkModifiers}
+    {modifiers}
     defaultModifierPolicy={craftingDefaultModifierPolicy}
     defaultModifierIds={craftingDefaultModifierIds}
     maxModifierPicks={craftingMaxModifierPicks}
     inertCause={craftingModifierInertCause}
+    onEditLibrary={onOpenModifierLibrary}
     onChange={onUpdateCraftingCheckModifiers}
   />
 {/snippet}
 
 <!-- Salvage and gathering render the SAME card against their own selection (issue 1095).
-     The catalogue rows are read-only there — one surface authors the entries — while the
-     eligibility control and the combination-rule grid stay fully editable, because
-     deciding which entries apply and how they combine is what each activity owns. -->
+     Since issue 1117 the crafting card above is identical in kind: all three render the
+     library read-only — one surface authors the entries — while the eligibility control and
+     the combination-rule grid stay fully editable, because deciding which entries apply and
+     how they combine is what each activity owns. -->
 {#snippet salvageModifierCard()}
   <CraftingModifierCatalogueCard
     activity="salvage"
-    {checkModifiers}
+    {modifiers}
     defaultModifierPolicy={salvageDefaultModifierPolicy}
     defaultModifierIds={salvageDefaultModifierIds}
     maxModifierPicks={salvageMaxModifierPicks}
     inertCause={salvageModifierInertCause}
-    onEditCatalogue={goToCraftingCatalogue}
+    onEditLibrary={onOpenModifierLibrary}
     onChange={onUpdateSalvageCheckModifiers}
   />
 {/snippet}
@@ -756,13 +756,13 @@
 {#snippet gatheringModifierCard()}
   <CraftingModifierCatalogueCard
     activity="gathering"
-    {checkModifiers}
+    {modifiers}
     defaultModifierPolicy={gatheringDefaultModifierPolicy}
     defaultModifierIds={gatheringDefaultModifierIds}
     maxModifierPicks={gatheringMaxModifierPicks}
     inertCause={gatheringModifierInertCause}
     dormant
-    onEditCatalogue={goToCraftingCatalogue}
+    onEditLibrary={onOpenModifierLibrary}
     onChange={onUpdateGatheringCheckModifiers}
   />
 {/snippet}

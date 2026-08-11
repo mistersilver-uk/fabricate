@@ -26,7 +26,14 @@ const harness = createMountedComponentHarness({
     'src/systems/characterPrerequisites.js',
     // SystemEditView imports the pure copy-mapping helpers (issue 768); omitting it
     // HANGS this mount (reported as `# cancelled`).
-    'src/systems/characterModifierPrerequisiteCopy.js'
+    'src/systems/characterModifierPrerequisiteCopy.js',
+    // The unified modifier library's bounds pair and roll classification (issue 1117).
+    'src/systems/checkModifierResolver.js',
+    'src/systems/salvageCheckUsability.js',
+    'src/systems/toolCheckBonus.js',
+    'src/utils/checkModifierPicks.js',
+    'src/utils/craftingCheckExpression.js',
+    'src/ui/svelte/components/stepperLabels.js'
   ],
   compiledModules: [
     // The manager's ONE chip (issue 883). A `.svelte` the tree renders but the
@@ -36,6 +43,9 @@ const harness = createMountedComponentHarness({
     // the harness omits HANGS the suite (# cancelled) rather than failing it.
     'src/ui/svelte/apps/manager/EmptyState.svelte',
     'src/ui/svelte/components/IconPicker.svelte',
+    // The Modifiers section's min/max pair and `@`-sigil expression field (issue 1117).
+    'src/ui/svelte/components/Stepper.svelte',
+    'src/ui/svelte/apps/manager/RollDataExpressionInput.svelte',
     'src/ui/svelte/apps/manager/system/SystemEditorTabs.svelte',
     'src/ui/svelte/apps/manager/system/CharacterPrerequisitesCard.svelte',
     'src/ui/svelte/apps/manager/SystemOverviewView.svelte',

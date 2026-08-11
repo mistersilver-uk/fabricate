@@ -76,7 +76,7 @@ const SALVAGE_COMPONENT = { id: 'c1', name: 'Iron Ore', img: '', salvage: {} };
 
 function salvageSystem(mode, slot, selection = {}) {
   return {
-    checkModifiers: CATALOGUE,
+    modifiers: CATALOGUE,
     salvageResolutionMode: mode,
     salvageCraftingCheck: {
       [mode]: slot,
@@ -192,7 +192,7 @@ const GATHERING_TASK = { id: 't1', name: 'Forage', img: '', checkModifierIds: un
 
 function gatheringSystem(slot, selection = {}) {
   return {
-    checkModifiers: CATALOGUE,
+    modifiers: CATALOGUE,
     gatheringCraftingCheck: {
       ...slot,
       defaultModifierPolicy: 'addAll',
@@ -391,7 +391,7 @@ test('the LISTED formula and the ROLLED formula resolve the same scalar, under e
     ['bySubject', { craftingModifier: { modifierIds: [] } }, 0],
   ]) {
     const system = {
-      checkModifiers: CATALOGUE,
+      modifiers: CATALOGUE,
       craftingCheck: {
         defaultModifierPolicy: policy,
         defaultModifierIds: ['med', 'alch'],

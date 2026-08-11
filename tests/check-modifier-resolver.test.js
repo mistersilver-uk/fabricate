@@ -22,6 +22,7 @@ const {
   resolveModifierBounds,
   resolveActiveSalvageCheckFormula,
   resolveActiveGatheringCheckFormula,
+  isRollExpression,
 } = await import(RESOLVER_MODULE);
 const { appendCheckModifierTerm } = await import('../src/systems/toolCheckBonus.js');
 
@@ -274,7 +275,7 @@ test('resolveEligibleModifierIds does NOT truncate the playerPicks option list',
 
 test('buildCheckModifierContext projects the SYSTEM catalogue and the activity selection', () => {
   const system = {
-    checkModifiers: CATALOGUE,
+    modifiers: CATALOGUE,
     craftingCheck: {
       defaultModifierPolicy: 'bySubject',
       defaultModifierIds: ['med'],
@@ -301,7 +302,7 @@ test('buildCheckModifierContext projects the SYSTEM catalogue and the activity s
 // eval-vs-display defect `CraftingListingBuilder`'s call site exists to prevent.
 test('buildCheckModifierContext reads a DIFFERENT selection triple per activity', () => {
   const system = {
-    checkModifiers: CATALOGUE,
+    modifiers: CATALOGUE,
     craftingCheck: { defaultModifierPolicy: 'addAll', defaultModifierIds: ['med'] },
     salvageCraftingCheck: {
       defaultModifierPolicy: 'highest',
@@ -340,7 +341,7 @@ test('buildCheckModifierContext reads a DIFFERENT selection triple per activity'
 // authoredness is decided by `Array.isArray` AT ENTRY on all three — so an authored EMPTY
 // pick survives as `[]` (a real pick of zero) rather than collapsing to "inherit".
 test('buildCheckModifierContext reads each activity subject pick, preserving an authored empty', () => {
-  const system = { checkModifiers: CATALOGUE };
+  const system = { modifiers: CATALOGUE };
   assert.deepEqual(
     buildCheckModifierContext(system, 'crafting', { craftingModifier: { modifierIds: ['med'] } })
       .subjectModifierIds,
@@ -401,7 +402,7 @@ test('buildCheckModifierContext tolerates a null system, an unknown activity and
     subjectModifierIds: null,
     maxModifierPicks: undefined,
   });
-  assert.deepEqual(buildCheckModifierContext({ checkModifiers: CATALOGUE }, 'bogus', {}), {
+  assert.deepEqual(buildCheckModifierContext({ modifiers: CATALOGUE }, 'bogus', {}), {
     activity: 'bogus',
     catalogue: CATALOGUE,
     systemPolicy: undefined,
@@ -1279,7 +1280,7 @@ test('buildCheckModifierChoice offers the CLAMPED value the roll will append', (
 
 test('bySubject resolves and truncates identically on crafting, salvage and gathering', () => {
   const system = {
-    checkModifiers: CATALOGUE,
+    modifiers: CATALOGUE,
     craftingCheck: {
       defaultModifierPolicy: 'bySubject',
       defaultModifierIds: ['med'],
@@ -1316,7 +1317,7 @@ test('bySubject resolves and truncates identically on crafting, salvage and gath
 test('an AUTHORED EMPTY pick resolves to zero on all three activities', () => {
   const selection = { defaultModifierPolicy: 'bySubject', defaultModifierIds: ['med', 'alch'] };
   const system = {
-    checkModifiers: CATALOGUE,
+    modifiers: CATALOGUE,
     craftingCheck: selection,
     salvageCraftingCheck: selection,
     gatheringCraftingCheck: selection,
@@ -1413,4 +1414,49 @@ test('resolveActiveGatheringCheckFormula has no slot under d100 and one under bo
     '1d20',
     'the retired placeholder is stripped before the formula is reported'
   );
+});
+
+// ── isRollExpression (issue 1117) ────────────────────────────────────────────────
+//
+// ONE library needs ONE classifier. Two lived in the repo while two libraries did, and they
+// were COMPLEMENTARY rather than duplicates: `GatheringRichStateService`'s
+// `/\d\s*d\s*\d|[*\/()]/i` required a digit before the `d`, so it matched `1d6` and missed a
+// bare `d20`; `SystemEditView`'s `/d\d|[*\/()]/` required a word boundary before the `d`,
+// so it matched `d20` and — `1` and `d` both being word characters, leaving no boundary
+// between them — missed `1d6`. Neither was a superset of the other, so one library with two
+// readers would have disagreed about whether the same entry rolls.
+//
+// BOTH HALVES ARE ASSERTED, and that is the point of this test rather than an excess of
+// cases: dropping either alternation leaves the OTHER half's cases green, so a single
+// happy-path assertion would let the union silently collapse back to one of its inputs.
+test('isRollExpression is the UNION of the two patterns it replaced, not either one', () => {
+  for (const rolls of [
+    '1d6',            // the digit-prefixed half
+    '2 d 10',         // …with whitespace, which the digit-prefixed half tolerates
+    'd20',            // the boundary half — a BARE die, missed by the digit-prefixed one
+    '@prof + d4',     // …the same, mid-expression
+    '(@abilities.str.mod)d6',
+    '@a * 2',
+    '@a / 2',
+    'max(@a, 2)',
+  ]) {
+    assert.equal(isRollExpression(rolls), true, `${rolls} rolls or groups`);
+  }
+
+  for (const flat of [
+    '@abilities.med.mod',
+    '@abilities.dex.mod',  // a `d` at a word boundary NOT followed by a digit
+    '@skills.nat.total',
+    '@prof',
+    '3',
+    '',
+  ]) {
+    assert.equal(isRollExpression(flat), false, `${flat} resolves to a flat value`);
+  }
+
+  // Non-strings are not expressions; they classify as flat rather than throwing, because a
+  // malformed entry must still normalize.
+  for (const junk of [null, undefined, 7, {}, []]) {
+    assert.equal(isRollExpression(junk), false, `${String(junk)} is not an expression`);
+  }
 });

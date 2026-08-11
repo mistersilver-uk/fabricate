@@ -158,13 +158,17 @@ test('rebindCopyContainerIds: regenerates realm + env ids, preserves task/event/
     assert.deepEqual(env.includedRealmIds, [newRealmId], 'env realm refs rewired');
   }
 
-  // Task / event / characterModifier ids PRESERVED (D3) so linkages survive.
+  // Task / event / modifier ids PRESERVED (D3) so linkages survive. The modifier library
+  // moved onto the SYSTEM in issue 1117, so its id is asserted there rather than in the
+  // gathering slice — and the drop-row reference that names it must still resolve.
   const slice = prepared.gatheringConfig.system;
   assert.equal(slice.tasks[0].id, f.gatheringConfig.systems[FIXTURE_SYSTEM_ID].tasks[0].id);
   assert.equal(slice.events[0].id, f.gatheringConfig.systems[FIXTURE_SYSTEM_ID].events[0].id);
-  assert.equal(
-    slice.characterModifiers[0].id,
-    f.gatheringConfig.systems[FIXTURE_SYSTEM_ID].characterModifiers[0].id
+  const modifierIds = prepared.system.modifiers.map((entry) => entry.id);
+  assert.deepEqual(modifierIds, buildFullAuthoringFixture().system.modifiers.map((e) => e.id));
+  assert.ok(
+    modifierIds.includes(slice.tasks[0].dropRows[0].characterModifiers[0].modifierId),
+    'the drop row still names an id the library carries'
   );
   // The env still references the preserved task id.
   assert.ok(prepared.gatheringEnvironments[0].enabledTaskIds.includes(slice.tasks[0].id));

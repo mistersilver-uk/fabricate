@@ -889,12 +889,12 @@ function createStore(calls = [], options = {}) {
       // every assertion below is about. The persisted default is still `=== true` — this is
       // a fixture choice, not a change to the normalizer.
       craftingCheck: { enabled: true, ...(options.craftingCheck || {}) },
-      // The ONE system-level check-modifier catalogue (issue 1095). It moved out of
-      // `craftingCheck` so salvage and gathering can select over the same entries, and the
-      // store's projection is an ALLOWLIST — an unforwarded key here renders an empty
-      // catalogue on every activity, which is exactly the silent state this fixture exists
-      // to make reachable.
-      checkModifiers: options.checkModifiers,
+      // The ONE system-level modifier library (issues 1095, 1117). It moved out of
+      // `craftingCheck` so salvage and gathering can select over the same entries, absorbed
+      // the gathering character-modifier library, and the store's projection is an
+      // ALLOWLIST — an unforwarded key here renders an empty library on every activity,
+      // which is exactly the silent state this fixture exists to make reachable.
+      modifiers: options.modifiers,
       salvageResolutionMode: options.salvageResolutionMode || 'simple',
       salvageCraftingCheck: { enabled: true, ...(options.salvageCraftingCheck || {}) },
       gatheringCraftingCheck: { enabled: true, ...(options.gatheringCraftingCheck || {}) },
@@ -4463,30 +4463,23 @@ describe('CraftingSystemManager mounted behavior', () => {
     );
   });
 
-  it('checks view: the crafting-modifier catalogue card renders when the check is usable and emits edits (issue 770)', () => {
+  it('checks view: the modifier card renders when the check is usable and emits SELECTION edits (issues 770, 1117)', () => {
     const patches = [];
     mountChecksView({
       resolutionMode: 'simple',
       craftingCheckSimple: { rollFormula: '1d20 + 4' },
-      checkModifiers: [{ id: 'med', label: 'Medicine', expression: '@abilities.med.mod' }],
+      modifiers: [{ id: 'med', label: 'Medicine', expression: '@abilities.med.mod' }],
       craftingDefaultModifierPolicy: 'highest',
       craftingDefaultModifierIds: ['med'],
       onUpdateCraftingCheckModifiers: (patch) => patches.push(patch),
     }, 'modifiers');
     const card = target.querySelector('[data-crafting-modifier-catalogue]');
-    assert.ok(card, 'the catalogue card renders in the crafting stack when a formula is authored');
+    assert.ok(card, 'the modifier card renders in the crafting stack when a formula is authored');
     // The policy radio-cards reflect the passed default policy.
     assert.equal(
       card.querySelector('[data-crafting-modifier-policy-option="highest"] input').checked,
       true,
       'the default policy is pinned on the radio-cards'
-    );
-    // Adding a modifier emits a checkModifiers patch (whole-array replace).
-    card.querySelector('[data-crafting-modifier-add]').click();
-    flushSync();
-    assert.ok(
-      patches.some((p) => Array.isArray(p.checkModifiers) && p.checkModifiers.length === 2),
-      'add emits a two-entry checkModifiers patch'
     );
     // Switching policy emits a defaultModifierPolicy patch.
     card.querySelector('[data-crafting-modifier-policy-option="addAll"] input').click();
@@ -4506,42 +4499,30 @@ describe('CraftingSystemManager mounted behavior', () => {
       patches.some((p) => p.defaultModifierPolicy === 'playerPicks'),
       'selecting playerPicks emits defaultModifierPolicy'
     );
-    // The expression field drops the leading `@` for display and restores it on write,
-    // so the stored expression keeps the sigil the resolver's replaceFormulaData needs.
-    const expression = card.querySelector('input[data-crafting-modifier-field="expression"]');
+    // NO ENTRY AUTHORING, ON ANY ACTIVITY (issue 1117). The library is authored once, in
+    // System settings › Modifiers; every patch this card can emit is a selection patch, and
+    // the deep link is what replaces the editor.
+    for (const editorHook of [
+      '[data-crafting-modifier-add]',
+      '[data-crafting-modifier-field="expression"]',
+      '[data-crafting-modifier-field="icon"]',
+      '[data-crafting-modifier-remove]',
+    ]) {
+      assert.ok(!card.querySelector(editorHook), `${editorHook} is authoring, not selection`);
+    }
+    assert.ok(
+      Boolean(card.querySelector('[data-crafting-modifier-edit-link]')),
+      'the deep link to the one authoring surface renders instead'
+    );
+    // The entry is READ OUT instead — identity and expression, so the GM can tell which
+    // entry a checkbox is about without leaving the screen.
     assert.equal(
-      expression.value,
-      'abilities.med.mod',
-      'the expression editor hides the leading @'
+      card.querySelector('[data-crafting-modifier-readonly="label"]').textContent.trim(),
+      'Medicine'
     );
-    expression.value = 'abilities.arc.mod';
-    expression.dispatchEvent(new Event('input', { bubbles: true }));
-    flushSync();
-    assert.ok(
-      patches.some(
-        (p) =>
-          Array.isArray(p.checkModifiers) &&
-          p.checkModifiers[0]?.expression === '@abilities.arc.mod'
-      ),
-      'editing the expression re-adds the @ sigil for a roll-data path'
-    );
-    // A function/compound expression is stored VERBATIM — no spurious leading @ that
-    // would make the resolver read `@min` as an unknown roll-data key (contributes 0).
-    expression.value = 'min(@abilities.med.mod,@abilities.int.mod)';
-    expression.dispatchEvent(new Event('input', { bubbles: true }));
-    flushSync();
-    assert.ok(
-      patches.some(
-        (p) =>
-          Array.isArray(p.checkModifiers) &&
-          p.checkModifiers[0]?.expression === 'min(@abilities.med.mod,@abilities.int.mod)'
-      ),
-      'a function-leading expression is stored without a corrupting @ prefix'
-    );
-    // The icon field renders the shared IconPicker trigger (not a raw class input).
-    assert.ok(
-      card.querySelector('[data-crafting-modifier-field="icon"] .essence-icon-picker-trigger'),
-      'the modifier row uses the searchable IconPicker for its icon'
+    assert.equal(
+      card.querySelector('[data-crafting-modifier-readonly="expression"]').textContent.trim(),
+      '@abilities.med.mod'
     );
     // The eligibility state is authored PER ROW (issue 1095), by a real checkbox with a
     // presentational pill beside it. Unchecking the pre-selected entry emits an empty
@@ -4641,7 +4622,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     mountChecksView({
       resolutionMode: 'simple',
       craftingCheckSimple: { rollFormula: '1d20 + 4' },
-      checkModifiers: [{ id: 'med', label: 'Medicine', expression: '@abilities.med.mod' }],
+      modifiers: [{ id: 'med', label: 'Medicine', expression: '@abilities.med.mod' }],
       craftingDefaultModifierPolicy: 'bySubject',
     }, 'modifiers');
     const group = target.querySelector(
@@ -4689,7 +4670,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     const props = {
       resolutionMode: 'simple',
       craftingCheckSimple: { rollFormula: '1d20 + 4' },
-      checkModifiers: [{ id: 'med', label: 'Medicine', expression: '@abilities.med.mod' }],
+      modifiers: [{ id: 'med', label: 'Medicine', expression: '@abilities.med.mod' }],
     };
     // A cap on a selection nobody makes is a control with no effect, so the two
     // non-selecting rules do not render it at all.
@@ -4735,7 +4716,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     mountChecksView({
       resolutionMode: 'simple',
       craftingCheckSimple: { rollFormula: '1d20 + 4' },
-      checkModifiers: [{ id: 'med', label: 'Medicine', expression: '@abilities.med.mod' }],
+      modifiers: [{ id: 'med', label: 'Medicine', expression: '@abilities.med.mod' }],
       craftingDefaultModifierPolicy: 'playerPicks',
       craftingMaxModifierPicks: 3,
       onUpdateCraftingCheckModifiers: (patch) => patches.push(patch),
@@ -4758,7 +4739,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     mountChecksView({
       resolutionMode: 'simple',
       craftingCheckSimple: { rollFormula: '1d20 + 4' },
-      checkModifiers: [{ id: 'med', label: 'Medicine', expression: '@abilities.med.mod' }],
+      modifiers: [{ id: 'med', label: 'Medicine', expression: '@abilities.med.mod' }],
       craftingDefaultModifierPolicy: 'playerPicks',
       craftingMaxModifierPicks: 1,
     }, 'modifiers');
@@ -4772,7 +4753,7 @@ describe('CraftingSystemManager mounted behavior', () => {
       mountChecksView({
         resolutionMode: 'simple',
         craftingCheckSimple: { rollFormula: '1d20 + 4' },
-        checkModifiers: [{ id: 'med', label: 'Medicine', expression: '@med' }],
+        modifiers: [{ id: 'med', label: 'Medicine', expression: '@med' }],
         craftingDefaultModifierPolicy: 'playerPicks',
         craftingMaxModifierPicks: junk,
       }, 'modifiers');
@@ -4797,7 +4778,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     mountChecksView({
       resolutionMode: 'simple',
       craftingCheckSimple: { rollFormula: '' },
-      checkModifiers: [{ id: 'med', label: 'Medicine', expression: '@abilities.med.mod' }],
+      modifiers: [{ id: 'med', label: 'Medicine', expression: '@abilities.med.mod' }],
     }, 'modifiers');
     const card = target.querySelector('[data-crafting-modifier-catalogue]');
     assert.ok(Boolean(card), 'a formula-less check still shows the catalogue, with a warning');
@@ -4818,7 +4799,7 @@ describe('CraftingSystemManager mounted behavior', () => {
   // some incidental difference in the check.
   it('checks view: an EMPTY catalogue shows no inert notice even when the cause applies (issue 1055)', () => {
     const props = { resolutionMode: 'simple', craftingCheckSimple: { rollFormula: '' } };
-    mountChecksView({ ...props, checkModifiers: [] }, 'modifiers');
+    mountChecksView({ ...props, modifiers: [] }, 'modifiers');
     assert.ok(
       Boolean(target.querySelector('[data-crafting-modifier-empty]')),
       'the empty catalogue renders its empty state'
@@ -4834,7 +4815,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     // Same cause, one modifier: the notice appears and still names the cause.
     mountChecksView({
       ...props,
-      checkModifiers: [{ id: 'med', label: 'Medicine', expression: '@abilities.med.mod' }],
+      modifiers: [{ id: 'med', label: 'Medicine', expression: '@abilities.med.mod' }],
     }, 'modifiers');
     const notice = target.querySelector('[data-crafting-modifier-inert]');
     assert.ok(Boolean(notice), 'one authored modifier is enough to make the notice worth showing');
@@ -4870,7 +4851,7 @@ describe('CraftingSystemManager mounted behavior', () => {
         cause: 'noFormula',
       },
     ]) {
-      mountChecksView({ ...props, checkModifiers: catalogue }, 'modifiers');
+      mountChecksView({ ...props, modifiers: catalogue }, 'modifiers');
       const notice = target.querySelector('[data-crafting-modifier-inert]');
       assert.ok(Boolean(notice), `${cause}: an inert notice renders`);
       assert.equal(notice.getAttribute('data-crafting-modifier-inert'), cause);
@@ -4883,7 +4864,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     mountChecksView({
       resolutionMode: 'simple',
       craftingCheckSimple: { rollFormula: '1d20 + 4' },
-      checkModifiers: catalogue,
+      modifiers: catalogue,
     }, 'modifiers');
     assert.ok(
       !target.querySelector('[data-crafting-modifier-inert]'),
@@ -4895,7 +4876,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     mountChecksView({
       resolutionMode: 'simple',
       craftingCheckSimple: { rollFormula: '1d20 + 4' },
-      checkModifiers: [{ id: 'med', label: 'Medicine', expression: '@abilities.med.mod' }],
+      modifiers: [{ id: 'med', label: 'Medicine', expression: '@abilities.med.mod' }],
       // No `craftingDefaultModifierPolicy` at all — the never-authored state.
     }, 'modifiers');
     const checked = [...target.querySelectorAll('[data-crafting-modifier-policy-option]')].filter(
@@ -4918,7 +4899,7 @@ describe('CraftingSystemManager mounted behavior', () => {
         {
           resolutionMode: 'simple',
           craftingCheckSimple: { rollFormula: '1d20 + 4' },
-          checkModifiers: [{ id: 'med', label: 'Medicine', expression: '@abilities.med.mod' }],
+          modifiers: [{ id: 'med', label: 'Medicine', expression: '@abilities.med.mod' }],
           craftingDefaultModifierPolicy,
         },
         'modifiers'
@@ -6405,7 +6386,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     ...(maxModifierPicks === undefined ? {} : { maxModifierPicks }),
   });
   const modifierRuleSystem = (defaultModifierPolicy, maxModifierPicks) => ({
-    checkModifiers: MODIFIER_CATALOGUE,
+    modifiers: MODIFIER_CATALOGUE,
     craftingCheck: modifierRuleSystemCheck(defaultModifierPolicy, maxModifierPicks),
   });
 

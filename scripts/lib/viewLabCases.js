@@ -518,22 +518,37 @@ export const VIEW_LAB_CASES = Object.freeze([
     id: 'manager-system-edit-lists',
     label: 'Manager — System edit lists',
     smokeLabels: ['manager-system-edit-lists'],
-    // The three settings-list cards together — Character modifiers, Character prerequisites and
+    // The three settings-list cards together — Modifiers, Character prerequisites and
     // Currency Units — with one modifier open and its IconPicker down, and the Currency Units
-    // section collapsed to show whole-section collapse. That needs ONE system carrying all three,
-    // and herbalism is the only one that can: the modifiers card is gated on `gathering`, which
-    // Runework (the currency system) does not have.
+    // section collapsed to show whole-section collapse. Herbalism carries all three and is
+    // the system whose Modifiers library the checks screens select over. (The card is no
+    // longer gated on `gathering`, per issue 1117 — it now holds every CHECK modifier too —
+    // but herbalism remains the fixture with a populated library.)
     reaches: 'exact',
     query: { system: 'lab-herbalism' },
     steps: [
       'System Overview',
       { selector: '#system-tab-settings' },
       { selector: '[data-section-collapse="currency"]' },
-      { selector: '[data-system-character-modifier] [data-toggle-character-modifier]' },
-      { selector: '[data-system-character-modifier] .essence-icon-picker-trigger' },
-      { selector: '[data-system-character-modifiers]', scroll: true },
+      { selector: '[data-system-modifier] [data-toggle-modifier]' },
+      { selector: '[data-system-modifier] .essence-icon-picker-trigger' },
+      // Anchored on the card's TITLE, not the card. `scrollIntoViewIfNeeded` lands an
+      // over-tall element's BOTTOM edge, and issue 1117 made this section taller (a bounds
+      // row and its hint per open entry), which pushed the renamed "Modifiers" heading off
+      // the top of the frame. The title anchors it from the top instead — the same fix the
+      // checks-entries case records for the same cause.
+      { selector: '[data-system-modifiers] .manager-card-title', scroll: true },
     ],
     expectView: 'system-edit',
+    // THE ONE AUTHORING SURFACE (issue 1117), asserted on the fields it ABSORBED from the retired
+    // Checks-tab editor rather than only on the section it already had: the open row's `min`
+    // Stepper is what proves the check-only bounds pair reached this card, and it is the only
+    // frame in the registry that can show it now that no Checks route authors an entry.
+    // `hb-mod-medicine` is the world's only BOUNDED entry, so this frame carries real values
+    // rather than two `Unbounded` placeholders.
+    expectSelector:
+      '.fabricate-manager [data-system-modifiers]' +
+      ':has([data-system-modifier-bounds] [data-system-modifier-field="min"])',
     position: { width: 1280, height: 980 },
     kinds: ['manager', 'system-edit'],
     sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/SystemEditView\.svelte$/],
@@ -2091,17 +2106,17 @@ export const VIEW_LAB_CASES = Object.freeze([
     // two sibling cases above frame the rule grid and the cap rather than the entries.
     reaches: 'beyond',
     smokeLabels: [],
-    // THE ENTRY EDITOR, which is what actually grew in issue 1095 and what its siblings can no
-    // longer show: a row is now icon + label, expression + delete, a `min`/`max` Stepper pair on
-    // its own line, and an eligibility checkbox with its state word. Four lines, not two.
+    // THE CRAFTING ROWS, and since issue 1117 what they show is the ABSENCE of an editor.
+    // This case framed the entry editor while crafting owned the entries; crafting now renders
+    // the library read-only exactly as salvage and gathering do, so the frame's job is to prove
+    // that symmetry on the one activity that used to be special — the identity/expression
+    // read-out, the bounds chip on the world's only bounded entry, and the deep link that
+    // replaces the add button.
     //
     // Anchored on the FIRST row rather than on the rows container, and the difference is the
     // whole point: `scrollIntoViewIfNeeded` lands an over-tall container's BOTTOM edge, so
     // anchoring the container frames the last entries and drops the eligibility sentence that
     // now sits above the first one. Anchoring the first row frames the card from its top.
-    //
-    // `hb-mod-medicine` is the world's only BOUNDED entry, so this is also the only frame of the
-    // authoring pair carrying real values rather than two `Unbounded` placeholders.
     query: { system: 'lab-herbalism' },
     steps: [
       'Checks',
@@ -2110,27 +2125,28 @@ export const VIEW_LAB_CASES = Object.freeze([
       { selector: '[data-crafting-modifier-row="hb-mod-medicine"]', scroll: true },
     ],
     expectView: 'checks-crafting',
-    // The eligibility sentence ABOVE the rows, and a row carrying the bounds pair. Asserting the
-    // sentence's own hook is what would catch it moving back below the rule grid, which is where
-    // it sat until this change and where it read as a footnote about the pick cap.
+    // The eligibility sentence ABOVE the rows — asserting its own hook is what would catch it
+    // moving back below the rule grid, where it read as a footnote about the pick cap — AND the
+    // read-only treatment on crafting, through the one element the retired editable branch could
+    // not draw, plus the deep link that replaced the add button.
     expectSelector:
       '.fabricate-manager [data-crafting-modifier-catalogue="crafting"]' +
       ':has([data-crafting-modifier-defaults])' +
-      ':has([data-crafting-modifier-bounds="hb-mod-medicine"] ' +
-      '[data-crafting-modifier-field="min"])',
+      ':has([data-crafting-modifier-readonly="expression"])' +
+      ':has(.manager-modifier-bounds-chip)' +
+      ':has([data-crafting-modifier-edit-link])',
     kinds: ['manager', 'checks'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/checks\//,
       /^src\/ui\/svelte\/apps\/manager\/.*Check/,
     ],
   }),
-  // ── the OTHER TWO activities' catalogue cards (issue 1095) ──────────────────────────────────
+  // ── the OTHER TWO activities' modifier cards (issues 1095, 1117) ────────────────────────────
   //
-  // The card is activity-aware and only its ENTRY EDITOR is gated: salvage and gathering render
-  // each entry READ-ONLY, with a bounds chip and a link back to the crafting tab, while the
-  // per-entry eligibility control and the rule grid stay fully editable. That read-only row is a
-  // shape nothing else in the registry draws — the crafting frames above show the editor — and
-  // before these two cases there was no `manager-checks-salvage*` case in the registry at all.
+  // Every activity renders the library READ-ONLY now, with a bounds chip and a link to the system
+  // editor, while the per-entry eligibility control and the rule grid stay fully editable. What
+  // distinguishes these two frames from the crafting one above is therefore their SELECTION and
+  // their notices, not their editability — which is exactly the asymmetry issue 1117 removed.
   //
   // Both run on `lab-herbalism`, the one system with a catalogue, and both its salvage and its
   // gathering features are on. Their selections DIFFER from crafting's (`labContent.js`), which is
@@ -2140,7 +2156,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     id: 'manager-checks-salvage-modifiers',
     label: 'Manager — Checks salvage modifiers',
     // BEYOND the smoke: the walk never opens the salvage sub-tab of a system carrying a
-    // catalogue, so no counterpart frame of the read-only entry rows exists.
+    // library, so no counterpart frame of these rows exists.
     reaches: 'beyond',
     smokeLabels: [],
     query: { system: 'lab-herbalism' },
@@ -2151,9 +2167,9 @@ export const VIEW_LAB_CASES = Object.freeze([
       { selector: '[data-crafting-modifier-rows]', scroll: true },
     ],
     expectView: 'checks-salvage',
-    // THE READ-ONLY ROW, asserted through the one element the editable branch cannot draw. The
-    // `has(...bounds-chip)` clause is the bounds chip's only assertion anywhere: it renders for a
-    // bounded entry alone, and `hb-mod-medicine` is the world's only bounded one.
+    // THE READ-ONLY ROW, asserted through the one element the retired editable branch could not
+    // draw. The `has(...bounds-chip)` clause pins the bounds chip against the world's only
+    // bounded entry, `hb-mod-medicine`.
     expectSelector:
       '.fabricate-manager [data-crafting-modifier-catalogue="salvage"]' +
       ':has([data-crafting-modifier-readonly="expression"])' +

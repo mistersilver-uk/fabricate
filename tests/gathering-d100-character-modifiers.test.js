@@ -3,24 +3,25 @@ import assert from 'node:assert/strict';
 
 import { makeRichState } from './helpers/gathering.js';
 
-function configFor({ entries = [], events = [] } = {}) {
+// The gathering config no longer carries a modifier library (issue 1117): it moved onto the
+// crafting system, which `makeRichState({ modifiers })` builds and returns as `system`.
+function configFor({ events = [] } = {}) {
   return {
     systems: {
       'system-a': {
         rules: { rewardSelectionMode: 'allDrops', eventSelectionMode: 'allDrops' },
-        characterModifiers: entries,
         events
       }
     }
   };
 }
 
-function environmentWithLibrary(service, { events = [], conditions = null, biomes = null, rules = {} } = {}) {
+function environmentWithLibrary(service, system, { events = [], conditions = null, biomes = null, rules = {} } = {}) {
   const composed = service.composeEnvironment({
     id: 'env',
     craftingSystemId: 'system-a',
     tasks: []
-  }, { id: 'system-a' });
+  }, system);
   // Override conditions, biomes, and events inline (composeEnvironment uses system defaults)
   if (conditions) composed.conditions = conditions;
   if (biomes) composed.biomes = biomes;
@@ -36,8 +37,8 @@ function environmentWithLibrary(service, { events = [], conditions = null, biome
   return composed;
 }
 
-function composeAndResolve(service, { task, events = [], conditions = null, biomes = null, rules = {} } = {}) {
-  const composed = environmentWithLibrary(service, { events, conditions, biomes, rules });
+function composeAndResolve(service, system, { task, events = [], conditions = null, biomes = null, rules = {} } = {}) {
+  const composed = environmentWithLibrary(service, system, { events, conditions, biomes, rules });
   return service.resolveD100Attempt({
     task,
     environment: composed,
@@ -50,12 +51,13 @@ const STR_LIBRARY = [
 ];
 
 test('drop row sums character modifier into final threshold', async () => {
-  const { service } = makeRichState({
-    config: configFor({ entries: STR_LIBRARY }),
+  const { service, system } = makeRichState({
+    config: configFor(),
+    modifiers: STR_LIBRARY,
     rolls: [100],
     evaluateExpression: () => 5
   });
-  const result = await composeAndResolve(service, {
+  const result = await composeAndResolve(service, system, {
     task: {
       id: 't',
       dropRows: [{
@@ -75,12 +77,13 @@ test('drop row sums character modifier into final threshold', async () => {
 
 test('character modifier composes with condition modifier worked example', async () => {
   // dropRate 25 + weather +5 + strength +3 = finalThreshold 33; effectiveRoll = roll + 10 (gatheringModifier)
-  const { service } = makeRichState({
-    config: configFor({ entries: STR_LIBRARY }),
+  const { service, system } = makeRichState({
+    config: configFor(),
+    modifiers: STR_LIBRARY,
     rolls: [100],
     evaluateExpression: () => 3
   });
-  const result = await composeAndResolve(service, {
+  const result = await composeAndResolve(service, system, {
     task: {
       id: 't',
       gatheringModifier: { provider: 'static', value: 10 },
@@ -104,14 +107,13 @@ test('character modifier composes with condition modifier worked example', async
 });
 
 test('event threshold reduced by negative character modifier', async () => {
-  const { service } = makeRichState({
-    config: configFor({
-      entries: [{ id: 'stealth', label: 'Stealth', icon: 'fa-solid fa-eye', expression: '@stealth' }]
-    }),
+  const { service, system } = makeRichState({
+    config: configFor(),
+    modifiers: [{ id: 'stealth', label: 'Stealth', icon: 'fa-solid fa-eye', expression: '@stealth' }],
     rolls: [100, 100],
     evaluateExpression: () => 4
   });
-  const result = await composeAndResolve(service, {
+  const result = await composeAndResolve(service, system, {
     task: { id: 't', dropRows: [{ id: 'd', componentId: 'herb', quantity: 1, dropRate: 0 }] },
     events: [{
       id: 'h1',
@@ -126,14 +128,13 @@ test('event threshold reduced by negative character modifier', async () => {
 });
 
 test('eventModifier and characterModifiers are independent on the same event', async () => {
-  const { service } = makeRichState({
-    config: configFor({
-      entries: [{ id: 'stealth', label: 'Stealth', expression: '@stealth' }]
-    }),
+  const { service, system } = makeRichState({
+    config: configFor(),
+    modifiers: [{ id: 'stealth', label: 'Stealth', expression: '@stealth' }],
     rolls: [100],
     evaluateExpression: () => 5
   });
-  const result = await composeAndResolve(service, {
+  const result = await composeAndResolve(service, system, {
     task: { id: 't', dropRows: [] },
     events: [{
       id: 'h',
@@ -150,12 +151,13 @@ test('eventModifier and characterModifiers are independent on the same event', a
 });
 
 test('min/max clamp applied before operator', async () => {
-  const { service } = makeRichState({
-    config: configFor({ entries: STR_LIBRARY }),
+  const { service, system } = makeRichState({
+    config: configFor(),
+    modifiers: STR_LIBRARY,
     rolls: [100],
     evaluateExpression: () => 8
   });
-  const result = await composeAndResolve(service, {
+  const result = await composeAndResolve(service, system, {
     task: {
       id: 't',
       dropRows: [{
@@ -168,15 +170,16 @@ test('min/max clamp applied before operator', async () => {
 });
 
 test('multiple references on one row stack contributions', async () => {
-  const { service } = makeRichState({
-    config: configFor({ entries: [
+  const { service, system } = makeRichState({
+    config: configFor(),
+    modifiers: [
       { id: 'strength', label: 'Strength', expression: '@s' },
       { id: 'athletics', label: 'Athletics', expression: '@a' }
-    ] }),
+    ],
     rolls: [100],
     evaluateExpression: ({ expression }) => expression === '@s' ? 2 : 4
   });
-  const result = await composeAndResolve(service, {
+  const result = await composeAndResolve(service, system, {
     task: {
       id: 't',
       dropRows: [{
@@ -193,12 +196,13 @@ test('multiple references on one row stack contributions', async () => {
 
 test('same modifier id referenced twice on one row evaluates both', async () => {
   let calls = 0;
-  const { service } = makeRichState({
-    config: configFor({ entries: STR_LIBRARY }),
+  const { service, system } = makeRichState({
+    config: configFor(),
+    modifiers: STR_LIBRARY,
     rolls: [100],
     evaluateExpression: () => { calls += 1; return 3; }
   });
-  const result = await composeAndResolve(service, {
+  const result = await composeAndResolve(service, system, {
     task: {
       id: 't',
       dropRows: [{
@@ -216,12 +220,13 @@ test('same modifier id referenced twice on one row evaluates both', async () => 
 });
 
 test('same modifier id across different rows resolves independently', async () => {
-  const { service, evaluateCalls } = makeRichState({
-    config: configFor({ entries: STR_LIBRARY }),
+  const { service, system, evaluateCalls } = makeRichState({
+    config: configFor(),
+    modifiers: STR_LIBRARY,
     rolls: [100, 100],
     evaluateExpression: () => 2
   });
-  const result = await composeAndResolve(service, {
+  const result = await composeAndResolve(service, system, {
     task: {
       id: 't',
       dropRows: [
@@ -237,12 +242,13 @@ test('same modifier id across different rows resolves independently', async () =
 
 test('partial override inherits unset fields from library entry', async () => {
   let lastPayload;
-  const { service } = makeRichState({
-    config: configFor({ entries: STR_LIBRARY }),
+  const { service, system } = makeRichState({
+    config: configFor(),
+    modifiers: STR_LIBRARY,
     rolls: [100],
     evaluateExpression: (payload) => { lastPayload = payload; return 7; }
   });
-  await composeAndResolve(service, {
+  await composeAndResolve(service, system, {
     task: {
       id: 't',
       dropRows: [{
@@ -257,12 +263,13 @@ test('partial override inherits unset fields from library entry', async () => {
 
 test('expression override replaces library expression', async () => {
   let lastPayload;
-  const { service } = makeRichState({
-    config: configFor({ entries: STR_LIBRARY }),
+  const { service, system } = makeRichState({
+    config: configFor(),
+    modifiers: STR_LIBRARY,
     rolls: [100],
     evaluateExpression: (payload) => { lastPayload = payload; return 1; }
   });
-  await composeAndResolve(service, {
+  await composeAndResolve(service, system, {
     task: {
       id: 't',
       dropRows: [{
@@ -277,12 +284,13 @@ test('expression override replaces library expression', async () => {
 
 test('character modifier expression evaluation receives correct context shape', async () => {
   let lastPayload;
-  const { service } = makeRichState({
-    config: configFor({ entries: [{ id: 'mod', label: 'Mod', expression: '@mod' }] }),
+  const { service, system } = makeRichState({
+    config: configFor(),
+    modifiers: [{ id: 'mod', label: 'Mod', expression: '@mod' }],
     rolls: [100],
     evaluateExpression: (payload) => { lastPayload = payload; return 2; }
   });
-  await composeAndResolve(service, {
+  await composeAndResolve(service, system, {
     task: {
       id: 't',
       dropRows: [{
@@ -301,12 +309,13 @@ test('character modifier expression evaluation receives correct context shape', 
 });
 
 test('final threshold is clamped to 0..100', async () => {
-  const { service } = makeRichState({
-    config: configFor({ entries: STR_LIBRARY }),
+  const { service, system } = makeRichState({
+    config: configFor(),
+    modifiers: STR_LIBRARY,
     rolls: [100],
     evaluateExpression: () => 1000
   });
-  const result = await composeAndResolve(service, {
+  const result = await composeAndResolve(service, system, {
     task: {
       id: 't',
       dropRows: [{
@@ -324,8 +333,8 @@ const MOD_LIBRARY = [
   { id: 'mod', label: 'Mod', icon: 'fa-solid fa-dice', expression: '@mod' }
 ];
 
-async function resolveSingleRow(service, { dropRate, reference, rules = {}, conditionModifiers } = {}) {
-  const result = await composeAndResolve(service, {
+async function resolveSingleRow({ service, system }, { dropRate, reference, rules = {}, conditionModifiers } = {}) {
+  const result = await composeAndResolve(service, system, {
     rules,
     task: {
       id: 't',
@@ -342,9 +351,11 @@ async function resolveSingleRow(service, { dropRate, reference, rules = {}, cond
 // Shared arrange for the single-MOD_LIBRARY-reference cases below: every modifier
 // resolves to `value`; `rolls` defaults to a guaranteed-miss so the row is scored.
 function richForMod({ value = 10, rolls } = {}) {
-  const opts = { config: configFor({ entries: MOD_LIBRARY }), evaluateExpression: () => value };
+  const opts = { config: configFor(), modifiers: MOD_LIBRARY, evaluateExpression: () => value };
   if (rolls) opts.rolls = rolls;
-  return makeRichState(opts).service;
+  // BOTH halves: the service reads the gathering config, and `composeEnvironment` reads the
+  // modifier library off the system (issue 1117).
+  return makeRichState(opts);
 }
 
 async function resolveDrop({ dropRate, reference, value = 10, rules = {} } = {}) {
@@ -404,15 +415,16 @@ test('issue 299: multiplicative positive (base 50 x1.2 => 60)', async () => {
 test('issue 299: multiplicative system mode applies multiplicatively to every reference (base 20, +10% & -50% => 11)', async () => {
   // Under a multiplicative system mode every character modifier is its own
   // factor that multiplies into the running product: 1.1 * 0.5 = 0.55.
-  const { service } = makeRichState({
-    config: configFor({ entries: [
+  const { service, system } = makeRichState({
+    config: configFor(),
+    modifiers: [
       { id: 'add', label: 'Add', icon: 'fa-solid fa-plus', expression: '@add' },
       { id: 'mult', label: 'Mult', icon: 'fa-solid fa-xmark', expression: '@mult' }
-    ] }),
+    ],
     rolls: [100],
     evaluateExpression: (payload) => (payload.modifier.id === 'add' ? 10 : 50)
   });
-  const result = await composeAndResolve(service, {
+  const result = await composeAndResolve(service, system, {
     rules: { dropModifierMode: 'multiplicative' },
     task: {
       id: 't',
@@ -487,8 +499,8 @@ test('issue 299: min/max clamps value before factor (value 50 but max 10, - mult
 
 // Zero-rate boundary rows can never drop (threshold 101 > max roll 100), so we
 // inspect the no-dice preview which returns every row regardless of the roll.
-async function previewSingleRow(service, { dropRate, reference, rules = {} } = {}) {
-  const composed = environmentWithLibrary(service, { rules });
+async function previewSingleRow({ service, system }, { dropRate, reference, rules = {} } = {}) {
+  const composed = environmentWithLibrary(service, system, { rules });
   const preview = await service.previewDropBreakdown({
     environment: composed,
     task: {
@@ -538,12 +550,13 @@ test('issue 299: negative-factor guard (value 150, - mult => factor 0 => 0)', as
 });
 
 test('issue 299: event drop rate uses the same additive-then-multiplicative aggregation', async () => {
-  const { service } = makeRichState({
-    config: configFor({ entries: MOD_LIBRARY }),
+  const { service, system } = makeRichState({
+    config: configFor(),
+    modifiers: MOD_LIBRARY,
     rolls: [100, 100],
     evaluateExpression: () => 10
   });
-  const result = await composeAndResolve(service, {
+  const result = await composeAndResolve(service, system, {
     rules: { dropModifierMode: 'multiplicative' },
     task: { id: 't', dropRows: [{ id: 'd', componentId: 'herb', quantity: 1, dropRate: 0 }] },
     events: [{
@@ -571,12 +584,13 @@ test('issue 299: back-compat config/reference with no mode fields is identical t
 async function resolveConditionRow(
   { dropRate, conditionModifiers, conditions = null, biomes = null, rules = {}, characterModifiers = [] } = {}
 ) {
-  const service = makeRichState({
-    config: configFor({ entries: MOD_LIBRARY }),
+  const { service, system } = makeRichState({
+    config: configFor(),
+    modifiers: MOD_LIBRARY,
     rolls: [100],
     evaluateExpression: () => 10
-  }).service;
-  const result = await composeAndResolve(service, {
+  });
+  const result = await composeAndResolve(service, system, {
     rules,
     conditions,
     biomes,
@@ -590,8 +604,8 @@ async function resolveConditionRow(
 
 // Preview a single drop row (returns regardless of the roll) with condition modifiers.
 async function previewConditionRow({ dropRate, conditionModifiers, conditions = null, biomes = null, rules = {} } = {}) {
-  const service = makeRichState({ config: configFor({ entries: MOD_LIBRARY }) }).service;
-  const composed = environmentWithLibrary(service, { conditions, biomes, rules });
+  const { service, system } = makeRichState({ config: configFor(), modifiers: MOD_LIBRARY });
+  const composed = environmentWithLibrary(service, system, { conditions, biomes, rules });
   const preview = await service.previewDropBreakdown({
     environment: composed,
     task: {
@@ -817,8 +831,8 @@ test('issue 299: preview parity with the rolled result for a multiplicative cond
 });
 
 test('issue 299: taskSuccessChance reflects a multiplicative condition modifier', async () => {
-  const service = makeRichState({ config: configFor({ entries: [] }) }).service;
-  const composed = environmentWithLibrary(service, {
+  const { service, system } = makeRichState({ config: configFor(), modifiers: [] });
+  const composed = environmentWithLibrary(service, system, {
     conditions: { weather: 'rain', timeOfDay: 'day' },
     rules: { dropModifierMode: 'multiplicative' }
   });
@@ -836,11 +850,12 @@ test('issue 299: taskSuccessChance reflects a multiplicative condition modifier'
 });
 
 test('issue 299: event path honors a multiplicative condition modifier', async () => {
-  const service = makeRichState({
-    config: configFor({ entries: [] }),
+  const { service, system } = makeRichState({
+    config: configFor(),
+    modifiers: [],
     rolls: [100, 100]
-  }).service;
-  const result = await composeAndResolve(service, {
+  });
+  const result = await composeAndResolve(service, system, {
     rules: { dropModifierMode: 'multiplicative' },
     conditions: { weather: 'rain', timeOfDay: 'day' },
     task: { id: 't', dropRows: [{ id: 'd', componentId: 'herb', quantity: 1, dropRate: 0 }] },

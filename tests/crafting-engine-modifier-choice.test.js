@@ -252,7 +252,7 @@ function modifierSystem(checkSlot) {
   // The catalogue is SYSTEM-level since issue 1095; only the selection triple stays on
   // `craftingCheck`, and `buildCheckModifierContext` reads the two from those two places.
   return {
-    checkModifiers: PICK_CATALOGUE,
+    modifiers: PICK_CATALOGUE,
     craftingCheck: {
       defaultModifierPolicy: 'playerPicks',
       defaultModifierIds: ['med', 'herb'],
@@ -335,7 +335,7 @@ test('engine craft: dismissing the playerPicks prompt cancels with zero Item mut
   const system = {
     resolutionMode: 'simple',
     features: { craftingChecks: true },
-    checkModifiers: PICK_CATALOGUE,
+    modifiers: PICK_CATALOGUE,
     craftingCheck: {
       enabled: true,
       simple: { rollFormula: PICK_FORMULA, dc: 10, thresholdMode: 'meet' },
@@ -469,7 +469,7 @@ function ruleSystem({ policy, defaultIds = ['med', 'herb'], maxPicks } = {}) {
     ...RULE_SLOT,
   };
   if (maxPicks !== undefined) craftingCheck.maxModifierPicks = maxPicks;
-  return { resolutionMode: 'simple', checkModifiers: PICK_CATALOGUE, craftingCheck };
+  return { resolutionMode: 'simple', modifiers: PICK_CATALOGUE, craftingCheck };
 }
 
 /** A REAL recipe, so `Recipe._normalizeCraftingModifier` is on the path. */

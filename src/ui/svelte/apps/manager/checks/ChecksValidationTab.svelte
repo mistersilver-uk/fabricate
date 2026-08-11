@@ -25,13 +25,13 @@
 <script>
   import EditorValidationSurface from '../EditorValidationSurface.svelte';
   import { localize } from '../../../util/foundryBridge.js';
-  import { checkIssueCopy, checkTickCopy } from './checksCopy.js';
+  import { checkIssueCopy, checkTickCopy, interpolate } from './checksCopy.js';
   import { evaluateCheckReadiness, sectionForIssue } from './checksReadiness.js';
 
   let { sections = [], dirty = false, dirtyActivities = [], onSelectIssue = () => {} } = $props();
 
-  function text(key, fallback) {
-    const translated = localize(key);
+  function text(key, fallback, data) {
+    const translated = localize(key, data);
     return translated && translated !== key ? translated : fallback;
   }
 
@@ -53,9 +53,13 @@
     const copy = checkTickCopy(id);
     return text(copy.key, copy.fallback);
   }
-  function issueTitle(id) {
+  // `data` is the optional interpolation payload an issue carries when its sentence names
+  // something (issue 1117). `localize` formats only when data is supplied, and the English
+  // fallback is interpolated by hand so a world with no localization still reads the names
+  // rather than a literal `{names}`.
+  function issueTitle(id, data) {
     const copy = checkIssueCopy(id);
-    return text(copy.key, copy.fallback);
+    return interpolate(text(copy.key, copy.fallback, data), data);
   }
 
   const evaluated = $derived(
@@ -101,7 +105,7 @@
       })),
       ...readiness.issues.map((issue) => ({
         id: issue.id,
-        title: issueTitle(issue.id),
+        title: issueTitle(issue.id, issue.data),
         status: issue.severity === 'critical' ? 'block' : 'warn',
         target: { activity: subsystem, section: sectionForIssue(issue.id) },
         dataAttrs: {

@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
+import { CraftingSystemManager } from '../src/systems/CraftingSystemManager.js';
 import { GatheringRichStateService } from '../src/systems/GatheringRichStateService.js';
 import { SETTING_KEYS } from '../src/config/settings.js';
 import {
@@ -10,15 +11,14 @@ import {
   seedCharacterModifierPresets
 } from '../src/config/gatheringCharacterModifierPresets.js';
 
-function configWithLibrary(entries) {
-  return {
-    systems: {
-      'system-a': {
-        characterModifiers: entries
-      }
-    }
-  };
-}
+// ISSUE 1117 — THE LIBRARY MOVED, SO THIS SUITE MOVED WITH IT.
+//
+// It used to assert the gathering-config normalizer's per-system `characterModifiers`
+// block. There is no such block any more: the ONE library lives on the crafting system as
+// `system.modifiers`, and `CraftingSystemManager._normalizeModifierLibrary` owns its shape
+// (asserted in `tests/crafting-modifier-config.test.js`). What is left here is what is
+// still gathering's own: that the gathering config NO LONGER EMITS a library at all, that
+// the d100 resolution path reads the system's, and the preset seeding both surfaces share.
 
 function makeService(config = {}, options = {}) {
   const settings = new Map([[SETTING_KEYS.GATHERING_CONFIG, config]]);
@@ -30,38 +30,101 @@ function makeService(config = {}, options = {}) {
   });
 }
 
-test('normalizes empty characterModifiers to []', () => {
-  const service = makeService(configWithLibrary([]));
-  const config = service._config();
-  assert.deepEqual(config.systems['system-a'].characterModifiers, []);
+// THE RETIREMENT, asserted rather than assumed. `normalizeGatheringConfig` is an allowlist
+// rebuild, so NOT emitting the key is what deletes it from every world on the next save —
+// and that is precisely what makes the 1.23.0 migration's ordering load-bearing.
+test('the gathering config no longer emits a character modifier library', () => {
+  const service = makeService({
+    systems: {
+      'system-a': {
+        characterModifiers: [{ id: 'strength', label: 'Strength', expression: '@abilities.str.mod' }]
+      }
+    }
+  });
+  const systemConfig = service._config().systems['system-a'];
+  assert.equal(
+    Object.hasOwn(systemConfig, 'characterModifiers'),
+    false,
+    'the library is a SYSTEM field now; a config that still carried one would be a second ' +
+      'location for the same data'
+  );
 });
 
-test('coerces malformed library entries and drops invalid ones', () => {
-  const service = makeService(configWithLibrary([
-    null,
-    { id: 'strength', label: 'Strength', icon: 'fa-solid fa-dumbbell', expression: '@abilities.str.mod' },
-    { label: 'Missing ID', expression: 'whatever' },
-    { id: 'invalid-no-expr', label: 'No expression' },
-    { id: 'with-expr', expression: '1' }
-  ]));
-  const entries = service._config().systems['system-a'].characterModifiers;
-  const byId = Object.fromEntries(entries.map(entry => [entry.id, entry]));
-  assert.ok(byId.strength, 'strength preserved');
-  assert.equal(byId['invalid-no-expr'], undefined, 'no-expression entry dropped');
-  assert.ok(byId['with-expr'], 'entry with an expression preserved');
-  assert.equal(byId['with-expr'].provider, undefined, 'no provider field is stamped');
-  assert.deepEqual(Object.keys(byId.strength).sort((a, b) => a.localeCompare(b)), ['expression', 'icon', 'id', 'isRollExpression', 'label']);
-  assert.equal(byId.strength.isRollExpression, false, 'flat actor ref is not roll');
+// The d100 path resolves references against `system.modifiers`, which is the second
+// argument `composeEnvironment` already took for tools.
+test('a drop row resolves its reference against the SYSTEM library', async () => {
+  const evaluateCalls = [];
+  const service = makeService(
+    { systems: { 'system-a': {} } },
+    { evaluateExpression: async (payload) => { evaluateCalls.push(payload); return 3; } }
+  );
+  const composed = service.composeEnvironment(
+    { id: 'env', craftingSystemId: 'system-a', tasks: [], events: [] },
+    { id: 'system-a', modifiers: [{ id: 'str', label: 'Strength', expression: '@str' }] }
+  );
+  const result = await service.resolveD100Attempt({
+    task: {
+      id: 'task-evaluator',
+      dropRows: [{ id: 'drop-1', componentId: 'herb', quantity: 1, dropRate: 10, characterModifiers: [{ id: 'ref-1', modifierId: 'str', operator: '+' }] }]
+    },
+    environment: composed,
+    actor: { uuid: 'Actor.x' }
+  });
+  assert.equal(result.status === 'succeeded' || result.status === 'failed', true);
+  assert.equal(evaluateCalls.length, 1);
+  assert.equal(evaluateCalls[0].kind, 'characterModifier');
+  assert.equal(evaluateCalls[0].expression, '@str');
+  assert.equal(evaluateCalls[0].provider, undefined);
 });
 
-test('flags dice and operator expressions as roll expressions', () => {
-  const service = makeService(configWithLibrary([
-    { id: 'roll-d6', label: 'Roll d6', expression: '1d6 + @abilities.str.mod' },
-    { id: 'scaled-dice', label: 'Scaled', expression: '(@abilities.str.mod)d6' }
-  ]));
-  const entries = service._config().systems['system-a'].characterModifiers;
-  assert.equal(entries.find(e => e.id === 'roll-d6').isRollExpression, true);
-  assert.equal(entries.find(e => e.id === 'scaled-dice').isRollExpression, true);
+// The negative control for the move: a library left at the OLD location resolves nothing,
+// so a reference to it is a misconfiguration rather than a silent success. Without this the
+// test above would pass just as well against a read-alias.
+test('a library left in the gathering config resolves NOTHING', async () => {
+  const service = makeService(
+    {
+      systems: {
+        'system-a': {
+          characterModifiers: [{ id: 'str', label: 'Strength', expression: '@str' }]
+        }
+      }
+    },
+    { evaluateExpression: async () => 3 }
+  );
+  const composed = service.composeEnvironment(
+    { id: 'env', craftingSystemId: 'system-a', tasks: [], events: [] },
+    { id: 'system-a' }
+  );
+  const result = await service.resolveD100Attempt({
+    task: {
+      id: 'task-evaluator',
+      dropRows: [{ id: 'drop-1', componentId: 'herb', quantity: 1, dropRate: 10, characterModifiers: [{ id: 'ref-1', modifierId: 'str', operator: '+' }] }]
+    },
+    environment: composed,
+    actor: { uuid: 'Actor.x' }
+  });
+  assert.equal(result.status, 'misconfigured');
+  assert.equal(result.diagnostics[0].code, 'MISSING_CHARACTER_MODIFIER');
+});
+
+// The preset bundles are unchanged and are now seeded into the SYSTEM library, so their
+// output is asserted through the normalizer that owns that library.
+test('seeded presets survive the system normalizer, edits and all', () => {
+  const presets = getCharacterModifierPresetsForFoundrySystem('dnd5e');
+  const seeded = seedCharacterModifierPresets({ presets }).next;
+  seeded[0].label = 'Mighty Strength';
+  seeded[0].expression = '@abilities.str.mod + 1';
+  const manager = new CraftingSystemManager({ getRecipes: () => [] });
+  const system = manager._normalizeSystem({ id: 'sys', name: 'S', modifiers: seeded });
+  const strength = system.modifiers.find(entry => entry.id === seeded[0].id);
+  assert.equal(strength.label, 'Mighty Strength');
+  assert.equal(strength.expression, '@abilities.str.mod + 1');
+  assert.equal(strength.isRollExpression, false);
+});
+
+test('a new system has an empty library and nothing is auto-seeded', () => {
+  const manager = new CraftingSystemManager({ getRecipes: () => [] });
+  assert.deepEqual(manager._normalizeSystem({ id: 'sys', name: 'S' }).modifiers, []);
 });
 
 test('seedCharacterModifierPresets adds dnd5e presets idempotently', () => {
@@ -90,48 +153,4 @@ test('seedCharacterModifierPresets supports pf2e bundle', () => {
   assert.ok(presets.length >= 6);
   const result = seedCharacterModifierPresets({ presets });
   assert.equal(result.added.length, presets.length);
-});
-
-test('edited presets persist across normalization', () => {
-  const presets = getCharacterModifierPresetsForFoundrySystem('dnd5e');
-  const seeded = seedCharacterModifierPresets({ presets }).next;
-  seeded[0].label = 'Mighty Strength';
-  seeded[0].expression = '@abilities.str.mod + 1';
-  const service = makeService(configWithLibrary(seeded));
-  const out = service._config().systems['system-a'].characterModifiers;
-  const strength = out.find(entry => entry.id === seeded[0].id);
-  assert.equal(strength.label, 'Mighty Strength');
-  assert.equal(strength.expression, '@abilities.str.mod + 1');
-});
-
-test('new system shell has empty character modifier library without auto-seed', () => {
-  const service = makeService({ systems: { 'system-a': {} } });
-  const out = service._config().systems['system-a'].characterModifiers;
-  assert.deepEqual(out, []);
-});
-
-test('evaluator injection passes through with kind=characterModifier', async () => {
-  const evaluateCalls = [];
-  const service = makeService(
-    configWithLibrary([{ id: 'str', label: 'Strength', expression: '@str' }]),
-    {
-      evaluateExpression: async (payload) => { evaluateCalls.push(payload); return 3; }
-    }
-  );
-  const composed = service.composeEnvironment({
-    id: 'env', craftingSystemId: 'system-a', tasks: [], events: []
-  }, { id: 'system-a' });
-  const result = await service.resolveD100Attempt({
-    task: {
-      id: 'task-evaluator',
-      dropRows: [{ id: 'drop-1', componentId: 'herb', quantity: 1, dropRate: 10, characterModifiers: [{ id: 'ref-1', modifierId: 'str', operator: '+' }] }]
-    },
-    environment: composed,
-    actor: { uuid: 'Actor.x' }
-  });
-  assert.equal(result.status === 'succeeded' || result.status === 'failed', true);
-  assert.equal(evaluateCalls.length, 1);
-  assert.equal(evaluateCalls[0].kind, 'characterModifier');
-  assert.equal(evaluateCalls[0].expression, '@str');
-  assert.equal(evaluateCalls[0].provider, undefined);
 });

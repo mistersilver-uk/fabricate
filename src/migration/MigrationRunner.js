@@ -40,6 +40,7 @@ import { migrateSystemCheckModifierCatalogue } from './migrateSystemCheckModifie
 import { migrateToolsToFirstClass } from './migrateToolsToFirstClass.js';
 import { migrateToolsToSystem } from './migrateToolsToSystem.js';
 import { migrateUnifyGatheringRegions } from './migrateUnifyGatheringRegions.js';
+import { migrateUnifyModifierLibraries } from './migrateUnifyModifierLibraries.js';
 import { migrateVisibilityModeEnum } from './migrateVisibilityModeEnum.js';
 import { isFatalMigrationError } from './migrationErrors.js';
 
@@ -108,6 +109,24 @@ function _normalizeRetiredCraftingModEntry(entry) {
     normalized[key] = Number.isFinite(value) && value > 0 ? Math.trunc(value) : 0;
   }
   return normalized;
+}
+
+/**
+ * Normalize one entry of the transient `_unifiedModifierCollisions` report (1.23.0) into a
+ * fixed `{ system, collisions }` shape, dropping an entry that reports no collision.
+ *
+ * Coerced rather than passed through, for the reason
+ * {@link _normalizeRetiredCraftingModEntry} is: the GM notice formats the number without
+ * re-guarding it, so a hand-built or partially-written entry cannot put `NaN` or an object
+ * into a notification string.
+ * @param {*} entry
+ * @returns {{ system: string, collisions: number }|null}
+ */
+function _normalizeModifierCollisionEntry(entry) {
+  if (entry == null || typeof entry !== 'object' || Array.isArray(entry)) return null;
+  const collisions = Number(entry.collisions);
+  if (!Number.isFinite(collisions) || collisions <= 0) return null;
+  return { system: String(entry.system ?? ''), collisions: Math.trunc(collisions) };
 }
 
 // ---------------------------------------------------------------------------
@@ -407,6 +426,33 @@ const MIGRATIONS = [
     downgradeLosesData: true,
     migrate: (data) => migrateSystemCheckModifierCatalogue(data),
   },
+  {
+    version: '1.23.0',
+    // THE LOSSY-DOWNGRADE FACT IS IN THE LABEL, for the reason `1.22.0` states: the label
+    // is the only string a GM ever reads about this migration, and "Downgrade to 1.22.0"
+    // is precisely the choice this warning is about.
+    label:
+      'Merge the two modifier libraries a crafting system authored — the check-modifier ' +
+      'catalogue and the gathering character-modifier library — into one system.modifiers, ' +
+      'so a named actor expression is defined once and referenced by checks, drop rows, ' +
+      'events and stamina costs alike. An id authored in BOTH libraries keeps the check ' +
+      "entry's id and the gathering entry is re-keyed with a -gathering suffix, with every " +
+      'gathering reference rewritten to match. THE RUNNER ORDER IS LOAD-BEARING: this runs ' +
+      'before any manager load, and both normalizers are allowlist rebuilds that no longer ' +
+      'emit the old keys, so a save running first would have DELETED both libraries rather ' +
+      'than merging them. DOWNGRADING IS NOT LOSSLESS: 1.22.0 never saw system.modifiers, ' +
+      'so it drops the merged library on the first read — every check modifier stops ' +
+      'contributing to every roll AND every gathering drop row, event and stamina cost ' +
+      'loses the modifier it references, until you re-author both libraries',
+    downgradeTo: '1.22.0',
+    // MACHINE-READABLE, per the rule `1.22.0` established: a migration marked here must
+    // name the loss in its own `label` (`tests/migration-runner.test.js` enforces it over
+    // the whole registry).
+    downgradeLosesData: true,
+    // Reports the per-system id-collision counts through the transient
+    // `_unifiedModifierCollisions` field (captured and deleted by the runner below).
+    migrate: (data) => migrateUnifyModifierLibraries(data),
+  },
   // Future migrations added here in version order
 ];
 
@@ -464,6 +510,7 @@ export class MigrationRunner {
         },
         essenceCollisionDisabledRecipes: [],
         retiredCraftingModCounts: [],
+        unifiedModifierCollisions: [],
       };
     }
 
@@ -544,6 +591,7 @@ export class MigrationRunner {
             },
             essenceCollisionDisabledRecipes: [],
             retiredCraftingModCounts: [],
+            unifiedModifierCollisions: [],
           };
         }
         console.warn(`Fabricate | Migration "${migration.label}" failed: ${error.message}`);
@@ -604,6 +652,19 @@ export class MigrationRunner {
     }
     delete data._retiredCraftingModCounts;
 
+    // The 1.23.0 modifier-library unification reports, per system, how many gathering
+    // entries had to be re-keyed because their id was already taken by a check-modifier
+    // entry. Capture it for the GM notice — a re-keyed modifier is a visible rename in the
+    // authoring surface, so the GM has to be told which systems it happened in — and strip
+    // the transient field so it is never persisted.
+    let unifiedModifierCollisions = [];
+    if (Array.isArray(data._unifiedModifierCollisions)) {
+      unifiedModifierCollisions = data._unifiedModifierCollisions
+        .map((entry) => _normalizeModifierCollisionEntry(entry))
+        .filter(Boolean);
+    }
+    delete data._unifiedModifierCollisions;
+
     const recipesChanged = JSON.stringify(data.recipes) !== originalRecipesJson;
     const systemsChanged = JSON.stringify(data.systems) !== originalSystemsJson;
     const gatheringConfigChanged =
@@ -640,6 +701,7 @@ export class MigrationRunner {
       removedResultSelectionProviders,
       essenceCollisionDisabledRecipes,
       retiredCraftingModCounts,
+      unifiedModifierCollisions,
     };
   }
 

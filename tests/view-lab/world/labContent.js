@@ -3436,9 +3436,16 @@ export function buildLabContent() {
         // `DND5E_CHARACTER_MODIFIER_PRESETS` seeds and what the editor's
         // `RollDataExpressionInput` renders. Note the `@` sigil, which this convention keeps and
         // the sibling `characterPrerequisites` paths deliberately do not.
+        // ISSUE 1117: a DISTINCT id from the check library's `hb-mod-nature`. The two were the
+        // same id with different expressions, which was the duplication the unified library
+        // exists to remove — and after the merge it is a real collision, so the lab world would
+        // model the defect and fire the one-time rename notice on every lab build. The
+        // collision RULE is exercised by `tests/migrate-unify-modifier-libraries.test.js`
+        // against a world whose drop rows actually name the colliding id, which is where the
+        // reference rewrite can be proven too.
         characterModifiers: [
           {
-            id: 'hb-mod-nature',
+            id: 'hb-mod-herbalism-training',
             label: 'Herbalism Training',
             icon: 'fa-solid fa-leaf',
             expression: '@skills.nat.total',

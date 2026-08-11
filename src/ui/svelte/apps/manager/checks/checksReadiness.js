@@ -1,4 +1,5 @@
 import {
+  isRollExpression,
   resolveEligibleModifierIds,
   resolveModifierBounds,
 } from '../../../../../systems/checkModifierResolver.js';
@@ -54,6 +55,7 @@ export const CHECK_READINESS_ISSUE_IDS = Object.freeze([
   // Check modifiers
   'modifierBoundsInverted',
   'modifierBoundsUnsafe',
+  'modifierRollExpression',
   'modifiersInertNoCheck',
   'modifiersInertNoFormula',
 ]);
@@ -108,6 +110,7 @@ export const CHECK_ISSUE_SECTIONS = Object.freeze({
   multipleTierStepTargets: 'triggers',
   modifierBoundsInverted: 'modifiers',
   modifierBoundsUnsafe: 'modifiers',
+  modifierRollExpression: 'modifiers',
   modifiersInertNoCheck: 'modifiers',
   modifiersInertNoFormula: 'modifiers',
 });
@@ -184,18 +187,25 @@ export function sectionForIssue(id) {
  * load-bearing by routing every emit through here. The failure is loud and immediate
  * rather than a silently under-bucketed row on the Validation route.
  *
+ * `data` is the optional interpolation payload for an issue whose sentence NAMES something
+ * (issue 1117): `modifierRollExpression` has to say WHICH entries roll, because a shared
+ * library can be long and "one of your modifiers rolls dice" is not a repairable
+ * instruction. The key is attached only when supplied, so every other issue keeps its
+ * exact two-key shape and no consumer has to guard for it.
+ *
  * @param {CheckReadinessIssue[]} issues
  * @param {string} id
  * @param {'critical'|'warning'|'info'} severity
+ * @param {object|null} [data] Interpolation values for the issue's localized sentence.
  */
-function pushIssue(issues, id, severity) {
+function pushIssue(issues, id, severity, data = null) {
   if (!REGISTERED_ISSUE_IDS.has(id)) {
     throw new Error(
       `checksReadiness: unregistered issue id "${id}" — add it to CHECK_READINESS_ISSUE_IDS ` +
         'so every surface that buckets these ids can see it'
     );
   }
-  issues.push({ id, severity });
+  issues.push(data === null ? { id, severity } : { id, severity, data });
 }
 
 function trimmed(value) {
@@ -321,6 +331,18 @@ function fixedRangesHaveGap(outcomes, excluded) {
  *   otherwise clamp to poisons the SUM, and `appendCheckModifierTerm` drops the WHOLE term
  *   for an exponent-notation value — so before the containment this single entry deleted
  *   every other modifier from the roll.
+ * - **`modifierRollExpression`** (`critical`, BLOCKING; issue 1117). An eligible entry whose
+ *   expression ROLLS DICE. The unified library serves two consumers with different
+ *   contracts: a gathering drop row evaluates the expression and applies the result as a
+ *   percentage-point delta, where a roll is perfectly legal, while a check appends ONE
+ *   resolved scalar as a dice-grammar `Constant`. A roll-shaped expression cannot be that
+ *   scalar, and `appendCheckModifierTerm` refuses a value it cannot express by dropping the
+ *   WHOLE term — so a single roll-shaped entry selected by a check would silently delete
+ *   every OTHER eligible modifier from that roll, exactly the blast radius
+ *   `modifierBoundsUnsafe` documents. It is `critical` for that reason, and it names the
+ *   offending entry so the GM knows which of a shared library's entries this activity may
+ *   not select. It is raised ONLY for entries this activity actually selects: a roll-shaped
+ *   entry that only gathering drop rows reference is correct, not a defect.
  * - **`modifiersInertNoCheck` / `modifiersInertNoFormula`** (`warning`). An eligible
  *   selection that reaches no roll. These are the ONE owned path for "the gathering d100
  *   check-modifier section reports `noCheck`", and they are gated on the selection being
@@ -350,11 +372,25 @@ function checkModifierReadiness(modifierContext, { rollsNoCheck, hasRollFormula 
   const bounds = eligible.map((id) => resolveModifierBounds(byId.get(id)));
   const inverted = bounds.some((entry) => entry.inverted);
   const unsafe = bounds.some((entry) => entry.unsafe);
+  // The offending ENTRIES, not just a boolean: a shared library can be long, and "one of
+  // your modifiers rolls dice" is not a repairable instruction. `isRollExpression` is asked
+  // of the resolver rather than re-derived from the persisted flag, so an entry that
+  // somehow arrived with a stale flag is still classified by its actual expression.
+  const rollNames = eligible
+    .map((id) => byId.get(id))
+    .filter((entry) => isRollExpression(entry?.expression))
+    .map((entry) => entry.label || entry.id);
 
   const issues = [];
-  const checks = [{ id: 'modifierBoundsValid', satisfied: !inverted && !unsafe }];
+  const checks = [
+    { id: 'modifierBoundsValid', satisfied: !inverted && !unsafe },
+    { id: 'modifierExpressionsResolveToScalars', satisfied: rollNames.length === 0 },
+  ];
   if (inverted) pushIssue(issues, 'modifierBoundsInverted', 'critical');
   if (unsafe) pushIssue(issues, 'modifierBoundsUnsafe', 'critical');
+  if (rollNames.length > 0) {
+    pushIssue(issues, 'modifierRollExpression', 'critical', { names: rollNames.join(', ') });
+  }
   if (rollsNoCheck) pushIssue(issues, 'modifiersInertNoCheck', 'warning');
   else if (!hasRollFormula) pushIssue(issues, 'modifiersInertNoFormula', 'warning');
   return { checks, issues };

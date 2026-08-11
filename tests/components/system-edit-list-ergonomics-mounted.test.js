@@ -27,7 +27,14 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/fontAwesomeFreeClassicIcons.js',
     'src/ui/svelte/util/iconPickerPopover.js',
     'src/systems/characterPrerequisites.js',
-    'src/systems/characterModifierPrerequisiteCopy.js'
+    'src/systems/characterModifierPrerequisiteCopy.js',
+    // The unified modifier library's bounds pair and roll classification (issue 1117).
+    'src/systems/checkModifierResolver.js',
+    'src/systems/salvageCheckUsability.js',
+    'src/systems/toolCheckBonus.js',
+    'src/utils/checkModifierPicks.js',
+    'src/utils/craftingCheckExpression.js',
+    'src/ui/svelte/components/stepperLabels.js'
   ],
   compiledModules: [
     // The manager's ONE chip (issue 883). A `.svelte` the tree renders but the
@@ -37,6 +44,9 @@ const harness = createMountedComponentHarness({
     // the harness omits HANGS the suite (# cancelled) rather than failing it.
     'src/ui/svelte/apps/manager/EmptyState.svelte',
     'src/ui/svelte/components/IconPicker.svelte',
+    // The Modifiers section's min/max pair and `@`-sigil expression field (issue 1117).
+    'src/ui/svelte/components/Stepper.svelte',
+    'src/ui/svelte/apps/manager/RollDataExpressionInput.svelte',
     'src/ui/svelte/apps/manager/system/SystemEditorTabs.svelte',
     'src/ui/svelte/apps/manager/system/CharacterPrerequisitesCard.svelte',
     'src/ui/svelte/apps/manager/SystemOverviewView.svelte',
@@ -97,21 +107,21 @@ describe('system-edit list ergonomics (mounted, issue 768)', () => {
   it('renders a compact summary row (label + inline @-stripped expression) that is collapsed by default', async () => {
     const root = await harness.mount({
       selectedSystem: makeSystem(),
-      characterModifierLibrary: MODIFIERS
+      modifierLibrary: MODIFIERS
     });
 
-    const row = root.querySelector('[data-system-character-modifier="mod-herbalism"]');
+    const row = root.querySelector('[data-system-modifier="mod-herbalism"]');
     assert.ok(row, 'modifier row exists');
 
     // Collapsed by default: a summary toggle, no editor body.
-    const summary = row.querySelector('[data-toggle-character-modifier]');
+    const summary = row.querySelector('[data-toggle-modifier]');
     assert.ok(summary, 'the row renders an accordion summary toggle');
     assert.equal(summary.getAttribute('aria-expanded'), 'false', 'starts collapsed');
     assert.ok(!row.querySelector('.manager-modifier-body'), 'no editor body when collapsed');
 
     // The label and the inline expression (leading @ stripped) render on the summary.
     assert.ok(row.querySelector('.manager-modifier-label').textContent.includes('Herbalism'), 'label shows');
-    const expression = row.querySelector('[data-character-modifier-expression]');
+    const expression = row.querySelector('[data-modifier-expression]');
     assert.ok(expression, 'the expression renders inline on the summary');
     assert.ok(expression.textContent.includes('skills.nature.value'), 'expression body shows');
     assert.ok(!expression.textContent.includes('@'), 'the leading @ sigil is stripped from the inline display');
@@ -120,11 +130,11 @@ describe('system-edit list ergonomics (mounted, issue 768)', () => {
   it('expands to the IconPicker editor on the summary toggle', async () => {
     const root = await harness.mount({
       selectedSystem: makeSystem(),
-      characterModifierLibrary: MODIFIERS
+      modifierLibrary: MODIFIERS
     });
 
-    const row = root.querySelector('[data-system-character-modifier="mod-herbalism"]');
-    const summary = row.querySelector('[data-toggle-character-modifier]');
+    const row = root.querySelector('[data-system-modifier="mod-herbalism"]');
+    const summary = row.querySelector('[data-toggle-modifier]');
     summary.dispatchEvent(clickEvent());
     await flushRender();
 
@@ -132,18 +142,28 @@ describe('system-edit list ergonomics (mounted, issue 768)', () => {
     assert.ok(row.querySelector('.manager-modifier-body'), 'the editor body opens');
     const trigger = row.querySelector('.essence-icon-picker-trigger');
     assert.ok(trigger, 'the modifier editor renders an IconPicker trigger, not a bare text input');
-    // The editor keeps the RAW @-prefixed expression (only the summary strips it).
-    const expressionInput = [...row.querySelectorAll('.manager-modifier-body input')].find(
-      (input) => input.value.includes('skills.nature.value')
-    );
+    // The expression field is `RollDataExpressionInput` since issue 1117 — the control the
+    // retired Checks-tab editor used, adopted here because this is now the only surface that
+    // authors an expression. It renders the `@` as a SEPARATE prefix glyph and keeps the
+    // input's own value sigil-free, re-adding the sigil on write, so the stored value is
+    // unchanged and the field is not a bare text input.
+    const expressionInput = row.querySelector('[data-system-modifier-field="expression"]');
     assert.ok(expressionInput, 'the editor exposes the expression field');
-    assert.ok(expressionInput.value.startsWith('@'), 'the stored expression keeps its @ sigil in the editor');
+    assert.equal(
+      expressionInput.value,
+      'skills.nature.value',
+      'the input holds the path; the @ is the control’s own prefix, not typed text'
+    );
+    assert.ok(
+      Boolean(row.querySelector('.manager-prerequisite-at')),
+      'and the @ sigil is rendered beside it'
+    );
   });
 
   it('collapses a whole section on its header toggle', async () => {
     const root = await harness.mount({
       selectedSystem: makeSystem(),
-      characterModifierLibrary: MODIFIERS
+      modifierLibrary: MODIFIERS
     });
 
     const toggle = root.querySelector('[data-section-collapse="modifiers"]');
@@ -162,7 +182,7 @@ describe('system-edit list ergonomics (mounted, issue 768)', () => {
     const calls = [];
     const root = await harness.mount({
       selectedSystem: makeSystem(),
-      characterModifierLibrary: MODIFIERS,
+      modifierLibrary: MODIFIERS,
       characterPrerequisiteLibrary: PREREQUISITES,
       // Simulate the store add: record the mapped partial and return an entry whose
       // id is already in the seeded prereq library so the target editor can open it.
@@ -206,9 +226,9 @@ describe('system-edit list ergonomics (mounted, issue 768)', () => {
     const calls = [];
     const root = await harness.mount({
       selectedSystem: makeSystem(),
-      characterModifierLibrary: MODIFIERS,
+      modifierLibrary: MODIFIERS,
       characterPrerequisiteLibrary: PREREQUISITES,
-      onAddCharacterModifier: async (partial) => {
+      onAddModifier: async (partial) => {
         calls.push(partial);
         return { id: 'mod-lore' };
       }
@@ -224,7 +244,7 @@ describe('system-edit list ergonomics (mounted, issue 768)', () => {
     assert.equal(calls[0].expression, '@skills.cra.rank', 'path @-prefixed to expression');
     assert.ok(!('op' in calls[0]), 'op dropped');
 
-    const target = root.querySelector('[data-system-character-modifier="mod-lore"]');
+    const target = root.querySelector('[data-system-modifier="mod-lore"]');
     assert.ok(
       target.querySelector('.manager-character-modifier-editor'),
       'the newly-copied modifier is opened in edit mode'
@@ -240,8 +260,8 @@ describe('system-edit list ergonomics (mounted, issue 768)', () => {
     const calls = [];
     const root = await harness.mount({
       selectedSystem: makeSystem(),
-      characterModifierLibrary: MODIFIERS,
-      onReorderCharacterModifier: async (fromIndex, toIndex) => { calls.push([fromIndex, toIndex]); }
+      modifierLibrary: MODIFIERS,
+      onReorderModifier: async (fromIndex, toIndex) => { calls.push([fromIndex, toIndex]); }
     });
 
     // First row: Move up disabled, Move down enabled.
@@ -305,28 +325,100 @@ describe('system-edit list ergonomics (mounted, issue 768)', () => {
     assert.deepEqual(calls, [[0, 1]], 'the prerequisite reorder op fires with (index, index+1)');
   });
 
-  it('hides the Copy to Modifiers button (and the Modifiers section) when gathering is off', async () => {
+  // ISSUE 1117 INVERTED THIS TEST, deliberately. The section used to be gathering-scoped
+  // and vanish with the feature; the library now also carries every CHECK modifier, so
+  // gating the only authoring surface on an unrelated feature flag would make a crafting or
+  // salvage check modifier unauthorable. The section — and the Copy to Modifiers action that
+  // feeds it — therefore render for every system.
+  it('renders the Modifiers section (and Copy to Modifiers) with gathering OFF', async () => {
     const root = await harness.mount({
       selectedSystem: { ...makeSystem(), features: { gathering: false } },
-      characterModifierLibrary: MODIFIERS,
+      modifierLibrary: MODIFIERS,
       characterPrerequisiteLibrary: PREREQUISITES
     });
 
-    // Modifiers are gathering-scoped, so the whole section is gone...
     assert.ok(
-      !root.querySelector('[data-system-character-modifiers]'),
-      'the Character Modifiers section is absent when gathering is off'
+      Boolean(root.querySelector('[data-system-modifiers]')),
+      'the Modifiers section is not gathering-scoped: checks use the same library'
     );
-    // ...but the Prerequisites card still renders. Its rows must NOT offer a
-    // Copy to Modifiers action (there is no modifier store to copy into).
     assert.ok(
-      root.querySelector('[data-system-character-prerequisites]'),
+      Boolean(root.querySelector('[data-system-modifier="mod-herbalism"]')),
+      'and its rows render'
+    );
+    assert.ok(
+      Boolean(root.querySelector('[data-system-character-prerequisites]')),
       'the Character Prerequisites card still renders'
     );
+    assert.ok(
+      root.querySelectorAll('[data-copy-to-modifier]').length > 0,
+      'there IS a modifier library to copy into now, on every system'
+    );
+  });
+
+  // The bounds pair and the roll-shaped-expression warning are the two fields the library
+  // absorbed from the retired Checks-tab editor (issue 1117). Neither has any other home,
+  // so a mount is the only place they can be pinned.
+  it('authors the min/max bounds and warns about a roll-shaped expression', async () => {
+    const patches = [];
+    const root = await harness.mount({
+      selectedSystem: makeSystem(),
+      modifierLibrary: [
+        { id: 'mod-flat', label: 'Flat', icon: 'fa-solid fa-a', expression: '@skills.nature.value', min: -1, max: 5 },
+        { id: 'mod-roll', label: 'Rolled', icon: 'fa-solid fa-b', expression: '1d6' }
+      ],
+      onUpdateModifier: async (id, patch) => { patches.push([id, patch]); }
+    });
+
+    const flat = root.querySelector('[data-system-modifier="mod-flat"]');
+    flat.querySelector('[data-toggle-modifier]').dispatchEvent(clickEvent());
+    await flushRender();
+    const min = flat.querySelector('[data-system-modifier-field="min"]');
+    const max = flat.querySelector('[data-system-modifier-field="max"]');
+    assert.ok(min && max, 'both bounds are authorable');
+    assert.equal(min.value, '-1', 'a stored bound renders as its value, not as a blank');
+    assert.equal(max.value, '5');
+    assert.ok(
+      !flat.querySelector('[data-system-modifier-roll-note="mod-flat"]'),
+      'a flat expression raises no roll warning'
+    );
+
+    const rolled = root.querySelector('[data-system-modifier="mod-roll"]');
+    rolled.querySelector('[data-toggle-modifier]').dispatchEvent(clickEvent());
+    await flushRender();
+    assert.ok(
+      Boolean(rolled.querySelector('[data-system-modifier-roll-note="mod-roll"]')),
+      'a roll-shaped expression says so where it is authored, not only in Validation'
+    );
+  });
+
+  // An inverted or unrollable pair makes the entry contribute nothing, and the row says so
+  // while COLLAPSED — a fault only visible inside an open editor is a fault a GM scanning
+  // the list cannot see.
+  it('flags a blocking bounds fault on the collapsed row, naming the cause', async () => {
+    const root = await harness.mount({
+      selectedSystem: makeSystem(),
+      modifierLibrary: [
+        { id: 'mod-inv', label: 'Inverted', icon: 'fa-solid fa-a', expression: '@a', min: 5, max: -1 },
+        { id: 'mod-huge', label: 'Huge', icon: 'fa-solid fa-b', expression: '@b', min: 1e21 },
+        { id: 'mod-ok', label: 'Fine', icon: 'fa-solid fa-c', expression: '@c' }
+      ]
+    });
+
+    const inverted = root.querySelector('[data-system-modifier-bounds-invalid="mod-inv"]');
+    assert.ok(inverted, 'an inverted pair is called out where the GM authored it');
+    assert.equal(inverted.dataset.systemModifierBoundsCause, 'inverted');
+    assert.match(inverted.textContent.trim(), /minimum is above its maximum/i);
+
+    const huge = root.querySelector('[data-system-modifier-bounds-invalid="mod-huge"]');
+    assert.ok(huge, 'so is a bound the dice grammar cannot express');
     assert.equal(
-      root.querySelectorAll('[data-copy-to-modifier]').length,
-      0,
-      'no Copy to Modifiers button when gathering is off'
+      huge.dataset.systemModifierBoundsCause,
+      'unsafe',
+      'a DIFFERENT cause: "too large to appear in a roll" is not "min above max"'
+    );
+    assert.ok(
+      !root.querySelector('[data-system-modifier-bounds-invalid="mod-ok"]'),
+      'a well-formed entry gets no note'
     );
   });
 });

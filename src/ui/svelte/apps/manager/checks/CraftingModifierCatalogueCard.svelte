@@ -1,27 +1,20 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  Check-modifier catalogue + per-activity selection editor (issues 770, 1055, 1095).
+  Per-activity modifier SELECTION editor (issues 770, 1055, 1095, 1117).
 
-  A crafting system defines ONE named catalogue of check modifiers — e.g. Medicine,
-  Alchemy, Herbalism for a DC20 healing salve — each an authored roll-data expression
-  (`@abilities.med.mod`) with optional bounds. That catalogue lives on the SYSTEM
-  (`CraftingSystem.checkModifiers`), and crafting, salvage and gathering each select over
-  it with their own combination rule and default eligible set.
+  A crafting system defines ONE named modifier library — e.g. Medicine, Alchemy, Herbalism
+  for a DC20 healing salve — each an authored roll-data expression (`@abilities.med.mod`)
+  with optional bounds. That library lives on the SYSTEM (`CraftingSystem.modifiers`) and
+  is authored in ONE place: System settings > Modifiers.
 
-  THE CARD IS ACTIVITY-AWARE, AND ONLY THE ENTRY EDITOR IS GATED (issue 1095).
+  THIS CARD AUTHORS NO ENTRY, ON ANY ACTIVITY (issue 1117). Crafting used to, which made
+  the Checks screen a second editor for a system-level library and made salvage and
+  gathering second-class states of that asymmetry. All three now render the library
+  read-only with one deep link to the surface that owns it, and what stays here is the
+  SELECTION — which entries this activity applies and how they combine — because that is
+  genuinely per-activity.
 
-    - CRAFTING owns the catalogue: the icon picker, label, `@`-prefixed expression input,
-      the new absence-preserving `min`/`max` pair, delete and `+ Add modifier` all render
-      here. It is deliberately NOT read-only — the prototype's read-only Modifiers row is
-      authority for salvage and gathering, and adopting it on crafting would DELETE the
-      shipped editor.
-    - SALVAGE and GATHERING render each entry read-only, with a bounds chip and a link
-      back to the crafting tab where the catalogue is authored.
-    - On ALL THREE, the per-entry ELIGIBILITY control and the combination-rule grid stay
-      fully editable, because deciding which entries apply and how they combine is exactly
-      what each activity owns.
-
-  The card authors three things:
+  The card authors three things, and none of them is an entry:
 
     1. The COMBINATION RULE (`defaultModifierPolicy`) — who selects the eligible
        modifiers, and how they reduce to the one number appended to the check roll:
@@ -46,26 +39,23 @@
   change, so the distinction survives a monochrome render.
 
   Sibling of the failure-consumption card. Rendered for every sub-tab — INCLUDING the ones
-  where the catalogue cannot reach a roll, because a catalogue that silently does nothing
+  where the library cannot reach a roll, because a library that silently does nothing
   is the defect this card must report rather than hide. `inertCause` names which of the two
   reasons applies (there were three until issue 1094 retired the roll-formula
   placeholder and, with it, the "you forgot to reference it" cause).
 
-  Controlled component: it renders the passed props and emits a partial patch via
-  `onChange` — the store splits the system-level `checkModifiers` from this activity's
-  selection keys and writes both in one `updateSystem`, and the whole arrays are replaced
-  on write (removing an entry persists without a `-=`).
+  Controlled component: it renders the passed props and emits a partial SELECTION patch via
+  `onChange`, which the store merges into this activity's check block. It cannot emit a
+  library patch at all — the store's check-modifier saver no longer accepts one.
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
-  import IconPicker from '../../../components/IconPicker.svelte';
   import SelectionCheckbox from '../../../components/SelectionCheckbox.svelte';
   import StatusPill from '../../../components/StatusPill.svelte';
   import Stepper from '../../../components/Stepper.svelte';
   import { stepperLabels } from '../../../components/stepperLabels.js';
   import Chip from '../Chip.svelte';
   import RadioCardGroup from '../RadioCardGroup.svelte';
-  import RollDataExpressionInput from '../RollDataExpressionInput.svelte';
   import {
     normalizeModifierPolicy,
     policyDefersSelection,
@@ -82,11 +72,12 @@
 
   let {
     // Which activity's SELECTION this card edits: 'crafting' | 'salvage' | 'gathering'.
-    // It decides the `bySubject` label vocabulary, whether the entry editor renders, and
-    // whether the gathering disambiguation and dormancy notices render. It never decides
-    // whether the eligibility control or the rule grid render — those are on all three.
+    // It decides the `bySubject` label vocabulary and whether the gathering disambiguation
+    // and dormancy notices render. Since issue 1117 it decides nothing about EDITABILITY:
+    // the library rows are read-only and the eligibility control and rule grid are
+    // editable, on all three.
     activity = 'crafting',
-    checkModifiers = [],
+    modifiers = [],
     defaultModifierPolicy = 'addAll',
     defaultModifierIds = [],
     // The cap on how many modifiers a SELECTING rule may pick (issue 1055). ABSENT is a
@@ -105,9 +96,10 @@
     // reason, ALONGSIDE `inertCause` rather than instead of it — "d100 rolls no check" and
     // "the other two modes cannot be chosen yet" are different facts with different fixes.
     dormant = false,
-    // Navigate to the surface where the catalogue is authored. Rendered only where the
-    // entries are read-only; a null default keeps the card mountable in isolation.
-    onEditCatalogue = null,
+    // Navigate to the surface where the library is authored (System settings > Modifiers).
+    // Rendered on every activity now that the rows are read-only everywhere; a null default
+    // keeps the card mountable in isolation.
+    onEditLibrary = null,
     onChange = () => {},
   } = $props();
 
@@ -158,9 +150,6 @@
   };
 
   const subjectCopy = $derived(SUBJECT_COPY[activity] || SUBJECT_COPY.crafting);
-  // CRAFTING alone owns the catalogue ENTRIES. The eligibility control and the rule grid
-  // below are deliberately outside this gate.
-  const entriesEditable = $derived(activity === 'crafting');
 
   // Icon vocabulary for the four combination rules: Add all stacks the whole eligible
   // set, Highest sorts and takes the top one, By subject hands the selection to the
@@ -300,7 +289,7 @@
     },
   };
 
-  const modifiers = $derived(Array.isArray(checkModifiers) ? checkModifiers : []);
+  const library = $derived(Array.isArray(modifiers) ? modifiers : []);
   // Normalized through the resolver's OWN rule vocabulary rather than a local copy of
   // it. The literal `['addAll','highest','byRecipe','playerPicks']` that stood here was
   // a hand-maintained mirror of `VALID_POLICIES` — a mirror that has to be edited in
@@ -358,61 +347,13 @@
   // empty-catalogue empty state, warning about nothing on first contact with the tab.
   // `RecipeOverviewTab` already gates its equivalent banner on `hasModifierCatalogue`;
   // this is the same rule, on the surface that owns the catalogue.
-  const inert = $derived(modifiers.length > 0 ? INERT_COPY[inertCause] || null : null);
+  const inert = $derived(library.length > 0 ? INERT_COPY[inertCause] || null : null);
   const defaultIds = $derived(Array.isArray(defaultModifierIds) ? defaultModifierIds : []);
 
-  const minLabel = $derived(text('FABRICATE.Admin.Manager.Checks.Crafting.ModifierMin', 'Minimum'));
-  const maxLabel = $derived(text('FABRICATE.Admin.Manager.Checks.Crafting.ModifierMax', 'Maximum'));
-  const unboundedLabel = $derived(
-    text('FABRICATE.Admin.Manager.Checks.Crafting.ModifierBoundsUnbounded', 'Unbounded')
-  );
-
-  function newId() {
-    return globalThis.foundry?.utils?.randomID?.() ?? globalThis.crypto.randomUUID();
-  }
-
-  function emitModifiers(next) {
-    onChange({ checkModifiers: next });
-  }
-
-  function addModifier() {
-    emitModifiers([
-      ...modifiers,
-      { id: newId(), label: '', icon: DEFAULT_MODIFIER_ICON, expression: '' },
-    ]);
-  }
-
-  // A bare roll-data path with no leading `@`, e.g. `abilities.med.mod`. ONLY these
-  // get the sigil re-added on write; anything else is stored verbatim.
-  function updateModifier(id, patch) {
-    emitModifiers(
-      modifiers.map((modifier) => (modifier.id === id ? { ...modifier, ...patch } : modifier))
-    );
-  }
-
-  // `Stepper` reports a clamped number, or `null` when an `allowUnset` field is cleared.
-  // `null` is written as an EXPLICIT key rather than dropped, for the same reason the pick
-  // cap is: absence is the "unbounded" value, so clearing the field has to be able to
-  // REMOVE an existing bound, and a patch that omitted the key would leave the old one in
-  // place. The normalizer attaches the key only for a finite number, so a `null` round-trips
-  // to key-absent, which is what unbounded IS.
-  function updateBound(id, key, next) {
-    updateModifier(id, { [key]: next });
-  }
-
-  function removeModifier(id) {
-    // Dropping the entry from the catalogue also drops it from the default set so a
-    // dangling default id never lingers (the normalizer would drop it anyway). Both go in
-    // ONE patch, so the store writes them in one `updateSystem` rather than reading the
-    // system twice and building the second write from a pre-first snapshot.
-    onChange({
-      checkModifiers: modifiers.filter((modifier) => modifier.id !== id),
-      ...(defaultIds.includes(id) && {
-        defaultModifierIds: defaultIds.filter((defaultId) => defaultId !== id),
-      }),
-    });
-  }
-
+  // ── The three SELECTION writes, and the whole of what this card persists ────────────
+  // Each emits a partial patch the store merges into THIS activity's check block. None of
+  // them can touch the library (issue 1117): that is authored in System settings, and the
+  // store's check-modifier saver no longer accepts a library key at all.
   function selectPolicy(policy) {
     onChange({ defaultModifierPolicy: policy });
   }
@@ -484,7 +425,7 @@
   <p class="manager-muted">
     {text(
       'FABRICATE.Admin.Manager.Checks.Crafting.ModifierCatalogueIntro',
-      'Named character modifiers added to the check roll automatically, as one + N[Modifiers] term. Each expression resolves against the acting character (e.g. @abilities.med.mod). One catalogue is shared by crafting, salvage and gathering; each decides which entries apply.'
+      'Named character modifiers added to the check roll automatically, as one + N[Modifiers] term. Each expression resolves against the acting character (e.g. @abilities.med.mod). The library is authored once in System settings › Modifiers and shared by crafting, salvage and gathering; each decides which entries apply.'
     )}
   </p>
 
@@ -533,7 +474,7 @@
     </p>
   {/if}
 
-  {#if modifiers.length > 0 && eligibilityIntro.fallback}
+  {#if library.length > 0 && eligibilityIntro.fallback}
     <!-- The eligibility sentence for the ACTIVE rule, ABOVE the rows it governs. It states
          what switching an entry on MEANS under the rule the GM just chose, so it has to sit
          where that switching happens: below the rule grid it landed ~500px under the
@@ -550,153 +491,54 @@
   {/if}
 
   <div class="manager-modifier-catalogue" data-crafting-modifier-rows>
-    {#if modifiers.length === 0}
-      <!-- The empty state BRANCHES on who owns the entries. "Add one" is an instruction on
-           crafting, where the add button is directly below it; on salvage and gathering there
-           is no add button at all and the only control is a link to the crafting tab, so the
-           same sentence told the GM to do something this screen cannot do. -->
-      <p
-        class="manager-muted"
-        data-crafting-modifier-empty={entriesEditable ? 'editable' : 'linked'}
-      >
-        {#if entriesEditable}
-          {text(
-            'FABRICATE.Admin.Manager.Checks.Crafting.ModifierCatalogueEmpty',
-            'No check modifiers yet. Add one to make it available to the checks in this system.'
-          )}
-        {:else}
-          {text(
-            'FABRICATE.Admin.Manager.Checks.Crafting.ModifierCatalogueEmptyLinked',
-            'This system has no check modifiers yet. They are defined once, on the Crafting check.'
-          )}
-        {/if}
+    {#if library.length === 0}
+      <!-- ONE sentence, on every activity. It branched on who owned the entries while
+           crafting authored them; now nothing on this screen adds one, so the instruction
+           is the same everywhere and it names the surface that does. -->
+      <p class="manager-muted" data-crafting-modifier-empty="linked">
+        {text(
+          'FABRICATE.Admin.Manager.Checks.Crafting.ModifierCatalogueEmptyLinked',
+          'This system has no modifiers yet. They are defined once, in System settings › Modifiers.'
+        )}
       </p>
     {/if}
-    {#each modifiers as modifier (modifier.id)}
+    {#each library as modifier (modifier.id)}
       <div class="manager-character-modifier-row" data-crafting-modifier-row={modifier.id}>
-        {#if entriesEditable}
-          <div class="manager-modifier-name-row">
-            <div
-              class="manager-field manager-modifier-icon-field"
-              data-crafting-modifier-field="icon"
+        <!-- READ-ONLY on EVERY activity (issue 1117). The library is authored once, in
+             System settings › Modifiers; a second editor for the same rows is how two
+             screens come to disagree about which one wrote last, and crafting having one
+             while salvage and gathering did not was that asymmetry made visible. The
+             eligibility control below is NOT part of this: which entries an activity
+             applies is exactly what this screen owns. -->
+        <div class="manager-modifier-readonly-row">
+          <i
+            class={modifier.icon || DEFAULT_MODIFIER_ICON}
+            aria-hidden="true"
+            data-crafting-modifier-readonly-icon
+          ></i>
+          <span class="manager-modifier-readonly-label" data-crafting-modifier-readonly="label"
+            >{modifier.label || modifier.id}</span
+          >
+          <code
+            class="manager-modifier-readonly-expression"
+            data-crafting-modifier-readonly="expression">{modifier.expression || '—'}</code
+          >
+          {#if boundsChipLabel(modifier)}
+            <Chip tone="neutral" mono class="manager-modifier-bounds-chip"
+              >{boundsChipLabel(modifier)}</Chip
             >
-              <span class="manager-recipe-micro-label"
-                >{text('FABRICATE.Admin.Manager.Checks.Crafting.ModifierIcon', 'Icon')}</span
-              >
-              <IconPicker
-                value={modifier.icon || DEFAULT_MODIFIER_ICON}
-                buttonTitle={text(
-                  'FABRICATE.Admin.Manager.Checks.Crafting.ModifierChangeIcon',
-                  'Change icon'
-                )}
-                onChange={(iconClass) => updateModifier(modifier.id, { icon: iconClass })}
-              />
-            </div>
-            <label class="manager-field manager-modifier-label-field">
-              <span class="manager-recipe-micro-label"
-                >{text('FABRICATE.Admin.Manager.Checks.Crafting.ModifierLabel', 'Label')}</span
-              >
-              <input
-                type="text"
-                data-crafting-modifier-field="label"
-                value={modifier.label || ''}
-                placeholder={text(
-                  'FABRICATE.Admin.Manager.Checks.Crafting.ModifierLabelPlaceholder',
-                  'Medicine'
-                )}
-                oninput={(event) =>
-                  updateModifier(modifier.id, { label: event.currentTarget.value })}
-              />
-            </label>
-          </div>
-          <div class="manager-modifier-expression-row">
-            <label class="manager-field manager-modifier-field-expression">
-              <span class="manager-recipe-micro-label"
-                >{text(
-                  'FABRICATE.Admin.Manager.Checks.Crafting.ModifierExpression',
-                  'Expression'
-                )}</span
-              >
-              <RollDataExpressionInput
-                dataField="crafting-modifier"
-                inputAttrs={{ 'data-crafting-modifier-field': 'expression' }}
-                value={modifier.expression}
-                placeholder="abilities.med.mod"
-                onChange={(expression) => updateModifier(modifier.id, { expression })}
-              />
-            </label>
-            <button
-              type="button"
-              class="manager-icon-button is-danger manager-modifier-remove"
-              data-crafting-modifier-remove={modifier.id}
-              title={text(
-                'FABRICATE.Admin.Manager.Checks.Crafting.ModifierRemove',
-                'Remove modifier'
-              )}
-              aria-label={text(
-                'FABRICATE.Admin.Manager.Checks.Crafting.ModifierRemove',
-                'Remove modifier'
-              )}
-              onclick={() => removeModifier(modifier.id)}
+          {/if}
+          {#if modifier.isRollExpression}
+            <!-- A roll-shaped expression cannot reach a check: `appendCheckModifierTerm`
+                 refuses a non-decimal-safe value and drops the WHOLE term, so one such entry
+                 would delete every other eligible modifier from the roll. The row says so,
+                 and readiness raises `modifierRollExpression` at `critical` when this
+                 activity actually selects it. -->
+            <Chip tone="warning" class="manager-modifier-roll-chip" data-crafting-modifier-roll
+              >{text('FABRICATE.Admin.Manager.Checks.Crafting.ModifierRollTag', 'Rolls dice')}</Chip
             >
-              <i class="fas fa-trash" aria-hidden="true"></i>
-            </button>
-          </div>
-          <!-- The bounds pair sits on its OWN row, after the expression, rather than
-               beside it. At a real ~700-760px pane a third field on the expression line
-               compresses the expression input — the one field whose content is long and
-               whose truncation is silent — so the row reflows to two lines instead. -->
-          <div class="manager-modifier-bounds-row" data-crafting-modifier-bounds={modifier.id}>
-            <div class="manager-field manager-modifier-bound-field">
-              <span class="manager-recipe-micro-label">{minLabel}</span>
-              <Stepper
-                value={resolveModifierBounds(modifier).min}
-                allowUnset
-                fill
-                placeholder={unboundedLabel}
-                {...stepperLabels(minLabel)}
-                inputProps={{ 'data-crafting-modifier-field': 'min' }}
-                onChange={(next) => updateBound(modifier.id, 'min', next)}
-              />
-            </div>
-            <div class="manager-field manager-modifier-bound-field">
-              <span class="manager-recipe-micro-label">{maxLabel}</span>
-              <Stepper
-                value={resolveModifierBounds(modifier).max}
-                allowUnset
-                fill
-                placeholder={unboundedLabel}
-                {...stepperLabels(maxLabel)}
-                inputProps={{ 'data-crafting-modifier-field': 'max' }}
-                onChange={(next) => updateBound(modifier.id, 'max', next)}
-              />
-            </div>
-          </div>
-        {:else}
-          <!-- READ-ONLY entry (salvage, gathering). The catalogue is authored once, on
-               crafting; showing a second editor for the same rows would let two screens
-               disagree about which one wrote last. The eligibility control below is NOT
-               part of this gate. -->
-          <div class="manager-modifier-readonly-row">
-            <i
-              class={modifier.icon || DEFAULT_MODIFIER_ICON}
-              aria-hidden="true"
-              data-crafting-modifier-readonly-icon
-            ></i>
-            <span class="manager-modifier-readonly-label" data-crafting-modifier-readonly="label"
-              >{modifier.label || modifier.id}</span
-            >
-            <code
-              class="manager-modifier-readonly-expression"
-              data-crafting-modifier-readonly="expression">{modifier.expression || '—'}</code
-            >
-            {#if boundsChipLabel(modifier)}
-              <Chip tone="neutral" mono class="manager-modifier-bounds-chip"
-                >{boundsChipLabel(modifier)}</Chip
-              >
-            {/if}
-          </div>
-        {/if}
+          {/if}
+        </div>
 
         {#if boundsFault(modifier)}
           <p
@@ -746,22 +588,17 @@
         </div>
       </div>
     {/each}
-    {#if entriesEditable}
-      <button type="button" class="manager-button" data-crafting-modifier-add onclick={addModifier}>
-        <i class="fas fa-plus" aria-hidden="true"></i>
-        {text('FABRICATE.Admin.Manager.Checks.Crafting.ModifierAdd', 'Add modifier')}
-      </button>
-    {:else if onEditCatalogue}
+    {#if onEditLibrary}
       <button
         type="button"
         class="manager-button"
         data-crafting-modifier-edit-link
-        onclick={() => onEditCatalogue()}
+        onclick={() => onEditLibrary()}
       >
         <i class="fas fa-pen-to-square" aria-hidden="true"></i>
         {text(
           'FABRICATE.Admin.Manager.Checks.Crafting.ModifierEditCatalogue',
-          'Edit these modifiers on the Crafting check'
+          'Edit these modifiers in System settings'
         )}
       </button>
     {/if}

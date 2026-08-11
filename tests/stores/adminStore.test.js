@@ -408,7 +408,7 @@ describe('createAdminStore', () => {
       // projection, so this reads the ACTUAL projection to catch a silently-dropped field.
       const services = createMockServices();
       const sys = services._getSystemsMutable().find((s) => s.id === 'sys1');
-      sys.checkModifiers = [
+      sys.modifiers = [
         { id: 'med', label: 'Medicine', expression: '@abilities.med.mod', min: -1, max: 5 },
         { id: 'alch', label: 'Alchemy', expression: '@abilities.alch.mod' },
       ];
@@ -432,23 +432,24 @@ describe('createAdminStore', () => {
       const selected = get(store.viewState).selectedSystem;
       const check = selected.craftingCheck;
 
-      // The catalogue is a SYSTEM-level key since issue 1095, and it is projected there.
+      // The library is a SYSTEM-level key since issue 1095 and is named `modifiers` since
+      // issue 1117; it is projected there and nowhere else.
       assert.deepEqual(
-        selected.checkModifiers.map((modifier) => modifier.id),
+        selected.modifiers.map((modifier) => modifier.id),
         ['med', 'alch'],
-        'the catalogue surfaces through the projection allowlist, at the system level'
+        'the library surfaces through the projection allowlist, at the system level'
       );
       assert.notEqual(
-        selected.checkModifiers[0],
-        sys.checkModifiers[0],
-        'catalogue entries are cloned, not shared with the live system'
+        selected.modifiers[0],
+        sys.modifiers[0],
+        'library entries are cloned, not shared with the live system'
       );
       // The BOUNDS survive the projection too. Without them the read-only chip on salvage
       // and gathering renders nothing and the crafting steppers read blank — an
       // absence-preserving field is exactly the kind an allowlist drops unnoticed.
-      assert.equal(selected.checkModifiers[0].min, -1);
-      assert.equal(selected.checkModifiers[0].max, 5);
-      assert.equal(Object.hasOwn(selected.checkModifiers[1], 'min'), false);
+      assert.equal(selected.modifiers[0].min, -1);
+      assert.equal(selected.modifiers[0].max, 5);
+      assert.equal(Object.hasOwn(selected.modifiers[1], 'min'), false);
 
       assert.equal(check.defaultModifierPolicy, 'highest');
       assert.deepEqual(check.defaultModifierIds, ['med']);
@@ -600,11 +601,12 @@ describe('createAdminStore', () => {
       );
     });
 
-    it('saveCraftingCheckModifiers preserves sibling check fields and replaces the catalogue array (issue 770 persistence trap)', async () => {
-      // updateSystem shallow-merges only the top level, so a checkModifiers-only patch
-      // that failed to spread `...existing` would drop every sibling check field. Capture
-      // the persisted payload and assert the siblings survive AND that a dropped catalogue
-      // entry does not resurrect (whole-array replace, not merge).
+    it('saveCraftingCheckModifiers preserves sibling check fields and never writes the library (issue 770 persistence trap)', async () => {
+      // updateSystem shallow-merges only the top level, so a selection patch that failed to
+      // spread `...existing` would drop every sibling check field. Capture the persisted
+      // payload and assert the siblings survive AND that the shared library is untouched:
+      // since issue 1117 this saver has no library half at all, and the ONE authoring
+      // surface writes it through `updateSystem({ modifiers })` instead.
       let updateArgs = null;
       const services = createMockServices();
       const sys = services._getSystemsMutable().find((s) => s.id === 'sys1');
@@ -617,7 +619,7 @@ describe('createAdminStore', () => {
         defaultModifierPolicy: 'addAll',
         defaultModifierIds: ['med', 'alch'],
       };
-      sys.checkModifiers = [
+      sys.modifiers = [
         { id: 'med', label: 'Medicine', expression: '@med' },
         { id: 'alch', label: 'Alchemy', expression: '@alch' },
       ];
@@ -632,17 +634,12 @@ describe('createAdminStore', () => {
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
 
-      // The patch the card actually emits when a GM deletes a catalogue row: the entry
-      // leaves the SYSTEM catalogue and its id leaves THIS activity's default set, in ONE
-      // patch. That is the shallow-spread footgun surface — the nested half must spread
-      // `existing` or every sibling check field vanishes and the normalizer re-defaults it.
-      await store.saveCraftingCheckModifiers({
-        checkModifiers: [{ id: 'med', label: 'Medicine', expression: '@med' }],
-        defaultModifierIds: ['med'],
-      });
+      // The patch the card actually emits when a GM unticks a row: the id leaves THIS
+      // activity's default set and nothing else changes. That is the shallow-spread footgun
+      // surface — the nested half must spread `existing` or every sibling check field
+      // vanishes and the normalizer re-defaults it.
+      await store.saveCraftingCheckModifiers({ defaultModifierIds: ['med'] });
 
-      // The catalogue is a TOP-LEVEL write since issue 1095 and the selection stays nested,
-      // so the ONE `updateSystem` call carries both halves.
       const persisted = updateArgs.updates.craftingCheck;
       // Every sibling check field survives the nested write (would vanish without ...existing).
       assert.equal(persisted.simple.rollFormula, '1d20 + 4');
@@ -653,25 +650,26 @@ describe('createAdminStore', () => {
         consumeIngredientsOnFail: false,
         breakToolsOnFail: true,
       });
-      // The catalogue array is REPLACED whole — 'alch' does not resurrect.
-      assert.deepEqual(
-        updateArgs.updates.checkModifiers.map((modifier) => modifier.id),
-        ['med'],
-        'the whole checkModifiers array is replaced, not merged'
-      );
-      assert.deepEqual(persisted.defaultModifierIds, ['med'], 'the dropped id leaves the set');
+      assert.deepEqual(persisted.defaultModifierIds, ['med'], 'the unticked id leaves the set');
       // A sibling modifier field NOT in the patch is preserved from existing.
       assert.equal(persisted.defaultModifierPolicy, 'addAll');
 
-      // …and a catalogue-ONLY patch touches no activity block at all, so it cannot
-      // re-default a selection it was never asked about.
+      // THE LIBRARY IS UNREACHABLE FROM HERE (issue 1117). A patch that names it is simply
+      // merged into the activity's check block as an unknown key the normalizer drops — it
+      // does NOT become a second write path to the shared array.
       await store.saveCraftingCheckModifiers({
-        checkModifiers: [{ id: 'med', label: 'Medicine', expression: '@med' }],
+        modifiers: [{ id: 'med', label: 'Medicine', expression: '@med' }],
       });
       assert.equal(
-        Object.hasOwn(updateArgs.updates, 'craftingCheck'),
+        Object.hasOwn(updateArgs.updates, 'modifiers'),
         false,
-        'a catalogue-only write is a catalogue-only write'
+        'the Checks saver has no library half; one authoring surface owns that array'
+      );
+      await store.refresh();
+      assert.deepEqual(
+        get(store.viewState).selectedSystem.modifiers.map((entry) => entry.id),
+        ['med', 'alch'],
+        'and the authored library is intact'
       );
     });
 
@@ -688,7 +686,7 @@ describe('createAdminStore', () => {
         let updates = null;
         const services = createMockServices();
         const sys = services._getSystemsMutable().find((s) => s.id === 'sys1');
-        sys.checkModifiers = [{ id: 'med', label: 'Medicine', expression: '@med' }];
+        sys.modifiers = [{ id: 'med', label: 'Medicine', expression: '@med' }];
         sys[key] = {
           enabled: true,
           routed: { type: 'relative', rollFormula: '1d20 + 3' },
@@ -716,43 +714,57 @@ describe('createAdminStore', () => {
         assert.equal(persisted.routed.rollFormula, '1d20 + 3', 'the routed slot survives');
         assert.equal(persisted.progressive.rollFormula, '2d6', 'the progressive slot survives');
         assert.equal(
-          Object.hasOwn(updates, 'checkModifiers'),
+          Object.hasOwn(updates, 'modifiers'),
           false,
-          'a selection-only patch does not rewrite the shared catalogue'
+          'a selection-only patch does not rewrite the shared library'
         );
       });
     }
 
-    it('saveSystemCheckModifiers writes the catalogue at the SYSTEM level, alone', async () => {
-      let updates = null;
+    // THE ONE AUTHORING SURFACE'S WRITE PATH (issue 1117). Every library op goes through
+    // `updateSystem({ modifiers })` — a TOP-LEVEL key, so the array is replaced wholesale and
+    // removing an entry persists with no `-=` deletion — and touches no activity selection,
+    // so it cannot re-default a rule it was never asked about.
+    it('addSystemModifier and deleteSystemModifier write the library at the SYSTEM level, alone', async () => {
+      const calls = [];
       const services = createMockServices();
       const sys = services._getSystemsMutable().find((s) => s.id === 'sys1');
       sys.craftingCheck = { mode: 'passFail', defaultModifierPolicy: 'highest' };
+      sys.modifiers = [{ id: 'med', label: 'Medicine', expression: '@med', min: -1, max: 5 }];
       const origManager = services.getCraftingSystemManager();
       services.getCraftingSystemManager = () => ({
         ...origManager,
         updateSystem: async (id, next) => {
-          updates = next;
+          calls.push(next);
           await origManager.updateSystem(id, next);
         },
       });
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
 
-      await store.saveSystemCheckModifiers([
-        { id: 'med', label: 'Medicine', expression: '@med', min: -1, max: 5 },
-      ]);
-
-      assert.deepEqual(updates.checkModifiers, [
-        { id: 'med', label: 'Medicine', expression: '@med', min: -1, max: 5 },
-      ]);
-      assert.equal(
-        Object.hasOwn(updates, 'craftingCheck'),
-        false,
-        'a catalogue-only write touches no activity selection'
+      const added = await store.addSystemModifier('sys1', { id: 'alch', label: 'Alchemy' });
+      assert.equal(added.id, 'alch');
+      assert.deepEqual(
+        calls.at(-1).modifiers.map((entry) => entry.id),
+        ['med', 'alch'],
+        'the whole array is written, appended in order'
       );
+      assert.equal(
+        Object.hasOwn(calls.at(-1), 'craftingCheck'),
+        false,
+        'a library write touches no activity selection'
+      );
+
+      assert.equal(await store.deleteSystemModifier('sys1', 'med'), true);
+      assert.deepEqual(
+        calls.at(-1).modifiers.map((entry) => entry.id),
+        ['alch'],
+        'the removal persists as a whole-array replace'
+      );
+
       await store.refresh();
       const selected = get(store.viewState).selectedSystem;
+      assert.deepEqual(selected.modifiers.map((entry) => entry.id), ['alch']);
       assert.equal(
         selected.craftingCheck.defaultModifierPolicy,
         'highest',
@@ -760,48 +772,33 @@ describe('createAdminStore', () => {
       );
     });
 
-    // THE CATALOGUE VALUE IS GUARDED, and this is the reachable wipe it guards. The presence
-    // test (`Object.hasOwn`) and a truthiness test are UNDISCRIMINATED over every patch the
-    // card emits — `[]` is truthy, so the delete-the-last-entry patch takes the same branch
-    // under either — but they differ on `undefined`, and `saveSystemCheckModifiers` is
-    // exported with no in-repo caller, so that shape is reachable from the public surface.
-    // Written through, it reaches `_normalizeCheckModifierCatalogue`, whose
-    // `Array.isArray(catalogue) ? … : []` returns an EMPTY catalogue: every entry gone, for
-    // all three activities at once, on a call that looks like a no-op.
-    it('refuses to write a NON-ARRAY catalogue rather than wiping the system’s entries', async () => {
-      for (const junk of [undefined, null, 'oops', 7]) {
-        const calls = [];
-        const services = createMockServices();
-        const sys = services._getSystemsMutable().find((s) => s.id === 'sys1');
-        sys.checkModifiers = [{ id: 'med', label: 'Medicine', expression: '@med' }];
-        const origManager = services.getCraftingSystemManager();
-        services.getCraftingSystemManager = () => ({
-          ...origManager,
-          updateSystem: async (id, next) => {
-            calls.push(next);
-            await origManager.updateSystem(id, next);
-          },
-        });
-        const store = createAdminStore(services);
-        await store.selectSystem('sys1');
+    // A no-op op writes NOTHING. `addSystemModifier` refuses a duplicate id and
+    // `deleteSystemModifier` refuses an id the library does not carry; without those
+    // guards each would re-persist and re-project the whole system for a request that
+    // changes nothing.
+    it('refuses a duplicate add and an unknown delete without writing', async () => {
+      const calls = [];
+      const services = createMockServices();
+      const sys = services._getSystemsMutable().find((s) => s.id === 'sys1');
+      sys.modifiers = [{ id: 'med', label: 'Medicine', expression: '@med' }];
+      const origManager = services.getCraftingSystemManager();
+      services.getCraftingSystemManager = () => ({
+        ...origManager,
+        updateSystem: async (id, next) => {
+          calls.push(next);
+          await origManager.updateSystem(id, next);
+        },
+      });
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
 
-        await store.saveSystemCheckModifiers(junk);
-
-        assert.deepEqual(
-          calls,
-          [],
-          `${JSON.stringify(junk)} is not a catalogue, so nothing is persisted at all`
-        );
-        await store.refresh();
-        assert.deepEqual(
-          get(store.viewState).selectedSystem.checkModifiers.map((entry) => entry.id),
-          ['med'],
-          'and the authored catalogue is still there'
-        );
-      }
+      assert.equal(await store.addSystemModifier('sys1', { id: 'med' }), null);
+      assert.equal(await store.deleteSystemModifier('sys1', 'ghost'), false);
+      assert.equal(await store.updateSystemModifier('sys1', 'ghost', { label: 'X' }), false);
+      assert.deepEqual(calls, [], 'no op that changes nothing reaches updateSystem');
     });
 
-    // The empty-`update` early return. Without it a patch asking for NEITHER half still calls
+    // The empty-`update` early return. Without it a patch naming nothing still calls
     // `updateSystem({})`, which re-normalizes and re-persists the whole system and then
     // re-projects it through `refresh()` — a write, a settings round trip and a store churn
     // for a request that named nothing. Deleting the guard was green.
@@ -6457,23 +6454,25 @@ describe('createAdminStore', () => {
       });
       const sys = services.getCraftingSystemManager().getSystem('sys1');
       sys.features = { gathering: true };
+      // The library a drop-row reference points INTO is SYSTEM-owned (issue 1117); the
+      // gathering config carries only the tasks and events that reference it.
+      sys.modifiers = [
+        {
+          id: 'strength',
+          label: 'Strength',
+          icon: 'fa-solid fa-dumbbell',
+          expression: '@abilities.str.mod',
+        },
+        {
+          id: 'dexterity',
+          label: 'Dexterity',
+          icon: 'fa-solid fa-running',
+          expression: '@abilities.dex.mod',
+        },
+      ];
       services._store.gatheringConfig = {
         systems: {
           sys1: {
-            characterModifiers: [
-              {
-                id: 'strength',
-                label: 'Strength',
-                icon: 'fa-solid fa-dumbbell',
-                expression: '@abilities.str.mod',
-              },
-              {
-                id: 'dexterity',
-                label: 'Dexterity',
-                icon: 'fa-solid fa-running',
-                expression: '@abilities.dex.mod',
-              },
-            ],
             tasks: [
               {
                 id: 'task-iron',

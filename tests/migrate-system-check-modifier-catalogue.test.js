@@ -190,10 +190,14 @@ test('1.22.0 is registered with a downgrade target that states the loss', () => 
     /LOAD-BEARING/,
     'the label names the runner-ordering precondition the move depends on'
   );
-  assert.equal(
-    registry.at(-1).version,
-    '1.22.0',
-    'and it is the HIGHEST version, so the runner advances the world to it'
+  // It is no longer the highest version — `1.23.0` (issue 1117) merges this relocated
+  // catalogue with the gathering character-modifier library — so what is asserted here is
+  // that this entry still SITS in the ladder before it, which is what makes the move a
+  // precondition of the merge rather than a competing transform.
+  assert.ok(
+    registry.findIndex((migration) => migration.version === '1.22.0') <
+      registry.findIndex((migration) => migration.version === '1.23.0'),
+    '1.22.0 must run before 1.23.0, which merges the catalogue it relocates'
   );
 });
 
@@ -206,13 +210,19 @@ test('the export upcast lifts an imported bundle’s catalogue and rewrites its 
     recipes: [],
   };
   const migrated = migrateExportPayload(bundle);
-  assert.deepEqual(migrated.system.checkModifiers, CATALOGUE);
+  // The upcast chain does not stop at `1.22.0`: `1.23.0`'s mirror runs immediately after it
+  // and merges the just-lifted catalogue into `system.modifiers`, so the ASSERTION IS ON THE
+  // END OF THE CHAIN. That composition is the point — a bundle and a world have to reach one
+  // state by one route — and asserting the intermediate key would pin a state no imported
+  // bundle is ever in.
+  assert.deepEqual(migrated.system.modifiers, CATALOGUE);
+  assert.equal(Object.hasOwn(migrated.system, 'checkModifiers'), false);
   assert.equal(Object.hasOwn(migrated.system.craftingCheck, 'checkModifiers'), false);
   assert.equal(migrated.system.craftingCheck.defaultModifierPolicy, 'bySubject');
   // Branch-independent: a LEGACY-schema bundle gets the same treatment, because the
   // catalogue's LOCATION is orthogonal to the envelope version.
   const legacyBundle = migrateExportPayload({ fabricateVersion: '1.0.0', system: legacySystem() });
-  assert.deepEqual(legacyBundle.system.checkModifiers, CATALOGUE);
+  assert.deepEqual(legacyBundle.system.modifiers, CATALOGUE);
   assert.equal(legacyBundle.system.craftingCheck.defaultModifierPolicy, 'bySubject');
   // …and the input is never aliased.
   assert.ok(Array.isArray(bundle.system.craftingCheck.checkModifiers), 'the input is untouched');

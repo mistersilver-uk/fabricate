@@ -98,10 +98,10 @@ CraftingSystem = {
       checkBreakage: CheckBreakage,    // unified per-check trigger list (force award-all/none and/or break tools)
     },
 
-    // The SELECTION TRIPLE over `CraftingSystem.checkModifiers` (issue 1095), the SAME
+    // The SELECTION TRIPLE over `CraftingSystem.modifiers` (issues 1095, 1117), the SAME
     // three keys `craftingCheck` carries below and emitted by the SAME shared derivation
     // (`CraftingSystemManager._normalizeCheckModifierSelection`). It is spelled out on
-    // every activity rather than left implicit: the catalogue is shared, the SELECTION is
+    // every activity rather than left implicit: the library is shared, the SELECTION is
     // not, and a reader who found it on one block and not on another would reasonably
     // conclude this activity inherits crafting's rule. See `craftingCheck` for the full
     // semantics of each key.
@@ -123,10 +123,10 @@ CraftingSystem = {
     },
     routed: RoutedCheck,
 
-    // The SELECTION TRIPLE over `CraftingSystem.checkModifiers` (issue 1095), the SAME
+    // The SELECTION TRIPLE over `CraftingSystem.modifiers` (issues 1095, 1117), the SAME
     // three keys `craftingCheck` carries below and emitted by the SAME shared derivation
     // (`CraftingSystemManager._normalizeCheckModifierSelection`). It is spelled out on
-    // every activity rather than left implicit: the catalogue is shared, the SELECTION is
+    // every activity rather than left implicit: the library is shared, the SELECTION is
     // not, and a reader who found it on one block and not on another would reasonably
     // conclude this activity inherits crafting's rule. See `craftingCheck` for the full
     // semantics of each key.
@@ -135,10 +135,20 @@ CraftingSystem = {
     maxModifierPicks?: number,      // positive integer; default: key absent = unlimited
   },
 
-  // THE ONE named check-modifier catalogue for the WHOLE system (issue 1095). It moved
-  // here from `craftingCheck.checkModifiers` because salvage and gathering now select
-  // over the same entries, so it can no longer belong to any one activity; the `1.22.0`
-  // migration relocates it and deletes the old key.
+  // THE ONE named modifier library for the WHOLE system (issue 1117). It has moved twice:
+  // out of `craftingCheck.checkModifiers` in `1.22.0`, because salvage and gathering select
+  // over the same entries so it can belong to no one activity; and then, in `1.23.0`, it
+  // ABSORBED the gathering character-modifier library
+  // (`gatheringConfig.systems[systemId].characterModifiers`), because a named actor-driven
+  // expression is ONE concept and authoring it twice let a GM define "Medicine" as two
+  // unrelated records that could disagree. Both migrations delete the old key.
+  //
+  // THE SHAPE IS A SUPERSET, and each field is honoured by whichever consumer needs it:
+  // `min`/`max` clamp the resolved value of a CHECK modifier, while a gathering drop-row
+  // reference carries its OWN `min`/`max` that clamp its contribution independently.
+  // `isRollExpression` is DERIVED from the expression on every normalize and never read
+  // from the input, so a persisted or imported flag cannot contradict the expression
+  // beside it.
   //
   // Each `expression` is a roll-data fragment evaluated against the acting character
   // (missing/failed → 0). `icon`, `min` and `max` are attached ONLY when authored, so
@@ -151,9 +161,24 @@ CraftingSystem = {
   // SECOND blocking bounds fault, `modifierBoundsUnsafe`, also `critical`, and likewise
   // contains the entry to 0. Two issue ids rather than one cause with two readings: the
   // repairs differ and `1e21` is not an inversion.
-  // Absent = empty catalogue, so every activity's scalar is 0 and no term is appended.
-  checkModifiers?: {
-    id: string, label: string, expression: string, icon?: string, min?: number, max?: number
+  // A ROLL-SHAPED expression is legal here and illegal in a CHECK. A gathering drop row
+  // evaluates the expression and applies the result as a percentage-point delta, where a
+  // roll is meaningful; a check appends ONE resolved scalar as a dice-grammar `Constant`,
+  // which a roll cannot be — and `appendCheckModifierTerm` refuses a value it cannot
+  // express by dropping the WHOLE term, so one such entry selected by a check would delete
+  // every other modifier from that roll. Readiness therefore raises the BLOCKING
+  // `modifierRollExpression` naming the offending entries, but only for the activities that
+  // actually select them.
+  //
+  // An entry with an EMPTY expression is KEPT rather than dropped: the library has an "Add
+  // modifier" button, and an entry that vanished on save the moment it was created would
+  // make that button appear broken. It is still a runtime misconfiguration wherever it is
+  // referenced.
+  //
+  // Absent = empty library, so every activity's scalar is 0 and no term is appended.
+  modifiers?: {
+    id: string, label: string, expression: string, isRollExpression: boolean,
+    icon?: string, min?: number, max?: number
   }[],  // default []
 
   craftingCheck: {
@@ -200,8 +225,8 @@ CraftingSystem = {
       checkBreakage: CheckBreakage,
     },
 
-    // THE SELECTION TRIPLE, and only it (issue 1095). The CATALOGUE moved UP to
-    // `CraftingSystem.checkModifiers` — see the system shape above — because salvage and
+    // THE SELECTION TRIPLE, and only it (issues 1095, 1117). The LIBRARY moved UP to
+    // `CraftingSystem.modifiers` — see the system shape above — because salvage and
     // gathering now select over the same entries; the `1.22.0` migration relocates it and
     // DELETES this level's `checkModifiers` key. The identical triple appears on
     // `salvageCraftingCheck` and `gatheringCraftingCheck`, emitted by ONE shared
@@ -527,7 +552,7 @@ CraftingSystem = {
     The former `tiered` / `namedOutcomes` branch — which defaulted `outcomes` to `["low", "high"]` — was dead code and has been removed.
     This is distinct from `CraftingSystem.alchemy.checkMode` (`none` | `simple` | `tiered`, requirement 8), whose `tiered` value IS a live check-slot selector and is unaffected.
     `craftingCheck.outcomes` is a legacy free-text outcome-name list normalized to trimmed, lowercased, unique strings and defaulting to `["fail", "pass"]` when absent; it too has no runtime consumer (routed outcome tiers live on `routed.relativeOutcomes` / `routed.fixedOutcomes`).
-    **`craftingCheck.checkModifiers` no longer exists at this level either** (issue 1095): the catalogue is `CraftingSystem.checkModifiers`, and `_normalizeCraftingCheck` — an allowlist rebuild — does not emit the old key at all, which is why the `1.22.0` migration's before-any-load ordering is load-bearing rather than incidental.
+    **`craftingCheck.checkModifiers` no longer exists at this level either** (issues 1095, 1117): the library is `CraftingSystem.modifiers`, and `_normalizeCraftingCheck` — an allowlist rebuild — does not emit the old key at all, which is why the `1.22.0` and `1.23.0` migrations' before-any-load ordering is load-bearing rather than incidental.
 
 30. **Built-in check contract — the authored roll formula IS the built-in check.** Fabricate's supported "built-in" check lets a GM author a plain dice expression (`craftingCheck.simple` / `routed` / `progressive.rollFormula`) that the engine rolls and evaluates natively, with no macro and no game-system adapter — the low-complexity path for GMs who do not need dnd5e/pf2e-specific stat integration (the "built-in check source" desired in the domain audit).
     A check is **usable** IFF its resolution mode carries an authored `rollFormula` that SURVIVES the retired-placeholder shim (see the _Crafting Check Macro Contract_ section); `enabled` is only the optional-check on/off toggle and is never a proxy for "the check works".
@@ -559,8 +584,10 @@ CraftingSystem = {
     Separately, `data.blockedOutcomeId` (additive alongside `data.minTierFailed`, on a minimum-success-tier failure only) is the tier the recipe minimum BLOCKED — post-step and pre-gate.
     It is named for what the gate did to it rather than "rolled", because issue 975 mints **rolled tier** as a term of art for the PRE-step tier; the former `data.rolledOutcomeId` name would overload that word in the same change that defines it.
 
-33. **System-level check-modifier catalogue.** `CraftingSystem.checkModifiers` is the one named catalogue of check modifiers for the whole system: an ordered array of `{ id, label, expression, icon?, min?, max? }`, ids unique and trimmed, malformed entries dropped, a bad expression coerced to `''`, and `icon` / `min` / `max` attached only when authored.
-    It replaces `craftingCheck.checkModifiers`, which the `1.22.0` migration moves up and deletes.
+33. **System-level modifier library.** `CraftingSystem.modifiers` is the ONE named modifier library for the whole system: an ordered array of `{ id, label, expression, isRollExpression, icon?, min?, max? }`, ids unique and trimmed, malformed entries dropped, a bad expression coerced to `''`, `icon` / `min` / `max` attached only when authored, and `isRollExpression` DERIVED from the expression on every normalize.
+    It is referenced by all three activity checks AND by every gathering drop row, event and stamina cost, and it is authored on exactly ONE surface (System settings › Modifiers).
+    It replaces `craftingCheck.checkModifiers` (moved up and deleted by `1.22.0`), `CraftingSystem.checkModifiers` and `gatheringConfig.systems[systemId].characterModifiers` (merged and deleted by `1.23.0`).
+    An entry with an empty expression is kept, not dropped, because the authoring surface can create one.
     Each of `craftingCheck`, `salvageCraftingCheck` and `gatheringCraftingCheck` carries its own `{ defaultModifierPolicy, defaultModifierIds, maxModifierPicks? }` selection over it, normalized by ONE shared derivation (`CraftingSystemManager._normalizeCheckModifierSelection`) so the three cannot drift; a default id naming nothing in the catalogue is dropped, preserving order and de-duplication.
     `min` / `max` clamp the RESOLVED value of that entry, after expression evaluation and before combination, so a bound means the same thing under every combination rule.
     Both are absence-preserving in the same way `maxModifierPicks` is: only a FINITE number is attached, and `null` / `''` / `[]` are guarded explicitly before coercion because `Number()` reads all three as `0` and `0` is a real bound.
@@ -1158,7 +1185,7 @@ Recipe = {
     See resolution-modes/spec.md §Check Source.
     An unrecognized `defaultModifierPolicy` falls back to `addAll` at the activity-check level (`CraftingSystemManager._normalizeCheckModifierSelection`), which is the only level a rule exists at.
     Neither selecting rule needs new per-recipe fields: `playerPicks` changes only when the eligible set is chosen, and `bySubject` reuses this same `modifierIds` list.
-    Catalogue membership of the ids is NOT enforced here — the resolver drops unknown ids against the live system-level `CraftingSystem.checkModifiers`.
+    Library membership of the ids is NOT enforced here — the resolver drops unknown ids against the live system-level `CraftingSystem.modifiers`.
 14. `importSource` is durable settings-payload provenance stamped by the compendium importer (NOT a Foundry flag): `{ systemId, importedAt } | null`, identifying the source pack.
     The `Recipe` constructor normalizes it to object-or-`null` — a non-object, or an object missing a non-empty string `systemId`, normalizes to `null` — and `toJSON()` emits it.
     A recipe created through the GM authoring path is never stamped, so it round-trips as `null`; this structural absence is the never-prune guard (import never auto-removes an unprovenanced recipe).

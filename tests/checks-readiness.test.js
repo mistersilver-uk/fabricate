@@ -523,6 +523,9 @@ describe('CHECK_READINESS_ISSUE_IDS is the source of truth for every issue id', 
       { id: 'ok', label: 'Ok', expression: '@a' },
       { id: 'bad', label: 'Bad', expression: '@b', min: 5, max: -1 },
       { id: 'huge', label: 'Huge', expression: '@c', min: 1e21 },
+      // A ROLL-shaped expression (issue 1117). It is legal on a gathering drop row and not
+      // in a check, so a check that selects it raises `modifierRollExpression`.
+      { id: 'rolls', label: 'Rolls', expression: '1d4' },
     ];
     const context = (ids) => ({ catalogue, systemPolicy: 'addAll', defaultModifierIds: ids });
     collect({ rollFormula: '' }, { mode: 'simple' });
@@ -574,6 +577,7 @@ describe('CHECK_READINESS_ISSUE_IDS is the source of truth for every issue id', 
     collect({ rollFormula: '' }, { mode: 'simple', modifierContext: context(['ok', 'bad']) });
     collect({ rollFormula: '1d20' }, { mode: 'simple', modifierContext: context(['huge']) });
     collect({}, { mode: 'none', modifierContext: context(['ok']) });
+    collect({ rollFormula: '1d20' }, { mode: 'simple', modifierContext: context(['rolls']) });
     for (const id of emitted) {
       assert.ok(
         CHECK_READINESS_ISSUE_IDS.includes(id),
@@ -954,7 +958,7 @@ describe('readinessModeForSlot', () => {
         mode: readinessModeForSlot(null),
         modifierContext: buildCheckModifierContext(
           {
-            checkModifiers: [{ id: 'm1', name: 'Focus', min: 0, max: 2 }],
+            modifiers: [{ id: 'm1', name: 'Focus', min: 0, max: 2 }],
             craftingCheck: { defaultModifierPolicy: 'addAll', defaultModifierIds: ['m1'] },
           },
           'crafting',
