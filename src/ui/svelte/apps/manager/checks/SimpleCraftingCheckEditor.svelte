@@ -49,6 +49,12 @@
     foundrySystemId = '',
     // The activity's own word for the thing a check is rolled for; see CheckDifficultyCard.
     recordNoun = 'recipe',
+    // The check modifiers this check APPLIES and the rule that combines them, for the
+    // formula card's `WHAT ACTUALLY GETS ROLLED` inset. Resolved by the caller from the
+    // activity's whole modifier context, which is the same derivation the Modifiers
+    // section counts from — an editor re-deriving it would be a second opinion.
+    appliedModifiers = [],
+    modifierPolicy = 'addAll',
     onChange = () => {},
   } = $props();
 
@@ -106,13 +112,24 @@
   {#if shows('roll')}
     <section class="manager-inspector-card manager-checks-card" data-roll-formula-card>
       <div class="manager-checks-card-head">
-        <h3 class="manager-checks-card-title">
-          {text('FABRICATE.Admin.Manager.Checks.Crafting.FormulaTitle', 'Roll formula')}
-        </h3>
+        <div>
+          <h3 class="manager-checks-card-title">
+            {text('FABRICATE.Admin.Manager.Checks.Crafting.FormulaTitle', 'Formula')}
+          </h3>
+          <p class="manager-checks-card-description">
+            {text(
+              'FABRICATE.Admin.Manager.Checks.Crafting.FormulaLead',
+              'Rolled once per attempt.'
+            )}
+          </p>
+        </div>
       </div>
       <div class="manager-checks-card-body">
         <CheckFormulaFields
           rollFormula={value?.rollFormula || ''}
+          {appliedModifiers}
+          {modifierPolicy}
+          {recordNoun}
           {foundrySystemId}
           onChange={emit}
         />

@@ -4690,7 +4690,7 @@
             "RangeOverlap": "Some tier ranges overlap. Each value range must be unique.",
             "OutcomeUnnamed": "Name every outcome tier — an unnamed tier cannot be routed to a result group.",
             "OutcomeNoSuccess": "No outcome tier is marked as a Success — successful crafts can't route to a result set. Mark at least one tier as Success.",
-            "FormulaTitle": "Roll formula",
+            "FormulaTitle": "Formula",
             "FormulaLabel": "Formula",
             "ProgressiveLead": "Roll a formula for a numeric value. Results are awarded in order, each spending its difficulty from the value, until the value can no longer cover the next. Per-die crits force award-all or award-none.",
             "AwardModeTitle": "Award mode",
@@ -4744,7 +4744,16 @@
             "OutcomeFailure": "Failure",
             "DifficultyTitle": "Difficulty",
             "DifficultyLead": "The number the roll is measured against, and where that number comes from.",
-            "BaseDc": "Base DC"
+            "BaseDc": "Base DC",
+            "FormulaLead": "Rolled once per attempt.",
+            "Average": "avg",
+            "AverageHint": "The average of the dice, with every character value taken as zero — no actor is chosen on this screen.",
+            "ResolvedTitle": "What actually gets rolled",
+            "ResolvedNoModifiers": "No check modifiers apply, so the roll is exactly the formula above.",
+            "ResolvedAddAll": "Add all — every applied modifier is summed into the roll.",
+            "ResolvedHighest": "Highest — only the best applied modifier reaches the roll, ranked by its average.",
+            "ResolvedBySubject": "Chosen per {record} — each {record} picks which of these apply, and the picks are summed.",
+            "ResolvedPlayerPicks": "Player picks — the crafter chooses from these at roll time, and the picks are summed."
           },
           "Salvage": {
             "PageTitle": "Salvage check",

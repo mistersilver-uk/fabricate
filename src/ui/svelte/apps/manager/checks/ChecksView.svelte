@@ -65,6 +65,7 @@
     resolveActiveGatheringCheckFormula,
     resolveActiveSalvageCheckFormula,
     resolveEligibleModifierIds,
+    resolveModifierPolicy,
   } from '../../../../../systems/checkModifierResolver.js';
 
   // `resolutionMode` is the selected system's recipe resolution mode and selects
@@ -775,6 +776,25 @@
     return entry ? { title: entry[0], lead: entry[1] } : null;
   });
 
+  // ── What the formula card's `WHAT ACTUALLY GETS ROLLED` inset restates ──────────────
+  //
+  // Check modifiers are added to the roll AUTOMATICALLY and never appear in the formula
+  // text, so the field a GM types into is not the expression the engine rolls. The inset
+  // shows the difference, and it is fed from the SAME `resolveEligibleModifierIds` pass the
+  // section strip counts `Modifiers` from — a second derivation here would let one screen
+  // say three modifiers apply while the other drew two chips.
+  const appliedModifiers = $derived.by(() => {
+    const context = activeActivity?.modifierContext;
+    if (!context) return [];
+    const eligible = new Set(resolveEligibleModifierIds(context));
+    return (Array.isArray(context.catalogue) ? context.catalogue : []).filter((entry) =>
+      eligible.has(entry?.id)
+    );
+  });
+  const appliedModifierPolicy = $derived(
+    activeActivity ? resolveModifierPolicy(activeActivity.modifierContext) : 'addAll'
+  );
+
   // ── The RECORD NOUN (issue 1096) ────────────────────────────────────────────────────
   //
   // What this activity rolls a check FOR, in the activity's own word. The Difficulty card
@@ -1096,6 +1116,8 @@
             </section>
           {:else if craftingRouted}
             <CraftingCheckEditor
+              {appliedModifiers}
+              modifierPolicy={appliedModifierPolicy}
               {recordNoun}
               value={craftingCheck}
               {resolutionMode}
@@ -1106,6 +1128,8 @@
             />
           {:else if craftingSimple}
             <SimpleCraftingCheckEditor
+              {appliedModifiers}
+              modifierPolicy={appliedModifierPolicy}
               {recordNoun}
               value={craftingCheckSimple}
               section={activeSection}
@@ -1127,6 +1151,8 @@
         <div class="manager-checks-editor-stack" data-checks-panel="crafting">
           {#if craftingRouted}
             <CraftingCheckEditor
+              {appliedModifiers}
+              modifierPolicy={appliedModifierPolicy}
               {recordNoun}
               value={craftingCheck}
               {resolutionMode}
@@ -1137,6 +1163,8 @@
             />
           {:else if craftingSimple}
             <SimpleCraftingCheckEditor
+              {appliedModifiers}
+              modifierPolicy={appliedModifierPolicy}
               {recordNoun}
               value={craftingCheckSimple}
               section={activeSection}
@@ -1146,6 +1174,9 @@
             />
           {:else}
             <ProgressiveCraftingCheckEditor
+              {recordNoun}
+              {appliedModifiers}
+              modifierPolicy={appliedModifierPolicy}
               value={craftingCheckProgressive}
               section={activeSection}
               {foundrySystemId}
@@ -1222,6 +1253,8 @@
         <div class="manager-checks-editor-stack" data-checks-panel="salvage">
           {#if salvageRouted}
             <CraftingCheckEditor
+              {appliedModifiers}
+              modifierPolicy={appliedModifierPolicy}
               {recordNoun}
               value={salvageCheckRouted}
               showTiers={false}
@@ -1232,6 +1265,9 @@
             />
           {:else if salvageProgressive}
             <ProgressiveCraftingCheckEditor
+              {recordNoun}
+              {appliedModifiers}
+              modifierPolicy={appliedModifierPolicy}
               value={salvageCheckProgressive}
               section={activeSection}
               {foundrySystemId}
@@ -1240,6 +1276,8 @@
             />
           {:else if salvageSimple}
             <SimpleCraftingCheckEditor
+              {appliedModifiers}
+              modifierPolicy={appliedModifierPolicy}
               {recordNoun}
               value={salvageCheckSimple}
               showDcSource={false}
@@ -1301,6 +1339,9 @@
         <div class="manager-checks-editor-stack" data-checks-panel="gathering">
           {#if gatheringProgressive}
             <ProgressiveCraftingCheckEditor
+              {recordNoun}
+              {appliedModifiers}
+              modifierPolicy={appliedModifierPolicy}
               value={gatheringCheckProgressive}
               section={activeSection}
               {foundrySystemId}
@@ -1309,6 +1350,8 @@
             />
           {:else if gatheringRouted}
             <CraftingCheckEditor
+              {appliedModifiers}
+              modifierPolicy={appliedModifierPolicy}
               {recordNoun}
               value={gatheringCheckRouted}
               showTiers={false}

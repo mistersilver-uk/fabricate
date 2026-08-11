@@ -52,6 +52,9 @@ const harness = createMountedComponentHarness({
     // noun into its two DC-source sentences through `interpolate` (issue 1096). Manifest
     // only: no assertion below moved.
     'src/ui/svelte/apps/manager/checks/checksCopy.js',
+    // The deterministic roll-expression reducer. The formula card reads the `avg` of the
+    // authored formula from it (issue 1096). Manifest only.
+    'src/utils/rollExpressionAverage.js',
   ],
   compiledModules: [
     'src/ui/svelte/apps/manager/ItemDropZone.svelte',

@@ -28,6 +28,11 @@
     breakageAuthority = 'toolSpecific',
     section = '',
     foundrySystemId = '',
+    // See the note on the other two editors: the resolved applied-modifier set and its
+    // rule, for the formula card's `WHAT ACTUALLY GETS ROLLED` inset.
+    appliedModifiers = [],
+    modifierPolicy = 'addAll',
+    recordNoun = 'recipe',
     onChange = () => {},
   } = $props();
 
@@ -50,7 +55,7 @@
       <div class="manager-checks-card-head">
         <div>
           <h3 class="manager-checks-card-title">
-            {text('FABRICATE.Admin.Manager.Checks.Crafting.FormulaTitle', 'Roll formula')}
+            {text('FABRICATE.Admin.Manager.Checks.Crafting.FormulaTitle', 'Formula')}
           </h3>
           <p class="manager-checks-card-description">
             {text(
@@ -63,6 +68,9 @@
       <div class="manager-checks-card-body">
         <CheckFormulaFields
           rollFormula={value?.rollFormula || ''}
+          {appliedModifiers}
+          {modifierPolicy}
+          {recordNoun}
           {foundrySystemId}
           onChange={emit}
         />

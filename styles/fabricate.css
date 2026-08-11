@@ -3329,24 +3329,148 @@
   color: var(--fab-mv2-text-muted);
 }
 
-/* Formula + success threshold + comparison on one line. */
-.fabricate-manager .manager-checks-formula-row {
+/* ── The FORMULA card (issue 1096) ───────────────────────────────────────────────────
+   Three stacked parts: the input, the `WHAT ACTUALLY GETS ROLLED` inset, and the
+   suggestion chips. Every value is the prototype's, authored in px for the reason the
+   Checks parity block above states — several of them are half-pixels. */
+.fabricate-manager .manager-checks-formula {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+/* The input WELL, not the input: the field is borderless inside a bordered row that also
+   carries the leading dice glyph and the trailing average, so the three read as one
+   control rather than as a control with two decorations beside it. */
+.fabricate-manager .manager-checks-formula-input {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+  height: 40px;
+  padding: 0 12px;
+  border: 1px solid var(--fab-border);
+  border-radius: 9px;
+  background: var(--fab-surface-soft);
+}
+
+.fabricate-manager .manager-checks-formula-input > i {
+  flex: 0 0 auto;
+  color: var(--fab-accent);
+  font-size: 12px;
+}
+
+.fabricate-manager .manager-checks-formula-input input {
+  flex: 1 1 auto;
+  width: auto;
+  min-width: 0;
+  height: auto;
+  padding: 1px 2px;
+  border: 0;
+  color: var(--fab-text);
+  background: transparent;
+  font-family: var(--fab-font-mono);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+/* The reading, not a control: no border, no fill, and quiet enough that it never competes
+   with the expression it qualifies. */
+.fabricate-manager .manager-checks-formula-average {
+  flex: 0 0 auto;
+  color: var(--fab-text-subtle);
+  font-size: 10px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+/* WHAT ACTUALLY GETS ROLLED. The INFO family, because it is a standing explanation of how
+   the surface behaves rather than a hazard — the same reason the mode callout above the
+   cards is info. */
+.fabricate-manager .manager-checks-formula-resolved {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-width: 0;
+  margin-top: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--fab-info-border);
+  border-radius: 9px;
+  background: var(--fab-info-soft);
+}
+
+.fabricate-manager .manager-checks-formula-resolved > i {
+  flex: 0 0 auto;
+  margin-top: 2px;
+  color: var(--fab-info);
+  font-size: 11px;
+}
+
+.fabricate-manager .manager-checks-formula-resolved-body {
+  min-width: 0;
+}
+
+.fabricate-manager .manager-checks-formula-kicker {
+  margin: 0;
+  color: var(--fab-text-subtle);
+  font-size: 8.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.fabricate-manager .manager-checks-formula-expression {
   display: flex;
   flex-wrap: wrap;
-  align-items: flex-end;
-  gap: var(--fab-space-2);
+  align-items: center;
+  gap: 8px;
+  margin: 6px 0 0;
+  min-width: 0;
 }
 
-.fabricate-manager .manager-checks-formula-field {
-  flex: 1 1 220px;
+.fabricate-manager .manager-checks-formula-base {
+  color: var(--fab-text);
+  font-family: var(--fab-font-mono);
+  font-size: 13px;
+  font-weight: 500;
 }
 
-.fabricate-manager .manager-checks-threshold-field {
-  flex: 0 0 120px;
+.fabricate-manager .manager-checks-formula-join,
+.fabricate-manager .manager-checks-formula-sep {
+  font-size: 11.5px;
+  font-weight: 600;
 }
 
-.fabricate-manager .manager-checks-threshold-mode {
-  flex: 0 0 150px;
+.fabricate-manager .manager-checks-formula-join {
+  color: var(--fab-accent);
+}
+
+.fabricate-manager .manager-checks-formula-sep {
+  color: var(--fab-text-subtle);
+}
+
+/* An applied modifier, as a chip. The ACCENT family: these are the terms the engine adds
+   that the GM did not write, so they are the one thing in the expression that is not the
+   text above it. */
+.fabricate-manager .manager-checks-formula-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border: 1px solid var(--fab-accent-border);
+  border-radius: 7px;
+  color: var(--fab-accent);
+  background: var(--fab-accent-soft);
+  font-size: 11.5px;
+  font-weight: 600;
+}
+
+.fabricate-manager .manager-checks-formula-rule {
+  margin: 6px 0 0;
+  color: var(--fab-text-muted);
+  font-size: 10.5px;
+  font-weight: 400;
+  line-height: 1.5;
 }
 
 /* Dynamic-DC macro drop zone: reuse the dashed component-source drop look with a
