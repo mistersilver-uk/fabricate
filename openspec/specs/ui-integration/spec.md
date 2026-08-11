@@ -2341,6 +2341,7 @@ It shares the selected character and the component-source actors with the Crafti
 - **Filter chips.**
   A chip row in this fixed order: **All · Components · Essences · Tools · Books & Scrolls**.
   Each chip carries an icon and a live count computed over the search-filtered set, so a chip's badge reflects what selecting it would show.
+  **Components** lists component cards only: a card present **solely** because it is a registered Tool appears under **Tools** and NOT under **Components**, while a component that is also a tool appears under **both**.
 - **Sort.**
   Name / Quantity / **Type**.
 - **Card contract.**
@@ -2352,6 +2353,15 @@ It shares the selected character and the component-source actors with the Crafti
   - **essence pips**: one chip per essence the component carries, rendering the essence's **own authored icon**.
     Essences are GM-authored per system with their own icon; a fixed icon set, or a hue keyed on an essence's name, silently mis-renders any essence the GM named differently.
     The chip exists so the glyph reads against arbitrary artwork.
+- **Row kinds, and what "owned" means.**
+  The listing projects component rows, essence rows, Books & Scrolls rows, **and tool rows**.
+  A **tool row** is emitted for an owned document that resolves to a first-class library Tool of a system and to **no component of that same system**.
+  Tool identity resolves through the shared WIDE tool presence matcher defined in `data-models/spec.md` `## Tool` requirement 12 — durable `roles[systemId].toolId`, then the Tool's own source references, then its snapshot-name fallback — and **never** through `tool.componentId`.
+  It MUST be the wide presence matcher rather than the narrow durable-identity gate, so the inventory and the crafting tool gate can never disagree about what the player is carrying.
+  A component-only projection lists nothing at all for an owned item-sourced Tool, which carries `componentId: null` by construction; that was the shipped 1.8.0 behaviour, and it made every Tool authored in the Tool Studio invisible to its owner (issue 1119).
+  A system with Tools and **zero** Components still lists its owned tools.
+  A tool row's name, image and description resolve by the single precedence in `data-models/spec.md` `## Tool` requirement 13, with the generic `icons/svg/item-bag.svg` sentinel projected as **no image** so an unarted tool inherits the same default artwork an unarted component shows.
+  A tool is never consumed, produced, salvaged or essence-bearing **in its tool role**, so a tool-only row carries no salvage surface, no essences, no used-by and no produced-by.
 - **One card per unified physical stack.**
   The listing renders **one card per unified physical stack**, not one per crafting system.
   A physical document that backs a component in **N crafting systems** appears **once**, with its quantity counted **once** — a per-system card duplicated the same stack and let the player read N× the true count, and salvaging one card silently consumed the sibling's documents.
@@ -2361,6 +2371,11 @@ It shares the selected character and the component-source actors with the Crafti
   The card's at-a-glance signals (salvageable, tool, essence pips) are the **union** across participations, essence pips **deduped by essence id**.
   `broken` is a **singular** physical property of the document(s), never per system.
   Essence rows (synthetic per-system aggregates keyed `essence:<systemId>:<essenceId>`) and Books & Scrolls rows are legitimately distinct per system and are **NOT** collapsed by this behaviour.
+  A Tool contributes a **participation** on the same terms as a component, so a document that is **both** a managed component and a registered Tool (a whetstone) yields exactly **one** card — its component card, badged as a tool — and exactly **one** `systems[]` entry for that system, never two.
+  Within one system a tool match on a document already backed by a component participation **folds into** that participation rather than emitting its own; across systems the ordinary contributing-document intersection applies.
+  This is the common case rather than an edge one, because `_normalizeSystem` derives source references onto component-linked tools on every load, so both kinds resolve here.
+  The primary participation is biased **component before tool**, so a mixed card keeps its component identity, key, salvage surface, essences and produced-by.
+  A tool-only card is keyed `tool:<systemId>:<toolId>`; keying it by `componentId` would collide across every item-sourced tool in one system at `null`.
 - **Broken treatment.**
   `broken` is a **read-only** verdict, and no engine path un-breaks a tool.
   It has **two** sources, and reading only the second reports almost every broken tool a player can actually see as intact:
@@ -2368,6 +2383,7 @@ It shares the selected character and the component-source actors with the Crafti
   - the persisted **`flags.fabricate.toolBroken`** past fact — the authoritative presence-gate disqualifier, written by the `flagBroken` on-break action for **every** breakage mode and requiring no roll to know.
     This is the source that matters most: `flagBroken` is the only on-break mode that leaves a broken item in the player's inventory at all (`destroy` and `replaceWith` remove it), and a chance- or formula-broken tool carries this flag with **no usage counter** whatsoever.
   - a **projection** of usage exhaustion, which only `limitedUses` supports (the other modes decide at attempt time by a roll).
+    Exhaustion is evaluated against **the Tool the owned document resolves to**, never a Tool found by `componentId`, which is unreachable for an item-sourced Tool and merely lucky for a component-linked one (two Tools may name one component).
     It MUST NOT be applied under the `checkDriven` tool-breakage authority: usage still accrues there, but the active check decides breakage and per-tool modes are ignored, so projecting exhaustion would report a perfectly usable tool broken permanently.
 
 A broken item dims its artwork, takes a danger wash and a danger card border, and its **"Broken" pip REPLACES the quantity pip** — they are one slot, not two.
@@ -2384,6 +2400,8 @@ Brokenness is about **usability, not salvageability**, and MUST NOT gate the sal
 - **Inspector Info order.**
   Broken banner → description → essences → **Sources** (hidden for books) → **Contributing** (essence rows only, gated `isEssence`) → Used by → **Required for** (tool rows only, gated `isTool`, spanning recipe / salvage / gathering kinds) → Produced by (gated `!isEssence`).
   Sources and Contributing are physical facts of the stack and stay card-scoped; every other Info leaf scopes to the selected participation.
+  For a **tool-only** card the type chip reads **Tool**, and **Used by** and **Produced by** are OMITTED rather than rendered empty: a tool is neither consumed nor produced in that role, and "Not used by any known recipe" beneath a hammer several recipes require reads as a defect rather than as an empty state.
+  A **Required for** entry is indexed against BOTH the Tool's own id and, when present, its linked component id, so the disclosure survives `componentId: null` on an item-sourced Tool (issue 1119).
 - **Used-by reverse index composition.**
   The inspector's **Used by** list MUST include every component reachable through an ingredient's matcher, not only components a recipe names directly.
   Each ingredient option's `match` is expanded through the match-handler registry (`getMatchHandler(match).expandToComponentIds` against that option's own system components), so a direct component reference expands to its own id and a tag matcher expands to every component carrying the tags.
