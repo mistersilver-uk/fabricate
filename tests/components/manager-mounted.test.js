@@ -130,6 +130,7 @@ function compileManagerRoot() {
   writeCompiledSvelte('src/ui/svelte/apps/manager/checks/CheckModeCallout.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/checks/ChecksEditorTabs.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/checks/ChecksRightMenu.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/checks/CheckDifficultyCard.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/checks/CheckFormulaFields.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/checks/CheckTriggers.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/checks/CheckRecipeTiers.svelte');
@@ -3822,7 +3823,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     // unified trigger editor (replacing the old per-die crit table).
     assert.equal(target.querySelector('[data-check-roll-formula]').value, '2d6+1d4');
     assert.equal(target.querySelector('[data-check-dc]').value, '14');
-    assert.ok(target.querySelector('[data-threshold-mode]'), 'comparison select renders');
+    assert.ok(target.querySelector('[data-threshold-mode]'), 'the comparison control renders');
     assert.ok(target.querySelector('[data-check-triggers]'), 'the unified trigger editor renders');
     assert.equal(target.querySelector('[data-crit-group]'), null, 'the old crit table is gone');
     // Relative checks expose recipe tiers (DC overrides); fixed checks do not.
@@ -4030,7 +4031,14 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(target.querySelector('[data-simple-check-editor]'));
     // DC + comparison sit on the formula line.
     assert.equal(target.querySelector('[data-check-dc]').value, '12');
-    assert.equal(target.querySelector('[data-threshold-mode]').value, 'meet');
+    // The comparison is a SEGMENTED CONTROL now (issue 1096), not a <select>: two options is
+    // not a list to open, and both readings are on screen with the one in force lit.
+    assert.ok(
+      target
+        .querySelector('[data-threshold-mode-option="meet"]')
+        .classList.contains('is-active'),
+      'the meet-or-exceed segment is the lit one'
+    );
 
     // The old crit table is replaced by the always-rendered unified trigger editor.
     assert.equal(target.querySelector('[data-crit-group]'), null, 'the old crit table is gone');
@@ -4151,7 +4159,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     // Formula field is shared, but the DC + comparison are hidden (no threshold).
     assert.ok(target.querySelector('[data-check-roll-formula]'), 'the formula field renders');
     assert.equal(target.querySelector('[data-check-dc]'), null, 'no DC field');
-    assert.equal(target.querySelector('[data-threshold-mode]'), null, 'no comparison select');
+    assert.equal(target.querySelector('[data-threshold-mode]'), null, 'no comparison control');
     // No DC-source radios, recipe tiers, or macro drop zone.
     assert.equal(target.querySelector('[data-dc-mode-option]'), null);
     assert.equal(target.querySelector('[data-tier-name]'), null);

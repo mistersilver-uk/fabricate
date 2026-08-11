@@ -29,6 +29,7 @@
   import Stepper from '../../../components/Stepper.svelte';
   import ThresholdBandStrip from '../../../components/ThresholdBandStrip.svelte';
   import { stepperLabels } from '../../../components/stepperLabels.js';
+  import CheckDifficultyCard from './CheckDifficultyCard.svelte';
   import CheckFormulaFields from './CheckFormulaFields.svelte';
   import CheckRecipeTiers from './CheckRecipeTiers.svelte';
   import CheckTriggers from './CheckTriggers.svelte';
@@ -62,14 +63,18 @@
     resolutionMode = null,
     section = '',
     foundrySystemId = '',
+    // The activity's own word for the thing a check is rolled for, for the Difficulty
+    // card's `{record}` copy. A default keeps the editor mountable in isolation; hard-coding
+    // one activity's noun is how a gathering screen comes to talk about recipes.
+    recordNoun = 'recipe',
     onChange = () => {},
   } = $props();
 
   const checkDriven = $derived(breakageAuthority === 'checkDriven');
   const shows = (id) => !section || section === id;
-  // Fixed-type routed-by-check checks match by value range, so DC + the meet/exceed
-  // comparison are meaningless there; hide both (CheckFormulaFields' showDc gate wraps
-  // both). Any other case (relative type, salvage/gathering) keeps the DC.
+  // Fixed-type routed-by-check checks match by value range, so the DC and the meet/exceed
+  // comparison are meaningless there; the whole Difficulty card is withheld. Any other case
+  // (relative type, salvage/gathering) keeps it.
   const hideDc = $derived(resolutionMode === 'routedByCheck' && type === 'fixed');
   // Outcome options for the CheckTriggers outcomeTier condition — both tier lists
   // carry an id + name; the active list is the one the editor is showing.
@@ -406,15 +411,25 @@
       <div class="manager-checks-card-body">
         <CheckFormulaFields
           rollFormula={value?.rollFormula || ''}
-          dc={value?.dc ?? 15}
-          thresholdMode={value?.thresholdMode || 'meet'}
-          showDc={!hideDc}
           placeholder="1d20"
           {foundrySystemId}
           onChange={emit}
         />
       </div>
     </section>
+
+    <!-- DIFFICULTY, in its own card (issue 1096). No DC-source chooser: `dcMode` and
+         `macroUuid` live on the SIMPLE check slot only — the routed slot carries neither,
+         and the engine runs a DC macro for `simple.dcMode === 'dynamic'` alone — so a
+         static/dynamic pair here would write a field nothing reads. -->
+    {#if !hideDc}
+      <CheckDifficultyCard
+        dc={value?.dc ?? 15}
+        thresholdMode={value?.thresholdMode || 'meet'}
+        {recordNoun}
+        onChange={emit}
+      />
+    {/if}
   {/if}
 
   {#if shows('triggers')}

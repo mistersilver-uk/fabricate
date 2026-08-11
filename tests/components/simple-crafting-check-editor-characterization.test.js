@@ -48,6 +48,10 @@ const harness = createMountedComponentHarness({
     // bundles. Manifest only: no assertion below moved.
     'src/config/modifierExpressionSuggestions.js',
     'src/config/gatheringCharacterModifierPresets.js',
+    // The shared copy helpers. `CheckDifficultyCard` interpolates the activity's record
+    // noun into its two DC-source sentences through `interpolate` (issue 1096). Manifest
+    // only: no assertion below moved.
+    'src/ui/svelte/apps/manager/checks/checksCopy.js',
   ],
   compiledModules: [
     'src/ui/svelte/apps/manager/ItemDropZone.svelte',
@@ -66,6 +70,7 @@ const harness = createMountedComponentHarness({
     // The shared button primitive: the recipe-tier list and the trigger list are both
     // extended by its `dashed` role now (issue 1096). Manifest only.
     'src/ui/svelte/components/ManagerButton.svelte',
+    'src/ui/svelte/apps/manager/checks/CheckDifficultyCard.svelte',
     'src/ui/svelte/apps/manager/checks/CheckFormulaFields.svelte',
     'src/ui/svelte/apps/manager/checks/CheckRecipeTiers.svelte',
     'src/ui/svelte/apps/manager/checks/CheckTriggers.svelte',

@@ -775,6 +775,22 @@
     return entry ? { title: entry[0], lead: entry[1] } : null;
   });
 
+  // ── The RECORD NOUN (issue 1096) ────────────────────────────────────────────────────
+  //
+  // What this activity rolls a check FOR, in the activity's own word. The Difficulty card
+  // says "A fixed DC for every {record}", and hard-coding one activity's noun is how a
+  // gathering screen comes to talk about recipes. It is localized rather than derived from
+  // the route id, because a noun is copy.
+  const RECORD_NOUNS = {
+    crafting: ['FABRICATE.Admin.Manager.Checks.RecordNoun.Crafting', 'recipe'],
+    salvage: ['FABRICATE.Admin.Manager.Checks.RecordNoun.Salvage', 'salvageable item'],
+    gathering: ['FABRICATE.Admin.Manager.Checks.RecordNoun.Gathering', 'gathering task'],
+  };
+  const recordNoun = $derived.by(() => {
+    const entry = RECORD_NOUNS[activity] || RECORD_NOUNS.crafting;
+    return text(entry[0], entry[1]);
+  });
+
   // ── The roll section's mode callout (issue 1096) ────────────────────────────────────
   //
   // The AUTHORED mode for whichever activity is open, in that activity's own vocabulary —
@@ -1080,6 +1096,7 @@
             </section>
           {:else if craftingRouted}
             <CraftingCheckEditor
+              {recordNoun}
               value={craftingCheck}
               {resolutionMode}
               section={activeSection}
@@ -1089,6 +1106,7 @@
             />
           {:else if craftingSimple}
             <SimpleCraftingCheckEditor
+              {recordNoun}
               value={craftingCheckSimple}
               section={activeSection}
               {foundrySystemId}
@@ -1109,6 +1127,7 @@
         <div class="manager-checks-editor-stack" data-checks-panel="crafting">
           {#if craftingRouted}
             <CraftingCheckEditor
+              {recordNoun}
               value={craftingCheck}
               {resolutionMode}
               section={activeSection}
@@ -1118,6 +1137,7 @@
             />
           {:else if craftingSimple}
             <SimpleCraftingCheckEditor
+              {recordNoun}
               value={craftingCheckSimple}
               section={activeSection}
               {foundrySystemId}
@@ -1202,6 +1222,7 @@
         <div class="manager-checks-editor-stack" data-checks-panel="salvage">
           {#if salvageRouted}
             <CraftingCheckEditor
+              {recordNoun}
               value={salvageCheckRouted}
               showTiers={false}
               section={activeSection}
@@ -1219,6 +1240,7 @@
             />
           {:else if salvageSimple}
             <SimpleCraftingCheckEditor
+              {recordNoun}
               value={salvageCheckSimple}
               showDcSource={false}
               section={activeSection}
@@ -1287,6 +1309,7 @@
             />
           {:else if gatheringRouted}
             <CraftingCheckEditor
+              {recordNoun}
               value={gatheringCheckRouted}
               showTiers={false}
               section={activeSection}

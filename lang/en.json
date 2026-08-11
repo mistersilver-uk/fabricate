@@ -4702,10 +4702,9 @@
             "AwardExceedDesc": "Award each result in order only while the value strictly exceeds its difficulty.",
             "AwardAll": "Award all",
             "AwardNone": "Award none",
-            "Dc": "DC",
             "ThresholdComparison": "Comparison",
             "ThresholdMeet": "Meet or exceed",
-            "ThresholdExceed": "Exceed",
+            "ThresholdExceed": "Strictly exceed",
             "CritTitle": "Critical rolls",
             "CritRaw": "Raw roll",
             "CritMultiDieHint": "The value is the {die} total, from {min} to {max}.",
@@ -4718,9 +4717,9 @@
             "RemoveCrit": "Remove critical roll",
             "DcTitle": "DC source",
             "DcStatic": "Static",
-            "DcStaticDesc": "A fixed DC for every recipe, with optional named recipe tiers.",
+            "DcStaticDesc": "A fixed DC for every {record}, with optional named difficulty tiers.",
             "DcDynamic": "Dynamic",
-            "DcDynamicDesc": "A macro computes the DC from the ingredients, recipe, and actor.",
+            "DcDynamicDesc": "A macro computes the DC from the ingredients, the {record} and the actor.",
             "TiersTitle": "Recipe tiers",
             "TiersLead": "A recipe picks one of these, and its DC replaces the default above.",
             "AddTier": "Add tier",
@@ -4742,7 +4741,10 @@
             "BandsBoundary": "Threshold between {from} and {to}",
             "BandsFallback": "These tiers leave a gap or overlap, so they cannot be drawn as one continuous strip. Edit the numbers in the rows below; the strip returns once the ranges meet.",
             "BandsHint": "Drag or arrow-key a band edge to move its threshold, or type the numbers below. The numbers are the authority.",
-            "OutcomeFailure": "Failure"
+            "OutcomeFailure": "Failure",
+            "DifficultyTitle": "Difficulty",
+            "DifficultyLead": "The number the roll is measured against, and where that number comes from.",
+            "BaseDc": "Base DC"
           },
           "Salvage": {
             "PageTitle": "Salvage check",
@@ -4948,6 +4950,11 @@
             "SalvageProgressiveBody": "The roll produces a value rather than a verdict, and that value is spent down the item’s ordered salvage results until it runs out.",
             "GatheringD100": "d100 roll",
             "GatheringD100Body": "Each drop is rolled against its own percentage chance. There is no formula and no difficulty to author here — per-task tuning adjusts the chance, not the roll."
+          },
+          "RecordNoun": {
+            "Crafting": "recipe",
+            "Salvage": "salvageable item",
+            "Gathering": "gathering task"
           }
         },
         "Access": {

@@ -2407,6 +2407,59 @@
   font-weight: 600;
 }
 
+/* ── DIFFICULTY: `BASE DC` and `COMPARISON` (issue 1096) ─────────────────────────────
+   The two fields the prototype draws under the DC-source chooser. `BASE DC` is a fixed
+   118px track and `COMPARISON` takes the rest of the row, which is what makes the two
+   read as one number and its rule rather than as two equal choices.
+
+   Both controls are the shared primitives — `Stepper` and `SegmentedControl` — and this
+   block supplies only the SIZE and the micro-label, which is the one thing a layout
+   context may take from a primitive. */
+.fabricate-manager .manager-checks-difficulty-fields {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  min-width: 0;
+}
+
+/* A chooser above the fields; without one the fields are the card's whole body and the
+   margin would be dead space at its top. */
+.fabricate-manager
+  .manager-checks-card
+  .manager-resolution-mode-card
+  + .manager-checks-difficulty-fields {
+  margin-top: 13px;
+}
+
+.fabricate-manager .manager-checks-difficulty-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+
+.fabricate-manager .manager-checks-difficulty-field.is-dc {
+  flex: 0 0 auto;
+
+  /* The shared `Stepper` takes its HEIGHT from the layout context; its border, radius,
+     background and type stay the primitive's own. */
+  width: 118px;
+}
+
+.fabricate-manager .manager-checks-difficulty-field.is-comparison {
+  flex: 1 1 auto;
+}
+
+/* The prototype's micro-label: uppercase, tracked, at the studio's subtle ink. Same
+   treatment as the `WHAT ACTUALLY GETS ROLLED` kicker in the formula card. */
+.fabricate-manager .manager-checks-difficulty-label {
+  color: var(--fab-text-subtle);
+  font-size: 8.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
 /* The check-type chooser still renders through the shared `RadioCardGroup`; only the
    checks studio's own scale is restated, at (0,4,0) so it lands without touching the
    primitive every other screen uses. */

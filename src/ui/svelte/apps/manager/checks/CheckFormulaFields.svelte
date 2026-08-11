@@ -1,27 +1,22 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  Shared roll formula (+ optional DC + comparison) row for the crafting check
-  editors (simple, routed, and progressive). When the DC is shown the check
-  succeeds once the roll total reaches it, met-or-exceeded or strictly exceeded.
-  Controlled: reads the discrete fields and emits a partial patch via onChange
-  (the parent merges it into the full check object).
+  Shared ROLL FORMULA row for the crafting check editors (simple, routed and
+  progressive). Controlled: reads the formula and emits a partial patch via onChange (the
+  parent merges it into the whole check object).
 
-  `showDc` (default true) renders the DC + comparison fields. The progressive check
-  has no DC — its total is a numeric value, not a pass/fail threshold — so it sets
-  `showDc={false}` to render the formula field alone.
+  It used to carry the DC and the meet/exceed comparison too. They are the `Difficulty`
+  card's now (issue 1096, `CheckDifficultyCard.svelte`): this row answers "what is rolled"
+  and those two answer "what is it measured against", and a control answering the second
+  question inside the card answering the first is how a GM comes to read the DC as a term
+  in the formula.
 -->
 <script>
   import { getModifierExpressionSuggestions } from '../../../../../config/modifierExpressionSuggestions.js';
   import { localize } from '../../../util/foundryBridge.js';
-  import Stepper from '../../../components/Stepper.svelte';
-  import { stepperLabels } from '../../../components/stepperLabels.js';
 
   let {
     rollFormula = '',
-    dc = 15,
-    thresholdMode = 'meet',
     placeholder = '1d20+@abilities.int.mod',
-    showDc = true,
     foundrySystemId = '',
     onChange = () => {},
   } = $props();
@@ -30,8 +25,6 @@
     const translated = localize(key);
     return translated && translated !== key ? translated : fallback;
   }
-
-  const comparison = $derived(thresholdMode === 'exceed' ? 'exceed' : 'meet');
 
   // The formula token quick-add row (issue 1096). DERIVED FROM THE ACTIVE WORLD, never a
   // literal list.
@@ -56,10 +49,6 @@
     const current = String(rollFormula || '').trim();
     onChange({ rollFormula: current ? `${current} + ${token}` : token });
   }
-
-  // Visible field label, stepper accessible name, and the `{label}` slot in the shared
-  // `Decrease {label}` / `Increase {label}` adjunct strings — one string, three readers.
-  const dcLabel = $derived(text('FABRICATE.Admin.Manager.Checks.Crafting.Dc', 'DC'));
 </script>
 
 <div class="manager-checks-formula-row">
@@ -87,42 +76,4 @@
       {/each}
     </span>
   </label>
-  {#if showDc}
-    <!-- A `<div>`, not the `<label>` it was: see the NAMING contract in `Stepper.svelte`. -->
-    <div class="manager-field manager-checks-threshold-field">
-      <span>{dcLabel}</span>
-      <!-- `fill` rather than the inline default (D2): this is a 120px flex slot on an
-           `align-items: flex-end` row beside a 36px formula field and a 36px comparison
-           select, so an inline 102x28 island would change the control's width, height,
-           border and fill relative to its siblings.
-
-           `min={0}`: a check DC below zero is not a DC, and the bare input this replaced
-           had no live `−` button that could reach -1 from 0 in a single click. -->
-      <Stepper
-        fill
-        min={0}
-        value={dc ?? 15}
-        {...stepperLabels(dcLabel)}
-        inputProps={{ 'data-check-dc': '' }}
-        onChange={(next) => onChange({ dc: next })}
-      />
-    </div>
-    <label class="manager-field manager-checks-threshold-mode">
-      <span
-        >{text('FABRICATE.Admin.Manager.Checks.Crafting.ThresholdComparison', 'Comparison')}</span
-      >
-      <select
-        data-threshold-mode
-        value={comparison}
-        onchange={(event) => onChange({ thresholdMode: event.currentTarget.value })}
-      >
-        <option value="meet"
-          >{text('FABRICATE.Admin.Manager.Checks.Crafting.ThresholdMeet', 'Meet or exceed')}</option
-        >
-        <option value="exceed"
-          >{text('FABRICATE.Admin.Manager.Checks.Crafting.ThresholdExceed', 'Exceed')}</option
-        >
-      </select>
-    </label>
-  {/if}
 </div>

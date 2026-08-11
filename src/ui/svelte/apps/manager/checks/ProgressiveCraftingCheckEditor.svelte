@@ -63,7 +63,6 @@
       <div class="manager-checks-card-body">
         <CheckFormulaFields
           rollFormula={value?.rollFormula || ''}
-          showDc={false}
           {foundrySystemId}
           onChange={emit}
         />

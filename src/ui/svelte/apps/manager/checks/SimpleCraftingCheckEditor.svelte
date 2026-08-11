@@ -13,11 +13,12 @@
   (under `checkDriven` authority) break tools. The formula row, trigger editor, and
   recipe-tier table are shared with the routed editor.
 
-  `showDcSource` (default true) renders the DC-source section (static/dynamic
-  radios + the recipe-tier table + the dynamic-DC macro). Salvage and gathering
-  reuse this editor with `showDcSource={false}`: they have no recipes to pick a
-  tier from and no dynamic-DC macro, so they author just the default DC (on the
-  formula row) plus a per-entity DC override elsewhere.
+  `showDcSource` (default true) renders the DC-SOURCE half of this check: the
+  static/dynamic chooser inside the Difficulty card, plus the recipe-tier table or the
+  dynamic-DC macro card below it. Salvage and gathering reuse this editor with
+  `showDcSource={false}`: they have no records to pick a tier from and no dynamic-DC
+  macro, so they author the base DC and the comparison alone and take a per-entity DC
+  override elsewhere.
 
   Controlled component: renders `value` and emits the next value via `onChange`.
 -->
@@ -30,7 +31,7 @@
   import { resolveMacroName } from '../../../../../utils/macroReference.js';
   import IconFactRow from '../IconFactRow.svelte';
   import ItemDropZone from '../ItemDropZone.svelte';
-  import RadioCardGroup from '../RadioCardGroup.svelte';
+  import CheckDifficultyCard from './CheckDifficultyCard.svelte';
   import CheckFormulaFields from './CheckFormulaFields.svelte';
   import CheckRecipeTiers from './CheckRecipeTiers.svelte';
   import CheckTriggers from './CheckTriggers.svelte';
@@ -46,6 +47,8 @@
     breakageAuthority = 'toolSpecific',
     section = '',
     foundrySystemId = '',
+    // The activity's own word for the thing a check is rolled for; see CheckDifficultyCard.
+    recordNoun = 'recipe',
     onChange = () => {},
   } = $props();
 
@@ -56,27 +59,6 @@
     const translated = localize(key);
     return translated && translated !== key ? translated : fallback;
   }
-
-  // The two icons are literally what the DC is: an authored number, or a script that
-  // returns one.
-  const DC_MODE_OPTIONS = [
-    {
-      value: 'static',
-      icon: 'fas fa-hashtag',
-      labelKey: 'FABRICATE.Admin.Manager.Checks.Crafting.DcStatic',
-      fallback: 'Static',
-      descKey: 'FABRICATE.Admin.Manager.Checks.Crafting.DcStaticDesc',
-      descFallback: 'A fixed DC for every recipe, with optional named recipe tiers.',
-    },
-    {
-      value: 'dynamic',
-      icon: 'fas fa-code',
-      labelKey: 'FABRICATE.Admin.Manager.Checks.Crafting.DcDynamic',
-      fallback: 'Dynamic',
-      descKey: 'FABRICATE.Admin.Manager.Checks.Crafting.DcDynamicDesc',
-      descFallback: 'A macro computes the DC from the ingredients, recipe, and actor.',
-    },
-  ];
 
   const dcMode = $derived(value?.dcMode === 'dynamic' ? 'dynamic' : 'static');
 
@@ -93,11 +75,6 @@
 
   function emit(patch) {
     onChange({ ...value, ...patch });
-  }
-
-  function setDcMode(nextMode) {
-    if (nextMode === dcMode) return;
-    emit({ dcMode: nextMode });
   }
 
   // `ItemDropZone` has already refused anything that is not a Macro naming a document, so
@@ -136,13 +113,23 @@
       <div class="manager-checks-card-body">
         <CheckFormulaFields
           rollFormula={value?.rollFormula || ''}
-          dc={value?.dc ?? 15}
-          thresholdMode={value?.thresholdMode || 'meet'}
           {foundrySystemId}
           onChange={emit}
         />
       </div>
     </section>
+
+    <!-- DIFFICULTY, in its own card (issue 1096): the DC, the meet/exceed comparison and —
+         on this slot alone — where the number comes from. The simple check is the one that
+         carries `dcMode`/`macroUuid`, so it is the one that shows the chooser. -->
+    <CheckDifficultyCard
+      dc={value?.dc ?? 15}
+      thresholdMode={value?.thresholdMode || 'meet'}
+      dcMode={value?.dcMode || 'static'}
+      {showDcSource}
+      {recordNoun}
+      onChange={emit}
+    />
   {/if}
 
   <!-- A simple check's OUTCOME model: exactly two, and neither is authored. It is a
@@ -203,26 +190,6 @@
   {/if}
 
   {#if showDcSource && shows('roll')}
-    <section class="manager-inspector-card manager-checks-card" data-dc-source-card>
-      <div class="manager-checks-card-head">
-        <h3 class="manager-checks-card-title">
-          {text('FABRICATE.Admin.Manager.Checks.Crafting.DcTitle', 'DC source')}
-        </h3>
-      </div>
-      <div class="manager-checks-card-body">
-        <RadioCardGroup
-          legendKey="FABRICATE.Admin.Manager.Checks.Crafting.DcTitle"
-          legend="DC source"
-          options={DC_MODE_OPTIONS}
-          selectedValue={dcMode}
-          groupName="crafting-check-dc-mode"
-          columns={2}
-          optionDataAttr="data-dc-mode-option"
-          onChange={setDcMode}
-        />
-      </div>
-    </section>
-
     {#if dcMode === 'static'}
       <section class="manager-inspector-card manager-checks-card" data-static-dc>
         <CheckRecipeTiers
