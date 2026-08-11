@@ -78,10 +78,27 @@
 
   const checkDriven = $derived(breakageAuthority === 'checkDriven');
   const shows = (id) => !section || section === id;
-  // Fixed-type routed-by-check checks match by value range, so the DC and the meet/exceed
-  // comparison are meaningless there; the whole Difficulty card is withheld. Any other case
-  // (relative type, salvage/gathering) keeps it.
-  const hideDc = $derived(resolutionMode === 'routedByCheck' && type === 'fixed');
+  // ── THE ONE CONDITION under which this check has no anchor (issue 1096) ─────────────
+  //
+  // A `routedByCheck` check of `fixed` type matches a roll against ABSOLUTE value ranges.
+  // There is no DC in that arrangement — nothing to meet or exceed, and nothing for a
+  // recipe's difficulty tier to move — so three surfaces are withheld together and for one
+  // reason: the `Difficulty` card, the recipe difficulty tier list, and the Outcomes
+  // section's `PREVIEW AGAINST` selector.
+  //
+  // BOTH HALVES ARE LOAD-BEARING, and the gate is named rather than spelled out at three
+  // call sites so it cannot drift into three slightly different conditions:
+  //
+  //  - `fixed` ALONE is not enough. Salvage and gathering reuse this editor without a
+  //    system resolution mode, and their fixed checks keep a DC (see `showTiers={false}`
+  //    at those call sites) — so widening this to "any fixed check" would take the
+  //    difficulty away from a check that has one.
+  //  - `routedByCheck` ALONE is not enough either. A relative routed check is defined by
+  //    its DC: every tier threshold is an offset from it.
+  //
+  // `tests/components/crafting-check-anchor-gate.test.js` pins the condition on all four
+  // corners, so narrowing it or widening it fails rather than shipping.
+  const bandsAreAbsolute = $derived(resolutionMode === 'routedByCheck' && type === 'fixed');
   // Outcome options for the CheckTriggers outcomeTier condition — both tier lists
   // carry an id + name; the active list is the one the editor is showing.
   const breakageOutcomeOptions = $derived(
@@ -229,12 +246,14 @@
   // system, and writing it into the check would make a GM's viewport a saved field every
   // other GM then inherits.
   //
-  // RELATIVE ONLY. A `fixed` check's bands are absolute roll values that no recipe DC can
-  // move, and `routedByCheck + fixed` hides the DC field entirely — a control offering to
-  // re-anchor bands that have no anchor would be a promise the model cannot keep.
+  // WITHHELD ONLY WHERE THE BANDS HAVE NO ANCHOR — `bandsAreAbsolute`, the one named gate
+  // this editor uses for all three anchored surfaces. A `routedByCheck + fixed` check's
+  // bands are absolute roll values that no recipe DC can move, so a control offering to
+  // re-anchor them would be a promise the model cannot keep. Every OTHER case shows it,
+  // including a fixed salvage or gathering check, which keeps its DC.
   let previewTierId = $state('');
   const recipeTiers = $derived(Array.isArray(value?.tiers) ? value.tiers : []);
-  const showPreviewAgainst = $derived(type === 'relative' && recipeTiers.length > 0);
+  const showPreviewAgainst = $derived(!bandsAreAbsolute && recipeTiers.length > 0);
   const previewTier = $derived(recipeTiers.find((tier) => tier.id === previewTierId) || null);
   const previewDc = $derived(
     previewTier ? Number(previewTier.dc ?? 0) || 0 : Number(value?.dc ?? 0) || 0
@@ -439,7 +458,7 @@
          `macroUuid` live on the SIMPLE check slot only — the routed slot carries neither,
          and the engine runs a DC macro for `simple.dcMode === 'dynamic'` alone — so a
          static/dynamic pair here would write a field nothing reads. -->
-    {#if !hideDc}
+    {#if !bandsAreAbsolute}
       <CheckDifficultyCard
         dc={value?.dc ?? 15}
         thresholdMode={value?.thresholdMode || 'meet'}
@@ -460,7 +479,7 @@
     />
   {/if}
 
-  {#if showTiers && type === 'relative' && shows('roll')}
+  {#if showTiers && !bandsAreAbsolute && shows('roll')}
     <section class="manager-inspector-card" data-routed-tiers>
       <CheckRecipeTiers
         anchorsBands
