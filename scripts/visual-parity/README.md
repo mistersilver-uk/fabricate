@@ -67,7 +67,12 @@ So the classifier is **presentation-derived, never class-derived** — the proto
 Prose longer than 40 characters is skipped entirely, so the pass never diffs a sentence.
 Digit runs collapse to `#`, so `Outcomes · 5 tiers` and `Outcomes · 3 tiers` are one landmark: a count is data, the sentence around it is design.
 Roll-data paths and dice expressions are skipped for the same reason.
-And the assertion is **one-directional**: subject landmarks with no prototype counterpart are reported as EXTRAS and never fail, because a product legitimately says more than a mockup.
+The assertion is **one-directional for leaf content**: subject labels and glyphs with no prototype counterpart are reported as EXTRAS and never fail, because a product legitimately says more than a mockup.
+
+**It is not one-directional for CARDS.** A subject-only card fails.
+That asymmetry is deliberate and was paid for: a card is a claim about the shape of the screen, and a wrapper the product invented — with a title and a description the design never wrote — changes what a GM reads before they read anything inside it.
+A run reported `triggers: 0` while a `Check triggers` wrapper card nobody designed sat around the whole list.
+The escape hatch is an exemption with a stated reason — a decision someone made — rather than a default nobody chose.
 
 What survives all of that is exactly the class of defect the pass exists for.
 
@@ -147,6 +152,8 @@ Each of these has already cost a round.
 - **Starting below the shell.** A harness that renders the panel under test, rather than the real ancestor chain, cannot see an inset that lives above it. The first version of this harness passed while 36px of stacked dead space was on screen, because the shell's padding and the grid's gap were not in the tree at all. Declare `subject.requiredAncestors`; the comparator fails when one is missing.
 - **Comparing two transparent backgrounds.** Both sides often inherit their surface and report `rgba(0, 0, 0, 0)`, so the assertion passes on *any* background whatsoever. Set `effectiveBackground: true` and the harness walks to the nearest ancestor that actually paints.
 - **A named-region list can only catch what someone named.** `subject.chromeSweep` is the complement: it reports every border, outline and scrollbar on the chrome selectors you list that paints a forbidden colour. It is what caught host chrome leaking a crimson scrollbar through a pane as two full-height rules.
+- **A landmark nobody can SEE is not a landmark.** A mockup routinely carries a hidden branch of an alternative state, and a walk that reads a `display: none` subtree will demand the subject build a control the prototype does not draw. The classifier skips `display: none` and `visibility: hidden`, and deliberately does NOT skip the clip-path visually-hidden idiom, whose content is announced.
+- **A heading is a heading.** A presentational test — weight and size — is all a styled-components prototype can offer, and it is exactly the assumption such a prototype invites. It is wrong about the subject: a card headed by an UPPERCASE MICRO-LABEL, which is this manager's own inspector convention, sits far below any size floor, so the card read as titleless, folded into its parent, and was reported MISSING while on screen. A real `h1`–`h6` counts as a title whatever it measures.
 - **Measuring both sides cannot see one side's absence.** A region that is missing is either not in the map (nothing is asserted) or one line about a selector, and a region nobody named is invisible either way. `inventory.mjs` is the complement, and the section above states the rule it exists for.
 - **A subject that is a mirror of the app cannot report what the app lacks.** The structural pass points at the real app for exactly this reason; running it against the markup fixture would be running it against its own author's beliefs.
 - **A gate that covers two screens out of six reads as coverage.** The closed `screens` set, and the requirement that every screen owns at least one region, is what turns an unmeasured screen into a failure instead of a silence.

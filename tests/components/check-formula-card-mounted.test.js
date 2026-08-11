@@ -135,3 +135,35 @@ describe('the formula card states what a roll actually resolves to (issue 1096)'
     assert.equal(target.querySelector('[data-threshold-mode]'), null);
   });
 });
+
+// ── The suggestion chips, THROUGH THE RENDERED CONTROL ────────────────────────────────
+//
+// Added after an audit of this change's controls asked which of them a test actually
+// CLICKS. This one was asserted by presence only: `appendToken` was reachable by reading the
+// source and by nothing else, which is the same exposure that let a preset button be
+// reported inert with a green proof beside it.
+describe('a suggestion chip appends its term when CLICKED', () => {
+  it('appends to an authored formula with a joining +', async () => {
+    const emitted = [];
+    const target = await harness.mount({
+      rollFormula: '1d20',
+      foundrySystemId: '',
+      onChange: (patch) => emitted.push(patch),
+    });
+    const chip = target.querySelector('[data-check-formula-token]');
+    assert.ok(chip, 'at least one suggestion chip renders');
+    assert.equal(chip.tagName, 'BUTTON', 'it is a real button, not a click-handled span');
+    const token = chip.dataset.checkFormulaToken;
+    chip.click();
+    assert.equal(emitted.length, 1, 'the click reached the handler');
+    assert.equal(emitted.at(-1).rollFormula, `1d20 + ${token}`);
+  });
+
+  it('yields the term alone when the formula is empty, never a leading +', async () => {
+    const emitted = [];
+    const target = await harness.mount({ rollFormula: '', onChange: (patch) => emitted.push(patch) });
+    const chip = target.querySelector('[data-check-formula-token]');
+    chip.click();
+    assert.equal(emitted.at(-1).rollFormula, chip.dataset.checkFormulaToken);
+  });
+});

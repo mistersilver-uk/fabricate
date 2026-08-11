@@ -419,9 +419,30 @@ export function compareInventories({ screen, prototype, subject, exemptions = {}
     }
   }
 
+  // ── AN EXTRA CARD IS DRIFT (and a silent EXTRAS list is how it stays invisible) ──────
+  //
+  // The one-directional rule below — a product legitimately says more than a mockup — is
+  // true of LEAF CONTENT and false of CARDS. A card is a claim about the shape of the
+  // screen: a wrapper the product invented, with a title and a description the design never
+  // wrote, changes what a GM reads before they read anything inside it. Reporting one and
+  // passing is exactly how a `Check triggers` wrapper card nobody designed survived a
+  // `triggers: 0` run.
+  //
+  // So a subject-only CARD fails, and the escape hatch is an exemption with a stated reason
+  // — a decision someone made — rather than a default nobody chose.
   const prototypeTitles = new Set(prototype.cards.map((card) => card.title));
   for (const card of subject.cards) {
-    if (!prototypeTitles.has(card.title)) extras.push(`extra card "${card.rawTitle}"`);
+    if (prototypeTitles.has(card.title)) continue;
+    const key = landmarkKey(screen, card.path.slice(0, -1), 'extra-card', card.title);
+    if (exempt(key)) {
+      extras.push(`exempted extra card "${card.rawTitle}"`);
+      continue;
+    }
+    failures.push(
+      `EXTRA CARD "${card.rawTitle}": the subject draws it under ` +
+        `[${card.path.slice(0, -1).join(' > ') || 'the pane'}] and the prototype has no card ` +
+        `with that title  (${key})`
+    );
   }
 
   return { failures, extras };
@@ -465,8 +486,13 @@ export function inventoryExemptionProblems(exemptions = {}, observedKeys = new S
  * @param {object} inventory Prototype inventory for that screen.
  * @returns {string[]} Keys.
  */
-export function observableKeys(screen, inventory) {
+export function observableKeys(screen, inventory, subject = null) {
   const keys = [];
+  // A SUBJECT-only card's key is observable too, or an `extra-card` exemption would always
+  // read as stale and the run could never be made green by deciding about one.
+  for (const card of subject?.cards ?? []) {
+    keys.push(landmarkKey(screen, card.path.slice(0, -1), 'extra-card', card.title));
+  }
   for (const card of inventory.cards) {
     keys.push(landmarkKey(screen, card.path.slice(0, -1), 'card', card.title));
     for (const label of card.labels) keys.push(landmarkKey(screen, card.path, 'label', label));

@@ -139,7 +139,9 @@ async function main() {
       await spec.inventory.subject.navigate(subject.page, roots.measuredOn ?? screen);
       const subjectInventory = await inventoryOf(subject.page, roots.subject, null, limits);
 
-      for (const key of observableKeys(screen, prototypeInventory)) observed.add(key);
+      for (const key of observableKeys(screen, prototypeInventory, subjectInventory)) {
+        observed.add(key);
+      }
       const result = compareInventories({
         screen,
         prototype: prototypeInventory,
