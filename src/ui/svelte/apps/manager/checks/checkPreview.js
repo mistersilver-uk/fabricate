@@ -45,12 +45,12 @@
  * writes to it; {@link cloneRollData} exists for any caller that needs to augment it.
  */
 
+import { buildCheckModifierContext } from '../../../../../systems/checkModifierResolver.js';
 import {
   runFormulaPassFail,
   runFormulaProgressive,
   runFormulaRouted,
 } from '../../../../../systems/checkRoll.js';
-import { buildCheckModifierContext } from '../../../../../systems/checkModifierResolver.js';
 import { appendToolBonusTerms } from '../../../../../systems/toolCheckBonus.js';
 
 /** The "No actor" selection. An id no Foundry document can carry. */

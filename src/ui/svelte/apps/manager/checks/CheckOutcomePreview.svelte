@@ -110,9 +110,17 @@
 
     {#if rolled}
       <div class="manager-checks-simulator-readout" data-checks-simulator-readout>
+        <!-- The rolled face, ON the medallion. The digit is the subject and the die glyph
+             behind it is the tile's own art, so the number is layered over the tile rather
+             than placed beside it — an absolutely-positioned child with no offsets would
+             sit at its STATIC position, which is to the RIGHT of the tile and underneath
+             the breakdown line. `inset: 0` is what makes "on the medallion" true. -->
         <span class="manager-checks-simulator-face" data-checks-simulator-face>
-          <Medallion icon="fas fa-dice-d20" size={44} glyph={16} />
-          <small>{face ?? ''}</small>
+          <Medallion icon="" size={44} />
+          <small data-checks-simulator-face-value>
+            <strong>{face ?? ''}</strong>
+            <span>{preview.dieLabel}</span>
+          </small>
         </span>
         <span class="manager-checks-simulator-numbers">
           <small data-checks-simulator-breakdown>{preview.breakdown}</small>
@@ -198,13 +206,33 @@
     justify-content: center;
   }
 
+  /* The digit is the SUBJECT of this tile, so the medallion renders no competing glyph:
+     a 14px die icon and a 15px numeral centred on the same 44px square overlapped into an
+     unreadable blob in the rendered frame, which is the whole reason the caption below the
+     number exists rather than an icon beside it. */
   .manager-checks-simulator-face small {
     position: absolute;
-    color: var(--fab-text);
+    inset: 0;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    align-items: center;
+    justify-content: center;
     font-family: var(--fab-font-mono);
-    font-size: 0.95rem;
+    line-height: 1;
+  }
+
+  .manager-checks-simulator-face small strong {
+    color: var(--fab-text);
+    font-size: 1rem;
     font-weight: 700;
     font-variant-numeric: tabular-nums;
+  }
+
+  .manager-checks-simulator-face small span {
+    color: var(--fab-text-muted);
+    font-size: 0.55rem;
   }
 
   .manager-checks-simulator-numbers {

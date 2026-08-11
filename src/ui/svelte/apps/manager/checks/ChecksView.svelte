@@ -1160,6 +1160,11 @@
           ? null
           : total - previewPlan.dc,
       breakdown: terseBreakdown(previewResult, previewActor?.name ?? ''),
+      // The die the medallion is captioned with, read off the result's own dice bag rather
+      // than parsed out of the formula a second time.
+      dieLabel: previewResult?.data?.diceGroups?.[0]?.group
+        ? `d${String(previewResult.data.diceGroups[0].group).split('d')[1]}`
+        : '',
       bandName: band.name,
       bandDetail: band.detail,
       bandSuccess: band.success,

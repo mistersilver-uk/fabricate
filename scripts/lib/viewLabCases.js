@@ -5077,6 +5077,118 @@ export const VIEW_LAB_CASES = Object.freeze([
     kinds: ['manager', 'checks'],
     sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/checks\/CheckTriggers\.svelte$/],
   }),
+  // ── The outcome simulator and the odds histogram (issue 1097) ────────────────────────
+  //
+  // All four cases select an ACTOR first, and that is not decoration. Every lab system's
+  // check formula carries `@abilities.int.mod`, so under the resting "No actor" selection
+  // the formula does not reduce to a number, the simulator renders its unresolved warning
+  // and the histogram abstains — which is a real state, and one of these cases photographs
+  // it deliberately, but it is not the state the other three are named for.
+  managerCase({
+    id: 'manager-checks-crafting-simulator-rolled',
+    label: 'Manager — Checks crafting outcome preview, rolled',
+    // BEYOND the smoke. The walk never opens the Checks rail's simulator, so there is no
+    // counterpart frame of a rolled readout to fall short of.
+    reaches: 'beyond',
+    smokeLabels: [],
+    // Runework is the only routed-by-check fixture with NAMED outcome tiers, which is what
+    // makes the matched band card render something a GM can read.
+    query: { system: 'lab-runework' },
+    steps: [
+      'Checks',
+      { selector: '#manager-checks-nav-crafting' },
+      { selector: '[data-checks-preview-actor]', select: 'lab-actor-idrin' },
+      // The rail's simulator and odds panels COLLAPSE below the shipped 1320 container
+      // breakpoint (issue 1096), and the manager window is 1280 wide — so at the capture
+      // geometry the body is `display: none` and its contents are unreachable. Opening the
+      // disclosure is what makes this case photograph its own subject; without it the run
+      // fails on an invisible anchor rather than publishing the wrong frame, which is the
+      // behaviour the anchors exist for.
+      { selector: '[data-checks-simulator-disclosure]' },
+      { selector: '[data-checks-simulator-roll]' },
+      { selector: '[data-checks-simulator-readout]', scroll: true },
+    ],
+    expectView: 'checks-crafting',
+    // Anchored on the readout itself: a case that stopped rolling would fail here rather
+    // than publishing a frame of the pre-roll hint under a "rolled" name.
+    expectSelector: '.fabricate-manager [data-checks-simulator-band]',
+    kinds: ['manager', 'checks'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/checks\/checkPreview\.js$/,
+      /^src\/ui\/svelte\/apps\/manager\/checks\/CheckOutcomePreview\.svelte$/,
+    ],
+  }),
+  managerCase({
+    id: 'manager-checks-crafting-odds-enumerable',
+    label: 'Manager — Checks crafting odds histogram (enumerable)',
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-runework' },
+    steps: [
+      'Checks',
+      { selector: '#manager-checks-nav-crafting' },
+      { selector: '[data-checks-preview-actor]', select: 'lab-actor-idrin' },
+      { selector: '[data-checks-odds-disclosure]' },
+      { selector: '[data-checks-odds-state="enumerated"]', scroll: true },
+    ],
+    expectView: 'checks-crafting',
+    // The bars themselves, not the panel: a panel that abstained would still render.
+    expectSelector: '.fabricate-manager [data-checks-odds-bar]',
+    kinds: ['manager', 'checks'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/checks\/checkOdds\.js$/,
+      /^src\/ui\/svelte\/apps\/manager\/checks\/CheckOddsPanel\.svelte$/,
+    ],
+  }),
+  managerCase({
+    id: 'manager-checks-crafting-odds-not-enumerable',
+    label: 'Manager — Checks crafting odds histogram (not enumerable)',
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-runework' },
+    // The formula is TYPED rather than authored, for the reason
+    // `manager-checks-crafting-dynamic-dc` records: the fixture check is shared, so
+    // authoring `2d20` there would move every already-captured Runework frame to
+    // photograph one panel. The Checks editor stages into a draft, so the typed formula
+    // reaches the rendered state without persisting anything.
+    steps: [
+      'Checks',
+      { selector: '#manager-checks-nav-crafting' },
+      { selector: '[data-checks-preview-actor]', select: 'lab-actor-idrin' },
+      { selector: '[data-check-roll-formula]', fill: '2d20 + @abilities.int.mod' },
+      { selector: '[data-checks-odds-disclosure]' },
+      { selector: '[data-checks-odds-state="not-enumerable"]', scroll: true },
+    ],
+    expectView: 'checks-crafting',
+    // The REASON, not merely the note: an abstention with no stated reason is the defect
+    // the discriminated codes exist to prevent.
+    expectSelector: '.fabricate-manager [data-checks-odds-reason="non-unit-count"]',
+    kinds: ['manager', 'checks'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/checks\/checkOdds\.js$/,
+      /^src\/ui\/svelte\/apps\/manager\/checks\/CheckOddsPanel\.svelte$/,
+    ],
+  }),
+  managerCase({
+    id: 'manager-checks-simple-two-band-strip',
+    label: 'Manager — Checks simple two-band DC strip',
+    reaches: 'beyond',
+    smokeLabels: [],
+    // Smithing is the fixture's `simple` system, so its Outcomes section is the two-outcome
+    // card the third `ThresholdBandStrip` binding renders in.
+    query: { system: 'lab-smithing' },
+    steps: [
+      'Checks',
+      { selector: '#manager-checks-nav-crafting' },
+      { selector: '#checks-section-outcomes' },
+      { selector: '[data-checks-preview-actor]', select: 'lab-actor-brenna' },
+      { selector: '[data-simple-band-strip]', scroll: true },
+    ],
+    expectView: 'checks-crafting',
+    expectSelector: '.fabricate-manager [data-simple-band-strip] [data-band-strip-handle]',
+    kinds: ['manager', 'checks'],
+    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/checks\/SimpleCraftingCheckEditor\.svelte$/],
+  }),
   // Player recipe detail, one per resolution mode. Each mode draws a DIFFERENT body — the routed
   // ones a route rail, progressive a stage rail, simple a plain ingredient list — so the four
   // frames together are the only side-by-side evidence that a change to one did not move another.

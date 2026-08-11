@@ -7676,3 +7676,102 @@ test('the modifier row gives every field room for its longest content at every m
     await context.close();
   }
 });
+
+// ── The simulator's face tile and the odds row (issue 1097) ─────────────────────────────
+//
+// Both are surfaces a mounted assertion CANNOT judge. `CheckOutcomePreview` layers the
+// rolled face over a `Medallion` with `position: absolute; inset: 0`, and `CheckOddsPanel`
+// lays its rows out on a three-track grid — neither of which happy-dom computes, so a
+// scoped selector renamed out from under either rule would leave every mounted assertion
+// green while the tile printed its digit beside the medallion instead of on it. That is
+// not hypothetical: the FIRST version of the face tile omitted the offsets, so the digit
+// landed at its static position to the RIGHT of the medallion and underneath the breakdown
+// line. It rendered, it was in the DOM, and it was invisible in the published frame.
+const previewScoped = scopedComponentCss(
+  resolve(__dirname, '../../src/ui/svelte/apps/manager/checks/CheckOutcomePreview.svelte')
+);
+const oddsScoped = scopedComponentCss(
+  resolve(__dirname, '../../src/ui/svelte/apps/manager/checks/CheckOddsPanel.svelte')
+);
+
+test('the simulator face tile layers the rolled digit ON the medallion, not beside it', async () => {
+  const browser = await chromium.launch();
+  try {
+    const page = await browser.newPage({ viewport: { width: 900, height: 400 } });
+    // Svelte scopes DESCENDANTS with `:where(.svelte-<hash>)`, so the hash has to land on
+    // every element the rules reach — not only on the token `withScopeHash` stamps. A
+    // fixture that stamped the wrapper alone would compute `position: static` and read as
+    // a defect in the component rather than in the fixture.
+    const hash = previewScoped.hashClass;
+    await page.setContent(
+      `<style>${css}</style><style>${previewScoped.css}</style>` +
+        `<div class="fabricate-manager"><div class="manager-checks-simulator-readout ${hash}">` +
+        `<span class="manager-checks-simulator-face ${hash}" id="tile">` +
+        `<span style="display:block;width:44px;height:44px"></span>` +
+        `<small id="value" class="${hash}"><strong class="${hash}">20</strong>` +
+        `<span class="${hash}">d20</span></small>` +
+        `</span></div></div>`
+    );
+    const geometry = await page.evaluate(() => {
+      const tile = document.getElementById('tile').getBoundingClientRect();
+      const value = document.getElementById('value').getBoundingClientRect();
+      return {
+        position: getComputedStyle(document.getElementById('value')).position,
+        overlaps:
+          value.left >= tile.left - 0.5 &&
+          value.right <= tile.right + 0.5 &&
+          value.top >= tile.top - 0.5 &&
+          value.bottom <= tile.bottom + 0.5,
+        width: Math.round(value.width),
+        tileWidth: Math.round(tile.width),
+      };
+    });
+    assert.equal(geometry.position, 'absolute', 'the rule that positions it still matches');
+    assert.equal(geometry.tileWidth, 44, 'the tile is the medallion’s own 44px square');
+    assert.equal(
+      geometry.width,
+      geometry.tileWidth,
+      '`inset: 0` makes the digit span the tile; without it the box collapses to its content'
+    );
+    assert.ok(geometry.overlaps, 'the digit sits INSIDE the tile rather than beside it');
+  } finally {
+    await browser.close();
+  }
+});
+
+test('an odds row keeps its bar between a bounded label and a pinned percentage', async () => {
+  const browser = await chromium.launch();
+  try {
+    const page = await browser.newPage({ viewport: { width: 320, height: 300 } });
+    const hash = oddsScoped.hashClass;
+    await page.setContent(
+      `<style>${css}</style><style>${oddsScoped.css}</style>` +
+        `<div class="fabricate-manager"><ul class="manager-checks-odds-list ${hash}">` +
+        `<li class="manager-checks-odds-row ${hash}" id="row">` +
+        `<span class="manager-checks-odds-label ${hash}" id="label">` +
+        `An extremely long localized outcome tier name that must not squeeze the bar</span>` +
+        `<span class="fab-fill-bar" id="bar" style="display:block;height:6px"></span>` +
+        `<span class="manager-checks-odds-percent ${hash}" id="percent">100%</span>` +
+        `</li></ul></div>`
+    );
+    const geometry = await page.evaluate(() => {
+      const read = (id) => document.getElementById(id).getBoundingClientRect();
+      return {
+        display: getComputedStyle(document.getElementById('row')).display,
+        label: Math.round(read('label').width),
+        bar: Math.round(read('bar').width),
+        percent: Math.round(read('percent').width),
+        overflow: getComputedStyle(document.getElementById('label')).overflow,
+      };
+    });
+    assert.equal(geometry.display, 'grid', 'the grid rule still matches this row');
+    assert.equal(geometry.overflow, 'hidden', 'and the label truncates rather than wrapping');
+    assert.ok(
+      geometry.label <= 90,
+      `a long tier name is bounded at the 5.5rem track (got ${geometry.label}px)`
+    );
+    assert.ok(geometry.bar > 40, `the bar keeps real width beside it (got ${geometry.bar}px)`);
+  } finally {
+    await browser.close();
+  }
+});

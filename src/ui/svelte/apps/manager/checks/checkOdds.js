@@ -58,13 +58,13 @@
  * failing whole on this one panel.
  */
 
+import { evaluateNumericExpression } from '../../../../../systems/checkModifierResolver.js';
 import {
   classifyCheckTotal,
   resolveCheckFormulaDisplay,
   resolveForcedOutcome,
   rolledDiceGroups,
 } from '../../../../../systems/checkRoll.js';
-import { evaluateNumericExpression } from '../../../../../systems/checkModifierResolver.js';
 import { resolveProgressiveAward } from '../../../../../utils/progressiveAward.js';
 
 /**
@@ -407,7 +407,7 @@ export function enumerateProgressiveOdds({ faces, remainder, difficulties, award
     });
     tally.set(awarded.length, (tally.get(awarded.length) ?? 0) + 1);
   }
-  return [...tally.entries()]
+  return [...tally]
     .toSorted(([left], [right]) => left - right)
     .map(([awarded, count]) => ({
       id: `award-${awarded}`,

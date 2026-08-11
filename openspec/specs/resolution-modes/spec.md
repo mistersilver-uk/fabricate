@@ -342,6 +342,11 @@ So a relative check's non-keyword-named failure tier (e.g. "Botch") whose id a G
 It is available on every routed check — crafting, salvage AND gathering — in both the `relative` and `fixed` tier types, and it is not gated on the tool-breakage authority (unlike a trigger's `breakTools` effect).
 It supersedes the retired `natStepping` boolean, which hard-coded the die (d20), the faces (1 and 20), the magnitude (±1) and the scope (relative crafting and salvage only); a persisted `natStepping: true` converts to an equivalent trigger pair on read (see `data-models`).
 
+**One classifier.**
+The whole post-roll resolution of a routed check — forced reroute, then tier stepping, then the recipe minimum-success-tier gate, in that order — is a SINGLE exported function (`classifyCheckTotal`), and `runFormulaRouted` calls it rather than restating it.
+That is what makes the Checks Studio's per-outcome odds histogram incapable of disagreeing with a real roll: the histogram buckets each enumerated die face through the same function the engine resolves through, so "they cannot drift" is a property of the code rather than a promise (see `ui-integration` §Per-outcome odds histogram).
+Any other consumer of routed classification consumes it the same way.
+
 **Two named tiers.**
 The **rolled tier** is what relative-margin or fixed-range matching produced, after any forced reroute; it is what step CONDITIONS read.
 The **final tier** is what remains after stepping; it is what routes to a result group, what the per-recipe minimum-success-tier gate judges, what tool-breakage conditions read, and whose `success` and `breakTools` apply.

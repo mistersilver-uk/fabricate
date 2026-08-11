@@ -253,7 +253,11 @@ describe('checkPreview: it NEVER executes a DC macro', () => {
     globalThis.fromUuid = async (uuid) => {
       resolved += 1;
       assert.equal(uuid, 'Macro.dc-macro');
-      return { type: 'script', command: 'globalThis.__previewMacroRan = (globalThis.__previewMacroRan ?? 0) + 1; return 19;' };
+      return {
+        type: 'script',
+        command:
+          'globalThis.__previewMacroRan = (globalThis.__previewMacroRan ?? 0) + 1; return 19;',
+      };
     };
     const dc = await MacroExecutor.run('Macro.dc-macro', {});
     ran = globalThis.__previewMacroRan ?? 0;
@@ -283,7 +287,11 @@ describe('checkPreview: it NEVER executes a DC macro', () => {
       record: null,
     });
     assert.equal(plan.dynamicDc, true, 'the readout is told to state that it did not run it');
-    assert.equal(plan.dc, 14, 'the authored static fallback, which is what the engine falls back to');
+    assert.equal(
+      plan.dc,
+      14,
+      'the authored static fallback, which is what the engine falls back to'
+    );
     const result = await runCheckPreview(plan);
     assert.equal(result.data.dc, 14);
   });
