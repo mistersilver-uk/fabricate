@@ -128,10 +128,23 @@ function collectInventory(root, limits) {
 
   const rootWidth = root.clientWidth || root.getBoundingClientRect().width || 1;
 
+  // A HEADING is a heading. Two rules, because the two documents say it differently:
+  //
+  //  - a real \`h1\`–\`h6\` element, which is what the subject uses — including for a card whose
+  //    heading is an UPPERCASE MICRO-LABEL rather than a sentence-case title, which is this
+  //    product's own inspector convention and is far below the presentational size floor;
+  //  - a presentational one, which is all the prototype has: it is a styled-components
+  //    document with no heading elements at all, so weight and size are the only signal.
+  //
+  // Without the first rule a card headed by a micro-label reads as having no title, folds
+  // into its parent, and is then reported MISSING while sitting on the screen.
   const isTitleLeaf = (el, text) => {
     if (!isLabelText(text)) return false;
+    if (/^h[1-6]$/.test(el.tagName.toLowerCase())) return true;
     const cs = getComputedStyle(el);
-    return Number.parseInt(cs.fontWeight, 10) >= MIN_TITLE_WEIGHT && px(cs.fontSize) >= MIN_TITLE_SIZE;
+    return (
+      Number.parseInt(cs.fontWeight, 10) >= MIN_TITLE_WEIGHT && px(cs.fontSize) >= MIN_TITLE_SIZE
+    );
   };
 
   // A CARD is a bordered, rounded, near-full-width container that OWNS A TITLE. The title

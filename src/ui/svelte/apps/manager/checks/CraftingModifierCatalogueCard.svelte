@@ -420,10 +420,20 @@
   data-crafting-modifier-catalogue={activity}
   data-check-modifier-activity={activity}
 >
+  <!-- `Named modifiers`, which is the prototype's word for this list (issue 1096). It is a
+       DIFFERENT key from `ModifierCatalogueHeading`, which the gathering task editor also
+       renders: there the heading disambiguates a task's check-modifier pick from the
+       character modifiers on its drop rows, and "Check modifiers" is the right word for
+       that. One key serving two meanings is how a rename breaks a screen nobody looked at. -->
   <h3 class="manager-card-title">
-    {text('FABRICATE.Admin.Manager.Checks.Crafting.ModifierCatalogueHeading', 'Check modifiers')}
+    {text('FABRICATE.Admin.Manager.Checks.Crafting.ModifierNamedHeading', 'Named modifiers')}
   </h3>
-  <p class="manager-muted">
+  <!-- Glyph-led, as the prototype marks this statement: it is a standing explanation of where
+       the list comes from, and the info glyph is what separates it from the prose that
+       describes what a GM is choosing. Not the shared `Callout`, which states ONE sentence per
+       strip and this is three — ours says more than the mockup's does. -->
+  <p class="manager-muted manager-modifier-catalogue-intro">
+    <i class="fas fa-circle-info" aria-hidden="true"></i>
     {text(
       'FABRICATE.Admin.Manager.Checks.Crafting.ModifierCatalogueIntro',
       'Named character modifiers added to the check roll automatically, as flavoured [Modifiers] terms — flat ones as one + N term, and a rolling one as its own dice term, so the dice show on the card. Each expression resolves against the acting character (e.g. @abilities.med.mod). The library is authored once in System settings › Modifiers and shared by crafting, salvage and gathering; each decides which entries apply.'
@@ -599,14 +609,14 @@
         <i class="fas fa-pen-to-square" aria-hidden="true"></i>
         {text(
           'FABRICATE.Admin.Manager.Checks.Crafting.ModifierEditCatalogue',
-          'Edit these modifiers in System settings'
+          'Edit in System settings'
         )}
       </button>
     {/if}
   </div>
 
   <h4 class="manager-modifier-subheading">
-    {text('FABRICATE.Admin.Manager.Checks.Crafting.ModifierPolicyHeading', 'Combination rule')}
+    {text('FABRICATE.Admin.Manager.Checks.Crafting.ModifierPolicyHeading', 'How they combine')}
   </h4>
   <!-- TWO columns, so the group is a 2x2. This is explicit maintainer feedback on the
        three-up layout that stood here: at this much copy per card — a name plus a
@@ -624,7 +634,7 @@
        card's inline size instead of the whole manager shell's. -->
   <RadioCardGroup
     legendKey="FABRICATE.Admin.Manager.Checks.Crafting.ModifierPolicyHeading"
-    legend="Combination rule"
+    legend="How they combine"
     options={policyOptions}
     selectedValue={selectedPolicy}
     groupName={`check-modifier-policy-${activity}`}

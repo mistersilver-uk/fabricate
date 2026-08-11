@@ -4601,7 +4601,7 @@
             "ModifierPillNone": "No modifiers selected.",
             "ModifierPillSelected": "{count} modifiers selected: {names}",
             "ModifierPillSelectedOne": "1 modifier selected: {names}",
-            "ModifierPolicyHeading": "Combination rule",
+            "ModifierPolicyHeading": "How they combine",
             "ModifierPolicyAddAll": "Add all",
             "ModifierPolicyAddAllDesc": "Sum every eligible modifier into the check roll.",
             "ModifierPolicyHighest": "Highest",
@@ -4625,7 +4625,7 @@
             "ModifierBoundsInverted": "This modifier’s minimum is above its maximum, so it adds nothing to the roll until you fix the two values.",
             "ModifierBoundsUnsafe": "This modifier’s bound is too large or too small to appear in a roll formula, so it adds nothing to the roll until you fix it.",
             "ModifierRollTag": "Rolls dice",
-            "ModifierEditCatalogue": "Edit these modifiers in System settings",
+            "ModifierEditCatalogue": "Edit in System settings",
             "SubjectModifierHeadingComponent": "Check modifiers for this component",
             "SubjectModifierHeadingTask": "Check modifiers for this task",
             "SubjectModifierAuthorComponent": "Pick check modifiers for this component",
@@ -4755,7 +4755,8 @@
             "ResolvedBySubject": "Chosen per {record} — each {record} picks which of these apply, and the picks are summed.",
             "ResolvedPlayerPicks": "Player picks — the crafter chooses from these at roll time, and the picks are summed.",
             "TiersLeadBands": "A recipe picks one of these; its DC anchors the outcome bands below.",
-            "ReorderTier": "Reorder {name} — use the up and down arrow keys"
+            "ReorderTier": "Reorder {name} — use the up and down arrow keys",
+            "ModifierNamedHeading": "Named modifiers"
           },
           "Salvage": {
             "PageTitle": "Salvage check",

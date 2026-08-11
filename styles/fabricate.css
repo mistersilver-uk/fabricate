@@ -2626,6 +2626,13 @@
   cursor: grabbing;
 }
 
+/* The catalogue's standing statement about where the list comes from, glyph-led on the same
+   rule as the band strip's hint: a decoration on prose, at the sentence's own size. */
+.fabricate-manager .manager-modifier-catalogue-intro > i {
+  margin-right: var(--fab-space-chip);
+  color: var(--fab-info);
+}
+
 /* ── A TRIGGER'S OWN SUMMARY (issue 1096) ────────────────────────────────────────────
    The condition as a sentence, over the controls that author it. The card used to be
    headed by the word `When` — the label of its first select — so a list of three read
