@@ -2582,6 +2582,50 @@
   border-color: var(--fab-danger-border);
 }
 
+/* The row being dragged, on the same rule the progressive result list uses: an accent edge
+   and a lifted surface, so a GM can see which row is travelling. */
+.fabricate-manager .manager-checks-tier-row.is-dragging {
+  border-color: var(--fab-accent-border);
+  background: var(--fab-surface-active);
+}
+
+/* THE DRAG HANDLE. A bare grip glyph, as the prototype draws it — but a real `<button>`,
+   because HTML5 drag-and-drop has no keyboard path and a handle only a mouse can use is a
+   reordering affordance half the GMs on this screen cannot reach.
+
+   It goes through `ManagerButton` like every other button in the studio, so this rule is
+   the reset that takes the pill off it: the primitive's padding, border, radius and fill
+   would otherwise draw a 34px control where the prototype draws an 11px glyph. Same shape
+   of override as `.manager-checks-tier-remove` below, which keeps its danger tint. */
+.fabricate-manager .manager-checks-tier-row .manager-checks-tier-grip {
+  appearance: none;
+  -webkit-appearance: none;
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 28px;
+  min-width: 0;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  color: var(--fab-text-disabled);
+  background: transparent;
+  font-size: 11px;
+  cursor: grab;
+}
+
+.fabricate-manager .manager-checks-tier-row .manager-checks-tier-grip:hover {
+  color: var(--fab-text-subtle);
+  background: transparent;
+}
+
+.fabricate-manager .manager-checks-tier-row:active .manager-checks-tier-grip {
+  cursor: grabbing;
+}
+
 /* A 12px ROUNDED SQUARE, which is what the prototype draws. The 50% dot this replaces was
    the same 12px key in a different shape. */
 .fabricate-manager .manager-checks-tier-swatch {

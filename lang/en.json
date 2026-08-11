@@ -4720,9 +4720,9 @@
             "DcStaticDesc": "A fixed DC for every {record}, with optional named difficulty tiers.",
             "DcDynamic": "Dynamic",
             "DcDynamicDesc": "A macro computes the DC from the ingredients, the {record} and the actor.",
-            "TiersTitle": "Recipe tiers",
-            "TiersLead": "A recipe picks one of these, and its DC replaces the default above.",
-            "AddTier": "Add tier",
+            "TiersTitle": "Recipe difficulty tiers",
+            "TiersLead": "A recipe picks one of these; its DC replaces the base DC above.",
+            "AddTier": "Add difficulty tier",
             "NoTiers": "No tiers yet. Add named tiers a recipe can select to override the DC.",
             "TierName": "Name",
             "TierDc": "DC",
@@ -4753,7 +4753,9 @@
             "ResolvedAddAll": "Add all — every applied modifier is summed into the roll.",
             "ResolvedHighest": "Highest — only the best applied modifier reaches the roll, ranked by its average.",
             "ResolvedBySubject": "Chosen per {record} — each {record} picks which of these apply, and the picks are summed.",
-            "ResolvedPlayerPicks": "Player picks — the crafter chooses from these at roll time, and the picks are summed."
+            "ResolvedPlayerPicks": "Player picks — the crafter chooses from these at roll time, and the picks are summed.",
+            "TiersLeadBands": "A recipe picks one of these; its DC anchors the outcome bands below.",
+            "ReorderTier": "Reorder {name} — use the up and down arrow keys"
           },
           "Salvage": {
             "PageTitle": "Salvage check",

@@ -463,6 +463,7 @@
   {#if showTiers && type === 'relative' && shows('roll')}
     <section class="manager-inspector-card" data-routed-tiers>
       <CheckRecipeTiers
+        anchorsBands
         tiers={value?.tiers || []}
         defaultDc={value?.dc ?? 0}
         onChange={(tiers) => emit({ tiers })}
