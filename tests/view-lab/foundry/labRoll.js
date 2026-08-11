@@ -36,12 +36,19 @@ import { evaluateNumericExpression } from '../../../src/systems/checkModifierRes
  * `src/utils/craftingCheckExpression.js` rewrites a plain `1d20` to `2d20kh1` / `2d20kl1` for
  * advantage and disadvantage, and nothing else in `src/` rewrites a formula.
  *
- * A term this pattern does NOT understand is thrown on, by the `UNPARSED_DIE` check below, and
- * that check is load-bearing rather than belt-and-braces: `evaluateNumericExpression` returns its
- * partial parse with no end-of-input assertion, so it truncates instead of rejecting. Measured,
- * before the guard existed: `3d6dl1` evaluated to 9 (the drop-lowest silently ignored) and
- * `1d20 + 1dF` to 21 (the fudge die silently contributing 1). Those are exactly the "silently
- * plausible number" this harness must not produce.
+ * A term this pattern does NOT understand is thrown on, by the `UNPARSED_DIE` check below.
+ *
+ * That check no longer stands where its own note said it did, and the note is corrected rather
+ * than deleted because the correction is the interesting part. It cited `evaluateNumericExpression`
+ * returning a partial parse with no end-of-input assertion — true when it was written, and false
+ * twice over now: issue 1118 moved that walk into `reduceRollExpression`, gave it an end-of-input
+ * assertion, and taught it dice, so `3d6dl1` and `1d20 + 1dF` both reduce correctly there. And the
+ * two residues it cited were never what `UNPARSED_DIE` matched anyway — `/\dd\d/i` needs a DIGIT
+ * on both sides of the `d`, so `dl1` and `dF` never reached it.
+ *
+ * The guard is kept, retargeted at what it can actually see: a die term whose faces are numeric
+ * and which this pattern therefore left in the string. A term the pattern misses entirely still
+ * escapes it, and that is stated rather than implied.
  */
 const DIE_TERM = /(\d*)d(\d+)(?:(kh|kl)(\d*))?/gi;
 

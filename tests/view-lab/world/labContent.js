@@ -3046,9 +3046,10 @@ const HERBALISM_CHECK_MODIFIERS = Object.freeze([
     // `defaultModifierIds` the second was depicted on no screen anywhere.
     //
     // It is a FOURTH entry rather than one of the three demoted, because the eligible set is
-    // load-bearing elsewhere: `player-crafting-roll-prompt` needs three eligible modifiers with
-    // three different values to show a choice rather than a row of interchangeable chips, and
-    // `maxModifierPicks: 3` below is sized to that set.
+    // load-bearing elsewhere: `player-crafting-roll-prompt` needs several eligible modifiers with
+    // DIFFERENT values to show a choice rather than a row of interchangeable chips, and
+    // `maxModifierPicks` below is sized to that set (four since issue 1118 review added the
+    // rolling `hb-mod-luck` to it).
   },
 ]);
 
@@ -3083,12 +3084,17 @@ const PROGRESSIVE_CHECK = Object.freeze({
   // system already has, because a non-empty catalogue is what un-hides the recipe editor's
   // modifier row at all.
   defaultModifierPolicy: 'playerPicks',
-  // THREE of the catalogue's FIVE entries (issue 1095 added `hb-mod-weather` precisely to leave
-  // one out, and issue 1118 added the rolling `hb-mod-luck`; see their own notes). The eligible set under `playerPicks` is this list,
+  // FOUR of the catalogue's FIVE entries (issue 1095 added `hb-mod-weather` precisely to leave
+  // one out; issue 1118's review added the rolling `hb-mod-luck` to this set so one frame shows
+  // a rolling option's chip). The eligible set under `playerPicks` is this list,
   // and the prompt needs at least TWO to render at all (the engine suppresses a one-option choice)
   // — but three with three DIFFERENT values (Medicine +4, Herbalism kit +3, Nature +2) is what
   // makes the frame show a choice rather than a row of interchangeable chips.
-  defaultModifierIds: ['hb-mod-medicine', 'hb-mod-nature', 'hb-mod-tools'],
+  // `hb-mod-luck` joins the crafting set (issue 1118 review) so ONE frame anywhere carries a
+  // ROLLING option in the roll prompt: its chip reads `+1d4`, which is the whole point of the
+  // display field — its average of 2.5 is a number the roll can never produce, and a chip
+  // reading `+2.5` beside a `1d4` would be a promise the dice cannot keep.
+  defaultModifierIds: ['hb-mod-medicine', 'hb-mod-nature', 'hb-mod-tools', 'hb-mod-luck'],
   // AN AUTHORED cap, equal to the eligible-set size above so it bounds nothing (issue 1055).
   // ABSENCE was authored here first — absence is the UNLIMITED reading — and it does not survive
   // the boot. `labWorld.js` seeds no `migrationVersion`, so `lastRunVersion` is `'0.0.0'` and
@@ -3115,7 +3121,7 @@ const PROGRESSIVE_CHECK = Object.freeze({
   // reading is reached by typing into it. `manager-checks-crafting-modifiers` does that, and
   // `tests/view-lab-world-migration.test.js` fails if a migration ever silently rewrites a lab
   // system's check block again.
-  maxModifierPicks: 3,
+  maxModifierPicks: 4,
 });
 
 /**

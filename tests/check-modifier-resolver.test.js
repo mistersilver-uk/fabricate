@@ -621,9 +621,9 @@ test('buildCheckModifierChoice maps eligible modifiers + pre-selects the best le
   assert.deepEqual(choice.modifiers, [
     // `formula: null` is the FLAT half of the 1118 shape: a flat entry appends a number and
     // never a fragment, and `display` is the chip the prompt renders for it.
-    { id: 'med', label: 'Medicine', icon: 'fa-med', average: 3, value: 3, formula: null, display: '+3' },
-    { id: 'alch', label: 'Alchemy', icon: 'fa-alch', average: 2, value: 2, formula: null, display: '+2' },
-    { id: 'herb', label: 'Herbalism', icon: 'fa-herb', average: 4, value: 4, formula: null, display: '+4' },
+    { id: 'med', label: 'Medicine', icon: 'fa-med', average: 3, value: 3, formula: null, blocked: false, display: '+3' },
+    { id: 'alch', label: 'Alchemy', icon: 'fa-alch', average: 2, value: 2, formula: null, blocked: false, display: '+2' },
+    { id: 'herb', label: 'Herbalism', icon: 'fa-herb', average: 4, value: 4, formula: null, blocked: false, display: '+4' },
   ]);
   assert.equal(choice.maxPicks, 1, 'the cap the prompt must enforce');
   assert.deepEqual(choice.defaultSelectedIds, ['herb'], 'herb (4) is the highest');
@@ -816,6 +816,7 @@ test('buildCheckModifierChoice defaults absent label/icon to empty strings', () 
     average: 1,
     value: 1,
     formula: null,
+    blocked: false,
     display: '+1',
   });
 });
@@ -1456,29 +1457,41 @@ test('resolveActiveGatheringCheckFormula has no slot under d100 and one under bo
 // BOTH HALVES ARE ASSERTED, and that is the point of this test rather than an excess of
 // cases: dropping either alternation leaves the OTHER half's cases green, so a single
 // happy-path assertion would let the union silently collapse back to one of its inputs.
-test('isRollExpression is the UNION of the two patterns it replaced, not either one', () => {
+// Issue 1118 review. `isRollExpression` no longer carries a pattern of its own: it asks
+// `reduceRollExpression`, which OBSERVES dice while it reduces. The pattern disagreed with
+// what actually appends in both directions, and each row below that moved lists which.
+test('isRollExpression answers the same question the resolver does', () => {
   for (const rolls of [
-    '1d6',            // the digit-prefixed half
-    '2 d 10',         // …with whitespace, which the digit-prefixed half tolerates
-    'd20',            // the boundary half — a BARE die, missed by the digit-prefixed one
-    '@prof + d4',     // …the same, mid-expression
+    '1d6',
+    'd20', // a BARE die
+    '@prof + d4', // `@`-paths are neutralized first, so the walk reaches the die
     '(@abilities.str.mod)d6',
-    '@a * 2',
-    '@a / 2',
-    'max(@a, 2)',
+    '1dF', // FALSE under the old pattern: a Fate die rolls and got no chip
+    '2dc', // …and a Coin die likewise
+    '{1d6,1d8}kh1',
   ]) {
-    assert.equal(isRollExpression(rolls), true, `${rolls} rolls or groups`);
+    assert.equal(isRollExpression(rolls), true, `${rolls} rolls`);
   }
 
   for (const flat of [
     '@abilities.med.mod',
-    '@abilities.dex.mod',  // a `d` at a word boundary NOT followed by a digit
+    '@abilities.dex.mod', // a `d` at a word boundary NOT followed by a digit
     '@skills.nat.total',
     '@prof',
     '3',
     '',
+    // TRUE under the old pattern, which also matched arithmetic GROUPING. None of these
+    // rolls anything, and since issue 1118 the chip carries a roll note beside it — so the
+    // old answer put a sentence about dice on an expression that has none.
+    '@a * 2',
+    '@a / 2',
+    'max(@a, 2)',
+    'floor(@a / 2)',
+    // TRUE under the old pattern, and not a die at all: Foundry's grammar admits no
+    // whitespace inside a die term, so `Roll.validate('2 d 10')` is false on 14.365.
+    '2 d 10',
   ]) {
-    assert.equal(isRollExpression(flat), false, `${flat} resolves to a flat value`);
+    assert.equal(isRollExpression(flat), false, `${flat} rolls nothing`);
   }
 
   // Non-strings are not expressions; they classify as flat rather than throwing, because a

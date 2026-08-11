@@ -41,6 +41,19 @@ const DEFERRED_MODIFIER_SLOT = `(modifier)[${CHECK_MODIFIER_TERM_LABEL}]`;
  *   from the formula string), so duplicate `NdS` groups (`1d20 + 1d20` → groupId 0
  *   and 1) are disambiguated deterministically. The `checkBreakage` `diceGroup`
  *   trigger DSL targets a group by this index.
+ *
+ *   SINCE ISSUE 1118 A ROLLING CHECK MODIFIER CONTRIBUTES DICE HERE TOO, and the decision
+ *   about that is deliberate rather than overlooked. Modifier terms are APPENDED, so every
+ *   die the authored formula declares keeps the index it always had and no working trigger
+ *   changes meaning. What DOES change is a trigger whose `groupId` already DANGLED — authored
+ *   against a formula that has since lost a die — which used to match nothing and can now
+ *   resolve against a modifier's die. It is not guarded here because the only available guard
+ *   is a group count re-parsed from the authored formula, and `parseDiceGroups` and
+ *   `roll.dice` do not agree term-for-term on every formula (a parenthesised die count, for
+ *   one), so a slice would sometimes drop an AUTHORED group from trigger matching — a worse
+ *   failure than the one it fixes. `CheckTriggers.svelte` offers only the authored formula's
+ *   groups, so a dangling id is reachable only by editing a formula after authoring a trigger
+ *   against it, and readiness has no rule for it.
  * - `sum` is the DiceTerm#total — the GROUP TOTAL (POST-MODIFIER, active-only). The
  *   `group` key (`NdS`) carries no modifiers, so a modified pool (keep/drop/explode/
  *   reroll, e.g. `2d20kh1`) reports its modified total under the plain `2d20` key — a
@@ -294,6 +307,20 @@ export async function evaluateCheckRoll(formula, actor, options = {}) {
   let effectiveFormula = baseFormula;
   let effectiveRollMode = options?.rollMode;
   let effectiveFlavor = options?.flavor;
+  // THE ADVANTAGE QUESTION IS ASKED OF THE AUTHORED CHECK, NEVER OF THE APPENDED MODIFIERS
+  // (issue 1118 review). Once a modifier may roll, `parsePlainDiceGroups` — which splits on
+  // parens AND flavour brackets — reads `(1d20)[Modifiers]` as a plain `1d20`, so a `2d10`
+  // check carrying a `1d20` modifier would offer Advantage it does not have and
+  // `applyD20Advantage` would rewrite the MODIFIER's die into `2d20kh1`. It also made the two
+  // paths disagree with each other: the non-deferred one computed `allowAdvantage` AFTER the
+  // append and the deferred one BEFORE it, on the same system.
+  //
+  // The transform is applied to this prefix and the remainder is re-attached, which is sound
+  // because every appender here only ever APPENDS to the trimmed base — `appendToolBonusTerms`
+  // and `appendCheckModifierRollTerms` both return `base + terms`. The `startsWith` guard
+  // keeps that an invariant rather than an assumption: a caller that ever breaks it falls back
+  // to the whole-string transform instead of splicing at the wrong offset.
+  let advantageBase = authoredFormula.trim();
 
   // A PRE-RESOLVED decision (issue 859): one prompt answer applied to every roll of a
   // bulk run. It stands in for the dialog's return value, so the whole block below —
@@ -336,8 +363,9 @@ export async function evaluateCheckRoll(formula, actor, options = {}) {
         activity: options.activity,
         img: options.img,
         modifierChoice,
-        // Advantage/Disadvantage are offered only for a plain-d20 check.
-        allowAdvantage: hasPlainD20(effectiveFormula),
+        // Advantage/Disadvantage are offered only for a plain-d20 check — the AUTHORED
+        // check, not whatever the modifiers appended to it.
+        allowAdvantage: hasPlainD20(advantageBase),
       });
     };
     const choice = preResolved ?? (await askPlayer());
@@ -379,7 +407,13 @@ export async function evaluateCheckRoll(formula, actor, options = {}) {
     // yielding e.g. `2d20kh1 + 3 + (2)`. Only a plain `1d20` is rewritten; any other
     // disposition or formula is left unchanged.
     if (choice.advantage === 'advantage' || choice.advantage === 'disadvantage') {
-      effectiveFormula = applyD20Advantage(effectiveFormula, choice.advantage);
+      if (effectiveFormula.startsWith(advantageBase)) {
+        const rewritten = applyD20Advantage(advantageBase, choice.advantage);
+        effectiveFormula = rewritten + effectiveFormula.slice(advantageBase.length);
+        advantageBase = rewritten;
+      } else {
+        effectiveFormula = applyD20Advantage(effectiveFormula, choice.advantage);
+      }
       resolved = resolveCheckFormulaDisplay(effectiveFormula, actor);
     }
     const bonus = typeof choice.bonus === 'string' ? choice.bonus.trim() : choice.bonus;

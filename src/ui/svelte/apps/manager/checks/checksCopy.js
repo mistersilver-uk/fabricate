@@ -30,6 +30,10 @@ export const CHECK_TICK_LABELS = Object.freeze({
     'CheckModifierBoundsValid',
     'Every applied check modifier has usable bounds',
   ],
+  modifierExpressionsResolve: [
+    'CheckModifierExpressionsResolve',
+    'Every applied check modifier can be rolled',
+  ],
   tierStepTargetsResolve: [
     'CheckTierStepTargetsResolve',
     'Tier-step targets name exactly one existing tier',
@@ -71,6 +75,10 @@ export const CHECK_ISSUE_LABELS = Object.freeze({
   modifierBoundsUnsafe: [
     'IssueModifierBoundsUnsafe',
     'A check modifier this check applies ({names}) has a minimum or maximum too large or too small to appear in a roll formula, so it contributes nothing. Use a whole number a die roll could plausibly reach.',
+  ],
+  modifierExpressionInvalid: [
+    'IssueModifierExpressionInvalid',
+    'A check modifier this check applies ({names}) has an expression Fabricate cannot roll, so it contributes nothing. Check it against your game system — a capitalised function name (MAX instead of max), more than 999 dice, or a decimal without a leading zero are all refused by the dice engine.',
   ],
   modifiersInertNoCheck: [
     'IssueModifiersInertNoCheck',

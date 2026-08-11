@@ -21,9 +21,11 @@ import {
   CHECK_ISSUE_LABELS,
   CHECK_TICK_LABELS,
   checkIssueCopy,
+  interpolate,
 } from '../src/ui/svelte/apps/manager/checks/checksCopy.js';
 import { planRetiredPlaceholderStrip } from '../src/utils/craftingCheckExpression.js';
 import { RETIRED_PLACEMENT_CORPUS } from './helpers/retiredPlaceholderOracle.js';
+import { recordedModifierRoll } from './helpers/recordedModifierRollShapes.js';
 
 const repoRoot = resolve(import.meta.dirname, '..');
 
@@ -523,6 +525,9 @@ describe('CHECK_READINESS_ISSUE_IDS is the source of truth for every issue id', 
       { id: 'ok', label: 'Ok', expression: '@a' },
       { id: 'bad', label: 'Bad', expression: '@b', min: 5, max: -1 },
       { id: 'huge', label: 'Huge', expression: '@c', min: 1e21 },
+      // An expression NOTHING can roll (issue 1118 review): the reducer refuses `1d4]`
+      // outright, with no dice engine needed. This row reaches `modifierExpressionInvalid`.
+      { id: 'broken', label: 'Broken', expression: '1d4]' },
       // A ROLL-shaped expression, kept in the sweep as a NEGATIVE control (issue 1118): a
       // check appends it as dice now, so it must raise NOTHING. While it raised
       // `modifierRollExpression` this row was what reached that branch, and the sweep below
@@ -581,6 +586,7 @@ describe('CHECK_READINESS_ISSUE_IDS is the source of truth for every issue id', 
     collect({ rollFormula: '1d20' }, { mode: 'simple', modifierContext: context(['huge']) });
     collect({}, { mode: 'none', modifierContext: context(['ok']) });
     collect({ rollFormula: '1d20' }, { mode: 'simple', modifierContext: context(['rolls']) });
+    collect({ rollFormula: '1d20' }, { mode: 'simple', modifierContext: context(['broken']) });
     for (const id of emitted) {
       assert.ok(
         CHECK_READINESS_ISSUE_IDS.includes(id),
@@ -696,6 +702,8 @@ describe('check-modifier readiness', () => {
     { id: 'ok', label: 'Ok', expression: '@a' },
     { id: 'inverted', label: 'Inverted', expression: '@b', min: 5, max: -1 },
     { id: 'huge', label: 'Huge', expression: '@c', min: 1e21 },
+    // An expression the reducer refuses outright, so it is detectable with no dice engine.
+    { id: 'broken', label: 'Broken', expression: '1d4]' },
   ];
   const context = (ids) => ({ catalogue, systemPolicy: 'addAll', defaultModifierIds: ids });
 
@@ -789,6 +797,31 @@ describe('check-modifier readiness', () => {
     );
   });
 
+  // THE SENTENCE, not the payload. Asserting `issue.data` leaves `interpolate()` free to be
+  // a no-op — the whole suite stayed byte-identical when it was made one — and a GM would
+  // then read a literal `({names})` on a blocking issue. This drives the same two steps the
+  // Validation route and the section Callout drive: resolve the copy, then interpolate it.
+  it('renders the named entries INTO the sentence a GM reads', () => {
+    const { issues } = evaluateCheckReadiness(
+      { rollFormula: '1d20' },
+      { mode: 'simple', modifierContext: context(['ok', 'inverted', 'huge', 'broken']) }
+    );
+    const sentenceFor = (id) => {
+      const issue = issues.find((entry) => entry.id === id);
+      return interpolate(checkIssueCopy(id).fallback, issue?.data);
+    };
+    for (const [id, name] of [
+      ['modifierBoundsInverted', 'Inverted'],
+      ['modifierBoundsUnsafe', 'Huge'],
+      ['modifierExpressionInvalid', 'Broken'],
+    ]) {
+      const sentence = sentenceFor(id);
+      assert.ok(sentence.includes(`(${name})`), `${id} names the entry: ${sentence}`);
+      assert.ok(!sentence.includes('{names}'), `${id} leaves no raw placeholder: ${sentence}`);
+      assert.ok(!sentence.includes('Ok'), `${id} names only its own fault: ${sentence}`);
+    }
+  });
+
   it('falls back to the entry id when a faulted entry has no label', () => {
     const { issues } = evaluateCheckReadiness(
       { rollFormula: '1d20' },
@@ -802,6 +835,99 @@ describe('check-modifier readiness', () => {
       }
     );
     assert.deepEqual(issues[0].data, { names: 'unnamed' }, 'an unnamed entry is still locatable');
+  });
+
+  // Issue 1118 review. Retiring `modifierRollExpression` left NO signal for an entry that
+  // contributes nothing for EXPRESSION reasons — including three that would have failed the
+  // check outright had the engine guard not dropped them first.
+  it('BLOCKS on an expression that cannot contribute, whatever the reason', () => {
+    // The last four are ENGINE-only faults: they reduce cleanly and only a dice engine can
+    // refuse them, so the recorded 14.365 double has to be installed for this test to reach
+    // them at all. Without it `fragmentRolls` fails open and those rows pass vacuously.
+    const previousRoll = globalThis.Roll;
+    globalThis.Roll = recordedModifierRoll();
+    try {
+      const unusable = [
+        ['reducer refuses the text', '1d4]'],
+        ['a bare word', 'damage'],
+        ['nothing authored at all', ''],
+        ['an unterminated flavour', '1d4[fire'],
+        ['a capitalised function name', 'MAX(1d4,2)'],
+        ['more dice than Foundry will roll', '1000d6'],
+        ['a decimal with no leading digit', '1d4 + .5'],
+      ];
+      for (const [why, expression] of unusable) {
+        const { checks, issues } = evaluateCheckReadiness(
+          { rollFormula: '1d20' },
+          {
+            mode: 'simple',
+            modifierContext: {
+              catalogue: [{ id: 'x', label: 'Broken one', expression }],
+              systemPolicy: 'addAll',
+              defaultModifierIds: ['x'],
+            },
+          }
+        );
+        const issue = issues.find((entry) => entry.id === 'modifierExpressionInvalid');
+        assert.ok(issue, `${why} (${expression}) is reported`);
+        assert.equal(issue.severity, 'critical', `${why}: BLOCKING`);
+        assert.deepEqual(issue.data, { names: 'Broken one' });
+        assert.equal(
+          checks.find((check) => check.id === 'modifierExpressionsResolve')?.satisfied,
+          false,
+          `${why}: the tick follows the issue`
+        );
+      }
+    } finally {
+      globalThis.Roll = previousRoll;
+    }
+  });
+
+  it('says nothing about an expression that resolves, however exotic', () => {
+    // The negative half. Each of these is a legal Foundry formula, and three of them
+    // (`pow`, `sqrt`, `clamp`) were refused by the reducer until this round.
+    for (const expression of [
+      '@skills.med.mod',
+      '1d4',
+      '{1d6,1d8}kh1',
+      'floor(1d8 / 2)',
+      'pow(1d4, 2)',
+      'sqrt(1d4)',
+      'clamp(1d8, 1, 6)',
+      '0',
+    ]) {
+      const { checks, issues } = evaluateCheckReadiness(
+        { rollFormula: '1d20' },
+        {
+          mode: 'simple',
+          modifierContext: {
+            catalogue: [{ id: 'x', label: 'Fine', expression }],
+            systemPolicy: 'addAll',
+            defaultModifierIds: ['x'],
+          },
+        }
+      );
+      assert.deepEqual(issues, [], `${expression} is usable`);
+      assert.equal(
+        checks.find((check) => check.id === 'modifierExpressionsResolve')?.satisfied,
+        true,
+        `${expression}: the tick is green`
+      );
+    }
+  });
+
+  // A BOUNDS fault is reported under its own repair and NOT a second time as an expression
+  // fault: one entry named under two different instructions is worse than one.
+  it('does not report a bounds fault a second time as an expression fault', () => {
+    const { issues } = evaluateCheckReadiness(
+      { rollFormula: '1d20' },
+      { mode: 'simple', modifierContext: context(['inverted', 'huge']) }
+    );
+    assert.equal(
+      issues.find((entry) => entry.id === 'modifierExpressionInvalid'),
+      undefined,
+      'both entries have perfectly readable expressions; only their bounds are wrong'
+    );
   });
 
   it('says nothing about an entry this activity does not apply', () => {
@@ -1032,7 +1158,10 @@ describe('readinessModeForSlot', () => {
         mode: readinessModeForSlot(null),
         modifierContext: buildCheckModifierContext(
           {
-            modifiers: [{ id: 'm1', name: 'Focus', min: 0, max: 2 }],
+            // A USABLE expression, so this test stays about inertness. An entry with none
+            // at all now raises `modifierExpressionInvalid` too, which is correct and is
+            // asserted on its own below.
+            modifiers: [{ id: 'm1', name: 'Focus', expression: '@focus', min: 0, max: 2 }],
             craftingCheck: { defaultModifierPolicy: 'addAll', defaultModifierIds: ['m1'] },
           },
           'crafting',

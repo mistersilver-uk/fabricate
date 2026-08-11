@@ -11,6 +11,9 @@ const { reduceRollExpression } = await import('../src/utils/rollExpressionAverag
 
 // ── the two answers one walk produces ────────────────────────────────────────
 
+// EXACT means exact: these are asserted by equality, and three of them (`pow`, `sqrt`,
+// `clamp`) are functions the reducer refused outright until the review round — Foundry
+// resolves any `Math` member, so refusing them silently dropped entries it could roll.
 test('a flat expression reduces exactly and reports that it does not roll', () => {
   for (const [expression, expected] of [
     ['3', 3],
@@ -19,6 +22,11 @@ test('a flat expression reduces exactly and reports that it does not roll', () =
     ['(2 + 3) * 4', 20],
     ['floor(7 / 2)', 3],
     ['max(1, 4, 2)', 4],
+    ['min(3, 7, 5)', 3],
+    ['max(2, 9)', 9],
+    ['pow(3, 2)', 9],
+    ['sqrt(16)', 4],
+    ['clamp(9, 1, 6)', 6],
     ['2.5', 2.5],
   ]) {
     assert.deepEqual(
@@ -50,11 +58,37 @@ test('rollsDice agrees with Foundry`s own determinism verdict on every recorded 
 test('the computed average matches the measured mean of the real 14.365 engine', () => {
   for (const [expression, measured, tolerance, kind] of RECORDED_EXPRESSION_MEANS) {
     const { value } = reduceRollExpression(expression);
+    // An `exact` row is graded by EQUALITY. Grading every row with the tolerant `<=` let an
+    // exact claim pass at any error inside its own (small) tolerance, so the word `exact`
+    // asserted nothing.
+    if (kind.startsWith('exact') && tolerance === 0) {
+      assert.equal(value, measured, `${expression} (${kind}) is exact, not approximate`);
+      continue;
+    }
     assert.ok(
       Math.abs(value - measured) <= tolerance,
       `${expression} (${kind}): computed ${value}, measured ${measured}, tolerance ${tolerance}`
     );
   }
+});
+
+// The rows the module's header used to describe as "well under one point" and is not. They
+// are recorded so the limitation is a measurement a reviewer can check, and so that a future
+// change which DOES model them reddens this test rather than passing silently.
+test('the counting modifiers are recorded as the wrong quantity, not as a near miss', () => {
+  const counting = RECORDED_EXPRESSION_MEANS.filter(([, , , kind]) =>
+    kind.startsWith('WRONG QUANTITY')
+  );
+  assert.ok(counting.length >= 4, 'cs / cf / df are all recorded');
+  const [, measured] = counting.find(([expression]) => expression === '1d20cs>15');
+  assert.ok(
+    Math.abs(reduceRollExpression('1d20cs>15').value - measured) > 9,
+    'a face-sum average cannot approximate a success COUNT, and the table says so'
+  );
+  assert.ok(
+    Math.abs(reduceRollExpression('1d20df<5').value - 9.83) < 0.75,
+    '`df` is at least no longer read as a drop-one, which answered 0'
+  );
 });
 
 // The single row that motivated the order-statistics walk, pinned on its own so a
@@ -108,6 +142,30 @@ test('`d%` is refused, because real 14.365 refuses to parse it', () => {
 // A word beginning with `d` must not be read as a die. Foundry`s own grammar admits any
 // letter as faces, which would make `damage` parse as "one d, faces a, modifiers mage"; the
 // reducer restricts faces to the denominations `CONFIG.Dice.terms` configures.
+// `FunctionTerm#function` is `CONFIG.Dice.functions[fn] ?? Math[fn]`, resolved CASE-SENSITIVELY,
+// and `CONFIG.Dice.functions` is `{}`. A lowercasing walk therefore valued an expression Foundry
+// throws on — measured: `MAX(1d4, 2)` reduced to 2.5 while the engine refused to roll it at all.
+test('function names are resolved case-sensitively, exactly as Foundry resolves them', () => {
+  for (const shouty of ['MAX(1d4, 2)', 'Min(1d4, 2)', 'FLOOR(1d8)', 'Abs(1d4)', 'Sqrt(4)']) {
+    assert.ok(Number.isNaN(reduceRollExpression(shouty).value), `${shouty} is not a Math member`);
+  }
+  for (const [correct, expected] of [
+    ['max(1d4, 2)', 2.5],
+    ['floor(1d8)', 4],
+    ['abs(1d4)', 2.5],
+  ]) {
+    assert.equal(reduceRollExpression(correct).value, expected, correct);
+  }
+});
+
+// The one `Math` member that is not a function of its arguments. Admitting it would make this
+// module's answer differ between two calls on the same text, which is the whole contract.
+test('Math.random is refused, however Foundry would resolve it', () => {
+  assert.ok(Number.isNaN(reduceRollExpression('random()').value));
+  assert.ok(Number.isNaN(reduceRollExpression('1d4 + random()').value));
+  assert.equal(reduceRollExpression('round(2.4)').value, 2, 'its neighbours still resolve');
+});
+
 test('a word starting with d is not a die', () => {
   assert.ok(Number.isNaN(reduceRollExpression('damage').value));
   assert.equal(reduceRollExpression('damage').rollsDice, false);

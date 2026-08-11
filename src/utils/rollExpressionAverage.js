@@ -28,19 +28,35 @@
  *   count) is EXACT, via {@link keptDiceAverage}. It is the one modifier worth computing
  *   properly: `2d20kh1` averages 13.825 and its plain sum is 21, so ranking it plainly
  *   would make an advantage-shaped modifier win `highest` against everything.
- * - Every OTHER die modifier (`x`, `r<2`, `min2`, `cs>3`, …) is consumed and the die's plain
- *   average is used. That is an approximation, stated as one: reproducing every Foundry
- *   modifier's expectation here would be a second dice engine, and measured against the
- *   real 14.365 engine those modifiers move the mean by well under one point.
+ * - Every OTHER die modifier is consumed and the die's PLAIN average is used. That is an
+ *   approximation, and the envelope below is MEASURED (40 000 real rolls each on 14.365)
+ *   rather than asserted, because the first version of this note claimed "well under one
+ *   point" and two whole families of modifier are nowhere near that:
+ *
+ *   | modifier family        | example       | computed | measured | note                    |
+ *   |------------------------|---------------|----------|----------|-------------------------|
+ *   | explode / reroll / min | `1d6x`        | 3.5      | 4.22     | within ~1 point         |
+ *   |                        | `2d10r1`      | 11       | 11.92    |                         |
+ *   |                        | `2d6min2`     | 7        | 7.33     |                         |
+ *   |                        | `2d6max4`     | 7        | 6.00     |                         |
+ *   | COUNTING (`cs`/`cf`)   | `1d20cs>15`   | 10.5     | 0.25     | **wrong by ~10**        |
+ *   |                        | `2d6cs>=5`    | 7        | 0.67     |                         |
+ *
+ *   `cs` and `cf` are not a distribution shift at all: they change what the total MEANS, from
+ *   a sum of faces to a COUNT OF SUCCESSES. No plain average can approximate that, and this
+ *   module does not try — it reports the face-sum average and the ranking it feeds is simply
+ *   wrong for such an entry. `df` (count failures) is the same family and used to be worse
+ *   still: the keep/drop pattern read its `d` as a drop-one and answered 0 against a measured
+ *   9.8, which is what the `(?![fF])` guard on {@link KEEP_AT} exists for.
  * - Pools: `{a, b, c}` sums its members; a `khN`/`dlN` pool keeps the N highest member
  *   averages and a `klN`/`dhN` pool the N lowest. Pool members are not identically
  *   distributed, so this one stays an approximation.
  *
- * A `min`/`max` around a die — whether the GM authored it or a per-entry bound generated it —
- * is reduced by applying the function to the die's MEAN, so `min(1d8, 6)` reads 4.5 where the
- * mean of the clamped roll is 4.125. That gap is Jensen's inequality and it is unavoidable
- * without a distribution rather than a mean; it is stated here because the per-entry bounds
- * generate exactly this shape.
+ * ANY NONLINEAR FUNCTION applied to a die is reduced by applying it to the die's MEAN, so
+ * `min(1d8, 6)` reads 4.5 against a measured 4.12 and `pow(1d4, 2)` reads 6.25 against 7.50.
+ * That gap is Jensen's inequality and it is unavoidable without a distribution rather than a
+ * mean; it is stated here because the per-entry bounds generate exactly this shape on every
+ * bounded rolling entry.
  *
  * THE AVERAGE RANKS; IT NEVER PAYS. Nothing here decides what a modifier contributes to a
  * roll — the authored dice reach the formula verbatim and Foundry rolls them, bounds and all.
@@ -73,8 +89,14 @@ const DENOMINATION_AVERAGES = new Map([
  */
 const DIE_AT = /^(\d+)?[dD](\d+|[fFcC])((?:[a-zA-Z]+|[0-9<>=]+)*)/;
 
-/** A keep/drop modifier at the head of a modifier run, e.g. `kh1`, `dl`, `kl2`, `k`. */
-const KEEP_AT = /^(kh|kl|dh|dl|k|d)(\d+)?/i;
+/**
+ * A keep/drop modifier at the head of a modifier run, e.g. `kh1`, `dl`, `kl2`, `k`.
+ *
+ * The bare `d` alternative is guarded with `(?![fF])` so `df` — Foundry's count-failures
+ * modifier — is not read as a drop-one. Unanchored, `1d20df<5` parsed as "drop 1 of 1 die",
+ * reducing to 0 against a measured mean of 9.8.
+ */
+const KEEP_AT = /^(kh|kl|dh|dl|k|d(?![fF]))(\d+)?/i;
 
 /** The remainder of a modifier run, consumed and ignored once a keep/drop is read. */
 const MODIFIER_RUN_AT = /^(?:[a-zA-Z]+|[0-9<>=]+)*/;
@@ -264,7 +286,9 @@ function createReader(source) {
   function parseFunction() {
     const start = index;
     while (index < source.length && /[a-zA-Z_]/.test(source[index])) index += 1;
-    const name = source.slice(start, index).toLowerCase();
+    // NOT lowercased: `FunctionTerm#function` resolves `Math[fn]` case-sensitively, so
+    // `MAX(1d4, 2)` is a function Foundry cannot call and this walk must not pretend it can.
+    const name = source.slice(start, index);
     skipWhitespace();
     const args = [];
     if (source[index] !== '(') return NaN;
@@ -392,34 +416,48 @@ function sumOf(values) {
   return values.reduce((total, value) => total + value, 0);
 }
 
+/**
+ * Foundry's own Math extensions (`common/primitives/math.mjs`), which a formula may call and
+ * a bare `Math` in Node does not carry. `clamp` is the one that matters for a modifier: a GM
+ * who writes `clamp(1d8, 1, 6)` is expressing exactly the bound this module is built around.
+ */
+const FOUNDRY_MATH_EXTENSIONS = Object.freeze({
+  clamp: (value, min, max) => Math.min(Math.max(value, min), max),
+  mix: (a, b, weight) => a * weight + b * (1 - weight),
+  toDegrees: (radians) => (radians * 180) / Math.PI,
+  toRadians: (degrees) => (degrees * Math.PI) / 180,
+});
+
+/**
+ * Apply a function term, MIRRORING Foundry's own resolution rather than curating a list.
+ *
+ * `FunctionTerm#function` is `CONFIG.Dice.functions[fn] ?? Math[fn]`, and `CONFIG.Dice.functions`
+ * is `{}`, so what a formula may call is exactly "a function on `Math`", CASE-SENSITIVELY. This
+ * used to be a lowercasing switch over eight names, and it was wrong in both directions:
+ *
+ * - It ACCEPTED `MAX(1d4, 2)`, because it lowercased first. Foundry does not: `Math.MAX` is
+ *   `undefined` and `FunctionTerm#_evaluateAsync` THROWS `The function "MAX" is not registered
+ *   in CONFIG.Dice.functions`. A GM who capitalised a function therefore had a modifier this
+ *   module said was worth 2.5 and a formula that could not roll at all.
+ * - It REFUSED `pow`, `sqrt`, `clamp` and every other real `Math` member, so an entry Foundry
+ *   would happily roll silently contributed nothing.
+ *
+ * `Math.random` is excluded by name: it is the one `Math` member that is not a function of its
+ * arguments, and this module's whole contract is a number derived from the TEXT.
+ *
+ * A nonlinear function applied to a die's MEAN is an approximation (Jensen's inequality) — see
+ * the module header. It is the same approximation `min`/`max` carry and is called out there.
+ *
+ * @param {string} name The function name, exactly as authored.
+ * @param {number[]} args
+ * @returns {number} `NaN` for a name Foundry could not resolve either.
+ */
 function applyMathFunction(name, args) {
-  switch (name) {
-    case 'floor': {
-      return Math.floor(args[0]);
-    }
-    case 'ceil': {
-      return Math.ceil(args[0]);
-    }
-    case 'round': {
-      return Math.round(args[0]);
-    }
-    case 'trunc': {
-      return Math.trunc(args[0]);
-    }
-    case 'abs': {
-      return Math.abs(args[0]);
-    }
-    case 'sign': {
-      return Math.sign(args[0]);
-    }
-    case 'min': {
-      return args.length > 0 ? Math.min(...args) : NaN;
-    }
-    case 'max': {
-      return args.length > 0 ? Math.max(...args) : NaN;
-    }
-    default: {
-      return NaN;
-    }
-  }
+  if (name === 'random') return NaN;
+  const fn = FOUNDRY_MATH_EXTENSIONS[name] ?? Math[name];
+  if (typeof fn !== 'function') return NaN;
+  // `Math.min()` / `Math.max()` with no arguments answer ±Infinity, which is not a
+  // contribution any formula could produce; the finite test at the top of the walk refuses it.
+  const value = fn(...args);
+  return typeof value === 'number' ? value : NaN;
 }

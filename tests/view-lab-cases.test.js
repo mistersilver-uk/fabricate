@@ -254,6 +254,163 @@ test('every sourceMatches pattern resolves to at least one source file', () => {
   );
 });
 
+/** Hooks that belong to Foundry's own chrome, which this repository neither ships nor renames. */
+const FOUNDRY_CHROME_HOOKS = new Set(['dialog-content']);
+
+/**
+ * A selector with every `:not(…)` group removed, brackets balanced.
+ *
+ * `String#replaceAll` with a regex cannot do this: a `:not(:has([data-x]))` carries nested
+ * parentheses, and a non-greedy pattern stops at the first `)`, leaving a dangling tail that
+ * then tokenizes.
+ *
+ * @param {string} selector
+ * @returns {string}
+ */
+function stripNegations(selector) {
+  let result = '';
+  let index = 0;
+  while (index < selector.length) {
+    const start = selector.indexOf(':not(', index);
+    if (start === -1) return result + selector.slice(index);
+    result += selector.slice(index, start);
+    let depth = 0;
+    let cursor = start + 4;
+    for (; cursor < selector.length; cursor += 1) {
+      if (selector[cursor] === '(') depth += 1;
+      else if (selector[cursor] === ')') {
+        depth -= 1;
+        if (depth === 0) break;
+      }
+    }
+    index = cursor + 1;
+  }
+  return result;
+}
+
+/**
+ * Assert that every stable hook in ONE selector still exists in the UI corpus.
+ *
+ * Extracted so `expectSelector` is checked by the SAME code as `steps[].selector` (issue 1118
+ * review). It was only ever run over steps, and `expectSelector` is the assertion the capture
+ * driver runs BEFORE it photographs: a dead one fails the job WHOLE and publishes nothing,
+ * while `npm test` stays green and `check-screenshots` passes on stale frames. A second copy of
+ * the extraction would drift, so there is one.
+ *
+ * `continue` in the original loop becomes `return`: each branch that recognises a selector
+ * SHAPE has finished with it.
+ */
+function collectSelectorHookFailures(viewCase, selector, sources, haystack, missing) {
+    const editorTab = /^#([a-z-]+)-tab-([a-z-]+)$/.exec(selector);
+    if (editorTab) {
+      const [, family, tabId] = editorTab;
+      const builders = [...sources].filter(([, text]) => text.includes(`${family}-tab-\${`));
+      if (builders.length === 0) {
+        missing.push(
+          `${viewCase.id}: selector "${selector}" (no component builds ${family}-tab-* ids)`
+        );
+      } else if (!builders.some(([, text]) => text.includes(`'${tabId}'`))) {
+        missing.push(
+          `${viewCase.id}: selector "${selector}" (${builders
+            .map(([file]) => file)
+            .join(', ')} declares no "${tabId}" tab)`
+        );
+      }
+      return;
+    }
+    // The two rail groups build their subitem ids from a nav item's id
+    // (`manager-crafting-nav-${id}` / `manager-gathering-nav-${id}`), so the literal selector
+    // never appears in source; the id stem is what a rename would move.
+    //
+    // Scoped to the file that BUILDS those ids, exactly as the editor-tab branch above is. This
+    // branch used to search the whole tree, which is the pass-on-a-coincidence failure that branch
+    // exists to prevent — found by mutation: renaming `gatheringNavItems`' `id: 'tasks'` in
+    // `CraftingSystemManagerRoot.svelte` left the guard green, because `id: 'tasks'` also occurs in
+    // `GatheringDetailTabs.svelte`, which is a PLAYER-app component that has nothing to do with the
+    // manager rail. Three nav ids were in that state: tasks, encounters, travel.
+    // The Checks section STRIP builds `checks-section-${section.id}` (issue 1096), so the
+    // literal never appears in source either — and unlike a rail subitem the ids do not
+    // live in a component at all: they are `CHECK_SECTION_IDS`, declared beside the issue
+    // registry that buckets into them. Checking membership of the imported constant is
+    // stronger than a source scan, because a section renamed in one place and not the
+    // other cannot satisfy it.
+    const sectionId = /^#checks-section-(.+)$/.exec(selector);
+    if (sectionId) {
+      if (!CHECK_SECTION_IDS.includes(sectionId[1])) {
+        missing.push(
+          `${viewCase.id}: selector "${selector}" names no CHECK_SECTION_IDS member ` +
+            `(${CHECK_SECTION_IDS.join(', ')})`
+        );
+      }
+      return;
+    }
+    const navId = /^#manager-(crafting|gathering|checks)-nav-(.+)$/.exec(selector);
+    if (navId) {
+      const [, group, id] = navId;
+      // The scope is the builder PLUS what it imports: the gathering items are declared inline in
+      // the root, but the crafting ones live in `crafting/craftingNav.js`, which the root pulls
+      // in. Builder-only would reject every crafting nav id; whole-tree would accept anything.
+      const scope = navDeclarationScope(sources, `manager-${group}-nav-\${`);
+      if (scope.length === 0) {
+        missing.push(
+          `${viewCase.id}: selector "${selector}" (no component builds manager-${group}-nav-* ids)`
+        );
+      } else if (!scope.some(([, text]) => text.includes(`id: '${id}'`))) {
+        missing.push(
+          `${viewCase.id}: selector "${selector}" (${scope
+            .map(([file]) => file)
+            .join(', ')} declares no "${id}" nav item)`
+        );
+      }
+      return;
+    }
+    // Everything else is a compound of stable hooks: literal element ids, class names, and
+    // `data-*` attribute names. EVERY hook in the selector is checked, not just the first —
+    // a compound whose leading class survives a rename of its trailing attribute would
+    // otherwise match a broader element and capture the wrong row. Attribute VALUES are not
+    // hooks: they are fixture ids, which live in `tests/view-lab/world/`, not in `src/`.
+    // Values are stripped BEFORE extraction, not filtered afterwards: a quoted uuid such as
+    // `[data-essence-carrier="Item.sm-coal"]` otherwise reads `.sm-coal` as a class name and
+    // fails against a tree that was never supposed to contain it.
+    // `:not(…)` asserts ABSENCE, so requiring its hooks to exist is backwards: the one case
+    // that pins "this editor renders no modifier surface at all" would be failed by the very
+    // deletion it exists to photograph. Stripped BEFORE values, so a value inside a `:not`
+    // cannot survive its removal.
+    const withoutValues = stripNegations(selector).replaceAll(/=\s*("[^"]*"|'[^']*')/g, '');
+    const tokens = [
+      ...withoutValues.matchAll(/#([a-z][\w-]*)|\.([a-z][\w-]*)|\[([a-z-]+)/gi),
+    ].map((match) => match[1] ?? match[2] ?? match[3]);
+    if (tokens.length === 0) {
+      missing.push(`${viewCase.id}: selector "${selector}" has no verifiable token`);
+      return;
+    }
+    for (const token of tokens) {
+      // Anchored on a word boundary at BOTH ends, not a bare substring. `haystack.includes(token)`
+      // passes on a coincidence whenever one hook name contains another:
+      //
+      //   prefix — renaming the real `data-component-select` left `data-component-select-all-page`
+      //     in a sibling component, so the substring still matched and the guard stayed green over
+      //     six broken selectors.
+      //   suffix — deleting the `.inventory-card` CLASS while keeping the `data-inventory-card`
+      //     ATTRIBUTE left the token `inventory-card` still matching, because the attribute name
+      //     ENDS with it. A trailing-only boundary does not see this.
+      //
+      // Both were found by mutation, the second after the first was "fixed". `[\w-]` is what an
+      // attribute or class name continues with, so requiring neither neighbour to be one is what
+      // makes a token stop matching a longer name that merely contains it.
+      // Foundry's own chrome is not in this corpus and never will be: a selector that reaches
+      // into a core dialog is pinning core markup, which this repository does not own and
+      // cannot rename. Named individually rather than pattern-matched, so adding one is a
+      // deliberate act.
+      if (FOUNDRY_CHROME_HOOKS.has(token)) continue;
+      const bounded = new RegExp(String.raw`(?<![\w-])${escapeForRegExp(token)}(?![\w-])`);
+      if (bounded.test(haystack)) continue;
+      missing.push(
+        `${viewCase.id}: selector "${selector}" (nothing in src matches "${token}")`
+      );
+    }
+}
+
 test('every interaction step names text that exists in the manager UI', () => {
   // Steps are clicked by accessible name. A renamed rail entry would otherwise click nothing, and
   // the case would capture whichever screen happened to be showing.
@@ -332,111 +489,36 @@ test('every interaction step names text that exists in the manager UI', () => {
       // selector appears literally. Both halves still have to be checked, and checking them
       // against the WHOLE tree would pass on a coincidence — `'overview'` occurs everywhere. So
       // locate the file that builds those ids, and require the tab id to be declared in THAT file.
-      const editorTab = /^#([a-z-]+)-tab-([a-z-]+)$/.exec(step.selector);
-      if (editorTab) {
-        const [, family, tabId] = editorTab;
-        const builders = [...sources].filter(([, text]) => text.includes(`${family}-tab-\${`));
-        if (builders.length === 0) {
-          missing.push(
-            `${viewCase.id}: selector "${step.selector}" (no component builds ${family}-tab-* ids)`
-          );
-        } else if (!builders.some(([, text]) => text.includes(`'${tabId}'`))) {
-          missing.push(
-            `${viewCase.id}: selector "${step.selector}" (${builders
-              .map(([file]) => file)
-              .join(', ')} declares no "${tabId}" tab)`
-          );
-        }
-        continue;
-      }
-      // The two rail groups build their subitem ids from a nav item's id
-      // (`manager-crafting-nav-${id}` / `manager-gathering-nav-${id}`), so the literal selector
-      // never appears in source; the id stem is what a rename would move.
-      //
-      // Scoped to the file that BUILDS those ids, exactly as the editor-tab branch above is. This
-      // branch used to search the whole tree, which is the pass-on-a-coincidence failure that branch
-      // exists to prevent — found by mutation: renaming `gatheringNavItems`' `id: 'tasks'` in
-      // `CraftingSystemManagerRoot.svelte` left the guard green, because `id: 'tasks'` also occurs in
-      // `GatheringDetailTabs.svelte`, which is a PLAYER-app component that has nothing to do with the
-      // manager rail. Three nav ids were in that state: tasks, encounters, travel.
-      // The Checks section STRIP builds `checks-section-${section.id}` (issue 1096), so the
-      // literal never appears in source either — and unlike a rail subitem the ids do not
-      // live in a component at all: they are `CHECK_SECTION_IDS`, declared beside the issue
-      // registry that buckets into them. Checking membership of the imported constant is
-      // stronger than a source scan, because a section renamed in one place and not the
-      // other cannot satisfy it.
-      const sectionId = /^#checks-section-(.+)$/.exec(step.selector);
-      if (sectionId) {
-        if (!CHECK_SECTION_IDS.includes(sectionId[1])) {
-          missing.push(
-            `${viewCase.id}: selector "${step.selector}" names no CHECK_SECTION_IDS member ` +
-              `(${CHECK_SECTION_IDS.join(', ')})`
-          );
-        }
-        continue;
-      }
-      const navId = /^#manager-(crafting|gathering|checks)-nav-(.+)$/.exec(step.selector);
-      if (navId) {
-        const [, group, id] = navId;
-        // The scope is the builder PLUS what it imports: the gathering items are declared inline in
-        // the root, but the crafting ones live in `crafting/craftingNav.js`, which the root pulls
-        // in. Builder-only would reject every crafting nav id; whole-tree would accept anything.
-        const scope = navDeclarationScope(sources, `manager-${group}-nav-\${`);
-        if (scope.length === 0) {
-          missing.push(
-            `${viewCase.id}: selector "${step.selector}" (no component builds manager-${group}-nav-* ids)`
-          );
-        } else if (!scope.some(([, text]) => text.includes(`id: '${id}'`))) {
-          missing.push(
-            `${viewCase.id}: selector "${step.selector}" (${scope
-              .map(([file]) => file)
-              .join(', ')} declares no "${id}" nav item)`
-          );
-        }
-        continue;
-      }
-      // Everything else is a compound of stable hooks: literal element ids, class names, and
-      // `data-*` attribute names. EVERY hook in the selector is checked, not just the first —
-      // a compound whose leading class survives a rename of its trailing attribute would
-      // otherwise match a broader element and capture the wrong row. Attribute VALUES are not
-      // hooks: they are fixture ids, which live in `tests/view-lab/world/`, not in `src/`.
-      // Values are stripped BEFORE extraction, not filtered afterwards: a quoted uuid such as
-      // `[data-essence-carrier="Item.sm-coal"]` otherwise reads `.sm-coal` as a class name and
-      // fails against a tree that was never supposed to contain it.
-      const withoutValues = step.selector.replaceAll(/=\s*("[^"]*"|'[^']*')/g, '');
-      const tokens = [
-        ...withoutValues.matchAll(/#([a-z][\w-]*)|\.([a-z][\w-]*)|\[([a-z-]+)/gi),
-      ].map((match) => match[1] ?? match[2] ?? match[3]);
-      if (tokens.length === 0) {
-        missing.push(`${viewCase.id}: selector "${step.selector}" has no verifiable token`);
-        continue;
-      }
-      for (const token of tokens) {
-        // Anchored on a word boundary at BOTH ends, not a bare substring. `haystack.includes(token)`
-        // passes on a coincidence whenever one hook name contains another:
-        //
-        //   prefix — renaming the real `data-component-select` left `data-component-select-all-page`
-        //     in a sibling component, so the substring still matched and the guard stayed green over
-        //     six broken selectors.
-        //   suffix — deleting the `.inventory-card` CLASS while keeping the `data-inventory-card`
-        //     ATTRIBUTE left the token `inventory-card` still matching, because the attribute name
-        //     ENDS with it. A trailing-only boundary does not see this.
-        //
-        // Both were found by mutation, the second after the first was "fixed". `[\w-]` is what an
-        // attribute or class name continues with, so requiring neither neighbour to be one is what
-        // makes a token stop matching a longer name that merely contains it.
-        const bounded = new RegExp(String.raw`(?<![\w-])${escapeForRegExp(token)}(?![\w-])`);
-        if (bounded.test(haystack)) continue;
-        missing.push(
-          `${viewCase.id}: selector "${step.selector}" (nothing in src matches "${token}")`
-        );
-      }
+      collectSelectorHookFailures(viewCase, step.selector, sources, haystack, missing);
     }
   }
   assert.deepEqual(
     missing,
     [],
     `these steps reference UI that no longer exists:\n  ${missing.join('\n  ')}`
+  );
+});
+
+test('every expectSelector names UI that still exists', () => {
+  // The step sweep above never looked at `expectSelector`, so a hook named only there — which
+  // is the normal shape for a case whose whole job is to assert a state — was guarded by
+  // nothing. `data-system-modifier-roll-note` was exactly that: mutated to nonsense, every
+  // guard passed and only a 20-minute capture run would have found it.
+  const sources = renderSources();
+  const haystack = [...sources.values()].join('\n');
+  const missing = [];
+  let checked = 0;
+  for (const viewCase of VIEW_LAB_CASES) {
+    if (typeof viewCase.expectSelector !== 'string') continue;
+    checked += 1;
+    collectSelectorHookFailures(viewCase, viewCase.expectSelector, sources, haystack, missing);
+  }
+  assert.ok(checked > 0, 'a sweep over an empty collection passes exactly as loudly as a real one');
+  assert.deepEqual(
+    missing,
+    [],
+    'these expectSelectors reference UI that no longer exists, so the capture job fails WHOLE ' +
+      `and publishes nothing:\n  ${missing.join('\n  ')}`
   );
 });
 

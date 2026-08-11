@@ -1,4 +1,5 @@
 import {
+  modifierExpressionResolves,
   resolveEligibleModifierIds,
   resolveModifierBounds,
 } from '../../../../../systems/checkModifierResolver.js';
@@ -54,6 +55,7 @@ export const CHECK_READINESS_ISSUE_IDS = Object.freeze([
   // Check modifiers
   'modifierBoundsInverted',
   'modifierBoundsUnsafe',
+  'modifierExpressionInvalid',
   'modifiersInertNoCheck',
   'modifiersInertNoFormula',
 ]);
@@ -108,6 +110,7 @@ export const CHECK_ISSUE_SECTIONS = Object.freeze({
   multipleTierStepTargets: 'triggers',
   modifierBoundsInverted: 'modifiers',
   modifierBoundsUnsafe: 'modifiers',
+  modifierExpressionInvalid: 'modifiers',
   modifiersInertNoCheck: 'modifiers',
   modifiersInertNoFormula: 'modifiers',
 });
@@ -337,8 +340,17 @@ function fixedRangesHaveGap(outcomes, excluded) {
  *   exponent-notation value — so before the containment this single entry deleted every
  *   other flat modifier from the roll. It bites a rolling entry the same way, where the
  *   bound would be emitted into a `min(…)`/`max(…)` the grammar cannot parse.
- * - Both NAME the offending entries, because a shared library can be long and "one of your
- *   modifiers has a bad bound" is not a repairable instruction. They are raised ONLY for
+ * - **`modifierExpressionInvalid`** (`critical`, BLOCKING; issue 1118 review). An eligible
+ *   entry whose EXPRESSION cannot contribute at all — text the reducer cannot read (`1d4]`,
+ *   `damage`, an empty expression) or a fragment the engine cannot roll (`MAX(1d4, 2)`,
+ *   `1000d6`, `1d4 + .5`). Retiring `modifierRollExpression` left this class reported by
+ *   NOTHING: the entry silently contributes zero, which is exactly the defect readiness
+ *   exists to surface, and the crash cases are worse than silent because appending them would
+ *   have failed the check outright. Bounds faults are excluded from it deliberately — they
+ *   are reported above under repairs of their own, and one entry named under two different
+ *   instructions is worse than one.
+ * - All three NAME the offending entries, because a shared library can be long and "one of
+ *   your modifiers has a bad bound" is not a repairable instruction. They are raised ONLY for
  *   entries this activity actually selects: a fault on an entry only gathering drop rows
  *   reference is not this check's problem.
  * - **`modifiersInertNoCheck` / `modifiersInertNoFormula`** (`warning`). An eligible
@@ -384,11 +396,26 @@ function checkModifierReadiness(modifierContext, { rollsNoCheck, hasRollFormula 
     .filter(({ entry }) => Boolean(entry));
   const inverted = namesOf(faulted.filter(({ bounds }) => bounds.inverted));
   const unsafe = namesOf(faulted.filter(({ bounds }) => bounds.unsafe));
+  // An entry whose EXPRESSION cannot contribute — bounds set aside, since those are reported
+  // above under their own repairs. Asked of the resolver rather than re-derived, so what
+  // readiness calls unusable and what the roll silently drops are one decision.
+  const unusable = namesOf(
+    faulted.filter(
+      ({ entry, bounds }) =>
+        !bounds.inverted && !bounds.unsafe && !modifierExpressionResolves(entry)
+    )
+  );
 
   const issues = [];
-  const checks = [{ id: 'modifierBoundsValid', satisfied: inverted === '' && unsafe === '' }];
+  const checks = [
+    { id: 'modifierBoundsValid', satisfied: inverted === '' && unsafe === '' },
+    { id: 'modifierExpressionsResolve', satisfied: unusable === '' },
+  ];
   if (inverted !== '') pushIssue(issues, 'modifierBoundsInverted', 'critical', { names: inverted });
   if (unsafe !== '') pushIssue(issues, 'modifierBoundsUnsafe', 'critical', { names: unsafe });
+  if (unusable !== '') {
+    pushIssue(issues, 'modifierExpressionInvalid', 'critical', { names: unusable });
+  }
   if (rollsNoCheck) pushIssue(issues, 'modifiersInertNoCheck', 'warning');
   else if (!hasRollFormula) pushIssue(issues, 'modifiersInertNoFormula', 'warning');
   return { checks, issues };

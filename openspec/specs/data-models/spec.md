@@ -559,7 +559,7 @@ CraftingSystem = {
     A check is **usable** IFF its resolution mode carries an authored `rollFormula` that SURVIVES the retired-placeholder shim (see the _Crafting Check Macro Contract_ section); `enabled` is only the optional-check on/off toggle and is never a proxy for "the check works".
     The post-shim reading is the whole rule and not a refinement of it (issue 1094): a stored `@craftingmod` IS authored and is NOT usable, because `stripRetiredModifierPlaceholder` reduces it to `''`, and so is any formula whose placement of that placeholder the shim refuses (`1d20 * @craftingmod`, `max(@craftingmod, 2)`, `(2 + @craftingmod + 4) * 3`).
     `resolveActiveCraftingCheckFormula` and `resolveSalvageCheck` apply the shim BEFORE their emptiness test, `checksReadiness` derives `hasRollFormula` from the same post-shim value, and `CraftingEngine._runCraftingCheck` gates every runner on `checkUsable` rather than on a raw `rollFormula` — so readiness, the inert-cause projection, the recipe editor and the engine cannot disagree about whether a check works.
-    Check-modifier CONTRIBUTION is independent of the formula's text: the resolved scalar is APPENDED as one `+ N[Modifiers]` term, so a usable formula always carries it and no placeholder is authored, spent or forgotten.
+    Check-modifier CONTRIBUTION is independent of the formula's text: the resolved contribution is APPENDED as flavoured `[Modifiers]` terms — one `+ N` term carrying the flat sum, plus one `+ (…)` dice term per rolling entry — so a usable formula always carries it and no placeholder is authored, spent or forgotten.
     The historical `checkSource` discriminator (with its `"builtIn"` value) and the `builtIn: { ability, skill, dc, advantage }` game-system adapter sub-object are **NOT** part of the model: that adapter, together with the macro-as-check-source fields (`macroUuid`, `successMacroUuid`, `failureMacroUuid`), was removed in the 1.8.0 migration (`migrateRemoveLegacyCheckSources`).
     Normalization never emits `checkSource` or `builtIn`, and any persisted values are stripped on migration.
     The distinct `craftingCheck.simple.macroUuid` (the optional dynamic-DC macro) is a separate, retained feature and is not a check source.
@@ -1073,7 +1073,7 @@ Recipe = {
 
   // The recipe author's PICK of crafting-check modifiers (issues 770, 1055). Absent
   // (null) = picked nothing; inherit the system's `defaultModifierIds`. Present = names
-  // the eligible id subset reduced to the scalar appended to the check roll (unknown ids
+  // the eligible id subset reduced to the contribution appended to the check roll (unknown ids
   // dropped at resolution against the live catalogue, and the survivors truncated to
   // `craftingCheck.maxModifierPicks`, and each clamped to its own entry's `min`/`max`).
   // It is honoured ONLY under the system's `bySubject` combination rule — rendered "By

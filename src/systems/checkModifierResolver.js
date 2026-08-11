@@ -89,12 +89,14 @@
  *
  * The `@`-substitution of a modifier expression is INJECTED
  * ({@link makeRollDataExpressionResolver}), so the reduction below is a pure,
- * exhaustively-testable function of TEXT. The one Foundry global that remains is
- * `Roll.validate`, taken as an optional parameter defaulting to `globalThis.Roll` — the same
- * shape `stripRetiredModifierPlaceholder` uses, and for the same reason: an authored
- * expression the grammar refuses must not be appended, because a fragment that throws inside
- * `new Roll(...)` becomes a rolled, and therefore CONSUMING, failure. It fails OPEN when the
- * global is absent (headless, tests), where nothing evaluates the formula anyway.
+ * exhaustively-testable function of TEXT. The one Foundry global that remains is the `Roll`
+ * CLASS, taken as an optional parameter defaulting to `globalThis.Roll` — the same shape
+ * `stripRetiredModifierPlaceholder` uses, and for a stronger reason: an expression the engine
+ * cannot ROLL must not be appended, because a fragment that throws inside `new Roll(...)`
+ * becomes a rolled, and therefore CONSUMING, failure. {@link fragmentRolls} proves that by
+ * rolling the fragment maximized rather than by asking `Roll.validate`, which is a PARSE
+ * oracle and answers `true` for `MAX(1d4, 2)`, `1000d6` and `1d4 + .5` alike. It fails OPEN
+ * when the global is absent (headless, tests), where nothing evaluates the formula anyway.
  */
 
 import { stripRetiredModifierPlaceholder } from '../utils/craftingCheckExpression.js';
@@ -145,11 +147,20 @@ const VALID_POLICIES = new Set(MODIFIER_POLICIES);
  * The classification is DERIVED and never authored: it is a fact about the expression, and
  * a persisted flag a GM could contradict would be a second source of truth for it.
  *
+ * IT ASKS THE REDUCER (issue 1118 review), and no longer a pattern of its own. The pattern
+ * disagreed with the resolver in BOTH directions: `1dF` and `2dC` roll and got no chip, while
+ * `@a * 2` got the chip — and, since 1118, a roll note about dice it does not have — because
+ * the pattern also matched arithmetic grouping. `reduceRollExpression` observes dice while it
+ * reduces, so the chip and what actually appends are now one decision.
+ *
  * @param {unknown} expression The authored expression.
- * @returns {boolean} True when the expression rolls dice or uses arithmetic grouping.
+ * @returns {boolean} True when the expression rolls dice.
  */
 export function isRollExpression(expression) {
-  return /\d\s*d\s*\d|\bd\s*\d|[*/()]/i.test(typeof expression === 'string' ? expression : '');
+  // The `@`-paths are neutralized FIRST. The walk stops dead at an `@`, so an authored
+  // `@prof + 1d4` — the ordinary shape of a real modifier — would otherwise never reach its
+  // die and would classify as flat.
+  return reduceRollExpression(neutralExpressionResolver(expression) ?? '').rollsDice;
 }
 
 /**
@@ -703,11 +714,19 @@ function catalogueById(catalogue) {
  *   another entry's contribution.
  *
  * A BLOCKED entry (inverted or grammar-inexpressible bounds, an expression that does not
- * reduce, a fragment `Roll.validate` refuses) carries `value: 0`, `formula: null` and
+ * reduce, a fragment the engine cannot roll) carries `value: 0`, `formula: null` and
  * `average: 0` — it contributes nothing, exactly as an unresolvable expression always has.
  *
+ * `display` is the chip the roll prompt renders, built here rather than by the prompt so it
+ * cannot describe a contribution different from the one appended.
+ *
+ * `blocked` states that outcome EXPLICITLY rather than leaving it to be inferred from
+ * `value === 0`, which a legitimately zero-valued entry shares. Readiness needs to tell those
+ * two apart to report the first and stay silent about the second.
+ *
  * @typedef {{ id: string, label: string, icon: string, average: number,
- *   value: number|null, formula: string|null }} ResolvedCheckModifier
+ *   value: number|null, formula: string|null, blocked: boolean,
+ *   display: string }} ResolvedCheckModifier
  */
 
 /** A blocked entry's resolution: present in the list, contributing nothing. */
@@ -719,6 +738,8 @@ function blockedModifier(id, entry) {
     average: 0,
     value: 0,
     formula: null,
+    blocked: true,
+    display: '+0',
   };
 }
 
@@ -756,10 +777,10 @@ function buildModifierRollFragment(text, bounds) {
  * both reduces the text and reports whether it rolls, which is why those are one call and
  * not a reduction plus a separate opinion about the same string.
  *
- * A ROLLING entry is additionally validated: the assembled fragment is handed to
- * `Roll.validate`, and a refusal blocks that entry alone. Without it an authored `1d4]`
- * would reach `new Roll(...)` and throw as a rolled — therefore consuming — failure, where
- * before this change it merely reduced to 0.
+ * A ROLLING entry is additionally proven ROLLABLE by {@link fragmentRolls}, and a refusal
+ * blocks that entry alone. Without it an authored `MAX(1d4, 2)` or `1000d6` would reach
+ * `new Roll(...)` and throw as a rolled — therefore CONSUMING — failure, where before this
+ * change it merely reduced to a number.
  *
  * @param {string} id
  * @param {object|undefined} entry
@@ -776,12 +797,109 @@ function resolveCatalogueEntry(id, entry, resolveExpression, Roll) {
   const { value, rollsDice } = reduceRollExpression(text);
   if (!Number.isFinite(value)) return blockedModifier(id, entry);
   const average = clampModifierValue(value, entry);
-  if (!rollsDice) return { ...blockedModifier(id, entry), average, value: average };
-  const formula = buildModifierRollFragment(text, bounds);
-  if (typeof Roll?.validate === 'function' && Roll.validate(formula) === false) {
-    return blockedModifier(id, entry);
+  if (!rollsDice) {
+    return {
+      ...blockedModifier(id, entry),
+      average,
+      value: average,
+      blocked: false,
+      display: modifierChipLabel(average, null, bounds),
+    };
   }
-  return { ...blockedModifier(id, entry), average, value: null, formula };
+  const formula = buildModifierRollFragment(text, bounds);
+  if (!fragmentRolls(formula, Roll)) return blockedModifier(id, entry);
+  return {
+    ...blockedModifier(id, entry),
+    average,
+    value: null,
+    formula,
+    blocked: false,
+    display: modifierChipLabel(average, text, bounds),
+  };
+}
+
+/**
+ * Whether a rolling fragment can actually be ROLLED, proven by rolling it.
+ *
+ * `Roll.validate` IS NOT THIS TEST, and believing it was is how the first version of this
+ * guard came to have a hole the size of a capitalized function name. `validate` is
+ * `evaluateSync({ strict: false })`, and `Roll#_evaluateASTSync` SKIPS every
+ * non-deterministic node — so on a fragment that rolls, which is every fragment reaching
+ * here, the dice-bearing subtree is never evaluated and no evaluate-time error class is
+ * exercised at all. It is a PARSE oracle wearing an evaluation's clothes. Measured against
+ * the shipped 14.365 stack over 355 emitted formulas, 25 validated `true` and then threw:
+ *
+ * | authored            | what `evaluate()` says                                            |
+ * |---------------------|-------------------------------------------------------------------|
+ * | `MAX(1d4, 2)`       | `The function "MAX" is not registered in CONFIG.Dice.functions`    |
+ * | `1000d6`            | `You may not evaluate a DiceTerm with more than 999 results`       |
+ * | `1d4 + .5`          | `Unresolved StringTerm .5` (`Constant` needs a leading digit)      |
+ *
+ * Each of those throws inside `evaluateCheckRoll`, which the runners catch as a FAILED
+ * check — ingredients spent, tools broken, every attempt, with only a `console.error`.
+ *
+ * `maximize: true` is what makes the proof total: it renders every term deterministic, so
+ * `_evaluateASTSync` skips NOTHING and every node is really evaluated. The finite test on
+ * the total is required rather than decorative — `Roll#total` is `Number(this._total) || 0`,
+ * which passes `-Infinity` through as a number, and `max(, 2)` is exactly that shape. So
+ * this predicate closes the empty-head trap BY CONSTRUCTION rather than by argument.
+ *
+ * Measured at 0.03-0.5 ms per fragment on the real stack, exploding and reroll pools
+ * included, and it runs once per eligible rolling entry per resolution.
+ *
+ * FAIL OPEN when there is no dice engine (headless, tests), matching
+ * `stripRetiredModifierPlaceholder`: nothing evaluates the formula there either, and
+ * answering "unrollable" would silently delete a modifier from every headless resolution.
+ *
+ * @param {string} formula The assembled, clamped fragment.
+ * @param {typeof globalThis.Roll} [Roll]
+ * @returns {boolean}
+ */
+function fragmentRolls(formula, Roll) {
+  if (typeof Roll !== 'function') return true;
+  try {
+    const roll = new Roll(formula);
+    if (typeof roll?.evaluateSync !== 'function') return true;
+    roll.evaluateSync({ maximize: true });
+    return Number.isFinite(roll.total);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Every `@`-path replaced by a neutral `0`, so an expression can be judged WITHOUT an actor.
+ *
+ * Readiness runs in the manager, where there is no crafter and no roll data, but the two
+ * faults it has to surface — text the reducer cannot read, and a fragment the engine cannot
+ * roll — are properties of the AUTHORED text that survive substitution: `MAX(1d4, @a)` throws
+ * whatever `@a` is, and `1d4]` never parses.
+ */
+function neutralExpressionResolver(expression) {
+  return typeof expression === 'string' ? expression.replaceAll(/@[\w.]+/g, '0') : null;
+}
+
+/**
+ * Whether a catalogue entry's EXPRESSION can contribute at all, judged without an actor
+ * (issue 1118 review).
+ *
+ * IT ANSWERS ABOUT THE WHOLE ENTRY, BOUNDS INCLUDED, and the caller is what keeps a bounds
+ * fault from being reported twice: `checkModifierReadiness` asks this only of entries whose
+ * bounds it has already found sound. An earlier draft stripped the bounds here as well, and
+ * that was dead code — mutation showed removing the strip changed no test, because the
+ * caller's filter already made it unreachable. One guard, at the place that knows why.
+ *
+ * WHAT IT CANNOT SEE, stated rather than implied: a fault that depends on the actor's roll
+ * data. `@count d6` is rollable at `@count = 2` and refused at `@count = 1000`, and no
+ * actor-free reading can decide that. The roll path still refuses it per attempt.
+ *
+ * @param {object|null|undefined} entry A catalogue entry.
+ * @param {typeof globalThis.Roll} [Roll]
+ * @returns {boolean} False when the entry would contribute nothing for expression reasons.
+ */
+export function modifierExpressionResolves(entry, Roll = globalThis.Roll) {
+  if (!entry || typeof entry !== 'object') return false;
+  return !resolveCatalogueEntry('', entry, neutralExpressionResolver, Roll).blocked;
 }
 
 /**
@@ -895,21 +1013,30 @@ function sumOf(values) {
  * The chip a roll-prompt option shows for a resolved modifier.
  *
  * A FLAT entry keeps its signed number (`+3`, `-2`), which is what the prompt has always
- * rendered. A ROLLING entry shows what it will actually roll — `+1d4`, or
- * `+min(max(1d8, -1), 6)` when it is bounded — because a rolling modifier's average is not
- * what the player receives, and a chip reading `+2.5` next to a `1d4` would be a number the
- * roll can never produce. The outer parentheses the fragment carries for append safety are
- * stripped: they are there to make the append parse, not to be read.
+ * rendered. A ROLLING entry shows what it will actually roll — `+1d4`, or `+1d8 (-1 to 6)`
+ * when it is bounded — because a rolling modifier's average is not what the player receives,
+ * and a chip reading `+2.5` next to a `1d4` would be a number the roll can never produce.
  *
- * @param {ResolvedCheckModifier} modifier
+ * IT IS BUILT FROM THE SAME INPUTS AS THE FRAGMENT, not read back out of it. Rendering the
+ * fragment with its outer parentheses stripped put `+min((1d4), 3)` in front of a player: the
+ * inner parentheses are there to make the APPEND parse, and the function wrapper is how a
+ * bound is expressed TO THE DICE ENGINE — neither is something to read. Taking `(text,
+ * bounds)` keeps the chip and the fragment one derivation while letting each say it in its
+ * own register.
+ *
+ * @param {number} value The flat value; ignored when `text` is present.
+ * @param {string|null} text The substituted expression, or `null` for a flat entry.
+ * @param {{ min: number|null, max: number|null }} bounds
  * @returns {string}
  */
-function modifierChipLabel(modifier) {
-  if (modifier.formula === null) {
-    return modifier.value < 0 ? String(modifier.value) : `+${modifier.value}`;
+function modifierChipLabel(value, text, bounds) {
+  if (text === null) return value < 0 ? String(value) : `+${value}`;
+  if (bounds.min !== null && bounds.max !== null) {
+    return `+${text} (${bounds.min} to ${bounds.max})`;
   }
-  const stripped = /^\((.*)\)$/s.exec(modifier.formula);
-  return `+${stripped ? stripped[1] : modifier.formula}`;
+  if (bounds.min !== null) return `+${text} (min ${bounds.min})`;
+  if (bounds.max !== null) return `+${text} (max ${bounds.max})`;
+  return `+${text}`;
 }
 
 /**
@@ -959,10 +1086,9 @@ export function buildCheckModifierChoice(context = {}, resolveExpression, Roll =
   // Two-option rule: with 0 or 1 eligible modifier there is nothing to pick.
   if (ids.length < 2) return null;
   const byId = catalogueById(context.catalogue);
-  const modifiers = ids.map((id) => {
-    const resolved = resolveCatalogueEntry(id, byId.get(id), resolveExpression, Roll);
-    return { ...resolved, display: modifierChipLabel(resolved) };
-  });
+  const modifiers = ids.map((id) =>
+    resolveCatalogueEntry(id, byId.get(id), resolveExpression, Roll)
+  );
   const cap = resolveMaxModifierPicks(context);
   const maxPicks = Number.isFinite(cap) ? Math.min(cap, modifiers.length) : modifiers.length;
   const defaultSelectedIds = bestByAverage(modifiers, maxPicks).map((modifier) => modifier.id);

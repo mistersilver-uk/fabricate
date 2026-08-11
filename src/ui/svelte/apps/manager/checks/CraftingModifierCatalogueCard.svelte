@@ -177,7 +177,8 @@
       labelKey: 'FABRICATE.Admin.Manager.Checks.Crafting.ModifierPolicyHighest',
       fallback: 'Highest',
       descKey: 'FABRICATE.Admin.Manager.Checks.Crafting.ModifierPolicyHighestDesc',
-      descFallback: 'Use only the single largest eligible modifier (a deterministic maximum).',
+      descFallback:
+        'Use only the single best eligible modifier, ranked by its average — so a 1d4 (2.5) beats a flat +2, and the winner is added as dice.',
     },
     {
       value: 'bySubject',
@@ -222,7 +223,7 @@
       icon: 'fas fa-arrow-up-wide-short',
       introKey: 'FABRICATE.Admin.Manager.Checks.Crafting.ModifierEligibilityIntroHighest',
       intro:
-        'The modifiers switched on here are compared — only the largest of them is added. Every attempt uses this set.',
+        'The modifiers switched on here are compared by their average — only the best of them is added. Every attempt uses this set.',
     },
     playerPicks: {
       key: 'FABRICATE.Admin.Manager.Checks.Crafting.ModifierEligibilitySelectable',
