@@ -76,9 +76,15 @@ Each entry has an **Icon**, a **Label** such as Medicine or Herbalism, and an **
 There is nothing to add to the roll formula: an entry that is eligible applies automatically.
 
 This is the same library gathering drop rows and events reference for their d100 chances, so a modifier is defined once and used wherever it makes sense.
-The two READ it differently, and one difference is a rule rather than a preference: **an expression that rolls dice cannot be used by a check**.
-A drop row can — it works the expression out and shifts the chance by the result — but a check adds a single settled number to its roll, and a rolled expression is not one.
-The row says so where you author it, and any check that applies such a modifier reports a blocking issue naming the entry.
+The two READ it differently — a drop row works the expression out and shifts the chance by the result, while a check adds it to the roll — but **an expression that rolls dice is welcome in both**.
+A check appends the dice to its own roll formula, so a `1d4` modifier is rolled once together with the check, animates like any other die, and shows on the chat card.
+
+Two consequences are worth knowing.
+
+- **A modifier's minimum and maximum clamp the RESULT of its roll, not the formula.**
+A `1d8` capped at `+6` contributes 6 on a roll of 7 and 3 on a roll of 3, and the die still shows.
+- **Where modifiers compete, they are ranked by their AVERAGE.**
+Under **Highest**, and under **Player picks** when nothing prompts, `1d4` is worth 2.5 and beats a flat `+2` — the same winner every time, with no hidden roll to decide it — and the winner is then added as dice.
 
 ### Upgrading from a version before 1.21.0
 

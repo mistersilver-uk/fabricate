@@ -35,7 +35,7 @@ import { evaluatePrerequisite } from './characterPrerequisites.js';
 import {
   buildCheckModifierChoice,
   buildCheckModifierContext,
-  makeRollDataExpressionEvaluator,
+  makeRollDataExpressionResolver,
   resolveActiveCraftingCheckFormula,
   resolveModifierPolicy,
 } from './checkModifierResolver.js';
@@ -4415,7 +4415,7 @@ export class CraftingEngine {
     // `buildInteractiveRollOptions` omits the `modifierChoice` key for a falsy value.
     return buildCheckModifierChoice(
       craftingModifierContext,
-      makeRollDataExpressionEvaluator(craftingActor)
+      makeRollDataExpressionResolver(craftingActor)
     );
   }
 

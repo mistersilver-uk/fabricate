@@ -634,12 +634,13 @@ Issue 1095 had left a gathering system with TWO named-modifier libraries in two 
 
 **What remains distinct is how each CONSUMER reads an entry, and that distinction is real.**
 A **gathering drop-row or event reference** (§Gathering Character Modifiers below) applies to the **d100** path only, is authored per drop row and per event, and contributes a percentage-point delta or a multiplicative factor of the drop chance.
-A **check-modifier selection**, made by `gatheringCraftingCheck`'s own `{defaultModifierPolicy, defaultModifierIds, maxModifierPicks?}` triple over the same library, applies to the **formula-rolled** modes and contributes an additive `+ N[Modifiers]` term on the roll; it is inert in `d100` and reports the cause `noCheck`.
+A **check-modifier selection**, made by `gatheringCraftingCheck`'s own `{defaultModifierPolicy, defaultModifierIds, maxModifierPicks?}` triple over the same library, applies to the **formula-rolled** modes and contributes additive `[Modifiers]` terms on the roll — one flat `+ N` term and one `+ (…)` term per rolling entry; it is inert in `d100` and reports the cause `noCheck`.
 The two arithmetics stay incompatible — unifying the LIBRARY does not unify them — so an entry is a shared definition, never a shared application.
 
-**A ROLL-SHAPED expression is the one entry a check may not select.**
-A drop row evaluates the expression and applies the result, where a roll is meaningful; a check appends one resolved scalar as a dice-grammar `Constant`, which a roll cannot be, and `appendCheckModifierTerm` drops the WHOLE term for a value it cannot express — so one roll-shaped entry selected by a check would delete every other modifier from that roll.
-Readiness raises the blocking `modifierRollExpression` NAMING the entries, for the selecting activity only.
+**A ROLL-SHAPED expression is legal for BOTH consumers** (issue 1118).
+A drop row evaluates the expression and applies the result; a check appends the DICE to its roll formula, so the authored variance survives to the roll.
+The two consumers still read an entry differently — a delta on a chance, against a term in a formula — but neither refuses a roll.
+The blocking `modifierRollExpression` readiness issue issue 1117 raised is RETIRED; the two BOUNDS faults are unaffected, and for a rolling entry they clamp the rolled result rather than a resolved number.
 
 **The disambiguation is now a naming requirement about SECTIONS, not libraries.**
 The GM-facing section label on a Checks route is **"Check modifiers"** because what that route authors is a selection; the drop-row and event sections keep **"Character modifiers"** because what they author is a reference with its own arithmetic; and the one authoring surface is labelled simply **"Modifiers"**, because it is neither — it is the library both read.

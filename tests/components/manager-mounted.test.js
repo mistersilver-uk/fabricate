@@ -628,6 +628,9 @@ function compileManagerRoot() {
     // omitting it does not fail the suite: every mounted manager test is reported as
     // `# cancelled` behind one `ERR_MODULE_NOT_FOUND` hook failure.
     'src/systems/checkModifierResolver.js',
+    // …and issue 1118 gave it another: the deterministic average a rolling modifier is
+    // ranked by, which is also what tells the resolver that a modifier rolls at all.
+    'src/utils/rollExpressionAverage.js',
     // …and issue 1095 gave it a THIRD import: `resolveActiveSalvageCheckFormula` delegates
     // to the one salvage `(mode, checkUsable)` derivation rather than re-deriving the pair.
     'src/systems/salvageCheckUsability.js',

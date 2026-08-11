@@ -16,7 +16,11 @@ import {
 } from '../utils/craftingCheckExpression.js';
 
 import { appendResolvedCheckModifier } from './checkModifierResolver.js';
-import { appendCheckModifierTerm, CHECK_MODIFIER_TERM_LABEL } from './toolCheckBonus.js';
+import {
+  appendCheckModifierRollTerms,
+  appendCheckModifierTerm,
+  CHECK_MODIFIER_TERM_LABEL,
+} from './toolCheckBonus.js';
 
 /**
  * The deferred `playerPicks` slot the roll prompt renders in place of a number.
@@ -150,8 +154,8 @@ function requestedModifierIds(modifierChoice, choice) {
 }
 
 /**
- * Reduce a returned prompt selection to the modifiers that actually count, the scalar
- * they SUM to, and their labels.
+ * Reduce a returned prompt selection to the modifiers that actually count, the scalar the
+ * FLAT ones sum to, the roll fragments the ROLLING ones contribute, and their labels.
  *
  * The prompt is a UI control, so its cap is not the invariant — this layer re-derives
  * the legal selection from the descriptor and never trusts what came back:
@@ -166,12 +170,18 @@ function requestedModifierIds(modifierChoice, choice) {
  *   keeps an over-large selection from paying MORE than a legal one.
  * - `maxPicks` absent, or not a positive integer, means 1 — the historical single-pick
  *   behaviour, so a descriptor built before this field existed cannot silently widen.
- * - An empty selection sums to 0.
+ * - An empty selection sums to 0 and contributes no fragments.
  *
- * @param {{modifiers?: Array<{id: string, label?: string, value?: number}>,
- *   maxPicks?: number, defaultSelectedIds?: string[], defaultSelectedId?: string}|null} modifierChoice
+ * The fragments are taken VERBATIM from the descriptor (issue 1118). They were built,
+ * clamped and validated by `checkModifierResolver` when the choice was described, so this
+ * layer neither re-clamps nor re-wraps them — a second spelling of the same fragment is how
+ * the offered chip and the rolled term would come to disagree.
+ *
+ * @param {{modifiers?: Array<{id: string, label?: string, value?: number|null,
+ *   formula?: string|null}>, maxPicks?: number, defaultSelectedIds?: string[],
+ *   defaultSelectedId?: string}|null} modifierChoice
  * @param {{chosenModifierIds?: unknown, chosenModifierId?: unknown}|null} choice
- * @returns {{value: number, labels: string[]}}
+ * @returns {{value: number, formulas: string[], labels: string[]}}
  */
 function resolveModifierSelection(modifierChoice, choice) {
   const offered = Array.isArray(modifierChoice?.modifiers) ? modifierChoice.modifiers : [];
@@ -185,10 +195,13 @@ function resolveModifierSelection(modifierChoice, choice) {
     const num = Number(modifier?.value);
     return sum + (Number.isFinite(num) ? num : 0);
   }, 0);
+  const formulas = picked
+    .map((modifier) => modifier?.formula)
+    .filter((formula) => typeof formula === 'string' && formula.trim() !== '');
   const labels = picked
     .map((modifier) => modifier?.label)
     .filter((label) => typeof label === 'string' && label !== '');
-  return { value, labels };
+  return { value, formulas, labels };
 }
 
 /**
@@ -338,13 +351,17 @@ export async function evaluateCheckRoll(formula, actor, options = {}) {
     // situational-bonus append — so those compose on top of the chosen modifier and the
     // same appended formula feeds eval AND display (eval == display).
     if (useDeferredChoice) {
-      // The player may pick UP TO `maxPicks` modifiers and they SUM;
-      // `resolveModifierSelection` owns the whole reduction, including re-imposing the
-      // cap the prompt only *displays* and falling back to the pre-selection when the
-      // prompt confirmed without one (headless). A zero sum appends nothing, which is
-      // the same formula an empty pick would have rolled before.
+      // The player may pick UP TO `maxPicks` modifiers; the flat ones SUM into one term and
+      // each rolling one appends its own (issue 1118). `resolveModifierSelection` owns the
+      // whole reduction, including re-imposing the cap the prompt only *displays* and
+      // falling back to the pre-selection when the prompt confirmed without one (headless).
+      // A zero sum with no fragments appends nothing, which is the same formula an empty
+      // pick would have rolled before.
       const selection = resolveModifierSelection(modifierChoice, choice);
-      effectiveFormula = appendCheckModifierTerm(effectiveFormula, { value: selection.value });
+      effectiveFormula = appendCheckModifierRollTerms(
+        appendCheckModifierTerm(effectiveFormula, { value: selection.value }),
+        selection.formulas
+      );
       resolved = resolveCheckFormulaDisplay(effectiveFormula, actor);
       // Best-effort: append the chosen modifier labels to the chat flavor (e.g.
       // `… · Herbalism, Alchemist's Kit`), riding the existing flavor thread. One

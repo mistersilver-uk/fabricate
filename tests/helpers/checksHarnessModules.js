@@ -53,6 +53,9 @@ export const CHECKS_TREE_RAW_MODULES = Object.freeze([
   'src/utils/checkModifierPicks.js',
   'src/systems/toolCheckBonus.js',
   'src/utils/craftingCheckExpression.js',
+  // Issue 1118: the resolver ranks a rolling modifier by the deterministic average this
+  // import-free leaf computes, and the same walk is what tells it a modifier rolls at all.
+  'src/utils/rollExpressionAverage.js',
   'src/utils/routedOutcomeKeywords.js',
   // The formula field's quick-add chips are DERIVED from the active world through this
   // module rather than hard-coded (issue 1096), so the whole checks tree now imports it.

@@ -19,10 +19,10 @@
  * system-agnostic terms.
  *
  * The agnostic half is genuinely agnostic: a flat constant and a die are valid in
- * every system because they reference no roll data at all. A die is legal on a
- * gathering drop row and NOT on a check (a check adds one resolved scalar), which
- * the editor already says in its own roll note — the chip does not hide that, it
- * puts the GM in a state the surface explains.
+ * every system because they reference no roll data at all. A die is legal EVERYWHERE
+ * (issue 1118) — a gathering drop row applies its result and a check appends the dice
+ * to its roll formula — so the die chip suggests a first-class expression rather than
+ * one the editor has to warn about.
  */
 
 import { getCharacterModifierPresetsForFoundrySystem } from './gatheringCharacterModifierPresets.js';

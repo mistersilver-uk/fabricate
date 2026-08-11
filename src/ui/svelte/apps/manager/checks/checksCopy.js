@@ -30,10 +30,6 @@ export const CHECK_TICK_LABELS = Object.freeze({
     'CheckModifierBoundsValid',
     'Every applied check modifier has usable bounds',
   ],
-  modifierExpressionsResolveToScalars: [
-    'CheckModifierExpressionsResolveToScalars',
-    'Every applied check modifier resolves to a single number',
-  ],
   tierStepTargetsResolve: [
     'CheckTierStepTargetsResolve',
     'Tier-step targets name exactly one existing tier',
@@ -70,15 +66,11 @@ export const CHECK_ISSUE_LABELS = Object.freeze({
   ],
   modifierBoundsInverted: [
     'IssueModifierBoundsInverted',
-    'A check modifier this check applies has a minimum above its maximum, so it contributes nothing to the roll until you fix the two values.',
+    'A check modifier this check applies ({names}) has a minimum above its maximum, so it contributes nothing to the roll until you fix the two values.',
   ],
   modifierBoundsUnsafe: [
     'IssueModifierBoundsUnsafe',
-    'A check modifier this check applies has a minimum or maximum too large or too small to appear in a roll formula, so it contributes nothing. Use a whole number a die roll could plausibly reach.',
-  ],
-  modifierRollExpression: [
-    'IssueModifierRollExpression',
-    'This check applies a modifier whose expression rolls dice ({names}). A check adds ONE resolved number to its roll, so a rolled expression cannot be used — and it would drop every other modifier from this roll with it. Either stop applying it here, or rewrite its expression as a flat value in System settings › Modifiers.',
+    'A check modifier this check applies ({names}) has a minimum or maximum too large or too small to appear in a roll formula, so it contributes nothing. Use a whole number a die roll could plausibly reach.',
   ],
   modifiersInertNoCheck: [
     'IssueModifiersInertNoCheck',

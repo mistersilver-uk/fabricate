@@ -554,6 +554,41 @@ export const VIEW_LAB_CASES = Object.freeze([
     sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/SystemEditView\.svelte$/],
   }),
   managerCase({
+    id: 'manager-system-edit-modifier-rolls',
+    label: 'Manager — System edit rolling modifier',
+    // BEYOND the smoke: the walk opens no modifier entry at all, and `manager-system-edit-lists`
+    // opens the FIRST one, which is flat. Nothing anywhere framed a rolling entry.
+    reaches: 'beyond',
+    smokeLabels: [],
+    // THE STATE ISSUE 1118 CREATES. A check accepts dice now, so `hb-mod-luck` (`1d4`, capped at
+    // +3) is a first-class entry rather than one the surface warns about: the row's "Rolls dice"
+    // chip is neutral, the open editor's roll note says the dice reach the check's own roll and
+    // that a competing rule ranks the entry by its average, and the bounds pair beside it clamps
+    // the ROLLED result. The retired copy said the opposite of all three, so this frame is the
+    // one place the reversal is visible.
+    //
+    // Anchored on the OPEN ROW rather than on the card title: the note and the bounds pair are
+    // what this frame exists for, and `manager-system-edit-lists` already frames the card from
+    // its heading.
+    query: { system: 'lab-herbalism' },
+    steps: [
+      'System Overview',
+      { selector: '#system-tab-settings' },
+      { selector: '[data-section-collapse="currency"]' },
+      { selector: '[data-system-modifier="hb-mod-luck"] [data-toggle-modifier]' },
+      { selector: '[data-system-modifier="hb-mod-luck"]', scroll: true },
+    ],
+    expectView: 'system-edit',
+    // The roll NOTE keyed to this entry is the assertion, because it is the element the retired
+    // rule's copy occupied and the only one that cannot render if the note is dropped.
+    expectSelector:
+      '.fabricate-manager [data-system-modifiers]' +
+      ':has([data-system-modifier-roll-note="hb-mod-luck"])',
+    position: { width: 1280, height: 980 },
+    kinds: ['manager', 'system-edit'],
+    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/SystemEditView\.svelte$/],
+  }),
+  managerCase({
     id: 'currency-actor-property',
     label: 'Manager — Currency actor property',
     smokeLabels: ['currency-actor-property'],

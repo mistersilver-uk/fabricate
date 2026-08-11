@@ -1499,19 +1499,23 @@
                                   </div>
                                 {/if}
                                 {#if modifierIsRoll(entry)}
-                                  <!-- A roll-shaped expression is legal on a gathering drop row
-                                       and NOT on a check: a check appends one resolved scalar,
-                                       so it is stated here where the expression is authored
-                                       rather than only in Validation, which the GM reaches
-                                       from somewhere else. -->
+                                  <!-- A roll-shaped expression is legal EVERYWHERE (issue
+                                       1118): a drop row applies its result and a check
+                                       appends the dice to its formula. The note stays because
+                                       two consequences are worth stating where the expression
+                                       is authored — the dice are rolled once with the check
+                                       and shown on the card, and a competing rule ranks this
+                                       entry by its average. It carries the shared muted
+                                       note class rather than the fault class the two BLOCKING
+                                       bounds problems use, because nothing here is wrong. -->
                                   <p
-                                    class="manager-modifier-bounds-error"
+                                    class="manager-muted"
                                     role="note"
                                     data-system-modifier-roll-note={entry.id}
                                   >
                                     {text(
                                       'FABRICATE.Admin.Manager.Modifiers.RollNote',
-                                      'This expression rolls dice. Gathering drop rows and events can use it, but a check cannot — a check adds one resolved number to its roll. Any check that selects this modifier reports a blocking issue.'
+                                      'This expression rolls dice. Every activity can use it: a gathering drop row applies its result, and a check appends the dice to its roll formula so the roll is made once and shows on the card. Where modifiers compete — Highest, or Player picks — this one is ranked by its average.'
                                     )}
                                   </p>
                                 {/if}

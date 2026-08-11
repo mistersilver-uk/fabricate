@@ -425,7 +425,7 @@
   <p class="manager-muted">
     {text(
       'FABRICATE.Admin.Manager.Checks.Crafting.ModifierCatalogueIntro',
-      'Named character modifiers added to the check roll automatically, as one + N[Modifiers] term. Each expression resolves against the acting character (e.g. @abilities.med.mod). The library is authored once in System settings › Modifiers and shared by crafting, salvage and gathering; each decides which entries apply.'
+      'Named character modifiers added to the check roll automatically, as flavoured [Modifiers] terms — flat ones as one + N term, and a rolling one as its own dice term, so the dice show on the card. Each expression resolves against the acting character (e.g. @abilities.med.mod). The library is authored once in System settings › Modifiers and shared by crafting, salvage and gathering; each decides which entries apply.'
     )}
   </p>
 
@@ -529,12 +529,12 @@
             >
           {/if}
           {#if modifier.isRollExpression}
-            <!-- A roll-shaped expression cannot reach a check: `appendCheckModifierTerm`
-                 refuses a non-decimal-safe value and drops the WHOLE term, so one such entry
-                 would delete every other eligible modifier from the roll. The row says so,
-                 and readiness raises `modifierRollExpression` at `critical` when this
-                 activity actually selects it. -->
-            <Chip tone="warning" class="manager-modifier-roll-chip" data-crafting-modifier-roll
+            <!-- A rolling entry is APPENDED AS DICE to this check's formula (issue 1118), so
+                 the chip is a neutral fact about the entry rather than a warning about it:
+                 the dice reach the roll, animate and show on the card. It was `warning` while
+                 a check could only append a scalar and readiness blocked such an entry; that
+                 rule is retired, so the tone follows it. -->
+            <Chip tone="neutral" class="manager-modifier-roll-chip" data-crafting-modifier-roll
               >{text('FABRICATE.Admin.Manager.Checks.Crafting.ModifierRollTag', 'Rolls dice')}</Chip
             >
           {/if}

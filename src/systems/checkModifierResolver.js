@@ -25,34 +25,60 @@
  * alias and never re-emits it, exactly as `breakToolsOnFail` reads
  * `consumeCatalystsOnFail`.
  *
- * PER-ENTRY BOUNDS (issue 1095). An entry's optional `min`/`max` clamp the RESOLVED
- * value, after expression evaluation and before combination. Both are absence-preserving
- * in the same way `maxModifierPicks` is: only a finite number is attached, and absence
- * means unbounded. An authored `min > max` is a BLOCKING readiness issue
- * (`modifierBoundsInverted`) and the entry contributes 0 until it is repaired — the same
- * refuse posture `INVALID_CHARACTER_MODIFIER_BOUNDS` already takes for gathering drop
- * modifiers, adopted deliberately so a check modifier and a drop modifier fail the same
- * way. See {@link resolveModifierBounds} and {@link clampModifierValue}.
+ * EVERY RULE ACCEPTS DICE (issue 1118). A modifier expression may roll — `1d4`,
+ * `2d20kh1`, `{1d6,1d8}kh1` — on all four combination rules, including the ones a check
+ * consumes. A rolling entry is appended to the check's formula AS DICE
+ * (`1d20 + 2[Modifiers] + (1d4)[Modifiers]`), so the variance the GM authored survives to
+ * the roll, appears in `roll.dice`, animates, and shows on the chat card. Between issues
+ * 1117 and 1118 this module modelled a check modifier on a TOOL BONUS, which is a scalar,
+ * and a roll-shaped entry was a blocking readiness issue; that rule is retired, and with it
+ * `modifierRollExpression`.
  *
- * THE SCALAR APPENDS; IT DOES NOT SUBSTITUTE (issue 1094). There is no placeholder to
- * spend and no token a GM can forget: the resolved number is appended as one flavoured
- * `+ N[Modifiers]` term, exactly the way `appendToolBonusTerms` appends tool bonuses,
- * so a catalogue that reaches a rolled check always contributes. The retired
- * placeholder is stripped from stored formulas by the `1.21.0` migration and
- * from any survivor by `stripRetiredModifierPlaceholder`, so it can never double-count.
+ * Two consequences follow, and both are decisions rather than implementation details:
+ *
+ * - **`highest` and `playerPicks` rank by AVERAGE** ({@link reduceRollExpression}), so
+ *   `1d4` (2.5) beats a flat `+2`, the winner is the same on every attempt, and no hidden
+ *   roll is spent to find it. The winner is then appended AS DICE, so ranking
+ *   deterministically does not flatten what it selects.
+ * - **`min`/`max` clamp the ROLLED result**, expressed IN THE FORMULA as
+ *   `min(max((1d8), -1), 6)`. One roll, the dice stay visible, and "never more than +6"
+ *   means what it says: a roll of 7 contributes 6 and a roll of 3 contributes 3. Verified
+ *   against the shipped 14.365 dice stack rather than assumed — `CONFIG.Dice.functions` is
+ *   `{}` so `min`/`max` fall through to `Math.min`/`Math.max`, `FunctionTerm` evaluates a
+ *   dice argument rather than stringifying it, and `FunctionTerm#dice` bubbles the inner die
+ *   up into `Roll#dice`. See `tests/helpers/recordedModifierRollShapes.js`, which records
+ *   that run.
+ *
+ * PER-ENTRY BOUNDS (issue 1095). An entry's optional `min`/`max` bound its contribution.
+ * Both are absence-preserving in the same way `maxModifierPicks` is: only a finite number is
+ * attached, and absence means unbounded. An authored `min > max` is a BLOCKING readiness
+ * issue (`modifierBoundsInverted`) and the entry contributes nothing until it is repaired —
+ * the same refuse posture `INVALID_CHARACTER_MODIFIER_BOUNDS` already takes for gathering
+ * drop modifiers, adopted deliberately so a check modifier and a drop modifier fail the same
+ * way. A dice expression does NOT exempt a bound from being sane: the same two faults block
+ * a rolling entry, they just clamp a rolled number instead of a resolved one. See
+ * {@link resolveModifierBounds} and {@link clampModifierValue}.
+ *
+ * THE MODIFIER APPENDS; IT DOES NOT SUBSTITUTE (issue 1094). There is no placeholder to
+ * spend and no token a GM can forget: the resolved contribution is appended as flavoured
+ * `[Modifiers]` terms, exactly the way `appendToolBonusTerms` appends tool bonuses, so a
+ * catalogue that reaches a rolled check always contributes. The retired placeholder is
+ * stripped from stored formulas by the `1.21.0` migration and from any survivor by
+ * `stripRetiredModifierPlaceholder`, so it can never double-count.
  *
  * This module serves the two modes the catalogue reduces through:
  *
- * - DETERMINISTIC SCALAR ({@link resolveCheckModifierScalar}) — `addAll` and
+ * - DETERMINISTIC CONTRIBUTION ({@link resolveCheckModifierContribution}) — `addAll` and
  *   `highest` always, and `playerPicks` on every non-interactive path (API, headless,
- *   automated), where it resolves to the best legal selection.
- *   {@link appendResolvedCheckModifier} appends it before the string reaches Foundry's
+ *   automated), where it resolves to the best legal selection. It returns the flat SCALAR
+ *   and the ROLL FRAGMENTS separately, because those are appended by different functions;
+ *   {@link appendResolvedCheckModifier} appends both before the string reaches Foundry's
  *   `Roll`.
  * - INTERACTIVE CHOICE ({@link buildCheckModifierChoice}) — an interactive
  *   `playerPicks` attempt over an authored formula with at least TWO eligible modifiers.
- *   This module only DESCRIBES the options (and the highest-valued pre-selection); the
- *   term is appended by `evaluateCheckRoll` once the roll prompt returns the player's
- *   pick, through the same {@link appendCheckModifierTerm} the scalar path uses.
+ *   This module only DESCRIBES the options (and the highest-averaging pre-selection); the
+ *   terms are appended by `evaluateCheckRoll` once the roll prompt returns the player's
+ *   pick, through the same two appenders the deterministic path uses.
  *
  * Three sibling derivations complete the ownership at the other end —
  * {@link resolveActiveCraftingCheckFormula}, {@link resolveActiveSalvageCheckFormula}
@@ -61,16 +87,25 @@
  * a roll at all; all three apply the issue-1094 retirement shim BEFORE their emptiness
  * test, so readiness and the roll path can never disagree on any activity.
  *
- * This module is intentionally free of Foundry globals: the numeric evaluation of a
- * modifier expression is INJECTED (`evaluateExpression`), so the reduction is a pure,
- * exhaustively-testable function. `checkRoll.js` supplies the real evaluator (backed
- * by `Roll.replaceFormulaData` + a deterministic arithmetic reducer).
+ * The `@`-substitution of a modifier expression is INJECTED
+ * ({@link makeRollDataExpressionResolver}), so the reduction below is a pure,
+ * exhaustively-testable function of TEXT. The one Foundry global that remains is
+ * `Roll.validate`, taken as an optional parameter defaulting to `globalThis.Roll` — the same
+ * shape `stripRetiredModifierPlaceholder` uses, and for the same reason: an authored
+ * expression the grammar refuses must not be appended, because a fragment that throws inside
+ * `new Roll(...)` becomes a rolled, and therefore CONSUMING, failure. It fails OPEN when the
+ * global is absent (headless, tests), where nothing evaluates the formula anyway.
  */
 
 import { stripRetiredModifierPlaceholder } from '../utils/craftingCheckExpression.js';
+import { reduceRollExpression } from '../utils/rollExpressionAverage.js';
 
 import { resolveSalvageCheck } from './salvageCheckUsability.js';
-import { appendCheckModifierTerm, isDecimalSafeTermValue } from './toolCheckBonus.js';
+import {
+  appendCheckModifierRollTerms,
+  appendCheckModifierTerm,
+  isDecimalSafeTermValue,
+} from './toolCheckBonus.js';
 
 /**
  * The combination rules a system may choose, in authoring-surface order. Each states
@@ -657,72 +692,194 @@ function catalogueById(catalogue) {
 }
 
 /**
- * Evaluate one catalogue entry to its CLAMPED finite contribution. A missing or failed
- * expression contributes 0 (never NaN), and the entry's own bounds are applied here so
- * every consumer of a modifier value gets the bounded one.
- * @param {object|undefined} entry
- * @param {(expression: string|undefined) => number} evaluateExpression
- * @returns {number}
+ * One catalogue entry, resolved against the acting character (issue 1118).
+ *
+ * `average` is the ranking number and is ALWAYS finite. Exactly one of `value` and
+ * `formula` is set on a contributing entry:
+ *
+ * - `value` — a flat entry's clamped number. Several of these SUM into one appended term.
+ * - `formula` — a rolling entry's clamped, parenthesised roll fragment. Each of these gets
+ *   its OWN appended term, so the dice stay attributable and one bad fragment cannot delete
+ *   another entry's contribution.
+ *
+ * A BLOCKED entry (inverted or grammar-inexpressible bounds, an expression that does not
+ * reduce, a fragment `Roll.validate` refuses) carries `value: 0`, `formula: null` and
+ * `average: 0` — it contributes nothing, exactly as an unresolvable expression always has.
+ *
+ * @typedef {{ id: string, label: string, icon: string, average: number,
+ *   value: number|null, formula: string|null }} ResolvedCheckModifier
  */
-function resolveEntryValue(entry, evaluateExpression) {
-  const raw = typeof evaluateExpression === 'function' ? evaluateExpression(entry?.expression) : 0;
-  const num = Number(raw);
-  return clampModifierValue(Number.isFinite(num) ? num : 0, entry);
+
+/** A blocked entry's resolution: present in the list, contributing nothing. */
+function blockedModifier(id, entry) {
+  return {
+    id,
+    label: typeof entry?.label === 'string' ? entry.label : '',
+    icon: typeof entry?.icon === 'string' ? entry.icon : '',
+    average: 0,
+    value: 0,
+    formula: null,
+  };
 }
 
 /**
- * Resolve the check-modifier scalar for a modifier context.
+ * The clamped roll fragment for a rolling entry, expressed IN THE FORMULA.
  *
- * Reduction semantics:
- * - `highest`  → the deterministic `max(...)` of the eligible expression values (a
- *   scalar, NOT a keep-highest dice pool).
- * - `addAll`   → the sum of the eligible expression values.
- * - `bySubject` → the sum of what the SUBJECT picked. No special case is needed here:
+ * The expression is ALWAYS parenthesised first, and that is a correctness requirement rather
+ * than tidiness: an authored expression may carry its own flavour or bind more loosely than
+ * the append position implies, and `1d4[fire][Modifiers]` is a syntax error on 14.365 where
+ * `(1d4[fire])[Modifiers]` parses and rolls.
+ *
+ * The bounds then wrap it — `max` raises to the minimum, `min` lowers to the maximum — so a
+ * half-bounded entry emits ONE function and an unbounded one emits none.
+ *
+ * @param {string} text The `@`-substituted expression.
+ * @param {{ min: number|null, max: number|null }} bounds
+ * @returns {string}
+ */
+function buildModifierRollFragment(text, bounds) {
+  const inner = `(${text})`;
+  if (bounds.min !== null && bounds.max !== null) {
+    return `min(max(${inner}, ${bounds.min}), ${bounds.max})`;
+  }
+  if (bounds.min !== null) return `max(${inner}, ${bounds.min})`;
+  if (bounds.max !== null) return `min(${inner}, ${bounds.max})`;
+  return inner;
+}
+
+/**
+ * Resolve one catalogue entry to its {@link ResolvedCheckModifier}.
+ *
+ * The order is deliberate. Bounds are checked FIRST, so a blocked bound refuses the entry
+ * before any expression work and a dice expression cannot smuggle a bad bound past the
+ * check. Then the injected resolver substitutes `@`-paths; then {@link reduceRollExpression}
+ * both reduces the text and reports whether it rolls, which is why those are one call and
+ * not a reduction plus a separate opinion about the same string.
+ *
+ * A ROLLING entry is additionally validated: the assembled fragment is handed to
+ * `Roll.validate`, and a refusal blocks that entry alone. Without it an authored `1d4]`
+ * would reach `new Roll(...)` and throw as a rolled — therefore consuming — failure, where
+ * before this change it merely reduced to 0.
+ *
+ * @param {string} id
+ * @param {object|undefined} entry
+ * @param {(expression: string|undefined) => string|number|null} resolveExpression
+ * @param {typeof globalThis.Roll} [Roll]
+ * @returns {ResolvedCheckModifier}
+ */
+function resolveCatalogueEntry(id, entry, resolveExpression, Roll) {
+  const bounds = resolveModifierBounds(entry);
+  if (bounds.inverted || bounds.unsafe) return blockedModifier(id, entry);
+  const raw = typeof resolveExpression === 'function' ? resolveExpression(entry?.expression) : null;
+  const text = raw === null || raw === undefined ? '' : String(raw).trim();
+  if (text === '') return blockedModifier(id, entry);
+  const { value, rollsDice } = reduceRollExpression(text);
+  if (!Number.isFinite(value)) return blockedModifier(id, entry);
+  const average = clampModifierValue(value, entry);
+  if (!rollsDice) return { ...blockedModifier(id, entry), average, value: average };
+  const formula = buildModifierRollFragment(text, bounds);
+  if (typeof Roll?.validate === 'function' && Roll.validate(formula) === false) {
+    return blockedModifier(id, entry);
+  }
+  return { ...blockedModifier(id, entry), average, value: null, formula };
+}
+
+/**
+ * Resolve the eligible catalogue entries a modifier context SELECTS, in the order they are
+ * appended.
+ *
+ * Selection semantics, unchanged in shape from the pre-1118 scalar and restated because the
+ * ranking key changed from "value" to "average":
+ *
+ * - `addAll`    → every entry in the activity's default set.
+ * - `highest`   → the ONE entry with the highest average. `1d4` (2.5) beats a flat `+2`, and
+ *   the winner is appended as dice, so ranking deterministically does not flatten it.
+ * - `bySubject` → what the SUBJECT picked. No special case is needed:
  *   {@link resolveEligibleModifierIds} has already narrowed the list to the subject's
- *   selection and truncated it to the cap, so summing that list is the whole rule.
- * - `playerPicks` → the DETERMINISTIC (non-interactive / API / headless) fallback: the
- *   sum of the BEST LEGAL SELECTION, i.e. the highest `maxModifierPicks` values. At a
- *   cap of 1 that is exactly `max(...)` — the historical behaviour — and unbounded it is
- *   the sum, because picking everything is then legal and optimal. The interactive
- *   per-roll selection is handled OUT of this scalar path, via
- *   {@link buildCheckModifierChoice} + the interactive branch of `evaluateCheckRoll`.
+ *   selection and truncated it to the cap.
+ * - `playerPicks` → the DETERMINISTIC (non-interactive / API / headless) fallback: the BEST
+ *   LEGAL SELECTION, i.e. the highest-averaging `maxModifierPicks` entries. At a cap of 1
+ *   that is exactly `highest` — the historical behaviour — and unbounded it is everything,
+ *   because picking everything is then legal and optimal. The interactive per-roll selection
+ *   is handled OUT of this path, via {@link buildCheckModifierChoice} + the interactive
+ *   branch of `evaluateCheckRoll`.
  *
- * Each value is CLAMPED to its own entry's `min`/`max` before it is combined (issue
- * 1095), so a bound means the same thing under every rule and an inverted pair
- * contributes 0.
- *
- * A missing/failed expression contributes 0 (never NaN). An empty eligible set → 0 —
- * including a subject's AUTHORED empty set under `bySubject`.
+ * The two ranking rules SORT ON A COPY carrying each entry's eligible-set index, so equal
+ * averages tie-break by authored order (first occurrence wins) and the result is returned in
+ * eligible order rather than in rank order — the appended formula must not depend on which
+ * entry happened to rank highest.
  *
  * @param {object} context
- * @param {Array} [context.catalogue]
- * @param {unknown} [context.systemPolicy]
- * @param {Array} [context.defaultModifierIds]
- * @param {Array|null} [context.subjectModifierIds]
- * @param {number} [context.maxModifierPicks]
- * @param {(expression: string|undefined) => number} evaluateExpression Injected
- *   numeric evaluator (roll-data resolution + arithmetic), so the reduction is pure.
- * @returns {number}
+ * @param {(expression: string|undefined) => string|number|null} resolveExpression
+ * @param {typeof globalThis.Roll} [Roll]
+ * @returns {ResolvedCheckModifier[]}
  */
-export function resolveCheckModifierScalar(context = {}, evaluateExpression) {
+export function resolveSelectedCheckModifiers(
+  context = {},
+  resolveExpression,
+  Roll = globalThis.Roll
+) {
   const policy = resolveModifierPolicy(context);
-  const ids = resolveEligibleModifierIds(context);
   const byId = catalogueById(context.catalogue);
-  const values = ids.map((id) => resolveEntryValue(byId.get(id), evaluateExpression));
-  if (values.length === 0) return 0;
-  if (policy === 'highest') return Math.max(...values);
-  if (policy === 'playerPicks') {
-    // The non-interactive fallback stands in for a player who picks optimally: the sum
-    // of the highest N values the cap allows. At N=1 this is `max(...)`, reproducing the
-    // historical single-pick behaviour exactly; unbounded, every value is legal to pick
-    // and the same expression yields the plain sum.
-    const limit = resolveMaxModifierPicks(context);
-    if (limit >= values.length) return sumOf(values);
-    return sumOf([...values].sort((a, b) => b - a).slice(0, limit));
-  }
-  // `addAll` sums the activity's default set; `bySubject` sums the subject's
+  const resolved = resolveEligibleModifierIds(context).map((id) =>
+    resolveCatalogueEntry(id, byId.get(id), resolveExpression, Roll)
+  );
+  if (resolved.length === 0) return resolved;
+  if (policy === 'highest') return bestByAverage(resolved, 1);
+  if (policy === 'playerPicks') return bestByAverage(resolved, resolveMaxModifierPicks(context));
+  // `addAll` takes the activity's default set; `bySubject` takes the subject's
   // already-narrowed and already-capped selection.
-  return sumOf(values);
+  return resolved;
+}
+
+/**
+ * The `limit` highest-averaging entries, returned in ELIGIBLE order. Ties keep the first
+ * authored occurrence, matching the single-pick behaviour this generalizes.
+ * @param {ResolvedCheckModifier[]} resolved
+ * @param {number} limit
+ * @returns {ResolvedCheckModifier[]}
+ */
+function bestByAverage(resolved, limit) {
+  if (limit >= resolved.length) return resolved;
+  return resolved
+    .map((modifier, index) => ({ modifier, index }))
+    .sort((a, b) => b.modifier.average - a.modifier.average || a.index - b.index)
+    .slice(0, limit)
+    .sort((a, b) => a.index - b.index)
+    .map(({ modifier }) => modifier);
+}
+
+/**
+ * Resolve a modifier context to the two things a formula needs: the FLAT SCALAR every
+ * non-rolling selected entry sums to, and the ROLL FRAGMENTS each rolling one contributes.
+ *
+ * They are returned separately because they are appended by different functions —
+ * `appendCheckModifierTerm` collapses the scalar into one `+ N[Modifiers]` term and
+ * `appendCheckModifierRollTerms` gives each fragment its own — and because a caller that
+ * only needs the number (a display chip, a readiness read) must not have to know how a
+ * fragment is spelled.
+ *
+ * A zero scalar with no fragments is the "nothing applies" answer: an empty eligible set, a
+ * subject's authored-empty pick, or a selection whose every entry is blocked.
+ *
+ * @param {object} context
+ * @param {(expression: string|undefined) => string|number|null} resolveExpression
+ * @param {typeof globalThis.Roll} [Roll]
+ * @returns {{ scalar: number, rollTerms: string[], selected: ResolvedCheckModifier[] }}
+ */
+export function resolveCheckModifierContribution(
+  context = {},
+  resolveExpression,
+  Roll = globalThis.Roll
+) {
+  const selected = resolveSelectedCheckModifiers(context, resolveExpression, Roll);
+  return {
+    scalar: sumOf(selected.map((modifier) => modifier.value ?? 0)),
+    rollTerms: selected
+      .map((modifier) => modifier.formula)
+      .filter((formula) => typeof formula === 'string' && formula !== ''),
+    selected,
+  };
 }
 
 /**
@@ -735,66 +892,80 @@ function sumOf(values) {
 }
 
 /**
- * Build the interactive `playerPicks` choice descriptor for a modifier context: the
- * eligible modifier set mapped to `{ id, label, icon, value }` (value = the modifier's
- * `expression` evaluated to a finite number, else 0), the `maxPicks` cap the prompt must
- * enforce, and the pre-selection.
+ * The chip a roll-prompt option shows for a resolved modifier.
  *
- * The pre-selection is the BEST LEGAL selection — the highest-valued `maxPicks`
- * modifiers, tie-broken by eligible-set order (the FIRST occurrence among equal values
- * wins) — so it agrees exactly with the deterministic scalar a non-interactive craft
- * would have rolled. `defaultSelectedIds` carries it; `defaultSelectedId` remains the
- * first of them so a single-pick prompt keeps its existing contract unchanged.
+ * A FLAT entry keeps its signed number (`+3`, `-2`), which is what the prompt has always
+ * rendered. A ROLLING entry shows what it will actually roll — `+1d4`, or
+ * `+min(max(1d8, -1), 6)` when it is bounded — because a rolling modifier's average is not
+ * what the player receives, and a chip reading `+2.5` next to a `1d4` would be a number the
+ * roll can never produce. The outer parentheses the fragment carries for append safety are
+ * stripped: they are there to make the append parse, not to be read.
+ *
+ * @param {ResolvedCheckModifier} modifier
+ * @returns {string}
+ */
+function modifierChipLabel(modifier) {
+  if (modifier.formula === null) {
+    return modifier.value < 0 ? String(modifier.value) : `+${modifier.value}`;
+  }
+  const stripped = /^\((.*)\)$/s.exec(modifier.formula);
+  return `+${stripped ? stripped[1] : modifier.formula}`;
+}
+
+/**
+ * Build the interactive `playerPicks` choice descriptor for a modifier context: the
+ * eligible modifier set mapped to `{ id, label, icon, value, formula, display }`, the
+ * `maxPicks` cap the prompt must enforce, and the pre-selection.
+ *
+ * Each option carries BOTH halves of its resolution, because the prompt needs different
+ * ones for different jobs: `value` is the flat number a chosen flat entry appends (null for
+ * a rolling one), `formula` is the clamped roll fragment a chosen rolling entry appends
+ * (null for a flat one), `average` is what the pre-selection ranks by, and `display` is the
+ * chip. `evaluateCheckRoll` re-derives the legal selection from this descriptor and never
+ * trusts what the prompt returns, so every one of these has to travel with it.
+ *
+ * The pre-selection is the BEST LEGAL selection — the highest-AVERAGING `maxPicks`
+ * modifiers, tie-broken by eligible-set order (the FIRST occurrence among equal averages
+ * wins) — so it agrees exactly with what a non-interactive craft would have rolled.
+ * `defaultSelectedIds` carries it; `defaultSelectedId` remains the first of them so a
+ * single-pick prompt keeps its existing contract unchanged.
  *
  * Returns `null` when FEWER THAN TWO modifiers are eligible, so the caller omits the
- * choice and the formula keeps its deterministic scalar. Zero eligible modifiers is the
- * obvious case; ONE is suppressed too because a single-option radio group is not a
+ * choice and the formula keeps its deterministic contribution. Zero eligible modifiers is
+ * the obvious case; ONE is suppressed too because a single-option radio group is not a
  * choice — the player cannot change it, and with one eligible modifier `highest` IS the
  * only possible pick, so the deterministic path produces identical arithmetic without
  * rendering a choice-less "Check modifier" panel.
  *
  * This appends NOTHING; it only surfaces the options for the interactive roll prompt.
- * The chosen value is appended downstream in `evaluateCheckRoll` once the player
+ * The chosen contribution is appended downstream in `evaluateCheckRoll` once the player
  * confirms.
  *
- * Each option's `value` is CLAMPED to its entry's own `min`/`max` (issue 1095) through
- * the same {@link clampModifierValue} the scalar path uses, so the number the player is
- * shown, the number the pre-selection is computed from, and the number the roll appends
- * are all one number. An inverted pair reads 0 here too, so the prompt never advertises a
- * contribution a blocked entry cannot make.
+ * Every option is resolved through the same {@link resolveCatalogueEntry} the deterministic
+ * path uses, so the number the player is shown, the number the pre-selection is computed
+ * from, and what the roll appends are all one resolution. A blocked entry reads `+0` here
+ * too, so the prompt never advertises a contribution it cannot make.
  *
  * @param {object} context The modifier context ({@link buildCheckModifierContext}'s bag).
- * @param {(expression: string|undefined) => number} evaluateExpression Injected
- *   numeric evaluator (roll-data resolution + arithmetic).
- * @returns {{ modifiers: Array<{id:string,label:string,icon:string,value:number}>,
- *   maxPicks: number, defaultSelectedIds: string[], defaultSelectedId: string }|null}
+ * @param {(expression: string|undefined) => string|number|null} resolveExpression Injected
+ *   `@`-substitution.
+ * @param {typeof globalThis.Roll} [Roll]
+ * @returns {{ modifiers: Array<{id:string,label:string,icon:string,value:number|null,
+ *   formula:string|null,average:number,display:string}>, maxPicks: number,
+ *   defaultSelectedIds: string[], defaultSelectedId: string }|null}
  */
-export function buildCheckModifierChoice(context = {}, evaluateExpression) {
+export function buildCheckModifierChoice(context = {}, resolveExpression, Roll = globalThis.Roll) {
   const ids = resolveEligibleModifierIds(context);
   // Two-option rule: with 0 or 1 eligible modifier there is nothing to pick.
   if (ids.length < 2) return null;
   const byId = catalogueById(context.catalogue);
   const modifiers = ids.map((id) => {
-    const entry = byId.get(id);
-    return {
-      id,
-      label: typeof entry?.label === 'string' ? entry.label : '',
-      icon: typeof entry?.icon === 'string' ? entry.icon : '',
-      value: resolveEntryValue(entry, evaluateExpression),
-    };
+    const resolved = resolveCatalogueEntry(id, byId.get(id), resolveExpression, Roll);
+    return { ...resolved, display: modifierChipLabel(resolved) };
   });
-  // Pre-select the best LEGAL selection: the highest-valued `maxPicks` modifiers. The
-  // sort is on a copy carrying each modifier's original index so equal values tie-break
-  // by eligible-set order (first occurrence wins), matching the single-pick behaviour
-  // this generalizes and keeping the pre-selection equal to the deterministic scalar.
   const cap = resolveMaxModifierPicks(context);
   const maxPicks = Number.isFinite(cap) ? Math.min(cap, modifiers.length) : modifiers.length;
-  const defaultSelectedIds = modifiers
-    .map((modifier, index) => ({ modifier, index }))
-    .sort((a, b) => b.modifier.value - a.modifier.value || a.index - b.index)
-    .slice(0, maxPicks)
-    .sort((a, b) => a.index - b.index)
-    .map(({ modifier }) => modifier.id);
+  const defaultSelectedIds = bestByAverage(modifiers, maxPicks).map((modifier) => modifier.id);
   return {
     modifiers,
     maxPicks,
@@ -804,184 +975,74 @@ export function buildCheckModifierChoice(context = {}, evaluateExpression) {
 }
 
 /**
- * Deterministically evaluate a resolved arithmetic string (post `@`-substitution) to
- * a number. Supports `+ - * / %`, parentheses, unary +/-, decimals, and the common
- * roll-data math functions (`floor`/`ceil`/`round`/`trunc`/`abs`/`sign`/`min`/`max`).
- * No dice, no `eval`/`Function` (avoids the code-injection smell). Returns NaN on a
- * malformed input; callers coerce that to 0.
+ * Deterministically evaluate a resolved expression (post `@`-substitution) to a number.
+ *
+ * DELEGATES to {@link reduceRollExpression} rather than carrying its own walk (issue 1118).
+ * The two had to agree about arithmetic anyway, and a second recursive-descent reducer for
+ * the same grammar is how a dice-aware reduction and a dice-blind one come to answer
+ * differently about `floor(1d8 / 2)`.
+ *
+ * The reduction is the expression's deterministic AVERAGE, so a dice term contributes its
+ * mean rather than a rolled face. That is the only reading that is a function of the text.
+ *
  * @param {string} input
- * @returns {number}
+ * @returns {number} NaN on a malformed input; callers coerce that to 0.
  */
 export function evaluateNumericExpression(input) {
-  const src = String(input ?? '').trim();
-  if (src === '') return NaN;
-  let i = 0;
-
-  const skipWs = () => {
-    while (i < src.length && /\s/.test(src[i])) i++;
-  };
-
-  function parseExpression() {
-    let left = parseTerm();
-    for (;;) {
-      skipWs();
-      const op = src[i];
-      if (op === '+' || op === '-') {
-        i++;
-        const right = parseTerm();
-        left = op === '+' ? left + right : left - right;
-      } else break;
-    }
-    return left;
-  }
-
-  function parseTerm() {
-    let left = parseUnary();
-    for (;;) {
-      skipWs();
-      const op = src[i];
-      if (['*', '/', '%'].includes(op)) {
-        i++;
-        const right = parseUnary();
-        if (op === '*') left *= right;
-        else if (op === '/') left = right === 0 ? NaN : left / right;
-        else left = right === 0 ? NaN : left % right;
-      } else break;
-    }
-    return left;
-  }
-
-  function parseUnary() {
-    skipWs();
-    if (src[i] === '+') {
-      i++;
-      return parseUnary();
-    }
-    if (src[i] === '-') {
-      i++;
-      return -parseUnary();
-    }
-    return parsePrimary();
-  }
-
-  function parsePrimary() {
-    skipWs();
-    const ch = src[i];
-    if (ch === '(') {
-      i++;
-      const value = parseExpression();
-      skipWs();
-      if (src[i] === ')') i++;
-      return value;
-    }
-    if (/[a-zA-Z_]/.test(ch)) return parseFunction();
-    return parseNumber();
-  }
-
-  function parseNumber() {
-    skipWs();
-    const start = i;
-    while (i < src.length && /[0-9.]/.test(src[i])) i++;
-    const num = Number(src.slice(start, i));
-    return Number.isFinite(num) ? num : NaN;
-  }
-
-  function parseFunction() {
-    const start = i;
-    while (i < src.length && /[a-zA-Z_]/.test(src[i])) i++;
-    const name = src.slice(start, i).toLowerCase();
-    skipWs();
-    const args = [];
-    if (src[i] === '(') {
-      i++;
-      skipWs();
-      if (src[i] !== ')') {
-        args.push(parseExpression());
-        skipWs();
-        while (src[i] === ',') {
-          i++;
-          args.push(parseExpression());
-          skipWs();
-        }
-      }
-      if (src[i] === ')') i++;
-    }
-    return applyMathFunction(name, args);
-  }
-
-  const result = parseExpression();
-  return Number.isFinite(result) ? result : NaN;
-}
-
-function applyMathFunction(name, args) {
-  switch (name) {
-    case 'floor': {
-      return Math.floor(args[0]);
-    }
-    case 'ceil': {
-      return Math.ceil(args[0]);
-    }
-    case 'round': {
-      return Math.round(args[0]);
-    }
-    case 'trunc': {
-      return Math.trunc(args[0]);
-    }
-    case 'abs': {
-      return Math.abs(args[0]);
-    }
-    case 'sign': {
-      return Math.sign(args[0]);
-    }
-    case 'min': {
-      return args.length > 0 ? Math.min(...args) : NaN;
-    }
-    case 'max': {
-      return args.length > 0 ? Math.max(...args) : NaN;
-    }
-    default: {
-      return NaN;
-    }
-  }
+  return reduceRollExpression(input).value;
 }
 
 /**
- * Build the real expression evaluator for a crafting actor: resolve an expression's
+ * Build the real `@`-substitution for a crafting actor: resolve an expression's
  * `@`-placeholders against the actor's roll data via Foundry's `Roll.replaceFormulaData`
- * (missing keys → 0), then reduce the arithmetic deterministically. Any unresolved key,
- * NaN, or malformed expression yields 0 — never NaN into the roll.
+ * (missing keys → 0) and return the RESOLVED TEXT.
+ *
+ * IT RETURNS TEXT, NOT A NUMBER (issue 1118), and that is the whole seam change. A modifier
+ * may roll, so reducing here would have destroyed the dice before anything downstream could
+ * decide whether to append them; substitution is the only part of the resolution that needs
+ * Foundry, and it is therefore the only part that is injected. {@link reduceRollExpression}
+ * does the reduction, purely, from the text this returns.
+ *
+ * An unresolved key, an injected NaN sentinel, an absent `Roll`, or an empty expression all
+ * yield `null` — "this expression does not resolve for this actor" — which every caller
+ * treats as contributing nothing, exactly as the pre-1118 evaluator's `0` did.
+ *
  * @param {object|null} actor
  * @param {typeof globalThis.Roll} [Roll]
- * @returns {(expression: string|undefined) => number}
+ * @returns {(expression: string|undefined) => string|null}
  */
-export function makeRollDataExpressionEvaluator(actor, Roll = globalThis.Roll) {
+export function makeRollDataExpressionResolver(actor, Roll = globalThis.Roll) {
   const rollData = actor?.getRollData?.() ?? actor?.system ?? {};
   return (expression) => {
-    if (typeof expression !== 'string' || expression.trim() === '') return 0;
-    if (typeof Roll?.replaceFormulaData !== 'function') return 0;
+    if (typeof expression !== 'string' || expression.trim() === '') return null;
+    if (typeof Roll?.replaceFormulaData !== 'function') return null;
     const replaced = Roll.replaceFormulaData(String(expression), rollData, {
       missing: '0',
       warn: false,
     });
-    // An unresolved key or an injected NaN sentinel means the expression does not
-    // reduce to a number for this actor → contribute 0.
-    if (/@/.test(replaced) || /NaN/i.test(replaced)) return 0;
-    const value = evaluateNumericExpression(replaced);
-    return Number.isFinite(value) ? value : 0;
+    // An unresolved key or an injected NaN sentinel means the expression does not resolve
+    // for this actor → contribute nothing.
+    if (/@/.test(replaced) || /NaN/i.test(replaced)) return null;
+    return replaced;
   };
 }
 
 /**
- * Apply a check-modifier context to a formula: resolve the eligible modifiers to a
- * scalar against the crafter's roll data and APPEND it as one flavoured
- * `+ N[Modifiers]` term, BEFORE the string reaches Foundry's `Roll` (issue 1094).
+ * Apply a check-modifier context to a formula: resolve the eligible modifiers against the
+ * crafter's roll data and APPEND their contribution, BEFORE the string reaches Foundry's
+ * `Roll` (issues 1094, 1118).
+ *
+ * TWO APPENDS, IN A FIXED ORDER. The flat modifiers collapse into one `+ N[Modifiers]` term
+ * first, then each rolling modifier gets its own `+ (…)[Modifiers]` term in eligible order.
+ * The flat term leads so that a catalogue with no dice in it emits the byte-identical
+ * formula it always has.
  *
  * There is no placeholder and no back-compat branch: a GM authors no token and cannot
- * forget one, so a catalogue that reaches a rolled check always contributes. A ZERO
- * scalar — an empty eligible set, a subject's authored-empty pick, or no context at all
- * — appends nothing, so those formulas are byte-identical to their authored form apart
- * from the trim `appendToolBonusTerms` applies. A non-finite or exponent-notation scalar
- * also appends nothing rather than emitting a term the dice grammar cannot parse.
+ * forget one, so a catalogue that reaches a rolled check always contributes. A ZERO scalar
+ * with no fragments — an empty eligible set, a subject's authored-empty pick, or no context
+ * at all — appends nothing, so those formulas are byte-identical to their authored form
+ * apart from the trim `appendToolBonusTerms` applies. A non-finite or exponent-notation
+ * scalar also appends nothing rather than emitting a term the dice grammar cannot parse.
  *
  * The NAME says what it does rather than where it came from (issue 1095): it appends an
  * already-resolvable context, on any of the three activities, and nothing about it is
@@ -1003,8 +1064,14 @@ export function appendResolvedCheckModifier(
   Roll = globalThis.Roll
 ) {
   if (typeof formula !== 'string') return formula;
-  const scalar = craftingModifier
-    ? resolveCheckModifierScalar(craftingModifier, makeRollDataExpressionEvaluator(actor, Roll))
-    : 0;
-  return appendCheckModifierTerm(formula, { value: scalar });
+  if (!craftingModifier) return appendCheckModifierTerm(formula, { value: 0 });
+  const { scalar, rollTerms } = resolveCheckModifierContribution(
+    craftingModifier,
+    makeRollDataExpressionResolver(actor, Roll),
+    Roll
+  );
+  return appendCheckModifierRollTerms(
+    appendCheckModifierTerm(formula, { value: scalar }),
+    rollTerms
+  );
 }

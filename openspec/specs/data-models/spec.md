@@ -144,7 +144,8 @@ CraftingSystem = {
   // unrelated records that could disagree. Both migrations delete the old key.
   //
   // THE SHAPE IS A SUPERSET, and each field is honoured by whichever consumer needs it:
-  // `min`/`max` clamp the resolved value of a CHECK modifier, while a gathering drop-row
+  // `min`/`max` clamp a CHECK modifier's contribution — the resolved number for a flat
+  // entry, and the ROLLED result for a rolling one — while a gathering drop-row
   // reference carries its OWN `min`/`max` that clamp its contribution independently.
   // `isRollExpression` is DERIVED from the expression on every normalize and never read
   // from the input, so a persisted or imported flag cannot contradict the expression
@@ -161,21 +162,21 @@ CraftingSystem = {
   // SECOND blocking bounds fault, `modifierBoundsUnsafe`, also `critical`, and likewise
   // contains the entry to 0. Two issue ids rather than one cause with two readings: the
   // repairs differ and `1e21` is not an inversion.
-  // A ROLL-SHAPED expression is legal here and illegal in a CHECK. A gathering drop row
-  // evaluates the expression and applies the result as a percentage-point delta, where a
-  // roll is meaningful; a check appends ONE resolved scalar as a dice-grammar `Constant`,
-  // which a roll cannot be — and `appendCheckModifierTerm` refuses a value it cannot
-  // express by dropping the WHOLE term, so one such entry selected by a check would delete
-  // every other modifier from that roll. Readiness therefore raises the BLOCKING
-  // `modifierRollExpression` naming the offending entries, but only for the activities that
-  // actually select them.
+  // A ROLL-SHAPED expression is legal here and legal in a CHECK (issue 1118). A gathering
+  // drop row evaluates the expression and applies the result as a percentage-point delta;
+  // a check appends the DICE to its roll formula, so the authored variance survives to the
+  // roll and shows on the card. The bounds above clamp the ROLLED result for such an entry,
+  // in the formula. `isRollExpression` is therefore a DISPLAY classification and never a
+  // gate: the blocking `modifierRollExpression` readiness issue issue 1117 raised is
+  // RETIRED.
   //
   // An entry with an EMPTY expression is KEPT rather than dropped: the library has an "Add
   // modifier" button, and an entry that vanished on save the moment it was created would
   // make that button appear broken. It is still a runtime misconfiguration wherever it is
   // referenced.
   //
-  // Absent = empty library, so every activity's scalar is 0 and no term is appended.
+  // Absent = empty library, so every activity's contribution is nothing and no term is
+  // appended.
   modifiers?: {
     id: string, label: string, expression: string, isRollExpression: boolean,
     icon?: string, min?: number, max?: number
@@ -589,7 +590,7 @@ CraftingSystem = {
     It replaces `craftingCheck.checkModifiers` (moved up and deleted by `1.22.0`), `CraftingSystem.checkModifiers` and `gatheringConfig.systems[systemId].characterModifiers` (merged and deleted by `1.23.0`).
     An entry with an empty expression is kept, not dropped, because the authoring surface can create one.
     Each of `craftingCheck`, `salvageCraftingCheck` and `gatheringCraftingCheck` carries its own `{ defaultModifierPolicy, defaultModifierIds, maxModifierPicks? }` selection over it, normalized by ONE shared derivation (`CraftingSystemManager._normalizeCheckModifierSelection`) so the three cannot drift; a default id naming nothing in the catalogue is dropped, preserving order and de-duplication.
-    `min` / `max` clamp the RESOLVED value of that entry, after expression evaluation and before combination, so a bound means the same thing under every combination rule.
+    `min` / `max` clamp that entry's CONTRIBUTION, so a bound means the same thing under every combination rule: the resolved value for a flat expression, and the ROLLED result for a rolling one, the latter expressed in the formula as `min(max((1d8), -1), 6)`.
     Both are absence-preserving in the same way `maxModifierPicks` is: only a FINITE number is attached, and `null` / `''` / `[]` are guarded explicitly before coercion because `Number()` reads all three as `0` and `0` is a real bound.
     An authored `min > max` is preserved verbatim rather than reordered, raises the BLOCKING `modifierBoundsInverted` readiness issue, and makes that entry contribute exactly 0 until it is repaired.
     A bound that is finite but NOT expressible as a dice-grammar `Constant` — `1e21`, `1e-7` — is the SECOND blocking bounds fault, `modifierBoundsUnsafe` (also `critical`), and contains that entry to 0 in the same way; it is a separate issue id rather than a second cause on the first, because the repairs differ and `1e21` is not an inversion.

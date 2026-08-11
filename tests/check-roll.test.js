@@ -460,6 +460,74 @@ async function rollChoice(modifierChoice, choice) {
   return rolled;
 }
 
+// ── a chosen ROLLING modifier (issue 1118) ──────────────────────────────────
+//
+// A descriptor option carries `formula` instead of `value` when its expression rolls, and
+// the chosen fragment is appended VERBATIM as its own flavoured term. It is taken from the
+// descriptor rather than rebuilt here, so the chip the player was offered and the term that
+// rolls are one derivation.
+const DICE_PICK_CHOICE = {
+  modifiers: [
+    { id: 'med', label: 'Medicine', icon: 'fa-med', value: 3, formula: null, display: '+3' },
+    {
+      id: 'luck',
+      label: 'Luck',
+      icon: 'fa-luck',
+      value: null,
+      formula: '(1d4)',
+      display: '+1d4',
+    },
+    {
+      id: 'bounded',
+      label: 'Bounded',
+      icon: 'fa-b',
+      value: null,
+      formula: 'min(max((1d8), -1), 6)',
+      display: '+min(max((1d8), -1), 6)',
+    },
+  ],
+  maxPicks: 2,
+  defaultSelectedIds: ['bounded'],
+  defaultSelectedId: 'bounded',
+};
+
+test('playerPicks: a chosen ROLLING modifier appends its dice, not its average', async () => {
+  assert.equal(
+    await rollChoice(DICE_PICK_CHOICE, { chosenModifierIds: ['luck'] }),
+    '1d20 + (1d4)[Modifiers]',
+    'the fragment is appended verbatim; 2.5 is a number the roll could never produce'
+  );
+  assert.equal(
+    await rollChoice(DICE_PICK_CHOICE, { chosenModifierIds: ['bounded'] }),
+    '1d20 + min(max((1d8), -1), 6)[Modifiers]',
+    'and a bounded one keeps its clamp'
+  );
+});
+
+test('playerPicks: a mixed selection sums the flat half and appends the rolling half', async () => {
+  assert.equal(
+    await rollChoice(DICE_PICK_CHOICE, { chosenModifierIds: ['med', 'luck'] }),
+    '1d20 + 3[Modifiers] + (1d4)[Modifiers]',
+    'one flat term, then one term per rolling pick'
+  );
+});
+
+test('playerPicks: the cap still truncates a rolling selection', async () => {
+  assert.equal(
+    await rollChoice(DICE_PICK_CHOICE, { chosenModifierIds: ['med', 'luck', 'bounded'] }),
+    '1d20 + 3[Modifiers] + (1d4)[Modifiers]',
+    'the third pick exceeds maxPicks 2 and is dropped in descriptor order'
+  );
+});
+
+test('playerPicks: a rolling PRE-SELECTION is what a headless confirm rolls', async () => {
+  assert.equal(
+    await rollChoice(DICE_PICK_CHOICE, {}),
+    '1d20 + min(max((1d8), -1), 6)[Modifiers]',
+    'confirming without a selection falls back to the descriptor pre-selection'
+  );
+});
+
 test('playerPicks: a multi-pick selection SUMS the chosen modifiers', async () => {
   assert.equal(
     await rollChoice(MULTI_PICK_CHOICE, { chosenModifierIds: ['med', 'herb'] }),

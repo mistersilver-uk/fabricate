@@ -523,8 +523,11 @@ describe('CHECK_READINESS_ISSUE_IDS is the source of truth for every issue id', 
       { id: 'ok', label: 'Ok', expression: '@a' },
       { id: 'bad', label: 'Bad', expression: '@b', min: 5, max: -1 },
       { id: 'huge', label: 'Huge', expression: '@c', min: 1e21 },
-      // A ROLL-shaped expression (issue 1117). It is legal on a gathering drop row and not
-      // in a check, so a check that selects it raises `modifierRollExpression`.
+      // A ROLL-shaped expression, kept in the sweep as a NEGATIVE control (issue 1118): a
+      // check appends it as dice now, so it must raise NOTHING. While it raised
+      // `modifierRollExpression` this row was what reached that branch, and the sweep below
+      // asserts the registry equals what these fixtures emit — so leaving the row in is what
+      // makes the retirement observable rather than merely untested.
       { id: 'rolls', label: 'Rolls', expression: '1d4' },
     ];
     const context = (ids) => ({ catalogue, systemPolicy: 'addAll', defaultModifierIds: ids });
@@ -728,6 +731,77 @@ describe('check-modifier readiness', () => {
       'and it is NOT reported as an inversion — the repair is different'
     );
     assert.equal(checks.find((check) => check.id === 'modifierBoundsValid')?.satisfied, false);
+  });
+
+  // Issue 1118. A check appends a rolling modifier AS DICE, so the rule the retired
+  // `modifierRollExpression` enforced no longer exists. Asserted from the REGISTRY as well
+  // as from a fixture, because an id that is merely never raised looks identical to one
+  // that is raised on a branch this fixture does not reach.
+  it('says NOTHING about an expression that rolls dice, on any rule', () => {
+    const rolling = [
+      { id: 'rolls', label: 'Rolls', expression: '1d4' },
+      { id: 'pool', label: 'Pool', expression: '{1d6,1d8}kh1' },
+    ];
+    for (const systemPolicy of ['addAll', 'highest', 'bySubject', 'playerPicks']) {
+      const { checks, issues } = evaluateCheckReadiness(
+        { rollFormula: '1d20' },
+        {
+          mode: 'simple',
+          modifierContext: {
+            catalogue: rolling,
+            systemPolicy,
+            defaultModifierIds: ['rolls', 'pool'],
+          },
+        }
+      );
+      assert.deepEqual(issues, [], `${systemPolicy}: a rolling modifier is not a defect`);
+      assert.equal(
+        checks.find((check) => check.id === 'modifierBoundsValid')?.satisfied,
+        true,
+        `${systemPolicy}: the bounds rule still ran, so this is not silence from an early return`
+      );
+    }
+    assert.ok(
+      !CHECK_READINESS_ISSUE_IDS.includes('modifierRollExpression'),
+      'the id is retired from the registry, not merely unreachable'
+    );
+    assert.ok(
+      !Object.hasOwn(CHECK_ISSUE_SECTIONS, 'modifierRollExpression'),
+      'and from the section map, so no bucket names an id nothing can raise'
+    );
+  });
+
+  // Both bounds faults NAME the offending entries. A shared library can be long, and the
+  // Validation route's sentence is the only place a GM is told WHICH entry to repair.
+  it('names the offending entries on both bounds faults', () => {
+    const { issues } = evaluateCheckReadiness(
+      { rollFormula: '1d20' },
+      { mode: 'simple', modifierContext: context(['ok', 'inverted', 'huge']) }
+    );
+    assert.deepEqual(
+      issues.find((entry) => entry.id === 'modifierBoundsInverted')?.data,
+      { names: 'Inverted' }
+    );
+    assert.deepEqual(
+      issues.find((entry) => entry.id === 'modifierBoundsUnsafe')?.data,
+      { names: 'Huge' },
+      'and each names only its OWN fault, so the two sentences are separately repairable'
+    );
+  });
+
+  it('falls back to the entry id when a faulted entry has no label', () => {
+    const { issues } = evaluateCheckReadiness(
+      { rollFormula: '1d20' },
+      {
+        mode: 'simple',
+        modifierContext: {
+          catalogue: [{ id: 'unnamed', expression: '@a', min: 5, max: -1 }],
+          systemPolicy: 'addAll',
+          defaultModifierIds: ['unnamed'],
+        },
+      }
+    );
+    assert.deepEqual(issues[0].data, { names: 'unnamed' }, 'an unnamed entry is still locatable');
   });
 
   it('says nothing about an entry this activity does not apply', () => {

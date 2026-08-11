@@ -1,5 +1,4 @@
 import {
-  isRollExpression,
   resolveEligibleModifierIds,
   resolveModifierBounds,
 } from '../../../../../systems/checkModifierResolver.js';
@@ -55,7 +54,6 @@ export const CHECK_READINESS_ISSUE_IDS = Object.freeze([
   // Check modifiers
   'modifierBoundsInverted',
   'modifierBoundsUnsafe',
-  'modifierRollExpression',
   'modifiersInertNoCheck',
   'modifiersInertNoFormula',
 ]);
@@ -110,7 +108,6 @@ export const CHECK_ISSUE_SECTIONS = Object.freeze({
   multipleTierStepTargets: 'triggers',
   modifierBoundsInverted: 'modifiers',
   modifierBoundsUnsafe: 'modifiers',
-  modifierRollExpression: 'modifiers',
   modifiersInertNoCheck: 'modifiers',
   modifiersInertNoFormula: 'modifiers',
 });
@@ -188,8 +185,8 @@ export function sectionForIssue(id) {
  * rather than a silently under-bucketed row on the Validation route.
  *
  * `data` is the optional interpolation payload for an issue whose sentence NAMES something
- * (issue 1117): `modifierRollExpression` has to say WHICH entries roll, because a shared
- * library can be long and "one of your modifiers rolls dice" is not a repairable
+ * (issue 1117): the two bounds faults have to say WHICH entries carry them, because a shared
+ * library can be long and "one of your modifiers has a bad bound" is not a repairable
  * instruction. The key is attached only when supplied, so every other issue keeps its
  * exact two-key shape and no consumer has to guard for it.
  *
@@ -316,33 +313,34 @@ function fixedRangesHaveGap(outcomes, excluded) {
  * catalogue contains, because the catalogue is shared by all three activities and a
  * gathering check has no business reporting a crafting-only entry:
  *
+ * A ROLL-SHAPED EXPRESSION IS NOT ONE OF THEM (issue 1118). Between issues 1117 and 1118 an
+ * eligible entry whose expression rolled dice raised a blocking `modifierRollExpression`,
+ * because a check appended one resolved scalar as a dice-grammar `Constant` and a roll
+ * cannot be one. A check now appends a rolling modifier AS DICE, so the rule it enforced no
+ * longer exists and the id is retired rather than reworded — there is nothing left to report
+ * about an entry that rolls.
+ *
  * - **`modifierBoundsInverted`** (`critical`, BLOCKING). An entry whose authored
- *   `min > max` contributes 0 until it is repaired — the refuse posture
+ *   `min > max` contributes nothing until it is repaired — the refuse posture
  *   `INVALID_CHARACTER_MODIFIER_BOUNDS` already takes for gathering drop modifiers,
  *   adopted deliberately so a check modifier and a drop modifier fail the same way. It is
  *   not a warning: the entry is silently worth nothing, which is exactly the class of
- *   defect readiness exists to surface.
+ *   defect readiness exists to surface. A dice expression does not exempt an entry from it:
+ *   the bounds clamp a rolled result exactly as they clamped a resolved number.
  * - **`modifierBoundsUnsafe`** (`critical`, BLOCKING). An entry whose authored bound is
  *   finite but not expressible as a dice-grammar `Constant` — `1e21`, `1e-7`. It is a
  *   SEPARATE id rather than a second cause folded into the one above, because the two need
  *   different advice: "your minimum is above your maximum" and "this number is too large to
  *   roll" are not the same repair. It is `critical` for a stronger reason than its sibling:
- *   `clampModifierValue` now contains it to the offending entry, but the bound it would
- *   otherwise clamp to poisons the SUM, and `appendCheckModifierTerm` drops the WHOLE term
- *   for an exponent-notation value — so before the containment this single entry deleted
- *   every other modifier from the roll.
- * - **`modifierRollExpression`** (`critical`, BLOCKING; issue 1117). An eligible entry whose
- *   expression ROLLS DICE. The unified library serves two consumers with different
- *   contracts: a gathering drop row evaluates the expression and applies the result as a
- *   percentage-point delta, where a roll is perfectly legal, while a check appends ONE
- *   resolved scalar as a dice-grammar `Constant`. A roll-shaped expression cannot be that
- *   scalar, and `appendCheckModifierTerm` refuses a value it cannot express by dropping the
- *   WHOLE term — so a single roll-shaped entry selected by a check would silently delete
- *   every OTHER eligible modifier from that roll, exactly the blast radius
- *   `modifierBoundsUnsafe` documents. It is `critical` for that reason, and it names the
- *   offending entry so the GM knows which of a shared library's entries this activity may
- *   not select. It is raised ONLY for entries this activity actually selects: a roll-shaped
- *   entry that only gathering drop rows reference is correct, not a defect.
+ *   the resolver contains it to the offending entry, but the bound it would otherwise clamp
+ *   to poisons the flat SUM, and `appendCheckModifierTerm` drops the WHOLE term for an
+ *   exponent-notation value — so before the containment this single entry deleted every
+ *   other flat modifier from the roll. It bites a rolling entry the same way, where the
+ *   bound would be emitted into a `min(…)`/`max(…)` the grammar cannot parse.
+ * - Both NAME the offending entries, because a shared library can be long and "one of your
+ *   modifiers has a bad bound" is not a repairable instruction. They are raised ONLY for
+ *   entries this activity actually selects: a fault on an entry only gathering drop rows
+ *   reference is not this check's problem.
  * - **`modifiersInertNoCheck` / `modifiersInertNoFormula`** (`warning`). An eligible
  *   selection that reaches no roll. These are the ONE owned path for "the gathering d100
  *   check-modifier section reports `noCheck`", and they are gated on the selection being
@@ -358,6 +356,16 @@ function fixedRangesHaveGap(outcomes, excluded) {
  * @param {{ rollsNoCheck: boolean, hasRollFormula: boolean }} formulaState
  * @returns {{ checks: CheckReadinessCheck[], issues: CheckReadinessIssue[] }}
  */
+/**
+ * The offending entries' display names, comma-joined, or `''` when none are faulted. The
+ * label is preferred and the id is the fallback, so an unnamed entry is still locatable.
+ * @param {Array<{entry: object}>} faulted
+ * @returns {string}
+ */
+function namesOf(faulted) {
+  return faulted.map(({ entry }) => entry.label || entry.id).join(', ');
+}
+
 function checkModifierReadiness(modifierContext, { rollsNoCheck, hasRollFormula }) {
   if (!modifierContext) return { checks: [], issues: [] };
   const eligible = resolveEligibleModifierIds(modifierContext);
@@ -369,28 +377,18 @@ function checkModifierReadiness(modifierContext, { rollsNoCheck, hasRollFormula 
       .filter((entry) => entry && typeof entry === 'object' && typeof entry.id === 'string')
       .map((entry) => [entry.id, entry])
   );
-  const bounds = eligible.map((id) => resolveModifierBounds(byId.get(id)));
-  const inverted = bounds.some((entry) => entry.inverted);
-  const unsafe = bounds.some((entry) => entry.unsafe);
   // The offending ENTRIES, not just a boolean: a shared library can be long, and "one of
-  // your modifiers rolls dice" is not a repairable instruction. `isRollExpression` is asked
-  // of the resolver rather than re-derived from the persisted flag, so an entry that
-  // somehow arrived with a stale flag is still classified by its actual expression.
-  const rollNames = eligible
-    .map((id) => byId.get(id))
-    .filter((entry) => isRollExpression(entry?.expression))
-    .map((entry) => entry.label || entry.id);
+  // your modifiers has a bad bound" is not a repairable instruction.
+  const faulted = eligible
+    .map((id) => ({ entry: byId.get(id), bounds: resolveModifierBounds(byId.get(id)) }))
+    .filter(({ entry }) => Boolean(entry));
+  const inverted = namesOf(faulted.filter(({ bounds }) => bounds.inverted));
+  const unsafe = namesOf(faulted.filter(({ bounds }) => bounds.unsafe));
 
   const issues = [];
-  const checks = [
-    { id: 'modifierBoundsValid', satisfied: !inverted && !unsafe },
-    { id: 'modifierExpressionsResolveToScalars', satisfied: rollNames.length === 0 },
-  ];
-  if (inverted) pushIssue(issues, 'modifierBoundsInverted', 'critical');
-  if (unsafe) pushIssue(issues, 'modifierBoundsUnsafe', 'critical');
-  if (rollNames.length > 0) {
-    pushIssue(issues, 'modifierRollExpression', 'critical', { names: rollNames.join(', ') });
-  }
+  const checks = [{ id: 'modifierBoundsValid', satisfied: inverted === '' && unsafe === '' }];
+  if (inverted !== '') pushIssue(issues, 'modifierBoundsInverted', 'critical', { names: inverted });
+  if (unsafe !== '') pushIssue(issues, 'modifierBoundsUnsafe', 'critical', { names: unsafe });
   if (rollsNoCheck) pushIssue(issues, 'modifiersInertNoCheck', 'warning');
   else if (!hasRollFormula) pushIssue(issues, 'modifiersInertNoFormula', 'warning');
   return { checks, issues };
