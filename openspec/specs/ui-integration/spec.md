@@ -88,7 +88,7 @@ Only two kinds of rule for a primitive stay in the global sheet: what must beat 
 A layout-context rule places the primitive and MUST NOT restyle it: no `font-size`, `font-family`, `font-weight`, `border`, `border-radius`, or `background`.
 The player crafting app's requirement rail, requirement tile, essence pool, consumption-plan panel, and essence-contribution chip are held to that CSS rule as player-side primitives, which is why they added no rules to `styles/fabricate.css`.
 
-Two live non-conformances are recorded here rather than left to be discovered, because a rule whose exceptions are unwritten is a rule nobody can rely on.
+Three live non-conformances are recorded here rather than left to be discovered, because a rule whose exceptions are unwritten is a rule nobody can rely on.
 
 - `FillBar` now EXISTS at `src/ui/svelte/components/FillBar.svelte`, and `src/ui/svelte/apps/gathering/ChanceBar.svelte` is REBUILT on it rather than widened: `ChanceBar` is a percentage instrument and does not own the have/need meaning, so widening it in place would have made it the second component owning half a meaning rather than the primitive that owns one.
   `FillBar` is a LEAF — it renders the track and the value-width fill and declares no `role` or `aria-*`, because the accessible semantics differ per site (`ChanceBar` is a `meter` with its own `aria-valuenow`; an odds row's bar is decorative).
@@ -100,6 +100,13 @@ Two live non-conformances are recorded here rather than left to be discovered, b
   Its shipped consumer is the Checks Studio right rail, whose simulator and odds panels each collapse to it at the existing 1320 breakpoint.
   The COLLAPSED TRIGGER CARD is a debt with a named owner rather than a second site already using it: the trigger cards render expanded, so the summary row the prototype shows — condition sentence, effect chip, disclosure — is not built, and when it is it MUST adopt this primitive rather than declare a second chevron.
   It renders a real `<button>`, so a caller nests it beside a row's content and never converts a `role="button"` wrapper around it into a `<button>`, which would nest buttons and land invalid DOM.
+- THE manager's labelled push-button exists at `src/ui/svelte/components/ManagerButton.svelte`, taking a `role` of `neutral`, `primary`, `ghost` or `danger`.
+  It replaces a CSS CONVENTION — `manager-button` plus a remembered `is-*` modifier — which is exactly the "shared CSS class each site hand-rolls markup against" this section forbids, and which had already drifted: the system Modifiers card painted `Delete modifier` as a neutral verb while the Tool Studio painted the identical verb as danger.
+  It is the one primitive here that deliberately has NO scoped `<style>`, and it claims the section’s own button-geometry exception to say so.
+  Emitting exactly the classes `styles/fabricate.css` already styles is what makes converting a CORRECT call site provably a no-op on screen, which is the property that lets the sweep proceed one screen at a time; a scoped block would instead be a second source of truth for the same control and would begin to disagree with the global sheet.
+  The Tool Studio’s `.manager-tool-edit-actions` cluster is the AUTHORITY for what a manager button looks like, and `tests/components/manager-layout.test.js` compares a converted card button against it in a real browser on `font-size`, `font-weight`, `padding`, `height` and `border-radius`, so drift fails a gate rather than shipping.
+  `ArmedDangerButton` is a CONSUMER of the same CSS contract and NOT of this component: it owns a two-state arm/confirm machine whose danger role is an invariant rather than a caller’s choice, so composing them would push a `class:is-armed`, a second label slot and a keydown/blur contract into a primitive no other site wants.
+  141 unconverted call sites across 47 components remain and are a debt with a named owner rather than an accepted state; only the Modifiers card and the Tool Studio header are converted, because a broad visual sweep would drag every manager screen’s evidence into one run.
 
 #### Threshold band strip
 
