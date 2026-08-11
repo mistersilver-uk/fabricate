@@ -113,30 +113,53 @@ export const CHECK_ISSUE_SECTIONS = Object.freeze({
 });
 
 /**
- * The CRAFTING resolution mode, translated into the vocabulary this evaluator dispatches on
- * (issue 1096).
+ * The mode this evaluator answers "this activity rolls no check at all" under (issue 1096).
  *
- * `evaluateCheckReadiness` branches on `mode === 'routed'`, but the system-level crafting
- * resolution mode is never that string: it is `routedByCheck`, `routedByIngredients`,
- * `simple`, `progressive` or `alchemy`. Handing the raw mode through therefore SKIPPED every
- * outcome-tier rule for the one mode that has outcome tiers — a `routedByCheck` system with
- * an unnamed tier, no success tier, an overlapping range or a gap reported clean, on the one
- * surface a GM consults to find out whether a check works.
- *
- * It is a translation and not a widening of the branch above, because the two vocabularies
- * are genuinely different: `routedByIngredients` routes on the INGREDIENT SET and authors
- * its optional pass/fail check on the shared simple slot, so it must NOT reach the routed
- * rules, and alchemy's shape is its `checkMode` rather than its resolution mode.
- *
- * @param {string} resolutionMode The system's crafting resolution mode.
- * @param {string} [alchemyCheckMode] `none` | `simple` | `tiered`, read only under alchemy.
- * @returns {'routed'|'simple'|'progressive'} The mode {@link evaluateCheckReadiness} takes.
+ * Gathering `d100` and alchemy `checkMode: 'none'` are the two reachable members, and they
+ * are the SAME state as far as readiness is concerned: there is no formula, no outcome tier
+ * and no trigger to author, and the only rule that still applies is whether an authored
+ * check-modifier selection reaches a roll (it does not).
+ * @type {'none'}
  */
-export function craftingReadinessMode(resolutionMode, alchemyCheckMode = 'none') {
-  if (resolutionMode === 'routedByCheck') return 'routed';
-  if (resolutionMode === 'progressive') return 'progressive';
-  if (resolutionMode === 'alchemy') return alchemyCheckMode === 'tiered' ? 'routed' : 'simple';
-  return 'simple';
+export const NO_CHECK_MODE = 'none';
+
+/**
+ * Every mode {@link evaluateCheckReadiness} dispatches on. Frozen, and enforced below.
+ * @type {ReadonlyArray<string>}
+ */
+export const CHECK_READINESS_MODES = Object.freeze(['simple', 'routed', 'progressive', 'none']);
+
+const SUPPORTED_MODES = new Set(CHECK_READINESS_MODES);
+
+/**
+ * The readiness mode for a RESOLVED check slot (issue 1096).
+ *
+ * `evaluateCheckReadiness` branches on `mode === 'routed'`, but no subsystem's authored
+ * resolution mode is ever that string: crafting's is `routedByCheck`, `routedByIngredients`,
+ * `simple`, `progressive` or `alchemy`, and alchemy's shape is its `checkMode` rather than
+ * its resolution mode. Something has to translate — and the translation is ALREADY OWNED, by
+ * `checkModifierResolver`'s `CRAFTING_CHECK_SLOTS` / `ALCHEMY_CHECK_SLOTS` /
+ * `GATHERING_CHECK_SLOTS` maps, which decide which sub-config the ENGINE actually rolls.
+ *
+ * SO THIS TAKES THE SLOT, NOT THE MODE, and that is the whole point of the signature. A
+ * second mapping from resolution mode to readiness mode is how the rail badge came to
+ * evaluate the alchemy SIMPLE draft under ROUTED rules (the badge's draft was picked by one
+ * mapping and its rules by another) and to demand a roll formula for alchemy `none`, a mode
+ * that rolls nothing and whose route renders no formula field to clear it with. Reading the
+ * slot means the check being evaluated and the rules it is evaluated under are chosen by the
+ * same decision.
+ *
+ * The slot names ARE the readiness modes — `simple`, `routed`, `progressive` — so this is a
+ * total function with exactly one interesting case: `null`, which the resolvers return for a
+ * mode that rolls no check at all, becomes {@link NO_CHECK_MODE}.
+ *
+ * @param {'simple'|'routed'|'progressive'|null|undefined} slot The `slot` field of
+ *   `resolveActiveCraftingCheckFormula`, `resolveActiveSalvageCheckFormula` or
+ *   `resolveActiveGatheringCheckFormula`.
+ * @returns {'simple'|'routed'|'progressive'|'none'}
+ */
+export function readinessModeForSlot(slot) {
+  return slot || NO_CHECK_MODE;
 }
 
 /**
@@ -342,9 +365,12 @@ function checkModifierReadiness(modifierContext, { rollsNoCheck, hasRollFormula 
  *
  * @param {object} check Plain check draft (the active draft for its mode).
  * @param {object} [options]
- * @param {'routed'|'simple'|'alchemy'|'progressive'|'d100'} [options.mode] The
- *   subsystem's resolution mode. `d100` (gathering's fixed roll) is not authored,
- *   so it has no formula and no outcomes to validate.
+ * @param {'routed'|'simple'|'progressive'|'none'} [options.mode] The mode to evaluate
+ *   under — a {@link CHECK_READINESS_MODES} member, which callers derive from the ENGINE's
+ *   resolved slot through {@link readinessModeForSlot}. An unrecognized mode THROWS rather
+ *   than defaulting: a caller handing through a raw resolution mode (`routedByCheck`,
+ *   `alchemy`, `d100`) silently skipped every rule that mode has, on the one surface a GM
+ *   consults to find out whether a check works, and a default is what made that silent.
  * @param {object|null} [options.modifierContext] A `buildCheckModifierContext` bag for
  *   this activity (issue 1095). Omitted by a caller that has no system to build one from,
  *   in which case no check-modifier rule is evaluated.
@@ -352,19 +378,30 @@ function checkModifierReadiness(modifierContext, { rollsNoCheck, hasRollFormula 
  */
 export function evaluateCheckReadiness(check = {}, options = {}) {
   const mode = options.mode || 'simple';
+  if (!SUPPORTED_MODES.has(mode)) {
+    throw new Error(
+      `checksReadiness: unsupported mode "${mode}" — pass a CHECK_READINESS_MODES member, ` +
+        'derived from the resolved check slot with readinessModeForSlot()'
+    );
+  }
   const modifierContext = options.modifierContext ?? null;
   const checks = [];
   const issues = [];
 
-  // The gathering d100 check is the fixed d100 roll — there is nothing to author
-  // and therefore no formula, no outcome tiers and no triggers to validate.
+  // A mode that rolls NO CHECK AT ALL: gathering `d100` (the fixed roll against each drop's
+  // chance) and alchemy `checkMode: 'none'`. There is nothing to author and therefore no
+  // formula, no outcome tiers and no triggers to validate.
   //
-  // IT IS NO LONGER A BARE EARLY RETURN (issue 1095). The check-modifier selection is
-  // authored on `gatheringCraftingCheck` regardless of the resolution mode, so a GM can
-  // author one and reach `d100` — where it rolls nothing. Reporting `modifiersInertNoCheck`
-  // here is the only owned path for that state; returning empty left it unreported on the
-  // one surface a GM consults to find out whether a check works.
-  if (mode === 'd100') {
+  // IT IS NOT A BARE EARLY RETURN (issue 1095). The check-modifier selection is authored on
+  // the activity's check regardless of the resolution mode, so a GM can author one and reach
+  // a mode that rolls nothing. Reporting `modifiersInertNoCheck` here is the only owned path
+  // for that state; returning empty left it unreported.
+  //
+  // AND IT MUST NOT REPORT `noRollFormula` (issue 1096). It did, for alchemy `none`, because
+  // a second resolution-mode mapping coerced that mode to `simple`: a permanent "1 issue"
+  // badge on the rail, raised against a route that renders no formula field, so no control
+  // the GM could reach would ever clear it.
+  if (mode === NO_CHECK_MODE) {
     const modifiers = checkModifierReadiness(modifierContext, {
       rollsNoCheck: true,
       hasRollFormula: false,

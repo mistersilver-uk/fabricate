@@ -59,8 +59,6 @@
     modifierCount = null,
     issueCount = 0,
     allChecks = [],
-    actorOptions = [],
-    recordOptions = [],
     onToggleActive = () => {},
   } = $props();
 
@@ -87,6 +85,21 @@
   const craftingNone = $derived(activeTab === 'crafting' && activation?.none === true);
   const showActiveToggle = $derived(
     activeTab === 'gathering' ? !gatheringD100 : !craftingNone && activation?.optional === true
+  );
+  // What the LOCKED toggle reads. Every mode that hides the switch runs its check — routed
+  // and progressive require one, and gathering `d100` IS the roll — with exactly one
+  // exception: alchemy `checkMode: 'none'`, which rolls nothing at all. Deriving the reading
+  // from that one exception rather than from `activation.enabled` is deliberate: a mandatory
+  // check runs whatever the persisted `enabled` flag happens to say, and showing a locked OFF
+  // beside a check the engine rolls would be a worse lie than showing no state at all.
+  const lockedOn = $derived(!craftingNone);
+  const lockedReading = $derived(
+    lockedOn
+      ? text('FABRICATE.Admin.Manager.Checks.Active.LockedOn', 'Check is on')
+      : text('FABRICATE.Admin.Manager.Checks.Active.LockedOff', 'Check is off')
+  );
+  const lockedLabel = $derived(
+    `${lockedReading} — ${text('FABRICATE.Admin.Manager.Checks.Active.LockedSuffix', 'locked by the resolution mode')}`
   );
   const requiredHint = $derived(
     craftingNone
@@ -285,12 +298,39 @@
           </button>
           <p class="manager-muted">{optionalHint}</p>
         {:else}
+          <!-- A LOCKED toggle, not a bare sentence. Removing the control removed the STATE
+               with it, so on a routed or progressive check a GM could not see whether the
+               check was on at all — and "the mode requires this check" does not say which way
+               the switch is set. The prototype's `crafting-roll` frame is the assigned
+               authority for this control and shows exactly this: the track, the reading, and
+               a padlock. It is an INDICATOR, not a disabled control: nothing here is
+               actionable, so it is announced as one labelled image rather than as a button a
+               GM might keep trying to press. -->
+          <span
+            class={`manager-status-toggle is-locked ${lockedOn ? 'is-on' : 'is-off'}`}
+            data-checks-active-locked={lockedOn ? 'on' : 'off'}
+            role="img"
+            aria-label={lockedLabel}
+          >
+            <span class="manager-status-toggle-track" aria-hidden="true"
+              ><span class="manager-status-toggle-knob"></span></span
+            >
+            <span class="manager-status-toggle-label">{lockedReading}</span>
+            <i class="fas fa-lock manager-checks-active-lock" aria-hidden="true"></i>
+          </span>
           <p class="manager-muted" data-checks-active-required>{requiredHint}</p>
         {/if}
       </section>
     {/if}
 
     {#if !checkOff}
+      <!-- PRE-ROLL, like the two panels below it, and deliberately NOT two `<select>`s.
+           The record selector's meaning is defined by the simulator that reads it (issue
+           1097): what a "record" is, which ones are offered, and what the strip re-announces
+           when one is chosen are all that change's decisions. Two enabled-looking selects
+           reading "No actors" / "No records" invite a GM to make a choice nothing consumes,
+           which is worse than a stated absence — so this panel says what it will do and
+           offers no control until there is something behind it. -->
       <section class="manager-inspector-card" data-checks-preview-as>
         <h3 class="manager-card-title">
           {text('FABRICATE.Admin.Manager.Checks.PreviewAs.Title', 'Preview as')}
@@ -298,35 +338,9 @@
         <p class="manager-muted">
           {text(
             'FABRICATE.Admin.Manager.Checks.PreviewAs.Hint',
-            'Choose an actor and a record to read this check against. Nothing here changes the system.'
+            'Once the outcome preview is in place you can read this check against a chosen actor and record here. Nothing selected here will change the system.'
           )}
         </p>
-        <label class="manager-field">
-          <span>{text('FABRICATE.Admin.Manager.Checks.PreviewAs.Actor', 'Actor')}</span>
-          <select data-checks-preview-actor disabled={actorOptions.length === 0}>
-            {#each actorOptions as option (option.id)}
-              <option value={option.id}>{option.name}</option>
-            {/each}
-            {#if actorOptions.length === 0}
-              <option value=""
-                >{text('FABRICATE.Admin.Manager.Checks.PreviewAs.NoActors', 'No actors')}</option
-              >
-            {/if}
-          </select>
-        </label>
-        <label class="manager-field">
-          <span>{text('FABRICATE.Admin.Manager.Checks.PreviewAs.Record', 'Against')}</span>
-          <select data-checks-preview-record disabled={recordOptions.length === 0}>
-            {#each recordOptions as option (option.id)}
-              <option value={option.id}>{option.name}</option>
-            {/each}
-            {#if recordOptions.length === 0}
-              <option value=""
-                >{text('FABRICATE.Admin.Manager.Checks.PreviewAs.NoRecords', 'No records')}</option
-              >
-            {/if}
-          </select>
-        </label>
       </section>
 
       <section class="manager-checks-rail-panel manager-inspector-card" data-checks-simulator>
@@ -463,6 +477,22 @@
 
   .manager-checks-rail-head > :global(.manager-card-title) {
     min-width: 0;
+  }
+
+  /* The LOCKED reading of the activation switch. It reuses the shipped switch's own track
+     and knob — same meaning, same drawing — and changes only what a non-interactive, full
+     width indicator needs: the 78px control cap does not apply to a row that also carries a
+     reading and a padlock. */
+  .manager-status-toggle.is-locked {
+    width: 100%;
+    max-width: none;
+    cursor: default;
+  }
+
+  .manager-checks-active-lock {
+    margin-left: auto;
+    color: var(--fab-text-muted);
+    font-size: 0.72rem;
   }
 
   /* Above the shipped 1320 breakpoint these two panels are plain panels: the body shows

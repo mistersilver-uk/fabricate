@@ -64,8 +64,10 @@
 
   ## Bounds, and the clamp
 
-  `aria-valuemin` / `aria-valuemax` are the NEIGHBOURING boundaries, and at the outermost
-  handles they are the TRACK DOMAIN. The domain is stated per binding:
+  `aria-valuemin` / `aria-valuemax` are ONE STEP INSIDE the neighbouring boundaries, and at
+  the outermost handles one step inside the TRACK. The step of clearance is what stops a drag
+  collapsing a band to zero width — including the first and last bands, whose outer edges have
+  no handle of their own to be pushed back by. The domain is stated per binding:
 
   - `relative` — the authored range extended one step past the outermost tier. "One step"
     is the tier interval, not the stepper's increment: it is what makes the last band the
@@ -180,15 +182,65 @@
     return { min: low ?? first, max: high ?? derivedMax };
   });
 
-  const span = $derived(Math.max(domain.max - domain.min, Number.EPSILON));
+  /**
+   * The value the DRAWN track ends at, which is not always the domain's own maximum.
+   *
+   * A `fixed` band owns an INCLUSIVE range, so a band ending at 20 occupies the track right
+   * up to 21 — the same rule every interior seam already obeys, since band *i* is drawn from
+   * its own `from` to the NEXT band's `from`, which is `end + 1`. Ending the drawing at the
+   * authored `to` therefore made the last band exactly one unit narrower than a set of equal
+   * ranges should render, on every fixed check. An explicit `max` override is respected
+   * verbatim: a caller stating the track's extent has already answered this.
+   */
+  const trackMax = $derived.by(() => {
+    if (!resolved || binding !== 'fixed' || numeric(max) !== null) return domain.max;
+    return resolved.at(-1).to !== null ? domain.max + 1 : domain.max;
+  });
+
+  const span = $derived(Math.max(trackMax - domain.min, Number.EPSILON));
 
   const percentOf = (value) => ((value - domain.min) / span) * 100;
 
-  /** The `[lower, upper]` bound a handle may move between: its neighbours, else the domain. */
+  /**
+   * The `[lower, upper]` bound a handle may move between: one step inside its neighbours, and
+   * one step inside the drawn track at the two outermost handles.
+   *
+   * EVERY BAND KEEPS AT LEAST ONE STEP OF WIDTH, including the first and the last. The
+   * outermost handles used to be bounded by the raw track extent, so handle 0 could be
+   * dragged onto the first band's OWN lower edge and collapse it to zero width — a named
+   * tier reduced to nothing, with its focus ring clipped away by the track's
+   * `overflow: hidden`, so the GM could neither see it nor aim at it again. The steppers in
+   * the rows below remain the authority and can still author whatever the data allows; it is
+   * the DRAG that must not be able to erase a band.
+   *
+   * A degenerate interval — a tier narrower than `step`, which authored data can be — would
+   * otherwise report `aria-valuemin` ABOVE `aria-valuemax`, a range no assistive technology
+   * can describe. It reports the handle's current value for both instead, which is the
+   * truthful answer: this handle has nowhere to go.
+   */
   function boundsFor(index) {
-    const lower = index === 0 ? domain.min : boundaries[index - 1] + step;
-    const upper = index === boundaries.length - 1 ? domain.max : boundaries[index + 1] - step;
+    const lower = index === 0 ? domain.min + step : boundaries[index - 1] + step;
+    const upper = index === boundaries.length - 1 ? trackMax - step : boundaries[index + 1] - step;
+    if (lower > upper) {
+      const pinned = boundaries[index];
+      return [pinned, pinned];
+    }
     return [lower, upper];
+  }
+
+  /**
+   * The ANNOUNCED range, which is the movement range widened to contain the handle's own
+   * value. They are the same thing for well-formed data and are not for authored data the
+   * strip must still describe: a tier interval narrower than `step` puts the current boundary
+   * outside its own movement range, and `aria-valuenow` outside `[aria-valuemin,
+   * aria-valuemax]` is a slider no assistive technology can read out coherently. The
+   * MOVEMENT clamp is deliberately left narrow — widening that instead would let a key press
+   * push a handle past its neighbour, which is the one thing the clamp exists to forbid.
+   */
+  function ariaBoundsFor(index) {
+    const [lower, upper] = boundsFor(index);
+    const now = boundaries[index];
+    return [Math.min(lower, now), Math.max(upper, now)];
   }
 
   function clampTo(index, value) {
@@ -246,6 +298,8 @@
     const rect = trackElement?.getBoundingClientRect?.();
     if (!rect || !rect.width) return null;
     const ratio = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
+    // Against the DRAWN extent, so the pointer maps onto the same scale the bands are
+    // painted with — a `fixed` strip's last band reaches `to + 1`.
     return domain.min + ratio * span;
   }
 
@@ -302,12 +356,12 @@
     >
       {#each resolved as band, index (band.id || index)}
         {@const from = band.from}
-        {@const to = index === resolved.length - 1 ? domain.max : resolved[index + 1].from}
+        {@const to = index === resolved.length - 1 ? trackMax : resolved[index + 1].from}
         <span
           class="fab-band-strip-band"
           class:is-untinted={!band.color}
           style={`left: ${percentOf(from)}%; width: ${percentOf(to) - percentOf(from)}%;${
-            band.color ? ` background: ${band.color};` : ''
+            band.color ? ` --fab-band-strip-fill: ${band.color};` : ''
           }`}
           data-band-strip-band={band.id || index}
         >
@@ -316,7 +370,7 @@
       {/each}
 
       {#each boundaries as boundary, index (index)}
-        {@const bounds = boundsFor(index)}
+        {@const bounds = ariaBoundsFor(index)}
         <!-- A real ARIA widget, not a click-handled bare element: role, focus, keys and a
              24x24 hit area the ~2px seam could never offer. It nests INSIDE the track
              rather than converting a wrapper into a `<button>`, which would nest buttons. -->
@@ -374,7 +428,16 @@
     background: var(--fab-surface-raised);
   }
 
-  /* SOLID fills with hard edges — no gradient, and no visual-style exemption claimed. */
+  /* SOLID fills with hard edges — no gradient, and no visual-style exemption claimed.
+
+     The caller's runtime colour arrives inline as `--fab-band-strip-fill` and is painted
+     from here, rather than landing inline as `background` directly. Two reasons, and both
+     are about the value being real: the DECLARED FALLBACK means an absent or unresolvable
+     colour paints the neutral surface rather than nothing at all (an unset `var()` resolves
+     to the guaranteed-invalid value and `background` then falls back to `transparent`); and
+     happy-dom's `cssText` parser silently DISCARDS a `color-mix()` written as a `background`
+     value while preserving it verbatim as a custom property, so a mounted test can see the
+     colour a caller actually derived instead of an empty style attribute. */
   .fab-band-strip-band {
     position: absolute;
     top: 0;
@@ -385,7 +448,7 @@
     min-width: 0;
     padding: 0 var(--fab-space-2);
     overflow: hidden;
-    background: var(--fab-surface-soft);
+    background: var(--fab-band-strip-fill, var(--fab-surface-soft));
   }
 
   .fab-band-strip-band.is-untinted {

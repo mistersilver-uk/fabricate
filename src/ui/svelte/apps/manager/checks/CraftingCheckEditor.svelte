@@ -47,15 +47,18 @@
   // `section` (issue 1096) selects which of this editor's cards render, so the Checks
   // Studio's five-section strip hosts the SAME editor rather than a per-section fork.
   // Empty renders every card, which is what every caller outside the studio still gets.
-  // `previewLabel` names the record the band strip is drawn against; it is announced in
-  // the strip's group label and in each handle's `aria-valuetext`.
+  //
+  // There is deliberately NO `previewLabel` here. `ThresholdBandStrip` takes one and names it
+  // in its group label and `aria-valuetext`, but nothing in the product can supply one: what a
+  // previewed record IS, and which one is selected, are the outcome simulator's decisions.
+  // A prop forwarded from every caller as `''` is a claim the surface cannot honour, so the
+  // strip is drawn against the check's own DC and says so.
   let {
     value = null,
     showTiers = true,
     breakageAuthority = 'toolSpecific',
     resolutionMode = null,
     section = '',
-    previewLabel = '',
     onChange = () => {},
   } = $props();
 
@@ -182,20 +185,71 @@
   // because a strip that had to read two authored shapes would be two components wearing
   // one name — relative offsets are resolved against the previewed DC here.
   //
-  // Band identity is carried by a THEME TOKEN chosen from the tier's own `success` flag,
-  // not by a persisted colour: outcome tiers carry no authored colour today, and inventing
-  // one would be a persisted-shape change this work does not own. The strip's `color` prop
-  // takes it verbatim, so an authored swatch can replace this later with no strip change.
+  // Band identity is carried by a THEME TOKEN, not by a persisted colour: outcome tiers carry
+  // no authored colour today, and inventing one would be a persisted-shape change this work
+  // does not own. The strip's `color` prop takes the value verbatim, so an authored swatch can
+  // replace this later with no strip change.
+  //
+  // TWO SEMANTIC FAMILIES, N BANDS — and a TONAL RAMP inside each, because reading the flag
+  // alone painted Standard and Masterwork the same colour on a five-tier check. Per-band
+  // identity is what the strip exists for (its own doc says so, and the primitive refuses the
+  // full-track gradient exemption on exactly that ground), and a control where two of five
+  // bands are indistinguishable has not got it. The ramp runs in VALUE order within the
+  // family, weakest to strongest, so the strip reads left-to-right as escalating rather than
+  // as an arbitrary palette — and it stays inside the family, so a success band is never
+  // mistakable for a failure one.
   const previewDc = $derived(Number(value?.dc ?? 0) || 0);
-  const bandStripBands = $derived(
-    outcomes.map((outcome, index) => ({
+
+  // The mix range. The floor stays clear of the surface it is mixed into (a band at 8% is
+  // not a colour, it is a smudge) and the ceiling stops short of the raw token so a
+  // full-strength band is not confusable with the `is-invalid` row highlight.
+  const BAND_TONE_MIN = 32;
+  const BAND_TONE_MAX = 88;
+
+  function bandTonePercent(rank, count) {
+    if (count <= 1) return BAND_TONE_MAX;
+    return Math.round(BAND_TONE_MIN + ((BAND_TONE_MAX - BAND_TONE_MIN) * rank) / (count - 1));
+  }
+
+  function bandColour(success, rank, count) {
+    const family = success ? 'var(--fab-success)' : 'var(--fab-danger)';
+    return `color-mix(in srgb, ${family} ${bandTonePercent(rank, count)}%, var(--fab-surface-raised))`;
+  }
+
+  const bandStripBands = $derived.by(() => {
+    const rows = outcomes.map((outcome, index) => ({
       id: outcome.id,
       index,
       name: outcome.name,
-      color: outcome.success === true ? 'var(--fab-success-soft)' : 'var(--fab-danger-soft)',
+      success: outcome.success === true,
       from: type === 'fixed' ? Number(outcome.start) : previewDc + Number(outcome.dc),
       to: type === 'fixed' ? Number(outcome.end) : null,
-    }))
+    }));
+    // Plain objects keyed by the authored index, not `Map`s: `svelte/prefer-svelte-reactivity`
+    // rejects a mutable built-in `Map` inside a component, and nothing here needs reactivity —
+    // both are local to this one derivation and rebuilt whole on every run.
+    const ranked = {};
+    for (const success of [false, true]) {
+      const family = rows
+        .filter((row) => row.success === success)
+        .sort(
+          (a, b) => (Number.isFinite(a.from) ? a.from : 0) - (Number.isFinite(b.from) ? b.from : 0)
+        );
+      family.forEach((row, rank) => {
+        ranked[row.index] = { rank, count: family.length };
+      });
+    }
+    return rows.map((row) => {
+      const place = ranked[row.index] || { rank: 0, count: 1 };
+      return { ...row, color: bandColour(row.success, place.rank, place.count) };
+    });
+  });
+
+  // The same colour, on the tier ROW, so the strip and the row that authors it are visibly
+  // one thing. Without it the ramp is a pattern with no key: five shades on a track and no
+  // way to tell which row moved which band.
+  const bandColourById = $derived(
+    Object.fromEntries(bandStripBands.map((band) => [band.id, band.color]))
   );
 
   /**
@@ -298,7 +352,6 @@
         binding={type === 'fixed' ? 'fixed' : 'relative'}
         bands={bandStripBands}
         {previewDc}
-        {previewLabel}
         groupLabel={text('FABRICATE.Admin.Manager.Checks.Crafting.BandsTitle', 'Outcome bands')}
         boundaryLabel={(band, nextBand) =>
           text(
@@ -352,6 +405,10 @@
           )}
         >
           <div class="manager-checks-outcome-head" role="row">
+            <span
+              role="columnheader"
+              aria-label={text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeBand', 'Band')}
+            ></span>
             <span role="columnheader"
               >{text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeName', 'Name')}</span
             >
@@ -382,6 +439,16 @@
               data-outcome-row={outcome.id}
               data-outcome-id={outcome.id}
             >
+              <!-- The KEY to the strip above: this row's band, in this row's colour. Not an
+                   icon and not a control — it carries the row's own accessible name through
+                   the Name field beside it, so it is decorative to a screen reader and the
+                   information it adds is the visual pairing sighted GMs need. -->
+              <span
+                class="manager-checks-outcome-swatch"
+                data-outcome-swatch={outcome.id}
+                style={`--fab-outcome-swatch: ${bandColourById[outcome.id] || 'var(--fab-surface-active)'};`}
+                aria-hidden="true"
+              ></span>
               <input
                 data-outcome-name
                 aria-label={text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeName', 'Name')}

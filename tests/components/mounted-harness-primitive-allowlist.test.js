@@ -72,9 +72,12 @@ const SHARED_PRIMITIVES = [
   // five hand-rolled copies of that shape as a live non-conformance, so every future
   // conversion drops it into another mounted tree — the gathering player suites already
   // pulled it in through `ChanceBar`'s rebuild, and four more sites are named debt.
-  // `RowDisclosure` is here for the same forward-looking reason: it is deliberately used by
-  // TWO sites in the change that introduced it, which is exactly the shape that hangs a
-  // third suite later.
+  // `RowDisclosure` is here for the same forward-looking reason, and its justification is
+  // stated as it actually is rather than as it was planned: ONE consumer today, the Checks
+  // right rail, which collapses two panels through it. The collapsed TRIGGER card that was
+  // to be its second site is not built, and the prototype's summary row is named debt in
+  // `ui-integration/spec.md`. When it lands it adopts this control and drops it into another
+  // mounted tree — which is exactly the shape that hangs a third suite later.
   'src/ui/svelte/components/FillBar.svelte',
   'src/ui/svelte/components/RowDisclosure.svelte',
   'src/ui/svelte/components/ThresholdBandStrip.svelte',

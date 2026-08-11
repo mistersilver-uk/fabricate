@@ -569,6 +569,9 @@ function compileManagerRoot() {
     // resolves dropped source documents for the Tool Studio.
     'src/utils/plainTextDescription.js',
     'src/ui/svelte/apps/manager/checks/checksReadiness.js',
+    // The ONE copy map (issue 1096): the Validation route and the section-level Callout both
+    // render an issue's sentence from it.
+    'src/ui/svelte/apps/manager/checks/checksCopy.js',
     // The Checks rail GROUP model (issue 1096). The root imports it to build the four child
     // routes, their badges and the `checks` redirect, so it is in the tree from the first
     // render. This list has NO dependency validator: omitting it does not fail the suite,
@@ -1968,6 +1971,17 @@ function createStore(calls = [], options = {}) {
     },
     saveCraftingCheckSimple: (simple) => {
       calls.push(['saveCraftingCheckSimple', simple]);
+      // A store save that REFUSES, mirroring `saveSystemDetails`/`updateEssence`. The route
+      // exit is gated on the answer, so a fixture that could only ever succeed cannot tell a
+      // guard that inspects it from one that returns `true` unconditionally.
+      return options.saveCraftingCheckSimpleResult;
+    },
+    // The Checks Studio's three-way route-exit prompt (issue 1096). It is `confirmDiscard*`
+    // like its eight siblings and returns 'save' | 'discard' | 'cancel'; `true` is the legacy
+    // discard alias the root also accepts.
+    confirmDiscardDirtyChecksDraft: (activities) => {
+      calls.push(['confirmDiscardDirtyChecksDraft', activities]);
+      return options.confirmDiscardChecksResult ?? true;
     },
     saveCraftingCheckActive: (enabled) => {
       calls.push(['saveCraftingCheckActive', enabled]);
@@ -16736,5 +16750,579 @@ describe('CraftingSystemManager mounted behavior', () => {
   it('re-announces a recipe-item save that fails the same way twice', async () => {
     await openDirtyRecipeItemEditor([], { saveRecipeItemResult: false });
     await assertRepeatFailureReAnnounces('[data-recipe-item-save-error]', clickRecipeItemSave);
+  });
+
+  // ── Issue 1096, revision 2: the seven behaviours whose mutations SURVIVED ─────────────
+  //
+  // Everything below was written because a full-suite mutation of the code it covers left
+  // the suite green. That is the standard each of these is held to: revert the line and one
+  // NAMED test here goes red. They are grouped in one block because they share the same
+  // mount-and-route setup, not because they are one concern.
+
+  // Drain the route-exit cascade. It is a chain of promise-returning guards and the Save
+  // branch adds several more `await`s inside the store call, so a fixed handful of
+  // `Promise.resolve()`s is not enough for every branch — and a too-short drain would make
+  // "the GM stayed put" pass for a route exit that simply had not finished yet. The
+  // navigate-away positive control below is what proves this drain is long enough.
+  async function settleRouteExit() {
+    for (let i = 0; i < 24; i += 1) await Promise.resolve();
+    await tick();
+    flushSync();
+    await tick();
+    flushSync();
+  }
+
+  async function mountChecks(calls = [], storeOptions = {}) {
+    mountManager(calls, storeOptions);
+    navButton('Checks').click();
+    await tick();
+    flushSync();
+    return target;
+  }
+
+  it('evaluates the check the ENGINE rolls, for the one mode the two mappings disagreed on', async () => {
+    // ALCHEMY + TIERED. The route renders the ROUTED editor (its own derivation reads
+    // `alchemy.checkMode`), so the routed draft is the one a GM edits — but the rail badge
+    // picked the SIMPLE draft from a second mapping while evaluating it under ROUTED rules.
+    // The fixture makes the two answers differ: the routed draft has an unnamed, non-success
+    // tier (two criticals), the simple draft is clean.
+    await mountChecks([], {
+      alchemyResolutionMode: 'alchemy',
+      alchemyConfig: { checkMode: 'tiered', learnOnCraft: true, consumeOnFail: true },
+      craftingCheck: {
+        enabled: true,
+        simple: { rollFormula: '1d20', dc: 12 },
+        routed: {
+          rollFormula: '1d20',
+          type: 'relative',
+          relativeOutcomes: [{ id: 'x', name: '', success: false, dc: 0 }],
+        },
+      },
+    });
+
+    const badge = target.querySelector('[data-checks-nav-issues="crafting"]');
+    assert.ok(badge, 'the routed draft is broken, so the rail child is badged');
+    assert.equal(badge.textContent.trim(), '2', 'unnamed tier + no success tier');
+
+    // And the Validation route reports exactly the same two, from the same pass. The
+    // invariant this whole studio is built on is that these can never disagree.
+    await openChecksActivity('validation');
+    const reported = [
+      ...target.querySelectorAll(
+        '[data-checks-validation-section="crafting"] [data-issue-severity="critical"]'
+      ),
+    ].map((row) => row.getAttribute('data-issue'));
+    assert.deepEqual(reported.sort(), ['noSuccessOutcome', 'unnamedOutcome']);
+  });
+
+  it('marks and SAVES an alchemy-tiered edit, which lands on the routed draft', async () => {
+    // The same disagreement, on the other side: dirty tracking and Save dispatched through
+    // the mapping that said `simple`, so an edit to the routed draft the GM can actually make
+    // was never marked unsaved and never written.
+    const calls = [];
+    await mountChecks(calls, {
+      alchemyResolutionMode: 'alchemy',
+      alchemyConfig: { checkMode: 'tiered', learnOnCraft: true, consumeOnFail: true },
+      craftingCheck: {
+        enabled: true,
+        simple: { rollFormula: '1d20', dc: 12 },
+        routed: {
+          rollFormula: '1d20',
+          type: 'relative',
+          relativeOutcomes: [{ id: 'x', name: 'Success', success: true, dc: 0 }],
+        },
+      },
+    });
+    await openChecksActivity('crafting');
+    setInputValue(target.querySelector('[data-check-roll-formula]'), '1d20 + 4');
+    await tick();
+    flushSync();
+
+    assert.ok(
+      target.querySelector('[data-checks-nav-dirty="crafting"]'),
+      'the edit marks the crafting child unsaved'
+    );
+    target.querySelector('[data-checks-save]').click();
+    await tick();
+    flushSync();
+    const written = calls.find((call) => call[0] === 'saveCraftingCheckRouted');
+    assert.ok(written, 'Save writes the ROUTED slot, which is what alchemy-tiered rolls');
+    assert.equal(written[1].rollFormula, '1d20 + 4');
+    assert.ok(
+      !calls.some((call) => call[0] === 'saveCraftingCheckSimple'),
+      'and never the simple slot, which this mode does not roll'
+    );
+  });
+
+  it('raises NO readiness issue on a crafting mode that rolls no check at all', async () => {
+    // Alchemy `none`. The coerced reading demanded a roll formula, so the rail carried a
+    // permanent "1 issue" badge that no control on the route could clear — the route renders
+    // no formula field at all.
+    await mountChecks([], {
+      alchemyResolutionMode: 'alchemy',
+      alchemyConfig: { checkMode: 'none', learnOnCraft: true, consumeOnFail: true },
+      craftingCheck: { enabled: true, simple: { rollFormula: '', dc: 12 } },
+    });
+    assert.ok(
+      !target.querySelector('[data-checks-nav-issues="crafting"]'),
+      'a mode that rolls nothing has no formula to be missing'
+    );
+    await openChecksActivity('crafting');
+    assert.ok(
+      target.querySelector('[data-alchemy-none-readonly]'),
+      'and the route says so, with no formula field to clear a badge with'
+    );
+    assert.ok(
+      !target.querySelector('[data-checks-section-dot="roll"]'),
+      'so The roll carries no dot either'
+    );
+  });
+
+  it('states a result for a Validation group with neither a tick nor an issue', async () => {
+    // Gathering in `d100` with no eligible modifiers evaluates to nothing at all, and an
+    // unfiltered map drew a `GATHERING CHECK` heading with a rule under it and nothing else.
+    await mountChecks([], { gatheringResolutionMode: 'd100' });
+    await openChecksActivity('validation');
+    const group = target.querySelector('[data-checks-validation-section="gathering"]');
+    assert.ok(group, 'gathering is still evaluated and still has a group');
+    const rows = group.querySelectorAll('.manager-recipe-val-row');
+    assert.equal(rows.length, 1, 'exactly one row, not an empty heading');
+    assert.ok(
+      group.querySelector('[data-checks-no-issues="gathering"]'),
+      'and that row is the stated "no issues" result'
+    );
+    assert.match(rows[0].textContent, /No issues detected/i);
+  });
+
+  it('honours a REPEATED deep link to a section the GM has since left', async () => {
+    // The latch was on the section VALUE, so the second request equalled it and was
+    // swallowed: deep-link to `roll`, click Triggers, deep-link to `roll` again, and the GM
+    // landed on Triggers. Cross-activity deep-linking makes that the ordinary path.
+    await mountChecks([], {
+      alchemyResolutionMode: 'routedByCheck',
+      craftingCheck: {
+        enabled: true,
+        routed: {
+          rollFormula: '',
+          type: 'relative',
+          relativeOutcomes: [{ id: 'x', name: 'Success', success: true, dc: 0 }],
+        },
+      },
+    });
+    await openChecksActivity('validation');
+
+    const deepLink = () => {
+      const row = target.querySelector(
+        '[data-checks-validation-section="crafting"] [data-issue="noRollFormula"]'
+      );
+      assert.ok(row, 'the missing formula is reported and deep-linkable');
+      row.querySelector('.manager-recipe-val-view').click();
+    };
+
+    deepLink();
+    await tick();
+    flushSync();
+    assert.equal(
+      target.querySelector('#checks-section-roll').getAttribute('aria-selected'),
+      'true',
+      'the first deep link opens The roll'
+    );
+
+    await openChecksSection('triggers');
+    assert.equal(
+      target.querySelector('#checks-section-triggers').getAttribute('aria-selected'),
+      'true'
+    );
+
+    await openChecksActivity('validation');
+    deepLink();
+    await tick();
+    flushSync();
+    assert.equal(
+      target.querySelector('#checks-section-roll').getAttribute('aria-selected'),
+      'true',
+      'and so does the SECOND, for the same section'
+    );
+  });
+
+  it('does not re-apply a standing deep link when the GM picks another section', async () => {
+    // The mirror defect, which is why the latch cannot simply be removed: a request treated
+    // as a standing instruction drags the strip back on every recomputation.
+    await mountChecks([], {
+      alchemyResolutionMode: 'routedByCheck',
+      craftingCheck: {
+        enabled: true,
+        routed: {
+          rollFormula: '',
+          type: 'relative',
+          relativeOutcomes: [{ id: 'x', name: 'Success', success: true, dc: 0 }],
+        },
+      },
+    });
+    await openChecksActivity('validation');
+    target
+      .querySelector('[data-checks-validation-section="crafting"] [data-issue="noRollFormula"]')
+      .querySelector('.manager-recipe-val-view')
+      .click();
+    await tick();
+    flushSync();
+    // Two further section clicks, each of which re-runs the adoption effect. A latch that
+    // never fired would drag the strip back to the standing `roll` request on every one.
+    await openChecksSection('outcomes');
+    await openChecksSection('modifiers');
+    assert.equal(
+      target.querySelector('#checks-section-modifiers').getAttribute('aria-selected'),
+      'true',
+      'the GM stays where they clicked'
+    );
+    assert.equal(
+      target.querySelector('#checks-section-roll').getAttribute('aria-selected'),
+      'false',
+      'and the honoured request does not re-apply itself'
+    );
+  });
+
+  it('deep-links to the owning ACTIVITY as well as the section', async () => {
+    // Both halves of `onOpenActivity`, driven from the Validation route. Dropping either the
+    // `setView` or the section left the other looking correct.
+    //
+    // The fixture picks an issue that buckets to OUTCOMES, not to the roll: `roll` is the
+    // section the strip opens on by default, so a deep link that dropped the section entirely
+    // would still land there and the assertion would prove nothing.
+    await mountChecks([], {
+      salvageResolutionMode: 'routed',
+      salvageCraftingCheck: {
+        enabled: true,
+        routed: {
+          rollFormula: '1d20',
+          type: 'relative',
+          relativeOutcomes: [{ id: 's1', name: 'Scrap', success: false, dc: 0 }],
+        },
+      },
+    });
+    await openChecksActivity('validation');
+    target
+      .querySelector('[data-checks-validation-section="salvage"] [data-issue="noSuccessOutcome"]')
+      .querySelector('.manager-recipe-val-view')
+      .click();
+    await tick();
+    flushSync();
+    assert.equal(
+      target.querySelector('.fabricate-manager').dataset.managerView,
+      'checks-salvage',
+      'the route follows the issue to its owning activity'
+    );
+    assert.equal(
+      target.querySelector('#checks-section-outcomes').getAttribute('aria-selected'),
+      'true',
+      'and the section it names is the one that opens — not the default'
+    );
+  });
+
+  it('explains the open section’s warning dot IN the panel', async () => {
+    // The dot's legend (DN8). Without it the only route to the sentence is to leave for
+    // Validation and deep-link back.
+    await mountChecks([], {
+      alchemyResolutionMode: 'routedByCheck',
+      craftingCheck: {
+        enabled: true,
+        routed: {
+          rollFormula: '',
+          type: 'relative',
+          relativeOutcomes: [{ id: 'x', name: 'Success', success: true, dc: 0 }],
+        },
+      },
+    });
+    await openChecksActivity('crafting');
+    const callout = target.querySelector('[data-checks-section-callout="noRollFormula"]');
+    assert.ok(callout, 'the roll section explains its own dot');
+    assert.match(callout.textContent, /no roll formula/i);
+    assert.equal(
+      callout.getAttribute('data-callout-tone'),
+      'info',
+      'a non-blocking issue is guidance, not a hazard'
+    );
+    // A section with no issue of its own carries none.
+    await openChecksSection('triggers');
+    assert.ok(
+      !target.querySelector('[data-checks-section-callout]'),
+      'Triggers owns no open issue here, so it states nothing'
+    );
+  });
+
+  it('renders the full activity rail stack, so the Validation absence assertions mean something', async () => {
+    // The four rail hooks were asserted ABSENT on Validation and nowhere else, so renaming
+    // all four out of existence satisfied the negative loop and the suite stayed green.
+    await mountChecks([], { alchemyResolutionMode: 'simple' });
+    await openChecksActivity('crafting');
+    for (const present of [
+      // `data-checks-rail` is the View Lab's `manager-checks-stacked-floor` wait selector.
+      // A rename fails the capture job WHOLE, publishing nothing while `check-screenshots`
+      // stays green on stale frames — so it is pinned here, not only in the case registry.
+      '[data-checks-rail="crafting"]',
+      '[data-checks-active="crafting"]',
+      '[data-checks-preview-as]',
+      '[data-checks-simulator]',
+      '[data-checks-odds]',
+      '[data-checks-digest]',
+      '[data-checks-sections]',
+    ]) {
+      assert.ok(target.querySelector(present), `an activity route renders ${present}`);
+    }
+    // Preview-as is a PRE-ROLL slot: a stated sentence and no control. Two enabled-looking
+    // selects reading "No actors" / "No records" invited a choice nothing consumed.
+    const previewAs = target.querySelector('[data-checks-preview-as]');
+    assert.ok(
+      !previewAs.querySelector('select'),
+      'the panel offers no control until there is something behind it'
+    );
+    assert.ok(previewAs.querySelector('.manager-muted'), 'it states what it will do instead');
+  });
+
+  it('keeps the gathering d100 route on its own explanation, not the check-OFF empty state', async () => {
+    // The D-2 predicate. `optional` means `mode === 'd100'` on gathering — the one mode with
+    // no toggle at all — so reading `optional && !enabled` collapsed the d100 route to "turn
+    // this check on" for a check nobody can turn on, and took the shipped explanation away.
+    await mountChecks([], {
+      gatheringResolutionMode: 'd100',
+      gatheringCraftingCheck: { enabled: false },
+    });
+    await openChecksActivity('gathering');
+    assert.ok(
+      !target.querySelector('[data-checks-off-empty]'),
+      'a mode with no toggle is INERT, never "switched off"'
+    );
+    assert.ok(
+      target.querySelector('[data-gathering-d100-readonly]'),
+      'the d100 explanation is what renders'
+    );
+    assert.ok(
+      target.querySelector('[data-checks-active-locked="on"]'),
+      'and the rail states the locked reading rather than removing the switch'
+    );
+
+    // The positive half, so the assertion above is discriminating: an activity that DOES have
+    // a live toggle, switched off, still collapses to the empty state.
+    await mountChecks([], {
+      alchemyResolutionMode: 'simple',
+      craftingCheck: { enabled: false, simple: { rollFormula: '1d20', dc: 12 } },
+    });
+    await openChecksActivity('crafting');
+    assert.ok(
+      target.querySelector('[data-checks-off-empty]'),
+      'an optional check the GM switched off does collapse'
+    );
+    assert.ok(target.querySelector('[data-checks-turn-on]'), 'with the way back on in the panel');
+  });
+
+  it('prompts on leaving a dirty Checks route, and discards when the prompt says so', async () => {
+    const calls = [];
+    await mountChecks(calls, { alchemyResolutionMode: 'simple' });
+    await openChecksActivity('crafting');
+    setInputValue(target.querySelector('[data-check-roll-formula]'), '1d20 + 7');
+    await tick();
+    flushSync();
+
+    // Moving BETWEEN Checks children never prompts — the drafts live above the route.
+    await openChecksActivity('salvage');
+    assert.ok(
+      !calls.some((call) => call[0] === 'confirmDiscardDirtyChecksDraft'),
+      'a sibling Checks route preserves the draft silently'
+    );
+
+    navButton('Components').click();
+    await settleRouteExit();
+    const prompt = calls.find((call) => call[0] === 'confirmDiscardDirtyChecksDraft');
+    assert.ok(prompt, 'leaving the studio with an unsaved edit prompts');
+    // Lowercase because the localization fake returns the key, so the root's `text()` falls
+    // back to the activity id. The point of the assertion is that the prompt is TOLD which
+    // activities are dirty, not how the label is cased.
+    assert.deepEqual(prompt[1], ['crafting'], 'and NAMES the dirty activity');
+    assert.equal(
+      target.querySelector('.fabricate-manager').dataset.managerView,
+      'components',
+      'discard lets navigation proceed'
+    );
+  });
+
+  it('stays on the Checks route when a Save-on-navigate does not land', async () => {
+    // `finishChecksRouteExit` returned `true` unconditionally after awaiting the save, so a
+    // refused write navigated away from work nothing had persisted. The essence and
+    // system-details guards gate on `result !== false`; this one now does too.
+    const calls = [];
+    await mountChecks(calls, {
+      alchemyResolutionMode: 'simple',
+      confirmDiscardChecksResult: 'save',
+      saveCraftingCheckSimpleResult: false,
+    });
+    await openChecksActivity('crafting');
+    setInputValue(target.querySelector('[data-check-roll-formula]'), '1d20 + 7');
+    await tick();
+    flushSync();
+
+    navButton('Components').click();
+    await settleRouteExit();
+    assert.ok(
+      calls.some((call) => call[0] === 'saveCraftingCheckSimple'),
+      'the save is attempted'
+    );
+    assert.equal(
+      target.querySelector('.fabricate-manager').dataset.managerView,
+      'checks-crafting',
+      'a refused save keeps the GM on the studio'
+    );
+    assert.ok(
+      target.querySelector('[data-checks-nav-dirty="crafting"]'),
+      'and the activity is still marked unsaved, because the baseline was not moved'
+    );
+  });
+
+  it('navigates away when the Save-on-navigate DOES land', async () => {
+    // The positive control for the gate above: without it, "always false" would pass.
+    const calls = [];
+    await mountChecks(calls, {
+      alchemyResolutionMode: 'simple',
+      confirmDiscardChecksResult: 'save',
+    });
+    await openChecksActivity('crafting');
+    setInputValue(target.querySelector('[data-check-roll-formula]'), '1d20 + 7');
+    await tick();
+    flushSync();
+
+    navButton('Components').click();
+    await settleRouteExit();
+    const written = calls.find((call) => call[0] === 'saveCraftingCheckSimple');
+    assert.ok(written, 'the save is attempted');
+    assert.equal(written[1].rollFormula, '1d20 + 7');
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'components');
+  });
+
+  it('gives every outcome band its OWN colour, and keys the strip from the tier rows', async () => {
+    // Deriving the fill from the `success` flag alone painted Standard and Masterwork
+    // identically on a five-tier check — per-band identity is the whole reason this control
+    // refuses the full-track gradient exemption, and two of five bands indistinguishable is
+    // not per-band identity. The ramp runs inside each semantic family, in value order.
+    await mountChecks([], {
+      alchemyResolutionMode: 'routedByCheck',
+      craftingCheck: {
+        enabled: true,
+        routed: {
+          rollFormula: '1d20',
+          type: 'relative',
+          relativeOutcomes: [
+            { id: 'ruined', name: 'Ruined', success: false, dc: -10 },
+            { id: 'flawed', name: 'Flawed', success: false, dc: -5 },
+            { id: 'standard', name: 'Standard', success: true, dc: 0 },
+            { id: 'fine', name: 'Fine', success: true, dc: 5 },
+            { id: 'masterwork', name: 'Masterwork', success: true, dc: 10 },
+          ],
+        },
+      },
+    });
+    await openChecksActivity('crafting');
+    await openChecksSection('outcomes');
+
+    const bands = [...target.querySelectorAll('[data-band-strip-band]')].map((band) =>
+      /--fab-band-strip-fill:\s*([^;]+)/.exec(band.getAttribute('style') || '')?.[1]
+    );
+    assert.equal(bands.length, 5, 'five authored tiers draw five bands');
+    assert.equal(new Set(bands).size, 5, `five DISTINCT fills, got ${bands.join(' | ')}`);
+    // Still two families: every success band mixes the success token, every failure band the
+    // danger one, so the ramp cannot make a failure tier read as a success.
+    assert.ok(
+      bands.slice(2).every((fill) => fill.includes('--fab-success')),
+      'the three success tiers stay in the success family'
+    );
+    assert.ok(
+      bands.slice(0, 2).every((fill) => fill.includes('--fab-danger')),
+      'and the two failure tiers in the danger one'
+    );
+
+    // The KEY: each tier row repeats its own band's colour, or the ramp is a pattern with no
+    // legend and no way to tell which row moved which band.
+    const swatch = (id) =>
+      target.querySelector(`[data-outcome-swatch="${id}"]`)?.getAttribute('style') || '';
+    assert.ok(swatch('ruined').startsWith('--fab-outcome-swatch:'), 'the swatch carries a fill');
+    for (const [index, id] of ['ruined', 'flawed', 'standard', 'fine', 'masterwork'].entries()) {
+      assert.ok(
+        swatch(id).includes(bands[index]),
+        `the ${id} row wears its own band colour (${bands[index]})`
+      );
+    }
+  });
+
+  it('drives the section strip from Home and End as well as the arrows', async () => {
+    await mountChecks([], { alchemyResolutionMode: 'simple' });
+    await openChecksActivity('crafting');
+    const press = (id, key) => {
+      const button = target.querySelector(`#checks-section-${id}`);
+      assert.ok(button, `the strip offers ${id}`);
+      button.dispatchEvent(new globalThis.KeyboardEvent('keydown', { key, bubbles: true }));
+    };
+    const selected = () =>
+      [...target.querySelectorAll('[data-checks-section-button]')].find(
+        (button) => button.getAttribute('aria-selected') === 'true'
+      )?.dataset.checksSectionButton;
+
+    await openChecksSection('triggers');
+    press('triggers', 'End');
+    await tick();
+    flushSync();
+    assert.equal(selected(), 'on-failure', 'End goes to the last section');
+
+    press('on-failure', 'Home');
+    await tick();
+    flushSync();
+    assert.equal(selected(), 'roll', 'and Home back to the first');
+
+    // …and the arrows still work, so the two additions did not replace them.
+    press('roll', 'ArrowRight');
+    await tick();
+    flushSync();
+    assert.equal(selected(), 'outcomes');
+  });
+
+  it('points only the SELECTED tab at a panel, because only its panel exists', async () => {
+    await mountChecks([], { alchemyResolutionMode: 'simple' });
+    await openChecksActivity('crafting');
+    const tabs = [...target.querySelectorAll('[data-checks-section-button]')];
+    assert.ok(tabs.length >= 5, 'the strip renders its sections');
+    const controlled = tabs.filter((tab) => tab.hasAttribute('aria-controls'));
+    assert.equal(controlled.length, 1, 'exactly one tab carries aria-controls');
+    assert.equal(controlled[0].getAttribute('aria-selected'), 'true', 'and it is the selected one');
+    const panelId = controlled[0].getAttribute('aria-controls');
+    assert.ok(
+      target.querySelector(`#${panelId}`),
+      `aria-controls must name a node that exists, got ${panelId}`
+    );
+    // The other four reference nothing rather than an id that resolves to nothing: an IDREF
+    // to nowhere is reported as a broken relationship, not as "not currently shown".
+    for (const tab of tabs.filter((candidate) => candidate !== controlled[0])) {
+      assert.ok(!tab.hasAttribute('aria-controls'), `${tab.dataset.checksSectionButton} names none`);
+    }
+  });
+
+  it('gives every labelled rail marker a role, so the name is actually exposed', async () => {
+    // ARIA-in-HTML forbids `aria-label` on a generic element: a bare `<span aria-label>` has
+    // no role to hang the name on, so the name is simply not exposed. The sibling dirty
+    // marker already had `role="img"`; the two issue badges did not.
+    await mountChecks([], { alchemyResolutionMode: 'routedByCheck' });
+    for (const selector of [
+      '[data-checks-nav-issues="checks"]',
+      '[data-checks-nav-issues="crafting"]',
+    ]) {
+      const badge = target.querySelector(selector);
+      assert.ok(badge, `${selector} renders for a check with an open issue`);
+      assert.equal(badge.tagName, 'SPAN');
+      assert.ok(badge.hasAttribute('aria-label'), `${selector} carries a name`);
+      assert.equal(badge.getAttribute('role'), 'img', `${selector} carries a role to expose it`);
+    }
+    // Proven against the sibling that already got this right, so the rule is stated once.
+    await openChecksActivity('crafting');
+    setInputValue(target.querySelector('[data-check-roll-formula]'), '1d20 + 1');
+    await tick();
+    flushSync();
+    const dirty = target.querySelector('[data-checks-nav-dirty="crafting"]');
+    assert.equal(dirty.getAttribute('role'), 'img');
   });
 });

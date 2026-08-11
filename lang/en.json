@@ -4557,7 +4557,10 @@
             "OptionalHint": "Turn this check on to require a roll for the activity, or off to resolve it without one.",
             "RequiredHint": "The current resolution mode requires this check, so it cannot be turned off here.",
             "GatheringHint": "In d100 mode the gathering check is the fixed d100 roll and cannot be turned off here.",
-            "AlchemyNoneHint": "This alchemy system resolves without a crafting check. Choose Simple or Tiered at the top of the Crafting tab to author one."
+            "AlchemyNoneHint": "This alchemy system resolves without a crafting check. Choose Simple or Tiered at the top of the Crafting tab to author one.",
+            "LockedOn": "Check is on",
+            "LockedOff": "Check is off",
+            "LockedSuffix": "locked by the resolution mode"
           },
           "Crafting": {
             "PageTitle": "Crafting check",
@@ -4731,7 +4734,8 @@
             "BandsBoundary": "Threshold between {from} and {to}",
             "BandsFallback": "These tiers leave a gap or overlap, so they cannot be drawn as one continuous strip. Edit the numbers in the rows below; the strip returns once the ranges meet.",
             "BandsHint": "Drag or arrow-key a band edge to move its threshold, or type the numbers below. The numbers are the authority.",
-            "OutcomeFailure": "Failure"
+            "OutcomeFailure": "Failure",
+            "OutcomeBand": "Band"
           },
           "Salvage": {
             "PageTitle": "Salvage check",
@@ -4875,11 +4879,7 @@
           },
           "PreviewAs": {
             "Title": "Preview as",
-            "Hint": "Choose an actor and a record to read this check against. Nothing here changes the system.",
-            "Actor": "Actor",
-            "Record": "Against",
-            "NoActors": "No actors",
-            "NoRecords": "No records"
+            "Hint": "Once the outcome preview is in place you can read this check against a chosen actor and record here. Nothing selected here will change the system."
           },
           "Simulator": {
             "Title": "Outcome preview",

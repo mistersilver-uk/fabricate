@@ -25,6 +25,7 @@
 <script>
   import EditorValidationSurface from '../EditorValidationSurface.svelte';
   import { localize } from '../../../util/foundryBridge.js';
+  import { checkIssueCopy, checkTickCopy } from './checksCopy.js';
   import { evaluateCheckReadiness, sectionForIssue } from './checksReadiness.js';
 
   let { sections = [], dirty = false, dirtyActivities = [], onSelectIssue = () => {} } = $props();
@@ -44,89 +45,17 @@
     salvage: 'fas fa-recycle',
     gathering: 'fas fa-seedling',
   };
-  const CHECK_LABELS = {
-    hasRollFormula: ['CheckHasRollFormula', 'Has a roll formula'],
-    outcomesNamed: ['CheckOutcomesNamed', 'Every outcome tier is named'],
-    hasSuccessOutcome: ['CheckHasSuccessOutcome', 'At least one outcome is a Success'],
-    rangesValid: ['CheckRangesValid', 'Every tier range is valid'],
-    rangesNoOverlap: ['CheckRangesNoOverlap', 'No tier ranges overlap'],
-    rangesContiguous: ['CheckRangesContiguous', 'Tier ranges leave no unclaimed values'],
-    modifierBoundsValid: [
-      'CheckModifierBoundsValid',
-      'Every applied check modifier has usable bounds',
-    ],
-    tierStepTargetsResolve: [
-      'CheckTierStepTargetsResolve',
-      'Tier-step targets name exactly one existing tier',
-    ],
-  };
-  const ISSUE_LABELS = {
-    noRollFormula: [
-      'IssueNoRollFormula',
-      'This check has no roll formula; it will not resolve until one is set.',
-    ],
-    retiredPlaceholderInFormula: [
-      'IssueRetiredPlaceholderInFormula',
-      'This formula contains the retired @craftingmod placeholder. It is ignored and removed before the roll — check modifiers are added automatically now — so delete it.',
-    ],
-    retiredPlaceholderBreaksFormula: [
-      'IssueRetiredPlaceholderBreaksFormula',
-      'This formula uses the retired @craftingmod placeholder somewhere it cannot be removed safely, so the whole formula is discarded and this check will not roll. Rewrite it by hand without the placeholder — check modifiers are added automatically now.',
-    ],
-    unnamedOutcome: [
-      'IssueUnnamedOutcome',
-      'Name every outcome tier — an unnamed tier cannot be routed to a result group.',
-    ],
-    noSuccessOutcome: [
-      'IssueNoSuccessOutcome',
-      "No outcome tier is marked as a Success — successful crafts can't route to a result set. Mark at least one tier as Success.",
-    ],
-    rangeInvalid: ['IssueRangeInvalid', 'Some tiers have a start greater than their end.'],
-    rangeOverlap: [
-      'IssueRangeOverlap',
-      'Some tier ranges overlap. Each value range must be unique.',
-    ],
-    rangeGap: [
-      'IssueRangeGap',
-      'Some values between your lowest and highest tier belong to no tier at all, so a roll landing there matches nothing and the attempt cannot be routed. Close the gap.',
-    ],
-    modifierBoundsInverted: [
-      'IssueModifierBoundsInverted',
-      'A check modifier this check applies has a minimum above its maximum, so it contributes nothing to the roll until you fix the two values.',
-    ],
-    modifierBoundsUnsafe: [
-      'IssueModifierBoundsUnsafe',
-      'A check modifier this check applies has a minimum or maximum too large or too small to appear in a roll formula, so it contributes nothing. Use a whole number a die roll could plausibly reach.',
-    ],
-    modifiersInertNoCheck: [
-      'IssueModifiersInertNoCheck',
-      'This resolution mode rolls no check, so the check modifiers selected here are never applied.',
-    ],
-    modifiersInertNoFormula: [
-      'IssueModifiersInertNoFormula',
-      'This check has no roll formula yet, so the check modifiers selected here are never applied.',
-    ],
-    danglingTierStepTarget: [
-      'IssueDanglingTierStepTarget',
-      "A trigger's target tier is not set, or names a tier this check does not have; that step does nothing until you pick one of this check's outcome tiers.",
-    ],
-    multipleTierStepTargets: [
-      'IssueMultipleTierStepTargets',
-      'Two or more triggers set a target tier; if more than one matches, the lowest-ranked wins.',
-    ],
-  };
-
   function subsystemLabel(subsystem) {
     const meta = SUBSYSTEM_LABELS[subsystem] || [subsystem, subsystem];
     return text(`FABRICATE.Admin.Manager.Checks.Validation.${meta[0]}`, meta[1]);
   }
   function checkLabel(id) {
-    const meta = CHECK_LABELS[id] || [id, id];
-    return text(`FABRICATE.Admin.Manager.Checks.Validation.${meta[0]}`, meta[1]);
+    const copy = checkTickCopy(id);
+    return text(copy.key, copy.fallback);
   }
   function issueTitle(id) {
-    const meta = ISSUE_LABELS[id] || [id, id];
-    return text(`FABRICATE.Admin.Manager.Checks.Validation.${meta[0]}`, meta[1]);
+    const copy = checkIssueCopy(id);
+    return text(copy.key, copy.fallback);
   }
 
   const evaluated = $derived(
@@ -154,31 +83,52 @@
   // ONE row per check tick and per issue, in that order, so a group reads as "what holds"
   // followed by "what does not". An issue's row carries the deep-link target; a satisfied
   // tick has nowhere to go.
+  //
+  // A group with NEITHER still states its result (issue 1096). That is a reachable state, not
+  // a hypothetical: a gathering check in `d100` mode with no eligible check modifiers reports
+  // no tick and no issue, and an unfiltered map then drew a `GATHERING CHECK` heading with a
+  // rule under it and nothing else — a heading over emptiness, where the surface it replaced
+  // said "No issues detected." in so many words. The group is kept rather than dropped
+  // because its ABSENCE would read as "gathering was not evaluated", which is a different and
+  // equally wrong claim.
+  function rowsFor(subsystem, readiness) {
+    const rows = [
+      ...readiness.checks.map((check) => ({
+        id: check.id,
+        title: checkLabel(check.id),
+        status: check.satisfied ? 'pass' : 'warn',
+        dataAttrs: { 'data-subsystem': subsystem, 'data-satisfied': String(check.satisfied) },
+      })),
+      ...readiness.issues.map((issue) => ({
+        id: issue.id,
+        title: issueTitle(issue.id),
+        status: issue.severity === 'critical' ? 'block' : 'warn',
+        target: { activity: subsystem, section: sectionForIssue(issue.id) },
+        dataAttrs: {
+          'data-subsystem': subsystem,
+          'data-issue': issue.id,
+          'data-issue-severity': issue.severity,
+        },
+      })),
+    ];
+    if (rows.length > 0) return rows;
+    return [
+      {
+        id: 'noIssues',
+        title: text('FABRICATE.Admin.Manager.Checks.Validation.NoIssues', 'No issues detected.'),
+        status: 'pass',
+        dataAttrs: { 'data-subsystem': subsystem, 'data-checks-no-issues': subsystem },
+      },
+    ];
+  }
+
   const groups = $derived(
     evaluated.map(({ subsystem, readiness }) => ({
       id: subsystem,
       icon: SUBSYSTEM_ICONS[subsystem] || 'fas fa-dice-d20',
       label: subsystemLabel(subsystem),
       dataAttrs: { 'data-checks-validation-section': subsystem },
-      rows: [
-        ...readiness.checks.map((check) => ({
-          id: check.id,
-          title: checkLabel(check.id),
-          status: check.satisfied ? 'pass' : 'warn',
-          dataAttrs: { 'data-subsystem': subsystem, 'data-satisfied': String(check.satisfied) },
-        })),
-        ...readiness.issues.map((issue) => ({
-          id: issue.id,
-          title: issueTitle(issue.id),
-          status: issue.severity === 'critical' ? 'block' : 'warn',
-          target: { activity: subsystem, section: sectionForIssue(issue.id) },
-          dataAttrs: {
-            'data-subsystem': subsystem,
-            'data-issue': issue.id,
-            'data-issue-severity': issue.severity,
-          },
-        })),
-      ],
+      rows: rowsFor(subsystem, readiness),
     }))
   );
 

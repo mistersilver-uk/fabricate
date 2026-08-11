@@ -42,6 +42,9 @@ export const CHECKS_TREE_RAW_MODULES = Object.freeze([
   'src/ui/svelte/actions/dismissOnOutsideClick.js',
   'src/ui/svelte/actions/portal.js',
   'src/ui/svelte/apps/manager/checks/checksReadiness.js',
+  // The ONE copy map (issue 1096): the Validation route and the section-level Callout both
+  // render an issue's sentence from it, so both halves of the checks tree import it.
+  'src/ui/svelte/apps/manager/checks/checksCopy.js',
   // The attribute-name literals the rule group renders, hoisted out of Svelte markup so
   // `tests/view-lab-cases.test.js` can import rather than restate them (issue 1095).
   'src/ui/svelte/apps/manager/checks/modifierPolicyAttrs.js',

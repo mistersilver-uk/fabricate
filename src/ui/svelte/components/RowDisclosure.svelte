@@ -7,9 +7,14 @@
   owns a heading, a count and the whole header band above a set of rows — and pressing a
   collapsed trigger card open is not the same act as collapsing a section of the page. Two
   "labelled regions that expand" landing in one change must either share an implementation
-  or name the behavioural mismatch that forbids it; this is the shared implementation, and
-  both sites in issue 1096 use it: the collapsed trigger card and the right rail's
-  collapsed panels at the ≤1320 breakpoint.
+  or name the behavioural mismatch that forbids it; this is the shared implementation.
+
+  ITS SHIPPED CONSUMER IS THE CHECKS RIGHT RAIL, whose simulator and odds panels each collapse
+  to it at the existing ≤1320 breakpoint. The collapsed TRIGGER card is not a second consumer:
+  issue 1096 left the trigger cards rendering expanded, so the prototype's summary row —
+  condition sentence, effect chip, disclosure — is still to be built. It is recorded here
+  rather than claimed, because a primitive justified by a site that does not exist is a
+  justification nobody can check. When that row is built it adopts this control.
 
   It renders a real `<button>` and therefore must not be placed INSIDE another button.
   Converting a `role="button"` wrapper into a `<button>` around it would nest buttons and

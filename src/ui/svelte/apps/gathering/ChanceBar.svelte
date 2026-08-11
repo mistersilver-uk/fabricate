@@ -52,6 +52,23 @@
   // Only the event scale recolours the fill by tier; the success scale stays a
   // flat green (FillBar's `success` tone).
   const rootClass = $derived(isEvent ? `chance-bar tier-${tier}` : 'chance-bar');
+  // The tier custom property is set by `.chance-bar.tier-*` in the global sheet. It carries
+  // its own FALLBACK because `var()` with none resolves to the guaranteed-invalid value and
+  // `background` then falls back to `transparent` — a fill that paints NOTHING, which is
+  // indistinguishable from 0% at any value. Any state where the tier rule has not applied
+  // (a bar rendered outside `.fabricate`, an unscoped mount in a test harness) would draw an
+  // empty track under a caption reading "78%".
+  // The tier custom property, which the scoped block below declares a DEFAULT for as well as
+  // four tier values — an unset `var()` resolves to the guaranteed-invalid value and
+  // `background` then falls back to `transparent`, painting NOTHING, which is
+  // indistinguishable from 0% under a caption reading "78%".
+  //
+  // The fallback lives in the STYLESHEET rather than inline as `var(--x, var(--y))` for a
+  // reason worth stating: happy-dom's CSS value parser silently DISCARDS a nested `var()`
+  // from `cssText`, so the whole `background` declaration vanishes from the mounted DOM — and
+  // the mounted assertion that proves the FillBar child actually consumes this property would
+  // then be asserting on an element that carries no background at all. A declared default in
+  // the block that owns the tiers guarantees the same thing without blinding the test.
   const fillColour = $derived(isEvent ? 'var(--chance-bar-fill)' : '');
   const captionKey = $derived(
     isEvent
@@ -95,6 +112,11 @@
 
 <style>
   .chance-bar {
+    /* The DEFAULT for the property the FillBar child paints from. Every tier rule below is
+       more specific and overrides it; it exists so that a bar whose tier rule somehow did not
+       apply still paints a fill rather than nothing at all. */
+    --chance-bar-fill: var(--fab-danger);
+
     display: flex;
     flex-direction: column;
     gap: 3px;

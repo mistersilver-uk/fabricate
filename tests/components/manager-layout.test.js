@@ -3771,7 +3771,12 @@ test('manager environments browser and edit route define compact responsive geom
   const editorShellBlock = blockFor('.fabricate-manager .manager-environment-editor-shell');
   const editorViewBlock = blockFor('.fabricate-manager .manager-environment-edit-view');
   const detailsGridBlock = blockFor('.fabricate-manager .manager-environment-details-grid');
-  const workspaceBlock = blockFor('.fabricate-manager .manager-environment-workspace');
+  // NOT `blockFor`: that returns the FIRST block matching the selector, and the workspace's
+  // narrow override — which sets only the column token — is declared EARLIER in the file than
+  // the base rule this assertion is about. The base rule is the unindented one.
+  const workspaceBlock = (css.match(
+    /^\.fabricate-manager \.manager-environment-workspace \{[\s\S]*?\}/m
+  ) || [''])[0];
   const weightFieldBlock = blockFor('.fabricate-manager .manager-environment-comp-weight-field');
   const compMenuBlock = blockFor('.fabricate-manager .manager-environment-comp-menu');
   const compMenuButtonBlock = blockFor('.fabricate-manager .manager-environment-comp-menu button');
@@ -3896,8 +3901,10 @@ test('manager environments browser and edit route define compact responsive geom
     'environment details band should include a compact status/evidence card'
   );
   assert.ok(
-    workspaceBlock.includes('grid-template-columns: minmax(0, 1fr) 300px;'),
-    'environment editor workspace should pair the main composition column with a fixed 300px inspector (matching the standard manager inspector width) at normal widths'
+    workspaceBlock.includes(
+      'grid-template-columns: var(--fab-env-workspace-grid, minmax(0, 1fr) 300px);'
+    ),
+    'environment editor workspace should pair the main composition column with a fixed 300px inspector (matching the standard manager inspector width) at normal widths, through the token its narrow override sets'
   );
   const compBlock = blockFor('.fabricate-manager .manager-environment-comp');
   assert.ok(
@@ -4059,11 +4066,12 @@ test('manager environments browser and edit route define compact responsive geom
       mediumQuery.includes('overflow: visible;'),
     'stacked environment edit layout should release nested scroll containment'
   );
-  assert.ok(
-    mediumQuery.includes('.fabricate-manager .manager-environment-workspace') &&
-      mediumQuery.includes('grid-template-columns: minmax(0, 1fr);'),
-    'stacked environment editor should put details, task rail, editor, and evidence in one column'
-  );
+  // The workspace's own narrow override is NOT asserted as text here. It was, and the
+  // assertion passed for the whole life of a rule that never applied: a container query adds
+  // no specificity, so `grid-template-columns` inside this block tied with the base rule
+  // declared later in the sheet and lost on source order. A source-text assertion cannot tell
+  // a live rule from a dead one — `manager workspace restacks at the declared floor` below
+  // measures the rendered grid instead.
 });
 
 test('manager environment inspector evidence table wraps compact pills without horizontal overflow', async () => {
@@ -6475,4 +6483,111 @@ test('every manager select paints an opaque background, so its popup opens dark'
     [],
     `a translucent select background opens a LIGHT popup:\n- ${offenders.join('\n- ')}`
   );
+});
+
+// ── The Checks Studio restacks at the declared floor, MEASURED (issue 1096) ──────────────
+//
+// This replaces two source-text assertions, and the replacement is the whole point. Both of
+// the rules below were asserted by `css.includes(...)` and both passed while broken:
+//
+//  - the workspace's `@container … (max-width: 1120px)` override tied with the base rule on
+//    specificity (a container query adds none) and LOST on source order, so between 1120 and
+//    961 — a band that contains the declared 1024x640 floor — `.manager-body` restacked while
+//    the workspace stayed a 300px side column. The acceptance frame that exists to show a
+//    stacked studio at the floor showed a side rail.
+//  - `[data-manager-view^="checks"]` is a PREFIX match because `checks` became four child
+//    routes. Narrowing it to `=` matched nothing, and an `includes('…checks…')` assertion
+//    cannot see the difference between the two.
+//
+// A rendered measurement can see both. `chromium` is already this file's tool for exactly
+// this reason: happy-dom applies no stylesheet and computes no cascade, so nothing in a
+// mounted suite could ever have caught either.
+async function readWorkspaceGrid(width, view) {
+  const browser = await chromium.launch();
+  const page = await browser.newPage({ viewport: { width, height: 720 }, deviceScaleFactor: 1 });
+  try {
+    await page.setContent(
+      `<style>${css}</style>` +
+        `<div style="width:${width}px;height:640px">` +
+        `<div class="fabricate-manager" data-manager-view="${view}">` +
+        `<div class="manager-body"><aside class="manager-rail">Rail</aside>` +
+        `<main class="manager-main"><div class="manager-environment-edit-view">` +
+        `<div class="manager-environment-workspace">` +
+        `<div class="manager-environment-tab-panel">Panel</div>` +
+        `<aside class="manager-inspector manager-environment-inspector">Rail</aside>` +
+        `</div></div></main></div></div></div>`
+    );
+    return await page.evaluate(() => {
+      const columns = (selector) => {
+        const node = document.querySelector(selector);
+        return node ? getComputedStyle(node).gridTemplateColumns.split(' ').length : 0;
+      };
+      const workspace = document.querySelector('.manager-environment-workspace');
+      return {
+        bodyColumns: columns('.manager-body'),
+        workspaceColumns: columns('.manager-environment-workspace'),
+        workspaceWidth: workspace ? workspace.getBoundingClientRect().width : 0,
+        panelWidth: document.querySelector('.manager-environment-tab-panel')?.getBoundingClientRect()
+          .width,
+        inspectorWidth: document
+          .querySelector('.manager-environment-inspector')
+          ?.getBoundingClientRect().width,
+      };
+    });
+  } finally {
+    await browser.close();
+  }
+}
+
+// Imported rather than restated, so a change to the route set is a change to this guard too.
+const { CHECKS_VIEWS, CHECKS_REDIRECT_VIEW } = await import(
+  '../../src/ui/svelte/apps/manager/checks/checksNav.js'
+);
+
+test('every checks child route releases the shared inspector column', async () => {
+  // The aside is unconditionally suppressed on a Checks route by the root's `!isChecksRoute`
+  // guard, so the 300px column MUST be released for every child or the studio renders against
+  // a dead strip. `recipe-edit` has this guard already (recipe-edit-placeholder.test.js); the
+  // Checks half is the one that was missing.
+  for (const view of [...CHECKS_VIEWS, CHECKS_REDIRECT_VIEW]) {
+    const { bodyColumns } = await readWorkspaceGrid(1280, view);
+    assert.equal(bodyColumns, 2, `${view} must render rail + main, with no dead inspector track`);
+  }
+  // A negative control: an ordinary route keeps the three-column body, so the assertion above
+  // is discriminating rather than true of everything.
+  const { bodyColumns } = await readWorkspaceGrid(1280, 'recipes');
+  assert.equal(bodyColumns, 3, 'a non-editor route still has its inspector column');
+});
+
+test('the manager workspace restacks at the declared 1024 floor, not only below 960', async () => {
+  // 1280: the side-rail state, which must survive.
+  const wide = await readWorkspaceGrid(1280, 'checks-crafting');
+  assert.equal(wide.workspaceColumns, 2, 'the workspace is panel + rail above the breakpoint');
+  assert.ok(
+    Math.abs(wide.inspectorWidth - 300) < 1,
+    `the side rail is 300px wide, got ${wide.inspectorWidth}`
+  );
+
+  // 1024x640 — the DECLARED FLOOR, and the width `manager-checks-stacked-floor` photographs.
+  // It sits inside the 1120→961 band, which is exactly where the dead rule left a side rail.
+  const floor = await readWorkspaceGrid(1024, 'checks-crafting');
+  assert.equal(floor.bodyColumns, 1, 'the body is stacked at the floor');
+  assert.equal(floor.workspaceColumns, 1, 'and so is the workspace — no 300px side column');
+  assert.ok(
+    floor.panelWidth > 600,
+    `the panel takes the full stacked width, got ${floor.panelWidth}`
+  );
+
+  // 1100: the top of the same band, to prove the boundary is 1120 and not 960.
+  const band = await readWorkspaceGrid(1100, 'checks-crafting');
+  assert.equal(band.workspaceColumns, 1, 'the whole 1120→961 band is stacked');
+});
+
+test('the environment, tags and system studios restack at the same floor', async () => {
+  // The dead rule was never Checks-specific: `.manager-environment-workspace` is the shared
+  // editor shell, so every studio built on it carried the same 1120→961 side rail.
+  for (const view of ['environment-edit', 'system-edit', 'crafting-settings']) {
+    const floor = await readWorkspaceGrid(1024, view);
+    assert.equal(floor.workspaceColumns, 1, `${view} stacks its workspace at the floor`);
+  }
 });

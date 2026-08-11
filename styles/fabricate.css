@@ -2070,22 +2070,39 @@
    DESIGN minimum, the width at which the typeable field is as wide as an unfilled stepper,
    not a hard limit. If a rendered frame overflows, narrow the fixed Start/End pair first —
    they are the least-used columns. */
+
+/* The leading 10px track is the BAND SWATCH: the tier row's own colour on the strip above
+   it, so the ramp on the track has a key. It is the narrowest column by a wide margin
+   because it carries no text and no target — it is a legend, not a control. */
 .fabricate-manager .manager-checks-outcome-table.is-relative {
-  grid-template-columns: minmax(140px, 1fr) 102px 104px 124px 40px;
+  grid-template-columns: 10px minmax(140px, 1fr) 102px 104px 124px 40px;
 }
 
 .fabricate-manager .manager-checks-outcome-table.is-fixed {
-  grid-template-columns: minmax(130px, 1fr) 102px 102px 104px 124px 40px;
+  grid-template-columns: 10px minmax(130px, 1fr) 102px 102px 104px 124px 40px;
 }
 
 /* checkDriven authority drops the per-outcome break-tools column (tool breakage is
    authored via the CheckBreakage editor instead). */
 .fabricate-manager .manager-checks-outcome-table.is-relative.is-no-break {
-  grid-template-columns: minmax(140px, 1fr) 102px 104px 40px;
+  grid-template-columns: 10px minmax(140px, 1fr) 102px 104px 40px;
 }
 
 .fabricate-manager .manager-checks-outcome-table.is-fixed.is-no-break {
-  grid-template-columns: minmax(130px, 1fr) 102px 102px 104px 40px;
+  grid-template-columns: 10px minmax(130px, 1fr) 102px 102px 104px 40px;
+}
+
+/* Painted from an inline custom property rather than an inline `background`, matching the
+   band it keys: the declared fallback means an absent colour paints the neutral surface
+   instead of nothing, and it is the only shape a `color-mix()` survives happy-dom's
+   `cssText` parser in — so the pairing is testable. */
+.fabricate-manager .manager-checks-outcome-swatch {
+  display: block;
+  width: 10px;
+  height: 24px;
+  border: 1px solid var(--fab-border);
+  border-radius: 3px;
+  background: var(--fab-outcome-swatch, var(--fab-surface-active));
 }
 
 /* Simple-check recipe tiers: Name + DC + remove. */
@@ -4274,7 +4291,7 @@
    input` and `.manager-toolbar .manager-button`, but not `select`.
 
    The essence library (issue 1036) is the THIRD studio on this bar and joins it for the
-   same reason. It had re-derived the bar in its own scoped `\3c style>`, which looked
+   same reason. It had re-derived the bar in its own scoped `<style>`, which looked
    equivalent and was not, in two ways a source read cannot show:
 
     - a SCOPED rule cannot reach `BulkSelectionToolbar`'s root. That primitive renders
@@ -7904,7 +7921,7 @@
    reason: it renders OUTSIDE a `.manager-field`, in the Category panel's heading row. */
 
 /* `:not(.fab-stepper-input)` — the shared `Stepper` supplies its OWN borderless chrome
-   (48px wide, 22px tall, transparent) from its component-scoped \3c style>. This rule is
+   (48px wide, 22px tall, transparent) from its component-scoped <style>. This rule is
    `.fabricate-manager .manager-field input`, which OUT-SPECIFIES that scoped rule, so a
    Stepper placed inside any `.manager-field` was silently stretched to 100% width and
    36px tall and re-bordered — the stepper stopped looking like a stepper. The recipe's
@@ -8402,7 +8419,7 @@
 
 /* ── The Validation tab's aggregate header (issue 676) ────────────────────────────
    Rehomed from the deleted RecipeContextRail, which showed it only while this tab was
-   open. It lives in the GLOBAL sheet, not a scoped Svelte \3c style>, for two reasons: the
+   open. It lives in the GLOBAL sheet, not a scoped Svelte <style>, for two reasons: the
    rest of the recipe studio's chrome already does (`.manager-recipe-tab`,
    `.manager-recipe-val-*`), and a component-scoped
    block is INVISIBLE to `recipe-studio-font-size.test.js`, which renders raw markup
@@ -13887,7 +13904,15 @@
     overflow: visible;
   }
 
-  .fabricate-manager .manager-environment-workspace,
+  /* The workspace releases its 300px side rail through the TOKEN its base rule reads, not
+     through `grid-template-columns`: that base rule is declared later in this file and a
+     container query adds no specificity, so the direct property tied and lost. See the base
+     rule for the band this left broken. Its two siblings below are declared EARLIER in the
+     file, so their direct override still wins and stays as it is. */
+  .fabricate-manager .manager-environment-workspace {
+    --fab-env-workspace-grid: minmax(0, 1fr);
+  }
+
   .fabricate-manager .manager-tags-categories-workspace,
   .fabricate-manager .manager-environment-details-grid {
     grid-template-columns: minmax(0, 1fr);
@@ -16302,9 +16327,22 @@
   margin-left: var(--fab-space-2xs);
 }
 
+/* The editor workspace: tab panel + 300px side rail.
+
+   THE COLUMN TRACK IS A TOKEN, and that is not decoration (issue 1096). The narrow override
+   for this element lives in the `@container fabricate-manager (max-width: 1120px)` block
+   ~2400 lines ABOVE, and a container query adds no specificity — so an override written as
+   `grid-template-columns` there tied (0,2,0) with this rule and LOST on source order alone.
+   It was dead for its whole life: between 1120 and 961 the body restacked to one column while
+   this stayed a 300px side rail, and the DECLARED 1024x640 FLOOR sits inside that band, so
+   the studio was a side rail at the one width its acceptance frame photographs. Setting a
+   custom property instead cannot tie: this rule never declares
+   `--fab-env-workspace-grid`, so the query's declaration is unopposed wherever it applies,
+   whichever order the two are read in. `--fab-env-comp-grid` in the same file is the
+   precedent. */
 .fabricate-manager .manager-environment-workspace {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 300px;
+  grid-template-columns: var(--fab-env-workspace-grid, minmax(0, 1fr) 300px);
   gap: var(--fab-space-3);
   min-width: 0;
   min-height: 0;
@@ -17681,9 +17719,9 @@
 }
 
 @container fabricate-manager (max-width: 960px) {
-  .fabricate-manager .manager-environment-workspace {
-    grid-template-columns: minmax(0, 1fr);
-  }
+  /* The workspace's single-column restack is NOT repeated here. It belongs to the 1120 block
+     above, and 960 is inside 1120 — this copy only existed because the 1120 one never
+     applied, which made it look like the breakpoint. */
 
   .fabricate-manager .manager-environment-overview-duo,
   .fabricate-manager .manager-environment-context-split {
@@ -19993,7 +20031,7 @@
    so the body drops the formula and the DC — a batch has no single subject — and
    replaces them with a subject strip and a note saying the answer lands on every roll.
 
-   These rules live HERE rather than in a scoped `\3c style>` block because the dialog body
+   These rules live HERE rather than in a scoped `<style>` block because the dialog body
    is an HTML STRING handed to DialogV2, which renders outside every Svelte component's
    scope: a scoped selector would compile to a `.svelte-xxxx` attribute no element in the
    dialog carries. They reuse the `.fabricate-roll-prompt` root so the die row, the

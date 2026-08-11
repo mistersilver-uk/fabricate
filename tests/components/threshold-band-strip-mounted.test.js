@@ -227,7 +227,7 @@ describe('ThresholdBandStrip: the band↔boundary mapping, per binding', () => {
 });
 
 describe('ThresholdBandStrip: bounds and the clamp', () => {
-  it('bounds a handle by its NEIGHBOURS, and the outermost by the track domain', async () => {
+  it('bounds every handle ONE STEP inside its neighbour, and the outermost inside the track', async () => {
     const root = await harness.mount({ bands: RELATIVE_BANDS, previewDc: 12, step: 1 });
     const bounds = handles(root).map((handle) => [
       handle.getAttribute('aria-valuemin'),
@@ -236,19 +236,107 @@ describe('ThresholdBandStrip: bounds and the clamp', () => {
     // Interior handles: the neighbouring boundaries, one step in.
     assert.deepEqual(bounds[1], ['8', '16']);
     assert.deepEqual(bounds[2], ['13', '21']);
-    // Outermost: the TRACK DOMAIN. In `relative` that is the authored range extended one
-    // step past the outermost tier, where the step is the tier interval — which is what
-    // makes the last band the same width as its neighbours rather than a sliver.
-    assert.equal(bounds[0][0], '2', 'the first band’s own lower bound, which has no handle');
-    assert.equal(bounds[3][1], '27', 'one tier interval past the last tier');
+    // Outermost: one step inside the TRACK, which in `relative` is the authored range
+    // extended one tier interval past the outermost tier (that extension is what makes the
+    // last band the same width as its neighbours rather than a sliver).
+    //
+    // ONE STEP INSIDE, not the raw edge. The first band's lower edge is 2 and its upper edge
+    // is this handle: bounding it at 2 let a drag put the two edges on the same value and
+    // collapse Ruined to zero width — a named tier reduced to nothing, with its focus ring
+    // clipped away by the track's `overflow: hidden`, so the GM could neither see it nor aim
+    // at it again. The same argument bounds the last handle one step inside the far edge.
+    assert.equal(bounds[0][0], '3', 'one step above the first band’s own lower edge');
+    assert.equal(bounds[3][1], '26', 'one step below the far edge of the track');
   });
 
-  it('takes the fixed domain from the authored span, verbatim', async () => {
+  it('never lets a drag collapse the first or the last band', async () => {
+    // The bound above, driven the way a GM drives it. `Home` on handle 0 goes as low as the
+    // strip permits; the emitted offset must still leave Ruined a band.
+    const writes = [];
+    const root = await harness.mount({
+      bands: RELATIVE_BANDS,
+      previewDc: 12,
+      step: 1,
+      onChange: (patch) => writes.push(patch),
+    });
+    press(handles(root)[0], 'Home');
+    assert.deepEqual(writes.at(-1), { binding: 'relative', index: 1, dc: -9 }, 'absolute 3, not 2');
+    press(handles(root).at(-1), 'End');
+    assert.deepEqual(writes.at(-1), { binding: 'relative', index: 4, dc: 14 }, 'absolute 26, not 27');
+  });
+
+  it('takes the fixed domain from the authored span, whose last band ends INCLUSIVELY', async () => {
     const root = await harness.mount({ binding: 'fixed', bands: FIXED_BANDS });
     const first = handles(root)[0];
     const last = handles(root).at(-1);
-    assert.equal(first.getAttribute('aria-valuemin'), '1', 'min(start)');
+    assert.equal(first.getAttribute('aria-valuemin'), '2', 'one step above min(start)');
+    // The track runs to `max(end) + 1` because a fixed range is INCLUSIVE — band *i* is drawn
+    // to where band *i+1* starts, which is `end + 1` — so one step inside it is `max(end)`.
     assert.equal(last.getAttribute('aria-valuemax'), '34', 'max(end)');
+  });
+
+  it('draws the LAST fixed band the same width as an equal-sized neighbour', async () => {
+    // Slag 1–9 and Rough 10–17 are 9 and 8 wide; Masterwork 27–34 is 8 wide and must render
+    // 8 wide. Ending the drawing at the authored `to` made it 7 — one unit narrow on every
+    // fixed check, which reads as the top tier being rarer than it is.
+    const root = await harness.mount({ binding: 'fixed', bands: FIXED_BANDS });
+    const widths = [...root.querySelectorAll('[data-band-strip-band]')].map((band) =>
+      Number((band.getAttribute('style').match(/width:\s*([\d.]+)%/) || [])[1])
+    );
+    const total = 34 + 1 - 1; // trackMax 35 − domain.min 1
+    assert.ok(Math.abs(widths[1] - (8 / total) * 100) < 0.01, 'Rough is 8 units wide');
+    assert.ok(
+      Math.abs(widths[3] - (8 / total) * 100) < 0.01,
+      'and so is Masterwork — inclusive ranges meet at end + 1'
+    );
+  });
+
+  it('reports a describable range for a tier narrower than its own step', async () => {
+    // Authored data can put two boundaries closer together than `step`, which inverts the
+    // naive bound and announces `aria-valuemin` ABOVE `aria-valuemax` — a range no assistive
+    // technology can describe. The honest answer is that this handle has nowhere to go.
+    const root = await harness.mount({
+      bands: [
+        { id: 'a', name: 'A', from: 0 },
+        { id: 'b', name: 'B', from: 4 },
+        { id: 'c', name: 'C', from: 6 },
+        { id: 'd', name: 'D', from: 20 },
+      ],
+      step: 5,
+      previewDc: 0,
+    });
+    for (const handle of handles(root)) {
+      const min = Number(handle.getAttribute('aria-valuemin'));
+      const max = Number(handle.getAttribute('aria-valuemax'));
+      const now = Number(handle.getAttribute('aria-valuenow'));
+      assert.ok(min <= max, `aria-valuemin ${min} must not exceed aria-valuemax ${max}`);
+      assert.ok(now >= min && now <= max, `aria-valuenow ${now} must sit inside [${min}, ${max}]`);
+    }
+  });
+
+  it('round-trips a DESCENDING fixed list through the authored index, not the drawn one', async () => {
+    // A GM who lists Masterwork first has authored valid data. The strip DRAWS in value order
+    // and WRITES through each band's own authored index, so the coupled fixed pair must name
+    // the authored positions — reversed here — rather than the drawn ones.
+    const writes = [];
+    const descending = [...FIXED_BANDS].reverse().map((band, index) => ({ ...band, index }));
+    const root = await harness.mount({
+      binding: 'fixed',
+      bands: descending,
+      step: 1,
+      onChange: (patch) => writes.push(patch),
+    });
+    // Handle 1 sits at the Rough/Serviceable seam: value 18. Drawn positions 1 and 2;
+    // authored positions 2 (Serviceable) and 1 (Rough) in the reversed list.
+    assert.equal(handles(root)[1].getAttribute('aria-valuenow'), '18');
+    press(handles(root)[1], 'ArrowRight');
+    assert.deepEqual(writes.at(-1), {
+      binding: 'fixed',
+      index: 2,
+      end: 18,
+      nextIndex: 1,
+      start: 19,
+    });
   });
 
   it('CLAMPS at a neighbour rather than swapping or reordering', async () => {
@@ -316,7 +404,14 @@ describe('ThresholdBandStrip: colour, gradients and the fallback', () => {
       resolve(repoRoot, 'src/ui/svelte/components/ThresholdBandStrip.svelte'),
       'utf8'
     );
-    const styles = source.slice(source.indexOf('<style>'));
+    // The anchor is CHECKED before it is sliced on. `indexOf` answers -1 for a block that has
+    // been renamed or removed, `slice(-1)` then returns the last CHARACTER of the file, and
+    // the negative assertion below passes over a one-character string — green, having read
+    // nothing at all.
+    const styleStart = source.indexOf('<style>');
+    assert.notEqual(styleStart, -1, 'the component still has a scoped style block to read');
+    const styles = source.slice(styleStart);
+    assert.ok(styles.length > 500, 'and the slice is the block, not a fragment');
     assert.doesNotMatch(styles, /gradient\(/i, 'the scoped block declares no gradient either');
   });
 
@@ -347,11 +442,24 @@ describe('ThresholdBandStrip: colour, gradients and the fallback', () => {
         color: index % 2 === 0 ? 'var(--fab-success-soft)' : 'var(--fab-danger-soft)',
       })),
     });
+    // The colour lands as a CUSTOM PROPERTY the scoped rule paints from, not as a bare
+    // `background`. That is what gives it a declared fallback (an unset `var()` paints
+    // nothing at all), and it is also the only shape happy-dom's `cssText` parser preserves
+    // for a `color-mix()` — which the routed editor's tonal ramp derives.
     const painted = [...root.querySelectorAll('[data-band-strip-band]')].map(
-      (band) => /background:\s*([^;]+)/.exec(band.getAttribute('style'))?.[1]
+      (band) => /--fab-band-strip-fill:\s*([^;]+)/.exec(band.getAttribute('style'))?.[1]
     );
     assert.equal(painted.filter(Boolean).length, 4);
     for (const colour of painted) assert.match(colour, /var\(--fab-/);
+    const source = readFileSync(
+      resolve(repoRoot, 'src/ui/svelte/components/ThresholdBandStrip.svelte'),
+      'utf8'
+    );
+    assert.match(
+      source,
+      /background:\s*var\(--fab-band-strip-fill,\s*var\(--fab-[\w-]+\)\);/,
+      'and the rule that paints it declares a fallback, so an unset colour is not transparent'
+    );
   });
 
   it('falls back to the tier rows with a stated note when the set is GAPPED', async () => {

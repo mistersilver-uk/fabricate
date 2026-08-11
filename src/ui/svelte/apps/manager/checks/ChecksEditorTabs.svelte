@@ -46,11 +46,23 @@
     );
   }
 
+  // Arrow / Home / End, the four the ARIA tablist pattern asks a horizontal strip for. Home
+  // and End are not a nicety on a five-section strip whose sections are ordered — "back to
+  // the roll" and "the last section" are the two jumps a GM repeats — and a strip that
+  // handled the arrows but swallowed nothing else left them doing whatever the browser does
+  // with Home inside a button row, which is nothing.
+  function targetIndex(key, index) {
+    if (key === 'ArrowRight') return (index + 1) % sections.length;
+    if (key === 'ArrowLeft') return (index - 1 + sections.length) % sections.length;
+    if (key === 'Home') return 0;
+    if (key === 'End') return sections.length - 1;
+    return -1;
+  }
+
   function onKeydown(event, index) {
-    if (event.key !== 'ArrowRight' && event.key !== 'ArrowLeft') return;
+    const nextIndex = targetIndex(event.key, index);
+    if (nextIndex < 0) return;
     event.preventDefault();
-    const delta = event.key === 'ArrowRight' ? 1 : -1;
-    const nextIndex = (index + delta + sections.length) % sections.length;
     onSelect(sections[nextIndex].id);
     const buttons = event.currentTarget.parentElement?.querySelectorAll('[role="tab"]');
     buttons?.[nextIndex]?.focus();
@@ -63,6 +75,10 @@
   data-checks-sections
   aria-label={text('FABRICATE.Admin.Manager.Checks.Tabs.Label', 'Checks sections')}
 >
+  <!-- Only the SELECTED tab carries `aria-controls`, because only the selected section's
+       panel is in the document: this strip renders one panel at a time, so the other four
+       pointed at ids that resolved to nothing — an IDREF to nowhere, which assistive
+       technology reports as a broken relationship rather than as "not currently shown". -->
   {#each sections as section, index (section.id)}
     <button
       type="button"
@@ -70,7 +86,7 @@
       id={`checks-section-${section.id}`}
       class={`manager-environment-tab-button ${activeSection === section.id ? 'is-active' : ''}`}
       aria-selected={activeSection === section.id}
-      aria-controls={`checks-panel-${section.id}`}
+      aria-controls={activeSection === section.id ? `checks-panel-${section.id}` : undefined}
       tabindex={activeSection === section.id ? 0 : -1}
       data-checks-section-button={section.id}
       onclick={() => onSelect(section.id)}

@@ -97,6 +97,8 @@ Two live non-conformances are recorded here rather than left to be discovered, b
   Conversion of those four stays deferred because it would drag their screenshot-label sets into a single evidence run.
 - `CollapsibleGroupHeader` is explicitly NOT the primitive for a collapsed ROW disclosure; it is a GROUP header, owning a heading, a count and the header band above a set of rows.
   A single purpose-built row disclosure exists instead at `src/ui/svelte/components/RowDisclosure.svelte`, with `aria-expanded`, `aria-controls` and an accessible name, and it is the ONE implementation every such site uses — two "labelled regions that expand" landing in one change must share an implementation or name the behavioural mismatch that forbids it.
+  Its shipped consumer is the Checks Studio right rail, whose simulator and odds panels each collapse to it at the existing 1320 breakpoint.
+  The COLLAPSED TRIGGER CARD is a debt with a named owner rather than a second site already using it: the trigger cards render expanded, so the summary row the prototype shows — condition sentence, effect chip, disclosure — is not built, and when it is it MUST adopt this primitive rather than declare a second chevron.
   It renders a real `<button>`, so a caller nests it beside a row's content and never converts a `role="button"` wrapper around it into a `<button>`, which would nest buttons and land invalid DOM.
 
 #### Threshold band strip
@@ -106,6 +108,8 @@ The numeric steppers in the tier rows remain AUTHORITATIVE; the strip is a visua
 
 It uses NO gradient.
 Each band is a solid fill from that band's own runtime colour applied inline via `style=` (authored data, never a source literal), and it claims NO §Product UI Visual Style exemption — the exemption's own rule (a gradient across the complete track, fill kept full-width) conflicts with per-band identity, which is the whole point of the control.
+Per-band identity is therefore a real requirement on the CALLER, not just on the primitive: a caller deriving the colour from a two-valued flag renders two bands of a five-band set identically and has not got it.
+The routed check editor derives a TONAL RAMP inside each semantic family, running weakest to strongest in VALUE order and never crossing between families, and repeats each band's colour as a SWATCH on its own tier row so the ramp on the track has a key.
 
 Every boundary renders a VISIBLE handle with a hit area of at least 24x24 CSS pixels, satisfying WCAG 2.5.8; a ~2px band seam is not a target, so the visible grip is deliberately narrower than the box around it.
 Every handle is keyboard-operable: `role="slider"` with `aria-valuenow`, `aria-valuemin`, `aria-valuemax` and an `aria-label` naming the boundary, driven by Arrow, Home, End, PageUp and PageDown.
@@ -114,11 +118,15 @@ N bands yield N-1 handles, so the band-to-boundary mapping is stated rather than
 In `relative` mode handle _i_ writes `outcomes[i+1].dc`; in `fixed` mode handle _i_ writes the coupled pair `outcomes[i].end` and `outcomes[i+1].start` as ONE update; in the two-band `simple` binding the single handle writes `simple.dc`.
 The outermost authored values carry no handle and are edited by `Stepper` only — the first band's lower bound and the last band's upper bound.
 Bands are DRAWN in value order and WRITTEN through each band's authored index, because a routed tier list authored high-to-low is valid data and sorting the authored array instead would reorder a GM's rows from a drag.
-`aria-valuemin` and `aria-valuemax` are the NEIGHBOURING boundaries, and at the outermost handles they are the TRACK DOMAIN: the authored range extended one TIER interval past the outermost tier in `relative`, the authored `[min(start), max(end)]` span in `fixed`, and the DC field's own stepper range in `simple`.
+`aria-valuemin` and `aria-valuemax` are ONE STEP INSIDE the neighbouring boundaries, and at the outermost handles one step inside the TRACK: the authored range extended one TIER interval past the outermost tier in `relative`, the authored `[min(start), max(end) + 1]` span in `fixed`, and the DC field's own stepper range in `simple`.
+The step of clearance means NO DRAG CAN COLLAPSE A BAND to zero width, including the first and last, whose outer edges carry no handle to be pushed back by; a collapsed band's focus ring is clipped by the track's `overflow: hidden`, so the GM could neither see nor re-aim at the tier they had erased.
+A tier interval narrower than `step` is authored data the strip must still describe, and it reports the handle's own value as both bounds rather than an inverted range no assistive technology can read.
+A `fixed` band's range is INCLUSIVE, so the last band is drawn to `max(end) + 1` — the same rule every interior seam obeys, since band _i_ ends where band _i+1_ starts, which is `end + 1`.
 A handle dragged or keyed past a neighbour CLAMPS rather than swapping or reordering.
 
-In `relative` mode the strip renders and announces ABSOLUTE values against the previewed record's DC — `aria-valuenow` carries the absolute number, not the offset — and converts back to offsets on write, because the tier rows' steppers show offsets over the same state.
-Since that absolute number is a function of the previewed record and changes with no data change when the GM switches records, `aria-valuetext` carries BOTH readings ("17 — DC +5 against Uncommon Craft") and the previewed record is named in the strip's group label.
+In `relative` mode the strip renders and announces ABSOLUTE values against the check's own DC — `aria-valuenow` carries the absolute number, not the offset — and converts back to offsets on write, because the tier rows' steppers show offsets over the same state.
+Since the absolute number is not what the row shows, `aria-valuetext` carries BOTH readings ("17 — DC +5").
+The strip takes an optional `previewLabel` and names it in the group label and in `aria-valuetext` ("17 — DC +5 against Uncommon Craft"), but NO caller passes one: what a previewed record is, and which one is selected, is defined by the outcome simulator that reads it, so both live with that work rather than here.
 
 A gapped, overlapping or inverted authored set is reachable and a contiguous strip cannot render it, so the strip falls back to the tier rows alone with a stated note.
 An ABSENT upper edge is distinguished from an authored zero: `Number(null)` is `0` and finite, so a bare coercion reads every omitted edge as an authored `0` and reports a perfectly contiguous set as gapped.
@@ -477,6 +485,9 @@ The shipped Essences rail item and the `.manager-rail-toggle` collapse control b
 
 Each activity route renders FIVE sections — The roll / Outcomes / Triggers / Modifiers / On failure — each with a count badge and a warning dot fed from the same readiness evaluation that feeds the rail badge and the Validation route, so the three can never disagree.
 The warning dot carries a text accessible name, and a section carrying both a count and an issue renders both; a count of zero renders unbadged, because five sections each wearing a `0` is chrome rather than information.
+The dot is EXPLAINED IN THE PANEL: the open section renders the shared `Callout` for each of its own issues, carrying the same sentence the Validation route renders for that issue id from one exported copy map, toned `warning` for an issue that blocks enabling and `info` for one that does not.
+A dot whose only explanation is on another route is a signal with no legend, and two surfaces describing one issue from two copies of the sentence is how they come to describe it differently.
+The section strip is a real ARIA tablist driven by Arrow, Home and End, and only the SELECTED tab carries `aria-controls`, because only the selected section's panel is in the document.
 Outcomes renders in EVERY mode and hosts that mode's own outcome model: the two-outcome pass/fail statement on `simple`, the `awardMode` selector on `progressive`, the band strip plus the tier rows on `routed`.
 Its count badge is emitted only where there is a tier list to count, so `simple` and `progressive` render it unbadged.
 Modifiers renders in every mode too, INCLUDING the two that roll nothing — gathering `d100` and alchemy `none` — because the check-modifier catalogue card is the one owned path for reporting that a selection reaches no roll, and hiding the section it lives in would take that report away from the two states that need it.
@@ -486,22 +497,37 @@ A check that is switched off — the route has a LIVE Active toggle and it is no
 "Switched off" is not `optional && !enabled`: `optional` does not mean the same thing per activity (on gathering it is `mode === 'd100'`, the one mode with no toggle at all), so the predicate is stated per activity and alchemy `none` and gathering `d100` are INERT rather than off.
 
 The right rail is an INDEPENDENTLY SCROLLABLE container in the SIDE-COLUMN STATE ONLY, never a pinned column that clips.
-On an activity route it carries, in order: the documentation/quickstart pair, the activation toggle with its locked-mode hint, a "Preview as" actor and record selector, an outcome-preview simulator, a per-outcome odds histogram, and a "This check" digest whose status chip reads `OK` / `OFF` / a count pill.
+On an activity route it carries, in order: the documentation/quickstart pair, the activation control, a "Preview as" panel, an outcome-preview simulator, a per-outcome odds histogram, and a "This check" digest whose status chip reads `OK` / `OFF` / a count pill.
+Where the resolution mode denies the GM the choice, the activation control renders a LOCKED READING of the switch — the same track and knob, a padlock and the hint — not the hint alone: removing the control removed the state with it, and "this mode requires the check" does not say which way the switch is set.
+The reading is derived from the MODE rather than from the persisted `enabled` flag, since a mandatory check runs whatever that flag says; it reads on for every locked mode except alchemy `none`, which rolls nothing.
+The Preview-as panel is PRE-ROLL like the simulator and odds panels beside it: a stated sentence and no control, because what a previewed record is and which ones are offered are defined by the simulator that consumes them.
+Two enabled-looking selects reading "No actors" / "No records" invite a choice nothing consumes, which is worse than a stated absence.
 Its responsive behaviour reuses the SHIPPED `fabricate-manager` container ladder and introduces no new breakpoint: `styles/fabricate.css` already declares that container with blocks at 1320 / 1120 / 960 / 900 / 831 / 680, and `.fabricate-manager .manager-inspector` already carries `overflow-y: auto; max-height: 100%`.
 At the existing 1320 breakpoint and below, the odds histogram and the simulator readout become collapsed disclosures, headers and counts retained.
 At the existing 1120 breakpoint and below, the shipped rule already restacks `.manager-body` to one column with `grid-auto-rows: max-content` and hands scrolling to the body; the rail's own `overflow-y` / `max-height` is LEFT ALONE there, because that block unsets neither and a `max-content` track cannot be squeezed.
 The constraint is instead that `grid-auto-rows: max-content` MUST NOT be defeated and no `.manager-body` child may carry a definite height — that is the measured regression recorded above that block (issue 643: rail 225px, main 200px, inspector 179px, `.manager-table-scroll` squeezed to 24px), caused by zero-min-content children under implicit `auto` rows.
 At the 1024x640 declared floor the layout is therefore STACKED, not a side rail, and every panel is reachable by scrolling `.manager-body`.
+That requires the studio's own workspace to restack there too, and a container query adds NO specificity — so an override inside one that ties with a base rule declared later in the sheet loses on source order and is dead.
+The workspace's column track is therefore set through a custom property the base rule reads and never declares, which cannot tie whichever order the two are read in; a source-text assertion cannot tell a dead rule from a live one, so this is pinned by measuring the rendered grid at the floor.
 
 The Validation route renders the documentation pair and the "All checks" summary ONLY — no activation toggle, no Preview-as, no simulator, no histogram, no This-check digest — and renders no section strip.
 Validation renders through the shared `EditorValidationSurface`, selecting an issue deep-links to the owning activity AND section, and the issue-id to section map is proven exhaustive against the frozen `CHECK_READINESS_ISSUE_IDS` registry `evaluateCheckReadiness` pushes from — never a hand-copied list.
+A deep link is an EVENT with its own identity, not a standing instruction: the route carries a request nonce the section strip latches on, so the same section requested twice is two requests and the second still lands.
+Latching on the section VALUE strands the repeat — leave the requested section, ask for it again, and the request equals the latch and is swallowed — and not latching at all drags the strip back to the standing request the instant the GM clicks anything else.
 
 The draft model lives ABOVE the route: one dirty set across the four activities, one plural `Save checks` that persists every dirty activity, one system-wide `Unsaved` chip plus the per-activity rail markers, drafts preserved across Checks child routes, and a discard confirmation on leaving a dirty Checks route for a non-Checks route.
 That confirmation is `confirmDiscardDirtyChecksDraft`, built on the shared `_confirmDiscardDirtyDraft(contentKey, contentFallback, replacements)` helper seven of the nine existing draft prompts use, which returns `'save' | 'discard' | 'cancel'` by construction; it takes the three-way "save and continue / discard / cancel" shape the system-details variant uses, and it NAMES which activities are dirty.
 The rail badges, the section dots and the Validation counters read the LIVE draft and are a draft PREVIEW; the ENABLE gate reads COMMITTED state, and the Validation hero renders the unsaved condition explicitly rather than claiming "Ready to enable" for state that is not persisted.
 
-The crafting resolution mode is TRANSLATED into the readiness evaluator's own vocabulary before it is evaluated (`routedByCheck` to `routed`, `progressive` to `progressive`, alchemy per its `checkMode`, everything else to `simple`).
-The evaluator branches on `'routed'`, which the system-level crafting mode never is, so passing the raw mode through skipped every outcome-tier rule for the one mode that has outcome tiers.
+The readiness mode an activity is evaluated under is derived from the SLOT `checkModifierResolver` resolves — the sub-config the engine actually rolls — and never from a second mapping over the authored resolution mode.
+The evaluator branches on `'routed'`, which no subsystem's authored mode ever is, so passing the raw mode through skipped every outcome-tier rule for the one mode that has them; and a second mapping beside the resolver's disagreed with it for alchemy at `checkMode: 'tiered'`, so the rail badge evaluated the unused SIMPLE draft under ROUTED rules.
+The slot also chooses which draft is edited, marked dirty and saved, so the check being evaluated and the rules it is evaluated under are one decision.
+A slot of `null` — a mode that rolls NO check, which is alchemy `none` and gathering `d100` — is its own readiness mode, evaluating only whether an authored check-modifier selection reaches a roll; it must never report a missing roll formula, because the route renders no formula field with which to clear it.
+The evaluator REFUSES a mode outside its own vocabulary rather than defaulting to `simple`, since a default is what made the mismatch silent.
+
+A Validation group with no ticks and no issues states "No issues detected." rather than rendering a heading over nothing; the group is never dropped, because absence reads as "this subsystem was not evaluated".
+
+A `Save checks` that does not land BLOCKS the route exit it was raised for, matching the shipped essence and system-details guards: every dirty activity is still attempted, the answer is the conjunction, and a failed activity keeps its draft dirty.
 
 A check is usable iff its mode carries an authored `rollFormula`; the legacy check-source/macro layer (`macroUuid` / `successMacroUuid` / `failureMacroUuid` / `checkSource` / `builtIn`) was removed by migration 1.8.0 and is not authored.
 

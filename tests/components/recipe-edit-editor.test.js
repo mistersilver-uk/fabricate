@@ -840,11 +840,13 @@ describe('recipe-edit CSS uses the standard shell, not a bespoke workspace', () 
   });
 
   it('keeps the environment workspace inspector consistent at the standard 300px', () => {
-    const block = css.match(/\.manager-environment-workspace\s*\{[^}]*\}/);
+    // The BASE rule, which is the unindented one: the workspace's narrow override sets only
+    // the column token and is declared earlier in the sheet (issue 1096).
+    const block = css.match(/^\.fabricate-manager \.manager-environment-workspace\s*\{[^}]*\}/m);
     assert.ok(block, '.manager-environment-workspace rule exists');
     assert.match(
       block[0],
-      /grid-template-columns:\s*minmax\(0,\s*1fr\)\s*300px/,
+      /grid-template-columns:\s*var\(--fab-env-workspace-grid,\s*minmax\(0,\s*1fr\)\s*300px\)/,
       'environment workspace inspector is 300px, matching the standard global inspector'
     );
     assert.equal(block[0].includes('340px'), false, 'environment workspace no longer uses the wider 340px column');

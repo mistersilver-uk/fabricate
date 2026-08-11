@@ -2319,7 +2319,11 @@ test('the capture workflow renders and publishes the one id list it computed', (
 //
 // (3) closes the set rather than sampling it: the root declares exactly the literals the
 // registry uses, so the pin covers the whole registry instead of the checks subset.
-test('every expectView value names a route the manager root actually renders', () => {
+// THE RULE ITSELF, hoisted out of the two tests below so the capability proof cannot drift
+// from the enforcement. It was hand-copied into the proof, which meant a change to the
+// enforcing predicate left the proof asserting the OLD rule still rejected the old mistakes —
+// a proof of nothing, and green either way. One `accepts` is what makes the proof load-bearing.
+function buildExpectViewPredicate() {
   const rootSource = readFileSync(
     resolve(ROOT, 'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte'),
     'utf8'
@@ -2327,6 +2331,16 @@ test('every expectView value names a route the manager root actually renders', (
   const rendered = new Set(
     [...rootSource.matchAll(/currentView === '([a-z-]+)'/g)].map((match) => match[1])
   );
+  return {
+    rootSource,
+    rendered,
+    accepts: (value) =>
+      value.startsWith('checks') ? CHECKS_VIEWS.includes(value) : rendered.has(value),
+  };
+}
+
+test('every expectView value names a route the manager root actually renders', () => {
+  const { rootSource, rendered, accepts } = buildExpectViewPredicate();
   assert.ok(rendered.size > 10, "the scan must find the manager root route literals at all");
 
   // (2) — and it is the assertion that makes (1) worth anything. `CHECKS_VIEWS` is the set
@@ -2356,16 +2370,13 @@ test('every expectView value names a route the manager root actually renders', (
   const offenders = [];
   for (const viewCase of declared) {
     const value = viewCase.expectView;
-    if (value.startsWith('checks')) {
-      // (1)
-      if (!CHECKS_VIEWS.includes(value)) {
-        offenders.push(`${viewCase.id}: "${value}" is not a CHECKS_VIEWS member`);
-      }
-      continue;
-    }
-    // (3)
-    if (!rendered.has(value)) {
-      offenders.push(`${viewCase.id}: "${value}" is no route literal in the manager root`);
+    // (1) and (3), through the ONE predicate the capability proof below also runs.
+    if (!accepts(value)) {
+      offenders.push(
+        value.startsWith('checks')
+          ? `${viewCase.id}: "${value}" is not a CHECKS_VIEWS member`
+          : `${viewCase.id}: "${value}" is no route literal in the manager root`
+      );
     }
   }
   assert.deepEqual(offenders, [], offenders.join(`
@@ -2376,15 +2387,8 @@ test('the expectView pin FAILS against the pre-split value, and against a nav id
   // The capability proof, run against the two mistakes the pin exists to catch rather than
   // against an arbitrary bad string. Both are what the registry ACTUALLY contained before
   // this change, or what a plausible edit would put back.
-  const rootSource = readFileSync(
-    resolve(ROOT, 'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte'),
-    'utf8'
-  );
-  const rendered = new Set(
-    [...rootSource.matchAll(/currentView === '([a-z-]+)'/g)].map((match) => match[1])
-  );
-  const accepts = (value) =>
-    value.startsWith('checks') ? CHECKS_VIEWS.includes(value) : rendered.has(value);
+  // The SAME predicate the test above enforces with — not a restatement of it.
+  const { accepts } = buildExpectViewPredicate();
 
   assert.equal(accepts('checks'), false, 'the PRE-SPLIT value must be rejected');
   assert.equal(accepts('crafting'), false, 'a bare nav-item id must be rejected');

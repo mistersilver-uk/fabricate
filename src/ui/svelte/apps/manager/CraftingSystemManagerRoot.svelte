@@ -111,8 +111,13 @@
     isChecksRoute as isChecksView,
     resolveChecksRedirect,
   } from './checks/checksNav.js';
-  import { craftingReadinessMode, evaluateCheckReadiness } from './checks/checksReadiness.js';
-  import { buildCheckModifierContext } from '../../../../systems/checkModifierResolver.js';
+  import { evaluateCheckReadiness, readinessModeForSlot } from './checks/checksReadiness.js';
+  import {
+    buildCheckModifierContext,
+    resolveActiveCraftingCheckFormula,
+    resolveActiveGatheringCheckFormula,
+    resolveActiveSalvageCheckFormula,
+  } from '../../../../systems/checkModifierResolver.js';
   import RecipeEditView from './RecipeEditView.svelte';
   import { craftingEffect } from './crafting/craftingVisibility.js';
   import SystemEditView from './SystemEditView.svelte';
@@ -439,6 +444,11 @@
   // Empty until the router asks for one, so the very first deep link TO the roll section is
   // still a new request rather than one the view has already honoured at mount.
   let checksActiveSection = $state('');
+  // The REQUEST's identity, bumped on every deep link. `ChecksView` latches on this rather
+  // than on the section name, so asking twice for the same section is two requests: leave
+  // `roll` for Triggers, deep-link to `roll` again, and the second one still lands. Without
+  // it the repeat equalled the latch and was swallowed, stranding the GM on Triggers.
+  let checksSectionRequestNonce = $state(0);
   let checksMenuExpanded = $state(false);
   // The Graph surface (issue 442) is unimplemented; it stays a disabled placeholder
   // and, as of issue 745, renders only when experimental features are enabled.
@@ -548,25 +558,31 @@
     },
   });
 
-  // Which crafting check editor is active for the selected system, and whether it
-  // has unsaved staged edits — drives the single top-right Save button.
-  // Only `routedByCheck` authors the tier-routing routed check; `routedByIngredients`
-  // shares the simple pass/fail slot with `simple`/`alchemy`, so it routes dirty
-  // tracking + Save through the simple draft (`store.saveCraftingCheckSimple`) and its
-  // recipe "Check tier" dropdown falls out of the collapsed 'simple' mode. Collapsing it
-  // here costs nothing elsewhere, because the multi-set and routing behaviours are derived
-  // separately from the RAW `resolutionMode` rather than from this value:
-  // `recipeMultiSetAllowed` gates more than one ingredient/result set, and
-  // `recipeRoutingProvider` picks the routing basis ('check' for routedByCheck,
-  // 'ingredientSet' for routedByIngredients). Both routed modes stay covered there.
-  const craftingCheckMode = $derived(
-    (function _craftingCheckMode(resolution) {
-      if (resolution === 'routedByCheck') return 'routed';
-      if (resolution === 'progressive') return 'progressive';
-      if (['simple', 'alchemy', 'routedByIngredients'].includes(resolution)) return 'simple';
-      return null;
-    })(selectedSystem?.resolutionMode || 'simple')
-  );
+  // WHICH `craftingCheck` sub-config this system actually rolls — the SLOT — and therefore
+  // which draft is edited, tracked dirty, saved by the top-right Save button, and read for
+  // the recipe editor's "Check tier" options.
+  //
+  // IT IS THE ENGINE'S OWN ANSWER (issue 1096), not a second mapping beside it.
+  // `checkModifierResolver` owns `CRAFTING_CHECK_SLOTS` / `ALCHEMY_CHECK_SLOTS`, and the copy
+  // that stood here disagreed with it for exactly one configuration: alchemy at
+  // `checkMode: 'tiered'`, which rolls the ROUTED slot. The Checks route renders the routed
+  // editor there (its own derivation reads `alchemy.checkMode`), so a GM could edit that
+  // draft — while this said `simple`, so the edit was never marked dirty and Save never
+  // wrote it. The rail's readiness badge meanwhile evaluated the untouched simple draft
+  // under routed rules. One derivation is the only way those cannot disagree.
+  //
+  // `null` means the mode rolls NO check: alchemy `checkMode: 'none'`, and any resolution
+  // mode outside the canonical set. Nothing is dirty, nothing is saved and no tier options
+  // are offered, which is the honest answer for a check that never runs.
+  //
+  // Only `routedByCheck` authors the tier-routing routed check; `routedByIngredients` shares
+  // the simple pass/fail slot with `simple`. Collapsing those two here costs nothing
+  // elsewhere, because the multi-set and routing behaviours are derived separately from the
+  // RAW `resolutionMode` rather than from this value: `recipeMultiSetAllowed` gates more than
+  // one ingredient/result set, and `recipeRoutingProvider` picks the routing basis ('check'
+  // for routedByCheck, 'ingredientSet' for routedByIngredients). Both routed modes stay
+  // covered there.
+  const craftingCheckMode = $derived(resolveActiveCraftingCheckFormula(selectedSystem).slot);
   const craftingCheckDirty = $derived(
     (craftingCheckMode === 'routed' && checkRoutedDirty) ||
       (craftingCheckMode === 'simple' && checkSimpleDirty) ||
@@ -791,94 +807,156 @@
     });
   }
 
-  async function saveCraftingCheck() {
-    if (!selectedSystemId || craftingCheckSaving || !craftingCheckDirty) return;
-    if (craftingCheckMode === 'routed') {
-      checkRoutedSaving = true;
-      try {
-        await store?.saveCraftingCheckRouted?.(checkRoutedDraft);
-        checkRoutedBaseline = cloneRoutedCheck(checkRoutedDraft);
-      } finally {
-        checkRoutedSaving = false;
-      }
-    } else if (craftingCheckMode === 'simple') {
-      checkSimpleSaving = true;
-      try {
-        await store?.saveCraftingCheckSimple?.(checkSimpleDraft);
-        checkSimpleBaseline = cloneSimpleCheck(checkSimpleDraft);
-      } finally {
-        checkSimpleSaving = false;
-      }
-    } else if (craftingCheckMode === 'progressive') {
-      checkProgressiveSaving = true;
-      try {
-        await store?.saveCraftingCheckProgressive?.(checkProgressiveDraft);
-        checkProgressiveBaseline = cloneProgressiveCheck(checkProgressiveDraft);
-      } finally {
-        checkProgressiveSaving = false;
-      }
+  /**
+   * Run ONE check save and ANSWER WHETHER IT LANDED (issue 1096).
+   *
+   * Every check save used to be `await store?.save…()` and nothing else, which made "did that
+   * work?" an unanswerable question: a store no-op and a rejected `updateSystem` were both
+   * indistinguishable from success, so the route-exit guard's Save branch navigated away from
+   * unsaved work and a rejection escaped as an unhandled promise. The shipped essence and
+   * system-details guards answer it with `result !== false` and are the pattern followed
+   * here, with the rejection caught as well because the three check savers are the only ones
+   * whose store call can reject rather than return.
+   *
+   * The draft is RE-BASELINED only on success, so a failed save leaves the activity dirty —
+   * which is what keeps the rail marker, the Save button and the exit prompt all still
+   * saying there is something to save.
+   *
+   * @param {{ save: () => unknown, rebaseline: () => void, setSaving: (on: boolean) => void }} steps
+   * @returns {Promise<boolean>}
+   */
+  async function persistCheckDraft({ save, rebaseline, setSaving }) {
+    setSaving(true);
+    try {
+      if ((await save()) === false) return false;
+      rebaseline();
+      return true;
+    } catch (error) {
+      console.error('Failed to save check draft', error);
+      return false;
+    } finally {
+      setSaving(false);
     }
+  }
+
+  async function saveCraftingCheck() {
+    if (!selectedSystemId || craftingCheckSaving || !craftingCheckDirty) return true;
+    if (craftingCheckMode === 'routed') {
+      return persistCheckDraft({
+        save: () => store?.saveCraftingCheckRouted?.(checkRoutedDraft),
+        rebaseline: () => {
+          checkRoutedBaseline = cloneRoutedCheck(checkRoutedDraft);
+        },
+        setSaving: (on) => {
+          checkRoutedSaving = on;
+        },
+      });
+    }
+    if (craftingCheckMode === 'simple') {
+      return persistCheckDraft({
+        save: () => store?.saveCraftingCheckSimple?.(checkSimpleDraft),
+        rebaseline: () => {
+          checkSimpleBaseline = cloneSimpleCheck(checkSimpleDraft);
+        },
+        setSaving: (on) => {
+          checkSimpleSaving = on;
+        },
+      });
+    }
+    if (craftingCheckMode === 'progressive') {
+      return persistCheckDraft({
+        save: () => store?.saveCraftingCheckProgressive?.(checkProgressiveDraft),
+        rebaseline: () => {
+          checkProgressiveBaseline = cloneProgressiveCheck(checkProgressiveDraft);
+        },
+        setSaving: (on) => {
+          checkProgressiveSaving = on;
+        },
+      });
+    }
+    // No slot: this resolution mode rolls no crafting check, so there is nothing to persist.
+    return true;
   }
 
   async function saveSalvageCheck() {
-    if (!selectedSystemId || salvageCheckSaving || !salvageCheckDirty) return;
+    if (!selectedSystemId || salvageCheckSaving || !salvageCheckDirty) return true;
     if (salvageResolutionMode === 'routed') {
-      salvageRoutedSaving = true;
-      try {
-        await store?.saveSalvageCheckRouted?.(salvageRoutedDraft);
-        salvageRoutedBaseline = cloneRoutedCheck(salvageRoutedDraft);
-      } finally {
-        salvageRoutedSaving = false;
-      }
-    } else if (salvageResolutionMode === 'progressive') {
-      salvageProgressiveSaving = true;
-      try {
-        await store?.saveSalvageCheckProgressive?.(salvageProgressiveDraft);
-        salvageProgressiveBaseline = cloneProgressiveCheck(salvageProgressiveDraft);
-      } finally {
-        salvageProgressiveSaving = false;
-      }
-    } else {
-      salvageSimpleSaving = true;
-      try {
-        await store?.saveSalvageCheckSimple?.(salvageSimpleDraft);
-        salvageSimpleBaseline = cloneSimpleCheck(salvageSimpleDraft);
-      } finally {
-        salvageSimpleSaving = false;
-      }
+      return persistCheckDraft({
+        save: () => store?.saveSalvageCheckRouted?.(salvageRoutedDraft),
+        rebaseline: () => {
+          salvageRoutedBaseline = cloneRoutedCheck(salvageRoutedDraft);
+        },
+        setSaving: (on) => {
+          salvageRoutedSaving = on;
+        },
+      });
     }
+    if (salvageResolutionMode === 'progressive') {
+      return persistCheckDraft({
+        save: () => store?.saveSalvageCheckProgressive?.(salvageProgressiveDraft),
+        rebaseline: () => {
+          salvageProgressiveBaseline = cloneProgressiveCheck(salvageProgressiveDraft);
+        },
+        setSaving: (on) => {
+          salvageProgressiveSaving = on;
+        },
+      });
+    }
+    return persistCheckDraft({
+      save: () => store?.saveSalvageCheckSimple?.(salvageSimpleDraft),
+      rebaseline: () => {
+        salvageSimpleBaseline = cloneSimpleCheck(salvageSimpleDraft);
+      },
+      setSaving: (on) => {
+        salvageSimpleSaving = on;
+      },
+    });
   }
 
   async function saveGatheringCheck() {
-    if (!selectedSystemId || gatheringCheckSaving || !gatheringCheckDirty) return;
+    if (!selectedSystemId || gatheringCheckSaving || !gatheringCheckDirty) return true;
     if (gatheringResolutionMode === 'routed') {
-      gatheringRoutedSaving = true;
-      try {
-        await store?.saveGatheringCheckRouted?.(gatheringRoutedDraft);
-        gatheringRoutedBaseline = cloneRoutedCheck(gatheringRoutedDraft);
-      } finally {
-        gatheringRoutedSaving = false;
-      }
-    } else if (gatheringResolutionMode === 'progressive') {
-      gatheringProgressiveSaving = true;
-      try {
-        await store?.saveGatheringCheckProgressive?.(gatheringProgressiveDraft);
-        gatheringProgressiveBaseline = cloneProgressiveCheck(gatheringProgressiveDraft);
-      } finally {
-        gatheringProgressiveSaving = false;
-      }
+      return persistCheckDraft({
+        save: () => store?.saveGatheringCheckRouted?.(gatheringRoutedDraft),
+        rebaseline: () => {
+          gatheringRoutedBaseline = cloneRoutedCheck(gatheringRoutedDraft);
+        },
+        setSaving: (on) => {
+          gatheringRoutedSaving = on;
+        },
+      });
+    }
+    if (gatheringResolutionMode === 'progressive') {
+      return persistCheckDraft({
+        save: () => store?.saveGatheringCheckProgressive?.(gatheringProgressiveDraft),
+        rebaseline: () => {
+          gatheringProgressiveBaseline = cloneProgressiveCheck(gatheringProgressiveDraft);
+        },
+        setSaving: (on) => {
+          gatheringProgressiveSaving = on;
+        },
+      });
     }
     // d100 mode has no editable config — nothing to persist.
+    return true;
   }
 
   // The shared Checks header Save persists EVERY dirty activity (issue 1096), not just the
   // route in view. Sequential rather than concurrent: each of the three saves through the
   // store and re-baselines its own draft, and the store's publish is a two-phase projection
   // rebuild that three overlapping writers would race.
+  //
+  // It ANSWERS, and the answer is the conjunction rather than the last one: a Save that
+  // persisted crafting and failed salvage has not saved the checks, and the route-exit guard
+  // must not navigate away from the half that is still dirty. Every dirty activity is still
+  // ATTEMPTED — a crafting failure does not cancel the salvage write — because the GM asked
+  // to save all of them and stopping early would leave a second, unexplained casualty.
   async function saveChecks() {
-    if (craftingCheckDirty) await saveCraftingCheck();
-    if (salvageCheckDirty) await saveSalvageCheck();
-    if (gatheringCheckDirty) await saveGatheringCheck();
+    let saved = true;
+    if (craftingCheckDirty) saved = (await saveCraftingCheck()) && saved;
+    if (salvageCheckDirty) saved = (await saveSalvageCheck()) && saved;
+    if (gatheringCheckDirty) saved = (await saveGatheringCheck()) && saved;
+    return saved;
   }
 
   function onToggleCheckActive(kind, enabled) {
@@ -1908,39 +1986,56 @@
     salvageCraftingCheck: selectedSystem?.salvageCraftingCheck || {},
     gatheringCraftingCheck: selectedSystem?.gatheringCraftingCheck || {},
   });
-  function checksIssueCount(activity, check, mode) {
-    return evaluateCheckReadiness(check || {}, {
-      mode,
+  // ONE slot per activity decides BOTH halves of every badge: which draft is evaluated, and
+  // which rules it is evaluated under. Two derivations answered those two questions before
+  // (issue 1096) and disagreed for alchemy at `checkMode: 'tiered'` — the badge evaluated the
+  // untouched SIMPLE draft under ROUTED rules, so it hid criticals the Validation route
+  // reported, breaking the invariant that the dot, the badge and Validation cannot disagree.
+  const salvageCheckSlot = $derived(
+    resolveActiveSalvageCheckFormula({
+      salvageResolutionMode,
+      salvageCraftingCheck: {
+        simple: salvageSimpleDraft,
+        routed: salvageRoutedDraft,
+        progressive: salvageProgressiveDraft,
+      },
+    }).slot
+  );
+  const gatheringCheckSlot = $derived(
+    resolveActiveGatheringCheckFormula(
+      {
+        gatheringCraftingCheck: {
+          progressive: gatheringProgressiveDraft,
+          routed: gatheringRoutedDraft,
+        },
+      },
+      gatheringResolutionMode
+    ).slot
+  );
+  function draftForSlot(slot, drafts) {
+    return slot ? (drafts[slot] ?? null) : null;
+  }
+  function checksIssueCount(activity, slot, drafts) {
+    return evaluateCheckReadiness(draftForSlot(slot, drafts) || {}, {
+      mode: readinessModeForSlot(slot),
       modifierContext: buildCheckModifierContext(checksDraftSystem, activity, null),
     }).issues.length;
   }
   const checksIssueCounts = $derived({
-    crafting: checksIssueCount(
-      'crafting',
-      craftingCheckMode === 'routed'
-        ? checkRoutedDraft
-        : craftingCheckMode === 'progressive'
-          ? checkProgressiveDraft
-          : checkSimpleDraft,
-      craftingReadinessMode(
-        selectedSystem?.resolutionMode || 'simple',
-        selectedSystem?.alchemy?.checkMode || 'none'
-      )
-    ),
-    salvage: checksIssueCount(
-      'salvage',
-      salvageResolutionMode === 'routed'
-        ? salvageRoutedDraft
-        : salvageResolutionMode === 'progressive'
-          ? salvageProgressiveDraft
-          : salvageSimpleDraft,
-      salvageResolutionMode
-    ),
-    gathering: checksIssueCount(
-      'gathering',
-      gatheringResolutionMode === 'progressive' ? gatheringProgressiveDraft : gatheringRoutedDraft,
-      gatheringResolutionMode
-    ),
+    crafting: checksIssueCount('crafting', craftingCheckMode, {
+      simple: checkSimpleDraft,
+      routed: checkRoutedDraft,
+      progressive: checkProgressiveDraft,
+    }),
+    salvage: checksIssueCount('salvage', salvageCheckSlot, {
+      simple: salvageSimpleDraft,
+      routed: salvageRoutedDraft,
+      progressive: salvageProgressiveDraft,
+    }),
+    gathering: checksIssueCount('gathering', gatheringCheckSlot, {
+      progressive: gatheringProgressiveDraft,
+      routed: gatheringRoutedDraft,
+    }),
   });
   const checksNavArgs = $derived({
     features: selectedSystem?.features || {},
@@ -3234,8 +3329,10 @@
 
   async function finishChecksRouteExit(action) {
     if (action === 'save') {
-      await saveChecks();
-      return true;
+      // Navigation is gated on the SAVE, exactly as the essence and system-details guards
+      // gate theirs: a Save that did not land leaves the GM on the studio with the edit
+      // still in front of them, rather than navigating away from work nothing persisted.
+      return await saveChecks();
     }
     if (action === 'discard' || action === true) {
       discardChecksDrafts();
@@ -7084,6 +7181,7 @@
                 <span
                   class="manager-nav-issue-badge"
                   data-checks-nav-issues="checks"
+                  role="img"
                   aria-label={checksIssueName(checksNavCount)}>{checksNavCount}</span
                 >
               {/if}
@@ -7142,6 +7240,7 @@
                       <span
                         class="manager-nav-issue-badge"
                         data-checks-nav-issues={checksItem.id}
+                        role="img"
                         aria-label={checksIssueName(checksItem.issueCount)}
                         >{checksItem.issueCount}</span
                       >
@@ -7402,6 +7501,7 @@
             activation={checkActivation}
             activity={checksActiveTab}
             requestedSection={checksActiveSection}
+            requestedSectionNonce={checksSectionRequestNonce}
             dirty={checksDirty}
             dirtyActivities={checksDirtyActivities}
             {onUpdateCraftingCheck}
@@ -7420,6 +7520,7 @@
             {onUpdateAlchemyFlags}
             onOpenActivity={(activity, section) => {
               checksActiveSection = section || 'roll';
+              checksSectionRequestNonce += 1;
               setView(`checks-${activity}`);
             }}
             {onToggleCheckActive}

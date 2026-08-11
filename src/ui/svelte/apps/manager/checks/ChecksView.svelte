@@ -52,10 +52,12 @@
   import ChecksValidationTab from './ChecksValidationTab.svelte';
   import {
     CHECK_SECTION_IDS,
-    craftingReadinessMode,
     evaluateCheckReadiness,
+    readinessModeForSlot,
     sectionForIssue,
   } from './checksReadiness.js';
+  import Callout from '../Callout.svelte';
+  import { checkIssueCopy } from './checksCopy.js';
   import {
     buildCheckModifierContext,
     resolveActiveCraftingCheckFormula,
@@ -155,6 +157,13 @@
     // and the section it names has to travel with the route rather than be set on a
     // component instance the router is about to hand a different `activity`.
     requestedSection = '',
+    // The IDENTITY of that request (issue 1096). A router request is an EVENT, and an event
+    // needs a serial number: latching on the section VALUE strands a repeat. Deep-link to
+    // `roll`, click Triggers, deep-link to `roll` again and the second request equalled the
+    // latch, so it was swallowed and the GM stayed on Triggers — with cross-activity deep
+    // links the common case, that is the ordinary path, not an edge. The router bumps this on
+    // every request, so a repeat of the same section is a NEW request and lands.
+    requestedSectionNonce = 0,
     // Route to another activity — used by the read-only catalogue's "edit the catalogue"
     // link and by the Validation route's deep links.
     onOpenActivity = () => {},
@@ -164,6 +173,12 @@
   function text(key, fallback) {
     const translated = localize(key);
     return translated && translated !== key ? translated : fallback;
+  }
+
+  /** The Validation route's own sentence for a readiness issue — the same one, not a copy. */
+  function issueSentence(id) {
+    const copy = checkIssueCopy(id);
+    return text(copy.key, copy.fallback);
   }
 
   // The system-level alchemy check-mode selector (issue 554). For an alchemy
@@ -391,9 +406,14 @@
     const list = [
       {
         subsystem: 'crafting',
-        // TRANSLATED, not passed through: the evaluator branches on `'routed'`, and the
-        // system-level crafting mode is never that string.
-        mode: craftingReadinessMode(resolutionMode, alchemyCheckMode),
+        // THE SLOT, not the resolution mode. The check handed over and the rules it is
+        // evaluated under are BOTH chosen by `resolveActiveCraftingCheckFormula` — see
+        // `readinessModeForSlot` for what a second mapping cost here.
+        mode: readinessModeForSlot(activeCraftingCheck.slot),
+        // What the GM SELECTED, for display. It is a different vocabulary from the readiness
+        // mode on purpose — that one collapses every no-check mode to `none`, and a rail row
+        // reading "Gathering · none" names a mode no economy editor offers.
+        authoredMode: craftingAlchemy ? alchemyCheckMode : resolutionMode,
         check: craftingRouted
           ? craftingCheck
           : craftingProgressive
@@ -405,7 +425,8 @@
     if (salvageEnabled) {
       list.push({
         subsystem: 'salvage',
-        mode: salvageResolutionMode,
+        mode: readinessModeForSlot(activeSalvageCheck.slot),
+        authoredMode: salvageResolutionMode,
         check: salvageRouted
           ? salvageCheckRouted
           : salvageProgressive
@@ -417,7 +438,8 @@
     if (gatheringEnabled) {
       list.push({
         subsystem: 'gathering',
-        mode: gatheringResolutionMode,
+        mode: readinessModeForSlot(activeGatheringCheck.slot),
+        authoredMode: gatheringResolutionMode,
         check: gatheringProgressive ? gatheringCheckProgressive : gatheringCheckRouted,
         modifierContext: buildCheckModifierContext(draftSystem, 'gathering', null),
       });
@@ -528,11 +550,17 @@
   });
 
   let activeSection = $state('roll');
-  // The last router request this component has already honoured. Without it the effect below
-  // would re-apply the standing `requestedSection` on every recomputation and pull the strip
-  // back to it the instant the GM clicked anything else — a router request is an EVENT, not
-  // a standing instruction, and treating it as the latter makes the strip unusable.
-  let adoptedSection = $state('');
+  // The last router request this component has already honoured, latched by its NONCE rather
+  // than by the section it names. Some latch is required: without one the effect below would
+  // re-apply the standing `requestedSection` on every recomputation and pull the strip back
+  // to it the instant the GM clicked anything else — a router request is an EVENT, not a
+  // standing instruction, and treating it as the latter makes the strip unusable. Latching on
+  // the VALUE overcorrects into the mirror defect: a repeated request for a section already
+  // adopted is indistinguishable from the standing one and gets swallowed.
+  //
+  // `-1` rather than `0`, so the router's very first request — which may legitimately carry
+  // nonce 0 — is still a request this component has not honoured.
+  let adoptedSectionNonce = $state(-1);
   // A section the current route does not render must not stay selected: switching from a
   // routed crafting check to an OFF simple one would otherwise leave the strip pointing at
   // a section that renders nothing at all. A NEW router request wins where the route offers
@@ -541,10 +569,10 @@
     if (activity === 'validation') return;
     if (
       requestedSection &&
-      requestedSection !== adoptedSection &&
+      requestedSectionNonce !== adoptedSectionNonce &&
       sections.some((section) => section.id === requestedSection)
     ) {
-      adoptedSection = requestedSection;
+      adoptedSectionNonce = requestedSectionNonce;
       activeSection = requestedSection;
       return;
     }
@@ -580,7 +608,7 @@
         id: row.subsystem,
         icon: SUBSYSTEM_ICONS[row.subsystem] || 'fas fa-dice-d20',
         label: `${label} · ${state}`,
-        detail: [row.mode, row.check?.rollFormula || ''].filter(Boolean).join(' · '),
+        detail: [row.authoredMode, row.check?.rollFormula || ''].filter(Boolean).join(' · '),
       };
     })
   );
@@ -601,7 +629,42 @@
   const configTitle = text('FABRICATE.Admin.Manager.Checks.Configuration', 'Configuration');
   const pageKicker = text('FABRICATE.Admin.Manager.Checks.PageKicker', 'One per system');
   const page = $derived(PAGES[activity] || PAGES.crafting);
-  const modeLabel = $derived(activeMode || resolutionMode);
+
+  // The AUTHORED mode, for the "{section} does not apply in {mode} mode" copy — not the
+  // readiness mode. Those are different vocabularies on purpose (`readinessModeForSlot`
+  // collapses every no-check mode to `none`), and naming the readiness one here would tell a
+  // GM standing on the gathering route that Triggers "does not apply in none mode" when the
+  // mode they selected is called d100.
+  const routeModeLabel = $derived.by(() => {
+    if (activity === 'salvage') return salvageResolutionMode;
+    if (activity === 'gathering') return gatheringResolutionMode;
+    if (craftingAlchemy) return alchemyCheckMode;
+    return resolutionMode;
+  });
+  const modeLabel = $derived(routeModeLabel || resolutionMode);
+
+  // ── The section-level Callout (issue 1096, DN8) ─────────────────────────────────────
+  //
+  // The strip's warning dot says a section has an open issue; this says WHAT. Without it the
+  // GM's only route to the sentence is to leave the route for Validation and deep-link back
+  // — a dot that can only be explained somewhere else is a signal with no legend.
+  //
+  // It is the SAME `activeReadiness` pass the dot is counted from, bucketed by the same
+  // `sectionForIssue`, and the SAME copy the Validation route renders (one exported map, not
+  // a second set of sentences), so the two surfaces cannot describe one issue differently.
+  //
+  // Tone splits on the severity the Validation route already splits on: a `critical` issue
+  // BLOCKS enabling the system, which is the hazard `warning` is for; a non-blocking one is
+  // guidance about how this check will behave, which is `info`.
+  const activeSectionIssues = $derived(
+    activeReadiness.issues
+      .filter((issue) => sectionForIssue(issue.id) === activeSection)
+      .map((issue) => ({
+        id: issue.id,
+        tone: issue.severity === 'critical' ? 'warning' : 'info',
+        text: issueSentence(issue.id),
+      }))
+  );
 </script>
 
 <!-- Rendered in BOTH crafting branches (alchemy and non-alchemy) from one definition.
@@ -688,6 +751,23 @@
       id={`checks-panel-${activity === 'validation' ? 'validation' : activeSection}`}
       aria-labelledby={activity === 'validation' ? undefined : `checks-section-${activeSection}`}
     >
+      <!-- The section's own warning dot, explained IN the panel (DN8). It sits above the
+           section content rather than inside each branch: every activity route, every mode
+           and every section reaches this one insertion point, and a per-branch copy would be
+           five places for a sentence to go missing from. -->
+      {#if activity !== 'validation' && !routeIsOff && activeSectionIssues.length > 0}
+        <div class="manager-checks-section-callouts" data-checks-section-callouts={activeSection}>
+          {#each activeSectionIssues as issue (issue.id)}
+            <Callout
+              tone={issue.tone}
+              text={issue.text}
+              dataAttr="data-checks-section-callout"
+              dataValue={issue.id}
+            />
+          {/each}
+        </div>
+      {/if}
+
       {#if activity === 'validation'}
         <ChecksValidationTab
           sections={validationSections}
@@ -1087,3 +1167,14 @@
     />
   </div>
 </div>
+
+<style>
+  /* Layout only. The strip itself is the shared `Callout` primitive and states its own
+     appearance; this stacks one or more of them above the section content. */
+  .manager-checks-section-callouts {
+    display: flex;
+    flex-direction: column;
+    gap: var(--fab-space-2);
+    margin-bottom: var(--fab-space-3);
+  }
+</style>

@@ -110,14 +110,24 @@ describe('ChanceBar (mounted)', () => {
       resolve(repoRoot, 'src/ui/svelte/apps/gathering/ChanceBar.svelte'),
       'utf8'
     );
-    const declared = [...source.matchAll(/--chance-bar-fill:\s*([^;]+);/g)].map(([, value]) =>
-      value.trim()
+    const declared = [...source.matchAll(/\.chance-bar\.tier-\w+\s*\{\s*--chance-bar-fill:\s*([^;]+);/g)].map(
+      ([, value]) => value.trim()
     );
     assert.equal(declared.length, 4, `expected four tier declarations, got ${declared.length}`);
     assert.equal(new Set(declared).size, 4, `expected four distinct fills, got ${declared}`);
     for (const colour of declared) {
       assert.match(colour, /var\(--fab-/, `${colour} should resolve through a theme token`);
     }
+
+    // And a DEFAULT on the base class. `var()` with no value and no fallback resolves to the
+    // guaranteed-invalid value, so `background` falls back to `transparent` — a fill that
+    // paints nothing, under a caption reading a real percentage. The default is declared at
+    // lower specificity than the four tiers, so it can only ever apply when none of them does.
+    assert.match(
+      source,
+      /\.chance-bar\s*\{\s*(?:\/\*[\s\S]*?\*\/\s*)?--chance-bar-fill:\s*var\(--fab-[\w-]+\);/,
+      'the base .chance-bar rule declares a fallback fill'
+    );
   });
 
   it('leaves the success scale on the primitive semantic tone, with no inline colour', async () => {
