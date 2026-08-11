@@ -125,6 +125,9 @@ function compileManagerRoot() {
   writeCompiledSvelte('src/ui/svelte/components/ThresholdBandStrip.svelte');
   writeCompiledSvelte('src/ui/svelte/components/RowDisclosure.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/checks/ChecksView.svelte');
+  // The roll section's mode callout (issue 1096). `ChecksView` imports it STATICALLY, so
+  // omitting it does not skip a branch — it fails module resolution for the whole suite.
+  writeCompiledSvelte('src/ui/svelte/apps/manager/checks/CheckModeCallout.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/checks/ChecksEditorTabs.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/checks/ChecksRightMenu.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/checks/CheckFormulaFields.svelte');
@@ -577,6 +580,10 @@ function compileManagerRoot() {
     // The ONE copy map (issue 1096): the Validation route and the section-level Callout both
     // render an issue's sentence from it.
     'src/ui/svelte/apps/manager/checks/checksCopy.js',
+    // The per-mode explanation the roll section opens with (issue 1096). A pure data
+    // table imported by `CheckModeCallout.svelte`, which `ChecksView` imports statically,
+    // so omitting it reports every mounted manager test as `# cancelled`.
+    'src/ui/svelte/apps/manager/checks/checkModeCallout.js',
     // The Checks rail GROUP model (issue 1096). The root imports it to build the four child
     // routes, their badges and the `checks` redirect, so it is in the tree from the first
     // render. This list has NO dependency validator: omitting it does not fail the suite,

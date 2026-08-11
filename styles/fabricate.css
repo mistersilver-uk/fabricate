@@ -2299,6 +2299,114 @@
   text-transform: none;
 }
 
+/* ── WHAT THIS MODE DOES: the roll section's opening callout (issue 1096) ────────────
+   The prototype opens The roll with a titled explanation of the resolution mode: a glyph
+   in a rounded tile, the mode's name, one paragraph, and a row of three facts. It is the
+   INFO family, and the only place on this screen that paints one — a mode explanation is
+   a permanent statement about how the surface behaves, which is what `info` is for.
+
+   Not `.manager-callout`: that primitive is one glyph plus one sentence, and widening it
+   to carry a title, a paragraph and a fact list would make one component two shapes. */
+.fabricate-manager .manager-checks-mode-callout {
+  display: flex;
+  align-items: flex-start;
+  gap: 13px;
+  min-width: 0;
+  margin: 0 0 14px;
+  padding: 15px 16px;
+  border: 1px solid var(--fab-info-border);
+  border-radius: 11px;
+  background: var(--fab-info-soft);
+}
+
+/* A DORMANT mode (gathering's routed and progressive, disabled pending issue 683) is not
+   an explanation of a live configuration, so it takes the warning edge the rest of the
+   studio uses for "this reaches nothing". The geometry does not move. */
+.fabricate-manager .manager-checks-mode-callout.is-dormant {
+  border-color: var(--fab-warning-border);
+  background: var(--fab-warning-soft);
+}
+
+.fabricate-manager .manager-checks-mode-callout-icon {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  color: var(--fab-info);
+  background: var(--fab-bg-1);
+  font-size: 14px;
+}
+
+.fabricate-manager .manager-checks-mode-callout.is-dormant .manager-checks-mode-callout-icon {
+  color: var(--fab-warning);
+}
+
+.fabricate-manager .manager-checks-mode-callout-body {
+  min-width: 0;
+}
+
+.fabricate-manager .manager-checks-mode-callout-title {
+  margin: 0;
+  color: var(--fab-text);
+  font-family: var(--fab-font-serif);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.fabricate-manager .manager-checks-mode-callout-lead {
+  margin: 6px 0 0;
+  color: var(--fab-text-muted);
+  font-size: 11.5px;
+  font-weight: 400;
+  line-height: 1.55;
+}
+
+.fabricate-manager .manager-checks-mode-callout-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.fabricate-manager .manager-checks-mode-callout-fact {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--fab-text-subtle);
+  font-size: 10.5px;
+  font-weight: 500;
+}
+
+.fabricate-manager .manager-checks-mode-callout-fact > i {
+  color: var(--fab-info);
+  font-size: 10px;
+}
+
+.fabricate-manager .manager-checks-mode-callout.is-dormant .manager-checks-mode-callout-fact > i {
+  color: var(--fab-warning);
+}
+
+/* The prototype separates a fact's LABEL from its VALUE with a middle dot. It is
+   punctuation rather than content — a screen reader announcing "Check middle-dot
+   Required" is worse than announcing "Check Required" — so it is drawn, not written. */
+.fabricate-manager .manager-checks-mode-callout-fact > b::before {
+  margin-right: 7px;
+  content: "·";
+}
+
+.fabricate-manager .manager-checks-mode-callout-fact > b {
+  color: var(--fab-text-secondary);
+  font-size: 10.5px;
+  font-weight: 600;
+}
+
 /* The check-type chooser still renders through the shared `RadioCardGroup`; only the
    checks studio's own scale is restated, at (0,4,0) so it lands without touching the
    primitive every other screen uses. */

@@ -57,6 +57,7 @@
     sectionForIssue,
   } from './checksReadiness.js';
   import Callout from '../Callout.svelte';
+  import CheckModeCallout from './CheckModeCallout.svelte';
   import { checkIssueCopy, interpolate } from './checksCopy.js';
   import {
     buildCheckModifierContext,
@@ -774,6 +775,22 @@
     return entry ? { title: entry[0], lead: entry[1] } : null;
   });
 
+  // ── The roll section's mode callout (issue 1096) ────────────────────────────────────
+  //
+  // The AUTHORED mode for whichever activity is open, in that activity's own vocabulary —
+  // the same three fields `routeModeLabel` reads, for the same reason: crafting stores
+  // `routedByCheck` where salvage and gathering both store `routed`, so one shared token
+  // would name the wrong mode on two routes out of three.
+  //
+  // It renders on `roll` alone. The callout explains what the mode does with A ROLL, and
+  // that statement belongs at the top of the section that authors the roll rather than
+  // repeated above every section's cards.
+  const calloutMode = $derived.by(() => {
+    if (activity === 'salvage') return salvageResolutionMode;
+    if (activity === 'gathering') return gatheringResolutionMode;
+    return resolutionMode;
+  });
+
   const activeSectionIssues = $derived(
     activeReadiness.issues
       .filter((issue) => sectionForIssue(issue.id) === activeSection)
@@ -882,6 +899,18 @@
            section content rather than inside each branch: every activity route, every mode
            and every section reaches this one insertion point, and a per-branch copy would be
            five places for a sentence to go missing from. -->
+      <!-- WHAT THIS MODE DOES. Above the section's own issue callouts: this one is a
+           standing statement about the mode, and an issue callout is about THIS check, so
+           the general fact reads before the particular one. -->
+      {#if activity !== 'validation' && !routeIsOff && activeSection === 'roll'}
+        <CheckModeCallout
+          {activity}
+          mode={calloutMode}
+          {alchemyCheckMode}
+          outcomeCount={outcomeCount ?? 0}
+        />
+      {/if}
+
       {#if activity !== 'validation' && !routeIsOff && activeSectionIssues.length > 0}
         <div class="manager-checks-section-callouts" data-checks-section-callouts={activeSection}>
           {#each activeSectionIssues as issue (issue.id)}

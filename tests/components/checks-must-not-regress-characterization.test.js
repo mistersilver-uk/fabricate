@@ -68,6 +68,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/checks/SimpleCraftingCheckEditor.svelte',
     'src/ui/svelte/apps/manager/checks/ProgressiveCraftingCheckEditor.svelte',
     'src/ui/svelte/apps/manager/checks/CheckAwardMode.svelte',
+    'src/ui/svelte/apps/manager/checks/CheckModeCallout.svelte',
     'src/ui/svelte/apps/manager/checks/ChecksView.svelte',
   ],
   componentPath: 'src/ui/svelte/apps/manager/checks/ChecksView.svelte',
