@@ -3140,6 +3140,19 @@ const PROGRESSIVE_CHECK = Object.freeze({
     rollFormula: '1d20 + @abilities.int.mod',
     thresholds: { success: 12 },
     stageAdvanceOnSuccess: 1,
+    // The Checks Studio's PREVIEW SANDBOX (issue 1097), and the ONLY authored one in the
+    // world. A progressive check awards by spending its rolled value down an ordered list of
+    // result difficulties, so its histogram cannot be drawn without one — and the order is
+    // scratch state a GM types for one experiment, never a real recipe's. Herbalism is the
+    // world's only progressive system, so this is the one place a progressive histogram can
+    // be photographed at all.
+    //
+    // THE NUMBERS ARE CHOSEN TO MAKE BOTH HALVES OF THE RULE VISIBLE, against the `1d20`
+    // totals this check can roll. `6` is payable by all but the two lowest totals, so an
+    // award of NOTHING is reachable and IS listed — it is a real outcome, not an absence.
+    // `40` is payable by none of them, so `3 of 4` and `4 of 4` have zero probability and
+    // are OMITTED: a bar at 0% would claim the bucket exists.
+    preview: { difficulties: [6, 9, 14, 40] },
   },
   checkModifiers: HERBALISM_CHECK_MODIFIERS,
   // `playerPicks` ON THE SYSTEM (issue 1055), and it has to be here rather than on a recipe.

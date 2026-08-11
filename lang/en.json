@@ -4965,7 +4965,10 @@
             "Record": "Preview against record",
             "NoActor": "No actor",
             "NoActorHint": "With no actor selected every roll-data key reads as 0.",
-            "DefaultRecord": "Default"
+            "DefaultRecord": "Default",
+            "Difficulties": "Result difficulties",
+            "DifficultiesPlaceholder": "e.g. 6, 9, 14, 40",
+            "DifficultiesHint": "A try-it-out order for this check only. The roll is spent down it in the order you type, and nothing else reads these numbers."
           },
           "Simulator": {
             "Title": "Outcome preview",
@@ -5000,7 +5003,7 @@
             "NoOutcomes": "Add outcome bands to see how often each one comes up.",
             "Unrouted": "No outcome",
             "AwardCount": "{awarded} of {of}",
-            "ProgressiveNoRecord": "Chances for a progressive check are counted in results awarded, which needs a record whose results carry difficulties.",
+            "ReasonNoSandboxOrder": "A progressive check is counted in results awarded. Type an order of result difficulties under “Preview as” to see how often each count comes up.",
             "ReasonParseThrew": "This formula is not complete yet, so it cannot be read.",
             "ReasonNoDice": "This formula rolls no dice of its own, so there is nothing to chart.",
             "ReasonMultipleDieGroups": "This formula rolls more than one group of dice. Chances are listed for a single die only.",

@@ -520,6 +520,7 @@ The reading is derived from the MODE rather than from the persisted `enabled` fl
 The Preview-as panel carries an ACTOR selector and a RECORD selector, and both are real controls with a simulator behind them.
 "Preview as" offers UNFILTERED `game.actors` — the Studio is GM-only and a GM's `Document#isOwner` is true for every actor, so the player-side "assigned character OR owner" union would hide actors a GM can legitimately preview against — plus an explicit "No actor" option, under which every `@` key resolves to `0` and the panel renders the unresolved warning rather than a total.
 The RECORD is the same selection the Outcomes section's band strip is drawn against: a check's own default DC first, then every authored recipe tier.
+In PROGRESSIVE mode the record selector is replaced by the progressive preview sandbox's ordered-difficulty field, because a record's whole contribution is a DC and a progressive check has none.
 
 ##### Outcome-preview simulator
 
@@ -560,6 +561,23 @@ The caption is COMPUTED from the enumerated space, never hard-coded — a `1d12`
 
 The enumerator resolves the remainder ONCE against the previewed actor and does NOT re-pass the modifier context to a formula the preview arg-builder has already appended to, or every bucket shifts by the scalar.
 Progressive checks bucket by AWARD COUNT and OMIT a count no face can reach, while an award of nothing is listed wherever it is reachable.
+
+###### The progressive preview sandbox
+
+A progressive check awards by spending its rolled value down an ORDERED list of result difficulties, so its histogram cannot be drawn without one — and that order is SANDBOX STATE ON THE CHECK, at `progressive.preview.difficulties`, typed by the GM for one experiment.
+It is NOT derived from a recipe's `resultGroups[].results[].componentId` → `system.components[].difficulty` chain, and it is not a player's stored order or a GM's configured values.
+The Studio's subject is the CHECK: the simulator previews what a check DOES, not what some recipe will do with it, which is also why a Preview-as record supplies a DC rather than an outcome and why the record selector is replaced by this field in progressive mode — a record has nothing to offer a check with no DC.
+It does not have to be plausible; it has to show the correct behaviour, which it does because the enumerator spends it through the same `resolveProgressiveAward` loop crafting, salvage and gathering all award through.
+
+Five properties are load-bearing.
+It is PERSISTED on the check block, so a GM's experiment survives a reload, which means every allowlist rebuild the block passes through MUST emit it or the next save drops it silently.
+NO ENGINE PATH READS IT: deleting the key changes no runtime behaviour, because it is scratch and not configuration.
+READINESS NEVER VALIDATES IT: it raises no readiness issue, badges no section dot and blocks no enable, and a nonsensical or negative order is the GM's business rather than a validation target.
+EXPORT STRIPS IT, for the reason `import-export` states.
+And it is ABSENCE-PRESERVING and ORDER-PRESERVING: an absent list means no experiment has been run and is not the same as an authored empty one, the order IS the datum and nothing sorts it, and an entry that does not reduce to a finite number is not STORED — a persisted `NaN` round-trips through JSON as `null` and reads back as a perfectly finite `0`, which would silently make the experiment mean something else after a reload.
+The field itself keeps the GM's raw text while they type rather than echoing the stored numbers back, so a separator or a half-typed word is never rewritten under the cursor.
+
+An empty sandbox renders its own stated sentence NAMING THE FIELD that fills it, and that sentence is not one of the enumerability refusal codes: those all say the formula cannot be charted, and this one says the opposite — the formula is fine and the experiment has not been typed yet.
 Bars render through `FillBar`, flat.
 
 The View Lab's `Roll` double carries a `parse` static whose term shape is derived from RECORDED real-Foundry output, because the lab's `Roll` otherwise exposes only `replaceFormulaData` and `validate` and every render of the histogram panel would throw — and one bad case fails the capture job whole, publishing nothing while `check-screenshots` stays green on stale frames.

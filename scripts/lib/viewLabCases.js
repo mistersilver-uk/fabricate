@@ -5170,6 +5170,39 @@ export const VIEW_LAB_CASES = Object.freeze([
     ],
   }),
   managerCase({
+    id: 'manager-checks-crafting-odds-progressive',
+    label: 'Manager — Checks crafting odds histogram (progressive award count)',
+    reaches: 'beyond',
+    smokeLabels: [],
+    // Herbalism is the world's ONLY progressive system, so it is the only route where a
+    // histogram bucketed by award count exists at all. Its check carries the authored
+    // preview sandbox (`progressive.preview.difficulties`) that supplies the order — see
+    // `PROGRESSIVE_CHECK` in `tests/view-lab/world/labContent.js` for why those four numbers.
+    query: { system: 'lab-herbalism' },
+    steps: [
+      'Checks',
+      { selector: '#manager-checks-nav-crafting' },
+      { selector: '[data-checks-preview-actor]', select: 'lab-actor-idrin' },
+      { selector: '[data-checks-odds-disclosure]' },
+      { selector: '[data-checks-odds-state="enumerated"]', scroll: true },
+    ],
+    expectView: 'checks-crafting',
+    // A BUCKET THAT MUST EXIST, not merely a bar. `award-0` is the reachable award of
+    // nothing, and it is the half of the rule a histogram is most likely to drop by
+    // treating "awarded nothing" as "no outcome": anchoring on it means a build that
+    // stopped listing it fails here instead of publishing a three-bar frame that looks fine.
+    expectSelector: '.fabricate-manager [data-checks-odds-row="award-0"]',
+    kinds: ['manager', 'checks'],
+    // NO entry for `src/systems/progressiveCheckSandbox.js`, deliberately: `isUiFile` admits
+    // only `src/ui/`, `styles/`, `.svelte` and `.css`, so a change confined to that module
+    // selects no case at all and a pattern for it here would be unreachable code — the same
+    // trap the `Stepper` note two thousand lines up records for a different reason.
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/checks\/checkOdds\.js$/,
+      /^src\/ui\/svelte\/apps\/manager\/checks\/CheckOddsPanel\.svelte$/,
+    ],
+  }),
+  managerCase({
     id: 'manager-checks-simple-two-band-strip',
     label: 'Manager — Checks simple two-band DC strip',
     reaches: 'beyond',

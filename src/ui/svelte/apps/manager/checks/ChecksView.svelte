@@ -83,7 +83,12 @@
     enumerateProgressiveOdds,
     enumerateRoutedOdds,
     expectedFormulaValue,
+    SANDBOX_ABSENT,
   } from './checkOdds.js';
+  import {
+    formatPreviewDifficulties,
+    parsePreviewDifficulties,
+  } from '../../../../../systems/progressiveCheckSandbox.js';
 
   // `resolutionMode` is the selected system's recipe resolution mode and selects
   // which crafting check editor renders: routed → the outcome-tier editor;
@@ -882,9 +887,43 @@
   const previewActors = $derived(activity === 'validation' ? [] : listPreviewActors());
   const previewActor = $derived(resolvePreviewActor(previewActorId));
 
+  // ── The progressive PREVIEW SANDBOX (issue 1097) ────────────────────────────────────
+  //
+  // A progressive check awards by spending its rolled value down an ORDERED list of result
+  // difficulties, so its histogram cannot be drawn without one. That list is SANDBOX STATE
+  // ON THE CHECK — the GM types an order for this experiment — and not a real record's:
+  // this screen previews what a CHECK does, not what a recipe will do, and a Preview-as
+  // record supplies a DC rather than an outcome.
+  //
+  // It is read from the live DRAFT, so the histogram moves with the field, and written back
+  // through the SAME per-activity update callback every other progressive edit uses, so it
+  // saves with them and survives a reload. Nothing else reads it: no engine path, no
+  // readiness rule, and the exporter strips it.
+  const isProgressive = $derived(activeMode === 'progressive');
+  const previewDifficulties = $derived(
+    isProgressive && Array.isArray(activeCheck?.preview?.difficulties)
+      ? activeCheck.preview.difficulties
+      : []
+  );
+  const previewDifficultiesText = $derived(formatPreviewDifficulties(previewDifficulties));
+
+  /** Which progressive draft this route's sandbox edit belongs to. */
+  const PROGRESSIVE_UPDATERS = {
+    crafting: (next) => onUpdateCraftingCheckProgressive(next),
+    salvage: (next) => onUpdateSalvageCheckProgressive(next),
+    gathering: (next) => onUpdateGatheringCheckProgressive(next),
+  };
+
+  function updatePreviewDifficulties(raw) {
+    if (!isProgressive || !activeCheck) return;
+    const update = PROGRESSIVE_UPDATERS[activity];
+    if (!update) return;
+    update({ ...activeCheck, preview: { difficulties: parsePreviewDifficulties(raw) } });
+  }
+
   // A progressive check has no DC at all, so labelling its records with one would invent a
   // number the mode does not have.
-  const recordsCarryDc = $derived(activeMode !== 'progressive');
+  const recordsCarryDc = $derived(!isProgressive);
   const previewRecords = $derived(
     buildPreviewRecords({
       check: activeCheck,
@@ -979,33 +1018,23 @@
   /**
    * Progressive bucketing, by AWARD COUNT rather than by tier.
    *
-   * It needs the previewed record's ORDERED RESULT DIFFICULTIES, which no record reachable
-   * from this route carries: a progressive check authors no recipe tiers, and the selected
-   * system's recipes are not threaded into the Checks route. So the enumeration is real and
-   * tested, and this surface states the absence rather than inventing a sample.
+   * The ordered difficulties are the check's OWN preview sandbox, not a record's: this
+   * screen previews what a CHECK does, and a Preview-as record supplies a DC rather than an
+   * outcome. An empty sandbox is a stated absence with the control named, never an invented
+   * sample — see `src/systems/progressiveCheckSandbox.js`.
    *
    * @param {number} faces The die's face count.
    * @param {number} remainder The deterministic remainder.
    * @returns {object} The model.
    */
   function buildProgressiveOdds(faces, remainder) {
-    const difficulties = Array.isArray(previewRecord?.difficulties)
-      ? previewRecord.difficulties
-      : [];
-    if (difficulties.length === 0) {
-      return {
-        kind: 'progressive',
-        enumerable: false,
-        note: text(
-          'FABRICATE.Admin.Manager.Checks.Odds.ProgressiveNoRecord',
-          'Chances for a progressive check are counted in results awarded, which needs a record whose results carry difficulties.'
-        ),
-      };
+    if (previewDifficulties.length === 0) {
+      return { kind: 'progressive', enumerable: false, reason: SANDBOX_ABSENT };
     }
     const rows = enumerateProgressiveOdds({
       faces,
       remainder,
-      difficulties,
+      difficulties: previewDifficulties,
       awardMode: activeCheck?.awardMode || 'equal',
     }).map((row) => ({
       id: row.id,
@@ -1819,10 +1848,13 @@
       {previewActorId}
       {previewActorSummary}
       previewRecordId={previewRecord?.id ?? ''}
+      {previewDifficultiesText}
+      previewIsProgressive={isProgressive}
       preview={previewModel}
       odds={oddsModel}
       onSelectPreviewActor={(id) => (previewActorId = id)}
       onSelectPreviewRecord={selectPreviewRecord}
+      onEditPreviewDifficulties={updatePreviewDifficulties}
       onRollPreview={rollPreview}
       onToggleActive={(enabled) => onToggleCheckActive(activity, enabled)}
       onOpen={(target, section) => onOpenActivity(target, section)}

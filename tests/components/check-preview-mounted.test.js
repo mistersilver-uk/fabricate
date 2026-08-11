@@ -453,6 +453,109 @@ describe('the `avg` annotation on the formula field', () => {
   });
 });
 
+describe('the progressive PREVIEW SANDBOX', () => {
+  const PROGRESSIVE_CHECK = {
+    awardMode: 'equal',
+    rollFormula: '1d20 + @prof',
+    checkBreakage: { triggers: [] },
+  };
+
+  /**
+   * Mount the crafting route in progressive mode.
+   *
+   * @param {?object} preview The check's sandbox block, or null for none.
+   * @param {object} [props] Extra props.
+   * @returns {Promise<object>} The mounted root.
+   */
+  function mountProgressive(preview, props = {}) {
+    return mountChecks({
+      resolutionMode: 'progressive',
+      craftingCheck: null,
+      craftingCheckProgressive: preview ? { ...PROGRESSIVE_CHECK, preview } : PROGRESSIVE_CHECK,
+      ...props,
+    });
+  }
+
+  it('REPLACES the record selector, because a progressive check has no DC', async () => {
+    const root = await mountProgressive({ difficulties: [6, 9] });
+    assert.ok(
+      !root.querySelector('[data-checks-preview-record]'),
+      'a record supplies a DC and nothing else, so it has nothing to offer this mode'
+    );
+    const field = root.querySelector('[data-checks-preview-difficulties]');
+    assert.ok(Boolean(field), 'the sandbox order takes that slot');
+    assert.equal(field.value, '6, 9', 'seeded from the persisted experiment');
+  });
+
+  it('leaves the record selector alone in every OTHER mode', async () => {
+    const root = await mountChecks();
+    assert.ok(Boolean(root.querySelector('[data-checks-preview-record]')));
+    assert.ok(!root.querySelector('[data-checks-preview-difficulties]'));
+  });
+
+  it('buckets the histogram by AWARD COUNT over the GM’s own order', async () => {
+    // `1d20 + @prof` for Sera is `1d20 + 3`, so totals run 4..23. Against 6/9/14/40 the
+    // cumulative cost is 6/15/29/69: an award of NOTHING is reachable (totals 4-5), one and
+    // two are, three and four are not.
+    const root = await mountProgressive({ difficulties: [6, 9, 14, 40] });
+    await choose(root.querySelector('[data-checks-preview-actor]'), 'sera');
+    const rows = [...root.querySelectorAll('[data-checks-odds-row]')].map((row) => [
+      row.getAttribute('data-checks-odds-row'),
+      row.querySelector('[data-checks-odds-percent]').textContent.trim(),
+    ]);
+    assert.deepEqual(rows, [
+      ['award-0', '10%'],
+      ['award-1', '45%'],
+      ['award-2', '45%'],
+    ]);
+    assert.equal(
+      root.querySelector('[data-checks-odds-row="award-0"] .manager-checks-odds-label').textContent
+        .trim(),
+      '0 of 4',
+      'an award of nothing is a real outcome and IS listed, out of the authored four'
+    );
+  });
+
+  it('states the ABSENCE and names the field rather than inventing a sample', async () => {
+    const root = await mountProgressive(null);
+    await choose(root.querySelector('[data-checks-preview-actor]'), 'sera');
+    const note = root.querySelector('[data-checks-odds-state="not-enumerable"]');
+    assert.ok(Boolean(note), 'no chart without an order');
+    assert.equal(
+      note.getAttribute('data-checks-odds-reason'),
+      'no-sandbox-order',
+      'and NOT an enumerability refusal: the formula is perfectly enumerable'
+    );
+    assert.match(note.textContent, /Preview as/, 'the sentence names the field that fills it');
+  });
+
+  it('writes the typed order back through the SAME draft every other progressive edit uses', async () => {
+    const changes = [];
+    const root = await mountProgressive(
+      { difficulties: [6] },
+      { onUpdateCraftingCheckProgressive: (next) => changes.push(next) }
+    );
+    const field = root.querySelector('[data-checks-preview-difficulties]');
+    field.value = '14, -2, 6';
+    field.dispatchEvent(new globalThis.Event('input', { bubbles: true }));
+    await settle();
+    assert.equal(changes.length, 1);
+    assert.deepEqual(
+      changes[0].preview.difficulties,
+      [14, -2, 6],
+      'order preserved and unsorted, and a negative is the GM’s business'
+    );
+    assert.equal(changes[0].rollFormula, '1d20 + @prof', 'the rest of the draft rides along');
+  });
+
+  // The field's "keeps the GM's own text" guard is NOT graded here, deliberately. This
+  // harness mounts `ChecksView` with STATIC props, so the order never round-trips back
+  // through the draft — and the guard only does anything on a round trip. A test here
+  // would pass with the guard deleted, which is the definition of a vacuous one. It is
+  // graded in `tests/components/manager-mounted.test.js`, the only suite that mounts the
+  // root and therefore the only one where the draft answers back.
+});
+
 describe('the source contract these hooks are pinned by', () => {
   it('keeps the panels on the shared primitives the spec names', () => {
     const odds = readFileSync(

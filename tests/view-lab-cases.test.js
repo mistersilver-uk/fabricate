@@ -960,7 +960,11 @@ const NEW_CHECKS_MODULES = [
   ],
   [
     'src/ui/svelte/apps/manager/checks/checkOdds.js',
-    ['manager-checks-crafting-odds-enumerable', 'manager-checks-crafting-odds-not-enumerable'],
+    [
+      'manager-checks-crafting-odds-enumerable',
+      'manager-checks-crafting-odds-not-enumerable',
+      'manager-checks-crafting-odds-progressive',
+    ],
   ],
 ];
 

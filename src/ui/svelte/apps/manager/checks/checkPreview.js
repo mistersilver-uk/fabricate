@@ -135,23 +135,23 @@ export function cloneRollData(actor) {
  * every record — the selector still lists them, because the simulator's readout and the
  * "What happens" rows are per-record even where the bands are not.
  *
+ * A RECORD SUPPLIES A DC AND NOTHING ELSE. A progressive check has no DC, and its award
+ * count comes from the check's own preview sandbox (`progressive.preview.difficulties`)
+ * rather than from a record — see `src/systems/progressiveCheckSandbox.js` for why the
+ * Studio previews the CHECK rather than what some recipe would do with it.
+ *
  * @param {object} params Params.
  * @param {object|null} params.check The active check draft.
- * @param {Array<object>} [params.recipes] Optional recipe-backed records. Reserved for
- *   the progressive award-count histogram, which needs a recipe's ordered result
- *   difficulties; nothing supplies them today (see the handoff note on issue 1097).
  * @param {string} [params.defaultLabel] The localized name of the default record.
- * @returns {Array<{id: string, name: string, dc: number, difficulties: Array<number>}>}
- *   The records, default first.
+ * @returns {Array<{id: string, name: string, dc: number}>} The records, default first.
  */
-export function buildPreviewRecords({ check, recipes = [], defaultLabel = 'Default' }) {
+export function buildPreviewRecords({ check, defaultLabel = 'Default' }) {
   const baseDc = Number(check?.dc ?? 0);
   const records = [
     {
       id: DEFAULT_RECORD_ID,
       name: defaultLabel,
       dc: Number.isFinite(baseDc) ? baseDc : 0,
-      difficulties: [],
     },
   ];
   for (const tier of Array.isArray(check?.tiers) ? check.tiers : []) {
@@ -161,16 +161,6 @@ export function buildPreviewRecords({ check, recipes = [], defaultLabel = 'Defau
       id: String(tier.id),
       name: String(tier.name ?? ''),
       dc: Number.isFinite(dc) ? dc : records[0].dc,
-      difficulties: [],
-    });
-  }
-  for (const recipe of Array.isArray(recipes) ? recipes : []) {
-    if (!recipe?.id) continue;
-    records.push({
-      id: String(recipe.id),
-      name: String(recipe.name ?? ''),
-      dc: Number.isFinite(Number(recipe.dc)) ? Number(recipe.dc) : records[0].dc,
-      difficulties: Array.isArray(recipe.difficulties) ? recipe.difficulties.map(Number) : [],
     });
   }
   return records;

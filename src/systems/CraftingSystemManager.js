@@ -52,6 +52,7 @@ import {
 } from './checkModifierResolver.js';
 import { normalizeCurrencyConfig } from './currencyProfile.js';
 import { normalizeGatheringRealmList, normalizeGatheringRealmSettings } from './gatheringRealms.js';
+import { normalizePreviewSandbox } from './progressiveCheckSandbox.js';
 import { RecipeActivationError } from './RecipeActivationError.js';
 import { RecipePersistenceError } from './RecipePersistenceError.js';
 import { SignatureValidator } from './SignatureValidator.js';
@@ -807,7 +808,16 @@ export class CraftingSystemManager {
   _normalizeProgressiveCraftingCheck(progressive = {}) {
     const source = !progressive || typeof progressive !== 'object' ? {} : progressive;
     const rollFormula = typeof source.rollFormula === 'string' ? source.rollFormula : '';
-    return {
+    // The Checks Studio's PREVIEW SANDBOX (issue 1097): the ordered result difficulties a
+    // GM types to see what a progressive check would award. It is emitted here because
+    // this literal is an allowlist rebuild — an unemitted key is dropped on the next save
+    // — and it is ABSENCE-PRESERVING, because an absent experiment is not an empty one.
+    //
+    // NO RUNTIME PATH READS IT, deliberately: it is scratch state, not configuration, and
+    // the engine spends a recipe's own `components[].difficulty` list. Nothing validates
+    // it either — a nonsensical experiment is the GM's business.
+    const preview = normalizePreviewSandbox(source.preview);
+    const normalized = {
       awardMode: ['partial', 'equal', 'exceed'].includes(source.awardMode)
         ? source.awardMode
         : 'equal',
@@ -818,6 +828,10 @@ export class CraftingSystemManager {
         source.checkBreakage
       ),
     };
+    // Attached rather than spread, the same way `_normalizeCheckModifierCatalogue` attaches
+    // its optional bounds: the key is ABSENT when no experiment has been run.
+    if (preview) normalized.preview = preview;
+    return normalized;
   }
 
   _normalizeSimpleTier(tier) {

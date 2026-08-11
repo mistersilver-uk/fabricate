@@ -371,6 +371,17 @@ describe('checkPreview: the actor and record selection', () => {
     assert.equal(records[0].dc, 15);
   });
 
+  it('carries a DC and NOTHING ELSE — a record is not an outcome (issue 1097)', () => {
+    // The `difficulties` slot this used to emit was a seam for the progressive award-count
+    // histogram, on the assumption that its ordered result difficulties would arrive on a
+    // record. They do not: that order is sandbox state ON THE CHECK, so the slot was an
+    // empty array every caller read as "no record has one" — a shape claiming a capability
+    // nothing could ever fill.
+    for (const record of buildPreviewRecords({ check: ROUTED_DRAFT, defaultLabel: 'Default' })) {
+      assert.deepEqual(Object.keys(record).toSorted(), ['dc', 'id', 'name']);
+    }
+  });
+
   it('treats the actor roll data as read-only by cloning before any augmentation', () => {
     const live = { prof: 3, abilities: { str: { mod: 2 } } };
     const actor = { getRollData: () => live };

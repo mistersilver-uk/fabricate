@@ -78,6 +78,11 @@ export const CHECKS_TREE_RAW_MODULES = Object.freeze([
   'src/ui/svelte/apps/manager/checks/checkOdds.js',
   'src/systems/checkRoll.js',
   'src/utils/progressiveAward.js',
+  // The progressive PREVIEW SANDBOX derivation (issue 1097). BOTH halves of the checks tree
+  // import it — `ChecksView` to read and write the order, `ChecksRightMenu` to keep the
+  // field's own text in step with it — and it lives under `src/systems/` because the
+  // persistence normalizer and the manager root's draft clone share the same derivation.
+  'src/systems/progressiveCheckSandbox.js',
   // `checkRoll.js` evaluates a trigger's condition through the shared breakage evaluator,
   // and that module's own closure is the rest of this block. Eight modules for one
   // evaluator reads like over-filling; it is not, and the check is mechanical — drop any

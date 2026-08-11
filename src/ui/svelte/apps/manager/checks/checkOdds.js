@@ -93,6 +93,18 @@ export const ODDS_REASONS = Object.freeze({
   unresolvedRollData: 'unresolved-roll-data',
 });
 
+/**
+ * Why a PROGRESSIVE histogram has nothing to draw even though the formula is enumerable.
+ *
+ * It is deliberately NOT an {@link ODDS_REASONS} member: those nine all say the formula
+ * cannot be enumerated, and this one says the opposite — the formula is fine, and the
+ * missing input is the GM's own sandbox order, which one field in the Preview-as card
+ * fills. Folding it in would let a reader (and a test) mistake "the GM has not run an
+ * experiment yet" for "this check cannot be charted".
+ * @type {string}
+ */
+export const SANDBOX_ABSENT = 'no-sandbox-order';
+
 /** A Foundry flavour annotation (`+ 3[Tools]`). Inert label text, never a value. */
 const FLAVOUR_SPAN = /\[[^\]]*]/g;
 

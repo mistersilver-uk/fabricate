@@ -33,7 +33,7 @@
 <script>
   import FillBar from '../../../components/FillBar.svelte';
   import { localize } from '../../../util/foundryBridge.js';
-  import { ODDS_REASONS } from './checkOdds.js';
+  import { ODDS_REASONS, SANDBOX_ABSENT } from './checkOdds.js';
 
   let {
     /**
@@ -91,6 +91,14 @@
     [ODDS_REASONS.unresolvedRollData]: [
       'FABRICATE.Admin.Manager.Checks.Odds.ReasonUnresolvedRollData',
       'This formula does not reduce to a number for the selected actor.',
+    ],
+    // NOT an enumerability refusal: the formula is perfectly enumerable and the missing
+    // input is the EXPERIMENT. It shares this branch because the observable is the same —
+    // no chart, one stated sentence — and it names the control that fills it, because an
+    // abstention whose remedy is one field away should say which field.
+    [SANDBOX_ABSENT]: [
+      'FABRICATE.Admin.Manager.Checks.Odds.ReasonNoSandboxOrder',
+      'A progressive check is counted in results awarded. Type an order of result difficulties under “Preview as” to see how often each count comes up.',
     ],
   };
 

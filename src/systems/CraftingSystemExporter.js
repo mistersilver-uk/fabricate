@@ -46,8 +46,9 @@ export function buildExportPayload(
 
   const systemId = system.id;
 
-  // Deep-clone system and strip transitional aliases to keep export clean
-  const exportSystem = stripTransitionalAliases(structuredClone(system));
+  // Deep-clone system, strip transitional aliases, and strip the Checks Studio's
+  // progressive PREVIEW SANDBOX, which is authoring scratch rather than authoring data.
+  const exportSystem = stripPreviewSandbox(stripTransitionalAliases(structuredClone(system)));
 
   // Replace craftingSystemId with placeholder so imports can rebind
   const exportRecipes = recipes.map((recipe) => {
@@ -261,5 +262,33 @@ function stripTransitionalAliases(system) {
     }
   }
 
+  return system;
+}
+
+/** Every check block that can carry a progressive sub-object (issue 1097). */
+const PROGRESSIVE_CHECK_KEYS = ['craftingCheck', 'salvageCraftingCheck', 'gatheringCraftingCheck'];
+
+/**
+ * Remove the Checks Studio's progressive PREVIEW SANDBOX from an export.
+ *
+ * `progressive.preview.difficulties` is the ordered list a GM types into the odds histogram
+ * to see what a check would award. It is an experiment on one authoring screen, not a
+ * property of the system: no runtime path reads it and no readiness rule validates it. A
+ * value shipped inside a distributed system reads to the recipient as configuration they are
+ * expected to understand, which is exactly the misreading this strip prevents — and it is
+ * the same call the `runtimeStateIncluded: false` boundary already makes about every other
+ * piece of non-authoring state.
+ *
+ * ABSENCE-PRESERVING in the other direction too: it deletes the key rather than emptying it,
+ * so an import cannot tell an exported experiment from one that was never run.
+ *
+ * @param {object} system The cloned export system.
+ * @returns {object} The same object, sandbox removed.
+ */
+function stripPreviewSandbox(system) {
+  for (const key of PROGRESSIVE_CHECK_KEYS) {
+    const progressive = system?.[key]?.progressive;
+    if (progressive && typeof progressive === 'object') delete progressive.preview;
+  }
   return system;
 }

@@ -671,6 +671,11 @@ function compileManagerRoot() {
     'src/ui/svelte/apps/manager/checks/checkOdds.js',
     'src/systems/checkRoll.js',
     'src/utils/progressiveAward.js',
+    // The progressive PREVIEW SANDBOX derivation (issue 1097). THREE importers put it in
+    // this root's static graph: the root's own `cloneProgressiveCheck`, `ChecksView` and
+    // `ChecksRightMenu` — which is the point, since one derivation is what stops the draft
+    // clone and the persistence normalizer from disagreeing about what an order is.
+    'src/systems/progressiveCheckSandbox.js',
     'src/toolBreakageRuntime.js',
   ]) {
     const rawDestination = join(tempRoot, rawPath);
@@ -3627,6 +3632,83 @@ describe('CraftingSystemManager mounted behavior', () => {
       target.querySelector('[data-checks-save]').disabled,
       'saving clears the unsaved state and re-disables the Save button'
     );
+  });
+
+  it('Checks carries the progressive PREVIEW SANDBOX through the draft and into the save', async () => {
+    // The THIRD allowlist rebuild the progressive block passes through (issue 1097). The
+    // manager's normalizer and the store's projection are graded in
+    // `tests/progressive-preview-sandbox.test.js`; what only this suite can grade — it is
+    // the only one that mounts `CraftingSystemManagerRoot` — is `cloneProgressiveCheck`,
+    // whose whitelist would otherwise hold the GM's experiment for exactly as long as the
+    // panel stayed open and then write a block without it.
+    const calls = [];
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore(calls, {
+          salvageResolutionMode: 'progressive',
+          salvageCraftingCheck: {
+            enabled: true,
+            progressive: {
+              awardMode: 'equal',
+              rollFormula: '1d20',
+              preview: { difficulties: [6, 9] },
+            },
+          },
+        }),
+        services: { openCurrentAdmin: () => {} },
+      },
+    });
+    flushSync();
+
+    navButton('Checks').click();
+    await tick();
+    flushSync();
+    await openChecksActivity('salvage');
+
+    const field = target.querySelector('[data-checks-preview-difficulties]');
+    assert.ok(field, 'the sandbox field renders on a progressive route');
+    assert.equal(
+      field.value,
+      '6, 9',
+      'the DRAFT clone carried the persisted order; a whitelist that dropped it reads empty'
+    );
+
+    // THE FIELD KEEPS THE GM'S OWN TEXT, and only a ROUND TRIP can show it. The stored
+    // datum is `number[]`, so echoing it back would delete a trailing separator and a
+    // half-typed word from under the cursor. The input below is the one that discriminates:
+    // it BOTH adds a number (so the order upstream really changes, and the resync runs) AND
+    // carries noise that stores as nothing (so a resync would rewrite the field).
+    setInputValue(field, '6, 9, 14, x');
+    await tick();
+    flushSync();
+    assert.equal(
+      target.querySelector('[data-checks-preview-difficulties]').value,
+      '6, 9, 14, x',
+      'the half-typed entry survived the order it just wrote upstream'
+    );
+
+    setInputValue(field, '14, 6, -2');
+    await tick();
+    flushSync();
+
+    const saveButton = target.querySelector('[data-checks-save]');
+    assert.equal(saveButton.disabled, false, 'a sandbox edit is a real unsaved change');
+    saveButton.click();
+    await tick();
+    await Promise.resolve();
+    flushSync();
+
+    const saved = calls.find((call) => call[0] === 'saveSalvageCheckProgressive');
+    assert.ok(saved, 'Save routes the sandbox through the salvage progressive seam');
+    assert.deepEqual(
+      saved[1].preview.difficulties,
+      [14, 6, -2],
+      'order preserved and unsorted, negatives kept — the experiment is the GM’s'
+    );
+    assert.equal(saved[1].rollFormula, '1d20', 'and the rest of the block rode along');
   });
 
   it('Checks Gathering tab in d100 economy mode renders the read-only card and no editor', async () => {
