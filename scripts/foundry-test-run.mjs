@@ -505,6 +505,73 @@ async function openManagerCraftingSection(page, subitemId, managerView) {
     .waitFor({ state: 'visible', timeout: 5_000 });
 }
 
+/**
+ * Select one of the open Checks activity route's five sections (issue 1096).
+ *
+ * The strip is `The roll / Outcomes / Triggers / Modifiers / On failure`, and ONE section's
+ * content is in the DOM at a time — so a control that used to sit further down one scrolling
+ * activity page (the trigger card, the failure-consumption policy, the check-modifier
+ * catalogue) is reached by selecting the section that OWNS it, not by scrolling to it.
+ *
+ * The wait is on the strip reporting the selection rather than on whatever the section
+ * contains: the strip is what owns which section renders, so a caller's own next assertion
+ * stays the thing that fails when the content is missing.
+ *
+ * The strip is a tab strip, so it is addressed by its `data-` hook the way every other tab
+ * strip in this walk is; the rail sub-items above are addressed by id, the way every other
+ * rail group in this walk is. Both hooks are shipped for this harness.
+ * @param {import('playwright').Page} page
+ * @param {string} section
+ */
+async function openChecksSection(page, section) {
+  const button = page
+    .locator(`.fabricate-manager [data-checks-section-button="${section}"]`)
+    .first();
+  await button.waitFor({ state: 'visible', timeout: 5_000 });
+  await button.click();
+  await page
+    .locator(`.fabricate-manager [data-checks-section-button="${section}"][aria-selected="true"]`)
+    .first()
+    .waitFor({ state: 'visible', timeout: 5_000 });
+}
+
+/**
+ * Open a Checks Studio ACTIVITY route, and optionally one of its sections (issue 1096).
+ *
+ * Checks used to be one rail button holding four `data-checks-tab-button` tabs. Those four are
+ * now rail ROUTES under an expandable Checks group, and the tab strip they lived in is gone
+ * from the product — so every walk that reaches a checks surface navigates the group.
+ *
+ * The parent click is part of the navigation rather than a nicety: the submenu is only in the
+ * DOM while the group is expanded, and a freshly mounted manager renders it collapsed.
+ * Activating the parent expands the group AND routes to its first available child, so the
+ * sub-item click that follows is what selects the activity — the same two-step shape
+ * `openManagerCraftingSection` uses for the Crafting group.
+ *
+ * Pass `section` for an activity route; omit it for Validation, which renders no strip. Naming
+ * the landing section is worth doing even when it is the default one: the strip keeps its
+ * selection across route changes, so an unnamed section makes a frame depend on wherever an
+ * earlier step in the same manager session happened to leave it.
+ * @param {import('playwright').Page} page
+ * @param {string} activity crafting | salvage | gathering | validation
+ * @param {string} [section]
+ */
+async function openChecksActivity(page, activity, section = '') {
+  await page.locator('.fabricate-manager .manager-nav-button:has-text("Checks")').first().click();
+  const navItem = page.locator(`.fabricate-manager #manager-checks-nav-${activity}`).first();
+  await navItem.waitFor({ state: 'visible', timeout: 5_000 });
+  await navItem.click();
+  await page
+    .locator('.fabricate-manager [data-checks-editor]')
+    .first()
+    .waitFor({ state: 'visible', timeout: 5_000 });
+  await page
+    .locator(`.fabricate-manager [data-checks-panel="${activity}"]`)
+    .first()
+    .waitFor({ state: 'visible', timeout: 5_000 });
+  if (section) await openChecksSection(page, section);
+}
+
 // Return to the recipes browser (via the Crafting group) and open the named
 // recipe's editor, waiting for the recipe-edit route. Consolidates the
 // "return then open recipe X" sequence the recipe-editor captures repeat.
@@ -5963,9 +6030,10 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
     throw new Error('Recipe Tools policy-removal check unexpectedly dirtied the Recipe draft');
   }
 
-  await page.locator('.fabricate-manager .manager-nav-button:has-text("Checks")').first().click();
-  await page.locator('[data-checks-editor]').first().waitFor({ state: 'visible', timeout: 5_000 });
-  await page.locator('[data-checks-tab-button="crafting"]').first().click();
+  // The trigger editor is the crafting route's TRIGGERS section (issue 1096). It used to be
+  // one card further down the crafting tab's single scrolling page; now only the selected
+  // section renders, so the section is navigated to rather than scrolled to.
+  await openChecksActivity(page, 'crafting', 'triggers');
   // Tier stepping is a per-trigger EFFECT (issue 975), not the check-wide
   // natural-stepping toggle this walk used to round-trip, so exercising it
   // means AUTHORING a trigger. Add one, drive its tier-step row, then remove it: the
@@ -9636,9 +9704,10 @@ async function main() {
         await page.evaluate(async () => {
           await globalThis.__fabricateSmokeManagerApp?._adminStore?.refresh?.();
         });
-        await page.locator('.fabricate-manager .manager-nav-button:has-text("Checks")').first().click();
-        await page.locator('.fabricate-manager [data-checks-editor]').first().waitFor({ state: 'visible', timeout: 5_000 });
-        await page.locator('.fabricate-manager [data-checks-tab-button="gathering"]').first().click();
+        // `roll` NAMED rather than taken by default (issue 1096): it is the route's landing
+        // section and the one the View Lab case for this same label publishes, and naming it
+        // keeps the frame the same picture whatever an earlier checks visit selected.
+        await openChecksActivity(page, 'gathering', 'roll');
         await page.locator('.fabricate-manager [data-checks-panel="gathering"] [data-crafting-check-editor]').first()
           .waitFor({ state: 'visible', timeout: 5_000 });
         await assertManagerLayoutStable(page, 'checks gathering editor');
@@ -9656,11 +9725,12 @@ async function main() {
           await globalThis.__fabricateSmokeManagerApp?._adminStore?.refresh?.();
         });
 
-        // Checks → Validation tab (#485): the per-check readiness checklist plus
+        // Checks → Validation route (#485): the per-check readiness checklist plus
         // severity-grouped issues for the in-play subsystem checks. With the economy
         // back to d100 the gathering check is omitted, so the rollup frames the
-        // crafting and salvage check sections.
-        await page.locator('.fabricate-manager [data-checks-tab-button="validation"]').first().click();
+        // crafting and salvage check sections. No section argument: Validation is the one
+        // route with no section strip — it is a rollup of the other three.
+        await openChecksActivity(page, 'validation');
         await page.locator('.fabricate-manager [data-checks-panel="validation"]').first()
           .waitFor({ state: 'visible', timeout: 5_000 });
         await page.locator('.fabricate-manager [data-checks-validation-section="crafting"]').first()
@@ -9670,18 +9740,23 @@ async function main() {
         await screenshot(page, 'manager-checks-validation');
         process.stdout.write('  D0: checks validation tab screenshotted\n');
 
-        // Checks → Crafting tab, scrolled to the failure-consumption controls
+        // Checks → Crafting route, at the failure-consumption controls
         // (issue #752 — evidence for #736's #712 half). The smoke system resolves
-        // routedByCheck, so the crafting tab renders the routed CraftingCheckEditor;
-        // its failure-consumption controls land at the bottom of that editor after
-        // #712 rebases, so scroll the editor's last section into view before the
-        // capture. Guarded so a hiccup records a failed step, not an abort.
+        // routedByCheck, so the crafting route renders the routed CraftingCheckEditor;
+        // its failure-consumption controls are the ON FAILURE section (issue 1096).
+        // Guarded so a hiccup records a failed step, not an abort.
         try {
-          await page.locator('.fabricate-manager [data-checks-tab-button="crafting"]').first().click();
+          // Land on `roll` FIRST and assert the editor there, then move to the section that
+          // owns the consumption card. The order is deliberate: the routed editor renders
+          // none of its own cards under `on-failure`, so its wrapper is present but empty
+          // there — asserting it visible on arrival is only meaningful on a section the
+          // editor actually draws into.
+          await openChecksActivity(page, 'crafting', 'roll');
           const craftingCheckEditor = page
             .locator('.fabricate-manager [data-checks-panel="crafting"] [data-crafting-check-editor]')
             .first();
           await craftingCheckEditor.waitFor({ state: 'visible', timeout: 5_000 });
+          await openChecksSection(page, 'on-failure');
           // Issue 712's failure-consumption card is a SIBLING of the check editor
           // inside the crafting panel, so anchor on it directly when present and
           // fall back to the editor's last section on builds that predate it.
@@ -9709,9 +9784,13 @@ async function main() {
         // shows the redesigned rows — IconPicker + label + the `@`-adorned expression
         // field — plus the four-option rule group and the pick-cap field that the two
         // SELECTING rules reveal, in its blank "Unlimited" state. A DEDICATED frame (not
-        // the failure-consumption one above, which the same tab scrolls elsewhere for) so
-        // both cards get exact, un-cropped evidence.
+        // the failure-consumption one above, which the same route selects another section
+        // for) so both cards get exact, un-cropped evidence.
         try {
+          // The catalogue card is the crafting route's MODIFIERS section (issue 1096) — it
+          // used to be the last card on the same scrolling page as the consumption policy,
+          // which is why the frame above no longer leaves it merely below the fold.
+          await openChecksSection(page, 'modifiers');
           const modifierCard = page
             .locator('.fabricate-manager [data-checks-panel="crafting"] [data-crafting-modifier-catalogue]')
             .first();
@@ -10949,7 +11028,12 @@ async function main() {
             // alchemy-mode system — capture there when the card exists so the
             // frame demonstrates the flags; fall back to the settings surface
             // on builds that predate the card.
-            await page.locator('.fabricate-manager .manager-nav-button:has-text("Checks")').first().click();
+            //
+            // They are the crafting route's ON FAILURE section (issue 1096). The route's
+            // landing section shows the alchemy check-mode selector instead, and the card
+            // probe below is a soft `count()` guard — so without the section click this
+            // capture would degrade silently to a frame of the wrong card rather than fail.
+            await openChecksActivity(page, 'crafting', 'on-failure');
             await settleManagerNav(page);
             const alchemyBehaviourCard = page
               .locator('.fabricate-manager [data-alchemy-behaviour]')
