@@ -71,10 +71,12 @@ And the assertion is **one-directional**: subject landmarks with no prototype co
 
 What survives all of that is exactly the class of defect the pass exists for.
 
-### Its subject should be the REAL app, not the markup fixture
+### Its subject must be the REAL app, not the markup fixture
 
-`compare`'s subject is a hand-authored markup fixture, which is a **mirror**.
-A structural pass asking "is anything missing?" of a mirror can only report what its author already knew was missing.
+This is the single most important decision in the pass, so state it as a rule rather than as a preference: **a structural pass run against a mirror can only report what its author already knew was missing.**
+
+`compare`'s subject is a hand-authored markup fixture, and a fixture is a mirror of what its author believed the app renders.
+Point the structural pass at that and it re-reads those beliefs back to you — which is exactly how a screen came to ship with a whole callout card absent behind a green run.
 So the spec supplies `inventory.subject.open(browser)` / `.navigate(page, screen)` and points them at whatever renders the shipped components — in this repository, the View Lab, which boots once and reaches every section as a tab of one window.
 
 ### Recording a structural exemption

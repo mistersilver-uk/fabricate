@@ -36,6 +36,9 @@
   import ManagerButton from '../../../components/ManagerButton.svelte';
   import { localize } from '../../../util/foundryBridge.js';
   import { parseDiceGroups } from '../../../../../utils/craftingCheckExpression.js';
+  import { interpolate } from './checksCopy.js';
+  import { buildPresetTrigger, checkTriggerPresets } from './checkTriggerPresets.js';
+  import { summariseCondition, summariseEffect } from './checkTriggerSummary.js';
   import SegmentedControl from '../SegmentedControl.svelte';
   import Stepper from '../../../components/Stepper.svelte';
   import { stepperLabels } from '../../../components/stepperLabels.js';
@@ -360,7 +363,104 @@
       : [...current, optionId];
     updateCondition(id, { tierIds: next });
   }
+
+  // ── What each trigger says about itself (issue 1096) ─────────────────────────────
+  //
+  // The card used to be headed by the word `When` — the label of its first `<select>` — so a
+  // list of three triggers read `When`, `When`, `When`. The sentence is composed by the pure
+  // `checkTriggerSummary` module; this is only the localization bridge, which is why a
+  // fragment arrives as `{ key, fallback }` and is resolved here.
+  const tierNames = $derived(
+    Object.fromEntries((outcomeOptions ?? []).map((option) => [option.id, option.name || '']))
+  );
+
+  /** Resolve one fragment, filling any nested fragment in its data first. */
+  function phrase(fragment) {
+    const data = Object.fromEntries(
+      Object.entries(fragment.data ?? {}).map(([key, entry]) => [
+        key,
+        entry && typeof entry === 'object' ? text(entry.key, entry.fallback) : entry,
+      ])
+    );
+    return interpolate(text(fragment.key, fragment.fallback), data);
+  }
+
+  function conditionSummary(trigger) {
+    return phrase(summariseCondition(trigger?.condition ?? {}, { diceGroups, tierNames }));
+  }
+
+  function effectSentence(trigger) {
+    const clauses = summariseEffect(trigger, {
+      tierNames,
+      progressive: kind === 'progressive',
+      showBreakTools,
+    }).map((clause) => phrase(clause));
+    const joined = clauses.join(
+      text('FABRICATE.Admin.Manager.Checks.Breakage.SummaryJoin', ', and ')
+    );
+    return interpolate(
+      text(
+        'FABRICATE.Admin.Manager.Checks.Breakage.SummarySentence',
+        'When {condition}, {effect}.'
+      ),
+      { condition: conditionSummary(trigger).toLowerCase(), effect: joined }
+    );
+  }
+
+  // ── The preset row (issue 1096) ──────────────────────────────────────────────────
+  //
+  // Withheld entirely when the formula rolls no dice: a `Natural 20 on 1d20` preset offered
+  // against a formula with no die would author a condition pointing at a group that does not
+  // exist. `checkTriggerPresets` decides that, not this component.
+  const presets = $derived(checkTriggerPresets({ kind, diceGroups }));
+
+  function addPreset(presetId) {
+    const trigger = buildPresetTrigger({
+      presetId,
+      kind,
+      diceGroups,
+      showBreakTools,
+      newId,
+    });
+    if (trigger) emit([...triggers, trigger]);
+  }
 </script>
+
+<!-- ADD A COMMON TRIGGER. Its own card above the list, as the prototype has it: it is not
+     part of the trigger editor, it is the shortcut past having to learn the editor first.
+     A preset authors an ORDINARY trigger — no marker field, nothing downstream treats it
+     differently — which is what keeps it a shortcut rather than a second kind of trigger. -->
+{#if presets.length > 0}
+  <section class="manager-inspector-card manager-checks-card" data-check-trigger-presets>
+    <div class="manager-checks-card-head">
+      <div>
+        <h3 class="manager-checks-card-title">
+          {text('FABRICATE.Admin.Manager.Checks.Breakage.PresetsTitle', 'Add a common trigger')}
+        </h3>
+        <p class="manager-checks-card-description">
+          {text(
+            'FABRICATE.Admin.Manager.Checks.Breakage.PresetsLead',
+            'One click for the conditions almost every system writes.'
+          )}
+        </p>
+      </div>
+    </div>
+    <div class="manager-checks-card-body">
+      <div class="manager-checks-trigger-presets">
+        {#each presets as preset (preset.id)}
+          <ManagerButton
+            role="dashed"
+            data-add-trigger-preset={preset.id}
+            onclick={() => addPreset(preset.id)}
+          >
+            <i class={preset.icon} aria-hidden="true"></i>
+            <span>{phrase(preset)}</span>
+          </ManagerButton>
+        {/each}
+      </div>
+    </div>
+  </section>
+{/if}
 
 <section class="manager-inspector-card manager-checks-card" data-check-triggers>
   <div class="manager-checks-card-head">
@@ -397,6 +497,16 @@
           {@const isOutcomeTier = condition.type === 'outcomeTier'}
           {@const selectedOutcome = isOutcomeTier ? 'none' : outcomeFor(trigger)}
           <div class="manager-checks-breakage-trigger" data-trigger={trigger.id}>
+            <!-- WHAT THIS TRIGGER IS, before the controls that author it. `<h4>`, under the
+                 card's own `<h3>`: it is a heading in the document outline, not a caption. -->
+            <div class="manager-checks-trigger-summary">
+              <h4 class="manager-checks-trigger-summary-title" data-trigger-summary={trigger.id}>
+                {conditionSummary(trigger)}
+              </h4>
+              <p class="manager-checks-trigger-summary-lead" data-trigger-effect={trigger.id}>
+                {effectSentence(trigger)}
+              </p>
+            </div>
             <div class="manager-checks-trigger-top">
               <div class="manager-checks-breakage-condition">
                 <label class="manager-field">

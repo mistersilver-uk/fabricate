@@ -48,6 +48,10 @@ export const CHECKS_TREE_RAW_MODULES = Object.freeze([
   // The per-mode explanation the roll section opens with (issue 1096). A pure data table,
   // imported by `CheckModeCallout.svelte`, which `ChecksView` imports statically.
   'src/ui/svelte/apps/manager/checks/checkModeCallout.js',
+  // A trigger's own summary and the common-trigger presets (issue 1096). Both are pure
+  // modules imported by `CheckTriggers.svelte`.
+  'src/ui/svelte/apps/manager/checks/checkTriggerSummary.js',
+  'src/ui/svelte/apps/manager/checks/checkTriggerPresets.js',
   // The attribute-name literals the rule group renders, hoisted out of Svelte markup so
   // `tests/view-lab-cases.test.js` can import rather than restate them (issue 1095).
   'src/ui/svelte/apps/manager/checks/modifierPolicyAttrs.js',

@@ -585,6 +585,8 @@ function compileManagerRoot() {
     // table imported by `CheckModeCallout.svelte`, which `ChecksView` imports statically,
     // so omitting it reports every mounted manager test as `# cancelled`.
     'src/ui/svelte/apps/manager/checks/checkModeCallout.js',
+    'src/ui/svelte/apps/manager/checks/checkTriggerSummary.js',
+    'src/ui/svelte/apps/manager/checks/checkTriggerPresets.js',
     // The Checks rail GROUP model (issue 1096). The root imports it to build the four child
     // routes, their badges and the `checks` redirect, so it is in the tree from the first
     // render. This list has NO dependency validator: omitting it does not fail the suite,

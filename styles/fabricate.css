@@ -2626,6 +2626,57 @@
   cursor: grabbing;
 }
 
+/* ── A TRIGGER'S OWN SUMMARY (issue 1096) ────────────────────────────────────────────
+   The condition as a sentence, over the controls that author it. The card used to be
+   headed by the word `When` — the label of its first select — so a list of three read
+   `When`, `When`, `When`. */
+.fabricate-manager .manager-checks-trigger-summary {
+  min-width: 0;
+  margin-bottom: 10px;
+}
+
+.fabricate-manager .manager-checks-trigger-summary-title {
+  margin: 0;
+  color: var(--fab-text);
+  font-family: var(--fab-font-serif);
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.fabricate-manager .manager-checks-trigger-summary-lead {
+  margin: 3px 0 0;
+  color: var(--fab-text-muted);
+  font-size: 10.5px;
+  font-weight: 400;
+  line-height: 1.5;
+}
+
+/* The preset row. Each preset is the dashed ADD role, because that is what it does — it
+   appends a row to the list below — and the row wraps rather than scrolling, so a narrow
+   pane stacks them instead of hiding the second one. */
+.fabricate-manager .manager-checks-trigger-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  min-width: 0;
+}
+
+/* (0,4,0), which is what it takes to beat `.manager-button.fab-manager-button.is-dashed`'s
+   pinned full width and 34px height. A preset CHIP hugs its own sentence and sits beside its
+   sibling; the dashed control at the foot of a list spans that list because it extends it.
+   Size and fill only: the dashed edge, radius scale, weight and ink stay the primitive's. */
+.fabricate-manager .manager-checks-trigger-presets .manager-button.fab-manager-button.is-dashed {
+  flex: 0 1 auto;
+  width: auto;
+  height: 30px;
+  min-height: 0;
+  padding: 0 12px;
+  border-radius: 8px;
+  background: var(--fab-bg-0);
+}
+
 /* The band strip's hint sentence, glyph-led. The glyph is a decoration on prose rather
    than a control, so it takes the sentence's own ink at its own size. */
 .fabricate-manager [data-outcome-band-strip-hint] > i {

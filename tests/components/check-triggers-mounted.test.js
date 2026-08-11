@@ -24,7 +24,10 @@ const harness = createMountedComponentHarness({
   rawModules: [
     'src/ui/svelte/util/foundryBridge.js',
     'src/ui/svelte/components/stepperLabels.js',
-    'src/utils/craftingCheckExpression.js'
+    'src/utils/craftingCheckExpression.js',
+    'src/ui/svelte/apps/manager/checks/checksCopy.js',
+    'src/ui/svelte/apps/manager/checks/checkTriggerSummary.js',
+    'src/ui/svelte/apps/manager/checks/checkTriggerPresets.js'
   ],
   compiledModules: [
     // The shipped segmented primitive: the outcome toggle and the tier-step mode

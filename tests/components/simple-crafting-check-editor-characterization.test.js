@@ -55,6 +55,10 @@ const harness = createMountedComponentHarness({
     // The deterministic roll-expression reducer. The formula card reads the `avg` of the
     // authored formula from it (issue 1096). Manifest only.
     'src/utils/rollExpressionAverage.js',
+    // A trigger's own summary and the common-trigger presets (issue 1096), both pure and
+    // both imported by `CheckTriggers.svelte`. Manifest only.
+    'src/ui/svelte/apps/manager/checks/checkTriggerSummary.js',
+    'src/ui/svelte/apps/manager/checks/checkTriggerPresets.js',
   ],
   compiledModules: [
     'src/ui/svelte/apps/manager/ItemDropZone.svelte',

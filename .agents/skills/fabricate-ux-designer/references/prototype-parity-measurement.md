@@ -25,7 +25,7 @@ Two things about it are worth carrying into a review rather than rediscovering:
 
 <!-- markdownlint-disable markdownlint-sentences-per-line -->
 
-- **Its subject must be the real app.** `compare.mjs`'s subject is a hand-authored markup fixture, which is a mirror of what its author believed the app renders. A structural pass run against a mirror can only report what its author already knew was missing, so point it at whatever renders the shipped components — here, the View Lab.
+- **Its subject must be the real app.** A structural pass run against a mirror can only report what its author already knew was missing — and `compare.mjs`'s subject is a hand-authored markup fixture, which is precisely a mirror of what its author believed the app renders. Point the structural pass at whatever renders the shipped components instead; here, the View Lab. This is the decision the whole pass stands or falls on.
 - **It reports EXTRAS without failing on them.** The assertion is one-directional on purpose: a product legitimately says more than a mockup, and a gate that failed on the difference would be switched off within a day.
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
