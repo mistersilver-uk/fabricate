@@ -22,6 +22,7 @@
   import { localize } from '../util/foundryBridge.js';
   import { dragSource } from '../actions/dragSource.js';
   import { buildInteractableDragPayload } from '../../../canvas/interactableDragPayload.js';
+  import { resolveToolDisplayImage, resolveToolDisplayName } from '../../../models/toolDisplay.js';
   import { DEFAULT_GATHERING_TASK_IMG } from '../../gatheringTaskDefaults.js';
   import {
     buildSystemLabelMap,
@@ -82,23 +83,18 @@
       .includes(needle);
   }
 
-  const DEFAULT_TOOL_IMAGE = 'icons/svg/item-bag.svg';
-
-  // Mirror ToolsBrowserView.toolPrimaryLabel / toolImage: a Tool has no required
-  // name, so resolve its DISPLAY NAME from `tool.label` else the managed
-  // component's name, and its IMAGE from the component's img (default icon only
-  // when there is no image). The managed component is looked up through the
+  // The single `data-models` requirement-13 precedence: authored label, then the
+  // registration snapshot, then the managed component, then the localized fallback.
+  // The snapshot rung is load-bearing — omitting it rendered "Unnamed tool" + the
+  // item-bag sentinel for every item-sourced Tool, which carries `componentId: null`
+  // by construction (issue 1119). The managed component is looked up through the
   // services bag (same `system.components` source ToolsBrowserView reads).
   function toolDisplayName(tool, component) {
-    const label = String(tool?.label || '').trim();
-    if (label) return label;
-    const componentName = component?.name;
-    if (componentName) return String(componentName);
-    return text('FABRICATE.Canvas.Browser.UnnamedTool', 'Unnamed tool');
-  }
-
-  function toolImage(component) {
-    return component?.img || DEFAULT_TOOL_IMAGE;
+    return resolveToolDisplayName(
+      tool,
+      component,
+      text('FABRICATE.Canvas.Browser.UnnamedTool', 'Unnamed tool')
+    );
   }
 
   const tools = $derived(
@@ -110,7 +106,7 @@
         return {
           id: String(tool?.id ?? ''),
           label: toolDisplayName(tool, component),
-          img: toolImage(component),
+          img: resolveToolDisplayImage(tool, component),
         };
       })
       .filter((tool) => tool.id && matchesSearch(tool.label))

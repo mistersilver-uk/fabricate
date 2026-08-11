@@ -116,11 +116,17 @@
   // may know the same stack by a different name/icon in each system.
   const displayName = $derived(String((active ? active.name : item?.name) ?? ''));
   const displayImg = $derived((active ? active.img : item?.img) ?? '');
+  // A card that backs NO component in any system is a tool-only card (issue 1119): it reads
+  // as a Tool, and the affordances a tool never has in that role are omitted rather than
+  // rendered empty.
+  const isToolOnly = $derived(item?.isToolOnly === true);
   const typeLabel = $derived(
     localize(
       isEssence
         ? 'FABRICATE.App.Inventory.Detail.TypeEssence'
-        : 'FABRICATE.App.Inventory.Detail.TypeComponent'
+        : isToolOnly
+          ? 'FABRICATE.App.Inventory.Detail.TypeTool'
+          : 'FABRICATE.App.Inventory.Detail.TypeComponent'
     )
   );
   // The header's chip row, as data for the shared shell: the kind reads quiet, tier and
@@ -430,40 +436,45 @@
         </section>
       {/if}
 
-      <section class="inventory-detail-section">
-        <p class="inventory-detail-section-title">
-          {localize('FABRICATE.App.Inventory.Detail.UsedByTitle')}
-        </p>
-        {#if usedBy.length > 0}
-          <ul class="inventory-detail-list">
-            {#each sliceOf(usedBy, 'used') as use (use.recipeId + ':' + use.role)}
-              <li>
-                <button
-                  type="button"
-                  class="inventory-detail-recipe"
-                  data-inventory-used-by={use.recipeId}
-                  onclick={() => openRecipe(use.recipeId)}
-                >
-                  <CraftingThumb src={use.recipeImg ?? ''} alt="" size={40} />
-                  <span class="inventory-detail-row-name">{use.recipeName}</span>
-                  <span class="inventory-chip inventory-chip-role">{roleLabel(use.role)}</span>
-                </button>
-              </li>
-            {/each}
-          </ul>
-          <InventoryDetailPager
-            list={usedBy}
-            sectionKey="used"
-            page={pageOf(usedBy, 'used')}
-            pageSize={PAGE_SIZE}
-            onPage={(value) => setPage('used', value)}
-          />
-        {:else}
-          <p class="inventory-detail-empty-note">
-            {localize('FABRICATE.App.Inventory.Detail.UsedByEmpty')}
+      <!-- Omitted for a tool-only card: a tool is never consumed in that role, and
+           "Not used by any known recipe" under a hammer six recipes require reads as a
+           defect rather than as an empty state (issue 1119). -->
+      {#if !isToolOnly}
+        <section class="inventory-detail-section">
+          <p class="inventory-detail-section-title">
+            {localize('FABRICATE.App.Inventory.Detail.UsedByTitle')}
           </p>
-        {/if}
-      </section>
+          {#if usedBy.length > 0}
+            <ul class="inventory-detail-list">
+              {#each sliceOf(usedBy, 'used') as use (use.recipeId + ':' + use.role)}
+                <li>
+                  <button
+                    type="button"
+                    class="inventory-detail-recipe"
+                    data-inventory-used-by={use.recipeId}
+                    onclick={() => openRecipe(use.recipeId)}
+                  >
+                    <CraftingThumb src={use.recipeImg ?? ''} alt="" size={40} />
+                    <span class="inventory-detail-row-name">{use.recipeName}</span>
+                    <span class="inventory-chip inventory-chip-role">{roleLabel(use.role)}</span>
+                  </button>
+                </li>
+              {/each}
+            </ul>
+            <InventoryDetailPager
+              list={usedBy}
+              sectionKey="used"
+              page={pageOf(usedBy, 'used')}
+              pageSize={PAGE_SIZE}
+              onPage={(value) => setPage('used', value)}
+            />
+          {:else}
+            <p class="inventory-detail-empty-note">
+              {localize('FABRICATE.App.Inventory.Detail.UsedByEmpty')}
+            </p>
+          {/if}
+        </section>
+      {/if}
 
       {#if isTool}
         <section class="inventory-detail-section" data-inventory-section="required">
@@ -510,7 +521,8 @@
         </section>
       {/if}
 
-      {#if !isEssence}
+      <!-- Also omitted for a tool-only card: nothing produces a tool IN ITS TOOL ROLE. -->
+      {#if !isEssence && !isToolOnly}
         <section class="inventory-detail-section">
           <p class="inventory-detail-section-title">
             {localize('FABRICATE.App.Inventory.Detail.ProducedByTitle')}

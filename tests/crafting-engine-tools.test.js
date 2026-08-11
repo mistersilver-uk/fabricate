@@ -210,7 +210,7 @@ test('_applyToolBreakage: limitedUses increments toolUsage and records usedTools
   const used = await engine._applyToolBreakage(recipe(), [{ tool, item: axe }]);
   assert.deepEqual(getPath(axe._flags.fabricate, 'fabricate.toolUsage'), { timesUsed: 2 });
   assert.equal(used.length, 1);
-  assert.deepEqual(used[0], { actorUuid: 'Actor.a', itemUuid: 'Item.c-axe', quantity: 1, componentId: 'c-axe', broken: false });
+  assert.deepEqual(used[0], { actorUuid: 'Actor.a', itemUuid: 'Item.c-axe', quantity: 1, componentId: 'c-axe', toolId: null, broken: false });
 });
 
 test('_applyToolBreakage: breakageChance 100 destroys via onBreak destroy', async () => {
@@ -478,7 +478,7 @@ test('craft(): records usedTools on the success run record and increments toolUs
   assert.ok(successPayload, 'a success run payload was recorded');
   assert.equal(successPayload.usedTools.length, 1);
   assert.deepEqual(successPayload.usedTools[0], {
-    actorUuid: 'Actor.a1', itemUuid: 'Item.c-axe', quantity: 1, componentId: 'c-axe', broken: false
+    actorUuid: 'Actor.a1', itemUuid: 'Item.c-axe', quantity: 1, componentId: 'c-axe', toolId: null, broken: false
   });
   assert.deepEqual(getPath(toolItem._flags.fabricate, 'fabricate.toolUsage'), { timesUsed: 1 });
 });

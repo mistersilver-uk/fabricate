@@ -1,28 +1,31 @@
 import { getMatchHandler } from '../../../../../models/match/matchTypes.js';
+import {
+  TOOL_IMAGE_SENTINEL,
+  linkedComponentFor,
+  resolveToolDescription,
+  resolveToolDisplayImage,
+  resolveToolDisplayName,
+} from '../../../../../models/toolDisplay.js';
 import { Tool } from '../../../../../models/Tool.js';
 
-const DEFAULT_TOOL_IMAGE = 'icons/svg/item-bag.svg';
+// The precedence itself lives in `src/models/toolDisplay.js` so the engines, chat cards and Run
+// Journal projection can reach it too — importing this module from `src/systems/` would invert
+// the layering, which is why those surfaces each re-derived the rule and drifted (issues 976,
+// 1119). These wrappers keep the manager UI's existing `(tool, managedItems)` call shape.
+const DEFAULT_TOOL_IMAGE = TOOL_IMAGE_SENTINEL;
 
-function managedItemFor(tool, managedItems = []) {
-  if (!tool?.componentId) return null;
-  return managedItems.find((item) => String(item.id) === String(tool.componentId)) || null;
-}
+const managedItemFor = linkedComponentFor;
 
 export function toolDisplayName(tool, managedItems = [], fallback = 'Untitled tool') {
-  return (
-    String(tool?.label || '').trim() ||
-    tool?.name ||
-    managedItemFor(tool, managedItems)?.name ||
-    fallback
-  );
+  return resolveToolDisplayName(tool, managedItemFor(tool, managedItems), fallback);
 }
 
 export function toolDisplayImage(tool, managedItems = []) {
-  return tool?.img || managedItemFor(tool, managedItems)?.img || DEFAULT_TOOL_IMAGE;
+  return resolveToolDisplayImage(tool, managedItemFor(tool, managedItems));
 }
 
 export function toolDescription(tool, managedItems = []) {
-  return String(tool?.description || managedItemFor(tool, managedItems)?.description || '').trim();
+  return resolveToolDescription(tool, managedItemFor(tool, managedItems));
 }
 
 export function toolBreakageSummary(tool, authority = 'toolSpecific') {

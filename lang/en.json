@@ -410,6 +410,7 @@
         "NoActor": "Select a character to see their crafting inventory.",
         "Empty": "This character isn't carrying any crafting components yet.",
         "NoMatches": "No items match the current filters.",
+        "UntitledTool": "Unnamed tool",
         "Filters": {
           "SearchPlaceholder": "Search items, essences, tags…",
           "SearchLabel": "Search inventory",
@@ -567,6 +568,7 @@
           "Tier": "Tier {tier}",
           "TypeComponent": "Component",
           "TypeEssence": "Essence",
+          "TypeTool": "Tool",
           "TypeRecipeItem": "Recipe item",
           "LimitsTitle": "Limits",
           "LearningLimitLabel": "Recipes learned",

@@ -255,7 +255,7 @@ test('(c) craft() of the step-tier step uses/records the tool (toolUsage++ and u
   assert.ok(lastSuccess, 'success payload recorded');
   assert.equal(lastSuccess.usedTools.length, 1);
   assert.deepEqual(lastSuccess.usedTools[0], {
-    actorUuid: 'Actor.a1', itemUuid: 'Item.h1', quantity: 1, componentId: 'c-hammer', broken: false
+    actorUuid: 'Actor.a1', itemUuid: 'Item.h1', quantity: 1, componentId: 'c-hammer', toolId: 'tool-hammer', broken: false
   });
   assert.deepEqual(getPath(hammer._flags.fabricate, 'fabricate.toolUsage'), { timesUsed: 1 });
 });

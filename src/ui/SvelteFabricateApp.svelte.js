@@ -182,10 +182,19 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
     // the same componentId string. The engine excludes a virtual match from
     // breakage/usage. This is the single app→engine threading boundary for the
     // gathering surface. With no active tool the payload is null (inert).
+    // Issue 1119: the payload carries the station's library TOOL id alongside any
+    // componentId. An item-sourced Tool has no componentId, so a componentId-only payload
+    // was inert for every station the Tool Studio can author.
     const presentTools = () => {
       const componentId = this._activeCanvasTool?.componentId;
+      const toolId = this._activeCanvasTool?.toolId;
       const systemId = this._activeCanvasTool?.systemId;
-      return componentId && systemId ? { systemId, componentIds: [componentId] } : null;
+      if (!systemId || (!componentId && !toolId)) return null;
+      return {
+        systemId,
+        componentIds: componentId ? [componentId] : [],
+        toolIds: toolId ? [toolId] : [],
+      };
     };
     const services = {
       getCraftingSystemManager: () => game?.fabricate?.getCraftingSystemManager?.() ?? null,

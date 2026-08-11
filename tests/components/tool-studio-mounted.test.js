@@ -35,6 +35,9 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/dropUtils.js',
     'src/ui/svelte/actions/dragDrop.js',
     'src/ui/svelte/apps/manager/tools/toolStudio.js',
+    // `toolStudio.js` delegates the Tool display precedence to this layering-neutral leaf
+    // so the engines and chat cards can reuse it too (issue 1119).
+    'src/models/toolDisplay.js',
     ...SEARCHABLE_POPOVER_RAW_MODULES,
   ],
   compiledModules: [
