@@ -416,7 +416,11 @@ test('playerPicks: the chosen modifier is APPENDED BEFORE the advantage transfor
   });
   // The append (med → 3) precedes the plain-d20 advantage rewrite, so the modifier
   // composes on top of the kept-highest pool: `2d20kh1 + 3[Modifiers]`, eval == display.
-  assert.equal(rolledFormulas.at(-1), '2d20kh1 + 3[Modifiers]', 'advantage composes on the chosen modifier');
+  assert.equal(
+    rolledFormulas.at(-1),
+    '2d20kh1 + 3[Modifiers]',
+    'advantage composes on the chosen modifier'
+  );
   assert.equal(rolled.resolvedFormula, '2d20kh1 + 3[Modifiers]', 'display equals what evaluated');
   delete globalThis.Roll;
 });
@@ -842,12 +846,16 @@ function withChatMessage(run) {
 test('playerPicks: the chosen modifier label is appended to the chat flavor', async () => {
   const posted = stubCraftingModChatRoll();
   await withChatMessage(() =>
-    evaluateCheckRoll('1d20', { getRollData: () => ({}) }, {
-      interactive: true,
-      modifierChoice: PICK_CHOICE,
-      flavor: 'Healing Salve — Crafting check (DC 10)',
-      prompt: async () => ({ confirmed: true, chosenModifierId: 'med', advantage: 'normal' }),
-    })
+    evaluateCheckRoll(
+      '1d20',
+      { getRollData: () => ({}) },
+      {
+        interactive: true,
+        modifierChoice: PICK_CHOICE,
+        flavor: 'Healing Salve — Crafting check (DC 10)',
+        prompt: async () => ({ confirmed: true, chosenModifierId: 'med', advantage: 'normal' }),
+      }
+    )
   );
   assert.equal(
     posted.at(-1).data.flavor,
@@ -860,12 +868,16 @@ test('playerPicks: the chosen modifier label is appended to the chat flavor', as
 test('playerPicks: an empty base flavor gets the label alone, never an orphan bullet', async () => {
   const posted = stubCraftingModChatRoll();
   await withChatMessage(() =>
-    evaluateCheckRoll('1d20', { getRollData: () => ({}) }, {
-      interactive: true,
-      modifierChoice: PICK_CHOICE,
-      // No `flavor`: a direct caller / test path production never takes.
-      prompt: async () => ({ confirmed: true, chosenModifierId: 'herb', advantage: 'normal' }),
-    })
+    evaluateCheckRoll(
+      '1d20',
+      { getRollData: () => ({}) },
+      {
+        interactive: true,
+        modifierChoice: PICK_CHOICE,
+        // No `flavor`: a direct caller / test path production never takes.
+        prompt: async () => ({ confirmed: true, chosenModifierId: 'herb', advantage: 'normal' }),
+      }
+    )
   );
   assert.equal(posted.at(-1).data.flavor, 'Herbalism', 'no leading "· " on an empty base');
   delete globalThis.Roll;
@@ -921,18 +933,22 @@ test('playerPicks: an EMPTY multi-pick selection leaves the flavor untouched', a
 test('playerPicks: an unlabelled chosen modifier leaves the flavor untouched', async () => {
   const posted = stubCraftingModChatRoll();
   await withChatMessage(() =>
-    evaluateCheckRoll('1d20', { getRollData: () => ({}) }, {
-      interactive: true,
-      modifierChoice: {
-        modifiers: [
-          { id: 'bare', label: '', icon: '', value: 3 },
-          { id: 'herb', label: 'Herbalism', icon: 'fa-herb', value: 5 },
-        ],
-        defaultSelectedId: 'herb',
-      },
-      flavor: 'Crafting check',
-      prompt: async () => ({ confirmed: true, chosenModifierId: 'bare', advantage: 'normal' }),
-    })
+    evaluateCheckRoll(
+      '1d20',
+      { getRollData: () => ({}) },
+      {
+        interactive: true,
+        modifierChoice: {
+          modifiers: [
+            { id: 'bare', label: '', icon: '', value: 3 },
+            { id: 'herb', label: 'Herbalism', icon: 'fa-herb', value: 5 },
+          ],
+          defaultSelectedId: 'herb',
+        },
+        flavor: 'Crafting check',
+        prompt: async () => ({ confirmed: true, chosenModifierId: 'bare', advantage: 'normal' }),
+      }
+    )
   );
   assert.equal(posted.at(-1).data.flavor, 'Crafting check', 'no trailing "· " for a blank label');
   delete globalThis.Roll;
@@ -1702,6 +1718,25 @@ const CLASSIFIER_CASES = [
     1,
   ],
   [
+    // The forced-outcome BYPASS of the recipe minimum, which no other case reaches: a forced
+    // success reroutes to Fine, whose `start` clears the minimum, while an UNFORCED total in
+    // Rough would be blocked by it. Without this case the `!forced &&` guard on the gate can
+    // be deleted and every other parity assertion stays green.
+    'a forced FAILURE bypasses the recipe minimum gate',
+    {
+      type: 'fixed',
+      fixedOutcomes: FIXED_TIERS,
+      minOutcomeId: 'fine',
+      triggers: [totalTrigger({ value: 12, outcome: 'failure' })],
+    },
+    STEP_TOTAL,
+  ],
+  [
+    'an UNFORCED total below the recipe minimum is blocked',
+    { type: 'fixed', fixedOutcomes: FIXED_TIERS, minOutcomeId: 'fine' },
+    STEP_TOTAL,
+  ],
+  [
     'a tier step moves the rolled tier',
     { type: 'fixed', fixedOutcomes: FIXED_TIERS, triggers: [STEP_UP_ONE] },
     STEP_TOTAL,
@@ -1718,9 +1753,7 @@ for (const [name, config, total] of CLASSIFIER_CASES) {
     const thresholdMode = name.includes('exceed') ? 'exceed' : 'meet';
     const comparison = thresholdMode === 'exceed' ? 'exceed' : 'meet';
     const diceGroups = [{ groupId: 0, group: '1d20', sum: total, results: [total] }];
-    stubRoll(total, [
-      { number: 1, faces: 20, total, results: [{ result: total, active: true }] },
-    ]);
+    stubRoll(total, [{ number: 1, faces: 20, total, results: [{ result: total, active: true }] }]);
 
     const runner = await runFormulaRouted({
       formula: '1d20',
@@ -1808,4 +1841,32 @@ test('classifyCheckTotal: a per-die trigger is INVISIBLE without `results` on th
   });
   assert.equal(withResults.forcedDisposition, 'success', 'the production bag carries the faces');
   assert.equal(withoutResults.forcedDisposition, null, 'a hand-shaped bag silently drops them');
+});
+
+test('classifyCheckTotal: a forced outcome BYPASSES the recipe minimum-success-tier gate', () => {
+  const args = {
+    type: 'fixed',
+    total: STEP_TOTAL,
+    dc: 0,
+    comparison: 'meet',
+    relativeOutcomes: [],
+    fixedOutcomes: FIXED_TIERS,
+    minOutcomeId: 'fine',
+    diceGroups: [{ groupId: 0, group: '1d20', sum: STEP_TOTAL, results: [STEP_TOTAL] }],
+  };
+  const unforced = classifyCheckTotal({ ...args, triggers: [] });
+  // A forced FAILURE, deliberately: it reroutes to the WORST failing tier, which ranks
+  // below the recipe minimum. A forced SUCCESS reroutes to the best succeeding tier, which
+  // clears the minimum on its own — so a test built on one would pass whether or not the
+  // bypass existed, which is exactly the vacuous proof this case replaces.
+  const forced = classifyCheckTotal({
+    ...args,
+    triggers: [totalTrigger({ value: STEP_TOTAL, outcome: 'failure' })],
+  });
+  assert.equal(unforced.minTierFailed, true, 'Rough ranks below the required Fine');
+  assert.equal(unforced.matched, null, 'so nothing routes');
+  assert.equal(unforced.blockedOutcomeId, 'rough', 'and the blocked tier is named');
+  assert.equal(forced.minTierFailed, false, 'a natural crit is never judged by a recipe minimum');
+  assert.equal(forced.matched?.id, 'slag', 'the forced tier routes, minimum or not');
+  assert.equal(forced.blockedOutcomeId, null, 'and no tier is reported as blocked');
 });

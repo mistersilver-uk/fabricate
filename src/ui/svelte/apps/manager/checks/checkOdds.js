@@ -169,9 +169,11 @@ function refuseDieShape(die) {
  * @returns {?{enumerable: false, reason: string}} A refusal, or null when it passes.
  */
 function refuseRemainder(terms) {
-  // Determinism FIRST. A `ParentheticalTerm` reports `isDeterministic: false` and also
-  // carries a string `term`, so testing for a string term first would answer
-  // `1d20 + (2d6)` with the wrong reason. See {@link isStringTermLike}.
+  // Determinism first, which decides PRECEDENCE for a remainder carrying both a string term
+  // and a rolled one. It is NOT what keeps `1d20 + (2d6)` off the string-term branch —
+  // {@link isStringTermLike} does that, by excluding a parenthetical outright — because a
+  // DETERMINISTIC parenthetical (`1d20 + (2)`) passes this test and would then be refused
+  // as a string term by any looser predicate.
   if (terms.some((term) => term?.isDeterministic !== true)) {
     return refuse(ODDS_REASONS.nonDeterministicRemainder);
   }

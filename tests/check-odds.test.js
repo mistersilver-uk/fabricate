@@ -101,6 +101,24 @@ describe('checkOdds: the positive whitelist, graded against recorded Foundry 14.
     // enumerates too, so "it accepted" cannot be a coincidence of the shorter string.
     assert.equal(describe14365('1d20 + 5').enumerable, true);
   });
+
+  it('accepts a DETERMINISTIC parenthetical, which is what makes the string-term test precise', () => {
+    // `ParentheticalTerm` carries a string `term` exactly as `StringTerm` does (recorded
+    // from 14.365), so a predicate that told them apart by that field alone would refuse
+    // `1d20 + (2)` — a formula real Foundry evaluates to a fixed number — as a stray word.
+    assert.deepEqual(describe14365('1d20 + (2)'), {
+      enumerable: true,
+      faces: 20,
+      remainder: 2,
+      display: '1d20 + (2)',
+    });
+    // …and its non-deterministic sibling is still refused, with the reason that names the
+    // dice inside it rather than the string field it happens to share.
+    assert.deepEqual(describe14365('1d20 + (2d6)'), {
+      enumerable: false,
+      reason: ODDS_REASONS.nonDeterministicRemainder,
+    });
+  });
 });
 
 describe('checkOdds: every refusal carries its OWN reason code', () => {
@@ -461,5 +479,25 @@ describe('checkOdds: the avg annotation', () => {
   it('is OMITTED when the formula does not reduce to a number for this actor', () => {
     assert.equal(avg('1d20 + @nope'), null);
     assert.equal(avg('1d20 + @prof', null), null, 'and with no actor at all');
+  });
+
+  it('is OMITTED on `resolved === false` even where the ARITHMETIC would still reduce', () => {
+    // The `missing: 'NaN'` path poisons the arithmetic on its own, so an unresolved `@` key
+    // would be omitted whether or not the `resolved` flag were consulted. `Roll.validate`
+    // is the OTHER half of that flag, and it is the half that makes reading the flag
+    // load-bearing: the display reduces to a perfectly good number and the formula is still
+    // one Foundry refuses to roll, so an annotation on it would be a number for a check
+    // that cannot happen.
+    const refusing = recordedRollDouble({ validate: () => false });
+    assert.equal(
+      expectedFormulaValue('1d20 + 5', ACTOR, { Roll: refusing }),
+      null,
+      'a formula Foundry will not accept gets no expected value'
+    );
+    assert.equal(
+      expectedFormulaValue('1d20 + 5', ACTOR, { Roll: REAL }),
+      15,
+      'and the same formula DOES get one once Foundry accepts it'
+    );
   });
 });
