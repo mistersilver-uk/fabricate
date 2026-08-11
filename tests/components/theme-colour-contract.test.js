@@ -29,7 +29,11 @@ const themePaletteAnchors = Object.freeze({
   'hearth-herb': ['#161C19', '#1F2924', '#2B3831', '#53695E', '#F1E9D8', '#C8A36E', '#9BB79E', '#AFC7A4', '#B98378'],
   'starglass-arcana': ['#121824', '#1A2232', '#243147', '#40506B', '#F2ECFF', '#9FC5E8', '#C7A6E6', '#9DC9BD', '#C78A96'],
   sovereign: ['#0A0E1A', '#101627', '#182036', '#2A3550', '#F2EAD6', '#CFC198', '#E4C066', '#81BE96', '#C96E66'],
-  'foundry-native': ['#0C0A14', '#111018', '#30282F', '#2E2833', '#F3F3F5', '#BC8963', '#706B70', '#617054', '#A16C60']
+  // `foundry-native` carries a TENTH anchor. `#BC8963` was this palette's accent AND its
+  // warning, byte-identical, so one anchor pinned two roles and the accent could be re-pointed
+  // without moving an anchor at all (issue 1096 re-pointed it to `#D9B06D`). Both are listed:
+  // the tan still has to be here as `--fab-warning`, and the gold now pins the accent.
+  'foundry-native': ['#0C0A14', '#111018', '#30282F', '#2E2833', '#F3F3F5', '#BC8963', '#D9B06D', '#706B70', '#617054', '#A16C60']
 });
 
 function collectProductFiles(rootPath) {

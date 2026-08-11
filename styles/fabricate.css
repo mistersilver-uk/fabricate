@@ -203,6 +203,20 @@
   --fab-accent: #E8C6A7;
   --fab-accent-hover: #F1D1B5;
   --fab-accent-strong: #D9B89C;
+
+  /* `--fab-accent-text` (issue 1096) completes the accent family: every SEMANTIC family already
+     ships an ink readable on its own soft fill, and accent shipped only `--fab-on-accent`, the
+     ink for the solid button. The outcome band ramp needs the soft-fill ink, and without it the
+     accent band had to be inked with the accent itself — 4.48:1 in `ironblood-forge`, under AA.
+
+     DERIVED PER THEME, not eyeballed, so each palette's ink is authored the way that palette
+     authors its other four: in oklch, the accent's OWN hue, at the mean lightness of that
+     theme's four existing `*-text` tokens, with the accent's chroma scaled by the mean
+     ink/tone chroma ratio of those same four. The check that this reproduces the convention
+     rather than hitting a threshold: on `-soft` over `--fab-bg-1` each derived accent ink lands
+     INSIDE the range its own theme's four existing inks occupy (here 8.44:1, between danger's
+     7.75 and info's 9.78). `foundry-native` states its own rule instead; see that block. */
+  --fab-accent-text: #F1DBC7;
   --fab-accent-soft: rgb(232 198 167 / 16%);
   --fab-accent-border: rgb(232 198 167 / 48%);
   --fab-on-accent: #111A23;
@@ -324,6 +338,7 @@
   --fab-accent: #63D47B;
   --fab-accent-hover: #72DF89;
   --fab-accent-strong: #3EB95F;
+  --fab-accent-text: #CCEDD0;
   --fab-accent-soft: rgb(99 212 123 / 16%);
   --fab-accent-border: rgb(99 212 123 / 54%);
   --fab-on-accent: #051E0C;
@@ -445,6 +460,7 @@
   --fab-accent: #C58B5A;
   --fab-accent-hover: #D1A37C;
   --fab-accent-strong: #A5754D;
+  --fab-accent-text: #EBC5A7;
   --fab-accent-soft: rgb(197 139 90 / 16%);
   --fab-accent-border: rgb(197 139 90 / 48%);
   --fab-on-accent: #141214;
@@ -566,6 +582,7 @@
   --fab-accent: #C8A36E;
   --fab-accent-hover: #D3B78C;
   --fab-accent-strong: #A88B5F;
+  --fab-accent-text: #EAD5B9;
   --fab-accent-soft: rgb(200 163 110 / 16%);
   --fab-accent-border: rgb(200 163 110 / 48%);
   --fab-on-accent: #161C19;
@@ -687,6 +704,7 @@
   --fab-accent: #9FC5E8;
   --fab-accent-hover: #B6D0EE;
   --fab-accent-strong: #86A6C5;
+  --fab-accent-text: #D1E1F0;
   --fab-accent-soft: rgb(159 197 232 / 16%);
   --fab-accent-border: rgb(159 197 232 / 48%);
   --fab-on-accent: #121824;
@@ -805,11 +823,32 @@
   --fab-text-muted: rgb(182 180 178 / 78%);
   --fab-text-subtle: rgb(182 180 178 / 60%);
   --fab-text-disabled: rgb(148 143 144 / 50%);
-  --fab-accent: #BC8963;
-  --fab-accent-hover: #C1966E;
-  --fab-accent-strong: #A16C60;
-  --fab-accent-soft: rgb(188 137 99 / 14%);
-  --fab-accent-border: rgb(188 137 99 / 42%);
+
+  /* The accent family is a GOLD lane of its own, not the tan one warning and danger already
+     occupy (issue 1096). It used to be `#BC8963` — byte-identical to `--fab-warning` — with
+     `--fab-accent-strong: #A16C60` byte-identical to `--fab-danger`, so the accent role had no
+     colour of its own anywhere in this palette. That was invisible until the outcome band ramp
+     started painting accent and warning side by side and drew them as one band.
+
+     Derived, not picked: the HUE and CHROMA are this theme's own authored gold,
+     `--fab-badge-gold: #C9A15E` (oklch h 79.2, C 0.0975), which is already a step off the tan
+     `--fab-warning` lane (h 57.5); the LIGHTNESS is 0.780, the mean `--fab-accent` lightness
+     across the other six palettes, where foundry-native's 0.671 was the outlier low. Hover and
+     strong take this palette family's mean offsets from accent (+0.048 / -0.078 L on the same
+     hue), so the family moves as one rather than jumping hue under the pointer.
+     `--fab-border*` keeps the tan: that is the theme's chrome tint, not its accent.
+
+     `--fab-accent-text` is `#F3F3F5` because this palette states ONE ink for every semantic —
+     its four existing `*-text` tokens are all that value verbatim. Deriving it the way the
+     other six themes' accent inks are derived lands on `#F8F2EE`, a distance of 0.0103 in
+     OKLab from the theme's own ink, so the convention is kept rather than broken for a
+     rounding difference. */
+  --fab-accent: #D9B06D;
+  --fab-accent-hover: #E9C07C;
+  --fab-accent-strong: #C09855;
+  --fab-accent-text: #F3F3F5;
+  --fab-accent-soft: rgb(217 176 109 / 14%);
+  --fab-accent-border: rgb(217 176 109 / 42%);
   --fab-on-accent: #191813;
   --fab-on-danger: #050403;
   --fab-on-info: #F3F3F5;
@@ -929,6 +968,7 @@
   --fab-accent: #E4C066;
   --fab-accent-hover: #EED592;
   --fab-accent-strong: #C9A94E;
+  --fab-accent-text: #ECDBB5;
   --fab-accent-soft: rgb(228 192 102 / 16%);
   --fab-accent-border: rgb(228 192 102 / 46%);
   --fab-on-accent: #161007;
@@ -2071,37 +2111,46 @@
    not a hard limit. If a rendered frame overflows, narrow the fixed Start/End pair first —
    they are the least-used columns. */
 
-/* The leading 10px track is the BAND SWATCH: the tier row's own colour on the strip above
+/* The leading 12px track is the BAND SWATCH: the tier row's own colour on the strip above
    it, so the ramp on the track has a key. It is the narrowest column by a wide margin
-   because it carries no text and no target — it is a legend, not a control. */
+   because it carries no text and no target — it is a legend, not a control.
+
+   12px, not the 10px it shipped at, because the swatch is a 12x12 DOT: the track is the dot's
+   own diameter, so the four literals below move with the rule that draws it. */
 .fabricate-manager .manager-checks-outcome-table.is-relative {
-  grid-template-columns: 10px minmax(140px, 1fr) 102px 104px 124px 40px;
+  grid-template-columns: 12px minmax(140px, 1fr) 102px 104px 124px 40px;
 }
 
 .fabricate-manager .manager-checks-outcome-table.is-fixed {
-  grid-template-columns: 10px minmax(130px, 1fr) 102px 102px 104px 124px 40px;
+  grid-template-columns: 12px minmax(130px, 1fr) 102px 102px 104px 124px 40px;
 }
 
 /* checkDriven authority drops the per-outcome break-tools column (tool breakage is
    authored via the CheckBreakage editor instead). */
 .fabricate-manager .manager-checks-outcome-table.is-relative.is-no-break {
-  grid-template-columns: 10px minmax(140px, 1fr) 102px 104px 40px;
+  grid-template-columns: 12px minmax(140px, 1fr) 102px 104px 40px;
 }
 
 .fabricate-manager .manager-checks-outcome-table.is-fixed.is-no-break {
-  grid-template-columns: 10px minmax(130px, 1fr) 102px 102px 104px 40px;
+  grid-template-columns: 12px minmax(130px, 1fr) 102px 102px 104px 40px;
 }
 
-/* Painted from an inline custom property rather than an inline `background`, matching the
-   band it keys: the declared fallback means an absent colour paints the neutral surface
-   instead of nothing, and it is the only shape a `color-mix()` survives happy-dom's
-   `cssText` parser in — so the pairing is testable. */
+/* A 12x12 ROUND DOT in the band's own SATURATED hue — not the mixed fill the band paints
+   (issue 1096). The band is a 26% mix into `--fab-bg-0` because it has to carry a tier NAME at
+   AA; the dot carries no text, so it can show the hue at full strength, and the two read as the
+   same key precisely because the dot is the undiluted version of the band's tone. It also needs
+   no border: a saturated dot separates from the row surface on its own, where the pale 10x24
+   mixed bar it replaced did not and had to be outlined to be seen at all.
+
+   Painted from an inline custom property rather than an inline `background`: the declared
+   fallback means an absent colour paints the neutral surface instead of nothing, and it is the
+   only shape a `color-mix()` survives happy-dom's `cssText` parser in — so the pairing stays
+   testable even though this rule now takes a plain token. */
 .fabricate-manager .manager-checks-outcome-swatch {
   display: block;
-  width: 10px;
-  height: 24px;
-  border: 1px solid var(--fab-border);
-  border-radius: 3px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
   background: var(--fab-outcome-swatch, var(--fab-surface-active));
 }
 

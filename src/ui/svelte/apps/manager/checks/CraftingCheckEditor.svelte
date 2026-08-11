@@ -190,52 +190,60 @@
   // does not own. The strip's `color` prop takes the value verbatim, so an authored swatch can
   // replace this later with no strip change.
   //
-  // TWO SEMANTIC FAMILIES, N BANDS — and a TONAL RAMP inside each, because reading the flag
-  // alone painted Standard and Masterwork the same colour on a five-tier check. Per-band
-  // identity is what the strip exists for (its own doc says so, and the primitive refuses the
-  // full-track gradient exemption on exactly that ground), and a control where two of five
-  // bands are indistinguishable has not got it. The ramp runs in VALUE order within the
-  // family, weakest to strongest, so the strip reads left-to-right as escalating rather than
-  // as an arbitrary palette — and it stays inside the family, so a success band is never
-  // mistakable for a failure one.
+  // FIVE HUES, WALKED BY POSITION IN VALUE ORDER. The band a tier gets is decided by where it
+  // sits in the ordered list — first tier takes the first tone, last tier the last — and NOT by
+  // its `success` flag. Two reasons, and the second is the one that was wrong before.
+  //
+  // A flag has two values, so a flag-derived colour paints two of a five-tier check's bands
+  // identically; per-band identity is the whole reason this control refuses the full-track
+  // gradient exemption, so that is a defect and not a preference. Ranking WITHIN each family
+  // fixed the duplication but not the reading: on a three-tier check the one failure tier is a
+  // family of ONE and took the family's strongest tone, so the strip ran mid, dark, light — the
+  // darkest band in the MIDDLE, and the failure lighter than the first success. Walking one
+  // ramp across the whole list is what makes the strip read left-to-right as escalating.
+  //
+  // The ramp does not need to re-state the success/failure split, because the row beneath every
+  // band already does: each tier row carries a Success/Failure pill, and the boundary handles
+  // name both tiers. A colour is a weaker carrier of that fact than the words already on screen.
   const previewDc = $derived(Number(value?.dc ?? 0) || 0);
 
-  // THE RAMP IS BOUNDED BY THE BAND NAME'S CONTRAST, and it is mixed into an OPAQUE base
-  // for exactly that reason.
+  // THE RAMP IS BOUNDED BY THE BAND NAME'S CONTRAST, and it is mixed into an OPAQUE base for
+  // exactly that reason.
   //
-  // Each band carries its tier's NAME, in `--fab-text` at 0.72rem/600 — normal-size text, so
-  // WCAG AA wants 4.5:1 against whatever the band paints. The first version of this ramp
-  // mixed into `--fab-surface-raised`, which is TRANSLUCENT in every theme, so the mix
-  // percentage doubled as an opacity: the fill got lighter as the ramp climbed and the cream
-  // ink fell to 2.63:1 on a failure band and 1.74:1 on the top success band (measured from
-  // the rendered `coverage-mode-routed-check-checks` frame).
+  // Each band carries its tier's NAME at 0.72rem/600 — normal-size text, so WCAG AA wants
+  // 4.5:1 against whatever the band paints. An earlier ramp mixed into `--fab-surface-raised`,
+  // which is TRANSLUCENT in every theme, so the mix percentage doubled as an opacity: the fill
+  // lightened as the ramp climbed and the ink fell to 1.74:1. Mixed into `--fab-bg-0` the
+  // painted colour is a pure function of the theme's own tokens, independent of whatever the
+  // strip is stacked on, which is what makes any claim about it measurable at all.
   //
-  // Shipping a per-band INK alongside the fill does not rescue that. The two inks available
-  // are `--fab-text` (which needs a fill luminance <= 0.111) and `--fab-on-success` /
-  // `--fab-on-danger` (which need >= 0.219), and a monotone ramp from one side to the other
-  // must cross the gap between them: at 32-88% into `--fab-surface-raised`, a five-band
-  // family lands two to four of its bands inside it, where NEITHER ink reaches 4.5:1.
-  //
-  // So the fill is mixed into `--fab-bg-0`, which is opaque. That makes the painted colour a
-  // pure function of the theme's own tokens — independent of whatever the strip is stacked
-  // on — and lets the whole ramp sit below the `--fab-text` ceiling. The measured ceiling is
-  // 45% (binding case: the `fabricate` theme's `--fab-success`); 44% keeps a band of margin.
-  // At 10-44% every band of every family in all seven shipped palettes clears 4.5:1 with at
-  // least 5.1:1, and the ends of a five-band family are still 2.19:1 (success) and 1.76:1
-  // (danger) apart, which is WIDER separation than any AA-clean ramp into the translucent
-  // surface could give.
-  const BAND_TONE_MIN = 10;
-  const BAND_TONE_MAX = 44;
+  // Each tone brings its OWN ink — `--fab-<tone>-text`, the ink each family already ships for
+  // its soft fill — rather than one `--fab-text` for the whole strip. That is what buys the
+  // headroom: a single ink forces every band to stay under one luminance ceiling, and it was
+  // that ceiling, not the hues, that held the previous ramp to a 4.64:1 floor. Measured across
+  // all five tones, all seven palettes and every band count, the floor is now 7.12:1
+  // (`hearth-herb`, danger) — see the AA gate in tests/components/manager-layout.test.js.
+  const BAND_TONES = ['danger', 'warning', 'success', 'info', 'accent'];
+  const BAND_TONE_MIX = 26;
   const BAND_TONE_BASE = 'var(--fab-bg-0)';
 
-  function bandTonePercent(rank, count) {
-    if (count <= 1) return BAND_TONE_MAX;
-    return Math.round(BAND_TONE_MIN + ((BAND_TONE_MAX - BAND_TONE_MIN) * rank) / (count - 1));
+  /**
+   * The tone for the band at `position` of `count`, in value order.
+   *
+   * A single band takes the MIDDLE tone: with nothing to escalate against, an end of the ramp
+   * would be a claim about a tier list that has no shape.
+   *
+   * Counts above five reuse a tone — five stops cannot give six bands six hues — so a six-tier
+   * check paints two adjacent bands alike. That is the cost of the five-stop ramp and it is
+   * stated here rather than hidden; the tier rows below still name every tier.
+   */
+  function toneFor(position, count) {
+    if (count <= 1) return BAND_TONES[Math.floor(BAND_TONES.length / 2)];
+    return BAND_TONES[Math.round((position * (BAND_TONES.length - 1)) / (count - 1))];
   }
 
-  function bandColour(success, rank, count) {
-    const family = success ? 'var(--fab-success)' : 'var(--fab-danger)';
-    return `color-mix(in srgb, ${family} ${bandTonePercent(rank, count)}%, ${BAND_TONE_BASE})`;
+  function bandFill(tone) {
+    return `color-mix(in oklab, var(--fab-${tone}) ${BAND_TONE_MIX}%, ${BAND_TONE_BASE})`;
   }
 
   const bandStripBands = $derived.by(() => {
@@ -247,31 +255,34 @@
       from: type === 'fixed' ? Number(outcome.start) : previewDc + Number(outcome.dc),
       to: type === 'fixed' ? Number(outcome.end) : null,
     }));
-    // Plain objects keyed by the authored index, not `Map`s: `svelte/prefer-svelte-reactivity`
-    // rejects a mutable built-in `Map` inside a component, and nothing here needs reactivity —
-    // both are local to this one derivation and rebuilt whole on every run.
-    const ranked = {};
-    for (const success of [false, true]) {
-      const family = rows
-        .filter((row) => row.success === success)
-        .sort(
-          (a, b) => (Number.isFinite(a.from) ? a.from : 0) - (Number.isFinite(b.from) ? b.from : 0)
-        );
-      family.forEach((row, rank) => {
-        ranked[row.index] = { rank, count: family.length };
-      });
-    }
+    // Value order, which is the order the strip DRAWS in — not the authored order, which a GM
+    // listing Masterwork first has authored high-to-low. A plain object keyed by the authored
+    // index rather than a `Map`: `svelte/prefer-svelte-reactivity` rejects a mutable built-in
+    // `Map` inside a component, and nothing here needs reactivity.
+    const ordered = [...rows].sort(
+      (a, b) => (Number.isFinite(a.from) ? a.from : 0) - (Number.isFinite(b.from) ? b.from : 0)
+    );
+    const toneByIndex = {};
+    ordered.forEach((row, position) => {
+      toneByIndex[row.index] = toneFor(position, ordered.length);
+    });
     return rows.map((row) => {
-      const place = ranked[row.index] || { rank: 0, count: 1 };
-      return { ...row, color: bandColour(row.success, place.rank, place.count) };
+      const tone = toneByIndex[row.index];
+      return {
+        ...row,
+        color: bandFill(tone),
+        ink: `var(--fab-${tone}-text)`,
+        swatch: `var(--fab-${tone})`,
+      };
     });
   });
 
-  // The same colour, on the tier ROW, so the strip and the row that authors it are visibly
-  // one thing. Without it the ramp is a pattern with no key: five shades on a track and no
-  // way to tell which row moved which band.
-  const bandColourById = $derived(
-    Object.fromEntries(bandStripBands.map((band) => [band.id, band.color]))
+  // The key to the strip, on the tier ROW: the band's tone at FULL STRENGTH, as a dot. Without
+  // it the ramp is a pattern with no legend and no way to tell which row moved which band. The
+  // dot shows the undiluted tone rather than the band's 26% fill because it carries no text, so
+  // nothing about it is bounded by contrast — and a 12px pale mix would read as no colour.
+  const bandSwatchById = $derived(
+    Object.fromEntries(bandStripBands.map((band) => [band.id, band.swatch]))
   );
 
   /**
@@ -461,14 +472,14 @@
               data-outcome-row={outcome.id}
               data-outcome-id={outcome.id}
             >
-              <!-- The KEY to the strip above: this row's band, in this row's colour. Not an
-                   icon and not a control — it carries the row's own accessible name through
-                   the Name field beside it, so it is decorative to a screen reader and the
-                   information it adds is the visual pairing sighted GMs need. -->
+              <!-- The KEY to the strip above: this row's band, as a dot in that band's own
+                   tone. Not an icon and not a control — it carries the row's own accessible
+                   name through the Name field beside it, so it is decorative to a screen
+                   reader and the information it adds is the visual pairing sighted GMs need. -->
               <span
                 class="manager-checks-outcome-swatch"
                 data-outcome-swatch={outcome.id}
-                style={`--fab-outcome-swatch: ${bandColourById[outcome.id] || 'var(--fab-surface-active)'};`}
+                style={`--fab-outcome-swatch: ${bandSwatchById[outcome.id] || 'var(--fab-surface-active)'};`}
                 aria-hidden="true"
               ></span>
               <input

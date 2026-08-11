@@ -25,8 +25,14 @@
 
   Callers hand `bands` in ABSOLUTE track values, whatever the binding underneath, because
   a strip that also had to know how to read three authored shapes would be three components
-  wearing one name. Each band is `{ id, name, color, from, to, index }`; `to` is optional
+  wearing one name. Each band is `{ id, name, color, ink, from, to, index }`; `to` is optional
   and derived from the next band's `from` when omitted.
+
+  `ink` is the band NAME's colour, and it travels with `color` because the two are one
+  decision: the name is drawn ON the fill, so whoever picks the fill is the only party that
+  can know what stays readable on it. A band that supplies a fill but no ink gets `--fab-text`,
+  which is the right answer only for a fill chosen against `--fab-text` — so the fallback is a
+  default, not a licence to omit it.
 
   Bands are drawn in VALUE order, and `index` is the position of the band in the caller's
   own authored array. The two are the same thing for an ascending tier list and are NOT for
@@ -146,6 +152,7 @@
         id: band?.id ?? '',
         name: band?.name ?? '',
         color: typeof band?.color === 'string' ? band.color : '',
+        ink: typeof band?.ink === 'string' ? band.ink : '',
         from: numeric(band?.from),
         to: numeric(band?.to),
         index: Number.isInteger(band?.index) ? band.index : position,
@@ -362,7 +369,7 @@
           class:is-untinted={!band.color}
           style={`left: ${percentOf(from)}%; width: ${percentOf(to) - percentOf(from)}%;${
             band.color ? ` --fab-band-strip-fill: ${band.color};` : ''
-          }`}
+          }${band.ink ? ` --fab-band-strip-ink: ${band.ink};` : ''}`}
           data-band-strip-band={band.id || index}
         >
           <span class="fab-band-strip-band-name">{band.name}</span>
@@ -461,11 +468,16 @@
   }
 
   /* A long localized band name wraps to nothing and truncates instead, so a wide name
-     cannot change the strip's height and shove the tier rows' steppers down the page. */
+     cannot change the strip's height and shove the tier rows' steppers down the page.
+
+     The ink arrives inline as `--fab-band-strip-ink` from the same caller that chose the fill,
+     for the same two reasons the fill does: an unresolvable value falls back to the declared
+     `--fab-text` rather than to nothing, and happy-dom preserves a custom property verbatim
+     where it discards an unparsed `color` value. */
   .fab-band-strip-band-name {
     max-width: 100%;
     overflow: hidden;
-    color: var(--fab-text);
+    color: var(--fab-band-strip-ink, var(--fab-text));
     font-size: 0.72rem;
     font-weight: 600;
     text-overflow: ellipsis;

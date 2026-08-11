@@ -6704,11 +6704,12 @@ test('the band fill and the tier-row swatch are painted by rules that still matc
         `<div class="fabricate-manager"><div class="fab-band-strip-track">` +
           // `left`/`width` as the component emits them, so the band is a real bounded box
           // and the long name below has something to be truncated against.
-          `<span class="fab-band-strip-band" id="tinted" style="left: 0%; width: 90px; --fab-band-strip-fill: rgb(20, 90, 40);">` +
+          `<span class="fab-band-strip-band" id="tinted" style="left: 0%; width: 90px; --fab-band-strip-fill: rgb(20, 90, 40); --fab-band-strip-ink: rgb(250, 200, 10);">` +
           // A long localized tier name, because the rule that keeps it on one line is the
           // reason the strip's height is stable — a wrapped name shoves the tier rows down.
           `<span class="fab-band-strip-band-name" id="longname">Ausserordentlich Meisterhaft Geschmiedet</span></span>` +
-          `<span class="fab-band-strip-band" id="plain"><span class="fab-band-strip-band-name">Ruined</span></span>` +
+          `<span class="fab-band-strip-band" id="plain">` +
+          `<span class="fab-band-strip-band-name" id="plainname">Ruined</span></span>` +
           `</div>` +
           `<div class="manager-checks-outcome-table is-relative">` +
           `<span class="manager-checks-outcome-swatch" id="keyed" style="--fab-outcome-swatch: rgb(20, 90, 40);"></span>` +
@@ -6729,11 +6730,16 @@ test('the band fill and the tier-row swatch are painted by rules that still matc
       };
       const longName = document.querySelector('#longname');
       const longNameStyle = getComputedStyle(longName);
+      const keyed = document.getElementById('keyed');
       return {
         tinted: read('tinted'),
         plain: read('plain'),
         keyed: read('keyed'),
         unkeyed: read('unkeyed'),
+        inkedName: longNameStyle.color,
+        plainName: getComputedStyle(document.querySelector('#plainname')).color,
+        keyedRadius: getComputedStyle(keyed).borderRadius,
+        keyedHeight: keyed.getBoundingClientRect().height,
         longName: {
           whiteSpace: longNameStyle.whiteSpace,
           textOverflow: longNameStyle.textOverflow,
@@ -6779,29 +6785,53 @@ test('the band fill and the tier-row swatch are painted by rules that still matc
   // about the rule rather than about a string that happened to fit.
   assert.ok(painted.longName.overflowed, 'the fixture name is long enough to need truncating');
 
+  // The band's INK is per-band and inline (issue 1096), so the name rule has to READ it. A
+  // hard-coded `color: var(--fab-text)` here would leave the AA gate below measuring an ink no
+  // band ever wears; the untinted control proves the declared fallback still applies.
+  assert.equal(painted.inkedName, 'rgb(250, 200, 10)', 'a band name takes its own inline ink');
+  assert.notEqual(painted.plainName, painted.inkedName, 'and falls back when the band omits one');
+
   // The swatch key, whose whole rule could be deleted without a red before this (issue 1096
-  // made it normative in `ui-integration`).
+  // made it normative in `ui-integration`). It is a 12x12 DOT: square, round, and exactly the
+  // width of the table's leading track, so a track literal moved without the rule reds here.
   assert.equal(painted.keyed.background, 'rgb(20, 90, 40)', 'the swatch repeats its band colour');
   assert.notEqual(painted.unkeyed.background, painted.keyed.background, 'unkeyed paints neutral');
   assert.ok(
-    Math.abs(painted.keyed.width - 10) < 0.5,
-    `the swatch is the table's 10px leading track, got ${painted.keyed.width}`
+    Math.abs(painted.keyed.width - 12) < 0.5,
+    `the swatch is the table's 12px leading track, got ${painted.keyed.width}`
   );
-  assert.equal(painted.tableTracks[0], '10px', 'and the table still declares that track first');
+  assert.ok(
+    Math.abs(painted.keyedHeight - painted.keyed.width) < 0.5,
+    `a dot is square, got ${painted.keyed.width}x${painted.keyedHeight}`
+  );
+  assert.equal(painted.keyedRadius, '50%', 'and round rather than a bar with soft corners');
+  assert.equal(painted.tableTracks[0], '12px', 'and the table still declares that track first');
 });
 
 test('every outcome band name clears WCAG AA in every shipped theme', async () => {
-  // The ramp is READ OUT OF the editor rather than restated, so widening it without
-  // re-checking contrast fails here. `bandColour`'s expression is pinned too — otherwise this
-  // could go on measuring a formula the component no longer uses.
-  const toneMin = Number(/const BAND_TONE_MIN = (\d+);/.exec(checkEditorSource)?.[1]);
-  const toneMax = Number(/const BAND_TONE_MAX = (\d+);/.exec(checkEditorSource)?.[1]);
+  // The ramp is READ OUT OF the editor rather than restated, so adding a tone or widening the
+  // mix without re-checking contrast fails here. `bandFill`'s expression and the ink's are
+  // pinned too — otherwise this could go on measuring a formula the component no longer uses.
+  const toneNames = /const BAND_TONES = \[([^\]]+)\];/
+    .exec(checkEditorSource)?.[1]
+    .split(',')
+    .map((name) => name.trim().replace(/^'|'$/g, ''));
+  const toneMix = Number(/const BAND_TONE_MIX = (\d+);/.exec(checkEditorSource)?.[1]);
   const toneBase = /const BAND_TONE_BASE = '([^']+)';/.exec(checkEditorSource)?.[1];
-  assert.ok(toneMin > 0 && toneMax > toneMin, 'the ramp constants are readable');
+  assert.ok(toneNames?.length >= 2, 'the ramp tones are readable');
+  assert.ok(toneMix > 0, 'the mix percentage is readable');
   assert.match(
     checkEditorSource,
-    /color-mix\(in srgb, \$\{family\} \$\{bandTonePercent\(rank, count\)\}%, \$\{BAND_TONE_BASE\}\)/,
-    'bandColour still composes exactly the expression measured here'
+    /color-mix\(in oklab, var\(--fab-\$\{tone\}\) \$\{BAND_TONE_MIX\}%, \$\{BAND_TONE_BASE\}\)/,
+    'bandFill still composes exactly the expression measured here'
+  );
+  // Each tone brings its OWN ink, which is the headroom this ramp is spending. Pinning the
+  // expression stops the component quietly reverting to one `--fab-text` for the whole strip
+  // while this file goes on measuring five inks it no longer paints.
+  assert.match(
+    checkEditorSource,
+    /ink: `var\(--fab-\$\{tone\}-text\)`/,
+    'and each band still takes its own tone-text ink'
   );
   // An OPAQUE base is what makes this measurable at all: mixed into a translucent surface the
   // fill's painted colour depends on whatever the strip is stacked on, so no fixture could
@@ -6811,35 +6841,22 @@ test('every outcome band name clears WCAG AA in every shipped theme', async () =
   const themes = [...css.matchAll(/:root\[data-fabricate-theme="([\w-]+)"\]/g)].map((m) => m[1]);
   assert.ok(themes.length >= 6, `every palette is measured, found ${themes.length}`);
 
-  const tones = [];
-  for (const count of [1, 2, 3, 5]) {
-    for (let rank = 0; rank < count; rank += 1) {
-      tones.push(
-        count <= 1 ? toneMax : Math.round(toneMin + ((toneMax - toneMin) * rank) / (count - 1))
-      );
-    }
-  }
-
   const measured = await withBandStripPage(async (page) => {
     const cells = themes
-      .map((theme) =>
-        ['success', 'danger']
-          .map((family) =>
-            tones
-              .map(
-                (tone) =>
-                  `<span class="fab-band-strip-band" data-probe="${theme}|${family}|${tone}" ` +
-                  `style="--fab-band-strip-fill: color-mix(in srgb, var(--fab-${family}) ${tone}%, ${toneBase});">` +
-                  `<span class="fab-band-strip-band-name">Masterwork</span></span>`
-              )
-              .join('')
-          )
-          .join('')
-      )
       .map(
-        (row, index) =>
-          `<div class="fabricate" data-fabricate-theme="${themes[index]}">` +
-          `<div class="fab-band-strip-track">${row}</div></div>`
+        (theme) =>
+          `<div class="fabricate" data-fabricate-theme="${theme}">` +
+          `<div class="fab-band-strip-track">` +
+          toneNames
+            .map(
+              (tone) =>
+                `<span class="fab-band-strip-band" data-probe="${theme}|${tone}" ` +
+                `style="--fab-band-strip-fill: color-mix(in oklab, var(--fab-${tone}) ${toneMix}%, ${toneBase}); ` +
+                `--fab-band-strip-ink: var(--fab-${tone}-text);">` +
+                `<span class="fab-band-strip-band-name">Masterwork</span></span>`
+            )
+            .join('') +
+          `</div></div>`
       )
       .join('');
     await page.setContent(bandStripFixture(`<div class="fabricate-manager">${cells}</div>`));
@@ -6953,5 +6970,27 @@ test('every outcome band name clears WCAG AA in every shipped theme', async () =
     failures,
     [],
     `a band name at 0.72rem/600 is normal-size text and needs 4.5:1:\n- ${failures.join('\n- ')}`
+  );
+
+  // PER-BAND IDENTITY, measured per palette rather than inferred from the tone TOKENS having
+  // different names. `foundry-native` shipped `--fab-accent` byte-identical to `--fab-warning`,
+  // so five differently-named tones painted four colours and bands 2 and 5 were one band —
+  // invisible to every check on this ramp, because they all reasoned about token names.
+  const collisions = [];
+  for (const theme of themes) {
+    const inTheme = measured.filter((m) => m.probe.startsWith(`${theme}|`));
+    for (let i = 0; i < inTheme.length; i += 1) {
+      for (let j = i + 1; j < inTheme.length; j += 1) {
+        if (inTheme[i].fillPixel !== inTheme[j].fillPixel) continue;
+        collisions.push(
+          `${inTheme[i].probe} and ${inTheme[j].probe} both paint ${inTheme[i].fillPixel}`
+        );
+      }
+    }
+  }
+  assert.deepEqual(
+    collisions,
+    [],
+    `two bands of one strip must never paint the same colour:\n- ${collisions.join('\n- ')}`
   );
 });

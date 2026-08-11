@@ -462,6 +462,39 @@ describe('ThresholdBandStrip: colour, gradients and the fallback', () => {
     );
   });
 
+  it('carries each band INK the same way, and omits it rather than inventing one', async () => {
+    // The ink travels with the fill because the two are one decision: the name is drawn ON the
+    // fill, so only whoever chose the fill can know what stays readable on it. A band that
+    // supplies no ink must emit NOTHING, or the scoped rule's `--fab-text` fallback is
+    // unreachable and an untinted band's name has no declared colour at all.
+    const root = await harness.mount({
+      binding: 'fixed',
+      bands: FIXED_BANDS.map((band, index) => ({
+        ...band,
+        color: 'var(--fab-success)',
+        ...(index === 0 ? {} : { ink: 'var(--fab-success-text)' }),
+      })),
+    });
+    const inked = [...root.querySelectorAll('[data-band-strip-band]')].map(
+      (band) => /--fab-band-strip-ink:\s*([^;]+)/.exec(band.getAttribute('style'))?.[1]
+    );
+    assert.equal(inked[0], undefined, 'a band with no ink emits no ink property');
+    assert.deepEqual(inked.slice(1), [
+      'var(--fab-success-text)',
+      'var(--fab-success-text)',
+      'var(--fab-success-text)',
+    ]);
+    const source = readFileSync(
+      resolve(repoRoot, 'src/ui/svelte/components/ThresholdBandStrip.svelte'),
+      'utf8'
+    );
+    assert.match(
+      source,
+      /color:\s*var\(--fab-band-strip-ink,\s*var\(--fab-text\)\);/,
+      'and the band-name rule reads it with the declared fallback'
+    );
+  });
+
   it('falls back to the tier rows with a stated note when the set is GAPPED', async () => {
     const root = await harness.mount({
       binding: 'fixed',

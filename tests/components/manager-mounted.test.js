@@ -17271,7 +17271,8 @@ describe('CraftingSystemManager mounted behavior', () => {
     // Deriving the fill from the `success` flag alone painted Standard and Masterwork
     // identically on a five-tier check — per-band identity is the whole reason this control
     // refuses the full-track gradient exemption, and two of five bands indistinguishable is
-    // not per-band identity. The ramp runs inside each semantic family, in value order.
+    // not per-band identity. The ramp walks five tones by POSITION IN VALUE ORDER across the
+    // whole list, so a five-tier check spends the ramp exactly once, end to end.
     await mountChecks([], {
       alchemyResolutionMode: 'routedByCheck',
       craftingCheck: {
@@ -17292,33 +17293,82 @@ describe('CraftingSystemManager mounted behavior', () => {
     await openChecksActivity('crafting');
     await openChecksSection('outcomes');
 
-    const bands = [...target.querySelectorAll('[data-band-strip-band]')].map((band) =>
-      /--fab-band-strip-fill:\s*([^;]+)/.exec(band.getAttribute('style') || '')?.[1]
-    );
+    const styleOf = (band) => band.getAttribute('style') || '';
+    const drawn = [...target.querySelectorAll('[data-band-strip-band]')];
+    const bands = drawn.map((band) => /--fab-band-strip-fill:\s*([^;]+)/.exec(styleOf(band))?.[1]);
+    const inks = drawn.map((band) => /--fab-band-strip-ink:\s*([^;]+)/.exec(styleOf(band))?.[1]);
     assert.equal(bands.length, 5, 'five authored tiers draw five bands');
     assert.equal(new Set(bands).size, 5, `five DISTINCT fills, got ${bands.join(' | ')}`);
-    // Still two families: every success band mixes the success token, every failure band the
-    // danger one, so the ramp cannot make a failure tier read as a success.
-    assert.ok(
-      bands.slice(2).every((fill) => fill.includes('--fab-success')),
-      'the three success tiers stay in the success family'
+    // The ramp itself, named tone by tone in value order, because "five distinct fills" alone
+    // would pass just as well for five arbitrary colours in an arbitrary order — and the order
+    // is the claim: the strip has to read left-to-right as escalating.
+    assert.deepEqual(
+      bands.map((fill) => /var\(--fab-([\w-]+)\)/.exec(fill)?.[1]),
+      ['danger', 'warning', 'success', 'info', 'accent'],
+      `the ramp walks its five tones in value order, got ${bands.join(' | ')}`
     );
-    assert.ok(
-      bands.slice(0, 2).every((fill) => fill.includes('--fab-danger')),
-      'and the two failure tiers in the danger one'
+    // Each band inks its own name. One ink for the whole strip is what held the previous ramp
+    // under a single luminance ceiling, so a band that loses its ink loses the headroom too.
+    assert.deepEqual(
+      inks,
+      [
+        'var(--fab-danger-text)',
+        'var(--fab-warning-text)',
+        'var(--fab-success-text)',
+        'var(--fab-info-text)',
+        'var(--fab-accent-text)',
+      ],
+      `every band carries its own tone's ink, got ${inks.join(' | ')}`
     );
 
-    // The KEY: each tier row repeats its own band's colour, or the ramp is a pattern with no
-    // legend and no way to tell which row moved which band.
+    // The KEY: each tier row wears its own band's tone, at FULL STRENGTH rather than as the
+    // band's mixed fill, or the ramp is a pattern with no legend and no way to tell which row
+    // moved which band.
     const swatch = (id) =>
       target.querySelector(`[data-outcome-swatch="${id}"]`)?.getAttribute('style') || '';
     assert.ok(swatch('ruined').startsWith('--fab-outcome-swatch:'), 'the swatch carries a fill');
     for (const [index, id] of ['ruined', 'flawed', 'standard', 'fine', 'masterwork'].entries()) {
-      assert.ok(
-        swatch(id).includes(bands[index]),
-        `the ${id} row wears its own band colour (${bands[index]})`
+      const tone = /var\(--fab-([\w-]+)\)/.exec(bands[index])?.[1];
+      assert.equal(
+        swatch(id),
+        `--fab-outcome-swatch: var(--fab-${tone});`,
+        `the ${id} row wears its own band's tone undiluted`
       );
     }
+  });
+
+  it('spends the whole ramp on a THREE-tier check, so it still reads as escalating', async () => {
+    // The three-tier case is where ranking inside each semantic family went wrong: the single
+    // failure tier was a family of one and took that family's strongest tone, so the strip ran
+    // mid, dark, light — the darkest band in the MIDDLE and the failure lighter than the first
+    // success. Walking one ramp across the whole list is the fix, and it is only visible at a
+    // count where the two rules disagree.
+    await mountChecks([], {
+      alchemyResolutionMode: 'routedByCheck',
+      craftingCheck: {
+        enabled: true,
+        routed: {
+          rollFormula: '1d20',
+          type: 'relative',
+          relativeOutcomes: [
+            { id: 'ruined', name: 'Ruined', success: false, dc: -5 },
+            { id: 'standard', name: 'Standard', success: true, dc: 0 },
+            { id: 'masterwork', name: 'Masterwork', success: true, dc: 5 },
+          ],
+        },
+      },
+    });
+    await openChecksActivity('crafting');
+    await openChecksSection('outcomes');
+
+    const bands = [...target.querySelectorAll('[data-band-strip-band]')].map(
+      (band) => /--fab-band-strip-fill:\s*([^;]+)/.exec(band.getAttribute('style') || '')?.[1]
+    );
+    assert.deepEqual(
+      bands.map((fill) => /var\(--fab-([\w-]+)\)/.exec(fill)?.[1]),
+      ['danger', 'success', 'accent'],
+      `three tiers take the ramp's two ends and its middle, got ${bands.join(' | ')}`
+    );
   });
 
   it('drives the section strip from Home and End as well as the arrows', async () => {

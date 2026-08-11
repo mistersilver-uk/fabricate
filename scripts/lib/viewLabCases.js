@@ -4838,6 +4838,50 @@ export const VIEW_LAB_CASES = Object.freeze([
     sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/checks\//],
   }),
   managerCase({
+    id: 'coverage-mode-routed-check-five-bands',
+    label: 'Coverage — routedByCheck outcome tiers, five bands',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { system: 'lab-runework' },
+    // THE FRAME THAT SHOWS THE WHOLE RAMP (issue 1096). The band ramp has five tones and every
+    // routed check in the fixture world has THREE tiers, so until this case the two ends of the
+    // ramp — the tones a four- or five-tier check reaches and a three-tier one skips — appeared
+    // in no frame at all. A five-band strip is also the only count at which "one tone per band"
+    // and "a tone reused" look different.
+    //
+    // It reaches five tiers by DRIVING the editor rather than by seeding a fifth system: the
+    // fixture world's `ROUTED_CHECK` is read by the salvage routing rows, the section badge
+    // count and both player routed-crafting cases, so widening it would rewrite frames that are
+    // not about this. Two `Add outcome` clicks and four typed fields cost nothing outside this
+    // case.
+    //
+    // The two new tiers are given DCs OUTSIDE the authored −5/0/+5 span. A new outcome is born
+    // at `dc: 0`, which ties Standard's lower edge, and the strip refuses to draw a tied edge as
+    // a clean seam — so without these the case would photograph the non-contiguous fallback note
+    // and be named for a strip it never rendered.
+    //
+    // `:nth-match()` is Playwright's, not CSS's: the two new rows carry `randomID()` ids, so
+    // there is no stable per-row hook to aim at and position in the authored table is the only
+    // address they have.
+    steps: [
+      'Checks',
+      { selector: '#manager-checks-nav-crafting' },
+      { selector: '#checks-section-outcomes' },
+      { selector: '[data-add-outcome]' },
+      { selector: '[data-add-outcome]' },
+      { selector: ':nth-match([data-outcome-name], 4)', fill: 'Flawless' },
+      { selector: ':nth-match([data-outcome-dc], 4)', fill: '10' },
+      { selector: ':nth-match([data-outcome-success], 4)' },
+      { selector: ':nth-match([data-outcome-name], 5)', fill: 'Slag' },
+      { selector: ':nth-match([data-outcome-dc], 5)', fill: '-10' },
+      { selector: '[data-outcome-band-strip-hint]', scroll: true },
+    ],
+    expectView: 'checks-crafting',
+    expectSelector: '.fabricate-manager [data-band-strip-band]',
+    kinds: ['manager', 'checks', 'resolution-mode'],
+    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/checks\//],
+  }),
+  managerCase({
     id: 'manager-checks-crafting-dynamic-dc',
     label: 'Manager — Checks crafting dynamic DC macro',
     // BEYOND the smoke. The walk never switches the DC source, so there is no counterpart frame of
