@@ -7908,6 +7908,7 @@
             onToggleFeature={(storeKey, checked) => store.toggleFeature?.(storeKey, checked)}
             modifierLibrary={selectedSystemModifiers}
             modifierPresetsSupported={characterModifierPresetsSupported}
+            {foundrySystemId}
             onAddModifier={onAddCharacterModifier}
             onUpdateModifier={onUpdateCharacterModifier}
             onDeleteModifier={onDeleteCharacterModifier}

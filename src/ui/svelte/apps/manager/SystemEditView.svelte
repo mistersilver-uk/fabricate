@@ -16,6 +16,7 @@
   import { dragDrop } from '../../actions/dragDrop.js';
   import { resolveDropData } from '../../util/dropUtils.js';
   import IconPicker from '../../components/IconPicker.svelte';
+  import ManagerButton from '../../components/ManagerButton.svelte';
   import Stepper from '../../components/Stepper.svelte';
   import { stepperLabels } from '../../components/stepperLabels.js';
   import RollDataExpressionInput from './RollDataExpressionInput.svelte';
@@ -31,6 +32,10 @@
     isRollExpression,
     resolveModifierBounds,
   } from '../../../../systems/checkModifierResolver.js';
+  import {
+    appendModifierExpressionTerm,
+    getModifierExpressionSuggestions,
+  } from '../../../../config/modifierExpressionSuggestions.js';
 
   let {
     selectedSystem = null,
@@ -78,6 +83,11 @@
     // modifier has nothing to do with the gathering feature flag.
     modifierLibrary = [],
     modifierPresetsSupported = false,
+    // The active Foundry game system id (`game.system.id`). Drives the SYSTEM-SPECIFIC half
+    // of the expression suggestion chips: a roll-data path is only meaningful in the world
+    // that defines it, so an unknown id yields the agnostic chips alone rather than a
+    // `dnd5e` row offered to a world that has no `@abilities`.
+    foundrySystemId = '',
     onAddModifier = async () => null,
     onUpdateModifier = async () => {},
     onDeleteModifier = async () => {},
@@ -530,6 +540,30 @@
   // key only for a finite number, so a `null` round-trips to key-absent.
   function handleModifierBound(modifierId, key, next) {
     onUpdateModifier(modifierId, { [key]: next });
+  }
+
+  // The expression field's roll-data suggestion chips (issue 1096). Derived from the ACTIVE
+  // world rather than written out here — see `modifierExpressionSuggestions.js` for why a
+  // hard-coded row would be wrong in every system but one.
+  const modifierExpressionSuggestions = $derived(getModifierExpressionSuggestions(foundrySystemId));
+
+  // Appending, not replacing: the chips build up a compound expression. The caret is left at
+  // the end of the field the GM is editing so the next keystroke continues the expression
+  // instead of landing wherever focus happened to be — a chip that silently steals focus to
+  // nowhere is worse than no chip. The DOM lookup is scoped to the clicked chip's OWN editor
+  // body, so an open second row is never touched.
+  async function handleModifierSuggestion(event, entry, term) {
+    const input = event.currentTarget
+      ?.closest('[data-system-modifier-editor]')
+      ?.querySelector('[data-system-modifier-field="expression"]');
+    await onUpdateModifier(entry.id, {
+      expression: appendModifierExpressionTerm(entry.expression, term),
+    });
+    await tick();
+    if (!input) return;
+    input.focus();
+    const caret = input.value.length;
+    input.setSelectionRange?.(caret, caret);
   }
 
   async function handleAddCurrencyUnit() {
@@ -1125,18 +1159,17 @@
                       )}
                     </p>
                   </div>
+                  <!-- Both header verbs go through the shared primitive (issue 1096). `Add
+                       modifier` keeps its primary role; `Seed presets` stays NEUTRAL, which
+                       is what its bare `manager-button` already rendered — this change fixes
+                       the sites that carried no role by mistake, not the ones that are
+                       deliberately quiet. -->
                   <div class="manager-character-modifier-card-header-actions">
-                    <button
-                      type="button"
-                      class="manager-button is-primary"
-                      onclick={handleAddModifier}
-                    >
+                    <ManagerButton role="primary" onclick={handleAddModifier}>
                       <i class="fa-solid fa-plus" aria-hidden="true"></i>
                       {text('FABRICATE.Admin.Manager.Modifiers.Add', 'Add modifier')}
-                    </button>
-                    <button
-                      type="button"
-                      class="manager-button"
+                    </ManagerButton>
+                    <ManagerButton
                       disabled={!modifierPresetsSupported}
                       data-tooltip={!modifierPresetsSupported
                         ? text(
@@ -1148,7 +1181,7 @@
                     >
                       <i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i>
                       {text('FABRICATE.Admin.Manager.Modifiers.SeedPresets', 'Seed presets')}
-                    </button>
+                    </ManagerButton>
                   </div>
                 </header>
                 {#if !modifiersCollapsed}
@@ -1318,7 +1351,16 @@
                               <div
                                 class="manager-modifier-body manager-character-modifier-editor"
                                 id={`system-modifier-body-${entry.id}`}
+                                data-system-modifier-editor={entry.id}
                               >
+                                <!-- Icon, label, minimum and maximum on ONE line, ahead of the
+                                     expression (issue 1096, maintainer round). The four are the
+                                     entry's short scalars; the expression is the one field whose
+                                     content is long, so it gets the full width below them rather
+                                     than competing with three neighbours for it. The row wraps
+                                     at narrow manager widths — the bounds pair wraps as a UNIT,
+                                     because a min separated from its max reads as two unrelated
+                                     fields. -->
                                 <div class="manager-modifier-name-row">
                                   <div class="manager-field manager-modifier-icon-field">
                                     <span
@@ -1354,7 +1396,57 @@
                                         })}
                                     />
                                   </label>
+                                  <!-- The bounds pair rides the SAME line as icon and label
+                                       since issue 1096. It keeps its own wrapper — and its own
+                                       `data-system-modifier-bounds` hook — so the two steppers
+                                       stay one flex item and wrap together, and so the View Lab
+                                       case that anchors on that hook still resolves. -->
+                                  <div
+                                    class="manager-modifier-bounds-row"
+                                    data-system-modifier-bounds={entry.id}
+                                  >
+                                    <div class="manager-field manager-modifier-bound-field">
+                                      <span class="manager-recipe-micro-label"
+                                        >{modifierMinLabel}</span
+                                      >
+                                      <Stepper
+                                        value={resolveModifierBounds(entry).min}
+                                        allowUnset
+                                        fill
+                                        placeholder={modifierUnboundedLabel}
+                                        {...stepperLabels(modifierMinLabel)}
+                                        inputProps={{ 'data-system-modifier-field': 'min' }}
+                                        onChange={(next) =>
+                                          handleModifierBound(entry.id, 'min', next)}
+                                      />
+                                    </div>
+                                    <div class="manager-field manager-modifier-bound-field">
+                                      <span class="manager-recipe-micro-label"
+                                        >{modifierMaxLabel}</span
+                                      >
+                                      <Stepper
+                                        value={resolveModifierBounds(entry).max}
+                                        allowUnset
+                                        fill
+                                        placeholder={modifierUnboundedLabel}
+                                        {...stepperLabels(modifierMaxLabel)}
+                                        inputProps={{ 'data-system-modifier-field': 'max' }}
+                                        onChange={(next) =>
+                                          handleModifierBound(entry.id, 'max', next)}
+                                      />
+                                    </div>
+                                  </div>
                                 </div>
+                                <!-- The bounds hint sits DIRECTLY under the bounds it explains
+                                     (issue 1096, maintainer round). Below the expression and its
+                                     suggestion chips it read as a note about the expression,
+                                     which is the one thing it says nothing about. -->
+                                <p class="manager-muted manager-modifier-bounds-hint">
+                                  {text(
+                                    'FABRICATE.Admin.Manager.Modifiers.BoundsHint',
+                                    'Optional. These clamp the resolved value when a check uses this modifier. Leave them empty for no limit — empty is not zero.'
+                                  )}
+                                </p>
                                 <label class="manager-field">
                                   <span
                                     >{text(
@@ -1371,51 +1463,41 @@
                                       onUpdateModifier(entry.id, { expression })}
                                   />
                                 </label>
-                                <!-- The bounds pair sits on its OWN row, after the expression,
-                                     rather than beside it: at a real pane width a third field
-                                     on the expression line compresses the one field whose
-                                     content is long and whose truncation is silent. -->
-                                <div
-                                  class="manager-modifier-bounds-row"
-                                  data-system-modifier-bounds={entry.id}
-                                >
-                                  <div class="manager-field manager-modifier-bound-field">
-                                    <span class="manager-recipe-micro-label"
-                                      >{modifierMinLabel}</span
-                                    >
-                                    <Stepper
-                                      value={resolveModifierBounds(entry).min}
-                                      allowUnset
-                                      fill
-                                      placeholder={modifierUnboundedLabel}
-                                      {...stepperLabels(modifierMinLabel)}
-                                      inputProps={{ 'data-system-modifier-field': 'min' }}
-                                      onChange={(next) =>
-                                        handleModifierBound(entry.id, 'min', next)}
-                                    />
+                                {#if modifierExpressionSuggestions.length > 0}
+                                  <!-- Roll-data suggestion chips (issue 1096). Each APPENDS its
+                                       term to the expression above rather than replacing it, so
+                                       a GM builds `@abilities.wis.mod + 1d4` by clicking twice.
+                                       The system-specific chips come from the active world's
+                                       preset bundle — the same derivation `Seed presets` uses —
+                                       so a chip can never offer a path this world does not
+                                       define. -->
+                                  <div
+                                    class="manager-modifier-expression-suggestions"
+                                    data-system-modifier-suggestions={entry.id}
+                                    aria-label={text(
+                                      'FABRICATE.Admin.Manager.Modifiers.SuggestionsLabel',
+                                      'Add a term to this expression'
+                                    )}
+                                  >
+                                    {#each modifierExpressionSuggestions as suggestion (suggestion.id)}
+                                      <button
+                                        type="button"
+                                        class="manager-tag-suggestion manager-modifier-expression-suggestion"
+                                        data-system-modifier-suggestion={suggestion.id}
+                                        title={suggestion.label}
+                                        onclick={(event) =>
+                                          handleModifierSuggestion(
+                                            event,
+                                            entry,
+                                            suggestion.expression
+                                          )}
+                                      >
+                                        <i class="fa-solid fa-plus" aria-hidden="true"></i>
+                                        <span>{suggestion.expression}</span>
+                                      </button>
+                                    {/each}
                                   </div>
-                                  <div class="manager-field manager-modifier-bound-field">
-                                    <span class="manager-recipe-micro-label"
-                                      >{modifierMaxLabel}</span
-                                    >
-                                    <Stepper
-                                      value={resolveModifierBounds(entry).max}
-                                      allowUnset
-                                      fill
-                                      placeholder={modifierUnboundedLabel}
-                                      {...stepperLabels(modifierMaxLabel)}
-                                      inputProps={{ 'data-system-modifier-field': 'max' }}
-                                      onChange={(next) =>
-                                        handleModifierBound(entry.id, 'max', next)}
-                                    />
-                                  </div>
-                                </div>
-                                <p class="manager-muted manager-modifier-bounds-hint">
-                                  {text(
-                                    'FABRICATE.Admin.Manager.Modifiers.BoundsHint',
-                                    'Optional. These clamp the resolved value when a check uses this modifier. Leave them empty for no limit — empty is not zero.'
-                                  )}
-                                </p>
+                                {/if}
                                 {#if modifierIsRoll(entry)}
                                   <!-- A roll-shaped expression is legal on a gathering drop row
                                        and NOT on a check: a check appends one resolved scalar,
@@ -1433,21 +1515,28 @@
                                     )}
                                   </p>
                                 {/if}
+                                <!-- THE REPORTED DEFECT (issue 1096). Both verbs carried a BARE
+                                     `manager-button`: `Delete modifier` was painted as a
+                                     neutral action while the identical verb in the Tool Studio
+                                     is danger, and neither matched the studio's label scale.
+                                     The roles are copied from `ToolEditView`'s header — its
+                                     `Delete` is `danger` and its `Back to tools` is `ghost` —
+                                     rather than chosen here. -->
                                 <div class="manager-character-modifier-actions">
-                                  <button
-                                    type="button"
-                                    class="manager-button"
+                                  <ManagerButton
+                                    role="ghost"
+                                    data-system-modifier-done={entry.id}
                                     onclick={() => (modifierEditingId = '')}
-                                    >{text('FABRICATE.Admin.Manager.Done', 'Done')}</button
+                                    >{text('FABRICATE.Admin.Manager.Done', 'Done')}</ManagerButton
                                   >
-                                  <button
-                                    type="button"
-                                    class="manager-button is-danger"
+                                  <ManagerButton
+                                    role="danger"
+                                    data-system-modifier-delete={entry.id}
                                     onclick={() => handleDeleteModifier(entry.id)}
                                     >{text(
                                       'FABRICATE.Admin.Manager.Modifiers.Delete',
                                       'Delete modifier'
-                                    )}</button
+                                    )}</ManagerButton
                                   >
                                 </div>
                               </div>

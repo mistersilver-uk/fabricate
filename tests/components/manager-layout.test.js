@@ -6994,3 +6994,292 @@ test('every outcome band name clears WCAG AA in every shipped theme', async () =
     `two bands of one strip must never paint the same colour:\n- ${collisions.join('\n- ')}`
   );
 });
+
+// ── The tool studio is the AUTHORITY for a manager button (issue 1096) ─────────────────────
+//
+// The reported defect was that the Modifiers card's buttons did not look like the Tool
+// Studio's: a bare `manager-button` for a destructive verb, and a visibly different label
+// scale. The cause is structural rather than a typo. The Tool Studio's refined treatment
+// comes from an ANCESTOR-CONTEXT rule — `.manager-header-actions .manager-button`, 38px and
+// `0.72rem` — so a card that is not inside a `.manager-header-actions` could never match it
+// however carefully its class string was written.
+//
+// A shared component that merely emits the same class names would not have caught this and
+// will not catch the next one: the drift lives in the SHEET, not in the markup. So the
+// equivalence is measured, in a real browser, on the two roles the maintainer's screenshot
+// shows drifting. `ManagerButton.svelte`'s own class list is read out of the component
+// rather than restated here, so a fixture that stopped matching what the component emits
+// fails instead of quietly measuring markup the product no longer renders.
+const managerButtonPath = resolve(__dirname, '../../src/ui/svelte/components/ManagerButton.svelte');
+const managerButtonSource = readFileSync(managerButtonPath, 'utf8');
+
+function managerButtonClassesFor(role) {
+  const literal = managerButtonSource.match(/const classes = \$derived\(\s*\[([\s\S]*?)\]/);
+  assert.ok(literal, 'ManagerButton declares its emitted classes as one array literal');
+  const base = [...literal[1].matchAll(/'([a-z][\w-]*)'/g)].map(([, token]) => token);
+  assert.ok(
+    base.includes('manager-button') && base.includes('fab-manager-button'),
+    `ManagerButton must emit both the convention class and the primitive class, got ${base.join(' ')}`
+  );
+  assert.match(
+    literal[1],
+    /is-\$\{role\}/,
+    'ManagerButton must derive its role modifier from the prop, not hard-code one'
+  );
+  return `${base.join(' ')} is-${role}`;
+}
+
+const AUTHORITY_PROBES = ['primary', 'danger'];
+
+test('a Modifiers card button renders exactly like the tool studio button of the same role', async () => {
+  const browser = await chromium.launch();
+  const page = await browser.newPage({ viewport: { width: 1280, height: 720 }, deviceScaleFactor: 1 });
+
+  try {
+    const toolButtons = AUTHORITY_PROBES.map(
+      (role) =>
+        `<button type="button" class="${managerButtonClassesFor(role)}" data-probe="tool-${role}"><i class="fas fa-save"></i><span>Save tool</span></button>`
+    ).join('');
+    const cardButtons = AUTHORITY_PROBES.map(
+      (role) =>
+        `<button type="button" class="${managerButtonClassesFor(role)}" data-probe="card-${role}"><i class="fa-solid fa-plus"></i><span>Delete modifier</span></button>`
+    ).join('');
+    // The NEGATIVE CONTROL: the class string this card shipped before the conversion. If it
+    // measured the same as the converted one, the primitive would be changing nothing and
+    // every assertion below would pass vacuously.
+    const unconverted =
+      '<button type="button" class="manager-button is-danger" data-probe="card-unconverted"><i class="fa-solid fa-plus"></i><span>Delete modifier</span></button>';
+
+    await page.setContent(`
+      <!doctype html>
+      <html lang="en">
+        <head>
+          <meta charset="utf-8">
+          <style>
+            ${css}
+            body { margin: 0; padding: 24px; font-family: Arial, sans-serif; font-size: 16px; }
+            .fas::before, .fa-solid::before { content: "x"; }
+          </style>
+        </head>
+        <body>
+          <main class="fabricate-manager">
+            <header class="manager-tool-edit-header">
+              <div class="manager-header-actions manager-tool-edit-actions">${toolButtons}</div>
+            </header>
+            <section class="manager-edit-card manager-character-modifier-card">
+              <div class="manager-modifier-body manager-character-modifier-editor">
+                <div class="manager-character-modifier-actions">${cardButtons}${unconverted}</div>
+              </div>
+            </section>
+          </main>
+        </body>
+      </html>
+    `);
+
+    const measured = await page.evaluate(() => {
+      const read = (probe) => {
+        const element = document.querySelector(`[data-probe="${probe}"]`);
+        if (!element) return null;
+        const style = getComputedStyle(element);
+        return {
+          fontSize: style.fontSize,
+          fontWeight: style.fontWeight,
+          padding: `${style.paddingTop} ${style.paddingRight} ${style.paddingBottom} ${style.paddingLeft}`,
+          height: `${Math.round(element.getBoundingClientRect().height)}px`,
+          borderRadius: style.borderRadius,
+        };
+      };
+      return Object.fromEntries(
+        [
+          'tool-primary',
+          'card-primary',
+          'tool-danger',
+          'card-danger',
+          'card-unconverted',
+        ].map((probe) => [probe, read(probe)])
+      );
+    });
+
+    for (const probe of Object.keys(measured)) {
+      assert.ok(measured[probe], `${probe} rendered`);
+    }
+
+    // The gate would be vacuous if the sheet styled nothing: an unstyled button reports the
+    // UA default on both sides and matches trivially. These pin that the authority's own
+    // rule reached the fixture. 34px and 0.72rem are what `.manager-tool-edit-actions
+    // .manager-button` renders — NOT the 38px `.manager-header-actions` declares, which that
+    // later, more specific block overrides.
+    assert.equal(measured['tool-primary'].fontSize, '11.52px', 'the tool studio label is 0.72rem');
+    assert.equal(measured['tool-primary'].height, '34px', 'at the tool studio control height');
+
+    // …and the control proves the conversion is doing work: the shipped bare class string
+    // renders at the app's inherited body size, which is the reported defect.
+    assert.notEqual(
+      measured['card-unconverted'].fontSize,
+      measured['tool-primary'].fontSize,
+      'an unconverted card button must NOT already match the authority, or this gate proves nothing'
+    );
+
+    for (const role of AUTHORITY_PROBES) {
+      const authority = measured[`tool-${role}`];
+      const card = measured[`card-${role}`];
+      for (const property of ['fontSize', 'fontWeight', 'padding', 'height', 'borderRadius']) {
+        assert.equal(
+          card[property],
+          authority[property],
+          `${role}: the Modifiers card's ${property} (${card[property]}) must match the tool studio's (${authority[property]})`
+        );
+      }
+    }
+  } finally {
+    await page.close();
+    await browser.close();
+  }
+});
+
+// ── The bounds steppers must render "Unbounded" in full (issue 1096) ───────────────────────
+//
+// Reported from a live build: with icon and label taking the row's growth, the two bound
+// steppers collapsed to roughly 70px each and the `Unbounded` placeholder truncated to
+// `Unb`. That placeholder is the ONLY thing on the control that says an empty bound means
+// no limit rather than a limit of zero, so a truncation there is not cosmetic — it deletes
+// the field's meaning. `empty is not zero` is a documented product rule, and this is where a
+// GM reads it.
+//
+// It is MEASURED rather than eyeballed, and measured the only way an `<input>` placeholder
+// can be: an input's `scrollWidth` always equals its `clientWidth`, so overflow is invisible
+// to the DOM. The text is measured against the input's own computed font with a canvas
+// metric and compared to the content box.
+const MODIFIER_BOUNDS_ROW_WIDTHS = [1280, 1120, 960, 831, 680];
+
+// `Stepper` owns its chrome in a scoped `<style>`, and the whole measurement turns on ONE of
+// its rules: `.fab-stepper.is-fill … .fab-stepper-input { flex: 1 1 0; width: auto;
+// min-width: 0 }` is what makes the input obey the track it is given. Without the compiled
+// CSS the fixture renders a UA-default `<input>` — 181px wide and happily overflowing an
+// 80px stepper — so every width would "fit" and the gate would prove nothing. It is stamped
+// with the real scoping hash and appended after the global sheet, exactly as `css: 'injected'`
+// ships it.
+const stepperScoped = scopedComponentCss(
+  resolve(__dirname, '../../src/ui/svelte/components/Stepper.svelte')
+);
+
+function withStepperHash(markup) {
+  return ['fab-stepper', 'fab-stepper-input', 'fab-stepper-adjunct'].reduce(
+    (current, token) => withScopeHash(current, token, stepperScoped.hashClass),
+    markup
+  );
+}
+
+test('the modifier row gives every field room for its longest content at every manager width', async () => {
+  const browser = await chromium.launch();
+
+  try {
+    const stepper = (bound) =>
+      `<div class="fab-stepper is-fill"><button type="button" class="fab-stepper-adjunct"><i class="fas fa-minus"></i></button><input type="number" class="fab-stepper-input" data-stepper-input data-system-modifier-field="${bound}" placeholder="Unbounded"><button type="button" class="fab-stepper-adjunct"><i class="fas fa-plus"></i></button></div>`;
+    const boundField = (bound, caption) =>
+      `<div class="manager-field manager-modifier-bound-field" data-bound="${bound}"><span class="manager-recipe-micro-label">${caption}</span>${stepper(bound)}</div>`;
+    const editor = `
+      <div class="manager-modifier-body manager-character-modifier-editor">
+        <div class="manager-modifier-name-row">
+          <div class="manager-field manager-modifier-icon-field"><span>Icon</span><button type="button" class="essence-icon-picker-trigger"><i class="fas fa-leaf"></i></button></div>
+          <label class="manager-field manager-modifier-label-field"><span>Label</span><input type="text" data-modifier-label value="Herbalism"></label>
+          <div class="manager-modifier-bounds-row" data-system-modifier-bounds="mod-probe">
+            ${boundField('min', 'Minimum')}${boundField('max', 'Maximum')}
+          </div>
+        </div>
+      </div>`;
+
+    const failures = [];
+    for (const width of MODIFIER_BOUNDS_ROW_WIDTHS) {
+      const page = await browser.newPage({ viewport: { width, height: 800 }, deviceScaleFactor: 1 });
+      try {
+        await page.setContent(`
+          <!doctype html>
+          <html lang="en">
+            <head>
+              <meta charset="utf-8">
+              <style>
+                ${css}
+                ${stepperScoped.css}
+                body { margin: 0; font-family: Arial, sans-serif; font-size: 16px; }
+                /* The real manager container, so the shipped fabricate-manager container
+                   queries resolve against this width rather than never matching. */
+                .fabricate-manager { container-type: inline-size; container-name: fabricate-manager; }
+                .manager-settings-pane { box-sizing: border-box; width: 100%; padding: 16px; }
+                .fas::before { content: "x"; }
+              </style>
+            </head>
+            <body>
+              <main class="fabricate-manager"><div class="manager-settings-pane">${withStepperHash(editor)}</div></main>
+            </body>
+          </html>
+        `);
+
+        const report = await page.evaluate(() => {
+          const measureText = (element, text) => {
+            const style = getComputedStyle(element);
+            const context = document.createElement('canvas').getContext('2d');
+            context.font = `${style.fontStyle} ${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
+            return context.measureText(text).width;
+          };
+          const row = document.querySelector('.manager-modifier-name-row');
+          const label = document.querySelector('[data-modifier-label]');
+          const labelStyle = getComputedStyle(label);
+          return {
+            rowOverflow: row.scrollWidth > row.clientWidth + 1,
+            label: {
+              content: Math.round(
+                label.getBoundingClientRect().width -
+                  Number.parseFloat(labelStyle.paddingLeft) -
+                  Number.parseFloat(labelStyle.paddingRight)
+              ),
+              // The longest label the product itself authors, measured in the FIELD'S OWN
+              // font rather than compared to a round number someone picked.
+              needed: Math.round(measureText(label, 'Herbalism Training')),
+            },
+            bounds: ['min', 'max'].map((bound) => {
+              const input = document.querySelector(`[data-system-modifier-field="${bound}"]`);
+              const style = getComputedStyle(input);
+              const content =
+                input.getBoundingClientRect().width -
+                Number.parseFloat(style.paddingLeft) -
+                Number.parseFloat(style.paddingRight);
+              return {
+                bound,
+                content: Math.round(content),
+                needed: Math.round(measureText(input, input.placeholder)),
+                fieldWidth: Math.round(
+                  document.querySelector(`[data-bound="${bound}"]`).getBoundingClientRect().width
+                ),
+              };
+            }),
+          };
+        });
+
+        if (report.rowOverflow) failures.push(`${width}px: the row overflows its track`);
+        if (report.label.content < report.label.needed) {
+          failures.push(
+            `${width}px label: "Herbalism Training" needs ${report.label.needed}px and the field offers ${report.label.content}px`
+          );
+        }
+        for (const bound of report.bounds) {
+          if (bound.content < bound.needed) {
+            failures.push(
+              `${width}px ${bound.bound}: "Unbounded" needs ${bound.needed}px and the input offers ${bound.content}px (field ${bound.fieldWidth}px)`
+            );
+          }
+        }
+      } finally {
+        await page.close();
+      }
+    }
+
+    assert.deepEqual(
+      failures,
+      [],
+      `a truncated "Unbounded" reads as "Unb" and destroys the empty-is-not-zero contract:\n- ${failures.join('\n- ')}`
+    );
+  } finally {
+    await browser.close();
+  }
+});

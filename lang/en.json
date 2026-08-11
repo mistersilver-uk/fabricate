@@ -3911,6 +3911,7 @@
           "Icon": "Icon",
           "ChangeIcon": "Change icon",
           "Expression": "Expression",
+          "SuggestionsLabel": "Add a term to this expression",
           "SeedPresets": "Seed presets",
           "SeedPresetsUnsupported": "Preset seeding is only available for dnd5e or pf2e worlds.",
           "RollTag": "Roll",

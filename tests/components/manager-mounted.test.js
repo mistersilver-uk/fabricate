@@ -237,6 +237,10 @@ function compileManagerRoot() {
   // The shared chip (issue 883). The root reaches it through the Tool Studio and Knowledge
   // trees today, and through every other manager screen as the conversion proceeds.
   writeCompiledSvelte('src/ui/svelte/apps/manager/Chip.svelte');
+  // THE manager's labelled push-button (issue 1096). The root reaches it through the Tool
+  // Studio header and the System Overview Modifiers card, and through every other screen
+  // as the conversion proceeds.
+  writeCompiledSvelte('src/ui/svelte/components/ManagerButton.svelte');
   for (const knowledgeComponent of [
     'KnowledgeTabs',
     'KnowledgeRoster',
@@ -596,6 +600,11 @@ function compileManagerRoot() {
     // SystemEditView imports the pure modifier↔prerequisite copy-mapping helpers
     // (issue 768); omitting it HANGS every mounted manager test as `# cancelled`.
     'src/systems/characterModifierPrerequisiteCopy.js',
+    // The expression suggestion chips' derivation (issue 1096) and the per-Foundry-system
+    // preset bundle it reads. Both are pure leaves; SystemEditView imports the first,
+    // which imports the second.
+    'src/config/modifierExpressionSuggestions.js',
+    'src/config/gatheringCharacterModifierPresets.js',
     'src/config/currencyPresets.js',
     'src/config/currencyProviders.js',
     'src/systems/Pf2eInventoryCoinAdapter.js',

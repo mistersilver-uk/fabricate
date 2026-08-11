@@ -1719,6 +1719,57 @@
   font-weight: 700;
 }
 
+/* ── The tool studio's treatment, released from its ancestor (issue 1096) ─────────
+   `ManagerButton.svelte` emits `fab-manager-button` beside `manager-button`, and the
+   rules below re-declare the tool studio's values against that class with NO ancestor
+   requirement. That is the whole mechanism: the maintainer ruled the Tool Studio's
+   Back/Delete/Save cluster the AUTHORITY for a manager button, and it looks the way it
+   does only because it sits inside `.manager-tool-edit-actions`. A card elsewhere —
+   the Modifiers card is the reported case — could never match it, because it has no
+   such ancestor and landed on the base control at the app's INHERITED body size.
+   "The fonts differ from the tool studio's" is that missing `font-size`, exactly.
+
+   The values are COPIED from `.manager-tool-edit-actions .manager-button` (and from
+   the `.manager-header-actions` `.is-primary` rule that still wins the padding there),
+   never re-chosen; no new size, spacing or radius scale is introduced. NOTE which
+   block that is: `.manager-header-actions .manager-button` above declares a 38px
+   control, but `.manager-tool-edit-actions .manager-button` is later AND more
+   specific, so what the Tool Studio actually renders is 34px. Copying the 38 would
+   have re-typed the authority instead of adopting it.
+
+   These are declared BEFORE the tool studio's own block on purpose. At equal
+   specificity the later rule wins, so the Tool Studio keeps being styled by its own
+   selectors and converting it is provably a no-op, while every other converted site
+   picks these up. Against the base `.fabricate-manager .manager-button` (0,2,0) this
+   (0,3,0) wins outright, which is what lifts the Modifiers card.
+   `manager-layout.test.js` measures the result in a real browser rather than trusting
+   that arithmetic. */
+.fabricate-manager .manager-button.fab-manager-button {
+  min-height: 34px;
+  padding: 0 var(--fab-space-3);
+  font-size: 0.72rem;
+}
+
+.fabricate-manager .manager-button.fab-manager-button.is-primary {
+  padding: 0 var(--fab-space-4);
+  font-weight: 700;
+}
+
+/* The ghost's RESTING border is the difference that matters: the base `.is-ghost` is
+   borderless until hover, while the tool studio's Back button keeps a border so it
+   reads as a button before the pointer arrives (§F6). */
+.fabricate-manager .manager-button.fab-manager-button.is-ghost {
+  border-color: var(--fab-mv2-border);
+  color: var(--fab-mv2-text-muted);
+  background: transparent;
+}
+
+.fabricate-manager .manager-button.fab-manager-button.is-ghost:not(:disabled):hover {
+  border-color: var(--fab-border);
+  color: var(--fab-text);
+  background: var(--fab-surface-soft);
+}
+
 /* Ghost Back button (§F6): quiet, but the design keeps a resting border so it reads
    as a button before hover, not a bare label. */
 .fabricate-manager .manager-header-actions .manager-button.is-ghost {
@@ -2823,10 +2874,36 @@
   padding: 0 var(--fab-space-3) var(--fab-space-3);
 }
 
+/* ── Icon · Label · Minimum · Maximum, on ONE line (issue 1096) ──────────────────
+   The bounds pair used to sit on its own row below the expression, as two full-width
+   stepper rows. The maintainer's ruling is that all four short scalars belong on the
+   line above the expression, leaving the one long field the full width.
+
+   Degradation is by WRAP rather than by a container query, deliberately: the editor
+   body is nested several layers inside the settings panel, so the manager container's
+   width is a poor proxy for the width this row actually gets, and a container query
+   adds no specificity to lean on if it were wrong. `flex-wrap` reacts to the real
+   track, and the bounds pair is a single flex ITEM, so min and max always wrap
+   together — a min separated from its max reads as two unrelated fields rather than a
+   range.
+
+   WHO GETS THE SLACK took two corrections from live testing, and the answer is neither
+   of the first two arrangements. Letting Icon and Label grow left the steppers at
+   roughly 70px each, truncating the `Unbounded` placeholder to `Unb` — and that
+   placeholder is the only thing on the control that says an empty bound means NO LIMIT
+   rather than zero. Handing the growth to the bounds instead over-corrected: they took
+   ~325px each while Label, the one field holding FREE TEXT, was left at ~150px, where
+   a seeded entry like `Herbalism Training` truncates in the box the GM types into.
+
+   The settled rule follows from what each field can hold. A bound is a short signed
+   number or the word `Unbounded`, so it has a KNOWN maximum and takes a fixed track. A
+   label is arbitrary text with no maximum, so it takes the surplus. Icon is a
+   fixed-width trigger and grows for nobody. */
 .fabricate-manager .manager-modifier-name-row {
   display: flex;
   align-items: flex-end;
   gap: var(--fab-space-2);
+  flex-wrap: wrap;
 }
 
 .fabricate-manager .manager-modifier-icon-field {
@@ -2834,7 +2911,28 @@
 }
 
 .fabricate-manager .manager-modifier-name-row .manager-modifier-label-field {
-  flex: 1 1 auto;
+  flex: 1 1 22ch;
+  min-width: 0;
+}
+
+.fabricate-manager .manager-modifier-name-row .manager-modifier-bounds-row {
+  display: flex;
+  gap: var(--fab-space-2);
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+/* A FIXED track, wide enough for the longest thing a bound can hold. 148px is measured
+   rather than chosen: the stepper spends ~58px of its box on the two adjuncts, padding
+   and borders, and `Unbounded` needs ~59px of the remainder at this font, so 148px
+   leaves real headroom for a longer translation while still handing every other pixel
+   of the row to the label. The shipped `flex: 0 1 80px` this replaces left 22px of
+   content for those 59px — that is the `Unb` the maintainer saw, and
+   `manager-layout.test.js` reds on exactly that arithmetic. No `min-width`: a floor was
+   tried here and measured inert, because the row wraps the pair onto its own line long
+   before either field could reach it. */
+.fabricate-manager .manager-modifier-name-row .manager-modifier-bound-field {
+  flex: 0 1 148px;
   min-width: 0;
 }
 
@@ -2863,6 +2961,42 @@
   display: flex;
   flex-direction: column;
   gap: var(--fab-space-2);
+}
+
+/* ── Roll-data suggestion chips under the expression (issue 1096) ─────────────────
+   The CHIP is the shipped `.manager-tag-suggestion` — same 16px-glyph-plus-label grid,
+   same success-tinted hover — so this row and the modifier typeahead speak with one
+   voice. Its CONTAINER is not `.manager-tag-suggestions`: that one is the absolutely
+   positioned drop-down panel a typeahead opens over the page, and reusing it here
+   would mean unsetting `position`, `z-index`, `top`, `max-height`, `box-shadow` and
+   the panel surface — fighting a rule rather than reusing it. A static row is a
+   different container for the same chip, which is exactly the relationship
+   `.manager-character-modifier-add-suggestion` already has with the chip. */
+.fabricate-manager .manager-modifier-expression-suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--fab-space-chip);
+  align-items: center;
+  min-width: 0;
+}
+
+/* Three classes (0,3,0) to clear the base chip's `border: 0` and transparent fill at
+   (0,2,0). A resting border is required here and not in the drop-down: inside a panel
+   the chips are enclosed and separated by the panel itself, whereas on the page they
+   are loose controls and have to read as controls before hover. */
+.fabricate-manager .manager-tag-suggestion.manager-modifier-expression-suggestion {
+  flex: 0 1 auto;
+  border: 1px solid var(--fab-mv2-border);
+  background: var(--fab-mv2-surface-1);
+  font-family: var(--fab-font-mono, monospace);
+  font-size: 0.72rem;
+}
+
+.fabricate-manager .manager-modifier-expression-suggestion > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .fabricate-manager .manager-character-modifier-actions {

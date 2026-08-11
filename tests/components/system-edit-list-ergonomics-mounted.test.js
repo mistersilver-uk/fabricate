@@ -28,6 +28,11 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/iconPickerPopover.js',
     'src/systems/characterPrerequisites.js',
     'src/systems/characterModifierPrerequisiteCopy.js',
+    // The expression suggestion chips' derivation (issue 1096) and the per-Foundry-system
+    // preset bundle it reads. Both are pure leaves; SystemEditView imports the first,
+    // which imports the second.
+    'src/config/modifierExpressionSuggestions.js',
+    'src/config/gatheringCharacterModifierPresets.js',
     // The unified modifier library's bounds pair and roll classification (issue 1117).
     'src/systems/checkModifierResolver.js',
     'src/systems/salvageCheckUsability.js',
@@ -44,6 +49,10 @@ const harness = createMountedComponentHarness({
     // the harness omits HANGS the suite (# cancelled) rather than failing it.
     'src/ui/svelte/apps/manager/EmptyState.svelte',
     'src/ui/svelte/components/IconPicker.svelte',
+    // THE manager's labelled push-button (issue 1096). The Modifiers card and the Tool
+    // Studio header both render through it; an omission HANGS this suite rather than
+    // failing it.
+    'src/ui/svelte/components/ManagerButton.svelte',
     // The Modifiers section's min/max pair and `@`-sigil expression field (issue 1117).
     'src/ui/svelte/components/Stepper.svelte',
     'src/ui/svelte/apps/manager/RollDataExpressionInput.svelte',
@@ -419,6 +428,234 @@ describe('system-edit list ergonomics (mounted, issue 768)', () => {
     assert.ok(
       !root.querySelector('[data-system-modifier-bounds-invalid="mod-ok"]'),
       'a well-formed entry gets no note'
+    );
+  });
+});
+
+// ── Issue 1096, maintainer round ──────────────────────────────────────────────────────────
+// Three reported defects in this card, all of them only visible on screen until now.
+describe('modifier editor treatment and layout (mounted, issue 1096)', () => {
+  const BOUNDED = Object.freeze([
+    { id: 'mod-flat', label: 'Flat', icon: 'fa-solid fa-a', expression: '@abilities.wis.mod', min: -1, max: 5 }
+  ]);
+
+  async function openEditor(props = {}) {
+    const root = await harness.mount({
+      selectedSystem: makeSystem(),
+      modifierLibrary: BOUNDED,
+      ...props
+    });
+    const row = root.querySelector('[data-system-modifier="mod-flat"]');
+    row.querySelector('[data-toggle-modifier]').dispatchEvent(clickEvent());
+    await flushRender();
+    return { root, row };
+  }
+
+  // DEFECT 1. `Delete modifier` and `Done` shipped a BARE `manager-button`: the destructive
+  // verb was painted as a neutral one, while the identical verb in the Tool Studio is
+  // danger. The roles now come from the shared primitive, so the class is emitted from ONE
+  // place instead of remembered at each call site.
+  it('gives Delete the danger role and Done the ghost role, through the shared primitive', async () => {
+    const { row } = await openEditor();
+
+    const del = row.querySelector('[data-system-modifier-delete="mod-flat"]');
+    const done = row.querySelector('[data-system-modifier-done="mod-flat"]');
+    assert.ok(del && done, 'the open editor renders both verbs');
+
+    assert.ok(del.classList.contains('is-danger'), 'deleting a modifier is a DESTRUCTIVE action');
+    assert.ok(!done.classList.contains('is-danger'), 'and Done is not');
+    assert.ok(done.classList.contains('is-ghost'), 'Done is the quiet verb, as Back is in the Tool Studio');
+
+    // Both go through `ManagerButton`, which is what stops the pair drifting apart again:
+    // the primitive's own class is present on each.
+    for (const [name, button] of [['Delete modifier', del], ['Done', done]]) {
+      assert.ok(
+        button.classList.contains('manager-button') &&
+          button.classList.contains('fab-manager-button'),
+        `${name} renders through the shared primitive, not a hand-written class string`
+      );
+      assert.equal(button.getAttribute('type'), 'button', `${name} never submits`);
+    }
+  });
+
+  it('routes the card’s header verbs through the primitive too, keeping Add primary and Seed presets quiet', async () => {
+    const root = await harness.mount({ selectedSystem: makeSystem(), modifierLibrary: BOUNDED });
+    // Scoped to the Modifiers card: the prerequisites and currency cards reuse the same
+    // header-actions class, and this change converts only this one.
+    const actions = [
+      ...root.querySelectorAll(
+        '[data-system-modifiers] .manager-character-modifier-card-header-actions .manager-button'
+      )
+    ];
+
+    assert.equal(actions.length, 2, 'Add modifier and Seed presets');
+    assert.ok(
+      actions.every((button) => button.classList.contains('fab-manager-button')),
+      'both header verbs are the shared primitive'
+    );
+    assert.ok(actions[0].classList.contains('is-primary'), 'Add modifier stays the loud verb');
+    assert.ok(
+      !actions[1].classList.contains('is-primary') && !actions[1].classList.contains('is-danger'),
+      'Seed presets stays deliberately neutral — this change fixes the roles that were MISSING, not the quiet ones'
+    );
+  });
+
+  // DEFECT 2. Icon, label, minimum and maximum on ONE line, ahead of the expression. The
+  // ORDER is the assertion, not the presence: every one of these elements existed before,
+  // just stacked into three rows.
+  it('puts icon, label, minimum and maximum on one line, before the expression', async () => {
+    const { row } = await openEditor();
+
+    const nameRow = row.querySelector('.manager-modifier-name-row');
+    assert.ok(nameRow, 'the editor still has its top row');
+    assert.ok(
+      Boolean(nameRow.querySelector('.manager-modifier-icon-field')),
+      'the icon is on that row'
+    );
+    assert.ok(
+      Boolean(nameRow.querySelector('[data-system-modifier-field="label"]')),
+      'so is the label'
+    );
+    const bounds = nameRow.querySelector('[data-system-modifier-bounds="mod-flat"]');
+    assert.ok(bounds, 'and so is the bounds pair, which used to sit on its own row below');
+    assert.ok(
+      Boolean(bounds.querySelector('[data-system-modifier-field="min"]')) &&
+        Boolean(bounds.querySelector('[data-system-modifier-field="max"]')),
+      'both bounds ride that one wrapper, so they wrap together'
+    );
+
+    // The expression comes AFTER the row, in document order.
+    const expression = row.querySelector('[data-system-modifier-field="expression"]');
+    assert.ok(expression, 'the expression field is still rendered');
+    assert.ok(
+      Boolean(
+        nameRow.compareDocumentPosition(expression) &
+          globalThis.window.Node.DOCUMENT_POSITION_FOLLOWING
+      ),
+      'the expression is BELOW the four short fields, not above them'
+    );
+    assert.ok(
+      !nameRow.contains(expression),
+      'and it is not squeezed onto the same line as its three neighbours'
+    );
+
+    // The bounds hint explains the BOUNDS ("empty is not zero"), so it reads directly under
+    // them. Below the expression and its suggestion chips it attached itself to the one field
+    // it says nothing about.
+    const hint = row.querySelector('.manager-modifier-bounds-hint');
+    assert.ok(hint, 'the hint is still rendered');
+    assert.ok(
+      Boolean(
+        hint.compareDocumentPosition(expression) &
+          globalThis.window.Node.DOCUMENT_POSITION_FOLLOWING
+      ),
+      'the bounds hint sits above the expression, beside the bounds it describes'
+    );
+  });
+
+  it('keeps the bounds absence-preserving and the Unbounded placeholder after the move', async () => {
+    const patches = [];
+    const root = await harness.mount({
+      selectedSystem: makeSystem(),
+      modifierLibrary: [{ id: 'mod-open', label: 'Open', icon: 'fa-solid fa-a', expression: '@a' }],
+      onUpdateModifier: async (id, patch) => { patches.push([id, patch]); }
+    });
+    const row = root.querySelector('[data-system-modifier="mod-open"]');
+    row.querySelector('[data-toggle-modifier]').dispatchEvent(clickEvent());
+    await flushRender();
+
+    const min = row.querySelector('[data-system-modifier-field="min"]');
+    assert.equal(min.value, '', 'an unbounded bound stays EMPTY — empty is not zero');
+    assert.equal(min.getAttribute('placeholder'), 'Unbounded', 'the placeholder survives the move');
+
+    min.value = '3';
+    min.dispatchEvent(new globalThis.window.Event('input', { bubbles: true }));
+    await flushRender();
+    assert.deepEqual(patches, [['mod-open', { min: 3 }]], 'the stepper still patches its own key');
+  });
+
+  it('still renders the bounds fault surface when the pair is inverted', async () => {
+    const root = await harness.mount({
+      selectedSystem: makeSystem(),
+      modifierLibrary: [{ id: 'mod-inv', label: 'Inverted', icon: 'fa-solid fa-a', expression: '@a', min: 5, max: -1 }]
+    });
+    const note = root.querySelector('.manager-modifier-bounds-error[data-system-modifier-bounds-invalid="mod-inv"]');
+    assert.ok(note, 'the error surface is not a casualty of the relayout');
+  });
+
+  // DEFECT 3. Roll-data suggestion chips under the expression, which APPEND.
+  it('offers roll-data suggestion chips under the expression, derived from the active world', async () => {
+    const { row } = await openEditor({ foundrySystemId: 'dnd5e' });
+
+    const chips = [...row.querySelectorAll('[data-system-modifier-suggestion]')];
+    assert.ok(chips.length > 0, 'the expression carries a suggestion row');
+    const terms = chips.map((chip) => chip.textContent.trim());
+    assert.ok(terms.includes('@abilities.wis.mod'), 'a dnd5e world is offered dnd5e roll data');
+    assert.ok(terms.includes('1d4'), 'and the system-agnostic terms beside it');
+
+    const suggestions = row.querySelector('[data-system-modifier-suggestions="mod-flat"]');
+    const expression = row.querySelector('[data-system-modifier-field="expression"]');
+    assert.ok(
+      Boolean(
+        expression.compareDocumentPosition(suggestions) &
+          globalThis.window.Node.DOCUMENT_POSITION_FOLLOWING
+      ),
+      'the chips sit UNDER the field they fill in'
+    );
+  });
+
+  it('offers the pf2e paths in a pf2e world, so the row is not one hard-coded list', async () => {
+    const { row } = await openEditor({ foundrySystemId: 'pf2e' });
+    const terms = [...row.querySelectorAll('[data-system-modifier-suggestion]')].map((chip) =>
+      chip.textContent.trim()
+    );
+    assert.ok(
+      terms.includes('@actor.system.abilities.wis.mod'),
+      'the pf2e wisdom path, which is a different string from the dnd5e one'
+    );
+    assert.ok(!terms.includes('@abilities.wis.mod'), 'and never the dnd5e one');
+  });
+
+  it('APPENDS a clicked suggestion to the expression rather than replacing it', async () => {
+    const patches = [];
+    const { row } = await openEditor({
+      foundrySystemId: 'dnd5e',
+      onUpdateModifier: async (id, patch) => { patches.push([id, patch]); }
+    });
+
+    const die = [...row.querySelectorAll('[data-system-modifier-suggestion]')].find(
+      (chip) => chip.textContent.trim() === '1d4'
+    );
+    assert.ok(die, 'the 1d4 chip is present');
+    die.dispatchEvent(clickEvent());
+    await flushRender();
+
+    assert.deepEqual(
+      patches,
+      [['mod-flat', { expression: '@abilities.wis.mod + 1d4' }]],
+      'the authored expression is EXTENDED — a chip that replaced it would destroy the GM’s work'
+    );
+  });
+
+  it('leaves focus and the caret at the end of the expression field after a chip', async () => {
+    const { row } = await openEditor({ foundrySystemId: 'dnd5e' });
+    const expression = row.querySelector('[data-system-modifier-field="expression"]');
+
+    const chip = row.querySelector('[data-system-modifier-suggestion]');
+    chip.dispatchEvent(clickEvent());
+    await flushRender();
+
+    // A BOOLEAN, never `assert.equal(activeElement, expression)`: on failure node:assert
+    // serialises both mounted elements to build its diff and walks happy-dom's circular tree
+    // until the heap dies, which surfaces as a hung `# cancelled` suite with no message.
+    assert.ok(
+      globalThis.window.document.activeElement === expression,
+      'the field the chip filled in takes focus, so the next keystroke continues the expression'
+    );
+    assert.equal(
+      expression.selectionStart,
+      expression.value.length,
+      'and the caret is at the end rather than wherever it happened to be'
     );
   });
 });
