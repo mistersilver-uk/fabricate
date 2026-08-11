@@ -45,17 +45,23 @@
 
 <div class="manager-checks-editor" data-progressive-check-editor>
   {#if shows('roll')}
-    <section class="manager-inspector-card">
-      <h3 class="manager-card-title">
-        {text('FABRICATE.Admin.Manager.Checks.Crafting.FormulaTitle', 'Roll formula')}
-      </h3>
-      <p class="manager-muted">
-        {text(
-          'FABRICATE.Admin.Manager.Checks.Crafting.ProgressiveLead',
-          'Roll a formula for a numeric value. Results are awarded in order, each spending its difficulty from the value, until the value can no longer cover the next. Per-die crits force award-all or award-none.'
-        )}
-      </p>
-      <CheckFormulaFields rollFormula={value?.rollFormula || ''} showDc={false} onChange={emit} />
+    <section class="manager-inspector-card manager-checks-card" data-roll-formula-card>
+      <div class="manager-checks-card-head">
+        <div>
+          <h3 class="manager-checks-card-title">
+            {text('FABRICATE.Admin.Manager.Checks.Crafting.FormulaTitle', 'Roll formula')}
+          </h3>
+          <p class="manager-checks-card-description">
+            {text(
+              'FABRICATE.Admin.Manager.Checks.Crafting.ProgressiveLead',
+              'Roll a formula for a numeric value. Results are awarded in order, each spending its difficulty from the value, until the value can no longer cover the next. Per-die crits force award-all or award-none.'
+            )}
+          </p>
+        </div>
+      </div>
+      <div class="manager-checks-card-body">
+        <CheckFormulaFields rollFormula={value?.rollFormula || ''} showDc={false} onChange={emit} />
+      </div>
     </section>
   {/if}
 
@@ -74,15 +80,19 @@
        Outcomes in every mode: hiding it here would remove this control from the UI
        entirely, which no test would have seen. -->
   {#if shows('outcomes')}
-    <section class="manager-inspector-card" data-award-mode>
-      <h3 class="manager-card-title">
-        {text('FABRICATE.Admin.Manager.Checks.Crafting.AwardModeTitle', 'Award mode')}
-      </h3>
-      <CheckAwardMode
-        value={value?.awardMode || 'equal'}
-        name="crafting-progressive-award-mode"
-        onChange={(awardMode) => emit({ awardMode })}
-      />
+    <section class="manager-inspector-card manager-checks-card" data-award-mode>
+      <div class="manager-checks-card-head">
+        <h3 class="manager-checks-card-title">
+          {text('FABRICATE.Admin.Manager.Checks.Crafting.AwardModeTitle', 'Award mode')}
+        </h3>
+      </div>
+      <div class="manager-checks-card-body">
+        <CheckAwardMode
+          value={value?.awardMode || 'equal'}
+          name="crafting-progressive-award-mode"
+          onChange={(awardMode) => emit({ awardMode })}
+        />
+      </div>
     </section>
   {/if}
 </div>

@@ -126,16 +126,20 @@
 
 <div class="manager-checks-editor" data-simple-check-editor>
   {#if shows('roll')}
-    <section class="manager-inspector-card">
-      <h3 class="manager-card-title">
-        {text('FABRICATE.Admin.Manager.Checks.Crafting.FormulaTitle', 'Roll formula')}
-      </h3>
-      <CheckFormulaFields
-        rollFormula={value?.rollFormula || ''}
-        dc={value?.dc ?? 15}
-        thresholdMode={value?.thresholdMode || 'meet'}
-        onChange={emit}
-      />
+    <section class="manager-inspector-card manager-checks-card" data-roll-formula-card>
+      <div class="manager-checks-card-head">
+        <h3 class="manager-checks-card-title">
+          {text('FABRICATE.Admin.Manager.Checks.Crafting.FormulaTitle', 'Roll formula')}
+        </h3>
+      </div>
+      <div class="manager-checks-card-body">
+        <CheckFormulaFields
+          rollFormula={value?.rollFormula || ''}
+          dc={value?.dc ?? 15}
+          thresholdMode={value?.thresholdMode || 'meet'}
+          onChange={emit}
+        />
+      </div>
     </section>
   {/if}
 
@@ -145,37 +149,43 @@
        badge. It renders in every mode precisely because it is the mode's outcome model;
        hiding it would leave the section blank on the one mode that has nothing else. -->
   {#if shows('outcomes')}
-    <section class="manager-inspector-card" data-simple-outcomes>
-      <h3 class="manager-card-title">
-        {text('FABRICATE.Admin.Manager.Checks.Crafting.TwoOutcomesTitle', 'Two outcomes')}
-      </h3>
-      <p class="manager-muted">
-        {text(
-          'FABRICATE.Admin.Manager.Checks.Crafting.TwoOutcomesLead',
-          'A simple check either clears the difficulty or it does not.'
-        )}
-      </p>
-      <div class="manager-checks-flag-list">
-        <IconFactRow
-          icon="fas fa-circle-check"
-          dataAttr="data-simple-outcome"
-          dataValue="success"
-          title={text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeSuccess', 'Success')}
-          subtitle={text(
-            'FABRICATE.Admin.Manager.Checks.Crafting.OutcomeSuccessDesc',
-            'The roll reaches the DC, and the recipe’s result group is produced in full.'
-          )}
-        />
-        <IconFactRow
-          icon="fas fa-circle-xmark"
-          dataAttr="data-simple-outcome"
-          dataValue="failure"
-          title={text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeFailure', 'Failure')}
-          subtitle={text(
-            'FABRICATE.Admin.Manager.Checks.Crafting.OutcomeFailureDesc',
-            'The roll misses the DC; nothing is produced, and the failure policy decides the cost.'
-          )}
-        />
+    <section class="manager-inspector-card manager-checks-card" data-simple-outcomes>
+      <div class="manager-checks-card-head">
+        <div>
+          <h3 class="manager-checks-card-title">
+            {text('FABRICATE.Admin.Manager.Checks.Crafting.TwoOutcomesTitle', 'Two outcomes')}
+          </h3>
+          <p class="manager-checks-card-description">
+            {text(
+              'FABRICATE.Admin.Manager.Checks.Crafting.TwoOutcomesLead',
+              'A simple check either clears the difficulty or it does not.'
+            )}
+          </p>
+        </div>
+      </div>
+      <div class="manager-checks-card-body">
+        <div class="manager-checks-flag-list">
+          <IconFactRow
+            icon="fas fa-circle-check"
+            dataAttr="data-simple-outcome"
+            dataValue="success"
+            title={text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeSuccess', 'Success')}
+            subtitle={text(
+              'FABRICATE.Admin.Manager.Checks.Crafting.OutcomeSuccessDesc',
+              'The roll reaches the DC, and the recipe’s result group is produced in full.'
+            )}
+          />
+          <IconFactRow
+            icon="fas fa-circle-xmark"
+            dataAttr="data-simple-outcome"
+            dataValue="failure"
+            title={text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeFailure', 'Failure')}
+            subtitle={text(
+              'FABRICATE.Admin.Manager.Checks.Crafting.OutcomeFailureDesc',
+              'The roll misses the DC; nothing is produced, and the failure policy decides the cost.'
+            )}
+          />
+        </div>
       </div>
     </section>
   {/if}
@@ -191,24 +201,28 @@
   {/if}
 
   {#if showDcSource && shows('roll')}
-    <section class="manager-inspector-card">
-      <h3 class="manager-card-title">
-        {text('FABRICATE.Admin.Manager.Checks.Crafting.DcTitle', 'DC source')}
-      </h3>
-      <RadioCardGroup
-        legendKey="FABRICATE.Admin.Manager.Checks.Crafting.DcTitle"
-        legend="DC source"
-        options={DC_MODE_OPTIONS}
-        selectedValue={dcMode}
-        groupName="crafting-check-dc-mode"
-        columns={2}
-        optionDataAttr="data-dc-mode-option"
-        onChange={setDcMode}
-      />
+    <section class="manager-inspector-card manager-checks-card" data-dc-source-card>
+      <div class="manager-checks-card-head">
+        <h3 class="manager-checks-card-title">
+          {text('FABRICATE.Admin.Manager.Checks.Crafting.DcTitle', 'DC source')}
+        </h3>
+      </div>
+      <div class="manager-checks-card-body">
+        <RadioCardGroup
+          legendKey="FABRICATE.Admin.Manager.Checks.Crafting.DcTitle"
+          legend="DC source"
+          options={DC_MODE_OPTIONS}
+          selectedValue={dcMode}
+          groupName="crafting-check-dc-mode"
+          columns={2}
+          optionDataAttr="data-dc-mode-option"
+          onChange={setDcMode}
+        />
+      </div>
     </section>
 
     {#if dcMode === 'static'}
-      <section class="manager-inspector-card" data-static-dc>
+      <section class="manager-inspector-card manager-checks-card" data-static-dc>
         <CheckRecipeTiers
           tiers={value?.tiers || []}
           defaultDc={value?.dc ?? 0}
@@ -216,17 +230,22 @@
         />
       </section>
     {:else}
-      <section class="manager-inspector-card" data-dynamic-dc>
-        <h3 class="manager-card-title">
-          {text('FABRICATE.Admin.Manager.Checks.Crafting.MacroTitle', 'DC macro')}
-        </h3>
-        <p class="manager-muted">
-          {text(
-            'FABRICATE.Admin.Manager.Checks.Crafting.MacroHint',
-            'The macro is run with the selected ingredient set, the recipe, and the actor, and must return the DC.'
-          )}
-        </p>
-        <!-- The shared drop primitive (issue 1036). It was hand-rolled here — a bare
+      <section class="manager-inspector-card manager-checks-card" data-dynamic-dc>
+        <div class="manager-checks-card-head">
+          <div>
+            <h3 class="manager-checks-card-title">
+              {text('FABRICATE.Admin.Manager.Checks.Crafting.MacroTitle', 'DC macro')}
+            </h3>
+            <p class="manager-checks-card-description">
+              {text(
+                'FABRICATE.Admin.Manager.Checks.Crafting.MacroHint',
+                'The macro is run with the selected ingredient set, the recipe, and the actor, and must return the DC.'
+              )}
+            </p>
+          </div>
+        </div>
+        <div class="manager-checks-card-body">
+          <!-- The shared drop primitive (issue 1036). It was hand-rolled here — a bare
              `use:dragDrop` div with its own linked/empty branch and its own unlink button
              — while three other manager surfaces already rendered the same card through
              `ItemDropZone`. Converting it is what gives this control the compendium-drag
@@ -235,17 +254,21 @@
              `data-check-macro-dropzone` and `data-unlink-macro` are preserved by the
              `kind` mapping: `manager-mounted.test.js` and the View Lab checks case both
              select on the first. -->
-        <ItemDropZone
-          kind="check-macro"
-          documentType="Macro"
-          item={value?.macroUuid ? { name: macroCardLabel } : null}
-          state={resolvedMacroMissing ? 'missing' : 'linked'}
-          title={macroCardLabel}
-          emptyIcon="fas fa-scroll"
-          unlinkLabel={text('FABRICATE.Admin.Manager.Checks.Crafting.MacroUnlink', 'Unlink macro')}
-          onDrop={handleMacroDrop}
-          onUnlink={() => emit({ macroUuid: null })}
-        />
+          <ItemDropZone
+            kind="check-macro"
+            documentType="Macro"
+            item={value?.macroUuid ? { name: macroCardLabel } : null}
+            state={resolvedMacroMissing ? 'missing' : 'linked'}
+            title={macroCardLabel}
+            emptyIcon="fas fa-scroll"
+            unlinkLabel={text(
+              'FABRICATE.Admin.Manager.Checks.Crafting.MacroUnlink',
+              'Unlink macro'
+            )}
+            onDrop={handleMacroDrop}
+            onUnlink={() => emit({ macroUuid: null })}
+          />
+        </div>
       </section>
     {/if}
   {/if}

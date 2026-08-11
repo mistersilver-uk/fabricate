@@ -4724,6 +4724,7 @@
             "DcDynamic": "Dynamic",
             "DcDynamicDesc": "A macro computes the DC from the ingredients, recipe, and actor.",
             "TiersTitle": "Recipe tiers",
+            "TiersLead": "A recipe picks one of these, and its DC replaces the default above.",
             "AddTier": "Add tier",
             "NoTiers": "No tiers yet. Add named tiers a recipe can select to override the DC.",
             "TierName": "Name",

@@ -4914,6 +4914,38 @@ export const VIEW_LAB_CASES = Object.freeze([
     ],
   }),
   managerCase({
+    id: 'manager-checks-crafting-recipe-tiers',
+    label: 'Manager — Checks crafting recipe tiers',
+    // BEYOND the smoke. The walk never adds a recipe tier, and every simple check in the
+    // fixture world authors none — so the populated list has never been photographed at all.
+    reaches: 'beyond',
+    smokeLabels: [],
+    // THE ROW TREATMENT, which is what issue 1096 changed here: the recipe-tier list was the
+    // last consumer of `.manager-checks-outcome-table` on The roll, drawing boxed inputs in a
+    // grid with a column-header row, while the prototype draws the same list as the Outcomes
+    // screen draws its tiers. An EMPTY list photographs the dashed control and nothing else,
+    // so the case adds two rows to reach the state it is named for.
+    query: {},
+    steps: [
+      'Checks',
+      { selector: '#manager-checks-nav-crafting' },
+      { selector: '[data-add-tier]' },
+      { selector: '[data-add-tier]' },
+      { selector: ':nth-match([data-tier-name], 1)', fill: 'Apprentice work' },
+      { selector: ':nth-match([data-tier-name], 2)', fill: 'Masterwork' },
+      { selector: '[data-tier-row]', scroll: true },
+    ],
+    expectView: 'checks-crafting',
+    // The ROW, not the card: a card that kept its old table would still satisfy a selector
+    // aimed at the section, and the row class is the thing this frame is evidence for.
+    expectSelector: '.fabricate-manager .manager-checks-tier-list [data-tier-row]',
+    kinds: ['manager', 'checks'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/checks\/CheckRecipeTiers\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/checks\/SimpleCraftingCheckEditor\.svelte$/,
+    ],
+  }),
+  managerCase({
     id: 'manager-checks-crafting-tier-step',
     label: 'Manager — Checks crafting tier-step triggers',
     // BEYOND the smoke. The capture walk never AUTHORS a trigger — it adds one, drives the

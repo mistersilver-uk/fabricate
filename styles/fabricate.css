@@ -2237,6 +2237,15 @@
   padding: 14px 16px;
 }
 
+/* A body whose whole content is a LIST plus the dashed control that extends it. The
+   prototype's recipe-tier card is exactly this, at its own inset and its own 6px rhythm. */
+.fabricate-manager .manager-checks-card-body.is-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 14px;
+}
+
 /* SENTENCE CASE, in the display face, at full text ink. The manager's `.manager-card-title`
    is an uppercase micro-label at muted ink — correct for the rail's flat section headings
    and wrong for a card that carries a title AND a description line. */
@@ -2435,6 +2444,17 @@
   background: var(--fab-bg-2);
   font-size: 12.5px;
   font-weight: 500;
+}
+
+/* The number's label, in the ROW rather than in a column header — which is where the
+   prototype puts it, and what lets the recipe-tier list drop its header row entirely. */
+.fabricate-manager .manager-checks-tier-unit {
+  flex: 0 0 auto;
+  color: var(--fab-text-subtle);
+  font-size: 9px;
+  font-weight: 400;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
 }
 
 .fabricate-manager .manager-checks-tier-stepper {
