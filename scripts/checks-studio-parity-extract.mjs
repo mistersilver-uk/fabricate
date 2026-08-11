@@ -66,9 +66,18 @@ const PROPERTY_GROUPS = {
   type: ['color', 'fontSize', 'fontWeight', 'textTransform'],
   tracking: ['letterSpacing'],
   box: ['paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft'],
-  gap: ['columnGap'],
+  // BOTH axes. `columnGap` alone could not see a stacking gutter, which is precisely how the
+  // studio's fourth stacked inset survived the first fixture: the 12px row gap between the
+  // section strip and the body read as dead space above the inspector and no recorded
+  // property was looking at it (issue 1096, maintainer inspector comparison).
+  gap: ['columnGap', 'rowGap'],
   size: ['width', 'height'],
   blockSize: ['height'],
+  // A Font Awesome GLYPH. Deliberately narrower than `type`: the weight and the transform of
+  // an icon come from Font Awesome's own sheet, which neither app's stylesheet owns and which
+  // the parity fixture does not load, so recording them would compare the harness to itself.
+  // Its colour and its size are this studio's own decisions and are recorded.
+  glyph: ['color', 'fontSize'],
   // The SCROLLER's own paint. Nothing selected a token for it, so Foundry core's crimson
   // scrollbar leaked into the studio as two full-height vertical rules at the pane's edges.
   scroll: ['scrollbarColor', 'scrollbarWidth'],
@@ -108,6 +117,16 @@ const REGIONS = [
   {
     name: 'studio-shell',
     groups: ['box'],
+    locator: `pane().parentElement.parentElement`,
+  },
+  // The element that STACKS the section strip on the body. In the prototype the header block
+  // (breadcrumb, title, section strip) and the body grid are siblings with no gutter at all;
+  // Fabricate had 12px between them, running the full width, which is the dead band the
+  // maintainer saw above the inspector's documentation pair. Nothing measured a ROW gap until
+  // this region, so the 12px passed the first fixture untouched.
+  {
+    name: 'editor-stack',
+    groups: ['gap'],
     locator: `pane().parentElement.parentElement`,
   },
   { name: 'pane-heading', groups: ['type'], locator: `paneHeading()` },
@@ -196,6 +215,74 @@ const REGIONS = [
     name: 'inspector-section-heading',
     groups: ['type', 'tracking'],
     locator: `inspectorSectionHeading()`,
+  },
+  // ── The rail, region by region (issue 1096, maintainer inspector comparison) ─────────
+  // The first fixture measured three things in the whole inspector — its surface, one card
+  // and one heading — so the whole of what the maintainer went on to report by hand (a kicker
+  // the prototype does not have, kickers missing their glyph, a digest drawn as four cards)
+  // was outside the gate. These regions are that comparison, mechanised.
+  { name: 'inspector-links', groups: ['gap'], locator: `inspector().firstElementChild` },
+  {
+    name: 'inspector-link',
+    groups: ['surface', 'border', 'type', 'blockSize'],
+    locator: `inspector().firstElementChild.firstElementChild`,
+  },
+  {
+    name: 'inspector-active-card',
+    groups: ['surface', 'border', 'box'],
+    locator: `activationCard()`,
+  },
+  {
+    name: 'inspector-active-track',
+    groups: ['surface', 'size'],
+    locator: `activationCard().firstElementChild.firstElementChild`,
+  },
+  { name: 'inspector-active-reading', groups: ['type'], locator: `spanWithText('Check is on')` },
+  {
+    name: 'inspector-active-hint',
+    groups: ['type'],
+    locator: `activationCard().lastElementChild`,
+  },
+  {
+    name: 'inspector-active-lock',
+    groups: ['glyph'],
+    locator: `activationCard().querySelector('.fa-lock')`,
+  },
+  {
+    name: 'inspector-head-icon',
+    groups: ['glyph'],
+    locator: `kicker('Chance per outcome').previousElementSibling`,
+  },
+  {
+    name: 'inspector-head-note',
+    groups: ['type'],
+    locator: `kicker('Chance per outcome').nextElementSibling`,
+  },
+  // The digest CARD versus its INSET. The prototype's card carries no padding — its head and
+  // its body each own theirs — and Fabricate's head is flat, above the card, so Fabricate's
+  // card is the counterpart of the prototype's BODY. Recording the two separately is what
+  // lets the surface come from the card and the box from the body without either being a
+  // comparison between two different things.
+  // The copy a panel with nothing in it yet states its subject with. Fabricate's three
+  // pre-roll panels (issue 1097) are exactly that state, so this is the type they are read at.
+  {
+    name: 'inspector-panel-copy',
+    groups: ['type'],
+    locator: `spanStartingWith('Roll a test check')`,
+  },
+  { name: 'inspector-list-card', groups: ['surface', 'border'], locator: `digestCard()` },
+  {
+    name: 'inspector-list-inset',
+    groups: ['box', 'gap'],
+    locator: `digestBody()`,
+  },
+  { name: 'inspector-list-row', groups: ['box', 'gap', 'border'], locator: `digestRow()` },
+  { name: 'inspector-list-row-icon', groups: ['glyph'], locator: `digestRow().children[0]` },
+  { name: 'inspector-list-row-text', groups: ['type'], locator: `digestRow().children[1]` },
+  {
+    name: 'inspector-list-row-chevron',
+    groups: ['glyph'],
+    locator: `digestRow().lastElementChild`,
   },
 ];
 
@@ -326,6 +413,43 @@ async function main() {
             (el) => el.textContent.trim() === 'Preview as'
           );
         const inspectorCard = () => inspectorSectionHeading().closest('div').parentElement;
+        // A rail KICKER by its own words. The rail's headings are the only uppercase 9px
+        // spans in the tree, so matching the text is unambiguous and survives a reorder.
+        const kicker = (label) => {
+          const found = [...inspector().querySelectorAll('span')].find(
+            (el) => el.children.length === 0 && el.textContent.trim() === label
+          );
+          if (!found) throw new Error(`rail kicker "${label}" not found`);
+          return found;
+        };
+        const spanWithText = (label) => {
+          const found = [...inspector().querySelectorAll('span')].find(
+            (el) => el.children.length === 0 && el.textContent.trim() === label
+          );
+          if (!found) throw new Error(`rail text "${label}" not found`);
+          return found;
+        };
+        const spanStartingWith = (label) => {
+          const found = [...inspector().querySelectorAll('span')].find(
+            (el) => el.children.length === 0 && el.textContent.trim().startsWith(label)
+          );
+          if (!found) throw new Error(`rail text starting "${label}" not found`);
+          return found;
+        };
+        // The activation card is the rail's SECOND block and carries no heading of its own —
+        // which is the whole point of the region. Located by its tinted surface rather than by
+        // position, so a rail that grew a panel above it still resolves.
+        const activationCard = () => {
+          const found = [...inspector().querySelectorAll('div')].find(
+            (el) => el.querySelector('.fa-lock') && getComputedStyle(el).borderTopWidth === '1px'
+          );
+          if (!found) throw new Error('activation card not found');
+          return found;
+        };
+        // eslint-disable-next-line unicorn/better-dom-traversing -- the head is a plain div
+        const digestCard = () => kicker('This check').parentElement.parentElement;
+        const digestBody = () => kicker('This check').parentElement.nextElementSibling;
+        const digestRow = () => digestBody().firstElementChild;
 
         const scope = {
           pane,
@@ -344,6 +468,13 @@ async function main() {
           inspector,
           inspectorCard,
           inspectorSectionHeading,
+          kicker,
+          spanWithText,
+          spanStartingWith,
+          activationCard,
+          digestCard,
+          digestBody,
+          digestRow,
         };
 
         function paintedBackground(el) {

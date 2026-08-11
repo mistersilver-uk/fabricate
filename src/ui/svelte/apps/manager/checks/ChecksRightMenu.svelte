@@ -7,6 +7,14 @@
   outcome-preview slot, a per-outcome odds slot, and a "This check" digest whose status chip
   reads `OK` / `OFF` / a count pill.
 
+  ## The activation card has NO heading
+
+  Every other section here is named by a flat kicker; this one is not, because the prototype
+  names it nothing. The CARD is the statement — a switch, the words `Check is on`, and (when
+  the mode locks it) a padlock and the sentence saying which mode requires it. An `ACTIVE`
+  kicker above a card reading `On` said the same thing twice and read as a third section
+  (issue 1096, maintainer inspector comparison).
+
   The two preview slots render their PRE-ROLL copy only. issue 1097 fills them with the real
   simulator and the odds enumerator; the slots exist here because the rail's shape and its
   scroll behaviour are what this change is for, and a rail missing two of its six panels
@@ -28,6 +36,19 @@
   the `ABOUT CRAFTING CHECKS` explainer card that stood at the top are all gone, because
   the prototype has none of them.
 
+  The heading ROW is the prototype's, inside that structure: a leading glyph, the kicker,
+  and an optional right-aligned adjunct — the odds panel's die domain, the digest's status
+  chip. The two authorities do not collide here, because one owns where the heading sits and
+  the other owns what it is made of.
+
+  ## The digest and the all-checks list are ONE card of compact rows
+
+  Not a stack of bordered cards. Each row is a 29px line — glyph, one line of text, trailing
+  chevron — and the chevron is an affordance rather than decoration: the row opens the
+  section (or the activity's check) it describes, through the same `onOpen` deep link the
+  Validation issues use. A row that states an ABSENCE ("no roll formula yet", "resolves
+  without a roll") has nowhere to go, so it carries neither a chevron nor a target.
+
   ## Responsive behaviour reuses the SHIPPED container ladder
 
   `styles/fabricate.css` declares `container-name: fabricate-manager` with blocks at
@@ -48,7 +69,6 @@
 -->
 <script>
   import Chip from '../Chip.svelte';
-  import IconFactRow from '../IconFactRow.svelte';
   import { localize } from '../../../util/foundryBridge.js';
 
   let {
@@ -62,6 +82,7 @@
     issueCount = 0,
     allChecks = [],
     onToggleActive = () => {},
+    onOpen = () => {},
   } = $props();
 
   function text(key, fallback) {
@@ -71,9 +92,8 @@
 
   const isValidation = $derived(activeTab === 'validation');
   const activeOn = $derived(activation?.enabled === true);
-  const activeTitle = text('FABRICATE.Admin.Manager.Checks.Active.Title', 'Active');
-  const onLabel = text('FABRICATE.Admin.Manager.StatusOn', 'On');
-  const offLabel = text('FABRICATE.Admin.Manager.StatusOff', 'Off');
+  const onLabel = text('FABRICATE.Admin.Manager.Checks.Active.LockedOn', 'Check is on');
+  const offLabel = text('FABRICATE.Admin.Manager.Checks.Active.LockedOff', 'Check is off');
   const optionalHint = text(
     'FABRICATE.Admin.Manager.Checks.Active.OptionalHint',
     'Turn this check on to require a roll for the activity, or off to resolve it without one.'
@@ -95,14 +115,15 @@
   // check runs whatever the persisted `enabled` flag happens to say, and showing a locked OFF
   // beside a check the engine rolls would be a worse lie than showing no state at all.
   const lockedOn = $derived(!craftingNone);
-  // THE SAME TWO WORDS THE LIVE SWITCH USES (issue 1096). This read `Check is on` / `Check is
-  // off` while the switch one mode over read `On` / `Off` — two vocabularies for one state,
-  // side by side in the same card slot, which reads as two different facts rather than one
-  // fact in two modes. The padlock and the hint below carry the "locked" meaning visually and
-  // in prose, and the `aria-label` still says it in words.
+  // ONE VOCABULARY, and it is the PROTOTYPE's (issue 1096, maintainer inspector comparison).
+  // The reading was `On` / `Off` in both slots, which is the manager's own switch vocabulary
+  // and not what the card it now lives in says; the prototype's card reads `Check is on`, so
+  // both the live switch and the locked indicator read that. The point the earlier ruling
+  // settled survives unchanged — the two slots must not speak differently — and `onLabel` /
+  // `offLabel` are still the single source both read.
   const lockedReading = $derived(lockedOn ? onLabel : offLabel);
   const lockedLabel = $derived(
-    `${lockedOn ? text('FABRICATE.Admin.Manager.Checks.Active.LockedOn', 'Check is on') : text('FABRICATE.Admin.Manager.Checks.Active.LockedOff', 'Check is off')} — ${text('FABRICATE.Admin.Manager.Checks.Active.LockedSuffix', 'locked by the resolution mode')}`
+    `${lockedReading} — ${text('FABRICATE.Admin.Manager.Checks.Active.LockedSuffix', 'locked by the resolution mode')}`
   );
   const requiredHint = $derived(
     craftingNone
@@ -159,12 +180,162 @@
     return list.filter((outcome) => outcome?.success === true).length;
   });
 
+  const hasFormula = $derived(Boolean(activeCheck?.rollFormula));
   const formulaFact = $derived(
-    activeCheck?.rollFormula
+    hasFormula
       ? `${text('FABRICATE.Admin.Manager.Checks.Digest.Formula', 'Formula')} · ${activeCheck.rollFormula}`
       : text('FABRICATE.Admin.Manager.Checks.Digest.NoFormula', 'No roll formula yet')
   );
+
+  // The odds heading's right-aligned adjunct — the prototype's `all 20 faces`. It names the
+  // DOMAIN the enumerator will walk, so it is derived from this check's own die rather than
+  // stated: a `1d20` check enumerates twenty faces and a `2d6` one does not. Absent when the
+  // formula names no die at all, because then there is no domain to name and a fixed "20"
+  // would be a claim about a check that does not roll a d20.
+  const oddsDomain = $derived.by(() => {
+    const match = /(?:^|[^\w.])\d*d(\d+)/i.exec(activeCheck?.rollFormula ?? '');
+    if (!match) return '';
+    return text('FABRICATE.Admin.Manager.Checks.Odds.Faces', 'all {faces} faces').replace(
+      '{faces}',
+      match[1]
+    );
+  });
+
+  /**
+   * The digest's rows, as data.
+   *
+   * `target` is what the row's chevron opens; a row with none states an absence and is not a
+   * target. Built as a list rather than four conditional blocks so the row treatment is
+   * declared once and every row is provably the same shape.
+   */
+  const digestRows = $derived.by(() => {
+    if (checkOff) {
+      return [
+        {
+          id: 'off',
+          icon: 'fas fa-ban',
+          title: text(
+            'FABRICATE.Admin.Manager.Checks.Digest.Off',
+            'This activity resolves without a roll while the check is off.'
+          ),
+          target: null,
+          tone: 'absent',
+        },
+      ];
+    }
+    const rows = [
+      {
+        id: 'formula',
+        icon: 'fas fa-dice-d20',
+        title: formulaFact,
+        target: hasFormula ? [activeTab, 'roll'] : null,
+        tone: hasFormula ? 'set' : 'absent',
+      },
+    ];
+    if (typeof outcomeCount === 'number') {
+      rows.push({
+        id: 'outcomes',
+        icon: 'fas fa-code-branch',
+        title: text(
+          'FABRICATE.Admin.Manager.Checks.Digest.Outcomes',
+          '{count} outcome tiers, {success} count as success'
+        )
+          .replace('{count}', String(outcomeCount))
+          .replace('{success}', String(successCount)),
+        target: [activeTab, 'outcomes'],
+        tone: 'set',
+      });
+    }
+    if (typeof triggerCount === 'number') {
+      rows.push({
+        id: 'triggers',
+        icon: 'fas fa-bolt',
+        title: text(
+          'FABRICATE.Admin.Manager.Checks.Digest.Triggers',
+          '{count} triggers active'
+        ).replace('{count}', String(triggerCount)),
+        target: [activeTab, 'triggers'],
+        tone: 'set',
+      });
+    }
+    if (typeof modifierCount === 'number') {
+      rows.push({
+        id: 'modifiers',
+        icon: 'fas fa-user-group',
+        title: text(
+          'FABRICATE.Admin.Manager.Checks.Digest.Modifiers',
+          '{count} check modifiers apply'
+        ).replace('{count}', String(modifierCount)),
+        target: [activeTab, 'modifiers'],
+        tone: 'set',
+      });
+    }
+    return rows;
+  });
+
+  // The Validation rail's rows carry the SAME shape, so they render through the same row.
+  // They open the activity's own check rather than a section of this one, and their glyph is
+  // an activity mark rather than a report on something authored — so `tone` is not `set`.
+  const allCheckRows = $derived(
+    allChecks.map((row) => ({
+      id: row.id,
+      icon: row.icon,
+      title: row.label,
+      detail: row.detail,
+      target: [row.id, 'roll'],
+      tone: 'activity',
+    }))
+  );
 </script>
+
+<!--
+  The heading row every section shares: the prototype's leading glyph and the Tool Studio's
+  flat kicker. A caller that carries an adjunct (the odds domain, the digest's chip) renders
+  it after this, inside the same row, where `margin-left: auto` puts it hard right.
+-->
+{#snippet railHead(icon, title)}
+  <i class={`${icon} manager-checks-rail-head-icon`} aria-hidden="true"></i>
+  <p class="manager-kicker">{title}</p>
+{/snippet}
+
+<!--
+  One compact row of a rail list.
+
+  `row.target` is `[activity, section]` or `null`; a row with no target states an absence, so
+  it renders as a plain row with no chevron and nothing to press. `row.tone` is `set` when the
+  glyph reports something the GM has authored (the prototype's green) and anything else when
+  it does not.
+-->
+{#snippet railRow(row, hook)}
+  {#if row.target}
+    <button
+      type="button"
+      class={`manager-checks-rail-row ${row.tone === 'set' ? 'is-set' : ''} ${row.detail ? 'is-detailed' : ''}`}
+      {...{ [hook]: row.id }}
+      onclick={() => onOpen(row.target[0], row.target[1])}
+    >
+      {@render railRowBody(row)}
+      <i class="fas fa-chevron-right manager-checks-rail-row-chevron" aria-hidden="true"></i>
+    </button>
+  {:else}
+    <div
+      class={`manager-checks-rail-row ${row.tone === 'set' ? 'is-set' : ''} ${row.detail ? 'is-detailed' : ''}`}
+      {...{ [hook]: row.id }}
+    >
+      {@render railRowBody(row)}
+    </div>
+  {/if}
+{/snippet}
+
+{#snippet railRowBody(row)}
+  <i class={row.icon} aria-hidden="true"></i>
+  <span class="manager-checks-rail-row-body">
+    <span class="manager-checks-rail-row-text">{row.title}</span>
+    {#if row.detail}
+      <span class="manager-checks-rail-row-detail">{row.detail}</span>
+    {/if}
+  </span>
+{/snippet}
 
 <aside
   class="manager-inspector manager-environment-inspector manager-checks-rail"
@@ -196,28 +367,25 @@
   {#if isValidation}
     <!-- The Validation rail: the docs pair above, and this. Nothing else has a subject
          on a route that validates all three checks at once. -->
-    <p class="manager-kicker">
-      {text('FABRICATE.Admin.Manager.Checks.Validation.AllChecks', 'All checks')}
-    </p>
-    <section class="manager-inspector-card" data-checks-all-checks>
-      {#each allChecks as row (row.id)}
-        <IconFactRow
-          icon={row.icon}
-          dataAttr="data-checks-all-checks-row"
-          dataValue={row.id}
-          title={row.label}
-          subtitle={row.detail}
-        />
+    <div class="manager-checks-rail-head">
+      {@render railHead(
+        'fas fa-layer-group',
+        text('FABRICATE.Admin.Manager.Checks.Validation.AllChecks', 'All checks')
+      )}
+    </div>
+    <section class="manager-inspector-card is-rail-list" data-checks-all-checks>
+      {#each allCheckRows as row (row.id)}
+        {@render railRow(row, 'data-checks-all-checks-row')}
       {/each}
     </section>
   {:else}
     {#if activation}
-      <!-- FLAT HEADING, CARD BENEATH — the Tool Studio's inspector convention, which is the
-           assigned authority for the rail's STRUCTURE. Every section here reads the same
-           way: an uppercase `.manager-kicker` naming the section, then the card it labels,
-           never a card wrapping each section with a title inside it. -->
-      <p class="manager-kicker">{activeTitle}</p>
-      <section class="manager-inspector-card" data-checks-active={activeTab}>
+      <!-- NO KICKER. The card IS the section: the switch, the reading, and the sentence that
+           says which mode locks it. See the header note. -->
+      <section
+        class={`manager-inspector-card manager-checks-active-card ${(showActiveToggle ? activeOn : lockedOn) ? 'is-on' : 'is-off'}`}
+        data-checks-active={activeTab}
+      >
         {#if showActiveToggle}
           <button
             type="button"
@@ -266,9 +434,12 @@
            reading "No actors" / "No records" invite a GM to make a choice nothing consumes,
            which is worse than a stated absence — so this panel says what it will do and
            offers no control until there is something behind it. -->
-      <p class="manager-kicker">
-        {text('FABRICATE.Admin.Manager.Checks.PreviewAs.Title', 'Preview as')}
-      </p>
+      <div class="manager-checks-rail-head">
+        {@render railHead(
+          'fas fa-user',
+          text('FABRICATE.Admin.Manager.Checks.PreviewAs.Title', 'Preview as')
+        )}
+      </div>
       <section class="manager-inspector-card" data-checks-preview-as>
         <p class="manager-muted">
           {text(
@@ -282,9 +453,12 @@
            disclosure anywhere in this rail: a panel whose whole content is one sentence of
            pre-roll copy has nothing to collapse, and hiding it behind a control made the
            rail read as if two features were missing rather than pending (issue 1097). -->
-      <p class="manager-kicker">
-        {text('FABRICATE.Admin.Manager.Checks.Simulator.Title', 'Outcome preview')}
-      </p>
+      <div class="manager-checks-rail-head">
+        {@render railHead(
+          'fas fa-flask-vial',
+          text('FABRICATE.Admin.Manager.Checks.Simulator.Title', 'Outcome preview')
+        )}
+      </div>
       <section class="manager-inspector-card" data-checks-simulator>
         <p class="manager-muted">
           {text(
@@ -294,9 +468,15 @@
         </p>
       </section>
 
-      <p class="manager-kicker">
-        {text('FABRICATE.Admin.Manager.Checks.Odds.Title', 'Chance per outcome')}
-      </p>
+      <div class="manager-checks-rail-head">
+        {@render railHead(
+          'fas fa-chart-column',
+          text('FABRICATE.Admin.Manager.Checks.Odds.Title', 'Chance per outcome')
+        )}
+        {#if oddsDomain}
+          <span class="manager-checks-rail-head-note" data-checks-odds-domain>{oddsDomain}</span>
+        {/if}
+      </div>
       <section class="manager-inspector-card" data-checks-odds>
         <p class="manager-muted">
           {text(
@@ -308,126 +488,25 @@
     {/if}
 
     <div class="manager-checks-rail-head">
-      <p class="manager-kicker">
-        {text('FABRICATE.Admin.Manager.Checks.Digest.Title', 'This check')}
-      </p>
+      {@render railHead(
+        'fas fa-clipboard-check',
+        text('FABRICATE.Admin.Manager.Checks.Digest.Title', 'This check')
+      )}
       <Chip tone={digestStatus.tone}>{digestStatus.label}</Chip>
     </div>
-    <section class="manager-inspector-card" data-checks-digest>
-      {#if checkOff}
-        <IconFactRow
-          icon="fas fa-ban"
-          dataAttr="data-checks-digest-row"
-          dataValue="off"
-          title={text(
-            'FABRICATE.Admin.Manager.Checks.Digest.Off',
-            'This activity resolves without a roll while the check is off.'
-          )}
-        />
-      {:else}
-        <IconFactRow
-          icon="fas fa-dice-d20"
-          dataAttr="data-checks-digest-row"
-          dataValue="formula"
-          title={formulaFact}
-        />
-        {#if typeof outcomeCount === 'number'}
-          <IconFactRow
-            icon="fas fa-code-branch"
-            dataAttr="data-checks-digest-row"
-            dataValue="outcomes"
-            title={text(
-              'FABRICATE.Admin.Manager.Checks.Digest.Outcomes',
-              '{count} outcome tiers, {success} count as success'
-            )
-              .replace('{count}', String(outcomeCount))
-              .replace('{success}', String(successCount))}
-          />
-        {/if}
-        {#if typeof triggerCount === 'number'}
-          <IconFactRow
-            icon="fas fa-bolt"
-            dataAttr="data-checks-digest-row"
-            dataValue="triggers"
-            title={text(
-              'FABRICATE.Admin.Manager.Checks.Digest.Triggers',
-              '{count} triggers active'
-            ).replace('{count}', String(triggerCount))}
-          />
-        {/if}
-        {#if typeof modifierCount === 'number'}
-          <IconFactRow
-            icon="fas fa-user-group"
-            dataAttr="data-checks-digest-row"
-            dataValue="modifiers"
-            title={text(
-              'FABRICATE.Admin.Manager.Checks.Digest.Modifiers',
-              '{count} check modifiers apply'
-            ).replace('{count}', String(modifierCount))}
-          />
-        {/if}
-      {/if}
+    <section class="manager-inspector-card is-rail-list" data-checks-digest>
+      {#each digestRows as row (row.id)}
+        {@render railRow(row, 'data-checks-digest-row')}
+      {/each}
     </section>
   {/if}
 </aside>
 
-<style>
-  .manager-checks-rail-head {
-    display: flex;
-    gap: var(--fab-space-2);
-    align-items: center;
-    justify-content: space-between;
-    min-width: 0;
-  }
-
-  .manager-checks-rail-head > :global(.manager-kicker) {
-    min-width: 0;
-  }
-
-  /* The documentation / quickstart pair the prototype opens the rail with. */
-  .manager-checks-rail-links {
-    display: flex;
-    gap: var(--fab-space-2);
-  }
-
-  .manager-checks-rail-link {
-    display: flex;
-    flex: 1 1 0;
-    align-items: center;
-    justify-content: center;
-    gap: 7px;
-    min-width: 0;
-    height: 30px;
-    border: 1px solid var(--fab-border);
-    border-radius: 8px;
-    color: var(--fab-text-muted);
-    background: var(--fab-bg-1);
-    font-size: 10.5px;
-    font-weight: 600;
-    text-decoration: none;
-  }
-
-  .manager-checks-rail-link:hover {
-    border-color: var(--fab-accent-border);
-    color: var(--fab-text);
-  }
-
-  /* The LOCKED reading of the activation switch. It reuses the shipped switch's own track
-     and knob — same meaning, same drawing — and changes only what a non-interactive, full
-     width indicator needs: the 78px control cap does not apply to a row that also carries a
-     reading and a padlock. */
-  .manager-status-toggle.is-locked {
-    width: 100%;
-    max-width: none;
-    cursor: default;
-  }
-
-  .manager-checks-active-lock {
-    margin-left: auto;
-    color: var(--fab-text-muted);
-    font-size: 0.72rem;
-  }
-
-  /* The 1320 disclosure ladder is gone with the disclosures themselves. The rail names no
-     breakpoint of its own now; the manager container's own six still apply to it. */
-</style>
+<!--
+  NO SCOPED BLOCK. Every rule this rail draws itself with is a MEASURED value compared against
+  the prototype by `tests/components/checks-studio-parity.test.js`, and that gate reads
+  `styles/fabricate.css` plus the scoped CSS of the primitives it names. Rules split between
+  here and there would be measured only if this file were added to that list too — so the
+  rail's rules all live in the sheet's Checks Studio parity block, next to the numbers they
+  have to agree with (issue 1096).
+-->

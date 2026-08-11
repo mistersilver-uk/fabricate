@@ -1290,6 +1290,7 @@
       issueCount={activeReadiness.issues.length}
       allChecks={allChecksSummary}
       onToggleActive={(enabled) => onToggleCheckActive(activity, enabled)}
+      onOpen={(target, section) => onOpenActivity(target, section)}
     />
   </div>
 </div>

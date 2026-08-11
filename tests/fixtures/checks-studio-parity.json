@@ -39,7 +39,8 @@
       "paddingLeft"
     ],
     "gap": [
-      "columnGap"
+      "columnGap",
+      "rowGap"
     ],
     "size": [
       "width",
@@ -47,6 +48,10 @@
     ],
     "blockSize": [
       "height"
+    ],
+    "glyph": [
+      "color",
+      "fontSize"
     ],
     "scroll": [
       "scrollbarColor",
@@ -90,7 +95,8 @@
         "paddingRight": "0px",
         "paddingBottom": "0px",
         "paddingLeft": "0px",
-        "columnGap": "normal"
+        "columnGap": "normal",
+        "rowGap": "normal"
       }
     },
     "studio-shell": {
@@ -104,6 +110,17 @@
         "paddingRight": "0px",
         "paddingBottom": "0px",
         "paddingLeft": "0px"
+      }
+    },
+    "editor-stack": {
+      "groups": [
+        "gap"
+      ],
+      "prototypeLocator": "pane().parentElement.parentElement",
+      "tag": "div",
+      "properties": {
+        "columnGap": "normal",
+        "rowGap": "normal"
       }
     },
     "pane-heading": {
@@ -330,7 +347,8 @@
         "paddingRight": "11px",
         "paddingBottom": "8px",
         "paddingLeft": "11px",
-        "columnGap": "10px"
+        "columnGap": "10px",
+        "rowGap": "10px"
       }
     },
     "tier-swatch": {
@@ -438,6 +456,7 @@
         "paddingBottom": "3px",
         "paddingLeft": "3px",
         "columnGap": "3px",
+        "rowGap": "3px",
         "width": "158px",
         "height": "34px"
       }
@@ -578,6 +597,237 @@
         "fontWeight": "700",
         "textTransform": "uppercase",
         "letterSpacing": "1.26px"
+      }
+    },
+    "inspector-links": {
+      "groups": [
+        "gap"
+      ],
+      "prototypeLocator": "inspector().firstElementChild",
+      "tag": "div",
+      "properties": {
+        "columnGap": "8px",
+        "rowGap": "8px"
+      }
+    },
+    "inspector-link": {
+      "groups": [
+        "surface",
+        "border",
+        "type",
+        "blockSize"
+      ],
+      "prototypeLocator": "inspector().firstElementChild.firstElementChild",
+      "tag": "a",
+      "properties": {
+        "backgroundColor": "rgb(21, 33, 43)",
+        "borderTopWidth": "1px",
+        "borderTopStyle": "solid",
+        "borderTopColor": "rgba(217, 184, 156, 0.18)",
+        "borderTopLeftRadius": "8px",
+        "color": "rgba(217, 184, 156, 0.74)",
+        "fontSize": "10.5px",
+        "fontWeight": "600",
+        "textTransform": "none",
+        "height": "30px"
+      }
+    },
+    "inspector-active-card": {
+      "groups": [
+        "surface",
+        "border",
+        "box"
+      ],
+      "prototypeLocator": "activationCard()",
+      "tag": "div",
+      "properties": {
+        "backgroundColor": "rgba(154, 184, 156, 0.16)",
+        "borderTopWidth": "1px",
+        "borderTopStyle": "solid",
+        "borderTopColor": "rgba(154, 184, 156, 0.56)",
+        "borderTopLeftRadius": "11px",
+        "paddingTop": "13px",
+        "paddingRight": "14px",
+        "paddingBottom": "13px",
+        "paddingLeft": "14px"
+      }
+    },
+    "inspector-active-track": {
+      "groups": [
+        "surface",
+        "size"
+      ],
+      "prototypeLocator": "activationCard().firstElementChild.firstElementChild",
+      "tag": "div",
+      "properties": {
+        "backgroundColor": "rgb(154, 184, 156)",
+        "width": "40px",
+        "height": "22px"
+      },
+      "exemptions": {
+        "width": "SHARED PRIMITIVE. The switch is the manager-wide `.manager-status-toggle` (34x20 track, 14x14 knob), used on every enable/disable row in the app; the prototype draws this one at 40x22. The maintainer's instruction names the CARD and its LABEL as what the rail adopts from the prototype, not the control inside it, and restating a switch's geometry for one rail forks the control every other screen shares. Its COLOUR is not exempt and is compared: the lit track is `--fab-success`, the prototype's own value.",
+        "height": "SHARED PRIMITIVE. The switch is the manager-wide `.manager-status-toggle` (34x20 track, 14x14 knob), used on every enable/disable row in the app; the prototype draws this one at 40x22. The maintainer's instruction names the CARD and its LABEL as what the rail adopts from the prototype, not the control inside it, and restating a switch's geometry for one rail forks the control every other screen shares. Its COLOUR is not exempt and is compared: the lit track is `--fab-success`, the prototype's own value."
+      }
+    },
+    "inspector-active-reading": {
+      "groups": [
+        "type"
+      ],
+      "prototypeLocator": "spanWithText('Check is on')",
+      "tag": "span",
+      "properties": {
+        "color": "rgb(241, 209, 181)",
+        "fontSize": "12.5px",
+        "fontWeight": "600",
+        "textTransform": "none"
+      }
+    },
+    "inspector-active-hint": {
+      "groups": [
+        "type"
+      ],
+      "prototypeLocator": "activationCard().lastElementChild",
+      "tag": "div",
+      "properties": {
+        "color": "rgba(217, 184, 156, 0.74)",
+        "fontSize": "10.5px",
+        "fontWeight": "400",
+        "textTransform": "none"
+      }
+    },
+    "inspector-active-lock": {
+      "groups": [
+        "glyph"
+      ],
+      "prototypeLocator": "activationCard().querySelector('.fa-lock')",
+      "tag": "i",
+      "properties": {
+        "color": "rgba(217, 184, 156, 0.56)",
+        "fontSize": "10px"
+      }
+    },
+    "inspector-head-icon": {
+      "groups": [
+        "glyph"
+      ],
+      "prototypeLocator": "kicker('Chance per outcome').previousElementSibling",
+      "tag": "i",
+      "properties": {
+        "color": "rgba(217, 184, 156, 0.56)",
+        "fontSize": "11px"
+      }
+    },
+    "inspector-head-note": {
+      "groups": [
+        "type"
+      ],
+      "prototypeLocator": "kicker('Chance per outcome').nextElementSibling",
+      "tag": "span",
+      "properties": {
+        "color": "rgba(217, 184, 156, 0.56)",
+        "fontSize": "9.5px",
+        "fontWeight": "400",
+        "textTransform": "none"
+      }
+    },
+    "inspector-panel-copy": {
+      "groups": [
+        "type"
+      ],
+      "prototypeLocator": "spanStartingWith('Roll a test check')",
+      "tag": "span",
+      "properties": {
+        "color": "rgba(217, 184, 156, 0.56)",
+        "fontSize": "11px",
+        "fontWeight": "400",
+        "textTransform": "none"
+      }
+    },
+    "inspector-list-card": {
+      "groups": [
+        "surface",
+        "border"
+      ],
+      "prototypeLocator": "digestCard()",
+      "tag": "div",
+      "properties": {
+        "backgroundColor": "rgb(21, 33, 43)",
+        "borderTopWidth": "1px",
+        "borderTopStyle": "solid",
+        "borderTopColor": "rgba(217, 184, 156, 0.18)",
+        "borderTopLeftRadius": "11px"
+      }
+    },
+    "inspector-list-inset": {
+      "groups": [
+        "box",
+        "gap"
+      ],
+      "prototypeLocator": "digestBody()",
+      "tag": "div",
+      "properties": {
+        "paddingTop": "9px",
+        "paddingRight": "11px",
+        "paddingBottom": "9px",
+        "paddingLeft": "11px",
+        "columnGap": "3px",
+        "rowGap": "3px"
+      }
+    },
+    "inspector-list-row": {
+      "groups": [
+        "box",
+        "gap",
+        "border"
+      ],
+      "prototypeLocator": "digestRow()",
+      "tag": "div",
+      "properties": {
+        "paddingTop": "7px",
+        "paddingRight": "8px",
+        "paddingBottom": "7px",
+        "paddingLeft": "8px",
+        "columnGap": "9px",
+        "rowGap": "9px",
+        "borderTopWidth": "0px",
+        "borderTopStyle": "none",
+        "borderTopColor": "rgb(241, 209, 181)",
+        "borderTopLeftRadius": "7px"
+      }
+    },
+    "inspector-list-row-icon": {
+      "groups": [
+        "glyph"
+      ],
+      "prototypeLocator": "digestRow().children[0]",
+      "tag": "i",
+      "properties": {
+        "color": "rgb(154, 184, 156)",
+        "fontSize": "10px"
+      }
+    },
+    "inspector-list-row-text": {
+      "groups": [
+        "type"
+      ],
+      "prototypeLocator": "digestRow().children[1]",
+      "tag": "span",
+      "properties": {
+        "color": "rgba(217, 184, 156, 0.74)",
+        "fontSize": "10.5px",
+        "fontWeight": "500",
+        "textTransform": "none"
+      }
+    },
+    "inspector-list-row-chevron": {
+      "groups": [
+        "glyph"
+      ],
+      "prototypeLocator": "digestRow().lastElementChild",
+      "tag": "i",
+      "properties": {
+        "color": "rgba(217, 184, 156, 0.42)",
+        "fontSize": "8px"
       }
     }
   }

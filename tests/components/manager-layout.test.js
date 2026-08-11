@@ -1416,17 +1416,35 @@ test("the checks rail follows the Tool Studio's inspector convention", () => {
   // title inside it. Two studios cannot both be right, so the assertion moves with the
   // ruling rather than being deleted.
   assert.ok(
-    rightMenu.includes('<section class="manager-inspector-card" data-checks-active={activeTab}>'),
+    rightMenu.includes('manager-inspector-card manager-checks-active-card'),
     'the Active card wears the shared inspector-card shell'
   );
   assert.ok(
-    rightMenu.includes('<p class="manager-kicker">{activeTitle}</p>'),
-    'the Active section is named by a flat kicker above its card, as the Tool Studio does'
+    rightMenu.includes('<p class="manager-kicker">{title}</p>'),
+    'sections are named by a flat kicker above their card, as the Tool Studio does'
   );
   assert.equal(
     rightMenu.includes('manager-card-title'),
     false,
     'a card-title inside a rail card is the convention the Tool Studio replaced'
+  );
+
+  // …and the ACTIVATION section is named by nothing at all (issue 1096, maintainer inspector
+  // comparison). The prototype gives that card no heading: the switch and the words beside it
+  // are the statement, and an `ACTIVE` kicker over a card reading `On` said it twice. The
+  // convention above is unchanged for the five sections that DO carry a heading.
+  assert.equal(
+    rightMenu.includes('{activeTitle}'),
+    false,
+    'the Active kicker is gone; the card states its own subject'
+  );
+
+  // Every heading row leads with the prototype's glyph. A kicker with no glyph is the reading
+  // this replaced, and the snippet is the only place a heading is built — so one assertion
+  // covers all five.
+  assert.ok(
+    rightMenu.includes('manager-checks-rail-head-icon'),
+    'the heading row leads with a glyph'
   );
 
   // The two collapsibles are gone with it. The prototype has no disclosure anywhere in

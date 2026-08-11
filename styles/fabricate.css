@@ -2490,8 +2490,18 @@
    sitting on their own colour and every border between them disappeared. The prototype's
    pane is the app-window shade, `--fab-bg-1`, one step darker than the cards on it.
    Scoped to the checks editor: this is a statement about this studio's surfaces, and the
-   other views' backgrounds are not in this change's scope. */
-.fabricate-manager .manager-environment-edit-view[data-checks-editor] {
+   other views' backgrounds are not in this change's scope.
+
+   (0,4,0) — deliberately, and this is the FOURTH stacked inset (issue 1096, maintainer
+   inspector comparison). At (0,3,0) this rule tied with
+   `.manager-environment-edit-view[data-environment-editor]` ~14000 lines below, which the
+   checks editor also carries, and lost on source order — so the section strip and the body
+   below it stayed 12px apart across the WHOLE width, which is the dead band above the
+   inspector's documentation pair. The prototype's header block ends where its body grid
+   begins. The `checks-editor-stack-gap` fixture region measures this row gap now, so the
+   tie cannot come back unseen. */
+.fabricate-manager[data-manager-view^="checks"]
+  .manager-environment-edit-view[data-checks-editor] {
   gap: 0;
   background: var(--fab-bg-1);
 }
@@ -2557,11 +2567,256 @@
 
 .fabricate-manager .manager-checks-rail .manager-kicker {
   margin: 0;
+  min-width: 0;
   color: var(--fab-text-subtle);
   font-size: 9px;
   font-weight: 700;
   letter-spacing: 0.14em;
   text-transform: uppercase;
+}
+
+/* THE HEADING ROW. The Tool Studio owns where it sits — flat, above its card — and the
+   prototype owns what it is made of: a leading glyph at the kicker's own ink, and an optional
+   adjunct pushed hard right (the odds panel's die domain, the digest's status chip). A bare
+   text kicker was the shipped reading; the glyph is what makes six of them scannable. */
+.fabricate-manager .manager-checks-rail-head {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+}
+
+.fabricate-manager .manager-checks-rail-head-icon {
+  flex: 0 0 auto;
+  color: var(--fab-text-subtle);
+  font-size: 11px;
+}
+
+.fabricate-manager .manager-checks-rail-head-note {
+  flex: 0 0 auto;
+  margin-left: auto;
+  color: var(--fab-text-subtle);
+  font-size: 9.5px;
+  font-weight: 400;
+  white-space: nowrap;
+}
+
+.fabricate-manager .manager-checks-rail-head > :last-child:not(.manager-kicker, .manager-checks-rail-head-note) {
+  margin-left: auto;
+}
+
+/* The documentation / quickstart pair the prototype opens the rail with. */
+.fabricate-manager .manager-checks-rail-links {
+  display: flex;
+  gap: 8px;
+}
+
+.fabricate-manager .manager-checks-rail-link {
+  display: flex;
+  flex: 1 1 0;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-width: 0;
+  height: 30px;
+  border: 1px solid var(--fab-border);
+  border-radius: 8px;
+  color: var(--fab-text-muted);
+  background: var(--fab-bg-1);
+  font-size: 10.5px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.fabricate-manager .manager-checks-rail-link:hover {
+  border-color: var(--fab-accent-border);
+  color: var(--fab-text);
+}
+
+/* ── The activation card ─────────────────────────────────────────────────────────────
+   The prototype gives this section NO heading: the card is the statement, so it carries the
+   state in its own surface. `is-on` is the success family it paints there; `is-off` keeps the
+   rail's ordinary card, because the prototype never shows an off check and inventing a colour
+   for a state it does not draw is exactly the guessing this parity work exists to end. */
+.fabricate-manager .manager-checks-rail .manager-checks-active-card {
+  gap: 7px;
+  padding: 13px 14px;
+}
+
+.fabricate-manager .manager-checks-rail .manager-checks-active-card.is-on {
+  border-color: var(--fab-success-border);
+  background: var(--fab-success-soft);
+}
+
+/* The switch in this card is a full-width ROW, live or locked. The shared control caps itself
+   at 78px because it normally sits at the end of a list row beside its own label, and a card
+   whose whole content is the switch and its reading is not that: at 78px the card's sentence
+   ellipsised to `Che…`, which is what the cap is for everywhere else and a defect here. */
+.fabricate-manager .manager-checks-active-card .manager-status-toggle {
+  width: 100%;
+  max-width: none;
+}
+
+/* The LOCKED reading reuses the shipped switch's own track and knob — same meaning, same
+   drawing — and adds only that there is nothing to press. */
+.fabricate-manager .manager-status-toggle.is-locked {
+  cursor: default;
+}
+
+.fabricate-manager .manager-checks-active-lock {
+  margin-left: auto;
+  color: var(--fab-text-subtle);
+  font-size: 10px;
+}
+
+/* The reading beside the switch is the CARD's own sentence, not a control label, so it takes
+   the prototype's card type rather than the manager switch's 0.74rem/700 badge type. */
+.fabricate-manager .manager-checks-active-card .manager-status-toggle-label {
+  color: var(--fab-text);
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+/* The rail's PANEL COPY. Two scales, and they are the prototype's own: a panel with nothing
+   in it yet states its subject at 11px in the subtle ink, and the activation card's hint —
+   which qualifies a control right above it — is one step up in the muted ink. */
+.fabricate-manager .manager-checks-rail .manager-muted {
+  margin: 0;
+  color: var(--fab-text-subtle);
+  font-size: 11px;
+  font-weight: 400;
+}
+
+.fabricate-manager .manager-checks-active-card .manager-muted {
+  color: var(--fab-text-muted);
+  font-size: 10.5px;
+}
+
+/* ── The rail's LISTS ────────────────────────────────────────────────────────────────
+   `THIS CHECK` and `ALL CHECKS` are ONE card of compact rows each, not a stack of bordered
+   cards. The shipped reading gave every fact its own 1px card and its own 0.76rem two-line
+   body, which made four facts as tall as the four panels above them put together. */
+.fabricate-manager .manager-checks-rail .manager-inspector-card.is-rail-list {
+  gap: 3px;
+  padding: 9px 11px;
+}
+
+.fabricate-manager .manager-checks-rail-row {
+  /* Foundry's `button` rule sets a fixed height and its own border, and a row is neither.
+     Same reset the tier row's remove control takes. */
+  appearance: none;
+  -webkit-appearance: none;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  min-width: 0;
+
+  /* `height: auto` is the load-bearing half of this reset, not `min-height`. Foundry's core
+     `button` rule sets a FIXED height, which `min-height: 0` does not cancel — so the
+     one-line digest rows happened to fit it and the Validation rail's two-line rows drew on
+     top of each other. A mounted test cannot see this: Foundry's sheet is not in it. */
+  height: auto;
+  min-height: 0;
+  margin: 0;
+  padding: 7px 8px;
+  border: 0;
+  border-radius: 7px;
+
+  /* Declared, not inherited: a `<button>` takes `buttontext` from the UA, so the row's own
+     ink — which `border: 0` still resolves its border colour from — would be the browser's
+     white rather than the rail's. The muted reading lives on the text span below. */
+  color: var(--fab-text);
+  background: none;
+  font-family: inherit;
+  font-size: 10.5px;
+  font-weight: 500;
+  line-height: 1.3;
+  text-align: left;
+}
+
+.fabricate-manager button.manager-checks-rail-row {
+  cursor: pointer;
+}
+
+/* The row itself keeps the rail's own ink, and the muted reading lives on the TEXT — which is
+   how the prototype builds it, and it is not cosmetic here: with `border: 0` the row's border
+   colour still computes to its `color`, so tinting the row would have moved a recorded value
+   nothing draws. */
+.fabricate-manager button.manager-checks-rail-row:hover .manager-checks-rail-row-text {
+  color: var(--fab-text);
+}
+
+.fabricate-manager button.manager-checks-rail-row:hover {
+  background: var(--fab-surface-soft);
+}
+
+.fabricate-manager button.manager-checks-rail-row:focus-visible {
+  outline: 2px solid var(--fab-accent);
+  outline-offset: -2px;
+}
+
+/* A row whose subject the GM has authored reports it in the success family — the prototype's
+   green tick on a fact that is set. A row stating an ABSENCE keeps the subtle ink, because a
+   green "no roll formula yet" would claim the opposite of what it says. */
+.fabricate-manager .manager-checks-rail-row > i:first-child {
+  flex: 0 0 12px;
+  color: var(--fab-text-subtle);
+  font-size: 10px;
+  text-align: center;
+}
+
+.fabricate-manager .manager-checks-rail-row.is-set > i:first-child {
+  color: var(--fab-success);
+}
+
+.fabricate-manager .manager-checks-rail-row-body {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.fabricate-manager .manager-checks-rail-row-text {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--fab-text-muted);
+  font-size: inherit;
+  font-weight: inherit;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* A row that carries a second line is the Validation rail's: its first line names the check
+   rather than reporting a fact, so it takes the prototype's heavier row title. */
+.fabricate-manager .manager-checks-rail-row.is-detailed {
+  padding: 8px;
+}
+
+.fabricate-manager .manager-checks-rail-row.is-detailed .manager-checks-rail-row-text {
+  color: var(--fab-text-secondary);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.fabricate-manager .manager-checks-rail-row-detail {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--fab-text-muted);
+  font-size: 10px;
+  font-weight: 400;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* `--fab-text-disabled` is this theme's 42% ink and the exact value the prototype draws the
+   chevron at. Nothing here is disabled; the token is named for its commonest use, not its
+   only one. */
+.fabricate-manager .manager-checks-rail-row-chevron {
+  flex: 0 0 auto;
+  margin-left: auto;
+  color: var(--fab-text-disabled);
+  font-size: 8px;
 }
 
 /* The checks editors' choice selectors (check type, DC source, award mode, alchemy

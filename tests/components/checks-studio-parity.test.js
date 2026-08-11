@@ -81,6 +81,7 @@ const FABRICATE_SELECTORS = {
   'pane-background': { selector: '.manager-environment-tab-panel', effectiveBackground: true },
   'pane-container': { selector: '.manager-environment-workspace' },
   'studio-shell': { selector: '.manager-environment-editor-shell' },
+  'editor-stack': { selector: '.manager-environment-edit-view' },
   'pane-heading': { selector: '.manager-checks-pane-title' },
   'pane-description': { selector: '.manager-checks-pane-lead' },
   'card-surface': { selector: '[data-outcome-bands]' },
@@ -115,8 +116,28 @@ const FABRICATE_SELECTORS = {
   'tier-delete-button': { selector: '.manager-checks-tier-remove' },
   'add-tier-button': { selector: '.manager-button.is-dashed' },
   'inspector-surface': { selector: '.manager-checks-rail', effectiveBackground: true },
-  'inspector-card': { selector: '.manager-checks-rail .manager-inspector-card' },
+  'inspector-card': { selector: '.manager-checks-rail [data-checks-preview-as]' },
   'inspector-section-heading': { selector: '.manager-checks-rail .manager-kicker' },
+  'inspector-links': { selector: '.manager-checks-rail-links' },
+  'inspector-link': { selector: '.manager-checks-rail-link' },
+  'inspector-active-card': { selector: '.manager-checks-active-card' },
+  'inspector-active-track': {
+    selector: '.manager-checks-active-card .manager-status-toggle-track',
+  },
+  'inspector-active-reading': {
+    selector: '.manager-checks-active-card .manager-status-toggle-label',
+  },
+  'inspector-active-hint': { selector: '.manager-checks-active-card .manager-muted' },
+  'inspector-active-lock': { selector: '.manager-checks-active-lock' },
+  'inspector-head-icon': { selector: '.manager-checks-rail-head-icon' },
+  'inspector-head-note': { selector: '.manager-checks-rail-head-note' },
+  'inspector-panel-copy': { selector: '[data-checks-simulator] .manager-muted' },
+  'inspector-list-card': { selector: '[data-checks-digest]' },
+  'inspector-list-inset': { selector: '[data-checks-digest]' },
+  'inspector-list-row': { selector: '[data-checks-digest-row="outcomes"]' },
+  'inspector-list-row-icon': { selector: '[data-checks-digest-row="outcomes"] > i:first-child' },
+  'inspector-list-row-text': { selector: '[data-checks-digest-row="outcomes"] .manager-checks-rail-row-text' },
+  'inspector-list-row-chevron': { selector: '.manager-checks-rail-row-chevron' },
 };
 
 // The class / attribute tokens the fixture markup below asserts on, mapped to the component
@@ -144,6 +165,20 @@ const SELECTOR_PROVENANCE = {
   'src/ui/svelte/apps/manager/checks/ChecksRightMenu.svelte': [
     'manager-checks-rail',
     'manager-kicker',
+    'manager-checks-rail-links',
+    'manager-checks-rail-link',
+    'manager-checks-rail-head',
+    'manager-checks-rail-head-icon',
+    'manager-checks-rail-head-note',
+    'manager-checks-active-card',
+    'manager-checks-active-lock',
+    'manager-checks-rail-row',
+    'manager-checks-rail-row-text',
+    'manager-checks-rail-row-chevron',
+    'data-checks-digest',
+    'data-checks-digest-row',
+    'data-checks-simulator',
+    'data-checks-preview-as',
   ],
   'src/ui/svelte/apps/manager/SegmentedControl.svelte': ['manager-segmented', 'manager-segment'],
   'src/ui/svelte/components/Stepper.svelte': ['fab-stepper', 'fab-stepper-input'],
@@ -193,12 +228,16 @@ function outcomesFixture() {
   // started at the tab panel, and that is exactly why it passed while the maintainer was
   // looking at 36px of stacked dead space: the shell's padding and the workspace's gap were
   // not in the tree at all, so nothing could measure them (issue 1096, parity round 2).
+  // `data-manager-view` is LOAD-BEARING, not decoration. The studio's own gutter rule is
+  // (0,4,0) precisely because `[data-environment-editor]` — which the checks editor also
+  // carries — ties it at (0,3,0) and wins on source order; a fixture root without the route
+  // attribute would measure the losing side and pass a 12px band nobody wanted.
   return `
-<div class="fabricate-manager" data-fabricate-theme="fabricate">
+<div class="fabricate-manager" data-fabricate-theme="fabricate" data-manager-view="checks-crafting">
   <div class="manager-body">
     <main class="manager-main manager-environment-edit-main">
       <section class="manager-environment-editor-shell" data-checks-shell>
-      <div class="manager-environment-edit-view" data-checks-editor>
+      <div class="manager-environment-edit-view" data-environment-editor data-checks-editor>
         <div class="manager-environment-tabs manager-checks-sections" role="tablist"></div>
         <div class="manager-environment-workspace">
           <div class="manager-environment-tab-panel">
@@ -257,9 +296,43 @@ function outcomesFixture() {
             </div>
           </div>
           <aside class="manager-inspector manager-environment-inspector manager-checks-rail" data-checks-rail="crafting">
-            <div class="manager-checks-rail-links"><a class="manager-checks-rail-link" href="#docs"><i class="fas fa-book-open"></i><span>Documentation</span></a></div>
-            <p class="manager-kicker">Active</p>
-            <section class="manager-inspector-card" data-checks-active="crafting"><p class="manager-muted">Locked by the resolution mode.</p></section>
+            <div class="manager-checks-rail-links">
+              <a class="manager-checks-rail-link" href="#docs"><i class="fas fa-book-open"></i><span>Documentation</span></a>
+              <a class="manager-checks-rail-link" href="#quickstart"><i class="fas fa-circle-question"></i><span>Quickstart</span></a>
+            </div>
+            <section class="manager-inspector-card manager-checks-active-card is-on" data-checks-active="crafting">
+              <span class="manager-status-toggle is-locked is-on" data-checks-active-locked="on" role="img" aria-label="Check is on">
+                <span class="manager-status-toggle-track"><span class="manager-status-toggle-knob"></span></span>
+                <span class="manager-status-toggle-label">Check is on</span>
+                <i class="fas fa-lock manager-checks-active-lock"></i>
+              </span>
+              <p class="manager-muted" data-checks-active-required>The routed by check resolution mode requires this check, so it cannot be turned off here.</p>
+            </section>
+            <div class="manager-checks-rail-head">
+              <i class="fas fa-user manager-checks-rail-head-icon"></i>
+              <p class="manager-kicker">Preview as</p>
+            </div>
+            <section class="manager-inspector-card" data-checks-preview-as><p class="manager-muted">Reading this check against an actor and record arrives with the outcome preview.</p></section>
+            <div class="manager-checks-rail-head">
+              <i class="fas fa-flask-vial manager-checks-rail-head-icon"></i>
+              <p class="manager-kicker">Outcome preview</p>
+            </div>
+            <section class="manager-inspector-card" data-checks-simulator><p class="manager-muted">Roll a test check to see exactly which outcome a record lands on and what it costs the character.</p></section>
+            <div class="manager-checks-rail-head">
+              <i class="fas fa-chart-column manager-checks-rail-head-icon"></i>
+              <p class="manager-kicker">Chance per outcome</p>
+              <span class="manager-checks-rail-head-note" data-checks-odds-domain>all 20 faces</span>
+            </div>
+            <section class="manager-inspector-card" data-checks-odds><p class="manager-muted">Once this check has a formula and its outcome bands are set, the chance of landing on each one is listed here.</p></section>
+            <div class="manager-checks-rail-head">
+              <i class="fas fa-clipboard-check manager-checks-rail-head-icon"></i>
+              <p class="manager-kicker">This check</p>
+              <span class="manager-chip is-positive">OK</span>
+            </div>
+            <section class="manager-inspector-card is-rail-list" data-checks-digest>
+              <button type="button" class="manager-checks-rail-row is-set" data-checks-digest-row="formula"><i class="fas fa-dice-d20"></i><span class="manager-checks-rail-row-body"><span class="manager-checks-rail-row-text">Formula · 1d20 + @prof</span></span><i class="fas fa-chevron-right manager-checks-rail-row-chevron"></i></button>
+              <button type="button" class="manager-checks-rail-row is-set" data-checks-digest-row="outcomes"><i class="fas fa-code-branch"></i><span class="manager-checks-rail-row-body"><span class="manager-checks-rail-row-text">5 outcome tiers, 3 count as success</span></span><i class="fas fa-chevron-right manager-checks-rail-row-chevron"></i></button>
+            </section>
           </aside>
         </div>
       </div>

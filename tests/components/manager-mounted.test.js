@@ -3214,6 +3214,11 @@ describe('CraftingSystemManager mounted behavior', () => {
       // maintainer made the authority for this rail's structure. This block asserted the
       // opposite (a `.manager-card-title` inside the card, no kicker anywhere) until that
       // ruling; the assertion moves with it rather than being deleted.
+      //
+      // The ACTIVATION card is the one section with no heading at all, which is not an
+      // exception to that convention but the prototype's own reading of this card: the switch
+      // and the words `Check is on` beside it say what an `ACTIVE` kicker over a card saying
+      // `On` said twice (issue 1096, maintainer inspector comparison).
       const activeCard = target.querySelector(`[data-checks-active="${activeTab}"]`);
       assert.ok(activeCard, `${activeTab} menu renders its Active card`);
       assert.ok(
@@ -3221,8 +3226,29 @@ describe('CraftingSystemManager mounted behavior', () => {
         'a card-title inside a rail card is the convention the Tool Studio replaced'
       );
       assert.ok(
-        Boolean(activeCard.previousElementSibling?.classList.contains('manager-kicker')),
-        'the Active section is named by a flat kicker directly above its card'
+        !activeCard.previousElementSibling?.classList.contains('manager-kicker'),
+        'the activation card carries no heading: it states its own subject'
+      );
+      assert.match(
+        activeCard.textContent,
+        /Check is (on|off)/,
+        'and it reads the sentence the prototype gives the card, not a bare On/Off'
+      );
+
+      // Every OTHER section keeps the flat kicker, and now carries the prototype's leading
+      // glyph in the same row. A kicker with no glyph is the reading this replaced.
+      const digestHead = target.querySelector('[data-checks-digest]').previousElementSibling;
+      assert.ok(
+        Boolean(digestHead?.classList.contains('manager-checks-rail-head')),
+        'the digest is named by a flat heading row directly above its card'
+      );
+      assert.ok(
+        Boolean(digestHead.querySelector('.manager-checks-rail-head-icon')),
+        'and that row leads with a glyph'
+      );
+      assert.ok(
+        Boolean(digestHead.querySelector('.manager-kicker')),
+        'and still names the section with a kicker'
       );
 
       unmount(mounted);
@@ -16971,15 +16997,17 @@ describe('CraftingSystemManager mounted behavior', () => {
   });
 
   it('reads the locked activation state in the SAME words the live switch uses', async () => {
-    // The locked indicator said `Check is on` where the switch one mode over says `On` — two
-    // vocabularies for one state, in the same card slot. The padlock, the hint and the
-    // `aria-label` carry the locked meaning; the reading itself should not restate it.
+    // ONE vocabulary across both slots, and it is the CARD's. The two readings were `Check is
+    // on` and `On`, which is two vocabularies for one state side by side; they were unified on
+    // `On` and are now unified on the prototype's own sentence, because the heading that used
+    // to name this section is gone and the card has to say what it is (issue 1096). The
+    // property under test is unchanged: the locked reading is the live switch's own word.
     await mountChecks([], { alchemyResolutionMode: 'simple' });
     await openChecksActivity('crafting');
     const live = target.querySelector('[data-checks-active-toggle] .manager-status-toggle-label');
     assert.ok(Boolean(live), 'a simple crafting check offers the live switch');
     const liveReading = live.textContent.trim();
-    assert.equal(liveReading, 'On', 'the live switch reads On');
+    assert.equal(liveReading, 'Check is on', 'the live switch reads the card sentence');
 
     // routedByCheck REQUIRES its check, so the same slot renders the locked indicator.
     await mountChecks([], routedCraftingOptions('1d20'));
@@ -16997,6 +17025,83 @@ describe('CraftingSystemManager mounted behavior', () => {
     );
     // The locked MEANING still reaches assistive tech, which is why the reading can drop it.
     assert.match(locked.getAttribute('aria-label'), /Check is on — locked by the resolution mode/);
+  });
+
+  it('opens the section a digest row describes, and offers nothing to press on an absence', async () => {
+    // The digest rows grew the prototype's trailing chevron, and a chevron that goes nowhere is
+    // worse than no chevron: it advertises a destination the row does not have. So the row IS
+    // the deep link — the same one the Validation issues use — and a row that reports an
+    // ABSENCE is not a link at all (issue 1096).
+    await mountChecks([], routedCraftingOptions('1d20'));
+    await openChecksActivity('crafting');
+
+    // ONE card of rows, not one card per row. Direct children, so a row re-wrapped in its own
+    // card fails here rather than passing on a selector that finds it at any depth.
+    const digest = target.querySelector('[data-checks-digest]');
+    const rows = [...digest.children];
+    assert.ok(rows.length >= 2, 'the digest states more than one fact');
+    assert.ok(
+      rows.every((row) => row.classList.contains('manager-checks-rail-row')),
+      'every direct child of the digest card is a row, so the card is not a stack of cards'
+    );
+
+    const triggers = target.querySelector('[data-checks-digest-row="triggers"]');
+    assert.equal(triggers.tagName, 'BUTTON', 'a row with a destination is pressable');
+    assert.ok(
+      Boolean(triggers.querySelector('.manager-checks-rail-row-chevron')),
+      'and carries the chevron that says so'
+    );
+    triggers.click();
+    await tick();
+    flushSync();
+    assert.equal(
+      target.querySelector('#checks-section-triggers').getAttribute('aria-selected'),
+      'true',
+      'pressing the triggers row opens the Triggers section'
+    );
+
+    // The same rail with the check switched OFF: one row, stating an absence, going nowhere.
+    await mountChecks([], {
+      alchemyResolutionMode: 'simple',
+      craftingCheck: { enabled: false, simple: { rollFormula: '1d20', dc: 12 } },
+    });
+    await openChecksActivity('crafting');
+    const off = target.querySelector('[data-checks-digest-row="off"]');
+    assert.ok(Boolean(off), 'an off check states why the digest is empty');
+    assert.equal(off.tagName, 'DIV', 'and states it without offering anything to press');
+    assert.ok(
+      !off.querySelector('.manager-checks-rail-row-chevron'),
+      'so it carries no chevron either'
+    );
+  });
+
+  it('names the die domain the odds panel will enumerate, from the check’s own formula', async () => {
+    // The prototype's `CHANCE PER OUTCOME` heading carries `all 20 faces` hard right. It is a
+    // fact about THIS check's die, so it is derived from the formula rather than stated — a
+    // fixed "20" beside a 2d6 check would be a claim about a check that does not roll a d20.
+    await mountChecks([], routedCraftingOptions('1d20 + @prof'));
+    await openChecksActivity('crafting');
+    assert.equal(
+      target.querySelector('[data-checks-odds-domain]')?.textContent.trim(),
+      'all 20 faces',
+      'a d20 check enumerates twenty faces'
+    );
+
+    await mountChecks([], routedCraftingOptions('2d6 + @prof'));
+    await openChecksActivity('crafting');
+    assert.equal(
+      target.querySelector('[data-checks-odds-domain]')?.textContent.trim(),
+      'all 6 faces',
+      'and a 2d6 check names its own die, not the d20'
+    );
+
+    // No die, no domain. The heading states nothing rather than a number nothing supports.
+    await mountChecks([], routedCraftingOptions('@prof'));
+    await openChecksActivity('crafting');
+    assert.ok(
+      !target.querySelector('[data-checks-odds-domain]'),
+      'a formula that rolls no die names no domain'
+    );
   });
 
   it('names each mode in the ALL CHECKS rail the way its own picker names it', async () => {
@@ -17018,9 +17123,11 @@ describe('CraftingSystemManager mounted behavior', () => {
     });
     await openChecksActivity('validation');
 
-    // `IconFactRow` renders its `subtitle` — the mode + formula line — in a `<small>`.
+    // The rail row renders its second line — the mode + formula — in its own detail span.
     const detailOf = (id) =>
-      target.querySelector(`[data-checks-all-checks-row="${id}"] small`)?.textContent || '';
+      target.querySelector(
+        `[data-checks-all-checks-row="${id}"] .manager-checks-rail-row-detail`
+      )?.textContent || '';
     const card = target.querySelector('[data-checks-all-checks]');
     assert.ok(Boolean(card), 'the Validation rail renders the All checks card');
     const cardText = card.textContent;

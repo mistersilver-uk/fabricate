@@ -4898,6 +4898,7 @@
           },
           "Odds": {
             "Title": "Chance per outcome",
+            "Faces": "all {faces} faces",
             "Hint": "Once this check has a formula and its outcome bands are set, the chance of landing on each one is listed here."
           },
           "Digest": {
