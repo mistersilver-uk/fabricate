@@ -45,17 +45,16 @@ async function measureScreen(browser, options) {
     );
     return await page.evaluate(
       ({ selectors, prelude, sweep, ancestors }) => {
-        // eslint-disable-next-line no-new-func -- authored in the spec, never user input.
         new Function(`${prelude}\nglobalThis.__parity = { paintedBackground, chromeSweep };`)();
         const { paintedBackground, chromeSweep } = globalThis.__parity;
         const regions = {};
         for (const [name, entry] of Object.entries(selectors)) {
-          const el = document.querySelector(entry.selector);
+          const el = globalThis.document.querySelector(entry.selector);
           if (!el) {
             regions[name] = { missing: entry.selector };
             continue;
           }
-          const cs = getComputedStyle(el);
+          const cs = globalThis.getComputedStyle(el);
           const props = {};
           for (const prop of entry.properties) {
             props[prop] =
@@ -72,7 +71,7 @@ async function measureScreen(browser, options) {
           // cannot see an inset that lives above it, and the first version of this one passed
           // while 36px of stacked dead space was on screen for exactly that reason.
           missingAncestors: (ancestors ?? []).filter(
-            (selector) => !document.querySelector(selector)
+            (selector) => !globalThis.document.querySelector(selector)
           ),
         };
       },
@@ -98,35 +97,35 @@ async function main() {
   const spec = await import(pathToFileURL(resolve(process.cwd(), specPath)).href);
   const fixture = JSON.parse(readFileSync(resolve(process.cwd(), fixturePath), 'utf8'));
 
-  const failures = [];
-  failures.push(...validateSpec(spec));
-  // The fixture carries its OWN screen list and its own region screens, so a fixture that
-  // came back one screen narrower fails here even if the spec was edited to match.
-  failures.push(
-    ...coverageProblems(
-      fixture.screens ?? [],
-      Object.entries(fixture.regions).map(([name, region]) => ({ name, screen: region.screen }))
-    )
-  );
-  if (JSON.stringify(fixture.screens ?? []) !== JSON.stringify(spec.screens)) {
-    failures.push(
-      `the fixture's screens ${JSON.stringify(fixture.screens)} are not the spec's ` +
-        `${JSON.stringify(spec.screens)}: regenerate rather than hand-editing`
-    );
-  }
-  failures.push(...exemptionProblems(fixture));
-
   // Both directions of the selector map, for the same reason as the screen set: a region with
   // no selector is measured against the prototype and compared to nothing, and a selector with
   // no region asserts nothing at all.
-  const mapped = Object.keys(spec.subject.selectors).sort();
-  const measured = Object.keys(fixture.regions).sort();
-  for (const name of measured) {
-    if (!mapped.includes(name)) failures.push(`region "${name}" has no subject selector`);
-  }
-  for (const name of mapped) {
-    if (!measured.includes(name)) failures.push(`subject selector "${name}" measures no region`);
-  }
+  const byName = (left, right) => left.localeCompare(right);
+  const mapped = Object.keys(spec.subject.selectors).sort(byName);
+  const measured = Object.keys(fixture.regions).sort(byName);
+
+  const failures = [
+    ...validateSpec(spec),
+    // The fixture carries its OWN screen list and its own region screens, so a fixture that
+    // came back one screen narrower fails here even if the spec was edited to match.
+    ...coverageProblems(
+      fixture.screens ?? [],
+      Object.entries(fixture.regions).map(([name, region]) => ({ name, screen: region.screen }))
+    ),
+    ...(JSON.stringify(fixture.screens ?? []) === JSON.stringify(spec.screens)
+      ? []
+      : [
+          `the fixture's screens ${JSON.stringify(fixture.screens)} are not the spec's ` +
+            `${JSON.stringify(spec.screens)}: regenerate rather than hand-editing`,
+        ]),
+    ...exemptionProblems(fixture),
+    ...measured
+      .filter((name) => !mapped.includes(name))
+      .map((name) => `region "${name}" has no subject selector`),
+    ...mapped
+      .filter((name) => !measured.includes(name))
+      .map((name) => `subject selector "${name}" measures no region`),
+  ];
 
   const browser = await chromium.launch();
   const drift = [];
@@ -186,7 +185,8 @@ async function main() {
     `screens: ${spec.screens.map((s) => `${s}(${byScreenCount[s] ?? 0})`).join(' ')}\n`
   );
   if (failures.length > 0) process.stdout.write(`\nGATE PROBLEMS\n  ${failures.join('\n  ')}\n`);
-  if (drift.length > 0) process.stdout.write(`\nDRIFT (${drift.length})\n  ${drift.join('\n  ')}\n`);
+  if (drift.length > 0)
+    process.stdout.write(`\nDRIFT (${drift.length})\n  ${drift.join('\n  ')}\n`);
   if (failures.length === 0 && drift.length === 0) process.stdout.write('parity: no drift\n');
   return failures.length + drift.length > 0 ? 1 : 0;
 }

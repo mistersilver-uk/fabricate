@@ -2248,7 +2248,11 @@
 
 /* SENTENCE CASE, in the display face, at full text ink. The manager's `.manager-card-title`
    is an uppercase micro-label at muted ink — correct for the rail's flat section headings
-   and wrong for a card that carries a title AND a description line. */
+   and wrong for a card that carries a title AND a description line.
+
+   `h2` as well as `h3`: two of the studio's read-only pages state their subject as a page
+   heading over a kicker, and an uppercase micro-label was as wrong there as on a card. */
+.fabricate-manager h2.manager-checks-card-title,
 .fabricate-manager .manager-checks-card-title {
   margin: 0;
   color: var(--fab-text);
@@ -2745,7 +2749,7 @@
 
   /* Declared, not inherited: a `<button>` takes `buttontext` from the UA, so the row's own
      ink — which `border: 0` still resolves its border colour from — would be the browser's
-     white rather than the rail's. The muted reading lives on the text span below. */
+     default rather than the rail's. The muted reading lives on the text span below. */
   color: var(--fab-text);
   background: none;
   font-family: inherit;
@@ -2839,6 +2843,94 @@
   font-size: 8px;
 }
 
+/* ── The Modifiers screen's entry rows ────────────────────────────────────────────────
+   A read-only catalogue entry is a ROW on the studio's own row shape — the same box the
+   outcome and recipe tiers use — rather than an unboxed line of text. Scoped to the studio's
+   catalogue card so the same markup elsewhere is untouched. */
+.fabricate-manager .manager-checks-card .manager-modifier-readonly-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 9px 11px;
+  border: 1px solid var(--fab-border);
+  border-radius: 9px;
+  background: var(--fab-bg-0);
+}
+
+/* ── The On failure screen's flag cards ───────────────────────────────────────────────
+   `ToggleCard` is the manager's shared status card and the recipe editor's Overview uses it
+   too, so this restates the studio's own metrics through the flag list rather than moving the
+   primitive: the accent tint on the ON state, the 28px icon tile, and the prototype's type. */
+.fabricate-manager .manager-checks-flag-list .manager-recipe-status-card {
+  gap: 12px;
+  padding: 14px 15px;
+  border-radius: 11px;
+}
+
+.fabricate-manager .manager-checks-flag-list .manager-recipe-status-card.is-on {
+  border-color: var(--fab-accent-border);
+  background: var(--fab-accent-soft);
+}
+
+.fabricate-manager .manager-checks-flag-list .manager-recipe-status-icon {
+  display: flex;
+  flex: 0 0 28px;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  color: var(--fab-accent);
+  background: var(--fab-bg-1);
+  font-size: 12px;
+}
+
+.fabricate-manager .manager-checks-flag-list .manager-recipe-status-title {
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.fabricate-manager .manager-checks-flag-list .manager-recipe-status-sub {
+  font-size: 11px;
+}
+
+/* ── The Validation screen ────────────────────────────────────────────────────────────
+   `EditorValidationSurface` is shared with the recipe editor, so every rule here is scoped to
+   the checks route: same primitive, this studio's metrics. */
+.fabricate-manager .manager-checks-validation-route .manager-recipe-rail-summary {
+  gap: 16px;
+  padding: 19px 20px;
+  border-radius: 11px;
+  background: var(--fab-bg-2);
+}
+
+.fabricate-manager .manager-checks-validation-route .manager-recipe-rail-summary.is-pass {
+  border-color: var(--fab-success-border);
+}
+
+.fabricate-manager .manager-checks-validation-route .manager-recipe-rail-count {
+  height: 34px;
+  padding: 0 13px;
+  border-radius: 9px;
+  background: var(--fab-bg-2);
+}
+
+.fabricate-manager .manager-checks-validation-route .manager-recipe-val-group-label {
+  font-size: 9px;
+  letter-spacing: 0.11em;
+}
+
+.fabricate-manager .manager-checks-validation-route .manager-recipe-val-rows {
+  border-radius: 11px;
+  background: var(--fab-bg-2);
+}
+
+.fabricate-manager .manager-checks-validation-route .manager-recipe-val-row {
+  gap: 11px;
+  padding: 13px 14px;
+}
+
 /* The checks editors' choice selectors (check type, DC source, award mode, alchemy
    check mode, modifier policy) render through the shared `RadioCardGroup` primitive
    (issue 855), so they carry the `manager-resolution-mode-card is-config-cards`
@@ -2912,26 +3004,49 @@
   grid-template-columns: minmax(140px, 1fr) 102px 40px;
 }
 
-/* Unified per-check trigger editor (issue 419 recombine). Each trigger is a
-   bordered, padded card split into two rows by a divider: the top row carries the
-   condition controls (When / Group / Measure / Is / Value) with the remove button
-   pinned to its top-right; the bottom row carries the Outcome three-way toggle and
-   the optional Break-tools pill. */
+/* Unified per-check trigger editor (issue 419 recombine). Each trigger is a card split
+   into rows by a divider: the top row carries the condition controls (When / Group /
+   Measure / Is / Value) with the remove button pinned to its top-right; the bottom row
+   carries the Outcome three-way toggle and the optional Break-tools pill.
+
+   ── At the prototype's metrics (issue 1096) ─────────────────────────────────────────
+   A trigger is a CARD with its own inset, not a tinted well: `--fab-bg-2` at radius 10 with
+   the ordinary border, carrying no padding of its own so its rows own theirs. The list gaps
+   at 8px and is extended by a full-width dashed control under it. */
+.fabricate-manager .manager-checks-trigger-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
 .fabricate-manager .manager-checks-breakage-trigger {
   display: grid;
-  gap: var(--fab-space-2);
-  padding: var(--fab-space-2);
+  gap: 0;
+  padding: 0;
+  overflow: hidden;
   border: 1px solid var(--fab-border);
-  border-radius: 6px;
-  background: var(--fab-surface-soft);
+  border-radius: 10px;
+  background: var(--fab-bg-2);
+}
+
+/* The card's ROWS take the inset; its divider is a hairline between them and must not,
+   or the rule renders as a 22px band the width of the card. */
+.fabricate-manager .manager-checks-breakage-trigger > *:not(.manager-checks-trigger-divider) {
+  padding: 11px 13px;
+}
+
+.fabricate-manager .manager-checks-breakage-trigger > .manager-checks-trigger-divider {
+  margin: 0;
 }
 
 /* Top row: condition fields take the available width and wrap; the remove button
-   sits at the top-right, aligned with the first field row. */
+   sits at the top-right, aligned with the first field row. The 11px gutter is the
+   prototype's own (issue 1096). */
 .fabricate-manager .manager-checks-trigger-top {
   display: flex;
   align-items: flex-start;
-  gap: var(--fab-space-2);
+  gap: 11px;
 }
 
 .fabricate-manager .manager-checks-breakage-condition {

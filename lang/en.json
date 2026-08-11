@@ -4571,7 +4571,6 @@
           "Dirty": "Unsaved",
           "Save": "Save checks",
           "Active": {
-            "Title": "Active",
             "OptionalHint": "Turn this check on to require a roll for the activity, or off to resolve it without one.",
             "RequiredHint": "The current resolution mode requires this check, so it cannot be turned off here.",
             "GatheringHint": "In d100 mode the gathering check is the fixed d100 roll and cannot be turned off here.",
@@ -4686,7 +4685,6 @@
             "OutcomeSuccessOff": "Failure",
             "OutcomeBreakOn": "Break",
             "OutcomeBreakOff": "Don't break",
-            "OutcomeActions": "Actions",
             "RemoveOutcome": "Remove outcome",
             "RangeInvalid": "Some tiers have a start greater than their end.",
             "RangeOverlap": "Some tier ranges overlap. Each value range must be unique.",

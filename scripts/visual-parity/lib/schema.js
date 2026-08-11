@@ -65,7 +65,7 @@ export function validateSpec(spec) {
   if (!Array.isArray(spec?.regions) || spec.regions.length === 0) {
     problems.push('spec.regions must be a non-empty array');
   }
-  const screens = new Set(spec?.screens ?? []);
+  const screens = new Set(spec?.screens);
   for (const region of spec?.regions ?? []) {
     if (!region.name) problems.push('a region has no name');
     if (!screens.has(region.screen)) {
@@ -99,7 +99,9 @@ export function coverageProblems(screens, regions) {
   }
   for (const region of regions) {
     if (!screens.includes(region.screen)) {
-      problems.push(`region "${region.name}" claims screen "${region.screen}", which is not declared`);
+      problems.push(
+        `region "${region.name}" claims screen "${region.screen}", which is not declared`
+      );
     }
   }
   return problems;

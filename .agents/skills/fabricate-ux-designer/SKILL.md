@@ -30,6 +30,7 @@ For read-only UX review, return verdicts, findings, and recommended text; only w
 - `openspec/specs/ui-integration/spec.md` first, then other UI-related specs as needed
 - `.agents/skills/fabricate-ux-designer/references/design-system.md` — the `--fab-*` token, component, and pattern reference — when proposing or reviewing visual design or building a new surface
 - `.agents/skills/fabricate-ux-designer/references/visual-evidence-and-reuse.md` — the mandatory reference matrix, reuse-inventory, provenance, and maintainer-manual-evidence procedure for non-trivial UI work
+- `.agents/skills/fabricate-ux-designer/references/prototype-parity-measurement.md` — when a design prototype exists and the question is whether a screen RENDERS like it, pointing at the local `scripts/visual-parity/` harness and the failure modes that make a parity claim untrue while looking true
 - relevant files under `src/ui/`, `src/ui/svelte/`, `styles/`, and `lang/`
 - the active Vite dev URL when available, or a prompt to ask the user for it before using container-backed flows
 - embedded screenshot images in the PR description (S3-hosted; the View Lab capture job publishes these on every push), View Lab frames you render yourself, and smoke screenshots for views outside the case registry
@@ -107,6 +108,8 @@ When reviewing a plan, audit the UI portion of the issue delta against these con
 - Treat unrelated image markdown, artifact names, and file lists in a PR as missing normal UI evidence; screenshots must be embedded images of the changed view (produced by `npm run screenshots:ui:publish`, S3-hosted).
 There is no `SCREENSHOTS_NEEDED:` handoff; only a maintainer-applied `screenshots-exempt` label can waive the requirement.
 - Validate every automated affected view against the provenance procedure in `.agents/skills/fabricate-ux-designer/references/visual-evidence-and-reuse.md`; generic provenance is mandatory and any view-specific parity constraints remain stricter additions.
+- When a design prototype exists, measure the screen against it with `scripts/visual-parity/` rather than judging by eye, and read `.agents/skills/fabricate-ux-designer/references/prototype-parity-measurement.md` first.
+That harness is local-only and never runs in CI, so any drift it exposes and nobody closes must be written into the handoff rather than left to a red build that will not exist.
 - Do not implement production UI changes unless the user explicitly switches to implementation work.
 
 ## PR description template

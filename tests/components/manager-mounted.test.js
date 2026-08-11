@@ -2757,7 +2757,7 @@ describe('CraftingSystemManager mounted behavior', () => {
       'd100 gathering renders the read-only card, not an editor'
     );
     assert.equal(
-      gatheringPanel.querySelector('.manager-card-title').textContent.trim(),
+      gatheringPanel.querySelector('.manager-checks-card-title').textContent.trim(),
       'Fixed d100 roll'
     );
     assert.ok(

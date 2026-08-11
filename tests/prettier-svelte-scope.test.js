@@ -107,7 +107,13 @@ const GATE_TARGETS = [
   'scripts/lib/foundrySmokeArms.js',
   'scripts/lib/foundryBrowserBoot.js',
   'scripts/foundry-version-assert.mjs',
-  'scripts/checks-studio-parity-extract.mjs',
+  // The screen-agnostic visual-parity harness (issue 1096). It replaced a single
+  // prototype-specific extractor: the prototype, its region map and its fixture are
+  // development-time artefacts under `tmp/` and are not in the tree at all.
+  'scripts/visual-parity/extract.mjs',
+  'scripts/visual-parity/compare.mjs',
+  'scripts/visual-parity/lib/measure.js',
+  'scripts/visual-parity/lib/schema.js',
   'eslint.config.js',
 ];
 const FORMAT_ARGV = ['prettier', '--write', ...GATE_TARGETS];

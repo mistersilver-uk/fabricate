@@ -43,6 +43,11 @@ const harness = createMountedComponentHarness({
     'src/utils/macroReference.js',
     'src/ui/svelte/util/dropUtils.js',
     'src/ui/svelte/actions/dragDrop.js',
+    // The formula field's quick-add chips are DERIVED from the active world rather than
+    // hard-coded (issue 1096), so the tree now imports the derivation and its preset
+    // bundles. Manifest only: no assertion below moved.
+    'src/config/modifierExpressionSuggestions.js',
+    'src/config/gatheringCharacterModifierPresets.js',
   ],
   compiledModules: [
     'src/ui/svelte/apps/manager/ItemDropZone.svelte',
@@ -58,6 +63,9 @@ const harness = createMountedComponentHarness({
     // did. `tests/components/mounted-harness-primitive-allowlist.test.js` is what turned
     // the omission into a failure here rather than a hung suite.
     'src/ui/svelte/apps/manager/IconFactRow.svelte',
+    // The shared button primitive: the recipe-tier list and the trigger list are both
+    // extended by its `dashed` role now (issue 1096). Manifest only.
+    'src/ui/svelte/components/ManagerButton.svelte',
     'src/ui/svelte/apps/manager/checks/CheckFormulaFields.svelte',
     'src/ui/svelte/apps/manager/checks/CheckRecipeTiers.svelte',
     'src/ui/svelte/apps/manager/checks/CheckTriggers.svelte',

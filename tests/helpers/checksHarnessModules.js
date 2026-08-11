@@ -54,6 +54,10 @@ export const CHECKS_TREE_RAW_MODULES = Object.freeze([
   'src/systems/toolCheckBonus.js',
   'src/utils/craftingCheckExpression.js',
   'src/utils/routedOutcomeKeywords.js',
+  // The formula field's quick-add chips are DERIVED from the active world through this
+  // module rather than hard-coded (issue 1096), so the whole checks tree now imports it.
+  'src/config/modifierExpressionSuggestions.js',
+  'src/config/gatheringCharacterModifierPresets.js',
 ]);
 
 /**
@@ -70,6 +74,9 @@ export const CHECKS_TREE_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/components/RowDisclosure.svelte',
   'src/ui/svelte/components/ThresholdBandStrip.svelte',
   'src/ui/svelte/components/Stepper.svelte',
+  // The shared button primitive. Every list in the studio is extended by the prototype's
+  // full-width dashed control, which is this primitive's `dashed` role (issue 1096).
+  'src/ui/svelte/components/ManagerButton.svelte',
   'src/ui/svelte/apps/manager/Callout.svelte',
   'src/ui/svelte/apps/manager/Chip.svelte',
   'src/ui/svelte/apps/manager/EditorValidationSurface.svelte',

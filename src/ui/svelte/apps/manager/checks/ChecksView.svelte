@@ -931,7 +931,7 @@
         <div class="manager-checks-editor-stack" data-checks-panel="crafting">
           {#if activeSection === 'roll'}
             <section class="manager-inspector-card">
-              <h3 class="manager-card-title">
+              <h3 class="manager-checks-card-title">
                 {text('FABRICATE.Admin.SystemSettings.Alchemy.CheckModeHeading', 'Alchemy check')}
               </h3>
               <p class="manager-muted">
@@ -956,7 +956,7 @@
 
           {#if activeSection === 'on-failure'}
             <section class="manager-inspector-card" data-alchemy-behaviour>
-              <h3 class="manager-card-title">
+              <h3 class="manager-checks-card-title">
                 {text(
                   'FABRICATE.Admin.SystemSettings.Alchemy.BehaviourHeading',
                   'Alchemy behaviour'
@@ -1036,7 +1036,7 @@
           {#if alchemyNone && ['roll', 'outcomes', 'triggers'].includes(activeSection)}
             <section class="manager-inspector-card" data-alchemy-none-readonly>
               <p class="manager-kicker">{pageKicker}</p>
-              <h2 class="manager-card-title">
+              <h2 class="manager-checks-card-title">
                 {text(
                   'FABRICATE.Admin.Manager.Checks.Crafting.AlchemyNoneTitle',
                   'Resolves without a check'
@@ -1107,7 +1107,7 @@
 
           {#if activeSection === 'on-failure'}
             <section class="manager-inspector-card" data-failure-consumption>
-              <h3 class="manager-card-title">
+              <h3 class="manager-checks-card-title">
                 {text(
                   'FABRICATE.Admin.Manager.Checks.Crafting.FailureConsumptionHeading',
                   'Failure consumption policy'
@@ -1212,7 +1212,7 @@
           {#if activeSection === 'roll'}
             <section class="manager-inspector-card">
               <p class="manager-kicker">{pageKicker}</p>
-              <h2 class="manager-card-title">
+              <h2 class="manager-checks-card-title">
                 {text('FABRICATE.Admin.Manager.Checks.Gathering.D100Title', 'Fixed d100 roll')}
               </h2>
               <p class="manager-muted">
@@ -1223,7 +1223,7 @@
               </p>
             </section>
             <section class="manager-inspector-card">
-              <h3 class="manager-card-title">{configTitle}</h3>
+              <h3 class="manager-checks-card-title">{configTitle}</h3>
               <p class="manager-muted">
                 {text(
                   'FABRICATE.Admin.Manager.Checks.Gathering.D100Hint',
@@ -1279,11 +1279,11 @@
         <div class="manager-checks-page" data-checks-panel={activity}>
           <section class="manager-inspector-card">
             <p class="manager-kicker">{pageKicker}</p>
-            <h2 class="manager-card-title">{page.title}</h2>
+            <h2 class="manager-checks-card-title">{page.title}</h2>
             <p class="manager-muted">{page.lead}</p>
           </section>
           <section class="manager-inspector-card">
-            <h3 class="manager-card-title">{configTitle}</h3>
+            <h3 class="manager-checks-card-title">{configTitle}</h3>
             <p class="manager-muted">{page.configHint}</p>
           </section>
         </div>

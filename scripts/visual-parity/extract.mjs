@@ -43,7 +43,7 @@ async function main() {
     return 2;
   }
 
-  const propertyGroups = { ...DEFAULT_PROPERTY_GROUPS, ...(spec.propertyGroups ?? {}) };
+  const propertyGroups = { ...DEFAULT_PROPERTY_GROUPS, ...spec.propertyGroups };
   const resolvedOut = resolve(process.cwd(), outPath);
   // Exemptions are HAND-AUTHORED and live in the fixture beside the measurement they suspend,
   // so a reader of one region sees both. They are CARRIED ACROSS a regeneration rather than
@@ -85,20 +85,23 @@ async function main() {
       await spec.navigate(page, screen);
       const values = await page.evaluate(
         ({ regionSpecs, groups, prelude, helpers }) => {
-          // eslint-disable-next-line no-new-func -- authored in the spec, never user input,
           // and a string only because it has to cross the page boundary into `evaluate`.
           const readRegion = new Function(`${prelude}\nreturn readRegion;`)();
-          // eslint-disable-next-line no-new-func -- see above.
+
           const scope = new Function(`return (${helpers});`)();
           const out = {};
           for (const region of regionSpecs) {
-            // eslint-disable-next-line no-new-func -- see above.
             const fn = new Function(...Object.keys(scope), `return (${region.locator});`);
             const el = fn(...Object.values(scope));
             if (!el) throw new Error(`region ${region.name}: locator resolved to nothing`);
             out[region.name] = {
               tag: el.tagName.toLowerCase(),
-              properties: readRegion(el, region.groups, groups, region.effectiveBackground === true),
+              properties: readRegion(
+                el,
+                region.groups,
+                groups,
+                region.effectiveBackground === true
+              ),
             };
           }
           return out;

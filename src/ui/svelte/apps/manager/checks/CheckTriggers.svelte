@@ -33,6 +33,7 @@
   `outcomeOptions`).
 -->
 <script>
+  import ManagerButton from '../../../components/ManagerButton.svelte';
   import { localize } from '../../../util/foundryBridge.js';
   import { parseDiceGroups } from '../../../../../utils/craftingCheckExpression.js';
   import SegmentedControl from '../SegmentedControl.svelte';
@@ -361,223 +362,242 @@
   }
 </script>
 
-<section class="manager-inspector-card" data-check-triggers>
+<section class="manager-inspector-card manager-checks-card" data-check-triggers>
   <div class="manager-checks-card-head">
-    <h3 class="manager-card-title">
-      {text('FABRICATE.Admin.Manager.Checks.Breakage.Title', 'Check triggers')}
-    </h3>
-    <button type="button" class="manager-button" data-add-trigger onclick={addTrigger}>
-      <i class="fas fa-plus" aria-hidden="true"></i>
-      <span>{text('FABRICATE.Admin.Manager.Checks.Breakage.AddTrigger', 'Add trigger')}</span>
-    </button>
+    <div>
+      <h3 class="manager-checks-card-title">
+        {text('FABRICATE.Admin.Manager.Checks.Breakage.Title', 'Check triggers')}
+      </h3>
+      <p class="manager-checks-card-description">
+        {showBreakTools
+          ? text(
+              'FABRICATE.Admin.Manager.Checks.Breakage.Lead',
+              'Each trigger can force the check outcome and/or break every required tool for the attempt (immune tools are never broken).'
+            )
+          : text(
+              'FABRICATE.Admin.Manager.Checks.Breakage.LeadOutcomeOnly',
+              'Each trigger can force the check outcome. Switch the tool-breakage authority to check-driven to let triggers break tools.'
+            )}
+      </p>
+    </div>
   </div>
 
-  <p class="manager-muted">
-    {showBreakTools
-      ? text(
-          'FABRICATE.Admin.Manager.Checks.Breakage.Lead',
-          'Each trigger can force the check outcome and/or break every required tool for the attempt (immune tools are never broken).'
-        )
-      : text(
-          'FABRICATE.Admin.Manager.Checks.Breakage.LeadOutcomeOnly',
-          'Each trigger can force the check outcome. Switch the tool-breakage authority to check-driven to let triggers break tools.'
+  <div class="manager-checks-card-body is-stack">
+    {#if triggers.length === 0}
+      <p class="manager-muted" data-triggers-empty>
+        {text(
+          'FABRICATE.Admin.Manager.Checks.Breakage.Empty',
+          'No triggers yet. Add one to force an outcome or break tools on this check.'
         )}
-  </p>
+      </p>
+    {:else}
+      <div class="manager-checks-trigger-list" role="list">
+        {#each triggers as trigger (trigger.id)}
+          {@const condition = trigger.condition || {}}
+          {@const isOutcomeTier = condition.type === 'outcomeTier'}
+          {@const selectedOutcome = isOutcomeTier ? 'none' : outcomeFor(trigger)}
+          <div class="manager-checks-breakage-trigger" data-trigger={trigger.id}>
+            <div class="manager-checks-trigger-top">
+              <div class="manager-checks-breakage-condition">
+                <label class="manager-field">
+                  <span
+                    >{text('FABRICATE.Admin.Manager.Checks.Breakage.ConditionType', 'When')}</span
+                  >
+                  <select
+                    data-trigger-condition-type
+                    value={condition.type || 'rollTotal'}
+                    onchange={(event) => setConditionType(trigger.id, event.currentTarget.value)}
+                  >
+                    {#each conditionTypes as option (option.value)}
+                      <option value={option.value}>{text(option.labelKey, option.fallback)}</option>
+                    {/each}
+                  </select>
+                </label>
 
-  {#if triggers.length === 0}
-    <p class="manager-muted" data-triggers-empty>
-      {text(
-        'FABRICATE.Admin.Manager.Checks.Breakage.Empty',
-        'No triggers yet. Add one to force an outcome or break tools on this check.'
-      )}
-    </p>
-  {:else}
-    {#each triggers as trigger (trigger.id)}
-      {@const condition = trigger.condition || {}}
-      {@const isOutcomeTier = condition.type === 'outcomeTier'}
-      {@const selectedOutcome = isOutcomeTier ? 'none' : outcomeFor(trigger)}
-      <div class="manager-checks-breakage-trigger" data-trigger={trigger.id}>
-        <div class="manager-checks-trigger-top">
-          <div class="manager-checks-breakage-condition">
-            <label class="manager-field">
-              <span>{text('FABRICATE.Admin.Manager.Checks.Breakage.ConditionType', 'When')}</span>
-              <select
-                data-trigger-condition-type
-                value={condition.type || 'rollTotal'}
-                onchange={(event) => setConditionType(trigger.id, event.currentTarget.value)}
-              >
-                {#each conditionTypes as option (option.value)}
-                  <option value={option.value}>{text(option.labelKey, option.fallback)}</option>
-                {/each}
-              </select>
-            </label>
-
-            {#if condition.type === 'diceGroup'}
-              <label class="manager-field">
-                <span>{text('FABRICATE.Admin.Manager.Checks.Breakage.Group', 'Group')}</span>
-                <select
-                  data-trigger-group
-                  value={String(condition.groupId ?? '')}
-                  onchange={(event) =>
-                    updateCondition(trigger.id, { groupId: Number(event.currentTarget.value) })}
-                >
-                  {#each diceGroups as group (group.groupId)}
-                    <option value={String(group.groupId)}>{group.label}</option>
-                  {/each}
-                </select>
-              </label>
-              <label class="manager-field">
-                <span>{text('FABRICATE.Admin.Manager.Checks.Breakage.Aggregate', 'Measure')}</span>
-                <select
-                  data-trigger-aggregate
-                  value={condition.aggregate || 'anyDie'}
-                  onchange={(event) =>
-                    updateCondition(trigger.id, { aggregate: event.currentTarget.value })}
-                >
-                  {#each AGGREGATES as option (option.value)}
-                    <option value={option.value}>{text(option.labelKey, option.fallback)}</option>
-                  {/each}
-                </select>
-              </label>
-            {/if}
-
-            {#if isOutcomeTier}
-              <div
-                class="manager-checks-breakage-tiers"
-                role="group"
-                aria-label={text('FABRICATE.Admin.Manager.Checks.Breakage.Tiers', 'Outcome tiers')}
-              >
-                {#if outcomeOptions.length === 0}
-                  <p class="manager-muted" data-trigger-no-tiers>
-                    {text(
-                      'FABRICATE.Admin.Manager.Checks.Breakage.NoTiers',
-                      'Add named outcome tiers to target them.'
-                    )}
-                  </p>
-                {:else}
-                  {#each outcomeOptions as option (option.id)}
-                    <button
-                      type="button"
-                      class={`manager-checks-state-pill ${isOutcomeSelected(condition, option.id) ? 'is-positive' : 'is-negative'}`}
-                      data-trigger-tier={option.id}
-                      aria-pressed={isOutcomeSelected(condition, option.id)}
-                      onclick={() => toggleOutcomeTier(trigger.id, option.id)}
+                {#if condition.type === 'diceGroup'}
+                  <label class="manager-field">
+                    <span>{text('FABRICATE.Admin.Manager.Checks.Breakage.Group', 'Group')}</span>
+                    <select
+                      data-trigger-group
+                      value={String(condition.groupId ?? '')}
+                      onchange={(event) =>
+                        updateCondition(trigger.id, { groupId: Number(event.currentTarget.value) })}
                     >
-                      {option.name ||
-                        text('FABRICATE.Admin.Manager.Checks.Breakage.UnnamedTier', 'Unnamed tier')}
-                    </button>
-                  {/each}
+                      {#each diceGroups as group (group.groupId)}
+                        <option value={String(group.groupId)}>{group.label}</option>
+                      {/each}
+                    </select>
+                  </label>
+                  <label class="manager-field">
+                    <span
+                      >{text('FABRICATE.Admin.Manager.Checks.Breakage.Aggregate', 'Measure')}</span
+                    >
+                    <select
+                      data-trigger-aggregate
+                      value={condition.aggregate || 'anyDie'}
+                      onchange={(event) =>
+                        updateCondition(trigger.id, { aggregate: event.currentTarget.value })}
+                    >
+                      {#each AGGREGATES as option (option.value)}
+                        <option value={option.value}
+                          >{text(option.labelKey, option.fallback)}</option
+                        >
+                      {/each}
+                    </select>
+                  </label>
+                {/if}
+
+                {#if isOutcomeTier}
+                  <div
+                    class="manager-checks-breakage-tiers"
+                    role="group"
+                    aria-label={text(
+                      'FABRICATE.Admin.Manager.Checks.Breakage.Tiers',
+                      'Outcome tiers'
+                    )}
+                  >
+                    {#if outcomeOptions.length === 0}
+                      <p class="manager-muted" data-trigger-no-tiers>
+                        {text(
+                          'FABRICATE.Admin.Manager.Checks.Breakage.NoTiers',
+                          'Add named outcome tiers to target them.'
+                        )}
+                      </p>
+                    {:else}
+                      {#each outcomeOptions as option (option.id)}
+                        <button
+                          type="button"
+                          class={`manager-checks-state-pill ${isOutcomeSelected(condition, option.id) ? 'is-positive' : 'is-negative'}`}
+                          data-trigger-tier={option.id}
+                          aria-pressed={isOutcomeSelected(condition, option.id)}
+                          onclick={() => toggleOutcomeTier(trigger.id, option.id)}
+                        >
+                          {option.name ||
+                            text(
+                              'FABRICATE.Admin.Manager.Checks.Breakage.UnnamedTier',
+                              'Unnamed tier'
+                            )}
+                        </button>
+                      {/each}
+                    {/if}
+                  </div>
+                {:else}
+                  <label class="manager-field">
+                    <span>{text('FABRICATE.Admin.Manager.Checks.Breakage.Operator', 'Is')}</span>
+                    <select
+                      data-trigger-operator
+                      value={condition.operator || '=='}
+                      onchange={(event) =>
+                        updateCondition(trigger.id, { operator: event.currentTarget.value })}
+                    >
+                      {#each OPERATORS as operator (operator)}
+                        <option value={operator}>{operator}</option>
+                      {/each}
+                    </select>
+                  </label>
+                  <!-- A `<div>`, not the `<label>` it was: see the NAMING contract in
+                   `Stepper.svelte`. -->
+                  <div class="manager-field">
+                    <span>{conditionValueLabel}</span>
+                    <Stepper
+                      fill
+                      value={condition.value ?? 0}
+                      {...stepperLabels(conditionValueLabel)}
+                      inputProps={{ 'data-trigger-value': '' }}
+                      onChange={(next) => updateCondition(trigger.id, { value: next })}
+                    />
+                  </div>
                 {/if}
               </div>
-            {:else}
-              <label class="manager-field">
-                <span>{text('FABRICATE.Admin.Manager.Checks.Breakage.Operator', 'Is')}</span>
-                <select
-                  data-trigger-operator
-                  value={condition.operator || '=='}
-                  onchange={(event) =>
-                    updateCondition(trigger.id, { operator: event.currentTarget.value })}
-                >
-                  {#each OPERATORS as operator (operator)}
-                    <option value={operator}>{operator}</option>
-                  {/each}
-                </select>
-              </label>
-              <!-- A `<div>`, not the `<label>` it was: see the NAMING contract in
-                   `Stepper.svelte`. -->
-              <div class="manager-field">
-                <span>{conditionValueLabel}</span>
-                <Stepper
-                  fill
-                  value={condition.value ?? 0}
-                  {...stepperLabels(conditionValueLabel)}
-                  inputProps={{ 'data-trigger-value': '' }}
-                  onChange={(next) => updateCondition(trigger.id, { value: next })}
-                />
-              </div>
-            {/if}
-          </div>
 
-          <button
-            type="button"
-            class="manager-icon-button is-danger manager-checks-trigger-remove"
-            data-remove-trigger
-            aria-label={text(
-              'FABRICATE.Admin.Manager.Checks.Breakage.RemoveTrigger',
-              'Remove trigger'
-            )}
-            onclick={() => removeTrigger(trigger.id)}
-          >
-            <i class="fas fa-trash" aria-hidden="true"></i>
-          </button>
-        </div>
-
-        <hr class="manager-checks-trigger-divider" aria-hidden="true" />
-
-        <div class="manager-checks-trigger-bottom">
-          <div class="manager-field manager-checks-trigger-outcome">
-            <span>{text('FABRICATE.Admin.Manager.Checks.Breakage.OutcomeColumn', 'Outcome')}</span>
-            <SegmentedControl
-              options={outcomeSegments(isOutcomeTier)}
-              value={selectedOutcome}
-              groupName={`outcome-${trigger.id}`}
-              ariaLabel={text('FABRICATE.Admin.Manager.Checks.Breakage.OutcomeColumn', 'Outcome')}
-              optionDataAttr="data-trigger-outcome"
-              onChange={(next) => updateTrigger(trigger.id, { outcome: next })}
-            />
-          </div>
-
-          {#if showBreakTools}
-            <div class="manager-field manager-checks-trigger-break">
-              <span
-                >{text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeBreak', 'Break tools')}</span
-              >
               <button
                 type="button"
-                class={`manager-checks-state-pill ${trigger.breakTools === true ? 'is-negative' : 'is-positive'}`}
-                data-trigger-break
-                aria-pressed={trigger.breakTools === true}
+                class="manager-icon-button is-danger manager-checks-trigger-remove"
+                data-remove-trigger
                 aria-label={text(
-                  'FABRICATE.Admin.Manager.Checks.Crafting.OutcomeBreak',
-                  'Break tools'
+                  'FABRICATE.Admin.Manager.Checks.Breakage.RemoveTrigger',
+                  'Remove trigger'
                 )}
-                onclick={() =>
-                  updateTrigger(trigger.id, { breakTools: !(trigger.breakTools === true) })}
+                onclick={() => removeTrigger(trigger.id)}
               >
-                {trigger.breakTools === true ? breakOnLabel : breakOffLabel}
+                <i class="fas fa-trash" aria-hidden="true"></i>
               </button>
             </div>
-          {/if}
-        </div>
 
-        {#if kind === 'routed'}
-          {@const step = tierStepFor(trigger)}
-          {@const dangling = isDanglingTarget(step)}
-          <!-- Its OWN row, not a third field in the bottom row: at the pinned 1280
+            <hr class="manager-checks-trigger-divider" aria-hidden="true" />
+
+            <div class="manager-checks-trigger-bottom">
+              <div class="manager-field manager-checks-trigger-outcome">
+                <span
+                  >{text('FABRICATE.Admin.Manager.Checks.Breakage.OutcomeColumn', 'Outcome')}</span
+                >
+                <SegmentedControl
+                  options={outcomeSegments(isOutcomeTier)}
+                  value={selectedOutcome}
+                  groupName={`outcome-${trigger.id}`}
+                  ariaLabel={text(
+                    'FABRICATE.Admin.Manager.Checks.Breakage.OutcomeColumn',
+                    'Outcome'
+                  )}
+                  optionDataAttr="data-trigger-outcome"
+                  onChange={(next) => updateTrigger(trigger.id, { outcome: next })}
+                />
+              </div>
+
+              {#if showBreakTools}
+                <div class="manager-field manager-checks-trigger-break">
+                  <span
+                    >{text(
+                      'FABRICATE.Admin.Manager.Checks.Crafting.OutcomeBreak',
+                      'Break tools'
+                    )}</span
+                  >
+                  <button
+                    type="button"
+                    class={`manager-checks-state-pill ${trigger.breakTools === true ? 'is-negative' : 'is-positive'}`}
+                    data-trigger-break
+                    aria-pressed={trigger.breakTools === true}
+                    aria-label={text(
+                      'FABRICATE.Admin.Manager.Checks.Crafting.OutcomeBreak',
+                      'Break tools'
+                    )}
+                    onclick={() =>
+                      updateTrigger(trigger.id, { breakTools: !(trigger.breakTools === true) })}
+                  >
+                    {trigger.breakTools === true ? breakOnLabel : breakOffLabel}
+                  </button>
+                </div>
+              {/if}
+            </div>
+
+            {#if kind === 'routed'}
+              {@const step = tierStepFor(trigger)}
+              {@const dangling = isDanglingTarget(step)}
+              <!-- Its OWN row, not a third field in the bottom row: at the pinned 1280
                manager geometry the outcome toggle plus the break pill already spend
                most of the trigger card's width, and a four-segment control plus an
                operand does not fit what is left. -->
-          <div class="manager-checks-trigger-step-row" data-trigger-tier-step>
-            <div class="manager-field manager-checks-trigger-step-mode">
-              <span>{tierStepLabel}</span>
-              <SegmentedControl
-                options={TIER_STEP_MODES}
-                value={step.mode}
-                groupName={`tierstep-${trigger.id}`}
-                ariaLabel={tierStepModeLabel}
-                optionDataAttr="data-trigger-tier-step-mode"
-                onChange={(mode) => updateTierStep(trigger.id, { mode })}
-              />
-            </div>
+              <div class="manager-checks-trigger-step-row" data-trigger-tier-step>
+                <div class="manager-field manager-checks-trigger-step-mode">
+                  <span>{tierStepLabel}</span>
+                  <SegmentedControl
+                    options={TIER_STEP_MODES}
+                    value={step.mode}
+                    groupName={`tierstep-${trigger.id}`}
+                    ariaLabel={tierStepModeLabel}
+                    optionDataAttr="data-trigger-tier-step-mode"
+                    onChange={(mode) => updateTierStep(trigger.id, { mode })}
+                  />
+                </div>
 
-            <!-- The operand slot is ALWAYS present at one pinned width and only its
+                <!-- The operand slot is ALWAYS present at one pinned width and only its
                  contents swap, so changing mode never moves the control out from
                  under the pointer in this wrapping row. -->
-            <div
-              class={`manager-field manager-checks-trigger-step-operand ${dangling ? 'is-invalid' : ''}`}
-            >
-              {#if step.mode === 'up' || step.mode === 'down'}
-                <!-- `fill` is what keeps the canonical no-movement guarantee (ui-integration
+                <div
+                  class={`manager-field manager-checks-trigger-step-operand ${dangling ? 'is-invalid' : ''}`}
+                >
+                  {#if step.mode === 'up' || step.mode === 'down'}
+                    <!-- `fill` is what keeps the canonical no-movement guarantee (ui-integration
                      spec, "a stable operand slot at one pinned width"): the slot stays
                      pinned at 160px and the primitive stretches into it, so swapping mode
                      between this stepper, the tier `<select>` and the inert placeholder
@@ -590,76 +610,95 @@
                      `<input>` — the smoke harness calls Playwright's `fill()` and
                      `inputValue()` on it, and neither resolves against a wrapper `<div>`.
                      `Math.trunc` stays: `Stepper` clamps but does not truncate. -->
-                <Stepper
-                  fill
-                  value={step.steps}
-                  min={1}
-                  {...tierStepAdjunctLabels}
-                  ariaLabel={step.mode === 'up'
-                    ? text('FABRICATE.Admin.Manager.Checks.Breakage.TierStepStepsUp', 'Steps up')
-                    : text(
-                        'FABRICATE.Admin.Manager.Checks.Breakage.TierStepStepsDown',
-                        'Steps down'
-                      )}
-                  inputProps={{ 'data-trigger-tier-step-steps': '' }}
-                  onChange={(next) =>
-                    updateTierStep(trigger.id, { steps: Math.max(1, Math.trunc(next)) })}
-                />
-              {:else if step.mode === 'target' && outcomeOptions.length > 0}
-                <!-- A <select> whose value matches no option renders its FIRST option as
+                    <Stepper
+                      fill
+                      value={step.steps}
+                      min={1}
+                      {...tierStepAdjunctLabels}
+                      ariaLabel={step.mode === 'up'
+                        ? text(
+                            'FABRICATE.Admin.Manager.Checks.Breakage.TierStepStepsUp',
+                            'Steps up'
+                          )
+                        : text(
+                            'FABRICATE.Admin.Manager.Checks.Breakage.TierStepStepsDown',
+                            'Steps down'
+                          )}
+                      inputProps={{ 'data-trigger-tier-step-steps': '' }}
+                      onChange={(next) =>
+                        updateTierStep(trigger.id, { steps: Math.max(1, Math.trunc(next)) })}
+                    />
+                  {:else if step.mode === 'target' && outcomeOptions.length > 0}
+                    <!-- A <select> whose value matches no option renders its FIRST option as
                      selected, so a null tierId would show a real tier the check has not
                      persisted. The disabled placeholder is what makes "nothing chosen"
                      read as nothing chosen. -->
-                <select
-                  data-trigger-tier-step-target
-                  aria-label={text('FABRICATE.Admin.Manager.Checks.Breakage.TierStepTier', 'Tier')}
-                  value={step.tierId ?? ''}
-                  onchange={(event) =>
-                    updateTierStep(trigger.id, { tierId: event.currentTarget.value || null })}
-                >
-                  <option value="" disabled
-                    >{text(
-                      'FABRICATE.Admin.Manager.Checks.Breakage.TierStepChoose',
-                      'Choose a tier…'
-                    )}</option
-                  >
-                  {#each outcomeOptions as option (option.id)}
-                    <option value={option.id}
-                      >{option.name ||
-                        text(
-                          'FABRICATE.Admin.Manager.Checks.Breakage.UnnamedTier',
-                          'Unnamed tier'
+                    <select
+                      data-trigger-tier-step-target
+                      aria-label={text(
+                        'FABRICATE.Admin.Manager.Checks.Breakage.TierStepTier',
+                        'Tier'
+                      )}
+                      value={step.tierId ?? ''}
+                      onchange={(event) =>
+                        updateTierStep(trigger.id, { tierId: event.currentTarget.value || null })}
+                    >
+                      <option value="" disabled
+                        >{text(
+                          'FABRICATE.Admin.Manager.Checks.Breakage.TierStepChoose',
+                          'Choose a tier…'
                         )}</option
-                    >
-                  {/each}
-                  {#if dangling}
-                    <option value={step.tierId} disabled
-                      >{text(
-                        'FABRICATE.Admin.Manager.Checks.Breakage.TierStepMissingTier',
-                        'Missing tier'
-                      )}</option
-                    >
+                      >
+                      {#each outcomeOptions as option (option.id)}
+                        <option value={option.id}
+                          >{option.name ||
+                            text(
+                              'FABRICATE.Admin.Manager.Checks.Breakage.UnnamedTier',
+                              'Unnamed tier'
+                            )}</option
+                        >
+                      {/each}
+                      {#if dangling}
+                        <option value={step.tierId} disabled
+                          >{text(
+                            'FABRICATE.Admin.Manager.Checks.Breakage.TierStepMissingTier',
+                            'Missing tier'
+                          )}</option
+                        >
+                      {/if}
+                    </select>
+                  {:else}
+                    <input type="text" value="" disabled aria-hidden="true" tabindex="-1" />
                   {/if}
-                </select>
-              {:else}
-                <input type="text" value="" disabled aria-hidden="true" tabindex="-1" />
-              {/if}
-            </div>
+                </div>
 
-            {#if step.mode === 'target' && outcomeOptions.length === 0}
-              <!-- Its own hook, distinct from the outcomeTier condition's: a trigger that
+                {#if step.mode === 'target' && outcomeOptions.length === 0}
+                  <!-- Its own hook, distinct from the outcomeTier condition's: a trigger that
                    is both outcomeTier-conditioned and target-stepping on a tier-less check
                    would otherwise carry two identically-hooked nodes in one card. -->
-              <p class="manager-muted manager-checks-trigger-step-hint" data-trigger-step-no-tiers>
-                {text(
-                  'FABRICATE.Admin.Manager.Checks.Breakage.TierStepNoTiers',
-                  'Add named outcome tiers to step to one.'
-                )}
-              </p>
+                  <p
+                    class="manager-muted manager-checks-trigger-step-hint"
+                    data-trigger-step-no-tiers
+                  >
+                    {text(
+                      'FABRICATE.Admin.Manager.Checks.Breakage.TierStepNoTiers',
+                      'Add named outcome tiers to step to one.'
+                    )}
+                  </p>
+                {/if}
+              </div>
             {/if}
           </div>
-        {/if}
+        {/each}
       </div>
-    {/each}
-  {/if}
+    {/if}
+
+    <!-- The prototype extends the list with a full-width dashed control UNDER it, not a
+         button in the card head: the head names the section, and the action that grows the
+         list belongs at the end of the list it grows. -->
+    <ManagerButton role="dashed" data-add-trigger onclick={addTrigger}>
+      <i class="fas fa-plus" aria-hidden="true"></i>
+      <span>{text('FABRICATE.Admin.Manager.Checks.Breakage.AddTrigger', 'Add trigger')}</span>
+    </ManagerButton>
+  </div>
 </section>
