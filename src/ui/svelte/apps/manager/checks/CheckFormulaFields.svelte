@@ -161,7 +161,7 @@
         )}
       >
         {text('FABRICATE.Admin.Manager.Checks.Crafting.Average', 'avg')}
-        {average}
+        <span>{average}</span>
       </span>
     {/if}
   </div>
@@ -207,7 +207,11 @@
         data-check-formula-token={token}
         onclick={() => appendToken(token)}
       >
-        + {token}
+        <!-- The verb as a GLYPH, which is what the prototype draws: the chip APPENDS the
+             term to the formula, and a literal `+` character in the label reads as part of
+             the expression rather than as the thing the button does. -->
+        <i class="fas fa-plus" aria-hidden="true"></i>
+        <span>{token}</span>
       </button>
     {/each}
   </span>
