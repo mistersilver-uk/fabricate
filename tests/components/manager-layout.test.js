@@ -48,9 +48,7 @@ function scopedStyles(componentSource) {
   const start = componentSource.lastIndexOf(STYLE_OPEN);
   const end = componentSource.lastIndexOf('\n</style>');
   if (start < 0 || end <= start) return '';
-  return componentSource
-    .slice(start + STYLE_OPEN.length, end)
-    .replace(/\/\*[\s\S]*?\*\//g, '');
+  return componentSource.slice(start + STYLE_OPEN.length, end).replace(/\/\*[\s\S]*?\*\//g, '');
 }
 
 const emptyStateStyles = scopedStyles(emptyStateSource);
@@ -1089,10 +1087,7 @@ test('manager empty states use refined heading and setup-panel styling', () => {
     !emptyPanelBlock.includes('min-height:'),
     'panel height should be padding-driven as in the prototype, not floored'
   );
-  assert.ok(
-    !emptyPanelBlock.includes('background:'),
-    'the prototype panel carries no fill'
-  );
+  assert.ok(!emptyPanelBlock.includes('background:'), 'the prototype panel carries no fill');
   assert.ok(
     emptyIconBlock.includes('font-size: 18px;') &&
       emptyIconBlock.includes('color: var(--fab-text-subtle);') &&
@@ -1264,10 +1259,7 @@ test('the shared explainer card reuses the card shell and owns only the explaine
   // out of its card and a one-link primitive is exactly the incompatibility that kept a
   // hand-rolled card alive beside it. The single `docsHref`/`docsLabel` pair is gone rather
   // than kept alongside — two ways to express one link is the drift this pass removes.
-  assert.ok(
-    /\blinks = \[\]/.test(explainerCardSource),
-    'the explainer takes a list of docs links'
-  );
+  assert.ok(/\blinks = \[\]/.test(explainerCardSource), 'the explainer takes a list of docs links');
   for (const dead of ['docsHref', 'docsLabel']) {
     assert.equal(
       withoutComments(explainerCardSource).includes(dead),
@@ -1846,13 +1838,13 @@ test('manager recipe row collapses in the specified order and never drops its co
 // declarations — the base and the two rungs — or the checkbox lands under the edit pencil
 // at the very widths where the row is tightest.
 test('the recipe cluster appends a bulk selection column that the ladder never drops', () => {
-  const declarations = [...css.matchAll(/--fab-recipe-cluster-cols:\s*([^;]+);/g)].map(([, value]) =>
-    value.replace(/\s+/g, ' ').trim()
+  const declarations = [...css.matchAll(/--fab-recipe-cluster-cols:\s*([^;]+);/g)].map(
+    ([, value]) => value.replace(/\s+/g, ' ').trim()
   );
   assert.equal(
     declarations.length,
     3,
-    'the base template plus the ladder\'s two rewrites — a fourth would be an unpinned band'
+    "the base template plus the ladder's two rewrites — a fourth would be an unpinned band"
   );
 
   for (const declaration of declarations) {
@@ -1930,7 +1922,7 @@ test('the bulk-selected row state is one joined selector across every multi-sele
   assert.equal(
     css.includes('has no selection row at all'),
     false,
-    'that block\'s stated reason is retired by issue 1010 and must not survive as a false claim'
+    "that block's stated reason is retired by issue 1010 and must not survive as a false claim"
   );
 });
 
@@ -3031,9 +3023,7 @@ test('manager gathering task browser defines bounded toolbar and compact table g
   );
   assert.ok(
     continuousGradientFillBlock.includes('width: 100%;') &&
-      continuousGradientFillBlock.includes(
-        'background: var(--fab-chance-slider-track-gradient);'
-      ),
+      continuousGradientFillBlock.includes('background: var(--fab-chance-slider-track-gradient);'),
     'configured chance sliders should paint their semantic gradient across the complete inset track'
   );
   assert.ok(
@@ -5623,10 +5613,7 @@ test('the armed danger button paints a solid danger fill with its own readable f
   );
 
   assert.ok(armedBlock.includes('background: var(--fab-danger);'), 'armed uses the danger fill');
-  assert.ok(
-    armedBlock.includes('border-color: var(--fab-danger);'),
-    'armed uses the danger edge'
-  );
+  assert.ok(armedBlock.includes('border-color: var(--fab-danger);'), 'armed uses the danger edge');
   assert.ok(
     armedBlock.includes('color: var(--fab-on-danger);'),
     'armed text uses the dedicated on-danger token, not on-accent or danger-text'
@@ -5663,7 +5650,9 @@ async function readRenderedKnowledgeGeometry(width) {
     // whole state vocabulary as chips on line 2.
     const row = `<li class="manager-knowledge-copy-row"><span class="manager-knowledge-copy-identity"><span class="manager-knowledge-copy-copy"><span class="manager-knowledge-copy-heading"><strong class="manager-knowledge-copy-name">An Exceptionally Long Localized Recipe Item Name</strong><span class="manager-chip">4 Recipe Book</span><span class="manager-chip">×3</span></span><span class="manager-knowledge-copy-chips"><span class="manager-chip is-warning">2 of 5 uses spent</span><span class="manager-chip is-danger">Inert</span></span></span></span><span class="manager-knowledge-row-actions"><button class="manager-button">Expend use</button><button class="manager-button is-danger">Delete</button></span></li>`;
     await page.setContent(
-      withChipHash(`<style>${css}</style><style>${chipCss}</style><div style="width:${width}px;height:686px"><div class="fabricate-manager" data-manager-view="knowledge"><div class="manager-body"><aside class="manager-rail">Rail</aside><main class="manager-main manager-knowledge-main" data-knowledge-view><section class="manager-knowledge-roster"><label class="manager-search"><input type="search"></label><div class="manager-knowledge-roster-scroll"><div class="manager-knowledge-roster-list"><button class="manager-knowledge-roster-row"><span class="fab-medallion" style="width:34px;height:34px"></span><span class="manager-knowledge-roster-copy"><strong class="manager-knowledge-roster-name">Aria Thorn</strong><small class="manager-knowledge-roster-meta">2 item(s) · 3 learned</small></span></button></div></div></section><section class="manager-knowledge-detail"><header class="manager-knowledge-detail-header"><div class="manager-knowledge-detail-identity"><div class="manager-knowledge-detail-copy"><h2 class="manager-knowledge-detail-name">Aria Thorn</h2></div></div><div class="manager-knowledge-fact-cluster"><div class="manager-fact"><span class="manager-fact-line"><strong>2</strong> <span class="manager-fact-label">Recipe items</span></span></div><div class="manager-fact"><span class="manager-fact-line"><strong>3</strong> <span class="manager-fact-label">Learned recipes</span></span></div></div><div class="manager-knowledge-reset-actions"><button class="manager-button is-danger">Reset this system</button><button class="manager-button is-danger">Reset all systems</button></div></header><div class="manager-editor-tabs manager-knowledge-tabs"><button class="manager-editor-tab-button is-active">Recipe items</button><button class="manager-editor-tab-button">Learned recipes</button></div><section class="manager-editor-tab-panel manager-knowledge-panel"><div class="manager-knowledge-tab-body"><ul class="manager-knowledge-row-list">${row}</ul></div></section></section></main></div></div></div>`)
+      withChipHash(
+        `<style>${css}</style><style>${chipCss}</style><div style="width:${width}px;height:686px"><div class="fabricate-manager" data-manager-view="knowledge"><div class="manager-body"><aside class="manager-rail">Rail</aside><main class="manager-main manager-knowledge-main" data-knowledge-view><section class="manager-knowledge-roster"><label class="manager-search"><input type="search"></label><div class="manager-knowledge-roster-scroll"><div class="manager-knowledge-roster-list"><button class="manager-knowledge-roster-row"><span class="fab-medallion" style="width:34px;height:34px"></span><span class="manager-knowledge-roster-copy"><strong class="manager-knowledge-roster-name">Aria Thorn</strong><small class="manager-knowledge-roster-meta">2 item(s) · 3 learned</small></span></button></div></div></section><section class="manager-knowledge-detail"><header class="manager-knowledge-detail-header"><div class="manager-knowledge-detail-identity"><div class="manager-knowledge-detail-copy"><h2 class="manager-knowledge-detail-name">Aria Thorn</h2></div></div><div class="manager-knowledge-fact-cluster"><div class="manager-fact"><span class="manager-fact-line"><strong>2</strong> <span class="manager-fact-label">Recipe items</span></span></div><div class="manager-fact"><span class="manager-fact-line"><strong>3</strong> <span class="manager-fact-label">Learned recipes</span></span></div></div><div class="manager-knowledge-reset-actions"><button class="manager-button is-danger">Reset this system</button><button class="manager-button is-danger">Reset all systems</button></div></header><div class="manager-editor-tabs manager-knowledge-tabs"><button class="manager-editor-tab-button is-active">Recipe items</button><button class="manager-editor-tab-button">Learned recipes</button></div><section class="manager-editor-tab-panel manager-knowledge-panel"><div class="manager-knowledge-tab-body"><ul class="manager-knowledge-row-list">${row}</ul></div></section></section></main></div></div></div>`
+      )
     );
     return await page.evaluate(() => {
       const box = (selector) => {
@@ -5694,7 +5683,10 @@ test('Knowledge keeps a rail/roster/detail triptych with unclipped row actions f
     assert.equal(Math.round(report.rail.width), 220, `${width}px rail column`);
     assert.equal(Math.round(report.roster.width), 250, `${width}px roster column`);
     assert.ok(report.roster.left >= report.rail.right - 1, `${width}px roster follows the rail`);
-    assert.ok(report.detail.left >= report.roster.right - 1, `${width}px detail follows the roster`);
+    assert.ok(
+      report.detail.left >= report.roster.right - 1,
+      `${width}px detail follows the roster`
+    );
     assert.equal(report.inspectorPresent, false, `${width}px no fourth inspector column`);
     assert.ok(
       report.actions.right <= report.row.right + 1,
@@ -6000,7 +5992,9 @@ test('the reserved vocabulary row renders exactly as tall as a custom row', asyn
       <button type="button" class="manager-icon-button"><i class="fas fa-trash"></i></button>
     </div>`;
     await page.setContent(
-      withChipHash(`<style>${css}</style><style>${chipCss}</style><div class="fabricate-manager" data-manager-view="tags"><div class="manager-body"><main class="manager-main manager-tags-categories"><div class="manager-editor-tabs manager-vocabulary-tabs" role="tablist"><button type="button" class="manager-editor-tab-button is-active"><span>Recipe categories</span><span class="manager-chip is-neutral manager-editor-tab-badge">17</span></button></div><div class="manager-tags-categories-workspace" role="tabpanel"><section class="manager-vocabulary-panel"><div class="manager-vocabulary-list"><div class="manager-vocabulary-card is-locked" data-vocabulary-locked-card>${lockedRow}</div><div class="manager-vocabulary-card" data-vocabulary-custom-card>${customRow}</div></div></section></div></main></div></div>`)
+      withChipHash(
+        `<style>${css}</style><style>${chipCss}</style><div class="fabricate-manager" data-manager-view="tags"><div class="manager-body"><main class="manager-main manager-tags-categories"><div class="manager-editor-tabs manager-vocabulary-tabs" role="tablist"><button type="button" class="manager-editor-tab-button is-active"><span>Recipe categories</span><span class="manager-chip is-neutral manager-editor-tab-badge">17</span></button></div><div class="manager-tags-categories-workspace" role="tabpanel"><section class="manager-vocabulary-panel"><div class="manager-vocabulary-list"><div class="manager-vocabulary-card is-locked" data-vocabulary-locked-card>${lockedRow}</div><div class="manager-vocabulary-card" data-vocabulary-custom-card>${customRow}</div></div></section></div></main></div></div>`
+      )
     );
     const geometry = await page.evaluate(() => {
       const locked = document.querySelector('[data-vocabulary-locked-card]');
@@ -6016,9 +6010,8 @@ test('the reserved vocabulary row renders exactly as tall as a custom row', asyn
         lockedChipHeight: Math.round(
           locked.querySelector('.manager-chip').getBoundingClientRect().height
         ),
-        lockedChipBackground: getComputedStyle(
-          locked.querySelector('.manager-chip')
-        ).backgroundColor,
+        lockedChipBackground: getComputedStyle(locked.querySelector('.manager-chip'))
+          .backgroundColor,
         defaultChipBackground: getComputedStyle(
           document.querySelector('.manager-editor-tab-button .manager-chip')
         ).backgroundColor,
@@ -6456,8 +6449,10 @@ test('every manager select paints an opaque background, so its popup opens dark'
   // 2. Component scoped styles: correlate `<select class="x">` with `.x { background }` in
   //    the same file's `<style>` block. This is the shape the defect actually took, so a
   //    global-sheet-only scan would have missed it.
-  const managerFiles = readdirSync(managerComponentDir, { recursive: true, withFileTypes: true })
-    .filter((entry) => entry.isFile() && entry.name.endsWith('.svelte'));
+  const managerFiles = readdirSync(managerComponentDir, {
+    recursive: true,
+    withFileTypes: true,
+  }).filter((entry) => entry.isFile() && entry.name.endsWith('.svelte'));
 
   for (const entry of managerFiles) {
     const full = resolve(entry.parentPath, entry.name);
@@ -6527,8 +6522,9 @@ async function readWorkspaceGrid(width, view) {
         bodyColumns: columns('.manager-body'),
         workspaceColumns: columns('.manager-environment-workspace'),
         workspaceWidth: workspace ? workspace.getBoundingClientRect().width : 0,
-        panelWidth: document.querySelector('.manager-environment-tab-panel')?.getBoundingClientRect()
-          .width,
+        panelWidth: document
+          .querySelector('.manager-environment-tab-panel')
+          ?.getBoundingClientRect().width,
         inspectorWidth: document
           .querySelector('.manager-environment-inspector')
           ?.getBoundingClientRect().width,
@@ -6540,9 +6536,8 @@ async function readWorkspaceGrid(width, view) {
 }
 
 // Imported rather than restated, so a change to the route set is a change to this guard too.
-const { CHECKS_VIEWS, CHECKS_REDIRECT_VIEW } = await import(
-  '../../src/ui/svelte/apps/manager/checks/checksNav.js'
-);
+const { CHECKS_VIEWS, CHECKS_REDIRECT_VIEW } =
+  await import('../../src/ui/svelte/apps/manager/checks/checksNav.js');
 
 test('every checks child route releases the shared inspector column', async () => {
   // The aside is unconditionally suppressed on a Checks route by the root's `!isChecksRoute`
@@ -6658,7 +6653,10 @@ test('the locked activation indicator offers no hover affordance', async () => {
 // rule carries `position`, `width`, `overflow` AND the background — left the mounted suite
 // green. And `color-mix()` cannot be evaluated at all outside a browser, so the contrast the
 // band names actually get was invisible to every gate here until this one.
-const bandStripPath = resolve(__dirname, '../../src/ui/svelte/components/ThresholdBandStrip.svelte');
+const bandStripPath = resolve(
+  __dirname,
+  '../../src/ui/svelte/components/ThresholdBandStrip.svelte'
+);
 const checkEditorPath = resolve(
   __dirname,
   '../../src/ui/svelte/apps/manager/checks/CraftingCheckEditor.svelte'
@@ -6677,11 +6675,26 @@ async function withBandStripPage(run) {
   }
 }
 
+/**
+ * The strip's fixture, stamped with the real scope hash on EVERY class the component's own
+ * `<style>` addresses — not just the band.
+ *
+ * `withScopeHash` matches a whole class token, so stamping only `fab-band-strip-band` left
+ * `fab-band-strip-band-name` unstamped and its scoped rule matching nothing. That was
+ * invisible while the rule declared `color: var(--fab-text)`, because an unmatched rule and
+ * an inherited `--fab-text` paint the same pixels; it stops being invisible the moment the
+ * name takes an ink of its own, which is exactly the change this fixture now has to see.
+ */
 function bandStripFixture(body) {
-  return (
-    `<style>${css}</style><style>${bandStripScoped.css}</style>` +
-    withScopeHash(body, 'fab-band-strip-band', bandStripScoped.hashClass)
+  const stamped = [
+    'fab-band-strip-track',
+    'fab-band-strip-band',
+    'fab-band-strip-band-name',
+  ].reduce(
+    (markup, className) => withScopeHash(markup, className, bandStripScoped.hashClass),
+    body
   );
+  return `<style>${css}</style><style>${bandStripScoped.css}</style>${stamped}`;
 }
 
 test('the band fill and the tier-row swatch are painted by rules that still match', async () => {
@@ -6689,8 +6702,12 @@ test('the band fill and the tier-row swatch are painted by rules that still matc
     await page.setContent(
       bandStripFixture(
         `<div class="fabricate-manager"><div class="fab-band-strip-track">` +
-          `<span class="fab-band-strip-band" id="tinted" style="--fab-band-strip-fill: rgb(20, 90, 40);">` +
-          `<span class="fab-band-strip-band-name">Masterwork</span></span>` +
+          // `left`/`width` as the component emits them, so the band is a real bounded box
+          // and the long name below has something to be truncated against.
+          `<span class="fab-band-strip-band" id="tinted" style="left: 0%; width: 90px; --fab-band-strip-fill: rgb(20, 90, 40);">` +
+          // A long localized tier name, because the rule that keeps it on one line is the
+          // reason the strip's height is stable — a wrapped name shoves the tier rows down.
+          `<span class="fab-band-strip-band-name" id="longname">Ausserordentlich Meisterhaft Geschmiedet</span></span>` +
           `<span class="fab-band-strip-band" id="plain"><span class="fab-band-strip-band-name">Ruined</span></span>` +
           `</div>` +
           `<div class="manager-checks-outcome-table is-relative">` +
@@ -6710,11 +6727,24 @@ test('the band fill and the tier-row swatch are painted by rules that still matc
           overflow: style.overflow,
         };
       };
+      const longName = document.querySelector('#longname');
+      const longNameStyle = getComputedStyle(longName);
       return {
         tinted: read('tinted'),
         plain: read('plain'),
         keyed: read('keyed'),
         unkeyed: read('unkeyed'),
+        longName: {
+          whiteSpace: longNameStyle.whiteSpace,
+          textOverflow: longNameStyle.textOverflow,
+          overflow: longNameStyle.overflow,
+          // `line-height` computes to the keyword `normal` here, so the number of lines is
+          // derived from the rendered height against the font size instead: one line lands
+          // near 1.2em and two lines cannot fit under 2em.
+          height: longName.getBoundingClientRect().height,
+          fontSize: parseFloat(longNameStyle.fontSize),
+          overflowed: longName.scrollWidth > longName.clientWidth,
+        },
         tableTracks: getComputedStyle(
           document.querySelector('.manager-checks-outcome-table.is-relative')
         ).gridTemplateColumns.split(' '),
@@ -6733,6 +6763,21 @@ test('the band fill and the tier-row swatch are painted by rules that still matc
   // The rest of the rule the mounted assertion also cannot see.
   assert.equal(painted.tinted.position, 'absolute', 'the band is placed against the track');
   assert.equal(painted.tinted.overflow, 'hidden', 'a long band name truncates rather than wraps');
+
+  // The band NAME's own rule, which nothing measured until this fixture started stamping the
+  // scope hash onto it. The component states the contract ("a long localized band name wraps
+  // to nothing and truncates instead, so a wide name cannot change the strip's height"), and
+  // a wrapped name is the failure: it grows the 44px track and pushes the tier rows down.
+  assert.equal(painted.longName.whiteSpace, 'nowrap', 'a long tier name stays on one line');
+  assert.equal(painted.longName.textOverflow, 'ellipsis', 'and is elided rather than clipped');
+  assert.equal(painted.longName.overflow, 'hidden', 'with the overflow the ellipsis needs');
+  assert.ok(
+    painted.longName.height < painted.longName.fontSize * 2,
+    `so it occupies one line box, got ${painted.longName.height}px at ${painted.longName.fontSize}px`
+  );
+  // The positive control: the name really is wider than its box, so "one line" is a fact
+  // about the rule rather than about a string that happened to fit.
+  assert.ok(painted.longName.overflowed, 'the fixture name is long enough to need truncating');
 
   // The swatch key, whose whole rule could be deleted without a red before this (issue 1096
   // made it normative in `ui-integration`).
@@ -6769,11 +6814,13 @@ test('every outcome band name clears WCAG AA in every shipped theme', async () =
   const tones = [];
   for (const count of [1, 2, 3, 5]) {
     for (let rank = 0; rank < count; rank += 1) {
-      tones.push(count <= 1 ? toneMax : Math.round(toneMin + ((toneMax - toneMin) * rank) / (count - 1)));
+      tones.push(
+        count <= 1 ? toneMax : Math.round(toneMin + ((toneMax - toneMin) * rank) / (count - 1))
+      );
     }
   }
 
-  const failures = await withBandStripPage(async (page) => {
+  const measured = await withBandStripPage(async (page) => {
     const cells = themes
       .map((theme) =>
         ['success', 'danger']
@@ -6797,32 +6844,110 @@ test('every outcome band name clears WCAG AA in every shipped theme', async () =
       .join('');
     await page.setContent(bandStripFixture(`<div class="fabricate-manager">${cells}</div>`));
     return page.evaluate(() => {
+      // THE COLOUR IS RASTERISED, because scraping numbers out of the computed string is
+      // what made the first version of this gate vacuous.
+      //
+      // `color-mix(in srgb, …)` does NOT compute to `rgb()`. It computes to
+      // `color(srgb 0.303059 0.374588 0.346039)` — fractional channels in 0..1. The old
+      // `colour.match(/[\d.]+/g)` read those three fractions as 0..255 channels, so EVERY
+      // fill measured as very nearly black, every ratio came back at 12-19:1, and the gate
+      // could not have failed whatever the ramp did. (`color-mix(in oklab, …)` computes to
+      // `oklab(…)` and breaks it the same way, with the added trap of negative a/b channels
+      // the regex silently drops the sign from.)
+      //
+      // A canvas does the colour-space conversion the browser itself does when painting, so
+      // the bytes that come back are the pixels a GM actually sees, in any colour space.
+      const canvas = document.createElement('canvas');
+      canvas.width = 1;
+      canvas.height = 1;
+      const ctx = canvas.getContext('2d', { willReadFrequently: true });
+      const rasterise = (value) => {
+        // Two different sentinels: `fillStyle` IGNORES an unparseable value and keeps the
+        // previous one, so painting the same colour twice from opposite sentinels is what
+        // tells "the browser refused this" apart from "this really is that colour".
+        const samples = ['#000000', '#ffffff'].map((sentinel) => {
+          ctx.fillStyle = sentinel;
+          ctx.fillStyle = value;
+          ctx.clearRect(0, 0, 1, 1);
+          ctx.fillRect(0, 0, 1, 1);
+          return [...ctx.getImageData(0, 0, 1, 1).data];
+        });
+        const [first, second] = samples;
+        if (first.some((channel, index) => channel !== second[index])) return null;
+        return first;
+      };
       const channel = (value) => {
         const s = value / 255;
         return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
       };
-      const luminance = (colour) => {
-        const [r, g, b] = colour.match(/[\d.]+/g).map(Number);
-        return 0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b);
-      };
-      const bad = [];
-      for (const band of document.querySelectorAll('[data-probe]')) {
+      const luminance = ([r, g, b]) =>
+        0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b);
+
+      return [...document.querySelectorAll('[data-probe]')].map((band) => {
         const name = band.querySelector('.fab-band-strip-band-name');
         const fill = getComputedStyle(band).backgroundColor;
-        // A translucent fill would make this measurement a lie, so it is refused outright.
-        if (/rgba\([^)]*,\s*(0|0?\.\d+)\)\s*$/.test(fill)) {
-          bad.push(`${band.dataset.probe}: translucent fill ${fill}`);
-          continue;
+        const ink = getComputedStyle(name).color;
+        const fillPixel = rasterise(fill);
+        const inkPixel = rasterise(ink);
+        if (!fillPixel || !inkPixel) {
+          return { probe: band.dataset.probe, fill, ink, unreadable: true, ratio: 0 };
         }
-        const [light, dark] = [luminance(getComputedStyle(name).color), luminance(fill)].sort(
-          (a, b) => b - a
-        );
-        const ratio = (light + 0.05) / (dark + 0.05);
-        if (ratio < 4.5) bad.push(`${band.dataset.probe}: ${ratio.toFixed(2)}:1 on ${fill}`);
-      }
-      return bad;
+        // Alpha, measured rather than pattern-matched: a translucent fill in ANY colour
+        // space would make the ratio below a statement about a fixture, not about a GM's
+        // screen. `rgba(…)` was the only shape the old test could recognise.
+        const translucent = fillPixel[3] < 255 || inkPixel[3] < 255;
+        const [light, dark] = [luminance(inkPixel), luminance(fillPixel)].sort((a, b) => b - a);
+        return {
+          probe: band.dataset.probe,
+          fill,
+          ink,
+          fillPixel: `rgb(${fillPixel.slice(0, 3).join(', ')})`,
+          translucent,
+          ratio: Math.round(((light + 0.05) / (dark + 0.05)) * 100) / 100,
+        };
+      });
     });
   });
+
+  // ── The measurement's own preconditions, asserted rather than assumed ──────────────────
+  //
+  // Every one of these is a way this gate can go green while measuring nothing, and the
+  // shipped version of it tripped the second.
+
+  // 1. The colour parsed at all. A value `fillStyle` refuses leaves the previous paint on the
+  //    canvas, so a refusal must not read as a colour.
+  const unreadable = measured.filter((m) => m.unreadable).map((m) => `${m.probe}: ${m.fill}`);
+  assert.deepEqual(unreadable, [], `unrasterisable colours:\n- ${unreadable.join('\n- ')}`);
+
+  // 2. The fill did not collapse to black, which is exactly where a `color(srgb 0.30 …)`
+  //    string lands when it is scraped as three 0..255 channels — the failure that made this
+  //    gate report a comfortable 12-19:1 for every band regardless of the ramp.
+  assert.ok(
+    measured.every((m) => m.fillPixel !== 'rgb(0, 0, 0)'),
+    'a fill measured as pure black means the colour never survived conversion'
+  );
+
+  // 3. The inline fill is REACHING the element. Every probe painting the same pixels would
+  //    mean the fixture's custom property is inert and the ramp is not under test at all.
+  const distinctFills = new Set(measured.map((m) => m.fillPixel));
+  assert.ok(
+    distinctFills.size > 5,
+    `the ramp must paint distinct fills, got ${distinctFills.size}: ${[...distinctFills].join(' ')}`
+  );
+
+  if (process.env.FAB_REPORT_BAND_AA) {
+    for (const m of measured) {
+      console.log(`${m.probe} ${m.ratio.toFixed(2)}:1 ${m.ink} on ${m.fillPixel}`);
+    }
+  }
+
+  const failures = measured
+    .filter((m) => m.translucent || m.ratio < 4.5)
+    .map((m) =>
+      m.translucent
+        ? `${m.probe}: translucent fill ${m.fill}`
+        : `${m.probe}: ${m.ratio.toFixed(2)}:1 (${m.ink} on ${m.fillPixel})`
+    );
 
   assert.deepEqual(
     failures,
