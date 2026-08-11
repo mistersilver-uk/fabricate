@@ -112,8 +112,12 @@ const GATE_TARGETS = [
   // development-time artefacts under `tmp/` and are not in the tree at all.
   'scripts/visual-parity/extract.mjs',
   'scripts/visual-parity/compare.mjs',
+  // The STRUCTURAL pass, which is what lets the harness see absence at all: a comparison
+  // of computed styles can only ever measure regions that exist on both sides.
+  'scripts/visual-parity/inventory.mjs',
   'scripts/visual-parity/lib/measure.js',
   'scripts/visual-parity/lib/schema.js',
+  'scripts/visual-parity/lib/inventory.js',
   'eslint.config.js',
 ];
 const FORMAT_ARGV = ['prettier', '--write', ...GATE_TARGETS];
