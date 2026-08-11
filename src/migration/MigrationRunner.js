@@ -453,6 +453,30 @@ const MIGRATIONS = [
     // `_unifiedModifierCollisions` field (captured and deleted by the runner below).
     migrate: (data) => migrateUnifyModifierLibraries(data),
   },
+  {
+    version: '1.24.0',
+    // THE LOSSY-DOWNGRADE FACT IS IN THE LABEL, per the rule 1.22.0 established: the label
+    // is the only string a GM reads at the Keep/Downgrade prompt.
+    label:
+      'Give the routed check its own DC source, so a routed relative check can compute its ' +
+      'base DC from a macro exactly as a simple check can. NO DATA IS REWRITTEN: the ' +
+      'routed normalizer defaults an absent dcMode to static, so every existing system ' +
+      'loads unchanged and this entry exists to mark the version boundary. DOWNGRADING IS ' +
+      'NOT LOSSLESS: 1.23.0 never saw routed.dcMode or routed.macroUuid, and its routed ' +
+      'normalizer is an allowlist rebuild that does not emit them, so the first save on ' +
+      'that build DELETES both — a routed check set to Dynamic silently reverts to its ' +
+      'static DC and loses the macro link, which you must re-author',
+    downgradeTo: '1.23.0',
+    // MACHINE-READABLE, per the rule 1.22.0 established: a migration marked here must name
+    // the loss in its own `label` (`tests/migration-runner.test.js` enforces it over the
+    // whole registry).
+    downgradeLosesData: true,
+    // A DELIBERATE NO-OP, in the shape 1.20.0's recipe-level entry already uses. There is
+    // nothing to rewrite — absence already reads as `static` — and writing the default onto
+    // every stored routed slot would touch every system in the world to change nothing.
+    // What this entry buys is the boundary the recovery prompt warns at.
+    migrate: (data) => data,
+  },
   // Future migrations added here in version order
 ];
 

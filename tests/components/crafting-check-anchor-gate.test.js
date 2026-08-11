@@ -27,11 +27,20 @@ const repoRoot = resolve(import.meta.dirname, '../..');
 const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-check-anchor-gate-',
-  rawModules: [...CHECKS_TREE_RAW_MODULES, 'src/utils/rollExpressionAverage.js'],
+  rawModules: [
+    ...CHECKS_TREE_RAW_MODULES,
+    'src/utils/rollExpressionAverage.js',
+    // The DC-macro card joined the routed tree with issue 1096's dcMode work.
+    'src/ui/svelte/actions/dragDrop.js',
+    'src/ui/svelte/util/dropUtils.js',
+    'src/utils/macroReference.js',
+  ],
   compiledModules: [
     ...CHECKS_TREE_COMPILED_MODULES,
     'src/ui/svelte/apps/manager/SegmentedControl.svelte',
+    'src/ui/svelte/apps/manager/ItemDropZone.svelte',
     'src/ui/svelte/components/ManagerButton.svelte',
+    'src/ui/svelte/apps/manager/checks/CheckDcMacroCard.svelte',
     'src/ui/svelte/apps/manager/checks/CheckDifficultyCard.svelte',
     'src/ui/svelte/apps/manager/checks/CheckFormulaFields.svelte',
     'src/ui/svelte/apps/manager/checks/CheckRecipeTiers.svelte',
@@ -76,14 +85,18 @@ async function render({ type, resolutionMode }) {
 
 function anchoredSurfaces(target) {
   return {
+    // The DC-SOURCE CHOOSER is part of the anchored set now (issue 1096): a routed relative
+    // check is defined as bands offset from a DC, so it has one — and it is the same named
+    // `bandsAreAbsolute` gate, not a fourth spelling of the condition.
+    dcSource: target.querySelector('[data-dc-mode-option="dynamic"]') !== null,
     difficulty: target.querySelector('[data-check-difficulty-card]') !== null,
     tiers: target.querySelector('[data-routed-tiers]') !== null,
     previewAgainst: target.querySelector('[data-preview-against]') !== null,
   };
 }
 
-const ALL_SHOWN = { difficulty: true, tiers: true, previewAgainst: true };
-const ALL_WITHHELD = { difficulty: false, tiers: false, previewAgainst: false };
+const ALL_SHOWN = { dcSource: true, difficulty: true, tiers: true, previewAgainst: true };
+const ALL_WITHHELD = { dcSource: false, difficulty: false, tiers: false, previewAgainst: false };
 
 describe('the anchor gate is exactly routedByCheck AND fixed (issue 1096)', () => {
   it('withholds all three anchored surfaces on routedByCheck + fixed', async () => {
@@ -140,6 +153,10 @@ describe('the anchor gate is exactly routedByCheck AND fixed (issue 1096)', () =
     assert.ok(
       target.querySelector('[data-check-difficulty-card]'),
       'the emptiness of the tier list must not be confused with the anchor gate'
+    );
+    assert.ok(
+      target.querySelector('[data-dc-mode-option="dynamic"]'),
+      'nor with the DC-source chooser, which the same gate governs'
     );
   });
 });

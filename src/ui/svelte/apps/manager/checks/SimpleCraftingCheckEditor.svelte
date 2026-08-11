@@ -24,13 +24,8 @@
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
-  import { resolveDropData } from '../../../util/dropUtils.js';
-  // The shared macro-name resolver (issue 1036), lifted out of this file so the essence
-  // editor's property-macro card resolves names the same way rather than re-deriving the
-  // `globalThis.fromUuid` indirection and the stale-resolution latch.
-  import { resolveMacroName } from '../../../../../utils/macroReference.js';
   import IconFactRow from '../IconFactRow.svelte';
-  import ItemDropZone from '../ItemDropZone.svelte';
+  import CheckDcMacroCard from './CheckDcMacroCard.svelte';
   import CheckDifficultyCard from './CheckDifficultyCard.svelte';
   import CheckFormulaFields from './CheckFormulaFields.svelte';
   import CheckRecipeTiers from './CheckRecipeTiers.svelte';
@@ -68,44 +63,9 @@
 
   const dcMode = $derived(value?.dcMode === 'dynamic' ? 'dynamic' : 'static');
 
-  let resolvedMacroName = $state('');
-  let resolvedMacroMissing = $state(false);
-  $effect(() => {
-    resolvedMacroName = '';
-    resolvedMacroMissing = false;
-    return resolveMacroName(value?.macroUuid, ({ name, missing }) => {
-      resolvedMacroName = name;
-      resolvedMacroMissing = missing;
-    });
-  });
-
   function emit(patch) {
     onChange({ ...value, ...patch });
   }
-
-  // `ItemDropZone` has already refused anything that is not a Macro naming a document, so
-  // this only has to resolve the uuid out of whichever drag shape arrived. It keeps calling
-  // `resolveDropData` because the zone hands `onDrop` the RAW payload by contract.
-  function handleMacroDrop(data) {
-    const { uuid } = resolveDropData(data);
-    if (!uuid) return;
-    emit({ macroUuid: uuid });
-  }
-
-  // The card's label, resolved here so the markup stays declarative. It is the ONE string
-  // the zone renders — empty prompt, resolved name, or the missing notice.
-  const macroCardLabel = $derived.by(() => {
-    if (!value?.macroUuid) {
-      return text(
-        'FABRICATE.Admin.Manager.Checks.Crafting.MacroDropHint',
-        'Drag a macro here to compute the DC.'
-      );
-    }
-    if (resolvedMacroMissing) {
-      return text('FABRICATE.Admin.Manager.Checks.Crafting.MacroMissing', 'Linked macro not found');
-    }
-    return resolvedMacroName || value.macroUuid;
-  });
 </script>
 
 <div class="manager-checks-editor" data-simple-check-editor>
@@ -207,55 +167,18 @@
   {/if}
 
   {#if showDcSource && shows('roll')}
-    {#if dcMode === 'static'}
-      <section class="manager-inspector-card manager-checks-card" data-static-dc>
-        <CheckRecipeTiers
-          tiers={value?.tiers || []}
-          defaultDc={value?.dc ?? 0}
-          onChange={(tiers) => emit({ tiers })}
-        />
-      </section>
-    {:else}
-      <section class="manager-inspector-card manager-checks-card" data-dynamic-dc>
-        <div class="manager-checks-card-head">
-          <div>
-            <h3 class="manager-checks-card-title">
-              {text('FABRICATE.Admin.Manager.Checks.Crafting.MacroTitle', 'DC macro')}
-            </h3>
-            <p class="manager-checks-card-description">
-              {text(
-                'FABRICATE.Admin.Manager.Checks.Crafting.MacroHint',
-                'The macro is run with the selected ingredient set, the recipe, and the actor, and must return the DC.'
-              )}
-            </p>
-          </div>
-        </div>
-        <div class="manager-checks-card-body">
-          <!-- The shared drop primitive (issue 1036). It was hand-rolled here — a bare
-             `use:dragDrop` div with its own linked/empty branch and its own unlink button
-             — while three other manager surfaces already rendered the same card through
-             `ItemDropZone`. Converting it is what gives this control the compendium-drag
-             acceptance the hand-rolled `resolveDropData` guard already had but the
-             primitive did not, and the MISSING treatment neither of them had.
-             `data-check-macro-dropzone` and `data-unlink-macro` are preserved by the
-             `kind` mapping: `manager-mounted.test.js` and the View Lab checks case both
-             select on the first. -->
-          <ItemDropZone
-            kind="check-macro"
-            documentType="Macro"
-            item={value?.macroUuid ? { name: macroCardLabel } : null}
-            state={resolvedMacroMissing ? 'missing' : 'linked'}
-            title={macroCardLabel}
-            emptyIcon="fas fa-scroll"
-            unlinkLabel={text(
-              'FABRICATE.Admin.Manager.Checks.Crafting.MacroUnlink',
-              'Unlink macro'
-            )}
-            onDrop={handleMacroDrop}
-            onUnlink={() => emit({ macroUuid: null })}
-          />
-        </div>
-      </section>
+    <!-- THE TIER LIST RENDERS UNDER BOTH MODES (issue 1096). The macro is handed the tier's
+         DC as its anchor and returns the final number, so the two COMPOSE rather than
+         compete; hiding the tiers under dynamic would hide half of what the engine reads. -->
+    <section class="manager-inspector-card manager-checks-card" data-static-dc>
+      <CheckRecipeTiers
+        tiers={value?.tiers || []}
+        defaultDc={value?.dc ?? 0}
+        onChange={(tiers) => emit({ tiers })}
+      />
+    </section>
+    {#if dcMode === 'dynamic'}
+      <CheckDcMacroCard macroUuid={value?.macroUuid ?? null} onChange={emit} />
     {/if}
   {/if}
 </div>

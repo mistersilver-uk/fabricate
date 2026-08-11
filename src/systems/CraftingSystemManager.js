@@ -943,6 +943,19 @@ export class CraftingSystemManager {
       rollFormula,
       dc: Number.isFinite(dc) ? Math.trunc(dc) : 15,
       thresholdMode: source.thresholdMode === 'exceed' ? 'exceed' : 'meet',
+      // WHERE THE DC COMES FROM, on the routed slot too (issue 1096). The engine already
+      // resolved the routed base DC through `_resolveSimpleCheckDc` — that method is
+      // parameterized over the check config precisely so routed takes the same recipe-tier
+      // and dynamic path — so the plumbing existed and only the field did not. A routed
+      // RELATIVE check is defined as bands offset from a DC (`dc + outcome.dc`), so it has
+      // one by construction, and offering the number without its source was incoherent.
+      //
+      // ABSENCE-PRESERVING: anything that is not exactly `dynamic` reads `static`, so every
+      // system authored before this field existed loads as static with no rewrite.
+      // `macroUuid` is kept whatever the mode, for the reason the simple slot keeps it —
+      // switching modes must never destroy the other side's configuration.
+      dcMode: source.dcMode === 'dynamic' ? 'dynamic' : 'static',
+      macroUuid: source.macroUuid || null,
       tiers: tiers.map((tier) => this._normalizeSimpleTier(tier)).filter(Boolean),
       relativeOutcomes: relative
         .map((outcome) => this._normalizeRoutedOutcome(outcome, 'relative'))
@@ -3209,10 +3222,10 @@ export class CraftingSystemManager {
    * Both directions are guarded to fill only an UNAUTHORED destination (an authored
    * destination formula is never clobbered). `→ simple`/`alchemy` targets already read
    * `simple`, and `→ progressive` has no comparable pass/fail fields, so neither needs
-   * a move. Caveat: a `dcMode: 'dynamic'` simple check copied into `routedByCheck`
-   * loses its dynamic DC (the routed slot has no `dcMode`); the resulting static
-   * `routed.dc` is whatever value lingered in the simple slot, so the GM should
-   * re-author the DC after switching into `routedByCheck`.
+   * a move. The `dcMode: 'dynamic'` caveat that used to stand here is GONE: the routed
+   * slot carries `dcMode`/`macroUuid` now (issue 1096), so a dynamic simple check crossing
+   * into `routedByCheck` keeps its macro instead of silently reverting to a static DC that
+   * happened to linger in the simple slot.
    *
    * @param {object} merged The merged (post-change, normalized) system.
    * @param {string} fromMode
@@ -3234,8 +3247,9 @@ export class CraftingSystemManager {
    * Copy the shared pass/fail crafting-check fields (`rollFormula`, `dc`,
    * `thresholdMode`, `tiers`, `checkBreakage`) from a source slot to a destination
    * slot, but ONLY when the destination has no authored `rollFormula` and the source
-   * does — so an authored destination is never clobbered. `dcMode`/`macroUuid` are not
-   * copied (the routed slot has neither; the read-time normalizer defaults them).
+   * does — so an authored destination is never clobbered. `dcMode`/`macroUuid` travel with
+   * the rest now that BOTH slots carry them (issue 1096): leaving them behind was the one
+   * way this move could silently change what a check rolls against.
    * @param {object} source
    * @param {object} destination
    * @private
@@ -3258,6 +3272,8 @@ export class CraftingSystemManager {
         ? source.tiers.map((tier) => ({ ...tier }))
         : source.tiers;
     }
+    if ('dcMode' in source) destination.dcMode = source.dcMode;
+    if ('macroUuid' in source) destination.macroUuid = source.macroUuid;
     if ('checkBreakage' in source) {
       destination.checkBreakage =
         source.checkBreakage && typeof source.checkBreakage === 'object'

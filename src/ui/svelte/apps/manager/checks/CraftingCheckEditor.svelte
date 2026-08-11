@@ -29,6 +29,7 @@
   import Stepper from '../../../components/Stepper.svelte';
   import ThresholdBandStrip from '../../../components/ThresholdBandStrip.svelte';
   import { stepperLabels } from '../../../components/stepperLabels.js';
+  import CheckDcMacroCard from './CheckDcMacroCard.svelte';
   import CheckDifficultyCard from './CheckDifficultyCard.svelte';
   import CheckFormulaFields from './CheckFormulaFields.svelte';
   import CheckRecipeTiers from './CheckRecipeTiers.svelte';
@@ -454,14 +455,21 @@
       </div>
     </section>
 
-    <!-- DIFFICULTY, in its own card (issue 1096). No DC-source chooser: `dcMode` and
-         `macroUuid` live on the SIMPLE check slot only — the routed slot carries neither,
-         and the engine runs a DC macro for `simple.dcMode === 'dynamic'` alone — so a
-         static/dynamic pair here would write a field nothing reads. -->
+    <!-- DIFFICULTY, in its own card (issue 1096), WITH its DC-source chooser. A routed
+         RELATIVE check is defined as bands offset from a DC (`dc + outcome.dc`), so it has
+         one by construction and offering the number without its source was incoherent; the
+         engine already resolved this slot's base DC through the same
+         `_resolveSimpleCheckDc` path, so only the field was missing.
+
+         `bandsAreAbsolute` — routed + fixed — is the one state with no DC at all, and it is
+         the SAME named gate the tier list and `PREVIEW AGAINST` read rather than a fourth
+         spelling of the condition. -->
     {#if !bandsAreAbsolute}
       <CheckDifficultyCard
+        showDcSource
         dc={value?.dc ?? 15}
         thresholdMode={value?.thresholdMode || 'meet'}
+        dcMode={value?.dcMode || 'static'}
         {recordNoun}
         onChange={emit}
       />
@@ -479,6 +487,8 @@
     />
   {/if}
 
+  <!-- The tier list renders under BOTH DC modes: the macro is handed the selected tier's DC
+       as its anchor and returns the final number, so the two COMPOSE rather than compete. -->
   {#if showTiers && !bandsAreAbsolute && shows('roll')}
     <section class="manager-inspector-card" data-routed-tiers>
       <CheckRecipeTiers
@@ -488,6 +498,10 @@
         onChange={(tiers) => emit({ tiers })}
       />
     </section>
+  {/if}
+
+  {#if !bandsAreAbsolute && shows('roll') && value?.dcMode === 'dynamic'}
+    <CheckDcMacroCard macroUuid={value?.macroUuid ?? null} onChange={emit} />
   {/if}
 
   {#if shows('outcomes')}

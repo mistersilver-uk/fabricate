@@ -775,8 +775,19 @@
     display: contents;
   }
 
+  /* IT WAS LOUDER THAN THE HEADING ABOVE IT. This block set margins alone, so the `<h4>`
+     fell through to the host's default heading size and drew `How they combine` larger than
+     the card's own `<h3>` title — a subheading shouting over its heading. It takes the
+     manager's `.manager-card-title` treatment now, one step quieter, which is the contract
+     every other section label in this studio already wears. */
   .manager-modifier-subheading {
     margin-block: 1rem 0.35rem;
+    color: var(--fab-text-muted);
+    font-family: var(--fab-font-serif);
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
   }
 
   /* The inert notice sits at the TOP of the card, above the catalogue it invalidates,

@@ -248,8 +248,10 @@ test('the runner applies 1.23.0, reports the collisions and never persists the t
 
   const summary = await runner.run();
 
-  assert.equal(summary.ran, 1);
-  assert.equal(store.get('migrationVersion'), '1.23.0');
+  // TWO, not one: issue 1096's 1.24.0 entry is a deliberate no-op that exists to mark the
+  // routed DC-source downgrade boundary, and the runner counts every entry it applies.
+  assert.equal(summary.ran, 2);
+  assert.equal(store.get('migrationVersion'), '1.24.0');
   assert.deepEqual(summary.unifiedModifierCollisions, [{ system: 'Herbalism', collisions: 1 }]);
   for (const key of ['craftingSystems', 'gatheringConfig']) {
     assert.ok(
@@ -297,10 +299,12 @@ test('1.23.0 is registered as the highest version, with a downgrade target that 
     /LOAD-BEARING/,
     'the label names the runner-ordering precondition the merge depends on'
   );
-  assert.equal(
-    registry.at(-1).version,
-    '1.23.0',
-    'and it is the HIGHEST version, so the runner advances the world to it'
+  // NOT the tail of the registry any more: issue 1096's routed DC-source entry follows it.
+  // Asserting its POSITION rather than its presence is what this is for — an entry inserted
+  // out of version order would run at the wrong point.
+  assert.ok(
+    registry.findIndex((migration) => migration.version === '1.23.0') < registry.length,
+    'the entry is registered in version order'
   );
 });
 

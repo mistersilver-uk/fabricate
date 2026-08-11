@@ -4728,7 +4728,7 @@
             "TierDc": "DC",
             "RemoveTier": "Remove tier",
             "MacroTitle": "DC macro",
-            "MacroHint": "The macro is run with the selected ingredient set, the recipe, and the actor, and must return the DC.",
+            "MacroHint": "The macro is handed the base DC above — the difficulty tier the record selected, or the base DC when it selects none — alongside the ingredients, the record and the actor, and returns the number to use. A macro that fails or returns no number leaves the base DC in place.",
             "MacroDropHint": "Drag a macro here to compute the DC.",
             "MacroMissing": "Linked macro not found",
             "MacroUnlink": "Unlink macro",

@@ -505,3 +505,81 @@ describe('CheckTriggers (mounted): tier-step effect', () => {
     );
   });
 });
+
+// ── The common-trigger presets, THROUGH THE RENDERED CONTROL (issue 1096) ──────────────
+//
+// The pure-module test proves `buildPresetTrigger` returns the right object. It says nothing
+// about whether a GM clicking the button reaches it — the handler, the button's own state and
+// the emit that carries the result are all outside that proof, and the control shipped INERT
+// with that proof green. These go through the DOM: find the rendered button, click it, and
+// assert the trigger arrives in the emitted block.
+describe('the common-trigger presets author a trigger when CLICKED', () => {
+  it('renders a preset button per offered preset for a routed check', async () => {
+    const root = await harness.mount({
+      value: triggerBlock([]),
+      rollFormula: '1d20',
+      kind: 'routed',
+      outcomeOptions: ROUTED_TIERS,
+      showBreakTools: false
+    });
+    const buttons = [...root.querySelectorAll('[data-add-trigger-preset]')];
+    assert.equal(buttons.length, 2, 'both presets render');
+    assert.equal(buttons[0].tagName, 'BUTTON', 'the preset is a real button');
+    assert.equal(buttons[0].disabled, false, 'and it is not disabled');
+  });
+
+  it('CLICKING a preset emits a fully authored trigger', async () => {
+    const emitted = [];
+    const root = await harness.mount({
+      value: triggerBlock([]),
+      rollFormula: '1d20',
+      kind: 'routed',
+      outcomeOptions: ROUTED_TIERS,
+      showBreakTools: false,
+      onChange: (next) => emitted.push(next)
+    });
+
+    root.querySelector('[data-add-trigger-preset="high"]').click();
+    assert.equal(emitted.length, 1, 'the click reached the handler');
+    const trigger = emitted.at(-1).triggers.at(-1);
+    assert.deepEqual(trigger.condition, {
+      type: 'diceGroup',
+      groupId: 0,
+      aggregate: 'anyDie',
+      operator: '==',
+      value: 20
+    });
+    assert.deepEqual(trigger.tierStep, { mode: 'up', steps: 1, tierId: null });
+    assert.ok(trigger.id, 'it carries a real id');
+  });
+
+  it('APPENDS to the existing list rather than replacing it', async () => {
+    const emitted = [];
+    const root = await harness.mount({
+      value: triggerBlock([rollTotalTrigger]),
+      rollFormula: '1d20',
+      kind: 'routed',
+      outcomeOptions: ROUTED_TIERS,
+      showBreakTools: false,
+      onChange: (next) => emitted.push(next)
+    });
+    root.querySelector('[data-add-trigger-preset="low"]').click();
+    assert.deepEqual(
+      emitted.at(-1).triggers.map((entry) => entry.id.slice(0, 2)),
+      ['t1', emitted.at(-1).triggers.at(-1).id.slice(0, 2)],
+      'the authored trigger survives'
+    );
+    assert.equal(emitted.at(-1).triggers.length, 2);
+  });
+
+  it('offers no preset row at all when the formula rolls no dice', async () => {
+    const root = await harness.mount({
+      value: triggerBlock([]),
+      rollFormula: '@abilities.int.mod',
+      kind: 'routed',
+      outcomeOptions: ROUTED_TIERS,
+      showBreakTools: false
+    });
+    assert.equal(root.querySelector('[data-check-trigger-presets]'), null);
+  });
+});

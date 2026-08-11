@@ -390,7 +390,7 @@ test('out of routedByIngredients does NOT clobber an already-authored routed slo
   assert.equal(check.routed.dc, 25);
 });
 
-test('a dynamic-DC simple check moved into routedByCheck loses its dynamic DC (routed has no dcMode)', async () => {
+test('a dynamic-DC simple check moved into routedByCheck KEEPS its dynamic DC (issue 1096)', async () => {
   settingsStore.clear();
   const recipeManager = makeRecipeManager([]);
   const manager = makeManager(recipeManager);
@@ -407,10 +407,11 @@ test('a dynamic-DC simple check moved into routedByCheck loses its dynamic DC (r
 
   const routed = manager.getSystem('sys-1').craftingCheck.routed;
   assert.equal(routed.rollFormula, '1d20');
-  // The routed slot carries no dcMode/macroUuid; the dynamic DC is lost and the
-  // copied static routed.dc is whatever lingered in the simple slot (13 here).
-  assert.equal('dcMode' in routed, false, 'routed slot has no dcMode');
-  assert.equal(routed.dc, 13, 'copied static DC lingers from the simple slot (GM should re-author)');
+  // The routed slot carries dcMode/macroUuid now (issue 1096), so the move no longer
+  // silently reverts a dynamic check to whatever static DC lingered in the simple slot.
+  assert.equal(routed.dcMode, 'dynamic', 'the DC source travels with the formula');
+  assert.equal(routed.macroUuid, 'Macro.abc', 'the macro link travels with it');
+  assert.equal(routed.dc, 13, 'the static DC still travels, as the anchor the macro receives');
 });
 
 test('crossing into a non-RI, non-routedByCheck mode moves no crafting-check config', async () => {

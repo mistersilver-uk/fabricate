@@ -77,6 +77,7 @@ const harness = createMountedComponentHarness({
     // The shared button primitive: the recipe-tier list and the trigger list are both
     // extended by its `dashed` role now (issue 1096). Manifest only.
     'src/ui/svelte/components/ManagerButton.svelte',
+    'src/ui/svelte/apps/manager/checks/CheckDcMacroCard.svelte',
     'src/ui/svelte/apps/manager/checks/CheckDifficultyCard.svelte',
     'src/ui/svelte/apps/manager/checks/CheckFormulaFields.svelte',
     'src/ui/svelte/apps/manager/checks/CheckRecipeTiers.svelte',

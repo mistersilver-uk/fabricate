@@ -4698,34 +4698,54 @@ export class CraftingEngine {
    * the SAME recipe-tier / dynamic path as the simple check, not the flat config DC.
    */
   async _resolveSimpleCheckDc(system, simple, recipe, ingredientSet, craftingActor) {
-    const fallback = Number.isFinite(Number(simple.dc)) ? Math.trunc(Number(simple.dc)) : 15;
-    if (simple.dcMode === 'dynamic') {
-      if (!simple.macroUuid) return fallback;
-      try {
-        const value = await MacroExecutor.run(simple.macroUuid, {
-          recipe: recipe?.toJSON?.() || recipe,
-          craftingSystem: system,
-          craftingActor,
-          candidateIngredientSet: ingredientSet,
-        });
-        const numeric = Number(value);
-        return Number.isFinite(numeric) ? Math.trunc(numeric) : fallback;
-      } catch (error) {
-        console.error(
-          `Fabricate | Simple crafting check DC macro failed (${simple.macroUuid})`,
-          error
-        );
-        return fallback;
-      }
+    // THE ANCHOR, resolved FIRST and always: the record's selected difficulty tier when it
+    // names one that still exists, else the static default.
+    const anchor = this._resolveCheckAnchorDc(simple, recipe);
+    if (simple.dcMode !== 'dynamic') return anchor;
+    if (!simple.macroUuid) return anchor;
+    try {
+      const value = await MacroExecutor.run(simple.macroUuid, {
+        recipe: recipe?.toJSON?.() || recipe,
+        craftingSystem: system,
+        craftingActor,
+        candidateIngredientSet: ingredientSet,
+        // THE MACRO RECEIVES THE ANCHOR AND RETURNS THE FINAL NUMBER (issue 1096,
+        // maintainer's ruling). The tier sets the anchor and the macro adjusts it, so the
+        // two COMPOSE rather than compete: a GM can author "Legendary Craft is 21" and
+        // still have a macro shift it for ingredient quality. It subsumes the older
+        // macro-wins behaviour at no cost — a macro that ignores the argument behaves
+        // exactly as it did — and it is why neither the tiers nor the tier list are hidden
+        // under dynamic. Additive to a NAMED bag (`MacroExecutor.run(uuid, payload = {})`),
+        // so a shipped macro that destructures the fields it wants is unaffected.
+        anchorDc: anchor,
+      });
+      const numeric = Number(value);
+      return Number.isFinite(numeric) ? Math.trunc(numeric) : anchor;
+    } catch (error) {
+      console.error(`Fabricate | Crafting check DC macro failed (${simple.macroUuid})`, error);
+      return anchor;
     }
+  }
+
+  /**
+   * The DC before any macro runs: the record's selected difficulty tier, else the static
+   * default. Split out of {@link _resolveSimpleCheckDc} because it is now needed TWICE in
+   * that method — once as the value a static check resolves to, and once as the input a
+   * dynamic macro is handed — and a second inline copy would be two chances to disagree
+   * about what "the anchor" means.
+   *
+   * @param {object} config The check config (`simple` or `routed`).
+   * @param {object} recipe The record being resolved, which may name a tier.
+   * @returns {number} The anchor DC, never NaN.
+   */
+  _resolveCheckAnchorDc(config, recipe) {
+    const fallback = Number.isFinite(Number(config?.dc)) ? Math.trunc(Number(config.dc)) : 15;
     const tierId = recipe?.checkTierId;
-    if (tierId) {
-      const tiers = Array.isArray(simple.tiers) ? simple.tiers : [];
-      const tier = tiers.find((entry) => entry.id === tierId);
-      const tierDc = Number(tier?.dc);
-      if (tier && Number.isFinite(tierDc)) return Math.trunc(tierDc);
-    }
-    return fallback;
+    if (!tierId) return fallback;
+    const tiers = Array.isArray(config?.tiers) ? config.tiers : [];
+    const tier = tiers.find((entry) => entry.id === tierId);
+    const tierDc = Number(tier?.dc);
+    return tier && Number.isFinite(tierDc) ? Math.trunc(tierDc) : fallback;
   }
 
   /**

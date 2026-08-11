@@ -130,6 +130,7 @@ function compileManagerRoot() {
   writeCompiledSvelte('src/ui/svelte/apps/manager/checks/CheckModeCallout.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/checks/ChecksEditorTabs.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/checks/ChecksRightMenu.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/checks/CheckDcMacroCard.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/checks/CheckDifficultyCard.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/checks/CheckFormulaFields.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/checks/CheckTriggers.svelte');
