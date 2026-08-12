@@ -247,10 +247,15 @@ describe('routed recipe resolution', () => {
     assert.equal(result.groups[0].id, 'standard', 'routed to the assigned group, not the same-named one');
   });
 
-  it('routedByCheck: a success:false tier in checkOutcomeIds does NOT route as success', () => {
-    const system = buildSystem('routedByCheck', {
+  // A `success: false` tier in `checkOutcomeIds` NEVER produces a `disposition: 'success'`
+  // result — the original constraint, preserved verbatim by issue 1098. What the
+  // failure-result policy decides is whether it produces a `'failure'` one instead of
+  // nothing at all, and the two states are pinned separately below.
+  function botchSystem(failureResultPolicy) {
+    return buildSystem('routedByCheck', {
       craftingCheck: {
         enabled: true,
+        failureResultPolicy,
         routed: {
           type: 'relative',
           rollExpression: '1d20',
@@ -259,13 +264,40 @@ describe('routed recipe resolution', () => {
         },
       },
     });
-    const service = buildService(system);
+  }
+
+  function resolveBotch(failureResultPolicy) {
+    const service = buildService(botchSystem(failureResultPolicy));
     const assigned = groups();
     assigned[1].checkOutcomeIds = ['t-botch'];
     const recipe = recipeWithStep(step({ resultGroups: assigned }));
-    const result = resolve(service, recipe, { outcome: 'Botch' });
-    assert.notEqual(result.meta.disposition, 'success');
+    return resolve(service, recipe, { outcome: 'Botch' });
+  }
+
+  it('routedByCheck: a success:false tier in checkOutcomeIds does NOT route as success', () => {
+    for (const policy of ['never', 'perRecord', 'always']) {
+      assert.notEqual(resolveBotch(policy).meta.disposition, 'success', policy);
+    }
+  });
+
+  it('routedByCheck: failureResultPolicy never leaves a failure-marked tier routing nothing', () => {
+    const result = resolveBotch('never');
     assert.deepEqual(result.groups, []);
+    // Byte-for-byte the pre-1098 path: no tier resolves, so it falls through to
+    // name matching, and "Botch" matches no group.
+    assert.equal(result.meta.disposition, 'misconfiguration');
+  });
+
+  it('routedByCheck: a permitting policy routes a failure-marked tier with disposition failure', () => {
+    for (const policy of ['perRecord', 'always']) {
+      const result = resolveBotch(policy);
+      assert.equal(result.meta.disposition, 'failure', policy);
+      assert.deepEqual(
+        result.groups.map((group) => group.id),
+        ['standard'],
+        policy
+      );
+    }
   });
 
   it('routedByCheck falls back to outcome-name matching when no tier is assigned', () => {

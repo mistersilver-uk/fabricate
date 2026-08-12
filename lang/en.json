@@ -1267,6 +1267,7 @@
       "Roll": "Roll",
       "FailureReason": "Reason",
       "ConsumedOnFailure": "Consumed on Failure",
+      "ProducedOnFailure": "Produced on Failure",
       "GatherSuccess": "Gathering Successful",
       "GatherFailure": "Gathering Failed",
       "GatherActor": "Gatherer",

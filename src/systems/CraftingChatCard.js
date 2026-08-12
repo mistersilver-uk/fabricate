@@ -57,6 +57,7 @@ export const CRAFTING_CHAT_KEYS = Object.freeze({
   tierStepTarget: 'FABRICATE.Chat.TierStepTarget',
   failureReason: 'FABRICATE.Chat.FailureReason',
   consumedOnFailure: 'FABRICATE.Chat.ConsumedOnFailure',
+  producedOnFailure: 'FABRICATE.Chat.ProducedOnFailure',
 });
 
 /** Escape text destined for HTML so user-authored names cannot inject markup. */
@@ -221,6 +222,18 @@ export function buildResultCard(model = {}, keys, localize = (key) => key) {
     // Failure: consumed source + tools were forfeited together — one section.
     const forfeited = [...(model.consumed || []), ...(model.tools || [])];
     sections = [
+      // WHAT A FAILURE PRODUCED (issue 1098). Until the failure-result policy shipped,
+      // this branch never read `model.results` at all, so an award threaded to the card
+      // rendered as nothing — the seam that made "asserted on the posted chat card"
+      // unsatisfiable. It is FIRST, mirroring the success branch's what-you-got-then-what-
+      // it-cost order, and `renderSection` returns '' for an empty list, so every failure
+      // card that awards nothing is byte-for-byte what it was. Shared with crafting, whose
+      // simple/alchemy failure award had the same latent gap.
+      renderSection({
+        heading: loc(keys.producedOnFailure),
+        entries: model.results,
+        modifier: 'results',
+      }),
       renderSection({
         heading: loc(keys.consumedOnFailure),
         entries: forfeited,
