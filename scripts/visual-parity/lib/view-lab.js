@@ -28,6 +28,28 @@ const VITE_MODULE = 'vite';
 export const VIEW_LAB_PAGE = 'tests/view-lab/index.html';
 export const VIEW_LAB_VITE_CONFIG = 'tests/view-lab/vite.config.js';
 
+/** The lab's pinned port (`tests/view-lab/vite.config.js` sets `strictPort`). */
+export const VIEW_LAB_PORT = 5273;
+
+/**
+ * Whether something on this port is already serving the lab's entry document.
+ *
+ * Asks for the PAGE rather than for the port: a stray listener would answer the connection
+ * and then serve something that is not the lab, and a run that attached to it would report
+ * the difference as the product's drift.
+ *
+ * @param {number} port Port to probe.
+ * @returns {Promise<boolean>} True when the lab is already being served there.
+ */
+async function labIsServing(port) {
+  try {
+    const response = await fetch(`http://127.0.0.1:${port}/${VIEW_LAB_PAGE}`);
+    return response.ok && (await response.text()).includes('view-lab');
+  } catch {
+    return false;
+  }
+}
+
 /** The lab's own readiness contract: one of these two lands on `<body>` when it settles. */
 const READY_FLAGS = () => {
   const { viewLabReady, viewLabError } = globalThis.document.body.dataset;
@@ -45,6 +67,7 @@ const READY_FLAGS = () => {
  * @param {object} [options.viewport] Page viewport; the lab window sizes itself from `query`.
  * @param {number} [options.settleMs] Quiet time after readiness, for fonts and transitions.
  * @param {number} [options.attempts] Boot attempts; a cold server races Vite's optimiser.
+ * @param {number} [options.port] The lab's pinned port, used to find a lab already running.
  * @param {(page: object) => Promise<void>} [options.afterOpen] Spec-owned first navigation.
  * @returns {Promise<{page: object, dispose: () => Promise<void>}>} The live subject.
  */
@@ -56,21 +79,33 @@ export async function openViewLab(browser, options) {
     viewport = { width: 1920, height: 1200 },
     settleMs = 600,
     attempts = 4,
+    port = VIEW_LAB_PORT,
     afterOpen = null,
   } = options;
 
-  const { createServer } = await import(VITE_MODULE);
-  const server = await createServer({ configFile: resolve(repoRoot, VIEW_LAB_VITE_CONFIG) });
-  await server.listen();
+  // ATTACH to a lab that is already running rather than fighting it for the port.
+  //
+  // The lab pins `strictPort`, so a second server cannot come up beside it: a maintainer with
+  // the lab open in a browser — the normal state while a screen is being worked on — made
+  // every parity run fail with `Port 5273 is already in use`, which reads as a harness fault
+  // and is really just two things wanting one port. A dev server serves the working tree on
+  // every request, so an attached run measures the same files a fresh server would, and this
+  // run must NOT close a server it did not start.
+  const running = await labIsServing(port);
+  const { createServer } = running ? {} : await import(VITE_MODULE);
+  const server = running
+    ? null
+    : await createServer({ configFile: resolve(repoRoot, VIEW_LAB_VITE_CONFIG) });
+  if (server) await server.listen();
   const page = await browser.newPage({ viewport, deviceScaleFactor: 1 });
   const dispose = async () => {
     await page.close();
-    await server.close();
+    if (server) await server.close();
   };
 
   try {
     const search = new URLSearchParams({ app, ...query });
-    const url = `http://127.0.0.1:${server.config.server.port}/${VIEW_LAB_PAGE}?${search}`;
+    const url = `http://127.0.0.1:${server?.config.server.port ?? port}/${VIEW_LAB_PAGE}?${search}`;
     let booted = false;
     for (let attempt = 0; attempt < attempts && !booted; attempt += 1) {
       try {
