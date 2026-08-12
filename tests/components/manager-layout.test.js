@@ -1,10 +1,28 @@
-import test from 'node:test';
+import test, { after, before } from 'node:test';
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
 import { scopedComponentCss, withScopeHash } from '../helpers/scoped-component-css.js';
+
+// ONE Chromium process for this whole file (issue tests-perf follow-up). This file carries
+// every computed-style parity guard in the repo and used to launch a fresh browser per test —
+// 20 separate `chromium.launch()` calls — and Chromium's own startup cost dominated the file's
+// runtime badly enough to blow its CI budget under load. A browser process is expensive to
+// start and cheap to reuse; the isolation that actually matters is per-TEST state (cookies,
+// `document`, injected markup), which a fresh browser CONTEXT gives for a fraction of the cost.
+// So every test below opens its own `sharedBrowser.newContext()` (or `.newPage()` on one, where
+// a helper hands back a bare page) and closes ONLY that context, never the shared browser.
+let sharedBrowser;
+
+before(async () => {
+  sharedBrowser = await chromium.launch();
+});
+
+after(async () => {
+  await sharedBrowser.close();
+});
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const cssPath = resolve(__dirname, '../../styles/fabricate.css');
@@ -98,8 +116,11 @@ function withChipHash(markup) {
 }
 
 async function readRenderedToolGeometry(width, view) {
-  const browser = await chromium.launch();
-  const page = await browser.newPage({ viewport: { width, height: 720 }, deviceScaleFactor: 1 });
+  const context = await sharedBrowser.newContext({
+    viewport: { width, height: 720 },
+    deviceScaleFactor: 1,
+  });
+  const page = await context.newPage();
   try {
     const editor =
       view === 'tool-edit'
@@ -188,7 +209,7 @@ async function readRenderedToolGeometry(width, view) {
       };
     });
   } finally {
-    await browser.close();
+    await context.close();
   }
 }
 
@@ -339,11 +360,11 @@ test('manager character modifier search suggestions keep icons in row flow', () 
 });
 
 test('manager character modifier search suggestions render with availability-style icon geometry', async () => {
-  const browser = await chromium.launch();
-  const page = await browser.newPage({
+  const context = await sharedBrowser.newContext({
     viewport: { width: 760, height: 320 },
     deviceScaleFactor: 1,
   });
+  const page = await context.newPage();
 
   try {
     await page.setContent(`
@@ -500,8 +521,7 @@ test('manager character modifier search suggestions render with availability-sty
       'character suggestion icon gap should match availability rows'
     );
   } finally {
-    await page.close();
-    await browser.close();
+    await context.close();
   }
 });
 
@@ -3397,11 +3417,11 @@ test('manager gathering task browser defines bounded toolbar and compact table g
 });
 
 test('chance slider rails clip continuous Tool gradients at thumb-centre endpoints without changing Gathering fill', async () => {
-  const browser = await chromium.launch();
-  const page = await browser.newPage({
+  const context = await sharedBrowser.newContext({
     viewport: { width: 640, height: 240 },
     deviceScaleFactor: 1,
   });
+  const page = await context.newPage();
 
   try {
     await page.setContent(`
@@ -3468,8 +3488,7 @@ test('chance slider rails clip continuous Tool gradients at thumb-centre endpoin
     assert.equal(report.gathering.backgroundImage, 'none');
     assert.notEqual(report.gathering.backgroundColor, 'rgba(0, 0, 0, 0)');
   } finally {
-    await page.close();
-    await browser.close();
+    await context.close();
   }
 });
 
@@ -4107,11 +4126,11 @@ test('manager environments browser and edit route define compact responsive geom
 });
 
 test('manager environment inspector evidence table wraps compact pills without horizontal overflow', async () => {
-  const browser = await chromium.launch();
-  const page = await browser.newPage({
+  const context = await sharedBrowser.newContext({
     viewport: { width: 360, height: 360 },
     deviceScaleFactor: 1,
   });
+  const page = await context.newPage();
 
   try {
     await page.setContent(`
@@ -4354,17 +4373,16 @@ test('manager environment inspector evidence table wraps compact pills without h
       'status pills should retain subtle state backgrounds'
     );
   } finally {
-    await page.close();
-    await browser.close();
+    await context.close();
   }
 });
 
 test('manager environment composition overflow menu renders bounded single-line rows', async () => {
-  const browser = await chromium.launch();
-  const page = await browser.newPage({
+  const context = await sharedBrowser.newContext({
     viewport: { width: 360, height: 260 },
     deviceScaleFactor: 1,
   });
+  const page = await context.newPage();
 
   try {
     await page.setContent(`
@@ -4542,8 +4560,7 @@ test('manager environment composition overflow menu renders bounded single-line 
       'disabled note labels should truncate within the same bounded label column'
     );
   } finally {
-    await page.close();
-    await browser.close();
+    await context.close();
   }
 });
 
@@ -5685,8 +5702,11 @@ test('the armed danger button paints a solid danger fill with its own readable f
 // still hold while the detail pane is at its narrowest, so a non-wrapping row clips
 // its action cluster with no scrollbar. Measured, not asserted from CSS text.
 async function readRenderedKnowledgeGeometry(width) {
-  const browser = await chromium.launch();
-  const page = await browser.newPage({ viewport: { width, height: 720 }, deviceScaleFactor: 1 });
+  const context = await sharedBrowser.newContext({
+    viewport: { width, height: 720 },
+    deviceScaleFactor: 1,
+  });
+  const page = await context.newPage();
   try {
     // Mirrors the shipped two-line rhythm: name + type (+ quantity) on line 1, the
     // whole state vocabulary as chips on line 2.
@@ -5715,7 +5735,7 @@ async function readRenderedKnowledgeGeometry(width) {
       };
     });
   } finally {
-    await browser.close();
+    await context.close();
   }
 }
 
@@ -5744,11 +5764,11 @@ test('recipe tag chips zero their list-item margins so a host list rule cannot i
   // non-last items a margin-bottom inflated only the first chip's box (e.g. it
   // rendered 34px tall vs the last chip's 30px). Our class rule must zero the
   // margin and win on specificity even when the host rule is declared later.
-  const browser = await chromium.launch();
-  const page = await browser.newPage({
+  const context = await sharedBrowser.newContext({
     viewport: { width: 760, height: 320 },
     deviceScaleFactor: 1,
   });
+  const page = await context.newPage();
 
   try {
     await page.setContent(`
@@ -5801,19 +5821,18 @@ test('recipe tag chips zero their list-item margins so a host list rule cannot i
     }
     assert.equal(report[0].height, report[1].height, 'both chips should derive the same height');
   } finally {
-    await page.close();
-    await browser.close();
+    await context.close();
   }
 });
 
 test('recipe tag list spans the full row width on its own line below the controls', async () => {
   // The chosen-tags box should drop to a full-width line under the match
   // controls + quantity row, so chips never share width with the row-end controls.
-  const browser = await chromium.launch();
-  const page = await browser.newPage({
+  const context = await sharedBrowser.newContext({
     viewport: { width: 760, height: 360 },
     deviceScaleFactor: 1,
   });
+  const page = await context.newPage();
 
   try {
     await page.setContent(`
@@ -5901,8 +5920,7 @@ test('recipe tag list spans the full row width on its own line below the control
       'tags list should sit on its own line below the controls/quantity row'
     );
   } finally {
-    await page.close();
-    await browser.close();
+    await context.close();
   }
 });
 
@@ -6019,8 +6037,8 @@ test('the Tags & Categories route names one grid track per section and grows the
 // class-based, so nothing here depends on the element; the fixture is updated so it keeps
 // MIRRORING shipped markup rather than quietly describing a shape that no longer exists.
 test('the reserved vocabulary row renders exactly as tall as a custom row', async () => {
-  const browser = await chromium.launch();
-  const page = await browser.newPage({ viewport: { width: 760, height: 600 } });
+  const context = await sharedBrowser.newContext({ viewport: { width: 760, height: 600 } });
+  const page = await context.newPage();
   try {
     const lockedRow = `<div class="manager-vocabulary-row">
       <span class="manager-vocabulary-icon is-locked-icon"><i class="fas fa-lock"></i></span>
@@ -6103,7 +6121,7 @@ test('the reserved vocabulary row renders exactly as tall as a custom row', asyn
       'the reserved row must not render an inline explanatory sentence'
     );
   } finally {
-    await browser.close();
+    await context.close();
   }
 });
 
@@ -6119,10 +6137,10 @@ test('the reserved vocabulary row renders exactly as tall as a custom row', asyn
 // Asserted on the RENDERED background rather than on the selector text, so a future rule
 // that reintroduces a background by some other route fails too (issue 883).
 test('a range input inside the gathering edit views stays transparent for the slider fill', async () => {
-  const browser = await chromium.launch();
+  const context = await sharedBrowser.newContext({ viewport: { width: 900, height: 200 } });
   try {
     for (const view of ['manager-gathering-task-edit-view', 'manager-gathering-event-edit-view']) {
-      const page = await browser.newPage({ viewport: { width: 900, height: 200 } });
+      const page = await context.newPage();
       try {
         await page.setContent(
           `<style>${css}</style>` +
@@ -6159,7 +6177,7 @@ test('a range input inside the gathering edit views stays transparent for the sl
       }
     }
   } finally {
-    await browser.close();
+    await context.close();
   }
 });
 
@@ -6173,8 +6191,8 @@ test('a range input inside the gathering edit views stays transparent for the sl
 // reintroduced by any route (a new rule, an ancestor, a different class) fails too, and so
 // this stays true if the shell's own values are ever retuned (issue 883).
 test('the gathering inspector rail cards render as one card, not three treatments', async () => {
-  const browser = await chromium.launch();
-  const page = await browser.newPage({ viewport: { width: 420, height: 600 } });
+  const context = await sharedBrowser.newContext({ viewport: { width: 420, height: 600 } });
+  const page = await context.newPage();
   try {
     await page.setContent(
       `<style>${css}</style>` +
@@ -6237,8 +6255,7 @@ test('the gathering inspector rail cards render as one card, not three treatment
       );
     }
   } finally {
-    await page.close();
-    await browser.close();
+    await context.close();
   }
 });
 
@@ -6316,10 +6333,10 @@ test('both converted chance-slider sites render a real fill, not a bare thumb', 
     },
   ];
 
-  const browser = await chromium.launch();
+  const context = await sharedBrowser.newContext({ viewport: { width: 900, height: 260 } });
   try {
     for (const site of sites) {
-      const page = await browser.newPage({ viewport: { width: 900, height: 260 } });
+      const page = await context.newPage();
       try {
         await page.setContent(
           `<style>${css}</style>` +
@@ -6375,7 +6392,7 @@ test('both converted chance-slider sites render a real fill, not a bare thumb', 
       }
     }
   } finally {
-    await browser.close();
+    await context.close();
   }
 });
 
@@ -6540,8 +6557,11 @@ test('every manager select paints an opaque background, so its popup opens dark'
 // this reason: happy-dom applies no stylesheet and computes no cascade, so nothing in a
 // mounted suite could ever have caught either.
 async function readWorkspaceGrid(width, view) {
-  const browser = await chromium.launch();
-  const page = await browser.newPage({ viewport: { width, height: 720 }, deviceScaleFactor: 1 });
+  const context = await sharedBrowser.newContext({
+    viewport: { width, height: 720 },
+    deviceScaleFactor: 1,
+  });
+  const page = await context.newPage();
   try {
     await page.setContent(
       `<style>${css}</style>` +
@@ -6573,7 +6593,7 @@ async function readWorkspaceGrid(width, view) {
       };
     });
   } finally {
-    await browser.close();
+    await context.close();
   }
 }
 
@@ -6657,9 +6677,9 @@ test('the Checks Studio really renders into the classes those measurements measu
 // the Difficulty card's radio cards. Real Chromium + the real stylesheet, because happy-dom
 // applies no cascade and could not see either the extra padding or the fix.
 //
-// ONE shared browser/page for both the fixed and the reintroduced-defect measurement below —
-// this file already launches Chromium dozens of times over, and a second `chromium.launch()`
-// here buys nothing a second `page.setContent()` on the same page does not.
+// ONE shared page for both the fixed and the reintroduced-defect measurement below — a second
+// `page.setContent()` on the same page is all a second measurement ever needed, whether the
+// browser behind it is this file's shared one or a fresh one.
 async function checksRollEdges(page, tiersWrapperClass) {
   const difficultyCard = `
     <section class="manager-inspector-card manager-checks-card" data-check-difficulty-card>
@@ -6744,12 +6764,12 @@ async function checksRollEdges(page, tiersWrapperClass) {
 }
 
 test('the recipe difficulty tier row shares the Difficulty card radio-card edges, and the bare card shell reintroduces the inset', async () => {
-  const browser = await chromium.launch();
+  const context = await sharedBrowser.newContext({
+    viewport: { width: 960, height: 800 },
+    deviceScaleFactor: 1,
+  });
   try {
-    const page = await browser.newPage({
-      viewport: { width: 960, height: 800 },
-      deviceScaleFactor: 1,
-    });
+    const page = await context.newPage();
 
     const edges = await checksRollEdges(page, 'manager-inspector-card manager-checks-card');
     assert.equal(
@@ -6788,7 +6808,7 @@ test('the recipe difficulty tier row shares the Difficulty card radio-card edges
       'expected the bare card shell to inset the tier row past the radio-card right edge'
     );
   } finally {
-    await browser.close();
+    await context.close();
   }
 });
 
@@ -6859,12 +6879,12 @@ async function modifiersCombinationRuleMetrics(page, cardWrapperClass) {
 }
 
 test('the modifiers card and its combination-rule cards take the studio scale, and the bare shell reintroduces the generic one', async () => {
-  const browser = await chromium.launch();
+  const context = await sharedBrowser.newContext({
+    viewport: { width: 960, height: 700 },
+    deviceScaleFactor: 1,
+  });
   try {
-    const page = await browser.newPage({
-      viewport: { width: 960, height: 700 },
-      deviceScaleFactor: 1,
-    });
+    const page = await context.newPage();
 
     const fixed = await modifiersCombinationRuleMetrics(
       page,
@@ -6912,7 +6932,7 @@ test('the modifiers card and its combination-rule cards take the studio scale, a
         `(bare: ${broken.optionGap})`
     );
   } finally {
-    await browser.close();
+    await context.close();
   }
 });
 
@@ -6940,8 +6960,8 @@ test('the locked activation indicator offers no hover affordance', async () => {
   // The hover rule excluded `:disabled` and `.is-disabled`, and a span can be neither, so the
   // pointer brightened a thing nothing happens when you press — a false affordance measurable
   // only in a browser, since the rule is a `:hover` over a `color-mix()`.
-  const browser = await chromium.launch();
-  const page = await browser.newPage({ viewport: { width: 600, height: 300 } });
+  const context = await sharedBrowser.newContext({ viewport: { width: 600, height: 300 } });
+  const page = await context.newPage();
   try {
     await page.setContent(
       `<style>${css}</style><div class="fabricate-manager">` +
@@ -6971,7 +6991,7 @@ test('the locked activation indicator offers no hover affordance', async () => {
     assert.notEqual(liveHovered, liveResting, 'an actionable switch still lifts under the pointer');
     assert.equal(lockedHovered, lockedResting, 'the locked indicator does not');
   } finally {
-    await browser.close();
+    await context.close();
   }
 });
 
@@ -6995,14 +7015,14 @@ const checkEditorPath = resolve(
 const bandStripScoped = scopedComponentCss(bandStripPath);
 const checkEditorSource = readFileSync(checkEditorPath, 'utf8');
 
-/** Renders a fixture against the real sheet plus the strip's own scoped CSS, in one browser. */
+/** Renders a fixture against the real sheet plus the strip's own scoped CSS, in one context. */
 async function withBandStripPage(run) {
-  const browser = await chromium.launch();
-  const page = await browser.newPage({ viewport: { width: 900, height: 400 } });
+  const context = await sharedBrowser.newContext({ viewport: { width: 900, height: 400 } });
+  const page = await context.newPage();
   try {
     return await run(page);
   } finally {
-    await browser.close();
+    await context.close();
   }
 }
 
@@ -7137,6 +7157,46 @@ test('the band fill and the tier-row swatch are painted by rules that still matc
   );
   assert.equal(painted.keyedRadius, '50%', 'and round rather than a bar with soft corners');
   assert.equal(painted.tableTracks[0], '12px', 'and the table still declares that track first');
+});
+
+// The band-strip hint's separation from the first tier row (maintainer parity round 4). The
+// REAL defect two attempts at this fix both missed was never the pixel value: `.fabricate-
+// manager .manager-muted` (this sheet, below) states `margin: var(--fab-space-2xs) 0 0` — a
+// SHORTHAND that zeroes `margin-bottom` — at the SAME (0,2,0) specificity as an unscoped
+// `.fabricate-manager [data-outcome-band-strip-hint]` rule and LATER in source order, so the
+// unscoped rule always lost and the hint's bottom margin computed to 0 no matter what number
+// it declared. The fix is scoped to `[data-outcome-bands]` at (0,3,0), and 20px reproduces the
+// prototype's rhythm without the 10px a deliberately-dropped column-header row occupied there
+// (see the CSS comment on `[data-outcome-band-strip-hint]`, and `scripts/visual-parity`
+// region `band-strip-hint`). This fixture mirrors the card's own DOM order — `.manager-muted`
+// hint, then `.manager-checks-tier-list` — so a regression back to the unscoped selector, or
+// to the shorthand reset winning again, reds here exactly as it would on screen.
+test('the band-strip hint keeps its 20px separation from the first tier row', async () => {
+  const gap = await withBandStripPage(async (page) => {
+    await page.setContent(
+      `<style>${css}</style>` +
+        '<div class="fabricate-manager">' +
+        '<section class="manager-inspector-card manager-checks-card" data-outcome-bands>' +
+        '<div class="manager-checks-card-body is-roomy">' +
+        '<p class="manager-muted" data-outcome-band-strip-hint>' +
+        'Drag or arrow-key a band edge to move its threshold.</p>' +
+        '<div class="manager-checks-tier-list" role="list">' +
+        '<div class="manager-checks-tier-row" role="listitem">Common Craft &middot; DC 8</div>' +
+        '<div class="manager-checks-tier-row" role="listitem">Uncommon Craft &middot; DC 12</div>' +
+        '</div></div></section></div>'
+    );
+    return page.evaluate(() => {
+      const hint = document.querySelector('[data-outcome-band-strip-hint]').getBoundingClientRect();
+      const row = document.querySelector('.manager-checks-tier-row').getBoundingClientRect();
+      return Math.round((row.top - hint.bottom) * 100) / 100;
+    });
+  });
+  assert.equal(
+    gap,
+    20,
+    `the hint must sit 20px above the first tier row (14px block separation + the list's own ` +
+      `6px row cadence), got ${gap}px`
+  );
 });
 
 test('every outcome band name clears WCAG AA in every shipped theme', async () => {
@@ -7363,11 +7423,11 @@ function managerButtonClassesFor(role) {
 const AUTHORITY_PROBES = ['primary', 'danger'];
 
 test('a Modifiers card button renders exactly like the tool studio button of the same role', async () => {
-  const browser = await chromium.launch();
-  const page = await browser.newPage({
+  const context = await sharedBrowser.newContext({
     viewport: { width: 1280, height: 720 },
     deviceScaleFactor: 1,
   });
+  const page = await context.newPage();
 
   try {
     const toolButtons = AUTHORITY_PROBES.map(
@@ -7462,8 +7522,7 @@ test('a Modifiers card button renders exactly like the tool studio button of the
       }
     }
   } finally {
-    await page.close();
-    await browser.close();
+    await context.close();
   }
 });
 
@@ -7501,7 +7560,7 @@ function withStepperHash(markup) {
 }
 
 test('the modifier row gives every field room for its longest content at every manager width', async () => {
-  const browser = await chromium.launch();
+  const context = await sharedBrowser.newContext({ deviceScaleFactor: 1 });
 
   try {
     const stepper = (bound) =>
@@ -7521,10 +7580,8 @@ test('the modifier row gives every field room for its longest content at every m
 
     const failures = [];
     for (const width of MODIFIER_BOUNDS_ROW_WIDTHS) {
-      const page = await browser.newPage({
-        viewport: { width, height: 800 },
-        deviceScaleFactor: 1,
-      });
+      const page = await context.newPage();
+      await page.setViewportSize({ width, height: 800 });
       try {
         await page.setContent(`
           <!doctype html>
@@ -7613,6 +7670,6 @@ test('the modifier row gives every field room for its longest content at every m
       `a truncated "Unbounded" reads as "Unb" and destroys the empty-is-not-zero contract:\n- ${failures.join('\n- ')}`
     );
   } finally {
-    await browser.close();
+    await context.close();
   }
 });

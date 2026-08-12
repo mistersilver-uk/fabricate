@@ -2699,12 +2699,31 @@
 /* The band strip's hint sentence, glyph-led. The glyph is a decoration on prose rather
    than a control, so it takes the sentence's own ink at its own size.
 
-   The bottom margin is the prototype's own separation, measured rather than chosen: there
-   the hint ENDS the strip's block (the card body's 14px bottom padding sits under it) and the
-   tier list is a separate block below. Ours renders both in one body, so without this the
-   sentence abutted the first tier row — `.manager-muted` states a top margin only. */
-.fabricate-manager [data-outcome-band-strip-hint] {
-  margin-bottom: 14px;
+   THE REAL DEFECT (maintainer parity round 4) was never the pixel value: it was that no
+   value here could ever take effect. `.fabricate-manager .manager-muted` (below, in this
+   same sheet) states `margin: var(--fab-space-2xs) 0 0` — a SHORTHAND that zeroes
+   `margin-bottom` — at the same (0,2,0) specificity as a bare `.fabricate-manager
+   [data-outcome-band-strip-hint]` rule, and later in source order, so it always won and the
+   hint's bottom margin computed to 0 regardless of what number this rule declared. That is
+   why the first attempt at this fix (14px) still read as abutting: it was never applied.
+   Scoped to `[data-outcome-bands]` at (0,3,0) so it wins without depending on source order
+   against the (0,2,0) base rule — the same fix shape `.manager-checks-sections
+   .manager-environment-tab-button` uses above for the same reason.
+
+   The VALUE reproduces the prototype's rhythm rather than one of its raw numbers (measured
+   with `scripts/visual-parity`, prototype `.../checks-studio.spec.mjs`, region
+   `band-strip-hint`). There the hint sits 30px above the first tier row: 14px is the
+   wrapping block's own bottom padding (the same "end of this block" separation used
+   everywhere else in this card), then a 10px `TIER / DC ± / COUNTS AS` column-header row,
+   then the list's own 6px inter-row gap before the first real row. This card deliberately
+   drops that header row (issue 1096; see the `outcomes|outcome bands|label:tier` structural
+   exemption), so matching 30px literally would leave an unexplained empty band where a
+   header used to be, and matching only the 14px block-end drops the list's own lead-in
+   rhythm entirely. 20px reproduces BOTH rhythms the prototype actually uses — the 14px block
+   separation and the list's 6px row cadence — without the 10px the header's own text
+   occupied. */
+.fabricate-manager [data-outcome-bands] [data-outcome-band-strip-hint] {
+  margin-bottom: 20px;
 }
 
 .fabricate-manager [data-outcome-band-strip-hint] > i {
