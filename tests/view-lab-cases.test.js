@@ -1607,13 +1607,13 @@ test('ADDING a case still narrows to that case when the hunk header numbers are 
   }
 });
 
-test('a hunk whose content recurs in two different cases selects every publishable case', () => {
+test('a hunk whose content recurs in two different cases selects THOSE cases, not the corpus', () => {
   const everything = publishableCases().length;
   const windows = recurringWindows(registrySource, caseIdByLine(), 7);
   assert.ok(
     windows.length > 0,
     'this registry is supposed to contain seven-line windows that recur; if it no longer does, ' +
-      'this test is measuring nothing and the agreement rule has lost its fixture'
+      'this test is measuring nothing and the union rule has lost its fixture'
   );
 
   const crossCase = windows.filter(
@@ -1622,47 +1622,88 @@ test('a hunk whose content recurs in two different cases selects every publishab
   assert.ok(
     crossCase.length > 0,
     'no recurring window spans two different case literals any more, so nothing here can prove ' +
-      'that an ambiguous hunk widens instead of guessing'
+      'what an ambiguous hunk selects'
   );
 
-  // The middle line of the window, patched with its OWN correct line numbers. This is the precision
-  // the agreement rule deliberately gives up: the patch is aligned, it verifies, and it is still
-  // ambiguous — the identical window elsewhere would attribute it to a different case, so the only
-  // honest answer is the whole corpus.
+  // The middle line of the window, patched with its OWN correct line numbers: the patch is aligned,
+  // it verifies, and it is still ambiguous — the identical window elsewhere would attribute it to a
+  // different case. The honest answer is the UNION of the places it could be (issue 1127). That set
+  // always CONTAINS the true one, because the anchor sequence is content the rendered file holds at
+  // every candidate, so the edit landed at one of them.
   for (const window of crossCase.slice(0, 3)) {
     const line = window.starts[0] + 3;
-    assert.equal(
-      selectedIds([REGISTRY_PATH], registryPatches([line])).length,
-      everything,
+    const expected = [...new Set(window.ids)];
+    const selected = selectedIds([REGISTRY_PATH], registryPatches([line]));
+    assert.deepEqual(
+      [...selected].sort(),
+      [...expected].sort(),
       `line ${line} sits in a window that also occurs at ${window.starts.slice(1).join(', ')}, ` +
-        `attributing to ${[...new Set(window.ids)].join(' / ')} — an aligned patch there must widen`
+        `so an aligned patch there must select exactly ${expected.join(' / ')}`
+    );
+    assert.ok(
+      selected.length < everything,
+      'the union must be a narrowing; selecting the whole corpus for an ambiguous hunk is the ' +
+        'regression issue 1127 removed'
     );
   }
 });
 
-test('no window recurs within one region of either attributed input, so that branch has no fixture', () => {
-  // The measurement, recorded rather than replaced by an invented fixture. `regionsTouchedByHunk`
-  // ACCEPTS several candidate anchors when they all attribute identically — a window that recurs
-  // inside ONE region. NEITHER attributed input contains such a window: not this registry, and not
-  // `labActors.js`, whose four fixture tables share the region machinery. So there is nothing real
-  // to assert that branch against, and a synthetic file would only prove the test can build one.
+test('the SAME edit applied to sibling cases selects exactly those siblings (issue 1125 shape)', () => {
+  // The shape that made this worth fixing. PR #1125 added four identical lines to three sibling
+  // case literals; each hunk anchored at more than one of them, the candidates disagreed, and the
+  // capture widened to 209 frames and 28 minutes for want of three.
   //
-  // Both inputs are measured rather than one, because the claim is about the branch and the branch
-  // serves both. If this ever fails, that input has grown exactly the fixture the branch is
-  // missing: name it here and assert the branch narrows to the single region both occurrences
-  // share.
+  // Built from the registry's own duplication rather than invented: one window that recurs across
+  // several case literals, patched at its middle line in EVERY case it occurs in — which is what
+  // "the same edit, applied to each sibling" produces.
+  const window = recurringWindows(registrySource, caseIdByLine(), 7)
+    .filter((entry) => entry.ids.every(Boolean) && new Set(entry.ids).size > 2)
+    .at(0);
+  assert.ok(
+    window,
+    'no seven-line window recurs across three or more case literals, so this registry can no ' +
+      'longer produce the multi-sibling edit issue 1125 hit'
+  );
+
+  const siblings = [...new Set(window.ids)];
+  const selected = selectedIds(
+    [REGISTRY_PATH],
+    registryPatches(window.starts.map((start) => start + 3))
+  );
+  assert.deepEqual(
+    [...selected].sort(),
+    [...siblings].sort(),
+    `editing the same line in ${siblings.length} sibling cases must select exactly those ${siblings.length}`
+  );
+});
+
+test('no recurring window mixes inside-a-region with outside-every-region, so the widening short-circuit has no fixture', () => {
+  // The measurement, recorded rather than replaced by an invented fixture. The union rule keeps ONE
+  // way to widen on a multi-candidate hunk: a candidate that lands outside every region returns
+  // EVERY_PUBLISHABLE_CASE, and `regionsTouchedByHunk` short-circuits on it ABOVE the union, because
+  // the true edit may be that candidate and code outside a case literal can move every frame.
+  //
+  // Reaching that short-circuit needs a window occurring BOTH inside a region and outside every
+  // region. NEITHER attributed input contains one: not this registry, and not `labActors.js`, whose
+  // four fixture tables share the region machinery. So there is nothing real to assert it against,
+  // and a synthetic file would only prove the test can build one.
+  //
+  // Both inputs are measured rather than one, because the claim is about the short-circuit and the
+  // short-circuit serves both. If this ever fails, that input has grown exactly the fixture the
+  // branch is missing: name it here and assert the answer is the whole corpus, NOT the union of the
+  // regions the other occurrences sit in.
   for (const [where, source, owner] of [
     ['the registry', registrySource, caseIdByLine()],
     [LAB_ACTORS_PATH, labActorsSource, tableNameByLine()],
   ]) {
-    const sameRegion = recurringWindows(source, owner, 7).filter(
-      (window) => window.ids.every(Boolean) && new Set(window.ids).size === 1
+    const mixed = recurringWindows(source, owner, 7).filter(
+      (window) => window.ids.some(Boolean) && window.ids.some((id) => !id)
     );
     assert.deepEqual(
-      sameRegion.map((window) => `${window.ids[0]} at ${window.starts.join(', ')}`),
+      mixed.map((window) => `at ${window.starts.join(', ')}`),
       [],
-      `a seven-line window now recurs inside a single region of ${where}, which is the fixture ` +
-        'the all-candidates-agree branch of `regionsTouchedByHunk` has never had'
+      `a seven-line window of ${where} now occurs both inside a region and outside every region, ` +
+        "which is the fixture `regionsTouchedByHunk`'s widening short-circuit has never had"
     );
   }
 });
