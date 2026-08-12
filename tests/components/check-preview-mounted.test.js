@@ -55,10 +55,18 @@ const harness = createMountedComponentHarness({
   componentPath: 'src/ui/svelte/apps/manager/checks/ChecksView.svelte',
 });
 
-/** Two world actors, so "unfiltered `game.actors`" is observable rather than asserted. */
+/**
+ * The world's actors — two player characters and one that is not.
+ *
+ * The bestiary entry is the point rather than padding: the "Preview as" list is filtered by
+ * the shared player-character predicate (maintainer ruling on issue 1097), and a fixture of
+ * nothing but characters would let a filter that dropped ALL of them, or none of them, pass
+ * unchallenged. `Balehound` is what a real world has twenty-five of.
+ */
 const WORLD_ACTORS = [
-  { id: 'sera', name: 'Sera Vane', getRollData: () => ({ prof: 3 }) },
-  { id: 'bare', name: 'Bare Hands', getRollData: () => ({}) },
+  { id: 'sera', name: 'Sera Vane', type: 'character', getRollData: () => ({ prof: 3 }) },
+  { id: 'bare', name: 'Bare Hands', type: 'character', getRollData: () => ({}) },
+  { id: 'balehound', name: 'Balehound', type: 'npc', getRollData: () => ({ prof: 9 }) },
 ];
 
 /** A `Roll` that always rolls the same face — a preview must be reproducible in a test. */
@@ -199,16 +207,100 @@ async function choose(select, value) {
   await settle();
 }
 
+/**
+ * Pick an actor in the "Preview as" control the way a GM does.
+ *
+ * TWO CLICKS, because that control is a `SearchablePopover` rather than a `<select>`: open
+ * the trigger, then press the option by its own `data-popover-option` identity handle. The
+ * popover PORTALS to the nearest `.fabricate-manager`, and a mounted tree has none, so the
+ * action degrades to a no-op and the options stay inside `root` — which is what makes a
+ * query rooted there correct here and wrong in the running app.
+ *
+ * @param {HTMLElement} root The mounted tree.
+ * @param {string} actorId The actor id, or `no-actor`.
+ */
+async function choosePreviewActor(root, actorId) {
+  const trigger = root.querySelector('[data-checks-preview-actor]');
+  assert.ok(Boolean(trigger), 'the "Preview as" control renders');
+  trigger.click();
+  await settle();
+  const option = root.querySelector(`[data-popover-option="${actorId}"]`);
+  assert.ok(Boolean(option), `the picker offers "${actorId}"`);
+  option.click();
+  await settle();
+}
+
 describe('the Preview-as control (issue 1096 shipped it as a SLOT; this fills it)', () => {
-  it('offers every world actor, unfiltered, behind an explicit "No actor" option', async () => {
+  it('offers the PLAYER CHARACTERS only, behind an explicit "No actor" option', async () => {
+    // This inverts what the control shipped as. It listed `game.actors` unfiltered, on the
+    // ground that a GM owns every actor — which answers a question about authority, not the
+    // one a preview picker asks. A world's directory is mostly bestiary, so `Balehound` is
+    // present in the fixture and must be ABSENT from the list.
     const root = await mountChecks();
-    const select = root.querySelector('[data-checks-preview-actor]');
-    assert.ok(select, 'the actor selector is a real control');
+    const trigger = root.querySelector('[data-checks-preview-actor]');
+    assert.ok(Boolean(trigger), 'the actor picker is a real control');
+    assert.equal(trigger.tagName, 'BUTTON', 'and it is the shipped popover trigger');
+    trigger.click();
+    await settle();
     assert.deepEqual(
-      [...select.options].map((option) => option.value),
-      ['', 'sera', 'bare']
+      [...root.querySelectorAll('[data-popover-option]')].map((option) =>
+        option.getAttribute('data-popover-option')
+      ),
+      ['no-actor', 'sera', 'bare'],
+      'the npc is filtered out; "No actor" leads and is a real option, not an absence'
     );
-    assert.equal(select.value, '', '"No actor" is the resting selection');
+    assert.match(trigger.textContent, /No actor/, '"No actor" is the resting selection');
+  });
+
+  it('SEARCHES the list, which is the whole reason it is not a native select', async () => {
+    const root = await mountChecks();
+    root.querySelector('[data-checks-preview-actor]').click();
+    await settle();
+    const search = root.querySelector('.manager-travel-popover-search input');
+    assert.ok(Boolean(search), 'the picker offers a search field');
+    search.value = 'sera';
+    search.dispatchEvent(new globalThis.Event('input', { bubbles: true }));
+    await settle();
+    assert.deepEqual(
+      [...root.querySelectorAll('[data-popover-option]')].map((option) =>
+        option.getAttribute('data-popover-option')
+      ),
+      ['sera'],
+      'a GM types a name instead of scrolling a world of them'
+    );
+  });
+
+  it('rolls through the studio BUTTON PRIMITIVE, not a hand-written class string', async () => {
+    // Reported as "the roll button does not match the studio's button". The cause is not a
+    // missing rule: `manager-button is-primary` matches no rule stating a type size, so the
+    // label took Foundry's 14px app base while every converted button in the studio read at
+    // the primitive's 11.52px. `fab-manager-button` is what `ManagerButton` emits and is the
+    // only class the type-scale rule keys on, so its presence IS the conversion.
+    // `manager-layout.test.js` measures what that class then renders as; this pins that the
+    // component still asks for it.
+    const root = await mountChecks();
+    const roll = root.querySelector('[data-checks-simulator-roll]');
+    assert.equal(roll.tagName, 'BUTTON', 'it is one button, not a button inside a button');
+    assert.equal(roll.querySelectorAll('button').length, 0, 'and nests none');
+    assert.ok(
+      roll.classList.contains('fab-manager-button'),
+      'the roll action renders through ManagerButton'
+    );
+    assert.ok(roll.classList.contains('is-primary'), 'in the primary role it always had');
+    assert.ok(
+      roll.classList.contains('manager-checks-simulator-roll'),
+      'keeping its own hook for the Foundry width/height reset in the sheet'
+    );
+  });
+
+  it('names the chosen actor on the trigger, so the selection is readable when closed', async () => {
+    const root = await mountChecks();
+    await choosePreviewActor(root, 'sera');
+    assert.match(
+      root.querySelector('[data-checks-preview-actor]').textContent,
+      /Sera Vane/,
+      'a popover that closes without stating its selection is worse than the select it replaced'
+    );
   });
 
   it('offers the check default and every authored recipe tier as records', async () => {
@@ -293,7 +385,7 @@ describe('the outcome-preview readout', () => {
 
   it('rolls through the engine runner and renders what came back', async () => {
     const root = await mountChecks();
-    await choose(root.querySelector('[data-checks-preview-actor]'), 'sera');
+    await choosePreviewActor(root, 'sera');
     root.querySelector('[data-checks-simulator-roll]').click();
     await settle();
     await settle();
@@ -318,7 +410,7 @@ describe('the outcome-preview readout', () => {
 
   it('lists "What happens" rows derived from the same result object', async () => {
     const root = await mountChecks();
-    await choose(root.querySelector('[data-checks-preview-actor]'), 'sera');
+    await choosePreviewActor(root, 'sera');
     root.querySelector('[data-checks-simulator-roll]').click();
     await settle();
     await settle();
@@ -330,7 +422,7 @@ describe('the outcome-preview readout', () => {
 
   it('DROPS a stale readout when the previewed record changes underneath it', async () => {
     const root = await mountChecks();
-    await choose(root.querySelector('[data-checks-preview-actor]'), 'sera');
+    await choosePreviewActor(root, 'sera');
     root.querySelector('[data-checks-simulator-roll]').click();
     await settle();
     await settle();
@@ -344,7 +436,7 @@ describe('the outcome-preview readout', () => {
 
   it('warns rather than presenting a plausible wrong total for an unresolved key', async () => {
     const root = await mountChecks();
-    await choose(root.querySelector('[data-checks-preview-actor]'), 'bare');
+    await choosePreviewActor(root, 'bare');
     assert.ok(
       root.querySelector('[data-checks-simulator-note="unresolved"]'),
       'Bare Hands has no @prof, and Roll.parse would silently make it 0'
@@ -369,7 +461,7 @@ describe('the odds histogram', () => {
     // answer where there is one — a heading naming a domain the panel beneath it refuses to
     // chart is the same class of lie the histogram itself is guarded against.
     const root = await mountChecks();
-    await choose(root.querySelector('[data-checks-preview-actor]'), 'sera');
+    await choosePreviewActor(root, 'sera');
     assert.equal(
       root.querySelector('[data-checks-odds-state]').getAttribute('data-checks-odds-state'),
       'enumerated'
@@ -388,7 +480,7 @@ describe('the odds histogram', () => {
     const root = await mountChecks({
       craftingCheck: { ...ROUTED_CHECK, rollFormula: '2d20 + @prof' },
     });
-    await choose(root.querySelector('[data-checks-preview-actor]'), 'sera');
+    await choosePreviewActor(root, 'sera');
     assert.equal(
       root.querySelector('[data-checks-odds-state]').getAttribute('data-checks-odds-state'),
       'not-enumerable'
@@ -398,7 +490,7 @@ describe('the odds histogram', () => {
 
   it('renders every bar through the shipped FillBar rather than a sixth hand-rolled one', async () => {
     const root = await mountChecks();
-    await choose(root.querySelector('[data-checks-preview-actor]'), 'sera');
+    await choosePreviewActor(root, 'sera');
     const bars = [...root.querySelectorAll('[data-checks-odds-bar]')];
     assert.ok(bars.length > 0, 'there are bars');
     for (const bar of bars) {
@@ -416,7 +508,7 @@ describe('the odds histogram', () => {
     const root = await mountChecks({
       craftingCheck: { ...ROUTED_CHECK, rollFormula: '2d20 + @prof' },
     });
-    await choose(root.querySelector('[data-checks-preview-actor]'), 'sera');
+    await choosePreviewActor(root, 'sera');
     const note = root.querySelector('[data-checks-odds-state="not-enumerable"]');
     assert.ok(Boolean(note), 'the panel abstains');
     assert.equal(note.getAttribute('data-checks-odds-reason'), 'non-unit-count');
@@ -459,7 +551,7 @@ describe('the simple check’s two-band strip', () => {
       requestedSection: 'outcomes',
       requestedSectionNonce: 1,
     });
-    await choose(root.querySelector('[data-checks-preview-actor]'), 'sera');
+    await choosePreviewActor(root, 'sera');
     const handle = root.querySelector('[data-simple-band-strip] [data-band-strip-handle]');
     // The HANDLE's range is the track inset by one on each side — a boundary that sat on the
     // track's own floor would leave the failure band no width at all — so a track of `4..23`
@@ -497,7 +589,7 @@ describe('the modifier context reaches the derivations that DESCRIBE the roll', 
     // `1d20 + @prof + 2[Modifiers]`, on one screen, for one check.
     const percents = async (props) => {
       const root = await mountChecks(props);
-      await choose(root.querySelector('[data-checks-preview-actor]'), 'sera');
+      await choosePreviewActor(root, 'sera');
       return [...root.querySelectorAll('[data-checks-odds-percent]')].map(
         (cell) => `${cell.getAttribute('data-checks-odds-percent')}:${cell.textContent.trim()}`
       );
@@ -563,7 +655,7 @@ describe('the progressive PREVIEW SANDBOX', () => {
     // cumulative cost is 6/15/29/69: an award of NOTHING is reachable (totals 4-5), one and
     // two are, three and four are not.
     const root = await mountProgressive({ difficulties: [6, 9, 14, 40] });
-    await choose(root.querySelector('[data-checks-preview-actor]'), 'sera');
+    await choosePreviewActor(root, 'sera');
     const rows = [...root.querySelectorAll('[data-checks-odds-row]')].map((row) => [
       row.getAttribute('data-checks-odds-row'),
       row.querySelector('[data-checks-odds-percent]').textContent.trim(),
@@ -583,7 +675,7 @@ describe('the progressive PREVIEW SANDBOX', () => {
 
   it('states the ABSENCE and names the field rather than inventing a sample', async () => {
     const root = await mountProgressive(null);
-    await choose(root.querySelector('[data-checks-preview-actor]'), 'sera');
+    await choosePreviewActor(root, 'sera');
     const note = root.querySelector('[data-checks-odds-state="not-enumerable"]');
     assert.ok(Boolean(note), 'no chart without an order');
     assert.equal(

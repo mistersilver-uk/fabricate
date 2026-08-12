@@ -676,6 +676,12 @@ function compileManagerRoot() {
     // `ChecksRightMenu` — which is the point, since one derivation is what stops the draft
     // clone and the persistence normalizer from disagreeing about what an order is.
     'src/systems/progressiveCheckSandbox.js',
+    // The shared, GM-configurable player-character predicate (issue 1024). `checkPreview.js`
+    // imports it to filter the rail's "Preview as" list, so it entered this root's static
+    // graph with that filter — and this list has no dependency validator, so omitting it
+    // reports every mounted manager test as `# cancelled` behind one ERR_MODULE_NOT_FOUND
+    // rather than failing one. It imports nothing, so this entry closes the graph.
+    'src/config/playerCharacterTypes.js',
     'src/toolBreakageRuntime.js',
   ]) {
     const rawDestination = join(tempRoot, rawPath);
@@ -4054,6 +4060,64 @@ describe('CraftingSystemManager mounted behavior', () => {
       'editing relative tiers never touches the independent fixed tiers'
     );
   });
+
+  // ── The ZERO state must offer the way out of itself (issue 1097 follow-up) ─────────────
+  //
+  // Reported from a live build on alchemy at `checkMode: 'tiered'`, and NOT alchemy-specific:
+  // this is the routed editor for every routed check, and every one of them starts empty. The
+  // add control was the last child of `.manager-checks-tier-list`, which renders only in the
+  // `{:else}` branch — so a check with no tiers showed the sentence "No outcome tiers yet. Add
+  // the tiers this check routes results into." with nothing on screen to press.
+  //
+  // The case above cannot see this and never could: it mounts a check that ALREADY has a
+  // relative tier, which is the state that worked. Emptiness is the whole subject here.
+  for (const [type, key] of [
+    ['relative', 'relativeOutcomes'],
+    ['fixed', 'fixedOutcomes'],
+  ]) {
+    it(`crafting check editor (${type}): the add control is reachable with ZERO outcome tiers`, () => {
+      const emitted = [];
+      const value = {
+        type,
+        rollFormula: '1d20',
+        dc: 12,
+        thresholdMode: 'meet',
+        tiers: [],
+        checkBreakage: { triggers: [] },
+        relativeOutcomes: [],
+        fixedOutcomes: [],
+      };
+      target = document.createElement('div');
+      document.body.appendChild(target);
+      mounted = mount(CraftingCheckEditorComponent, {
+        target,
+        props: { value, onChange: (next) => emitted.push(next) },
+      });
+      flushSync();
+
+      assert.ok(
+        Boolean(target.querySelector('[data-outcomes-empty]')),
+        'the empty state states the absence'
+      );
+      assert.equal(
+        target.querySelector('.manager-checks-tier-list'),
+        null,
+        'and there is no list, which is exactly what used to take the add control with it'
+      );
+      const add = target.querySelector('[data-add-outcome-tier]');
+      assert.ok(
+        Boolean(add),
+        'an instruction to add tiers must come with the control that adds one'
+      );
+      add.click();
+      flushSync();
+      assert.equal(
+        emitted.at(-1)[key].length,
+        1,
+        `pressing it authors the first ${type} tier, so the dead end is genuinely open`
+      );
+    });
+  }
 
   it('crafting check editor (fixed): bounds the value range and flags overlapping tiers', () => {
     const value = {
@@ -17536,13 +17600,21 @@ describe('CraftingSystemManager mounted behavior', () => {
     // assertion inverts rather than relaxes: BOTH selectors are real, and the actor one
     // carries the explicit "No actor" option the readout's unresolved warning depends on.
     const previewAs = target.querySelector('[data-checks-preview-as]');
-    const actorSelect = previewAs.querySelector('[data-checks-preview-actor]');
+    const actorPicker = previewAs.querySelector('[data-checks-preview-actor]');
     const recordSelect = previewAs.querySelector('[data-checks-preview-record]');
-    assert.ok(actorSelect, 'the actor selector is a real control now that a simulator reads it');
+    assert.ok(actorPicker, 'the actor picker is a real control now that a simulator reads it');
     assert.ok(recordSelect, 'so is the record selector');
-    assert.ok(
-      [...actorSelect.options].some((option) => option.value === ''),
-      '"No actor" is an explicit option, not an absence'
+    // The actor control is a `SearchablePopover` rather than a `<select>` (the issue 1097
+    // follow-up): the list is filtered to player characters and searched, because a world's
+    // actor directory is mostly bestiary. Its options exist only while it is open, so what
+    // is pinned from here is that the hook lands on the TRIGGER — the View Lab's five checks
+    // simulator cases open it through exactly this selector, and a hook that moved to a
+    // wrapper would fail the capture job whole while every mounted query still resolved.
+    assert.equal(actorPicker.tagName, 'BUTTON', 'the hook is on the popover trigger itself');
+    assert.match(
+      actorPicker.textContent,
+      /No actor/,
+      '"No actor" is an explicit resting selection, not an absence'
     );
   });
 

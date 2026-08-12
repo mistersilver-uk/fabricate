@@ -813,13 +813,30 @@
   // shows the difference, and it is fed from the SAME `resolveEligibleModifierIds` pass the
   // section strip counts `Modifiers` from — a second derivation here would let one screen
   // say three modifiers apply while the other drew two chips.
+  //
+  // IT MAPS TO THE VIEW SHAPE, and that is the contract rather than a convenience.
+  // `CheckFormulaFields` documents its prop as `[{ id, name, icon }]` — a persistence entry
+  // is `{ id, label, expression, isRollExpression, icon?, min?, max? }` — and this
+  // derivation used to hand the raw entries straight through. `label` is not `name`, so
+  // every chip rendered `undefined` into an empty span and the inset read
+  // `1d20 + @prof + [icon] + [icon] + [icon]`: three modifiers whose whole contribution to
+  // the sentence was a glyph, and, since the glyph is `aria-hidden`, three chips with NO
+  // accessible name at all.
+  //
+  // Mapped HERE rather than by reading `label` in the component, because the component is
+  // presentational and its prop is the seam: `checkPreview.js` builds `{ id, name, … }`
+  // view models for the same screen, one editor already forwards this prop through three
+  // layers, and a component that reached into a persistence field would tie the rail's
+  // markup to the storage shape. The `|| entry.id` fallback is the catalogue card's own
+  // (`modifier.label || modifier.id`) — a label is optional in the persisted shape, so a
+  // chip must still name something.
   const appliedModifiers = $derived.by(() => {
     const context = activeActivity?.modifierContext;
     if (!context) return [];
     const eligible = new Set(resolveEligibleModifierIds(context));
-    return (Array.isArray(context.catalogue) ? context.catalogue : []).filter((entry) =>
-      eligible.has(entry?.id)
-    );
+    return (Array.isArray(context.catalogue) ? context.catalogue : [])
+      .filter((entry) => eligible.has(entry?.id))
+      .map((entry) => ({ id: entry.id, name: entry.label || entry.id, icon: entry.icon || '' }));
   });
   const appliedModifierPolicy = $derived(
     activeActivity ? resolveModifierPolicy(activeActivity.modifierContext) : 'addAll'
@@ -1468,7 +1485,7 @@
               <p class="manager-muted">
                 {text(
                   'FABRICATE.Admin.SystemSettings.Alchemy.BehaviourIntro',
-                  'How brewing rewards discovery, treats failed attempts, and remembers dead ends. These apply regardless of the check mode above.'
+                  'How brewing rewards discovery, treats failed attempts, and remembers dead ends. These apply whatever alchemy check mode is set on The roll section.'
                 )}
               </p>
               <div class="manager-checks-flag-list">

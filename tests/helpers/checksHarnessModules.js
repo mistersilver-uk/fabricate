@@ -96,6 +96,11 @@ export const CHECKS_TREE_RAW_MODULES = Object.freeze([
   'src/models/match/matchTypes.js',
   'src/systems/itemStackQuantity.js',
   'src/utils/objectPath.js',
+  // The shared, GM-configurable player-character predicate (issue 1024). The rail's
+  // "Preview as" list is filtered by it — a crafting check is previewed against a
+  // CHARACTER, and an unfiltered world roster is mostly bestiary — and `checkPreview.js`
+  // imports it directly. It is an import-free leaf, so this single entry closes the graph.
+  'src/config/playerCharacterTypes.js',
 ]);
 
 /**
@@ -130,6 +135,12 @@ export const CHECKS_TREE_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/apps/manager/ExplainerCard.svelte',
   'src/ui/svelte/apps/manager/RadioCardGroup.svelte',
   'src/ui/svelte/apps/manager/RollDataExpressionInput.svelte',
+  // The manager's ONE searchable picker. The rail's "Preview as" actor control renders
+  // through it rather than through a native `<select>`, so every checks suite that mounts
+  // the rail compiles it — omit it and those suites HANG (`# cancelled`), they do not fail.
+  // Its own closure (`Chip`, `EmptyState`, `iconPickerPopover.js`, `dismissOnOutsideClick.js`,
+  // `portal.js`) is already declared here for other reasons.
+  'src/ui/svelte/apps/manager/SearchablePopover.svelte',
   'src/ui/svelte/apps/manager/ToggleCard.svelte',
   'src/ui/svelte/apps/manager/checks/CheckOddsPanel.svelte',
   'src/ui/svelte/apps/manager/checks/CheckOutcomePreview.svelte',

@@ -625,7 +625,7 @@
         </p>
 
         {#if outcomes.length === 0}
-          <p class="manager-muted">
+          <p class="manager-muted" data-outcomes-empty>
             {text(
               'FABRICATE.Admin.Manager.Checks.Crafting.NoOutcomes',
               'No outcome tiers yet. Add the tiers this check routes results into.'
@@ -760,18 +760,38 @@
                 </ManagerButton>
               </div>
             {/each}
-
-            <ManagerButton role="dashed" data-add-outcome-tier onclick={addOutcome}>
-              <i class="fas fa-plus" aria-hidden="true"></i>
-              <span
-                >{text(
-                  'FABRICATE.Admin.Manager.Checks.Crafting.AddOutcomeTier',
-                  'Add outcome tier'
-                )}</span
-              >
-            </ManagerButton>
           </div>
         {/if}
+
+        <!-- OUTSIDE the `{#if}`, and that is the fix rather than the layout (issue 1097
+             follow-up, maintainer report). This control used to be the last child of
+             `.manager-checks-tier-list`, which only renders when there is at least one row —
+             so a check with ZERO outcome tiers displayed "No outcome tiers yet. Add the tiers
+             this check routes results into." and NOTHING to press. An instruction with no way
+             to follow it is a dead end, and it is the state every routed check starts in: a
+             fresh routed-by-check crafting check and an alchemy check switched to `tiered`
+             both land here with nothing authored.
+
+             Placed BENEATH the empty sentence, not beside it, because that is what the two
+             siblings in this same studio already do — `CheckRecipeTiers` and `CheckTriggers`
+             each close their `{#if}` and then render the dashed control as the next child, so
+             the action that grows the list sits where the list ends in both states. Its
+             `margin-top` is the list's own 6px gap, so the populated state is pixel-unchanged
+             by the move. -->
+        <ManagerButton
+          role="dashed"
+          class="manager-checks-outcome-add"
+          data-add-outcome-tier
+          onclick={addOutcome}
+        >
+          <i class="fas fa-plus" aria-hidden="true"></i>
+          <span
+            >{text(
+              'FABRICATE.Admin.Manager.Checks.Crafting.AddOutcomeTier',
+              'Add outcome tier'
+            )}</span
+          >
+        </ManagerButton>
       </div>
     </section>
   {/if}

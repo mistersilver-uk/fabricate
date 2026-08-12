@@ -268,6 +268,31 @@ function managerCase(entry) {
 }
 
 /**
+ * Choose an actor in the Checks rail's "Preview as" picker.
+ *
+ * TWO STEPS, because that control is a `SearchablePopover` rather than a native `<select>`
+ * (issue 1097 follow-up): a world's actor directory is mostly bestiary, so the list is
+ * filtered to player characters and made searchable. There is no `selectOption` to issue —
+ * open the trigger, then click the option by its own `data-popover-option` identity handle
+ * rather than by its localized label.
+ *
+ * Written once and spread into every case that needs it. Five cases select an actor before
+ * they can reach their state (every lab system's check formula carries
+ * `@abilities.int.mod`, so under the resting "No actor" selection nothing reduces to a
+ * number), and five hand-written pairs are five places for the control's hooks to drift out
+ * of step — a stale one fails the capture job WHOLE and publishes nothing.
+ *
+ * @param {string} actorId The lab actor id to preview as.
+ * @returns {object[]} The ordered steps.
+ */
+function previewAsActor(actorId) {
+  return [
+    { selector: '[data-checks-preview-actor]' },
+    { selector: `[data-popover-option="${actorId}"]` },
+  ];
+}
+
+/**
  * @param {object} entry Case fields.
  * @returns {object} A complete case.
  */
@@ -5097,7 +5122,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     steps: [
       'Checks',
       { selector: '#manager-checks-nav-crafting' },
-      { selector: '[data-checks-preview-actor]', select: 'lab-actor-idrin' },
+      ...previewAsActor('lab-actor-idrin'),
       // NO DISCLOSURE STEP. These two panels were collapsible when this case was written and
       // are not any more: issue 1096's rail is a flat `.manager-kicker` heading over a bare
       // card, on the Tool Studio's inspector convention, so the body is always in the
@@ -5125,7 +5150,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     steps: [
       'Checks',
       { selector: '#manager-checks-nav-crafting' },
-      { selector: '[data-checks-preview-actor]', select: 'lab-actor-idrin' },
+      ...previewAsActor('lab-actor-idrin'),
       { selector: '[data-checks-odds-state="enumerated"]', scroll: true },
     ],
     expectView: 'checks-crafting',
@@ -5151,7 +5176,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     steps: [
       'Checks',
       { selector: '#manager-checks-nav-crafting' },
-      { selector: '[data-checks-preview-actor]', select: 'lab-actor-idrin' },
+      ...previewAsActor('lab-actor-idrin'),
       { selector: '[data-check-roll-formula]', fill: '2d20 + @abilities.int.mod' },
       { selector: '[data-checks-odds-state="not-enumerable"]', scroll: true },
     ],
@@ -5178,7 +5203,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     steps: [
       'Checks',
       { selector: '#manager-checks-nav-crafting' },
-      { selector: '[data-checks-preview-actor]', select: 'lab-actor-idrin' },
+      ...previewAsActor('lab-actor-idrin'),
       { selector: '[data-checks-odds-state="enumerated"]', scroll: true },
     ],
     expectView: 'checks-crafting',
@@ -5209,7 +5234,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       'Checks',
       { selector: '#manager-checks-nav-crafting' },
       { selector: '#checks-section-outcomes' },
-      { selector: '[data-checks-preview-actor]', select: 'lab-actor-brenna' },
+      ...previewAsActor('lab-actor-brenna'),
       { selector: '[data-simple-band-strip]', scroll: true },
     ],
     expectView: 'checks-crafting',

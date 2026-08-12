@@ -28,6 +28,7 @@
 -->
 <script>
   import IconFactRow from '../IconFactRow.svelte';
+  import ManagerButton from '../../../components/ManagerButton.svelte';
   import Medallion from '../../../components/Medallion.svelte';
   import { localize } from '../../../util/foundryBridge.js';
 
@@ -75,9 +76,21 @@
       )}
     </p>
   {:else}
-    <button
-      type="button"
-      class="manager-button is-primary manager-checks-simulator-roll"
+    <!-- THE STUDIO'S BUTTON PRIMITIVE, not a hand-written class string (issue 1097
+         follow-up). The bare `manager-button is-primary` this shipped as matched no rule
+         that states a type size, so the label landed on Foundry's INHERITED 14px app base
+         while every other button in the Checks Studio read at the primitive's 11.52px —
+         which is exactly the drift `ManagerButton` exists to end, and exactly the drift a
+         remembered class string cannot be checked for.
+
+         It is a CONVERSION, not a wrapper: the element below is already the button, so
+         nothing here nests one inside another. Its Foundry `<button>` reset (full width,
+         released height) moved to the sheet's Checks Studio block with it — a scoped rule
+         naming a class this component no longer emits would match nothing and fail the
+         Svelte compiler-warning sweep. -->
+    <ManagerButton
+      role="primary"
+      class="manager-checks-simulator-roll"
       data-checks-simulator-roll
       disabled={preview.rolling === true}
       onclick={() => onRoll()}
@@ -88,7 +101,7 @@
           ? text('FABRICATE.Admin.Manager.Checks.Simulator.RollAgain', 'Roll again')
           : text('FABRICATE.Admin.Manager.Checks.Simulator.Roll', 'Roll a test check')}</span
       >
-    </button>
+    </ManagerButton>
 
     {#if preview.dynamicDc}
       <p class="manager-muted" data-checks-simulator-note="dynamic-dc">
@@ -180,15 +193,6 @@
     flex-direction: column;
     gap: var(--fab-space-2);
     min-width: 0;
-  }
-
-  /* The Foundry `<button>` reset this rail's other actions already carry: the host sheet
-     centres button content and pins a fixed height, which would crop the icon+label pair. */
-  .manager-checks-simulator-roll {
-    justify-content: center;
-    width: 100%;
-    height: auto;
-    min-height: 32px;
   }
 
   .manager-checks-simulator-readout {

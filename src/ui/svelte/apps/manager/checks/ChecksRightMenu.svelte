@@ -73,6 +73,7 @@
   import { localize } from '../../../util/foundryBridge.js';
   import CheckOddsPanel from './CheckOddsPanel.svelte';
   import CheckOutcomePreview from './CheckOutcomePreview.svelte';
+  import SearchablePopover from '../SearchablePopover.svelte';
   import { NO_ACTOR_ID } from './checkPreview.js';
   import {
     formatPreviewDifficulties,
@@ -169,6 +170,38 @@
             'The current resolution mode requires this check, so it cannot be turned off here.'
           )
   );
+
+  // ── The "Preview as" option list ────────────────────────────────────────────────────
+  //
+  // "No actor" leads, always, and it is a real option rather than the empty state of a
+  // search: it is the selection under which the readout renders its unresolved-roll-data
+  // warning, so it has to be reachable from any filter — which is why it is stamped with
+  // its own `data-popover-option` handle rather than found by its localized label.
+  const noActorLabel = text('FABRICATE.Admin.Manager.Checks.PreviewAs.NoActor', 'No actor');
+  const previewActorLabel = text(
+    'FABRICATE.Admin.Manager.Checks.PreviewAs.Actor',
+    'Preview as actor'
+  );
+  const selectedPreviewActor = $derived(
+    previewActorId === NO_ACTOR_ID
+      ? null
+      : (previewActors.find((actor) => actor.id === previewActorId) ?? null)
+  );
+  const previewActorOptions = $derived([
+    {
+      id: NO_ACTOR_ID,
+      label: noActorLabel,
+      icon: 'fas fa-user-slash',
+      dataId: 'no-actor',
+    },
+    ...previewActors.map((actor) => ({
+      id: actor.id,
+      label: actor.name,
+      icon: 'fas fa-user',
+      img: actor.img || '',
+      dataId: actor.id,
+    })),
+  ]);
 
   const DOCS_BASE = 'https://mistersilver-uk.github.io/fabricate';
 
@@ -512,12 +545,29 @@
            SLOT because an actor/record selector that changed nothing would be worse than a
            stated absence; the simulator below now consumes both, so the selectors are real.
 
-           The actor list is UNFILTERED `game.actors`. The Studio is GM-only and a GM's
-           `Document#isOwner` is true for every actor, so the player-side "assigned
-           character OR owner" union would hide actors a GM can legitimately preview
-           against. "No actor" is an explicit option rather than an absence: under it every
-           `@` key resolves to 0 and the readout renders its unresolved warning instead of a
-           total, which is a statement rather than a plausible wrong number. -->
+           ## The actor list is FILTERED to player characters, and it is SEARCHABLE
+
+           Both halves reverse what this rail shipped with, on the same reported ground
+           (maintainer ruling, issue 1097). The retired reasoning was that the Studio is
+           GM-only and a GM's `Document#isOwner` is true for every actor, so no filter is
+           NEEDED — which is a statement about authority, and authority is not the question
+           a preview picker answers. The question is who a check is previewed AGAINST, and a
+           crafting check is rolled by a character. A real world's actor directory is mostly
+           bestiary, so the unfiltered list rendered as a flat native `<select>` of every
+           Balehound, Jadmór and swarm in the world with the three pickable actors somewhere
+           inside it. Membership is `listPreviewActors`'s shared, GM-configurable
+           player-character predicate — this screen does not get its own narrower answer.
+
+           The control is the shipped `SearchablePopover`, not a native `<select>` and not a
+           hand-rolled combobox: it is what every other long picker in the manager uses, it
+           searches, and it renders each actor's own portrait, so a GM picks a face rather
+           than reading a list. `data-checks-preview-actor` stays ON THE TRIGGER (via
+           `triggerData`) rather than moving to a wrapper, because a mounted suite and six
+           View Lab cases address the control through it.
+
+           "No actor" is an explicit option rather than an absence: under it every `@` key
+           resolves to 0 and the readout renders its unresolved warning instead of a total,
+           which is a statement rather than a plausible wrong number. -->
       <div class="manager-checks-rail-head">
         {@render railHead(
           'fas fa-user',
@@ -525,23 +575,31 @@
         )}
       </div>
       <section class="manager-inspector-card" data-checks-preview-as>
-        <label class="manager-field">
-          <span class="sr-only"
-            >{text('FABRICATE.Admin.Manager.Checks.PreviewAs.Actor', 'Preview as actor')}</span
-          >
-          <select
-            data-checks-preview-actor
-            value={previewActorId}
-            onchange={(event) => onSelectPreviewActor(event.currentTarget.value)}
-          >
-            <option value={NO_ACTOR_ID}
-              >{text('FABRICATE.Admin.Manager.Checks.PreviewAs.NoActor', 'No actor')}</option
-            >
-            {#each previewActors as actor (actor.id)}
-              <option value={actor.id}>{actor.name}</option>
-            {/each}
-          </select>
-        </label>
+        <SearchablePopover
+          value={previewActorId}
+          options={previewActorOptions}
+          pickerClass="manager-checks-preview-actor"
+          triggerClass="manager-button manager-travel-picker-trigger manager-checks-preview-actor-trigger"
+          triggerData={{ 'data-checks-preview-actor': '' }}
+          triggerIcon={selectedPreviewActor ? '' : 'fas fa-user-slash'}
+          triggerImg={selectedPreviewActor?.img || ''}
+          triggerLabel={selectedPreviewActor?.name || noActorLabel}
+          triggerAriaLabel={previewActorLabel}
+          dialogAriaLabel={previewActorLabel}
+          searchPlaceholder={text(
+            'FABRICATE.Admin.Manager.Checks.PreviewAs.ActorSearchPlaceholder',
+            'Search characters...'
+          )}
+          searchAriaLabel={text(
+            'FABRICATE.Admin.Manager.Checks.PreviewAs.ActorSearchLabel',
+            'Search characters'
+          )}
+          emptyHint={text(
+            'FABRICATE.Admin.Manager.Checks.PreviewAs.NoActorMatches',
+            'No characters match your search.'
+          )}
+          onChoose={(id) => onSelectPreviewActor(id)}
+        />
         {#if previewActorSummary}
           <p class="manager-muted" data-checks-preview-actor-summary>{previewActorSummary}</p>
         {/if}

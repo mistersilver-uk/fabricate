@@ -7529,6 +7529,173 @@ test('a Modifiers card button renders exactly like the tool studio button of the
   }
 });
 
+// ── The Checks rail's CONTROL TYPE SCALE (issue 1097 follow-up) ────────────────────────────
+//
+// Three reported defects, one measurement, because all three are the same failure: a control
+// that matched no rule stating its type and silently took whatever it inherited.
+//
+//  - The two "Preview as" controls sat in a `.manager-field`, so they took that wrapper's
+//    0.82rem/700 BY INHERITANCE. Inheritance is invisible to every gate this repo has: no
+//    rule declares it, so a source-text pin cannot see it and a per-region parity comparison
+//    has no region to compare. They rendered at 13.12px/700 against the prototype's 11.5/500.
+//  - The simulator's roll action was a hand-written `manager-button is-primary`, and the base
+//    `.manager-button` rule states no `font-size` at all — so it landed on Foundry's own 14px
+//    app base, larger still, next to a studio whose every other button reads at 11.52px.
+//
+// MEASURED, in Chromium, under the real Foundry core sheet, because that last one only
+// happens when Foundry's stylesheet is present. The two NEGATIVE CONTROLS below are what
+// stop this passing vacuously: they are the exact class strings the defect shipped with, and
+// each must still measure WRONG, or the rules being asserted are doing nothing.
+const CHECKS_RAIL_FOUNDRY_CSS = readFileSync(
+  resolve(__dirname, '../fixtures/foundry-core-min.css'),
+  'utf8'
+);
+
+test('the Checks rail states its own control type scale instead of inheriting one', async () => {
+  const context = await sharedBrowser.newContext({
+    viewport: { width: 1280, height: 900 },
+    deviceScaleFactor: 1,
+  });
+  const page = await context.newPage();
+
+  try {
+    // The rail is the workspace grid's 300px column, so the panel sibling is load-bearing:
+    // without it the rail lands in the `minmax(0, 1fr)` track and every control measures a
+    // width no product surface has.
+    await page.setContent(`
+      <!doctype html>
+      <html lang="en">
+        <head>
+          <meta charset="utf-8">
+          <style>${CHECKS_RAIL_FOUNDRY_CSS}</style>
+          <style>${css}</style>
+          <style>:root { --font-primary: Arial, sans-serif; }</style>
+        </head>
+        <body class="game">
+          <div class="application theme-dark">
+            <section class="window-content">
+              <div class="fabricate fabricate-manager" data-fabricate-theme="dark" data-manager-view="checks">
+                <div class="manager-body">
+                  <div class="manager-environment-workspace">
+                    <div class="manager-environment-tab-panel"></div>
+                    <aside class="manager-inspector manager-environment-inspector manager-checks-rail" data-checks-rail="crafting">
+                      <section class="manager-inspector-card" data-checks-preview-as>
+                        <div class="manager-travel-picker manager-checks-preview-actor">
+                          <button type="button" data-probe="preview-actor" data-checks-preview-actor
+                            class="manager-button manager-travel-picker-trigger manager-checks-preview-actor-trigger">
+                            <i class="fas fa-user-slash"></i><span class="manager-travel-picker-value">No actor</span>
+                          </button>
+                        </div>
+                        <label class="manager-field">
+                          <span class="sr-only">Preview against record</span>
+                          <select data-probe="preview-record" data-checks-preview-record><option>Uncommon Craft</option></select>
+                        </label>
+                        <label class="manager-field">
+                          <span>Result difficulties</span>
+                          <input type="text" data-probe="preview-difficulties" value="6, 9, 14">
+                        </label>
+                      </section>
+                      <section class="manager-inspector-card" data-checks-simulator>
+                        <div class="manager-checks-simulator">
+                          <button type="button" data-probe="roll" data-checks-simulator-roll
+                            class="manager-button fab-manager-button is-primary manager-checks-simulator-roll">
+                            <i class="fas fa-dice-d20"></i><span>Roll a test check</span>
+                          </button>
+                          <button type="button" data-probe="roll-unconverted"
+                            class="manager-button is-primary">
+                            <i class="fas fa-dice-d20"></i><span>Roll a test check</span>
+                          </button>
+                        </div>
+                      </section>
+                    </aside>
+                  </div>
+                </div>
+              </div>
+              <!-- OUTSIDE the rail, on purpose: the same field markup, unreached by the rail
+                   rule, is what the two pickers measured before it existed. -->
+              <div class="fabricate fabricate-manager" data-fabricate-theme="dark">
+                <label class="manager-field">
+                  <select data-probe="field-select-elsewhere"><option>Uncommon Craft</option></select>
+                </label>
+              </div>
+            </section>
+          </div>
+        </body>
+      </html>
+    `);
+
+    const measured = await page.evaluate(() =>
+      Object.fromEntries(
+        [...document.querySelectorAll('[data-probe]')].map((element) => {
+          const style = getComputedStyle(element);
+          return [
+            element.dataset.probe,
+            {
+              fontSize: style.fontSize,
+              fontWeight: style.fontWeight,
+              width: Math.round(element.getBoundingClientRect().width),
+              height: Math.round(element.getBoundingClientRect().height),
+            },
+          ];
+        })
+      )
+    );
+
+    // 11.5px/500 is the prototype's own declaration on both of its rail pickers
+    // (`font: 500 11.5px var(--sans)`), read off the artefact rather than chosen. The
+    // sandbox input is joined to them because it stands in the same card, in the same slot.
+    for (const probe of ['preview-actor', 'preview-record', 'preview-difficulties']) {
+      assert.equal(measured[probe].fontSize, '11.5px', `${probe} reads at the prototype's size`);
+      assert.equal(measured[probe].fontWeight, '500', `${probe} reads at the prototype's weight`);
+    }
+
+    // The NEGATIVE CONTROL for the pickers: the identical `.manager-field` control one card
+    // away still inherits 0.82rem/700, which is what the rail's two controls rendered as.
+    assert.equal(
+      measured['field-select-elsewhere'].fontSize,
+      '13.12px',
+      'a field control outside the rail is unchanged — this gate must not be measuring a ' +
+        'global re-type of every select in the manager'
+    );
+    assert.notEqual(
+      measured['preview-record'].fontSize,
+      measured['field-select-elsewhere'].fontSize,
+      'and the rail rule is therefore doing work'
+    );
+
+    // The roll action takes the PRIMITIVE's scale, not a value chosen here: 11.52px is
+    // `.manager-button.fab-manager-button`'s 0.72rem, the Tool Studio's authority, and it is
+    // within half a pixel of the prototype's own 11.5px/700 roll button.
+    assert.equal(measured.roll.fontSize, '11.52px', 'the roll button reads at the primitive');
+    assert.equal(measured.roll.fontWeight, '700');
+    // The Foundry reset. Core's `button` rule pins a height and centres content; the button
+    // is a full-width icon+label pair inside a card, so the rail block releases the height
+    // and the width. `height: auto` is the load-bearing half — `min-height` does not cancel
+    // a fixed `height`.
+    assert.equal(measured.roll.height, 34, 'released from Foundry’s fixed button height');
+    assert.equal(
+      measured.roll.width,
+      measured['preview-record'].width,
+      'and spans the card exactly as the controls above it do'
+    );
+
+    // The NEGATIVE CONTROL for the button: the bare class string it shipped with lands on
+    // Foundry's app base, which is the reported "font is too large".
+    assert.equal(
+      measured['roll-unconverted'].fontSize,
+      '14px',
+      'the unconverted class string still bleeds Foundry’s 14px app base'
+    );
+    assert.notEqual(
+      measured.roll.fontSize,
+      measured['roll-unconverted'].fontSize,
+      'so converting to the primitive is what changes the reading'
+    );
+  } finally {
+    await context.close();
+  }
+});
+
 // ── The bounds steppers must render "Unbounded" in full (issue 1096) ───────────────────────
 //
 // Reported from a live build: with icon and label taking the row's growth, the two bound

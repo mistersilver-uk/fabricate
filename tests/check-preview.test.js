@@ -353,19 +353,39 @@ describe('checkPreview: unresolved roll data is surfaced, never silently zeroed'
 });
 
 describe('checkPreview: the actor and record selection', () => {
-  it('lists game.actors UNFILTERED, because the Studio is GM-only', () => {
+  // The list used to be UNFILTERED, on the ground that the Studio is GM-only and a GM owns
+  // every actor. That is a statement about AUTHORITY, and authority was never the question:
+  // a crafting check is previewed against a CHARACTER, and a real world's actor directory is
+  // mostly bestiary. The maintainer overruled it; these two cases are the reversal.
+  it('offers only PLAYER-CHARACTER actors, whatever the GM may own', () => {
     const actors = listPreviewActors({
       getActors: () => [
-        { id: 'a', name: 'Owned' },
-        { id: 'b', name: 'Unowned', isOwner: false },
-        { id: 'c', name: 'Someone else’s', ownership: { default: 0 } },
+        { id: 'a', name: 'Sera Vane', type: 'character' },
+        { id: 'b', name: 'Balehound', type: 'npc' },
+        { id: 'c', name: 'Bat Swarm', type: 'npc', isOwner: true },
+        { id: 'd', name: 'Jadmór', type: 'vehicle', ownership: { default: 3 } },
       ],
+      isPlayerCharacter: (actor) => actor.type === 'character',
     });
     assert.deepEqual(
       actors.map((actor) => actor.id),
-      ['a', 'b', 'c'],
-      'a player-side "assigned character OR owner" union would be the wrong shape here'
+      ['a'],
+      'ownership does not make a bestiary entry something a check is previewed against'
     );
+  });
+
+  it('takes its membership from the SHARED player-character predicate by default', () => {
+    // No `isPlayerCharacter` seam and no `game.settings`, so the shipped predicate runs with
+    // its own degraded-to-`[]` additional-types read: the literal `character` still matches,
+    // which is the additivity guarantee `playerCharacterTypes.js` makes structurally. A
+    // default that filtered nothing would make the case above prove only the seam.
+    const actors = listPreviewActors({
+      getActors: () => [
+        { id: 'a', name: 'Sera Vane', type: 'character', img: 'icons/sera.webp' },
+        { id: 'b', name: 'Balehound', type: 'npc' },
+      ],
+    });
+    assert.deepEqual(actors, [{ id: 'a', name: 'Sera Vane', img: 'icons/sera.webp' }]);
   });
 
   it('resolves "No actor" to null rather than to a lookup', () => {

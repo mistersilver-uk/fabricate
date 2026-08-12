@@ -45,6 +45,7 @@
  * writes to it; {@link cloneRollData} exists for any caller that needs to augment it.
  */
 
+import { isPlayerCharacterActor } from '../../../../../config/playerCharacterTypes.js';
 import { buildCheckModifierContext } from '../../../../../systems/checkModifierResolver.js';
 import {
   runFormulaPassFail,
@@ -67,24 +68,42 @@ const RUNNER_KINDS = new Map([
 ]);
 
 /**
- * Every actor in the world, unfiltered.
+ * The world's PLAYER-CHARACTER actors.
  *
- * The Studio is GM-only and a GM's `Document#isOwner` is true for every actor, so the
- * player-side "assigned character OR owner" union would be the wrong shape here: it
- * would hide actors the GM can legitimately preview against. The seam is injected so the
- * list is testable without a `game`.
+ * THIS LIST IS FILTERED, and the earlier reasoning for leaving it unfiltered is retired
+ * (issue 1097, maintainer ruling). That reasoning was about AUTHORITY — the Studio is
+ * GM-only and a GM's `Document#isOwner` is true for every actor, so nothing here is
+ * forbidden to them — and authority was never the question a preview picker answers. The
+ * question is WHO A CHECK IS PREVIEWED AGAINST, and a crafting check is rolled by a
+ * character: a real world's actor directory is mostly bestiary (28 entries of Balehound,
+ * Jadmór and swarms in the reported case), so an unfiltered list buried the three actors a
+ * GM would ever pick behind twenty-five that resolve no crafting roll data at all.
+ *
+ * Membership is the shared, GM-CONFIGURABLE player-character predicate, so a system whose
+ * player actors are not typed `character` is served by the same setting that already serves
+ * the actor-selection bar, the stamina roster and the Access and Knowledge rosters — this
+ * screen does not get a second, narrower answer to "what is a player character".
+ *
+ * Both seams are injected so the list is testable without a `game`.
  *
  * @param {object} [options] Options.
  * @param {() => Iterable<object>} [options.getActors] The actor source.
- * @returns {Array<{id: string, name: string}>} Actors, in world order.
+ * @param {(actor: object) => boolean} [options.isPlayerCharacter] The membership predicate.
+ * @returns {Array<{id: string, name: string, img: string}>} Actors, in world order.
  */
 export function listPreviewActors({
   getActors = () => globalThis.game?.actors?.contents ?? globalThis.game?.actors ?? [],
+  isPlayerCharacter = isPlayerCharacterActor,
 } = {}) {
   const actors = [];
   for (const actor of getActors() ?? []) {
     if (!actor?.id) continue;
-    actors.push({ id: String(actor.id), name: String(actor.name ?? actor.id) });
+    if (!isPlayerCharacter(actor)) continue;
+    actors.push({
+      id: String(actor.id),
+      name: String(actor.name ?? actor.id),
+      img: typeof actor.img === 'string' ? actor.img : '',
+    });
   }
   return actors;
 }
