@@ -999,6 +999,13 @@ Represent one curated item entry available to recipes and salvage operations.
 10. When importing or replacing a component source from a Foundry Item, Fabricate must verify a recorded canonical source UUID from `_stats.compendiumSource` or `flags.core.sourceId` before storing it as the component's primary source reference.
 11. If the recorded canonical source UUID no longer resolves but the live dropped Item UUID does resolve, Fabricate must store the live dropped Item UUID as the component's primary `registeredItemUuid` and `originItemUuid`, and preserve the broken canonical source UUID in `aliasItemUuids`.
 12. The broken-source fallback applies to single item import, folder import, compendium pack import, and replace-source.
+    12a.
+    A bulk component import — a compendium pack import — must persist the whole batch with a SINGLE `craftingSystems` world-setting write, not one write per item, and the number of writes must not grow with the number of imported items.
+    Each write replaces the entire setting and is replicated to every connected client, so a per-item write makes a bulk import quadratic in corpus size.
+    Batching must not change any per-item outcome: the same added / updated / skipped classification, the same counts, the same aggregated broken-source fallbacks, and the same durable role-flag stamp on each source document.
+    A batch whose every item is skipped changes nothing in the corpus and must write nothing at all.
+    An item that fails part-way through a batch must still surface its error to the caller, and the items imported before it must be carried by the batch's single write rather than lost.
+    A single-item import is its own batch of one and must persist immediately.
 13. `Component.category` defaults to `general`.
     Every component normalizes to at least the reserved `general` bucket; there is no "uncategorized" state.
     A custom token is free text surfaced verbatim; only `general` is localized.

@@ -4530,7 +4530,22 @@ export class CraftingSystemManager {
     return summary;
   }
 
-  async addItemFromUuid(systemId, itemUuid) {
+  /**
+   * Import (or refresh) a single component from a source Item UUID.
+   *
+   * @param {string} systemId
+   * @param {string} itemUuid
+   * @param {{persist?: boolean}} [options] - Set `persist=false` for batch callers (e.g.
+   *   {@link addItemsFromPack}) that mutate the in-memory system per item and then issue a
+   *   SINGLE `save()` after the whole batch, collapsing N growing whole-corpus
+   *   `craftingSystems` world writes into one. Nothing else is gated by it: the source
+   *   resolution, the type guard, the match/overwrite classification, the durable
+   *   role-flag stamp on the source document, and the returned `{item, action,
+   *   sourceFallbacks}` are identical either way. Default `true` keeps every single-item
+   *   caller issuing its one write.
+   * @returns {Promise<{item: object, action: 'added'|'updated'|'skipped', sourceFallbacks: Array}>}
+   */
+  async addItemFromUuid(systemId, itemUuid, options = {}) {
     this._assertGM('add component from uuid');
     const system = this.getSystem(systemId);
     if (!system) throw new Error(`Crafting system not found: ${systemId}`);
@@ -4591,7 +4606,7 @@ export class CraftingSystemManager {
       existing.originItemUuid = nextSnapshot.originItemUuid;
       existing.aliasItemUuids = nextFallbacks;
 
-      await this.save();
+      if (options.persist !== false) await this.save();
       return { item: existing, action: 'updated', sourceFallbacks: nextSnapshot.sourceFallbacks };
     }
 
@@ -4608,7 +4623,7 @@ export class CraftingSystemManager {
     system.components.push(item);
     const addedRoleKey = this._componentRoleFlagKey(system.id);
     if (addedRoleKey) await this._stampSourceIdentity(source, addedRoleKey, item.id);
-    await this.save();
+    if (options.persist !== false) await this.save();
     return { item, action: 'added', sourceFallbacks: nextSnapshot.sourceFallbacks };
   }
 
@@ -4721,13 +4736,38 @@ export class CraftingSystemManager {
     let updated = 0;
     let skipped = 0;
     const sourceFallbacks = [];
-    for (const item of items) {
-      const uuid = `Compendium.${packId}.${item.id}`;
-      const result = await this.addItemFromUuid(systemId, uuid);
-      if (result.action === 'added') added++;
-      else if (result.action === 'updated') updated++;
-      else skipped++;
-      if (Array.isArray(result.sourceFallbacks)) sourceFallbacks.push(...result.sourceFallbacks);
+    // Each item mutates the in-memory system only (persist:false); the whole batch is
+    // flushed with ONE `save()` below, collapsing N growing whole-corpus `craftingSystems`
+    // world writes — each of which is also replicated to every connected client and
+    // re-normalized there — into a single write (issue 1086). This is the
+    // `CompendiumImporter` recipe-batching pattern (issue 776) applied to component import.
+    //
+    // `dirty` tracks whether anything actually changed the corpus. A `skipped` item mutates
+    // nothing (it only re-stamps the SOURCE document's role flag, which is a per-document
+    // write this batching never touched), so an all-skipped re-drop writes nothing at all —
+    // exactly as before, when the skipped branch returned ahead of its own `save()`.
+    let dirty = false;
+    try {
+      for (const item of items) {
+        const uuid = `Compendium.${packId}.${item.id}`;
+        const result = await this.addItemFromUuid(systemId, uuid, { persist: false });
+        if (result.action === 'added') {
+          added++;
+          dirty = true;
+        } else if (result.action === 'updated') {
+          updated++;
+          dirty = true;
+        } else skipped++;
+        if (Array.isArray(result.sourceFallbacks)) sourceFallbacks.push(...result.sourceFallbacks);
+      }
+    } finally {
+      // `finally`, not a trailing statement: an item that throws mid-batch (a source that
+      // resolves to a non-Item, a duplicate-source collision) must still persist the items
+      // already imported. Per-item saves gave that for free; the batched write has to ask
+      // for it. The error still propagates — this flushes the partial batch, it does not
+      // swallow the failure — which matches `CompendiumImporter`, where a failed record
+      // likewise leaves its predecessors in the single post-loop save.
+      if (dirty) await this.save();
     }
 
     return { added, updated, skipped, total: items.length, sourceFallbacks };
