@@ -2497,8 +2497,8 @@ function _descriptionTextCandidate(value, seen = new Set()) {
 }
 
 /**
- * Which of the TWO reasons a check-modifier catalogue is INERT applies, or `null` when it
- * is live. Discriminated rather than collapsed to one boolean because each cause needs
+ * Which of the two FORMULA-DERIVED reasons a check-modifier catalogue is INERT applies, or
+ * `null` when it is live. Discriminated rather than collapsed to one boolean because each cause needs
  * different GM-facing copy — "this mode rolls no check" is a different fix from "this
  * check has no formula yet". The order matters: a mode with no check slot has no formula
  * to inspect.
@@ -2513,6 +2513,15 @@ function _descriptionTextCandidate(value, seen = new Set()) {
  * catalogue, so they need the same answer and it must come from ONE derivation. The
  * argument is whichever of the three `resolveActive*CheckFormula` siblings owns the
  * activity — all three return the same shape for exactly this reason.
+ *
+ * A THIRD cause exists that this function cannot return, and the boundary is deliberate:
+ * gathering `d100` is `noModifierSupport`, not `noCheck`. The d100 rolled against each
+ * drop's chance IS that mode's check, so the mode does roll and only the seam to add a
+ * modifier to that roll is missing. Deciding that needs the gathering resolution mode,
+ * which is not derivable from this argument, so `ChecksView.svelte` applies the override
+ * where the mode is in scope. This function answers the two questions a `{slot,
+ * checkUsable}` pair can answer, and nothing here may be read as a claim that d100 rolls
+ * no check.
  * @param {{ slot: string|null, checkUsable: boolean }} formula
  * @returns {'noCheck'|'noFormula'|null}
  */
@@ -2547,12 +2556,21 @@ function _checkModifierInertCause(formula) {
  * roll. The activity picks which `resolveActive*CheckFormula` sibling answers and which
  * check block the cap is read from.
  *
- * GATHERING IS ANSWERED AGAINST `d100` (issue 1095, decision 8), and that is a fact
- * rather than a shortcut: the gathering resolution mode lives on the gathering ECONOMY
- * config, which this projection cannot see, and both formula-rolled modes are rendered
- * `disabled` pending issue 683 — so `d100` is the only mode a GM can select, and
- * `noCheck` is the true answer for every system today. When 683 ships, the real mode is
- * threaded in here and this stops being a constant.
+ * GATHERING IS ANSWERED AGAINST `d100` (issue 1095, decision 8), because the gathering
+ * resolution mode lives on the gathering ECONOMY config, which this projection cannot
+ * see, and both formula-rolled modes are rendered `disabled` pending issue 683 — so
+ * `d100` is the only mode a GM can select today.
+ *
+ * ITS `modifierFormulaInertCause` IS THEREFORE `noCheck`, AND THAT IS NOT THE GM-FACING
+ * ANSWER. Gathering `d100` is `noModifierSupport`: the d100 rolled against each drop's
+ * chance IS that mode's check, and only the seam to add a modifier to it is missing.
+ * `ChecksView.svelte` overrides the cause where the mode is in scope, and no surface reads
+ * this projection's gathering cause today — the one consumer
+ * (`CraftingSystemManagerRoot.svelte`, for the recipe Overview banner) reads the CRAFTING
+ * projection only. Any future consumer must apply the same override rather than render
+ * `noCheck`'s copy, which tells a GM the mode rolls nothing and to switch to one that
+ * rolls. When 683 ships, the real mode is threaded in here and this stops being a
+ * constant.
  *
  * @param {object} system The selected crafting system.
  * @param {'crafting'|'salvage'|'gathering'} activity
