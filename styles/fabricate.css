@@ -2801,8 +2801,16 @@
    rhythm entirely. 20px reproduces BOTH rhythms the prototype actually uses — the 14px block
    separation and the list's 6px row cadence — without the 10px the header's own text
    occupied. */
+/* Colour and size come from the same measurement, and both were drifting while only the
+   margin was being argued about. `.manager-muted` renders `--fab-text-muted` (74% alpha) at
+   the manager's own 12.48px; the prototype draws this sentence at `--fab-text-subtle`
+   (56% — the SAME hue, so this is an alpha swap between two shipped tokens, not a new
+   colour) and 10.5px. It is a hint about a control, not body copy, and the prototype sizes
+   it accordingly. Measured values, from the `band-strip-hint` parity region. */
 .fabricate-manager [data-outcome-bands] [data-outcome-band-strip-hint] {
   margin-bottom: 20px;
+  color: var(--fab-text-subtle);
+  font-size: 10.5px;
 }
 
 .fabricate-manager [data-outcome-band-strip-hint] > i {
