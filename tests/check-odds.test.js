@@ -27,7 +27,6 @@ import {
   enumeratePassFailOdds,
   enumerateProgressiveOdds,
   enumerateRoutedOdds,
-  expectedFormulaValue,
 } from '../src/ui/svelte/apps/manager/checks/checkOdds.js';
 import { buildPreviewCheckArgs } from '../src/ui/svelte/apps/manager/checks/checkPreview.js';
 import { resolveForcedOutcome } from '../src/systems/checkRoll.js';
@@ -463,41 +462,3 @@ describe('checkOdds: pass/fail and progressive bucketing', () => {
   });
 });
 
-describe('checkOdds: the avg annotation', () => {
-  const avg = (formula, actor = ACTOR) => expectedFormulaValue(formula, actor, { Roll: REAL });
-
-  it('is the expected value of the RESOLVED formula for the previewed actor', () => {
-    assert.equal(avg('1d20 + @prof'), 13, '10.5 + 3, floored');
-    assert.equal(avg('1d20 + 3[Tools] + 2[Modifiers]'), 15);
-  });
-
-  it('is LOOSER than the histogram: it answers for a formula the histogram abstains from', () => {
-    assert.equal(avg('2d6'), 7);
-    assert.equal(describe14365('2d6').enumerable, false);
-  });
-
-  it('is OMITTED when the formula does not reduce to a number for this actor', () => {
-    assert.equal(avg('1d20 + @nope'), null);
-    assert.equal(avg('1d20 + @prof', null), null, 'and with no actor at all');
-  });
-
-  it('is OMITTED on `resolved === false` even where the ARITHMETIC would still reduce', () => {
-    // The `missing: 'NaN'` path poisons the arithmetic on its own, so an unresolved `@` key
-    // would be omitted whether or not the `resolved` flag were consulted. `Roll.validate`
-    // is the OTHER half of that flag, and it is the half that makes reading the flag
-    // load-bearing: the display reduces to a perfectly good number and the formula is still
-    // one Foundry refuses to roll, so an annotation on it would be a number for a check
-    // that cannot happen.
-    const refusing = recordedRollDouble({ validate: () => false });
-    assert.equal(
-      expectedFormulaValue('1d20 + 5', ACTOR, { Roll: refusing }),
-      null,
-      'a formula Foundry will not accept gets no expected value'
-    );
-    assert.equal(
-      expectedFormulaValue('1d20 + 5', ACTOR, { Roll: REAL }),
-      15,
-      'and the same formula DOES get one once Foundry accepts it'
-    );
-  });
-});

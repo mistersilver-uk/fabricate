@@ -436,42 +436,36 @@ describe('the simple check’s two-band strip', () => {
   });
 });
 
-describe('the `avg` annotation on the formula field', () => {
-  it('renders the expected value of the previewed formula', async () => {
-    const root = await mountChecks();
-    await choose(root.querySelector('[data-checks-preview-actor]'), 'sera');
-    assert.equal(
-      root.querySelector('[data-check-formula-average]').textContent.trim(),
-      'avg 13',
-      '10.5 + 3, floored'
-    );
-  });
-
-  it('is OMITTED when the formula does not reduce to a number for this actor', async () => {
-    const root = await mountChecks();
-    await choose(root.querySelector('[data-checks-preview-actor]'), 'bare');
-    assert.ok(
-      !root.querySelector('[data-check-formula-average]'),
-      'an average is a claim about a number, and there is no number to make it about'
-    );
-  });
-
-  it('COUNTS the check-modifier catalogue, because the runner appends it (issue 1097)', async () => {
-    // The ROUTE-level half of the "one formula" fix. `buildPreviewCheckArgs` hands the
-    // runner an authored formula plus a modifier context and `evaluateCheckRoll` appends
-    // the resolved scalar itself, so every derivation that DESCRIBES the roll has to be
-    // handed that context too. This is the cheapest observable of the threading: an `avg`
-    // blind to the catalogue reads 13 where the check will actually roll an average of 15.
-    const root = await mountChecks({
+describe('the modifier context reaches the derivations that DESCRIBE the roll', () => {
+  it('shifts the histogram, because the runner appends a scalar the arg bag does not carry', async () => {
+    // The ROUTE-level half of the "one formula" fix. `buildPreviewCheckArgs` hands the runner
+    // an authored formula plus a modifier context and `evaluateCheckRoll` appends the resolved
+    // scalar itself, so every derivation that DESCRIBES the roll has to be handed that context
+    // too. A histogram blind to it charts `1d20 + @prof` beside a readout rolling
+    // `1d20 + @prof + 2[Modifiers]`, on one screen, for one check.
+    //
+    // This USED to be asserted on the `avg N` annotation, which was the cheapest observable
+    // while this change owned one. It does not own one any more, and the histogram is the
+    // better subject in any case: `avg` is one number and the histogram is every bucket.
+    const percents = async (props) => {
+      const root = await mountChecks(props);
+      await choose(root.querySelector('[data-checks-preview-actor]'), 'sera');
+      return [...root.querySelectorAll('[data-checks-odds-percent]')].map(
+        (cell) => `${cell.getAttribute('data-checks-odds-percent')}:${cell.textContent.trim()}`
+      );
+    };
+    const without = await percents();
+    harness.remount();
+    const withCatalogue = await percents({
       modifiers: [{ id: 'mod-kit', label: 'Kit', expression: '2' }],
       craftingDefaultModifierPolicy: 'addAll',
       craftingDefaultModifierIds: ['mod-kit'],
     });
-    await choose(root.querySelector('[data-checks-preview-actor]'), 'sera');
-    assert.equal(
-      root.querySelector('[data-check-formula-average]').textContent.trim(),
-      'avg 15',
-      '10.5 + 3 from @prof + 2 from the catalogue, floored'
+    assert.ok(without.length > 0, 'the histogram draws in both arms');
+    assert.notDeepEqual(
+      withCatalogue,
+      without,
+      'a +2 the runner appends must move the chance of every tier'
     );
   });
 });

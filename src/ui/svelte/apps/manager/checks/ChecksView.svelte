@@ -82,7 +82,6 @@
     enumeratePassFailOdds,
     enumerateProgressiveOdds,
     enumerateRoutedOdds,
-    expectedFormulaValue,
     SANDBOX_ABSENT,
   } from './checkOdds.js';
   import {
@@ -968,11 +967,6 @@
   // check reads that signal first, so the two can never disagree about whether this
   // formula reduces to a number for this actor.
   const previewResolved = $derived(enumeration.reason !== 'unresolved-roll-data');
-  const formulaAverage = $derived(
-    previewFormula === ''
-      ? null
-      : expectedFormulaValue(previewFormula, previewActor, { craftingModifier: previewModifier })
-  );
 
   // The reachable total range, which is what the simple check's two-band strip is drawn
   // across. Null when the formula is not enumerable; the editor then falls back to a
@@ -1259,7 +1253,6 @@
     previewRecordId: previewRecord?.id ?? '',
     previewDcOverride: previewRecord?.dc ?? null,
     previewLabel: previewRecord?.name ?? '',
-    average: formulaAverage,
     onSelectPreviewRecord: selectPreviewRecord,
   });
   const simplePreviewProps = $derived({
@@ -1268,7 +1261,6 @@
     previewLabel: previewRecord?.name ?? '',
     trackMin: previewTrack.min,
     trackMax: previewTrack.max,
-    average: formulaAverage,
     onSelectPreviewRecord: selectPreviewRecord,
   });
   const previewActorSummary = $derived(
@@ -1628,7 +1620,6 @@
               section={activeSection}
               {foundrySystemId}
               breakageAuthority={craftingBreakageAuthority}
-              average={formulaAverage}
               onChange={onUpdateCraftingCheckProgressive}
             />
           {/if}
@@ -1725,7 +1716,6 @@
               section={activeSection}
               {foundrySystemId}
               breakageAuthority={salvageBreakageAuthority}
-              average={formulaAverage}
               onChange={onUpdateSalvageCheckProgressive}
             />
           {:else if salvageSimple}
@@ -1801,7 +1791,6 @@
               section={activeSection}
               {foundrySystemId}
               breakageAuthority={gatheringBreakageAuthority}
-              average={formulaAverage}
               onChange={onUpdateGatheringCheckProgressive}
             />
           {:else if gatheringRouted}

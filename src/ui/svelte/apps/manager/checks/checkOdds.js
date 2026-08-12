@@ -112,9 +112,6 @@ const FLAVOUR_SPAN = /\[[^\]]*]/g;
 /** The `NdS` substring of an already-validated single-die formula. */
 const DIE_SUBSTRING = /\d*d\d+/i;
 
-/** Every `NdS` substring, for the expected-value annotation (which allows N groups). */
-const DIE_SUBSTRING_ALL = /(\d*)d(\d+)/gi;
-
 const refuse = (reason) => ({ enumerable: false, reason });
 
 /**
@@ -447,52 +444,4 @@ export function enumerateProgressiveOdds({ faces, remainder, difficulties, award
       count,
       percent: percentOf(count, faces),
     }));
-}
-
-/**
- * The expected value of a resolved formula, for the `avg N` annotation beside the
- * formula field.
- *
- * It is DELIBERATELY looser than the enumerability predicate: `avg` is an annotation on
- * the field a GM is typing in, so it answers for every formula that resolves to a
- * number, including the multi-group and modified ones the histogram abstains from. Each
- * `NdS` group contributes its own mean, `N*(S+1)/2`; a keep/drop/explode modifier is not
- * modelled, which is why this is an ANNOTATION and never a bucket.
- *
- * Returns null whenever the formula does not resolve for this actor, which is the same
- * `resolved === false` signal the readout's own warning uses.
- *
- * It answers about the formula the runner will ROLL, so it takes the same modifier
- * context the histogram does: an `avg` computed off the authored string would sit on the
- * field claiming a number the check cannot produce, which is the histogram's own defect
- * in a smaller font.
- *
- * @param {string} formula The AUTHORED preview formula.
- * @param {object|null} actor The previewed actor.
- * @param {object} [options] Options.
- * @param {*} [options.Roll] The `Roll` class; defaults to `globalThis.Roll`.
- * @param {object|null} [options.craftingModifier] The check-modifier context.
- * @returns {?number} The floored expected value, or null.
- */
-export function expectedFormulaValue(
-  formula,
-  actor,
-  { Roll = globalThis.Roll, craftingModifier = null } = {}
-) {
-  const display = resolveCheckFormulaDisplay(
-    resolveRolledFormula(formula, actor, craftingModifier, Roll),
-    actor,
-    null,
-    Roll
-  );
-  if (!display || display.resolved === false) return null;
-  const masked = display.display.replaceAll(FLAVOUR_SPAN, '');
-  const averaged = masked.replaceAll(DIE_SUBSTRING_ALL, (match, rawCount, rawFaces) => {
-    const count = rawCount === '' ? 1 : Number(rawCount);
-    const sides = Number(rawFaces);
-    if (!Number.isInteger(count) || !Number.isInteger(sides) || sides < 1) return match;
-    return String((count * (sides + 1)) / 2);
-  });
-  const value = evaluateNumericExpression(averaged);
-  return Number.isFinite(value) ? Math.floor(value) : null;
 }
