@@ -5018,6 +5018,37 @@ export const VIEW_LAB_CASES = Object.freeze([
     kinds: ['manager', 'checks'],
     sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/checks\/CheckTriggers\.svelte$/],
   }),
+  managerCase({
+    id: 'manager-checks-crafting-trigger-break-tools',
+    label: 'Manager — Checks crafting trigger break-tools card',
+    // BEYOND the smoke, and a state NO other frame reaches: breaking tools is authored on a
+    // trigger only while the SYSTEM's tool-breakage authority is check-driven, and every
+    // fixture system rests on `toolSpecific`. Without this case the card that issue 1096 gave
+    // that effect — a bordered card with a wrench, a sentence and a switch, where a two-word
+    // pill used to sit — is in no published frame at all.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-runework' },
+    steps: [
+      // The authority is a per-system radio pair on the tools browser, so it is CLICKED rather
+      // than pinned on the fixture — the same route `manager-tool-stress-immune` takes for the
+      // same reason, and the same one the smoke takes.
+      'Tools',
+      { selector: '[data-tool-authority-segment="checkDriven"]' },
+      'Checks',
+      { selector: '#manager-checks-nav-crafting' },
+      { selector: '#checks-section-triggers' },
+      { selector: '[data-trigger-disclosure="rw-trig-step-up"]' },
+      { selector: '[data-trigger="rw-trig-step-up"] [data-trigger-break]', scroll: true },
+    ],
+    expectView: 'checks-crafting',
+    // The subject itself, not the route: the authority click and the disclosure click both have
+    // to have landed, and a frame of the right screen with either one missing would show the
+    // state this case is named for being ABSENT.
+    expectSelector: '[data-trigger="rw-trig-step-up"] [data-trigger-break]',
+    kinds: ['manager', 'checks'],
+    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/checks\/CheckTriggers\.svelte$/],
+  }),
   // Player recipe detail, one per resolution mode. Each mode draws a DIFFERENT body — the routed
   // ones a route rail, progressive a stage rail, simple a plain ingredient list — so the four
   // frames together are the only side-by-side evidence that a change to one did not move another.
