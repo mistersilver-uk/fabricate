@@ -21,9 +21,9 @@ const harness = createMountedComponentHarness({
   tmpPrefix: 'fabricate-essence-preview-',
   rawModules: [
     'src/ui/svelte/util/foundryBridge.js',
-    // The preview builds its two synthetic tiles with this pure helper, which imports only
-    // craftingImageDefaults; InventoryItemCard imports the same leaf.
+    // The preview builds its two synthetic tiles with this pure helper, which imports nothing.
     'src/ui/svelte/util/essencePreviewRow.js',
+    // InventoryItemCard's own image leaf.
     'src/ui/svelte/util/craftingImageDefaults.js',
     // The essence colour fold, shared by the card tile, its pips and the inspector.
     'src/ui/svelte/util/essenceTint.js',
@@ -64,13 +64,13 @@ describe('EssenceBehaviorPreview — "How players see it" mounts the real player
       "carrying the essence's name"
     );
 
-    // The fake carrying component: a normal card on a CORE Foundry icon, carrying the pip.
+    // The fake carrying component: a normal card on a CORE Foundry pack icon, carrying the pip.
     const component = root.querySelector('[data-essence-preview-component]');
     assert.ok(component, 'the carrying-component cell renders');
     const art = component.querySelector('.inventory-card-art img');
     assert.ok(
-      art?.getAttribute('src').includes('icons/svg/item-bag.svg'),
-      'on the core item-bag icon'
+      art?.getAttribute('src').includes('icons/containers/bags/pack-engraved-leather-leaf-tan.webp'),
+      'on the core engraved-leather pack icon, NOT the item-bag "no image" sentinel'
     );
     const pip = component.querySelector('[data-inventory-pip="essence"]');
     assert.ok(pip, 'and it carries the essence as a pip');

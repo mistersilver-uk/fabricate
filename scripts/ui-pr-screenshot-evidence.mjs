@@ -520,7 +520,11 @@ export const VIEW_RECIPES = Object.freeze([
     matches: [
       /^src\/ui\/svelte\/apps\/manager\/Essence(?:Browser|Edit)View\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/essences\//,
-      /^src\/ui\/svelte\/util\/(?:essenceIcons|managerColorTokens)\.js$/,
+      // `essencePreviewRow` builds the two synthetic tiles the editor's "How players see it"
+      // rail mounts, so a change to it is only visible in `manager-essence-edit-first-state`
+      // (issue 1124). Absent here it fell through to the broad fallback set and would have
+      // published frames that cannot show the change.
+      /^src\/ui\/svelte\/util\/(?:essenceIcons|essencePreviewRow|managerColorTokens)\.js$/,
       /^src\/utils\/essence(?:BrowserModel|BulkEditModel|Validation)\.js$/,
     ],
   },
