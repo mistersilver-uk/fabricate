@@ -23,10 +23,13 @@
   import SystemEditorTabs from './system/SystemEditorTabs.svelte';
   import CharacterPrerequisitesCard from './system/CharacterPrerequisitesCard.svelte';
   import SystemOverviewView from './SystemOverviewView.svelte';
+  // `stripExpressionSigil` is NOT imported any more: the summary row reads the stored
+  // expression back verbatim now that the field no longer supplies the `@`. The helper itself
+  // is untouched — the prerequisite copy path still derives a `path` from an expression
+  // through it, which is a different question from how a list reads.
   import {
     mapModifierToPrerequisite,
     mapPrerequisiteToModifier,
-    stripExpressionSigil,
   } from '../../../../systems/characterModifierPrerequisiteCopy.js';
   import {
     isRollExpression,
