@@ -233,14 +233,20 @@ test('the modifier card fallbacks match lang/en.json exactly', () => {
     'label + description pairs across the three activity-independent combination rules'
   );
   // SUBJECT_COPY: FOUR key/literal pairs per activity, on THREE activities (issue 1095) —
-  // the per-activity `bySubject` label, its description, its pick-cap hint and its
-  // eligibility intro. Twelve sentences that would otherwise drift one at a time, plus the
-  // three activity-independent eligibility intros that share the `introKey`/`intro` shape.
+  // the per-activity `bySubject` label, its description, its pick-cap hint and the card
+  // DESCRIPTION it shows under that rule. Twelve sentences that would otherwise drift one at
+  // a time, plus the three activity-independent card descriptions that share the shape.
+  //
+  // `leadKey`/`lead` since issue 1096's parity round: that sentence used to be a paragraph of
+  // its own above the rows (`introKey`/`intro`) and is now the card's description, in the
+  // head, because that is where the prototype states it and what it states is rule-keyed.
+  // `bySubject`'s entry in `ELIGIBILITY_COPY` is deliberately EMPTY — the sentence is
+  // per-activity there, so it comes out of `SUBJECT_COPY` — which is why this is 6 and not 7.
   for (const [keyProp, valueProp, expected] of [
     ['labelKey', 'label', 3],
     ['descKey', 'desc', 3],
     ['capKey', 'cap', 3],
-    ['introKey', 'intro', 6],
+    ['leadKey', 'lead', 6],
   ]) {
     assertMirrored(
       [
@@ -262,8 +268,11 @@ test('the modifier card fallbacks match lang/en.json exactly', () => {
     [...source.matchAll(/\bkey:\s*'([^']+)',\s*(?:label|fallback):\s*'((?:[^'\\]|\\.)*)'/g)],
     11,
     'the playerPicks cap hint, the two surviving inert-cause sentences, the four ON ' +
-      'eligibility words, and the FOUR OFF ones — one per rule, because "Not applied" is ' +
-      'the negation of `Applied` and of nothing else'
+      'eligibility words, and the four OFF ones — one ENTRY per rule, because "Not applied" ' +
+      'is the negation of `Applied` and of nothing else. Four entries, THREE distinct keys ' +
+      'since issue 1096: the two rules that defer the selection share `Selectable`, because ' +
+      'the rule cards beside them say "the modifiers you mark selectable" in the prototype’s ' +
+      'own words'
   );
   // Everything else the card localizes INLINE, through `text(key, fallback)` — the empty
   // state's two branches, the two bounds faults, the read-only link, the field captions.

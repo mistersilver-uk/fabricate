@@ -1,6 +1,6 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  Per-activity modifier SELECTION editor (issues 770, 1055, 1095, 1117).
+  Per-activity modifier SELECTION editor (issues 770, 1055, 1095, 1117, 1096).
 
   A crafting system defines ONE named modifier library — e.g. Medicine, Alchemy, Herbalism
   for a DC20 healing salve — each an authored roll-data expression (`@abilities.med.mod`)
@@ -13,6 +13,51 @@
   read-only with one deep link to the surface that owns it, and what stays here is the
   SELECTION — which entries this activity applies and how they combine — because that is
   genuinely per-activity.
+
+  ── TWO CARDS, AND THE ROW IS ONE LINE (issue 1096, maintainer parity round) ──────────
+
+  This surface is rebuilt against the standalone Checks Studio prototype, and the
+  differences it closes were invisible to the parity harness for a stated reason: no lab
+  system authored a modifier library, so `modifier-entry-row` sat marked `unreachable`,
+  the rows never rendered, and nothing about them was measured. Everything AROUND them
+  matched, so the screen reported clean. `tests/view-lab/world/labContent.js` now seeds
+  runework's library, the marking is gone, and the row and its parts are measured.
+
+  What changed, each of it a value read off the prototype rather than chosen here:
+
+    - TWO studio cards, `Named modifiers` and `How they combine`, each with a real head
+      (sentence-case title + description) rather than one card under two uppercase
+      micro-labels. The uppercase-kicker correction landed on every other screen in this
+      studio and never reached this one.
+    - The deep link sits in the FIRST card's HEAD, top right, link-styled. It was a
+      full-width button at the foot of the rows, which reads as a list-extending action —
+      the one thing this card explicitly cannot do.
+    - ONE ROW PER ENTRY, single line: glyph tile, name, expression, bounds chip, and the
+      eligibility control at the right end. It was a two-line bordered sub-card — a name
+      row, then a second row carrying a checkbox and a pill.
+    - THE PILL IS THE CONTROL. It was presentational, sat beside a `SelectionCheckbox`,
+      and was hidden from assistive technology because the checkbox already said the
+      state. There is no checkbox now: the pill is a real `aria-pressed` toggle button
+      carrying the row's accessible name, which is the one control the design draws.
+      Never NESTED in anything interactive — an interactive control inside an interactive
+      control lands invalid DOM, the trap `ArmedDangerButton.svelte`'s header warns about.
+      The not-selected state differs by more than colour: the dot goes unlit AND the word
+      changes, so the distinction survives a monochrome render.
+    - THE LIBRARY NOTE CLOSES THE CARD instead of opening it, in the prototype's own
+      words. Ours was a much longer paragraph at the top, above the rows it qualifies.
+    - THE CARD DESCRIPTION IS RULE-KEYED, because the prototype's is: `Mark which of the
+      system's modifiers this check applies` under `addAll`, a comparison sentence under
+      `highest`, and a "may choose from" sentence naming the picker under the two rules
+      that defer. That sentence IS this card's eligibility explanation, so it keeps the
+      `data-crafting-modifier-defaults` hook and the `aria-describedby` wiring the pill
+      needs; it simply sits where the design puts it.
+
+  THE ELIGIBILITY VOCABULARY IS THE PROTOTYPE'S THREE WORDS, not our four. `bySubject`
+  used to read `Picked per subject` / `Not picked by default`; it now reads `Selectable` /
+  `Not selectable`, the same pair `playerPicks` uses. That is forced rather than preferred:
+  the prototype's own `By recipe` description — which this card is required to ship
+  verbatim — says "from the modifiers you mark SELECTABLE", so a row reading anything else
+  would make the sentence beside it untrue about our own control.
 
   The card authors three things, and none of them is an entry:
 
@@ -27,16 +72,10 @@
     2. The PICK CAP (`maxModifierPicks`) — how many modifiers the deferred-to party may
        pick. It bounds the two selecting rules only, and ABSENT means unlimited, which is
        why the control's empty state is a real value rather than a blank to be defaulted.
+       It sits in the SECOND card, under the rule grid, because that is the card whose
+       rules it bounds — and where the prototype draws it.
     3. The DEFAULT ELIGIBLE SET (`defaultModifierIds`) — which catalogue entries this
-       activity applies, toggled per row by the eligibility control.
-
-  THE ELIGIBILITY CONTROL IS THE CHECKBOX; THE PILL IS PRESENTATIONAL (issue 1095, DN9).
-  `SelectionCheckbox` is the accessible control and carries the accessible name;
-  `StatusPill` renders the state word beside it and is inert. They are ADJACENT and NEVER
-  NESTED — an interactive control inside an interactive pill lands invalid DOM, the same
-  trap `ArmedDangerButton.svelte`'s header warns about. The not-selected state differs by
-  more than colour: the checkbox itself is unchecked and the pill's word AND glyph both
-  change, so the distinction survives a monochrome render.
+       activity applies, toggled per row by the eligibility pill.
 
   Sibling of the failure-consumption card. Rendered for every sub-tab — INCLUDING the ones
   where the library cannot reach a roll, because a library that silently does nothing
@@ -50,11 +89,10 @@
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
-  import SelectionCheckbox from '../../../components/SelectionCheckbox.svelte';
-  import StatusPill from '../../../components/StatusPill.svelte';
   import Stepper from '../../../components/Stepper.svelte';
   import { stepperLabels } from '../../../components/stepperLabels.js';
   import Chip from '../Chip.svelte';
+  import ManagerButton from '../../../components/ManagerButton.svelte';
   import RadioCardGroup from '../RadioCardGroup.svelte';
   import {
     normalizeModifierPolicy,
@@ -117,35 +155,31 @@
       labelKey: 'FABRICATE.Admin.Manager.Checks.Crafting.ModifierPolicyBySubjectCrafting',
       label: 'By recipe',
       descKey: 'FABRICATE.Admin.Manager.Checks.Crafting.ModifierPolicyBySubjectCraftingDesc',
-      desc: 'Each recipe picks which modifiers apply, on its Overview tab; the picks are summed. Recipes that pick nothing use the default set above.',
+      desc: 'Each recipe takes up to a number you set from the modifiers you mark selectable.',
       capKey: 'FABRICATE.Admin.Manager.Checks.Crafting.ModifierMaxPicksBySubjectCrafting',
       cap: 'The most modifiers a recipe author may pick for one recipe. Leave it empty for no limit. Lowering it below what a recipe already picked keeps the recipe intact but rolls only the first modifiers it picked, up to this many.',
-      introKey: 'FABRICATE.Admin.Manager.Checks.Crafting.ModifierEligibilityIntroBySubjectCrafting',
-      intro:
-        'Which modifiers apply when a recipe does not pick its own. A recipe can pick its own set on its Overview tab.',
+      leadKey: 'FABRICATE.Admin.Manager.Checks.Crafting.ModifierEligibilityIntroBySubjectCrafting',
+      lead: 'Mark which of the system’s modifiers the recipe may choose from.',
     },
     salvage: {
       labelKey: 'FABRICATE.Admin.Manager.Checks.Crafting.ModifierPolicyBySubjectSalvage',
       label: 'By component',
       descKey: 'FABRICATE.Admin.Manager.Checks.Crafting.ModifierPolicyBySubjectSalvageDesc',
-      desc: 'Each component picks which modifiers apply, on its Salvage tab; the picks are summed. Components that pick nothing use the default set above.',
+      desc: 'Each component takes up to a number you set from the modifiers you mark selectable.',
       capKey: 'FABRICATE.Admin.Manager.Checks.Crafting.ModifierMaxPicksBySubjectSalvage',
       cap: 'The most modifiers a component may pick for one salvage. Leave it empty for no limit. Lowering it below what a component already picked keeps the component intact but rolls only the first modifiers it picked, up to this many.',
-      introKey: 'FABRICATE.Admin.Manager.Checks.Crafting.ModifierEligibilityIntroBySubjectSalvage',
-      intro:
-        'Which modifiers apply when a component does not pick its own. A component can pick its own set on its Salvage tab.',
+      leadKey: 'FABRICATE.Admin.Manager.Checks.Crafting.ModifierEligibilityIntroBySubjectSalvage',
+      lead: 'Mark which of the system’s modifiers the component may choose from.',
     },
     gathering: {
       labelKey: 'FABRICATE.Admin.Manager.Checks.Crafting.ModifierPolicyBySubjectGathering',
       label: 'By gathering task',
       descKey: 'FABRICATE.Admin.Manager.Checks.Crafting.ModifierPolicyBySubjectGatheringDesc',
-      desc: 'Each gathering task picks which modifiers apply, in the gathering library; the picks are summed. Tasks that pick nothing use the default set above.',
+      desc: 'Each gathering task takes up to a number you set from the modifiers you mark selectable.',
       capKey: 'FABRICATE.Admin.Manager.Checks.Crafting.ModifierMaxPicksBySubjectGathering',
       cap: 'The most modifiers a gathering task may pick. Leave it empty for no limit. Lowering it below what a task already picked keeps the task intact but rolls only the first modifiers it picked, up to this many.',
-      introKey:
-        'FABRICATE.Admin.Manager.Checks.Crafting.ModifierEligibilityIntroBySubjectGathering',
-      intro:
-        'Which modifiers apply when a gathering task does not pick its own. A task can pick its own set in the gathering library.',
+      leadKey: 'FABRICATE.Admin.Manager.Checks.Crafting.ModifierEligibilityIntroBySubjectGathering',
+      lead: 'Mark which of the system’s modifiers the gathering task may choose from.',
     },
   };
 
@@ -162,6 +196,12 @@
   // The ORDER mirrors `MODIFIER_POLICIES`, which declares itself to be in
   // authoring-surface order; the two selecting rules therefore sit adjacent, which is
   // what the 2x2 grid below reads as a pair.
+  //
+  // EVERY DESCRIPTION IS THE PROTOTYPE'S OWN SENTENCE (issue 1096). Ours were longer and
+  // differently worded, and three of them described the mechanism ("the picks are
+  // summed", "Recipes that pick nothing use the default set above") where the design
+  // describes the decision. Each names the eligibility word the rule puts on the rows
+  // above, which is what ties the two cards together.
   const policyOptions = $derived([
     {
       value: 'addAll',
@@ -169,7 +209,8 @@
       labelKey: 'FABRICATE.Admin.Manager.Checks.Crafting.ModifierPolicyAddAll',
       fallback: 'Add all',
       descKey: 'FABRICATE.Admin.Manager.Checks.Crafting.ModifierPolicyAddAllDesc',
-      descFallback: 'Sum every eligible modifier into the check roll.',
+      descFallback:
+        'Every modifier you mark applied is summed into the roll — nothing is chosen at the table.',
     },
     {
       value: 'highest',
@@ -178,7 +219,7 @@
       fallback: 'Highest',
       descKey: 'FABRICATE.Admin.Manager.Checks.Crafting.ModifierPolicyHighestDesc',
       descFallback:
-        'Use only the single best eligible modifier, ranked by its average — so a 1d4 (2.5) beats a flat +2, and the winner is added as dice.',
+        'The modifiers you mark considered are compared and only the largest is added — a deterministic maximum.',
     },
     {
       value: 'bySubject',
@@ -195,62 +236,53 @@
       fallback: 'Player picks',
       descKey: 'FABRICATE.Admin.Manager.Checks.Crafting.ModifierPolicyPlayerPicksDesc',
       descFallback:
-        'The player picks from the default set at roll time on an interactive attempt; the picks are summed and added to the roll. Other attempts pick the best legal selection.',
+        'The player takes up to a number you set from the modifiers you mark selectable, at roll time.',
     },
   ]);
 
-  // The ELIGIBILITY vocabulary: four words, one per rule, because the rule decides what
-  // "on" MEANS for an entry. `Applied` is unconditional, `Considered` enters a maximum,
-  // `Selectable` is offered to the player, and `Picked per subject` is offered to the
-  // record being resolved. One word for all four would have to be vague enough to be true
-  // of every one of them, which is exactly how "Enabled" says nothing.
+  // The ELIGIBILITY vocabulary: THREE words, one per KIND of rule, because the rule
+  // decides what "on" MEANS for an entry. `Applied` is unconditional, `Considered` enters
+  // a maximum, and `Selectable` is offered to whoever the rule defers to — the player at
+  // roll time, or the record being resolved at authoring time. One word for all of them
+  // would have to be vague enough to be true of every one, which is exactly how "Enabled"
+  // says nothing.
   //
-  // Each state is a DIFFERENT StatusPill tone AND a different glyph, and the not-selected
-  // state below changes both, so the distinction is never carried by colour alone.
+  // `bySubject` shares `playerPicks`'s word rather than owning a fourth (`Picked per
+  // subject`, issue 1095). The prototype's own `By recipe` description — shipped verbatim
+  // above — reads "from the modifiers you mark selectable", so a row saying anything else
+  // makes that sentence untrue about the control beside it.
   const ELIGIBILITY_COPY = {
     addAll: {
       key: 'FABRICATE.Admin.Manager.Checks.Crafting.ModifierEligibilityApplied',
       label: 'Applied',
-      tone: 'success',
-      icon: 'fas fa-circle-check',
-      introKey: 'FABRICATE.Admin.Manager.Checks.Crafting.ModifierEligibilityIntroAddAll',
-      intro: 'Every modifier switched on here is added to the roll. Every attempt uses this set.',
+      leadKey: 'FABRICATE.Admin.Manager.Checks.Crafting.ModifierEligibilityIntroAddAll',
+      lead: 'Mark which of the system’s modifiers this check applies.',
     },
     highest: {
       key: 'FABRICATE.Admin.Manager.Checks.Crafting.ModifierEligibilityConsidered',
       label: 'Considered',
-      tone: 'accent',
-      icon: 'fas fa-arrow-up-wide-short',
-      introKey: 'FABRICATE.Admin.Manager.Checks.Crafting.ModifierEligibilityIntroHighest',
-      intro:
-        'The modifiers switched on here are compared by their average — only the best of them is added. Every attempt uses this set.',
+      leadKey: 'FABRICATE.Admin.Manager.Checks.Crafting.ModifierEligibilityIntroHighest',
+      lead: 'Mark which of the system’s modifiers are compared — only the largest of them is added.',
     },
     playerPicks: {
       key: 'FABRICATE.Admin.Manager.Checks.Crafting.ModifierEligibilitySelectable',
       label: 'Selectable',
-      tone: 'info',
-      icon: 'fas fa-hand-pointer',
-      introKey: 'FABRICATE.Admin.Manager.Checks.Crafting.ModifierEligibilityIntroPlayerPicks',
-      intro:
-        'Which modifiers the player chooses from at roll time. Every attempt in this system offers this set.',
+      leadKey: 'FABRICATE.Admin.Manager.Checks.Crafting.ModifierEligibilityIntroPlayerPicks',
+      lead: 'Mark which of the system’s modifiers the player may choose from.',
     },
     bySubject: {
-      key: 'FABRICATE.Admin.Manager.Checks.Crafting.ModifierEligibilityBySubject',
-      label: 'Picked per subject',
-      tone: 'warning',
-      icon: 'fas fa-scroll',
-      introKey: '',
-      intro: '',
+      key: 'FABRICATE.Admin.Manager.Checks.Crafting.ModifierEligibilitySelectable',
+      label: 'Selectable',
+      leadKey: '',
+      lead: '',
     },
   };
 
   // The NOT-selected vocabulary, keyed off the rule for the same reason the ON one is:
   // "Not applied" is the negation of `Applied` and of nothing else, so under the other
-  // three rules it was one OFF word answering four different ON words — the row said
+  // rules it was one OFF word answering several different ON words — the row said
   // "Selectable" or "Considered" when on and "Not applied" when off, which are not the two
-  // ends of one statement. The GLYPH and TONE stay constant across all four, deliberately:
-  // the not-selected state has to read as one state at a glance, and it is the WORD that
-  // completes the sentence the rule started.
+  // ends of one statement.
   const NOT_ELIGIBLE_COPY = {
     addAll: {
       key: 'FABRICATE.Admin.Manager.Checks.Crafting.ModifierEligibilityOff',
@@ -265,12 +297,10 @@
       label: 'Not selectable',
     },
     bySubject: {
-      key: 'FABRICATE.Admin.Manager.Checks.Crafting.ModifierEligibilityOffBySubject',
-      label: 'Not picked by default',
+      key: 'FABRICATE.Admin.Manager.Checks.Crafting.ModifierEligibilityOffPlayerPicks',
+      label: 'Not selectable',
     },
   };
-  const NOT_ELIGIBLE_TONE = 'subtle';
-  const NOT_ELIGIBLE_ICON = 'fas fa-circle-minus';
 
   // Why the catalogue reaches no roll. Each cause has its own remedy, so each has its
   // own sentence — "the modifiers do nothing" with no reason is not actionable. Both
@@ -327,13 +357,14 @@
   const maxPicksLabel = $derived(
     text('FABRICATE.Admin.Manager.Checks.Crafting.ModifierMaxPicks', 'Maximum picks')
   );
-  // What the default set IS depends on the rule, and the four readings are materially
-  // different decisions. Under `bySubject` the sentence also depends on the ACTIVITY,
-  // because the record doing the picking is a recipe, a component or a gathering task.
-  const eligibilityIntro = $derived(
+  // THE CARD'S DESCRIPTION, and it depends on the rule because the prototype's does. What
+  // marking an entry MEANS is the whole subject of this card, and the four readings are
+  // materially different decisions; under `bySubject` the sentence also depends on the
+  // ACTIVITY, because the record doing the picking is a recipe, a component or a task.
+  const cardLead = $derived(
     selectedPolicy === 'bySubject'
-      ? { key: subjectCopy.introKey, fallback: subjectCopy.intro }
-      : { key: eligibility.introKey, fallback: eligibility.intro }
+      ? { key: subjectCopy.leadKey, fallback: subjectCopy.lead }
+      : { key: eligibility.leadKey, fallback: eligibility.lead }
   );
   // KEYED BY ACTIVITY, not a module-level literal. This component is instantiated three
   // times — crafting, salvage and gathering — and a hardcoded id is unique only because the
@@ -399,109 +430,116 @@
     return bounds.unsafe ? 'unsafe' : '';
   }
 
-  const notEligible = $derived({
-    ...(NOT_ELIGIBLE_COPY[selectedPolicy] || NOT_ELIGIBLE_COPY.addAll),
-    tone: NOT_ELIGIBLE_TONE,
-    icon: NOT_ELIGIBLE_ICON,
-  });
+  const notEligible = $derived(NOT_ELIGIBLE_COPY[selectedPolicy] || NOT_ELIGIBLE_COPY.addAll);
 
-  function eligibilityStateOf(id) {
-    return defaultIds.includes(id) ? eligibility : notEligible;
+  function isEligible(id) {
+    return defaultIds.includes(id);
   }
 
   function eligibilityLabelOf(id) {
-    const state = eligibilityStateOf(id);
+    const state = isEligible(id) ? eligibility : notEligible;
     return text(state.key, state.label);
   }
 </script>
 
+<!-- CARD ONE: the library, read-only, with the selection control on each row. -->
 <section
   class="manager-inspector-card manager-checks-card"
   data-crafting-modifier-catalogue={activity}
   data-check-modifier-activity={activity}
 >
-  <!-- `Named modifiers`, which is the prototype's word for this list (issue 1096). It is a
-       DIFFERENT key from `ModifierCatalogueHeading`, which the gathering task editor also
-       renders: there the heading disambiguates a task's check-modifier pick from the
-       character modifiers on its drop rows, and "Check modifiers" is the right word for
-       that. One key serving two meanings is how a rename breaks a screen nobody looked at. -->
-  <h3 class="manager-card-title">
-    {text('FABRICATE.Admin.Manager.Checks.Crafting.ModifierNamedHeading', 'Named modifiers')}
-  </h3>
-  <!-- Glyph-led, as the prototype marks this statement: it is a standing explanation of where
-       the list comes from, and the info glyph is what separates it from the prose that
-       describes what a GM is choosing. Not the shared `Callout`, which states ONE sentence per
-       strip and this is three — ours says more than the mockup's does. -->
-  <p class="manager-muted manager-modifier-catalogue-intro">
-    <i class="fas fa-circle-info" aria-hidden="true"></i>
-    {text(
-      'FABRICATE.Admin.Manager.Checks.Crafting.ModifierCatalogueIntro',
-      'Named character modifiers added to the check roll automatically, as flavoured [Modifiers] terms — flat ones as one + N term, and a rolling one as its own dice term, so the dice show on the card. Each expression resolves against the acting character (e.g. @abilities.med.mod). The library is authored once in System settings › Modifiers and shared by crafting, salvage and gathering; each decides which entries apply.'
-    )}
-  </p>
+  <!-- The head carries the deep link at its top right, which is where the design puts the
+       one action this card has. It was a full-width button under the rows, in the slot
+       every other list in this studio fills with its "add a row" control — a shape that
+       promises exactly the thing this card cannot do. -->
+  <div class="manager-checks-card-head">
+    <div class="manager-checks-card-head-body">
+      <div class="manager-checks-card-heading">
+        <!-- `Named modifiers`, which is the prototype's word for this list (issue 1096). It
+             is a DIFFERENT key from `ModifierCatalogueHeading`, which the gathering task
+             editor also renders: there the heading disambiguates a task's check-modifier
+             pick from the character modifiers on its drop rows, and "Check modifiers" is
+             the right word for that. One key serving two meanings is how a rename breaks a
+             screen nobody looked at. -->
+        <h3 class="manager-checks-card-title">
+          {text('FABRICATE.Admin.Manager.Checks.Crafting.ModifierNamedHeading', 'Named modifiers')}
+        </h3>
+        {#if onEditLibrary}
+          <ManagerButton
+            class="manager-checks-card-head-link"
+            data-crafting-modifier-edit-link
+            onclick={() => onEditLibrary()}
+          >
+            {text(
+              'FABRICATE.Admin.Manager.Checks.Crafting.ModifierEditCatalogue',
+              'Edit in system settings'
+            )}
+            <i class="fas fa-arrow-up-right-from-square" aria-hidden="true"></i>
+          </ManagerButton>
+        {/if}
+      </div>
+      <!-- The RULE'S OWN SENTENCE, in the description slot. It states what marking an entry
+           MEANS under the rule the GM just chose, which is why it sits above the rows that
+           do the marking rather than under the grid that sets the rule — where it read as a
+           footnote about the pick cap. It keeps the `aria-describedby` target id: the pill's
+           accessible name ends in "Applied", and this is what makes that word mean
+           something to a reader who never sees the rule grid. -->
+      <p
+        class="manager-checks-card-description"
+        id={ELIGIBILITY_INTRO_ID}
+        data-crafting-modifier-defaults={selectedPolicy}
+      >
+        {text(cardLead.key, cardLead.fallback)}
+      </p>
+    </div>
+  </div>
 
-  {#if activity === 'gathering'}
-    <!-- The disambiguation is a NAMING rule, and it is stated in BOTH directions. No
-         surface shows both concepts at once, so a sentence that only said "this is the
-         check-modifier one" would be answering a question the screen never raises. -->
-    <p class="manager-muted" data-gathering-modifier-disambiguation>
-      {text(
-        'FABRICATE.Admin.Manager.Checks.Gathering.ModifierDisambiguation',
-        'These are check modifiers: they add to a rolled gathering formula in progressive and routed resolution. They are not the gathering library’s character modifiers, which shift a drop’s percentage chance in d100 resolution and never apply to a rolled formula.'
-      )}
-    </p>
-  {/if}
-
-  {#if dormant}
-    <p class="manager-modifier-inert" role="note" data-check-modifier-dormant>
-      <i class="fa-solid fa-clock" aria-hidden="true"></i>
-      <span>
-        <strong
-          >{text(
-            'FABRICATE.Admin.Manager.Checks.Gathering.ModifierDormantHeading',
-            'Not in use yet'
-          )}</strong
-        >
+  <div class="manager-checks-card-body is-stack" data-crafting-modifier-rows>
+    {#if activity === 'gathering'}
+      <!-- The disambiguation is a NAMING rule, and it is stated in BOTH directions. No
+           surface shows both concepts at once, so a sentence that only said "this is the
+           check-modifier one" would be answering a question the screen never raises. -->
+      <p class="manager-muted" data-gathering-modifier-disambiguation>
         {text(
-          'FABRICATE.Admin.Manager.Checks.Gathering.ModifierDormantBody',
-          'Progressive and routed gathering are disabled pending issue 683, so no gathering configuration you can choose today rolls a formula. Anything you set here is saved and starts applying when those modes ship.'
+          'FABRICATE.Admin.Manager.Checks.Gathering.ModifierDisambiguation',
+          'These are check modifiers: they add to a rolled gathering formula in progressive and routed resolution. They are not the gathering library’s character modifiers, which shift a drop’s percentage chance in d100 resolution and never apply to a rolled formula.'
         )}
-      </span>
-    </p>
-  {/if}
+      </p>
+    {/if}
 
-  {#if inert}
-    <p class="manager-modifier-inert" role="note" data-crafting-modifier-inert={inertCause}>
-      <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
-      <span>
-        <strong
-          >{text(
-            'FABRICATE.Admin.Manager.Checks.Crafting.ModifierInertHeading',
-            'These modifiers reach no roll'
-          )}</strong
-        >
-        {text(inert.key, inert.fallback)}
-      </span>
-    </p>
-  {/if}
+    {#if dormant}
+      <p class="manager-modifier-inert" role="note" data-check-modifier-dormant>
+        <i class="fa-solid fa-clock" aria-hidden="true"></i>
+        <span>
+          <strong
+            >{text(
+              'FABRICATE.Admin.Manager.Checks.Gathering.ModifierDormantHeading',
+              'Not in use yet'
+            )}</strong
+          >
+          {text(
+            'FABRICATE.Admin.Manager.Checks.Gathering.ModifierDormantBody',
+            'Progressive and routed gathering are disabled pending issue 683, so no gathering configuration you can choose today rolls a formula. Anything you set here is saved and starts applying when those modes ship.'
+          )}
+        </span>
+      </p>
+    {/if}
 
-  {#if library.length > 0 && eligibilityIntro.fallback}
-    <!-- The eligibility sentence for the ACTIVE rule, ABOVE the rows it governs. It states
-         what switching an entry on MEANS under the rule the GM just chose, so it has to sit
-         where that switching happens: below the rule grid it landed ~500px under the
-         controls it explains and read as a footnote about the pick cap. The rule grid
-         re-renders this sentence the moment the rule changes, so "it would describe a rule
-         they are about to change" is not a risk the position creates. -->
-    <p
-      class="manager-muted"
-      id={ELIGIBILITY_INTRO_ID}
-      data-crafting-modifier-defaults={selectedPolicy}
-    >
-      {text(eligibilityIntro.key, eligibilityIntro.fallback)}
-    </p>
-  {/if}
+    {#if inert}
+      <p class="manager-modifier-inert" role="note" data-crafting-modifier-inert={inertCause}>
+        <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
+        <span>
+          <strong
+            >{text(
+              'FABRICATE.Admin.Manager.Checks.Crafting.ModifierInertHeading',
+              'These modifiers reach no roll'
+            )}</strong
+          >
+          {text(inert.key, inert.fallback)}
+        </span>
+      </p>
+    {/if}
 
-  <div class="manager-modifier-catalogue" data-crafting-modifier-rows>
     {#if library.length === 0}
       <!-- ONE sentence, on every activity. It branched on who owned the entries while
            crafting authored them; now nothing on this screen adds one, so the instruction
@@ -513,190 +551,197 @@
         )}
       </p>
     {/if}
-    {#each library as modifier (modifier.id)}
-      <div class="manager-character-modifier-row" data-crafting-modifier-row={modifier.id}>
-        <!-- READ-ONLY on EVERY activity (issue 1117). The library is authored once, in
-             System settings › Modifiers; a second editor for the same rows is how two
-             screens come to disagree about which one wrote last, and crafting having one
-             while salvage and gathering did not was that asymmetry made visible. The
-             eligibility control below is NOT part of this: which entries an activity
-             applies is exactly what this screen owns. -->
-        <div class="manager-modifier-readonly-row">
-          <i
-            class={modifier.icon || DEFAULT_MODIFIER_ICON}
-            aria-hidden="true"
-            data-crafting-modifier-readonly-icon
-          ></i>
-          <span class="manager-modifier-readonly-label" data-crafting-modifier-readonly="label"
-            >{modifier.label || modifier.id}</span
-          >
-          <code
-            class="manager-modifier-readonly-expression"
-            data-crafting-modifier-readonly="expression">{modifier.expression || '—'}</code
-          >
-          {#if boundsChipLabel(modifier)}
-            <Chip tone="neutral" mono class="manager-modifier-bounds-chip"
-              >{boundsChipLabel(modifier)}</Chip
-            >
-          {/if}
-          {#if modifier.isRollExpression}
-            <!-- A rolling entry is APPENDED AS DICE to this check's formula (issue 1118), so
-                 the chip is a neutral fact about the entry rather than a warning about it:
-                 the dice reach the roll, animate and show on the card. It was `warning` while
-                 a check could only append a scalar and readiness blocked such an entry; that
-                 rule is retired, so the tone follows it. -->
-            <Chip tone="neutral" class="manager-modifier-roll-chip" data-crafting-modifier-roll
-              >{text('FABRICATE.Admin.Manager.Checks.Crafting.ModifierRollTag', 'Rolls dice')}</Chip
-            >
-          {/if}
-        </div>
 
-        {#if boundsFault(modifier)}
-          <p
-            class="manager-modifier-bounds-error"
-            role="note"
-            data-crafting-modifier-bounds-invalid={modifier.id}
-            data-crafting-modifier-bounds-cause={boundsFault(modifier)}
+    {#each library as modifier (modifier.id)}
+      <!-- ONE ROW, ONE LINE, and it is a DIRECT child of the rows list so the list's own
+           6px rhythm separates entries rather than a wrapper's. READ-ONLY on EVERY activity
+           (issue 1117): the library is authored once, in System settings › Modifiers, and a
+           second editor for the same rows is how two screens come to disagree about which
+           one wrote last. The eligibility pill at the end is NOT part of that — which
+           entries an activity applies is exactly what this screen owns. -->
+      <div class="manager-modifier-readonly-row" data-crafting-modifier-row={modifier.id}>
+        <span class="manager-modifier-readonly-glyph" aria-hidden="true">
+          <i class={modifier.icon || DEFAULT_MODIFIER_ICON} data-crafting-modifier-readonly-icon
+          ></i>
+        </span>
+        <span class="manager-modifier-readonly-label" data-crafting-modifier-readonly="label"
+          >{modifier.label || modifier.id}</span
+        >
+        <code
+          class="manager-modifier-readonly-expression"
+          data-crafting-modifier-readonly="expression">{modifier.expression || '—'}</code
+        >
+        {#if boundsChipLabel(modifier)}
+          <Chip tone="neutral" mono class="manager-modifier-bounds-chip"
+            >{boundsChipLabel(modifier)}</Chip
           >
-            {#if boundsFault(modifier) === 'inverted'}
-              {text(
-                'FABRICATE.Admin.Manager.Checks.Crafting.ModifierBoundsInverted',
-                'This modifier’s minimum is above its maximum, so it adds nothing to the roll until you fix the two values.'
-              )}
-            {:else}
-              {text(
-                'FABRICATE.Admin.Manager.Checks.Crafting.ModifierBoundsUnsafe',
-                'This modifier’s bound is too large or too small to appear in a roll formula, so it adds nothing to the roll until you fix it.'
-              )}
-            {/if}
-          </p>
+        {/if}
+        {#if modifier.isRollExpression}
+          <!-- A rolling entry is APPENDED AS DICE to this check's formula (issue 1118), so
+               the chip is a neutral fact about the entry rather than a warning about it:
+               the dice reach the roll, animate and show on the card. It was `warning` while
+               a check could only append a scalar and readiness blocked such an entry; that
+               rule is retired, so the tone follows it. -->
+          <Chip tone="neutral" class="manager-modifier-roll-chip" data-crafting-modifier-roll
+            >{text('FABRICATE.Admin.Manager.Checks.Crafting.ModifierRollTag', 'Rolls dice')}</Chip
+          >
         {/if}
 
-        <!-- The ELIGIBILITY control, on ALL THREE activities. The checkbox IS the control
-             and carries the accessible name; the pill beside it repeats the state as a word
-             for sighted users and is HIDDEN from assistive technology, because the checkbox's
-             own accessible name already ends in that word — leaving both in the tree read the
-             state twice ("Medicine — Applied, checkbox, Applied"). They are siblings, never
-             nested. The `aria-describedby` points at the ACTIVE RULE's eligibility sentence
-             above, which is what makes "Applied" mean something to a reader who never sees the
-             rule grid. -->
-        <div class="manager-modifier-eligibility" data-crafting-modifier-eligibility={modifier.id}>
-          <SelectionCheckbox
-            size="sm"
-            checked={defaultIds.includes(modifier.id)}
-            ariaLabel={`${modifier.label || modifier.id} — ${eligibilityLabelOf(modifier.id)}`}
-            aria-describedby={eligibilityIntro.fallback ? ELIGIBILITY_INTRO_ID : undefined}
-            data-crafting-modifier-eligibility-input={modifier.id}
-            onChange={(checked) => toggleDefault(modifier.id, checked)}
-          />
-          <span class="manager-modifier-eligibility-pill" aria-hidden="true">
-            <StatusPill
-              tone={eligibilityStateOf(modifier.id).tone}
-              icon={eligibilityStateOf(modifier.id).icon}
-              label={eligibilityLabelOf(modifier.id)}
-            />
-          </span>
-        </div>
+        <!-- THE ELIGIBILITY CONTROL, and it is the pill itself (issue 1096). A real
+             `aria-pressed` toggle button, carrying the row's accessible name and pointed at
+             the rule's sentence in the card head above. It is the LAST thing on the row and
+             nothing interactive nests inside it. The off state changes the word AND unlights
+             the dot, so it is never carried by colour alone. -->
+        <button
+          type="button"
+          class="manager-modifier-eligibility"
+          class:is-on={isEligible(modifier.id)}
+          aria-pressed={isEligible(modifier.id)}
+          aria-label={`${modifier.label || modifier.id} — ${eligibilityLabelOf(modifier.id)}`}
+          aria-describedby={cardLead.fallback ? ELIGIBILITY_INTRO_ID : undefined}
+          data-crafting-modifier-eligibility={modifier.id}
+          data-crafting-modifier-eligibility-input={modifier.id}
+          onclick={() => toggleDefault(modifier.id, !isEligible(modifier.id))}
+        >
+          <span class="manager-modifier-eligibility-dot" aria-hidden="true"></span>
+          {eligibilityLabelOf(modifier.id)}
+        </button>
       </div>
+
+      {#if boundsFault(modifier)}
+        <p
+          class="manager-modifier-bounds-error"
+          role="note"
+          data-crafting-modifier-bounds-invalid={modifier.id}
+          data-crafting-modifier-bounds-cause={boundsFault(modifier)}
+        >
+          {#if boundsFault(modifier) === 'inverted'}
+            {text(
+              'FABRICATE.Admin.Manager.Checks.Crafting.ModifierBoundsInverted',
+              'This modifier’s minimum is above its maximum, so it adds nothing to the roll until you fix the two values.'
+            )}
+          {:else}
+            {text(
+              'FABRICATE.Admin.Manager.Checks.Crafting.ModifierBoundsUnsafe',
+              'This modifier’s bound is too large or too small to appear in a roll formula, so it adds nothing to the roll until you fix it.'
+            )}
+          {/if}
+        </p>
+      {/if}
     {/each}
-    {#if onEditLibrary}
-      <button
-        type="button"
-        class="manager-button"
-        data-crafting-modifier-edit-link
-        onclick={() => onEditLibrary()}
-      >
-        <i class="fas fa-pen-to-square" aria-hidden="true"></i>
+
+    <!-- THE NOTE THAT CLOSES THE CARD. It was a much longer paragraph at the TOP, above the
+         rows it qualifies, and it opened the screen with four clauses of mechanism. This is
+         the prototype's own sentence, in the prototype's own place: a standing pointer to
+         the surface that owns the entries, read after the entries rather than before them. -->
+    <p class="manager-modifier-library-note" role="note" data-crafting-modifier-library-note>
+      <i class="fas fa-circle-info" aria-hidden="true"></i>
+      <span>
         {text(
-          'FABRICATE.Admin.Manager.Checks.Crafting.ModifierEditCatalogue',
-          'Edit in System settings'
+          'FABRICATE.Admin.Manager.Checks.Crafting.ModifierLibraryNote',
+          'These are defined once for the whole crafting system, in system settings — this check only decides which of them apply and how.'
         )}
-      </button>
-    {/if}
+      </span>
+    </p>
+  </div>
+</section>
+
+<!-- CARD TWO: how the marked entries reduce to the one number the roll gets. Its own studio
+     card, as the design draws it — it was an uppercase micro-label inside the card above,
+     which is the treatment this studio retired everywhere else. -->
+<section class="manager-inspector-card manager-checks-card" data-crafting-modifier-policy-card>
+  <div class="manager-checks-card-head">
+    <div class="manager-checks-card-head-body">
+      <h3 class="manager-checks-card-title">
+        {text('FABRICATE.Admin.Manager.Checks.Crafting.ModifierPolicyHeading', 'How they combine')}
+      </h3>
+      <p class="manager-checks-card-description">
+        {text(
+          'FABRICATE.Admin.Manager.Checks.Crafting.ModifierPolicyLead',
+          'Which of the named modifiers reach the roll, and how they are added up.'
+        )}
+      </p>
+    </div>
   </div>
 
-  <h4 class="manager-modifier-subheading">
-    {text('FABRICATE.Admin.Manager.Checks.Crafting.ModifierPolicyHeading', 'How they combine')}
-  </h4>
-  <!-- TWO columns, so the group is a 2x2. This is explicit maintainer feedback on the
-       three-up layout that stood here: at this much copy per card — a name plus a
-       two-clause sentence naming who selects, when, and how the picks reduce — three
-       columns packs too much text into each card, so the layout drops to two.
-       `--manager-radio-card-columns` is a FIXED track count
-       (`repeat(var(…), minmax(0, 1fr))`), never `auto-fit`, so the count is the layout:
-       four options at 2 columns is a clean 2x2 with no orphan row, and it puts the two
-       non-selecting rules on the top row and the two selecting rules on the bottom one,
-       which is the distinction the pick cap below applies to.
+  <div class="manager-checks-card-body">
+    <!-- TWO columns, so the group is a 2x2. This is explicit maintainer feedback on the
+         three-up layout that stood here: at this much copy per card — a name plus a
+         sentence naming who selects, when, and how the picks reduce — three columns packs
+         too much text into each card, so the layout drops to two.
+         `--manager-radio-card-columns` is a FIXED track count
+         (`repeat(var(…), minmax(0, 1fr))`), never `auto-fit`, so the count is the layout:
+         four options at 2 columns is a clean 2x2 with no orphan row, and it puts the two
+         non-selecting rules on the top row and the two selecting rules on the bottom one,
+         which is the distinction the pick cap below applies to.
 
-       It REFLOWS to 1x4 rather than overflowing at a narrow pane: the card declares
-       itself a container in the style block below, so the shipped
-       `@container (max-width: 620px)` rule for `.is-config-cards` now measures THIS
-       card's inline size instead of the whole manager shell's. -->
-  <RadioCardGroup
-    legendKey="FABRICATE.Admin.Manager.Checks.Crafting.ModifierPolicyHeading"
-    legend="How they combine"
-    options={policyOptions}
-    selectedValue={selectedPolicy}
-    groupName={`check-modifier-policy-${activity}`}
-    columns={2}
-    dataAttr="data-crafting-modifier-policy"
-    optionDataAttr={MODIFIER_POLICY_OPTION_ATTR}
-    onChange={selectPolicy}
-  />
+         It REFLOWS to 1x4 rather than overflowing at a narrow pane: the card declares
+         itself a container in the style block below, so the shipped
+         `@container (max-width: 620px)` rule for `.is-config-cards` now measures THIS
+         card's inline size instead of the whole manager shell's. -->
+    <RadioCardGroup
+      legendKey="FABRICATE.Admin.Manager.Checks.Crafting.ModifierPolicyHeading"
+      legend="How they combine"
+      options={policyOptions}
+      selectedValue={selectedPolicy}
+      groupName={`check-modifier-policy-${activity}`}
+      columns={2}
+      dataAttr="data-crafting-modifier-policy"
+      optionDataAttr={MODIFIER_POLICY_OPTION_ATTR}
+      onChange={selectPolicy}
+    />
 
-  {#if defersSelection && maxPicksCopy}
-    <!-- Shown under the two SELECTING rules only, because a cap on a selection nobody
-         makes is a control with no effect. Membership comes from the resolver
-         (`policyDefersSelection`), not from a local list, so this surface cannot drift
-         from the reduction it is bounding. -->
-    <h4 class="manager-modifier-subheading">{maxPicksLabel}</h4>
-    <p class="manager-muted" id={MAX_PICKS_HINT_ID}>
-      {text(maxPicksCopy.key, maxPicksCopy.fallback)}
-    </p>
-    <!-- `<div>`, not `<label>`: see the NAMING contract in `Stepper.svelte`. It carries no
-         caption span either — the `<h4>` above IS this field's visible label, and a second
-         "Maximum picks" directly under the first would be the same words twice. The
-         Stepper's `ariaLabel` repeats that heading verbatim, so the accessible name still
-         starts with the visible one (WCAG 2.5.3). -->
-    <div
-      class="manager-field manager-modifier-max-picks-field"
-      data-crafting-modifier-max-picks={maxPicksValue === null
-        ? 'unlimited'
-        : String(maxPicksValue)}
-    >
-      <Stepper
-        value={maxPicksValue}
-        allowUnset
-        min={1}
-        fill
-        placeholder={text(
-          'FABRICATE.Admin.Manager.Checks.Crafting.ModifierMaxPicksUnlimited',
-          'Unlimited'
-        )}
-        {...stepperLabels(maxPicksLabel)}
-        inputProps={{
-          'data-crafting-modifier-max-picks-input': '',
-          'aria-describedby': MAX_PICKS_HINT_ID,
-        }}
-        onChange={selectMaxPicks}
-      />
-    </div>
-  {/if}
+    {#if defersSelection && maxPicksCopy}
+      <!-- Shown under the two SELECTING rules only, because a cap on a selection nobody
+           makes is a control with no effect. Membership comes from the resolver
+           (`policyDefersSelection`), not from a local list, so this surface cannot drift
+           from the reduction it is bounding. It sits in THIS card because these are the
+           rules it bounds, and because the prototype draws it here. -->
+      <div class="manager-modifier-max-picks" data-crafting-modifier-max-picks-block>
+        <div class="manager-modifier-max-picks-body">
+          <!-- A `<h4>`, sentence case, at the prototype's own 11.5px/600 — NOT the uppercase
+               micro-label this card wore. Two of the three kickers on this screen became card
+               titles; leaving the third as `MAXIMUM PICKS` would keep the exact treatment the
+               rebuild removes, one block lower down. -->
+          <h4 class="manager-checks-card-subheading">{maxPicksLabel}</h4>
+          <p class="manager-modifier-max-picks-hint" id={MAX_PICKS_HINT_ID}>
+            {text(maxPicksCopy.key, maxPicksCopy.fallback)}
+          </p>
+        </div>
+        <!-- `<div>`, not `<label>`: see the NAMING contract in `Stepper.svelte`. It carries
+             no caption span either — the `<h4>` beside it IS this field's visible label, and a
+             second "Maximum picks" under the first would be the same words twice.
+             The Stepper's `ariaLabel` repeats that heading verbatim, so the accessible name
+             still starts with the visible one (WCAG 2.5.3). -->
+        <div
+          class="manager-field manager-modifier-max-picks-field"
+          data-crafting-modifier-max-picks={maxPicksValue === null
+            ? 'unlimited'
+            : String(maxPicksValue)}
+        >
+          <Stepper
+            value={maxPicksValue}
+            allowUnset
+            min={1}
+            fill
+            placeholder={text(
+              'FABRICATE.Admin.Manager.Checks.Crafting.ModifierMaxPicksUnlimited',
+              'Unlimited'
+            )}
+            {...stepperLabels(maxPicksLabel)}
+            inputProps={{
+              'data-crafting-modifier-max-picks-input': '',
+              'aria-describedby': MAX_PICKS_HINT_ID,
+            }}
+            onChange={selectMaxPicks}
+          />
+        </div>
+      </div>
+    {/if}
+  </div>
 </section>
 
 <style>
-  /* 12px/14px and 6px are MEASURED values (issue 1096): the prototype's rows list carries its
-     own inset and its own tighter rhythm, the same contract `.manager-checks-card-body.is-stack`
-     states for the recipe-tier list. Px rather than rem for the reason that block states —
-     exactness a rounded rem cannot express. */
-  .manager-modifier-catalogue {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    padding: 12px 14px;
-    margin-block: 0.5rem 1rem;
-  }
-
   /* The card is its OWN container-query context (issue 1095, D4). The shipped
      `@container (max-width: 620px)` rule that reflows a `.is-config-cards` radio grid to
      one column is UNNAMED, so it resolves against the NEAREST container — which was the
@@ -708,102 +753,64 @@
     container-type: inline-size;
   }
 
-  /* The row container, the icon/label name-row, and the `@` expression field all reuse
-     the global manager-character-modifier-row / manager-modifier-name-row /
-     manager-prerequisite-path-input classes (styles/fabricate.css) so the Checks-tab
-     catalogue reads as the same design language as the System-tab modifier list. Only
-     the expression + delete line needs a local rule. */
-  .manager-modifier-expression-row {
-    display: flex;
-    align-items: flex-end;
-    gap: 0.5rem;
-  }
+  /* ── THE ROW'S CHIPS, AND WHY THEY ARE STYLED HERE ────────────────────────────────────
+     `Chip` is still the primitive — this restates its GEOMETRY for this row, exactly as the
+     manager restates `ToggleCard`'s and `Callout`'s elsewhere in this studio — but the rule
+     cannot live in `styles/fabricate.css`, and that is a cascade fact rather than a
+     preference.
 
-  .manager-modifier-field-expression {
-    flex: 1 1 auto;
-  }
+     That sheet is imported at `layer(modules)` (Foundry imports a module stylesheet into
+     that layer; `tests/view-lab/cascade.css` mirrors it), while Svelte's `css: 'injected'`
+     blocks land UNLAYERED — and an unlayered author declaration beats a layered one no
+     matter how specific the layered selector is. The pair below was written in the global
+     sheet first, at (0,4,0), and the parity run still reported the chip at the shared
+     primitive's own padding, radius, fill, height and weight; an unlayered probe carrying
+     the identical selector landed immediately.
 
-  .manager-modifier-remove {
+     `:global(...)` under a scoped ancestor compiles to
+     `.manager-modifier-readonly-row.svelte-<hash> .manager-chip.manager-modifier-*` — four
+     classes, unlayered — so it beats `Chip.svelte`'s own `.manager-chip.svelte-<hash>` on
+     specificity within the same layer, and it cannot reach a chip outside this row. */
+  .manager-modifier-readonly-row :global(.manager-chip.manager-modifier-bounds-chip),
+  .manager-modifier-readonly-row :global(.manager-chip.manager-modifier-roll-chip) {
     flex: 0 0 auto;
+    min-height: 22px;
+    padding: 0 9px;
+    border: 1px solid var(--fab-border);
+    border-radius: 999px;
+    color: var(--fab-text-secondary);
+    background: var(--fab-bg-2);
+    font-size: 10px;
+    font-weight: 600;
+    white-space: nowrap;
   }
 
-  /* The bounds pair: two narrow steppers on their own line. `max-width` per field for the
-     reason the pick cap states — a two-character numeric field has no intrinsic width, so
-     `fill` alone would stretch each across half the card. */
-  .manager-modifier-bounds-row {
-    display: flex;
-    gap: var(--fab-space-2);
-    margin-top: 0.35rem;
-  }
-
-  .manager-modifier-bound-field {
-    flex: 0 0 auto;
-    max-width: 160px;
+  /* THE RULE GRID'S OWN GUTTER, on this card only. `RadioCardGroup` is shared and its 12px
+     gutter is one value across the manager, while the prototype draws 10px here — and 11px
+     on the Outcomes screen's otherwise identical group, which is the mockup disagreeing with
+     itself rather than a second scale to adopt. So this states the measured value where it is
+     measured and leaves the primitive alone. Same unlayered-`:global()` route as the chips
+     above, for the same cascade reason. */
+  .manager-inspector-card :global(.manager-resolution-mode-options) {
+    gap: 10px;
   }
 
   .manager-modifier-bounds-error {
-    margin-block: 0.35rem 0;
+    margin-block: 0 0.15rem;
     color: var(--fab-danger-text);
     font-size: 0.68rem;
     line-height: 1.4;
   }
 
-  /* Read-only entry (salvage, gathering): identity, expression and bounds on one line. */
-  .manager-modifier-readonly-row {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--fab-space-2);
-    align-items: center;
-  }
-
-  .manager-modifier-readonly-label {
-    font-weight: 600;
-  }
-
-  .manager-modifier-readonly-expression {
-    color: var(--fab-text-subtle);
-    font-size: 0.68rem;
-  }
-
-  /* The eligibility control and its pill: ADJACENT siblings, never nested. */
-  .manager-modifier-eligibility {
-    display: flex;
-    gap: var(--fab-space-2);
-    align-items: center;
-    margin-top: 0.35rem;
-  }
-
-  /* The `aria-hidden` wrapper the pill sits in contributes NO box: the pill stays a direct
-     flex item of the row above, so the wrapper changes the accessibility tree and nothing
-     else. */
-  .manager-modifier-eligibility-pill {
-    display: contents;
-  }
-
-  /* IT WAS LOUDER THAN THE HEADING ABOVE IT. This block set margins alone, so the `<h4>`
-     fell through to the host's default heading size and drew `How they combine` larger than
-     the card's own `<h3>` title — a subheading shouting over its heading. It takes the
-     manager's `.manager-card-title` treatment now, one step quieter, which is the contract
-     every other section label in this studio already wears. */
-  .manager-modifier-subheading {
-    margin-block: 1rem 0.35rem;
-    color: var(--fab-text-muted);
-    font-family: var(--fab-font-serif);
-    font-size: 0.7rem;
-    font-weight: 700;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-  }
-
-  /* The inert notice sits at the TOP of the card, above the catalogue it invalidates,
-     and is warning-toned rather than muted: everything below it is authoring that
+  /* The inert and dormant notices sit at the TOP of the rows list, above the catalogue they
+     invalidate, and are warning-toned rather than muted: everything below is authoring that
      currently reaches no roll, which is not a footnote. Mirrors
      `.manager-resolution-mode-note`'s icon-beside-text shape (RadioCardGroup) so the
      two read as the same kind of statement. */
   .manager-modifier-inert {
     display: flex;
     gap: var(--fab-space-2);
-    margin-block: 0.5rem 0;
+    margin-block: 0;
     padding: var(--fab-space-2) var(--fab-space-3);
     border: 1px solid var(--fab-warning-border);
     border-radius: 8px;
@@ -826,7 +833,9 @@
      flex item and `align-items: stretch` widens it to the same box anyway). 160px is the
      width the other four such call sites use. */
   .manager-modifier-max-picks-field {
+    flex: 0 0 auto;
+    width: 160px;
     max-width: 160px;
-    margin-top: 0.35rem;
+    margin: 0;
   }
 </style>

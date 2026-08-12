@@ -4609,21 +4609,26 @@ describe('CraftingSystemManager mounted behavior', () => {
     }, 'modifiers');
     const card = target.querySelector('[data-crafting-modifier-catalogue]');
     assert.ok(card, 'the modifier card renders in the crafting stack when a formula is authored');
+    // THE RULE GRID IS ITS OWN CARD since issue 1096's parity round — `How they combine` is a
+    // sibling studio card rather than an uppercase kicker inside the library card — so the grid
+    // is reached from the panel, not from `card`.
+    const ruleCard = target.querySelector('[data-crafting-modifier-policy-card]');
+    assert.ok(ruleCard, 'the combination rule renders as its own card beside the library');
     // The policy radio-cards reflect the passed default policy.
     assert.equal(
-      card.querySelector('[data-crafting-modifier-policy-option="highest"] input').checked,
+      ruleCard.querySelector('[data-crafting-modifier-policy-option="highest"] input').checked,
       true,
       'the default policy is pinned on the radio-cards'
     );
     // Switching policy emits a defaultModifierPolicy patch.
-    card.querySelector('[data-crafting-modifier-policy-option="addAll"] input').click();
+    ruleCard.querySelector('[data-crafting-modifier-policy-option="addAll"] input').click();
     flushSync();
     assert.ok(
       patches.some((p) => p.defaultModifierPolicy === 'addAll'),
       'selecting a policy radio emits defaultModifierPolicy'
     );
     // The Phase-2 "Player picks" policy renders as a fourth radio and emits (issue 770 P2).
-    const playerPicksOption = card.querySelector(
+    const playerPicksOption = ruleCard.querySelector(
       '[data-crafting-modifier-policy-option="playerPicks"] input'
     );
     assert.ok(playerPicksOption, 'the playerPicks policy radio renders');
@@ -4658,31 +4663,26 @@ describe('CraftingSystemManager mounted behavior', () => {
       card.querySelector('[data-crafting-modifier-readonly="expression"]').textContent.trim(),
       '@abilities.med.mod'
     );
-    // The eligibility state is authored PER ROW (issue 1095), by a real checkbox with a
-    // presentational pill beside it. Unchecking the pre-selected entry emits an empty
-    // defaultModifierIds patch.
+    // The eligibility state is authored PER ROW (issue 1095), and since issue 1096's parity
+    // round the PILL IS THAT CONTROL: one `aria-pressed` toggle button at the row's right end,
+    // where there used to be a `SelectionCheckbox` with an inert `StatusPill` beside it on a
+    // second line. Turning the pre-selected entry off emits an empty defaultModifierIds patch.
     const eligibility = card.querySelector('[data-crafting-modifier-eligibility="med"]');
     assert.ok(eligibility, 'each catalogue row carries its own eligibility control');
-    const eligibilityInput = eligibility.querySelector(
-      '[data-crafting-modifier-eligibility-input="med"]'
-    );
-    assert.ok(eligibilityInput, 'the accessible CONTROL is a real checkbox input');
-    assert.equal(eligibilityInput.type, 'checkbox', 'it is a checkbox, not a button or a pill');
-    assert.equal(eligibilityInput.checked, true, 'the default-eligible entry reads as on');
-    // DN9: the pill is PRESENTATIONAL and ADJACENT — never an ancestor of the control.
-    // An interactive control inside an interactive pill lands invalid DOM.
-    const pill = eligibility.querySelector('[data-status-pill]');
-    assert.ok(pill, 'the state word renders through the shared StatusPill');
+    assert.equal(eligibility.tagName, 'BUTTON', 'the accessible CONTROL is the pill itself');
+    assert.equal(eligibility.getAttribute('aria-pressed'), 'true', 'the eligible entry reads as on');
+    // Nothing interactive NESTS: an interactive control inside an interactive one lands DOM the
+    // browser did not build as authored, and a half-finished conversion is exactly how a stray
+    // checkbox would survive inside the pill.
     assert.ok(
-      !pill.contains(eligibilityInput),
-      'the pill must not CONTAIN the checkbox — adjacent siblings, never nested'
+      !eligibility.querySelector('input, button, a'),
+      'the pill contains no second control — it IS the control'
     );
-    eligibilityInput.checked = false;
-    eligibilityInput.dispatchEvent(new Event('change', { bubbles: true }));
+    eligibility.click();
     flushSync();
     assert.ok(
       patches.some((p) => Array.isArray(p.defaultModifierIds) && p.defaultModifierIds.length === 0),
-      'unchecking an entry emits an empty defaultModifierIds set'
+      'switching an entry off emits an empty defaultModifierIds set'
     );
   });
 
@@ -4759,8 +4759,11 @@ describe('CraftingSystemManager mounted behavior', () => {
       modifiers: [{ id: 'med', label: 'Medicine', expression: '@abilities.med.mod' }],
       craftingDefaultModifierPolicy: 'bySubject',
     }, 'modifiers');
+    // SCOPED TO THE RULE CARD, not the library card: issue 1096's parity round split
+    // `How they combine` out into its own studio card, and the capture registry's selectors
+    // were re-pointed with it.
     const group = target.querySelector(
-      '[data-crafting-modifier-catalogue] [data-crafting-modifier-policy]'
+      '[data-crafting-modifier-policy-card] [data-crafting-modifier-policy]'
     );
     assert.ok(Boolean(group), 'the group still resolves by [data-crafting-modifier-policy]');
     const options = [...group.querySelectorAll('[data-crafting-modifier-policy-option]')];
@@ -5024,9 +5027,11 @@ describe('CraftingSystemManager mounted behavior', () => {
     );
   });
 
-  // What the default set IS depends on the rule, and the three readings are materially
-  // different decisions — the whole eligible set nobody narrows, the fallback a recipe
-  // inherits until it picks its own, or the menu the player chooses from at roll time.
+  // What marking an entry MEANS depends on the rule, and the readings are materially different
+  // decisions — the whole set nobody narrows, the set compared for a maximum, or the menu
+  // offered to whoever the rule defers to. Issue 1096's parity round moved this sentence into
+  // the card's DESCRIPTION slot and took the prototype's own wording for it, so the probes
+  // below are its new sentences; the property under test is unchanged.
   it('checks view: the default-set intro follows the combination rule (issue 1055)', () => {
     const introText = (craftingDefaultModifierPolicy) => {
       mountChecksView(
@@ -5045,17 +5050,21 @@ describe('CraftingSystemManager mounted behavior', () => {
       return text;
     };
     assert.ok(
-      introText('bySubject').includes('Overview tab'),
-      'under Recipe picks the GM is told where a recipe picks its own set'
+      introText('bySubject').includes('the recipe may choose from'),
+      'under By recipe the sentence names the RECORD that does the choosing'
     );
     assert.ok(
-      introText('playerPicks').includes('roll time'),
-      'under Player picks the default set is the menu offered at roll time'
+      introText('playerPicks').includes('the player may choose from'),
+      'under Player picks it names the PLAYER — the same sentence, a different chooser'
+    );
+    assert.ok(
+      introText('highest').includes('only the largest of them is added'),
+      'under Highest it states the reduction, because marking an entry enters it into a comparison'
     );
     for (const locked of ['addAll', 'highest']) {
       assert.ok(
-        !introText(locked).includes('Overview tab'),
-        `at ${locked} nobody narrows the set, so the sentence must not promise a control that is not there`
+        !introText(locked).includes('may choose from'),
+        `at ${locked} nobody chooses, so the sentence must not promise a control that is not there`
       );
     }
   });

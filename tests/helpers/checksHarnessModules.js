@@ -78,8 +78,13 @@ export const CHECKS_TREE_RAW_MODULES = Object.freeze([
 export const CHECKS_TREE_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/components/IconPicker.svelte',
   'src/ui/svelte/components/ModifierPillSelect.svelte',
-  'src/ui/svelte/components/SelectionCheckbox.svelte',
-  'src/ui/svelte/components/StatusPill.svelte',
+  // `SelectionCheckbox` and `StatusPill` left this closure with issue 1096's parity round: the
+  // modifier row's eligibility control was a checkbox plus an inert pill, and it is now ONE
+  // `aria-pressed` toggle button that the card renders itself. Nothing else in the checks tree
+  // reached for either. They are dropped rather than kept "in case", because a manifest that
+  // names modules the tree does not import is the drift this file exists to stop; the validator
+  // reports a MISSING module loudly, so re-adding one is a one-line fix if a tree grows back
+  // into it.
   'src/ui/svelte/components/FillBar.svelte',
   'src/ui/svelte/components/RowDisclosure.svelte',
   'src/ui/svelte/components/ThresholdBandStrip.svelte',

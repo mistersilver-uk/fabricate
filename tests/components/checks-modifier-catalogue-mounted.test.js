@@ -1,8 +1,15 @@
 /**
  * The modifier SELECTION card and the Validation tab's per-activity wiring, MOUNTED
- * (issues 1095, 1117).
+ * (issues 1095, 1117, 1096).
  *
- * Two things shipped unpinned and are pinned here:
+ * ISSUE 1096's PARITY ROUND rebuilt this surface against the design prototype, and what it
+ * changed is mostly INVISIBLE to a frame, which is why so much of it is pinned here: the
+ * eligibility pill became the real control (a checkbox went away, and the accessible name, the
+ * pressed state and the description all moved onto the pill), the deep link moved into the card
+ * head, the library note moved to the foot, `How they combine` became its own card, and the
+ * `bySubject` eligibility vocabulary collapsed onto `playerPicks`'s.
+ *
+ * Two further things shipped unpinned and are pinned here:
  *
  *  1. THE READ-ONLY LIBRARY ROWS. Issue 1117 removed the entry editor from this card on
  *     EVERY activity, crafting included: the library has one authoring surface (System
@@ -216,13 +223,18 @@ describe('the check-modifier catalogue card (mounted)', () => {
     harness.remount();
   });
 
-  it('gives the not-selected state one word per RULE, not one word for four', async () => {
-    const seen = new Set();
+  // THREE WORDS, one per KIND of rule (issue 1096). It was four: `bySubject` owned `Picked per
+  // subject` / `Not picked by default`. The prototype gives both DEFERRING rules the same pair,
+  // and that is forced rather than preferred — its `By recipe` description, which this card now
+  // ships verbatim, reads "from the modifiers you mark SELECTABLE", so a row saying anything
+  // else makes the sentence beside it untrue about the control it names.
+  it('gives the not-selected state one word per KIND of rule, and the two deferring rules share', async () => {
+    const seen = new Map();
     for (const [policy, on, off] of [
-      ['addAll', /Applied/, /Not applied/],
-      ['highest', /Considered/, /Not considered/],
-      ['playerPicks', /Selectable/, /Not selectable/],
-      ['bySubject', /Picked per subject/, /Not picked/],
+      ['addAll', /^Applied$/, /^Not applied$/],
+      ['highest', /^Considered$/, /^Not considered$/],
+      ['playerPicks', /^Selectable$/, /^Not selectable$/],
+      ['bySubject', /^Selectable$/, /^Not selectable$/],
     ]) {
       harness.remount();
       const target = await mountChecks({ craftingDefaultModifierPolicy: policy });
@@ -235,34 +247,146 @@ describe('the check-modifier catalogue card (mounted)', () => {
         .textContent.trim();
       assert.match(selected, on, `${policy}: the ON word`);
       assert.match(notSelected, off, `${policy}: the OFF word answers the ON one`);
-      seen.add(notSelected);
+      seen.set(policy, notSelected);
     }
-    assert.equal(seen.size, 4, 'four rules, four OFF words — none reused');
+    assert.equal(
+      new Set(seen.values()).size,
+      3,
+      'three OFF words over four rules — reused ONLY by the two that defer the selection'
+    );
+    assert.equal(
+      seen.get('bySubject'),
+      seen.get('playerPicks'),
+      'the two deferring rules say the same thing because the rule card beside them does'
+    );
     harness.remount();
   });
 
-  it('hides the eligibility pill from assistive tech, because the checkbox already says it', async () => {
+  // THE PILL IS THE CONTROL (issue 1096). It was presentational, sat beside a
+  // `SelectionCheckbox`, and was hidden from assistive technology because the checkbox already
+  // carried the state word. The prototype draws one control per row, so the checkbox is gone and
+  // the pill is a real toggle button — which means the accessible name, the pressed state and
+  // the description all have to move onto it, and none of that is visible in a frame.
+  it('makes the pill the real control: a toggle button, named, pressed and described', async () => {
     const target = await mountChecks();
-    const row = target.querySelector(
-      '[data-crafting-modifier-catalogue="crafting"] [data-crafting-modifier-eligibility="med"]'
-    );
-    const input = row.querySelector('[data-crafting-modifier-eligibility-input="med"]');
+    const card = target.querySelector('[data-crafting-modifier-catalogue="crafting"]');
+    const pill = card.querySelector('[data-crafting-modifier-eligibility="med"]');
+    assert.equal(pill.tagName, 'BUTTON', 'a control a keyboard can reach and activate');
+    assert.equal(pill.getAttribute('type'), 'button', 'never a submit inside a form-adjacent card');
+    assert.equal(pill.getAttribute('aria-pressed'), 'true', 'the selected entry reads as pressed');
     assert.match(
-      input.getAttribute('aria-label'),
+      pill.getAttribute('aria-label'),
       /Medicine — Applied/,
-      'the CHECKBOX carries the accessible name, state word included'
-    );
-    const pill = row.querySelector('[data-status-pill]');
-    assert.ok(Boolean(pill), 'the pill still renders for sighted users');
-    assert.equal(
-      pill.closest('[aria-hidden="true"]') === null,
-      false,
-      'and is hidden from a reader, which would otherwise hear "Applied" twice'
+      'the pill carries the row’s accessible name, state word included — nothing else can now'
     );
     assert.ok(
-      Boolean(target.querySelector(`#${input.getAttribute('aria-describedby')}`)),
-      'its description resolves to the active rule’s eligibility sentence, so "Applied" ' +
-        'means something to a reader who never sees the rule grid'
+      Boolean(target.querySelector(`#${pill.getAttribute('aria-describedby')}`)),
+      'its description resolves to the active rule’s sentence, so "Applied" means something ' +
+        'to a reader who never sees the rule grid'
+    );
+    assert.equal(
+      card.querySelector('[data-crafting-modifier-eligibility="huge"]').getAttribute('aria-pressed'),
+      'false',
+      'and an unselected entry reads as unpressed rather than merely differently coloured'
+    );
+
+    // NO NESTED CONTROL, in either direction. An interactive control inside an interactive one
+    // lands DOM the browser did not build as authored, and the retired checkbox is exactly what
+    // a partial conversion would leave behind.
+    assert.ok(!pill.querySelector('button, input, a'), 'nothing interactive nests inside the pill');
+    assert.ok(
+      !card.querySelector('input[type="checkbox"]'),
+      'the checkbox is gone — two controls for one decision is what this replaces'
+    );
+    harness.remount();
+  });
+
+  it('toggles the eligible set from the pill, both ways', async () => {
+    const patches = [];
+    const target = await mountChecks({
+      onUpdateCraftingCheckModifiers: (patch) => patches.push(patch),
+    });
+    const card = target.querySelector('[data-crafting-modifier-catalogue="crafting"]');
+    card.querySelector('[data-crafting-modifier-eligibility="huge"]').click();
+    card.querySelector('[data-crafting-modifier-eligibility="med"]').click();
+    assert.deepEqual(
+      patches,
+      [{ defaultModifierIds: ['med', 'huge'] }, { defaultModifierIds: [] }],
+      'clicking an unselected entry adds it and clicking a selected one removes it — the ' +
+        'pill IS the write, not a label beside one'
+    );
+    harness.remount();
+  });
+
+  // THE SHAPE OF THE SCREEN, which no per-element assertion can state. Each clause below is
+  // something that shipped in the wrong PLACE rather than missing: the deep link sat at the foot
+  // of the rows in the slot every other list here fills with its add-a-row control, the library
+  // note opened the card instead of closing it, and `How they combine` was an uppercase
+  // micro-label inside the catalogue card rather than a card of its own.
+  it('puts the deep link in the card HEAD and the library note at the FOOT', async () => {
+    const target = await mountChecks();
+    const card = target.querySelector('[data-crafting-modifier-catalogue="crafting"]');
+    const link = card.querySelector('[data-crafting-modifier-edit-link]');
+    assert.ok(
+      Boolean(link.closest('.manager-checks-card-head')),
+      'the one action this card has sits beside its title, not under its rows'
+    );
+    const rows = card.querySelector('[data-crafting-modifier-rows]');
+    assert.ok(!rows.contains(link), 'and is not a member of the list it cannot extend');
+
+    const note = card.querySelector('[data-crafting-modifier-library-note]');
+    assert.ok(Boolean(note), 'the library note still states where the entries are authored');
+    assert.equal(
+      rows.lastElementChild,
+      note,
+      'and CLOSES the card: it qualifies the rows, so it is read after them, not before'
+    );
+    harness.remount();
+  });
+
+  it('gives `How they combine` its own studio card, with a title and a description', async () => {
+    const target = await mountChecks();
+    const policyCard = target.querySelector('[data-crafting-modifier-policy-card]');
+    assert.ok(Boolean(policyCard), 'the combination rule is a card, not a kicker inside one');
+    assert.ok(
+      policyCard.classList.contains('manager-checks-card'),
+      'and it wears the studio card contract, which is what strips the inspector inset'
+    );
+    assert.equal(
+      policyCard.querySelector('.manager-checks-card-title').textContent.trim(),
+      'How they combine',
+      'a sentence-case title, not an uppercase micro-label'
+    );
+    assert.ok(
+      Boolean(policyCard.querySelector('.manager-checks-card-description')),
+      'with the description every other studio card head carries'
+    );
+    const catalogue = target.querySelector('[data-crafting-modifier-catalogue="crafting"]');
+    assert.ok(
+      !catalogue.contains(policyCard),
+      'two sibling cards — a card nested in a card is not what the stack gutter separates'
+    );
+    // The pick cap belongs to the rules it bounds, so it travels with them.
+    assert.ok(
+      !catalogue.querySelector('[data-crafting-modifier-max-picks]'),
+      'and the cap is not left behind in the library card'
+    );
+    harness.remount();
+  });
+
+  it('keeps the pick cap with the rules it bounds, under a selecting rule only', async () => {
+    const target = await mountChecks({ craftingDefaultModifierPolicy: 'playerPicks' });
+    const cap = target.querySelector('[data-crafting-modifier-max-picks]');
+    assert.ok(
+      Boolean(cap?.closest('[data-crafting-modifier-policy-card]')),
+      'the cap bounds the two deferring rules, so it sits in the card that chooses them'
+    );
+    harness.remount();
+    const nonSelecting = await mountChecks({ craftingDefaultModifierPolicy: 'addAll' });
+    assert.ok(
+      !nonSelecting.querySelector('[data-crafting-modifier-max-picks]'),
+      'and is absent under a rule where nobody selects — a cap on no selection is a control ' +
+        'with no effect'
     );
     harness.remount();
   });

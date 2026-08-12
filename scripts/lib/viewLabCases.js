@@ -2080,13 +2080,19 @@ export const VIEW_LAB_CASES = Object.freeze([
       { selector: '[data-crafting-modifier-max-picks]', scroll: true },
     ],
     expectView: 'checks-crafting',
-    // Two things at once, on the one card. `bySubject` is the FOURTH option — the one the redesign
-    // restored, the one that makes the row count even, and the only one whose absence would
-    // silently turn the 2x2 this frame is evidence for back into a three-across row. The
-    // `unlimited` cap reading is the other half, and asserting the VALUE rather than the field's
-    // presence is what separates this frame from its bounded sibling.
+    // Two things at once, on the one card — and that card is `How they combine`, which issue
+    // 1096's parity round split out of the catalogue card. This selector named
+    // `[data-crafting-modifier-catalogue]`, which is now the LIBRARY card and contains neither
+    // the rule grid nor the cap: left alone it would match nothing, and a registry selector
+    // that matches nothing fails the capture job whole and publishes NO frames at all.
+    //
+    // `bySubject` is the FOURTH option — the one the redesign restored, the one that makes the
+    // row count even, and the only one whose absence would silently turn the 2x2 this frame is
+    // evidence for back into a three-across row. The `unlimited` cap reading is the other half,
+    // and asserting the VALUE rather than the field's presence is what separates this frame
+    // from its bounded sibling.
     expectSelector:
-      '.fabricate-manager [data-crafting-modifier-catalogue]' +
+      '.fabricate-manager [data-crafting-modifier-policy-card]' +
       ':has([data-crafting-modifier-policy-option="bySubject"])' +
       ':has([data-crafting-modifier-max-picks="unlimited"])',
     kinds: ['manager', 'checks'],
@@ -2148,28 +2154,35 @@ export const VIEW_LAB_CASES = Object.freeze([
     // read-out, the bounds chip on the world's only bounded entry, and the deep link that
     // replaces the add button.
     //
-    // Anchored on the FIRST row rather than on the rows container, and the difference is the
-    // whole point: `scrollIntoViewIfNeeded` lands an over-tall container's BOTTOM edge, so
-    // anchoring the container frames the last entries and drops the eligibility sentence that
-    // now sits above the first one. Anchoring the first row frames the card from its top.
+    // Anchored on the card's TITLE (issue 1096's parity round), not on its first row.
+    // `scrollIntoViewIfNeeded` lands an over-tall element's BOTTOM edge, so anchoring the rows
+    // container frames the last entries; anchoring the first ROW was the previous fix and it
+    // now drops the card HEAD — which is where the rebuild put the deep link and the rule's own
+    // sentence, and is therefore half of what this frame exists to show. The title anchors it
+    // from the top, the same fix `manager-system-edit-lists` records for the same cause.
     query: { system: 'lab-herbalism' },
     steps: [
       'Checks',
       { selector: '#manager-checks-nav-crafting' },
       { selector: '#checks-section-modifiers' },
-      { selector: '[data-crafting-modifier-row="hb-mod-medicine"]', scroll: true },
+      {
+        selector: '[data-crafting-modifier-catalogue="crafting"] .manager-checks-card-title',
+        scroll: true,
+      },
     ],
     expectView: 'checks-crafting',
-    // The eligibility sentence ABOVE the rows — asserting its own hook is what would catch it
-    // moving back below the rule grid, where it read as a footnote about the pick cap — AND the
-    // read-only treatment on crafting, through the one element the retired editable branch could
-    // not draw, plus the deep link that replaced the add button.
+    // THE WHOLE OF THE REBUILT CARD, clause by clause, because each clause is a thing that
+    // shipped wrong and could come back: the rule's sentence in the head's description slot,
+    // the read-only expression, the bounds chip ON the row, the deep link (which was a
+    // full-width button at the foot), and the library note that now CLOSES the card instead of
+    // opening it.
     expectSelector:
       '.fabricate-manager [data-crafting-modifier-catalogue="crafting"]' +
-      ':has([data-crafting-modifier-defaults])' +
+      ':has(.manager-checks-card-head [data-crafting-modifier-defaults])' +
       ':has([data-crafting-modifier-readonly="expression"])' +
-      ':has(.manager-modifier-bounds-chip)' +
-      ':has([data-crafting-modifier-edit-link])',
+      ':has(.manager-modifier-readonly-row .manager-modifier-bounds-chip)' +
+      ':has(.manager-checks-card-head [data-crafting-modifier-edit-link])' +
+      ':has([data-crafting-modifier-library-note])',
     kinds: ['manager', 'checks'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/checks\//,
@@ -2354,9 +2367,12 @@ export const VIEW_LAB_CASES = Object.freeze([
       { selector: '[data-crafting-modifier-policy]', scroll: true },
     ],
     expectView: 'checks-crafting',
+    // RE-POINTED at the rule card (issue 1096's parity round). The grid moved out of
+    // `[data-crafting-modifier-catalogue]` into its own `How they combine` card, so the old
+    // descendant selector matches nothing — and a registry selector that matches nothing fails
+    // the capture job whole rather than this one case.
     expectSelector:
-      '.fabricate-manager [data-crafting-modifier-catalogue="crafting"] ' +
-      '[data-crafting-modifier-policy]',
+      '.fabricate-manager [data-crafting-modifier-policy-card] [data-crafting-modifier-policy]',
     position: { width: 1000, height: 720 },
     kinds: ['manager', 'checks', 'responsive'],
     sourceMatches: [

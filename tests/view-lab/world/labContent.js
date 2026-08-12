@@ -2869,7 +2869,7 @@ const ROUTED_CHECK = Object.freeze({
   // than through an empty state. It is also the rule that leaves every runework recipe frame
   // alone: the per-recipe picker renders under `bySubject` and under nothing else.
   defaultModifierPolicy: 'addAll',
-  defaultModifierIds: ['rw-mod-rune-lore', 'rw-mod-steady-hand', 'rw-mod-chisel'],
+  defaultModifierIds: ['rw-mod-rune-lore', 'rw-mod-etching', 'rw-mod-chisel'],
 });
 
 /**
@@ -2901,7 +2901,7 @@ const ROUTED_SALVAGE_CHECK = Object.freeze({
   // system whose rows the parity pass measures, without touching the crafting screen it
   // measures them on.
   defaultModifierPolicy: 'addAll',
-  defaultModifierIds: ['rw-mod-rune-lore', 'rw-mod-steady-hand'],
+  defaultModifierIds: ['rw-mod-rune-lore', 'rw-mod-etching'],
 });
 
 /**
@@ -3104,9 +3104,16 @@ const RUNEWORK_CHECK_MODIFIERS = Object.freeze([
     max: 5,
   },
   {
-    id: 'rw-mod-steady-hand',
-    label: 'Steady hand',
-    icon: 'fa-solid fa-hand',
+    // NOT `fa-hand`, which was the first icon here and cost a false finding worth recording.
+    // The roll screen draws a chip per library entry AND a chip per roll-data SUGGESTION, and
+    // the structural parity pass matches glyphs by Font Awesome name alone — so a modifier
+    // wearing `fa-hand` aliased the mockup's `fa-hand` SUGGESTION chip, turned a
+    // legitimately-exempted absence into a spurious match, and then reported the two as out
+    // of order. A lab fixture must not manufacture findings on a screen it has nothing to say
+    // about, so these three glyphs are chosen from outside the mockup's own vocabulary.
+    id: 'rw-mod-etching',
+    label: 'Etching hand',
+    icon: 'fa-solid fa-pen-nib',
     expression: '@abilities.dex.mod',
     min: -1,
     max: 5,
@@ -3114,7 +3121,7 @@ const RUNEWORK_CHECK_MODIFIERS = Object.freeze([
   {
     id: 'rw-mod-chisel',
     label: 'Inscriber’s chisel',
-    icon: 'fa-solid fa-pen-nib',
+    icon: 'fa-solid fa-hammer',
     expression: '@prof',
     min: -1,
     max: 5,

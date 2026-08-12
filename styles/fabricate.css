@@ -1974,6 +1974,12 @@
      thickness does not. The two declarations are one pair — the overflow decides whether a
      scroller appears here at all, this decides what it looks like when it does. */
   scrollbar-width: thin;
+
+  /* The backstop under the nav's own scroller (see `.manager-nav`), and inert in normal use:
+     the nav absorbs the rail's slack, so the rail itself only ever overflows when it is too
+     short for the pinned label, the scope card and the nav's floor together. Reachability
+     there matters more than avoiding a second scrollbar in a window that small. */
+  overflow: hidden auto;
 }
 
 .fabricate-manager .manager-rail-toggle {
@@ -2278,6 +2284,85 @@
   font-size: 10.5px;
   font-weight: 400;
   line-height: 1.5;
+  text-transform: none;
+}
+
+/* A head whose TITLE ROW carries an action at its right (issue 1096). The prototype puts a
+   card's one action beside its title, not under its body, and the description runs the full
+   head width beneath both. The head is a flex row, so the block holding the title row and
+   the description has to GROW — without this it is content-width and `margin-left: auto` on
+   the action has no slack to spend. */
+.fabricate-manager .manager-checks-card-head-body {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.fabricate-manager .manager-checks-card-heading {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  min-width: 0;
+}
+
+/* The head's action, LINK-STYLED. `ManagerButton` is still the primitive — it owns the
+   `<button>` semantics, the type and the disabled contract — and this is an extra-class
+   rule in the global sheet, which is the adaptation route that component's header names.
+   (0,4,0), because it has to beat `.manager-button.fab-manager-button`'s own 34px control
+   at (0,3,0) without depending on source order.
+
+   The reset is the same one the trigger disclosure states: Foundry's core `button` rule
+   imposes a fixed height, a border and a font, and no mounted test can see it. */
+.fabricate-manager .manager-button.fab-manager-button.manager-checks-card-head-link {
+  appearance: none;
+  -webkit-appearance: none;
+  display: inline-flex;
+  flex: 0 0 auto;
+  gap: 6px;
+  align-items: center;
+  height: auto;
+  min-height: 0;
+  margin-left: auto;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  color: var(--fab-accent);
+  background: none;
+  box-shadow: none;
+  font-family: inherit;
+  font-size: 10.5px;
+  font-weight: 600;
+
+  /* `normal`, not a ratio. The prototype states this link's type as a `font:` shorthand,
+     which resets `line-height` to `normal` — 13px for the manager's face at 10.5px — and the
+     link's own box IS that line box. A ratio of 1.25 computes 13.125px and stands the whole
+     control an eighth of a pixel proud, which is what the parity run reported. */
+  line-height: normal;
+  white-space: nowrap;
+}
+
+.fabricate-manager .manager-button.fab-manager-button.manager-checks-card-head-link > i {
+  font-size: 9px;
+}
+
+.fabricate-manager
+  .manager-button.fab-manager-button.manager-checks-card-head-link:not(:disabled):hover {
+  color: var(--fab-text);
+  background: none;
+  text-decoration: underline;
+}
+
+/* A label for a block INSIDE a card body — the pick cap's, and the only one left on this
+   screen. Sentence case at the prototype's 11.5px/600, in the body face rather than the
+   card title's display face: it names a field, it does not head a card. It is deliberately
+   NOT `.manager-card-title`, which is the manager's uppercase micro-label — the treatment
+   this studio retired from its cards. */
+.fabricate-manager .manager-checks-card-subheading {
+  margin: 0;
+  color: var(--fab-text);
+  font-family: inherit;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0;
   text-transform: none;
 }
 
@@ -3157,9 +3242,18 @@
 }
 
 /* ── The Modifiers screen's entry rows ────────────────────────────────────────────────
-   A read-only catalogue entry is a ROW on the studio's own row shape — the same box the
-   outcome and recipe tiers use — rather than an unboxed line of text. Scoped to the studio's
-   catalogue card so the same markup elsewhere is untouched. */
+   ONE ROW PER ENTRY, ON ONE LINE, and every number below is the prototype's own — recorded
+   by the `modifier-entry-row` region and its parts in the parity fixture, so changing one
+   here reds that run with the region and property named.
+
+   These rows went unmeasured until issue 1096's parity round: `modifier-entry-row` was
+   marked `unreachable` because no lab system authored a modifier library, so the card drew
+   its empty sentence and the rows never rendered. Everything around them matched, and the
+   screen reported clean while drawing a two-line bordered sub-card per entry. The lab world
+   seeds a library now (`tests/view-lab/world/labContent.js`), the marking is gone, and the
+   assertion is live.
+
+   Scoped to the studio's catalogue card so the same markup elsewhere is untouched. */
 .fabricate-manager .manager-checks-card .manager-modifier-readonly-row {
   display: flex;
   align-items: center;
@@ -3169,6 +3263,183 @@
   border: 1px solid var(--fab-border);
   border-radius: 9px;
   background: var(--fab-bg-0);
+}
+
+/* The entry's GLYPH TILE, the row's own leading square. Its family is the accent rather
+   than a per-entry tone: a modifier is not a hazard, and the tile exists to make the row
+   scannable by icon, not to grade it. */
+.fabricate-manager .manager-checks-card .manager-modifier-readonly-glyph {
+  display: flex;
+  flex: 0 0 26px;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  color: var(--fab-accent);
+  background: var(--fab-bg-3);
+  font-size: 11px;
+}
+
+.fabricate-manager .manager-checks-card .manager-modifier-readonly-label {
+  flex: 0 0 auto;
+  color: var(--fab-text);
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+/* THE ONE ELASTIC CELL. The expression takes the row's slack, which is what puts the bounds
+   chip and the eligibility control against the row's right edge with no auto margin
+   anywhere — exactly how the prototype lays the row out. `min-width: 0` is load-bearing: a
+   flex item's default `min-width: auto` refuses to shrink below its content, so a long
+   `@`-path would push the pill out of the row instead of ellipsing. */
+.fabricate-manager .manager-checks-card .manager-modifier-readonly-expression {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--fab-text-secondary);
+  background: none;
+  font-family: var(--fab-font-mono);
+  font-size: 11.5px;
+  font-weight: 500;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* THE ROW'S TWO CHIPS ARE NOT STYLED HERE, and that is a cascade fact rather than a
+   preference. This sheet is imported at `layer(modules)` — `tests/view-lab/cascade.css`
+   mirrors how Foundry imports a module stylesheet — while Svelte's `css: 'injected'` blocks
+   land UNLAYERED, and an unlayered author declaration beats every layered one no matter how
+   specific the layered selector is. So a rule here restating a property `Chip.svelte`'s own
+   scoped block declares cannot win, at any specificity. This exact pair was written here
+   first, at (0,4,0), and the parity run reported the chip still at the shared primitive's
+   padding, radius, fill, size and weight; an unlayered probe carrying the identical selector
+   landed immediately. The chip's parity geometry therefore lives in
+   `CraftingModifierCatalogueCard.svelte`'s own scoped block, which is unlayered too. */
+
+/* THE ELIGIBILITY CONTROL, and the pill IS it (issue 1096). It was a `SelectionCheckbox`
+   with an inert `StatusPill` beside it, on a second line of the row.
+
+   The `appearance`/`height`/`box-shadow` reset is not decoration: Foundry's core `button`
+   rule imposes a fixed height, its own border and its own font, and `min-height: 0` does
+   not cancel a fixed `height`. A mounted test cannot see any of that, because Foundry's
+   sheet is not in it — the same reset `.manager-checks-trigger-disclosure` states above,
+   for the same reason. */
+.fabricate-manager .manager-checks-card .manager-modifier-eligibility {
+  appearance: none;
+  -webkit-appearance: none;
+  display: inline-flex;
+  flex: 0 0 auto;
+  gap: 7px;
+  align-items: center;
+  justify-content: center;
+  width: 112px;
+  height: 28px;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--fab-border);
+  border-radius: 7px;
+  color: var(--fab-text-subtle);
+  background: transparent;
+  box-shadow: none;
+  font-family: inherit;
+  font-size: 10.5px;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.fabricate-manager .manager-checks-card .manager-modifier-eligibility.is-on {
+  border-color: var(--fab-accent-border);
+  color: var(--fab-accent);
+  background: var(--fab-accent-soft);
+}
+
+.fabricate-manager .manager-checks-card .manager-modifier-eligibility:hover {
+  border-color: var(--fab-accent-border);
+  color: var(--fab-accent);
+}
+
+.fabricate-manager .manager-checks-card .manager-modifier-eligibility:focus-visible {
+  outline: 2px solid var(--fab-accent);
+  outline-offset: 2px;
+}
+
+/* The state DOT. Colour is never the only carrier — the word beside it changes too — but the
+   dot is what makes the state legible without reading, and an unlit one is a different SHAPE
+   of statement from a lit one at a glance down a column of rows. */
+.fabricate-manager .manager-checks-card .manager-modifier-eligibility-dot {
+  flex: 0 0 auto;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--fab-bg-3);
+}
+
+.fabricate-manager
+  .manager-checks-card
+  .manager-modifier-eligibility.is-on
+  .manager-modifier-eligibility-dot {
+  background: var(--fab-accent);
+}
+
+/* THE NOTE THAT CLOSES THE CARD. Quiet on purpose: the surface fill and the ordinary border,
+   with the glyph carrying the only colour, because it points at another screen rather than
+   reporting a hazard. Same treatment the On failure screen's closing note takes. */
+.fabricate-manager .manager-checks-card .manager-modifier-library-note {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  margin: 0;
+  padding: 11px 12px;
+  border: 1px solid var(--fab-border);
+  border-radius: 9px;
+  color: var(--fab-text-muted);
+  background: var(--fab-surface-soft);
+  font-size: 10.5px;
+  font-weight: 400;
+  line-height: 1.55;
+}
+
+.fabricate-manager .manager-checks-card .manager-modifier-library-note > i {
+  flex: 0 0 auto;
+  margin-top: 1px;
+  color: var(--fab-info);
+  font-size: 11px;
+}
+
+/* THE PICK CAP, as the row the prototype draws: its label and hint on the left, the Stepper
+   on the right, inside the studio's own row box. It was a stacked heading, paragraph and
+   field taking the card body's default rhythm. */
+.fabricate-manager .manager-checks-card .manager-modifier-max-picks {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  margin-top: 14px;
+  padding: 11px 13px;
+  border: 1px solid var(--fab-border);
+  border-radius: 9px;
+  background: var(--fab-bg-0);
+}
+
+.fabricate-manager .manager-checks-card .manager-modifier-max-picks-body {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* Stated on the ELEMENT, not inherited from `.manager-muted`. That class sets
+   `margin: … 0 0` as a shorthand at the same specificity a longhand here would tie with,
+   and the later of two tied declarations wins — which is how a neighbouring hint on this
+   studio's Outcomes screen computed a `margin-bottom` of `0px` while its own rule said
+   otherwise. Nothing here depends on that class. */
+.fabricate-manager .manager-checks-card .manager-modifier-max-picks-hint {
+  margin: 3px 0 0;
+  color: var(--fab-text-muted);
+  font-size: 10px;
+  font-weight: 400;
+  line-height: 1.5;
 }
 
 /* ── The On failure screen's flag cards ───────────────────────────────────────────────
