@@ -1792,6 +1792,15 @@ The GM component surfaces: the component browser and the component editor.
     The panel states permanently that applying essences overwrites the values on every selected component, and additionally warns when the staged overwrite would in fact change or remove authored essence values on at least one selected component.
     One action applies every staged axis to every selected component; it names the number of components it will affect and is inert until at least one axis is staged.
     Applying persists through a single set-apply write, then clears the selection and the staged changes, returning the rail to the single-component inspector.
+11. The component browser's bulk edit panel offers a set DELETE, rendered below the panel shell rather than inside it, so a destructive action never reads as a second way of applying the staged edit.
+    The set delete exists because the panel swap at requirement 10 otherwise removes the only delete affordance at exactly the moment the GM has selected the rows they want removed; unlink and copy-source-UUID stay inspector-only, because neither is destructive.
+    The delete states its impact BEFORE it is armed and recomputes it when the selection changes: how many components will be deleted, how many recipes will be rewritten, and how many of those recipes will be left with no ingredient sets or no results and clamped to disabled.
+    The two recipe numbers are counts of DISTINCT recipes, so neither exceeds what the cascade will touch: a recipe naming two selected components is rewritten once, never counted once per component.
+    The disabled number counts only recipes going from enabled to disabled, because it warns about craftability the GM is about to lose rather than restating what was already off.
+    Deletion is WARNED, not BLOCKED: no component is refused and no set member is skipped on account of the recipes referencing it, matching the essence rule under Essences Tab.
+    The set delete uses the two-step armed confirmation rather than a modal dialog, paired with the impact statement above; the armed token is dropped whenever the selection changes at all, because an arm is a statement about a specific set.
+    The set write persists through a single crafting-system write and a single recipes write regardless of set size, then clears the selection and returns the rail to the single-component inspector.
+    The single-component delete states the same arithmetic in its confirmation, from the same computation, so the two forms cannot report different numbers for the same component.
 
 ## Step Editor
 
