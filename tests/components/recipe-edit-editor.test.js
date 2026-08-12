@@ -32,6 +32,19 @@ const grantAccessInspectorPath = resolve(
   'src/ui/svelte/apps/manager/GrantAccessInspector.svelte'
 );
 const storePath = resolve(repoRoot, 'src/ui/svelte/stores/adminStore.js');
+// The GM browser row and inspector projection left `adminStore.js` for pure modules in
+// issue 1090. The assertions below that pin a PROJECTED field therefore read the
+// projection module, not the store — the store is reactive wiring now — and
+// `projectionSource` is the two concatenated so a field that migrates between them
+// stays covered.
+const recipeRowProjectionPath = resolve(
+  repoRoot,
+  'src/ui/svelte/stores/adminRecipeRowProjection.js'
+);
+const systemInspectorProjectionPath = resolve(
+  repoRoot,
+  'src/ui/svelte/stores/adminSystemInspectorProjection.js'
+);
 const modelPath = resolve(repoRoot, 'src/models/Recipe.js');
 const managerPath = resolve(repoRoot, 'src/systems/RecipeManager.js');
 const graphPath = resolve(repoRoot, 'src/ui/svelte/util/recipeGraphBuilder.js');
@@ -61,6 +74,9 @@ const browserInspectorSource = readFileSync(browserInspectorPath, 'utf8');
 const accessSurfaceSource = readFileSync(accessSurfacePath, 'utf8');
 const grantAccessInspectorSource = readFileSync(grantAccessInspectorPath, 'utf8');
 const storeSource = readFileSync(storePath, 'utf8');
+const recipeRowProjectionSource = readFileSync(recipeRowProjectionPath, 'utf8');
+const systemInspectorProjectionSource = readFileSync(systemInspectorProjectionPath, 'utf8');
+const projectionSource = `${recipeRowProjectionSource}\n${systemInspectorProjectionSource}`;
 const modelSource = readFileSync(modelPath, 'utf8');
 const managerSource = readFileSync(managerPath, 'utf8');
 const graphSource = readFileSync(graphPath, 'utf8');
@@ -579,9 +595,10 @@ describe('adminStore recipe-item projections + API', () => {
   });
 
   it('projects recipeItemId on recipes and recipeItemDefinitions on the selected system', () => {
-    assert.ok(storeSource.includes('recipeItemId,'), 'recipeItemId projected onto recipe rows');
-    assert.ok(/recipeItemDefinitions:\s*Array\.isArray\(selectedSystem\.recipeItemDefinitions\)/.test(storeSource), 'recipeItemDefinitions projected');
-    assert.equal(storeSource.includes('linkedRecipeItemUuid'), false, 'never projects the legacy alias');
+    assert.ok(recipeRowProjectionSource.includes('recipeItemId,'), 'recipeItemId projected onto recipe rows');
+    assert.ok(/recipeItemDefinitions:\s*Array\.isArray\(selectedSystem\.recipeItemDefinitions\)/.test(systemInspectorProjectionSource), 'recipeItemDefinitions projected');
+    assert.equal(storeSource.includes('linkedRecipeItemUuid'), false, 'the store never projects the legacy alias');
+    assert.equal(projectionSource.includes('linkedRecipeItemUuid'), false, 'nor does the projection');
   });
 });
 
@@ -1057,7 +1074,7 @@ describe('recipe image readers resolve the recipe own image through the shared h
 
   it('leaves the store with no book image for any reader to prefer, membership intact', () => {
     assert.equal(
-      storeSource.includes('recipeItemImg'),
+      `${storeSource}\n${projectionSource}`.includes('recipeItemImg'),
       false,
       'the projection no longer derives an image from the first containing book'
     );
@@ -1067,7 +1084,7 @@ describe('recipe image readers resolve the recipe own image through the shared h
       'recipeItemName',
       'recipeItemSourceUuid',
     ]) {
-      assert.ok(storeSource.includes(field), `the projection keeps ${field}`);
+      assert.ok(recipeRowProjectionSource.includes(field), `the projection keeps ${field}`);
     }
   });
 
@@ -1243,8 +1260,8 @@ describe('the editor enable-toggle gate is named apart from the activation gate 
     // The other half. Renaming the projection instead of the editor local would satisfy
     // the negative assertions above while leaving the two concepts merged under one name.
     assert.ok(
-      storeSource.includes('enableBlocked: _isRecipeEnableBlocked('),
-      'adminStore still projects the activation gate onto GM recipe rows as enableBlocked'
+      recipeRowProjectionSource.includes('enableBlocked: _isRecipeEnableBlocked('),
+      'the row projection still projects the activation gate onto GM recipe rows as enableBlocked'
     );
     assert.ok(
       browserInspectorSource.includes('selectedRecipe.enableBlocked'),
