@@ -115,7 +115,7 @@
       {anchorsBands
         ? text(
             'FABRICATE.Admin.Manager.Checks.Crafting.TiersLeadBands',
-            'A recipe picks one of these; its DC anchors the outcome bands below.'
+            'A recipe picks one of these; its DC anchors the outcome bands on the Outcomes section.'
           )
         : text(
             'FABRICATE.Admin.Manager.Checks.Crafting.TiersLead',

@@ -317,7 +317,7 @@
     noFormula: {
       key: 'FABRICATE.Admin.Manager.Checks.Crafting.ModifierInertNoFormula',
       fallback:
-        'The check for this resolution mode has no roll formula yet, so nothing here is rolled. Author one above and these modifiers are added to it automatically.',
+        'The check for this resolution mode has no roll formula yet, so nothing here is rolled. Author one on The roll section and these modifiers are added to it automatically.',
     },
     // GATHERING d100 ONLY, and it exists because `noCheck` is FALSE here. The d100 rolled
     // against each drop's chance IS this mode's check; what it lacks is a seam to add

@@ -698,10 +698,16 @@
 </aside>
 
 <!--
-  NO SCOPED BLOCK. Every rule this rail draws itself with is a MEASURED value compared against
-  the prototype by `tests/components/checks-studio-parity.test.js`, and that gate reads
-  `styles/fabricate.css` plus the scoped CSS of the primitives it names. Rules split between
-  here and there would be measured only if this file were added to that list too — so the
-  rail's rules all live in the sheet's Checks Studio parity block, next to the numbers they
-  have to agree with (issue 1096).
+  NO SCOPED BLOCK. Every rule this rail draws itself with is a MEASURED value taken from the
+  prototype, and they all live together in the sheet's Checks Studio parity block, next to the
+  numbers they have to agree with (issue 1096).
+
+  THERE IS NO GATE BEHIND THEM. This note used to name
+  `tests/components/checks-studio-parity.test.js` as the thing that measured them; that test was
+  DELETED when the parity harness moved out of CI, and the comment outlived it. The live
+  instrument is `scripts/visual-parity/`, which is dev-time only and never runs in CI — so a
+  number changed here reds nothing, which is exactly how three type-scale values in this rail
+  came to drift from the prototype unnoticed. Measure with `scripts/visual-parity/` by hand, and
+  pin anything that must not move again in `tests/components/manager-layout.test.js`, which does
+  run under `npm test`.
 -->

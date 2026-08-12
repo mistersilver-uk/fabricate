@@ -1565,7 +1565,7 @@
               <p class="manager-muted">
                 {text(
                   'FABRICATE.Admin.Manager.Checks.Crafting.AlchemyNoneLead',
-                  'This alchemy system is set to “No check”, so a matched brew always succeeds and produces its single result set. There is nothing to configure here. Choose Simple or Tiered above to author a crafting check.'
+                  'This alchemy system is set to “No check”, so a matched brew always succeeds and produces its single result set. There is nothing to configure here. Choose Simple or Tiered on The roll section to author a crafting check.'
                 )}
               </p>
             </section>

@@ -2204,9 +2204,15 @@
 
 /* ══ Checks Studio visual parity with the standalone prototype (issue 1096) ═══════════
    Every rule below is a MEASURED value, not a chosen one: `tests/fixtures/checks-studio-parity.json`
-   records the prototype's computed styles per named region, and
-   `tests/components/checks-studio-parity.test.js` renders these rules in Chromium and
-   compares. Change a number here and that gate reds with the region and property named.
+   records the prototype's computed styles per named region.
+
+   NOTHING GATES THEM IN CI. This block used to say that
+   `tests/components/checks-studio-parity.test.js` rendered these rules in Chromium and compared,
+   and that changing a number here would red that gate. That test was DELETED when the parity
+   harness moved out of CI, and this claim outlived it by several commits — which is how three
+   type-scale values in the Checks rail drifted from the prototype with every gate green. The
+   live instrument is `scripts/visual-parity/`, run by hand at dev time. A value that must not
+   move again belongs in `tests/components/manager-layout.test.js`, which runs under `npm test`.
 
    The type sizes here are authored in PX rather than this sheet's usual `rem`, and that is
    deliberate: the prototype authors px, several of its sizes are half-pixels (10.5, 12.5,
