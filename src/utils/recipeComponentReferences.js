@@ -221,7 +221,12 @@ export function stripComponentsFromRecipeJson(recipe, componentIds) {
 
   json.ingredientSets = stripSets(source?.ingredientSets);
   json.resultGroups = stripResultGroups(source?.resultGroups);
-  json.results = (source?.results || []).filter((res) => !isDeletedLegacy(res));
+  // The flat top-level `results` alias is NOT re-emitted (issue 1087). It was only ever a
+  // flatten of `resultGroups` above, so a component stripped from the groups is already gone
+  // from any flatten of them — writing the key back would put the retired alias straight into
+  // the `updateRecipe` merge payload and undo the retirement one delete at a time. READING it
+  // stays permanent, above and in `Recipe._normalizeResultGroups`: a plain legacy object handed
+  // to these helpers may still carry it.
 
   // The STEP copies, rewritten by the same two helpers. `getExecutionSteps()` returns these
   // and ignores the recipe-level fields, so leaving them behind is what would strand a

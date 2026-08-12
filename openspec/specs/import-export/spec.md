@@ -36,6 +36,10 @@ A system export MUST include every supported GM-authored record type for that sy
 This spans the `craftingSystems`, `recipes`, `gatheringEnvironments`, and `gatheringConfig` settings.
 The per-system `economy` slice (stamina defaults and resource-node/limitation flags) MUST ride along.
 
+Completeness is a property of the authoring DATA, not of the key set: an exported recipe carries whatever `Recipe.toJSON()` emits, which since `1.25.0` (issue 1087) omits the flat top-level `results` alias and every field whose absence the constructor rebuilds to the identical value (see `data-models/spec.md` requirement 18).
+An export produced after that change is therefore smaller and key-sparser than one produced before it while describing the same system, and MUST NOT be treated as incomplete for the keys it leaves out.
+Import MUST keep ACCEPTING both, permanently: the read fallbacks are what let an export authored by any earlier version — or by third-party content that never round-tripped through this module — still import with every result and every authored value intact.
+
 ### Explicit schema markers
 
 The export envelope MUST carry an integer `schemaVersion` that is distinct from `fabricateVersion`.
@@ -135,6 +139,8 @@ Terminating the progress indicator on failure MUST NOT suppress, wrap, or alter 
 ### Round-trip integrity
 
 For supported authoring data, a single-store keep-mode `export → import → export` MUST be equivalent modulo the volatile envelope fields `exportedAt` and `fabricateVersion`.
+Equivalence is over the RECONSTRUCTED authoring data, not the literal key set: a bundle carrying the flat top-level `results` alias, or carrying a field at the value its constructor rebuilds from absence, MUST come back describing the same recipes even though the re-export omits those keys (`data-models/spec.md` requirement 18 and § Write-Retired Aliases).
+Losing a result that reached the payload only through the flat alias would be a round-trip failure, which is why the read fallback is permanent rather than a migration window.
 `craftingCheck.maxModifierPicks` MUST round-trip through `export → import → export` under keep mode, and an ABSENT cap MUST stay absent for every rule the derivation above does not stamp — absence is the "unlimited" value, so writing a bound where the source had none would truncate recipe picks the bundle carries.
 `CraftingSystem.modifiers` — the ONE system-level modifier library (issues 1095, 1117), with each entry's absence-preserving `min` / `max` — MUST round-trip under keep mode, as MUST each of the three activity checks' `defaultModifierPolicy` / `defaultModifierIds` / `maxModifierPicks` selection triple.
 `buildExportPayload` deep-clones the system, so the top-level catalogue round-trips for free once `_normalizeSystem` emits it there; an entry that authored NEITHER bound MUST come back with neither key, because a `min: 0` acquired in transit is a legal-looking catalogue that silently zeroes the modifier.

@@ -5931,6 +5931,10 @@ export class CraftingSystemManager {
    * Whether a rewritten recipe has lost its ingredient sets or its results entirely and
    * must therefore be clamped to disabled. Shared by the single and set essence deletes so
    * the two cannot disagree about what "no longer craftable" means.
+   *
+   * Both callers pass `recipe.toJSON()`, whose result data lives in `resultGroups` alone: the
+   * flat top-level `results` alias is no longer emitted (issue 1087) and was a flatten of
+   * exactly those groups, so it could never have made this predicate answer differently.
    * @param {object} updated a plain recipe JSON.
    * @returns {boolean}
    * @private

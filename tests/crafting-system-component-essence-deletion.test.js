@@ -324,6 +324,33 @@ test('deleteItem strips a legacy systemItem-alias match ingredient', async () =>
   assert.equal(aliasUpdate.updates.enabled, false, 'recipe left without ingredient sets is disabled');
 });
 
+test('deleteItem disables a recipe whose only RESULT was the deleted component', async () => {
+  // The result side of the strip, and the branch that decides "no longer craftable".
+  // `deleteItem` used to answer that question from the flat top-level `results` alias as well
+  // as from `resultGroups`; issue 1087 retired the alias from `Recipe.toJSON()`, so the answer
+  // now comes from the groups alone — which is where the alias's entries always came from.
+  // Nothing else covered this branch: replacing it with a constant `true` broke no test.
+  notifications.length = 0;
+  const recipeManager = makeRecipeManager();
+  const manager = makeManager(recipeManager);
+
+  await manager.deleteItem('sys', 'bar');
+
+  const ironUpdate = recipeManager.updateCalls.find(call => call.recipeId === 'recipe-iron');
+  assert.ok(ironUpdate, 'the recipe producing the deleted component is updated');
+  assert.equal(ironUpdate.updates.resultGroups.length, 0, 'the emptied result group is dropped');
+  assert.ok(
+    !('results' in ironUpdate.updates),
+    'and the retired flat alias is not written back into the update payload'
+  );
+  assert.equal(ironUpdate.updates.enabled, false, 'a recipe left with no results is disabled');
+  assert.equal(
+    ironUpdate.updates.ingredientSets.length,
+    1,
+    'while its untouched ingredient set survives — the disable is the results rule, not a wipe'
+  );
+});
+
 test('_recipeReferencesComponent detects structured-match and legacy-alias component references', () => {
   const recipeManager = makeRecipeManager();
   const manager = makeManager(recipeManager);
