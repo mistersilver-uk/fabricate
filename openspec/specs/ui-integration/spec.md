@@ -356,7 +356,8 @@ Selected-system navigation:
 - The Manager V2 selected-system `Crafting` nav group (recipes, crafting settings, access, books & scrolls, recipe item editor) is **unconditional**: it renders whenever a crafting system is selected, regardless of `fabricate.experimentalFeatures` (issue 745, the v1.3 headline).
   The only experimental-gated selected-system rail item is `Graph`: it renders as a disabled planned rail item with the `Soon` treatment **only** while `fabricate.experimentalFeatures` is enabled, and cannot become the active route until its v2 route content is implemented (#442).
   There is no `Recipes` placeholder rail item and no `Rules` rail item; the deferred-placeholder set is `graph` alone, shown only under the experimental toggle.
-  The top-level `Checks` rail item (hosting the Crafting / Salvage / Gathering / Validation sub-tabs) and the `Tags & Categories` rail item are fully implemented and **not** experimental-gated.
+  The top-level `Checks` rail item — an expandable nav GROUP whose Crafting / Salvage / Gathering / Validation entries are rail CHILDREN owning the routes `CHECKS_VIEWS` declares, not tabs inside one view — and the `Tags & Categories` rail item are fully implemented and **not** experimental-gated.
+  "Sub-tab" names the five SECTIONS inside an activity route and must not be reused for these children.
   When `Recipes` is the active route, its `recipe-edit` subroute is treated as part of the Recipes route for navigation, breadcrumb (`Crafting` then `Recipes` then `Edit recipe`), and left-nav active-state purposes — the same sibling-subroute relationship the Essences route has with `essence-edit`.
 - The selected-system `Crafting` rail item is an expandable nav group modelled on the Gathering group, shown whenever a crafting system is selected.
   The parent row shows an expand/collapse control and the recipe count as its badge.
@@ -426,7 +427,7 @@ Tabs:
 - Essences (only when enabled)
 - Recipes
 - Tags & Categories
-- Checks (Crafting / Salvage / Gathering / Validation sub-tabs)
+- Checks (an expandable group whose children are the Crafting / Salvage / Gathering / Validation routes)
 - Environments (only when the selected system has `features.gathering === true`)
 
 ### Systems Tab
@@ -465,7 +466,7 @@ Routed keeps its multi-group list and Add group; progressive is unchanged.
 #### Feature Toggles
 
 - Gathering: persists `features.gathering` and makes the selected system's gated `Environments` tab reachable when enabled.
-- Salvage (`features.salvage`): GM toggle, default on — an absent key defaults true, a present key must be exactly true; gates the salvage subsystem (Checks tab, resolution-mode card, component editor, validation, runtime, and player salvage panel).
+- Salvage (`features.salvage`): GM toggle, default on — an absent key defaults true, a present key must be exactly true; gates the salvage subsystem (the `checks-salvage` route, resolution-mode card, component editor, validation, runtime, and player salvage panel).
 - Chat output (`features.chatOutput`): GM toggle, default on; hint "Posts a summary chat card after crafting and gathering attempts." — gates the crafting, salvage, and gathering result chat cards.
 
 #### Feature Controls
@@ -549,7 +550,7 @@ A check is usable iff its mode carries an authored `rollFormula`; the legacy che
 - Enable checks (the on/off toggle for the optional simple-mode check)
 - Roll formula, DC, and tier controls per mode (`simple` / `routed` / `progressive`)
 - The simple-mode dynamic-DC macro (`craftingCheck.simple.macroUuid`) — the one surviving check-adjacent macro (it only computes the DC)
-- Failure consumption policy — two live-persisting toggles in the non-alchemy crafting sub-tab editing `craftingCheck.consumption.consumeIngredientsOnFail` (default `true`; whether a recipe's ingredients are consumed on a failed crafting check) and `craftingCheck.consumption.breakToolsOnFail` (default `false`; whether required tools break on a failed check — the 1.7.0 rename of `consumeCatalystsOnFail`).
+- Failure consumption policy — two live-persisting toggles on the **On failure** section of the non-alchemy `checks-crafting` route, editing `craftingCheck.consumption.consumeIngredientsOnFail` (default `true`; whether a recipe's ingredients are consumed on a failed crafting check) and `craftingCheck.consumption.breakToolsOnFail` (default `false`; whether required tools break on a failed check — the 1.7.0 rename of `consumeCatalystsOnFail`).
   The engine applies this policy on every failed crafting check; it is NOT shown in alchemy mode, where consumption is governed by the distinct `alchemy.consumeOnFail` flag.
   Salvage failure consumption is a separate, independently-defaulted policy read from `salvageCraftingCheck.consumption` (`consumeComponentOnFail`, default `true`; `breakToolsOnFail`, default `false`) that this crafting control does not change.
 - Optional routed outcomes reference list (for GM guidance only; not a routing map)
@@ -1505,7 +1506,7 @@ Under **Inherit system default** the pill row is replaced by a read-only line na
 
 **Pick cap disclosure.** When the system's cap is bounded, the picker states it in words beneath the pills ("This system lets a recipe pick one check modifier." at a cap of 1, otherwise "…up to N check modifiers."), and adds an at-cap clause once the recipe has picked that many.
 An unbounded (absent) cap renders no sentence at all, because there is nothing to disclose.
-The add-menu button is disabled at the cap and an add is refused a second time in the toggle handler, which is what holds when the cap is lowered on the Checks tab while this editor is open — but neither is the invariant: `resolveEligibleModifierIds` truncates on read, so a cap lowered below what a recipe already picked is honoured whatever is on disk, and the recipe's stored picks survive intact.
+The add-menu button is disabled at the cap and an add is refused a second time in the toggle handler, which is what holds when the cap is lowered on the Checks studio while this editor is open — but neither is the invariant: `resolveEligibleModifierIds` truncates on read, so a cap lowered below what a recipe already picked is honoured whatever is on disk, and the recipe's stored picks survive intact.
 
 A legacy `craftingModifier.policy` left on disk by a pre-1055 world is CARRIED FORWARD untouched by every writer on this tab.
 This surface no longer authors a rule and must not silently delete one either — dropping a key while editing a neighbouring one is data loss disguised as a set edit — and the key is inert regardless, because the resolver never reads it.
@@ -1526,7 +1527,7 @@ It renders full-bleed below the grid, replacing the control the grid would other
 A library selection can be inert for THREE DISTINCT reasons this selector distinguishes rather than collapsing into one boolean: the mode rolls no check slot at all (`noCheck`), a slot exists but carries no authored roll formula (`noFormula`), or the mode rolls a check that cannot take modifiers yet (`noModifierSupport`, reachable only on gathering `d100`) — each renders its own remedy-specific copy, both on this tab and on the Checks card.
 The third cause is REMOVED with the placeholder, together with the remedy-specific copy it drove on both surfaces.
 The selector reports `rollFormula` and `checkUsable` POST-shim, so a stored formula whose only content was the retired placeholder reports `noFormula` rather than reporting usable.
-**Checks tab — Validation, the retired-placeholder readiness split.** `checksReadiness.js` derives `hasRollFormula` from the POST-shim formula, not the raw field, so the Validation tab cannot tick "Has a roll formula" green for a check `checkUsable` reports as unusable — the invariant `resolution-modes/spec.md` states, on the one surface a GM consults to find out whether a check works.
+**Checks studio — Validation, the retired-placeholder readiness split.** `checksReadiness.js` derives `hasRollFormula` from the POST-shim formula, not the raw field, so the Validation route cannot tick "Has a roll formula" green for a check `checkUsable` reports as unusable — the invariant `resolution-modes/spec.md` states, on the one surface a GM consults to find out whether a check works.
 A typed retired placeholder raises one of TWO mutually exclusive issues, and the split is on the STRIP OUTCOME `planRetiredPlaceholderStrip` reports — the same decider `checkUsable` and the `1.21.0` migration reduce — never on the placement classifier alone, because the two disagree and the tab and the migration would then give the GM opposite instructions about one formula:
 
 - `retiredPlaceholderInFormula` (**warning**) when the shim STRIPS the placement.
@@ -1545,9 +1546,10 @@ It is kept here because `evaluateCheckReadiness` is a pure evaluator over a plai
 Both strings NAME `@craftingmod` explicitly rather than saying "a retired placeholder", which is unidentifiable in a formula carrying several `@` tokens.
 That is not in tension with the inert-cause copy: those two strings must not name a placeholder because they would be telling a GM to ADD one, and there is none to add.
 
-The catalogue card renders in **every** crafting sub-tab, including alchemy: it is no longer gated on a single "check usable" boolean, because that gate made two of the three inert causes unreachable on the sub-tabs it hid the card from entirely.
+The catalogue card renders in **every** crafting activity route, including alchemy: it is no longer gated on a single "check usable" boolean, because that gate made two of the three inert causes AS THEY STOOD AT ISSUE 1055 (`noCheck` / `noFormula` / `noPlaceholder`) unreachable on the surfaces it hid the card from entirely.
+That historical triple is not the live one: `noPlaceholder` retired with the placeholder at issue 1094 and `noModifierSupport` was added at issue 1096, so the live set is again THREE and is stated below.
 
-**Checks tab — combination rule and pick cap.** `CraftingModifierCatalogueCard.svelte` authors everything the SYSTEM owns here, and the system owns all of it: there is no authority axis and no per-recipe rule override.
+**Checks studio — combination rule and pick cap.** `CraftingModifierCatalogueCard.svelte` authors everything the SYSTEM owns here, and the system owns all of it: there is no authority axis and no per-recipe rule override.
 It renders the **Combination rule** as one `RadioCardGroup` of four options in `MODIFIER_POLICIES` order — **Add all**, **Highest**, **By recipe / By component / By gathering task** (`bySubject`, labelled from the activity), **Player picks** — so the two selecting rules sit adjacent and the 2x2 grid reads them as a pair.
 `MODIFIER_POLICIES` remains the source of that list and its order, and `normalizeModifierPolicy` validates the selection; neither is re-declared as a local literal, and the latter is what makes a world still carrying the pre-1095 `byRecipe` select the right card.
 The 2x2 grid MUST reflow to 1x4 under the container query rather than overflow the real ~700–760px pane: the card declares itself a container (`container-type: inline-size`), so the shipped `@container (max-width: 620px)` rule for `.is-config-cards` measures the CARD rather than the whole manager shell.
@@ -1557,9 +1559,11 @@ Crafting used to carry an entry editor here, which made the Checks screen a seco
 **Read-only applies to the ENTRIES alone**: the per-entry eligibility control and the combination-rule grid stay fully editable on all three activities, because deciding which entries apply and how they combine is exactly what each activity owns.
 The Checks saver carries no library half at all, so the removal is structural rather than a hidden control.
 
-**The eligibility control carries EIGHT labels, not five**: one selected word per rule — `Applied` (`addAll`), `Considered` (`highest`), `Selectable` (`playerPicks`), `Picked per subject` (`bySubject`) — and one NOT-selected word per rule to answer it (`Not applied`, `Not considered`, `Not selectable`, `Not picked by default`).
-A single off word is the negation of ONE of the four and of no other, so a row reading "Selectable" when on and "Not applied" when off states the two ends of two different sentences.
-The GLYPH and the TONE stay constant across all four off readings, deliberately: the not-selected state has to read as one state at a glance, and it is the WORD that completes the sentence the rule started.
+**The eligibility control carries SIX labels over four rules, not one word and not eight**: three selected words — `Applied` (`addAll`), `Considered` (`highest`), `Selectable` (BOTH `playerPicks` AND `bySubject`) — and one NOT-selected word to answer each (`Not applied`, `Not considered`, `Not selectable`).
+A single off word is the negation of ONE on word and of no other, so a row reading "Selectable" when on and "Not applied" when off states the two ends of two different sentences.
+**`bySubject` SHARES `playerPicks`'s pair rather than owning a fourth**, and that is a requirement rather than an economy: the shipped `By recipe` rule description reads "from the modifiers you mark **selectable**", so a row wearing any other word makes the sentence beside it untrue about its own control.
+One word per KIND of rule is the rule — unconditional, entered into a maximum, or offered to whoever the rule defers to — and the two deferring rules differ in WHO is offered the entry, never in whether it is offered.
+The GLYPH and the TONE stay constant across every off reading, deliberately: the not-selected state has to read as one state at a glance, and it is the WORD that completes the sentence the rule started.
 **The accessible CONTROL is the `SelectionCheckbox`, and it carries the WHOLE accessible name — the entry's label and the state word — in its own `aria-label`.
 The `StatusPill` beside it is presentational and `aria-hidden`**: leaving both in the accessibility tree read the state twice, and a pill that merely supplied `aria-labelledby` would still be a second copy of the same words.
 One of the two, never both.
@@ -1567,7 +1571,9 @@ The checkbox is `aria-describedby` the ACTIVE RULE's eligibility sentence, which
 The two are adjacent and are NEVER nested — an interactive control inside an interactive pill lands invalid DOM.
 The not-selected state differs by more than colour: the checkbox is unchecked and the pill's word AND glyph both change, so the distinction survives a monochrome render.
 
-The section is labelled **"Check modifiers"** on all three activities — an explicit, recorded deviation from the prototype's bare "Modifiers" — because what THIS section authors is a selection, told apart by name from the drop-row and event sections' "Character modifiers" references and from the one authoring surface's plain "Modifiers".
+**Issue 1096 REVERSED this section's name, and the reversal is the requirement.** It was labelled "Check modifiers" on all three activities as a recorded deviation from the prototype; the studio's five-section strip now names the section **"Modifiers"**, and the two cards inside it are **"Named modifiers"** (the read-only library with the eligibility control) and **"How they combine"** (the rule grid and the pick cap).
+The disambiguation that name was carrying is not lost, because it moved to where the two concepts can actually be confused: a drop row and an event still head their references "Character modifiers", the one authoring surface is still plain "Modifiers", and the surviving "Check modifiers" heading names a SUBJECT's pick — its one consumer is the gathering task editor, where a task's check-modifier pick sits on the same screen as its drop rows' character modifiers.
+A Checks route needs no such qualifier: the route is already named for the activity whose check it authors.
 The **gathering section additionally renders the dormancy notice** naming issue 683.
 
 Beneath it, a **Maximum picks** stepper authors `maxModifierPicks`.
@@ -1762,20 +1768,20 @@ The routing basis is the system **mode**, not a per-recipe provider: the recipe 
 
 ### Alchemy check-mode selector (issue 554)
 
-- At the **top of the Checks tab's Crafting sub-tab**, shown only when `resolutionMode === "alchemy"`: a native check-editor radio group (`manager-checks-type-options`) for `alchemy.checkMode` (`none` / `simple` / `tiered`), rendered ABOVE the per-mode editor and persisted live via `store.setAlchemyCheckMode` (which spreads the nested `alchemy` block so `learnOnCraft`/`consumeOnFail`/`showAttemptHistoryToPlayers` are preserved).
+- At the **top of the `checks-crafting` route's The roll section**, shown only when `resolutionMode === "alchemy"`: a native check-editor radio group (`manager-checks-type-options`) for `alchemy.checkMode` (`none` / `simple` / `tiered`), rendered ABOVE the per-mode editor and persisted live via `store.setAlchemyCheckMode` (which spreads the nested `alchemy` block so `learnOnCraft`/`consumeOnFail`/`showAttemptHistoryToPlayers` are preserved).
   Selecting a mode swaps the editor below it live.
 - The selector is NOT rendered on the Crafting Settings page; that page keeps only the Recipe resolution, Recipe visibility, and (when salvage is on) Salvage resolution cards.
-- The three behaviour flags the selector preserves (`learnOnCraft`, `consumeOnFail`, `showAttemptHistoryToPlayers`) are themselves authored by the **Alchemy behaviour-flag controls** below the selector; see that requirement for the sanctioned authoring path.
+- The three behaviour flags the selector preserves (`learnOnCraft`, `consumeOnFail`, `showAttemptHistoryToPlayers`) are themselves authored by the **Alchemy behaviour-flag controls**, which since issue 1096 live on a DIFFERENT SECTION of the same route (**On failure**) and are never on screen with the selector; see that requirement for the sanctioned authoring path.
 
 ### Alchemy behaviour-flag controls (issue 713)
 
-- Below the alchemy check-mode selector on the Checks tab's Crafting sub-tab (shown only when `resolutionMode === "alchemy"`, regardless of `checkMode`): three live-persisting toggle cards editing the system-level alchemy behaviour flags — `learnOnCraft` (default `false`), `consumeOnFail` (default `true`), and `showAttemptHistoryToPlayers` (default `true`).
+- On the **On failure** section of the `checks-crafting` route (shown only when `resolutionMode === "alchemy"`, regardless of `checkMode`): three live-persisting toggle cards editing the system-level alchemy behaviour flags — `learnOnCraft` (default `false`), `consumeOnFail` (default `true`), and `showAttemptHistoryToPlayers` (default `true`).
 - Each toggle reflects the stored value (including a stored non-default value) and persists through `store.saveAlchemyConfig`, which spreads the nested `alchemy` block so `checkMode` and the other two flags are preserved.
   Because `saveAlchemyConfig` rewrites all three flags from its argument, the caller sends the current projected values with only the toggled field overridden.
 - The controls' semantics are defined by `resolution-modes/spec.md` (consume-on-fail) and `recipe-visibility/spec.md` (learn-on-craft, attempt history); this requirement covers only the authoring surface.
   The failure-consumption toggles of §Crafting Check Controls are the distinct, non-alchemy `craftingCheck.consumption` policy and are NOT shown in alchemy mode.
 
-### Checks tab per-mode behaviour (issue 554)
+### Checks studio per-mode behaviour (issue 554)
 
 Which of the five sections renders in each mode.
 Crafting: `simple` and `routedByIngredients` render all five with Outcomes as the two-outcome statement; `routedByCheck` renders all five with the band strip and the tier rows; `progressive` renders all five with Outcomes as the `awardMode` selector; `alchemy` follows its `checkMode`, and `none` keeps the read-only "resolves without a check" notice with no editor and no Active card.

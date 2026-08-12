@@ -209,7 +209,7 @@ CraftingSystem = {
     // outcome tiers live on routed.relativeOutcomes / routed.fixedOutcomes.
     outcomes?: string[],           // default ["fail", "pass"]
 
-    // Per-resolution-mode check sub-objects authored in the GM Checks tab; the
+    // Per-resolution-mode check sub-objects authored in the GM Checks studio; the
     // active one is selected by resolutionMode. (Shapes: SimpleCheck / RoutedCheck /
     // CheckBreakage defined below.)
     // Slot ownership: `simple` is the SHARED optional pass/fail crafting-check slot
