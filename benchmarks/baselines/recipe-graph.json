@@ -1,0 +1,65 @@
+{
+  "profile": "recipe-graph",
+  "harnessVersion": 1,
+  "seed": 1071,
+  "description": "Sparse (1,000 recipes, fan-out 1) and dense (500 recipes, fan-out 8) dependency graphs.",
+  "construction": "literal payloads",
+  "requiresNodeModules": false,
+  "ceiling": "Depth and fan-out are both bounded. Edge count is producer x consumer, so an unbounded dense corpus makes the benchmark the pathology it measures; and layoutGraph cycle detection is a recursive unguarded DFS, so an unbounded chain stack-overflows first.",
+  "scale": {
+    "components": 2000,
+    "sparseRecipes": 1000,
+    "sparseFanOut": 1,
+    "denseRecipes": 500,
+    "denseFanOut": 8,
+    "layerCount": 12
+  },
+  "inventoryMix": [
+    {
+      "stacks": 20,
+      "unmatched": 14,
+      "durable": 4,
+      "sourceRef": 2,
+      "books": 0,
+      "unmatchedRatio": 0.7,
+      "sourceActorCount": 1
+    }
+  ],
+  "checksums": {
+    "corpus": "2f536cfc04bbcdd5",
+    "components": "b63d504416cc9541",
+    "inventory": "5e217420bb6e023b"
+  },
+  "cases": {
+    "graph.buildRecipeGraph.sparse": {
+      "description": "Producer/consumer edge derivation over the bounded sparse corpus.",
+      "counts": {
+        "nodes": 1000,
+        "edges": 968
+      }
+    },
+    "graph.layoutGraph.sparse": {
+      "description": "Layered layout + edge paths over the bounded sparse graph.",
+      "counts": {
+        "nodes": 1000,
+        "edges": 968,
+        "cycleEdges": 1
+      }
+    },
+    "graph.buildRecipeGraph.dense": {
+      "description": "Producer/consumer edge derivation over the bounded dense corpus.",
+      "counts": {
+        "nodes": 500,
+        "edges": 3568
+      }
+    },
+    "graph.layoutGraph.dense": {
+      "description": "Layered layout + edge paths over the bounded dense graph.",
+      "counts": {
+        "nodes": 500,
+        "edges": 3568,
+        "cycleEdges": 0
+      }
+    }
+  }
+}

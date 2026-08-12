@@ -22,6 +22,10 @@ stats.html
 .foundry-e2e/cache/
 # Harvested Foundry window chrome for the View Lab (proprietary; never commit)
 /.foundry-chrome/
+# Class-2 benchmark run records: wall clock + heap + machine envelope (issue 1071).
+# Machine-DEPENDENT and never asserted, so they must not be committed — the committed,
+# machine-invariant half lives in benchmarks/baselines/ and is tracked.
+/.benchmarks/
 # Assembled data directory for Docker mount (contains symlinks)
 .foundry-e2e/data/
 test-results/

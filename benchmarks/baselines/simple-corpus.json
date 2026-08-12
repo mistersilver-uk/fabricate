@@ -1,0 +1,134 @@
+{
+  "profile": "simple-corpus",
+  "harnessVersion": 1,
+  "seed": 1071,
+  "description": "10,000 simple recipes over a 5,000-component library; token 20-stack inventory.",
+  "construction": "literal payloads; the serialization cases hydrate them through Recipe.fromJSON",
+  "requiresNodeModules": false,
+  "ceiling": null,
+  "scale": {
+    "components": 5000,
+    "recipes": 10000,
+    "tools": 0,
+    "heldStacks": 20
+  },
+  "inventoryMix": [
+    {
+      "stacks": 20,
+      "unmatched": 14,
+      "durable": 4,
+      "sourceRef": 2,
+      "books": 0,
+      "unmatchedRatio": 0.7,
+      "sourceActorCount": 1
+    }
+  ],
+  "checksums": {
+    "corpus": "9f5e1c44b3e5bbad",
+    "components": "32b44781d2425cde",
+    "inventory": "c404b4a6a230b89b"
+  },
+  "cases": {
+    "recipeManager.getRecipes.unfiltered": {
+      "description": "Materialise the whole 10,000-recipe map with no filters.",
+      "counts": {
+        "recipesReturned": 10000
+      }
+    },
+    "recipeManager.getRecipes.search": {
+      "description": "The player/GM search path: enabled + system + tag + free-text over 10,000 recipes.",
+      "counts": {
+        "recipesReturned": 186
+      }
+    },
+    "recipeBrowserModel.buildRecipeBrowserModel": {
+      "description": "The pure GM recipe browser projection: filter, sort, group, paginate.",
+      "counts": {
+        "pagedRows": 25,
+        "filteredRows": 10000,
+        "totalRows": 10000,
+        "categoryGroups": 1
+      }
+    },
+    "componentBrowserModel.filterSortPaginate": {
+      "description": "The pure GM component browser projection over a 5,000-component library.",
+      "counts": {
+        "pagedRows": 25,
+        "totalRows": 838,
+        "categoryGroups": 5
+      }
+    },
+    "browserPagination.paginateRows": {
+      "description": "The shared page-window primitive over 10,000 rows.",
+      "counts": {
+        "pagedRows": 25,
+        "pageCount": 400
+      }
+    },
+    "recipe.hydrateCorpus": {
+      "description": "RECONSTRUCTION: Recipe.fromJSON over the whole 10,000-recipe corpus. Uses real model constructors, not literals, because reconstruction is what it measures.",
+      "counts": {
+        "hydratedRecipes": 10000,
+        "hydratedIngredientSets": 10000
+      }
+    },
+    "recipeManager.save": {
+      "description": "SERIALIZATION: RecipeManager.save() replaces the whole `recipes` world setting. Real Recipe#toJSON output; the byte count is the replicated payload every client re-parses.",
+      "counts": {
+        "serializedRecipes": 10000,
+        "serializedBytes": 19809637
+      }
+    },
+    "craftingSystemManager.save": {
+      "description": "SERIALIZATION: CraftingSystemManager.save() replaces the whole `craftingSystems` setting, so a single component edit replicates the entire 5,000-component library.",
+      "counts": {
+        "serializedSystems": 1,
+        "serializedBytes": 1973455
+      }
+    },
+    "craftingSystemManager.normalizeImport": {
+      "description": "The normalization/import path #1076 targets: initialize() reads the persisted setting and runs _normalizeSystem over the whole 5,000-component library.",
+      "counts": {
+        "componentCandidatesExamined": 5000,
+        "normalizedSystems": 1,
+        "normalizedComponents": 5000
+      }
+    },
+    "craftingListing.buildListing.corpusAxis@25": {
+      "description": "The player crafting open over 25 rows against a token 20-stack inventory. The CORPUS axis of the same path the held-inventory profile varies by held stacks.",
+      "counts": {
+        "componentCandidatesExamined": 7280050,
+        "craftingActorItemsReads": 125,
+        "craftingActorItemsScanned": 1250,
+        "sourceActor0ItemsReads": 125,
+        "sourceActor0ItemsScanned": 1250,
+        "listedRecipes": 25,
+        "availableRecipes": 5
+      }
+    },
+    "craftingListing.buildListing.corpusAxis@50": {
+      "description": "The player crafting open over 50 rows against a token 20-stack inventory. The CORPUS axis of the same path the held-inventory profile varies by held stacks.",
+      "counts": {
+        "componentCandidatesExamined": 14613850,
+        "craftingActorItemsReads": 250,
+        "craftingActorItemsScanned": 2500,
+        "sourceActor0ItemsReads": 250,
+        "sourceActor0ItemsScanned": 2500,
+        "listedRecipes": 50,
+        "availableRecipes": 5
+      }
+    },
+    "craftingListing.buildListing.corpusAxis@100": {
+      "description": "The player crafting open over 100 rows against a token 20-stack inventory. The CORPUS axis of the same path the held-inventory profile varies by held stacks.",
+      "counts": {
+        "componentCandidatesExamined": 29442700,
+        "craftingActorItemsReads": 500,
+        "craftingActorItemsScanned": 5000,
+        "sourceActor0ItemsReads": 500,
+        "sourceActor0ItemsScanned": 5000,
+        "listedRecipes": 100,
+        "availableRecipes": 5
+      }
+    }
+  }
+}

@@ -1,0 +1,270 @@
+{
+  "profile": "held-inventory",
+  "harnessVersion": 1,
+  "seed": 1071,
+  "description": "THE INVENTORY AXIS. 100 / 500 / 1,000 held stacks (70% resolving to NO component) across one crafting actor and 2 source actors, against a 5,000-component library and a pinned 20-recipe corpus.",
+  "construction": "literal payloads",
+  "requiresNodeModules": false,
+  "ceiling": "The recipe corpus is pinned at 6 BY DESIGN. evaluateCraftability is recipes x items x components — measured on this checkout at ~137 ms per recipe at 1,000 held stacks against 5,000 components, i.e. ~11 s for a 20-row open — so this profile varies inventory and nothing else, and keeps the row count low enough for the drift test to re-derive every count inside npm test. Its counterpart corpus axis lives in simple-corpus.",
+  "scale": {
+    "components": 5000,
+    "recipes": 6,
+    "inventorySeries": [
+      100,
+      500,
+      1000
+    ],
+    "unmatchedRatio": 0.7,
+    "sourceActorCount": 2,
+    "bulkSalvageRows": 5
+  },
+  "inventoryMix": [
+    {
+      "stacks": 100,
+      "unmatched": 70,
+      "durable": 20,
+      "sourceRef": 10,
+      "books": 0,
+      "unmatchedRatio": 0.7,
+      "sourceActorCount": 2
+    },
+    {
+      "stacks": 500,
+      "unmatched": 350,
+      "durable": 100,
+      "sourceRef": 50,
+      "books": 0,
+      "unmatchedRatio": 0.7,
+      "sourceActorCount": 2
+    },
+    {
+      "stacks": 1000,
+      "unmatched": 700,
+      "durable": 200,
+      "sourceRef": 100,
+      "books": 0,
+      "unmatchedRatio": 0.7,
+      "sourceActorCount": 2
+    }
+  ],
+  "checksums": {
+    "corpus": "a32dc4e1b9ac875b",
+    "components": "32b44781d2425cde",
+    "inventory": "05d8154708918218"
+  },
+  "cases": {
+    "identity.resolveComponentForItem.miss@100": {
+      "description": "THE MISS CASE. Items with no Fabricate flags and no matching source reference, against a 5,000-component library: both durable tiers miss and the raw-reference tier scans the library in full before returning null.",
+      "counts": {
+        "componentCandidatesExamined": 350000,
+        "itemsResolved": 70,
+        "matches": 0
+      }
+    },
+    "identity.findMatchingComponent.miss@100": {
+      "description": "The same miss case through the FULL resolver including the name fallback — a SECOND complete library scan per item (essenceResolver -> componentNameMatch).",
+      "counts": {
+        "componentCandidatesExamined": 700000,
+        "itemsResolved": 70,
+        "matches": 0
+      }
+    },
+    "identity.resolveComponentForItem.hit@100": {
+      "description": "THE HIT CASE, kept separate on purpose. A durable roles-map flag resolves on tier 1; averaging it with the miss case above hides a two-orders-of-magnitude difference.",
+      "counts": {
+        "componentCandidatesExamined": 310,
+        "itemsResolved": 20,
+        "matches": 20
+      }
+    },
+    "craftingEngine.findComponentItems@100": {
+      "description": "The craft/salvage execution matcher for ONE component: O(items x components), because itemResolvesToComponent re-runs full candidate resolution per item.",
+      "counts": {
+        "componentCandidatesExamined": 125135,
+        "craftingActorItemsReads": 1,
+        "craftingActorItemsScanned": 34,
+        "matchedItems": 1
+      }
+    },
+    "craftingEngine.findComponentItems.bulk@100": {
+      "description": "A bulk salvage/destroy run of 5 rows, which calls the matcher ONCE PER ROW — so the run is O(rows x items x components). Bounded at 5 rows because the product is already tens of millions of candidate examinations.",
+      "counts": {
+        "componentCandidatesExamined": 625675,
+        "craftingActorItemsReads": 5,
+        "craftingActorItemsScanned": 170,
+        "rows": 5,
+        "matchedItems": 5
+      }
+    },
+    "craftingListing.buildListing@100": {
+      "description": "The player crafting open at this inventory size. Corpus pinned at 20 recipes so the ONLY thing varying across the series is held-stack count.",
+      "counts": {
+        "componentCandidatesExamined": 8479686,
+        "craftingActorItemsReads": 30,
+        "craftingActorItemsScanned": 1020,
+        "sourceActor0ItemsReads": 30,
+        "sourceActor0ItemsScanned": 990,
+        "sourceActor1ItemsReads": 30,
+        "sourceActor1ItemsScanned": 990,
+        "listedRecipes": 6,
+        "availableRecipes": 6
+      }
+    },
+    "inventoryListing.buildListing@100": {
+      "description": "The Inventory tab open at this inventory size, same pinned 20-row corpus.",
+      "counts": {
+        "componentCandidatesExamined": 710465,
+        "craftingActorItemsReads": 2,
+        "craftingActorItemsScanned": 68,
+        "sourceActor0ItemsReads": 2,
+        "sourceActor0ItemsScanned": 66,
+        "sourceActor1ItemsReads": 2,
+        "sourceActor1ItemsScanned": 66,
+        "rows": 30,
+        "componentRows": 30
+      }
+    },
+    "identity.resolveComponentForItem.miss@500": {
+      "description": "THE MISS CASE. Items with no Fabricate flags and no matching source reference, against a 5,000-component library: both durable tiers miss and the raw-reference tier scans the library in full before returning null.",
+      "counts": {
+        "componentCandidatesExamined": 1750000,
+        "itemsResolved": 350,
+        "matches": 0
+      }
+    },
+    "identity.findMatchingComponent.miss@500": {
+      "description": "The same miss case through the FULL resolver including the name fallback — a SECOND complete library scan per item (essenceResolver -> componentNameMatch).",
+      "counts": {
+        "componentCandidatesExamined": 3500000,
+        "itemsResolved": 350,
+        "matches": 0
+      }
+    },
+    "identity.resolveComponentForItem.hit@500": {
+      "description": "THE HIT CASE, kept separate on purpose. A durable roles-map flag resolves on tier 1; averaging it with the miss case above hides a two-orders-of-magnitude difference.",
+      "counts": {
+        "componentCandidatesExamined": 7550,
+        "itemsResolved": 100,
+        "matches": 100
+      }
+    },
+    "craftingEngine.findComponentItems@500": {
+      "description": "The craft/salvage execution matcher for ONE component: O(items x components), because itemResolvesToComponent re-runs full candidate resolution per item.",
+      "counts": {
+        "componentCandidatesExamined": 588825,
+        "craftingActorItemsReads": 1,
+        "craftingActorItemsScanned": 167,
+        "matchedItems": 1
+      }
+    },
+    "craftingEngine.findComponentItems.bulk@500": {
+      "description": "A bulk salvage/destroy run of 5 rows, which calls the matcher ONCE PER ROW — so the run is O(rows x items x components). Bounded at 5 rows because the product is already tens of millions of candidate examinations.",
+      "counts": {
+        "componentCandidatesExamined": 2944125,
+        "craftingActorItemsReads": 5,
+        "craftingActorItemsScanned": 835,
+        "rows": 5,
+        "matchedItems": 5
+      }
+    },
+    "craftingListing.buildListing@500": {
+      "description": "The player crafting open at this inventory size. Corpus pinned at 20 recipes so the ONLY thing varying across the series is held-stack count.",
+      "counts": {
+        "componentCandidatesExamined": 42373926,
+        "craftingActorItemsReads": 30,
+        "craftingActorItemsScanned": 5010,
+        "sourceActor0ItemsReads": 30,
+        "sourceActor0ItemsScanned": 5010,
+        "sourceActor1ItemsReads": 30,
+        "sourceActor1ItemsScanned": 4980,
+        "listedRecipes": 6,
+        "availableRecipes": 4
+      }
+    },
+    "inventoryListing.buildListing@500": {
+      "description": "The Inventory tab open at this inventory size, same pinned 20-row corpus.",
+      "counts": {
+        "componentCandidatesExamined": 3521325,
+        "craftingActorItemsReads": 2,
+        "craftingActorItemsScanned": 334,
+        "sourceActor0ItemsReads": 2,
+        "sourceActor0ItemsScanned": 334,
+        "sourceActor1ItemsReads": 2,
+        "sourceActor1ItemsScanned": 332,
+        "rows": 150,
+        "componentRows": 150
+      }
+    },
+    "identity.resolveComponentForItem.miss@1000": {
+      "description": "THE MISS CASE. Items with no Fabricate flags and no matching source reference, against a 5,000-component library: both durable tiers miss and the raw-reference tier scans the library in full before returning null.",
+      "counts": {
+        "componentCandidatesExamined": 3500000,
+        "itemsResolved": 700,
+        "matches": 0
+      }
+    },
+    "identity.findMatchingComponent.miss@1000": {
+      "description": "The same miss case through the FULL resolver including the name fallback — a SECOND complete library scan per item (essenceResolver -> componentNameMatch).",
+      "counts": {
+        "componentCandidatesExamined": 7000000,
+        "itemsResolved": 700,
+        "matches": 0
+      }
+    },
+    "identity.resolveComponentForItem.hit@1000": {
+      "description": "THE HIT CASE, kept separate on purpose. A durable roles-map flag resolves on tier 1; averaging it with the miss case above hides a two-orders-of-magnitude difference.",
+      "counts": {
+        "componentCandidatesExamined": 30100,
+        "itemsResolved": 200,
+        "matches": 200
+      }
+    },
+    "craftingEngine.findComponentItems@1000": {
+      "description": "The craft/salvage execution matcher for ONE component: O(items x components), because itemResolvesToComponent re-runs full candidate resolution per item.",
+      "counts": {
+        "componentCandidatesExamined": 1189850,
+        "craftingActorItemsReads": 1,
+        "craftingActorItemsScanned": 334,
+        "matchedItems": 1
+      }
+    },
+    "craftingEngine.findComponentItems.bulk@1000": {
+      "description": "A bulk salvage/destroy run of 5 rows, which calls the matcher ONCE PER ROW — so the run is O(rows x items x components). Bounded at 5 rows because the product is already tens of millions of candidate examinations.",
+      "counts": {
+        "componentCandidatesExamined": 5949250,
+        "craftingActorItemsReads": 5,
+        "craftingActorItemsScanned": 1670,
+        "rows": 5,
+        "matchedItems": 5
+      }
+    },
+    "craftingListing.buildListing@1000": {
+      "description": "The player crafting open at this inventory size. Corpus pinned at 20 recipes so the ONLY thing varying across the series is held-stack count.",
+      "counts": {
+        "componentCandidatesExamined": 85227726,
+        "craftingActorItemsReads": 30,
+        "craftingActorItemsScanned": 10020,
+        "sourceActor0ItemsReads": 30,
+        "sourceActor0ItemsScanned": 9990,
+        "sourceActor1ItemsReads": 30,
+        "sourceActor1ItemsScanned": 9990,
+        "listedRecipes": 6,
+        "availableRecipes": 4
+      }
+    },
+    "inventoryListing.buildListing@1000": {
+      "description": "The Inventory tab open at this inventory size, same pinned 20-row corpus.",
+      "counts": {
+        "componentCandidatesExamined": 7055150,
+        "craftingActorItemsReads": 2,
+        "craftingActorItemsScanned": 668,
+        "sourceActor0ItemsReads": 2,
+        "sourceActor0ItemsScanned": 666,
+        "sourceActor1ItemsReads": 2,
+        "sourceActor1ItemsScanned": 666,
+        "rows": 300,
+        "componentRows": 300
+      }
+    }
+  }
+}
