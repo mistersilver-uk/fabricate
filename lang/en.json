@@ -3911,6 +3911,7 @@
           "Icon": "Icon",
           "ChangeIcon": "Change icon",
           "Expression": "Expression",
+          "ExpressionHint": "A character-data path needs its leading @ — for example @abilities.med.mod. A number or a dice expression does not: write 2 or 1d4 as-is.",
           "SuggestionsLabel": "Add a term to this expression",
           "SeedPresets": "Seed presets",
           "SeedPresetsUnsupported": "Preset seeding is only available for dnd5e or pf2e worlds.",

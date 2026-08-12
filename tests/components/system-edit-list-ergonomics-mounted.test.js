@@ -114,7 +114,7 @@ afterEach(() => {
 });
 
 describe('system-edit list ergonomics (mounted, issue 768)', () => {
-  it('renders a compact summary row (label + inline @-stripped expression) that is collapsed by default', async () => {
+  it('renders a compact summary row (label + the inline expression, verbatim) that is collapsed by default', async () => {
     const root = await harness.mount({
       selectedSystem: makeSystem(),
       modifierLibrary: MODIFIERS
@@ -129,12 +129,17 @@ describe('system-edit list ergonomics (mounted, issue 768)', () => {
     assert.equal(summary.getAttribute('aria-expanded'), 'false', 'starts collapsed');
     assert.ok(!row.querySelector('.manager-modifier-body'), 'no editor body when collapsed');
 
-    // The label and the inline expression (leading @ stripped) render on the summary.
+    // The label and the inline expression render on the summary, VERBATIM. The row used to
+    // strip the leading @, which agreed with an editor that drew the sigil as its own cap; the
+    // field is a plain input now (maintainer ruling, issue 1096) and the GM types the @
+    // themselves, so a list that hid it would show a value nobody wrote.
     assert.ok(row.querySelector('.manager-modifier-label').textContent.includes('Herbalism'), 'label shows');
     const expression = row.querySelector('[data-modifier-expression]');
     assert.ok(expression, 'the expression renders inline on the summary');
-    assert.ok(expression.textContent.includes('skills.nature.value'), 'expression body shows');
-    assert.ok(!expression.textContent.includes('@'), 'the leading @ sigil is stripped from the inline display');
+    assert.ok(
+      expression.textContent.includes('@skills.nature.value'),
+      'the stored expression reads back exactly, sigil included'
+    );
   });
 
   it('expands to the IconPicker editor on the summary toggle', async () => {
@@ -152,21 +157,23 @@ describe('system-edit list ergonomics (mounted, issue 768)', () => {
     assert.ok(row.querySelector('.manager-modifier-body'), 'the editor body opens');
     const trigger = row.querySelector('.essence-icon-picker-trigger');
     assert.ok(trigger, 'the modifier editor renders an IconPicker trigger, not a bare text input');
-    // The expression field is `RollDataExpressionInput` since issue 1117 — the control the
-    // retired Checks-tab editor used, adopted here because this is now the only surface that
-    // authors an expression. It renders the `@` as a SEPARATE prefix glyph and keeps the
-    // input's own value sigil-free, re-adding the sigil on write, so the stored value is
-    // unchanged and the field is not a bare text input.
+    // The expression field is `RollDataExpressionInput` with `sigil={false}` (maintainer
+    // ruling, issue 1096): a PLAIN input over the stored value. The `@` cap was written when an
+    // expression was always a roll-data path, and dice retired that premise — a cap that
+    // prepends `@` to whatever is typed turns `1d4` into `@1d4`, and the adaptive cap that
+    // shipped restructures the field as the GM types. Both halves are asserted, because
+    // "shows the value" and "draws no cap" are different claims and dropping either would
+    // leave half the ruling unguarded.
     const expressionInput = row.querySelector('[data-system-modifier-field="expression"]');
     assert.ok(expressionInput, 'the editor exposes the expression field');
     assert.equal(
       expressionInput.value,
-      'skills.nature.value',
-      'the input holds the path; the @ is the control’s own prefix, not typed text'
+      '@skills.nature.value',
+      'the input holds the stored expression byte for byte, sigil included'
     );
     assert.ok(
-      Boolean(row.querySelector('.manager-prerequisite-at')),
-      'and the @ sigil is rendered beside it'
+      !row.querySelector('.manager-prerequisite-at'),
+      'and nothing supplies the @ for the GM any more — the placeholder and hint teach it'
     );
   });
 
@@ -636,6 +643,41 @@ describe('modifier editor treatment and layout (mounted, issue 1096)', () => {
       [['mod-flat', { expression: '@abilities.wis.mod + 1d4' }]],
       'the authored expression is EXTENDED — a chip that replaced it would destroy the GM’s work'
     );
+  });
+
+  // NO RE-PREPENDING (maintainer ruling, issue 1096). This is the half of the ruling no
+  // rendered assertion can reach: the field used to re-add `@` to a bare roll-data path on
+  // every keystroke, so a GM who typed `abilities.str.mod` got `@abilities.str.mod` stored.
+  // What is typed is now what is stored, which is exactly why the placeholder and the hint
+  // beside the field have to teach the sigil — and why they are asserted here too, so the
+  // requirement and the thing that teaches it cannot drift apart.
+  it('stores the expression exactly as typed, adding no sigil of its own', async () => {
+    const patches = [];
+    const { row } = await openEditor({
+      foundrySystemId: 'dnd5e',
+      onUpdateModifier: async (id, patch) => {
+        patches.push([id, patch]);
+      },
+    });
+
+    const expression = row.querySelector('[data-system-modifier-field="expression"]');
+    expression.value = 'abilities.str.mod';
+    expression.dispatchEvent(new globalThis.window.Event('input', { bubbles: true }));
+    await flushRender();
+
+    assert.deepEqual(
+      patches,
+      [['mod-flat', { expression: 'abilities.str.mod' }]],
+      'a bare path is stored bare: the control supplies nothing, so `1d4` cannot become `@1d4`'
+    );
+    assert.equal(
+      expression.getAttribute('placeholder'),
+      '@abilities.med.mod',
+      'and the placeholder models an expression that would actually resolve'
+    );
+    const hint = row.querySelector('[data-system-modifier-expression-hint]');
+    assert.ok(Boolean(hint), 'the field states the requirement it no longer meets for the GM');
+    assert.match(hint.textContent, /leading @/, 'and says which character that is');
   });
 
   it('leaves focus and the caret at the end of the expression field after a chip', async () => {

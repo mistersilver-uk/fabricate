@@ -1592,7 +1592,12 @@ The Character Prerequisites card's **Copy to Modifiers** action loses the same g
 It keeps every convention the settings-list cards already have and the Checks card never had — add, update, delete, whole-section collapse, accessible **Move up / Move down** reorder, opt-in preset seeding, and the row-level **Copy to prerequisites** cross-list copy — and it ABSORBS the check-only fields the Checks card used to own:
 
 - a paired absence-preserving `min` / `max` `Stepper` set with an `Unbounded` placeholder, on its OWN row after the expression input so the row reflows to two lines at a narrow pane rather than compressing the expression field, plus a hint stating that empty is not zero;
-- the `@`-prefixed `RollDataExpressionInput`, adopted from the retired Checks editor because this is now the one surface that authors an expression: it renders the sigil as a separate prefix glyph, keeps the input's own value sigil-free and re-adds the sigil on write for a bare roll-data path, storing a function or compound expression verbatim;
+- a PLAIN `RollDataExpressionInput` (`sigil={false}`), adopted from the retired Checks editor because this is now the one surface that authors an expression.
+  It renders no `@` affix, strips nothing for display and re-prepends nothing on write: the stored expression is shown and written byte for byte.
+  The affix was correct while an expression was always a roll-data path, and dice retired that premise — a cap that prepends `@` to whatever is typed turns `1d4` into `@1d4`, and an adaptive cap that appears only for a bare path restructures the field as the GM types.
+  The leading `@` is therefore the GM's to write, and the surface teaches it: the placeholder reads `@abilities.med.mod` and a hint states that a number or dice expression takes no sigil.
+  No stored value changes — the affix only ever supplied the sigil on write, so a persisted path already carries it.
+  The summary row reads the stored expression back verbatim for the same reason;
 - the two BLOCKING bounds faults, reported on the COLLAPSED row and named by cause (`inverted` / `unsafe`), because an entry that contributes nothing is a fault a GM scanning the list must be able to see;
 - a **roll-shaped expression** warning on the open editor, stating that gathering rows may use it and a check may not, and that any check selecting it reports a blocking issue.
 

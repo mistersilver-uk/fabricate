@@ -519,8 +519,16 @@
   // The collapsed summary row shows the expression with its leading `@` sigil
   // stripped for a cleaner inline read (the raw `@`-prefixed value stays in the
   // editor's Expression field — only the DISPLAY strips it).
+  // VERBATIM, sigil included. It stripped the leading `@` while the editor below rendered that
+  // sigil as a separate cap, so the list and the field agreed. The field is a plain input now
+  // (maintainer ruling) and the GM writes the `@` themselves, so a list that hides it would be
+  // showing a value nobody typed — and hiding, on the one screen that teaches the requirement,
+  // exactly the character the requirement is about.
+  //
+  // `stripExpressionSigil` itself is untouched: the prerequisite copy path derives a `path`
+  // from an expression through it, and that transform is unrelated to how a list reads.
   function modifierExpressionDisplay(entry) {
-    return stripExpressionSigil(entry?.expression);
+    return String(entry?.expression ?? '').trim();
   }
 
   async function handleAddModifier() {
@@ -1454,14 +1462,34 @@
                                       'Expression'
                                     )}</span
                                   >
+                                  <!-- A PLAIN input: no `@` cap, no stripping, no re-prepending
+                                       (maintainer ruling). The affix was written when an
+                                       expression was always a roll-data path; dice made it
+                                       wrong, because a cap that prepends `@` to whatever is
+                                       typed turns `1d4` into `@1d4`. The adaptive compromise
+                                       that shipped — cap present only while the value is a
+                                       single `@`-path — restructures the field as the GM
+                                       types, and the ruling is against it.
+
+                                       So the leading `@` is now the GM's to write, and the
+                                       PLACEHOLDER has to teach that: it read
+                                       `abilities.med.mod`, which modelled an expression that
+                                       would not resolve. -->
                                   <RollDataExpressionInput
                                     dataField="system-modifier"
                                     inputAttrs={{ 'data-system-modifier-field': 'expression' }}
                                     value={entry.expression}
-                                    placeholder="abilities.med.mod"
+                                    placeholder="@abilities.med.mod"
+                                    sigil={false}
                                     onChange={(expression) =>
                                       onUpdateModifier(entry.id, { expression })}
                                   />
+                                  <small class="manager-muted" data-system-modifier-expression-hint>
+                                    {text(
+                                      'FABRICATE.Admin.Manager.Modifiers.ExpressionHint',
+                                      'A character-data path needs its leading @ — for example @abilities.med.mod. A number or a dice expression does not: write 2 or 1d4 as-is.'
+                                    )}
+                                  </small>
                                 </label>
                                 {#if modifierExpressionSuggestions.length > 0}
                                   <!-- Roll-data suggestion chips (issue 1096). Each APPENDS its

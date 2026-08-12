@@ -72,7 +72,9 @@ Crafting, Salvage and Gathering select over the same library, each with its own 
 ### Defining modifiers
 
 Open **System settings** for the crafting system and find the **Modifiers** card, then choose **Add modifier**.
-Each entry has an **Icon**, a **Label** such as Medicine or Herbalism, and an **Expression**, a roll-data path resolved against the acting character, for example `abilities.med.mod`.
+Each entry has an **Icon**, a **Label** such as Medicine or Herbalism, and an **Expression**.
+Write a character-data path with its leading `@` — for example `@abilities.med.mod` — because the field supplies nothing for you.
+A number or a dice expression takes no `@` at all: write `2` or `1d4` as they stand, and `@abilities.med.mod + 1d4` mixes the two.
 There is nothing to add to the roll formula: an entry that is eligible applies automatically.
 
 This is the same library gathering drop rows and events reference for their d100 chances, so a modifier is defined once and used wherever it makes sense.
