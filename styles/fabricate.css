@@ -2739,9 +2739,12 @@
   width: 158px;
 }
 
-/* The row's remove action: a subtle danger icon button, 28px square, not the manager's
-   40px `.manager-icon-button`. */
-.fabricate-manager .manager-checks-tier-row .manager-checks-tier-remove {
+/* The studio's remove action: a subtle danger icon button, 28px square, not the manager's
+   34px `.manager-icon-button`. ONE rule for both places this studio draws it — the tier row
+   and the trigger head — rather than a second copy of the same nine declarations, which is
+   what the duplication gate would have counted it as. */
+.fabricate-manager .manager-checks-tier-row .manager-checks-tier-remove,
+.fabricate-manager .manager-checks-trigger-head .manager-checks-trigger-remove {
   appearance: none;
   -webkit-appearance: none;
   display: flex;
