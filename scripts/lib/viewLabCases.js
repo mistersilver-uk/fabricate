@@ -5369,8 +5369,10 @@ function selectRenderFileCases(renderFiles) {
 //
 //   - no patch, an empty patch, or a patch that is not a unified diff;
 //   - a hunk header that does not parse, or a body line whose marker is not ` `, `+`, `-` or `\`;
-//   - a hunk whose content cannot be LOCATED unambiguously in the file that will render — see
-//     {@link regionsTouchedByHunk} for the three ways that happens;
+//   - a hunk whose content cannot be LOCATED AT ALL in the file that will render — see
+//     {@link regionsTouchedByHunk} for the two ways that happens. Content found in SEVERAL places
+//     is located, not unlocated: it answers with the union of those places, which contains
+//     whichever one the edit really was (issue 1127);
 //   - that file's own text not parsing into regions;
 //   - a changed line outside every region — in this registry a shared helper, a pattern constant,
 //     a case factory or `mapChangedFilesToCases` itself, any of which can move every frame.
@@ -5748,44 +5750,37 @@ function regionsTouchedAt(hunk, offset, regions) {
 }
 
 /**
- * Whether two candidate anchors attributed a hunk to the same regions.
- *
- * Compared as SETS rather than as a joined string. A separator-joined signature conflates
- * `{'a b', 'c'}` with `{'a', 'b c'}`, and nothing forbids a space in a region key — `CASE_ID_PATTERN`
- * accepts any run of non-quote characters — so two candidates that disagree could sign identically
- * and the disagreement rule would pass them through as agreement.
- *
- * @param {Set<string>} left One candidate's keys.
- * @param {Set<string>} right Another candidate's keys.
- * @returns {boolean} True when the two hold exactly the same keys.
- */
-function sameKeys(left, right) {
-  return left.size === right.size && [...left].every((key) => right.has(key));
-}
-
-/**
  * The regions one hunk touches, located by CONTENT.
  *
  * The hunk's context and added lines are exactly the lines that must exist, in that order, in the
  * file the producer will render — so they are the anchor, and the header's line numbers are never
- * consulted. Four outcomes, three of which widen:
+ * consulted. Four outcomes, two of which widen:
  *
  *   - an EMPTY sequence — a hunk carrying no context and no additions, which `-U0` produces — has
  *     nothing to anchor against, and "matches everywhere" is not an attribution;
  *   - NO occurrence — the patch describes content this checkout does not have, exactly as an
  *     unverifiable patch always did;
  *   - ONE occurrence — that is the anchor, and attribution proceeds from it;
- *   - SEVERAL occurrences — the hunk is attributed at each, and the answer is used only when every
- *     candidate agrees. The repetition is real, not theoretical: 76 distinct seven-line windows
- *     recur in this registry, one `sourceMatches` block recurs fourteen times verbatim, and the
- *     three `currency-*` cases share a byte-identical tail. Taking the first candidate would
- *     attribute a change to whichever twin came earlier in the file, which is the silent
- *     misattribution this rule exists to make unreachable.
+ *   - SEVERAL occurrences — the hunk is attributed at each, and the answer is their UNION. The
+ *     repetition is real, not theoretical: 76 distinct seven-line windows recur in this registry,
+ *     one `sourceMatches` block recurs fourteen times verbatim, and the three `currency-*` cases
+ *     share a byte-identical tail.
  *
- * The cost of the last rule is measured, not guessed: of the 3,740 lines inside a case literal, a
- * single-line edit with git's three lines of context anchors uniquely at 3,489 (93.3%) and widens
- * at 251 (6.7%). Those 251 narrow today only when their line numbers happen to be right, and are
- * silently misattributed when a merge shift lands them on a twin.
+ * The union is sound, and the argument is one sentence: the anchor sequence is the content that
+ * must EXIST in the file that will render, so wherever the edit actually landed, that place is one
+ * of the matched offsets — and a set containing every candidate therefore contains the true one.
+ * It is exact when the anchor is unique and a superset when it is not, which is the same direction
+ * of error the whole-corpus answer made, at a fraction of the cost. Taking the FIRST candidate
+ * instead would attribute a change to whichever twin came earlier in the file; that is the silent
+ * misattribution this rule still makes unreachable (issue 1127).
+ *
+ * The rule this replaced widened whenever two candidates disagreed. Of the 3,740 lines inside a
+ * case literal, a single-line edit with git's three lines of context anchors uniquely at 3,489
+ * (93.3%) and was ambiguous at 251 (6.7%) — but that measurement understates what it cost, because
+ * the ambiguity is not randomly distributed. Applying the SAME edit to a family of sibling cases is
+ * one of the commonest registry changes there is, and byte-identical siblings are precisely what
+ * makes an anchor ambiguous. PR #1125 added four lines to three sibling case literals and captured
+ * 209 frames in 28 minutes for want of three.
  *
  * @param {{marker: string, text: string}[]} hunk One hunk body.
  * @param {string[]} sourceLines The file that will render, by line.
@@ -5796,19 +5791,20 @@ function regionsTouchedByHunk(hunk, sourceLines, regions) {
   const sequence = hunk.filter(({ marker }) => marker !== '-').map(({ text }) => text);
   if (sequence.length === 0) return EVERY_PUBLISHABLE_CASE;
 
-  let agreed = null;
+  let union = null;
   for (const offset of anchorOffsets(sourceLines, sequence)) {
     const touched = regionsTouchedAt(hunk, offset, regions);
-    // One candidate widening settles it either way: if every candidate widens the answer is
-    // everything, and if only some do the candidates disagree, which is also everything.
+    // ONE candidate widening still settles it, and this short-circuit is what keeps the union
+    // honest. A candidate widens because it lands on a line outside every region — a shared
+    // factory, a section banner, the selection machinery itself — and the true edit may be that
+    // one. Unioning "some region" with "code that can move every frame" would answer with the
+    // region and lose the corpus, so this must stay ABOVE the union.
     if (touched === EVERY_PUBLISHABLE_CASE) return EVERY_PUBLISHABLE_CASE;
-    if (agreed === null) {
-      agreed = touched;
-      continue;
-    }
-    if (!sameKeys(agreed, touched)) return EVERY_PUBLISHABLE_CASE;
+    union ??= new Set();
+    for (const key of touched) union.add(key);
   }
-  return agreed ?? EVERY_PUBLISHABLE_CASE;
+  // No candidate at all: the patch describes content this checkout does not have.
+  return union ?? EVERY_PUBLISHABLE_CASE;
 }
 
 /**
@@ -6017,8 +6013,9 @@ function normalizePatches(patches) {
  *
  * Narrowing it is therefore allowed in exactly one direction: an input may select FEWER frames only
  * when the registry can show its work from what the cases declare about themselves, or from a diff
- * it has checked against the file that will render. Everything unmapped, unparseable or ambiguous
- * still selects all of them.
+ * it has checked against the file that will render. Everything unmapped or unparseable still
+ * selects all of them; a diff whose content is AMBIGUOUS selects the union of the places it could
+ * be, which is a superset of the truth rather than a guess at it.
  *
  * @param {string[]} files Changed paths.
  * @param {object} [options] Selection inputs beyond the file list.
