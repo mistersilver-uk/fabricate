@@ -48,6 +48,9 @@ const RAW_MODULES = [
   'src/models/Result.js',
   'src/utils/recipeCategories.js',
   'src/utils/routedOutcomeKeywords.js',
+  // Issue 1098: `routedOutcomeKeywords.js` reads the failure-result policy to decide
+  // which outcome tiers a result-authoring control may offer.
+  'src/utils/failureResultPolicy.js',
   'src/config/flags.js',
   // Ingredient + recipeReadiness dispatch through the match-type registry.
   'src/models/match/matchTypes.js',

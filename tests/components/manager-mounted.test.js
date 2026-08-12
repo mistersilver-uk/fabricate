@@ -131,6 +131,8 @@ function compileManagerRoot() {
   // The roll section's mode callout (issue 1096). `ChecksView` imports it STATICALLY, so
   // omitting it does not skip a branch — it fails module resolution for the whole suite.
   writeCompiledSvelte('src/ui/svelte/apps/manager/checks/CheckModeCallout.svelte');
+  // Issue 1098: the On-failure section's failure-result policy card.
+  writeCompiledSvelte('src/ui/svelte/apps/manager/checks/CheckFailurePolicy.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/checks/ChecksEditorTabs.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/checks/ChecksRightMenu.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/checks/CheckDcMacroCard.svelte');
@@ -581,6 +583,12 @@ function compileManagerRoot() {
     // omitting it: the suite HANGS as `# cancelled` rather than naming the missing file.
     'src/utils/browserPagination.js',
     'src/utils/routedOutcomeKeywords.js',
+    // Issue 1098: `routedOutcomeKeywords.js` reads the failure-result policy to decide
+    // which outcome tiers a result-authoring control may offer.
+    'src/utils/failureResultPolicy.js',
+    // Issue 1098: adminStore's gathering-task normalizer emits `task.failureOutcome`
+    // through this shared absence-preserving attach.
+    'src/utils/gatheringFailureOutcome.js',
     'src/utils/craftingCheckExpression.js',
     // foundryBridge imports the shared rich-text-to-plain-text normalizer when it
     // resolves dropped source documents for the Tool Studio.
