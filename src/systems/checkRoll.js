@@ -34,6 +34,45 @@ import {
 const DEFERRED_MODIFIER_SLOT = `(modifier)[${CHECK_MODIFIER_TERM_LABEL}]`;
 
 /**
+ * THE FORMULA THIS MODULE ACTUALLY ROLLS, for an authored formula and a modifier context.
+ *
+ * Two transforms stand between what a GM typed and what Foundry evaluates, and both are
+ * unconditional: the retired-placeholder shim (issue 1094) removes a `@craftingmod` token
+ * that survived the `1.21.0` migration, and {@link appendResolvedCheckModifier} resolves
+ * the eligible check modifiers to a scalar and appends ONE `+ N[Modifiers]` term.
+ *
+ * IT IS ONE DERIVATION BECAUSE THREE CALLERS NEED THE SAME ANSWER, and issue 1097 shipped
+ * the defect that proves it. {@link evaluateCheckRoll} and {@link resolveCheckFormulaDisplay}
+ * each carried their own copy of this pair, and the Checks Studio's odds enumerator carried
+ * neither: it charted the AUTHORED formula while the simulator beside it rolled the
+ * appended one, so a system with a non-empty check-modifier catalogue drew a histogram
+ * spanning `1..20` next to a readout rolling `5..24` — on the same screen, at the same
+ * time. Nothing published was wrong only because every View Lab check happened to resolve a
+ * zero scalar, which is luck rather than coverage. A preview that disagrees with the engine
+ * is worse than no preview, so the append has exactly one implementation and exactly one
+ * composition, and this is it.
+ *
+ * @param {string} formula The AUTHORED formula.
+ * @param {object|null} actor The actor whose roll data resolves it.
+ * @param {object|null} [craftingModifier] The check-modifier context, or null where no
+ *   modifier term should be appended (salvage/gathering, and the deferred `playerPicks`
+ *   path, which appends after the prompt returns instead).
+ * @param {*} [Roll] The `Roll` class; a parameter so an injected engine drives both the
+ *   shim's validity net and the append.
+ * @returns {string} The formula that will be rolled, or `''` when the shim emptied it.
+ */
+export function resolveRolledFormula(
+  formula,
+  actor,
+  craftingModifier = null,
+  Roll = globalThis.Roll
+) {
+  const authored = stripRetiredModifierPlaceholder(String(formula ?? ''), Roll);
+  if (authored.trim() === '') return '';
+  return appendResolvedCheckModifier(authored, actor, craftingModifier, Roll);
+}
+
+/**
  * Summarise an evaluated Roll's dice as
  * `{ groupId, group: "NdS", sum, results: number[] }` entries.
  *
@@ -295,9 +334,15 @@ export async function evaluateCheckRoll(formula, actor, options = {}) {
   // Append the resolved check-modifier scalar (issues 770, 1094) BEFORE anything
   // downstream reads the formula, so the dialog, roll, and journal all agree
   // (eval == display). A zero scalar — or no modifier context at all — appends nothing.
+  //
+  // Through {@link resolveRolledFormula} rather than inline (issue 1097): the shim above
+  // has already run, so this composition is a no-op re-strip, and routing it here is what
+  // makes "the formula this module rolls" a thing OTHER modules can ask for instead of
+  // rebuild. The Checks Studio's odds enumerator asks; before it could, it charted the
+  // authored formula while the simulator rolled the appended one.
   const baseFormula = useDeferredChoice
     ? authoredFormula
-    : appendResolvedCheckModifier(authoredFormula, actor, options?.craftingModifier);
+    : resolveRolledFormula(authoredFormula, actor, options?.craftingModifier);
   // Capture the @-resolved formula (e.g. "1d20 + 3") so the dialog and run journal
   // can show the actual modifiers, not the authored `@abilities…` placeholders.
   // Recomputed from the COMBINED formula below when a valid situational bonus is
@@ -495,19 +540,27 @@ export async function evaluateCheckRoll(formula, actor, options = {}) {
  * @param {object|null} [craftingModifier] The check-modifier context
  *   (`{ catalogue, systemPolicy, defaultModifierIds, recipeModifier }`); omit for
  *   salvage/gathering, or wherever no modifier term should be appended.
+ * @param {*} [Roll] The `Roll` class. A PARAMETER rather than a bare `globalThis` read
+ *   (issue 1097) so a caller that already injects a `Roll` — the Checks Studio's odds
+ *   enumerator does, to grade its predicate against recorded real-Foundry output — drives
+ *   ONE dice engine rather than two. Defaulted, so every existing caller is unchanged.
  * @returns {{ display: string, resolved: boolean }|null}
  */
-export function resolveCheckFormulaDisplay(formula, actor, craftingModifier = null) {
+export function resolveCheckFormulaDisplay(
+  formula,
+  actor,
+  craftingModifier = null,
+  Roll = globalThis.Roll
+) {
   if (typeof formula !== 'string' || formula.trim() === '') return null;
-  const Roll = globalThis.Roll;
   if (typeof Roll?.replaceFormulaData !== 'function') return null;
-  // The retirement shim runs unconditionally here too (issue 1094), so a display can
-  // never render a token the roll path has already stripped — and a formula that strips
-  // to empty reports "no formula" rather than a dangling operator.
-  const authored = stripRetiredModifierPlaceholder(String(formula), Roll);
-  if (authored.trim() === '') return null;
+  // The retirement shim and the modifier append are BOTH the roll path's, asked for
+  // rather than restated (issue 1097): a display can never render a token the roll path
+  // strips, nor omit a term the roll path adds, and a formula that strips to empty
+  // reports "no formula" rather than a dangling operator.
+  const substituted = resolveRolledFormula(formula, actor, craftingModifier, Roll);
+  if (substituted.trim() === '') return null;
   const rollData = actor?.getRollData?.() ?? actor?.system ?? {};
-  const substituted = appendResolvedCheckModifier(authored, actor, craftingModifier, Roll);
   const display = Roll.replaceFormulaData(substituted, rollData, {
     missing: 'NaN',
     warn: false,
@@ -1075,6 +1128,117 @@ function minSuccessTierFailed({ type, minOutcomeId, matched, relativeOutcomes, f
 }
 
 /**
+ * Classify ONE total against a routed check's tiers — the whole of
+ * {@link runFormulaRouted}'s post-roll resolution, extracted so nothing else has to
+ * restate it (issue 1097).
+ *
+ * The Checks Studio's odds histogram enumerates a die group's faces and buckets each
+ * one, and a preview that disagrees with the engine about which tier a total lands on
+ * is worse than no preview at all. So this is not a shared helper the runner *may*
+ * use: `runFormulaRouted` calls it, which is what makes drift impossible rather than
+ * merely unlikely.
+ *
+ * Composition order is the runner's own and is load-bearing — forced reroute, then
+ * tier step, then the recipe minimum gate — and is documented at each step in
+ * {@link runFormulaRouted}.
+ *
+ * `diceGroups` is the bag {@link resolveForcedOutcome} and {@link applyTierStepTriggers}
+ * both read. A caller synthesising one per face MUST build it through
+ * {@link rolledDiceGroups}: a bag missing `results` makes every per-die trigger silently
+ * invisible while still matching a hand-computed distribution for a trigger-free check.
+ *
+ * @param {object} params
+ * @param {'relative'|'fixed'} params.type
+ * @param {number} params.total The rolled (or enumerated) total.
+ * @param {number} params.dc The base DC relative thresholds are measured against.
+ * @param {'meet'|'exceed'} params.comparison Already reduced from `thresholdMode`.
+ * @param {Array<object>} [params.relativeOutcomes]
+ * @param {Array<object>} [params.fixedOutcomes]
+ * @param {Array<object>} [params.triggers]
+ * @param {Array<object>} [params.diceGroups]
+ * @param {boolean} [params.clampToNearest]
+ * @param {?string} [params.minOutcomeId]
+ * @returns {{
+ *   matched: object|null,
+ *   forcedDisposition: 'success'|'failure'|null,
+ *   success: boolean,
+ *   breakTools: boolean,
+ *   tierStepApplied: object|null,
+ *   minTierFailed: boolean,
+ *   blockedOutcomeId: string|null,
+ * }} `matched` is the EFFECTIVE tier (null when the minimum gate blocked it);
+ *   `blockedOutcomeId` names the tier the gate blocked and is null on a normal route.
+ */
+export function classifyCheckTotal({
+  type,
+  total,
+  dc,
+  comparison,
+  relativeOutcomes,
+  fixedOutcomes,
+  triggers,
+  diceGroups = [],
+  clampToNearest = false,
+  minOutcomeId = null,
+}) {
+  const forced = resolveForcedOutcome(triggers, { total, diceGroups });
+
+  let matched = forced
+    ? routeCritOutcome({
+        type,
+        forcedSuccess: forced.disposition === 'success',
+        relativeOutcomes,
+        fixedOutcomes,
+      })
+    : matchRoutedOutcome({
+        type,
+        total,
+        dc,
+        comparison,
+        relativeOutcomes,
+        fixedOutcomes,
+        clampToNearest,
+      });
+
+  const tierStep = applyTierStepTriggers({
+    rolled: matched,
+    type,
+    forcedDisposition: forced ? forced.disposition : null,
+    triggers,
+    relativeOutcomes,
+    fixedOutcomes,
+    total,
+    diceGroups,
+  });
+  matched = tierStep.matched;
+
+  const minTierFailed =
+    !forced &&
+    minSuccessTierFailed({ type, minOutcomeId, matched, relativeOutcomes, fixedOutcomes });
+  const effectiveMatched = minTierFailed ? null : matched;
+
+  const success = minTierFailed
+    ? false
+    : forced
+      ? forced.disposition === 'success'
+      : effectiveMatched
+        ? effectiveMatched.success === true
+        : false;
+
+  return {
+    matched: effectiveMatched,
+    forcedDisposition: forced ? forced.disposition : null,
+    success,
+    // The matched (or rerouted) tier's `breakTools` is the only `data.breakTools`
+    // source — the routed per-tier legacy bridge the breakage seam reads.
+    breakTools: effectiveMatched ? effectiveMatched.breakTools === true : false,
+    tierStepApplied: tierStep.tierStepApplied,
+    minTierFailed,
+    blockedOutcomeId: minTierFailed ? (matched?.id ?? null) : null,
+  };
+}
+
+/**
  * Run a routed formula check: roll the formula and map the total onto one of the
  * configured outcome tiers (relative DC deltas or fixed value ranges), returning
  * the matched tier's NAME as `outcome` for the activity's outcome→result-group
@@ -1178,73 +1342,30 @@ export async function runFormulaRouted({
   }
 
   const comparison = thresholdMode === 'exceed' ? 'exceed' : 'meet';
-  const forced = resolveForcedOutcome(triggers, { total, diceGroups });
 
-  let matched = matchRoutedOutcome({
+  // The WHOLE post-roll resolution — forced reroute, then tier step, then the recipe
+  // minimum gate — lives in the shared classifier so the Checks Studio's odds histogram
+  // buckets each enumerated face through the identical code (issue 1097). The ordering
+  // rationale is documented on {@link classifyCheckTotal}: forcing picks an EXTREME tier
+  // while a step is RELATIVE, so stepping first would be silently discarded, and the gate
+  // asks whether the craft reached the recipe's minimum, so it must judge the FINAL tier.
+  const classified = classifyCheckTotal({
     type,
     total,
     dc,
     comparison,
     relativeOutcomes,
     fixedOutcomes,
-    clampToNearest,
-  });
-
-  if (forced) {
-    // A forced outcome overrides the disposition: route to the best (success) /
-    // worst (failure) tier of that flag. If none exists, drop the tier-derived
-    // match entirely.
-    matched = routeCritOutcome({
-      type,
-      forcedSuccess: forced.disposition === 'success',
-      relativeOutcomes,
-      fixedOutcomes,
-    });
-  }
-
-  // Tier stepping (issue 975) sits between the forced reroute and the minimum-tier
-  // gate: forcing picks an EXTREME tier while a step is RELATIVE, so stepping first
-  // would be silently discarded, and the gate asks whether the craft reached the
-  // recipe's minimum, so it must judge the FINAL tier. There is no forced bypass —
-  // `natStepping` was a check-wide policy the GM could not scope, whereas a `tierStep`
-  // trigger is something the GM opted into on that trigger.
-  const tierStep = applyTierStepTriggers({
-    rolled: matched,
-    type,
-    forcedDisposition: forced ? forced.disposition : null,
     triggers,
-    relativeOutcomes,
-    fixedOutcomes,
-    total,
     diceGroups,
+    clampToNearest,
+    minOutcomeId,
   });
-  matched = tierStep.matched;
-
-  // Recipe minimum-success-tier gate (FIXED type only): when the FINAL (post-step)
-  // tier ranks below the recipe's required tier (by `start`), the craft fails
-  // outright. A forced (crit) outcome BYPASSES the gate — a natural crit must not be
-  // downgraded by a recipe minimum. Relative type is out of scope and ignored.
-  const minTierFailed =
-    !forced &&
-    minSuccessTierFailed({ type, minOutcomeId, matched, relativeOutcomes, fixedOutcomes });
-  // Below the required minimum: drop the matched tier so nothing routes and the craft
-  // takes its normal failure/consumption path (no success result).
-  const effectiveMatched = minTierFailed ? null : matched;
-
-  const success = minTierFailed
-    ? false
-    : forced
-      ? forced.disposition === 'success'
-      : effectiveMatched
-        ? effectiveMatched.success === true
-        : false;
-  // The matched (or rerouted) tier's `breakTools` is the only `data.breakTools`
-  // source — the routed per-tier legacy bridge the breakage seam reads.
-  const breakTools = effectiveMatched ? effectiveMatched.breakTools === true : false;
+  const { matched, success } = classified;
 
   return {
     success,
-    outcome: effectiveMatched ? effectiveMatched.name : null,
+    outcome: matched ? matched.name : null,
     value: total,
     data: {
       dc,
@@ -1253,18 +1374,21 @@ export async function runFormulaRouted({
       total,
       type,
       comparison,
-      outcomeId: effectiveMatched?.id ?? null,
+      outcomeId: matched?.id ?? null,
       success,
-      breakTools,
+      breakTools: classified.breakTools,
       diceGroups,
       // Additive on a real tier change only (issue 975): the resolved NET effect, the
       // REALIZED magnitude, and the ids that produced it.
-      ...(tierStep.tierStepApplied && { tierStepApplied: tierStep.tierStepApplied }),
+      ...(classified.tierStepApplied && { tierStepApplied: classified.tierStepApplied }),
       // Additive on a min-tier failure only: the tier the recipe minimum BLOCKED —
       // post-step, pre-gate — for a richer chat/journal explanation later. Named for
       // what the gate did to it rather than "rolled", which issue 975 mints as a term
       // of art for the PRE-step tier. Absent on a normal route.
-      ...(minTierFailed && { minTierFailed: true, blockedOutcomeId: matched?.id ?? null }),
+      ...(classified.minTierFailed && {
+        minTierFailed: true,
+        blockedOutcomeId: classified.blockedOutcomeId,
+      }),
     },
     message: success ? null : `${label} check failed`,
   };

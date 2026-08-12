@@ -32,6 +32,7 @@
     normalizeComponentCategory,
   } from '../../../../utils/componentCategories.js';
   import { categoryIconFor } from '../../../../utils/categoryIcons.js';
+  import { normalizePreviewSandbox } from '../../../../systems/progressiveCheckSandbox.js';
   import { buildVocabularyUsage } from '../../../../utils/vocabularyUsage.js';
   import { createRecipeBrowserState } from '../../../../utils/recipeBrowserModel.js';
   import {
@@ -382,13 +383,25 @@
   // award setting (awardMode) is carried through untouched so a save never drops it.
   function cloneProgressiveCheck(progressive) {
     const source = progressive && typeof progressive === 'object' ? progressive : {};
-    return {
+    // The Checks Studio's PREVIEW SANDBOX (issue 1097). This clone is the SECOND allowlist
+    // rebuild the block passes through — the manager's `_normalizeProgressiveCraftingCheck`
+    // is the first — and a draft that dropped the key would carry the GM's experiment for
+    // exactly as long as the panel stayed open, then write a block without it. It is
+    // normalized through the SAME derivation the persistence path uses, so a value the
+    // draft holds is a value that survives the save.
+    const preview = normalizePreviewSandbox(source.preview);
+    const draft = {
       awardMode: ['partial', 'equal', 'exceed'].includes(source.awardMode)
         ? source.awardMode
         : 'equal',
       rollFormula: typeof source.rollFormula === 'string' ? source.rollFormula : '',
       checkBreakage: cloneCheckBreakage(source.checkBreakage),
     };
+    // Attached rather than spread, so an absent experiment stays absent — and so the
+    // baseline and the draft, both built here, produce the same key order for the
+    // `JSON.stringify` dirty comparison.
+    if (preview) draft.preview = preview;
+    return draft;
   }
   let checkProgressiveDraft = $state(
     cloneProgressiveCheck($viewState.selectedSystem?.craftingCheck?.progressive)

@@ -268,6 +268,31 @@ function managerCase(entry) {
 }
 
 /**
+ * Choose an actor in the Checks rail's "Preview as" picker.
+ *
+ * TWO STEPS, because that control is a `SearchablePopover` rather than a native `<select>`
+ * (issue 1097 follow-up): a world's actor directory is mostly bestiary, so the list is
+ * filtered to player characters and made searchable. There is no `selectOption` to issue —
+ * open the trigger, then click the option by its own `data-popover-option` identity handle
+ * rather than by its localized label.
+ *
+ * Written once and spread into every case that needs it. Five cases select an actor before
+ * they can reach their state (every lab system's check formula carries
+ * `@abilities.int.mod`, so under the resting "No actor" selection nothing reduces to a
+ * number), and five hand-written pairs are five places for the control's hooks to drift out
+ * of step — a stale one fails the capture job WHOLE and publishes nothing.
+ *
+ * @param {string} actorId The lab actor id to preview as.
+ * @returns {object[]} The ordered steps.
+ */
+function previewAsActor(actorId) {
+  return [
+    { selector: '[data-checks-preview-actor]' },
+    { selector: `[data-popover-option="${actorId}"]` },
+  ];
+}
+
+/**
  * @param {object} entry Case fields.
  * @returns {object} A complete case.
  */
@@ -5076,6 +5101,216 @@ export const VIEW_LAB_CASES = Object.freeze([
     expectSelector: '[data-trigger="rw-trig-step-up"] [data-trigger-break]',
     kinds: ['manager', 'checks'],
     sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/checks\/CheckTriggers\.svelte$/],
+  }),
+  // ── The outcome simulator and the odds histogram (issue 1097) ────────────────────────
+  //
+  // All four cases select an ACTOR first, and that is not decoration. Every lab system's
+  // check formula carries `@abilities.int.mod`, so under the resting "No actor" selection
+  // the formula does not reduce to a number, the simulator renders its unresolved warning
+  // and the histogram abstains — which is a real state, and one of these cases photographs
+  // it deliberately, but it is not the state the other three are named for.
+  managerCase({
+    id: 'manager-checks-crafting-simulator-rolled',
+    label: 'Manager — Checks crafting outcome preview, rolled',
+    // BEYOND the smoke. The walk never opens the Checks rail's simulator, so there is no
+    // counterpart frame of a rolled readout to fall short of.
+    reaches: 'beyond',
+    smokeLabels: [],
+    // Runework is the only routed-by-check fixture with NAMED outcome tiers, which is what
+    // makes the matched band card render something a GM can read.
+    query: { system: 'lab-runework' },
+    steps: [
+      'Checks',
+      { selector: '#manager-checks-nav-crafting' },
+      ...previewAsActor('lab-actor-idrin'),
+      // NO DISCLOSURE STEP. These two panels were collapsible when this case was written and
+      // are not any more: issue 1096's rail is a flat `.manager-kicker` heading over a bare
+      // card, on the Tool Studio's inspector convention, so the body is always in the
+      // document and a click on a chevron that no longer exists would fail the capture job
+      // WHOLE and publish nothing at all.
+      { selector: '[data-checks-simulator-roll]' },
+      { selector: '[data-checks-simulator-readout]', scroll: true },
+    ],
+    expectView: 'checks-crafting',
+    // Anchored on the readout itself: a case that stopped rolling would fail here rather
+    // than publishing a frame of the pre-roll hint under a "rolled" name.
+    expectSelector: '.fabricate-manager [data-checks-simulator-band]',
+    kinds: ['manager', 'checks'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/checks\/checkPreview\.js$/,
+      /^src\/ui\/svelte\/apps\/manager\/checks\/CheckOutcomePreview\.svelte$/,
+    ],
+  }),
+  managerCase({
+    id: 'manager-checks-crafting-odds-enumerable',
+    label: 'Manager — Checks crafting odds histogram (enumerable)',
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-runework' },
+    steps: [
+      'Checks',
+      { selector: '#manager-checks-nav-crafting' },
+      ...previewAsActor('lab-actor-idrin'),
+      { selector: '[data-checks-odds-state="enumerated"]', scroll: true },
+    ],
+    expectView: 'checks-crafting',
+    // The bars themselves, not the panel: a panel that abstained would still render.
+    expectSelector: '.fabricate-manager [data-checks-odds-bar]',
+    kinds: ['manager', 'checks'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/checks\/checkOdds\.js$/,
+      /^src\/ui\/svelte\/apps\/manager\/checks\/CheckOddsPanel\.svelte$/,
+    ],
+  }),
+  managerCase({
+    id: 'manager-checks-crafting-odds-not-enumerable',
+    label: 'Manager — Checks crafting odds histogram (not enumerable)',
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-runework' },
+    // The formula is TYPED rather than authored, for the reason
+    // `manager-checks-crafting-dynamic-dc` records: the fixture check is shared, so
+    // authoring `2d20` there would move every already-captured Runework frame to
+    // photograph one panel. The Checks editor stages into a draft, so the typed formula
+    // reaches the rendered state without persisting anything.
+    steps: [
+      'Checks',
+      { selector: '#manager-checks-nav-crafting' },
+      ...previewAsActor('lab-actor-idrin'),
+      { selector: '[data-check-roll-formula]', fill: '2d20 + @abilities.int.mod' },
+      { selector: '[data-checks-odds-state="not-enumerable"]', scroll: true },
+    ],
+    expectView: 'checks-crafting',
+    // The REASON, not merely the note: an abstention with no stated reason is the defect
+    // the discriminated codes exist to prevent.
+    expectSelector: '.fabricate-manager [data-checks-odds-reason="non-unit-count"]',
+    kinds: ['manager', 'checks'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/checks\/checkOdds\.js$/,
+      /^src\/ui\/svelte\/apps\/manager\/checks\/CheckOddsPanel\.svelte$/,
+    ],
+  }),
+  managerCase({
+    id: 'manager-checks-crafting-odds-progressive',
+    label: 'Manager — Checks crafting odds histogram (progressive award count)',
+    reaches: 'beyond',
+    smokeLabels: [],
+    // Herbalism is the world's ONLY progressive system, so it is the only route where a
+    // histogram bucketed by award count exists at all. Its check carries the authored
+    // preview sandbox (`progressive.preview.difficulties`) that supplies the order — see
+    // `PROGRESSIVE_CHECK` in `tests/view-lab/world/labContent.js` for why those four numbers.
+    query: { system: 'lab-herbalism' },
+    steps: [
+      'Checks',
+      { selector: '#manager-checks-nav-crafting' },
+      ...previewAsActor('lab-actor-idrin'),
+      { selector: '[data-checks-odds-state="enumerated"]', scroll: true },
+    ],
+    expectView: 'checks-crafting',
+    // A BUCKET THAT MUST EXIST, not merely a bar. `award-0` is the reachable award of
+    // nothing, and it is the half of the rule a histogram is most likely to drop by
+    // treating "awarded nothing" as "no outcome": anchoring on it means a build that
+    // stopped listing it fails here instead of publishing a three-bar frame that looks fine.
+    expectSelector: '.fabricate-manager [data-checks-odds-row="award-0"]',
+    kinds: ['manager', 'checks'],
+    // NO entry for `src/systems/progressiveCheckSandbox.js`, deliberately: `isUiFile` admits
+    // only `src/ui/`, `styles/`, `.svelte` and `.css`, so a change confined to that module
+    // selects no case at all and a pattern for it here would be unreachable code — the same
+    // trap the `Stepper` note two thousand lines up records for a different reason.
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/checks\/checkOdds\.js$/,
+      /^src\/ui\/svelte\/apps\/manager\/checks\/CheckOddsPanel\.svelte$/,
+    ],
+  }),
+  managerCase({
+    id: 'manager-checks-simple-two-band-strip',
+    label: 'Manager — Checks simple two-band DC strip',
+    reaches: 'beyond',
+    smokeLabels: [],
+    // Smithing is the fixture's `simple` system, so its Outcomes section is the two-outcome
+    // card the third `ThresholdBandStrip` binding renders in.
+    query: { system: 'lab-smithing' },
+    steps: [
+      'Checks',
+      { selector: '#manager-checks-nav-crafting' },
+      { selector: '#checks-section-outcomes' },
+      ...previewAsActor('lab-actor-brenna'),
+      { selector: '[data-simple-band-strip]', scroll: true },
+    ],
+    expectView: 'checks-crafting',
+    expectSelector: '.fabricate-manager [data-simple-band-strip] [data-band-strip-handle]',
+    kinds: ['manager', 'checks'],
+    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/checks\/SimpleCraftingCheckEditor\.svelte$/],
+  }),
+  managerCase({
+    id: 'manager-checks-crafting-outcomes-empty',
+    label: 'Manager — Checks crafting Outcomes with zero tiers',
+    // BEYOND the smoke. The walk never empties an outcome table, and every routed check in the
+    // fixture world authors three tiers, so the state a routed check STARTS in was in no frame
+    // at all.
+    reaches: 'beyond',
+    smokeLabels: [],
+    // THE DEAD END THAT WAS FIXED (issue 1097 follow-up, maintainer report). `Add outcome tier`
+    // used to be the last child of `.manager-checks-tier-list`, which only renders when at least
+    // one tier exists — so a zero-tier routed check displayed "No outcome tiers yet. Add the
+    // tiers this check routes results into." and offered nothing to press. Every frame in the
+    // registry photographed a POPULATED table, so the dead end was invisible to capture and its
+    // repair is invisible without this.
+    //
+    // Reached by SWITCHING ALCHEMY TO TIERED rather than by deleting Runework's three tiers or
+    // by seeding a sixth system. `lab-alchemy` carries the shared frozen `SIMPLE_CHECK`, which
+    // authors no `routed` block at all, so `tiered` is the one route in this world where zero
+    // tiers is the check's own resting state rather than the residue of three delete clicks —
+    // and it is the second of the two states the fix's own comment names. It costs one click
+    // and no fixture change: seeding `checkMode: 'tiered'` on the fixture instead would flip
+    // every already-captured alchemy frame off the Simple two-slot Results editor
+    // `labContent.js` records as load-bearing, and raise a permanent no-tiers validation warning
+    // on the Validation frames.
+    query: { system: 'lab-alchemy' },
+    steps: [
+      'Checks',
+      { selector: '#manager-checks-nav-crafting' },
+      // The mode radio group renders only on The roll section, which is where the route lands.
+      { selector: '[data-crafting-alchemy-checkmode-option="tiered"] input' },
+      { selector: '#checks-section-outcomes' },
+      { selector: '[data-add-outcome-tier]', scroll: true },
+    ],
+    expectView: 'checks-crafting',
+    // THE FIX ITSELF, as a selector: the add control has to be a SIBLING of the empty sentence,
+    // which is what taking it out of the list's `{#if}` made it. Anchoring on either hook alone
+    // would pass on the broken markup — the sentence rendered fine before, and the control still
+    // exists whenever a tier does — so the sibling combinator is the assertion, not decoration.
+    expectSelector: '.fabricate-manager [data-outcomes-empty] ~ [data-add-outcome-tier]',
+    kinds: ['manager', 'checks'],
+    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/checks\/CraftingCheckEditor\.svelte$/],
+  }),
+  managerCase({
+    id: 'manager-checks-crafting-alchemy-behaviour',
+    label: 'Manager — Checks crafting alchemy behaviour card',
+    // BEYOND the smoke. The walk never opens an alchemy system's On failure section, so there is
+    // no counterpart frame to fall short of.
+    reaches: 'beyond',
+    smokeLabels: [],
+    // A CARD NO FRAME REACHED. `data-alchemy-behaviour` renders only for a system whose
+    // resolution mode is `alchemy`, and only on On failure — every other crafting route draws
+    // the two-toggle `data-failure-consumption` list there instead. `lab-alchemy` is the
+    // world's alchemy system with a check mode set, so it is the only route to this card, and
+    // its intro sentence (corrected in issue 1097 to name The roll section rather than pointing
+    // "above" at a card this screen no longer shows beside it) is what the frame is evidence for.
+    query: { system: 'lab-alchemy' },
+    steps: [
+      'Checks',
+      { selector: '#manager-checks-nav-crafting' },
+      { selector: '#checks-section-on-failure' },
+      { selector: '[data-alchemy-behaviour]', scroll: true },
+    ],
+    expectView: 'checks-crafting',
+    // The card, which is the subject and exists in no other state — not one of its toggles.
+    // A deeper anchor would fail the capture job WHOLE, and publish nothing, the day a flag is
+    // added or renamed inside a card whose SENTENCE is what this frame is about.
+    expectSelector: '.fabricate-manager [data-alchemy-behaviour]',
+    kinds: ['manager', 'checks'],
+    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/checks\/ChecksView\.svelte$/],
   }),
   // Player recipe detail, one per resolution mode. Each mode draws a DIFFERENT body — the routed
   // ones a route rail, progressive a stage rail, simple a plain ingredient list — so the four

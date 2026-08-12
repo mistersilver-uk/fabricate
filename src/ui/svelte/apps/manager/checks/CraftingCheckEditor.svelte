@@ -52,11 +52,13 @@
   // Studio's five-section strip hosts the SAME editor rather than a per-section fork.
   // Empty renders every card, which is what every caller outside the studio still gets.
   //
-  // There is deliberately NO `previewLabel` here. `ThresholdBandStrip` takes one and names it
-  // in its group label and `aria-valuetext`, but nothing in the product can supply one: what a
-  // previewed record IS, and which one is selected, are the outcome simulator's decisions.
-  // A prop forwarded from every caller as `''` is a claim the surface cannot honour, so the
-  // strip is drawn against the check's own DC and says so.
+  // `previewLabel` USED to be absent here, and the reason it was absent has expired. Issue
+  // 1096 could not supply one — what a previewed record IS, and which one is selected, were
+  // the outcome simulator's decisions and the simulator did not exist — so the strip was
+  // drawn against the check's own DC and said so. Issue 1097 ships that simulator, and the
+  // record it previews against is the SAME selection this card's PREVIEW AGAINST offers.
+  // ONE selection, not two: the strip and the readout beside it must never be describing
+  // different records, so the state is the route's and this control reports upward.
   let {
     value = null,
     showTiers = true,
@@ -74,6 +76,14 @@
     // section counts from — an editor re-deriving it would be a second opinion.
     appliedModifiers = [],
     modifierPolicy = 'addAll',
+    // The PREVIEW AGAINST binding (issue 1097). `previewRecords` is the route's own record
+    // list — `{ id, label }`, the same one the rail's simulator previews against — and
+    // `previewDcOverride` / `previewLabel` are the selected record's DC and name.
+    previewRecords = [],
+    previewRecordId = '',
+    previewDcOverride = null,
+    previewLabel = '',
+    onSelectPreviewRecord = () => {},
     onChange = () => {},
   } = $props();
 
@@ -243,36 +253,66 @@
   // their card; the rail's separate "Preview as" chooses an ACTOR and is issue 1097's.
   // Two controls, two subjects, and conflating them is what left this one missing.
   //
-  // LOCAL STATE, never persisted: choosing a tier to look at is not an edit to the
-  // system, and writing it into the check would make a GM's viewport a saved field every
-  // other GM then inherits.
+  // NEVER PERSISTED: choosing a record to look at is not an edit to the system, and
+  // writing it into the check would make a GM's viewport a saved field every other GM
+  // then inherits.
+  //
+  // BUT NOT LOCAL EITHER, WHERE A ROUTE OWNS IT (issue 1097). The Checks Studio's rail now
+  // reads the SAME record — the outcome preview rolls against it and the odds histogram
+  // enumerates against it — so a second copy of the selection here would let the strip and
+  // the readout beside it describe different records on one screen. When the route supplies
+  // `previewRecords` its `previewRecordId` is the authority and this control reports upward;
+  // when it does not (the characterization mounts, any caller outside the Studio) the local
+  // fallback below keeps the control live rather than inert. Exactly one of the two is ever
+  // read, so there is no two-way binding to fall out of step.
   //
   // WITHHELD ONLY WHERE THE BANDS HAVE NO ANCHOR — `bandsAreAbsolute`, the one named gate
   // this editor uses for all three anchored surfaces. A `routedByCheck + fixed` check's
   // bands are absolute roll values that no recipe DC can move, so a control offering to
   // re-anchor them would be a promise the model cannot keep. Every OTHER case shows it,
   // including a fixed salvage or gathering check, which keeps its DC.
-  let previewTierId = $state('');
+  let localPreviewRecordId = $state('');
   const recipeTiers = $derived(Array.isArray(value?.tiers) ? value.tiers : []);
-  const showPreviewAgainst = $derived(!bandsAreAbsolute && recipeTiers.length > 0);
-  const previewTier = $derived(recipeTiers.find((tier) => tier.id === previewTierId) || null);
-  const previewDc = $derived(
-    previewTier ? Number(previewTier.dc ?? 0) || 0 : Number(value?.dc ?? 0) || 0
-  );
+  const routeOwnsPreview = $derived(previewRecords.length > 0);
 
-  const previewAgainstOptions = $derived([
-    {
-      id: '',
-      label: text(
-        'FABRICATE.Admin.Manager.Checks.Crafting.PreviewAgainstDefault',
-        'Default · DC {dc}'
-      ).replace('{dc}', String(Number(value?.dc ?? 0) || 0)),
-    },
-    ...recipeTiers.map((tier) => ({
-      id: tier.id,
-      label: `${tier.name || text('FABRICATE.Admin.Manager.Checks.Crafting.UnnamedTier', 'Unnamed tier')} · ${text('FABRICATE.Admin.Manager.Checks.Crafting.TierDc', 'DC')} ${Number(tier.dc ?? 0) || 0}`,
-    })),
-  ]);
+  const previewAgainstOptions = $derived(
+    routeOwnsPreview
+      ? previewRecords
+      : [
+          {
+            id: '',
+            label: text(
+              'FABRICATE.Admin.Manager.Checks.Crafting.PreviewAgainstDefault',
+              'Default · DC {dc}'
+            ).replace('{dc}', String(Number(value?.dc ?? 0) || 0)),
+          },
+          ...recipeTiers.map((tier) => ({
+            id: tier.id,
+            label: `${tier.name || text('FABRICATE.Admin.Manager.Checks.Crafting.UnnamedTier', 'Unnamed tier')} · ${text('FABRICATE.Admin.Manager.Checks.Crafting.TierDc', 'DC')} ${Number(tier.dc ?? 0) || 0}`,
+          })),
+        ]
+  );
+  const showPreviewAgainst = $derived(!bandsAreAbsolute && previewAgainstOptions.length > 1);
+  const selectedPreviewRecordId = $derived(
+    routeOwnsPreview ? previewRecordId : localPreviewRecordId
+  );
+  const previewTier = $derived(
+    routeOwnsPreview ? null : recipeTiers.find((tier) => tier.id === localPreviewRecordId) || null
+  );
+  // The DC the relative bands are resolved against: the PREVIEWED RECORD's, falling back to
+  // the check's own default. A relative band's absolute position is a function of that
+  // number, which is exactly why the strip announces both readings — switching records moves
+  // every tick with no data change at all.
+  const previewDc = $derived.by(() => {
+    const supplied = Number(previewDcOverride);
+    if (routeOwnsPreview && Number.isFinite(supplied)) return supplied;
+    return previewTier ? Number(previewTier.dc ?? 0) || 0 : Number(value?.dc ?? 0) || 0;
+  });
+
+  function selectPreviewRecord(id) {
+    localPreviewRecordId = id;
+    onSelectPreviewRecord(id);
+  }
 
   // The two segments of the per-tier outcome toggle. Hoisted rather than rebuilt per row:
   // the option list is identical for every tier, and a per-row literal would be N copies
@@ -544,10 +584,8 @@
             <select
               data-preview-against-select
               aria-labelledby="checks-preview-against-label"
-              value={previewTierId}
-              onchange={(event) => {
-                previewTierId = event.currentTarget.value;
-              }}
+              value={selectedPreviewRecordId}
+              onchange={(event) => selectPreviewRecord(event.currentTarget.value)}
             >
               {#each previewAgainstOptions as option (option.id)}
                 <option value={option.id}>{option.label}</option>
@@ -555,38 +593,47 @@
             </select>
           </div>
         {/if}
-        <ThresholdBandStrip
-          binding={type === 'fixed' ? 'fixed' : 'relative'}
-          bands={bandStripBands}
-          {previewDc}
-          groupLabel={text('FABRICATE.Admin.Manager.Checks.Crafting.BandsTitle', 'Outcome bands')}
-          boundaryLabel={(band, nextBand) =>
-            text(
-              'FABRICATE.Admin.Manager.Checks.Crafting.BandsBoundary',
-              'Threshold between {from} and {to}'
-            )
-              .replace('{from}', band?.name || '')
-              .replace('{to}', nextBand?.name || '')}
-          fallbackNote={text(
-            'FABRICATE.Admin.Manager.Checks.Crafting.BandsFallback',
-            'These tiers leave a gap or overlap, so they cannot be drawn as one continuous strip. Edit the numbers in the rows below; the strip returns once the ranges meet.'
-          )}
-          dataAttr="data-outcome-band-strip"
-          onChange={applyBandStripChange}
-        />
-        <p class="manager-muted" data-outcome-band-strip-hint>
-          <!-- The pointer glyph leads the sentence, as the prototype draws it: the hint is
-               about a DIRECT-MANIPULATION affordance, and a glyph naming the pointer is what
-               separates it from the paragraphs of prose elsewhere on the screen. -->
-          <i class="fas fa-arrow-pointer" aria-hidden="true"></i>
-          {text(
-            'FABRICATE.Admin.Manager.Checks.Crafting.BandsHint',
-            'Drag or arrow-key a band edge to move its threshold, or type the numbers below. The numbers are the authority.'
-          )}
-        </p>
+        <!-- THE STRIP AND ITS HINT ARE FOR A CHECK THAT HAS TIERS. Both rendered
+             unconditionally, and both say something FALSE when there are none: the strip
+             cannot resolve an empty set, so it fell back to "these tiers leave a gap or
+             overlap" about tiers that do not exist, and the hint invited a GM to drag a band
+             edge on a strip with no edges. The zero state's own sentence and its add control
+             are below, and they are the whole message that state has. -->
+        {#if outcomes.length > 0}
+          <ThresholdBandStrip
+            binding={type === 'fixed' ? 'fixed' : 'relative'}
+            bands={bandStripBands}
+            {previewDc}
+            {previewLabel}
+            groupLabel={text('FABRICATE.Admin.Manager.Checks.Crafting.BandsTitle', 'Outcome bands')}
+            boundaryLabel={(band, nextBand) =>
+              text(
+                'FABRICATE.Admin.Manager.Checks.Crafting.BandsBoundary',
+                'Threshold between {from} and {to}'
+              )
+                .replace('{from}', band?.name || '')
+                .replace('{to}', nextBand?.name || '')}
+            fallbackNote={text(
+              'FABRICATE.Admin.Manager.Checks.Crafting.BandsFallback',
+              'These tiers leave a gap or overlap, so they cannot be drawn as one continuous strip. Edit the numbers in the rows below; the strip returns once the ranges meet.'
+            )}
+            dataAttr="data-outcome-band-strip"
+            onChange={applyBandStripChange}
+          />
+          <p class="manager-muted" data-outcome-band-strip-hint>
+            <!-- The pointer glyph leads the sentence, as the prototype draws it: the hint is
+                 about a DIRECT-MANIPULATION affordance, and a glyph naming the pointer is what
+                 separates it from the paragraphs of prose elsewhere on the screen. -->
+            <i class="fas fa-arrow-pointer" aria-hidden="true"></i>
+            {text(
+              'FABRICATE.Admin.Manager.Checks.Crafting.BandsHint',
+              'Drag or arrow-key a band edge to move its threshold, or type the numbers below. The numbers are the authority.'
+            )}
+          </p>
+        {/if}
 
         {#if outcomes.length === 0}
-          <p class="manager-muted">
+          <p class="manager-muted" data-outcomes-empty>
             {text(
               'FABRICATE.Admin.Manager.Checks.Crafting.NoOutcomes',
               'No outcome tiers yet. Add the tiers this check routes results into.'
@@ -721,18 +768,38 @@
                 </ManagerButton>
               </div>
             {/each}
-
-            <ManagerButton role="dashed" data-add-outcome-tier onclick={addOutcome}>
-              <i class="fas fa-plus" aria-hidden="true"></i>
-              <span
-                >{text(
-                  'FABRICATE.Admin.Manager.Checks.Crafting.AddOutcomeTier',
-                  'Add outcome tier'
-                )}</span
-              >
-            </ManagerButton>
           </div>
         {/if}
+
+        <!-- OUTSIDE the `{#if}`, and that is the fix rather than the layout (issue 1097
+             follow-up, maintainer report). This control used to be the last child of
+             `.manager-checks-tier-list`, which only renders when there is at least one row —
+             so a check with ZERO outcome tiers displayed "No outcome tiers yet. Add the tiers
+             this check routes results into." and NOTHING to press. An instruction with no way
+             to follow it is a dead end, and it is the state every routed check starts in: a
+             fresh routed-by-check crafting check and an alchemy check switched to `tiered`
+             both land here with nothing authored.
+
+             Placed BENEATH the empty sentence, not beside it, because that is what the two
+             siblings in this same studio already do — `CheckRecipeTiers` and `CheckTriggers`
+             each close their `{#if}` and then render the dashed control as the next child, so
+             the action that grows the list sits where the list ends in both states. Its
+             `margin-top` is the list's own 6px gap, so the populated state is pixel-unchanged
+             by the move. -->
+        <ManagerButton
+          role="dashed"
+          class="manager-checks-outcome-add"
+          data-add-outcome-tier
+          onclick={addOutcome}
+        >
+          <i class="fas fa-plus" aria-hidden="true"></i>
+          <span
+            >{text(
+              'FABRICATE.Admin.Manager.Checks.Crafting.AddOutcomeTier',
+              'Add outcome tier'
+            )}</span
+          >
+        </ManagerButton>
       </div>
     </section>
   {/if}

@@ -2204,9 +2204,15 @@
 
 /* ══ Checks Studio visual parity with the standalone prototype (issue 1096) ═══════════
    Every rule below is a MEASURED value, not a chosen one: `tests/fixtures/checks-studio-parity.json`
-   records the prototype's computed styles per named region, and
-   `tests/components/checks-studio-parity.test.js` renders these rules in Chromium and
-   compares. Change a number here and that gate reds with the region and property named.
+   records the prototype's computed styles per named region.
+
+   NOTHING GATES THEM IN CI. This block used to say that
+   `tests/components/checks-studio-parity.test.js` rendered these rules in Chromium and compared,
+   and that changing a number here would red that gate. That test was DELETED when the parity
+   harness moved out of CI, and this claim outlived it by several commits — which is how three
+   type-scale values in the Checks rail drifted from the prototype with every gate green. The
+   live instrument is `scripts/visual-parity/`, run by hand at dev time. A value that must not
+   move again belongs in `tests/components/manager-layout.test.js`, which runs under `npm test`.
 
    The type sizes here are authored in PX rather than this sheet's usual `rem`, and that is
    deliberate: the prototype authors px, several of its sizes are half-pixels (10.5, 12.5,
@@ -2683,6 +2689,15 @@
   flex-direction: column;
   gap: 6px;
   min-width: 0;
+}
+
+/* The outcome list's own append action, which lives OUTSIDE that list so it is reachable
+   from the zero state too (issue 1097 follow-up). It was the list's last flex child and took
+   the list's `gap` for its spacing; moving it out of a flex container took that spacing with
+   it, so the gap is restated here as a margin. The VALUE is the list's, copied rather than
+   re-chosen: the populated card must be pixel-identical after the move. */
+.fabricate-manager .manager-button.manager-checks-outcome-add {
+  margin-top: 6px;
 }
 
 .fabricate-manager .manager-checks-tier-row {
@@ -3242,6 +3257,63 @@
   margin-left: auto;
   color: var(--fab-text-disabled);
   font-size: 8px;
+}
+
+/* ── The rail's CONTROLS ─────────────────────────────────────────────────────────────
+   `PREVIEW AS` is the only card in this rail a GM operates rather than reads, and its two
+   controls were the one part of it nothing had measured: a `.manager-field` control takes
+   that wrapper's 0.82rem/700 by INHERITANCE, and inheritance is invisible to a per-region
+   parity comparison because no rule declares it anywhere. They rendered at 13.12px/700 —
+   heavier and a point and a half larger than the prototype's own — which is what the
+   maintainer reported as "too large and bolded".
+
+   11.5px/500 is READ OFF THE PROTOTYPE, not chosen: its rail declares
+   `font: 500 11.5px var(--sans)` on both the character picker and the record picker
+   (`GM Checks Studio (standalone).html`, the `simChar` / `previewTierId` controls). The
+   input is joined to them because the progressive sandbox's difficulty field stands in the
+   same card, in the same slot, and a field beside two controls at 11.5px reading at 13.12
+   would be the same defect one row down.
+
+   The prototype's control BOX is 34px tall at an 8px radius against this sheet's 36px/6px,
+   and that difference is deliberately NOT taken here: it is the manager's shared
+   `.manager-field` control geometry, so re-typing it from this block would move one card
+   out of step with every other form in the app rather than move the app. */
+.fabricate-manager .manager-checks-rail .manager-field select,
+.fabricate-manager .manager-checks-rail .manager-field input {
+  font-size: 11.5px;
+  font-weight: 500;
+}
+
+/* The "Preview as" ACTOR PICKER is a `SearchablePopover` rather than a native `<select>`
+   (issue 1097 follow-up), because the list is a world's player characters and a flat native
+   list of them is unusable past a handful. It sits in the slot the record select sits in
+   directly beneath, so it has to READ as that select's peer: full width, and the same
+   11.5px/500 the rule above gives it.
+
+   (0,3,0) is the requirement rather than the preference. `.fabricate-manager
+   .manager-button` declares `font-weight: 700` at the same (0,2,0) as a bare class rule
+   here would, thousands of lines LATER, so a two-class selector would lose the tie on
+   source order and the trigger would go on reading bold beside a 500-weight select. */
+.fabricate-manager .manager-button.manager-checks-preview-actor-trigger {
+  width: 100%;
+  font-size: 11.5px;
+  font-weight: 500;
+}
+
+/* The simulator's roll action. It renders through `ManagerButton`, so its type scale and
+   tone come from the primitive; what stays here is the FOUNDRY RESET the primitive cannot
+   carry — core's `button` rule centres content and pins a fixed height, and this button is
+   a full-width icon+label pair inside a card rather than a chrome control. It lived in
+   `CheckOutcomePreview.svelte`'s scoped block while the button was hand-written there;
+   scoping cannot reach a child component's element, so it moved here with the conversion.
+
+   (0,4,0), to beat `.manager-button.fab-manager-button`'s own (0,3,0) control height
+   without depending on source order. */
+.fabricate-manager .manager-button.fab-manager-button.manager-checks-simulator-roll {
+  justify-content: center;
+  width: 100%;
+  height: auto;
+  min-height: 34px;
 }
 
 /* ── The Modifiers screen's entry rows ────────────────────────────────────────────────

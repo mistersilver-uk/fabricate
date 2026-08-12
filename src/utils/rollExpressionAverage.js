@@ -104,15 +104,33 @@ const MODIFIER_RUN_AT = /^(?:[a-zA-Z]+|[0-9<>=]+)*/;
 /**
  * Reduce a roll expression to its deterministic average, and report whether it rolls.
  *
+ * `dieValue` REPLACES a die's contribution with a caller-supplied number, and it is what lets
+ * the Checks Studio's odds histogram enumerate rather than approximate (issue 1097). Called
+ * once per die IN READING ORDER — which is stable, because this is a deterministic
+ * recursive-descent walk — it lets a caller pin each die to a concrete face and read the
+ * expression's exact total for that assignment, functions, bounds, pools and all.
+ *
+ * It is a HOOK ON THIS WALK rather than a second one for the same reason `rollsDice` is: a
+ * caller that enumerated by scanning `NdS` out of the string would be a second opinion about
+ * where the dice are, and would read a clamp's bound arguments (`min(max((1d8), -1), 6)`) as
+ * flat addends the moment a check modifier started rolling. There is one reader, and the
+ * enumeration is a different question asked of it.
+ *
+ * Returning `undefined` from the hook falls through to the average, so a caller may pin some
+ * dice and average the rest.
+ *
  * @param {string} input The expression, with every `@`-path already substituted.
+ * @param {object} [options] Options.
+ * @param {?(die: {ordinal: number, count: number, faces: string, modifiers: string}) => (number|undefined)}
+ *   [options.dieValue] Per-die substitution.
  * @returns {{ value: number, rollsDice: boolean }} `value` is `NaN` when the expression
  *   cannot be reduced; `rollsDice` is true when at least one die or pool was read, whether
  *   or not the reduction succeeded.
  */
-export function reduceRollExpression(input) {
+export function reduceRollExpression(input, { dieValue = null } = {}) {
   const source = String(input ?? '').trim();
   if (source === '') return { value: NaN, rollsDice: false };
-  const reader = createReader(source);
+  const reader = createReader(source, dieValue);
   const value = reader.parseExpression();
   reader.skipWhitespace();
   // Trailing text the walk could not consume means the expression is not this grammar's,
@@ -129,9 +147,10 @@ export function reduceRollExpression(input) {
  * per-reduction state rather than module state.
  * @param {string} source
  */
-function createReader(source) {
+function createReader(source, dieValue = null) {
   let index = 0;
   let sawDice = false;
+  let dieOrdinal = 0;
 
   const skipWhitespace = () => {
     while (index < source.length && /\s/.test(source[index])) index += 1;
@@ -235,6 +254,19 @@ function createReader(source) {
   function dieAverage(count, faces, modifiers) {
     sawDice = true;
     skipFlavor();
+    if (dieValue) {
+      // BEFORE the shape checks below, deliberately: a substituting caller is answering for
+      // this die itself, and it is the one that gets to decide which shapes it can answer
+      // for. The ordinal is the die's position in reading order, which is what lets a caller
+      // hold one assignment across repeated reductions of the same expression.
+      const substituted = dieValue({
+        ordinal: dieOrdinal++,
+        count,
+        faces: String(faces),
+        modifiers: modifiers ?? '',
+      });
+      if (substituted !== undefined) return substituted;
+    }
     if (!Number.isFinite(count)) return NaN;
     const denomination = DENOMINATION_AVERAGES.get(String(faces).toLowerCase());
     if (denomination !== undefined) return keepCount(count, modifiers) * denomination;

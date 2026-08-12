@@ -97,8 +97,9 @@ Three live non-conformances are recorded here rather than left to be discovered,
   Conversion of those four stays deferred because it would drag their screenshot-label sets into a single evidence run.
 - `CollapsibleGroupHeader` is explicitly NOT the primitive for a collapsed ROW disclosure; it is a GROUP header, owning a heading, a count and the header band above a set of rows.
   A single purpose-built row disclosure exists instead at `src/ui/svelte/components/RowDisclosure.svelte`, with `aria-expanded`, `aria-controls` and an accessible name, and it is the ONE implementation every such site uses — two "labelled regions that expand" landing in one change must share an implementation or name the behavioural mismatch that forbids it.
-  Its shipped consumer is the Checks Studio right rail, whose simulator and odds panels each collapse to it at the existing 1320 breakpoint.
-  The COLLAPSED TRIGGER CARD is a debt with a named owner rather than a second site already using it: the trigger cards render expanded, so the summary row the prototype shows — condition sentence, effect chip, disclosure — is not built, and when it is it MUST adopt this primitive rather than declare a second chevron.
+  It has TWO shipped consumers: the Checks Studio right rail, whose simulator and odds panels each collapse to it at the existing 1320 breakpoint, and the COLLAPSED TRIGGER CARD, whose summary row states the trigger's condition as a sentence, its effects as a sentence and a chip, and carries this disclosure.
+  A collapsed trigger card keeps its editing body IN THE DOM and hides it with `display: none` rather than removing it: that takes its controls out of the tab order, so a keyboard user cannot land inside a closed card, and it keeps ONE markup tree rather than a second rendering path to keep in step.
+  A trigger a GM has just ADDED opens, because the collapsed summary is the resting state of a card that already says something.
   It renders a real `<button>`, so a caller nests it beside a row's content and never converts a `role="button"` wrapper around it into a `<button>`, which would nest buttons and land invalid DOM.
 - THE manager's labelled push-button exists at `src/ui/svelte/components/ManagerButton.svelte`, taking a `role` of `neutral`, `primary`, `ghost` or `danger`.
   It replaces a CSS CONVENTION — `manager-button` plus a remembered `is-*` modifier — which is exactly the "shared CSS class each site hand-rolls markup against" this section forbids, and which had already drifted: the system Modifiers card painted `Delete modifier` as a neutral verb while the Tool Studio painted the identical verb as danger.
@@ -139,9 +140,9 @@ A tier interval narrower than `step` is authored data the strip must still descr
 A `fixed` band's range is INCLUSIVE, so the last band is drawn to `max(end) + 1` — the same rule every interior seam obeys, since band _i_ ends where band _i+1_ starts, which is `end + 1`.
 A handle dragged or keyed past a neighbour CLAMPS rather than swapping or reordering.
 
-In `relative` mode the strip renders and announces ABSOLUTE values against the check's own DC — `aria-valuenow` carries the absolute number, not the offset — and converts back to offsets on write, because the tier rows' steppers show offsets over the same state.
-Since the absolute number is not what the row shows, `aria-valuetext` carries BOTH readings ("17 — DC +5").
-The strip takes an optional `previewLabel` and names it in the group label and in `aria-valuetext` ("17 — DC +5 against Uncommon Craft"), but NO caller passes one: what a previewed record is, and which one is selected, is defined by the outcome simulator that reads it, so both live with that work rather than here.
+In `relative` mode the strip renders and announces ABSOLUTE values against the PREVIEWED RECORD's DC — `aria-valuenow` carries the absolute number, not the offset — and converts back to offsets on write, because the tier rows' steppers show offsets over the same state.
+Since that absolute number is a function of the previewed record and changes with no data change when the GM switches records, `aria-valuetext` carries BOTH readings ("17 — DC +5 against Uncommon Craft") and the previewed record is named in the strip's group label.
+The previewed record is ONE selection shared with the right rail's "Preview as" card and with the simulator that rolls against it, held above both, because two controls each holding their own copy is how two surfaces come to disagree about which record is being previewed.
 
 A gapped, overlapping or inverted authored set is reachable and a contiguous strip cannot render it, so the strip falls back to the tier rows alone with a stated note.
 An ABSENT upper edge is distinguished from an authored zero: `Number(null)` is `0` and finite, so a bare coercion reads every omitted edge as an authored `0` and reports a perfectly contiguous set as gapped.
@@ -516,8 +517,82 @@ The right rail is an INDEPENDENTLY SCROLLABLE container in the SIDE-COLUMN STATE
 On an activity route it carries, in order: the documentation/quickstart pair, the activation control, a "Preview as" panel, an outcome-preview simulator, a per-outcome odds histogram, and a "This check" digest whose status chip reads `OK` / `OFF` / a count pill.
 Where the resolution mode denies the GM the choice, the activation control renders a LOCKED READING of the switch — the same track and knob, a padlock and the hint — not the hint alone: removing the control removed the state with it, and "this mode requires the check" does not say which way the switch is set.
 The reading is derived from the MODE rather than from the persisted `enabled` flag, since a mandatory check runs whatever that flag says; it reads on for every locked mode except alchemy `none`, which rolls nothing.
-The Preview-as panel is PRE-ROLL like the simulator and odds panels beside it: a stated sentence and no control, because what a previewed record is and which ones are offered are defined by the simulator that consumes them.
-Two enabled-looking selects reading "No actors" / "No records" invite a choice nothing consumes, which is worse than a stated absence.
+The Preview-as panel carries an ACTOR selector and a RECORD selector, and both are real controls with a simulator behind them.
+"Preview as" offers UNFILTERED `game.actors` — the Studio is GM-only and a GM's `Document#isOwner` is true for every actor, so the player-side "assigned character OR owner" union would hide actors a GM can legitimately preview against — plus an explicit "No actor" option, under which every `@` key resolves to `0` and the panel renders the unresolved warning rather than a total.
+The RECORD is the same selection the Outcomes section's band strip is drawn against: a check's own default DC first, then every authored recipe tier.
+In PROGRESSIVE mode the record selector is replaced by the progressive preview sandbox's ordered-difficulty field, because a record's whole contribution is a DC and a progressive check has none.
+
+##### Outcome-preview simulator
+
+The simulator DRIVES THE SAME RUNNERS the engines drive and reimplements no resolution: tier matching, forced outcomes and tier stepping have exactly one implementation, which is `src/systems/checkRoll.js`.
+A preview that disagreed with the engine about which tier a roll lands on would be worse than no preview at all.
+It rolls with a NULL interactive-roll bag, so it posts no chat message, shows no prompt and mutates nothing: all three runners spread `rollOptions` and `{...null}` is `{}`, the chat post is gated on `options?.interactive`, and `allowInteractive: false` bypasses Foundry's manual-fulfilment resolver.
+
+**It NEVER executes a DC macro.**
+For `dcMode: 'dynamic'` it resolves the STATIC fallback DC and renders a stated "resolved by macro at craft time, not previewed" note.
+The engine reaches a dynamic DC by calling `MacroExecutor.run`, which compiles `macro.command` into an `AsyncFunction` and executes it with the current user's authority, guarded only by `typeof command === 'string'` — which is NOT a script-type check, because Foundry declares `type` with `initial: CONST.MACRO_TYPES.CHAT` and `command` as `required: true, blank: true` on both types, and the shipped `ItemDropZone documentType="Macro"` accepts any Macro.
+A DC macro that creates a `ChatMessage`, updates an Actor or writes a flag must not be able to do so from a preview button.
+
+It renders only values present on the returned result, never a parallel model: the rolled die face on a `Medallion`, the TERSE breakdown line (`d20 9 +10 · Sera Vane` — the full resolved formula is the `THIS CHECK` digest's row), the total against the DC with its margin, the matched band card with its disposition, and a "What happens" list of icon fact rows including tier-step and minimum-tier evidence.
+It surfaces `resolved === false` — the signal `resolveCheckFormulaDisplay` already produces by re-resolving with `missing: 'NaN'` — as a stated "does not reduce to a number for this actor" warning, because `Roll.parse`'s own `missing: "0"` silently turns an unresolved `@` key into a plausible WRONG total, and "renders only values present on the result" does not catch that, since the wrong number IS on the result.
+It treats `Actor#getRollData()`'s live `system` object as read-only and clones before any local augmentation.
+A rolled readout describes ONE (formula, actor, record) tuple and is DROPPED when any of the three changes, because a total no current configuration produces must not stay on screen.
+
+##### Per-outcome odds histogram
+
+The histogram ENUMERATES the faces of the formula's single die group and buckets each one through the SAME classifier `runFormulaRouted` uses, extracted as `classifyCheckTotal` so resolution and preview cannot drift; a pass/fail check buckets through the same forced-outcome resolution plus the comparison, and a progressive check through the same `resolveProgressiveAward` loop the engines award through.
+There is no sampling and no `Math.random`.
+The per-face dice bag is produced by the EXISTING `rolledDiceGroups` code path, not hand-shaped, because `resolveForcedOutcome` and `applyTierStepTriggers` both read `data.diceGroups` and a bag missing `results` makes every natural-20 trigger invisible to the histogram while still matching a hand-computed distribution for a trigger-free check.
+
+**Its predicate is a POSITIVE WHITELIST over `Roll.parse`, not a string scan:** exactly one die term with `modifiers.length === 0`, `number === 1`, an integer `faces >= 1` and a NUMERIC denomination, with every remaining term deterministic and no `StringTerm` present.
+A string scan admits formulas face enumeration cannot describe — `2d6` is one die group with a triangular distribution, `1d6x` has unbounded support, `1d20r1` reweights, `1d20min2` clamps, `cs`/`cf`/`ms` change what `total` means, `1d(1d4)` leaves `number`/`faces` undefined, and `1df`/`1dc` are non-numeric denominations.
+
+**Three properties of `Roll.parse` are load-bearing and are stated rather than assumed.**
+(1) **It throws.** The compiled peggy grammar raises a `SyntaxError` and `Roll.parse` does not `try`, so every intermediate keystroke of a mid-edit formula (`1d20 +`, `1d20 + (`, `max(1d20,`) throws out of any predicate built on it; the call is WRAPPED and a thrown parse is a not-enumerable OUTCOME, never an escaped exception.
+(2) **`missing: "0"` blinds it.** `Roll.parse` runs `replaceFormulaData(formula, data, { missing: "0" })` first, so an unresolved `@` key becomes the literal `0` and parses cleanly — the unresolved-roll-data refusal is therefore read from `resolveCheckFormulaDisplay`'s `resolved === false`, not from the parse.
+(3) **Determinism must recurse, and a `StringTerm` lies.** `RollParser.flattenTree` only recurses into `node.class === "Node"`, so a parenthetical, function or pool term is pushed whole and `Roll.parse('1d20 + (2d6)')` yields exactly one top-level die term with hidden randomness inside; a top-level class scan would call it enumerable and draw a histogram that lies.
+Determinism is therefore judged by Foundry's own recursive `term.isDeterministic` — but `StringTerm#isDeterministic` returns `true` for an unresolvable string that then throws at evaluate, so a `StringTerm` is refused explicitly, and it is told apart from a `ParentheticalTerm` (which also carries a string `term`) by the fields only a parenthetical has.
+
+**Every refusal carries a discriminated reason code** — `parse-threw`, `no-dice`, `multiple-die-groups`, `die-modifiers`, `non-unit-count`, `non-integer-faces`, `non-numeric-denomination`, `non-deterministic-remainder`, `string-term`, `unresolved-roll-data` — so a refuse-everything predicate is distinguishable from a correct one and the panel can say WHY rather than only that it abstained.
+`non-numeric-denomination` is stated separately from `non-integer-faces` because a `FateDie` reports `faces: 3` and a `Coin` reports `faces: 2`: both are integers, and calling either "not an integer" would be a false statement in the panel.
+A formula whose only die sits inside a parenthetical, function or pool term refuses as `non-deterministic-remainder` rather than `no-dice`, which is reserved for a formula that really is all arithmetic.
+Anything outside the shape renders a stated note rather than an approximation: a histogram that lies is worse than one that abstains.
+The caption is COMPUTED from the enumerated space, never hard-coded — a `1d12` check reads "all 12 faces".
+
+**The histogram, the `avg` annotation and the simulator MUST describe ONE formula, and it is the formula the RUNNER rolls.**
+The preview arg-builder hands the runner an AUTHORED formula plus a check-modifier context, and the runner appends the resolved scalar itself — so a derivation that describes the roll without that context describes a formula nothing rolls.
+The append therefore has ONE implementation and ONE composition (`resolveRolledFormula`: the retired-placeholder shim, then the modifier append), which the runner, the display resolver and the enumerator all ASK FOR rather than rebuild.
+A second composition is free to drift, and drift here is a histogram spanning `1..20` beside a readout rolling `5..24`, for the same check, at the same moment.
+It is applied exactly ONCE: the appended formula is then resolved for display with the context omitted, exactly as the runner does, so the scalar cannot land twice.
+
+The TOOL bonus is appended ABOVE the runner — by the engine on a real craft and by the preview arg-builder on a preview — and the runner appends none of its own, so the preview matches the engine's shape and the enumerator layers only the modifier on top.
+The SITUATIONAL bonus is unreachable from a preview at all: it lives behind `interactive === true`, and a null roll-options bag spreads to `{}`.
+Because a system with an empty catalogue resolves a ZERO scalar and makes the append a no-op, this rule MUST be exercised with a non-empty catalogue and a non-zero resolved scalar or it is graded vacuously.
+Progressive checks bucket by AWARD COUNT and OMIT a count no face can reach, while an award of nothing is listed wherever it is reachable.
+
+###### The progressive preview sandbox
+
+A progressive check awards by spending its rolled value down an ORDERED list of result difficulties, so its histogram cannot be drawn without one — and that order is SANDBOX STATE ON THE CHECK, at `progressive.preview.difficulties`, typed by the GM for one experiment.
+It is NOT derived from a recipe's `resultGroups[].results[].componentId` → `system.components[].difficulty` chain, and it is not a player's stored order or a GM's configured values.
+The Studio's subject is the CHECK: the simulator previews what a check DOES, not what some recipe will do with it, which is also why a Preview-as record supplies a DC rather than an outcome and why the record selector is replaced by this field in progressive mode — a record has nothing to offer a check with no DC.
+It does not have to be plausible; it has to show the correct behaviour, which it does because the enumerator spends it through the same `resolveProgressiveAward` loop crafting, salvage and gathering all award through.
+
+Five properties are load-bearing.
+It is PERSISTED on the check block, so a GM's experiment survives a reload, which means every allowlist rebuild the block passes through MUST emit it or the next save drops it silently.
+NO ENGINE PATH READS IT: deleting the key changes no runtime behaviour, because it is scratch and not configuration.
+READINESS NEVER VALIDATES IT: it raises no readiness issue, badges no section dot and blocks no enable, and a nonsensical or negative order is the GM's business rather than a validation target.
+EXPORT STRIPS IT, for the reason `import-export` states.
+And it is ABSENCE-PRESERVING and ORDER-PRESERVING: an absent list means no experiment has been run and is not the same as an authored empty one, the order IS the datum and nothing sorts it, and an entry that does not reduce to a finite number is not STORED — a persisted `NaN` round-trips through JSON as `null` and reads back as a perfectly finite `0`, which would silently make the experiment mean something else after a reload.
+The field itself keeps the GM's raw text while they type rather than echoing the stored numbers back, so a separator or a half-typed word is never rewritten under the cursor.
+
+An empty sandbox renders its own stated sentence NAMING THE FIELD that fills it, and that sentence is not one of the enumerability refusal codes: those all say the formula cannot be charted, and this one says the opposite — the formula is fine and the experiment has not been typed yet.
+Bars render through `FillBar`, flat.
+
+The View Lab's `Roll` double carries a `parse` static whose term shape is derived from RECORDED real-Foundry output, because the lab's `Roll` otherwise exposes only `replaceFormulaData` and `validate` and every render of the histogram panel would throw — and one bad case fails the capture job whole, publishing nothing while `check-screenshots` stays green on stale frames.
+The panel additionally guards a missing or throwing `Roll.parse` as a not-enumerable result rather than a throw.
+
+An `avg N` annotation on the formula field renders the expected value of the PREVIEW formula for the previewed actor and is OMITTED whenever that formula does not reduce to a number.
+It is deliberately LOOSER than the histogram's predicate — it answers for multi-group and modified formulas the histogram abstains from — because it is an annotation on a field the GM is typing in rather than a claim about a distribution.
 Its responsive behaviour reuses the SHIPPED `fabricate-manager` container ladder and introduces no new breakpoint: `styles/fabricate.css` already declares that container with blocks at 1320 / 1120 / 960 / 900 / 831 / 680, and `.fabricate-manager .manager-inspector` already carries `overflow-y: auto; max-height: 100%`.
 At the existing 1320 breakpoint and below, the odds histogram and the simulator readout become collapsed disclosures, headers and counts retained.
 At the existing 1120 breakpoint and below, the shipped rule already restacks `.manager-body` to one column with `grid-auto-rows: max-content` and hands scrolling to the body; the rail's own `overflow-y` / `max-height` is LEFT ALONE there, because that block unsets neither and a `max-content` track cannot be squeezed.

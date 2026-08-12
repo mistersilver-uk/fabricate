@@ -15,10 +15,10 @@
   kicker above a card reading `On` said the same thing twice and read as a third section
   (issue 1096, maintainer inspector comparison).
 
-  The two preview slots render their PRE-ROLL copy only. issue 1097 fills them with the real
-  simulator and the odds enumerator; the slots exist here because the rail's shape and its
-  scroll behaviour are what this change is for, and a rail missing two of its six panels
-  cannot be photographed as evidence of either.
+  The two preview slots are FILLED as of issue 1097: `CheckOutcomePreview` drives the
+  engine's own runners and `CheckOddsPanel` renders the enumerated outcome space. The rail
+  owns neither computation — the route builds both view-models, because the draft, the
+  previewed record and the previewed actor all live above this component.
 
   ## The Validation route's rail is NOT this stack
 
@@ -68,8 +68,17 @@
   issue-643 regression the comment above that block records.
 -->
 <script>
+  import { untrack } from 'svelte';
   import Chip from '../Chip.svelte';
   import { localize } from '../../../util/foundryBridge.js';
+  import CheckOddsPanel from './CheckOddsPanel.svelte';
+  import CheckOutcomePreview from './CheckOutcomePreview.svelte';
+  import SearchablePopover from '../SearchablePopover.svelte';
+  import { NO_ACTOR_ID } from './checkPreview.js';
+  import {
+    formatPreviewDifficulties,
+    parsePreviewDifficulties,
+  } from '../../../../../systems/progressiveCheckSandbox.js';
 
   let {
     activeTab = 'crafting',
@@ -81,6 +90,26 @@
     modifierCount = null,
     issueCount = 0,
     allChecks = [],
+    // The "Preview as" selection. The rail RENDERS it and reports changes; the route owns
+    // it, because the band strip in the Outcomes section is bound to the same record and
+    // two components each holding their own copy is how two surfaces come to disagree
+    // about which record is being previewed.
+    previewActors = [],
+    previewRecords = [],
+    previewActorId = NO_ACTOR_ID,
+    previewRecordId = '',
+    previewActorSummary = '',
+    // The progressive PREVIEW SANDBOX (issue 1097). A progressive check has no DC, so the
+    // record selector has nothing to offer it; the ordered result difficulties the GM wants
+    // to experiment against take that slot instead.
+    previewIsProgressive = false,
+    previewDifficultiesText = '',
+    preview = null,
+    odds = null,
+    onSelectPreviewActor = () => {},
+    onSelectPreviewRecord = () => {},
+    onEditPreviewDifficulties = () => {},
+    onRollPreview = () => {},
     onToggleActive = () => {},
     onOpen = () => {},
   } = $props();
@@ -142,6 +171,38 @@
           )
   );
 
+  // ── The "Preview as" option list ────────────────────────────────────────────────────
+  //
+  // "No actor" leads, always, and it is a real option rather than the empty state of a
+  // search: it is the selection under which the readout renders its unresolved-roll-data
+  // warning, so it has to be reachable from any filter — which is why it is stamped with
+  // its own `data-popover-option` handle rather than found by its localized label.
+  const noActorLabel = text('FABRICATE.Admin.Manager.Checks.PreviewAs.NoActor', 'No actor');
+  const previewActorLabel = text(
+    'FABRICATE.Admin.Manager.Checks.PreviewAs.Actor',
+    'Preview as actor'
+  );
+  const selectedPreviewActor = $derived(
+    previewActorId === NO_ACTOR_ID
+      ? null
+      : (previewActors.find((actor) => actor.id === previewActorId) ?? null)
+  );
+  const previewActorOptions = $derived([
+    {
+      id: NO_ACTOR_ID,
+      label: noActorLabel,
+      icon: 'fas fa-user-slash',
+      dataId: 'no-actor',
+    },
+    ...previewActors.map((actor) => ({
+      id: actor.id,
+      label: actor.name,
+      icon: 'fas fa-user',
+      img: actor.img || '',
+      dataId: actor.id,
+    })),
+  ]);
+
   const DOCS_BASE = 'https://mistersilver-uk.github.io/fabricate';
 
   // The prototype's rail opens with a documentation / quickstart PAIR, not an explainer
@@ -188,11 +249,36 @@
   );
 
   // The odds heading's right-aligned adjunct — the prototype's `all 20 faces`. It names the
-  // DOMAIN the enumerator will walk, so it is derived from this check's own die rather than
-  // stated: a `1d20` check enumerates twenty faces and a `2d6` one does not. Absent when the
-  // formula names no die at all, because then there is no domain to name and a fixed "20"
-  // would be a claim about a check that does not roll a d20.
+  // DOMAIN the enumerator walks, so it is derived rather than stated: a `1d20` check
+  // enumerates twenty faces and a `2d6` one does not.
+  //
+  // IT IS THE ENUMERATOR'S OWN NUMBER WHERE THERE IS ONE (issue 1097). The regex below reads
+  // the AUTHORED formula, and since issue 1118 the formula that is ROLLED may carry a check
+  // modifier's die on top of it — so the two can differ, and a heading claiming a domain the
+  // panel beneath it refuses to chart is the exact failure the histogram itself is guarded
+  // against. A supplied view-model therefore answers for itself, including by answering
+  // NOTHING when it abstains; the regex survives only for a rail mounted without one.
   const oddsDomain = $derived.by(() => {
+    if (odds) {
+      if (odds.enumerable !== true) return '';
+      // TWO SENTENCES, because they are two different facts. One die has FACES and the
+      // histogram walked each of them; a formula carrying a rolling check modifier on top of
+      // its own die has a joint space, and calling 160 assignments "faces" would name a die
+      // with 160 sides that nothing rolls.
+      const faces = Number(odds.faces);
+      if (Number.isFinite(faces)) {
+        return text('FABRICATE.Admin.Manager.Checks.Odds.Faces', 'all {faces} faces').replace(
+          '{faces}',
+          String(faces)
+        );
+      }
+      const combinations = Number(odds.combinations);
+      if (!Number.isFinite(combinations)) return '';
+      return text(
+        'FABRICATE.Admin.Manager.Checks.Odds.Combinations',
+        'all {count} combinations'
+      ).replace('{count}', String(combinations));
+    }
     const match = /(?:^|[^\w.])\d*d(\d+)/i.exec(activeCheck?.rollFormula ?? '');
     if (!match) return '';
     return text('FABRICATE.Admin.Manager.Checks.Odds.Faces', 'all {faces} faces').replace(
@@ -286,6 +372,34 @@
       tone: 'activity',
     }))
   );
+
+  // ── The sandbox order field holds the GM'S OWN TEXT ─────────────────────────────────
+  //
+  // The stored datum is `number[]`, so echoing the field back through it REWRITES what was
+  // typed: "4, " re-renders as "4", the caret jumps a character back on every separator, and
+  // a half-typed word disappears from under the cursor. So the field keeps its raw text and
+  // reseeds from upstream only when the two describe DIFFERENT ORDERS — which lets a GM type
+  // a separator, or a stray word that simply contributes no difficulty, without the control
+  // fighting them, while an order arriving from anywhere ELSE (a route change, a discarded
+  // draft, a reload) still lands.
+  //
+  // Seeded through `untrack` and resynced by the effect, the shipped `PartyNameField` idiom
+  // — but the guard is necessary here and is not there, because this field commits on every
+  // keystroke rather than on blur, so its upstream value is NOT stable while typing.
+  let sandboxText = $state(untrack(() => previewDifficultiesText));
+  $effect(() => {
+    const incoming = previewDifficultiesText;
+    const localOrder = formatPreviewDifficulties(
+      parsePreviewDifficulties(untrack(() => sandboxText))
+    );
+    if (localOrder === incoming) return;
+    sandboxText = incoming;
+  });
+
+  function editSandbox(raw) {
+    sandboxText = raw;
+    onEditPreviewDifficulties(raw);
+  }
 </script>
 
 <!--
@@ -427,13 +541,33 @@
     {/if}
 
     {#if !checkOff}
-      <!-- PRE-ROLL, like the two panels below it, and deliberately NOT two `<select>`s.
-           The record selector's meaning is defined by the simulator that reads it (issue
-           1097): what a "record" is, which ones are offered, and what the strip re-announces
-           when one is chosen are all that change's decisions. Two enabled-looking selects
-           reading "No actors" / "No records" invite a GM to make a choice nothing consumes,
-           which is worse than a stated absence — so this panel says what it will do and
-           offers no control until there is something behind it. -->
+      <!-- THE REAL CONTROLS, as of issue 1097. Issue 1096 shipped this card as an honest
+           SLOT because an actor/record selector that changed nothing would be worse than a
+           stated absence; the simulator below now consumes both, so the selectors are real.
+
+           ## The actor list is FILTERED to player characters, and it is SEARCHABLE
+
+           Both halves reverse what this rail shipped with, on the same reported ground
+           (maintainer ruling, issue 1097). The retired reasoning was that the Studio is
+           GM-only and a GM's `Document#isOwner` is true for every actor, so no filter is
+           NEEDED — which is a statement about authority, and authority is not the question
+           a preview picker answers. The question is who a check is previewed AGAINST, and a
+           crafting check is rolled by a character. A real world's actor directory is mostly
+           bestiary, so the unfiltered list rendered as a flat native `<select>` of every
+           Balehound, Jadmór and swarm in the world with the three pickable actors somewhere
+           inside it. Membership is `listPreviewActors`'s shared, GM-configurable
+           player-character predicate — this screen does not get its own narrower answer.
+
+           The control is the shipped `SearchablePopover`, not a native `<select>` and not a
+           hand-rolled combobox: it is what every other long picker in the manager uses, it
+           searches, and it renders each actor's own portrait, so a GM picks a face rather
+           than reading a list. `data-checks-preview-actor` stays ON THE TRIGGER (via
+           `triggerData`) rather than moving to a wrapper, because a mounted suite and six
+           View Lab cases address the control through it.
+
+           "No actor" is an explicit option rather than an absence: under it every `@` key
+           resolves to 0 and the readout renders its unresolved warning instead of a total,
+           which is a statement rather than a plausible wrong number. -->
       <div class="manager-checks-rail-head">
         {@render railHead(
           'fas fa-user',
@@ -441,18 +575,89 @@
         )}
       </div>
       <section class="manager-inspector-card" data-checks-preview-as>
-        <p class="manager-muted">
-          {text(
-            'FABRICATE.Admin.Manager.Checks.PreviewAs.Hint',
-            'Reading this check against an actor and record arrives with the outcome preview. Nothing chosen here will ever change the system.'
+        <SearchablePopover
+          value={previewActorId}
+          options={previewActorOptions}
+          pickerClass="manager-checks-preview-actor"
+          triggerClass="manager-button manager-travel-picker-trigger manager-checks-preview-actor-trigger"
+          triggerData={{ 'data-checks-preview-actor': '' }}
+          triggerIcon={selectedPreviewActor ? '' : 'fas fa-user-slash'}
+          triggerImg={selectedPreviewActor?.img || ''}
+          triggerLabel={selectedPreviewActor?.name || noActorLabel}
+          triggerAriaLabel={previewActorLabel}
+          dialogAriaLabel={previewActorLabel}
+          searchPlaceholder={text(
+            'FABRICATE.Admin.Manager.Checks.PreviewAs.ActorSearchPlaceholder',
+            'Search characters...'
           )}
-        </p>
+          searchAriaLabel={text(
+            'FABRICATE.Admin.Manager.Checks.PreviewAs.ActorSearchLabel',
+            'Search characters'
+          )}
+          emptyHint={text(
+            'FABRICATE.Admin.Manager.Checks.PreviewAs.NoActorMatches',
+            'No characters match your search.'
+          )}
+          onChoose={(id) => onSelectPreviewActor(id)}
+        />
+        {#if previewActorSummary}
+          <p class="manager-muted" data-checks-preview-actor-summary>{previewActorSummary}</p>
+        {/if}
+        {#if previewIsProgressive}
+          <!-- THE SANDBOX ORDER, in the slot the record selector cannot fill (issue 1097).
+               A progressive check has no DC, so a record — whose whole contribution is a DC
+               — has nothing to offer it; what its histogram needs is an ORDERED list of
+               result difficulties to spend the rolled value down. This is scratch state for
+               one experiment: it is persisted on the check so it survives a reload, no
+               engine path reads it, no readiness rule validates it, and export strips it.
+               A nonsensical order is allowed on purpose — the panel is here to show what
+               the check does, not to police what a recipe would look like. -->
+          <label class="manager-field">
+            <span
+              >{text(
+                'FABRICATE.Admin.Manager.Checks.PreviewAs.Difficulties',
+                'Result difficulties'
+              )}</span
+            >
+            <input
+              type="text"
+              inputmode="numeric"
+              data-checks-preview-difficulties
+              placeholder={text(
+                'FABRICATE.Admin.Manager.Checks.PreviewAs.DifficultiesPlaceholder',
+                'e.g. 6, 9, 14, 40'
+              )}
+              value={sandboxText}
+              oninput={(event) => editSandbox(event.currentTarget.value)}
+            />
+          </label>
+          <p class="manager-muted" data-checks-preview-difficulties-hint>
+            {text(
+              'FABRICATE.Admin.Manager.Checks.PreviewAs.DifficultiesHint',
+              'A try-it-out order for this check only. The roll is spent down it in the order you type, and nothing else reads these numbers.'
+            )}
+          </p>
+        {:else}
+          <label class="manager-field">
+            <span class="sr-only"
+              >{text(
+                'FABRICATE.Admin.Manager.Checks.PreviewAs.Record',
+                'Preview against record'
+              )}</span
+            >
+            <select
+              data-checks-preview-record
+              value={previewRecordId}
+              onchange={(event) => onSelectPreviewRecord(event.currentTarget.value)}
+            >
+              {#each previewRecords as record (record.id)}
+                <option value={record.id}>{record.label}</option>
+              {/each}
+            </select>
+          </label>
+        {/if}
       </section>
 
-      <!-- NOT DISCLOSURES. These two panels were collapsible, and the prototype has no
-           disclosure anywhere in this rail: a panel whose whole content is one sentence of
-           pre-roll copy has nothing to collapse, and hiding it behind a control made the
-           rail read as if two features were missing rather than pending (issue 1097). -->
       <div class="manager-checks-rail-head">
         {@render railHead(
           'fas fa-flask-vial',
@@ -460,12 +665,7 @@
         )}
       </div>
       <section class="manager-inspector-card" data-checks-simulator>
-        <p class="manager-muted">
-          {text(
-            'FABRICATE.Admin.Manager.Checks.Simulator.Hint',
-            'Roll a test check to see exactly which outcome a record lands on and what it costs the character.'
-          )}
-        </p>
+        <CheckOutcomePreview {preview} onRoll={onRollPreview} />
       </section>
 
       <div class="manager-checks-rail-head">
@@ -478,12 +678,7 @@
         {/if}
       </div>
       <section class="manager-inspector-card" data-checks-odds>
-        <p class="manager-muted">
-          {text(
-            'FABRICATE.Admin.Manager.Checks.Odds.Hint',
-            'Once this check has a formula and its outcome bands are set, the chance of landing on each one is listed here.'
-          )}
-        </p>
+        <CheckOddsPanel {odds} />
       </section>
     {/if}
 
@@ -503,10 +698,16 @@
 </aside>
 
 <!--
-  NO SCOPED BLOCK. Every rule this rail draws itself with is a MEASURED value compared against
-  the prototype by `tests/components/checks-studio-parity.test.js`, and that gate reads
-  `styles/fabricate.css` plus the scoped CSS of the primitives it names. Rules split between
-  here and there would be measured only if this file were added to that list too — so the
-  rail's rules all live in the sheet's Checks Studio parity block, next to the numbers they
-  have to agree with (issue 1096).
+  NO SCOPED BLOCK. Every rule this rail draws itself with is a MEASURED value taken from the
+  prototype, and they all live together in the sheet's Checks Studio parity block, next to the
+  numbers they have to agree with (issue 1096).
+
+  THERE IS NO GATE BEHIND THEM. This note used to name
+  `tests/components/checks-studio-parity.test.js` as the thing that measured them; that test was
+  DELETED when the parity harness moved out of CI, and the comment outlived it. The live
+  instrument is `scripts/visual-parity/`, which is dev-time only and never runs in CI — so a
+  number changed here reds nothing, which is exactly how three type-scale values in this rail
+  came to drift from the prototype unnoticed. Measure with `scripts/visual-parity/` by hand, and
+  pin anything that must not move again in `tests/components/manager-layout.test.js`, which does
+  run under `npm test`.
 -->

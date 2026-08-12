@@ -3140,6 +3140,29 @@ const PROGRESSIVE_CHECK = Object.freeze({
     rollFormula: '1d20 + @abilities.int.mod',
     thresholds: { success: 12 },
     stageAdvanceOnSuccess: 1,
+    // The Checks Studio's PREVIEW SANDBOX (issue 1097), and the ONLY authored one in the
+    // world. A progressive check awards by spending its rolled value down an ordered list of
+    // result difficulties, so its histogram cannot be drawn without one — and the order is
+    // scratch state a GM types for one experiment, never a real recipe's. Herbalism is the
+    // world's only progressive system, so this is the one place a progressive histogram can
+    // be photographed at all.
+    //
+    // THE NUMBERS ARE CHOSEN TO MAKE BOTH HALVES OF THE RULE VISIBLE, against the totals
+    // this check can actually roll — `13..32`, because the previewed formula is
+    // `1d20 + @abilities.int.mod + 9[Modifiers]`: this system's check-modifier catalogue
+    // resolves a NON-ZERO scalar and the runner appends it. `16` is payable by all but the
+    // three lowest totals, so an award of NOTHING is reachable and IS listed — a real
+    // outcome, not an absence. Nothing reaches the third result, so `3 of 4` and `4 of 4`
+    // have zero probability and are OMITTED: a bar at 0% would claim the bucket exists.
+    //
+    // THE ORDER IS DELIBERATELY NOT ASCENDING. The spend runs down the list as typed, so a
+    // sorted list would be indistinguishable from an unsorted one on this frame.
+    //
+    // That non-zero scalar also makes this frame a SENTINEL for issue 1097's "one formula"
+    // rule: if any derivation that describes the roll stops being handed the modifier
+    // context, the whole domain drops by 9, `award-0` stops existing, and this case fails
+    // its own anchor rather than publishing a plausible-looking wrong histogram.
+    preview: { difficulties: [16, 9, 8, 40] },
   },
   checkModifiers: HERBALISM_CHECK_MODIFIERS,
   // `playerPicks` ON THE SYSTEM (issue 1055), and it has to be here rather than on a recipe.

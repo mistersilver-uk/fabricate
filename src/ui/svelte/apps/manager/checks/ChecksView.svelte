@@ -67,6 +67,27 @@
     resolveEligibleModifierIds,
     resolveModifierPolicy,
   } from '../../../../../systems/checkModifierResolver.js';
+  import {
+    DEFAULT_RECORD_ID,
+    NO_ACTOR_ID,
+    buildPreviewCheckArgs,
+    buildPreviewRecords,
+    listPreviewActors,
+    resolvePreviewActor,
+    runCheckPreview,
+    terseBreakdown,
+  } from './checkPreview.js';
+  import {
+    describeFormulaEnumerability,
+    enumeratePassFailOdds,
+    enumerateProgressiveOdds,
+    enumerateRoutedOdds,
+    SANDBOX_ABSENT,
+  } from './checkOdds.js';
+  import {
+    formatPreviewDifficulties,
+    parsePreviewDifficulties,
+  } from '../../../../../systems/progressiveCheckSandbox.js';
 
   // `resolutionMode` is the selected system's recipe resolution mode and selects
   // which crafting check editor renders: routed → the outcome-tier editor;
@@ -792,13 +813,30 @@
   // shows the difference, and it is fed from the SAME `resolveEligibleModifierIds` pass the
   // section strip counts `Modifiers` from — a second derivation here would let one screen
   // say three modifiers apply while the other drew two chips.
+  //
+  // IT MAPS TO THE VIEW SHAPE, and that is the contract rather than a convenience.
+  // `CheckFormulaFields` documents its prop as `[{ id, name, icon }]` — a persistence entry
+  // is `{ id, label, expression, isRollExpression, icon?, min?, max? }` — and this
+  // derivation used to hand the raw entries straight through. `label` is not `name`, so
+  // every chip rendered `undefined` into an empty span and the inset read
+  // `1d20 + @prof + [icon] + [icon] + [icon]`: three modifiers whose whole contribution to
+  // the sentence was a glyph, and, since the glyph is `aria-hidden`, three chips with NO
+  // accessible name at all.
+  //
+  // Mapped HERE rather than by reading `label` in the component, because the component is
+  // presentational and its prop is the seam: `checkPreview.js` builds `{ id, name, … }`
+  // view models for the same screen, one editor already forwards this prop through three
+  // layers, and a component that reached into a persistence field would tie the rail's
+  // markup to the storage shape. The `|| entry.id` fallback is the catalogue card's own
+  // (`modifier.label || modifier.id`) — a label is optional in the persisted shape, so a
+  // chip must still name something.
   const appliedModifiers = $derived.by(() => {
     const context = activeActivity?.modifierContext;
     if (!context) return [];
     const eligible = new Set(resolveEligibleModifierIds(context));
-    return (Array.isArray(context.catalogue) ? context.catalogue : []).filter((entry) =>
-      eligible.has(entry?.id)
-    );
+    return (Array.isArray(context.catalogue) ? context.catalogue : [])
+      .filter((entry) => eligible.has(entry?.id))
+      .map((entry) => ({ id: entry.id, name: entry.label || entry.id, icon: entry.icon || '' }));
   });
   const appliedModifierPolicy = $derived(
     activeActivity ? resolveModifierPolicy(activeActivity.modifierContext) : 'addAll'
@@ -844,6 +882,414 @@
         tone: issue.severity === 'critical' ? 'warning' : 'info',
         text: issueSentence(issue.id, issue.data),
       }))
+  );
+
+  // ── The simulator, the odds histogram and the previewed record (issue 1097) ─────────
+  //
+  // ONE selection, three readers. The rail's "Preview as" card offers it, the simulator
+  // rolls against it and the Outcomes section's band strip is drawn against it — so it
+  // lives HERE rather than in any of the three. Two components each holding their own
+  // copy is how two surfaces come to disagree about which record is being previewed, and
+  // the strip's dual `aria-valuetext` reading ("17 — DC +5 against Uncommon Craft") is a
+  // claim about the record the simulator is actually using.
+  let previewActorId = $state(NO_ACTOR_ID);
+  let previewRecordId = $state(DEFAULT_RECORD_ID);
+  let previewResult = $state(null);
+  let previewRolling = $state(false);
+
+  const dcWord = text('FABRICATE.Admin.Manager.Checks.Crafting.TierDc', 'DC');
+  const unroutedLabel = text('FABRICATE.Admin.Manager.Checks.Odds.Unrouted', 'No outcome');
+
+  const previewActors = $derived(activity === 'validation' ? [] : listPreviewActors());
+  const previewActor = $derived(resolvePreviewActor(previewActorId));
+
+  // ── The progressive PREVIEW SANDBOX (issue 1097) ────────────────────────────────────
+  //
+  // A progressive check awards by spending its rolled value down an ORDERED list of result
+  // difficulties, so its histogram cannot be drawn without one. That list is SANDBOX STATE
+  // ON THE CHECK — the GM types an order for this experiment — and not a real record's:
+  // this screen previews what a CHECK does, not what a recipe will do, and a Preview-as
+  // record supplies a DC rather than an outcome.
+  //
+  // It is read from the live DRAFT, so the histogram moves with the field, and written back
+  // through the SAME per-activity update callback every other progressive edit uses, so it
+  // saves with them and survives a reload. Nothing else reads it: no engine path, no
+  // readiness rule, and the exporter strips it.
+  const isProgressive = $derived(activeMode === 'progressive');
+  const previewDifficulties = $derived(
+    isProgressive && Array.isArray(activeCheck?.preview?.difficulties)
+      ? activeCheck.preview.difficulties
+      : []
+  );
+  const previewDifficultiesText = $derived(formatPreviewDifficulties(previewDifficulties));
+
+  /** Which progressive draft this route's sandbox edit belongs to. */
+  const PROGRESSIVE_UPDATERS = {
+    crafting: (next) => onUpdateCraftingCheckProgressive(next),
+    salvage: (next) => onUpdateSalvageCheckProgressive(next),
+    gathering: (next) => onUpdateGatheringCheckProgressive(next),
+  };
+
+  function updatePreviewDifficulties(raw) {
+    if (!isProgressive || !activeCheck) return;
+    const update = PROGRESSIVE_UPDATERS[activity];
+    if (!update) return;
+    update({ ...activeCheck, preview: { difficulties: parsePreviewDifficulties(raw) } });
+  }
+
+  // A progressive check has no DC at all, so labelling its records with one would invent a
+  // number the mode does not have.
+  const recordsCarryDc = $derived(!isProgressive);
+  const previewRecords = $derived(
+    buildPreviewRecords({
+      check: activeCheck,
+      defaultLabel: text('FABRICATE.Admin.Manager.Checks.PreviewAs.DefaultRecord', 'Default'),
+    }).map((record) => ({
+      ...record,
+      label: [record.name, recordsCarryDc ? `${dcWord} ${record.dc}` : '']
+        .filter(Boolean)
+        .join(' · '),
+    }))
+  );
+  const previewRecord = $derived(
+    previewRecords.find((record) => record.id === previewRecordId) ?? previewRecords[0] ?? null
+  );
+
+  const previewPlan = $derived(
+    buildPreviewCheckArgs({
+      activity,
+      mode: activeMode,
+      draft: activeCheck,
+      system: draftSystem,
+      subject: null,
+      actor: previewActor,
+      record: previewRecord,
+    })
+  );
+  const previewFormula = $derived(String(previewPlan.formula ?? '').trim());
+  // THE SAME CONTEXT THE RUNNER IS HANDED, threaded to the two derivations that describe
+  // the roll rather than perform it. `buildPreviewCheckArgs` gives the runner an authored
+  // formula plus this context and the runner appends the resolved scalar itself, so a
+  // histogram or an `avg` computed without it describes a formula nothing rolls.
+  const previewModifier = $derived(previewPlan.args?.craftingModifier ?? null);
+
+  const enumeration = $derived(
+    previewFormula === ''
+      ? { enumerable: false, reason: 'no-dice' }
+      : describeFormulaEnumerability(previewFormula, previewActor, {
+          craftingModifier: previewModifier,
+        })
+  );
+  // `resolved === false` is EXACTLY the unresolved-roll-data refusal: the enumerability
+  // check reads that signal first, so the two can never disagree about whether this
+  // formula reduces to a number for this actor.
+  const previewResolved = $derived(enumeration.reason !== 'unresolved-roll-data');
+
+  // The reachable total range, which is what the simple check's two-band strip is drawn
+  // across. Null when the formula is not enumerable; the editor then falls back to a
+  // window around the DC rather than drawing a track it cannot justify.
+  const previewTrack = $derived.by(() => {
+    if (!enumeration.enumerable) return { min: null, max: null };
+    // THE REACHABLE TOTALS, read off the enumeration rather than recomputed as
+    // `1 + remainder .. faces + remainder`. There is no single remainder any more: a bounded
+    // rolling check modifier contributes a clamped die, so the floor and ceiling are the
+    // extremes of the joint space and nothing shorter states them.
+    const totals = enumeration.outcomes.map((outcome) => outcome.total);
+    return { min: Math.min(...totals), max: Math.max(...totals) };
+  });
+
+  /**
+   * The odds view-model. Every branch either enumerates or states why it did not.
+   *
+   * @returns {object} The model `CheckOddsPanel` renders.
+   */
+  function buildOddsModel() {
+    const kind = previewPlan.kind;
+    if (!kind) return { kind: null };
+    if (enumeration.enumerable !== true) {
+      return { kind, enumerable: false, reason: enumeration.reason };
+    }
+    const { faces, combinations, outcomes } = enumeration;
+    if (kind === 'routed') {
+      const rows = enumerateRoutedOdds({ outcomes, args: previewPlan.args }).map((row) => ({
+        id: row.id || 'unrouted',
+        label: row.name || unroutedLabel,
+        percent: row.percent,
+        success: row.success,
+      }));
+      return { kind, enumerable: true, faces, combinations, rows };
+    }
+    if (kind === 'progressive') return buildProgressiveOdds(outcomes, faces, combinations);
+    const rows = enumeratePassFailOdds({
+      outcomes,
+      args: {
+        dc: previewPlan.dc,
+        comparison: previewPlan.args.thresholdMode === 'exceed' ? 'exceed' : 'meet',
+        triggers: previewPlan.args.triggers,
+      },
+    }).map((row) => ({
+      id: row.id,
+      label: row.success
+        ? text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeSuccess', 'Success')
+        : text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeFailure', 'Failure'),
+      percent: row.percent,
+      success: row.success,
+    }));
+    return { kind, enumerable: true, faces, combinations, rows };
+  }
+
+  /**
+   * Progressive bucketing, by AWARD COUNT rather than by tier.
+   *
+   * The ordered difficulties are the check's OWN preview sandbox, not a record's: this
+   * screen previews what a CHECK does, and a Preview-as record supplies a DC rather than an
+   * outcome. An empty sandbox is a stated absence with the control named, never an invented
+   * sample — see `src/systems/progressiveCheckSandbox.js`.
+   *
+   * @param {Array<object>} outcomes The enumerated outcome space.
+   * @param {?number} faces The die's face count, for a single-die formula.
+   * @param {number} combinations How many assignments the space holds.
+   * @returns {object} The model.
+   */
+  function buildProgressiveOdds(outcomes, faces, combinations) {
+    if (previewDifficulties.length === 0) {
+      return { kind: 'progressive', enumerable: false, reason: SANDBOX_ABSENT };
+    }
+    const rows = enumerateProgressiveOdds({
+      outcomes,
+      difficulties: previewDifficulties,
+      awardMode: activeCheck?.awardMode || 'equal',
+    }).map((row) => ({
+      id: row.id,
+      label: text('FABRICATE.Admin.Manager.Checks.Odds.AwardCount', '{awarded} of {of}')
+        .replace('{awarded}', String(row.awarded))
+        .replace('{of}', String(row.of)),
+      percent: row.percent,
+      success: row.awarded > 0,
+    }));
+    return { kind: 'progressive', enumerable: true, faces, combinations, rows };
+  }
+
+  const oddsModel = $derived(buildOddsModel());
+
+  /** The matched band card: the tier the result object actually names. */
+  function buildBandCard(result) {
+    if (!result) return { name: '', detail: '', success: false };
+    const success = result.success === true;
+    if (previewPlan.kind === 'routed') {
+      return {
+        name:
+          result.outcome ||
+          text('FABRICATE.Admin.Manager.Checks.Simulator.NoOutcome', 'No outcome tier'),
+        detail: success
+          ? text(
+              'FABRICATE.Admin.Manager.Checks.Simulator.BandSuccess',
+              'Counts as a success · the result group bound to this tier is produced.'
+            )
+          : text(
+              'FABRICATE.Admin.Manager.Checks.Simulator.BandFailure',
+              'Counts as a failure · nothing is produced.'
+            ),
+        success,
+      };
+    }
+    if (previewPlan.kind === 'progressive') {
+      return {
+        name: text('FABRICATE.Admin.Manager.Checks.Simulator.AwardValue', 'Awards {value}').replace(
+          '{value}',
+          String(result.value ?? 0)
+        ),
+        detail: text(
+          'FABRICATE.Admin.Manager.Checks.Simulator.AwardDetail',
+          'The value is spent down the recipe’s ordered results, each costing its own difficulty.'
+        ),
+        success: true,
+      };
+    }
+    return {
+      name: success
+        ? text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeSuccess', 'Success')
+        : text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeFailure', 'Failure'),
+      detail: success
+        ? text(
+            'FABRICATE.Admin.Manager.Checks.Crafting.OutcomeSuccessDesc',
+            'The roll reaches the DC, and the recipe’s result group is produced in full.'
+          )
+        : text(
+            'FABRICATE.Admin.Manager.Checks.Crafting.OutcomeFailureDesc',
+            'The roll misses the DC; nothing is produced, and the failure policy decides the cost.'
+          ),
+      success,
+    };
+  }
+
+  /**
+   * The "What happens" rows, every one of them read off the SAME result object the engine
+   * would act on. Nothing here is inferred from the draft.
+   *
+   * @param {object|null} result The runner result.
+   * @returns {Array<object>} `IconFactRow` inputs.
+   */
+  function buildPreviewFacts(result) {
+    if (!result) return [];
+    const facts = [];
+    const success = result.success === true;
+    facts.push({
+      id: 'result-group',
+      icon: 'fas fa-box-open',
+      title: text('FABRICATE.Admin.Manager.Checks.Simulator.FactResults', 'Result group produced'),
+      subtitle: success
+        ? buildBandCard(result).name
+        : text('FABRICATE.Admin.Manager.Checks.Simulator.FactResultsNone', 'None'),
+    });
+    if (activity !== 'gathering') {
+      const consumes = success || consumeIngredientsOnFail;
+      facts.push({
+        id: 'ingredients',
+        icon: 'fas fa-fire-flame-curved',
+        title: text(
+          'FABRICATE.Admin.Manager.Checks.Simulator.FactIngredients',
+          'Ingredients consumed'
+        ),
+        subtitle: consumes
+          ? text('FABRICATE.Admin.Manager.Checks.Simulator.FactAsListed', 'as listed')
+          : text('FABRICATE.Admin.Manager.Checks.Simulator.FactNotConsumed', 'kept'),
+      });
+    }
+    if (result.data?.breakTools === true || (!success && breakToolsOnFail)) {
+      facts.push({
+        id: 'tools',
+        icon: 'fas fa-hammer-crash',
+        title: text('FABRICATE.Admin.Manager.Checks.Simulator.FactTools', 'Required tools break'),
+        subtitle: '',
+      });
+    }
+    if (result.data?.tierStepApplied) {
+      const step = result.data.tierStepApplied;
+      facts.push({
+        id: 'tier-step',
+        icon: 'fas fa-arrow-up-right-dots',
+        title: text(
+          'FABRICATE.Admin.Manager.Checks.Simulator.FactTierStep',
+          'A trigger moved the tier by {steps}'
+        ).replace('{steps}', String(step.steps)),
+        subtitle: step.stepClamped
+          ? text(
+              'FABRICATE.Admin.Manager.Checks.Simulator.FactTierStepClamped',
+              'clamped at the end of the tier list'
+            )
+          : '',
+      });
+    }
+    if (result.data?.minTierFailed) {
+      facts.push({
+        id: 'min-tier',
+        icon: 'fas fa-ban',
+        title: text(
+          'FABRICATE.Admin.Manager.Checks.Simulator.FactMinTier',
+          'Blocked by the recipe’s minimum success tier'
+        ),
+        subtitle: '',
+      });
+    }
+    return facts;
+  }
+
+  const previewModel = $derived.by(() => {
+    const total = Number(previewResult?.data?.total);
+    const band = buildBandCard(previewResult);
+    return {
+      kind: previewPlan.kind,
+      hasFormula: previewFormula !== '',
+      dynamicDc: previewPlan.dynamicDc === true,
+      resolved: previewResolved,
+      rolling: previewRolling,
+      result: previewResult,
+      total: Number.isFinite(total) ? total : null,
+      dc: previewPlan.dc,
+      margin:
+        previewPlan.kind === 'progressive' || !Number.isFinite(total)
+          ? null
+          : total - previewPlan.dc,
+      breakdown: terseBreakdown(previewResult, previewActor?.name ?? ''),
+      // The die the medallion is captioned with, read off the result's own dice bag rather
+      // than parsed out of the formula a second time.
+      dieLabel: previewResult?.data?.diceGroups?.[0]?.group
+        ? `d${String(previewResult.data.diceGroups[0].group).split('d')[1]}`
+        : '',
+      bandName: band.name,
+      bandDetail: band.detail,
+      bandSuccess: band.success,
+      facts: buildPreviewFacts(previewResult),
+    };
+  });
+
+  // A rolled result describes ONE (formula, actor, record) tuple. Leaving it on screen
+  // after any of those changes would show a total no current configuration produces, so
+  // the identity of what was rolled is latched and the readout is dropped when it moves.
+  const previewSignature = $derived(
+    [
+      activity,
+      activeMode,
+      previewFormula,
+      previewActorId,
+      previewRecord?.id ?? '',
+      previewPlan.dc,
+    ].join(' ')
+  );
+  let adoptedPreviewSignature = $state('');
+  $effect(() => {
+    if (previewSignature === adoptedPreviewSignature) return;
+    adoptedPreviewSignature = previewSignature;
+    previewResult = null;
+  });
+  // A record the current check no longer offers must not stay selected: switching modes,
+  // or deleting the tier a GM was previewing against, would otherwise leave the `<select>`
+  // showing a value none of its options carries.
+  $effect(() => {
+    if (previewRecords.length === 0) return;
+    if (previewRecords.some((record) => record.id === previewRecordId)) return;
+    previewRecordId = previewRecords[0].id;
+  });
+
+  async function rollPreview() {
+    if (previewRolling) return;
+    previewRolling = true;
+    try {
+      previewResult = await runCheckPreview(previewPlan);
+    } finally {
+      previewRolling = false;
+    }
+  }
+
+  function selectPreviewRecord(id) {
+    previewRecordId = id;
+  }
+
+  // Spread rather than restated at each of the ten editor call sites. The prop list IS the
+  // contract, and ten copies of it drift — and count against the new-code duplication gate.
+  const routedPreviewProps = $derived({
+    previewRecords,
+    previewRecordId: previewRecord?.id ?? '',
+    previewDcOverride: previewRecord?.dc ?? null,
+    previewLabel: previewRecord?.name ?? '',
+    onSelectPreviewRecord: selectPreviewRecord,
+  });
+  const simplePreviewProps = $derived({
+    previewRecords,
+    previewRecordId: previewRecord?.id ?? '',
+    previewLabel: previewRecord?.name ?? '',
+    trackMin: previewTrack.min,
+    trackMax: previewTrack.max,
+    onSelectPreviewRecord: selectPreviewRecord,
+  });
+  const previewActorSummary = $derived(
+    previewActor
+      ? ''
+      : text(
+          'FABRICATE.Admin.Manager.Checks.PreviewAs.NoActorHint',
+          'With no actor selected every roll-data key reads as 0.'
+        )
   );
 </script>
 
@@ -1039,7 +1485,7 @@
               <p class="manager-muted">
                 {text(
                   'FABRICATE.Admin.SystemSettings.Alchemy.BehaviourIntro',
-                  'How brewing rewards discovery, treats failed attempts, and remembers dead ends. These apply regardless of the check mode above.'
+                  'How brewing rewards discovery, treats failed attempts, and remembers dead ends. These apply whatever alchemy check mode is set on The roll section.'
                 )}
               </p>
               <div class="manager-checks-flag-list">
@@ -1119,7 +1565,7 @@
               <p class="manager-muted">
                 {text(
                   'FABRICATE.Admin.Manager.Checks.Crafting.AlchemyNoneLead',
-                  'This alchemy system is set to “No check”, so a matched brew always succeeds and produces its single result set. There is nothing to configure here. Choose Simple or Tiered above to author a crafting check.'
+                  'This alchemy system is set to “No check”, so a matched brew always succeeds and produces its single result set. There is nothing to configure here. Choose Simple or Tiered on The roll section to author a crafting check.'
                 )}
               </p>
             </section>
@@ -1133,6 +1579,7 @@
               section={activeSection}
               {foundrySystemId}
               breakageAuthority={craftingBreakageAuthority}
+              {...routedPreviewProps}
               onChange={onUpdateCraftingCheck}
             />
           {:else if craftingSimple}
@@ -1144,6 +1591,7 @@
               section={activeSection}
               {foundrySystemId}
               breakageAuthority={craftingBreakageAuthority}
+              {...simplePreviewProps}
               onChange={onUpdateCraftingCheckSimple}
             />
           {/if}
@@ -1168,6 +1616,7 @@
               section={activeSection}
               {foundrySystemId}
               breakageAuthority={craftingBreakageAuthority}
+              {...routedPreviewProps}
               onChange={onUpdateCraftingCheck}
             />
           {:else if craftingSimple}
@@ -1179,6 +1628,7 @@
               section={activeSection}
               {foundrySystemId}
               breakageAuthority={craftingBreakageAuthority}
+              {...simplePreviewProps}
               onChange={onUpdateCraftingCheckSimple}
             />
           {:else}
@@ -1274,6 +1724,7 @@
               section={activeSection}
               {foundrySystemId}
               breakageAuthority={salvageBreakageAuthority}
+              {...routedPreviewProps}
               onChange={onUpdateSalvageCheckRouted}
             />
           {:else if salvageProgressive}
@@ -1297,6 +1748,7 @@
               section={activeSection}
               {foundrySystemId}
               breakageAuthority={salvageBreakageAuthority}
+              {...simplePreviewProps}
               onChange={onUpdateSalvageCheckSimple}
             />
           {/if}
@@ -1371,6 +1823,7 @@
               section={activeSection}
               {foundrySystemId}
               breakageAuthority={gatheringBreakageAuthority}
+              {...routedPreviewProps}
               onChange={onUpdateGatheringCheckRouted}
             />
           {/if}
@@ -1408,6 +1861,19 @@
       {modifierCount}
       issueCount={activeReadiness.issues.length}
       allChecks={allChecksSummary}
+      {previewActors}
+      {previewRecords}
+      {previewActorId}
+      {previewActorSummary}
+      previewRecordId={previewRecord?.id ?? ''}
+      {previewDifficultiesText}
+      previewIsProgressive={isProgressive}
+      preview={previewModel}
+      odds={oddsModel}
+      onSelectPreviewActor={(id) => (previewActorId = id)}
+      onSelectPreviewRecord={selectPreviewRecord}
+      onEditPreviewDifficulties={updatePreviewDifficulties}
+      onRollPreview={rollPreview}
       onToggleActive={(enabled) => onToggleCheckActive(activity, enabled)}
       onOpen={(target, section) => onOpenActivity(target, section)}
     />

@@ -392,6 +392,58 @@ describe('the check-modifier catalogue card (mounted)', () => {
   });
 });
 
+// ── The `WHAT ACTUALLY GETS ROLLED` chips NAME their modifiers ────────────────────────
+//
+// Reported from a live build: the inset read `1d20 + @abilities.dex.mod + @prof + [icon] +
+// [icon] + [icon]`. `ChecksView`'s `appliedModifiers` handed the RAW CATALOGUE ENTRIES to
+// `CheckFormulaFields`, whose prop contract is `[{ id, name, icon }]` — a persisted entry's
+// display field is `label`, so `{modifier.name}` was `undefined` in every chip.
+//
+// THIS SUITE, not `check-formula-card-mounted.test.js`. That one already asserts the chip
+// text and stayed green through the whole defect, because it mounts the component with a
+// hand-built `{ id, name, icon }` fixture — a test of the contract, driven by a fixture that
+// honours it, cannot see the caller that does not. So the assertion has to run down the real
+// derivation, which means mounting `ChecksView` with a real catalogue.
+describe('the formula inset names each applied modifier (issue 1097 follow-up)', () => {
+  before(() => harness.setup());
+  after(() => harness.teardown());
+
+  it('renders the catalogue entry’s LABEL in the chip, not an empty span', async () => {
+    const target = await mountChecks();
+    await openSection(target, 'roll');
+    const chips = [...target.querySelectorAll('[data-check-formula-modifier]')];
+    assert.deepEqual(
+      chips.map((chip) => chip.getAttribute('data-check-formula-modifier')),
+      ['med'],
+      'crafting selects exactly the well-formed entry'
+    );
+    assert.equal(
+      chips[0].textContent.trim(),
+      'Medicine',
+      'the chip states which modifier it is; the glyph beside it is aria-hidden, so an empty ' +
+        'name leaves the chip with NO accessible name at all'
+    );
+    harness.remount();
+  });
+
+  it('falls back to the entry id when the library authored no label', async () => {
+    // A `label` is optional in the persisted shape (`_normalizeModifierLibrary` defaults it
+    // to `''`), so the mapping cannot assume one. The fallback is the catalogue card's own
+    // `modifier.label || modifier.id`, which is what keeps the two readings of the same
+    // entry from disagreeing on the same screen.
+    const target = await mountChecks({
+      modifiers: [{ id: 'unnamed', label: '', expression: '@abilities.med.mod' }],
+      craftingDefaultModifierIds: ['unnamed'],
+    });
+    await openSection(target, 'roll');
+    assert.equal(
+      target.querySelector('[data-check-formula-modifier="unnamed"]').textContent.trim(),
+      'unnamed'
+    );
+    harness.remount();
+  });
+});
+
 describe('the Validation tab reads each activity’s OWN modifier context', () => {
   before(() => harness.setup());
   after(() => harness.teardown());

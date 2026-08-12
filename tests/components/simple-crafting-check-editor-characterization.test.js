@@ -79,6 +79,10 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/ManagerButton.svelte',
     'src/ui/svelte/apps/manager/checks/CheckDcMacroCard.svelte',
     'src/ui/svelte/apps/manager/checks/CheckDifficultyCard.svelte',
+    // An issue 1097 addition, and ONLY the dependency manifest: the simple check's Outcomes
+    // section gained the two-band `ThresholdBandStrip` (its single boundary IS the DC). No
+    // assertion below moved — this suite's whole value is that it did not.
+    'src/ui/svelte/components/ThresholdBandStrip.svelte',
     'src/ui/svelte/apps/manager/checks/CheckFormulaFields.svelte',
     'src/ui/svelte/apps/manager/checks/CheckRecipeTiers.svelte',
     // The shared status card: a trigger's break-tools effect is its own bordered card now

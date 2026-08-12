@@ -124,6 +124,9 @@ function compileManagerRoot() {
   // collapsible panels. Omitting either HANGS this suite (# cancelled), never fails it.
   writeCompiledSvelte('src/ui/svelte/components/ThresholdBandStrip.svelte');
   writeCompiledSvelte('src/ui/svelte/components/RowDisclosure.svelte');
+  // The odds histogram's bars are the shipped fill bar (issue 1097) rather than a sixth
+  // hand-rolled copy of the shape `ui-integration/spec.md` records as debt.
+  writeCompiledSvelte('src/ui/svelte/components/FillBar.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/checks/ChecksView.svelte');
   // The roll section's mode callout (issue 1096). `ChecksView` imports it STATICALLY, so
   // omitting it does not skip a branch — it fails module resolution for the whole suite.
@@ -132,6 +135,10 @@ function compileManagerRoot() {
   writeCompiledSvelte('src/ui/svelte/apps/manager/checks/ChecksRightMenu.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/checks/CheckDcMacroCard.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/checks/CheckDifficultyCard.svelte');
+  // The two panels issue 1096 shipped as SLOTS and issue 1097 filled: the rail renders
+  // both, so omitting either HANGS this suite rather than failing it.
+  writeCompiledSvelte('src/ui/svelte/apps/manager/checks/CheckOutcomePreview.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/checks/CheckOddsPanel.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/checks/CheckFormulaFields.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/checks/CheckTriggers.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/checks/CheckRecipeTiers.svelte');
@@ -653,6 +660,29 @@ function compileManagerRoot() {
     // is always in the mounted manager tree, so omitting this reports every mounted manager
     // test as `# cancelled` behind one ERR_MODULE_NOT_FOUND.
     'src/ui/svelte/apps/manager/checks/modifierPolicyAttrs.js',
+    // The outcome simulator and the odds enumerator (issue 1097), plus the engine modules
+    // they DRIVE rather than reimplement: `checkPreview.js` calls the same three runners
+    // the engines call and `checkOdds.js` buckets through the same classifier
+    // `runFormulaRouted` uses, so `checkRoll.js` — and the breakage-condition evaluator it
+    // evaluates triggers with, and the shared progressive-award loop — are genuinely in
+    // this root's static graph. Everything below `toolBreakageRuntime.js` is that module's
+    // own closure; the ones already listed above are not repeated.
+    'src/ui/svelte/apps/manager/checks/checkPreview.js',
+    'src/ui/svelte/apps/manager/checks/checkOdds.js',
+    'src/systems/checkRoll.js',
+    'src/utils/progressiveAward.js',
+    // The progressive PREVIEW SANDBOX derivation (issue 1097). THREE importers put it in
+    // this root's static graph: the root's own `cloneProgressiveCheck`, `ChecksView` and
+    // `ChecksRightMenu` — which is the point, since one derivation is what stops the draft
+    // clone and the persistence normalizer from disagreeing about what an order is.
+    'src/systems/progressiveCheckSandbox.js',
+    // The shared, GM-configurable player-character predicate (issue 1024). `checkPreview.js`
+    // imports it to filter the rail's "Preview as" list, so it entered this root's static
+    // graph with that filter — and this list has no dependency validator, so omitting it
+    // reports every mounted manager test as `# cancelled` behind one ERR_MODULE_NOT_FOUND
+    // rather than failing one. It imports nothing, so this entry closes the graph.
+    'src/config/playerCharacterTypes.js',
+    'src/toolBreakageRuntime.js',
   ]) {
     const rawDestination = join(tempRoot, rawPath);
     mkdirSync(dirname(rawDestination), { recursive: true });
@@ -3610,6 +3640,83 @@ describe('CraftingSystemManager mounted behavior', () => {
     );
   });
 
+  it('Checks carries the progressive PREVIEW SANDBOX through the draft and into the save', async () => {
+    // The THIRD allowlist rebuild the progressive block passes through (issue 1097). The
+    // manager's normalizer and the store's projection are graded in
+    // `tests/progressive-preview-sandbox.test.js`; what only this suite can grade — it is
+    // the only one that mounts `CraftingSystemManagerRoot` — is `cloneProgressiveCheck`,
+    // whose whitelist would otherwise hold the GM's experiment for exactly as long as the
+    // panel stayed open and then write a block without it.
+    const calls = [];
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore(calls, {
+          salvageResolutionMode: 'progressive',
+          salvageCraftingCheck: {
+            enabled: true,
+            progressive: {
+              awardMode: 'equal',
+              rollFormula: '1d20',
+              preview: { difficulties: [6, 9] },
+            },
+          },
+        }),
+        services: { openCurrentAdmin: () => {} },
+      },
+    });
+    flushSync();
+
+    navButton('Checks').click();
+    await tick();
+    flushSync();
+    await openChecksActivity('salvage');
+
+    const field = target.querySelector('[data-checks-preview-difficulties]');
+    assert.ok(field, 'the sandbox field renders on a progressive route');
+    assert.equal(
+      field.value,
+      '6, 9',
+      'the DRAFT clone carried the persisted order; a whitelist that dropped it reads empty'
+    );
+
+    // THE FIELD KEEPS THE GM'S OWN TEXT, and only a ROUND TRIP can show it. The stored
+    // datum is `number[]`, so echoing it back would delete a trailing separator and a
+    // half-typed word from under the cursor. The input below is the one that discriminates:
+    // it BOTH adds a number (so the order upstream really changes, and the resync runs) AND
+    // carries noise that stores as nothing (so a resync would rewrite the field).
+    setInputValue(field, '6, 9, 14, x');
+    await tick();
+    flushSync();
+    assert.equal(
+      target.querySelector('[data-checks-preview-difficulties]').value,
+      '6, 9, 14, x',
+      'the half-typed entry survived the order it just wrote upstream'
+    );
+
+    setInputValue(field, '14, 6, -2');
+    await tick();
+    flushSync();
+
+    const saveButton = target.querySelector('[data-checks-save]');
+    assert.equal(saveButton.disabled, false, 'a sandbox edit is a real unsaved change');
+    saveButton.click();
+    await tick();
+    await Promise.resolve();
+    flushSync();
+
+    const saved = calls.find((call) => call[0] === 'saveSalvageCheckProgressive');
+    assert.ok(saved, 'Save routes the sandbox through the salvage progressive seam');
+    assert.deepEqual(
+      saved[1].preview.difficulties,
+      [14, 6, -2],
+      'order preserved and unsorted, negatives kept — the experiment is the GM’s'
+    );
+    assert.equal(saved[1].rollFormula, '1d20', 'and the rest of the block rode along');
+  });
+
   it('Checks Gathering tab in d100 economy mode renders the read-only card and no editor', async () => {
     const calls = [];
     target = document.createElement('div');
@@ -3953,6 +4060,81 @@ describe('CraftingSystemManager mounted behavior', () => {
       'editing relative tiers never touches the independent fixed tiers'
     );
   });
+
+  // ── The ZERO state must offer the way out of itself (issue 1097 follow-up) ─────────────
+  //
+  // Reported from a live build on alchemy at `checkMode: 'tiered'`, and NOT alchemy-specific:
+  // this is the routed editor for every routed check, and every one of them starts empty. The
+  // add control was the last child of `.manager-checks-tier-list`, which renders only in the
+  // `{:else}` branch — so a check with no tiers showed the sentence "No outcome tiers yet. Add
+  // the tiers this check routes results into." with nothing on screen to press.
+  //
+  // The case above cannot see this and never could: it mounts a check that ALREADY has a
+  // relative tier, which is the state that worked. Emptiness is the whole subject here.
+  for (const [type, key] of [
+    ['relative', 'relativeOutcomes'],
+    ['fixed', 'fixedOutcomes'],
+  ]) {
+    it(`crafting check editor (${type}): the add control is reachable with ZERO outcome tiers`, () => {
+      const emitted = [];
+      const value = {
+        type,
+        rollFormula: '1d20',
+        dc: 12,
+        thresholdMode: 'meet',
+        tiers: [],
+        checkBreakage: { triggers: [] },
+        relativeOutcomes: [],
+        fixedOutcomes: [],
+      };
+      target = document.createElement('div');
+      document.body.appendChild(target);
+      mounted = mount(CraftingCheckEditorComponent, {
+        target,
+        props: { value, onChange: (next) => emitted.push(next) },
+      });
+      flushSync();
+
+      assert.ok(
+        Boolean(target.querySelector('[data-outcomes-empty]')),
+        'the empty state states the absence'
+      );
+      assert.equal(
+        target.querySelector('.manager-checks-tier-list'),
+        null,
+        'and there is no list, which is exactly what used to take the add control with it'
+      );
+      const add = target.querySelector('[data-add-outcome-tier]');
+      assert.ok(
+        Boolean(add),
+        'an instruction to add tiers must come with the control that adds one'
+      );
+      // ...and the zero state says NOTHING ELSE. Both of these rendered unconditionally and
+      // both are false with no tiers: the strip cannot resolve an empty set, so it fell back
+      // to "these tiers leave a gap or overlap" about tiers that do not exist, and the hint
+      // invited a GM to drag a band edge on a strip that has no edges. Asserted by ABSENCE
+      // because presence is what shipped — a test that only checked the empty sentence and the
+      // add control passed with both lies on screen beside them.
+      assert.equal(
+        target.querySelector('[data-outcome-band-strip]'),
+        null,
+        'a strip with no bands claims a gap or overlap between tiers that do not exist'
+      );
+      assert.equal(
+        target.querySelector('[data-outcome-band-strip-hint]'),
+        null,
+        'and the drag hint names an affordance the zero state does not offer'
+      );
+
+      add.click();
+      flushSync();
+      assert.equal(
+        emitted.at(-1)[key].length,
+        1,
+        `pressing it authors the first ${type} tier, so the dead end is genuinely open`
+      );
+    });
+  }
 
   it('crafting check editor (fixed): bounds the value range and flags overlapping tiers', () => {
     const value = {
@@ -17218,33 +17400,38 @@ describe('CraftingSystemManager mounted behavior', () => {
     }
   });
 
-  it('names the die domain the odds panel will enumerate, from the check’s own formula', async () => {
+  it('names the domain the odds panel ACTUALLY enumerated, never a die it merely mentions', async () => {
     // The prototype's `CHANCE PER OUTCOME` heading carries `all 20 faces` hard right. It is a
-    // fact about THIS check's die, so it is derived from the formula rather than stated — a
-    // fixed "20" beside a 2d6 check would be a claim about a check that does not roll a d20.
+    // fact about the space the histogram beneath it walked, so it is derived rather than
+    // stated — a fixed "20" beside a 2d6 check would be a claim about a check that does not
+    // roll a d20.
+    //
+    // IT READS THE PANEL, NOT THE FORMULA (issue 1097). This assertion used to expect
+    // `all 6 faces` for `2d6 + @prof`, off a regex that finds the first `NdS` in the AUTHORED
+    // string. That was the only derivation available while the panel was a slot; now that the
+    // panel is real it ABSTAINS on `2d6` — eleven outcomes on a triangular distribution are
+    // not six uniform faces — and prints "chances are listed for a single die only". A
+    // heading reading `all 6 faces` directly above that sentence is a contradiction on one
+    // screen, which is the exact defect class this change exists to remove. The regex is kept
+    // as the fallback for a rail mounted without a view-model and is unreachable here.
     await mountChecks([], routedCraftingOptions('1d20 + @prof'));
     await openChecksActivity('crafting');
-    assert.equal(
-      target.querySelector('[data-checks-odds-domain]')?.textContent.trim(),
-      'all 20 faces',
-      'a d20 check enumerates twenty faces'
-    );
-
-    await mountChecks([], routedCraftingOptions('2d6 + @prof'));
-    await openChecksActivity('crafting');
-    assert.equal(
-      target.querySelector('[data-checks-odds-domain]')?.textContent.trim(),
-      'all 6 faces',
-      'and a 2d6 check names its own die, not the d20'
-    );
-
-    // No die, no domain. The heading states nothing rather than a number nothing supports.
-    await mountChecks([], routedCraftingOptions('@prof'));
-    await openChecksActivity('crafting');
-    assert.ok(
-      !target.querySelector('[data-checks-odds-domain]'),
-      'a formula that rolls no die names no domain'
-    );
+    // This suite installs no dice engine, so the enumerator refuses every formula here for
+    // want of one. That is exactly the condition the arms below measure, and the POSITIVE
+    // arm — a real d20 check whose heading reads `all 20 faces` — is asserted in
+    // `tests/components/check-preview-mounted.test.js`, which does install one.
+    for (const formula of ['1d20 + @prof', '2d6 + @prof', '@prof']) {
+      await mountChecks([], routedCraftingOptions(formula));
+      await openChecksActivity('crafting');
+      assert.ok(
+        target.querySelector('[data-checks-odds-state="not-enumerable"]'),
+        `${formula}: the panel abstains without a dice engine`
+      );
+      assert.ok(
+        !target.querySelector('[data-checks-odds-domain]'),
+        `${formula}: and the heading names no domain the panel did not walk — not even for the d20 the regex fallback would have found`
+      );
+    }
   });
 
   it('names each mode in the ALL CHECKS rail the way its own picker names it', async () => {
@@ -17424,14 +17611,28 @@ describe('CraftingSystemManager mounted behavior', () => {
     ]) {
       assert.ok(target.querySelector(present), `an activity route renders ${present}`);
     }
-    // Preview-as is a PRE-ROLL slot: a stated sentence and no control. Two enabled-looking
-    // selects reading "No actors" / "No records" invited a choice nothing consumed.
+    // Preview-as was a PRE-ROLL SLOT under issue 1096 — a stated sentence and no control —
+    // because two enabled-looking selects reading "No actors" / "No records" would have
+    // invited a choice nothing consumed. Issue 1097 supplies the thing behind them, so the
+    // assertion inverts rather than relaxes: BOTH selectors are real, and the actor one
+    // carries the explicit "No actor" option the readout's unresolved warning depends on.
     const previewAs = target.querySelector('[data-checks-preview-as]');
-    assert.ok(
-      !previewAs.querySelector('select'),
-      'the panel offers no control until there is something behind it'
+    const actorPicker = previewAs.querySelector('[data-checks-preview-actor]');
+    const recordSelect = previewAs.querySelector('[data-checks-preview-record]');
+    assert.ok(actorPicker, 'the actor picker is a real control now that a simulator reads it');
+    assert.ok(recordSelect, 'so is the record selector');
+    // The actor control is a `SearchablePopover` rather than a `<select>` (the issue 1097
+    // follow-up): the list is filtered to player characters and searched, because a world's
+    // actor directory is mostly bestiary. Its options exist only while it is open, so what
+    // is pinned from here is that the hook lands on the TRIGGER — the View Lab's five checks
+    // simulator cases open it through exactly this selector, and a hook that moved to a
+    // wrapper would fail the capture job whole while every mounted query still resolved.
+    assert.equal(actorPicker.tagName, 'BUTTON', 'the hook is on the popover trigger itself');
+    assert.match(
+      actorPicker.textContent,
+      /No actor/,
+      '"No actor" is an explicit resting selection, not an absence'
     );
-    assert.ok(previewAs.querySelector('.manager-muted'), 'it states what it will do instead');
   });
 
   it('keeps the gathering d100 route on its own explanation, not the check-OFF empty state', async () => {

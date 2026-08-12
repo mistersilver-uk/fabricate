@@ -56,6 +56,15 @@
     triggerAddMarker — optional value for a `data-recipe-add` attribute on the
                    trigger button (lets the recipe editor mark popover-backed add
                    controls without wrapping the button)
+    triggerData  — OPTIONAL `{ 'data-x': 'value' }` map stamped verbatim on the
+                   trigger button. The general form of `triggerAddMarker`, for a
+                   caller whose stable hook is its own rather than the recipe
+                   editor's: the Checks Studio's "Preview as" control carries
+                   `data-checks-preview-actor`, which a mounted test and the View
+                   Lab case registry both address, and a wrapper element around
+                   the trigger would move that hook off the control it names.
+                   Spread FIRST, so it can never override this component's own
+                   `type`, `onclick` or ARIA contract.
     triggerTitle — optional native `title` tooltip on the trigger button
                    (backward-compatible; omitted when empty)
     showSearch   — render the search input (default true). A caller with only a
@@ -90,6 +99,7 @@
     showSearch = true,
     popoverClass = '',
     triggerAddMarker = '',
+    triggerData = {},
     triggerTitle = '',
     triggerAriaLabel = '',
     dialogAriaLabel = '',
@@ -245,6 +255,7 @@
   // One attribute set for both trigger shapes. Writing it twice would be a copy the
   // duplication gate counts and a place for the two shapes to drift apart.
   const triggerAttributes = $derived({
+    ...triggerData,
     type: 'button',
     'aria-haspopup': 'dialog',
     'aria-expanded': open,

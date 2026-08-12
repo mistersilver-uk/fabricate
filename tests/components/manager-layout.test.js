@@ -7529,6 +7529,173 @@ test('a Modifiers card button renders exactly like the tool studio button of the
   }
 });
 
+// ── The Checks rail's CONTROL TYPE SCALE (issue 1097 follow-up) ────────────────────────────
+//
+// Three reported defects, one measurement, because all three are the same failure: a control
+// that matched no rule stating its type and silently took whatever it inherited.
+//
+//  - The two "Preview as" controls sat in a `.manager-field`, so they took that wrapper's
+//    0.82rem/700 BY INHERITANCE. Inheritance is invisible to every gate this repo has: no
+//    rule declares it, so a source-text pin cannot see it and a per-region parity comparison
+//    has no region to compare. They rendered at 13.12px/700 against the prototype's 11.5/500.
+//  - The simulator's roll action was a hand-written `manager-button is-primary`, and the base
+//    `.manager-button` rule states no `font-size` at all — so it landed on Foundry's own 14px
+//    app base, larger still, next to a studio whose every other button reads at 11.52px.
+//
+// MEASURED, in Chromium, under the real Foundry core sheet, because that last one only
+// happens when Foundry's stylesheet is present. The two NEGATIVE CONTROLS below are what
+// stop this passing vacuously: they are the exact class strings the defect shipped with, and
+// each must still measure WRONG, or the rules being asserted are doing nothing.
+const CHECKS_RAIL_FOUNDRY_CSS = readFileSync(
+  resolve(__dirname, '../fixtures/foundry-core-min.css'),
+  'utf8'
+);
+
+test('the Checks rail states its own control type scale instead of inheriting one', async () => {
+  const context = await sharedBrowser.newContext({
+    viewport: { width: 1280, height: 900 },
+    deviceScaleFactor: 1,
+  });
+  const page = await context.newPage();
+
+  try {
+    // The rail is the workspace grid's 300px column, so the panel sibling is load-bearing:
+    // without it the rail lands in the `minmax(0, 1fr)` track and every control measures a
+    // width no product surface has.
+    await page.setContent(`
+      <!doctype html>
+      <html lang="en">
+        <head>
+          <meta charset="utf-8">
+          <style>${CHECKS_RAIL_FOUNDRY_CSS}</style>
+          <style>${css}</style>
+          <style>:root { --font-primary: Arial, sans-serif; }</style>
+        </head>
+        <body class="game">
+          <div class="application theme-dark">
+            <section class="window-content">
+              <div class="fabricate fabricate-manager" data-fabricate-theme="dark" data-manager-view="checks">
+                <div class="manager-body">
+                  <div class="manager-environment-workspace">
+                    <div class="manager-environment-tab-panel"></div>
+                    <aside class="manager-inspector manager-environment-inspector manager-checks-rail" data-checks-rail="crafting">
+                      <section class="manager-inspector-card" data-checks-preview-as>
+                        <div class="manager-travel-picker manager-checks-preview-actor">
+                          <button type="button" data-probe="preview-actor" data-checks-preview-actor
+                            class="manager-button manager-travel-picker-trigger manager-checks-preview-actor-trigger">
+                            <i class="fas fa-user-slash"></i><span class="manager-travel-picker-value">No actor</span>
+                          </button>
+                        </div>
+                        <label class="manager-field">
+                          <span class="sr-only">Preview against record</span>
+                          <select data-probe="preview-record" data-checks-preview-record><option>Uncommon Craft</option></select>
+                        </label>
+                        <label class="manager-field">
+                          <span>Result difficulties</span>
+                          <input type="text" data-probe="preview-difficulties" value="6, 9, 14">
+                        </label>
+                      </section>
+                      <section class="manager-inspector-card" data-checks-simulator>
+                        <div class="manager-checks-simulator">
+                          <button type="button" data-probe="roll" data-checks-simulator-roll
+                            class="manager-button fab-manager-button is-primary manager-checks-simulator-roll">
+                            <i class="fas fa-dice-d20"></i><span>Roll a test check</span>
+                          </button>
+                          <button type="button" data-probe="roll-unconverted"
+                            class="manager-button is-primary">
+                            <i class="fas fa-dice-d20"></i><span>Roll a test check</span>
+                          </button>
+                        </div>
+                      </section>
+                    </aside>
+                  </div>
+                </div>
+              </div>
+              <!-- OUTSIDE the rail, on purpose: the same field markup, unreached by the rail
+                   rule, is what the two pickers measured before it existed. -->
+              <div class="fabricate fabricate-manager" data-fabricate-theme="dark">
+                <label class="manager-field">
+                  <select data-probe="field-select-elsewhere"><option>Uncommon Craft</option></select>
+                </label>
+              </div>
+            </section>
+          </div>
+        </body>
+      </html>
+    `);
+
+    const measured = await page.evaluate(() =>
+      Object.fromEntries(
+        [...document.querySelectorAll('[data-probe]')].map((element) => {
+          const style = getComputedStyle(element);
+          return [
+            element.dataset.probe,
+            {
+              fontSize: style.fontSize,
+              fontWeight: style.fontWeight,
+              width: Math.round(element.getBoundingClientRect().width),
+              height: Math.round(element.getBoundingClientRect().height),
+            },
+          ];
+        })
+      )
+    );
+
+    // 11.5px/500 is the prototype's own declaration on both of its rail pickers
+    // (`font: 500 11.5px var(--sans)`), read off the artefact rather than chosen. The
+    // sandbox input is joined to them because it stands in the same card, in the same slot.
+    for (const probe of ['preview-actor', 'preview-record', 'preview-difficulties']) {
+      assert.equal(measured[probe].fontSize, '11.5px', `${probe} reads at the prototype's size`);
+      assert.equal(measured[probe].fontWeight, '500', `${probe} reads at the prototype's weight`);
+    }
+
+    // The NEGATIVE CONTROL for the pickers: the identical `.manager-field` control one card
+    // away still inherits 0.82rem/700, which is what the rail's two controls rendered as.
+    assert.equal(
+      measured['field-select-elsewhere'].fontSize,
+      '13.12px',
+      'a field control outside the rail is unchanged — this gate must not be measuring a ' +
+        'global re-type of every select in the manager'
+    );
+    assert.notEqual(
+      measured['preview-record'].fontSize,
+      measured['field-select-elsewhere'].fontSize,
+      'and the rail rule is therefore doing work'
+    );
+
+    // The roll action takes the PRIMITIVE's scale, not a value chosen here: 11.52px is
+    // `.manager-button.fab-manager-button`'s 0.72rem, the Tool Studio's authority, and it is
+    // within half a pixel of the prototype's own 11.5px/700 roll button.
+    assert.equal(measured.roll.fontSize, '11.52px', 'the roll button reads at the primitive');
+    assert.equal(measured.roll.fontWeight, '700');
+    // The Foundry reset. Core's `button` rule pins a height and centres content; the button
+    // is a full-width icon+label pair inside a card, so the rail block releases the height
+    // and the width. `height: auto` is the load-bearing half — `min-height` does not cancel
+    // a fixed `height`.
+    assert.equal(measured.roll.height, 34, 'released from Foundry’s fixed button height');
+    assert.equal(
+      measured.roll.width,
+      measured['preview-record'].width,
+      'and spans the card exactly as the controls above it do'
+    );
+
+    // The NEGATIVE CONTROL for the button: the bare class string it shipped with lands on
+    // Foundry's app base, which is the reported "font is too large".
+    assert.equal(
+      measured['roll-unconverted'].fontSize,
+      '14px',
+      'the unconverted class string still bleeds Foundry’s 14px app base'
+    );
+    assert.notEqual(
+      measured.roll.fontSize,
+      measured['roll-unconverted'].fontSize,
+      'so converting to the primitive is what changes the reading'
+    );
+  } finally {
+    await context.close();
+  }
+});
+
 // ── The bounds steppers must render "Unbounded" in full (issue 1096) ───────────────────────
 //
 // Reported from a live build: with icon and label taking the row's growth, the two bound
@@ -7674,5 +7841,104 @@ test('the modifier row gives every field room for its longest content at every m
     );
   } finally {
     await context.close();
+  }
+});
+
+// ── The simulator's face tile and the odds row (issue 1097) ─────────────────────────────
+//
+// Both are surfaces a mounted assertion CANNOT judge. `CheckOutcomePreview` layers the
+// rolled face over a `Medallion` with `position: absolute; inset: 0`, and `CheckOddsPanel`
+// lays its rows out on a three-track grid — neither of which happy-dom computes, so a
+// scoped selector renamed out from under either rule would leave every mounted assertion
+// green while the tile printed its digit beside the medallion instead of on it. That is
+// not hypothetical: the FIRST version of the face tile omitted the offsets, so the digit
+// landed at its static position to the RIGHT of the medallion and underneath the breakdown
+// line. It rendered, it was in the DOM, and it was invisible in the published frame.
+const previewScoped = scopedComponentCss(
+  resolve(__dirname, '../../src/ui/svelte/apps/manager/checks/CheckOutcomePreview.svelte')
+);
+const oddsScoped = scopedComponentCss(
+  resolve(__dirname, '../../src/ui/svelte/apps/manager/checks/CheckOddsPanel.svelte')
+);
+
+test('the simulator face tile layers the rolled digit ON the medallion, not beside it', async () => {
+  const browser = await chromium.launch();
+  try {
+    const page = await browser.newPage({ viewport: { width: 900, height: 400 } });
+    // Svelte scopes DESCENDANTS with `:where(.svelte-<hash>)`, so the hash has to land on
+    // every element the rules reach — not only on the token `withScopeHash` stamps. A
+    // fixture that stamped the wrapper alone would compute `position: static` and read as
+    // a defect in the component rather than in the fixture.
+    const hash = previewScoped.hashClass;
+    await page.setContent(
+      `<style>${css}</style><style>${previewScoped.css}</style>` +
+        `<div class="fabricate-manager"><div class="manager-checks-simulator-readout ${hash}">` +
+        `<span class="manager-checks-simulator-face ${hash}" id="tile">` +
+        `<span style="display:block;width:44px;height:44px"></span>` +
+        `<small id="value" class="${hash}"><strong class="${hash}">20</strong>` +
+        `<span class="${hash}">d20</span></small>` +
+        `</span></div></div>`
+    );
+    const geometry = await page.evaluate(() => {
+      const tile = document.getElementById('tile').getBoundingClientRect();
+      const value = document.getElementById('value').getBoundingClientRect();
+      return {
+        position: getComputedStyle(document.getElementById('value')).position,
+        overlaps:
+          value.left >= tile.left - 0.5 &&
+          value.right <= tile.right + 0.5 &&
+          value.top >= tile.top - 0.5 &&
+          value.bottom <= tile.bottom + 0.5,
+        width: Math.round(value.width),
+        tileWidth: Math.round(tile.width),
+      };
+    });
+    assert.equal(geometry.position, 'absolute', 'the rule that positions it still matches');
+    assert.equal(geometry.tileWidth, 44, 'the tile is the medallion’s own 44px square');
+    assert.equal(
+      geometry.width,
+      geometry.tileWidth,
+      '`inset: 0` makes the digit span the tile; without it the box collapses to its content'
+    );
+    assert.ok(geometry.overlaps, 'the digit sits INSIDE the tile rather than beside it');
+  } finally {
+    await browser.close();
+  }
+});
+
+test('an odds row keeps its bar between a bounded label and a pinned percentage', async () => {
+  const browser = await chromium.launch();
+  try {
+    const page = await browser.newPage({ viewport: { width: 320, height: 300 } });
+    const hash = oddsScoped.hashClass;
+    await page.setContent(
+      `<style>${css}</style><style>${oddsScoped.css}</style>` +
+        `<div class="fabricate-manager"><ul class="manager-checks-odds-list ${hash}">` +
+        `<li class="manager-checks-odds-row ${hash}" id="row">` +
+        `<span class="manager-checks-odds-label ${hash}" id="label">` +
+        `An extremely long localized outcome tier name that must not squeeze the bar</span>` +
+        `<span class="fab-fill-bar" id="bar" style="display:block;height:6px"></span>` +
+        `<span class="manager-checks-odds-percent ${hash}" id="percent">100%</span>` +
+        `</li></ul></div>`
+    );
+    const geometry = await page.evaluate(() => {
+      const read = (id) => document.getElementById(id).getBoundingClientRect();
+      return {
+        display: getComputedStyle(document.getElementById('row')).display,
+        label: Math.round(read('label').width),
+        bar: Math.round(read('bar').width),
+        percent: Math.round(read('percent').width),
+        overflow: getComputedStyle(document.getElementById('label')).overflow,
+      };
+    });
+    assert.equal(geometry.display, 'grid', 'the grid rule still matches this row');
+    assert.equal(geometry.overflow, 'hidden', 'and the label truncates rather than wrapping');
+    assert.ok(
+      geometry.label <= 90,
+      `a long tier name is bounded at the 5.5rem track (got ${geometry.label}px)`
+    );
+    assert.ok(geometry.bar > 40, `the bar keeps real width beside it (got ${geometry.bar}px)`);
+  } finally {
+    await browser.close();
   }
 });

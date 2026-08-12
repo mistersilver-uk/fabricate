@@ -47,6 +47,9 @@ The envelope MUST carry a `runtimeStateIncluded` boolean marker, which is `false
 Export MUST exclude runtime and world state by default.
 Excluded state comprises: per-environment `nodeRuntime`; the current-condition selection at both the top level (`conditions.{weather,timeOfDay}`) and per system (`conditions.<kind>.current`); gathering parties; per-character stamina and blind-task discovery; recent gathering history; active timed runs (including a salvage run's captured `resultOrder`); the stored per-user progressive result order (`progressiveResultOrder`, a user-scoped runtime preference); and actor or scene state.
 The GM-authored reorder **permission** is authoring data and IS exported, via `Recipe.toJSON()` and the salvage definition — only the player's chosen order is excluded.
+Export MUST also strip the Checks Studio's progressive PREVIEW SANDBOX (`progressive.preview`) from every check block that can carry one — the crafting, salvage and gathering checks alike.
+That list of ordered result difficulties is an experiment a GM types on one authoring screen to see what a progressive check would award: no runtime path reads it and no readiness rule validates it, so a value shipped inside a distributed system would read to the recipient as configuration they are expected to understand.
+The strip MUST DELETE the key rather than empty it, because an absent sandbox and an authored empty one are different states and an import must not be able to tell an exported experiment from one that was never run.
 When resetting the current-condition selection, export MUST preserve the authoring overrides (`conditions.<kind>.enabled` and `conditions.<kind>.values`) and reset only `current` to defaults.
 The `runtimeStateIncluded: false` marker MUST stay honest with this boundary.
 

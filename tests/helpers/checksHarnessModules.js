@@ -68,6 +68,39 @@ export const CHECKS_TREE_RAW_MODULES = Object.freeze([
   // module rather than hard-coded (issue 1096), so the whole checks tree now imports it.
   'src/config/modifierExpressionSuggestions.js',
   'src/config/gatheringCharacterModifierPresets.js',
+  // The outcome simulator and the odds enumerator (issue 1097), plus the engine modules
+  // they drive. `checkPreview.js` calls the SAME three runners the engines call and
+  // `checkOdds.js` buckets through the SAME classifier `runFormulaRouted` uses, so
+  // `checkRoll.js` — and its own `toolBreakageRuntime.js` condition evaluator and the
+  // shared `progressiveAward.js` loop — are genuinely in the checks tree's import graph
+  // now rather than being defensive entries.
+  'src/ui/svelte/apps/manager/checks/checkPreview.js',
+  'src/ui/svelte/apps/manager/checks/checkOdds.js',
+  'src/systems/checkRoll.js',
+  'src/utils/progressiveAward.js',
+  // The progressive PREVIEW SANDBOX derivation (issue 1097). BOTH halves of the checks tree
+  // import it — `ChecksView` to read and write the order, `ChecksRightMenu` to keep the
+  // field's own text in step with it — and it lives under `src/systems/` because the
+  // persistence normalizer and the manager root's draft clone share the same derivation.
+  'src/systems/progressiveCheckSandbox.js',
+  // `checkRoll.js` evaluates a trigger's condition through the shared breakage evaluator,
+  // and that module's own closure is the rest of this block. Eight modules for one
+  // evaluator reads like over-filling; it is not, and the check is mechanical — drop any
+  // one of them and the checks suites HANG rather than fail.
+  'src/toolBreakageRuntime.js',
+  'src/config/flags.js',
+  'src/config/stackQuantityPathPresets.js',
+  'src/models/Ingredient.js',
+  'src/models/IngredientGroup.js',
+  'src/models/Tool.js',
+  'src/models/match/matchTypes.js',
+  'src/systems/itemStackQuantity.js',
+  'src/utils/objectPath.js',
+  // The shared, GM-configurable player-character predicate (issue 1024). The rail's
+  // "Preview as" list is filtered by it — a crafting check is previewed against a
+  // CHARACTER, and an unfiltered world roster is mostly bestiary — and `checkPreview.js`
+  // imports it directly. It is an import-free leaf, so this single entry closes the graph.
+  'src/config/playerCharacterTypes.js',
 ]);
 
 /**
@@ -86,6 +119,7 @@ export const CHECKS_TREE_COMPILED_MODULES = Object.freeze([
   // reports a MISSING module loudly, so re-adding one is a one-line fix if a tree grows back
   // into it.
   'src/ui/svelte/components/FillBar.svelte',
+  'src/ui/svelte/components/Medallion.svelte',
   'src/ui/svelte/components/RowDisclosure.svelte',
   'src/ui/svelte/components/ThresholdBandStrip.svelte',
   'src/ui/svelte/components/Stepper.svelte',
@@ -101,7 +135,15 @@ export const CHECKS_TREE_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/apps/manager/ExplainerCard.svelte',
   'src/ui/svelte/apps/manager/RadioCardGroup.svelte',
   'src/ui/svelte/apps/manager/RollDataExpressionInput.svelte',
+  // The manager's ONE searchable picker. The rail's "Preview as" actor control renders
+  // through it rather than through a native `<select>`, so every checks suite that mounts
+  // the rail compiles it — omit it and those suites HANG (`# cancelled`), they do not fail.
+  // Its own closure (`Chip`, `EmptyState`, `iconPickerPopover.js`, `dismissOnOutsideClick.js`,
+  // `portal.js`) is already declared here for other reasons.
+  'src/ui/svelte/apps/manager/SearchablePopover.svelte',
   'src/ui/svelte/apps/manager/ToggleCard.svelte',
+  'src/ui/svelte/apps/manager/checks/CheckOddsPanel.svelte',
+  'src/ui/svelte/apps/manager/checks/CheckOutcomePreview.svelte',
   'src/ui/svelte/apps/manager/checks/ChecksEditorTabs.svelte',
   'src/ui/svelte/apps/manager/checks/ChecksRightMenu.svelte',
   'src/ui/svelte/apps/manager/checks/ChecksValidationTab.svelte',

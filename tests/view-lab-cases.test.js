@@ -947,6 +947,25 @@ const NEW_CHECKS_MODULES = [
     'src/ui/svelte/apps/manager/checks/checksNav.js',
     ['manager-checks-rail-group', 'manager-checks-rail-dirty'],
   ],
+  // The outcome simulator and the odds enumerator (issue 1097). BH4 asked for these two to
+  // select "exactly" their own cases and never the fallback; they are stated as the same
+  // POSITIVE pin their three siblings are, for the reason recorded above and now proven
+  // twice — the directory prefix nine cases already claim admits ANY `.js` under
+  // `apps/manager/checks/`, so "exactly these ids" is false for every module in this
+  // directory and "never the fallback" is unreachable rather than guarded. What is real,
+  // and what these entries hold, is that each module selects the frames it DETERMINES.
+  [
+    'src/ui/svelte/apps/manager/checks/checkPreview.js',
+    ['manager-checks-crafting-simulator-rolled'],
+  ],
+  [
+    'src/ui/svelte/apps/manager/checks/checkOdds.js',
+    [
+      'manager-checks-crafting-odds-enumerable',
+      'manager-checks-crafting-odds-not-enumerable',
+      'manager-checks-crafting-odds-progressive',
+    ],
+  ],
 ];
 
 test('a change confined to a new checks module selects the frames it determines', () => {
