@@ -2803,10 +2803,17 @@ function _buildSelectedSystemViewData(
       routed: selectedSystem.gatheringCraftingCheck?.routed
         ? _clonePlain(selectedSystem.gatheringCraftingCheck.routed)
         : null,
-      // Gathering's OWN selection over the system catalogue (issue 1095). Its
+      // Gathering's OWN selection over the system library (issue 1095). Its
       // `modifierFormulaInertCause` reads `noCheck` for every system today, because `d100`
-      // is the only gathering mode a GM can select (decision 8) — the section says so, and
-      // additionally renders the dormancy notice naming issue 683.
+      // is the only gathering mode a GM can select (decision 8) and no sub-config is
+      // authored for it.
+      //
+      // THE SECTION DOES NOT SAY `noCheck`; it OVERRIDES it. `ChecksView` answers gathering
+      // `d100` with `noModifierSupport` and renders `ModifierInertNoModifierSupport`,
+      // because the d100 rolled against each drop's chance IS that mode's check — only the
+      // seam to add a modifier to it is missing. `noCheck`'s copy would deny the mode rolls
+      // at all and send the GM to the two modes nobody can select yet. The dormancy notice
+      // naming issue 683 renders alongside it, not instead of it.
       ..._buildCheckModifierSelectionView(
         selectedSystem.gatheringCraftingCheck,
         selectedSystem,
