@@ -881,7 +881,7 @@
   let previewResult = $state(null);
   let previewRolling = $state(false);
 
-  const dcWord = text('FABRICATE.Admin.Manager.Checks.Crafting.Dc', 'DC');
+  const dcWord = text('FABRICATE.Admin.Manager.Checks.Crafting.TierDc', 'DC');
   const unroutedLabel = text('FABRICATE.Admin.Manager.Checks.Odds.Unrouted', 'No outcome');
 
   const previewActors = $derived(activity === 'validation' ? [] : listPreviewActors());

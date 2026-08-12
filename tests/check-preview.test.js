@@ -450,7 +450,8 @@ describe('checkPreview: the terse breakdown line', () => {
 describe('checkPreview: the histogram enumerates the formula the simulator rolls', () => {
   /** A system whose crafting check applies one catalogued modifier worth a flat +2. */
   const SYSTEM_WITH_CATALOGUE = {
-    checkModifiers: [{ id: 'mod-kit', label: 'Kit', expression: '2' }],
+    // `system.modifiers` since issue 1117: the ONE authored modifier library.
+    modifiers: [{ id: 'mod-kit', label: 'Kit', expression: '2' }],
     craftingCheck: { defaultModifierPolicy: 'addAll', defaultModifierIds: ['mod-kit'] },
   };
 

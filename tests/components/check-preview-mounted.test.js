@@ -39,6 +39,10 @@ const harness = createMountedComponentHarness({
     ...CHECKS_TREE_COMPILED_MODULES,
     'src/ui/svelte/apps/manager/ItemDropZone.svelte',
     'src/ui/svelte/apps/manager/SegmentedControl.svelte',
+    // The three cards issue 1096 split out of the editors this route mounts.
+    'src/ui/svelte/apps/manager/checks/CheckModeCallout.svelte',
+    'src/ui/svelte/apps/manager/checks/CheckDcMacroCard.svelte',
+    'src/ui/svelte/apps/manager/checks/CheckDifficultyCard.svelte',
     'src/ui/svelte/apps/manager/checks/CheckFormulaFields.svelte',
     'src/ui/svelte/apps/manager/checks/CheckRecipeTiers.svelte',
     'src/ui/svelte/apps/manager/checks/CheckTriggers.svelte',
@@ -459,7 +463,7 @@ describe('the `avg` annotation on the formula field', () => {
     // handed that context too. This is the cheapest observable of the threading: an `avg`
     // blind to the catalogue reads 13 where the check will actually roll an average of 15.
     const root = await mountChecks({
-      checkModifiers: [{ id: 'mod-kit', label: 'Kit', expression: '2' }],
+      modifiers: [{ id: 'mod-kit', label: 'Kit', expression: '2' }],
       craftingDefaultModifierPolicy: 'addAll',
       craftingDefaultModifierIds: ['mod-kit'],
     });

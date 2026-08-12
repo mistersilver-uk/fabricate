@@ -4735,6 +4735,7 @@
             "OutcomeSuccessDesc": "The roll reaches the DC, and the recipe’s result group is produced in full.",
             "OutcomeFailureDesc": "The roll misses the DC; nothing is produced, and the failure policy decides the cost.",
             "BandsTitle": "Outcome bands",
+            "BandsLead": "Transition points between the tiers below. Anything under the first band or over the last clamps into the end band.",
             "BandsBoundary": "Threshold between {from} and {to}",
             "BandsFallback": "These tiers leave a gap or overlap, so they cannot be drawn as one continuous strip. Edit the numbers in the rows below; the strip returns once the ranges meet.",
             "BandsHint": "Drag or arrow-key a band edge to move its threshold, or type the numbers below. The numbers are the authority.",

@@ -5098,13 +5098,11 @@ export const VIEW_LAB_CASES = Object.freeze([
       'Checks',
       { selector: '#manager-checks-nav-crafting' },
       { selector: '[data-checks-preview-actor]', select: 'lab-actor-idrin' },
-      // The rail's simulator and odds panels COLLAPSE below the shipped 1320 container
-      // breakpoint (issue 1096), and the manager window is 1280 wide — so at the capture
-      // geometry the body is `display: none` and its contents are unreachable. Opening the
-      // disclosure is what makes this case photograph its own subject; without it the run
-      // fails on an invisible anchor rather than publishing the wrong frame, which is the
-      // behaviour the anchors exist for.
-      { selector: '[data-checks-simulator-disclosure]' },
+      // NO DISCLOSURE STEP. These two panels were collapsible when this case was written and
+      // are not any more: issue 1096's rail is a flat `.manager-kicker` heading over a bare
+      // card, on the Tool Studio's inspector convention, so the body is always in the
+      // document and a click on a chevron that no longer exists would fail the capture job
+      // WHOLE and publish nothing at all.
       { selector: '[data-checks-simulator-roll]' },
       { selector: '[data-checks-simulator-readout]', scroll: true },
     ],
@@ -5128,7 +5126,6 @@ export const VIEW_LAB_CASES = Object.freeze([
       'Checks',
       { selector: '#manager-checks-nav-crafting' },
       { selector: '[data-checks-preview-actor]', select: 'lab-actor-idrin' },
-      { selector: '[data-checks-odds-disclosure]' },
       { selector: '[data-checks-odds-state="enumerated"]', scroll: true },
     ],
     expectView: 'checks-crafting',
@@ -5156,7 +5153,6 @@ export const VIEW_LAB_CASES = Object.freeze([
       { selector: '#manager-checks-nav-crafting' },
       { selector: '[data-checks-preview-actor]', select: 'lab-actor-idrin' },
       { selector: '[data-check-roll-formula]', fill: '2d20 + @abilities.int.mod' },
-      { selector: '[data-checks-odds-disclosure]' },
       { selector: '[data-checks-odds-state="not-enumerable"]', scroll: true },
     ],
     expectView: 'checks-crafting',
@@ -5183,7 +5179,6 @@ export const VIEW_LAB_CASES = Object.freeze([
       'Checks',
       { selector: '#manager-checks-nav-crafting' },
       { selector: '[data-checks-preview-actor]', select: 'lab-actor-idrin' },
-      { selector: '[data-checks-odds-disclosure]' },
       { selector: '[data-checks-odds-state="enumerated"]', scroll: true },
     ],
     expectView: 'checks-crafting',
