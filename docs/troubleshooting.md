@@ -95,8 +95,8 @@ Recipes resolve immediately with no skill check, even though the Routed by check
 
 **Step-by-step checks:**
 
-1. Open the Crafting Admin panel, go to the **Systems** tab, and check the **Crafting Checks** section.
-   Is a roll formula configured for the system's resolution mode?
+1. Open the Crafting Admin panel, select the system, and open **Checks › Crafting**.
+   On **The roll** section, is a roll formula configured for the system's resolution mode?
 2. Check the system's **Resolution Mode**.
    If the resolution mode is **Routed by check** or **Progressive**, a crafting check is required.
    Fabricate reports a validation error when its roll formula is missing.
@@ -118,14 +118,14 @@ Recipes resolve immediately with no skill check, even though the Routed by check
 - The system's **Combination rule** is not **By recipe**.
   That is the one rule that hands the selection to the recipe author, so it is the only rule under which the control appears.
   Under **Add all**, **Highest**, and **Player picks** the system decides, and the tab shows nothing rather than a control the system would ignore.
-- The system has no check modifiers in its catalogue yet, so there is nothing to pick from.
+- The system's modifier library is empty, so there is nothing to pick from.
 - The system's active crafting check cannot use a modifier right now.
   Either the resolution mode rolls no check at all, or the check has no roll formula authored yet.
   Under **By recipe** the recipe's Overview tab shows a banner naming which of these applies in place of the control.
 
 **Related symptom:** The control is there, but the **Add modifier** button is greyed out.
 The recipe has reached the system's **Maximum picks**.
-Raise that limit, or clear it entirely for no limit, on the **Check modifiers** card.
+Raise that limit, or clear it entirely for no limit, on the **How they combine** card of **Checks › Crafting › Modifiers**.
 
 **What is and is not lost:** Switching a system away from **By recipe**, or lowering **Maximum picks**, never deletes what a recipe picked.
 The picks stay stored and stop being applied, and restoring the rule or the limit applies them again immediately with nothing to re-enter.
@@ -133,16 +133,18 @@ A lowered limit rolls only the first few picks, up to the limit, and keeps the r
 
 **Step-by-step checks:**
 
-1. Open the Crafting Admin panel, select the system, go to the **Crafting check** page, and open the **Check modifiers** card.
-2. Confirm the catalogue has at least one modifier.
-   If it is empty, choose **Add modifier** and author one.
-3. Check the **Combination rule**.
-   If it is anything other than **By recipe**, that is why no recipe has a control; choose **By recipe** to hand the selection to your recipes.
+1. Open the Crafting Admin panel, select the system, and open **Checks › Crafting › Modifiers**.
+2. Confirm the library has at least one modifier.
+   The **Named modifiers** card lists them, and it is read-only.
+   If it is empty, follow its **Edit in system settings** link to **System settings › Modifiers** and choose **Add modifier** there.
+3. Check the **Combination rule** on the **How they combine** card.
+   If it is anything other than **By recipe**, that is why no recipe has a control.
+   Choose **By recipe** to hand the selection to your recipes.
 4. If the rule is already **By recipe**, open the recipe's **Overview** tab and read the banner in place of the control.
    It names whether the system's active check has no roll formula, or rolls no check at all for the current resolution mode.
-5. Fix whichever of those applies on the **Crafting check** page, then return to the recipe's Overview tab.
+5. Fix whichever of those applies on **Checks › Crafting**, then return to the recipe's Overview tab.
 
-**See also:** [Check modifiers]({% link crafting-checks.md %}#check-modifiers) covers the catalogue, the four combination rules, and the pick limit in full.
+**See also:** [Check modifiers]({% link crafting-checks.md %}#check-modifiers) covers the library, the four combination rules, and the pick limit in full.
 
 ---
 
@@ -211,7 +213,7 @@ A lowered limit rolls only the first few picks, up to the limit, and keeps the r
    This gives the item a durable identity link, after which it breaks and tracks usage normally.
 
 **See also:** [Tools]({% link tools.md %}) covers the system-owned Tool model, including the requirement gate, breakage modes, and on-break actions.
-[Crafting Checks]({% link crafting-checks.md %}#consumption-on-failure) covers consumption on failure settings.
+[Crafting Checks]({% link crafting-checks.md %}#failure-consumption-policy) covers consumption on failure settings.
 [Repairing Item Data](#repairing-item-data) covers the maintenance action that gives duplicated copies a durable identity link.
 
 ---

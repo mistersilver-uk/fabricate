@@ -30,7 +30,7 @@ Use this when different materials should make different things.
 For example, the same gold band could become a Ring of Fire Resistance with a ruby, or a Ring of Frost Resistance with a sapphire.
 
 The crafting check is **optional** in this mode, the same as Simple mode.
-It is authored on the **Crafting check** page with the same pass or fail editor Simple mode uses: a roll formula, a DC, a meet or exceed comparison, a static or dynamic difficulty, and per-recipe check tiers.
+It is authored in **The roll** section of **Checks › Crafting** with the same pass or fail editor Simple mode uses: a roll formula, a DC, a meet or exceed comparison, a static or dynamic difficulty, and per-recipe check tiers.
 If you configure a roll formula, the check still rolls when a player crafts, but it never changes which result group is produced.
 If you configure no roll formula, the craft proceeds with no check.
 Because it uses the same pass or fail check as Simple mode, a Routed by ingredients recipe can pick a per-recipe **Check tier** to shift its DC (but not the outcome-tier controls used by Routed by check).
@@ -147,10 +147,10 @@ See [Changing the resolution mode]({% link crafting-systems.md %}#feature-toggle
 
 Fabricate also carries your crafting check across when you switch modes.
 Routed by ingredients uses the same pass or fail check as Simple and Alchemy, while Routed by check uses named outcome tiers instead.
-When you switch a system between Routed by ingredients and Routed by check, Fabricate moves the check's roll formula and DC into the new mode's **Crafting check** editor, as long as you have not already set one up there.
+When you switch a system between Routed by ingredients and Routed by check, Fabricate moves the check's roll formula and DC into the new mode's editor on **Checks › Crafting**, as long as you have not already set one up there.
 One case needs your attention.
 If a Routed by ingredients check used a dynamic difficulty, switching into Routed by check drops the dynamic difficulty, because Routed by check does not support one.
-Re-author the DC on the **Crafting check** page after switching into Routed by check so the tier check uses the difficulty you intend.
+Re-author the DC in **The roll** section of **Checks › Crafting** after switching into Routed by check so the tier check uses the difficulty you intend.
 
 You author routed recipes in the recipe editor in the Crafting Admin panel, and the public API can create them too.
 See the [Recipe Manager API reference]({% link api/recipe-manager.md %}) for those methods.

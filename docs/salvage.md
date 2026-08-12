@@ -48,6 +48,8 @@ See the [CraftingSystemManager API]({% link api/system-manager.md %}).
 When the salvage resolution mode is Routed or Progressive, you must configure a salvage check.
 This is separate from the recipe crafting check.
 A system can have both.
+You author it on **Checks › Salvage**, which is laid out in the same five sections the crafting check uses.
+See [The Checks screen]({% link crafting-checks.md %}#the-checks-screen).
 
 Everything a player is shown when they salvage comes from the salvage check, never from the recipe crafting check.
 

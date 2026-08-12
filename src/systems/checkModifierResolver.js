@@ -449,8 +449,14 @@ const GATHERING_CHECK_SLOTS = new Map([
  *
  * `slot` is `null` only for an UNSUPPORTED salvage mode: every supported mode rolls a
  * slot, so salvage's `noCheck` cause reports a config defect rather than a legal
- * "this mode rolls nothing" state (which salvage, unlike crafting and gathering, has
- * none of).
+ * "this mode rolls no authored FORMULA" state (which salvage, unlike crafting and
+ * gathering, has none of).
+ *
+ * The wording is deliberate. Crafting's such state is alchemy `checkMode: 'none'`, which
+ * genuinely rolls nothing; gathering's is `d100`, which DOES roll — the d100 against each
+ * drop's chance is that mode's check, and what it lacks is an authored formula to append a
+ * modifier to. Calling gathering's state "rolls nothing" is what `noModifierSupport` exists
+ * to stop the UI saying.
  *
  * @param {object|null|undefined} system The crafting system.
  * @returns {{ mode: string, slot: 'simple'|'routed'|'progressive'|null, config: object|null,
