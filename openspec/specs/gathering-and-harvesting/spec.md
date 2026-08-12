@@ -634,7 +634,7 @@ Issue 1095 had left a gathering system with TWO named-modifier libraries in two 
 
 **What remains distinct is how each CONSUMER reads an entry, and that distinction is real.**
 A **gathering drop-row or event reference** (§Gathering Character Modifiers below) applies to the **d100** path only, is authored per drop row and per event, and contributes a percentage-point delta or a multiplicative factor of the drop chance.
-A **check-modifier selection**, made by `gatheringCraftingCheck`'s own `{defaultModifierPolicy, defaultModifierIds, maxModifierPicks?}` triple over the same library, applies to the **formula-rolled** modes and contributes additive `[Modifiers]` terms on the roll — one flat `+ N` term and one `+ (…)` term per rolling entry; it is inert in `d100` and reports the cause `noCheck`.
+A **check-modifier selection**, made by `gatheringCraftingCheck`'s own `{defaultModifierPolicy, defaultModifierIds, maxModifierPicks?}` triple over the same library, applies to the **formula-rolled** modes and contributes additive `[Modifiers]` terms on the roll — one flat `+ N` term and one `+ (…)` term per rolling entry; it is inert in `d100` and reports the cause `noModifierSupport` — that mode's check IS the d100 rolled against each drop's chance, and the inert cause names the absent modifier seam rather than claiming the mode rolls nothing.
 The two arithmetics stay incompatible — unifying the LIBRARY does not unify them — so an entry is a shared definition, never a shared application.
 
 **A ROLL-SHAPED expression is legal for BOTH consumers** (issue 1118).

@@ -266,8 +266,8 @@ test('the modifier card fallbacks match lang/en.json exactly', () => {
   // NOT_ELIGIBLE_COPY tables.
   assertMirrored(
     [...source.matchAll(/\bkey:\s*'([^']+)',\s*(?:label|fallback):\s*'((?:[^'\\]|\\.)*)'/g)],
-    11,
-    'the playerPicks cap hint, the two surviving inert-cause sentences, the four ON ' +
+    12,
+    'the playerPicks cap hint, the three inert-cause sentences, the four ON ' +
       'eligibility words, and the four OFF ones — one ENTRY per rule, because "Not applied" ' +
       'is the negation of `Applied` and of nothing else. Four entries, THREE distinct keys ' +
       'since issue 1096: the two rules that defer the selection share `Selectable`, because ' +

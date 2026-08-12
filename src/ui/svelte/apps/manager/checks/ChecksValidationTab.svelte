@@ -68,6 +68,7 @@
       readiness: evaluateCheckReadiness(section.check || {}, {
         mode: section.mode,
         modifierContext: section.modifierContext ?? null,
+        activity: section.subsystem,
       }),
     }))
   );

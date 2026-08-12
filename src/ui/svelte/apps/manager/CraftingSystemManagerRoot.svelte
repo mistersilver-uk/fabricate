@@ -2025,6 +2025,7 @@
     return evaluateCheckReadiness(draftForSlot(slot, drafts) || {}, {
       mode: readinessModeForSlot(slot),
       modifierContext: buildCheckModifierContext(checksDraftSystem, activity, null),
+      activity,
     }).issues.length;
   }
   const checksIssueCounts = $derived({

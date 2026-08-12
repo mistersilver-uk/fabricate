@@ -4771,7 +4771,8 @@
             "D100Hint": "Switch the gathering economy to progressive or routed resolution to define an editable check. Per-task tuning adjusts difficulty, not the roll.",
             "ModifierDisambiguation": "These are check modifiers: they add to a rolled gathering formula in progressive and routed resolution. They are not the gathering library’s character modifiers, which shift a drop’s percentage chance in d100 resolution and never apply to a rolled formula.",
             "ModifierDormantHeading": "Not in use yet",
-            "ModifierDormantBody": "Progressive and routed gathering are disabled pending issue 683, so no gathering configuration you can choose today rolls a formula. Anything you set here is saved and starts applying when those modes ship."
+            "ModifierDormantBody": "Progressive and routed gathering are not available yet, so no gathering configuration you can choose today rolls a formula. Anything you set here is saved and starts applying as soon as those modes ship.",
+            "ModifierInertNoModifierSupport": "The d100 roll against each drop’s chance is this mode’s check, and it cannot take check modifiers yet, so nothing selected here changes it."
           },
           "Validation": {
             "EmptyTitle": "Nothing to validate yet",
@@ -4808,6 +4809,7 @@
             "IssueModifierBoundsUnsafe": "A check modifier this check applies ({names}) has a minimum or maximum too large or too small to appear in a roll formula, so it contributes nothing. Use a whole number a die roll could plausibly reach.",
             "IssueModifierExpressionInvalid": "A check modifier this check applies ({names}) has an expression Fabricate cannot roll, so it contributes nothing. Check it against your game system — a capitalised function name (MAX instead of max), more than 999 dice, or a decimal without a leading zero are all refused by the dice engine.",
             "IssueModifiersInertNoCheck": "This resolution mode rolls no check, so the check modifiers selected here are never applied.",
+            "IssueModifiersInertNoModifierSupport": "The d100 roll against each drop’s chance is this mode’s check, and it cannot take check modifiers yet, so the ones selected here are never applied.",
             "IssueModifiersInertNoFormula": "This check has no roll formula yet, so the check modifiers selected here are never applied.",
             "IssueDanglingTierStepTarget": "A trigger's target tier is not set, or names a tier this check does not have; that step does nothing until you pick one of this check's outcome tiers.",
             "IssueMultipleTierStepTargets": "Two or more triggers set a target tier; if more than one matches, the lowest-ranked wins.",

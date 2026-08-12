@@ -585,6 +585,9 @@ describe('CHECK_READINESS_ISSUE_IDS is the source of truth for every issue id', 
     collect({ rollFormula: '' }, { mode: 'simple', modifierContext: context(['ok', 'bad']) });
     collect({ rollFormula: '1d20' }, { mode: 'simple', modifierContext: context(['huge']) });
     collect({}, { mode: 'none', modifierContext: context(['ok']) });
+    // The same no-check mode on GATHERING, which reaches the other inert sentence: its d100
+    // rolls, so it reports the missing modifier seam rather than a missing check.
+    collect({}, { mode: 'none', modifierContext: context(['ok']), activity: 'gathering' });
     collect({ rollFormula: '1d20' }, { mode: 'simple', modifierContext: context(['rolls']) });
     collect({ rollFormula: '1d20' }, { mode: 'simple', modifierContext: context(['broken']) });
     for (const id of emitted) {
@@ -940,17 +943,34 @@ describe('check-modifier readiness', () => {
     assert.equal(issues.find((entry) => entry.id === 'modifierBoundsInverted'), undefined);
   });
 
-  it('reports noCheck under gathering d100 — the ONE owned path for that state', () => {
+  it('reports noModifierSupport under gathering d100 — the ONE owned path for that state', () => {
     const { issues } = evaluateCheckReadiness(
       {},
-      { mode: 'none', modifierContext: context(['ok']) }
+      { mode: 'none', modifierContext: context(['ok']), activity: 'gathering' }
     );
     assert.ok(
+      issues.find((entry) => entry.id === 'modifiersInertNoModifierSupport'),
+      'the d100 against each drop chance IS the check; it just takes no modifiers yet'
+    );
+    assert.equal(
       issues.find((entry) => entry.id === 'modifiersInertNoCheck'),
-      'd100 rolls no authored formula, so a selection made here never applies'
+      undefined,
+      'd100 DOES roll a check, so the mode-rolls-nothing sentence would be false here'
     );
     // …and the d100 branch still validates nothing else: there is nothing authored.
     assert.equal(issues.find((entry) => entry.id === 'noRollFormula'), undefined);
+  });
+
+  it('keeps the mode-rolls-nothing reading for alchemy none, which really rolls nothing', () => {
+    const { issues } = evaluateCheckReadiness(
+      {},
+      { mode: 'none', modifierContext: context(['ok']), activity: 'crafting' }
+    );
+    assert.ok(issues.find((entry) => entry.id === 'modifiersInertNoCheck'));
+    assert.equal(
+      issues.find((entry) => entry.id === 'modifiersInertNoModifierSupport'),
+      undefined
+    );
   });
 
   it('reports noFormula when a check slot exists but is empty', () => {

@@ -317,7 +317,14 @@
       gatheringResolutionMode
     )
   );
-  const gatheringModifierInertCause = $derived(inertCauseFor(activeGatheringCheck));
+  // Gathering's d100 mode is NOT a `noCheck`. The d100 rolled against each drop's chance IS
+  // that mode's check — the roll simply has no seam to add modifiers to yet — so it gets its
+  // own cause rather than the generic one, whose sentence claims the mode rolls nothing and
+  // tells the GM to switch to a mode that rolls. `resolveActiveGatheringCheckFormula` returns
+  // a null slot for it because no sub-config is AUTHORED, which is a different question.
+  const gatheringModifierInertCause = $derived(
+    gatheringResolutionMode === 'd100' ? 'noModifierSupport' : inertCauseFor(activeGatheringCheck)
+  );
 
   // The one bag the readiness evaluator resolves eligibility through, built by the SAME
   // builder the engine threads to its check runners rather than a second literal of the
@@ -536,6 +543,7 @@
       ? evaluateCheckReadiness(activeCheck || {}, {
           mode: activeMode,
           modifierContext: activeActivity.modifierContext,
+          activity: activeActivity.subsystem,
         })
       : { checks: [], issues: [] }
   );
@@ -656,6 +664,7 @@
       const readiness = evaluateCheckReadiness(row.check || {}, {
         mode: row.mode,
         modifierContext: row.modifierContext,
+        activity: row.subsystem,
       });
       const label = text(
         `FABRICATE.Admin.Manager.Checks.Tabs.${row.subsystem[0].toUpperCase()}${row.subsystem.slice(1)}`,

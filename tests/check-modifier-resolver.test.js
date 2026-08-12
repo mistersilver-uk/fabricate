@@ -1425,7 +1425,7 @@ test('resolveActiveGatheringCheckFormula has no slot under d100 and one under bo
     },
   };
   const d100 = resolveActiveGatheringCheckFormula(system, 'd100');
-  assert.equal(d100.slot, null, 'd100 rolls no authored formula, so the catalogue is noCheck');
+  assert.equal(d100.slot, null, 'd100 authors no check slot, so the catalogue reaches no roll');
   assert.equal(d100.checkUsable, false);
   assert.equal(d100.requiresCheck, false);
   assert.equal(

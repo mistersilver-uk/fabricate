@@ -36,9 +36,9 @@ const NAMESPACE = 'FABRICATE.Admin.Manager.Checks.Mode.';
 /** The shipped gathering dormancy sentence, reused rather than re-worded. */
 const GATHERING_DORMANT_BODY = [
   'FABRICATE.Admin.Manager.Checks.Gathering.ModifierDormantBody',
-  'Progressive and routed gathering are disabled pending issue 683, so no gathering ' +
+  'Progressive and routed gathering are not available yet, so no gathering ' +
     'configuration you can choose today rolls a formula. Anything you set here is saved and ' +
-    'starts applying when those modes ship.',
+    'starts applying as soon as those modes ship.',
 ];
 
 /** The shipped gathering dormancy heading, used as this callout's `Check` fact value. */

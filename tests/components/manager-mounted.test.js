@@ -5009,6 +5009,32 @@ describe('CraftingSystemManager mounted behavior', () => {
     );
   });
 
+  // Gathering d100 is the one activity+mode where "this resolution mode rolls no check" is
+  // FALSE: the d100 rolled against each drop's chance IS the check. What it lacks is a seam
+  // to add modifiers to. It reported `noCheck` — telling the GM the mode rolls nothing and
+  // to switch to one that rolls, when the two gathering modes that take modifiers are the
+  // ones rendered disabled. Both halves below fail against that component.
+  it('checks view: gathering d100 names the missing MODIFIER SUPPORT, not a missing check', () => {
+    mountChecksView({
+      activity: 'gathering',
+      features: { gathering: true },
+      gatheringResolutionMode: 'd100',
+      modifiers: [{ id: 'med', label: 'Medicine', expression: '@abilities.med.mod' }],
+      gatheringDefaultModifierIds: ['med'],
+    }, 'modifiers');
+    const notice = target.querySelector('[data-crafting-modifier-inert]');
+    assert.ok(Boolean(notice), 'a selection that reaches no roll is still reported');
+    assert.equal(
+      notice.getAttribute('data-crafting-modifier-inert'),
+      'noModifierSupport',
+      'the cause is the absent modifier seam, not an absent check'
+    );
+    assert.ok(
+      !/rolls no check/i.test(notice.textContent),
+      'the d100 IS this mode’s check, so the sentence must not deny that it rolls one'
+    );
+  });
+
   it('checks view: an unstamped system shows the rule the ENGINE would apply, not a blank group (issue 1055)', () => {
     mountChecksView({
       resolutionMode: 'simple',

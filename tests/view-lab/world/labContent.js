@@ -3225,7 +3225,8 @@ const PROGRESSIVE_CHECK = Object.freeze({
  * the catalogued-but-not-selected entry, and it can only do that if NO activity selects it.
  *
  * No `enabled` and no formula slots: gathering resolves `d100` here, so the check-modifier seam is
- * inert with cause `noCheck` and dormant pending issue 683 either way. Authoring a formula would
+ * inert with cause `noModifierSupport` — the d100 against each drop's chance IS that mode's check,
+ * and it takes no modifiers yet — and dormant pending issue 683 either way. Authoring a formula would
  * claim a rolled gathering check this world does not have, and both notices are what
  * `manager-checks-gathering-modifiers` exists to photograph.
  */

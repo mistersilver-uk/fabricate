@@ -440,9 +440,17 @@ describe('the Validation tab reads each activity’s OWN modifier context', () =
   it('reports the gathering d100 selection as reaching no roll at all', async () => {
     const target = await mountChecks({ activity: 'validation' });
     assert.ok(
-      issuesIn(target, 'gathering').includes('modifiersInertNoCheck'),
-      'the fixed d100 roll has no formula, so a gathering selection applies to nothing — ' +
+      issuesIn(target, 'gathering').includes('modifiersInertNoModifierSupport'),
+      'the fixed d100 roll takes no modifiers, so a gathering selection applies to nothing — ' +
         'this section is the ONE owned path for saying so'
+    );
+    // NOT the mode-rolls-nothing sentence. The d100 rolled against each drop's chance IS
+    // this mode's check; only the seam to add modifiers to it is missing. Naming the wrong
+    // cause here told the GM to switch to a mode that rolls — and gathering's two such
+    // modes are exactly the ones rendered disabled.
+    assert.ok(
+      !issuesIn(target, 'gathering').includes('modifiersInertNoCheck'),
+      'gathering d100 must not claim its mode rolls no check'
     );
     assert.ok(
       !issuesIn(target, 'crafting').includes('modifiersInertNoCheck'),

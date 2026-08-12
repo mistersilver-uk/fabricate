@@ -124,9 +124,10 @@
     // means, and it must decide the same thing here as it does in the engine.
     maxModifierPicks = null,
     // Why the catalogue reaches no roll, or '' when it does: 'noCheck' (this resolution
-    // mode rolls no check at all) or 'noFormula' (a check slot exists but has no
-    // authored roll formula). One boolean cannot carry this, and the two need different
-    // remedies, so the cause is passed rather than derived from a flag.
+    // mode rolls no check at all), 'noFormula' (a check slot exists but has no authored
+    // roll formula) or 'noModifierSupport' (the mode rolls, but takes no modifiers yet —
+    // gathering d100). One boolean cannot carry this, and each needs a different remedy,
+    // so the cause is passed rather than derived from a flag.
     inertCause = '',
     // Whether this activity's whole check-modifier seam is DORMANT (issue 1095, decision
     // 8): gathering's formula-rolled modes are rendered disabled pending issue 683, so no
@@ -317,6 +318,16 @@
       key: 'FABRICATE.Admin.Manager.Checks.Crafting.ModifierInertNoFormula',
       fallback:
         'The check for this resolution mode has no roll formula yet, so nothing here is rolled. Author one above and these modifiers are added to it automatically.',
+    },
+    // GATHERING d100 ONLY, and it exists because `noCheck` is FALSE here. The d100 rolled
+    // against each drop's chance IS this mode's check; what it lacks is a seam to add
+    // modifiers to. Under `noCheck`'s sentence a GM was told the mode rolls nothing and
+    // instructed to switch to one that rolls — wrong on the first clause, and pointing at
+    // the two gathering modes nobody can select on the second.
+    noModifierSupport: {
+      key: 'FABRICATE.Admin.Manager.Checks.Gathering.ModifierInertNoModifierSupport',
+      fallback:
+        'The d100 roll against each drop’s chance is this mode’s check, and it cannot take check modifiers yet, so nothing selected here changes it.',
     },
   };
 
@@ -519,7 +530,7 @@
           >
           {text(
             'FABRICATE.Admin.Manager.Checks.Gathering.ModifierDormantBody',
-            'Progressive and routed gathering are disabled pending issue 683, so no gathering configuration you can choose today rolls a formula. Anything you set here is saved and starts applying when those modes ship.'
+            'Progressive and routed gathering are not available yet, so no gathering configuration you can choose today rolls a formula. Anything you set here is saved and starts applying as soon as those modes ship.'
           )}
         </span>
       </p>
@@ -799,6 +810,10 @@
      two read as the same kind of statement. */
   .manager-modifier-inert {
     display: flex;
+    /* Without this the flex default `stretch` gives the icon a box as tall as the whole
+       callout, and its glyph centres inside that — so on a three-line note the icon floats
+       halfway down instead of sitting beside the sentence it introduces. */
+    align-items: flex-start;
     gap: var(--fab-space-2);
     margin-block: 0;
     padding: var(--fab-space-2) var(--fab-space-3);
@@ -808,6 +823,13 @@
     background: var(--fab-warning-soft);
     font-size: 0.7rem;
     line-height: 1.45;
+  }
+
+  .manager-modifier-inert > i {
+    /* Share the paragraph's line box so the glyph lands ON the first line rather than at
+       the top of it — Font Awesome states its own line-height, which sits the glyph high. */
+    flex: 0 0 auto;
+    line-height: inherit;
   }
 
   .manager-modifier-inert strong {

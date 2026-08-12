@@ -57,6 +57,7 @@ export const CHECK_READINESS_ISSUE_IDS = Object.freeze([
   'modifierBoundsUnsafe',
   'modifierExpressionInvalid',
   'modifiersInertNoCheck',
+  'modifiersInertNoModifierSupport',
   'modifiersInertNoFormula',
 ]);
 
@@ -112,16 +113,22 @@ export const CHECK_ISSUE_SECTIONS = Object.freeze({
   modifierBoundsUnsafe: 'modifiers',
   modifierExpressionInvalid: 'modifiers',
   modifiersInertNoCheck: 'modifiers',
+  modifiersInertNoModifierSupport: 'modifiers',
   modifiersInertNoFormula: 'modifiers',
 });
 
 /**
  * The mode this evaluator answers "this activity rolls no check at all" under (issue 1096).
  *
- * Gathering `d100` and alchemy `checkMode: 'none'` are the two reachable members, and they
- * are the SAME state as far as readiness is concerned: there is no formula, no outcome tier
- * and no trigger to author, and the only rule that still applies is whether an authored
- * check-modifier selection reaches a roll (it does not).
+ * Gathering `d100` and alchemy `checkMode: 'none'` are the two reachable members. They are
+ * the same state for everything this evaluator AUTHORS — no formula, no outcome tier and no
+ * trigger — and the only rule that still applies is whether an authored check-modifier
+ * selection reaches a roll (it does not, in either).
+ *
+ * They differ in WHY, and the modifier issue splits on it: alchemy `none` rolls nothing at
+ * all, while gathering `d100` rolls the drop chance and simply cannot take modifiers yet.
+ * The name is this evaluator's own vocabulary — "no check to AUTHOR" — not a claim that
+ * nothing is rolled.
  * @type {'none'}
  */
 export const NO_CHECK_MODE = 'none';
@@ -353,9 +360,11 @@ function fixedRangesHaveGap(outcomes, excluded) {
  *   your modifiers has a bad bound" is not a repairable instruction. They are raised ONLY for
  *   entries this activity actually selects: a fault on an entry only gathering drop rows
  *   reference is not this check's problem.
- * - **`modifiersInertNoCheck` / `modifiersInertNoFormula`** (`warning`). An eligible
- *   selection that reaches no roll. These are the ONE owned path for "the gathering d100
- *   check-modifier section reports `noCheck`", and they are gated on the selection being
+ * - **`modifiersInertNoCheck` / `modifiersInertNoModifierSupport` / `modifiersInertNoFormula`**
+ *   (`warning`). An eligible selection that reaches no roll, under each of the three reasons
+ *   it can: the mode rolls nothing, the mode rolls but takes no modifiers yet (gathering
+ *   `d100`), or the mode rolls and has no formula authored. These are the ONE owned path for
+ *   "the gathering d100 check-modifier section is inert", and they are gated on the selection being
  *   NON-EMPTY for the same reason `CraftingModifierCatalogueCard` gates its notice on a
  *   non-empty catalogue: warning that nothing does anything, when nothing was authored,
  *   is noise on first contact.
@@ -378,7 +387,7 @@ function namesOf(faulted) {
   return faulted.map(({ entry }) => entry.label || entry.id).join(', ');
 }
 
-function checkModifierReadiness(modifierContext, { rollsNoCheck, hasRollFormula }) {
+function checkModifierReadiness(modifierContext, { rollsNoCheck, hasRollFormula, activity = '' }) {
   if (!modifierContext) return { checks: [], issues: [] };
   const eligible = resolveEligibleModifierIds(modifierContext);
   if (eligible.length === 0) return { checks: [], issues: [] };
@@ -416,8 +425,17 @@ function checkModifierReadiness(modifierContext, { rollsNoCheck, hasRollFormula 
   if (unusable !== '') {
     pushIssue(issues, 'modifierExpressionInvalid', 'critical', { names: unusable });
   }
-  if (rollsNoCheck) pushIssue(issues, 'modifiersInertNoCheck', 'warning');
-  else if (!hasRollFormula) pushIssue(issues, 'modifiersInertNoFormula', 'warning');
+  // The two no-check modes reach no roll for OPPOSITE reasons, so they cannot share a
+  // sentence. Alchemy `none` genuinely rolls nothing, and its remedy is to pick a mode that
+  // rolls. Gathering `d100` DOES roll — the d100 against each drop's chance IS that mode's
+  // check — it simply has no seam to add modifiers to yet, and telling that GM to "change
+  // the resolution mode to one that rolls a check" is wrong twice over: the mode already
+  // rolls one, and the two modes that would take modifiers cannot be selected today.
+  if (rollsNoCheck) {
+    const id =
+      activity === 'gathering' ? 'modifiersInertNoModifierSupport' : 'modifiersInertNoCheck';
+    pushIssue(issues, id, 'warning');
+  } else if (!hasRollFormula) pushIssue(issues, 'modifiersInertNoFormula', 'warning');
   return { checks, issues };
 }
 
@@ -435,6 +453,10 @@ function checkModifierReadiness(modifierContext, { rollsNoCheck, hasRollFormula 
  * @param {object|null} [options.modifierContext] A `buildCheckModifierContext` bag for
  *   this activity (issue 1095). Omitted by a caller that has no system to build one from,
  *   in which case no check-modifier rule is evaluated.
+ * @param {'crafting'|'salvage'|'gathering'} [options.activity] Which activity's check this
+ *   is. It changes exactly one answer — WHY a no-check mode's modifier selection reaches no
+ *   roll — because gathering's no-check mode still rolls and the others' do not. Omitting it
+ *   keeps the mode-rolls-nothing reading, which is right for every non-gathering caller.
  * @returns {{ checks: CheckReadinessCheck[], issues: CheckReadinessIssue[] }}
  */
 export function evaluateCheckReadiness(check = {}, options = {}) {
@@ -449,9 +471,9 @@ export function evaluateCheckReadiness(check = {}, options = {}) {
   const checks = [];
   const issues = [];
 
-  // A mode that rolls NO CHECK AT ALL: gathering `d100` (the fixed roll against each drop's
-  // chance) and alchemy `checkMode: 'none'`. There is nothing to author and therefore no
-  // formula, no outcome tiers and no triggers to validate.
+  // A mode with NO CHECK TO AUTHOR: gathering `d100` (whose check is the fixed roll against
+  // each drop's chance, not something authored here) and alchemy `checkMode: 'none'` (which
+  // rolls nothing at all). Neither has a formula, outcome tier or trigger to validate.
   //
   // IT IS NOT A BARE EARLY RETURN (issue 1095). The check-modifier selection is authored on
   // the activity's check regardless of the resolution mode, so a GM can author one and reach
@@ -466,6 +488,7 @@ export function evaluateCheckReadiness(check = {}, options = {}) {
     const modifiers = checkModifierReadiness(modifierContext, {
       rollsNoCheck: true,
       hasRollFormula: false,
+      activity: options.activity || '',
     });
     return { checks: modifiers.checks, issues: modifiers.issues };
   }

@@ -172,7 +172,8 @@ Each card shows every entry read-only — its name, its expression and a bounds 
 What each activity *does* own is fully editable there: which entries apply, how they combine, and the pick cap.
 
 **Gathering is not switched on yet.**
-Progressive and routed gathering are still disabled (issue 683), and the d100 mode rolls no formula, so nothing you set on the Gathering check's modifiers applies to a roll today.
+Progressive and routed gathering are not available yet, and while d100 resolution does roll a check — the d100 against each drop's chance — that roll cannot take check modifiers yet.
+So nothing you set on the Gathering check's modifiers applies to a roll today.
 The card says so.
 Anything you set is saved and starts applying when those gathering modes ship.
 

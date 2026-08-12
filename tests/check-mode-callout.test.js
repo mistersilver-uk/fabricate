@@ -106,7 +106,15 @@ test("gathering's routed mode is dormant and reuses the shipped dormancy sentenc
       'the dormancy sentence must be the one the Modifiers section already ships, not a ' +
         'second vocabulary for the same fact'
     );
-    assert.match(described.body.fallback, /issue 683/);
+    // The sentence must still SAY the modes are dormant, and must not do it by naming an
+    // internal issue: this is a GM-facing guide, and a tracker reference is a maintainer
+    // note that belongs in the module comment (where it still is), not on the screen.
+    assert.match(described.body.fallback, /not available yet/i);
+    assert.doesNotMatch(
+      described.body.fallback,
+      /\bissues?\s+\d+/i,
+      'user-facing copy must not name an internal issue number'
+    );
     const check = described.facts.find((entry) => entry.id === 'check');
     assert.equal(
       check.value.key,
