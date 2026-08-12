@@ -4887,7 +4887,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     // It reaches five tiers by DRIVING the editor rather than by seeding a fifth system: the
     // fixture world's `ROUTED_CHECK` is read by the salvage routing rows, the section badge
     // count and both player routed-crafting cases, so widening it would rewrite frames that are
-    // not about this. Two `Add outcome` clicks and four typed fields cost nothing outside this
+    // not about this. Two `Add outcome tier` clicks and four typed fields cost nothing outside
     // case.
     //
     // The two new tiers are given DCs OUTSIDE the authored −5/0/+5 span. A new outcome is born
@@ -4902,8 +4902,8 @@ export const VIEW_LAB_CASES = Object.freeze([
       'Checks',
       { selector: '#manager-checks-nav-crafting' },
       { selector: '#checks-section-outcomes' },
-      { selector: '[data-add-outcome]' },
-      { selector: '[data-add-outcome]' },
+      { selector: '[data-add-outcome-tier]' },
+      { selector: '[data-add-outcome-tier]' },
       { selector: ':nth-match([data-outcome-name], 4)', fill: 'Flawless' },
       { selector: ':nth-match([data-outcome-dc], 4)', fill: '10' },
       { selector: ':nth-match([data-outcome-success], 4)' },

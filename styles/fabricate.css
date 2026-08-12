@@ -1373,6 +1373,17 @@
 
 .fabricate-manager * {
   box-sizing: border-box;
+
+  /* THE SCROLLERS, restated per element rather than inherited (issue 1096, round 3).
+
+     The rule above sets `scrollbar-color` on the manager root, and it never reached a single
+     scrolling region: Foundry core states the same property on a UNIVERSAL selector, and a
+     declaration that matches an element DIRECTLY always beats a value inherited from its
+     ancestor — whatever the specificity of the ancestor's rule, and whichever layer either
+     sheet is in. So the pane and the rail went on painting core's dark red while the root
+     carried a value nothing read. Matching core's shape is what makes the value land; the
+     parity fixture records it on `pane-background` and `inspector-surface`. */
+  scrollbar-color: var(--fab-bg-3) transparent;
 }
 
 .fabricate-manager button,
@@ -2226,17 +2237,6 @@
   padding: 14px 15px 0;
 }
 
-/* Outcome bands states its description on the SAME line as its title, hard right. Check
-   type stacks its description under the title. One head element, one modifier. */
-.fabricate-manager .manager-checks-card-head.is-inline {
-  align-items: center;
-}
-
-.fabricate-manager .manager-checks-card-head.is-inline .manager-checks-card-description {
-  margin: 0 0 0 auto;
-  text-align: right;
-}
-
 .fabricate-manager .manager-checks-card-body {
   padding: 14px;
 }
@@ -2279,6 +2279,37 @@
   font-weight: 400;
   line-height: 1.5;
   text-transform: none;
+}
+
+/* The SECTION STRIP's own scale (maintainer parity round 3).
+
+   The strip renders through the shared `.manager-environment-tab-button`, which is tuned for
+   the environment editors: 14px/700 in a 38px tab. Against this studio's 12–13px card type
+   that reads a size too large, and the tab stands 2px short of the prototype's. Every number
+   below is the prototype's own, recorded by `section-tabs` / `section-tab` /
+   `section-tab-active` in the parity fixture — so changing one here reds that gate with the
+   region and property named.
+
+   Scoped to `.manager-checks-sections` and stated at (0,3,0) so it lands without touching the
+   primitive every other tab strip in the manager uses, and without depending on source order
+   against the (0,2,0) base rules. */
+.fabricate-manager .manager-environment-tabs.manager-checks-sections {
+  gap: 2px;
+}
+
+.fabricate-manager .manager-checks-sections .manager-environment-tab-button {
+  min-height: 40px;
+  gap: 7px;
+  padding: 11px 14px;
+  font-size: 12.5px;
+  font-weight: 500;
+}
+
+/* The active tab takes the ACCENT, not full text ink: the prototype separates the two, and
+   the 2px accent underline below it is the same colour. */
+.fabricate-manager .manager-checks-sections .manager-environment-tab-button.is-active {
+  color: var(--fab-accent);
+  font-weight: 600;
 }
 
 /* The PANE heading — the studio's section title, above the cards. It was missing entirely,
@@ -2666,7 +2697,16 @@
 }
 
 /* The band strip's hint sentence, glyph-led. The glyph is a decoration on prose rather
-   than a control, so it takes the sentence's own ink at its own size. */
+   than a control, so it takes the sentence's own ink at its own size.
+
+   The bottom margin is the prototype's own separation, measured rather than chosen: there
+   the hint ENDS the strip's block (the card body's 14px bottom padding sits under it) and the
+   tier list is a separate block below. Ours renders both in one body, so without this the
+   sentence abutted the first tier row — `.manager-muted` states a top margin only. */
+.fabricate-manager [data-outcome-band-strip-hint] {
+  margin-bottom: 14px;
+}
+
 .fabricate-manager [data-outcome-band-strip-hint] > i {
   margin-right: var(--fab-space-chip);
   font-size: 9px;
@@ -3533,6 +3573,22 @@
   background: var(--fab-surface-soft);
   font-size: 11.5px;
   font-weight: 500;
+}
+
+/* …but the SELECT takes an OPAQUE fill, and this is a rendering fact rather than a
+   preference (maintainer report, Firefox).
+
+   `--fab-surface-soft` is a 5% overlay. An `<input>` here is already `appearance: none` from
+   the manager's text-control baseline, so a translucent fill composites over the card exactly
+   as drawn. A `<select>` is not: only Chromium takes `appearance: base-select` (the
+   `@supports` block near the top of this sheet), so on every other engine the control is
+   still the PLATFORM widget, which paints its own field background underneath — and a 5%
+   overlay over the platform's light field reads as a near-white control with a pale border.
+   That is the same failure the manager solved once already, which is why every other manager
+   select — `.manager-field select`, `.manager-recipe-field select` — states an opaque fill.
+   This rule brings the trigger dropdowns back onto it. */
+.fabricate-manager .manager-checks-trigger-body .manager-field select {
+  background: var(--fab-mv2-bg);
 }
 
 /* The threshold is the one number on this row a GM reads back, so it takes the heavier

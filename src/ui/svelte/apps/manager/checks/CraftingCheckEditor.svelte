@@ -514,23 +514,26 @@
          same subject, and splitting them into two cards put a card border between a band
          and the row that moves it. -->
     <section class="manager-inspector-card manager-checks-card" data-outcome-bands>
-      <div class="manager-checks-card-head is-inline">
-        <h3 class="manager-checks-card-title">
-          {text('FABRICATE.Admin.Manager.Checks.Crafting.BandsTitle', 'Outcome bands')}
-        </h3>
-        <p class="manager-checks-card-description">
-          {text(
-            'FABRICATE.Admin.Manager.Checks.Crafting.BandsLead',
-            'Transition points between the tiers below. Anything under the first band or over the last clamps into the end band.'
-          )}
-        </p>
-        <!-- The top-right add action stays alongside the full-width dashed one at the
-             foot of the list: the head action is where a GM already looks for a card's
-             verb, and the dashed one is where the list ends. -->
-        <ManagerButton data-add-outcome onclick={addOutcome}>
-          <i class="fas fa-plus" aria-hidden="true"></i>
-          <span>{text('FABRICATE.Admin.Manager.Checks.Crafting.AddOutcome', 'Add outcome')}</span>
-        </ManagerButton>
+      <!-- STACKED and full-width, like every other studio card head, on the maintainer's
+           instruction. It was `is-inline`, which sets the description on the title's line and
+           pushes it hard right; with the head action gone there is nothing on that line to
+           set it against, and a right-aligned sentence squeezed into the half-width the title
+           leaves reads as a caption for the title rather than as the card's lead.
+
+           The head action went with it: ONE add control, the full-width dashed one at the
+           foot of the list, which is where the list ends and where a new tier appears. -->
+      <div class="manager-checks-card-head">
+        <div>
+          <h3 class="manager-checks-card-title">
+            {text('FABRICATE.Admin.Manager.Checks.Crafting.BandsTitle', 'Outcome bands')}
+          </h3>
+          <p class="manager-checks-card-description">
+            {text(
+              'FABRICATE.Admin.Manager.Checks.Crafting.BandsLead',
+              'Transition points between the tiers below. Anything under the first band or over the last clamps into the end band.'
+            )}
+          </p>
+        </div>
       </div>
       <div class="manager-checks-card-body is-roomy">
         {#if showPreviewAgainst}

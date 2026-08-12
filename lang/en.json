@@ -4671,7 +4671,6 @@
             "DiceGroups": "Dice groups",
             "NoDice": "No dice detected in this expression.",
             "OutcomesTitle": "Outcome tiers",
-            "AddOutcome": "Add outcome",
             "AddOutcomeTier": "Add outcome tier",
             "NoOutcomes": "No outcome tiers yet. Add the tiers this check routes results into.",
             "OutcomeName": "Name",

@@ -3938,7 +3938,10 @@ describe('CraftingSystemManager mounted behavior', () => {
     target.querySelector('[data-check-type-option="fixed"] input').click();
     assert.equal(emitted.at(-1).type, 'fixed', 'switching type emits the new type');
 
-    target.querySelector('[data-add-outcome]').click();
+    // The card's ONE add control, the dashed one at the foot of the list. The head carried a
+    // second `[data-add-outcome]` doing the same thing; it was removed on the maintainer's
+    // instruction, so this asserts through the control that survived.
+    target.querySelector('[data-add-outcome-tier]').click();
     assert.equal(emitted.at(-1).relativeOutcomes.length, 2, 'adding appends a relative tier');
     assert.ok(emitted.at(-1).relativeOutcomes.at(-1).id, 'a new tier is given a generated id');
 
