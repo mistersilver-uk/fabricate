@@ -14,7 +14,7 @@
  *   - `RECIPE_OMITTED_WHEN_DEFAULT` is a hand-maintained mirror of the constructor, so it is
  *     checked mechanically against a maximal and a minimal recipe rather than by eye;
  *   - `enabled: true` is deliberately NOT omitted, and the reason is a live reader;
- *   - the reduction is measured on a fixed corpus against the shape 1.24.0 wrote.
+ *   - the reduction is measured on a fixed corpus against the shape written before it.
  */
 
 import test from 'node:test';
@@ -310,7 +310,7 @@ test('1087: enabled: true is still emitted, because a live reader tests it for t
 // ---------------------------------------------------------------------------
 
 /**
- * The payload shape 1.24.0 wrote: the current one plus the flat alias plus every field the
+ * The payload shape written before this change: the current one plus the flat alias plus every field the
  * table now omits. Derived from the model itself — the in-memory value of an omitted key IS
  * the default that used to be written — so it cannot drift from the table.
  * @param {Recipe} recipe
@@ -325,7 +325,7 @@ function preRetirementPayload(recipe) {
   return payload;
 }
 
-test('1087: a representative corpus serializes at least 30% smaller than the 1.24.0 shape', () => {
+test('1087: a representative corpus serializes at least 30% smaller than the pre-retirement shape', () => {
   const corpus = Array.from(
     { length: 200 },
     (_, index) =>

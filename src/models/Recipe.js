@@ -834,7 +834,7 @@ export class Recipe {
 
     // PERMANENT INBOUND SHIM — do not remove with a "the alias is gone" cleanup.
     //
-    // `toJSON` stopped EMITTING the flat top-level `results` alias in 1.25.0 (issue 1087),
+    // `toJSON` stopped EMITTING the flat top-level `results` alias (issue 1087),
     // and that is a write-side change only. Every world saved before it, every crafting
     // system exported before it, and every third-party payload authored against it still
     // carries the alias as its only result data, and none of them is reachable to migrate.

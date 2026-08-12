@@ -36,7 +36,7 @@ A system export MUST include every supported GM-authored record type for that sy
 This spans the `craftingSystems`, `recipes`, `gatheringEnvironments`, and `gatheringConfig` settings.
 The per-system `economy` slice (stamina defaults and resource-node/limitation flags) MUST ride along.
 
-Completeness is a property of the authoring DATA, not of the key set: an exported recipe carries whatever `Recipe.toJSON()` emits, which since `1.25.0` (issue 1087) omits the flat top-level `results` alias and every field whose absence the constructor rebuilds to the identical value (see `data-models/spec.md` requirement 18).
+Completeness is a property of the authoring DATA, not of the key set: an exported recipe carries whatever `Recipe.toJSON()` emits, which since issue 1087 omits the flat top-level `results` alias and every field whose absence the constructor rebuilds to the identical value (see `data-models/spec.md` requirement 18).
 An export produced after that change is therefore smaller and key-sparser than one produced before it while describing the same system, and MUST NOT be treated as incomplete for the keys it leaves out.
 Import MUST keep ACCEPTING both, permanently: the read fallbacks are what let an export authored by any earlier version — or by third-party content that never round-tripped through this module — still import with every result and every authored value intact.
 
