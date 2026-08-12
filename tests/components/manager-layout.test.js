@@ -6646,6 +6646,168 @@ test('the Checks Studio really renders into the classes those measurements measu
   }
 });
 
+// The Difficulty card and the recipe-tier list beneath it (issue 1096 follow-up, "The roll").
+// Both card contracts render into `.manager-checks-card-body` — Difficulty's plain (14px each
+// side) and the tier list's `is-stack` (12px 14px) — so a row that fills its OWN list should
+// already land at the same 14px inset as the radio cards above. The routed editor's tier
+// section broke that by wrapping `CheckRecipeTiers` in the bare shared `.manager-inspector-card`
+// shell instead of `.manager-inspector-card.manager-checks-card`: the bare shell carries its
+// OWN `padding: var(--fab-space-3)` (12px) plus a border and background the card-with-padding-0
+// override exists to strip, so the tier row's edges landed 12px further in on both sides than
+// the Difficulty card's radio cards. Real Chromium + the real stylesheet, because happy-dom
+// applies no cascade and could not see either the extra padding or the fix.
+//
+// ONE shared browser/page for both the fixed and the reintroduced-defect measurement below —
+// this file already launches Chromium dozens of times over, and a second `chromium.launch()`
+// here buys nothing a second `page.setContent()` on the same page does not.
+async function checksRollEdges(page, tiersWrapperClass) {
+  const difficultyCard = `
+    <section class="manager-inspector-card manager-checks-card" data-check-difficulty-card>
+      <div class="manager-checks-card-head">
+        <div><h3 class="manager-checks-card-title">Difficulty</h3></div>
+      </div>
+      <div class="manager-checks-card-body">
+        <fieldset class="manager-field is-wide manager-resolution-mode-card manager-radio-card-group is-config-cards">
+          <legend class="manager-resolution-mode-legend">DC source</legend>
+          <div class="manager-resolution-mode-options" style="--manager-radio-card-columns: 2">
+            <label class="manager-resolution-option is-active" data-dc-mode-option="static">
+              <span class="manager-resolution-option-body"><span class="manager-resolution-option-name">Static</span></span>
+            </label>
+            <label class="manager-resolution-option" data-dc-mode-option="dynamic">
+              <span class="manager-resolution-option-body"><span class="manager-resolution-option-name">Dynamic</span></span>
+            </label>
+          </div>
+        </fieldset>
+        <div class="manager-checks-difficulty-fields">
+          <div class="manager-checks-difficulty-field is-dc">
+            <span class="manager-checks-difficulty-label">Base DC</span>
+          </div>
+          <div class="manager-checks-difficulty-field is-comparison">
+            <span class="manager-checks-difficulty-label">Comparison</span>
+          </div>
+        </div>
+      </div>
+    </section>`;
+  const tiersCard = `
+    <section class="${tiersWrapperClass}" data-routed-tiers>
+      <div class="manager-checks-card-head">
+        <div><h3 class="manager-checks-card-title">Recipe difficulty tiers</h3></div>
+      </div>
+      <div class="manager-checks-card-body is-stack">
+        <div class="manager-checks-tier-list" role="list" aria-label="Recipe difficulty tiers">
+          <div class="manager-checks-tier-row" role="listitem" data-tier-row="t1">
+            <button type="button" class="manager-checks-tier-grip"><i class="fas fa-grip-vertical"></i></button>
+            <input class="manager-checks-tier-name" data-tier-name value="Apprentice work">
+            <span class="manager-checks-tier-unit">DC</span>
+            <div class="manager-checks-tier-stepper is-narrow">
+              <div class="fab-stepper is-fill">
+                <button type="button" class="fab-stepper-adjunct"><i class="fas fa-minus"></i></button>
+                <input type="number" class="fab-stepper-input" data-tier-dc value="8">
+                <button type="button" class="fab-stepper-adjunct"><i class="fas fa-plus"></i></button>
+              </div>
+            </div>
+            <button type="button" class="manager-button fab-manager-button is-danger manager-checks-tier-remove" data-remove-tier>
+              <i class="fas fa-trash"></i>
+            </button>
+          </div>
+        </div>
+        <button type="button" class="manager-button fab-manager-button is-dashed" data-add-tier>
+          <i class="fas fa-plus"></i><span>Add difficulty tier</span>
+        </button>
+      </div>
+    </section>`;
+  await page.setContent(
+    `<style>${css}</style>` +
+      `<div style="width:900px;height:800px">` +
+      `<div class="fabricate-manager" data-fabricate-theme="fabricate" data-manager-view="checks-crafting">` +
+      `<div class="manager-checks-editor">${difficultyCard}${tiersCard}</div>` +
+      `</div></div>`
+  );
+  return await page.evaluate(() => {
+    const round = (value) => Math.round(value);
+    const options = [
+      ...document.querySelectorAll('[data-check-difficulty-card] .manager-resolution-option'),
+    ];
+    const firstOption = options[0].getBoundingClientRect();
+    const lastOption = options[options.length - 1].getBoundingClientRect();
+    const row = document.querySelector('[data-tier-row]').getBoundingClientRect();
+    const addTier = document.querySelector('[data-add-tier]').getBoundingClientRect();
+    return {
+      radioLeft: round(firstOption.left),
+      radioRight: round(lastOption.right),
+      rowLeft: round(row.left),
+      rowRight: round(row.right),
+      addTierLeft: round(addTier.left),
+      addTierRight: round(addTier.right),
+    };
+  });
+}
+
+test('the recipe difficulty tier row shares the Difficulty card radio-card edges, and the bare card shell reintroduces the inset', async () => {
+  const browser = await chromium.launch();
+  try {
+    const page = await browser.newPage({
+      viewport: { width: 960, height: 800 },
+      deviceScaleFactor: 1,
+    });
+
+    const edges = await checksRollEdges(page, 'manager-inspector-card manager-checks-card');
+    assert.equal(
+      edges.rowLeft,
+      edges.radioLeft,
+      `tier row left (${edges.rowLeft}) must equal the Difficulty card's radio-card left (${edges.radioLeft})`
+    );
+    assert.equal(
+      edges.rowRight,
+      edges.radioRight,
+      `tier row right (${edges.rowRight}) must equal the Difficulty card's radio-card right (${edges.radioRight})`
+    );
+    assert.equal(
+      edges.addTierLeft,
+      edges.radioLeft,
+      `the dashed Add control's left (${edges.addTierLeft}) must equal the radio-card left (${edges.radioLeft})`
+    );
+    assert.equal(
+      edges.addTierRight,
+      edges.radioRight,
+      `the dashed Add control's right (${edges.addTierRight}) must equal the radio-card right (${edges.radioRight})`
+    );
+
+    // MUTATION PROOF, same page: reintroducing the defect — wrapping the tier list in the bare
+    // `.manager-inspector-card` shell CraftingCheckEditor actually shipped — must desynchronise
+    // the edges the assertions above exist to pin. If this cannot fail, they prove nothing.
+    const broken = await checksRollEdges(page, 'manager-inspector-card');
+    assert.notEqual(
+      broken.rowLeft,
+      broken.radioLeft,
+      'expected the bare card shell to inset the tier row past the radio-card left edge'
+    );
+    assert.notEqual(
+      broken.rowRight,
+      broken.radioRight,
+      'expected the bare card shell to inset the tier row past the radio-card right edge'
+    );
+  } finally {
+    await browser.close();
+  }
+});
+
+test('CraftingCheckEditor really wraps the routed tier list in the checks-card contract', () => {
+  // The two measurement tests above are built from class LITERALS, so this is the join: it
+  // proves the real component renders the wrapper class combination the passing test measured,
+  // not merely that some markup string with the right classes exists somewhere in this file.
+  const craftingCheckEditor = readFileSync(
+    resolve(__dirname, '../../src/ui/svelte/apps/manager/checks/CraftingCheckEditor.svelte'),
+    'utf8'
+  );
+  assert.match(
+    withoutComments(craftingCheckEditor),
+    /<section class="manager-inspector-card manager-checks-card" data-routed-tiers>/,
+    'the routed tier section must carry manager-checks-card, or it falls back to the bare ' +
+      '.manager-inspector-card shell and its own 12px padding re-insets the tier row'
+  );
+});
+
 test('the locked activation indicator offers no hover affordance', async () => {
   // `.manager-status-toggle.is-locked` is a `<span role="img">`: an indicator, not a control.
   // The hover rule excluded `:disabled` and `.is-disabled`, and a span can be neither, so the
@@ -7075,7 +7237,10 @@ const AUTHORITY_PROBES = ['primary', 'danger'];
 
 test('a Modifiers card button renders exactly like the tool studio button of the same role', async () => {
   const browser = await chromium.launch();
-  const page = await browser.newPage({ viewport: { width: 1280, height: 720 }, deviceScaleFactor: 1 });
+  const page = await browser.newPage({
+    viewport: { width: 1280, height: 720 },
+    deviceScaleFactor: 1,
+  });
 
   try {
     const toolButtons = AUTHORITY_PROBES.map(
@@ -7132,13 +7297,9 @@ test('a Modifiers card button renders exactly like the tool studio button of the
         };
       };
       return Object.fromEntries(
-        [
-          'tool-primary',
-          'card-primary',
-          'tool-danger',
-          'card-danger',
-          'card-unconverted',
-        ].map((probe) => [probe, read(probe)])
+        ['tool-primary', 'card-primary', 'tool-danger', 'card-danger', 'card-unconverted'].map(
+          (probe) => [probe, read(probe)]
+        )
       );
     });
 
@@ -7233,7 +7394,10 @@ test('the modifier row gives every field room for its longest content at every m
 
     const failures = [];
     for (const width of MODIFIER_BOUNDS_ROW_WIDTHS) {
-      const page = await browser.newPage({ viewport: { width, height: 800 }, deviceScaleFactor: 1 });
+      const page = await browser.newPage({
+        viewport: { width, height: 800 },
+        deviceScaleFactor: 1,
+      });
       try {
         await page.setContent(`
           <!doctype html>

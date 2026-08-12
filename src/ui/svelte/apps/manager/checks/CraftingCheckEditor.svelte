@@ -490,7 +490,12 @@
   <!-- The tier list renders under BOTH DC modes: the macro is handed the selected tier's DC
        as its anchor and returns the final number, so the two COMPOSE rather than compete. -->
   {#if showTiers && !bandsAreAbsolute && shows('roll')}
-    <section class="manager-inspector-card" data-routed-tiers>
+    <!-- `manager-checks-card`, not the bare shared `.manager-inspector-card` shell — that
+         generic contract pads on TOP of `CheckRecipeTiers`' own card-body padding (issue
+         1096 follow-up), inset the tier rows past the Difficulty card's radio cards and
+         BASE DC / COMPARISON row above. `SimpleCraftingCheckEditor`'s `data-static-dc`
+         wrapper already carries both classes; this is that same contract. -->
+    <section class="manager-inspector-card manager-checks-card" data-routed-tiers>
       <CheckRecipeTiers
         anchorsBands
         tiers={value?.tiers || []}
