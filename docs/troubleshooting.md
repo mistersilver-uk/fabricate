@@ -175,6 +175,53 @@ A lowered limit rolls only the first few picks, up to the limit, and keeps the r
 
 ---
 
+## A Failed Check Produces Nothing, or Suddenly Produces Something
+
+**Symptom:** A recipe, salvageable item or gathering task has a failure result authored, but a failed
+check hands the crafter nothing — or the reverse, a failed check has started producing something it
+never used to.
+
+**Likely causes:**
+
+- The activity's **Produce a result on a failed check** setting is **Never**.
+  Every system that existed before Fabricate 1.25.0 was set to **Never** by the upgrade, deliberately,
+  so that nothing about it changed when you upgraded.
+- The record authors no failure output at all.
+  The setting SELECTS a failure output you wrote; it never invents one, so **Always** on a recipe with
+  no failure result still produces nothing.
+- The resolution mode has no failure outcome to produce.
+  **Routed by ingredients** and **Progressive** have no failure tier or reserved failure result set,
+  and gathering's routed and progressive modes are still being built, so the setting is inert there
+  and the section says so.
+- On a **Routed by check** system, the failure-marked outcome tier is not assigned to any result set.
+  A failing tier routes exactly like a succeeding one: it has to be bound to a result set.
+
+**Step-by-step checks:**
+
+1. Open the activity's check route — **Checks › Crafting**, **Checks › Salvage** or **Checks › Gathering** — and
+   go to its **On failure** section.
+   Read the **Produce a result on a failed check** card: **Never**, **Decided per recipe** or
+   **Always**.
+   Each activity has its own copy of this setting, so a crafting system set to **Always** says nothing
+   about what its salvage does.
+2. If the section shows a note saying the setting does not apply in this mode, that is the answer: the
+   mode has no failure outcome, and the note names why.
+3. In **simple** mode, open the record and confirm the failure output exists.
+   For a recipe that is the reserved failure result set on the **Results** tab, drawn with a danger
+   border; for a salvageable item it is the reserved failure result set on the component's Salvage
+   panel.
+4. In **Routed by check** mode, set the check route's **Produce a result on a failed check** to
+   **Decided per recipe** or **Always** first — the failure-marked tiers only appear in a result set's
+   **Produced on outcome** picker while failure results are permitted — then assign a result set to the
+   failing tier.
+   Nothing you have already assigned is deleted when you set it back to **Never**; those assignments
+   simply stop being offered and stop routing, and they come back when you permit failure results again.
+
+**See also:** [Crafting Checks]({% link crafting-checks.md %}#on-failure) for the setting and its three
+values, and [Salvage]({% link salvage.md %}) for salvage's own On failure section.
+
+---
+
 ## Tools Not Breaking or Tracking Usage
 
 {: .note }
