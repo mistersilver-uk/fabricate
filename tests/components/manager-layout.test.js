@@ -6808,6 +6808,133 @@ test('CraftingCheckEditor really wraps the routed tier list in the checks-card c
   );
 });
 
+// The Modifiers card and its "How they combine" combination-rule grid (issue 1096 follow-up,
+// found by pointing the visual-parity tooling at the real app). The studio's own control scale
+// for a combination-rule card is scoped `.manager-checks-card .manager-resolution-mode-card
+// .is-config-cards .manager-resolution-option`, so it only fires when the CARD ancestor carries
+// `manager-checks-card`. `CraftingModifierCatalogueCard` shipped wrapped in the bare shared
+// `.manager-inspector-card` shell instead — the identical defect the recipe-tier list above was
+// fixed for — so the card took the generic 8px radius and translucent fill, and the
+// combination-rule cards fell back to the shared `RadioCardGroup` primitive's own generic
+// padding and gap instead of the studio's 13px/11px. Real Chromium + the real stylesheet, for
+// the same reason the tier-row measurement above needs both.
+async function modifiersCombinationRuleMetrics(page, cardWrapperClass) {
+  const card = `
+    <section class="${cardWrapperClass}" data-crafting-modifier-catalogue="crafting">
+      <h3 class="manager-card-title">Named modifiers</h3>
+      <fieldset class="manager-field is-wide manager-resolution-mode-card manager-radio-card-group is-config-cards">
+        <legend class="manager-resolution-mode-legend">How they combine</legend>
+        <div class="manager-resolution-mode-options" style="--manager-radio-card-columns: 2">
+          <label class="manager-resolution-option is-active" data-crafting-modifier-policy-option="addAll">
+            <span class="manager-resolution-option-body"><span class="manager-resolution-option-name">Add all</span></span>
+          </label>
+          <label class="manager-resolution-option" data-crafting-modifier-policy-option="highest">
+            <span class="manager-resolution-option-body"><span class="manager-resolution-option-name">Highest</span></span>
+          </label>
+        </div>
+      </fieldset>
+    </section>`;
+  await page.setContent(
+    `<style>${css}</style>` +
+      `<div style="width:900px;height:600px">` +
+      `<div class="fabricate-manager" data-fabricate-theme="fabricate" data-manager-view="checks-crafting">` +
+      `<div class="manager-checks-editor">${card}</div>` +
+      `</div></div>`
+  );
+  return await page.evaluate(() => {
+    const round = (value) => Math.round(value * 100) / 100;
+    const section = document.querySelector('[data-crafting-modifier-catalogue]');
+    const sectionCs = getComputedStyle(section);
+    const option = document.querySelector('.manager-resolution-option');
+    const optionCs = getComputedStyle(option);
+    return {
+      cardRadius: round(parseFloat(sectionCs.borderTopLeftRadius)),
+      cardBackground: sectionCs.backgroundColor,
+      optionPaddingLeft: round(parseFloat(optionCs.paddingLeft)),
+      optionPaddingTop: round(parseFloat(optionCs.paddingTop)),
+      optionGap: optionCs.columnGap,
+      optionRadius: round(parseFloat(optionCs.borderTopLeftRadius)),
+    };
+  });
+}
+
+test('the modifiers card and its combination-rule cards take the studio scale, and the bare shell reintroduces the generic one', async () => {
+  const browser = await chromium.launch();
+  try {
+    const page = await browser.newPage({
+      viewport: { width: 960, height: 700 },
+      deviceScaleFactor: 1,
+    });
+
+    const fixed = await modifiersCombinationRuleMetrics(
+      page,
+      'manager-inspector-card manager-checks-card'
+    );
+    assert.equal(fixed.cardRadius, 11, "the studio card contract's own radius is 11px");
+    assert.equal(
+      fixed.optionPaddingLeft,
+      13,
+      "the combination-rule card's studio padding is 13px left/right"
+    );
+    assert.equal(
+      fixed.optionPaddingTop,
+      12,
+      "the combination-rule card's studio padding is 12px top/bottom"
+    );
+    assert.equal(fixed.optionRadius, 10, "the combination-rule card's studio radius is 10px");
+
+    // MUTATION PROOF, same page: reintroducing the defect — wrapping the card in the bare
+    // `.manager-inspector-card` shell `CraftingModifierCatalogueCard` actually shipped with —
+    // must desynchronise both the card's own look AND the combination-rule scale, because the
+    // studio's selector for the latter is scoped to the ancestor carrying `manager-checks-card`
+    // and fires only then. If this cannot fail, the assertions above prove nothing.
+    const broken = await modifiersCombinationRuleMetrics(page, 'manager-inspector-card');
+    assert.notEqual(
+      broken.cardRadius,
+      fixed.cardRadius,
+      `expected the bare card shell to fall back off the studio's 11px radius (bare: ${broken.cardRadius}px)`
+    );
+    assert.notEqual(
+      broken.cardBackground,
+      fixed.cardBackground,
+      'expected the bare card shell to fall back to the generic translucent fill'
+    );
+    assert.notEqual(
+      broken.optionPaddingLeft,
+      fixed.optionPaddingLeft,
+      `expected the bare shell to drop the combination-rule cards off 13px padding ` +
+        `(bare: ${broken.optionPaddingLeft}px)`
+    );
+    assert.notEqual(
+      broken.optionGap,
+      fixed.optionGap,
+      `expected the bare shell to drop the combination-rule cards off the studio's 11px gap ` +
+        `(bare: ${broken.optionGap})`
+    );
+  } finally {
+    await browser.close();
+  }
+});
+
+test('CraftingModifierCatalogueCard really wraps its card in the checks-card contract', () => {
+  // The measurement test above is built from class LITERALS, so this is the join: it proves the
+  // real component renders the wrapper class combination the passing test measured, not merely
+  // that some markup string with the right classes exists somewhere in this file.
+  const modifierCatalogueSource = readFileSync(
+    resolve(
+      __dirname,
+      '../../src/ui/svelte/apps/manager/checks/CraftingModifierCatalogueCard.svelte'
+    ),
+    'utf8'
+  );
+  assert.match(
+    withoutComments(modifierCatalogueSource),
+    /<section\s+class="manager-inspector-card manager-checks-card"\s+data-crafting-modifier-catalogue=/,
+    'the modifiers card must carry manager-checks-card, or it falls back to the bare ' +
+      '.manager-inspector-card shell and the combination-rule cards fall back to the generic scale'
+  );
+});
+
 test('the locked activation indicator offers no hover affordance', async () => {
   // `.manager-status-toggle.is-locked` is a `<span role="img">`: an indicator, not a control.
   // The hover rule excluded `:disabled` and `.is-disabled`, and a span can be neither, so the

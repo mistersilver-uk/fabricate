@@ -416,7 +416,7 @@
 </script>
 
 <section
-  class="manager-inspector-card"
+  class="manager-inspector-card manager-checks-card"
   data-crafting-modifier-catalogue={activity}
   data-check-modifier-activity={activity}
 >
@@ -685,10 +685,15 @@
 </section>
 
 <style>
+  /* 12px/14px and 6px are MEASURED values (issue 1096): the prototype's rows list carries its
+     own inset and its own tighter rhythm, the same contract `.manager-checks-card-body.is-stack`
+     states for the recipe-tier list. Px rather than rem for the reason that block states —
+     exactness a rounded rem cannot express. */
   .manager-modifier-catalogue {
     display: flex;
     flex-direction: column;
-    gap: 0.5rem;
+    gap: 6px;
+    padding: 12px 14px;
     margin-block: 0.5rem 1rem;
   }
 
