@@ -122,6 +122,15 @@ function makeRecipeManager() {
         ui.notifications.info(`Recipe "${updates.name}" updated`);
       }
     },
+    // The real `RecipeManager` exposes `save()`, and the component delete cascade now batches
+    // through it (issue 1129) exactly as the essence cascade already did: every rewrite is
+    // `{ persist: false }` and ONE trailing `save()` is the only persist. A double without
+    // `save` is LOOSER than the thing it stands for, which is how a suite proves a batching
+    // claim it never exercised. Recording the calls is what lets the batching be asserted.
+    saveCalls: 0,
+    async save() {
+      this.saveCalls += 1;
+    },
     // Spy for the alchemy post-deletion reconcile. Tests set `conflictDisableResult` to the list of
     // recipes the real manager would disable.
     conflictDisableResult: [],
@@ -394,6 +403,11 @@ function makeEssenceOptionRecipeManager() {
     async updateRecipe(recipeId, updates, options = {}) {
       updateCalls.push({ recipeId, updates, options });
     },
+    // See the note on the sibling double: the real `RecipeManager` has `save()`, so this one does too.
+    saveCalls: 0,
+    async save() {
+      this.saveCalls += 1;
+    },
     conflictDisableResult: [],
     disableCalls: [],
     async disableSignatureConflicts(systemId) {
@@ -423,4 +437,148 @@ test('deleteEssence detects and strips a first-class essence OPTION (not just th
   assert.equal(groups.length, 1, 'the emptied essence group is removed');
   assert.equal(groups[0].id, 'g-comp', 'the component group is retained');
   assert.equal(update.updates.enabled, true, 'the recipe still has ingredients/results, so it stays enabled');
+});
+
+// ── The batched set delete (issue 1129) ──────────────────────────────────────────────
+//
+// `deleteComponents` exists so a set delete issues ONE `craftingSystems` write and ONE
+// `recipes` write instead of N and N x M. These tests pin that batching, and pin the two
+// numbers the bulk panel states BEFORE the GM arms it — `recipesUpdated` and
+// `recipesDisabled` — against what the write actually does. The panel counts through the
+// same leaf functions this method executes through, so a drift between the stated and the
+// executed number would have to break one of these.
+
+test('deleteComponents rewrites each referencing recipe ONCE for the whole set', async () => {
+  notifications.length = 0;
+  const recipeManager = makeRecipeManager();
+  const manager = makeManager(recipeManager);
+
+  // `iron` and `wood` are named by disjoint recipes here, so the union is the plain sum;
+  // the shared-recipe case is the test below.
+  const result = await manager.deleteComponents('sys', ['iron', 'wood']);
+
+  assert.equal(result.deleted, 2);
+  assert.deepEqual(result.componentIds, ['iron', 'wood']);
+  assert.deepEqual(
+    recipeManager.updateCalls.map((call) => call.recipeId),
+    ['recipe-iron', 'recipe-none', 'recipe-match-iron', 'recipe-alias-iron'],
+    'every referencing recipe is rewritten exactly once, in one pass over the recipe list'
+  );
+});
+
+test('deleteComponents counts a SHARED recipe once rather than summing per component', async () => {
+  notifications.length = 0;
+  const recipeManager = makeRecipeManager();
+  const manager = makeManager(recipeManager);
+
+  // `recipe-iron` names iron as an ingredient AND bar as its result. Deleting both must
+  // rewrite it once and report 1 — a per-component sum would report 2, which is exactly the
+  // over-promise the impact statement exists to avoid.
+  const result = await manager.deleteComponents('sys', ['iron', 'bar']);
+
+  const ironRewrites = recipeManager.updateCalls.filter(
+    (call) => call.recipeId === 'recipe-iron'
+  );
+  assert.equal(ironRewrites.length, 1, 'the shared recipe is written once, not once per component');
+  assert.equal(
+    result.recipesUpdated,
+    new Set(recipeManager.updateCalls.map((call) => call.recipeId)).size,
+    'the reported count is the DISTINCT recipe count'
+  );
+});
+
+test('deleteComponents persists the recipe rewrites in ONE save, not one per recipe', async () => {
+  notifications.length = 0;
+  const recipeManager = makeRecipeManager();
+  const manager = makeManager(recipeManager);
+
+  await manager.deleteComponents('sys', ['iron', 'wood']);
+
+  assert.ok(recipeManager.updateCalls.length > 1, 'several recipes were rewritten');
+  for (const call of recipeManager.updateCalls) {
+    assert.equal(call.options.persist, false, 'no rewrite persists on its own');
+    assert.equal(call.options.emitChange, false, 'no rewrite emits its own change');
+    assert.equal(call.options.notify, false, 'per-recipe notification suppressed');
+  }
+  assert.equal(recipeManager.saveCalls, 1, 'exactly one trailing recipes save for the whole set');
+});
+
+test('deleteComponents reports the recipes it leaves uncraftable, and disables them', async () => {
+  notifications.length = 0;
+  const recipeManager = makeRecipeManager();
+  const manager = makeManager(recipeManager);
+
+  // `bar` is the ONLY result of recipe-iron, recipe-match-iron and recipe-alias-iron, so
+  // deleting it leaves each with nothing to produce.
+  const result = await manager.deleteComponents('sys', ['bar']);
+
+  const disabled = recipeManager.updateCalls.filter((call) => call.updates.enabled === false);
+  assert.equal(
+    result.recipesDisabled,
+    disabled.length,
+    'the reported disable count equals the number actually clamped'
+  );
+  assert.ok(result.recipesDisabled > 0, 'losing the only result disables the recipe');
+});
+
+test('deleteComponents ignores unknown ids and is a no-op for an empty selection', async () => {
+  notifications.length = 0;
+  const recipeManager = makeRecipeManager();
+  const manager = makeManager(recipeManager);
+
+  const empty = await manager.deleteComponents('sys', []);
+  assert.deepEqual(empty, { deleted: 0, componentIds: [], recipesUpdated: 0, recipesDisabled: 0 });
+
+  const unknown = await manager.deleteComponents('sys', ['nope', 'also-nope']);
+  assert.deepEqual(unknown, { deleted: 0, componentIds: [], recipesUpdated: 0, recipesDisabled: 0 });
+  assert.equal(recipeManager.updateCalls.length, 0, 'nothing is written for a no-op');
+});
+
+test('deleteComponents removes the components from the system', async () => {
+  notifications.length = 0;
+  const recipeManager = makeRecipeManager();
+  const manager = makeManager(recipeManager);
+
+  await manager.deleteComponents('sys', ['iron', 'unused']);
+
+  const remaining = manager.getSystem('sys').components.map((component) => component.id);
+  assert.ok(!remaining.includes('iron'));
+  assert.ok(!remaining.includes('unused'));
+  assert.ok(remaining.includes('wood'), 'unselected components are untouched');
+});
+
+test('deleteComponents deletes a recipe-referenced component rather than refusing it', async () => {
+  notifications.length = 0;
+  const recipeManager = makeRecipeManager();
+  const manager = makeManager(recipeManager);
+
+  // Warned, not blocked — the same rule the essence delete follows. `iron` is referenced by
+  // three recipes and is deleted anyway.
+  const result = await manager.deleteComponents('sys', ['iron']);
+
+  assert.equal(result.deleted, 1, 'nothing is skipped on account of recipe usage');
+  assert.ok(!manager.getSystem('sys').components.some((c) => c.id === 'iron'));
+});
+
+test('deleteItem and deleteComponents agree — the singular is the set of one', async () => {
+  notifications.length = 0;
+  const singleManagerRecipes = makeRecipeManager();
+  const singleManager = makeManager(singleManagerRecipes);
+  await singleManager.deleteItem('sys', 'iron');
+
+  notifications.length = 0;
+  const setManagerRecipes = makeRecipeManager();
+  const setManager = makeManager(setManagerRecipes);
+  await setManager.deleteComponents('sys', ['iron']);
+
+  assert.deepEqual(
+    setManagerRecipes.updateCalls.map((call) => call.recipeId),
+    singleManagerRecipes.updateCalls.map((call) => call.recipeId),
+    'both routes rewrite the same recipes'
+  );
+  assert.deepEqual(
+    setManager.getSystem('sys').components.map((c) => c.id),
+    singleManager.getSystem('sys').components.map((c) => c.id),
+    'both routes leave the same components behind'
+  );
 });
