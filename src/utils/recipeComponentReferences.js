@@ -21,14 +21,33 @@
  * `Recipe` instance (via `toJSON()`) or an already-plain recipe object, so the manager can
  * hand it a model and the store can hand it a projection.
  *
- * ── WHAT THIS WALK DELIBERATELY DOES NOT COVER ────────────────────────────────────
- * It does not walk `steps[].ingredientSets`, because the shipped `deleteItem` never did.
- * That is a real gap — a multi-step recipe naming a component only inside a step is neither
- * detected nor rewritten — but it is PRESERVED here rather than fixed, because closing it
- * changes what the delete does to stored recipes and belongs to its own change. Preserving
- * it also keeps the impact statement honest: the panel reports what the cascade actually
- * reaches, not what a wider walk would reach. `recipeLostItsShape` below is the one place
- * this file does look at steps, and the comment there says why.
+ * ── WHY THIS WALKS STEPS, WHEN THE SHIPPED `deleteItem` DID NOT ───────────────────
+ * The shipped strip read only the recipe-level `ingredientSets` / `resultGroups` / `results`,
+ * and so did its inline "no longer craftable" check. Routing the component deletes through
+ * the steps-aware shared `recipeLostItsShape` WITHOUT also walking steps here produced a
+ * regression, and the pairing is the whole reason it did:
+ *
+ *   `handleEnterMultiStep` seeds step 1 by COPYING the recipe-level sets and leaves the
+ *   recipe-level fields in place, while `Recipe.getExecutionSteps()` returns `steps` and
+ *   IGNORES those recipe-level copies. So every recipe converted from single-step by the
+ *   shipped editor holds two copies of the same references, and only `steps` is executable.
+ *   Strip the recipe-level copy alone and `recipeLostItsShape` sees the surviving step copy,
+ *   declares the recipe still craftable, and leaves it ENABLED — holding an ingredient that
+ *   no longer exists, offered to players, permanently unsatisfiable. The pre-change inline
+ *   check disabled it correctly.
+ *
+ * So detection and the rewrite both walk `steps[]`, exactly as the essence pipeline already
+ * does (`recipeReferencesEssence` flattens step sets; `_stripEssencesFromRecipes` rewrites
+ * them). That makes the shape decision sound, and closes the older gap where a multi-step
+ * recipe naming a component ONLY inside a step was never detected at all.
+ *
+ * ── WHAT THIS WALK STILL DOES NOT COVER ───────────────────────────────────────────
+ * Result rows are matched for DETECTION through `getIngredientComponentId` but stripped on
+ * the bare `componentId || systemItemId` pair, faithfully to the shipped rewrite. A result
+ * carrying a structured `match: {type:'component'}` is therefore detected and counted but not
+ * removed. Detection and the write still agree — both under-strip — so the stated number
+ * never promises less than the write performs; it is merely generous. `Result` (see
+ * `src/models/Result.js`) has no `match` field today, so this is latent rather than live.
  */
 
 import { getIngredientComponentId } from '../models/match/matchTypes.js';
@@ -49,13 +68,24 @@ export function recipeReferencesComponent(recipe, componentId) {
   const data = typeof recipe?.toJSON === 'function' ? recipe.toJSON() : recipe;
   const matchesId = (ref) => getIngredientComponentId(ref) === componentId;
 
-  for (const set of data?.ingredientSets || []) {
+  // Recipe-level AND step-level, flattened together — a converted multi-step recipe carries
+  // both copies and only the step copy is executable.
+  const sets = [
+    ...(data?.ingredientSets || []),
+    ...(data?.steps || []).flatMap((step) => step?.ingredientSets || []),
+  ];
+  const resultGroups = [
+    ...(data?.resultGroups || []),
+    ...(data?.steps || []).flatMap((step) => step?.resultGroups || []),
+  ];
+
+  for (const set of sets) {
     for (const group of set?.ingredientGroups || []) {
       if ((group?.options || []).some(matchesId)) return true;
     }
     if ((set?.ingredients || []).some(matchesId)) return true;
   }
-  for (const group of data?.resultGroups || []) {
+  for (const group of resultGroups) {
     if ((group?.results || []).some(matchesId)) return true;
   }
   return (data?.results || []).some(matchesId);
@@ -147,36 +177,52 @@ export function stripComponentsFromRecipeJson(recipe, componentIds) {
   // read them directly. Keep reading them directly.
   const isDeletedLegacy = (ref) => ids.has(ref?.componentId || ref?.systemItemId);
 
-  json.ingredientSets = (source?.ingredientSets || [])
-    .map((set) => ({
-      ...set,
-      ingredientGroups: (set?.ingredientGroups || [])
-        .map((group) => ({
-          ...group,
-          options: (group?.options || []).filter((option) => !isDeletedOption(option)),
-        }))
-        .filter((group) => (group.options || []).length > 0),
-      ingredients: (set?.ingredients || []).filter((ing) => !isDeletedLegacy(ing)),
-    }))
-    .map((set) => ({
-      ...set,
-      ingredients: (set.ingredientGroups || [])
-        .map((group) => group.options?.[0] || null)
-        .filter(Boolean),
-    }))
-    .filter(
-      (set) =>
-        (set.ingredientGroups?.length || set.ingredients?.length || 0) > 0 ||
-        Object.keys(set.essences || {}).length > 0
-    );
+  const stripSets = (sets) =>
+    (sets || [])
+      .map((set) => ({
+        ...set,
+        ingredientGroups: (set?.ingredientGroups || [])
+          .map((group) => ({
+            ...group,
+            options: (group?.options || []).filter((option) => !isDeletedOption(option)),
+          }))
+          .filter((group) => (group.options || []).length > 0),
+        ingredients: (set?.ingredients || []).filter((ing) => !isDeletedLegacy(ing)),
+      }))
+      .map((set) => ({
+        ...set,
+        ingredients: (set.ingredientGroups || [])
+          .map((group) => group.options?.[0] || null)
+          .filter(Boolean),
+      }))
+      .filter(
+        (set) =>
+          (set.ingredientGroups?.length || set.ingredients?.length || 0) > 0 ||
+          Object.keys(set.essences || {}).length > 0
+      );
 
-  json.resultGroups = (source?.resultGroups || [])
-    .map((group) => ({
-      ...group,
-      results: (group?.results || []).filter((res) => !isDeletedLegacy(res)),
-    }))
-    .filter((group) => (group.results || []).length > 0);
+  const stripResultGroups = (groups) =>
+    (groups || [])
+      .map((group) => ({
+        ...group,
+        results: (group?.results || []).filter((res) => !isDeletedLegacy(res)),
+      }))
+      .filter((group) => (group.results || []).length > 0);
+
+  json.ingredientSets = stripSets(source?.ingredientSets);
+  json.resultGroups = stripResultGroups(source?.resultGroups);
   json.results = (source?.results || []).filter((res) => !isDeletedLegacy(res));
+
+  // The STEP copies, rewritten by the same two helpers. `getExecutionSteps()` returns these
+  // and ignores the recipe-level fields, so leaving them behind is what would strand a
+  // converted recipe enabled-but-uncraftable — see the header.
+  if (Array.isArray(source?.steps)) {
+    json.steps = source.steps.map((step) => ({
+      ...step,
+      ingredientSets: stripSets(step?.ingredientSets),
+      resultGroups: stripResultGroups(step?.resultGroups),
+    }));
+  }
 
   const changed = recipeReferencesAnyComponent(source, ids);
   return { json, changed };

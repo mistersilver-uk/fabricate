@@ -5577,7 +5577,20 @@ export class CraftingSystemManager {
       });
     }
 
-    if (recipes.length > 0) await this.recipeManager.save();
+    if (recipes.length > 0) {
+      await this.recipeManager.save();
+      // ONE change signal for the whole batch, restoring what `emitChange: false` suppressed.
+      //
+      // This is load-bearing rather than tidy. Before the batching, each rewrite left
+      // `emitChange` at its default and `updateRecipe` fired `recipesChanged` per recipe on
+      // the acting client. `settingChangeBridge` does NOT backfill it: it re-emits only when
+      // `recipeManager.reload()` returns truthy, and on the WRITING client the in-memory map
+      // already equals the saved setting, so `reload()` returns false. Without this line a
+      // GM's own crafting window keeps offering pre-rewrite recipes until an unrelated write.
+      // `deleteItem` deliberately does not call `_notifySystemsChanged()`, so it has no other
+      // signal at all.
+      this.recipeManager.notifyRecipesChanged({ action: 'update' });
+    }
     return { recipesUpdated: recipes.length, recipesDisabled };
   }
 

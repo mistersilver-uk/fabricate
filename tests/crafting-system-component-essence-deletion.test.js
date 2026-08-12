@@ -86,6 +86,41 @@ function makeRecipeManager() {
       ],
       resultGroups: [{ id: 'rg4', results: [{ componentId: 'bar' }] }]
     }),
+    // A recipe CONVERTED from single-step to multi-step by the shipped editor.
+    // `handleEnterMultiStep` COPIES the recipe-level sets into step 1 and leaves the
+    // recipe-level fields in place, and `Recipe.getExecutionSteps()` then returns
+    // `steps` and IGNORES the recipe-level copies. So the only executable path is
+    // `steps[0]`, and both copies name `iron`.
+    makeRecipe({
+      id: 'recipe-multistep-iron',
+      name: 'Multi Step Iron',
+      craftingSystemId: 'sys',
+      enabled: true,
+      ingredientSets: [
+        {
+          id: 'ms-set',
+          essences: {},
+          ingredientGroups: [{ id: 'ms-g', options: [{ componentId: 'iron' }] }],
+          ingredients: [{ componentId: 'iron' }]
+        }
+      ],
+      resultGroups: [{ id: 'ms-rg', results: [{ componentId: 'bar' }] }],
+      steps: [
+        {
+          id: 'ms-step-1',
+          name: 'Step 1',
+          ingredientSets: [
+            {
+              id: 'ms-set',
+              essences: {},
+              ingredientGroups: [{ id: 'ms-g', options: [{ componentId: 'iron' }] }],
+              ingredients: [{ componentId: 'iron' }]
+            }
+          ],
+          resultGroups: [{ id: 'ms-rg', results: [{ componentId: 'bar' }] }]
+        }
+      ]
+    }),
     // Carries its component reference via the legacy `systemItem`/`systemItemId` alias match shape,
     // which the handler aliases to the component handler — deletion must still resolve and strip it.
     makeRecipe({
@@ -130,6 +165,13 @@ function makeRecipeManager() {
     saveCalls: 0,
     async save() {
       this.saveCalls += 1;
+    },
+    // The real `RecipeManager` exposes this, and the batched cascade now calls it ONCE to
+    // restore the change signal that `emitChange: false` suppresses on every rewrite. A
+    // double without it is looser than the real manager and hides a stale-UI regression.
+    notifyCalls: 0,
+    notifyRecipesChanged() {
+      this.notifyCalls += 1;
     },
     // Spy for the alchemy post-deletion reconcile. Tests set `conflictDisableResult` to the list of
     // recipes the real manager would disable.
@@ -177,13 +219,13 @@ test('deleteItem updates only recipes that reference the component, with one sum
 
   assert.deepEqual(
     recipeManager.updateCalls.map(call => call.recipeId),
-    ['recipe-iron', 'recipe-match-iron', 'recipe-alias-iron'],
-    'every iron-referencing recipe is updated — including the structured-match and legacy-alias forms'
+    ['recipe-iron', 'recipe-match-iron', 'recipe-multistep-iron', 'recipe-alias-iron'],
+    'every iron-referencing recipe is updated — including the structured-match, legacy-alias and multi-step forms'
   );
   for (const call of recipeManager.updateCalls) {
     assert.equal(call.options.notify, false, 'per-recipe notification suppressed');
   }
-  assert.deepEqual(notifications, ['Removed "Iron" and updated 3 recipe(s).']);
+  assert.deepEqual(notifications, ['Removed "Iron" and updated 4 recipe(s).']);
 });
 
 test('deleteItem strips a structured component-match ingredient and disables the emptied recipe', async () => {
@@ -408,6 +450,10 @@ function makeEssenceOptionRecipeManager() {
     async save() {
       this.saveCalls += 1;
     },
+    notifyCalls: 0,
+    notifyRecipesChanged() {
+      this.notifyCalls += 1;
+    },
     conflictDisableResult: [],
     disableCalls: [],
     async disableSignatureConflicts(systemId) {
@@ -461,7 +507,7 @@ test('deleteComponents rewrites each referencing recipe ONCE for the whole set',
   assert.deepEqual(result.componentIds, ['iron', 'wood']);
   assert.deepEqual(
     recipeManager.updateCalls.map((call) => call.recipeId),
-    ['recipe-iron', 'recipe-none', 'recipe-match-iron', 'recipe-alias-iron'],
+    ['recipe-iron', 'recipe-none', 'recipe-match-iron', 'recipe-multistep-iron', 'recipe-alias-iron'],
     'every referencing recipe is rewritten exactly once, in one pass over the recipe list'
   );
 });
@@ -581,4 +627,87 @@ test('deleteItem and deleteComponents agree — the singular is the set of one',
     singleManager.getSystem('sys').components.map((c) => c.id),
     'both routes leave the same components behind'
   );
+});
+
+
+test('1129: deleting a component strips it from STEP ingredient sets too', async () => {
+  notifications.length = 0;
+  const recipeManager = makeRecipeManager();
+  const manager = makeManager(recipeManager);
+
+  await manager.deleteComponents('sys', ['iron']);
+
+  const update = recipeManager.updateCalls.find((call) => call.recipeId === 'recipe-multistep-iron');
+  assert.ok(update, 'the converted multi-step recipe is detected as referencing iron');
+
+  const stepSets = update.updates.steps?.[0]?.ingredientSets || [];
+  const stepNamesIron = JSON.stringify(stepSets).includes('iron');
+  assert.equal(
+    stepNamesIron,
+    false,
+    'the STEP copy must be stripped too — it is the only path `getExecutionSteps()` executes'
+  );
+});
+
+test('1129: a converted multi-step recipe left with no executable path is DISABLED', async () => {
+  notifications.length = 0;
+  const recipeManager = makeRecipeManager();
+  const manager = makeManager(recipeManager);
+
+  // Before this issue, `deleteItem` read recipe-level sets only and clamped this recipe to
+  // disabled. A steps-aware "lost its shape" check paired with a strip that never walked
+  // steps would leave it ENABLED holding a reference to a component that no longer exists —
+  // permanently uncraftable, and offered to players.
+  await manager.deleteComponents('sys', ['iron']);
+
+  const update = recipeManager.updateCalls.find((call) => call.recipeId === 'recipe-multistep-iron');
+  assert.equal(
+    update.updates.enabled,
+    false,
+    'losing its only ingredient in every copy makes it uncraftable, so it must be disabled'
+  );
+});
+
+
+test('1129: a batched delete emits exactly ONE recipes-changed signal, and never zero', async () => {
+  notifications.length = 0;
+  const recipeManager = makeRecipeManager();
+  const manager = makeManager(recipeManager);
+
+  // Every rewrite is issued with `emitChange: false`, so without an explicit batch-level
+  // signal the acting client would receive NOTHING: `settingChangeBridge` re-emits only when
+  // `reload()` reports a change, and on the writing client the in-memory map already equals
+  // the saved setting. The GM's own crafting window would keep offering pre-rewrite recipes.
+  await manager.deleteComponents('sys', ['iron', 'wood']);
+
+  assert.ok(recipeManager.updateCalls.length > 1, 'several recipes were rewritten');
+  for (const call of recipeManager.updateCalls) {
+    assert.equal(call.options.emitChange, false, 'no rewrite emits its own change');
+  }
+  assert.equal(recipeManager.notifyCalls, 1, 'exactly one signal for the whole batch');
+});
+
+test('1129: the SINGULAR delete also emits a recipes-changed signal', async () => {
+  notifications.length = 0;
+  const recipeManager = makeRecipeManager();
+  const manager = makeManager(recipeManager);
+
+  // `deleteItem` does not call `_notifySystemsChanged()`, so the batched recipes signal is
+  // its ONLY change notification. Losing it is invisible to every other assertion here.
+  await manager.deleteItem('sys', 'iron');
+
+  assert.equal(recipeManager.notifyCalls, 1);
+});
+
+test('1129: a delete that rewrites NOTHING emits no signal and saves nothing', async () => {
+  notifications.length = 0;
+  const recipeManager = makeRecipeManager();
+  const manager = makeManager(recipeManager);
+
+  // `unused` is named by no recipe, so there is nothing to announce.
+  await manager.deleteComponents('sys', ['unused']);
+
+  assert.equal(recipeManager.updateCalls.length, 0);
+  assert.equal(recipeManager.saveCalls, 0, 'no recipes write for a component no recipe names');
+  assert.equal(recipeManager.notifyCalls, 0, 'and no spurious signal');
 });
