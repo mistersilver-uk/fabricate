@@ -38,6 +38,7 @@ import {
 } from '../../../systems/CraftingSystemExporter.js';
 import { recipeReferencesEssence } from '../../../utils/recipeEssenceReferences.js';
 import { describeEssenceDeleteImpact } from '../../../utils/essenceBulkEditModel.js';
+import { describeComponentDeleteImpact } from '../../../utils/recipeComponentReferences.js';
 import {
   isGeneralRecipeCategory,
   normalizeCustomRecipeCategories,
@@ -9512,6 +9513,53 @@ export function createAdminStore(services) {
 
   // --- Item/Component management ---
 
+  /**
+   * The selected system's recipes, for the component delete-impact arithmetic (issue 1129).
+   *
+   * Both delete forms read this so the singular dialog and the bulk panel cannot report
+   * different numbers for the same component.
+   *
+   * @param {string} sysId
+   * @returns {object[]}
+   * @private
+   */
+  function _selectedSystemRecipes(sysId) {
+    return services.getRecipeManager?.()?.getRecipes?.({ craftingSystemId: sysId }) || [];
+  }
+
+  /**
+   * What deleting this set of components would do, over the selected system's recipes
+   * (issue 1129).
+   *
+   * Exposed as a store function rather than projected onto `itemCards`, deliberately. The
+   * "recipes disabled" number cannot be computed per row — whether a recipe survives depends
+   * on the WHOLE selection, since two selected components may be the only two options of one
+   * ingredient group — so it needs recipe bodies. Computing it here keeps recipe JSON out of
+   * Svelte props entirely and keeps `_itemCardSignature` free of a recipes input it would
+   * otherwise need in order not to serve a stale count.
+   *
+   * Ids are resolved against the system first, so an id naming no component cannot inflate
+   * the count the GM is shown.
+   *
+   * @param {Iterable<string>} componentIds
+   * @returns {{deletable: number, deletableIds: string[], recipesRewritten: number,
+   *   recipesDisabled: number}}
+   */
+  function describeComponentDelete(componentIds) {
+    const sysId = get(selectedSystemId);
+    const empty = { deletable: 0, deletableIds: [], recipesRewritten: 0, recipesDisabled: 0 };
+    if (!sysId) return empty;
+
+    const system = services.getCraftingSystemManager().getSystem(sysId);
+    if (!system) return empty;
+
+    const known = new Set(_getManagedItems(system).map((item) => String(item?.id ?? '')));
+    const resolved = Array.from(componentIds || [], String).filter((id) => known.has(id));
+    if (resolved.length === 0) return empty;
+
+    return describeComponentDeleteImpact(resolved, _selectedSystemRecipes(sysId));
+  }
+
   async function deleteComponent(itemId) {
     const systemManager = services.getCraftingSystemManager();
     const sysId = get(selectedSystemId);
@@ -9520,9 +9568,20 @@ export function createAdminStore(services) {
     const item = _getManagedItems(system).find((i) => i.id === itemId);
     if (!item) return;
 
+    // The singular dialog states the same arithmetic the bulk panel states, from the same
+    // describer — before issue 1129 it was hardcoded English that named no numbers at all
+    // and simply said "and remove it from recipes".
+    const name = String(item.name || '');
+    const impact = describeComponentDelete([itemId]);
+    const data = { name, recipes: impact.recipesRewritten, disabled: impact.recipesDisabled };
     const confirmed = await services.confirmDialog({
-      title: `Delete ${item.name}?`,
-      content: `<p>Delete component <strong>${item.name}</strong> and remove it from recipes in this system?</p>`,
+      title:
+        services.localize?.('FABRICATE.Admin.Manager.Component.DeleteConfirm.Title', { name }) ||
+        `Delete ${name}?`,
+      content: `<p>${
+        services.localize?.('FABRICATE.Admin.Manager.Component.DeleteConfirm.Content', data) ||
+        `Delete component ${name}? This rewrites ${impact.recipesRewritten} recipe(s) and disables ${impact.recipesDisabled} of them.`
+      }</p>`,
       yes: () => true,
       no: () => false,
     });
@@ -9530,6 +9589,53 @@ export function createAdminStore(services) {
 
     await systemManager.deleteItem(sysId, itemId);
     await refresh();
+  }
+
+  /**
+   * Delete a SET of components (issue 1129) through the manager's batched primitive: ONE
+   * `craftingSystems` write and ONE `recipes` write for the whole set.
+   *
+   * The delete is WARNED, not BLOCKED: every requested component is deleted regardless of
+   * recipe usage, because the cascade rewrites every referencing recipe. There is no blocked
+   * partition to compute or report.
+   *
+   * Confirmation is the CALLER's, not this function's: the bulk delete is armed in the panel
+   * (`ArmedDangerButton`) beside an impact statement naming the counts, which is strictly
+   * more information than a modal can carry.
+   *
+   * @param {Iterable<string>} componentIds
+   * @returns {Promise<{deleted: number, recipesUpdated: number, recipesDisabled: number}>}
+   */
+  async function deleteComponents(componentIds) {
+    const empty = { deleted: 0, recipesUpdated: 0, recipesDisabled: 0 };
+    const systemManager = services.getCraftingSystemManager();
+    const sysId = get(selectedSystemId);
+    if (!sysId) return empty;
+
+    const system = systemManager.getSystem(sysId);
+    if (!system) return empty;
+
+    const requested = new Set(Array.from(componentIds || [], String).filter(Boolean));
+    if (requested.size === 0) return empty;
+
+    const resolved = _getManagedItems(system)
+      .map((item) => String(item?.id ?? ''))
+      .filter((id) => requested.has(id));
+    if (resolved.length === 0) return empty;
+
+    try {
+      const result = await systemManager.deleteComponents(sysId, resolved);
+      await refresh();
+      return {
+        deleted: Number(result?.deleted) || 0,
+        recipesUpdated: Number(result?.recipesUpdated) || 0,
+        recipesDisabled: Number(result?.recipesDisabled) || 0,
+      };
+    } catch (err) {
+      console.error('Fabricate | Failed to delete components:', err);
+      services.notify?.error?.(err?.message || 'Failed to delete components');
+      return empty;
+    }
   }
 
   async function updateComponent(itemId, updates = {}) {
@@ -9909,6 +10015,8 @@ export function createAdminStore(services) {
     exportSystem,
     importSystem,
     deleteComponent,
+    deleteComponents,
+    describeComponentDelete,
     updateComponent,
     applyComponentBulkEdit,
     applyRecipeBulkEdit,

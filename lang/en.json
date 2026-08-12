@@ -2578,6 +2578,10 @@
           },
           "Edit": "Edit component",
           "Delete": "Delete component",
+          "DeleteConfirm": {
+            "Title": "Delete {name}?",
+            "Content": "Delete component {name}? This rewrites {recipes} recipe(s) that reference it and leaves {disabled} of them uncraftable and disabled."
+          },
           "EditNamed": "Edit {name}",
           "DeleteNamed": "Delete {name}",
           "EditTitle": "Edit component",
@@ -2654,7 +2658,21 @@
             "ApplyOne": "Apply to 1 component",
             "Applied": "Applied bulk changes to {count} components.",
             "AppliedOne": "Applied bulk changes to 1 component.",
-            "AppliedNone": "No components needed changing."
+            "AppliedNone": "No components needed changing.",
+            "DeleteHeading": "Delete selected components",
+            "ImpactComponents": "{count} components will be deleted.",
+            "ImpactComponentsOne": "1 component will be deleted.",
+            "ImpactRecipes": "{count} recipes will be rewritten.",
+            "ImpactRecipesOne": "1 recipe will be rewritten.",
+            "ImpactDisabled": "{count} of those recipes will be left uncraftable and disabled.",
+            "ImpactDisabledOne": "1 of those recipes will be left uncraftable and disabled.",
+            "Delete": "Delete {count} components",
+            "DeleteOne": "Delete 1 component",
+            "DeleteAria": "Delete {count} components",
+            "DeleteAriaOne": "Delete 1 component",
+            "DeleteConfirm": "Confirm delete",
+            "DeleteConfirmAria": "Confirm deleting {count} component(s) and rewriting {recipes} recipe(s)",
+            "Deleted": "Deleted {count} component(s) and rewrote {recipes} recipe(s)."
           },
           "Back": "Back",
           "SourceActions": "Source actions",

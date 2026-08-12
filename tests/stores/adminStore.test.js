@@ -3230,6 +3230,144 @@ describe('createAdminStore', () => {
       assert.deepEqual(deletedArgs, { sysId: 'sys1', itemId: 'comp-1' });
     });
 
+    // ── The set delete (issue 1129) ──────────────────────────────────────────────
+    //
+    // The store half is a passthrough with NO confirmDialog: the panel arms beside an impact
+    // statement, which carries strictly more information than a modal. A dialog here would
+    // make the arm a second gate rather than the gate.
+
+    it('deleteComponents routes the whole set through the BATCHED manager primitive', async () => {
+      let batchArgs = null;
+      const services = createMockServices();
+      const origManager = services.getCraftingSystemManager();
+      const sys = origManager.getSystem('sys1');
+      if (sys) {
+        sys.components = [
+          makeItem({ id: 'comp-1', name: 'Herb' }),
+          makeItem({ id: 'comp-2', name: 'Root' }),
+        ];
+        delete sys.items;
+      }
+      services.getCraftingSystemManager = () => ({
+        ...origManager,
+        deleteComponents: async (sysId, ids) => {
+          batchArgs = { sysId, ids };
+          return { deleted: ids.length, recipesUpdated: 3, recipesDisabled: 1 };
+        },
+      });
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      const result = await store.deleteComponents(['comp-1', 'comp-2']);
+
+      assert.deepEqual(batchArgs, { sysId: 'sys1', ids: ['comp-1', 'comp-2'] });
+      assert.deepEqual(result, { deleted: 2, recipesUpdated: 3, recipesDisabled: 1 });
+    });
+
+    it('deleteComponents raises NO confirm dialog — the panel already armed', async () => {
+      let confirmCalled = false;
+      const services = createMockServices({
+        confirmDialog: async () => {
+          confirmCalled = true;
+          return true;
+        },
+      });
+      const origManager = services.getCraftingSystemManager();
+      const sys = origManager.getSystem('sys1');
+      if (sys) {
+        sys.components = [makeItem({ id: 'comp-1', name: 'Herb' })];
+        delete sys.items;
+      }
+      services.getCraftingSystemManager = () => ({
+        ...origManager,
+        deleteComponents: async () => ({ deleted: 1, recipesUpdated: 0, recipesDisabled: 0 }),
+      });
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      await store.deleteComponents(['comp-1']);
+
+      assert.equal(confirmCalled, false, 'confirmation is the caller-side arm, not a modal');
+    });
+
+    it('deleteComponents drops ids that name no component in the system', async () => {
+      let batchArgs = null;
+      const services = createMockServices();
+      const origManager = services.getCraftingSystemManager();
+      const sys = origManager.getSystem('sys1');
+      if (sys) {
+        sys.components = [makeItem({ id: 'comp-1', name: 'Herb' })];
+        delete sys.items;
+      }
+      services.getCraftingSystemManager = () => ({
+        ...origManager,
+        deleteComponents: async (sysId, ids) => {
+          batchArgs = { sysId, ids };
+          return { deleted: ids.length, recipesUpdated: 0, recipesDisabled: 0 };
+        },
+      });
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      await store.deleteComponents(['comp-1', 'ghost']);
+
+      assert.deepEqual(batchArgs.ids, ['comp-1'], 'an unresolved id never reaches the write');
+    });
+
+    it('deleteComponents is a no-op for an empty selection', async () => {
+      let called = false;
+      const services = createMockServices();
+      const origManager = services.getCraftingSystemManager();
+      services.getCraftingSystemManager = () => ({
+        ...origManager,
+        deleteComponents: async () => {
+          called = true;
+          return { deleted: 0, recipesUpdated: 0, recipesDisabled: 0 };
+        },
+      });
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      const result = await store.deleteComponents([]);
+
+      assert.equal(called, false);
+      assert.deepEqual(result, { deleted: 0, recipesUpdated: 0, recipesDisabled: 0 });
+    });
+
+    it('deleteComponents reports a failed write rather than throwing at the panel', async () => {
+      const services = createMockServices();
+      const origManager = services.getCraftingSystemManager();
+      const sys = origManager.getSystem('sys1');
+      if (sys) {
+        sys.components = [makeItem({ id: 'comp-1', name: 'Herb' })];
+        delete sys.items;
+      }
+      services.getCraftingSystemManager = () => ({
+        ...origManager,
+        deleteComponents: async () => {
+          throw new Error('nope');
+        },
+      });
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      const result = await store.deleteComponents(['comp-1']);
+
+      assert.deepEqual(result, { deleted: 0, recipesUpdated: 0, recipesDisabled: 0 });
+    });
+
+    it('describeComponentDelete resolves ids against the system before counting', async () => {
+      const services = createMockServices();
+      const origManager = services.getCraftingSystemManager();
+      const sys = origManager.getSystem('sys1');
+      if (sys) {
+        sys.components = [makeItem({ id: 'comp-1', name: 'Herb' })];
+        delete sys.items;
+      }
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+
+      // A ghost id must not inflate the number the GM is shown.
+      assert.equal(store.describeComponentDelete(['comp-1', 'ghost']).deletable, 1);
+      assert.equal(store.describeComponentDelete(['ghost']).deletable, 0);
+      assert.equal(store.describeComponentDelete([]).deletable, 0);
+    });
+
     it('updateComponent forwards updates to systemManager.updateItem and refreshes', async () => {
       let updateArgs = null;
       const services = createMockServices();

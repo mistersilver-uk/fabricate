@@ -191,6 +191,11 @@
   // lives on the lifted `componentBrowserState`, beside the browser's other view-state.
   let componentBulkDraft = $state(createComponentBulkDraft());
   let componentBulkApplying = $state(false);
+  // The armed bulk delete (issue 1129). `…Armed` is the single armed token for the whole
+  // selection — the target is the set, not a row — and it is cleared by the selection effect
+  // below on ANY change to the set.
+  let componentBulkDeleting = $state(false);
+  let componentBulkDeleteArmed = $state(false);
   // The recipe library's twin (issue 1010), owned here for the identical reason: the
   // recipe bulk panel is unmounted the moment the selection empties, so a panel-owned
   // draft would be destroyed by the very transition that is supposed to DISCARD it. The
@@ -1790,11 +1795,31 @@
   const componentBulkCategoryOptions = $derived(
     componentCategoryOptions(itemCards, selectedSystem?.componentCategories || [])
   );
-  // Discard the staged draft whenever the selection empties — a clear, a system switch, a
-  // prune that removed the last id, or a successful apply. The panel is unmounted at that
-  // point, so this is the only place the discard can honestly happen.
+  // What deleting the current selection would do (issue 1129). Derived from the STORE rather
+  // than from the selected cards, because the "recipes disabled" number depends on the whole
+  // selection against real recipe bodies — see `adminStore.describeComponentDelete`.
+  const componentBulkDeleteImpact = $derived(
+    store.describeComponentDelete?.(componentBulkSelectedIds) ?? {
+      deletable: 0,
+      deletableIds: [],
+      recipesRewritten: 0,
+      recipesDisabled: 0,
+    }
+  );
+  // Discard the staged draft when the selection empties — a clear, a system switch, a prune
+  // that removed the last id, or a successful apply — and DISARM the delete whenever the
+  // selection changes at all. An arm is a statement about a SPECIFIC set: once the set moves,
+  // the impact sentence the GM read before arming is no longer the impact of confirming, so
+  // the second click must not still be a confirmation. The Essence Studio's twin above is
+  // where this rule is stated at length.
+  //
+  // It reads the SET, not its size, for the reason recorded there: the browser assigns a NEW
+  // `Set` on every mutation, so set identity is what "changes at all" means, and a size
+  // dependency cannot see a same-size swap.
   $effect(() => {
-    if (componentBulkSelectionCount === 0) componentBulkDraft = createComponentBulkDraft();
+    const selectedIds = componentBulkSelectedIds;
+    if (selectedIds.size === 0) componentBulkDraft = createComponentBulkDraft();
+    componentBulkDeleteArmed = false;
   });
   // ── The recipe bulk selection (issue 1010) ───────────────────────────────────────
   // Read straight off the LIFTED browser state, which `RecipesBrowserView` binds: the
@@ -4204,6 +4229,36 @@
     } finally {
       componentBulkApplying = false;
     }
+  }
+
+  // The ARMED bulk delete's confirm step (issue 1129). The impact statement is rendered by
+  // the panel from `componentBulkDeleteImpact`; this only performs the write and reports what
+  // happened. The delete is warned, not blocked, so every selected component is deleted and
+  // nothing is skipped.
+  async function deleteSelectedComponents(ids) {
+    if (componentBulkDeleting) return false;
+    const targets = Array.isArray(ids) ? ids : [];
+    if (targets.length === 0) return false;
+    componentBulkDeleting = true;
+    try {
+      const result = await store.deleteComponents?.(targets);
+      if (!result) return false;
+      componentBulkDeleteArmed = false;
+      clearComponentBulkSelection();
+      notifyInfo(componentBulkDeletedMessage(result));
+      return true;
+    } finally {
+      componentBulkDeleting = false;
+    }
+  }
+
+  function componentBulkDeletedMessage(result) {
+    return text(
+      'FABRICATE.Admin.Manager.Component.BulkEdit.Deleted',
+      'Deleted {count} component(s) and rewrote {recipes} recipe(s).'
+    )
+      .replace('{count}', Number(result?.deleted) || 0)
+      .replace('{recipes}', Number(result?.recipesUpdated) || 0);
   }
 
   // ── Recipe bulk edit (issue 1010) ────────────────────────────────────────────────
@@ -10590,9 +10645,15 @@
               selectedCards={componentBulkSelectedCards}
               draft={componentBulkDraft}
               applying={componentBulkApplying}
+              deleting={componentBulkDeleting}
+              deleteArmed={componentBulkDeleteArmed}
+              deleteImpact={componentBulkDeleteImpact}
               onDraftChange={(next) => stageComponentBulkDraft(next)}
               onClearSelection={() => clearComponentBulkSelection()}
               onApply={() => applyComponentBulkEdit()}
+              onArmDelete={() => (componentBulkDeleteArmed = true)}
+              onDisarmDelete={() => (componentBulkDeleteArmed = false)}
+              onDelete={(ids) => deleteSelectedComponents(ids)}
             />
           {:else if selectedComponent}
             <ComponentBrowserInspector

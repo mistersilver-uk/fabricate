@@ -1865,6 +1865,32 @@ function createStore(calls = [], options = {}) {
     },
     setItemSearch: (term) => calls.push(['setItemSearch', term]),
     deleteComponent: (id) => calls.push(['deleteComponent', id]),
+    // The set delete (issue 1129). `describeComponentDelete` is a SYNCHRONOUS selector the
+    // root `$derived`s the panel's impact from, so the double returns a literal rather than a
+    // promise — an async double here would render an unresolved impact and the panel would
+    // silently show zeroes.
+    describeComponentDelete: (componentIds) => {
+      const ids = [...(componentIds || [])];
+      return (
+        options.componentDeleteImpact ?? {
+          deletable: ids.length,
+          deletableIds: ids,
+          recipesRewritten: ids.length > 0 ? 2 : 0,
+          recipesDisabled: ids.length > 0 ? 1 : 0,
+        }
+      );
+    },
+    deleteComponents: (componentIds) => {
+      const ids = [...(componentIds || [])];
+      calls.push(['deleteComponents', ids]);
+      return (
+        options.deleteComponentsResult ?? {
+          deleted: ids.length,
+          recipesUpdated: 2,
+          recipesDisabled: 1,
+        }
+      );
+    },
     updateComponent: (id, updates) => {
       calls.push(['updateComponent', id, updates]);
       if (options.updateComponentReject) return Promise.reject(new Error('update failed'));
@@ -7590,6 +7616,110 @@ describe('CraftingSystemManager mounted behavior', () => {
       target.querySelector('[data-component-bulk-apply]').disabled,
       true,
       'so a re-opened panel cannot apply a stale edit'
+    );
+  });
+
+  // ── The armed set delete, end to end (issue 1129) ──────────────────────────────────
+  //
+  // The panel-level suite proves the CARD behaves; this proves the ROOT wires it — that the
+  // impact reaches the panel, that the two clicks reach the store, and above all that the
+  // armed token does not survive a change to the set it was armed for.
+
+  function componentDeleteButton() {
+    return target.querySelector('[data-component-bulk-delete-card] .manager-button.is-danger');
+  }
+
+  it('offers the set delete the moment the bulk panel replaces the inspector', async () => {
+    await openComponentsBrowser();
+
+    // The gap this issue closes: before it, ticking a row hid the ONLY delete affordance.
+    assert.ok(
+      Boolean(target.querySelector('[data-component-action="delete"]')),
+      'the single-component inspector offers Delete'
+    );
+
+    tickComponentRow('c1');
+
+    assert.ok(
+      !target.querySelector('[data-component-action="delete"]'),
+      'the inspector — and its Delete — is replaced'
+    );
+    assert.ok(componentDeleteButton(), 'but the panel now carries its own set delete');
+    assert.match(
+      target.querySelector('[data-component-bulk-impact-row="recipes"]').textContent,
+      /2 recipes will be rewritten/,
+      'the impact the store computed reaches the panel'
+    );
+  });
+
+  it('takes TWO clicks, and the first writes nothing', async () => {
+    const calls = [];
+    await openComponentsBrowser(calls);
+    tickComponentRow('c1');
+    tickComponentRow('c2');
+
+    componentDeleteButton().click();
+    flushSync();
+    assert.equal(
+      calls.some((call) => call[0] === 'deleteComponents'),
+      false,
+      'the FIRST click only arms — nothing is written'
+    );
+    assert.equal(componentDeleteButton().getAttribute('data-armed'), 'true');
+
+    componentDeleteButton().click();
+    await tick();
+    flushSync();
+    const write = calls.find((call) => call[0] === 'deleteComponents');
+    assert.deepEqual(write?.[1], ['c1', 'c2'], 'the second click deletes the selection');
+  });
+
+  it('DISARMS when the selection changes underneath the armed control', async () => {
+    // An arm is a statement about a SPECIFIC set. If the set moves, the impact sentence the
+    // GM read before arming is no longer the impact of confirming, so the second click must
+    // not still be a confirmation.
+    const calls = [];
+    await openComponentsBrowser(calls);
+    tickComponentRow('c1');
+
+    componentDeleteButton().click();
+    flushSync();
+    assert.equal(componentDeleteButton().getAttribute('data-armed'), 'true');
+
+    tickComponentRow('c2');
+
+    assert.equal(
+      componentDeleteButton().getAttribute('data-armed'),
+      'false',
+      'growing the selection disarms the pending delete'
+    );
+    componentDeleteButton().click();
+    flushSync();
+    assert.equal(
+      calls.some((call) => call[0] === 'deleteComponents'),
+      false,
+      'the next click re-arms rather than writing'
+    );
+  });
+
+  it('clears the selection after a successful delete, returning the rail to the inspector', async () => {
+    const calls = [];
+    await openComponentsBrowser(calls);
+    tickComponentRow('c1');
+
+    componentDeleteButton().click();
+    flushSync();
+    componentDeleteButton().click();
+    await tick();
+    flushSync();
+
+    assert.ok(
+      calls.some((call) => call[0] === 'deleteComponents'),
+      'the write happened'
+    );
+    assert.ok(
+      Boolean(target.querySelector('[data-component-inspector]')),
+      'the rail returns to the single-component inspector'
     );
   });
 
