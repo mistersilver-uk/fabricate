@@ -4353,6 +4353,8 @@ describe('createAdminStore', () => {
         'exportSystem',
         'importSystem',
         'deleteComponent',
+        'deleteComponents',
+        'describeComponentDelete',
         'updateComponent',
         'setRecipeSearch',
         'setItemSearch',
