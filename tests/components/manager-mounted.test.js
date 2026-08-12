@@ -2191,7 +2191,6 @@ function createStore(calls = [], options = {}) {
       return options.deleteToolDraftResult ?? true;
     },
     enterToolsDraft: (systemId) => calls.push(['enterToolsDraft', systemId]),
-    addToolToDraft: (...args) => calls.push(['addToolToDraft', ...args]),
     addToolFromUuidToDraft: (...args) => {
       calls.push(['addToolFromUuidToDraft', ...args]);
       return true;

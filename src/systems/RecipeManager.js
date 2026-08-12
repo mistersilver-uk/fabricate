@@ -956,7 +956,7 @@ export class RecipeManager {
     const prerequisiteDefinitions = this._getToolPrerequisiteDefinitions(recipe);
     return tools.map((tool) => {
       const entry = matchedByTool.get(tool) ?? null;
-      const componentId = tool?.componentId || tool?.systemItemId;
+      const componentId = tool?.componentId;
       const toolDisplayName = String(tool?.label || tool?.name || '').trim();
       const actor =
         entry?.virtual === true
@@ -1927,8 +1927,7 @@ export class RecipeManager {
     // Snapshot-name fallback (presence only, never destructive): the item-sourced tool's
     // own snapshot name, or the linked component's name for a migrated componentId-tool.
     // Shared, telemetry-bearing helper (issue 540); case-INSENSITIVE, exactly as before.
-    const fallbackName =
-      tool.name || this._getComponent(recipe, tool.componentId || tool.systemItemId)?.name || '';
+    const fallbackName = tool.name || this._getComponent(recipe, tool.componentId)?.name || '';
     if (!fallbackName) return false;
     return matchComponentByName(
       item,

@@ -3094,14 +3094,10 @@ export function createAdminStore(services) {
     return Array.isArray(next) && next[0] ? patchToolDraft(next[0]) : false;
   }
 
-  function addToolToDraft(initialPatch = {}) {
-    return createToolDraft(initialPatch);
-  }
-
   /**
-   * Register a first-class item-sourced Tool from a dropped Item uuid (issue 561, B1). Unlike
-   * `addToolToDraft({ componentId })` (which links a managed component), this creates a tool
-   * with `componentId: null` carrying its OWN source refs + `name`/`img` snapshot and stamps
+   * Register a first-class item-sourced Tool from a dropped Item uuid (issue 561, B1). This
+   * creates a tool with `componentId: null` carrying its OWN source refs + `name`/`img`
+   * snapshot and stamps
    * the durable `roles[systemId].toolId` on the source Item — no component import required.
    * Persists directly through the manager (mirroring the persisted-tool delete path), then
    * seeds the new tool into the draft + baseline so it renders immediately and is not dirty.
@@ -9756,7 +9752,6 @@ export function createAdminStore(services) {
     toggleToolEnabled,
     enterToolsDraft,
     updateToolsDraft,
-    addToolToDraft,
     addToolFromUuidToDraft,
     updateToolInDraft,
     deleteToolFromDraft,
