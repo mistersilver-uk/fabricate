@@ -2633,33 +2633,6 @@
   color: var(--fab-info);
 }
 
-/* ── A TRIGGER'S OWN SUMMARY (issue 1096) ────────────────────────────────────────────
-   The condition as a sentence, over the controls that author it. The card used to be
-   headed by the word `When` — the label of its first select — so a list of three read
-   `When`, `When`, `When`. */
-.fabricate-manager .manager-checks-trigger-summary {
-  min-width: 0;
-  margin-bottom: 10px;
-}
-
-.fabricate-manager .manager-checks-trigger-summary-title {
-  margin: 0;
-  color: var(--fab-text);
-  font-family: var(--fab-font-serif);
-  font-size: 12.5px;
-  font-weight: 600;
-  letter-spacing: 0;
-  text-transform: none;
-}
-
-.fabricate-manager .manager-checks-trigger-summary-lead {
-  margin: 3px 0 0;
-  color: var(--fab-text-muted);
-  font-size: 10.5px;
-  font-weight: 400;
-  line-height: 1.5;
-}
-
 /* The preset row. Each preset is the dashed ADD role, because that is what it does — it
    appends a row to the list below — and the row wraps rather than scrolling, so a narrow
    pane stacks them instead of hiding the second one. */
@@ -3274,15 +3247,23 @@
   grid-template-columns: minmax(140px, 1fr) 102px 40px;
 }
 
-/* Unified per-check trigger editor (issue 419 recombine). Each trigger is a card split
-   into rows by a divider: the top row carries the condition controls (When / Group /
-   Measure / Is / Value) with the remove button pinned to its top-right; the bottom row
-   carries the Outcome three-way toggle and the optional Break-tools pill.
+/* ── A TRIGGER IS A COLLAPSED CARD (issue 419 recombine, redrawn for issue 1096) ──────
+   A trigger card states itself in a HEAD a GM can read at a glance — glyph tile, condition
+   title, effect sentence, result chip, chevron, delete — and hides its controls until that
+   head is clicked. Before this, every trigger drew its whole editor, so three triggers were
+   taller than the pane and authoring a preset looked inert: the card it added landed below a
+   fold nobody could see.
 
-   ── At the prototype's metrics (issue 1096) ─────────────────────────────────────────
-   A trigger is a CARD with its own inset, not a tinted well: `--fab-bg-2` at radius 10 with
-   the ordinary border, carrying no padding of its own so its rows own theirs. The list gaps
-   at 8px and is extended by a full-width dashed control under it. */
+   The list is NOT inside a card of its own. It used to be, under a `Check triggers` heading
+   and description the design never wrote, and the structural parity pass reports such a
+   wrapper as an EXTRA CARD for exactly that reason: a card is a claim about the shape of the
+   screen. The route below paints nothing and only carries the gutter. */
+.fabricate-manager .manager-checks-trigger-route {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
 .fabricate-manager .manager-checks-trigger-list {
   display: flex;
   flex-direction: column;
@@ -3291,32 +3272,194 @@
 }
 
 .fabricate-manager .manager-checks-breakage-trigger {
-  display: grid;
-  gap: 0;
-  padding: 0;
+  min-width: 0;
   overflow: hidden;
   border: 1px solid var(--fab-border);
   border-radius: 10px;
   background: var(--fab-bg-2);
 }
 
-/* The card's ROWS take the inset; its divider is a hairline between them and must not,
-   or the rule renders as a 22px band the width of the card. */
-.fabricate-manager .manager-checks-breakage-trigger > *:not(.manager-checks-trigger-divider) {
+/* The card being EDITED takes the stronger edge, which is the prototype's own distinction
+   between a card being read and a card being authored. */
+.fabricate-manager .manager-checks-breakage-trigger.is-expanded {
+  border-color: var(--fab-border-strong);
+}
+
+.fabricate-manager .manager-checks-trigger-head {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  min-width: 0;
   padding: 11px 13px;
 }
 
-.fabricate-manager .manager-checks-breakage-trigger > .manager-checks-trigger-divider {
+/* THE WHOLE HEAD IS THE DISCLOSURE. Foundry's core `button` rule sets a fixed height and its
+   own border, and a card head is neither — the same reset the rail's digest rows take, and
+   for the same reason: `min-height: 0` does not cancel a fixed `height`, so a two-line head
+   would draw on top of itself. A mounted test cannot see that; Foundry's sheet is not in it. */
+.fabricate-manager .manager-checks-trigger-disclosure {
+  appearance: none;
+  -webkit-appearance: none;
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: 11px;
+  min-width: 0;
+  height: auto;
+  min-height: 0;
   margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+
+  /* Declared, not inherited: a `<button>` takes `buttontext` from the UA, and `border: 0`
+     still resolves the border colour from `color`. */
+  color: var(--fab-text);
+  background: none;
+  box-shadow: none;
+  font-family: inherit;
+  line-height: 1.3;
+  text-align: left;
 }
 
-/* Top row: condition fields take the available width and wrap; the remove button
-   sits at the top-right, aligned with the first field row. The 11px gutter is the
-   prototype's own (issue 1096). */
-.fabricate-manager .manager-checks-trigger-top {
+.fabricate-manager button.manager-checks-trigger-disclosure {
+  cursor: pointer;
+}
+
+/* The effect's glyph tile. Its family is the effect's own — a step up reads info, a step down
+   reads warning — so a list of triggers is scannable by colour before it is read. */
+.fabricate-manager .manager-checks-trigger-glyph {
   display: flex;
-  align-items: flex-start;
-  gap: 11px;
+  flex: 0 0 28px;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  font-size: 12px;
+}
+
+.fabricate-manager .manager-checks-trigger-glyph.is-info {
+  color: var(--fab-info-text);
+  background: var(--fab-info-soft);
+}
+
+.fabricate-manager .manager-checks-trigger-glyph.is-warning {
+  color: var(--fab-warning-text);
+  background: var(--fab-warning-soft);
+}
+
+.fabricate-manager .manager-checks-trigger-glyph.is-success {
+  color: var(--fab-success-text);
+  background: var(--fab-success-soft);
+}
+
+.fabricate-manager .manager-checks-trigger-glyph.is-danger {
+  color: var(--fab-danger-text);
+  background: var(--fab-danger-soft);
+}
+
+.fabricate-manager .manager-checks-trigger-glyph.is-neutral {
+  color: var(--fab-text-subtle);
+  background: var(--fab-surface-soft);
+}
+
+.fabricate-manager .manager-checks-trigger-headline {
+  display: block;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* A `<span>`, not a heading: it sits inside the disclosure `<button>`, where a heading is not
+   permitted content. It keeps the card title's own type so the structural parity pass still
+   reads it as a title — that pass classifies presentationally at 12.5px/600. */
+.fabricate-manager .manager-checks-trigger-title {
+  display: block;
+  color: var(--fab-text);
+  font-family: var(--fab-font-serif);
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.fabricate-manager .manager-checks-trigger-lead {
+  display: block;
+  margin-top: 3px;
+  color: var(--fab-text-muted);
+  font-size: 10.5px;
+  font-weight: 400;
+  line-height: 1.5;
+}
+
+/* The result chip: the effect in two words, at the right of the head. Same family as the
+   glyph tile, so the pair reads as one statement. */
+.fabricate-manager .manager-checks-trigger-chip {
+  flex: 0 0 auto;
+  padding: 4px 9px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  font-size: 10px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.fabricate-manager .manager-checks-trigger-chip.is-info {
+  color: var(--fab-info-text);
+  border-color: var(--fab-info-border);
+  background: var(--fab-info-soft);
+}
+
+.fabricate-manager .manager-checks-trigger-chip.is-warning {
+  color: var(--fab-warning-text);
+  border-color: var(--fab-warning-border);
+  background: var(--fab-warning-soft);
+}
+
+.fabricate-manager .manager-checks-trigger-chip.is-success {
+  color: var(--fab-success-text);
+  border-color: var(--fab-success-border);
+  background: var(--fab-success-soft);
+}
+
+.fabricate-manager .manager-checks-trigger-chip.is-danger {
+  color: var(--fab-danger-text);
+  border-color: var(--fab-danger-border);
+  background: var(--fab-danger-soft);
+}
+
+.fabricate-manager .manager-checks-trigger-chevron {
+  flex: 0 0 auto;
+  color: var(--fab-text-subtle);
+  font-size: 10px;
+}
+
+/* Remove button: at the head's right, outside the disclosure — a `<button>` inside a
+   `<button>` is invalid and the DOM the browser builds from it is not the one authored. */
+.fabricate-manager .manager-checks-trigger-remove {
+  flex: 0 0 auto;
+}
+
+/* The expanded body: a darker inset under a hairline, as the prototype draws it, holding the
+   condition, the two effect groups, the break-tools card and the closing quotation. */
+.fabricate-manager .manager-checks-trigger-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  padding: 13px;
+  border-top: 1px solid var(--fab-border);
+  background: var(--fab-bg-0);
+}
+
+/* `CONDITION` — the body's own section heading, above the row of fields. */
+.fabricate-manager .manager-checks-trigger-legend {
+  margin: 0;
+  color: var(--fab-text-subtle);
+  font-size: 8.5px;
+  font-weight: 700;
+  letter-spacing: 0.68px;
+  text-transform: uppercase;
 }
 
 .fabricate-manager .manager-checks-breakage-condition {
@@ -3324,33 +3467,108 @@
   flex: 1 1 auto;
   flex-wrap: wrap;
   align-items: flex-end;
-  gap: var(--fab-space-2);
+  gap: 8px;
 }
 
-/* Remove button: top-right of the card, not bottom-aligned with the fields. */
-.fabricate-manager .manager-checks-trigger-remove {
-  flex: 0 0 auto;
+/* THIS STUDIO'S FIELD SCALE, restated in scope rather than moved onto the manager-wide
+   `.manager-field` — the same move `.manager-checks-flag-list` and the Validation route
+   already make with their own shared surfaces. The manager's default control is a 36px box
+   at 0.82rem; the prototype draws this row at 32px and 11.5px, and its labels as 8px
+   uppercase micro-labels rather than as 0.82rem/700 field names. */
+.fabricate-manager .manager-checks-trigger-body .manager-field > span {
+  color: var(--fab-text-subtle);
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.64px;
+  text-transform: uppercase;
 }
 
-/* Hairline divider between the condition row and the effects row. */
-.fabricate-manager .manager-checks-trigger-divider {
-  width: 100%;
-  height: 0;
-  margin: 0;
-  border: 0;
-  border-top: 1px solid var(--fab-border);
+.fabricate-manager .manager-checks-trigger-body .manager-field {
+  gap: 5px;
 }
 
-/* Bottom row: the Outcome toggle and the Break-tools pill, bottom-aligned. */
-.fabricate-manager .manager-checks-trigger-bottom {
+.fabricate-manager .manager-checks-trigger-body .manager-field select,
+.fabricate-manager
+  .manager-checks-trigger-body
+  .manager-field
+  input:not(.fab-stepper-input):not([type="radio"]):not([type="range"]) {
+  height: 32px;
+  padding: 0 8px;
+  border: 1px solid var(--fab-border);
+  border-radius: 7px;
+  background: var(--fab-surface-soft);
+  font-size: 11.5px;
+  font-weight: 500;
+}
+
+/* The threshold is the one number on this row a GM reads back, so it takes the heavier
+   reading the prototype gives it. */
+.fabricate-manager .manager-checks-trigger-value input {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.fabricate-manager .manager-checks-trigger-value {
+  flex: 0 0 129px;
+}
+
+/* The effect groups. Each is a labelled field beside its operand, and the row wraps as a
+   unit rather than squeezing a four-segment control narrower than its labels. */
+.fabricate-manager .manager-checks-trigger-effect-row {
   display: flex;
   flex-wrap: wrap;
   align-items: flex-end;
-  gap: var(--fab-space-3);
+  gap: 18px;
 }
 
-.fabricate-manager .manager-checks-trigger-break {
+/* The break-tools card inside a trigger: the shared `ToggleCard` at this studio's metrics,
+   the same restatement the On failure screen's flag list makes. */
+.fabricate-manager .manager-checks-trigger-body .manager-recipe-status-card {
+  gap: 11px;
+  padding: 10px 12px;
+  border-radius: 9px;
+  background: var(--fab-bg-2);
+}
+
+.fabricate-manager .manager-checks-trigger-body .manager-recipe-status-card.is-on {
+  border-color: var(--fab-accent-border);
+  background: var(--fab-accent-soft);
+}
+
+.fabricate-manager .manager-checks-trigger-body .manager-recipe-status-title {
+  font-size: 11.5px;
+}
+
+.fabricate-manager .manager-checks-trigger-body .manager-recipe-status-sub {
+  font-size: 10px;
+}
+
+/* The closing restatement, quotation-marked: the controls above are the parts and this is
+   what they add up to. */
+.fabricate-manager .manager-checks-trigger-quote {
+  display: flex;
+  gap: 9px;
+  margin: 0;
+  min-width: 0;
+  padding: 10px 12px;
+  border-radius: 9px;
+  color: var(--fab-text-muted);
+  background: var(--fab-surface-soft);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.fabricate-manager .manager-checks-trigger-quote > i {
   flex: 0 0 auto;
+  color: var(--fab-text-subtle);
+  font-size: 10px;
+}
+
+/* The standing explanation of why this trigger has no break-tools card. */
+.fabricate-manager .manager-checks-trigger-hint {
+  margin: 0;
+  font-size: 10.5px;
+  line-height: 1.5;
 }
 
 /* (The three-way Outcome toggle used to declare its own track and segment rules here,
@@ -3358,18 +3576,6 @@
    trigger card now renders the shipped `SegmentedControl` primitive, whose track,
    segments and per-option success/danger tints live in that component's own scoped
    styles.) */
-
-/* Tier-step row (issue 975): the trigger's third effect gets its OWN row below the
-   outcome/break row. At the pinned 1280 manager geometry the trigger card has roughly
-   651px, and the outcome toggle plus the break pill already spend about 476px of it —
-   a four-segment control plus an operand does not fit the remainder, and
-   `.manager-checks-trigger-bottom` wraps, so it would wrap at the DEFAULT width. */
-.fabricate-manager .manager-checks-trigger-step-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  gap: var(--fab-space-3);
-}
 
 /* The four-segment mode control hugs its content and wraps as a unit rather than
    being squeezed narrower than its labels. */

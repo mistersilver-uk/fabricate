@@ -192,3 +192,89 @@ export function summariseEffect(trigger = {}, context = {}) {
 
   return clauses.length === 0 ? [{ ...copy(['SummaryNoEffect', 'nothing changes']), data: {} }] : clauses;
 }
+
+/**
+ * WHAT THE COLLAPSED HEAD SHOWS (issue 1096).
+ *
+ * A trigger list collapses, so the head has to carry the effect at a glance: a glyph tile and a
+ * short result chip beside the condition sentence. The prototype models exactly two of these —
+ * a step-up (`fa-arrow-up`, the info family) and a step-down (`fa-arrow-down`, the warning
+ * family) — and nothing else, because its mockup world authors nothing else.
+ *
+ * The other effect shapes are REAL and shipped, so they are given the same treatment rather than
+ * being left blank: the prototype's rule is "the tile and the chip name the effect", and a
+ * forced outcome or a tool break is an effect. Each takes the glyph and the semantic family its
+ * own vocabulary already uses elsewhere in this manager.
+ *
+ * ONE effect wins the head even when a trigger carries several, and the order is the prototype's
+ * own reading: its second card both steps down AND breaks tools, and its chip says `Step down 1`.
+ * A tier step is the most specific statement about the result, a forced outcome is the next, and
+ * a bare tool break is the last. The full combination is still stated in prose by
+ * `summariseEffect` under the title.
+ *
+ * @param {object} trigger The whole trigger.
+ * @param {object} [context]
+ * @param {Record<string, string>} [context.tierNames] Outcome tier names by id.
+ * @param {boolean} [context.progressive] Whether this check awards rather than passes.
+ * @param {boolean} [context.showBreakTools] Whether tool breakage is authored on this check.
+ * @returns {{glyph: string, tone: string, chip: ({key: string, fallback: string, data: object}|null)}}
+ *   `chip` is null when nothing is in force — a trigger that changes nothing states that in its
+ *   own prose line and does not need a chip repeating it.
+ */
+export function summariseHeadline(trigger = {}, context = {}) {
+  const { tierNames = {}, progressive = false, showBreakTools = false } = context;
+  const step = trigger?.tierStep ?? {};
+  const steps = String(Math.max(1, Number(step.steps) || 1));
+
+  if (step.mode === 'up' || step.mode === 'down') {
+    const up = step.mode === 'up';
+    return {
+      glyph: up ? 'fas fa-arrow-up' : 'fas fa-arrow-down',
+      tone: up ? 'info' : 'warning',
+      chip: {
+        ...copy(up ? ['ChipStepUp', 'Step up {steps}'] : ['ChipStepDown', 'Step down {steps}']),
+        data: { steps },
+      },
+    };
+  }
+  if (step.mode === 'target') {
+    return {
+      glyph: 'fas fa-bullseye',
+      tone: 'info',
+      chip: {
+        ...copy(['ChipStepTarget', 'Becomes {tier}']),
+        // A nested fragment rather than a bare fallback string: the caller's `phrase()` resolves
+        // an object-valued datum through its own localization bridge, so the unset reading is
+        // translated instead of being pinned to English.
+        data: {
+          tier: tierNames[step.tierId] ?? copy(['SummaryStepTargetUnset', 'a tier that is not set']),
+        },
+      },
+    };
+  }
+  if (trigger?.outcome === 'success' || trigger?.outcome === 'failure') {
+    const success = trigger.outcome === 'success';
+    return {
+      glyph: success ? 'fas fa-circle-check' : 'fas fa-circle-xmark',
+      tone: success ? 'success' : 'danger',
+      chip: {
+        ...copy(
+          success
+            ? (progressive ? ['ChipAwardAll', 'Award all'] : ['ChipForceSuccess', 'Automatic success'])
+            : (progressive ? ['ChipAwardNone', 'Award none'] : ['ChipForceFailure', 'Automatic failure'])
+        ),
+        data: {},
+      },
+    };
+  }
+  // Same authority gate `summariseEffect` applies: under `toolSpecific` a check never breaks
+  // tools, so a chip claiming it would name an effect the engine will not run.
+  if (showBreakTools && trigger?.breakTools === true) {
+    return {
+      glyph: 'fas fa-hammer',
+      tone: 'warning',
+      chip: { ...copy(['ChipBreakTools', 'Tools break']), data: {} },
+    };
+  }
+  return { glyph: 'fas fa-bolt', tone: 'neutral', chip: null };
+}

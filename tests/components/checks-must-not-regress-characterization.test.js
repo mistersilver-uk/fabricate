@@ -36,6 +36,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
+import { flushSync } from '../../node_modules/svelte/src/index-client.js';
+
 import {
   CHECKS_TREE_COMPILED_MODULES,
   CHECKS_TREE_RAW_MODULES,
@@ -137,6 +139,29 @@ function mountChecks(props, section = '') {
     button.click();
     return Promise.resolve().then(() => target);
   });
+}
+
+/**
+ * Open a trigger's disclosure so its controls are in the document.
+ *
+ * Issue 1096 collapsed the trigger list — a check with three triggers used to draw three full
+ * editors, taller than the pane. The CAPABILITIES pinned below are unchanged; they simply live
+ * one click deeper now, so each case that reaches a trigger control opens it first.
+ *
+ * @param {HTMLElement} target Mounted root.
+ * @param {string} id The trigger id.
+ * @returns {HTMLElement} The trigger's card.
+ */
+function openTrigger(target, id) {
+  const disclosure = target.querySelector(`[data-trigger-disclosure="${id}"]`);
+  assert.ok(Boolean(disclosure), `the head of trigger ${id} renders`);
+  disclosure.click();
+  flushSync();
+  assert.ok(
+    Boolean(target.querySelector(`[data-trigger-body="${id}"]`)),
+    `the head of trigger ${id} opens its body`
+  );
+  return target.querySelector(`[data-trigger="${id}"]`);
 }
 
 describe('1093 must-not-regress — the states the prototype never depicts', () => {
@@ -280,7 +305,7 @@ describe('1093 must-not-regress — the states the prototype never depicts', () 
       'triggers'
     );
     assert.ok(
-      withGate.querySelector('[data-trigger="trg-1"] [data-trigger-break]'),
+      openTrigger(withGate, 'trg-1').querySelector('[data-trigger-break]'),
       'checkDriven exposes the per-trigger break-tools toggle'
     );
     harness.remount();
@@ -293,9 +318,8 @@ describe('1093 must-not-regress — the states the prototype never depicts', () 
       },
       'triggers'
     );
-    assert.equal(
-      withoutGate.querySelector('[data-trigger="trg-1"] [data-trigger-break]'),
-      null,
+    assert.ok(
+      !openTrigger(withoutGate, 'trg-1').querySelector('[data-trigger-break]'),
       'toolSpecific hides it: each tool’s own mode decides'
     );
     harness.remount();
@@ -347,7 +371,7 @@ describe('1093 must-not-regress — the states the prototype never depicts', () 
       'triggers'
     );
     const segments = [
-      ...target.querySelectorAll('[data-trigger="trg-1"] [data-trigger-outcome]'),
+      ...openTrigger(target, 'trg-1').querySelectorAll('[data-trigger-outcome]'),
     ].map((segment) => segment.getAttribute('data-trigger-outcome'));
     assert.deepEqual(
       segments,
@@ -372,7 +396,7 @@ describe('1093 must-not-regress — the states the prototype never depicts', () 
       },
       'triggers'
     );
-    const select = target.querySelector('[data-trigger="trg-1"] [data-trigger-condition-type]');
+    const select = openTrigger(target, 'trg-1').querySelector('[data-trigger-condition-type]');
     assert.ok(select, 'the condition-type control renders');
     const values = [...select.querySelectorAll('option')].map((option) => option.value);
     assert.ok(

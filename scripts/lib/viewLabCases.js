@@ -4998,14 +4998,23 @@ export const VIEW_LAB_CASES = Object.freeze([
       'Checks',
       { selector: '#manager-checks-nav-crafting' },
       { selector: '#checks-section-triggers' },
+      // The list COLLAPSES (issue 1096), so the subject of this case — the tier-step row — is
+      // not in the document until its trigger is opened. Clicking the head is what a GM does
+      // and is the only way to reach it; without this step the case would fail rather than
+      // quietly photograph a fold, because the anchor below resolves to nothing.
+      { selector: '[data-trigger-disclosure="rw-trig-step-up"]' },
       // Anchored on a NAMED trigger's own tier-step row, never on "the row's last control":
       // which control that is depends on the mode, so a mode change would silently move the
       // anchor. `scrollIntoViewIfNeeded` lands it near the bottom edge, so anchoring the
-      // second (and last) authored trigger frames both cards — the `target` tier select
-      // above and this one's step count — rather than one card and a fold.
+      // second (and last) authored trigger frames both cards — the collapsed one above and
+      // this one's expanded body — rather than one card and a fold.
       { selector: '[data-trigger="rw-trig-step-up"] [data-trigger-tier-step]', scroll: true },
     ],
     expectView: 'checks-crafting',
+    // The route alone is not enough here: the case is named for a control that only exists
+    // once the disclosure above has actually opened, and a click that no-oped would leave the
+    // right screen showing the wrong state.
+    expectSelector: '[data-trigger="rw-trig-step-up"] [data-trigger-tier-step]',
     kinds: ['manager', 'checks'],
     sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/checks\/CheckTriggers\.svelte$/],
   }),

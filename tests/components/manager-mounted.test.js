@@ -4048,16 +4048,15 @@ describe('CraftingSystemManager mounted behavior', () => {
     const triggers = target.querySelector('[data-check-triggers]');
     assert.ok(triggers, 'the unified trigger editor renders');
     assert.equal(triggers.querySelectorAll('[data-trigger]').length, 2, 'both triggers render');
-    // Under toolSpecific authority the outcome toggle is available but the break pill is not.
-    const c2 = triggers.querySelector('[data-trigger="c2"]');
+    // Under toolSpecific authority the outcome toggle is available but the break card is not.
+    const c2 = openTrigger(triggers, 'c2');
     assert.ok(
       c2.querySelector('[data-trigger-outcome="success"]').classList.contains('is-active'),
       'the success trigger shows the Automatic success segment selected'
     );
-    assert.equal(
-      triggers.querySelector('[data-trigger-break]'),
-      null,
-      'no break pill under toolSpecific'
+    assert.ok(
+      !triggers.querySelector('[data-trigger-break]'),
+      'no break card under toolSpecific'
     );
 
     // Choosing a segment emits the new outcome.
@@ -4172,7 +4171,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     // outcome toggle is relabelled award-all/award-none rather than success/failure.
     const triggers = target.querySelector('[data-check-triggers]');
     assert.ok(triggers, 'the unified trigger editor renders');
-    const c1Triggers = triggers.querySelector('[data-trigger="c1"]');
+    const c1Triggers = openTrigger(triggers, 'c1');
     assert.ok(
       c1Triggers.querySelector('[data-trigger-outcome="success"]').classList.contains('is-active'),
       'the success trigger selects the award-all segment'
@@ -4188,11 +4187,10 @@ describe('CraftingSystemManager mounted behavior', () => {
       optionLabels.some((label) => label.includes('Award none')),
       'failure reads "Award none"'
     );
-    // Default toolSpecific authority hides the per-trigger break pill.
-    assert.equal(
-      triggers.querySelector('[data-trigger-break]'),
-      null,
-      'no break pill under toolSpecific'
+    // Default toolSpecific authority hides the per-trigger break card.
+    assert.ok(
+      !triggers.querySelector('[data-trigger-break]'),
+      'no break card under toolSpecific'
     );
 
     // The award-mode selector renders, defaults to equal, and emits the chosen mode.
@@ -4251,6 +4249,28 @@ describe('CraftingSystemManager mounted behavior', () => {
     radio.dispatchEvent(new globalThis.window.Event('change', { bubbles: true }));
     flushSync();
     return radio;
+  }
+
+  // A trigger's controls sit behind a disclosure (issue 1096): a check with three triggers
+  // used to draw three full editors, taller than the pane. Open the one under test first.
+  function openTrigger(root, id) {
+    const disclosure = root.querySelector(`[data-trigger-disclosure="${id}"]`);
+    assert.ok(Boolean(disclosure), `the head of trigger ${id} renders`);
+    disclosure.click();
+    flushSync();
+    const card = root.querySelector(`[data-trigger="${id}"]`);
+    assert.ok(
+      Boolean(card.querySelector(`[data-trigger-body="${id}"]`)),
+      `the head of trigger ${id} opens its body`
+    );
+    return card;
+  }
+
+  /** Open the FIRST trigger a container renders, for cases that do not name one. */
+  function openFirstTrigger(root) {
+    const first = root.querySelector('[data-trigger]');
+    assert.ok(Boolean(first), 'at least one trigger renders');
+    return openTrigger(root, first.getAttribute('data-trigger'));
   }
 
   const breakageTriggers = {
@@ -4328,21 +4348,20 @@ describe('CraftingSystemManager mounted behavior', () => {
       mountCheckEditor(editorCase.component(), editorCase.value(), 'toolSpecific');
       const triggers = target.querySelector('[data-check-triggers]');
       assert.ok(triggers, 'the unified trigger editor renders under toolSpecific authority');
+      const card = openFirstTrigger(triggers);
       // The outcome toggle is always available (forcing works under both authorities).
       assert.ok(
-        triggers.querySelector('[data-trigger-outcome]'),
+        card.querySelector('[data-trigger-outcome]'),
         'the outcome toggle renders under toolSpecific'
       );
-      // The break-tools pill is gated off under toolSpecific.
-      assert.equal(
-        triggers.querySelector('[data-trigger-break]'),
-        null,
-        'the per-trigger break pill is hidden under toolSpecific'
+      // The break-tools card is gated off under toolSpecific.
+      assert.ok(
+        !card.querySelector('[data-trigger-break]'),
+        'the per-trigger break card is hidden under toolSpecific'
       );
       // The free-text label input is gone entirely.
-      assert.equal(
-        triggers.querySelector('[data-breakage-trigger-label]'),
-        null,
+      assert.ok(
+        !triggers.querySelector('[data-breakage-trigger-label]'),
         'no trigger label input remains'
       );
     });
@@ -4351,13 +4370,14 @@ describe('CraftingSystemManager mounted behavior', () => {
       mountCheckEditor(editorCase.component(), editorCase.value(), 'checkDriven');
       const triggers = target.querySelector('[data-check-triggers]');
       assert.ok(triggers, 'the unified trigger editor renders under checkDriven authority');
+      const card = openFirstTrigger(triggers);
       assert.ok(
-        triggers.querySelector('[data-trigger-outcome]'),
+        card.querySelector('[data-trigger-outcome]'),
         'the outcome toggle renders under checkDriven'
       );
       assert.ok(
-        triggers.querySelector('[data-trigger-break]'),
-        'the per-trigger break pill renders under checkDriven'
+        card.querySelector('[data-trigger-break]'),
+        'the per-trigger break card renders under checkDriven'
       );
     });
   }
@@ -4410,15 +4430,15 @@ describe('CraftingSystemManager mounted behavior', () => {
       'a new trigger breaks tools by default under checkDriven'
     );
 
-    // The existing trigger's break pill renders (checkDriven) and toggles breakTools.
-    const breakPill = target.querySelector('[data-trigger="c1"] [data-trigger-break]');
-    assert.ok(breakPill, 'the break pill renders under checkDriven');
-    breakPill.click();
+    // The existing trigger's break card renders (checkDriven) and its switch toggles breakTools.
+    const breakSwitch = openTrigger(target, 'c1').querySelector('[data-trigger-break]');
+    assert.ok(breakSwitch, 'the break card renders under checkDriven');
+    breakSwitch.click();
     flushSync();
     assert.equal(
       emitted.at(-1).checkBreakage.triggers.find((t) => t.id === 'c1').breakTools,
       false,
-      'clicking the break pill toggles breakTools off'
+      'clicking the break switch toggles breakTools off'
     );
   });
 
@@ -4441,7 +4461,7 @@ describe('CraftingSystemManager mounted behavior', () => {
       },
       'checkDriven'
     );
-    const tierTrigger = target.querySelector('[data-trigger="t1"]');
+    const tierTrigger = openTrigger(target, 't1');
     const successSeg = tierTrigger.querySelector('[data-trigger-outcome="success"]');
     const noneSeg = tierTrigger.querySelector('[data-trigger-outcome="none"]');
     assert.ok(successSeg, 'the outcome toggle renders for an outcomeTier trigger');
@@ -4495,12 +4515,12 @@ describe('CraftingSystemManager mounted behavior', () => {
       gatheringResolutionMode: 'routed',
       gatheringCheckRouted: routedBreakageValue,
     }, 'triggers');
-    // Crafting (always on) honours the system authority and shows the break pill.
+    // Crafting (always on) honours the system authority and shows the break card.
     const craftingTriggers = target.querySelector('[data-check-triggers]');
     assert.ok(craftingTriggers, 'crafting editor renders the unified triggers');
     assert.ok(
-      craftingTriggers.querySelector('[data-trigger-break]'),
-      'crafting break pill renders under checkDriven authority'
+      openFirstTrigger(craftingTriggers).querySelector('[data-trigger-break]'),
+      'crafting break card renders under checkDriven authority'
     );
 
     // Gathering is an opt-in feature: with it off, its Checks tab is not offered at
@@ -5014,7 +5034,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     // stepping is a per-trigger effect now, and it is no longer relative-only.
     mountCheckEditor(CraftingCheckEditorComponent, routedBreakageValue, 'toolSpecific');
     assert.ok(
-      target.querySelector('[data-trigger="c1"] [data-trigger-tier-step]'),
+      openTrigger(target, 'c1').querySelector('[data-trigger-tier-step]'),
       'a relative routed check offers the per-trigger tier step'
     );
 
@@ -5028,7 +5048,7 @@ describe('CraftingSystemManager mounted behavior', () => {
       'toolSpecific'
     );
     assert.ok(
-      target.querySelector('[data-trigger="c1"] [data-trigger-tier-step]'),
+      openTrigger(target, 'c1').querySelector('[data-trigger-tier-step]'),
       'a FIXED routed check offers it too — stepping is no longer type-scoped'
     );
   });
@@ -5053,7 +5073,9 @@ describe('CraftingSystemManager mounted behavior', () => {
         'triggers'
       );
       assert.ok(
-        target.querySelector(`[data-checks-panel="${activity}"] [data-trigger-tier-step]`),
+        openFirstTrigger(
+          target.querySelector(`[data-checks-panel="${activity}"] [data-check-triggers]`)
+        ).querySelector('[data-trigger-tier-step]'),
         `${activity} offers the per-trigger tier step`
       );
       unmount(mounted);
@@ -5097,7 +5119,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     flushSync();
     await openChecksSection('triggers');
 
-    const card = target.querySelector('[data-trigger="c1"]');
+    const card = openTrigger(target, 'c1');
     assert.ok(
       card.querySelector('[data-trigger-tier-step-mode="target"]').classList.contains('is-active'),
       'cloneCheckBreakage reads the persisted tierStep back into the draft'

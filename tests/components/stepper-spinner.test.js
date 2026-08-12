@@ -181,7 +181,7 @@ describe('numeric steppers suppress the native spinner (issue 1036)', () => {
     );
   });
 
-  it('leaves exactly the two registered bare number fields, and no others', () => {
+  it('leaves exactly the registered bare number fields, and no others', () => {
     // The register is drift-guarded in BOTH directions. A third bare field appearing anywhere
     // fails as an unmigrated field; a register entry whose file no longer holds a bare field fails
     // as a stale allowlist, so migrating either one later cannot leave dead permission behind.
@@ -192,10 +192,13 @@ describe('numeric steppers suppress the native spinner (issue 1036)', () => {
         + 'non-reuse register:\n  '
         + BARE_NUMBER_FIELD_REGISTER.map((entry) => `${entry.register} ${entry.path}: ${entry.reason}`).join('\n  ')
     );
+    // Derived from the register's own length rather than hard-coded, so adding an entry cannot
+    // hide a SECOND bare field appearing in an already-registered file: the claim being pinned is
+    // "one per entry", and that claim is what the total states.
     assert.equal(
       [...bareFieldCounts.values()].reduce((total, count) => total + count, 0),
-      2,
-      'each register entry holds exactly one bare field, so the total is two'
+      BARE_NUMBER_FIELD_REGISTER.length,
+      'each register entry holds exactly one bare field, so the total is the register length'
     );
   });
 
