@@ -1599,7 +1599,8 @@ It keeps every convention the settings-list cards already have and the Checks ca
   No stored value changes — the affix only ever supplied the sigil on write, so a persisted path already carries it.
   The summary row reads the stored expression back verbatim for the same reason;
 - the two BLOCKING bounds faults, reported on the COLLAPSED row and named by cause (`inverted` / `unsafe`), because an entry that contributes nothing is a fault a GM scanning the list must be able to see;
-- a **roll-shaped expression** warning on the open editor, stating that gathering rows may use it and a check may not, and that any check selecting it reports a blocking issue.
+- a **roll-shaped expression** note on the open editor, stating that EVERY activity may use it: a gathering drop row applies its rolled result, and a check appends the dice to its roll formula so the roll is made once and shows on the card, and that where modifiers compete — `highest`, or `playerPicks` — such an entry is ranked by its average.
+  It is a NOTE, not a warning, and it raises no readiness issue: the blocking `modifierRollExpression` is RETIRED, because there is nothing left to report about an entry that rolls.
 
 The summary row keeps its `@`-stripped inline expression and its `Roll` chip, and gains the signed bounds chip.
 The Checks screens' read-only modifier cards deep-link here, expanding the section and scrolling it into view; the link goes through the same route-exit guard every other manager navigation does, so leaving a dirty Checks draft still prompts.
