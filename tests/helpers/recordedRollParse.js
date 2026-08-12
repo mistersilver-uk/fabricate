@@ -354,6 +354,67 @@ export const RECORDED_ROLL_PARSE_14_365 = Object.freeze({
     threw: false,
     terms: [{ class: 'FunctionTerm', isIntermediate: true, isDeterministic: false }],
   },
+  // A BOUNDED ROLLING CHECK MODIFIER, verbatim from `buildModifierRollFragment` (issue 1118)
+  // and appended by `appendCheckModifierRollTerms`. This is the shape every system with a
+  // clamped rolling modifier authors, and the recording is what pins the fact the enumerator
+  // turns on: `flattenTree` pushes the whole `min(...)` as ONE `FunctionTerm`, so the dice
+  // inside it are invisible to any top-level term scan.
+  // The SAME preview formula with a rolling modifier appended instead of a flat one. Both
+  // arms of `checkPreview.test.js`'s catalogue case are recorded, so neither is graded
+  // against a modelled parse.
+  '1d20 + 3[Tools]': {
+    threw: false,
+    terms: [
+      {
+        class: 'Die',
+        faces: 20,
+        number: 1,
+        denomination: 'd20',
+        modifiers: [],
+        roll: '@@undefined',
+        isIntermediate: false,
+        isDeterministic: false,
+      },
+      { class: 'OperatorTerm', isIntermediate: false, isDeterministic: true },
+      { class: 'NumericTerm', number: 3, isIntermediate: false, isDeterministic: true },
+    ],
+  },
+  '1d20 + 3[Tools] + min(max((1d8), -1), 6)[Modifiers]': {
+    threw: false,
+    terms: [
+      {
+        class: 'Die',
+        faces: 20,
+        number: 1,
+        denomination: 'd20',
+        modifiers: [],
+        roll: '@@undefined',
+        isIntermediate: false,
+        isDeterministic: false,
+      },
+      { class: 'OperatorTerm', isIntermediate: false, isDeterministic: true },
+      { class: 'NumericTerm', number: 3, isIntermediate: false, isDeterministic: true },
+      { class: 'OperatorTerm', isIntermediate: false, isDeterministic: true },
+      { class: 'FunctionTerm', isIntermediate: true, isDeterministic: false },
+    ],
+  },
+  '1d20 + min(max((1d8), -1), 6)[Modifiers]': {
+    threw: false,
+    terms: [
+      {
+        class: 'Die',
+        faces: 20,
+        number: 1,
+        denomination: 'd20',
+        modifiers: [],
+        roll: '@@undefined',
+        isIntermediate: false,
+        isDeterministic: false,
+      },
+      { class: 'OperatorTerm', isIntermediate: false, isDeterministic: true },
+      { class: 'FunctionTerm', isIntermediate: true, isDeterministic: false },
+    ],
+  },
   '1d20 +': { threw: true, error: 'peg$SyntaxError' },
   '1d20 + (': { threw: true, error: 'peg$SyntaxError' },
   'max(1d20,': { threw: true, error: 'peg$SyntaxError' },

@@ -339,6 +339,37 @@ function readBalanced(source, start) {
  * @returns {Array<object>} Roll terms in infix order.
  * @throws {SyntaxError} On a malformed or half-typed formula.
  */
+/**
+ * Split an argument list on its TOP-LEVEL commas only.
+ *
+ * `String#split(',')` was the first spelling and it is wrong for the one formula shape this
+ * whole lab exists to render: a bounded rolling check modifier emits
+ * `min(max((1d8), -1), 6)`, whose outer argument list is `max((1d8), -1)` and `6`. Splitting
+ * on every comma cuts the inner call in half, and `readBalanced` then throws
+ * `Unbalanced parenthesis` out of a `Roll.parse` the real client parses without complaint —
+ * so the View Lab's odds panel would fail on exactly the formula the histogram is for, and
+ * one failing selector fails a capture job whole.
+ *
+ * @param {string} inner The text between the brackets.
+ * @returns {string[]} One entry per top-level argument.
+ */
+function splitArguments(inner) {
+  const parts = [];
+  let depth = 0;
+  let start = 0;
+  for (let index = 0; index < inner.length; index += 1) {
+    const character = inner[index];
+    if (character === '(' || character === '{') depth += 1;
+    else if (character === ')' || character === '}') depth -= 1;
+    else if (character === ',' && depth === 0) {
+      parts.push(inner.slice(start, index));
+      start = index + 1;
+    }
+  }
+  parts.push(inner.slice(start));
+  return parts;
+}
+
 function parseLabTerms(source) {
   const terms = [];
   let cursor = 0;
@@ -407,7 +438,7 @@ function readOperand(source, cursor, rest, terms) {
     if (closing === -1) throw new SyntaxError(`Unbalanced pool brace in "${source}"`);
     const inner = source.slice(cursor + 1, closing);
     const trailing = /^[a-z]+[<>=]?-?\d*/i.exec(source.slice(closing + 1));
-    const parts = inner.split(',').flatMap((part) => parseLabTerms(part));
+    const parts = splitArguments(inner).flatMap((part) => parseLabTerms(part));
     // `PoolTerm#isDeterministic` is `terms.every(...)`, and — unlike a parenthetical or a
     // function term — the recorded shape reports `isIntermediate: false`.
     terms.push({
@@ -437,12 +468,25 @@ function readOperand(source, cursor, rest, terms) {
     return number[0].length;
   }
 
+  // A UNARY SIGN, which the grammar allows in front of any operand and which a bounded
+  // rolling check modifier always produces: `min(max((1d8), -1), 6)` opens its second
+  // argument with one. The double used to refuse it outright, so the lab could not parse the
+  // formula the real client parses — and a Roll double that is STRICTER than core fails the
+  // panel on a formula that works in the product, which is the mirror of the
+  // looser-double trap this file exists to close.
+  if ((rest.startsWith('-') || rest.startsWith('+')) && rest.length > 1) {
+    const consumed = readOperand(source, cursor + 1, rest.slice(1), terms);
+    const operand = terms.at(-1);
+    if (rest.startsWith('-') && operand?.class === 'NumericTerm') operand.number = -operand.number;
+    return consumed + 1;
+  }
+
   const fn = LAB_FUNCTION.exec(rest);
   if (fn) {
     const { inner, end } = readBalanced(source, cursor + fn[0].length - 1);
     // `FunctionTerm#isDeterministic` is `this.terms.every(t => Roll.create(t).isDeterministic)`,
     // so it recurses; a comma-separated argument list is parsed argument by argument.
-    const parts = inner.split(',').flatMap((part) => parseLabTerms(part));
+    const parts = splitArguments(inner).flatMap((part) => parseLabTerms(part));
     terms.push({
       class: 'FunctionTerm',
       fn: fn[1],
