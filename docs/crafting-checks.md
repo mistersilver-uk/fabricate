@@ -44,7 +44,7 @@ When an optional check is switched off, the page collapses to a single section o
 
 Fabricate checks each activity page as you edit it.
 A section with something to fix carries a dot on the strip, and the same issue is counted on that activity's entry in the rail.
-The **Checks** entry itself totals the three activity counts.
+The **Checks** entry itself totals the counts of the activity pages it is showing you, so a hidden feature's stale issues never badge a page you cannot open to clear them.
 **Validation** restates that same total, so it is never added on top of it.
 
 Those counts and dots read your **unsaved** edits, so you can see what an edit would fix before committing to it.
