@@ -2053,6 +2053,94 @@ export const VIEW_LAB_CASES = Object.freeze([
     ],
   }),
   managerCase({
+    id: 'manager-checks-salvage-on-failure',
+    label: 'Manager — Checks salvage on failure',
+    // BEYOND the smoke, and beyond every previous build: this SECTION HAS NEVER EXISTED.
+    // Until issue 1098 the salvage route's On-failure section rendered the shared "nothing
+    // to set here" empty state, which was true of the screen and false of the data —
+    // `consumeComponentOnFail` and `breakToolsOnFail` have been persisted since 1.7.0 and
+    // were reachable from no editor at all.
+    //
+    // `lab-runework` is the system that authors BOTH of them at their non-default values
+    // (`consumeComponentOnFail: false`, `breakToolsOnFail: true`), so the frame photographs
+    // persisted state rather than two defaults, and its salvage policy is `always`.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-runework' },
+    steps: [
+      'Checks',
+      { selector: '#manager-checks-nav-salvage' },
+      { selector: '#checks-section-on-failure' },
+    ],
+    expectView: 'checks-salvage',
+    expectSelector:
+      '.fabricate-manager [data-failure-result-policy="salvage"]' +
+      ' ~ [data-salvage-failure-consumption]',
+    kinds: ['manager', 'checks'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/checks\//,
+      /^src\/ui\/svelte\/apps\/manager\/.*Check/,
+    ],
+  }),
+  managerCase({
+    id: 'manager-checks-gathering-on-failure',
+    label: 'Manager — Checks gathering on failure',
+    // The activity that renders the policy and NO consumption toggles, because it has no
+    // consumption block — plus the dormancy notice naming issue 683 and the read-only
+    // `task.failureOutcome` cross-reference in its no-record state. The absence of the
+    // toggles is the subject as much as the presence of the policy, and an absence is only
+    // judgeable from a photograph.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-herbalism' },
+    steps: [
+      'Checks',
+      { selector: '#manager-checks-nav-gathering' },
+      { selector: '#checks-section-on-failure' },
+    ],
+    expectView: 'checks-gathering',
+    expectSelector:
+      '.fabricate-manager [data-checks-panel="gathering"]' +
+      ':has([data-failure-result-policy="gathering"])' +
+      ':has([data-gathering-failure-dormant])' +
+      ':has([data-gathering-failure-outcome-empty])' +
+      ':not(:has([data-salvage-failure-consumption]))' +
+      ':not(:has([data-failure-consumption]))',
+    kinds: ['manager', 'checks'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/checks\//,
+      /^src\/ui\/svelte\/apps\/manager\/.*Check/,
+    ],
+  }),
+  managerCase({
+    id: 'manager-recipe-edit-results-failure-tier',
+    label: 'Manager — Recipe edit results failure tier',
+    // DECISION 7, and the only frame of it: a routed-by-check recipe's result-group card
+    // offering a FAILURE-MARKED outcome tier, which is reachable only because
+    // `lab-runework`'s crafting check authors `failureResultPolicy: 'always'`. Under the
+    // `never` every other routed system would carry, the picker offers success tiers only
+    // and this frame would be indistinguishable from `coverage-mode-routed-check-results`.
+    //
+    // The selector names `rw-ruined` — the world's one `success: false` tier —
+    // rather than counting options, because a count would pass on three success tiers.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-runework' },
+    steps: [
+      'Crafting',
+      { selector: '.manager-icon-button[aria-label^="Edit"]' },
+      { selector: '#recipe-tab-results' },
+      { selector: '[data-recipe-add="routing-option"]' },
+    ],
+    expectView: 'recipe-edit',
+    kinds: ['manager', 'recipes', 'resolution-mode'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/recipe\//,
+      /^src\/systems\/ResolutionModeService\.js$/,
+      /^src\/utils\/routedOutcomeKeywords\.js$/,
+    ],
+  }),
+  managerCase({
     id: 'manager-checks-crafting-modifiers',
     label: 'Manager — Checks crafting modifiers',
     smokeLabels: ['manager-checks-crafting-modifiers'],

@@ -13,6 +13,7 @@
   } from '../../../../gatheringImageDefaults.js';
   import { localize, notifyInfo, notifyWarn } from '../../util/foundryBridge.js';
   import { resolveDropUuid } from '../../util/dropUtils.js';
+  import { permitsFailureResults } from '../../../../utils/failureResultPolicy.js';
   import {
     routedOutcomeTierOptions,
     routedTierOptionsForPolicy,
@@ -707,6 +708,13 @@
   // — both empty the option list above, but each needs a different hint.
   const recipeRoutedHasOutcomeTiers = $derived.by(() =>
     routedHasOutcomeTiers(selectedSystem?.craftingCheck?.routed)
+  );
+  // Whether this system's crafting failure-result policy permits results on a failed check
+  // (issue 1098). Read through the shared predicate rather than compared to a literal, so
+  // the editor's third empty hint and the engine's routing decision cannot disagree about
+  // what an absent or unrecognized value means.
+  const recipeFailureResultsAllowed = $derived(
+    permitsFailureResults(selectedSystem?.craftingCheck?.failureResultPolicy)
   );
 
   // Salvage feature gate + the inputs the per-component salvage editor needs.
@@ -7837,6 +7845,7 @@
         routingProvider={recipeRoutingProvider}
         routedOutcomeTierOptions={recipeRoutedOutcomeTierOptions}
         routedOutcomeTiersDefined={recipeRoutedHasOutcomeTiers}
+        routedFailureResultsAllowed={recipeFailureResultsAllowed}
         alchemy={recipeAlchemy}
         signatureConflicts={recipeSignatureConflicts}
         onOpenComponent={(componentId) => editComponent(componentId)}

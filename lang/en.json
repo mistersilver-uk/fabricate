@@ -2171,6 +2171,7 @@
           "RoutingSearchOutcomeTiers": "Search outcomes...",
           "RoutingNoOutcomeTiers": "Define outcome tiers in the routed crafting check first.",
           "RoutingNoSuccessOutcomeTiers": "No outcome tier is marked as a Success. Mark one as Success in the crafting check to route a result set to it.",
+          "RoutingNoSuccessOutcomeTiersPolicy": "Every outcome tier on this check is a failure, and this system produces nothing on a failed check. Mark a tier as a Success, or let failed checks produce a result on the crafting check’s On failure section.",
           "RoutingRemove": "Remove",
           "AddResultItem": "Add item",
           "RemoveResultItem": "Remove item",

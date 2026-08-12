@@ -94,6 +94,12 @@
     routingProvider = null,
     routedOutcomeTierOptions = [],
     routedOutcomeTiersDefined = false,
+    // Whether the system's crafting failure-result policy permits results on a failed
+    // check (issue 1098, decision 7). It is what makes `routedOutcomeTierOptions` above
+    // the UNFILTERED tier list, and it is forwarded so the group card's empty hint can
+    // name the policy as a remedy rather than only "mark a tier as Success". A tab prop
+    // that is not ALSO forwarded through this wrapper silently defaults.
+    routedFailureResultsAllowed = false,
     // Alchemy enable-blocker inputs (issue 549): the alchemy context ({ checkMode })
     // for an alchemy system (null otherwise) and the cross-recipe signature conflicts
     // touching this recipe. Threaded through this wrapper so the Validation tab and
@@ -553,6 +559,7 @@
             {onOpenComponent}
             outcomeTierOptions={routedOutcomeTierOptions}
             outcomeTiersDefined={routedOutcomeTiersDefined}
+            failureResultsAllowed={routedFailureResultsAllowed}
             onAssignIngredientSet={assignIngredientSet}
             onUpdateResultGroups={updateResultGroups}
             onDeleteStep={deleteStepFrom('results')}

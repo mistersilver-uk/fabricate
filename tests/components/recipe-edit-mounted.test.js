@@ -1353,7 +1353,7 @@ describe('RecipeEditView (mounted)', () => {
     editHarness.remount();
   });
 
-  it('check mode: empty routing hint distinguishes no tiers from no success tiers', async () => {
+  it('check mode: empty routing hint distinguishes THREE states, not two', async () => {
     const groups = [{ id: 'grp-a', name: 'Group A', checkOutcomeIds: [], results: [] }];
 
     // No tiers authored at all → "define tiers first".
@@ -1373,20 +1373,44 @@ describe('RecipeEditView (mounted)', () => {
     );
     editHarness.remount();
 
-    // Tiers exist but none is a Success → success-filtered options empty, distinct hint.
-    const noSuccess = await mountResultGroups(groups, {
+    // Tiers exist, none can be offered, and the FAILURE-RESULT POLICY forbids failure
+    // results (issue 1098) → the third hint, which names BOTH remedies. "Mark one as
+    // Success" alone is half the story here: allowing failed checks to produce is the
+    // other, and it is the one a GM authoring a ruined-output recipe actually wants.
+    const forbiddenPolicy = await mountResultGroups(groups, {
       props: {
         routingProvider: 'check',
         routedOutcomeTierOptions: [],
         routedOutcomeTiersDefined: true,
+        routedFailureResultsAllowed: false,
       },
     });
     assert.match(
-      noSuccess.target.querySelector(
+      forbiddenPolicy.target.querySelector(
+        '[data-recipe-routing-assignment] .manager-recipe-routing-assignment-empty'
+      ).textContent,
+      /produces nothing on a failed check/,
+      'with failure-only tiers under a forbidding policy, the hint names the policy too'
+    );
+    editHarness.remount();
+
+    // The same two inputs under a PERMITTING policy keep the original sentence: the
+    // policy is not the obstacle there, so naming it would send the GM to a setting that
+    // is already correct.
+    const permittingPolicy = await mountResultGroups(groups, {
+      props: {
+        routingProvider: 'check',
+        routedOutcomeTierOptions: [],
+        routedOutcomeTiersDefined: true,
+        routedFailureResultsAllowed: true,
+      },
+    });
+    assert.match(
+      permittingPolicy.target.querySelector(
         '[data-recipe-routing-assignment] .manager-recipe-routing-assignment-empty'
       ).textContent,
       /marked as a Success/,
-      'with failure-only tiers, the hint points to marking a tier as Success'
+      'under a permitting policy the original success-tier hint stands'
     );
     editHarness.remount();
   });
