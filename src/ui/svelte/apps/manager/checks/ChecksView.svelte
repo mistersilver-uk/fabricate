@@ -1186,63 +1186,67 @@
           {/if}
 
           {#if activeSection === 'on-failure'}
-            <section class="manager-inspector-card" data-failure-consumption>
-              <h3 class="manager-checks-card-title">
-                {text(
-                  'FABRICATE.Admin.Manager.Checks.Crafting.FailureConsumptionHeading',
-                  'Failure consumption policy'
+            <!-- TWO TOP-LEVEL CARDS, as the prototype draws them, plus the note it ends the
+                 screen with. The `Failure consumption policy` card that used to wrap them was
+                 invented here: it named a policy the design does not name, and the pane head
+                 above already says what a failed check costs the character. `data-failure-
+                 consumption` rides the bare list wrapper so the smoke's anchor, the mounted
+                 suites' lookup and the alchemy absence check all keep resolving.
+
+                 The glyphs are the prototype's `fa-fire` and `fa-hammer` — the arguably more
+                 precise `fa-hammer-crash` / `fa-fire-flame-curved` were an exemption, and it
+                 has been overruled: the prototype is the authority for appearance. -->
+            <div class="manager-checks-flag-list" data-failure-consumption>
+              <ToggleCard
+                icon="fas fa-fire"
+                section="failure-consume-ingredients"
+                field="consumeIngredientsOnFail"
+                title={text(
+                  'FABRICATE.Admin.Manager.Checks.Crafting.ConsumeIngredientsOnFail',
+                  'Consume ingredients on a failed check'
                 )}
-              </h3>
-              <p class="manager-muted">
-                {text(
-                  'FABRICATE.Admin.Manager.Checks.Crafting.FailureConsumptionIntro',
-                  'What happens to a recipe’s ingredients and tools when its crafting check fails. Salvage failures follow their own separate policy.'
+                sub={text(
+                  'FABRICATE.Admin.Manager.Checks.Crafting.ConsumeIngredientsOnFailDesc',
+                  'The recipe’s ingredients are used up even when the crafting check fails. On by default.'
                 )}
-              </p>
-              <div class="manager-checks-flag-list">
-                <ToggleCard
-                  variant="is-info"
-                  icon="fas fa-fire-flame-curved"
-                  section="failure-consume-ingredients"
-                  field="consumeIngredientsOnFail"
-                  title={text(
-                    'FABRICATE.Admin.Manager.Checks.Crafting.ConsumeIngredientsOnFail',
-                    'Consume ingredients on a failed check'
-                  )}
-                  sub={text(
-                    'FABRICATE.Admin.Manager.Checks.Crafting.ConsumeIngredientsOnFailDesc',
-                    'The recipe’s ingredients are used up even when the crafting check fails. On by default.'
-                  )}
-                  toggleLabel={text(
-                    'FABRICATE.Admin.Manager.Checks.Crafting.ConsumeIngredientsOnFail',
-                    'Consume ingredients on a failed check'
-                  )}
-                  on={consumeIngredientsOnFail}
-                  onToggle={(next) =>
-                    onUpdateCraftingConsumption({ consumeIngredientsOnFail: next })}
-                />
-                <ToggleCard
-                  variant="is-info"
-                  icon="fas fa-hammer-crash"
-                  section="failure-break-tools"
-                  field="breakToolsOnFail"
-                  title={text(
-                    'FABRICATE.Admin.Manager.Checks.Crafting.BreakToolsOnFail',
-                    'Break tools on a failed check'
-                  )}
-                  sub={text(
-                    'FABRICATE.Admin.Manager.Checks.Crafting.BreakToolsOnFailDesc',
-                    'Required tools break when the crafting check fails. Off by default.'
-                  )}
-                  toggleLabel={text(
-                    'FABRICATE.Admin.Manager.Checks.Crafting.BreakToolsOnFail',
-                    'Break tools on a failed check'
-                  )}
-                  on={breakToolsOnFail}
-                  onToggle={(next) => onUpdateCraftingConsumption({ breakToolsOnFail: next })}
-                />
-              </div>
-            </section>
+                toggleLabel={text(
+                  'FABRICATE.Admin.Manager.Checks.Crafting.ConsumeIngredientsOnFail',
+                  'Consume ingredients on a failed check'
+                )}
+                on={consumeIngredientsOnFail}
+                onToggle={(next) => onUpdateCraftingConsumption({ consumeIngredientsOnFail: next })}
+              />
+              <ToggleCard
+                icon="fas fa-hammer"
+                section="failure-break-tools"
+                field="breakToolsOnFail"
+                title={text(
+                  'FABRICATE.Admin.Manager.Checks.Crafting.BreakToolsOnFail',
+                  'Break tools on a failed check'
+                )}
+                sub={text(
+                  'FABRICATE.Admin.Manager.Checks.Crafting.BreakToolsOnFailDesc',
+                  'Required tools break when the crafting check fails. Off by default.'
+                )}
+                toggleLabel={text(
+                  'FABRICATE.Admin.Manager.Checks.Crafting.BreakToolsOnFail',
+                  'Break tools on a failed check'
+                )}
+                on={breakToolsOnFail}
+                onToggle={(next) => onUpdateCraftingConsumption({ breakToolsOnFail: next })}
+              />
+            </div>
+            <!-- The sentence the wrapper's description used to carry, restored to where the
+                 prototype puts it: the last thing on the screen, and it says where the two
+                 policies this screen does NOT govern actually live. -->
+            <Callout
+              tone="info"
+              text={text(
+                'FABRICATE.Admin.Manager.Checks.Crafting.FailureSalvageNote',
+                'Salvage failures follow their own separate policy on the Salvage check. An individual trigger can also break tools on its own — see Triggers.'
+              )}
+              dataAttr="data-failure-salvage-note"
+            />
           {/if}
 
           {#if activeSection === 'modifiers'}

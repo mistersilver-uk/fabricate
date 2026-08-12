@@ -2166,13 +2166,21 @@
   min-width: 0;
 }
 
-/* Stacked list of ToggleCards inside a check card (failure consumption policy,
-   alchemy behaviour flags). */
+/* Stacked list of ToggleCards inside a check card (the alchemy behaviour flags). */
 .fabricate-manager .manager-checks-flag-list {
   display: grid;
   gap: var(--fab-space-2);
   margin-top: var(--fab-space-2);
   min-width: 0;
+}
+
+/* On failure's two flags are TOP-LEVEL cards (issue 1096), not a list inside one, so this
+   wrapper paints and offsets nothing: it takes the stack's own gutter, and the four things on
+   that screen — two flag cards and the closing note — sit at one even rhythm. The margin above
+   was the inset under a card heading that no longer exists. */
+.fabricate-manager .manager-checks-flag-list[data-failure-consumption] {
+  gap: var(--fab-space-3);
+  margin-top: 0;
 }
 
 .fabricate-manager .manager-checks-card-head {
@@ -3136,6 +3144,29 @@
 
 .fabricate-manager .manager-checks-flag-list .manager-recipe-status-sub {
   font-size: 11px;
+}
+
+/* The note the On failure screen ends on, at this studio's metrics. `Callout` is the manager's
+   shared standing-statement strip and its default is the INFO tint; the prototype draws this one
+   quietly — the surface fill and the ordinary border, with the glyph carrying the only colour —
+   because it is a pointer to two other screens rather than a hazard. Same primitive, this
+   studio's metrics, exactly as the flag list above restates `ToggleCard`. */
+.fabricate-manager .manager-callout[data-failure-salvage-note] {
+  gap: 11px;
+  align-items: flex-start;
+  padding: 13px 14px;
+  border-color: var(--fab-border);
+  border-radius: 10px;
+  color: var(--fab-text-muted);
+  background: var(--fab-surface-soft);
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1.55;
+}
+
+.fabricate-manager .manager-callout[data-failure-salvage-note] > i {
+  color: var(--fab-info);
+  font-size: 12px;
 }
 
 /* ── The Validation screen ────────────────────────────────────────────────────────────

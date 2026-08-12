@@ -3182,6 +3182,34 @@ describe('CraftingSystemManager mounted behavior', () => {
     const saved = calls.find((call) => call[0] === 'saveCraftingCheckConsumption');
     assert.ok(saved, 'toggling persists through saveCraftingCheckConsumption');
     assert.deepEqual(saved[1], { consumeIngredientsOnFail: true });
+
+    // ── The prototype's own SHAPE for this screen (issue 1096) ──────────────────────
+    // Both flags are TOP-LEVEL cards. The `Failure consumption policy` card that used to
+    // wrap them was invented here — the structural parity pass reported it as an extra
+    // card, and the exemption that excused it has been overruled rather than reworded.
+    assert.ok(
+      !target.querySelector('[data-checks-panel="crafting"] .manager-inspector-card [data-recipe-section="failure-consume-ingredients"]'),
+      'no card wraps the two failure flags'
+    );
+    // The prototype's glyphs, not the more literal ones this screen had chosen.
+    assert.ok(
+      Boolean(policy.querySelector('[data-recipe-section="failure-consume-ingredients"] i.fa-fire')),
+      'consume-on-fail wears the prototype’s fa-fire'
+    );
+    assert.ok(
+      Boolean(policy.querySelector('[data-recipe-section="failure-break-tools"] i.fa-hammer')),
+      'break-tools wears the prototype’s fa-hammer'
+    );
+    assert.ok(
+      !policy.querySelector('i.fa-fire-flame-curved, i.fa-hammer-crash'),
+      'and neither keeps the glyph the exemption used to defend'
+    );
+    // The note the prototype ends the screen with, which the removed wrapper's description
+    // was carrying — it names the two policies this screen does NOT govern.
+    const note = target.querySelector('[data-failure-salvage-note]');
+    assert.ok(Boolean(note), 'the salvage note closes the screen');
+    assert.ok(Boolean(note.querySelector('i.fa-circle-info')), 'glyph-led, as the prototype has it');
+    assert.match(note.textContent, /Salvage failures follow their own separate policy/);
   });
 
   it('points each Checks help card at the matching documentation page', () => {
