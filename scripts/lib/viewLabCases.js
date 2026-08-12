@@ -2690,6 +2690,10 @@ export const VIEW_LAB_CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/EssenceEditView\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/essences\/Essence(?:EditorTabs|IdentityTab|OnCraftTab|ValidationTab|BehaviorPreview)\.svelte$/,
+      // The rail's two synthetic tiles are built by this pure helper, and the rail renders on
+      // every tab (`showIdentity` defaults true; only the browser inspector passes false), so a
+      // change to it is visible in all three editor cases (issue 1124).
+      /^src\/ui\/svelte\/util\/essencePreviewRow\.js$/,
     ],
   }),
   managerCase({
@@ -2713,6 +2717,10 @@ export const VIEW_LAB_CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/EssenceEditView\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/essences\/Essence(?:EditorTabs|IdentityTab|OnCraftTab|ValidationTab|BehaviorPreview)\.svelte$/,
+      // The rail's two synthetic tiles are built by this pure helper, and the rail renders on
+      // every tab (`showIdentity` defaults true; only the browser inspector passes false), so a
+      // change to it is visible in all three editor cases (issue 1124).
+      /^src\/ui\/svelte\/util\/essencePreviewRow\.js$/,
     ],
   }),
   managerCase({
@@ -2735,6 +2743,10 @@ export const VIEW_LAB_CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/EssenceEditView\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/essences\/Essence(?:EditorTabs|IdentityTab|OnCraftTab|ValidationTab|BehaviorPreview)\.svelte$/,
+      // The rail's two synthetic tiles are built by this pure helper, and the rail renders on
+      // every tab (`showIdentity` defaults true; only the browser inspector passes false), so a
+      // change to it is visible in all three editor cases (issue 1124).
+      /^src\/ui\/svelte\/util\/essencePreviewRow\.js$/,
     ],
   }),
 

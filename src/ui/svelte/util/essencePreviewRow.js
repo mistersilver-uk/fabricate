@@ -5,16 +5,27 @@
 //      emits (the synthetic per-essence aggregate), so the card renders the real player
 //      essence glyph tile (`.inventory-card-essence`); and
 //   2. a fake CARRYING-COMPONENT row — an ordinary inventory item drawing a CORE Foundry
-//      icon that exists in every install (`icons/svg/item-bag.svg`) and carrying THIS
+//      icon that exists in every install ({@link SAMPLE_COMPONENT_IMAGE}) and carrying THIS
 //      essence as a pip, shaped like the component rows `InventoryListingBuilder` folds an
 //      essence's `essences[]` entry onto.
 //
 // Mirrors `recipeItemPreviewRow.js`: the editor feeds the REAL player component a synthetic
-// row so the preview can never drift from what players actually see. It imports ONLY the
-// sibling pure `craftingImageDefaults` leaf (already a harness rawModule) so the
-// mounted-test allowlist stays small.
+// row so the preview can never drift from what players actually see. It imports NOTHING, so
+// the mounted-test allowlist stays small.
 
-import { GENERIC_ITEM_IMAGE } from './craftingImageDefaults.js';
+/**
+ * The artwork the preview's fake carrying component wears.
+ *
+ * A real core Foundry pack icon, shipped in the release archive under Foundry's own `public/`
+ * root — no `systems/` prefix — so it resolves in every install whatever the game system.
+ *
+ * It is deliberately NOT `GENERIC_ITEM_IMAGE` (`icons/svg/item-bag.svg`). That path is a
+ * load-bearing "no image" SENTINEL: `resolveRecipeImage` and
+ * `InventoryListingBuilder._resolveRecipeImg` both read it as *absent* artwork, and a material
+ * tile swaps it for a fallback glyph. This tile is asserting "here is a component", not "here
+ * is a component nobody gave an image", so it needs artwork the resolvers treat as real.
+ */
+export const SAMPLE_COMPONENT_IMAGE = 'icons/containers/bags/pack-engraved-leather-leaf-tan.webp';
 
 function str(value) {
   return value == null ? '' : String(value);
@@ -78,15 +89,15 @@ export function buildEssencePreviewRow(
     contributors: [],
   };
 
-  // (2) The fake carrying component — an ordinary item on a CORE Foundry icon, carrying the
-  // one essence pip. `isEssenceSource: false` routes the card to its artwork branch.
+  // (2) The fake carrying component — an ordinary item on a CORE Foundry pack icon, carrying
+  // the one essence pip. `isEssenceSource: false` routes the card to its artwork branch.
   const componentRow = {
     key: `essence:preview:component:${id ?? 'draft'}`,
     componentId: null,
     systemId: null,
     systemName: '',
     name: str(sampleComponentName),
-    img: GENERIC_ITEM_IMAGE,
+    img: SAMPLE_COMPONENT_IMAGE,
     icon: null,
     // A carrying component has no essence colour of its own (its face is artwork, and the
     // card ignores `colorToken` on a non-essence row); carried null purely to keep both
