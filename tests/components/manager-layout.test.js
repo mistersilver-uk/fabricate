@@ -4840,6 +4840,169 @@ test('the stacked manager body sizes its regions to content instead of sharing i
   );
 });
 
+// The rail nav was unreachable in a SHORT window.
+//
+// Every rule that ever gave the rail a scroller lived in an `inline-size` container query — the
+// 1120px stacked block above and the per-view 831px ones — so a window that stayed WIDE and only
+// lost height never reached one. The rail's height is definite (the shell's `1fr` row) and it
+// carries `overflow: hidden` from the grouped region rule, so the bottom of the section list was
+// clipped: Tools, Checks, Gathering and the placeholders sat in the DOM and could not be reached
+// with a pointer. `assertManagerLayoutStable` cannot see this either — a CLIPPED rail does not
+// overflow, the same blind spot the issue-643 note above records.
+//
+// The fixture is the real shell shape on purpose: two `auto` header rows ABOVE the body, so
+// `.manager-body` lands in the `1fr` row and the rail inherits a window-bound height. Rendering
+// the body alone would put it in an implicit `auto` row, size it to its content, and the bug
+// would be unreproducible.
+function shortWindowRailMarkup(navItems) {
+  const items = Array.from({ length: navItems }, (item, index) => {
+    const last = index === navItems - 1 ? ' data-last-nav' : '';
+    return `<button class="manager-nav-button"${last}><span class="manager-nav-icon"><i class="fas fa-gem"></i></span><span class="manager-nav-label">Section ${index + 1}</span><span class="manager-nav-count">${index}</span></button>`;
+  }).join('');
+  return `<div class="fabricate-manager" data-manager-view="systems">
+      <div class="manager-titlebar" data-manager-titlebar><span>Fabricate</span></div>
+      <header class="manager-header"><h1>Crafting systems</h1></header>
+      <div class="manager-body">
+        <aside class="manager-rail">
+          <p class="manager-rail-title" data-manager-rail-section>GM management</p>
+          <section class="manager-rail-block">
+            <div class="manager-scope-card" data-scope-card>
+              <div class="manager-scope-card-head"><p class="manager-kicker">Crafting system</p><button class="manager-rail-toggle manager-scope-collapse" data-manager-rail-toggle>&lsaquo;</button></div>
+              <select class="manager-scope-select"><option>Lab Smithing</option></select>
+              <button class="manager-scope-return">All crafting systems</button>
+            </div>
+          </section>
+          <nav class="manager-nav">${items}</nav>
+        </aside>
+        <main class="manager-main"><div class="manager-table-scroll">Rows</div></main>
+        <aside class="manager-inspector"><section class="manager-inspector-card">Inspector</section></aside>
+      </div>
+    </div>`;
+}
+
+async function readShortWindowRailGeometry({ width = 1280, height = 560, navItems = 14 } = {}) {
+  const browser = await chromium.launch();
+  const page = await browser.newPage({ viewport: { width, height }, deviceScaleFactor: 1 });
+  try {
+    await page.setContent(
+      `<style>${css}</style><style>html,body{margin:0}</style><div style="width:${width}px;height:${height}px">${shortWindowRailMarkup(navItems)}</div>`
+    );
+    return await page.evaluate(() => {
+      const rail = document.querySelector('.manager-rail');
+      const nav = document.querySelector('.manager-nav');
+      const scope = document.querySelector('[data-scope-card]');
+      const last = document.querySelector('[data-last-nav]');
+      const scopeTopBefore = scope.getBoundingClientRect().top;
+      const navScrollable = nav.scrollHeight - nav.clientHeight;
+
+      // Reaching the bottom entry is the whole question, so drive the scroller rather than
+      // measuring its resting position: a clipped box reports a bottom entry that is simply
+      // off the end of the rail and stays there.
+      nav.scrollTop = nav.scrollHeight;
+
+      const navRect = nav.getBoundingClientRect();
+      const scopeRect = scope.getBoundingClientRect();
+      return {
+        navOverflowY: getComputedStyle(nav).overflowY,
+        navScrollable,
+        navScrolledBy: nav.scrollTop,
+        navTop: navRect.top,
+        navBottom: navRect.bottom,
+        lastItemBottom: last.getBoundingClientRect().bottom,
+        railBottom: rail.getBoundingClientRect().bottom,
+        railScrollable: rail.scrollHeight - rail.clientHeight,
+        scopeTopBefore,
+        scopeTopAfter: scopeRect.top,
+        scopeBottom: scopeRect.bottom,
+      };
+    });
+  } finally {
+    await browser.close();
+  }
+}
+
+test('a short window scrolls the rail nav instead of clipping its bottom entries', async () => {
+  const report = await readShortWindowRailGeometry();
+
+  assert.equal(
+    report.navOverflowY,
+    'auto',
+    'the rail nav must be a real scroller at full width, not a clipped box'
+  );
+  assert.ok(
+    report.navScrollable > 0,
+    'the fixture must actually overflow the rail, or this proves nothing'
+  );
+  assert.ok(report.navScrolledBy > 0, 'the nav must accept a scroll, not sit pinned at the top');
+  assert.ok(
+    report.lastItemBottom <= report.navBottom + 1,
+    'the last nav entry must be reachable inside the nav once it is scrolled to the end'
+  );
+  assert.ok(
+    report.navBottom <= report.railBottom + 1,
+    'the scrolling nav must stay inside the rail rather than run past it'
+  );
+
+  // The user-facing claim, stated against the rail rather than the nav: with the scroller
+  // removed this fixture puts the last entry ~340px BELOW the rail, clipped and unclickable,
+  // while every nav-relative measurement still looks healthy.
+  assert.ok(
+    report.lastItemBottom <= report.railBottom + 1,
+    'the last nav entry must be on screen inside the rail, not clipped below it'
+  );
+
+  // The scope card carries the rail collapse toggle and the system picker. Scrolling the
+  // sections must not take them off screen — that is why the nav is the scroller and not the
+  // whole rail.
+  assert.equal(
+    report.scopeTopAfter,
+    report.scopeTopBefore,
+    'the crafting-system scope card stays pinned while the section list scrolls'
+  );
+  assert.ok(
+    report.scopeBottom <= report.navTop + 1,
+    'the pinned scope card sits above the scrolling section list'
+  );
+
+  // The nav absorbs the rail's slack, so the rail itself must not also become a scroller here:
+  // two nested scrollbars in one 220px column is a worse bug than the one being fixed.
+  assert.ok(
+    report.railScrollable <= 1,
+    'the rail itself must not scroll while the nav has room to absorb the overflow'
+  );
+});
+
+test('the rail nav declares the scroller and the stacked breakpoint hands it back', () => {
+  const navBlock = blockFor('.fabricate-manager .manager-nav');
+  assert.ok(
+    navBlock.includes('flex: 1 1 auto;') &&
+      navBlock.includes('min-height:') &&
+      navBlock.includes('overflow: hidden auto;'),
+    'the nav grows into the rail and scrolls, with a floor so the pinned blocks cannot crush it'
+  );
+  assert.ok(
+    blockFor('.fabricate-manager .manager-rail').includes('overflow: hidden auto;'),
+    'the rail keeps a backstop scroller for a window too short even for the nav floor'
+  );
+  assert.ok(
+    css.includes(
+      '.fabricate-manager .manager-rail > .manager-rail-title,\n.fabricate-manager .manager-rail > .manager-rail-block {'
+    ),
+    'the blocks above the nav must opt out of shrinking, or they absorb the nav scroller'
+  );
+
+  // Stacked, the rail is already a bounded 232px strip that scrolls itself, so the nav must
+  // hand the scrolling back rather than scroll inside whatever the pinned blocks leave of it.
+  const query = css.slice(css.indexOf('@container fabricate-manager (max-width: 1120px)'));
+  const navStart = query.indexOf('.fabricate-manager .manager-nav {');
+  assert.ok(navStart > -1, 'the 1120px query must reset the nav scroller');
+  const stackedNavRule = query.slice(navStart, query.indexOf('}', navStart) + 1);
+  assert.ok(
+    stackedNavRule.includes('flex: 0 0 auto;') && stackedNavRule.includes('overflow: visible;'),
+    'the stacked nav keeps its content height and lets the bounded rail do the scrolling'
+  );
+});
+
 // Issue 643: the Studio rail adds a section label, a crafting-system card and count
 // numerals. Each has to opt out of the 56px collapsed strip explicitly, or it blows the
 // icon column out.
