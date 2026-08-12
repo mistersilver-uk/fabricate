@@ -146,6 +146,10 @@ describe('GatheringView mounted behavior', () => {
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringEnvironmentList.svelte');
     // GatheringView now renders the center-column detail tree; compile it too so
     // the compiled view can resolve its imports at mount time.
+    // `FillBar` joined this tree when issue 1096 rebuilt `ChanceBar` on the shared
+    // primitive `ui-integration/spec.md` names. A hand-rolled harness that omits it HANGS
+    // (# cancelled) rather than failing, which is why the primitive allowlist lists it.
+    writeCompiledSvelte('src/ui/svelte/components/FillBar.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/ChanceBar.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/LinkedScene.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringTaskRequirements.svelte');

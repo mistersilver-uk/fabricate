@@ -188,21 +188,27 @@ function countInertActiveCraftingCheck(system) {
   // point of the third argument — no migration can see a recipe's pick, so `bySubject`
   // falls back to the system set, which is exactly what the doc below says it counts.
   //
-  // THE CATALOGUE IS LIFTED FROM ITS PRE-1.22.0 LOCATION (issue 1095). This migration is
-  // `1.21.0` and the runner walks the ladder in version order, so at THIS point the
-  // catalogue still lives inside `craftingCheck` — `1.22.0` has not yet moved it to
-  // `system.checkModifiers`, which is where the shared builder reads it. Handing the
-  // builder a view carrying the catalogue at the key it reads is what keeps this count
-  // reading real data without hand-mirroring the bag or reaching backwards in the ladder.
+  // THE LIBRARY IS LIFTED FROM WHICHEVER OF ITS THREE LOCATIONS THIS WORLD IS AT (issues
+  // 1095, 1117). This migration is `1.21.0` and the runner walks the ladder in version
+  // order, so on a FIRST pass from an older world the library still lives inside
+  // `craftingCheck` — `1.22.0` has not yet lifted it to `system.checkModifiers`, and
+  // `1.23.0` has not yet merged that into `system.modifiers`, which is where the shared
+  // builder reads it. Handing the builder a view carrying it at the key it reads is what
+  // keeps this count reading real data without hand-mirroring the bag or reaching
+  // backwards in the ladder.
   //
-  // The `??` is not decoration: the spread is unconditional, so a system whose check
-  // carries no catalogue key would otherwise write `checkModifiers: undefined` OVER a
-  // system-level one. That is reachable — the ladder is re-runnable and a world already
-  // past `1.22.0` has the catalogue at the system key and nothing at the legacy one — and
-  // the failure is silent, a count of 0 where the world has eligible modifiers.
+  // THE `??` CHAIN IS NOT DECORATION, and it must cover all three: the spread is
+  // unconditional, so a system whose check carries no library key would otherwise write
+  // `modifiers: undefined` OVER a real one. Both later locations are reachable here — the
+  // ladder is re-runnable, so a world already past `1.22.0` has it at `checkModifiers` and
+  // one past `1.23.0` has it at `modifiers`, with nothing at the earlier keys — and the
+  // failure is silent, a count of 0 where the world has eligible modifiers.
   const eligible = resolveEligibleModifierIds(
     buildCheckModifierContext(
-      { ...system, checkModifiers: check.checkModifiers ?? system.checkModifiers },
+      {
+        ...system,
+        modifiers: check.checkModifiers ?? system.checkModifiers ?? system.modifiers,
+      },
       'crafting',
       null
     )

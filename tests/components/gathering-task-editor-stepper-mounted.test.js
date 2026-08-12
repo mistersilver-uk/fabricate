@@ -39,6 +39,7 @@ const harness = createMountedComponentHarness({
     'src/utils/checkModifierPicks.js',
     'src/systems/toolCheckBonus.js',
     'src/utils/craftingCheckExpression.js',
+    'src/utils/rollExpressionAverage.js',
     'src/ui/svelte/util/foundryBridge.js',
     'src/ui/svelte/components/stepperLabels.js',
     'src/ui/svelte/util/dropRateTier.js',

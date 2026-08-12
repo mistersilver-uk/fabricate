@@ -93,6 +93,11 @@ test('_normalizeCraftingCheck defaults the routed config when absent', () => {
     rollFormula: '',
     dc: 15,
     thresholdMode: 'meet',
+    // The routed slot carries its own DC SOURCE (issue 1096), absence-preserving: anything
+    // that is not exactly `dynamic` reads `static`, so a system authored before the field
+    // existed loads unchanged and needs no rewrite.
+    dcMode: 'static',
+    macroUuid: null,
     tiers: [],
     relativeOutcomes: [],
     fixedOutcomes: [],

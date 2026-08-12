@@ -105,8 +105,9 @@ this snippet, as authoritative.
 ## 2. Colour token reference
 
 Use the token, never the hex.
-Each accent and semantic ships a base plus `-soft` (14–16% fill) plus `-border` (44–56%);
-semantics also ship `-text` (readable on the soft fill), and accent ships `--fab-on-accent`.
+Each accent and semantic ships a base plus `-soft` (14–16% fill) plus `-border` (44–56%)
+plus `-text` (readable on the soft fill); accent additionally ships `--fab-on-accent`, the
+ink for the SOLID accent fill, which `--fab-accent-text` does not replace.
 
 **Surfaces (background ramp, darkest → tiles):**
 `--fab-bg-0` app base / GM rail · `--fab-bg-1` panel / window · `--fab-bg-2` raised / cards ·
@@ -124,7 +125,7 @@ semantics also ship `-text` (readable on the soft fill), and accent ships `--fab
 
 | Token family | Meaning |
 |---|---|
-| `--fab-accent` / `-strong` / `-soft` / `-border` / `--fab-on-accent` | primary actions, selection |
+| `--fab-accent` / `-strong` / `-text` / `-soft` / `-border` / `--fab-on-accent` | primary actions, selection |
 | `--fab-success` / `-text` / `-soft` / `-border` | ready, craftable, succeeded |
 | `--fab-info` / `-text` / `-soft` / `-border` | world-time, notes, neutral hints |
 | `--fab-warning` / `-text` / `-soft` / `-border` | waiting, stamina, missing |

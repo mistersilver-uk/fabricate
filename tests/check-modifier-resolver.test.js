@@ -13,17 +13,27 @@ const {
   resolveActiveCraftingCheckFormula,
   resolveModifierPolicy,
   resolveEligibleModifierIds,
-  resolveCheckModifierScalar,
+  resolveCheckModifierContribution,
+  resolveSelectedCheckModifiers,
   buildCheckModifierChoice,
   evaluateNumericExpression,
-  makeRollDataExpressionEvaluator,
+  makeRollDataExpressionResolver,
   appendResolvedCheckModifier,
   clampModifierValue,
   resolveModifierBounds,
   resolveActiveSalvageCheckFormula,
   resolveActiveGatheringCheckFormula,
+  isRollExpression,
 } = await import(RESOLVER_MODULE);
 const { appendCheckModifierTerm } = await import('../src/systems/toolCheckBonus.js');
+
+// The FLAT half of a resolved contribution. Every rule's arithmetic below is asserted
+// through this, because a catalogue of flat entries must reduce exactly as it did before
+// issue 1118 taught the same rules to carry dice; the dice half has its own suite in
+// `tests/check-modifier-dice.test.js`.
+function scalarOf(context, resolveExpression) {
+  return resolveCheckModifierContribution(context, resolveExpression).scalar;
+}
 
 const CATALOGUE = [
   { id: 'med', label: 'Medicine', expression: '@med' },
@@ -274,7 +284,7 @@ test('resolveEligibleModifierIds does NOT truncate the playerPicks option list',
 
 test('buildCheckModifierContext projects the SYSTEM catalogue and the activity selection', () => {
   const system = {
-    checkModifiers: CATALOGUE,
+    modifiers: CATALOGUE,
     craftingCheck: {
       defaultModifierPolicy: 'bySubject',
       defaultModifierIds: ['med'],
@@ -301,7 +311,7 @@ test('buildCheckModifierContext projects the SYSTEM catalogue and the activity s
 // eval-vs-display defect `CraftingListingBuilder`'s call site exists to prevent.
 test('buildCheckModifierContext reads a DIFFERENT selection triple per activity', () => {
   const system = {
-    checkModifiers: CATALOGUE,
+    modifiers: CATALOGUE,
     craftingCheck: { defaultModifierPolicy: 'addAll', defaultModifierIds: ['med'] },
     salvageCraftingCheck: {
       defaultModifierPolicy: 'highest',
@@ -340,7 +350,7 @@ test('buildCheckModifierContext reads a DIFFERENT selection triple per activity'
 // authoredness is decided by `Array.isArray` AT ENTRY on all three — so an authored EMPTY
 // pick survives as `[]` (a real pick of zero) rather than collapsing to "inherit".
 test('buildCheckModifierContext reads each activity subject pick, preserving an authored empty', () => {
-  const system = { checkModifiers: CATALOGUE };
+  const system = { modifiers: CATALOGUE };
   assert.deepEqual(
     buildCheckModifierContext(system, 'crafting', { craftingModifier: { modifierIds: ['med'] } })
       .subjectModifierIds,
@@ -401,7 +411,7 @@ test('buildCheckModifierContext tolerates a null system, an unknown activity and
     subjectModifierIds: null,
     maxModifierPicks: undefined,
   });
-  assert.deepEqual(buildCheckModifierContext({ checkModifiers: CATALOGUE }, 'bogus', {}), {
+  assert.deepEqual(buildCheckModifierContext({ modifiers: CATALOGUE }, 'bogus', {}), {
     activity: 'bogus',
     catalogue: CATALOGUE,
     systemPolicy: undefined,
@@ -413,16 +423,16 @@ test('buildCheckModifierContext tolerates a null system, an unknown activity and
 
 // ── scalar reduction truth table ─────────────────────────────────────────────
 
-test('resolveCheckModifierScalar addAll sums the eligible expression values', () => {
-  const scalar = resolveCheckModifierScalar(
+test('the flat contribution addAll sums the eligible expression values', () => {
+  const scalar = scalarOf(
     { catalogue: CATALOGUE, systemPolicy: 'addAll', defaultModifierIds: ['med', 'alch', 'herb'] },
     evaluatorFor({ '@med': 3, '@alch': 2, '@herb': 4 })
   );
   assert.equal(scalar, 9);
 });
 
-test('resolveCheckModifierScalar highest returns the max scalar (not a dice pool)', () => {
-  const scalar = resolveCheckModifierScalar(
+test('the flat contribution highest returns the max scalar (not a dice pool)', () => {
+  const scalar = scalarOf(
     { catalogue: CATALOGUE, systemPolicy: 'highest', defaultModifierIds: ['med', 'alch', 'herb'] },
     evaluatorFor({ '@med': 3, '@alch': 2, '@herb': 4 })
   );
@@ -433,7 +443,7 @@ test('resolveCheckModifierScalar highest returns the max scalar (not a dice pool
 // selection: at a cap of 1 that is exactly `max(...)` — the historical single-pick
 // behaviour every pre-1055 world had — and unbounded it is the plain sum, because
 // picking everything is then legal and optimal.
-test('resolveCheckModifierScalar playerPicks at cap 1 is byte-identical to highest', () => {
+test('the flat contribution playerPicks at cap 1 is byte-identical to highest', () => {
   const context = {
     catalogue: CATALOGUE,
     systemPolicy: 'playerPicks',
@@ -441,8 +451,8 @@ test('resolveCheckModifierScalar playerPicks at cap 1 is byte-identical to highe
     maxModifierPicks: 1,
   };
   const values = { '@med': 3, '@alch': 2, '@herb': 4 };
-  const asPlayerPicks = resolveCheckModifierScalar(context, evaluatorFor(values));
-  const asHighest = resolveCheckModifierScalar(
+  const asPlayerPicks = scalarOf(context, evaluatorFor(values));
+  const asHighest = scalarOf(
     { ...context, systemPolicy: 'highest' },
     evaluatorFor(values)
   );
@@ -450,7 +460,7 @@ test('resolveCheckModifierScalar playerPicks at cap 1 is byte-identical to highe
   assert.equal(asPlayerPicks, asHighest, 'the 1.20.0-migrated world rolls what it always rolled');
 });
 
-test('resolveCheckModifierScalar playerPicks sums the best N as the cap widens', () => {
+test('the flat contribution playerPicks sums the best N as the cap widens', () => {
   const context = {
     catalogue: CATALOGUE,
     systemPolicy: 'playerPicks',
@@ -458,30 +468,30 @@ test('resolveCheckModifierScalar playerPicks sums the best N as the cap widens',
   };
   const evaluate = evaluatorFor({ '@med': 3, '@alch': 2, '@herb': 4 });
   assert.equal(
-    resolveCheckModifierScalar({ ...context, maxModifierPicks: 2 }, evaluate),
+    scalarOf({ ...context, maxModifierPicks: 2 }, evaluate),
     7,
     'the two HIGHEST values (herb 4 + med 3), not the first two in eligible order'
   );
   assert.equal(
-    resolveCheckModifierScalar({ ...context, maxModifierPicks: 3 }, evaluate),
+    scalarOf({ ...context, maxModifierPicks: 3 }, evaluate),
     9,
     'a cap at the option count is the plain sum'
   );
   assert.equal(
-    resolveCheckModifierScalar({ ...context, maxModifierPicks: 99 }, evaluate),
+    scalarOf({ ...context, maxModifierPicks: 99 }, evaluate),
     9,
     'a cap ABOVE the option count adds nothing'
   );
   // …and unbounded is the same sum, because every value is then legal to pick. This is
   // the state the `1.20.0` migration exists to keep an upgraded world OUT of.
-  assert.equal(resolveCheckModifierScalar(context, evaluate), 9, 'unbounded playerPicks sums');
+  assert.equal(scalarOf(context, evaluate), 9, 'unbounded playerPicks sums');
 });
 
-test('resolveCheckModifierScalar playerPicks picks the best N even when they are negative', () => {
+test('the flat contribution playerPicks picks the best N even when they are negative', () => {
   // Guards the descending sort's seed: taking the FIRST two rather than the two highest
   // would reduce to -8 here.
   assert.equal(
-    resolveCheckModifierScalar(
+    scalarOf(
       {
         catalogue: CATALOGUE,
         systemPolicy: 'playerPicks',
@@ -498,7 +508,7 @@ test('resolveCheckModifierScalar playerPicks picks the best N even when they are
 // `bySubject` needs no special case in the reduction: `resolveEligibleModifierIds` has
 // already narrowed the list to the recipe's selection and truncated it to the cap, so
 // SUMMING that list is the whole rule.
-test('resolveCheckModifierScalar bySubject sums the recipe pick, truncated to the cap', () => {
+test('the flat contribution bySubject sums the recipe pick, truncated to the cap', () => {
   const context = {
     catalogue: CATALOGUE,
     systemPolicy: 'bySubject',
@@ -507,20 +517,20 @@ test('resolveCheckModifierScalar bySubject sums the recipe pick, truncated to th
   };
   const evaluate = evaluatorFor({ '@med': 3, '@alch': 2, '@herb': 4 });
   assert.equal(
-    resolveCheckModifierScalar(context, evaluate),
+    scalarOf(context, evaluate),
     6,
     'only the recipe set (alch 2 + herb 4) is summed — the system default med is excluded'
   );
   assert.equal(
-    resolveCheckModifierScalar({ ...context, maxModifierPicks: 1 }, evaluate),
+    scalarOf({ ...context, maxModifierPicks: 1 }, evaluate),
     2,
     'the cap keeps the FIRST pick in authored order (alch 2), never the best one'
   );
 });
 
-test('resolveCheckModifierScalar bySubject with nothing picked sums the system default set', () => {
+test('the flat contribution bySubject with nothing picked sums the system default set', () => {
   assert.equal(
-    resolveCheckModifierScalar(
+    scalarOf(
       {
         catalogue: CATALOGUE,
         systemPolicy: 'bySubject',
@@ -533,9 +543,9 @@ test('resolveCheckModifierScalar bySubject with nothing picked sums the system d
   );
 });
 
-test('resolveCheckModifierScalar: an authored empty set resolves @craftingmod to 0', () => {
+test('the flat contribution: an authored empty set resolves @craftingmod to 0', () => {
   assert.equal(
-    resolveCheckModifierScalar(
+    scalarOf(
       {
         catalogue: CATALOGUE,
         systemPolicy: 'bySubject',
@@ -550,14 +560,14 @@ test('resolveCheckModifierScalar: an authored empty set resolves @craftingmod to
 
 // The cap is meaningless to the two rules that select nothing, and must not silently
 // truncate what they reduce.
-test('resolveCheckModifierScalar: maxModifierPicks does not bound addAll or highest', () => {
+test('the flat contribution: maxModifierPicks does not bound addAll or highest', () => {
   const evaluate = evaluatorFor({ '@med': 3, '@alch': 2, '@herb': 4 });
   for (const [systemPolicy, expected] of [
     ['addAll', 9],
     ['highest', 4],
   ]) {
     assert.equal(
-      resolveCheckModifierScalar(
+      scalarOf(
         {
           catalogue: CATALOGUE,
           systemPolicy,
@@ -572,17 +582,17 @@ test('resolveCheckModifierScalar: maxModifierPicks does not bound addAll or high
   }
 });
 
-test('resolveCheckModifierScalar: a missing/failed expression contributes 0, never NaN', () => {
-  const scalar = resolveCheckModifierScalar(
+test('the flat contribution: a missing/failed expression contributes 0, never NaN', () => {
+  const scalar = scalarOf(
     { catalogue: CATALOGUE, systemPolicy: 'addAll', defaultModifierIds: ['med', 'alch'] },
     (expression) => (expression === '@med' ? 3 : NaN)
   );
   assert.equal(scalar, 3, 'NaN from @alch coerces to 0');
 });
 
-test('resolveCheckModifierScalar: an empty eligible set is 0', () => {
+test('the flat contribution: an empty eligible set is 0', () => {
   assert.equal(
-    resolveCheckModifierScalar(
+    scalarOf(
       { catalogue: CATALOGUE, systemPolicy: 'highest', defaultModifierIds: [] },
       evaluatorFor({})
     ),
@@ -609,9 +619,11 @@ test('buildCheckModifierChoice maps eligible modifiers + pre-selects the best le
     'the descriptor carries no token field: there is no placeholder left to name (issue 1094)'
   );
   assert.deepEqual(choice.modifiers, [
-    { id: 'med', label: 'Medicine', icon: 'fa-med', value: 3 },
-    { id: 'alch', label: 'Alchemy', icon: 'fa-alch', value: 2 },
-    { id: 'herb', label: 'Herbalism', icon: 'fa-herb', value: 4 },
+    // `formula: null` is the FLAT half of the 1118 shape: a flat entry appends a number and
+    // never a fragment, and `display` is the chip the prompt renders for it.
+    { id: 'med', label: 'Medicine', icon: 'fa-med', average: 3, value: 3, formula: null, blocked: false, display: '+3' },
+    { id: 'alch', label: 'Alchemy', icon: 'fa-alch', average: 2, value: 2, formula: null, blocked: false, display: '+2' },
+    { id: 'herb', label: 'Herbalism', icon: 'fa-herb', average: 4, value: 4, formula: null, blocked: false, display: '+4' },
   ]);
   assert.equal(choice.maxPicks, 1, 'the cap the prompt must enforce');
   assert.deepEqual(choice.defaultSelectedIds, ['herb'], 'herb (4) is the highest');
@@ -768,7 +780,7 @@ test('buildCheckModifierChoice returns null for a SINGLE eligible modifier (no c
   assert.equal(buildCheckModifierChoice(context, evaluate), null, 'one option is not a choice');
   // …and the value the deterministic fallback substitutes is the very same modifier.
   assert.equal(
-    resolveCheckModifierScalar({ ...context, systemPolicy: 'playerPicks' }, evaluate),
+    scalarOf({ ...context, systemPolicy: 'playerPicks' }, evaluate),
     3,
     'suppressing the single-option prompt changes no arithmetic'
   );
@@ -797,7 +809,16 @@ test('buildCheckModifierChoice defaults absent label/icon to empty strings', () 
     },
     evaluatorFor({ '@bare': 1, '@named': 0 })
   );
-  assert.deepEqual(choice.modifiers[0], { id: 'bare', label: '', icon: '', value: 1 });
+  assert.deepEqual(choice.modifiers[0], {
+    id: 'bare',
+    label: '',
+    icon: '',
+    average: 1,
+    value: 1,
+    formula: null,
+    blocked: false,
+    display: '+1',
+  });
 });
 
 // ── the retired substitution surface ─────────────────────────────────────────
@@ -842,18 +863,26 @@ function stubReplaceRoll() {
   return Roll;
 }
 
-test('makeRollDataExpressionEvaluator resolves @-paths then reduces to a number', () => {
+// It resolves to TEXT, not to a number (issue 1118): a modifier may roll, so reducing here
+// would destroy the dice before anything could decide whether to append them.
+test('makeRollDataExpressionResolver resolves @-paths to the substituted TEXT', () => {
   const Roll = stubReplaceRoll();
   const actor = { getRollData: () => ({ abilities: { med: { mod: 3 } }, prof: 2 }) };
-  const evaluate = makeRollDataExpressionEvaluator(actor, Roll);
-  assert.equal(evaluate('@abilities.med.mod'), 3);
-  assert.equal(evaluate('@abilities.med.mod + @prof'), 5);
+  const resolve = makeRollDataExpressionResolver(actor, Roll);
+  assert.equal(resolve('@abilities.med.mod'), '3');
+  assert.equal(resolve('@abilities.med.mod + @prof'), '3 + 2');
+  assert.equal(resolve('1d4 + @prof'), '1d4 + 2', 'the dice survive substitution verbatim');
   assert.equal(
-    evaluate('@abilities.ghost.mod'),
-    0,
+    resolve('@abilities.ghost.mod'),
+    '0',
     'a missing key resolves to 0 (missing sentinel)'
   );
-  assert.equal(evaluate(''), 0);
+  assert.equal(resolve(''), null, 'an empty expression does not resolve');
+  assert.equal(
+    makeRollDataExpressionResolver(actor, {})('@prof'),
+    null,
+    'no dice engine means no substitution, so the entry contributes nothing'
+  );
 });
 
 // ── appendResolvedCheckModifier (the seam checkRoll uses) ──────────────────────────
@@ -1200,7 +1229,7 @@ test('clampModifierValue applies each bound independently and refuses an inverte
   assert.equal(clampModifierValue(3, { min: 5, max: -1 }), 0);
 });
 
-test('resolveCheckModifierScalar clamps EACH value before combining, under every rule', () => {
+test('the flat contribution clamps EACH value before combining, under every rule', () => {
   const evaluate = evaluatorFor({ '@floor': -4, '@ceil': 9, '@both': 3 });
   const context = (systemPolicy) => ({
     catalogue: BOUNDED,
@@ -1209,12 +1238,12 @@ test('resolveCheckModifierScalar clamps EACH value before combining, under every
   });
   // Raw values -4, 9, 3 clamp to 2, 5, 3.
   assert.equal(
-    resolveCheckModifierScalar(context('addAll'), evaluate),
+    scalarOf(context('addAll'), evaluate),
     10,
     'addAll sums the CLAMPED values (2 + 5 + 3), not the raw ones (8)'
   );
   assert.equal(
-    resolveCheckModifierScalar(context('highest'), evaluate),
+    scalarOf(context('highest'), evaluate),
     5,
     'highest compares CLAMPED values, so the capped 9 does not win at 9'
   );
@@ -1230,7 +1259,7 @@ test('an entry with a grammar-inexpressible bound contributes 0 without poisonin
     { id: 'huge', label: 'Huge', expression: '@huge', min: 1e21 },
   ];
   const evaluate = evaluatorFor({ '@ok': 3, '@huge': 1 });
-  const scalar = resolveCheckModifierScalar(
+  const scalar = scalarOf(
     { catalogue, systemPolicy: 'addAll', defaultModifierIds: ['ok', 'huge'] },
     evaluate
   );
@@ -1242,14 +1271,14 @@ test('an entry with a grammar-inexpressible bound contributes 0 without poisonin
   );
 });
 
-test('resolveCheckModifierScalar makes an INVERTED entry contribute exactly 0', () => {
+test('the flat contribution makes an INVERTED entry contribute exactly 0', () => {
   const catalogue = [
     { id: 'ok', label: 'Ok', expression: '@ok' },
     { id: 'bad', label: 'Bad', expression: '@bad', min: 5, max: -1 },
   ];
   const evaluate = evaluatorFor({ '@ok': 3, '@bad': 100 });
   assert.equal(
-    resolveCheckModifierScalar(
+    scalarOf(
       { catalogue, systemPolicy: 'addAll', defaultModifierIds: ['ok', 'bad'] },
       evaluate
     ),
@@ -1279,7 +1308,7 @@ test('buildCheckModifierChoice offers the CLAMPED value the roll will append', (
 
 test('bySubject resolves and truncates identically on crafting, salvage and gathering', () => {
   const system = {
-    checkModifiers: CATALOGUE,
+    modifiers: CATALOGUE,
     craftingCheck: {
       defaultModifierPolicy: 'bySubject',
       defaultModifierIds: ['med'],
@@ -1309,14 +1338,14 @@ test('bySubject resolves and truncates identically on crafting, salvage and gath
       ['herb', 'med'],
       `${activity}: the FIRST N in authored order survive the cap, never the best N`
     );
-    assert.equal(resolveCheckModifierScalar(context, evaluate), 7, `${activity}: 4 + 3`);
+    assert.equal(scalarOf(context, evaluate), 7, `${activity}: 4 + 3`);
   }
 });
 
 test('an AUTHORED EMPTY pick resolves to zero on all three activities', () => {
   const selection = { defaultModifierPolicy: 'bySubject', defaultModifierIds: ['med', 'alch'] };
   const system = {
-    checkModifiers: CATALOGUE,
+    modifiers: CATALOGUE,
     craftingCheck: selection,
     salvageCraftingCheck: selection,
     gatheringCraftingCheck: selection,
@@ -1330,7 +1359,7 @@ test('an AUTHORED EMPTY pick resolves to zero on all three activities', () => {
   const evaluate = evaluatorFor({ '@med': 3, '@alch': 2 });
   for (const activity of ['crafting', 'salvage', 'gathering']) {
     assert.equal(
-      resolveCheckModifierScalar(
+      scalarOf(
         buildCheckModifierContext(system, activity, empty[activity]),
         evaluate
       ),
@@ -1338,7 +1367,7 @@ test('an AUTHORED EMPTY pick resolves to zero on all three activities', () => {
       `${activity}: an authored empty array is a real pick of zero`
     );
     assert.equal(
-      resolveCheckModifierScalar(
+      scalarOf(
         buildCheckModifierContext(system, activity, absent[activity]),
         evaluate
       ),
@@ -1396,7 +1425,7 @@ test('resolveActiveGatheringCheckFormula has no slot under d100 and one under bo
     },
   };
   const d100 = resolveActiveGatheringCheckFormula(system, 'd100');
-  assert.equal(d100.slot, null, 'd100 rolls no authored formula, so the catalogue is noCheck');
+  assert.equal(d100.slot, null, 'd100 authors no check slot, so the catalogue reaches no roll');
   assert.equal(d100.checkUsable, false);
   assert.equal(d100.requiresCheck, false);
   assert.equal(
@@ -1413,4 +1442,61 @@ test('resolveActiveGatheringCheckFormula has no slot under d100 and one under bo
     '1d20',
     'the retired placeholder is stripped before the formula is reported'
   );
+});
+
+// ── isRollExpression (issue 1117) ────────────────────────────────────────────────
+//
+// ONE library needs ONE classifier. Two lived in the repo while two libraries did, and they
+// were COMPLEMENTARY rather than duplicates: `GatheringRichStateService`'s
+// `/\d\s*d\s*\d|[*\/()]/i` required a digit before the `d`, so it matched `1d6` and missed a
+// bare `d20`; `SystemEditView`'s `/d\d|[*\/()]/` required a word boundary before the `d`,
+// so it matched `d20` and — `1` and `d` both being word characters, leaving no boundary
+// between them — missed `1d6`. Neither was a superset of the other, so one library with two
+// readers would have disagreed about whether the same entry rolls.
+//
+// BOTH HALVES ARE ASSERTED, and that is the point of this test rather than an excess of
+// cases: dropping either alternation leaves the OTHER half's cases green, so a single
+// happy-path assertion would let the union silently collapse back to one of its inputs.
+// Issue 1118 review. `isRollExpression` no longer carries a pattern of its own: it asks
+// `reduceRollExpression`, which OBSERVES dice while it reduces. The pattern disagreed with
+// what actually appends in both directions, and each row below that moved lists which.
+test('isRollExpression answers the same question the resolver does', () => {
+  for (const rolls of [
+    '1d6',
+    'd20', // a BARE die
+    '@prof + d4', // `@`-paths are neutralized first, so the walk reaches the die
+    '(@abilities.str.mod)d6',
+    '1dF', // FALSE under the old pattern: a Fate die rolls and got no chip
+    '2dc', // …and a Coin die likewise
+    '{1d6,1d8}kh1',
+  ]) {
+    assert.equal(isRollExpression(rolls), true, `${rolls} rolls`);
+  }
+
+  for (const flat of [
+    '@abilities.med.mod',
+    '@abilities.dex.mod', // a `d` at a word boundary NOT followed by a digit
+    '@skills.nat.total',
+    '@prof',
+    '3',
+    '',
+    // TRUE under the old pattern, which also matched arithmetic GROUPING. None of these
+    // rolls anything, and since issue 1118 the chip carries a roll note beside it — so the
+    // old answer put a sentence about dice on an expression that has none.
+    '@a * 2',
+    '@a / 2',
+    'max(@a, 2)',
+    'floor(@a / 2)',
+    // TRUE under the old pattern, and not a die at all: Foundry's grammar admits no
+    // whitespace inside a die term, so `Roll.validate('2 d 10')` is false on 14.365.
+    '2 d 10',
+  ]) {
+    assert.equal(isRollExpression(flat), false, `${flat} rolls nothing`);
+  }
+
+  // Non-strings are not expressions; they classify as flat rather than throwing, because a
+  // malformed entry must still normalize.
+  for (const junk of [null, undefined, 7, {}, []]) {
+    assert.equal(isRollExpression(junk), false, `${String(junk)} is not an expression`);
+  }
 });

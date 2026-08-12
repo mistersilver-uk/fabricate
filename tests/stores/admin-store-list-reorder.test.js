@@ -1,7 +1,7 @@
 /**
  * System Overview settings-list manual reorder (issue 768, increment 2). The
- * three lists — Character Modifiers (gathering world config), Character
- * Prerequisites and Currency Units (both on the crafting system) — persist their
+ * three lists — Modifiers, Character Prerequisites and Currency Units (all three
+ * on the crafting system since issue 1117) — persist their
  * order AS the array order, so each reorder op rewrites the array in place through
  * the list's existing save path and the order-preserving normalizer round-trips
  * it. These tests drive the REAL adminStore + normalizers (no stubs), asserting
@@ -18,11 +18,15 @@ import { normalizeCharacterPrerequisiteList } from '../../src/systems/characterP
 function createServices({ modifiers = [], prerequisites = [], currencyUnits = [] } = {}) {
   let idSeq = 0;
   const settingStore = {
-    gatheringConfig: { systems: { sys1: { characterModifiers: modifiers } } },
+    gatheringConfig: { systems: { sys1: {} } },
   };
   const system = {
     id: 'sys1',
     name: 'System One',
+    // The ONE modifier library, SYSTEM-owned since issue 1117 — it used to live in the
+    // gathering world config, which is why this suite's header called it "gathering world
+    // config" and why the reorder used to persist through `_saveGatheringConfig`.
+    modifiers,
     resolutionMode: 'simple',
     features: {},
     recipeVisibility: { listMode: 'global' },
@@ -83,8 +87,7 @@ async function storeFor(overrides) {
 }
 
 function modifierIds(store) {
-  const list = get(store.viewState).gatheringConfig?.systems?.sys1?.characterModifiers || [];
-  return list.map((entry) => entry.id);
+  return (get(store.viewState).selectedSystem.modifiers || []).map((entry) => entry.id);
 }
 function prerequisiteIds(store) {
   return (get(store.viewState).selectedSystem.characterPrerequisites || []).map((entry) => entry.id);
@@ -110,17 +113,17 @@ const CURRENCY_UNITS = [
 ];
 
 describe('adminStore settings-list reorder (issue 768)', () => {
-  it('reorderGatheringCharacterModifier moves an entry and persists the new order', async () => {
+  it('reorderSystemModifier moves an entry and persists the new order', async () => {
     const { store, services } = await storeFor({ modifiers: MODIFIERS });
     assert.deepEqual(modifierIds(store), ['mod-a', 'mod-b', 'mod-c']);
 
-    const ok = await store.reorderGatheringCharacterModifier(0, 2, 'sys1');
+    const ok = await store.reorderSystemModifier(0, 2, 'sys1');
     assert.equal(ok, true);
     assert.deepEqual(modifierIds(store), ['mod-b', 'mod-c', 'mod-a'], 're-projected order');
     assert.deepEqual(
-      services._settingStore.gatheringConfig.systems.sys1.characterModifiers.map((e) => e.id),
+      services._system.modifiers.map((e) => e.id),
       ['mod-b', 'mod-c', 'mod-a'],
-      'persisted through the gathering-config save path'
+      'persisted on the crafting system document, through updateSystem'
     );
   });
 
@@ -159,7 +162,7 @@ describe('adminStore settings-list reorder (issue 768)', () => {
       currencyUnits: CURRENCY_UNITS,
     });
 
-    await store.reorderGatheringCharacterModifier(0, 2, 'sys1');
+    await store.reorderSystemModifier(0, 2, 'sys1');
     await store.reorderCharacterPrerequisite(0, 2, 'sys1');
     await store.reorderCurrencyUnit(0, 2, 'sys1');
 
@@ -179,9 +182,9 @@ describe('adminStore settings-list reorder (issue 768)', () => {
       currencyUnits: CURRENCY_UNITS,
     });
 
-    assert.equal(await store.reorderGatheringCharacterModifier(0, 0, 'sys1'), false, 'no-op');
-    assert.equal(await store.reorderGatheringCharacterModifier(1, 9, 'sys1'), false, 'to out of range');
-    assert.equal(await store.reorderGatheringCharacterModifier(-1, 1, 'sys1'), false, 'from out of range');
+    assert.equal(await store.reorderSystemModifier(0, 0, 'sys1'), false, 'no-op');
+    assert.equal(await store.reorderSystemModifier(1, 9, 'sys1'), false, 'to out of range');
+    assert.equal(await store.reorderSystemModifier(-1, 1, 'sys1'), false, 'from out of range');
     assert.equal(await store.reorderCharacterPrerequisite(2, 2, 'sys1'), false, 'no-op');
     assert.equal(await store.reorderCharacterPrerequisite(0, 5, 'sys1'), false, 'out of range');
     assert.equal(await store.reorderCurrencyUnit(1, 1, 'sys1'), false, 'no-op');

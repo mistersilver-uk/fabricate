@@ -52,6 +52,10 @@ const harness = createMountedComponentHarness({
     // tab bar and the behavior preview all render it.
     'src/ui/svelte/apps/manager/Chip.svelte',
     'src/ui/svelte/components/ChanceSlider.svelte',
+    // THE manager's labelled push-button (issue 1096). The Modifiers card and the Tool
+    // Studio header both render through it; an omission HANGS this suite rather than
+    // failing it.
+    'src/ui/svelte/components/ManagerButton.svelte',
     'src/ui/svelte/components/Stepper.svelte',
     // The shared selection control (issue 772). `ChecklistCardRow` below renders it after
     // the conversion, so it is in this tree's static graph; the harness's closure validator

@@ -42,6 +42,16 @@ export const CHECKS_TREE_RAW_MODULES = Object.freeze([
   'src/ui/svelte/actions/dismissOnOutsideClick.js',
   'src/ui/svelte/actions/portal.js',
   'src/ui/svelte/apps/manager/checks/checksReadiness.js',
+  // The ONE copy map (issue 1096): the Validation route and the section-level Callout both
+  // render an issue's sentence from it, so both halves of the checks tree import it.
+  'src/ui/svelte/apps/manager/checks/checksCopy.js',
+  // The per-mode explanation the roll section opens with (issue 1096). A pure data table,
+  // imported by `CheckModeCallout.svelte`, which `ChecksView` imports statically.
+  'src/ui/svelte/apps/manager/checks/checkModeCallout.js',
+  // A trigger's own summary and the common-trigger presets (issue 1096). Both are pure
+  // modules imported by `CheckTriggers.svelte`.
+  'src/ui/svelte/apps/manager/checks/checkTriggerSummary.js',
+  'src/ui/svelte/apps/manager/checks/checkTriggerPresets.js',
   // The attribute-name literals the rule group renders, hoisted out of Svelte markup so
   // `tests/view-lab-cases.test.js` can import rather than restate them (issue 1095).
   'src/ui/svelte/apps/manager/checks/modifierPolicyAttrs.js',
@@ -50,7 +60,14 @@ export const CHECKS_TREE_RAW_MODULES = Object.freeze([
   'src/utils/checkModifierPicks.js',
   'src/systems/toolCheckBonus.js',
   'src/utils/craftingCheckExpression.js',
+  // Issue 1118: the resolver ranks a rolling modifier by the deterministic average this
+  // import-free leaf computes, and the same walk is what tells it a modifier rolls at all.
+  'src/utils/rollExpressionAverage.js',
   'src/utils/routedOutcomeKeywords.js',
+  // The formula field's quick-add chips are DERIVED from the active world through this
+  // module rather than hard-coded (issue 1096), so the whole checks tree now imports it.
+  'src/config/modifierExpressionSuggestions.js',
+  'src/config/gatheringCharacterModifierPresets.js',
 ]);
 
 /**
@@ -61,10 +78,26 @@ export const CHECKS_TREE_RAW_MODULES = Object.freeze([
 export const CHECKS_TREE_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/components/IconPicker.svelte',
   'src/ui/svelte/components/ModifierPillSelect.svelte',
-  'src/ui/svelte/components/SelectionCheckbox.svelte',
-  'src/ui/svelte/components/StatusPill.svelte',
+  // `SelectionCheckbox` and `StatusPill` left this closure with issue 1096's parity round: the
+  // modifier row's eligibility control was a checkbox plus an inert pill, and it is now ONE
+  // `aria-pressed` toggle button that the card renders itself. Nothing else in the checks tree
+  // reached for either. They are dropped rather than kept "in case", because a manifest that
+  // names modules the tree does not import is the drift this file exists to stop; the validator
+  // reports a MISSING module loudly, so re-adding one is a one-line fix if a tree grows back
+  // into it.
+  'src/ui/svelte/components/FillBar.svelte',
+  'src/ui/svelte/components/RowDisclosure.svelte',
+  'src/ui/svelte/components/ThresholdBandStrip.svelte',
   'src/ui/svelte/components/Stepper.svelte',
+  // The shared button primitive. Every list in the studio is extended by the prototype's
+  // full-width dashed control, which is this primitive's `dashed` role (issue 1096).
+  'src/ui/svelte/components/ManagerButton.svelte',
+  'src/ui/svelte/apps/manager/Callout.svelte',
   'src/ui/svelte/apps/manager/Chip.svelte',
+  'src/ui/svelte/apps/manager/EditorValidationSurface.svelte',
+  'src/ui/svelte/apps/manager/EmptyState.svelte',
+  'src/ui/svelte/apps/manager/IconFactRow.svelte',
+  'src/ui/svelte/apps/manager/InspectorActionButton.svelte',
   'src/ui/svelte/apps/manager/ExplainerCard.svelte',
   'src/ui/svelte/apps/manager/RadioCardGroup.svelte',
   'src/ui/svelte/apps/manager/RollDataExpressionInput.svelte',

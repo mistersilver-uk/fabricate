@@ -236,9 +236,10 @@ test('export -> import round-trips the authored cap, the bySubject rule and ever
     id: 'sys-round',
     name: 'Round Trip',
     components: [],
-    // The catalogue is SYSTEM-level since issue 1095, and `buildExportPayload` deep-clones
-    // the system, so it round-trips for free once `_normalizeSystem` emits it there.
-    checkModifiers: [
+    // The library is SYSTEM-level since issue 1095 and named `modifiers` since issue 1117,
+    // and `buildExportPayload` deep-clones the system, so it round-trips for free once
+    // `_normalizeSystem` emits it there.
+    modifiers: [
       { id: 'med', label: 'Medicine', expression: '@med', min: -1, max: 5 },
       { id: 'alch', label: 'Alchemy', expression: '@alch' },
     ],
@@ -283,8 +284,8 @@ test('export -> import round-trips the authored cap, the bySubject rule and ever
     'an authored cap survives the round trip — it is not re-derived as 1'
   );
   assert.equal(created[0].craftingCheck.defaultModifierPolicy, 'bySubject');
-  // The catalogue and its ABSENCE-PRESERVING bounds survive at the system level.
-  assert.deepEqual(created[0].checkModifiers, [
+  // The library and its ABSENCE-PRESERVING bounds survive at the system level.
+  assert.deepEqual(created[0].modifiers, [
     { id: 'med', label: 'Medicine', expression: '@med', min: -1, max: 5 },
     { id: 'alch', label: 'Alchemy', expression: '@alch' },
   ]);

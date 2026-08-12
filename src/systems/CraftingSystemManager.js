@@ -44,7 +44,9 @@ import {
 
 import { normalizeCharacterPrerequisiteList } from './characterPrerequisites.js';
 import {
+  isRollExpression,
   normalizeModifierPolicy,
+  resolveActiveCraftingCheckFormula,
   resolveMaxModifierPicks,
   resolveModifierBounds,
 } from './checkModifierResolver.js';
@@ -191,15 +193,15 @@ export class CraftingSystemManager {
     // hoisting is safe; the return literal below reuses `salvageResolutionMode`.
     const { salvageResolutionMode, salvageSimpleCheckHasFormula } =
       this._salvageNormalizationContext(system);
-    // The ONE system-level check-modifier catalogue (issue 1095), HOISTED above the three
+    // The ONE system-level modifier library (issue 1117), HOISTED above the three
     // activity checks because each of their selections is validated against it: a default
-    // id naming nothing in the catalogue is dropped. Before `1.22.0` this lived inside
-    // `craftingCheck`; the migration moves it up and deletes the old key, and it is NOT
-    // read from the old location here — the migration and the export-payload upcast are
-    // the two paths a legacy payload arrives through, and a silent read-alias would make
-    // the relocation unobservable.
-    const checkModifiers = this._normalizeCheckModifierCatalogue(system.checkModifiers);
-    const validCatalogueIds = new Set(checkModifiers.map((entry) => entry.id));
+    // id naming nothing in the library is dropped. It has moved twice —
+    // `craftingCheck.checkModifiers` before `1.22.0`, `system.checkModifiers` between
+    // `1.22.0` and `1.23.0` — and is NOT read from either old location here. The
+    // migrations and the export-payload upcast are the paths a legacy payload arrives
+    // through, and a silent read-alias would make the relocation unobservable.
+    const modifiers = this._normalizeModifierLibrary(system.modifiers);
+    const validCatalogueIds = new Set(modifiers.map((entry) => entry.id));
     const rawManagedItems = Array.isArray(system.components)
       ? system.components
       : Array.isArray(system.managedItems)
@@ -307,10 +309,11 @@ export class CraftingSystemManager {
         recipeItemDefinitions.some(
           (def) => Array.isArray(def.recipeIds) && def.recipeIds.length > 0
         ),
-      // The one named catalogue of check modifiers for the WHOLE system (issue 1095).
-      // Crafting, salvage and gathering each select over it through their own
-      // `{defaultModifierPolicy, defaultModifierIds, maxModifierPicks?}` triple below.
-      checkModifiers,
+      // The one named modifier library for the WHOLE system (issue 1117). Crafting,
+      // salvage and gathering checks each select over it through their own
+      // `{defaultModifierPolicy, defaultModifierIds, maxModifierPicks?}` triple below,
+      // and the gathering d100 drop rows, events and stamina costs REFERENCE it too.
+      modifiers,
       craftingCheck: this._normalizeCraftingCheck(system.craftingCheck, validCatalogueIds),
       // Canonical salvage mode, derived above with the salvage-normalization context
       // (issue 764) so the component map and this field agree on one value.
@@ -619,8 +622,8 @@ export class CraftingSystemManager {
       outcomes: normalizedOutcomes.length > 0 ? [...new Set(normalizedOutcomes)] : ['fail', 'pass'],
       routed: this._normalizeRoutedCraftingCheck(check?.routed),
       simple: this._normalizeSimpleCraftingCheck(check?.simple),
-      // Crafting's SELECTION over the system-level catalogue (issues 770, 1055, 1095).
-      // The catalogue itself moved UP to `system.checkModifiers` in `1.22.0`; what stays
+      // Crafting's SELECTION over the system-level library (issues 770, 1055, 1095, 1117).
+      // The library itself is `system.modifiers`; what stays
       // here — and, identically, on the salvage and gathering checks — is which entries
       // this activity applies and how they combine. Absent → the `addAll` default with an
       // empty id set, a no-op for a single-formula check (full back-compat).
@@ -629,18 +632,24 @@ export class CraftingSystemManager {
   }
 
   /**
-   * Normalize the SYSTEM-LEVEL check-modifier catalogue (issue 1095): the ONE named
-   * catalogue of `{id, label, expression, icon?, min?, max?}` entries every activity's
-   * check selects over. Malformed entries are dropped, ids are trimmed and de-duplicated,
+   * Normalize the SYSTEM-LEVEL modifier library (issue 1117): the ONE named library of
+   * `{id, label, icon?, expression, isRollExpression, min?, max?}` entries that every
+   * activity's check selects over AND that every gathering drop row, event and stamina
+   * cost references. Malformed entries are dropped, ids are trimmed and de-duplicated,
    * and a bad expression coerces to an empty string.
    *
-   * IT LIVES ON THE SYSTEM, not on `craftingCheck`. Before `1.22.0` it was persisted at
-   * `craftingCheck.checkModifiers`, which made it crafting-owned by construction; salvage
-   * and gathering now select over the same catalogue, so it cannot belong to any one of
-   * them. The `1.22.0` migration relocates it and deletes the old key, and the runner
-   * runs before any manager load — load-bearing, because THIS normalizer is an allowlist
-   * rebuild, so a save that ran first would have DELETED the old key rather than moving
-   * it.
+   * IT IS ONE LIBRARY, not two. Until issue 1117 a system authored modifiers twice, in
+   * two near-identical shapes: the check-modifier catalogue at `system.checkModifiers`
+   * and the gathering character-modifier library at
+   * `gatheringConfig.systems[systemId].characterModifiers`. The `1.23.0` migration merges
+   * them here, and the `checkModifiers`/`characterModifiers` keys are both retired — this
+   * normalizer is an ALLOWLIST REBUILD, so an unemitted key is dropped on the next save,
+   * which is exactly why the migration must run first (`_runMigrations` in `src/main.js`
+   * precedes every manager load).
+   *
+   * THE SHAPE IS A SUPERSET, and each field is honoured by whichever consumer needs it:
+   * `min`/`max` clamp the resolved value of a CHECK modifier, and gathering's own
+   * per-reference `min`/`max` clamp a drop contribution independently of them.
    *
    * `icon`, `min` and `max` are all ABSENCE-PRESERVING: each is attached only when
    * authored, so `null`, `undefined`, `''` and junk all normalize to the same shape (key
@@ -651,24 +660,40 @@ export class CraftingSystemManager {
    * roll a number nobody authored. `clampModifierValue` makes such an entry contribute 0
    * meanwhile — the refuse posture gathering's `INVALID_CHARACTER_MODIFIER_BOUNDS`
    * already takes.
-   * @param {unknown} catalogue Raw `system.checkModifiers`.
-   * @returns {Array<{id: string, label: string, expression: string, icon?: string,
-   *   min?: number, max?: number}>}
+   *
+   * `isRollExpression` is DERIVED here and never read off the input, so a persisted or
+   * imported flag can never contradict the expression beside it. It is emitted rather
+   * than left to each reader because the two readers that need it — the authoring
+   * surface's Roll chip and the check-readiness rule that BLOCKS on a roll-shaped
+   * expression reaching a check — must classify one entry identically.
+   *
+   * AN ENTRY WITH NO EXPRESSION IS KEPT, which is a deliberate change from the gathering
+   * normalizer this replaces (it dropped one). The library now has an "Add modifier"
+   * button, and an entry that vanished on save the moment it was created would make that
+   * button appear broken. An unresolvable expression is still a runtime misconfiguration
+   * — gathering reports `CHARACTER_MODIFIER_NON_FINITE` for it instead of
+   * `MISSING_CHARACTER_MODIFIER` — so nothing silently succeeds.
+   *
+   * @param {unknown} library Raw `system.modifiers`.
+   * @returns {Array<{id: string, label: string, expression: string, isRollExpression: boolean,
+   *   icon?: string, min?: number, max?: number}>}
    * @private
    */
-  _normalizeCheckModifierCatalogue(catalogue) {
-    const raw = Array.isArray(catalogue) ? catalogue : [];
+  _normalizeModifierLibrary(library) {
+    const raw = Array.isArray(library) ? library : [];
     const seenIds = new Set();
-    const checkModifiers = [];
+    const modifiers = [];
     for (const entry of raw) {
       if (!entry || typeof entry !== 'object') continue;
       const id = typeof entry.id === 'string' && entry.id.trim() ? entry.id.trim() : null;
       if (!id || seenIds.has(id)) continue;
       seenIds.add(id);
+      const expression = typeof entry.expression === 'string' ? entry.expression.trim() : '';
       const normalized = {
         id,
         label: typeof entry.label === 'string' ? entry.label : '',
-        expression: typeof entry.expression === 'string' ? entry.expression.trim() : '',
+        expression,
+        isRollExpression: isRollExpression(expression),
       };
       if (typeof entry.icon === 'string' && entry.icon.trim()) normalized.icon = entry.icon.trim();
       // Asked of the RESOLVER rather than re-derived here, so the persisted shape and the
@@ -680,9 +705,9 @@ export class CraftingSystemManager {
       const { min, max } = resolveModifierBounds(entry);
       if (min !== null) normalized.min = min;
       if (max !== null) normalized.max = max;
-      checkModifiers.push(normalized);
+      modifiers.push(normalized);
     }
-    return checkModifiers;
+    return modifiers;
   }
 
   /**
@@ -918,6 +943,19 @@ export class CraftingSystemManager {
       rollFormula,
       dc: Number.isFinite(dc) ? Math.trunc(dc) : 15,
       thresholdMode: source.thresholdMode === 'exceed' ? 'exceed' : 'meet',
+      // WHERE THE DC COMES FROM, on the routed slot too (issue 1096). The engine already
+      // resolved the routed base DC through `_resolveSimpleCheckDc` — that method is
+      // parameterized over the check config precisely so routed takes the same recipe-tier
+      // and dynamic path — so the plumbing existed and only the field did not. A routed
+      // RELATIVE check is defined as bands offset from a DC (`dc + outcome.dc`), so it has
+      // one by construction, and offering the number without its source was incoherent.
+      //
+      // ABSENCE-PRESERVING: anything that is not exactly `dynamic` reads `static`, so every
+      // system authored before this field existed loads as static with no rewrite.
+      // `macroUuid` is kept whatever the mode, for the reason the simple slot keeps it —
+      // switching modes must never destroy the other side's configuration.
+      dcMode: source.dcMode === 'dynamic' ? 'dynamic' : 'static',
+      macroUuid: source.macroUuid || null,
       tiers: tiers.map((tier) => this._normalizeSimpleTier(tier)).filter(Boolean),
       relativeOutcomes: relative
         .map((outcome) => this._normalizeRoutedOutcome(outcome, 'relative'))
@@ -3184,10 +3222,10 @@ export class CraftingSystemManager {
    * Both directions are guarded to fill only an UNAUTHORED destination (an authored
    * destination formula is never clobbered). `→ simple`/`alchemy` targets already read
    * `simple`, and `→ progressive` has no comparable pass/fail fields, so neither needs
-   * a move. Caveat: a `dcMode: 'dynamic'` simple check copied into `routedByCheck`
-   * loses its dynamic DC (the routed slot has no `dcMode`); the resulting static
-   * `routed.dc` is whatever value lingered in the simple slot, so the GM should
-   * re-author the DC after switching into `routedByCheck`.
+   * a move. The `dcMode: 'dynamic'` caveat that used to stand here is GONE: the routed
+   * slot carries `dcMode`/`macroUuid` now (issue 1096), so a dynamic simple check crossing
+   * into `routedByCheck` keeps its macro instead of silently reverting to a static DC that
+   * happened to linger in the simple slot.
    *
    * @param {object} merged The merged (post-change, normalized) system.
    * @param {string} fromMode
@@ -3209,8 +3247,9 @@ export class CraftingSystemManager {
    * Copy the shared pass/fail crafting-check fields (`rollFormula`, `dc`,
    * `thresholdMode`, `tiers`, `checkBreakage`) from a source slot to a destination
    * slot, but ONLY when the destination has no authored `rollFormula` and the source
-   * does — so an authored destination is never clobbered. `dcMode`/`macroUuid` are not
-   * copied (the routed slot has neither; the read-time normalizer defaults them).
+   * does — so an authored destination is never clobbered. `dcMode`/`macroUuid` travel with
+   * the rest now that BOTH slots carry them (issue 1096): leaving them behind was the one
+   * way this move could silently change what a check rolls against.
    * @param {object} source
    * @param {object} destination
    * @private
@@ -3233,6 +3272,8 @@ export class CraftingSystemManager {
         ? source.tiers.map((tier) => ({ ...tier }))
         : source.tiers;
     }
+    if ('dcMode' in source) destination.dcMode = source.dcMode;
+    if ('macroUuid' in source) destination.macroUuid = source.macroUuid;
     if ('checkBreakage' in source) {
       destination.checkBreakage =
         source.checkBreakage && typeof source.checkBreakage === 'object'
@@ -5103,9 +5144,20 @@ export class CraftingSystemManager {
    *
    * `null`/empty is the real instruction "Default DC" and resolves to `null`. Anything else
    * must name a tier the panel could have offered, which is exactly
-   * `resolveRecipeCheckTierOptions` over the system's active crafting-check mode — the same
+   * `resolveRecipeCheckTierOptions` over the system's active crafting-check SLOT — the same
    * helper the recipe editor's dropdown and the bulk panel's own gate read, so the three
    * cannot disagree about which tiers exist.
+   *
+   * THE SLOT IS THE RESOLVER'S OWN ANSWER (issue 1096), not a manager-side twin of it. A
+   * hand-rolled copy of the mode map stood here and was documented as "kept structurally
+   * identical" to `CraftingSystemManagerRoot`'s, which nothing pinned; the moment the root
+   * moved onto `resolveActiveCraftingCheckFormula` the two disagreed for alchemy, and the
+   * panel listed a routed tier that this method then threw on. One derivation is the only
+   * shape in which the offer and the write cannot drift.
+   *
+   * A `null` slot — alchemy at `checkMode: 'none'`, or a resolution mode outside the
+   * canonical set — yields `resolveRecipeCheckTierOptions(check, null) === []`, so a system
+   * that rolls no crafting check accepts Default DC and nothing else.
    *
    * @param {object} system
    * @param {?string} rawTierId
@@ -5118,35 +5170,13 @@ export class CraftingSystemManager {
 
     const options = resolveRecipeCheckTierOptions(
       system?.craftingCheck,
-      this._craftingCheckModeFor(system)
+      resolveActiveCraftingCheckFormula(system).slot
     );
     const known = options.some((tier) => String(tier?.id ?? '') === tierId);
     if (!known) {
       throw new Error(`Check tier not authored by crafting system ${system?.id}: ${tierId}`);
     }
     return tierId;
-  }
-
-  /**
-   * The active CRAFTING-CHECK mode for a system's resolution mode — the manager-side twin
-   * of `CraftingSystemManagerRoot`'s `_craftingCheckMode`, kept structurally identical so
-   * the write and the panel that stages for it resolve the same tier list.
-   *
-   * `null` for an unrecognised mode is deliberately preserved from that original even
-   * though `_normalizeSystem` coerces every persisted `resolutionMode` to one of five
-   * tokens: `resolveRecipeCheckTierOptions(check, null)` is `[]`, so an unnormalized system
-   * offers no tier rather than silently accepting one.
-   *
-   * @param {object} system
-   * @returns {'simple'|'routed'|'progressive'|null}
-   * @private
-   */
-  _craftingCheckModeFor(system) {
-    const resolution = system?.resolutionMode || 'simple';
-    if (resolution === 'routedByCheck') return 'routed';
-    if (resolution === 'progressive') return 'progressive';
-    if (['simple', 'alchemy', 'routedByIngredients'].includes(resolution)) return 'simple';
-    return null;
   }
 
   /**

@@ -3,12 +3,13 @@ import assert from 'node:assert/strict';
 
 import { makeRichState, makeEngine, environment, DEFAULT_TEST_ACTOR } from './helpers/gathering.js';
 
-function configFor({ entries = [], tasks = [], events = [] } = {}) {
+// The modifier library moved onto the crafting SYSTEM (issue 1117); the gathering config
+// no longer carries one, so `makeRichState({ modifiers })` builds it and returns `system`.
+function configFor({ tasks = [], events = [] } = {}) {
   return {
     systems: {
       'system-test': {
         rules: { rewardSelectionMode: 'allDrops', eventSelectionMode: 'allDrops' },
-        characterModifiers: entries,
         tasks,
         events
       }
@@ -25,14 +26,15 @@ const BLIND_TASK = {
 };
 
 test('non-GM viewer of blind history sees only contribution number', async () => {
-  const { service } = makeRichState({
-    config: configFor({ entries: STR_LIB, tasks: [BLIND_TASK] }),
+  const { service, system } = makeRichState({
+    config: configFor({ tasks: [BLIND_TASK] }),
+    modifiers: STR_LIB,
     rolls: [100],
     evaluateExpression: () => 5
   });
   const env = environment({ selectionMode: 'blind' });
   const calls = {};
-  const engine = makeEngine({ richState: service, env, calls });
+  const engine = makeEngine({ richState: service, env, calls, system });
   const viewer = { id: 'u', isGM: false };
   const result = await engine.startAttempt({ viewer, actor: DEFAULT_TEST_ACTOR, environmentId: 'env-test' });
   assert.equal(result.accepted, true);
@@ -51,14 +53,15 @@ test('non-GM viewer of blind history sees only contribution number', async () =>
 });
 
 test('GM viewer sees full evidence on the same run', async () => {
-  const { service } = makeRichState({
-    config: configFor({ entries: STR_LIB, tasks: [BLIND_TASK] }),
+  const { service, system } = makeRichState({
+    config: configFor({ tasks: [BLIND_TASK] }),
+    modifiers: STR_LIB,
     rolls: [100],
     evaluateExpression: () => 5
   });
   const env = environment({ selectionMode: 'blind' });
   const calls = {};
-  const engine = makeEngine({ richState: service, env, calls });
+  const engine = makeEngine({ richState: service, env, calls, system });
   const viewer = { id: 'gm', isGM: true };
   const result = await engine.startAttempt({ viewer, actor: DEFAULT_TEST_ACTOR, environmentId: 'env-test' });
   assert.equal(result.accepted, true);
@@ -73,14 +76,15 @@ test('GM viewer sees full evidence on the same run', async () => {
 });
 
 test('hidden row identity is redacted in blind snapshot', async () => {
-  const { service } = makeRichState({
-    config: configFor({ entries: STR_LIB, tasks: [BLIND_TASK] }),
+  const { service, system } = makeRichState({
+    config: configFor({ tasks: [BLIND_TASK] }),
+    modifiers: STR_LIB,
     rolls: [100],
     evaluateExpression: () => 2
   });
   const env = environment({ selectionMode: 'blind' });
   const calls = {};
-  const engine = makeEngine({ richState: service, env, calls });
+  const engine = makeEngine({ richState: service, env, calls, system });
   const result = await engine.startAttempt({ viewer: { id: 'u', isGM: false }, actor: DEFAULT_TEST_ACTOR, environmentId: 'env-test' });
   assert.equal(result.accepted, true);
   const snapshot = calls.terminal[0].payload.characterModifierSnapshot;

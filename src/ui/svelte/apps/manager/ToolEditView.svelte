@@ -1,6 +1,7 @@
 <!-- Svelte 5 runes mode -->
 <script>
   import Chip from './Chip.svelte';
+  import ManagerButton from '../../components/ManagerButton.svelte';
   import { localize } from '../../util/foundryBridge.js';
   import ToolBehaviorPreview from './tools/ToolBehaviorPreview.svelte';
   import ToolBreakageTab from './tools/ToolBreakageTab.svelte';
@@ -105,9 +106,14 @@
             >{text('FABRICATE.Admin.Manager.Tools.Dirty', 'Unsaved')}</Chip
           >{/if}
         {#if dirty}<span data-tool-editor-dirty hidden>dirty</span>{/if}
-        <button
-          type="button"
-          class="manager-button is-ghost"
+        <!-- These three are the AUTHORITY for `ManagerButton` (issue 1096): the maintainer's
+             reference for what a manager button should look like. They go through the
+             primitive so the two screens cannot drift apart again — a role or a treatment
+             that lands here now lands everywhere the primitive is used. Their rendering is
+             unchanged: `fab-manager-button` re-declares the same `.manager-header-actions`
+             values these already inherit from their ancestor. -->
+        <ManagerButton
+          role="ghost"
           data-tool-editor-back
           aria-label={text('FABRICATE.Admin.Manager.Tools.Editor.BackLabel', 'Back to Tools')}
           title={text('FABRICATE.Admin.Manager.Tools.Editor.BackLabel', 'Back to Tools')}
@@ -115,22 +121,20 @@
           disabled={saving}
           ><i class="fas fa-arrow-left" aria-hidden="true"></i><span
             >{text('FABRICATE.Admin.Manager.Tools.BackToTools', 'Back to tools')}</span
-          ></button
+          ></ManagerButton
         >
-        <button
-          type="button"
-          class="manager-button is-danger"
+        <ManagerButton
+          role="danger"
           data-tool-editor-delete
           aria-label={text('FABRICATE.Admin.Manager.Tools.Editor.DeleteLabel', 'Delete Tool')}
           onclick={onDelete}
           disabled={saving}
           ><i class="fas fa-trash" aria-hidden="true"></i><span
             >{text('FABRICATE.Admin.Manager.Tools.Delete', 'Delete')}</span
-          ></button
+          ></ManagerButton
         >
-        <button
-          type="button"
-          class="manager-button is-primary"
+        <ManagerButton
+          role="primary"
           data-tool-editor-save
           aria-label={text('FABRICATE.Admin.Manager.Tools.Editor.SaveLabel', 'Save Tool')}
           onclick={onSave}
@@ -143,7 +147,7 @@
               )}
           ><i class={saving ? 'fas fa-spinner fa-spin' : 'fas fa-save'} aria-hidden="true"></i><span
             >{text('FABRICATE.Admin.Manager.Tools.Save', 'Save tool')}</span
-          ></button
+          ></ManagerButton
         >
       </div>
     </div>

@@ -2863,6 +2863,13 @@ const ROUTED_CHECK = Object.freeze({
       ],
     },
   },
+  // THE SELECTION THE PARITY SUBJECT IS MEASURED ON. `addAll` over all three entries is the
+  // prototype's own resting state for this screen — three rows, each with its bounds chip, each
+  // reading `Applied` — so the shipped card and the design can be compared row for row rather
+  // than through an empty state. It is also the rule that leaves every runework recipe frame
+  // alone: the per-recipe picker renders under `bySubject` and under nothing else.
+  defaultModifierPolicy: 'addAll',
+  defaultModifierIds: ['rw-mod-rune-lore', 'rw-mod-etching', 'rw-mod-chisel'],
 });
 
 /**
@@ -2888,6 +2895,13 @@ const ROUTED_SALVAGE_CHECK = Object.freeze({
       { id: 'rw-salv-ruined', name: 'Ruined', success: false, breakTools: true, dc: -5 },
     ],
   },
+  // TWO of the three, on the SAME rule crafting uses, and the omission is the whole point: the
+  // eligibility control has two readings and crafting's frame shows only the `Applied` one.
+  // Leaving `rw-mod-chisel` out puts `Not applied` on screen beside its companion, on the one
+  // system whose rows the parity pass measures, without touching the crafting screen it
+  // measures them on.
+  defaultModifierPolicy: 'addAll',
+  defaultModifierIds: ['rw-mod-rune-lore', 'rw-mod-etching'],
 });
 
 /**
@@ -2914,7 +2928,11 @@ const PROGRESSIVE_SALVAGE_CHECK = Object.freeze({
   // read-only with a bounds chip, and with no eligible set every row would be in the
   // not-selected state and the chip's companion state would be depicted nowhere.
   defaultModifierPolicy: 'highest',
-  defaultModifierIds: ['hb-mod-medicine', 'hb-mod-tools'],
+  // `hb-mod-luck` is here so a CHECK actually selects a ROLLING entry (issue 1118). Under
+  // `highest` it also makes the rule's ranking visible: Lucky find averages 2.5 clamped to 3,
+  // against Medicine's +4 and the kit's +3, so it is eligible and loses — which is the honest
+  // depiction of "ranked by average" rather than a set where the dice always win.
+  defaultModifierIds: ['hb-mod-medicine', 'hb-mod-tools', 'hb-mod-luck'],
 });
 
 /**
@@ -2986,7 +3004,8 @@ const HERBALISM_CHECK_MODIFIERS = Object.freeze([
     label: 'Medicine',
     icon: 'fa-solid fa-kit-medical',
     expression: '@skills.med.mod',
-    // THE ONLY BOUNDED ENTRY IN THE WORLD (issue 1095). Per-entry `min`/`max` clamp the
+    // THE ONLY BOUNDED FLAT ENTRY IN THE WORLD (issue 1095; `hb-mod-luck` below is the bounded
+    // ROLLING one). Per-entry `min`/`max` clamp the
     // RESOLVED value, and three surfaces render them: the authoring pair of Steppers on the
     // crafting card, the read-only `-1 to +6` chip on the salvage and gathering cards, and
     // nothing at all on an unbounded entry. Without one bounded entry anywhere, every frame
@@ -3011,6 +3030,26 @@ const HERBALISM_CHECK_MODIFIERS = Object.freeze([
     expression: '@prof',
   },
   {
+    // THE ONE ROLLING ENTRY IN THE WORLD (issue 1118), and it is BOUNDED on purpose.
+    //
+    // A check accepts dice now, and the two rulings that come with that are only visible on an
+    // entry that rolls: the "Rolls dice" chip is a neutral fact rather than a warning, the
+    // authoring surface's roll note explains the two consequences, and the `max` clamps the
+    // ROLLED result (`min((1d4), 3)` in the formula) rather than a resolved number. With every
+    // lab entry flat, no frame anywhere could show any of it.
+    //
+    // It is eligible on SALVAGE only. Crafting's three-entry set is sized to
+    // `player-crafting-roll-prompt`, whose frame needs three DIFFERENT flat values to read as a
+    // choice, and gathering's card exists to photograph its inert notices — so salvage is the
+    // one selection where adding a fourth entry depicts something new instead of rewriting a
+    // frame that already had a job.
+    id: 'hb-mod-luck',
+    label: 'Lucky find',
+    icon: 'fa-solid fa-clover',
+    expression: '1d4',
+    max: 3,
+  },
+  {
     id: 'hb-mod-weather',
     label: 'Favourable weather',
     icon: 'fa-solid fa-cloud-sun',
@@ -3021,9 +3060,71 @@ const HERBALISM_CHECK_MODIFIERS = Object.freeze([
     // `defaultModifierIds` the second was depicted on no screen anywhere.
     //
     // It is a FOURTH entry rather than one of the three demoted, because the eligible set is
-    // load-bearing elsewhere: `player-crafting-roll-prompt` needs three eligible modifiers with
-    // three different values to show a choice rather than a row of interchangeable chips, and
-    // `maxModifierPicks: 3` below is sized to that set.
+    // load-bearing elsewhere: `player-crafting-roll-prompt` needs several eligible modifiers with
+    // DIFFERENT values to show a choice rather than a row of interchangeable chips, and
+    // `maxModifierPicks` below is sized to that set (four since issue 1118 review added the
+    // rolling `hb-mod-luck` to it).
+  },
+]);
+
+/**
+ * RUNEWORK'S OWN modifier library, and the reason it exists is a gate that could not fail.
+ *
+ * `modifier-entry-row` sat in the Checks Studio parity spec marked `unreachable`, on the stated
+ * grounds that no lab system authored a `CraftingSystem.modifiers` library — so the card drew its
+ * "no modifiers yet" sentence, the rows never rendered, and NOTHING about them was ever measured.
+ * Everything around them matched, so the modifiers screen reported clean while shipping a
+ * two-line sub-card per entry where the design draws one row. A region nobody can render is a
+ * region nobody is checking, and this library is what turns the assertion back on.
+ *
+ * It goes on RUNEWORK rather than on herbalism because runework is the system the parity subject
+ * boots (`routedByCheck` + a relative check is the mode the prototype draws), and because
+ * herbalism's five entries are sized to frames that already have jobs — the player roll prompt
+ * needs its three distinct flat values, and re-pointing the parity subject at herbalism would
+ * measure a screen no case photographs.
+ *
+ * Three entries, every one of them bounded `-1 to +5`, and every one of them selected below:
+ * three rows all carrying the bounds chip and all reading `Applied` is the resting state the
+ * prototype's own Modifiers screen draws, so the two documents can be laid side by side. The
+ * NOT-applied reading is depicted by runework's salvage selection, which deliberately leaves one
+ * entry out.
+ *
+ * The rule is `addAll`, which is what keeps this library free: `RecipeOverviewTab` gates its
+ * per-recipe picker on `bySubject`, so a non-selecting rule adds no control to any of runework's
+ * already-captured recipe frames. Every icon is Font Awesome FREE — Foundry bundles Pro, but a
+ * community package is not licensed to use one.
+ */
+const RUNEWORK_CHECK_MODIFIERS = Object.freeze([
+  {
+    id: 'rw-mod-rune-lore',
+    label: 'Rune lore',
+    icon: 'fa-solid fa-book-open',
+    expression: '@abilities.int.mod',
+    min: -1,
+    max: 5,
+  },
+  {
+    // NOT `fa-hand`, which was the first icon here and cost a false finding worth recording.
+    // The roll screen draws a chip per library entry AND a chip per roll-data SUGGESTION, and
+    // the structural parity pass matches glyphs by Font Awesome name alone — so a modifier
+    // wearing `fa-hand` aliased the mockup's `fa-hand` SUGGESTION chip, turned a
+    // legitimately-exempted absence into a spurious match, and then reported the two as out
+    // of order. A lab fixture must not manufacture findings on a screen it has nothing to say
+    // about, so these three glyphs are chosen from outside the mockup's own vocabulary.
+    id: 'rw-mod-etching',
+    label: 'Etching hand',
+    icon: 'fa-solid fa-pen-nib',
+    expression: '@abilities.dex.mod',
+    min: -1,
+    max: 5,
+  },
+  {
+    id: 'rw-mod-chisel',
+    label: 'Inscriber’s chisel',
+    icon: 'fa-solid fa-hammer',
+    expression: '@prof',
+    min: -1,
+    max: 5,
   },
 ]);
 
@@ -3058,12 +3159,17 @@ const PROGRESSIVE_CHECK = Object.freeze({
   // system already has, because a non-empty catalogue is what un-hides the recipe editor's
   // modifier row at all.
   defaultModifierPolicy: 'playerPicks',
-  // THREE of the catalogue's FOUR entries (issue 1095 added `hb-mod-weather` precisely to leave
-  // one out; see its own note). The eligible set under `playerPicks` is this list,
+  // FOUR of the catalogue's FIVE entries (issue 1095 added `hb-mod-weather` precisely to leave
+  // one out; issue 1118's review added the rolling `hb-mod-luck` to this set so one frame shows
+  // a rolling option's chip). The eligible set under `playerPicks` is this list,
   // and the prompt needs at least TWO to render at all (the engine suppresses a one-option choice)
   // — but three with three DIFFERENT values (Medicine +4, Herbalism kit +3, Nature +2) is what
   // makes the frame show a choice rather than a row of interchangeable chips.
-  defaultModifierIds: ['hb-mod-medicine', 'hb-mod-nature', 'hb-mod-tools'],
+  // `hb-mod-luck` joins the crafting set (issue 1118 review) so ONE frame anywhere carries a
+  // ROLLING option in the roll prompt: its chip reads `+1d4`, which is the whole point of the
+  // display field — its average of 2.5 is a number the roll can never produce, and a chip
+  // reading `+2.5` beside a `1d4` would be a promise the dice cannot keep.
+  defaultModifierIds: ['hb-mod-medicine', 'hb-mod-nature', 'hb-mod-tools', 'hb-mod-luck'],
   // AN AUTHORED cap, equal to the eligible-set size above so it bounds nothing (issue 1055).
   // ABSENCE was authored here first — absence is the UNLIMITED reading — and it does not survive
   // the boot. `labWorld.js` seeds no `migrationVersion`, so `lastRunVersion` is `'0.0.0'` and
@@ -3090,7 +3196,7 @@ const PROGRESSIVE_CHECK = Object.freeze({
   // reading is reached by typing into it. `manager-checks-crafting-modifiers` does that, and
   // `tests/view-lab-world-migration.test.js` fails if a migration ever silently rewrites a lab
   // system's check block again.
-  maxModifierPicks: 3,
+  maxModifierPicks: 4,
 });
 
 /**
@@ -3119,7 +3225,8 @@ const PROGRESSIVE_CHECK = Object.freeze({
  * the catalogued-but-not-selected entry, and it can only do that if NO activity selects it.
  *
  * No `enabled` and no formula slots: gathering resolves `d100` here, so the check-modifier seam is
- * inert with cause `noCheck` and dormant pending issue 683 either way. Authoring a formula would
+ * inert with cause `noModifierSupport` — the d100 against each drop's chance IS that mode's check,
+ * and it takes no modifiers yet — and dormant pending issue 683 either way. Authoring a formula would
  * claim a rolled gathering check this world does not have, and both notices are what
  * `manager-checks-gathering-modifiers` exists to photograph.
  */
@@ -3351,6 +3458,9 @@ export function buildLabContent() {
       recipeItemDefinitions: [],
       tools: RUNEWORK_TOOLS,
       characterPrerequisites: RUNEWORK_PREREQUISITES,
+      // The SECOND system carrying a modifier library, and the first whose rows anything
+      // measures — see `RUNEWORK_CHECK_MODIFIERS` for why the parity subject needed one.
+      modifiers: RUNEWORK_CHECK_MODIFIERS,
       gatheringRealms: [],
       gatheringRealmSettings: { revealMode: 'alwaysVisible', modifierVisibility: 'visible' },
       // The world's CURRENCY system, and runework carries it because nothing else does.
@@ -3436,9 +3546,16 @@ export function buildLabContent() {
         // `DND5E_CHARACTER_MODIFIER_PRESETS` seeds and what the editor's
         // `RollDataExpressionInput` renders. Note the `@` sigil, which this convention keeps and
         // the sibling `characterPrerequisites` paths deliberately do not.
+        // ISSUE 1117: a DISTINCT id from the check library's `hb-mod-nature`. The two were the
+        // same id with different expressions, which was the duplication the unified library
+        // exists to remove — and after the merge it is a real collision, so the lab world would
+        // model the defect and fire the one-time rename notice on every lab build. The
+        // collision RULE is exercised by `tests/migrate-unify-modifier-libraries.test.js`
+        // against a world whose drop rows actually name the colliding id, which is where the
+        // reference rewrite can be proven too.
         characterModifiers: [
           {
-            id: 'hb-mod-nature',
+            id: 'hb-mod-herbalism-training',
             label: 'Herbalism Training',
             icon: 'fa-solid fa-leaf',
             expression: '@skills.nat.total',

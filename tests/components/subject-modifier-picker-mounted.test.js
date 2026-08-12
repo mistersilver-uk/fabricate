@@ -33,6 +33,7 @@ const harness = createMountedComponentHarness({
     'src/utils/checkModifierPicks.js',
     'src/systems/toolCheckBonus.js',
     'src/utils/craftingCheckExpression.js',
+    'src/utils/rollExpressionAverage.js',
     'src/ui/svelte/util/foundryBridge.js',
     // `ModifierPillSelect`'s add menu dismisses on an outside click.
     'src/ui/svelte/actions/dismissOnOutsideClick.js',

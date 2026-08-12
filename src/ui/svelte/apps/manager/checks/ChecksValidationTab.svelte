@@ -1,32 +1,37 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  Validation tab for the Checks editor: a per-subsystem readiness checklist plus
-  severity-grouped issues for the crafting, salvage, and gathering checks. Mirrors
-  RecipeValidationTab — the pure `evaluateCheckReadiness` evaluator returns stable
-  check/issue ids, which this tab maps to localized copy. This is the canonical
-  place a GM sees what is wrong with a check; the individual editors no longer
-  print these messages inline. Uses the shared generic `.manager-editor-*`
-  validation classes.
+  The Checks Studio's Validation ROUTE (issue 1096; it was a tab).
+
+  It renders through the shared `EditorValidationSurface` rather than its own markup: that
+  primitive's props are already exactly this surface's needs — a summary medallion, three
+  counters, and severity-tagged rows grouped by owner — and the recipe editor's validation
+  tab has been on it since issue 883. Selecting an issue deep-links to the owning ACTIVITY
+  route AND the section that owns the control, through the one
+  `CHECK_ISSUE_SECTIONS` map the section dots and the rail badge also read.
+
+  ## The hero states the unsaved condition (DN4)
+
+  The badges, dots and counters on this screen are a DRAFT PREVIEW: they are computed on
+  the live draft so a GM sees the consequence of an edit before saving. The ENABLE gate is
+  not — it reads committed state. So a draft that clears every blocking issue must NOT be
+  reported as "Ready to enable", because enabling would act on a system that still carries
+  the old, unsaved state. The hero says so explicitly instead of claiming readiness for
+  state that is not persisted.
 
   `sections` is the list of in-play subsystem checks resolved by ChecksView:
-  `[{ subsystem: 'crafting'|'salvage'|'gathering', mode, check }]`. Subsystems that
-  are switched off (or the read-only gathering d100 roll) are omitted upstream.
+  `[{ subsystem, mode, check, modifierContext }]`. A subsystem that is switched off is
+  omitted upstream.
 -->
 <script>
-  import Chip from '../Chip.svelte';
+  import EditorValidationSurface from '../EditorValidationSurface.svelte';
   import { localize } from '../../../util/foundryBridge.js';
-  import { evaluateCheckReadiness } from './checksReadiness.js';
+  import { checkIssueCopy, checkTickCopy, interpolate } from './checksCopy.js';
+  import { evaluateCheckReadiness, sectionForIssue } from './checksReadiness.js';
 
-  let { sections = [] } = $props();
+  let { sections = [], dirty = false, dirtyActivities = [], onSelectIssue = () => {} } = $props();
 
-  function severityTone(severity) {
-    if (severity === 'critical') return 'danger';
-    if (severity === 'warning') return 'warning';
-    return 'neutral';
-  }
-
-  function text(key, fallback) {
-    const translated = localize(key);
+  function text(key, fallback, data) {
+    const translated = localize(key, data);
     return translated && translated !== key ? translated : fallback;
   }
 
@@ -35,89 +40,26 @@
     salvage: ['SubsystemSalvage', 'Salvage check'],
     gathering: ['SubsystemGathering', 'Gathering check'],
   };
-  const CHECK_LABELS = {
-    hasRollFormula: ['CheckHasRollFormula', 'Has a roll formula'],
-    outcomesNamed: ['CheckOutcomesNamed', 'Every outcome tier is named'],
-    hasSuccessOutcome: ['CheckHasSuccessOutcome', 'At least one outcome is a Success'],
-    rangesValid: ['CheckRangesValid', 'Every tier range is valid'],
-    rangesNoOverlap: ['CheckRangesNoOverlap', 'No tier ranges overlap'],
-    rangesContiguous: ['CheckRangesContiguous', 'Tier ranges leave no unclaimed values'],
-    modifierBoundsValid: [
-      'CheckModifierBoundsValid',
-      'Every applied check modifier has usable bounds',
-    ],
-    tierStepTargetsResolve: [
-      'CheckTierStepTargetsResolve',
-      'Tier-step targets name exactly one existing tier',
-    ],
+  const SUBSYSTEM_ICONS = {
+    crafting: 'fas fa-hammer',
+    salvage: 'fas fa-recycle',
+    gathering: 'fas fa-seedling',
   };
-  const ISSUE_LABELS = {
-    noRollFormula: [
-      'IssueNoRollFormula',
-      'This check has no roll formula; it will not resolve until one is set.',
-    ],
-    retiredPlaceholderInFormula: [
-      'IssueRetiredPlaceholderInFormula',
-      'This formula contains the retired @craftingmod placeholder. It is ignored and removed before the roll — check modifiers are added automatically now — so delete it.',
-    ],
-    retiredPlaceholderBreaksFormula: [
-      'IssueRetiredPlaceholderBreaksFormula',
-      'This formula uses the retired @craftingmod placeholder somewhere it cannot be removed safely, so the whole formula is discarded and this check will not roll. Rewrite it by hand without the placeholder — check modifiers are added automatically now.',
-    ],
-    unnamedOutcome: [
-      'IssueUnnamedOutcome',
-      'Name every outcome tier — an unnamed tier cannot be routed to a result group.',
-    ],
-    noSuccessOutcome: [
-      'IssueNoSuccessOutcome',
-      "No outcome tier is marked as a Success — successful crafts can't route to a result set. Mark at least one tier as Success.",
-    ],
-    rangeInvalid: ['IssueRangeInvalid', 'Some tiers have a start greater than their end.'],
-    rangeOverlap: [
-      'IssueRangeOverlap',
-      'Some tier ranges overlap. Each value range must be unique.',
-    ],
-    rangeGap: [
-      'IssueRangeGap',
-      'Some values between your lowest and highest tier belong to no tier at all, so a roll landing there matches nothing and the attempt cannot be routed. Close the gap.',
-    ],
-    modifierBoundsInverted: [
-      'IssueModifierBoundsInverted',
-      'A check modifier this check applies has a minimum above its maximum, so it contributes nothing to the roll until you fix the two values.',
-    ],
-    modifierBoundsUnsafe: [
-      'IssueModifierBoundsUnsafe',
-      'A check modifier this check applies has a minimum or maximum too large or too small to appear in a roll formula, so it contributes nothing. Use a whole number a die roll could plausibly reach.',
-    ],
-    modifiersInertNoCheck: [
-      'IssueModifiersInertNoCheck',
-      'This resolution mode rolls no check, so the check modifiers selected here are never applied.',
-    ],
-    modifiersInertNoFormula: [
-      'IssueModifiersInertNoFormula',
-      'This check has no roll formula yet, so the check modifiers selected here are never applied.',
-    ],
-    danglingTierStepTarget: [
-      'IssueDanglingTierStepTarget',
-      "A trigger's target tier is not set, or names a tier this check does not have; that step does nothing until you pick one of this check's outcome tiers.",
-    ],
-    multipleTierStepTargets: [
-      'IssueMultipleTierStepTargets',
-      'Two or more triggers set a target tier; if more than one matches, the lowest-ranked wins.',
-    ],
-  };
-
   function subsystemLabel(subsystem) {
     const meta = SUBSYSTEM_LABELS[subsystem] || [subsystem, subsystem];
     return text(`FABRICATE.Admin.Manager.Checks.Validation.${meta[0]}`, meta[1]);
   }
   function checkLabel(id) {
-    const meta = CHECK_LABELS[id] || [id, id];
-    return text(`FABRICATE.Admin.Manager.Checks.Validation.${meta[0]}`, meta[1]);
+    const copy = checkTickCopy(id);
+    return text(copy.key, copy.fallback);
   }
-  function issueTitle(id) {
-    const meta = ISSUE_LABELS[id] || [id, id];
-    return text(`FABRICATE.Admin.Manager.Checks.Validation.${meta[0]}`, meta[1]);
+  // `data` is the optional interpolation payload an issue carries when its sentence names
+  // something (issue 1117). `localize` formats only when data is supplied, and the English
+  // fallback is interpolated by hand so a world with no localization still reads the names
+  // rather than a literal `{names}`.
+  function issueTitle(id, data) {
+    const copy = checkIssueCopy(id);
+    return interpolate(text(copy.key, copy.fallback, data), data);
   }
 
   const evaluated = $derived(
@@ -126,79 +68,135 @@
       readiness: evaluateCheckReadiness(section.check || {}, {
         mode: section.mode,
         modifierContext: section.modifierContext ?? null,
+        activity: section.subsystem,
       }),
     }))
   );
+
+  const counts = $derived.by(() => {
+    let passing = 0;
+    let warnings = 0;
+    let blocking = 0;
+    for (const { readiness } of evaluated) {
+      passing += readiness.checks.filter((check) => check.satisfied).length;
+      warnings += readiness.issues.filter((issue) => issue.severity !== 'critical').length;
+      blocking += readiness.issues.filter((issue) => issue.severity === 'critical').length;
+    }
+    return { passing, warnings, blocking };
+  });
+
+  // ONE row per check tick and per issue, in that order, so a group reads as "what holds"
+  // followed by "what does not". An issue's row carries the deep-link target; a satisfied
+  // tick has nowhere to go.
+  //
+  // A group with NEITHER still states its result (issue 1096). That is a reachable state, not
+  // a hypothetical: a gathering check in `d100` mode with no eligible check modifiers reports
+  // no tick and no issue, and an unfiltered map then drew a `GATHERING CHECK` heading with a
+  // rule under it and nothing else — a heading over emptiness, where the surface it replaced
+  // said "No issues detected." in so many words. The group is kept rather than dropped
+  // because its ABSENCE would read as "gathering was not evaluated", which is a different and
+  // equally wrong claim.
+  function rowsFor(subsystem, readiness) {
+    const rows = [
+      ...readiness.checks.map((check) => ({
+        id: check.id,
+        title: checkLabel(check.id),
+        status: check.satisfied ? 'pass' : 'warn',
+        dataAttrs: { 'data-subsystem': subsystem, 'data-satisfied': String(check.satisfied) },
+      })),
+      ...readiness.issues.map((issue) => ({
+        id: issue.id,
+        title: issueTitle(issue.id, issue.data),
+        status: issue.severity === 'critical' ? 'block' : 'warn',
+        target: { activity: subsystem, section: sectionForIssue(issue.id) },
+        dataAttrs: {
+          'data-subsystem': subsystem,
+          'data-issue': issue.id,
+          'data-issue-severity': issue.severity,
+        },
+      })),
+    ];
+    if (rows.length > 0) return rows;
+    return [
+      {
+        id: 'noIssues',
+        title: text('FABRICATE.Admin.Manager.Checks.Validation.NoIssues', 'No issues detected.'),
+        status: 'pass',
+        dataAttrs: { 'data-subsystem': subsystem, 'data-checks-no-issues': subsystem },
+      },
+    ];
+  }
+
+  const groups = $derived(
+    evaluated.map(({ subsystem, readiness }) => ({
+      id: subsystem,
+      icon: SUBSYSTEM_ICONS[subsystem] || 'fas fa-dice-d20',
+      label: subsystemLabel(subsystem),
+      dataAttrs: { 'data-checks-validation-section': subsystem },
+      rows: rowsFor(subsystem, readiness),
+    }))
+  );
+
+  // The hero. Three states, and the UNSAVED one is not a decoration: `evaluateCheckReadiness`
+  // above ran against the live DRAFT, while enabling the system reads what is committed, so
+  // a clean draft is not evidence that the system may be enabled.
+  const summary = $derived.by(() => {
+    if (counts.blocking > 0) {
+      return {
+        status: 'block',
+        title: text('FABRICATE.Admin.Manager.Checks.Validation.HeroBlocked', 'Blocking issues'),
+        sub: text(
+          'FABRICATE.Admin.Manager.Checks.Validation.HeroBlockedSub',
+          'This system saves while incomplete, but it will not enable until every blocking issue is cleared.'
+        ),
+      };
+    }
+    if (dirty) {
+      const names = dirtyActivities.map((id) => subsystemLabel(id)).join(', ');
+      return {
+        status: 'warn',
+        title: text(
+          'FABRICATE.Admin.Manager.Checks.Validation.HeroUnsaved',
+          'Clean, but not saved yet'
+        ),
+        sub: text(
+          'FABRICATE.Admin.Manager.Checks.Validation.HeroUnsavedSub',
+          'These results describe your unsaved edits to {activities}. Enabling the system reads what is saved, so save the checks before enabling.'
+        ).replace('{activities}', names),
+      };
+    }
+    return {
+      status: 'pass',
+      title: text('FABRICATE.Admin.Manager.Checks.Validation.HeroReady', 'Ready to enable'),
+      sub: text(
+        'FABRICATE.Admin.Manager.Checks.Validation.HeroReadySub',
+        'Every activity check in this system is complete and consistent.'
+      ),
+    };
+  });
 </script>
 
-<section
-  class="manager-recipe-tab manager-checks-validation-tab"
-  data-checks-panel="validation"
-  data-recipe-tab="validation"
-  aria-label={text('FABRICATE.Admin.Manager.Checks.Validation.Title', 'Validation')}
->
-  {#if evaluated.length === 0}
-    <p class="manager-muted">
-      {text(
-        'FABRICATE.Admin.Manager.Checks.Validation.EmptyHint',
-        'Issues across the crafting, salvage, and gathering checks will be listed here.'
-      )}
-    </p>
-  {:else}
-    {#each evaluated as { subsystem, readiness } (subsystem)}
-      {@const issuesBy = {
-        critical: readiness.issues.filter((issue) => issue.severity === 'critical'),
-        warning: readiness.issues.filter((issue) => issue.severity === 'warning'),
-        info: readiness.issues.filter((issue) => issue.severity === 'info'),
-      }}
-      <section class="manager-task-core-card" data-checks-validation-section={subsystem}>
-        <h3 class="manager-card-title">{subsystemLabel(subsystem)}</h3>
-
-        <ul class="manager-editor-check-list">
-          {#each readiness.checks as check (check.id)}
-            <li
-              class={`manager-editor-check ${check.satisfied ? 'is-satisfied' : 'is-unsatisfied'}`}
-              data-subsystem={subsystem}
-              data-check={check.id}
-              data-satisfied={check.satisfied}
-            >
-              <i
-                class={check.satisfied ? 'fas fa-circle-check' : 'fas fa-circle-xmark'}
-                aria-hidden="true"
-              ></i>
-              <span>{checkLabel(check.id)}</span>
-            </li>
-          {/each}
-        </ul>
-
-        {#if readiness.issues.length === 0}
-          <p class="manager-muted" data-checks-no-issues={subsystem}>
-            {text('FABRICATE.Admin.Manager.Checks.Validation.NoIssues', 'No issues detected.')}
-          </p>
-        {:else}
-          {#each ['critical', 'warning', 'info'] as severity (severity)}
-            {#if issuesBy[severity].length > 0}
-              <ul class="manager-recipe-issue-list" data-issue-severity={severity}>
-                {#each issuesBy[severity] as issue, index (issue.id + index)}
-                  <li
-                    class={`manager-editor-issue is-${severity}`}
-                    data-subsystem={subsystem}
-                    data-issue={issue.id}
-                  >
-                    <Chip tone={severityTone(severity)}>
-                      {text(
-                        `FABRICATE.Admin.Manager.Checks.Validation.Severity.${severity}`,
-                        severity
-                      )}
-                    </Chip>
-                    <span class="manager-recipe-issue-title">{issueTitle(issue.id)}</span>
-                  </li>
-                {/each}
-              </ul>
-            {/if}
-          {/each}
-        {/if}
-      </section>
-    {/each}
-  {/if}
-</section>
+<div class="manager-checks-validation-route" data-checks-panel="validation">
+  <EditorValidationSurface
+    title={text('FABRICATE.Admin.Manager.Checks.Validation.Title', 'Validation')}
+    intro={text(
+      'FABRICATE.Admin.Manager.Checks.Validation.Intro',
+      'A crafting system saves even while incomplete, but only enables when every blocking issue is cleared.'
+    )}
+    {summary}
+    {counts}
+    countLabels={{
+      passing: text('FABRICATE.Admin.Manager.Checks.Validation.CountPassing', 'Passing'),
+      warnings: text('FABRICATE.Admin.Manager.Checks.Validation.CountWarnings', 'Warnings'),
+      blocking: text('FABRICATE.Admin.Manager.Checks.Validation.CountBlocking', 'Blocking'),
+    }}
+    {groups}
+    statusLabels={{
+      pass: text('FABRICATE.Admin.Manager.Checks.Validation.StatusPass', 'Pass'),
+      warn: text('FABRICATE.Admin.Manager.Checks.Validation.StatusWarn', 'Warning'),
+      block: text('FABRICATE.Admin.Manager.Checks.Validation.StatusBlock', 'Blocks enable'),
+    }}
+    rowDataAttr="data-checks-validation-check"
+    {onSelectIssue}
+  />
+</div>

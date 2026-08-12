@@ -238,6 +238,13 @@ export function objectLiteralKeys(objectSource) {
  * `scripts/foundry-test-run.mjs` calls Playwright's `fill()` / `inputValue()` on three of them,
  * and neither resolves against a wrapper `<div>`, so a hook that stopped riding `inputProps` is an
  * un-waivable smoke failure rather than a cosmetic one.
+ *
+ * `data-trigger-value` LEFT this list in issue 1096, which is a removal from the delta's list and
+ * therefore stated rather than done quietly. Its field is no longer a `Stepper` at all: a trigger
+ * threshold is TYPED (reaching 20 from 1 is nineteen clicks) and the prototype draws one plain
+ * input there. It is covered instead by `BARE_NUMBER_FIELD_REGISTER` entry R3, which is the
+ * register this repo already keeps for exactly that decision — so the hook did not stop being
+ * guarded, it moved to the guard that fits what it now is.
  */
 export const MIGRATED_INPUT_HOOKS = Object.freeze([
   'data-gathering-task-stamina-cost',
@@ -250,7 +257,6 @@ export const MIGRATED_INPUT_HOOKS = Object.freeze([
   'data-outcome-end',
   'data-tier-dc',
   'data-check-dc',
-  'data-trigger-value',
   'data-trigger-tier-step-steps',
   'data-economy-actor-current',
   'data-economy-actor-max',
@@ -261,11 +267,17 @@ export const MIGRATED_INPUT_HOOKS = Object.freeze([
 ]);
 
 /**
- * The two bare `type="number"` fields that survive the migration, with the reason each is allowed.
+ * Every bare `type="number"` field outside the shared primitive, with the reason each is allowed.
  *
- * Both come from the non-reuse register (D12). The set is asserted EXACTLY — every entry must
- * still exist and must still contain a bare field, and no third file may — so a later migration of
- * either one fails this as stale rather than leaving a dead allowlist entry behind.
+ * R1 and R2 come from the non-reuse register (D12); R3 was added by issue 1096. The set is
+ * asserted EXACTLY — every entry must still exist and must still contain a bare field, and no
+ * unregistered file may — so a later migration of any of them fails as stale rather than leaving
+ * a dead allowlist entry behind.
+ *
+ * `spinnerSuppressed` is the `iff` this register exists to keep honest: a field may lose the
+ * browser's drawn arrows only when something else on screen already lets a POINTER step the same
+ * value. R1 has a sibling range track; R2 and R3 have nothing, so their spinner is their only
+ * pointer path to the value and it stays.
  */
 export const BARE_NUMBER_FIELD_REGISTER = Object.freeze([
   Object.freeze({
@@ -282,6 +294,16 @@ export const BARE_NUMBER_FIELD_REGISTER = Object.freeze([
     reason:
       'a bare field inside a bordered currency chip, which is not a form row; it has no other '
       + 'pointer affordance at all, so its native spinner is the correct iff outcome and stays',
+    spinnerSuppressed: false,
+  }),
+  Object.freeze({
+    path: 'src/ui/svelte/apps/manager/checks/CheckTriggers.svelte',
+    register: 'R3',
+    reason:
+      'the trigger condition VALUE, returned from a Stepper to a plain field by issue 1096: a '
+      + 'threshold is typed rather than walked to (reaching 20 from 1 is nineteen clicks) and the '
+      + 'prototype draws one input there; with no adjuncts beside it the native spinner is its '
+      + 'only pointer path to the value, so it stays',
     spinnerSuppressed: false,
   }),
 ]);

@@ -106,9 +106,15 @@ test('the startup migration pass does not rewrite any lab system’s crafting ch
 });
 
 // The positive half of the exemption above: the relocation the lab build exercises is
-// asserted to have HAPPENED, in both directions. Without this the exemption would merely
-// stop looking at the one key `1.22.0` touches (issue 1095, C13).
-test('the startup migration pass LIFTS the lab catalogue to the system level', async () => {
+// asserted to have HAPPENED, end to end. Without this the exemption would merely stop
+// looking at the one key `1.22.0` touches (issue 1095, C13).
+//
+// THE LAB EXERCISES BOTH HOPS (issue 1117). `1.22.0` lifts `craftingCheck.checkModifiers`
+// to `system.checkModifiers`; `1.23.0` then merges that with the gathering
+// `characterModifiers` library into `system.modifiers`. `labContent.js` deliberately goes
+// on authoring BOTH at their pre-migration locations, so a lab build runs the whole ladder
+// and the frames render the state a GM upgrading will actually see.
+test('the startup migration pass MERGES both lab libraries into system.modifiers', async () => {
   const { before, after } = await migrateLabWorld();
   const seeded = labSystem(before.craftingSystems, LAB_SYSTEM_IDS.HERBALISM);
   const migrated = labSystem(after.craftingSystems, LAB_SYSTEM_IDS.HERBALISM);
@@ -119,16 +125,52 @@ test('the startup migration pass LIFTS the lab catalogue to the system level', a
     'the fixture must go on authoring the catalogue at the PRE-1.22.0 location, or the lab ' +
       'build stops exercising the migration and this assertion proves nothing'
   );
+  const seededGatheringConfig =
+    before.gatheringConfig?.systems?.[LAB_SYSTEM_IDS.HERBALISM] ?? {};
+  const seededGathering = seededGatheringConfig.characterModifiers ?? [];
+
+  // NO COLLISION IN THE LAB WORLD, deliberately: the two libraries authored the same id for
+  // two different expressions, which is precisely the duplication issue 1117 removes, and a
+  // fixture that kept it would model the defect AND fire the one-time rename notice on every
+  // lab build. The collision rule is exercised by
+  // `tests/migrate-unify-modifier-libraries.test.js`, against a world whose drop rows name the
+  // colliding id so the reference rewrite can be proven with it.
+  const seededIds = seeded.craftingCheck.checkModifiers.map((entry) => entry.id);
   assert.deepEqual(
-    migrated?.checkModifiers,
-    seeded.craftingCheck.checkModifiers,
-    'the catalogue arrives at the system level, entry for entry'
+    seededGathering.map((entry) => entry.id).filter((id) => seededIds.includes(id)),
+    [],
+    'the lab fixtures must author DISTINCT ids across the two libraries'
   );
+  assert.deepEqual(
+    migrated?.modifiers,
+    [...seeded.craftingCheck.checkModifiers, ...seededGathering],
+    'both libraries arrive in ONE system-level library, check entries first, entry for entry'
+  );
+
+  // The reference REWRITE that accompanies a re-key is proven in
+  // `tests/migrate-unify-modifier-libraries.test.js`, against a world whose drop rows
+  // actually name the colliding id. The lab world authors no such reference today, so
+  // asserting it here would be vacuous — and a vacuous assertion beside a real one is worse
+  // than none, because it reads as coverage.
+
   assert.equal(
     Object.hasOwn(migrated?.craftingCheck ?? {}, 'checkModifiers'),
     false,
-    'and the old key is DELETED rather than duplicated — two locations for one catalogue is ' +
+    'and the old key is DELETED rather than duplicated — two locations for one library is ' +
       'how two surfaces come to disagree about which one is authoritative'
+  );
+  assert.equal(
+    Object.hasOwn(migrated ?? {}, 'checkModifiers'),
+    false,
+    'as is the intermediate 1.22.0 location'
+  );
+  assert.equal(
+    Object.hasOwn(
+      after.gatheringConfig?.systems?.[LAB_SYSTEM_IDS.HERBALISM] ?? {},
+      'characterModifiers'
+    ),
+    false,
+    'and so is the gathering one'
   );
 });
 

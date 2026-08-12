@@ -1,10 +1,28 @@
-import test from 'node:test';
+import test, { after, before } from 'node:test';
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
 import { scopedComponentCss, withScopeHash } from '../helpers/scoped-component-css.js';
+
+// ONE Chromium process for this whole file (issue tests-perf follow-up). This file carries
+// every computed-style parity guard in the repo and used to launch a fresh browser per test —
+// 20 separate `chromium.launch()` calls — and Chromium's own startup cost dominated the file's
+// runtime badly enough to blow its CI budget under load. A browser process is expensive to
+// start and cheap to reuse; the isolation that actually matters is per-TEST state (cookies,
+// `document`, injected markup), which a fresh browser CONTEXT gives for a fraction of the cost.
+// So every test below opens its own `sharedBrowser.newContext()` (or `.newPage()` on one, where
+// a helper hands back a bare page) and closes ONLY that context, never the shared browser.
+let sharedBrowser;
+
+before(async () => {
+  sharedBrowser = await chromium.launch();
+});
+
+after(async () => {
+  await sharedBrowser.close();
+});
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const cssPath = resolve(__dirname, '../../styles/fabricate.css');
@@ -48,9 +66,7 @@ function scopedStyles(componentSource) {
   const start = componentSource.lastIndexOf(STYLE_OPEN);
   const end = componentSource.lastIndexOf('\n</style>');
   if (start < 0 || end <= start) return '';
-  return componentSource
-    .slice(start + STYLE_OPEN.length, end)
-    .replace(/\/\*[\s\S]*?\*\//g, '');
+  return componentSource.slice(start + STYLE_OPEN.length, end).replace(/\/\*[\s\S]*?\*\//g, '');
 }
 
 const emptyStateStyles = scopedStyles(emptyStateSource);
@@ -100,8 +116,11 @@ function withChipHash(markup) {
 }
 
 async function readRenderedToolGeometry(width, view) {
-  const browser = await chromium.launch();
-  const page = await browser.newPage({ viewport: { width, height: 720 }, deviceScaleFactor: 1 });
+  const context = await sharedBrowser.newContext({
+    viewport: { width, height: 720 },
+    deviceScaleFactor: 1,
+  });
+  const page = await context.newPage();
   try {
     const editor =
       view === 'tool-edit'
@@ -190,7 +209,7 @@ async function readRenderedToolGeometry(width, view) {
       };
     });
   } finally {
-    await browser.close();
+    await context.close();
   }
 }
 
@@ -341,11 +360,11 @@ test('manager character modifier search suggestions keep icons in row flow', () 
 });
 
 test('manager character modifier search suggestions render with availability-style icon geometry', async () => {
-  const browser = await chromium.launch();
-  const page = await browser.newPage({
+  const context = await sharedBrowser.newContext({
     viewport: { width: 760, height: 320 },
     deviceScaleFactor: 1,
   });
+  const page = await context.newPage();
 
   try {
     await page.setContent(`
@@ -502,8 +521,7 @@ test('manager character modifier search suggestions render with availability-sty
       'character suggestion icon gap should match availability rows'
     );
   } finally {
-    await page.close();
-    await browser.close();
+    await context.close();
   }
 });
 
@@ -644,7 +662,7 @@ test('manager systems status cells use stable interactive on-off toggles', () =>
   // the button is inert. The hover affordance has to live on the TRACK, which is the
   // part with an edge — otherwise every switch in the manager has no hover state at all.
   const toggleHoverBlock = blockFor(
-    '.fabricate-manager .manager-status-toggle:not(:disabled, .is-disabled):hover .manager-status-toggle-track'
+    '.fabricate-manager .manager-status-toggle:not(:disabled, .is-disabled, .is-locked):hover .manager-status-toggle-track'
   );
   assert.ok(
     toggleHoverBlock.includes('border-color:') && toggleHoverBlock.includes('background:'),
@@ -874,7 +892,11 @@ test('manager gathering rail submenu controls clear host mouse focus and keep gr
     'gathering submenu entries should be nested inside the group'
   );
   assert.ok(
-    subitemBlock.includes('grid-template-columns: 20px minmax(0, 1fr) auto;'),
+    // FOUR tracks since issue 1096: a Checks child can carry an unsaved marker AND an issue
+    // badge beside its label, and the three-track grid put the second one into the ICON cell
+    // of the row below it. The claim is unchanged — a submenu entry's trailing markers stay
+    // inside its own row — and the extra track is simply empty for every other rail group.
+    subitemBlock.includes('grid-template-columns: 20px minmax(0, 1fr) auto auto;'),
     'gathering submenu entries should keep count chips inside their rows'
   );
   // Issue 643: the rail's selected state is an IDENTITY cue ("you are here"), so it
@@ -1085,10 +1107,7 @@ test('manager empty states use refined heading and setup-panel styling', () => {
     !emptyPanelBlock.includes('min-height:'),
     'panel height should be padding-driven as in the prototype, not floored'
   );
-  assert.ok(
-    !emptyPanelBlock.includes('background:'),
-    'the prototype panel carries no fill'
-  );
+  assert.ok(!emptyPanelBlock.includes('background:'), 'the prototype panel carries no fill');
   assert.ok(
     emptyIconBlock.includes('font-size: 18px;') &&
       emptyIconBlock.includes('color: var(--fab-text-subtle);') &&
@@ -1260,10 +1279,7 @@ test('the shared explainer card reuses the card shell and owns only the explaine
   // out of its card and a one-link primitive is exactly the incompatibility that kept a
   // hand-rolled card alive beside it. The single `docsHref`/`docsLabel` pair is gone rather
   // than kept alongside — two ways to express one link is the drift this pass removes.
-  assert.ok(
-    /\blinks = \[\]/.test(explainerCardSource),
-    'the explainer takes a list of docs links'
-  );
+  assert.ok(/\blinks = \[\]/.test(explainerCardSource), 'the explainer takes a list of docs links');
   for (const dead of ['docsHref', 'docsLabel']) {
     assert.equal(
       withoutComments(explainerCardSource).includes(dead),
@@ -1368,7 +1384,13 @@ test('every explainer and fact-row site renders through the primitive, not by ha
     ['tools/ToolBehaviorPreview.svelte', ['ExplainerCard', 'IconFactRow']],
     ['tools/ToolBrowserInspector.svelte', ['IconFactRow']],
     ['CraftingSystemManagerRoot.svelte', ['ExplainerCard']],
-    ['checks/ChecksRightMenu.svelte', ['ExplainerCard']],
+    // `checks/ChecksRightMenu.svelte` is NOT on this list any more (issue 1096). The
+    // maintainer removed the `ABOUT CRAFTING CHECKS` explainer outright: the prototype's
+    // rail has no such card, and it pushed every panel with a subject below the fold. This
+    // row asserted the card was rendered through the primitive rather than by hand, which
+    // is a different question from whether it should be rendered at all — the rail now
+    // renders no explainer, and `the checks rail follows the Tool Studio's inspector
+    // convention` below is what holds that.
   ]) {
     const source = readFileSync(resolve(managerComponentDir, componentPath), 'utf8');
     for (const primitive of imports) {
@@ -1386,7 +1408,7 @@ test('every explainer and fact-row site renders through the primitive, not by ha
 // and a 0.98rem heading no other inspector had, sitting directly beside a `.manager-inspector-card`.
 // `.manager-setup-card` itself is NOT dead: the first-run procedures still use it, which is
 // exactly why the rail could not simply be left alone.
-test('the checks rail builds no card of its own', () => {
+test("the checks rail follows the Tool Studio's inspector convention", () => {
   const rightMenu = withoutComments(
     readFileSync(resolve(managerComponentDir, 'checks/ChecksRightMenu.svelte'), 'utf8')
   );
@@ -1404,21 +1426,57 @@ test('the checks rail builds no card of its own', () => {
     );
   }
 
-  // Both cards on the rail wear the shared shell, and the Active card titles itself with
-  // the manager's one card-title contract rather than a second heading treatment.
+  // ── The heading convention INVERTED (issue 1096) ────────────────────────────────────
+  //
+  // This block used to assert the opposite: a `.manager-card-title` inside each card and
+  // NO `.manager-kicker` anywhere on the rail. The maintainer made the Tool Studio's
+  // inspector the authority for this rail's structure, and the Tool Studio's
+  // (`ToolBehaviorPreview.svelte`) is a flat uppercase `.manager-kicker` naming the
+  // section with its card directly beneath — never a card wrapping the section with a
+  // title inside it. Two studios cannot both be right, so the assertion moves with the
+  // ruling rather than being deleted.
   assert.ok(
-    rightMenu.includes('<section class="manager-inspector-card" data-checks-active={activeTab}>'),
+    rightMenu.includes('manager-inspector-card manager-checks-active-card'),
     'the Active card wears the shared inspector-card shell'
   );
   assert.ok(
-    rightMenu.includes('<h3 class="manager-card-title">{activeTitle}</h3>'),
-    'the Active card titles itself with the shared card-title contract'
+    rightMenu.includes('<p class="manager-kicker">{title}</p>'),
+    'sections are named by a flat kicker above their card, as the Tool Studio does'
   );
   assert.equal(
-    rightMenu.includes('manager-kicker'),
+    rightMenu.includes('manager-card-title'),
     false,
-    'the rail should carry no second heading treatment'
+    'a card-title inside a rail card is the convention the Tool Studio replaced'
   );
+
+  // …and the ACTIVATION section is named by nothing at all (issue 1096, maintainer inspector
+  // comparison). The prototype gives that card no heading: the switch and the words beside it
+  // are the statement, and an `ACTIVE` kicker over a card reading `On` said it twice. The
+  // convention above is unchanged for the five sections that DO carry a heading.
+  assert.equal(
+    rightMenu.includes('{activeTitle}'),
+    false,
+    'the Active kicker is gone; the card states its own subject'
+  );
+
+  // Every heading row leads with the prototype's glyph. A kicker with no glyph is the reading
+  // this replaced, and the snippet is the only place a heading is built — so one assertion
+  // covers all five.
+  assert.ok(
+    rightMenu.includes('manager-checks-rail-head-icon'),
+    'the heading row leads with a glyph'
+  );
+
+  // The two collapsibles are gone with it. The prototype has no disclosure anywhere in
+  // this rail, and a panel whose whole content is one sentence of pre-roll copy has
+  // nothing to collapse.
+  for (const dead of ['RowDisclosure', 'manager-checks-rail-body', 'ExplainerCard']) {
+    assert.equal(
+      rightMenu.includes(dead),
+      false,
+      `${dead} was removed from the checks rail (issue 1096); it must not come back`
+    );
+  }
 
   // The procedure format stays available to the surfaces it belongs to, so this is a
   // conversion rather than a deletion.
@@ -1842,13 +1900,13 @@ test('manager recipe row collapses in the specified order and never drops its co
 // declarations — the base and the two rungs — or the checkbox lands under the edit pencil
 // at the very widths where the row is tightest.
 test('the recipe cluster appends a bulk selection column that the ladder never drops', () => {
-  const declarations = [...css.matchAll(/--fab-recipe-cluster-cols:\s*([^;]+);/g)].map(([, value]) =>
-    value.replace(/\s+/g, ' ').trim()
+  const declarations = [...css.matchAll(/--fab-recipe-cluster-cols:\s*([^;]+);/g)].map(
+    ([, value]) => value.replace(/\s+/g, ' ').trim()
   );
   assert.equal(
     declarations.length,
     3,
-    'the base template plus the ladder\'s two rewrites — a fourth would be an unpinned band'
+    "the base template plus the ladder's two rewrites — a fourth would be an unpinned band"
   );
 
   for (const declaration of declarations) {
@@ -1926,7 +1984,7 @@ test('the bulk-selected row state is one joined selector across every multi-sele
   assert.equal(
     css.includes('has no selection row at all'),
     false,
-    'that block\'s stated reason is retired by issue 1010 and must not survive as a false claim'
+    "that block's stated reason is retired by issue 1010 and must not survive as a false claim"
   );
 });
 
@@ -3027,9 +3085,7 @@ test('manager gathering task browser defines bounded toolbar and compact table g
   );
   assert.ok(
     continuousGradientFillBlock.includes('width: 100%;') &&
-      continuousGradientFillBlock.includes(
-        'background: var(--fab-chance-slider-track-gradient);'
-      ),
+      continuousGradientFillBlock.includes('background: var(--fab-chance-slider-track-gradient);'),
     'configured chance sliders should paint their semantic gradient across the complete inset track'
   );
   assert.ok(
@@ -3361,11 +3417,11 @@ test('manager gathering task browser defines bounded toolbar and compact table g
 });
 
 test('chance slider rails clip continuous Tool gradients at thumb-centre endpoints without changing Gathering fill', async () => {
-  const browser = await chromium.launch();
-  const page = await browser.newPage({
+  const context = await sharedBrowser.newContext({
     viewport: { width: 640, height: 240 },
     deviceScaleFactor: 1,
   });
+  const page = await context.newPage();
 
   try {
     await page.setContent(`
@@ -3432,8 +3488,7 @@ test('chance slider rails clip continuous Tool gradients at thumb-centre endpoin
     assert.equal(report.gathering.backgroundImage, 'none');
     assert.notEqual(report.gathering.backgroundColor, 'rgba(0, 0, 0, 0)');
   } finally {
-    await page.close();
-    await browser.close();
+    await context.close();
   }
 });
 
@@ -3767,7 +3822,12 @@ test('manager environments browser and edit route define compact responsive geom
   const editorShellBlock = blockFor('.fabricate-manager .manager-environment-editor-shell');
   const editorViewBlock = blockFor('.fabricate-manager .manager-environment-edit-view');
   const detailsGridBlock = blockFor('.fabricate-manager .manager-environment-details-grid');
-  const workspaceBlock = blockFor('.fabricate-manager .manager-environment-workspace');
+  // NOT `blockFor`: that returns the FIRST block matching the selector, and the workspace's
+  // narrow override — which sets only the column token — is declared EARLIER in the file than
+  // the base rule this assertion is about. The base rule is the unindented one.
+  const workspaceBlock = (css.match(
+    /^\.fabricate-manager \.manager-environment-workspace \{[\s\S]*?\}/m
+  ) || [''])[0];
   const weightFieldBlock = blockFor('.fabricate-manager .manager-environment-comp-weight-field');
   const compMenuBlock = blockFor('.fabricate-manager .manager-environment-comp-menu');
   const compMenuButtonBlock = blockFor('.fabricate-manager .manager-environment-comp-menu button');
@@ -3892,8 +3952,10 @@ test('manager environments browser and edit route define compact responsive geom
     'environment details band should include a compact status/evidence card'
   );
   assert.ok(
-    workspaceBlock.includes('grid-template-columns: minmax(0, 1fr) 300px;'),
-    'environment editor workspace should pair the main composition column with a fixed 300px inspector (matching the standard manager inspector width) at normal widths'
+    workspaceBlock.includes(
+      'grid-template-columns: var(--fab-env-workspace-grid, minmax(0, 1fr) 300px);'
+    ),
+    'environment editor workspace should pair the main composition column with a fixed 300px inspector (matching the standard manager inspector width) at normal widths, through the token its narrow override sets'
   );
   const compBlock = blockFor('.fabricate-manager .manager-environment-comp');
   assert.ok(
@@ -4055,19 +4117,20 @@ test('manager environments browser and edit route define compact responsive geom
       mediumQuery.includes('overflow: visible;'),
     'stacked environment edit layout should release nested scroll containment'
   );
-  assert.ok(
-    mediumQuery.includes('.fabricate-manager .manager-environment-workspace') &&
-      mediumQuery.includes('grid-template-columns: minmax(0, 1fr);'),
-    'stacked environment editor should put details, task rail, editor, and evidence in one column'
-  );
+  // The workspace's own narrow override is NOT asserted as text here. It was, and the
+  // assertion passed for the whole life of a rule that never applied: a container query adds
+  // no specificity, so `grid-template-columns` inside this block tied with the base rule
+  // declared later in the sheet and lost on source order. A source-text assertion cannot tell
+  // a live rule from a dead one — `manager workspace restacks at the declared floor` below
+  // measures the rendered grid instead.
 });
 
 test('manager environment inspector evidence table wraps compact pills without horizontal overflow', async () => {
-  const browser = await chromium.launch();
-  const page = await browser.newPage({
+  const context = await sharedBrowser.newContext({
     viewport: { width: 360, height: 360 },
     deviceScaleFactor: 1,
   });
+  const page = await context.newPage();
 
   try {
     await page.setContent(`
@@ -4310,17 +4373,16 @@ test('manager environment inspector evidence table wraps compact pills without h
       'status pills should retain subtle state backgrounds'
     );
   } finally {
-    await page.close();
-    await browser.close();
+    await context.close();
   }
 });
 
 test('manager environment composition overflow menu renders bounded single-line rows', async () => {
-  const browser = await chromium.launch();
-  const page = await browser.newPage({
+  const context = await sharedBrowser.newContext({
     viewport: { width: 360, height: 260 },
     deviceScaleFactor: 1,
   });
+  const page = await context.newPage();
 
   try {
     await page.setContent(`
@@ -4498,8 +4560,7 @@ test('manager environment composition overflow menu renders bounded single-line 
       'disabled note labels should truncate within the same bounded label column'
     );
   } finally {
-    await page.close();
-    await browser.close();
+    await context.close();
   }
 });
 
@@ -4881,8 +4942,11 @@ function shortWindowRailMarkup(navItems) {
 }
 
 async function readShortWindowRailGeometry({ width = 1280, height = 560, navItems = 14 } = {}) {
-  const browser = await chromium.launch();
-  const page = await browser.newPage({ viewport: { width, height }, deviceScaleFactor: 1 });
+  const context = await sharedBrowser.newContext({
+    viewport: { width, height },
+    deviceScaleFactor: 1,
+  });
+  const page = await context.newPage();
   try {
     await page.setContent(
       `<style>${css}</style><style>html,body{margin:0}</style><div style="width:${width}px;height:${height}px">${shortWindowRailMarkup(navItems)}</div>`
@@ -4917,7 +4981,7 @@ async function readShortWindowRailGeometry({ width = 1280, height = 560, navItem
       };
     });
   } finally {
-    await browser.close();
+    await context.close();
   }
 }
 
@@ -5611,10 +5675,7 @@ test('the armed danger button paints a solid danger fill with its own readable f
   );
 
   assert.ok(armedBlock.includes('background: var(--fab-danger);'), 'armed uses the danger fill');
-  assert.ok(
-    armedBlock.includes('border-color: var(--fab-danger);'),
-    'armed uses the danger edge'
-  );
+  assert.ok(armedBlock.includes('border-color: var(--fab-danger);'), 'armed uses the danger edge');
   assert.ok(
     armedBlock.includes('color: var(--fab-on-danger);'),
     'armed text uses the dedicated on-danger token, not on-accent or danger-text'
@@ -5644,14 +5705,19 @@ test('the armed danger button paints a solid danger fill with its own readable f
 // still hold while the detail pane is at its narrowest, so a non-wrapping row clips
 // its action cluster with no scrollbar. Measured, not asserted from CSS text.
 async function readRenderedKnowledgeGeometry(width) {
-  const browser = await chromium.launch();
-  const page = await browser.newPage({ viewport: { width, height: 720 }, deviceScaleFactor: 1 });
+  const context = await sharedBrowser.newContext({
+    viewport: { width, height: 720 },
+    deviceScaleFactor: 1,
+  });
+  const page = await context.newPage();
   try {
     // Mirrors the shipped two-line rhythm: name + type (+ quantity) on line 1, the
     // whole state vocabulary as chips on line 2.
     const row = `<li class="manager-knowledge-copy-row"><span class="manager-knowledge-copy-identity"><span class="manager-knowledge-copy-copy"><span class="manager-knowledge-copy-heading"><strong class="manager-knowledge-copy-name">An Exceptionally Long Localized Recipe Item Name</strong><span class="manager-chip">4 Recipe Book</span><span class="manager-chip">×3</span></span><span class="manager-knowledge-copy-chips"><span class="manager-chip is-warning">2 of 5 uses spent</span><span class="manager-chip is-danger">Inert</span></span></span></span><span class="manager-knowledge-row-actions"><button class="manager-button">Expend use</button><button class="manager-button is-danger">Delete</button></span></li>`;
     await page.setContent(
-      withChipHash(`<style>${css}</style><style>${chipCss}</style><div style="width:${width}px;height:686px"><div class="fabricate-manager" data-manager-view="knowledge"><div class="manager-body"><aside class="manager-rail">Rail</aside><main class="manager-main manager-knowledge-main" data-knowledge-view><section class="manager-knowledge-roster"><label class="manager-search"><input type="search"></label><div class="manager-knowledge-roster-scroll"><div class="manager-knowledge-roster-list"><button class="manager-knowledge-roster-row"><span class="fab-medallion" style="width:34px;height:34px"></span><span class="manager-knowledge-roster-copy"><strong class="manager-knowledge-roster-name">Aria Thorn</strong><small class="manager-knowledge-roster-meta">2 item(s) · 3 learned</small></span></button></div></div></section><section class="manager-knowledge-detail"><header class="manager-knowledge-detail-header"><div class="manager-knowledge-detail-identity"><div class="manager-knowledge-detail-copy"><h2 class="manager-knowledge-detail-name">Aria Thorn</h2></div></div><div class="manager-knowledge-fact-cluster"><div class="manager-fact"><span class="manager-fact-line"><strong>2</strong> <span class="manager-fact-label">Recipe items</span></span></div><div class="manager-fact"><span class="manager-fact-line"><strong>3</strong> <span class="manager-fact-label">Learned recipes</span></span></div></div><div class="manager-knowledge-reset-actions"><button class="manager-button is-danger">Reset this system</button><button class="manager-button is-danger">Reset all systems</button></div></header><div class="manager-editor-tabs manager-knowledge-tabs"><button class="manager-editor-tab-button is-active">Recipe items</button><button class="manager-editor-tab-button">Learned recipes</button></div><section class="manager-editor-tab-panel manager-knowledge-panel"><div class="manager-knowledge-tab-body"><ul class="manager-knowledge-row-list">${row}</ul></div></section></section></main></div></div></div>`)
+      withChipHash(
+        `<style>${css}</style><style>${chipCss}</style><div style="width:${width}px;height:686px"><div class="fabricate-manager" data-manager-view="knowledge"><div class="manager-body"><aside class="manager-rail">Rail</aside><main class="manager-main manager-knowledge-main" data-knowledge-view><section class="manager-knowledge-roster"><label class="manager-search"><input type="search"></label><div class="manager-knowledge-roster-scroll"><div class="manager-knowledge-roster-list"><button class="manager-knowledge-roster-row"><span class="fab-medallion" style="width:34px;height:34px"></span><span class="manager-knowledge-roster-copy"><strong class="manager-knowledge-roster-name">Aria Thorn</strong><small class="manager-knowledge-roster-meta">2 item(s) · 3 learned</small></span></button></div></div></section><section class="manager-knowledge-detail"><header class="manager-knowledge-detail-header"><div class="manager-knowledge-detail-identity"><div class="manager-knowledge-detail-copy"><h2 class="manager-knowledge-detail-name">Aria Thorn</h2></div></div><div class="manager-knowledge-fact-cluster"><div class="manager-fact"><span class="manager-fact-line"><strong>2</strong> <span class="manager-fact-label">Recipe items</span></span></div><div class="manager-fact"><span class="manager-fact-line"><strong>3</strong> <span class="manager-fact-label">Learned recipes</span></span></div></div><div class="manager-knowledge-reset-actions"><button class="manager-button is-danger">Reset this system</button><button class="manager-button is-danger">Reset all systems</button></div></header><div class="manager-editor-tabs manager-knowledge-tabs"><button class="manager-editor-tab-button is-active">Recipe items</button><button class="manager-editor-tab-button">Learned recipes</button></div><section class="manager-editor-tab-panel manager-knowledge-panel"><div class="manager-knowledge-tab-body"><ul class="manager-knowledge-row-list">${row}</ul></div></section></section></main></div></div></div>`
+      )
     );
     return await page.evaluate(() => {
       const box = (selector) => {
@@ -5672,7 +5738,7 @@ async function readRenderedKnowledgeGeometry(width) {
       };
     });
   } finally {
-    await browser.close();
+    await context.close();
   }
 }
 
@@ -5682,7 +5748,10 @@ test('Knowledge keeps a rail/roster/detail triptych with unclipped row actions f
     assert.equal(Math.round(report.rail.width), 220, `${width}px rail column`);
     assert.equal(Math.round(report.roster.width), 250, `${width}px roster column`);
     assert.ok(report.roster.left >= report.rail.right - 1, `${width}px roster follows the rail`);
-    assert.ok(report.detail.left >= report.roster.right - 1, `${width}px detail follows the roster`);
+    assert.ok(
+      report.detail.left >= report.roster.right - 1,
+      `${width}px detail follows the roster`
+    );
     assert.equal(report.inspectorPresent, false, `${width}px no fourth inspector column`);
     assert.ok(
       report.actions.right <= report.row.right + 1,
@@ -5698,11 +5767,11 @@ test('recipe tag chips zero their list-item margins so a host list rule cannot i
   // non-last items a margin-bottom inflated only the first chip's box (e.g. it
   // rendered 34px tall vs the last chip's 30px). Our class rule must zero the
   // margin and win on specificity even when the host rule is declared later.
-  const browser = await chromium.launch();
-  const page = await browser.newPage({
+  const context = await sharedBrowser.newContext({
     viewport: { width: 760, height: 320 },
     deviceScaleFactor: 1,
   });
+  const page = await context.newPage();
 
   try {
     await page.setContent(`
@@ -5755,19 +5824,18 @@ test('recipe tag chips zero their list-item margins so a host list rule cannot i
     }
     assert.equal(report[0].height, report[1].height, 'both chips should derive the same height');
   } finally {
-    await page.close();
-    await browser.close();
+    await context.close();
   }
 });
 
 test('recipe tag list spans the full row width on its own line below the controls', async () => {
   // The chosen-tags box should drop to a full-width line under the match
   // controls + quantity row, so chips never share width with the row-end controls.
-  const browser = await chromium.launch();
-  const page = await browser.newPage({
+  const context = await sharedBrowser.newContext({
     viewport: { width: 760, height: 360 },
     deviceScaleFactor: 1,
   });
+  const page = await context.newPage();
 
   try {
     await page.setContent(`
@@ -5855,8 +5923,7 @@ test('recipe tag list spans the full row width on its own line below the control
       'tags list should sit on its own line below the controls/quantity row'
     );
   } finally {
-    await page.close();
-    await browser.close();
+    await context.close();
   }
 });
 
@@ -5973,8 +6040,8 @@ test('the Tags & Categories route names one grid track per section and grows the
 // class-based, so nothing here depends on the element; the fixture is updated so it keeps
 // MIRRORING shipped markup rather than quietly describing a shape that no longer exists.
 test('the reserved vocabulary row renders exactly as tall as a custom row', async () => {
-  const browser = await chromium.launch();
-  const page = await browser.newPage({ viewport: { width: 760, height: 600 } });
+  const context = await sharedBrowser.newContext({ viewport: { width: 760, height: 600 } });
+  const page = await context.newPage();
   try {
     const lockedRow = `<div class="manager-vocabulary-row">
       <span class="manager-vocabulary-icon is-locked-icon"><i class="fas fa-lock"></i></span>
@@ -5988,7 +6055,9 @@ test('the reserved vocabulary row renders exactly as tall as a custom row', asyn
       <button type="button" class="manager-icon-button"><i class="fas fa-trash"></i></button>
     </div>`;
     await page.setContent(
-      withChipHash(`<style>${css}</style><style>${chipCss}</style><div class="fabricate-manager" data-manager-view="tags"><div class="manager-body"><main class="manager-main manager-tags-categories"><div class="manager-editor-tabs manager-vocabulary-tabs" role="tablist"><button type="button" class="manager-editor-tab-button is-active"><span>Recipe categories</span><span class="manager-chip is-neutral manager-editor-tab-badge">17</span></button></div><div class="manager-tags-categories-workspace" role="tabpanel"><section class="manager-vocabulary-panel"><div class="manager-vocabulary-list"><div class="manager-vocabulary-card is-locked" data-vocabulary-locked-card>${lockedRow}</div><div class="manager-vocabulary-card" data-vocabulary-custom-card>${customRow}</div></div></section></div></main></div></div>`)
+      withChipHash(
+        `<style>${css}</style><style>${chipCss}</style><div class="fabricate-manager" data-manager-view="tags"><div class="manager-body"><main class="manager-main manager-tags-categories"><div class="manager-editor-tabs manager-vocabulary-tabs" role="tablist"><button type="button" class="manager-editor-tab-button is-active"><span>Recipe categories</span><span class="manager-chip is-neutral manager-editor-tab-badge">17</span></button></div><div class="manager-tags-categories-workspace" role="tabpanel"><section class="manager-vocabulary-panel"><div class="manager-vocabulary-list"><div class="manager-vocabulary-card is-locked" data-vocabulary-locked-card>${lockedRow}</div><div class="manager-vocabulary-card" data-vocabulary-custom-card>${customRow}</div></div></section></div></main></div></div>`
+      )
     );
     const geometry = await page.evaluate(() => {
       const locked = document.querySelector('[data-vocabulary-locked-card]');
@@ -6004,9 +6073,8 @@ test('the reserved vocabulary row renders exactly as tall as a custom row', asyn
         lockedChipHeight: Math.round(
           locked.querySelector('.manager-chip').getBoundingClientRect().height
         ),
-        lockedChipBackground: getComputedStyle(
-          locked.querySelector('.manager-chip')
-        ).backgroundColor,
+        lockedChipBackground: getComputedStyle(locked.querySelector('.manager-chip'))
+          .backgroundColor,
         defaultChipBackground: getComputedStyle(
           document.querySelector('.manager-editor-tab-button .manager-chip')
         ).backgroundColor,
@@ -6056,7 +6124,7 @@ test('the reserved vocabulary row renders exactly as tall as a custom row', asyn
       'the reserved row must not render an inline explanatory sentence'
     );
   } finally {
-    await browser.close();
+    await context.close();
   }
 });
 
@@ -6072,10 +6140,10 @@ test('the reserved vocabulary row renders exactly as tall as a custom row', asyn
 // Asserted on the RENDERED background rather than on the selector text, so a future rule
 // that reintroduces a background by some other route fails too (issue 883).
 test('a range input inside the gathering edit views stays transparent for the slider fill', async () => {
-  const browser = await chromium.launch();
+  const context = await sharedBrowser.newContext({ viewport: { width: 900, height: 200 } });
   try {
     for (const view of ['manager-gathering-task-edit-view', 'manager-gathering-event-edit-view']) {
-      const page = await browser.newPage({ viewport: { width: 900, height: 200 } });
+      const page = await context.newPage();
       try {
         await page.setContent(
           `<style>${css}</style>` +
@@ -6112,7 +6180,7 @@ test('a range input inside the gathering edit views stays transparent for the sl
       }
     }
   } finally {
-    await browser.close();
+    await context.close();
   }
 });
 
@@ -6126,8 +6194,8 @@ test('a range input inside the gathering edit views stays transparent for the sl
 // reintroduced by any route (a new rule, an ancestor, a different class) fails too, and so
 // this stays true if the shell's own values are ever retuned (issue 883).
 test('the gathering inspector rail cards render as one card, not three treatments', async () => {
-  const browser = await chromium.launch();
-  const page = await browser.newPage({ viewport: { width: 420, height: 600 } });
+  const context = await sharedBrowser.newContext({ viewport: { width: 420, height: 600 } });
+  const page = await context.newPage();
   try {
     await page.setContent(
       `<style>${css}</style>` +
@@ -6190,8 +6258,7 @@ test('the gathering inspector rail cards render as one card, not three treatment
       );
     }
   } finally {
-    await page.close();
-    await browser.close();
+    await context.close();
   }
 });
 
@@ -6269,10 +6336,10 @@ test('both converted chance-slider sites render a real fill, not a bare thumb', 
     },
   ];
 
-  const browser = await chromium.launch();
+  const context = await sharedBrowser.newContext({ viewport: { width: 900, height: 260 } });
   try {
     for (const site of sites) {
-      const page = await browser.newPage({ viewport: { width: 900, height: 260 } });
+      const page = await context.newPage();
       try {
         await page.setContent(
           `<style>${css}</style>` +
@@ -6328,7 +6395,7 @@ test('both converted chance-slider sites render a real fill, not a bare thumb', 
       }
     }
   } finally {
-    await browser.close();
+    await context.close();
   }
 });
 
@@ -6444,8 +6511,10 @@ test('every manager select paints an opaque background, so its popup opens dark'
   // 2. Component scoped styles: correlate `<select class="x">` with `.x { background }` in
   //    the same file's `<style>` block. This is the shape the defect actually took, so a
   //    global-sheet-only scan would have missed it.
-  const managerFiles = readdirSync(managerComponentDir, { recursive: true, withFileTypes: true })
-    .filter((entry) => entry.isFile() && entry.name.endsWith('.svelte'));
+  const managerFiles = readdirSync(managerComponentDir, {
+    recursive: true,
+    withFileTypes: true,
+  }).filter((entry) => entry.isFile() && entry.name.endsWith('.svelte'));
 
   for (const entry of managerFiles) {
     const full = resolve(entry.parentPath, entry.name);
@@ -6471,4 +6540,1139 @@ test('every manager select paints an opaque background, so its popup opens dark'
     [],
     `a translucent select background opens a LIGHT popup:\n- ${offenders.join('\n- ')}`
   );
+});
+
+// ── The Checks Studio restacks at the declared floor, MEASURED (issue 1096) ──────────────
+//
+// This replaces two source-text assertions, and the replacement is the whole point. Both of
+// the rules below were asserted by `css.includes(...)` and both passed while broken:
+//
+//  - the workspace's `@container … (max-width: 1120px)` override tied with the base rule on
+//    specificity (a container query adds none) and LOST on source order, so between 1120 and
+//    961 — a band that contains the declared 1024x640 floor — `.manager-body` restacked while
+//    the workspace stayed a 300px side column. The acceptance frame that exists to show a
+//    stacked studio at the floor showed a side rail.
+//  - `[data-manager-view^="checks"]` is a PREFIX match because `checks` became four child
+//    routes. Narrowing it to `=` matched nothing, and an `includes('…checks…')` assertion
+//    cannot see the difference between the two.
+//
+// A rendered measurement can see both. `chromium` is already this file's tool for exactly
+// this reason: happy-dom applies no stylesheet and computes no cascade, so nothing in a
+// mounted suite could ever have caught either.
+async function readWorkspaceGrid(width, view) {
+  const context = await sharedBrowser.newContext({
+    viewport: { width, height: 720 },
+    deviceScaleFactor: 1,
+  });
+  const page = await context.newPage();
+  try {
+    await page.setContent(
+      `<style>${css}</style>` +
+        `<div style="width:${width}px;height:640px">` +
+        `<div class="fabricate-manager" data-manager-view="${view}">` +
+        `<div class="manager-body"><aside class="manager-rail">Rail</aside>` +
+        `<main class="manager-main"><div class="manager-environment-edit-view">` +
+        `<div class="manager-environment-workspace">` +
+        `<div class="manager-environment-tab-panel">Panel</div>` +
+        `<aside class="manager-inspector manager-environment-inspector">Rail</aside>` +
+        `</div></div></main></div></div></div>`
+    );
+    return await page.evaluate(() => {
+      const columns = (selector) => {
+        const node = document.querySelector(selector);
+        return node ? getComputedStyle(node).gridTemplateColumns.split(' ').length : 0;
+      };
+      const workspace = document.querySelector('.manager-environment-workspace');
+      return {
+        bodyColumns: columns('.manager-body'),
+        workspaceColumns: columns('.manager-environment-workspace'),
+        workspaceWidth: workspace ? workspace.getBoundingClientRect().width : 0,
+        panelWidth: document
+          .querySelector('.manager-environment-tab-panel')
+          ?.getBoundingClientRect().width,
+        inspectorWidth: document
+          .querySelector('.manager-environment-inspector')
+          ?.getBoundingClientRect().width,
+      };
+    });
+  } finally {
+    await context.close();
+  }
+}
+
+// Imported rather than restated, so a change to the route set is a change to this guard too.
+const { CHECKS_VIEWS, CHECKS_REDIRECT_VIEW } =
+  await import('../../src/ui/svelte/apps/manager/checks/checksNav.js');
+
+test('every checks child route releases the shared inspector column', async () => {
+  // The aside is unconditionally suppressed on a Checks route by the root's `!isChecksRoute`
+  // guard, so the 300px column MUST be released for every child or the studio renders against
+  // a dead strip. `recipe-edit` has this guard already (recipe-edit-placeholder.test.js); the
+  // Checks half is the one that was missing.
+  for (const view of [...CHECKS_VIEWS, CHECKS_REDIRECT_VIEW]) {
+    const { bodyColumns } = await readWorkspaceGrid(1280, view);
+    assert.equal(bodyColumns, 2, `${view} must render rail + main, with no dead inspector track`);
+  }
+  // A negative control: an ordinary route keeps the three-column body, so the assertion above
+  // is discriminating rather than true of everything.
+  const { bodyColumns } = await readWorkspaceGrid(1280, 'recipes');
+  assert.equal(bodyColumns, 3, 'a non-editor route still has its inspector column');
+});
+
+test('the manager workspace restacks at the declared 1024 floor, not only below 960', async () => {
+  // 1280: the side-rail state, which must survive.
+  const wide = await readWorkspaceGrid(1280, 'checks-crafting');
+  assert.equal(wide.workspaceColumns, 2, 'the workspace is panel + rail above the breakpoint');
+  assert.ok(
+    Math.abs(wide.inspectorWidth - 300) < 1,
+    `the side rail is 300px wide, got ${wide.inspectorWidth}`
+  );
+
+  // 1024x640 — the DECLARED FLOOR, and the width `manager-checks-stacked-floor` photographs.
+  // It sits inside the 1120→961 band, which is exactly where the dead rule left a side rail.
+  const floor = await readWorkspaceGrid(1024, 'checks-crafting');
+  assert.equal(floor.bodyColumns, 1, 'the body is stacked at the floor');
+  assert.equal(floor.workspaceColumns, 1, 'and so is the workspace — no 300px side column');
+  assert.ok(
+    floor.panelWidth > 600,
+    `the panel takes the full stacked width, got ${floor.panelWidth}`
+  );
+
+  // 1100: the top of the same band, to prove the boundary is 1120 and not 960.
+  const band = await readWorkspaceGrid(1100, 'checks-crafting');
+  assert.equal(band.workspaceColumns, 1, 'the whole 1120→961 band is stacked');
+});
+
+test('the environment, tags and system studios restack at the same floor', async () => {
+  // The dead rule was never Checks-specific: `.manager-environment-workspace` is the shared
+  // editor shell, so every studio built on it carried the same 1120→961 side rail.
+  for (const view of ['environment-edit', 'system-edit', 'crafting-settings']) {
+    const floor = await readWorkspaceGrid(1024, view);
+    assert.equal(floor.workspaceColumns, 1, `${view} stacks its workspace at the floor`);
+  }
+});
+
+test('the Checks Studio really renders into the classes those measurements measure', () => {
+  // `readWorkspaceGrid` builds its DOM from CLASS LITERALS and measures the stylesheet, so
+  // every assertion above survives ChecksView renaming its own wrapper — the measurement
+  // would keep proving a fact about a shell the studio no longer uses. This is the join.
+  const checksView = readFileSync(
+    resolve(__dirname, '../../src/ui/svelte/apps/manager/checks/ChecksView.svelte'),
+    'utf8'
+  );
+  for (const className of ['manager-environment-workspace', 'manager-environment-tab-panel']) {
+    assert.match(
+      withoutComments(checksView),
+      new RegExp(`class="${className}"`),
+      `ChecksView must render into .${className} for the restack measurements to be about it`
+    );
+  }
+});
+
+// The Difficulty card and the recipe-tier list beneath it (issue 1096 follow-up, "The roll").
+// Both card contracts render into `.manager-checks-card-body` — Difficulty's plain (14px each
+// side) and the tier list's `is-stack` (12px 14px) — so a row that fills its OWN list should
+// already land at the same 14px inset as the radio cards above. The routed editor's tier
+// section broke that by wrapping `CheckRecipeTiers` in the bare shared `.manager-inspector-card`
+// shell instead of `.manager-inspector-card.manager-checks-card`: the bare shell carries its
+// OWN `padding: var(--fab-space-3)` (12px) plus a border and background the card-with-padding-0
+// override exists to strip, so the tier row's edges landed 12px further in on both sides than
+// the Difficulty card's radio cards. Real Chromium + the real stylesheet, because happy-dom
+// applies no cascade and could not see either the extra padding or the fix.
+//
+// ONE shared page for both the fixed and the reintroduced-defect measurement below — a second
+// `page.setContent()` on the same page is all a second measurement ever needed, whether the
+// browser behind it is this file's shared one or a fresh one.
+async function checksRollEdges(page, tiersWrapperClass) {
+  const difficultyCard = `
+    <section class="manager-inspector-card manager-checks-card" data-check-difficulty-card>
+      <div class="manager-checks-card-head">
+        <div><h3 class="manager-checks-card-title">Difficulty</h3></div>
+      </div>
+      <div class="manager-checks-card-body">
+        <fieldset class="manager-field is-wide manager-resolution-mode-card manager-radio-card-group is-config-cards">
+          <legend class="manager-resolution-mode-legend">DC source</legend>
+          <div class="manager-resolution-mode-options" style="--manager-radio-card-columns: 2">
+            <label class="manager-resolution-option is-active" data-dc-mode-option="static">
+              <span class="manager-resolution-option-body"><span class="manager-resolution-option-name">Static</span></span>
+            </label>
+            <label class="manager-resolution-option" data-dc-mode-option="dynamic">
+              <span class="manager-resolution-option-body"><span class="manager-resolution-option-name">Dynamic</span></span>
+            </label>
+          </div>
+        </fieldset>
+        <div class="manager-checks-difficulty-fields">
+          <div class="manager-checks-difficulty-field is-dc">
+            <span class="manager-checks-difficulty-label">Base DC</span>
+          </div>
+          <div class="manager-checks-difficulty-field is-comparison">
+            <span class="manager-checks-difficulty-label">Comparison</span>
+          </div>
+        </div>
+      </div>
+    </section>`;
+  const tiersCard = `
+    <section class="${tiersWrapperClass}" data-routed-tiers>
+      <div class="manager-checks-card-head">
+        <div><h3 class="manager-checks-card-title">Recipe difficulty tiers</h3></div>
+      </div>
+      <div class="manager-checks-card-body is-stack">
+        <div class="manager-checks-tier-list" role="list" aria-label="Recipe difficulty tiers">
+          <div class="manager-checks-tier-row" role="listitem" data-tier-row="t1">
+            <button type="button" class="manager-checks-tier-grip"><i class="fas fa-grip-vertical"></i></button>
+            <input class="manager-checks-tier-name" data-tier-name value="Apprentice work">
+            <span class="manager-checks-tier-unit">DC</span>
+            <div class="manager-checks-tier-stepper is-narrow">
+              <div class="fab-stepper is-fill">
+                <button type="button" class="fab-stepper-adjunct"><i class="fas fa-minus"></i></button>
+                <input type="number" class="fab-stepper-input" data-tier-dc value="8">
+                <button type="button" class="fab-stepper-adjunct"><i class="fas fa-plus"></i></button>
+              </div>
+            </div>
+            <button type="button" class="manager-button fab-manager-button is-danger manager-checks-tier-remove" data-remove-tier>
+              <i class="fas fa-trash"></i>
+            </button>
+          </div>
+        </div>
+        <button type="button" class="manager-button fab-manager-button is-dashed" data-add-tier>
+          <i class="fas fa-plus"></i><span>Add difficulty tier</span>
+        </button>
+      </div>
+    </section>`;
+  await page.setContent(
+    `<style>${css}</style>` +
+      `<div style="width:900px;height:800px">` +
+      `<div class="fabricate-manager" data-fabricate-theme="fabricate" data-manager-view="checks-crafting">` +
+      `<div class="manager-checks-editor">${difficultyCard}${tiersCard}</div>` +
+      `</div></div>`
+  );
+  return await page.evaluate(() => {
+    const round = (value) => Math.round(value);
+    const options = [
+      ...document.querySelectorAll('[data-check-difficulty-card] .manager-resolution-option'),
+    ];
+    const firstOption = options[0].getBoundingClientRect();
+    const lastOption = options[options.length - 1].getBoundingClientRect();
+    const row = document.querySelector('[data-tier-row]').getBoundingClientRect();
+    const addTier = document.querySelector('[data-add-tier]').getBoundingClientRect();
+    return {
+      radioLeft: round(firstOption.left),
+      radioRight: round(lastOption.right),
+      rowLeft: round(row.left),
+      rowRight: round(row.right),
+      addTierLeft: round(addTier.left),
+      addTierRight: round(addTier.right),
+    };
+  });
+}
+
+test('the recipe difficulty tier row shares the Difficulty card radio-card edges, and the bare card shell reintroduces the inset', async () => {
+  const context = await sharedBrowser.newContext({
+    viewport: { width: 960, height: 800 },
+    deviceScaleFactor: 1,
+  });
+  try {
+    const page = await context.newPage();
+
+    const edges = await checksRollEdges(page, 'manager-inspector-card manager-checks-card');
+    assert.equal(
+      edges.rowLeft,
+      edges.radioLeft,
+      `tier row left (${edges.rowLeft}) must equal the Difficulty card's radio-card left (${edges.radioLeft})`
+    );
+    assert.equal(
+      edges.rowRight,
+      edges.radioRight,
+      `tier row right (${edges.rowRight}) must equal the Difficulty card's radio-card right (${edges.radioRight})`
+    );
+    assert.equal(
+      edges.addTierLeft,
+      edges.radioLeft,
+      `the dashed Add control's left (${edges.addTierLeft}) must equal the radio-card left (${edges.radioLeft})`
+    );
+    assert.equal(
+      edges.addTierRight,
+      edges.radioRight,
+      `the dashed Add control's right (${edges.addTierRight}) must equal the radio-card right (${edges.radioRight})`
+    );
+
+    // MUTATION PROOF, same page: reintroducing the defect — wrapping the tier list in the bare
+    // `.manager-inspector-card` shell CraftingCheckEditor actually shipped — must desynchronise
+    // the edges the assertions above exist to pin. If this cannot fail, they prove nothing.
+    const broken = await checksRollEdges(page, 'manager-inspector-card');
+    assert.notEqual(
+      broken.rowLeft,
+      broken.radioLeft,
+      'expected the bare card shell to inset the tier row past the radio-card left edge'
+    );
+    assert.notEqual(
+      broken.rowRight,
+      broken.radioRight,
+      'expected the bare card shell to inset the tier row past the radio-card right edge'
+    );
+  } finally {
+    await context.close();
+  }
+});
+
+test('CraftingCheckEditor really wraps the routed tier list in the checks-card contract', () => {
+  // The two measurement tests above are built from class LITERALS, so this is the join: it
+  // proves the real component renders the wrapper class combination the passing test measured,
+  // not merely that some markup string with the right classes exists somewhere in this file.
+  const craftingCheckEditor = readFileSync(
+    resolve(__dirname, '../../src/ui/svelte/apps/manager/checks/CraftingCheckEditor.svelte'),
+    'utf8'
+  );
+  assert.match(
+    withoutComments(craftingCheckEditor),
+    /<section class="manager-inspector-card manager-checks-card" data-routed-tiers>/,
+    'the routed tier section must carry manager-checks-card, or it falls back to the bare ' +
+      '.manager-inspector-card shell and its own 12px padding re-insets the tier row'
+  );
+});
+
+// The Modifiers card and its "How they combine" combination-rule grid (issue 1096 follow-up,
+// found by pointing the visual-parity tooling at the real app). The studio's own control scale
+// for a combination-rule card is scoped `.manager-checks-card .manager-resolution-mode-card
+// .is-config-cards .manager-resolution-option`, so it only fires when the CARD ancestor carries
+// `manager-checks-card`. `CraftingModifierCatalogueCard` shipped wrapped in the bare shared
+// `.manager-inspector-card` shell instead — the identical defect the recipe-tier list above was
+// fixed for — so the card took the generic 8px radius and translucent fill, and the
+// combination-rule cards fell back to the shared `RadioCardGroup` primitive's own generic
+// padding and gap instead of the studio's 13px/11px. Real Chromium + the real stylesheet, for
+// the same reason the tier-row measurement above needs both.
+async function modifiersCombinationRuleMetrics(page, cardWrapperClass) {
+  const card = `
+    <section class="${cardWrapperClass}" data-crafting-modifier-catalogue="crafting">
+      <h3 class="manager-card-title">Named modifiers</h3>
+      <fieldset class="manager-field is-wide manager-resolution-mode-card manager-radio-card-group is-config-cards">
+        <legend class="manager-resolution-mode-legend">How they combine</legend>
+        <div class="manager-resolution-mode-options" style="--manager-radio-card-columns: 2">
+          <label class="manager-resolution-option is-active" data-crafting-modifier-policy-option="addAll">
+            <span class="manager-resolution-option-body"><span class="manager-resolution-option-name">Add all</span></span>
+          </label>
+          <label class="manager-resolution-option" data-crafting-modifier-policy-option="highest">
+            <span class="manager-resolution-option-body"><span class="manager-resolution-option-name">Highest</span></span>
+          </label>
+        </div>
+      </fieldset>
+    </section>`;
+  await page.setContent(
+    `<style>${css}</style>` +
+      `<div style="width:900px;height:600px">` +
+      `<div class="fabricate-manager" data-fabricate-theme="fabricate" data-manager-view="checks-crafting">` +
+      `<div class="manager-checks-editor">${card}</div>` +
+      `</div></div>`
+  );
+  return await page.evaluate(() => {
+    const round = (value) => Math.round(value * 100) / 100;
+    const section = document.querySelector('[data-crafting-modifier-catalogue]');
+    const sectionCs = getComputedStyle(section);
+    const option = document.querySelector('.manager-resolution-option');
+    const optionCs = getComputedStyle(option);
+    return {
+      cardRadius: round(parseFloat(sectionCs.borderTopLeftRadius)),
+      cardBackground: sectionCs.backgroundColor,
+      optionPaddingLeft: round(parseFloat(optionCs.paddingLeft)),
+      optionPaddingTop: round(parseFloat(optionCs.paddingTop)),
+      optionGap: optionCs.columnGap,
+      optionRadius: round(parseFloat(optionCs.borderTopLeftRadius)),
+    };
+  });
+}
+
+test('the modifiers card and its combination-rule cards take the studio scale, and the bare shell reintroduces the generic one', async () => {
+  const context = await sharedBrowser.newContext({
+    viewport: { width: 960, height: 700 },
+    deviceScaleFactor: 1,
+  });
+  try {
+    const page = await context.newPage();
+
+    const fixed = await modifiersCombinationRuleMetrics(
+      page,
+      'manager-inspector-card manager-checks-card'
+    );
+    assert.equal(fixed.cardRadius, 11, "the studio card contract's own radius is 11px");
+    assert.equal(
+      fixed.optionPaddingLeft,
+      13,
+      "the combination-rule card's studio padding is 13px left/right"
+    );
+    assert.equal(
+      fixed.optionPaddingTop,
+      12,
+      "the combination-rule card's studio padding is 12px top/bottom"
+    );
+    assert.equal(fixed.optionRadius, 10, "the combination-rule card's studio radius is 10px");
+
+    // MUTATION PROOF, same page: reintroducing the defect — wrapping the card in the bare
+    // `.manager-inspector-card` shell `CraftingModifierCatalogueCard` actually shipped with —
+    // must desynchronise both the card's own look AND the combination-rule scale, because the
+    // studio's selector for the latter is scoped to the ancestor carrying `manager-checks-card`
+    // and fires only then. If this cannot fail, the assertions above prove nothing.
+    const broken = await modifiersCombinationRuleMetrics(page, 'manager-inspector-card');
+    assert.notEqual(
+      broken.cardRadius,
+      fixed.cardRadius,
+      `expected the bare card shell to fall back off the studio's 11px radius (bare: ${broken.cardRadius}px)`
+    );
+    assert.notEqual(
+      broken.cardBackground,
+      fixed.cardBackground,
+      'expected the bare card shell to fall back to the generic translucent fill'
+    );
+    assert.notEqual(
+      broken.optionPaddingLeft,
+      fixed.optionPaddingLeft,
+      `expected the bare shell to drop the combination-rule cards off 13px padding ` +
+        `(bare: ${broken.optionPaddingLeft}px)`
+    );
+    assert.notEqual(
+      broken.optionGap,
+      fixed.optionGap,
+      `expected the bare shell to drop the combination-rule cards off the studio's 11px gap ` +
+        `(bare: ${broken.optionGap})`
+    );
+  } finally {
+    await context.close();
+  }
+});
+
+test('CraftingModifierCatalogueCard really wraps its card in the checks-card contract', () => {
+  // The measurement test above is built from class LITERALS, so this is the join: it proves the
+  // real component renders the wrapper class combination the passing test measured, not merely
+  // that some markup string with the right classes exists somewhere in this file.
+  const modifierCatalogueSource = readFileSync(
+    resolve(
+      __dirname,
+      '../../src/ui/svelte/apps/manager/checks/CraftingModifierCatalogueCard.svelte'
+    ),
+    'utf8'
+  );
+  assert.match(
+    withoutComments(modifierCatalogueSource),
+    /<section\s+class="manager-inspector-card manager-checks-card"\s+data-crafting-modifier-catalogue=/,
+    'the modifiers card must carry manager-checks-card, or it falls back to the bare ' +
+      '.manager-inspector-card shell and the combination-rule cards fall back to the generic scale'
+  );
+});
+
+test('the locked activation indicator offers no hover affordance', async () => {
+  // `.manager-status-toggle.is-locked` is a `<span role="img">`: an indicator, not a control.
+  // The hover rule excluded `:disabled` and `.is-disabled`, and a span can be neither, so the
+  // pointer brightened a thing nothing happens when you press — a false affordance measurable
+  // only in a browser, since the rule is a `:hover` over a `color-mix()`.
+  const context = await sharedBrowser.newContext({ viewport: { width: 600, height: 300 } });
+  const page = await context.newPage();
+  try {
+    await page.setContent(
+      `<style>${css}</style><div class="fabricate-manager">` +
+        `<button type="button" class="manager-status-toggle is-on" id="live">` +
+        `<span class="manager-status-toggle-track"><span class="manager-status-toggle-knob"></span></span>` +
+        `<span class="manager-status-toggle-label">On</span></button>` +
+        `<span class="manager-status-toggle is-locked is-on" role="img" aria-label="Check is on" id="locked">` +
+        `<span class="manager-status-toggle-track"><span class="manager-status-toggle-knob"></span></span>` +
+        `<span class="manager-status-toggle-label">On</span></span>` +
+        `</div>`
+    );
+    const trackStyle = (id) =>
+      page.evaluate((selector) => {
+        const track = document.querySelector(selector);
+        const style = getComputedStyle(track);
+        return `${style.backgroundColor}|${style.borderColor}`;
+      }, `#${id} .manager-status-toggle-track`);
+
+    const liveResting = await trackStyle('live');
+    const lockedResting = await trackStyle('locked');
+    await page.hover('#live');
+    const liveHovered = await trackStyle('live');
+    await page.hover('#locked');
+    const lockedHovered = await trackStyle('locked');
+
+    // The positive control: the real switch DOES respond, so the negative below means something.
+    assert.notEqual(liveHovered, liveResting, 'an actionable switch still lifts under the pointer');
+    assert.equal(lockedHovered, lockedResting, 'the locked indicator does not');
+  } finally {
+    await context.close();
+  }
+});
+
+// ── The outcome band strip's fill, its swatch key, and the AA the names need (issue 1096) ──
+//
+// Everything below is measured in a real browser, and the reason is that NOTHING else in the
+// repo can see these facts. The mounted suites assert the inline custom property the editor
+// emits, which stays true after the rule that CONSUMES it is renamed or deleted: renaming
+// `.fab-band-strip-band` to `.fab-band-strip-band-unused` — a total visual break, since that
+// rule carries `position`, `width`, `overflow` AND the background — left the mounted suite
+// green. And `color-mix()` cannot be evaluated at all outside a browser, so the contrast the
+// band names actually get was invisible to every gate here until this one.
+const bandStripPath = resolve(
+  __dirname,
+  '../../src/ui/svelte/components/ThresholdBandStrip.svelte'
+);
+const checkEditorPath = resolve(
+  __dirname,
+  '../../src/ui/svelte/apps/manager/checks/CraftingCheckEditor.svelte'
+);
+const bandStripScoped = scopedComponentCss(bandStripPath);
+const checkEditorSource = readFileSync(checkEditorPath, 'utf8');
+
+/** Renders a fixture against the real sheet plus the strip's own scoped CSS, in one context. */
+async function withBandStripPage(run) {
+  const context = await sharedBrowser.newContext({ viewport: { width: 900, height: 400 } });
+  const page = await context.newPage();
+  try {
+    return await run(page);
+  } finally {
+    await context.close();
+  }
+}
+
+/**
+ * The strip's fixture, stamped with the real scope hash on EVERY class the component's own
+ * `<style>` addresses — not just the band.
+ *
+ * `withScopeHash` matches a whole class token, so stamping only `fab-band-strip-band` left
+ * `fab-band-strip-band-name` unstamped and its scoped rule matching nothing. That was
+ * invisible while the rule declared `color: var(--fab-text)`, because an unmatched rule and
+ * an inherited `--fab-text` paint the same pixels; it stops being invisible the moment the
+ * name takes an ink of its own, which is exactly the change this fixture now has to see.
+ */
+function bandStripFixture(body) {
+  const stamped = [
+    'fab-band-strip-track',
+    'fab-band-strip-band',
+    'fab-band-strip-band-name',
+  ].reduce(
+    (markup, className) => withScopeHash(markup, className, bandStripScoped.hashClass),
+    body
+  );
+  return `<style>${css}</style><style>${bandStripScoped.css}</style>${stamped}`;
+}
+
+test('the band fill and the tier-row swatch are painted by rules that still match', async () => {
+  const painted = await withBandStripPage(async (page) => {
+    await page.setContent(
+      bandStripFixture(
+        `<div class="fabricate-manager"><div class="fab-band-strip-track">` +
+          // `left`/`width` as the component emits them, so the band is a real bounded box
+          // and the long name below has something to be truncated against.
+          `<span class="fab-band-strip-band" id="tinted" style="left: 0%; width: 90px; --fab-band-strip-fill: rgb(20, 90, 40); --fab-band-strip-ink: rgb(250, 200, 10);">` +
+          // A long localized tier name, because the rule that keeps it on one line is the
+          // reason the strip's height is stable — a wrapped name shoves the tier rows down.
+          `<span class="fab-band-strip-band-name" id="longname">Ausserordentlich Meisterhaft Geschmiedet</span></span>` +
+          `<span class="fab-band-strip-band" id="plain">` +
+          `<span class="fab-band-strip-band-name" id="plainname">Ruined</span></span>` +
+          `</div>` +
+          `<div class="manager-checks-outcome-table is-relative">` +
+          `<span class="manager-checks-outcome-swatch" id="keyed" style="--fab-outcome-swatch: rgb(20, 90, 40);"></span>` +
+          `<span class="manager-checks-outcome-swatch" id="unkeyed"></span>` +
+          `</div></div>`
+      )
+    );
+    return page.evaluate(() => {
+      const read = (id) => {
+        const node = document.getElementById(id);
+        const style = getComputedStyle(node);
+        return {
+          background: style.backgroundColor,
+          width: node.getBoundingClientRect().width,
+          position: style.position,
+          overflow: style.overflow,
+        };
+      };
+      const longName = document.querySelector('#longname');
+      const longNameStyle = getComputedStyle(longName);
+      const keyed = document.getElementById('keyed');
+      return {
+        tinted: read('tinted'),
+        plain: read('plain'),
+        keyed: read('keyed'),
+        unkeyed: read('unkeyed'),
+        inkedName: longNameStyle.color,
+        plainName: getComputedStyle(document.querySelector('#plainname')).color,
+        keyedRadius: getComputedStyle(keyed).borderRadius,
+        keyedHeight: keyed.getBoundingClientRect().height,
+        longName: {
+          whiteSpace: longNameStyle.whiteSpace,
+          textOverflow: longNameStyle.textOverflow,
+          overflow: longNameStyle.overflow,
+          // `line-height` computes to the keyword `normal` here, so the number of lines is
+          // derived from the rendered height against the font size instead: one line lands
+          // near 1.2em and two lines cannot fit under 2em.
+          height: longName.getBoundingClientRect().height,
+          fontSize: parseFloat(longNameStyle.fontSize),
+          overflowed: longName.scrollWidth > longName.clientWidth,
+        },
+        tableTracks: getComputedStyle(
+          document.querySelector('.manager-checks-outcome-table.is-relative')
+        ).gridTemplateColumns.split(' '),
+      };
+    });
+  });
+
+  // The consuming rule exists AND reads the inline property: the same element with and
+  // without it must not paint the same colour.
+  assert.equal(painted.tinted.background, 'rgb(20, 90, 40)', 'the band paints its inline fill');
+  assert.notEqual(
+    painted.plain.background,
+    painted.tinted.background,
+    'an unset fill falls back to the declared neutral rather than to the tinted colour'
+  );
+  // The rest of the rule the mounted assertion also cannot see.
+  assert.equal(painted.tinted.position, 'absolute', 'the band is placed against the track');
+  assert.equal(painted.tinted.overflow, 'hidden', 'a long band name truncates rather than wraps');
+
+  // The band NAME's own rule, which nothing measured until this fixture started stamping the
+  // scope hash onto it. The component states the contract ("a long localized band name wraps
+  // to nothing and truncates instead, so a wide name cannot change the strip's height"), and
+  // a wrapped name is the failure: it grows the 44px track and pushes the tier rows down.
+  assert.equal(painted.longName.whiteSpace, 'nowrap', 'a long tier name stays on one line');
+  assert.equal(painted.longName.textOverflow, 'ellipsis', 'and is elided rather than clipped');
+  assert.equal(painted.longName.overflow, 'hidden', 'with the overflow the ellipsis needs');
+  assert.ok(
+    painted.longName.height < painted.longName.fontSize * 2,
+    `so it occupies one line box, got ${painted.longName.height}px at ${painted.longName.fontSize}px`
+  );
+  // The positive control: the name really is wider than its box, so "one line" is a fact
+  // about the rule rather than about a string that happened to fit.
+  assert.ok(painted.longName.overflowed, 'the fixture name is long enough to need truncating');
+
+  // The band's INK is per-band and inline (issue 1096), so the name rule has to READ it. A
+  // hard-coded `color: var(--fab-text)` here would leave the AA gate below measuring an ink no
+  // band ever wears; the untinted control proves the declared fallback still applies.
+  assert.equal(painted.inkedName, 'rgb(250, 200, 10)', 'a band name takes its own inline ink');
+  assert.notEqual(painted.plainName, painted.inkedName, 'and falls back when the band omits one');
+
+  // The swatch key, whose whole rule could be deleted without a red before this (issue 1096
+  // made it normative in `ui-integration`). It is a 12x12 DOT: square, round, and exactly the
+  // width of the table's leading track, so a track literal moved without the rule reds here.
+  assert.equal(painted.keyed.background, 'rgb(20, 90, 40)', 'the swatch repeats its band colour');
+  assert.notEqual(painted.unkeyed.background, painted.keyed.background, 'unkeyed paints neutral');
+  assert.ok(
+    Math.abs(painted.keyed.width - 12) < 0.5,
+    `the swatch is the table's 12px leading track, got ${painted.keyed.width}`
+  );
+  assert.ok(
+    Math.abs(painted.keyedHeight - painted.keyed.width) < 0.5,
+    `a dot is square, got ${painted.keyed.width}x${painted.keyedHeight}`
+  );
+  assert.equal(painted.keyedRadius, '50%', 'and round rather than a bar with soft corners');
+  assert.equal(painted.tableTracks[0], '12px', 'and the table still declares that track first');
+});
+
+// The band-strip hint's separation from the first tier row (maintainer parity round 4). The
+// REAL defect two attempts at this fix both missed was never the pixel value: `.fabricate-
+// manager .manager-muted` (this sheet, below) states `margin: var(--fab-space-2xs) 0 0` — a
+// SHORTHAND that zeroes `margin-bottom` — at the SAME (0,2,0) specificity as an unscoped
+// `.fabricate-manager [data-outcome-band-strip-hint]` rule and LATER in source order, so the
+// unscoped rule always lost and the hint's bottom margin computed to 0 no matter what number
+// it declared. The fix is scoped to `[data-outcome-bands]` at (0,3,0), and 20px reproduces the
+// prototype's rhythm without the 10px a deliberately-dropped column-header row occupied there
+// (see the CSS comment on `[data-outcome-band-strip-hint]`, and `scripts/visual-parity`
+// region `band-strip-hint`). This fixture mirrors the card's own DOM order — `.manager-muted`
+// hint, then `.manager-checks-tier-list` — so a regression back to the unscoped selector, or
+// to the shorthand reset winning again, reds here exactly as it would on screen.
+test('the band-strip hint keeps its 20px separation from the first tier row', async () => {
+  const gap = await withBandStripPage(async (page) => {
+    await page.setContent(
+      `<style>${css}</style>` +
+        '<div class="fabricate-manager">' +
+        '<section class="manager-inspector-card manager-checks-card" data-outcome-bands>' +
+        '<div class="manager-checks-card-body is-roomy">' +
+        '<p class="manager-muted" data-outcome-band-strip-hint>' +
+        'Drag or arrow-key a band edge to move its threshold.</p>' +
+        '<div class="manager-checks-tier-list" role="list">' +
+        '<div class="manager-checks-tier-row" role="listitem">Common Craft &middot; DC 8</div>' +
+        '<div class="manager-checks-tier-row" role="listitem">Uncommon Craft &middot; DC 12</div>' +
+        '</div></div></section></div>'
+    );
+    return page.evaluate(() => {
+      const hint = document.querySelector('[data-outcome-band-strip-hint]').getBoundingClientRect();
+      const row = document.querySelector('.manager-checks-tier-row').getBoundingClientRect();
+      return Math.round((row.top - hint.bottom) * 100) / 100;
+    });
+  });
+  assert.equal(
+    gap,
+    20,
+    `the hint must sit 20px above the first tier row (14px block separation + the list's own ` +
+      `6px row cadence), got ${gap}px`
+  );
+});
+
+test('every outcome band name clears WCAG AA in every shipped theme', async () => {
+  // The ramp is READ OUT OF the editor rather than restated, so adding a tone or widening the
+  // mix without re-checking contrast fails here. `bandFill`'s expression and the ink's are
+  // pinned too — otherwise this could go on measuring a formula the component no longer uses.
+  const toneNames = /const BAND_TONES = \[([^\]]+)\];/
+    .exec(checkEditorSource)?.[1]
+    .split(',')
+    .map((name) => name.trim().replace(/^'|'$/g, ''));
+  const toneMix = Number(/const BAND_TONE_MIX = (\d+);/.exec(checkEditorSource)?.[1]);
+  const toneBase = /const BAND_TONE_BASE = '([^']+)';/.exec(checkEditorSource)?.[1];
+  assert.ok(toneNames?.length >= 2, 'the ramp tones are readable');
+  assert.ok(toneMix > 0, 'the mix percentage is readable');
+  assert.match(
+    checkEditorSource,
+    /color-mix\(in oklab, var\(--fab-\$\{tone\}\) \$\{BAND_TONE_MIX\}%, \$\{BAND_TONE_BASE\}\)/,
+    'bandFill still composes exactly the expression measured here'
+  );
+  // Each tone brings its OWN ink, which is the headroom this ramp is spending. Pinning the
+  // expression stops the component quietly reverting to one `--fab-text` for the whole strip
+  // while this file goes on measuring five inks it no longer paints.
+  assert.match(
+    checkEditorSource,
+    /ink: `var\(--fab-\$\{tone\}-text\)`/,
+    'and each band still takes its own tone-text ink'
+  );
+  // An OPAQUE base is what makes this measurable at all: mixed into a translucent surface the
+  // fill's painted colour depends on whatever the strip is stacked on, so no fixture could
+  // state the contrast a GM actually sees.
+  assert.equal(toneBase, 'var(--fab-bg-0)', 'the ramp is mixed into an opaque base');
+
+  const themes = [...css.matchAll(/:root\[data-fabricate-theme="([\w-]+)"\]/g)].map((m) => m[1]);
+  assert.ok(themes.length >= 6, `every palette is measured, found ${themes.length}`);
+
+  const measured = await withBandStripPage(async (page) => {
+    const cells = themes
+      .map(
+        (theme) =>
+          `<div class="fabricate" data-fabricate-theme="${theme}">` +
+          `<div class="fab-band-strip-track">` +
+          toneNames
+            .map(
+              (tone) =>
+                `<span class="fab-band-strip-band" data-probe="${theme}|${tone}" ` +
+                `style="--fab-band-strip-fill: color-mix(in oklab, var(--fab-${tone}) ${toneMix}%, ${toneBase}); ` +
+                `--fab-band-strip-ink: var(--fab-${tone}-text);">` +
+                `<span class="fab-band-strip-band-name">Masterwork</span></span>`
+            )
+            .join('') +
+          `</div></div>`
+      )
+      .join('');
+    await page.setContent(bandStripFixture(`<div class="fabricate-manager">${cells}</div>`));
+    return page.evaluate(() => {
+      // THE COLOUR IS RASTERISED, because scraping numbers out of the computed string is
+      // what made the first version of this gate vacuous.
+      //
+      // `color-mix(in srgb, …)` does NOT compute to `rgb()`. It computes to
+      // `color(srgb 0.303059 0.374588 0.346039)` — fractional channels in 0..1. The old
+      // `colour.match(/[\d.]+/g)` read those three fractions as 0..255 channels, so EVERY
+      // fill measured as very nearly black, every ratio came back at 12-19:1, and the gate
+      // could not have failed whatever the ramp did. (`color-mix(in oklab, …)` computes to
+      // `oklab(…)` and breaks it the same way, with the added trap of negative a/b channels
+      // the regex silently drops the sign from.)
+      //
+      // A canvas does the colour-space conversion the browser itself does when painting, so
+      // the bytes that come back are the pixels a GM actually sees, in any colour space.
+      const canvas = document.createElement('canvas');
+      canvas.width = 1;
+      canvas.height = 1;
+      const ctx = canvas.getContext('2d', { willReadFrequently: true });
+      const rasterise = (value) => {
+        // Two different sentinels: `fillStyle` IGNORES an unparseable value and keeps the
+        // previous one, so painting the same colour twice from opposite sentinels is what
+        // tells "the browser refused this" apart from "this really is that colour".
+        const samples = ['#000000', '#ffffff'].map((sentinel) => {
+          ctx.fillStyle = sentinel;
+          ctx.fillStyle = value;
+          ctx.clearRect(0, 0, 1, 1);
+          ctx.fillRect(0, 0, 1, 1);
+          return [...ctx.getImageData(0, 0, 1, 1).data];
+        });
+        const [first, second] = samples;
+        if (first.some((channel, index) => channel !== second[index])) return null;
+        return first;
+      };
+      const channel = (value) => {
+        const s = value / 255;
+        return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+      };
+      const luminance = ([r, g, b]) =>
+        0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b);
+
+      return [...document.querySelectorAll('[data-probe]')].map((band) => {
+        const name = band.querySelector('.fab-band-strip-band-name');
+        const fill = getComputedStyle(band).backgroundColor;
+        const ink = getComputedStyle(name).color;
+        const fillPixel = rasterise(fill);
+        const inkPixel = rasterise(ink);
+        if (!fillPixel || !inkPixel) {
+          return { probe: band.dataset.probe, fill, ink, unreadable: true, ratio: 0 };
+        }
+        // Alpha, measured rather than pattern-matched: a translucent fill in ANY colour
+        // space would make the ratio below a statement about a fixture, not about a GM's
+        // screen. `rgba(…)` was the only shape the old test could recognise.
+        const translucent = fillPixel[3] < 255 || inkPixel[3] < 255;
+        const [light, dark] = [luminance(inkPixel), luminance(fillPixel)].sort((a, b) => b - a);
+        return {
+          probe: band.dataset.probe,
+          fill,
+          ink,
+          fillPixel: `rgb(${fillPixel.slice(0, 3).join(', ')})`,
+          translucent,
+          ratio: Math.round(((light + 0.05) / (dark + 0.05)) * 100) / 100,
+        };
+      });
+    });
+  });
+
+  // ── The measurement's own preconditions, asserted rather than assumed ──────────────────
+  //
+  // Every one of these is a way this gate can go green while measuring nothing, and the
+  // shipped version of it tripped the second.
+
+  // 1. The colour parsed at all. A value `fillStyle` refuses leaves the previous paint on the
+  //    canvas, so a refusal must not read as a colour.
+  const unreadable = measured.filter((m) => m.unreadable).map((m) => `${m.probe}: ${m.fill}`);
+  assert.deepEqual(unreadable, [], `unrasterisable colours:\n- ${unreadable.join('\n- ')}`);
+
+  // 2. The fill did not collapse to black, which is exactly where a `color(srgb 0.30 …)`
+  //    string lands when it is scraped as three 0..255 channels — the failure that made this
+  //    gate report a comfortable 12-19:1 for every band regardless of the ramp.
+  assert.ok(
+    measured.every((m) => m.fillPixel !== 'rgb(0, 0, 0)'),
+    'a fill measured as pure black means the colour never survived conversion'
+  );
+
+  // 3. The inline fill is REACHING the element. Every probe painting the same pixels would
+  //    mean the fixture's custom property is inert and the ramp is not under test at all.
+  const distinctFills = new Set(measured.map((m) => m.fillPixel));
+  assert.ok(
+    distinctFills.size > 5,
+    `the ramp must paint distinct fills, got ${distinctFills.size}: ${[...distinctFills].join(' ')}`
+  );
+
+  if (process.env.FAB_REPORT_BAND_AA) {
+    for (const m of measured) {
+      console.log(`${m.probe} ${m.ratio.toFixed(2)}:1 ${m.ink} on ${m.fillPixel}`);
+    }
+  }
+
+  const failures = measured
+    .filter((m) => m.translucent || m.ratio < 4.5)
+    .map((m) =>
+      m.translucent
+        ? `${m.probe}: translucent fill ${m.fill}`
+        : `${m.probe}: ${m.ratio.toFixed(2)}:1 (${m.ink} on ${m.fillPixel})`
+    );
+
+  assert.deepEqual(
+    failures,
+    [],
+    `a band name at 0.72rem/600 is normal-size text and needs 4.5:1:\n- ${failures.join('\n- ')}`
+  );
+
+  // PER-BAND IDENTITY, measured per palette rather than inferred from the tone TOKENS having
+  // different names. `foundry-native` shipped `--fab-accent` byte-identical to `--fab-warning`,
+  // so five differently-named tones painted four colours and bands 2 and 5 were one band —
+  // invisible to every check on this ramp, because they all reasoned about token names.
+  const collisions = [];
+  for (const theme of themes) {
+    const inTheme = measured.filter((m) => m.probe.startsWith(`${theme}|`));
+    for (let i = 0; i < inTheme.length; i += 1) {
+      for (let j = i + 1; j < inTheme.length; j += 1) {
+        if (inTheme[i].fillPixel !== inTheme[j].fillPixel) continue;
+        collisions.push(
+          `${inTheme[i].probe} and ${inTheme[j].probe} both paint ${inTheme[i].fillPixel}`
+        );
+      }
+    }
+  }
+  assert.deepEqual(
+    collisions,
+    [],
+    `two bands of one strip must never paint the same colour:\n- ${collisions.join('\n- ')}`
+  );
+});
+
+// ── The tool studio is the AUTHORITY for a manager button (issue 1096) ─────────────────────
+//
+// The reported defect was that the Modifiers card's buttons did not look like the Tool
+// Studio's: a bare `manager-button` for a destructive verb, and a visibly different label
+// scale. The cause is structural rather than a typo. The Tool Studio's refined treatment
+// comes from an ANCESTOR-CONTEXT rule — `.manager-header-actions .manager-button`, 38px and
+// `0.72rem` — so a card that is not inside a `.manager-header-actions` could never match it
+// however carefully its class string was written.
+//
+// A shared component that merely emits the same class names would not have caught this and
+// will not catch the next one: the drift lives in the SHEET, not in the markup. So the
+// equivalence is measured, in a real browser, on the two roles the maintainer's screenshot
+// shows drifting. `ManagerButton.svelte`'s own class list is read out of the component
+// rather than restated here, so a fixture that stopped matching what the component emits
+// fails instead of quietly measuring markup the product no longer renders.
+const managerButtonPath = resolve(__dirname, '../../src/ui/svelte/components/ManagerButton.svelte');
+const managerButtonSource = readFileSync(managerButtonPath, 'utf8');
+
+function managerButtonClassesFor(role) {
+  const literal = managerButtonSource.match(/const classes = \$derived\(\s*\[([\s\S]*?)\]/);
+  assert.ok(literal, 'ManagerButton declares its emitted classes as one array literal');
+  const base = [...literal[1].matchAll(/'([a-z][\w-]*)'/g)].map(([, token]) => token);
+  assert.ok(
+    base.includes('manager-button') && base.includes('fab-manager-button'),
+    `ManagerButton must emit both the convention class and the primitive class, got ${base.join(' ')}`
+  );
+  assert.match(
+    literal[1],
+    /is-\$\{role\}/,
+    'ManagerButton must derive its role modifier from the prop, not hard-code one'
+  );
+  return `${base.join(' ')} is-${role}`;
+}
+
+const AUTHORITY_PROBES = ['primary', 'danger'];
+
+test('a Modifiers card button renders exactly like the tool studio button of the same role', async () => {
+  const context = await sharedBrowser.newContext({
+    viewport: { width: 1280, height: 720 },
+    deviceScaleFactor: 1,
+  });
+  const page = await context.newPage();
+
+  try {
+    const toolButtons = AUTHORITY_PROBES.map(
+      (role) =>
+        `<button type="button" class="${managerButtonClassesFor(role)}" data-probe="tool-${role}"><i class="fas fa-save"></i><span>Save tool</span></button>`
+    ).join('');
+    const cardButtons = AUTHORITY_PROBES.map(
+      (role) =>
+        `<button type="button" class="${managerButtonClassesFor(role)}" data-probe="card-${role}"><i class="fa-solid fa-plus"></i><span>Delete modifier</span></button>`
+    ).join('');
+    // The NEGATIVE CONTROL: the class string this card shipped before the conversion. If it
+    // measured the same as the converted one, the primitive would be changing nothing and
+    // every assertion below would pass vacuously.
+    const unconverted =
+      '<button type="button" class="manager-button is-danger" data-probe="card-unconverted"><i class="fa-solid fa-plus"></i><span>Delete modifier</span></button>';
+
+    await page.setContent(`
+      <!doctype html>
+      <html lang="en">
+        <head>
+          <meta charset="utf-8">
+          <style>
+            ${css}
+            body { margin: 0; padding: 24px; font-family: Arial, sans-serif; font-size: 16px; }
+            .fas::before, .fa-solid::before { content: "x"; }
+          </style>
+        </head>
+        <body>
+          <main class="fabricate-manager">
+            <header class="manager-tool-edit-header">
+              <div class="manager-header-actions manager-tool-edit-actions">${toolButtons}</div>
+            </header>
+            <section class="manager-edit-card manager-character-modifier-card">
+              <div class="manager-modifier-body manager-character-modifier-editor">
+                <div class="manager-character-modifier-actions">${cardButtons}${unconverted}</div>
+              </div>
+            </section>
+          </main>
+        </body>
+      </html>
+    `);
+
+    const measured = await page.evaluate(() => {
+      const read = (probe) => {
+        const element = document.querySelector(`[data-probe="${probe}"]`);
+        if (!element) return null;
+        const style = getComputedStyle(element);
+        return {
+          fontSize: style.fontSize,
+          fontWeight: style.fontWeight,
+          padding: `${style.paddingTop} ${style.paddingRight} ${style.paddingBottom} ${style.paddingLeft}`,
+          height: `${Math.round(element.getBoundingClientRect().height)}px`,
+          borderRadius: style.borderRadius,
+        };
+      };
+      return Object.fromEntries(
+        ['tool-primary', 'card-primary', 'tool-danger', 'card-danger', 'card-unconverted'].map(
+          (probe) => [probe, read(probe)]
+        )
+      );
+    });
+
+    for (const probe of Object.keys(measured)) {
+      assert.ok(measured[probe], `${probe} rendered`);
+    }
+
+    // The gate would be vacuous if the sheet styled nothing: an unstyled button reports the
+    // UA default on both sides and matches trivially. These pin that the authority's own
+    // rule reached the fixture. 34px and 0.72rem are what `.manager-tool-edit-actions
+    // .manager-button` renders — NOT the 38px `.manager-header-actions` declares, which that
+    // later, more specific block overrides.
+    assert.equal(measured['tool-primary'].fontSize, '11.52px', 'the tool studio label is 0.72rem');
+    assert.equal(measured['tool-primary'].height, '34px', 'at the tool studio control height');
+
+    // …and the control proves the conversion is doing work: the shipped bare class string
+    // renders at the app's inherited body size, which is the reported defect.
+    assert.notEqual(
+      measured['card-unconverted'].fontSize,
+      measured['tool-primary'].fontSize,
+      'an unconverted card button must NOT already match the authority, or this gate proves nothing'
+    );
+
+    for (const role of AUTHORITY_PROBES) {
+      const authority = measured[`tool-${role}`];
+      const card = measured[`card-${role}`];
+      for (const property of ['fontSize', 'fontWeight', 'padding', 'height', 'borderRadius']) {
+        assert.equal(
+          card[property],
+          authority[property],
+          `${role}: the Modifiers card's ${property} (${card[property]}) must match the tool studio's (${authority[property]})`
+        );
+      }
+    }
+  } finally {
+    await context.close();
+  }
+});
+
+// ── The bounds steppers must render "Unbounded" in full (issue 1096) ───────────────────────
+//
+// Reported from a live build: with icon and label taking the row's growth, the two bound
+// steppers collapsed to roughly 70px each and the `Unbounded` placeholder truncated to
+// `Unb`. That placeholder is the ONLY thing on the control that says an empty bound means
+// no limit rather than a limit of zero, so a truncation there is not cosmetic — it deletes
+// the field's meaning. `empty is not zero` is a documented product rule, and this is where a
+// GM reads it.
+//
+// It is MEASURED rather than eyeballed, and measured the only way an `<input>` placeholder
+// can be: an input's `scrollWidth` always equals its `clientWidth`, so overflow is invisible
+// to the DOM. The text is measured against the input's own computed font with a canvas
+// metric and compared to the content box.
+const MODIFIER_BOUNDS_ROW_WIDTHS = [1280, 1120, 960, 831, 680];
+
+// `Stepper` owns its chrome in a scoped `<style>`, and the whole measurement turns on ONE of
+// its rules: `.fab-stepper.is-fill … .fab-stepper-input { flex: 1 1 0; width: auto;
+// min-width: 0 }` is what makes the input obey the track it is given. Without the compiled
+// CSS the fixture renders a UA-default `<input>` — 181px wide and happily overflowing an
+// 80px stepper — so every width would "fit" and the gate would prove nothing. It is stamped
+// with the real scoping hash and appended after the global sheet, exactly as `css: 'injected'`
+// ships it.
+const stepperScoped = scopedComponentCss(
+  resolve(__dirname, '../../src/ui/svelte/components/Stepper.svelte')
+);
+
+function withStepperHash(markup) {
+  return ['fab-stepper', 'fab-stepper-input', 'fab-stepper-adjunct'].reduce(
+    (current, token) => withScopeHash(current, token, stepperScoped.hashClass),
+    markup
+  );
+}
+
+test('the modifier row gives every field room for its longest content at every manager width', async () => {
+  const context = await sharedBrowser.newContext({ deviceScaleFactor: 1 });
+
+  try {
+    const stepper = (bound) =>
+      `<div class="fab-stepper is-fill"><button type="button" class="fab-stepper-adjunct"><i class="fas fa-minus"></i></button><input type="number" class="fab-stepper-input" data-stepper-input data-system-modifier-field="${bound}" placeholder="Unbounded"><button type="button" class="fab-stepper-adjunct"><i class="fas fa-plus"></i></button></div>`;
+    const boundField = (bound, caption) =>
+      `<div class="manager-field manager-modifier-bound-field" data-bound="${bound}"><span class="manager-recipe-micro-label">${caption}</span>${stepper(bound)}</div>`;
+    const editor = `
+      <div class="manager-modifier-body manager-character-modifier-editor">
+        <div class="manager-modifier-name-row">
+          <div class="manager-field manager-modifier-icon-field"><span>Icon</span><button type="button" class="essence-icon-picker-trigger"><i class="fas fa-leaf"></i></button></div>
+          <label class="manager-field manager-modifier-label-field"><span>Label</span><input type="text" data-modifier-label value="Herbalism"></label>
+          <div class="manager-modifier-bounds-row" data-system-modifier-bounds="mod-probe">
+            ${boundField('min', 'Minimum')}${boundField('max', 'Maximum')}
+          </div>
+        </div>
+      </div>`;
+
+    const failures = [];
+    for (const width of MODIFIER_BOUNDS_ROW_WIDTHS) {
+      const page = await context.newPage();
+      await page.setViewportSize({ width, height: 800 });
+      try {
+        await page.setContent(`
+          <!doctype html>
+          <html lang="en">
+            <head>
+              <meta charset="utf-8">
+              <style>
+                ${css}
+                ${stepperScoped.css}
+                body { margin: 0; font-family: Arial, sans-serif; font-size: 16px; }
+                /* The real manager container, so the shipped fabricate-manager container
+                   queries resolve against this width rather than never matching. */
+                .fabricate-manager { container-type: inline-size; container-name: fabricate-manager; }
+                .manager-settings-pane { box-sizing: border-box; width: 100%; padding: 16px; }
+                .fas::before { content: "x"; }
+              </style>
+            </head>
+            <body>
+              <main class="fabricate-manager"><div class="manager-settings-pane">${withStepperHash(editor)}</div></main>
+            </body>
+          </html>
+        `);
+
+        const report = await page.evaluate(() => {
+          const measureText = (element, text) => {
+            const style = getComputedStyle(element);
+            const context = document.createElement('canvas').getContext('2d');
+            context.font = `${style.fontStyle} ${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
+            return context.measureText(text).width;
+          };
+          const row = document.querySelector('.manager-modifier-name-row');
+          const label = document.querySelector('[data-modifier-label]');
+          const labelStyle = getComputedStyle(label);
+          return {
+            rowOverflow: row.scrollWidth > row.clientWidth + 1,
+            label: {
+              content: Math.round(
+                label.getBoundingClientRect().width -
+                  Number.parseFloat(labelStyle.paddingLeft) -
+                  Number.parseFloat(labelStyle.paddingRight)
+              ),
+              // The longest label the product itself authors, measured in the FIELD'S OWN
+              // font rather than compared to a round number someone picked.
+              needed: Math.round(measureText(label, 'Herbalism Training')),
+            },
+            bounds: ['min', 'max'].map((bound) => {
+              const input = document.querySelector(`[data-system-modifier-field="${bound}"]`);
+              const style = getComputedStyle(input);
+              const content =
+                input.getBoundingClientRect().width -
+                Number.parseFloat(style.paddingLeft) -
+                Number.parseFloat(style.paddingRight);
+              return {
+                bound,
+                content: Math.round(content),
+                needed: Math.round(measureText(input, input.placeholder)),
+                fieldWidth: Math.round(
+                  document.querySelector(`[data-bound="${bound}"]`).getBoundingClientRect().width
+                ),
+              };
+            }),
+          };
+        });
+
+        if (report.rowOverflow) failures.push(`${width}px: the row overflows its track`);
+        if (report.label.content < report.label.needed) {
+          failures.push(
+            `${width}px label: "Herbalism Training" needs ${report.label.needed}px and the field offers ${report.label.content}px`
+          );
+        }
+        for (const bound of report.bounds) {
+          if (bound.content < bound.needed) {
+            failures.push(
+              `${width}px ${bound.bound}: "Unbounded" needs ${bound.needed}px and the input offers ${bound.content}px (field ${bound.fieldWidth}px)`
+            );
+          }
+        }
+      } finally {
+        await page.close();
+      }
+    }
+
+    assert.deepEqual(
+      failures,
+      [],
+      `a truncated "Unbounded" reads as "Unb" and destroys the empty-is-not-zero contract:\n- ${failures.join('\n- ')}`
+    );
+  } finally {
+    await context.close();
+  }
 });

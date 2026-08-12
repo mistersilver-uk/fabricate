@@ -18,7 +18,7 @@ globalThis.ui = { notifications: { info() {}, warn() {}, error() {} } };
 
 const { CraftingEngine } = await import('../src/systems/CraftingEngine.js');
 const { GatheringEngine } = await import('../src/systems/GatheringEngine.js');
-const { buildCheckModifierContext, resolveCheckModifierScalar, makeRollDataExpressionEvaluator } =
+const { buildCheckModifierContext, resolveCheckModifierContribution, makeRollDataExpressionResolver } =
   await import('../src/systems/checkModifierResolver.js');
 
 const CATALOGUE = [
@@ -76,7 +76,7 @@ const SALVAGE_COMPONENT = { id: 'c1', name: 'Iron Ore', img: '', salvage: {} };
 
 function salvageSystem(mode, slot, selection = {}) {
   return {
-    checkModifiers: CATALOGUE,
+    modifiers: CATALOGUE,
     salvageResolutionMode: mode,
     salvageCraftingCheck: {
       [mode]: slot,
@@ -192,7 +192,7 @@ const GATHERING_TASK = { id: 't1', name: 'Forage', img: '', checkModifierIds: un
 
 function gatheringSystem(slot, selection = {}) {
   return {
-    checkModifiers: CATALOGUE,
+    modifiers: CATALOGUE,
     gatheringCraftingCheck: {
       ...slot,
       defaultModifierPolicy: 'addAll',
@@ -391,7 +391,7 @@ test('the LISTED formula and the ROLLED formula resolve the same scalar, under e
     ['bySubject', { craftingModifier: { modifierIds: [] } }, 0],
   ]) {
     const system = {
-      checkModifiers: CATALOGUE,
+      modifiers: CATALOGUE,
       craftingCheck: {
         defaultModifierPolicy: policy,
         defaultModifierIds: ['med', 'alch'],
@@ -403,7 +403,8 @@ test('the LISTED formula and the ROLLED formula resolve the same scalar, under e
     // either side is what would let the listed formula and the rolled one disagree.
     const context = buildCheckModifierContext(system, 'crafting', recipe);
     assert.equal(
-      resolveCheckModifierScalar(context, makeRollDataExpressionEvaluator(ACTOR, StubRoll)),
+      resolveCheckModifierContribution(context, makeRollDataExpressionResolver(ACTOR, StubRoll), StubRoll)
+        .scalar,
       expected,
       `${policy}: the listed scalar is the rolled scalar`
     );

@@ -247,6 +247,10 @@ export const CRAFTING_APP_RAW_MODULES = Object.freeze([
   // these two entries close the graph.
   'src/systems/toolCheckBonus.js',
   'src/utils/craftingCheckExpression.js',
+  // …and issue 1118 a FOURTH: the resolver ranks a rolling modifier by the deterministic
+  // average this import-free leaf computes, which is also what tells it that a modifier
+  // rolls at all.
+  'src/utils/rollExpressionAverage.js',
   // Issue 1095 gave it a third: `resolveActiveSalvageCheckFormula` delegates to the ONE
   // salvage `(mode, checkUsable)` derivation rather than re-deriving the pair. That module
   // imports only `craftingCheckExpression.js`, already listed, so this entry closes the

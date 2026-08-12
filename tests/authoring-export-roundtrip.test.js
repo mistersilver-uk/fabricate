@@ -71,14 +71,23 @@ test('round-trip: export → import(keep) → export is deep-equal modulo volati
   // round-trip has to be asserted POSITIVELY, against the non-default fixture values.
   const exported = second.system;
   assert.deepEqual(
-    exported.checkModifiers,
+    exported.modifiers,
     [
+      // NO `isRollExpression`: it is DERIVED by `CraftingSystemManager`, and this harness's
+      // system manager is a plain store rather than the real normalizer, so the round-trip
+      // under test is export/import fidelity of the AUTHORED fields.
       { id: 'mod-medicine', label: 'Medicine', expression: '@abilities.med.mod', min: -1, max: 5 },
       { id: 'mod-alchemy', label: 'Alchemy', expression: '@abilities.alch.mod' },
+      { id: 'mod-skilled', label: 'Skilled', expression: '@abilities.str.mod' },
     ],
-    'the catalogue round-trips at the SYSTEM level, and the unbounded entry keeps NEITHER ' +
-      'bound key — an absence-preserving field that acquired `min: 0` on the way through ' +
-      'would still be a legal catalogue'
+    'the ONE library round-trips at the SYSTEM level, and the unbounded entries keep ' +
+      'NEITHER bound key — an absence-preserving field that acquired `min: 0` on the way ' +
+      'through would still be a legal library'
+  );
+  assert.equal(
+    Object.hasOwn(second.gatheringConfig.system, 'characterModifiers'),
+    false,
+    'and the gathering slice carries no second library (issue 1117)'
   );
   for (const [key, policy, ids, cap] of [
     ['craftingCheck', 'bySubject', ['mod-medicine'], 2],

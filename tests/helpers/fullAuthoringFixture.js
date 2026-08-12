@@ -101,13 +101,16 @@ export function buildFullAuthoringFixture() {
       },
     ],
     gatheringRealmSettings: { revealMode: 'alwaysVisible', modifierVisibility: 'visible' },
-    // The ONE system-level check-modifier catalogue (issue 1095). TWO entries on purpose:
+    // The ONE system-level modifier library (issues 1095, 1117). THREE entries on purpose:
     // one carrying BOTH bounds and one carrying NEITHER, because `min`/`max` are
     // absence-preserving and a fixture where every entry is bounded cannot tell a
-    // round-trip that DROPS the keys from one that writes them everywhere.
-    checkModifiers: [
+    // round-trip that DROPS the keys from one that writes them everywhere — plus the entry
+    // a gathering drop row references, which used to live in a second library in the
+    // gathering config and now lives here with the rest.
+    modifiers: [
       { id: 'mod-medicine', label: 'Medicine', expression: '@abilities.med.mod', min: -1, max: 5 },
       { id: 'mod-alchemy', label: 'Alchemy', expression: '@abilities.alch.mod' },
+      { id: FIXTURE_MODIFIER_ID, label: 'Skilled', expression: '@abilities.str.mod' },
     ],
     // A NON-DEFAULT selection triple on EACH of the three activity checks. A
     // default-valued fixture is not an oracle for an allowlist rebuild: `addAll` with an
@@ -326,9 +329,6 @@ export function buildFullAuthoringFixture() {
             onBreak: { action: 'replace', replacementComponentId: 'comp-ore' },
           },
         ],
-        characterModifiers: [
-          { id: FIXTURE_MODIFIER_ID, name: 'Skilled', kind: 'bonus', value: 10 },
-        ],
       },
     },
   };
@@ -398,16 +398,22 @@ export const REQUIRED_FIXTURE_FEATURES = Object.freeze([
     'a drop row targets a world item via itemUuid',
     (f) => (slice(f).tasks ?? []).some((t) => (t.dropRows ?? []).some((row) => row.itemUuid)),
   ],
-  // ── issue 1095: the system-level catalogue and its three selections ──────────────
+  // ── issues 1095/1117: the ONE system-level library and its three selections ───────
   [
-    'system carries a check-modifier catalogue with one BOUNDED and one UNBOUNDED entry',
+    'system carries a modifier library with one BOUNDED and one UNBOUNDED entry',
     (f) => {
-      const catalogue = f.system.checkModifiers ?? [];
+      const library = f.system.modifiers ?? [];
       return (
-        catalogue.some((entry) => Number.isFinite(entry.min) && Number.isFinite(entry.max)) &&
-        catalogue.some((entry) => !Object.hasOwn(entry, 'min') && !Object.hasOwn(entry, 'max'))
+        library.some((entry) => Number.isFinite(entry.min) && Number.isFinite(entry.max)) &&
+        library.some((entry) => !Object.hasOwn(entry, 'min') && !Object.hasOwn(entry, 'max'))
       );
     },
+  ],
+  [
+    'the ONE library also carries the entry a gathering drop row references',
+    (f) =>
+      (f.system.modifiers ?? []).some((entry) => entry.id === FIXTURE_MODIFIER_ID) &&
+      !Object.hasOwn(f.gatheringConfig.systems[f.system.id] ?? {}, 'characterModifiers'),
   ],
   [
     'all THREE activity checks carry a NON-DEFAULT selection triple',

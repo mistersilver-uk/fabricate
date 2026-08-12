@@ -460,6 +460,164 @@ async function rollChoice(modifierChoice, choice) {
   return rolled;
 }
 
+// ── a chosen ROLLING modifier (issue 1118) ──────────────────────────────────
+//
+// A descriptor option carries `formula` instead of `value` when its expression rolls, and
+// the chosen fragment is appended VERBATIM as its own flavoured term. It is taken from the
+// descriptor rather than rebuilt here, so the chip the player was offered and the term that
+// rolls are one derivation.
+const DICE_PICK_CHOICE = {
+  modifiers: [
+    { id: 'med', label: 'Medicine', icon: 'fa-med', value: 3, formula: null, display: '+3' },
+    {
+      id: 'luck',
+      label: 'Luck',
+      icon: 'fa-luck',
+      value: null,
+      formula: '(1d4)',
+      display: '+1d4',
+    },
+    {
+      id: 'bounded',
+      label: 'Bounded',
+      icon: 'fa-b',
+      value: null,
+      formula: 'min(max((1d8), -1), 6)',
+      display: '+min(max((1d8), -1), 6)',
+    },
+  ],
+  maxPicks: 2,
+  defaultSelectedIds: ['bounded'],
+  defaultSelectedId: 'bounded',
+};
+
+test('playerPicks: a chosen ROLLING modifier appends its dice, not its average', async () => {
+  assert.equal(
+    await rollChoice(DICE_PICK_CHOICE, { chosenModifierIds: ['luck'] }),
+    '1d20 + (1d4)[Modifiers]',
+    'the fragment is appended verbatim; 2.5 is a number the roll could never produce'
+  );
+  assert.equal(
+    await rollChoice(DICE_PICK_CHOICE, { chosenModifierIds: ['bounded'] }),
+    '1d20 + min(max((1d8), -1), 6)[Modifiers]',
+    'and a bounded one keeps its clamp'
+  );
+});
+
+test('playerPicks: a mixed selection sums the flat half and appends the rolling half', async () => {
+  assert.equal(
+    await rollChoice(DICE_PICK_CHOICE, { chosenModifierIds: ['med', 'luck'] }),
+    '1d20 + 3[Modifiers] + (1d4)[Modifiers]',
+    'one flat term, then one term per rolling pick'
+  );
+});
+
+test('playerPicks: the cap still truncates a rolling selection', async () => {
+  assert.equal(
+    await rollChoice(DICE_PICK_CHOICE, { chosenModifierIds: ['med', 'luck', 'bounded'] }),
+    '1d20 + 3[Modifiers] + (1d4)[Modifiers]',
+    'the third pick exceeds maxPicks 2 and is dropped in descriptor order'
+  );
+});
+
+test('playerPicks: a rolling PRE-SELECTION is what a headless confirm rolls', async () => {
+  assert.equal(
+    await rollChoice(DICE_PICK_CHOICE, {}),
+    '1d20 + min(max((1d8), -1), 6)[Modifiers]',
+    'confirming without a selection falls back to the descriptor pre-selection'
+  );
+});
+
+// ── advantage belongs to the AUTHORED check, not to a modifier (issue 1118 review) ──
+//
+// `parsePlainDiceGroups` splits on parens AND flavour brackets, so `(1d20)[Modifiers]`
+// tokenises to a plain `1d20`. Without scoping, a check with no d20 of its own would offer
+// Advantage and the transform would rewrite the MODIFIER's die.
+const D20_MODIFIER_CHOICE = {
+  modifiers: [
+    { id: 'med', label: 'Medicine', icon: 'fa-med', value: 3, formula: null, display: '+3' },
+    { id: 'wild', label: 'Wild', icon: 'fa-w', value: null, formula: '(1d20)', display: '+1d20' },
+  ],
+  maxPicks: 1,
+  defaultSelectedIds: ['wild'],
+  defaultSelectedId: 'wild',
+};
+
+test('a d20 MODIFIER on a d20-less check neither offers nor receives advantage', async () => {
+  const rolledFormulas = stubCraftingModRoll();
+  let asked = null;
+  await evaluateCheckRoll(
+    '3d6',
+    { getRollData: () => ({}) },
+    {
+      interactive: true,
+      modifierChoice: D20_MODIFIER_CHOICE,
+      prompt: async (args) => {
+        asked = args;
+        return { confirmed: true, chosenModifierIds: ['wild'], advantage: 'advantage' };
+      },
+    }
+  );
+  assert.equal(asked.allowAdvantage, false, '3d6 is not a plain-d20 check, whatever it appends');
+  assert.equal(
+    rolledFormulas.at(-1),
+    '3d6 + (1d20)[Modifiers]',
+    "the modifier's die is left alone even when a caller forces the disposition"
+  );
+  delete globalThis.Roll;
+});
+
+// The NON-DEFERRED path asked the same question of the POST-append formula, so it is
+// covered separately: on the deferred path the two readings coincide and a mutation there
+// would go unnoticed.
+test('a non-deferred d20 modifier does not manufacture an advantage offer', async () => {
+  const rolledFormulas = stubCraftingModRoll();
+  let asked = null;
+  await evaluateCheckRoll(
+    '3d6',
+    { getRollData: () => ({}) },
+    {
+      interactive: true,
+      craftingModifier: {
+        catalogue: [{ id: 'wild', label: 'Wild', expression: '1d20' }],
+        systemPolicy: 'addAll',
+        defaultModifierIds: ['wild'],
+      },
+      prompt: async (args) => {
+        asked = args;
+        return { confirmed: true, advantage: 'advantage' };
+      },
+    }
+  );
+  assert.equal(asked.allowAdvantage, false, 'the appended d20 is not the check`s own');
+  assert.equal(rolledFormulas.at(-1), '3d6 + (1d20)[Modifiers]');
+  delete globalThis.Roll;
+});
+
+test('advantage still rewrites the CHECK`s own d20 with a d20 modifier appended', async () => {
+  const rolledFormulas = stubCraftingModRoll();
+  let asked = null;
+  await evaluateCheckRoll(
+    '1d20',
+    { getRollData: () => ({}) },
+    {
+      interactive: true,
+      modifierChoice: D20_MODIFIER_CHOICE,
+      prompt: async (args) => {
+        asked = args;
+        return { confirmed: true, chosenModifierIds: ['wild'], advantage: 'advantage' };
+      },
+    }
+  );
+  assert.equal(asked.allowAdvantage, true, 'the authored check IS a plain-d20 one');
+  assert.equal(
+    rolledFormulas.at(-1),
+    '2d20kh1 + (1d20)[Modifiers]',
+    'the FIRST plain d20 is the check`s own, and the modifier keeps its die'
+  );
+  delete globalThis.Roll;
+});
+
 test('playerPicks: a multi-pick selection SUMS the chosen modifiers', async () => {
   assert.equal(
     await rollChoice(MULTI_PICK_CHOICE, { chosenModifierIds: ['med', 'herb'] }),

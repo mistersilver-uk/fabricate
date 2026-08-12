@@ -862,6 +862,57 @@ test('no capture producer clicks the hidden radio inside a SegmentedControl segm
   );
 });
 
+// ── The Checks Studio's navigation hooks (issue 1096) ─────────────────────────────────────
+//
+// Issue 1096 replaced the four `data-checks-tab-button` ACTIVITY TABS with four rail routes and
+// a five-section strip. The smoke walk went on clicking the tabs and NOTHING failed: that hook
+// lived only in Svelte markup and in a Playwright selector string, so no unit test, lint rule or
+// type check ever saw the pair. The walk against real Foundry is the only thing that does, and
+// it is a manual twenty-minute run — which is how a whole surface's navigation came to be broken
+// on a branch whose CI was green.
+//
+// So both capture producers get a source-text contract: every `data-checks-*` attribute NAME
+// they navigate by must still be authored in the Checks Studio's own source. Name-level rather
+// than value-level, because the markup interpolates the values (`data-checks-panel={activity}`)
+// — and name-level is exactly the granularity this defect needed, since `data-checks-tab-button`
+// left `src/` altogether.
+const CHECKS_STUDIO_DIR = 'src/ui/svelte/apps/manager/checks';
+const CHECKS_STUDIO_SRC = [
+  ...readdirSync(CHECKS_STUDIO_DIR).map((entry) => join(CHECKS_STUDIO_DIR, entry)),
+  'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte',
+]
+  .map((path) => readFileSync(path, 'utf8'))
+  .join('\n');
+
+test('every Checks hook a capture producer navigates by is still shipped', () => {
+  const shipped = new Set(
+    [...CHECKS_STUDIO_SRC.matchAll(/\b(data-checks-[\w-]+)/g)].map((match) => match[1]),
+  );
+  // A derived contract whose input set silently empties passes forever while checking nothing.
+  // These three are the routing spine — the view wrapper, the activity panel and the section
+  // strip — so their absence means the scan read the wrong files, not that the product changed.
+  for (const anchor of ['data-checks-editor', 'data-checks-panel', 'data-checks-section-button']) {
+    assert.ok(shipped.has(anchor), `the Checks Studio source scan found no ${anchor}`);
+  }
+
+  let navigated = 0;
+  for (const producer of CAPTURE_PRODUCERS) {
+    for (const [, hook] of producer.source.matchAll(/\[(data-checks-[\w-]+)[=\]]/g)) {
+      navigated += 1;
+      assert.ok(
+        shipped.has(hook),
+        `${producer.path}: \`${hook}\` is not authored anywhere in the Checks Studio — it names a control the product no longer has`,
+      );
+    }
+  }
+  assert.ok(navigated > 0, 'no capture producer selects a Checks hook, so this guard checks nothing');
+
+  // The rail sub-item is addressed by its id, built by interpolation at both ends, so the
+  // name-level scan above cannot see it. Pin the two halves against each other instead.
+  assert.match(HARNESS, /#manager-checks-nav-\$\{activity\}/);
+  assert.match(CHECKS_STUDIO_SRC, /id=\{`manager-checks-nav-\$\{checksItem\.id\}`\}/);
+});
+
 test('each issue-772 bulk-edit frame stages the axes only IT can evidence', () => {
   // Split rather than one lazy regex per label: a `[\s\S]*?label: '<wanted>'` starts at the
   // EARLIEST call site and happily swallows the two before it, which would let a staging
@@ -1181,9 +1232,15 @@ test('the Tool Studio walk pins shipped selectors, viewport evidence, pointer co
   assert.doesNotMatch(toolStudioWalk, /page\.locator\('\[data-tool-edit-view\]'\)\.first\(\)/);
   assert.doesNotMatch(toolStudioWalk, /page\.locator\('\[data-tool-on-break-controls\]'\)\.first\(\)/);
   assert.doesNotMatch(toolStudioWalk, /onBreakFieldset\.isDisabled\(\)/);
+  // The closing move is RE-EXPRESSED, not relaxed (issue 1096). It used to be a bare Checks
+  // rail click, because the trigger card the next span drives was one scroll down a single
+  // Checks tab. The tabs are rail routes now and each route renders ONE section at a time, so
+  // reaching that card is a route AND a section — and a walk that lands on the crafting route
+  // without selecting Triggers finds no trigger card at all. Pinning the section is what makes
+  // that mistake fail here rather than 13 minutes into a real run.
   assert.match(
     toolStudioWalk,
-    /const recipeToolRow = page\.locator\([\s\S]*?select, \[data-recipe-tool-bonus-mode\][\s\S]*?must not expose Tool breakage or check-bonus policy controls[\s\S]*?unexpectedly dirtied the Recipe draft[\s\S]*?manager-nav-button:has-text\("Checks"\)/,
+    /const recipeToolRow = page\.locator\([\s\S]*?select, \[data-recipe-tool-bonus-mode\][\s\S]*?must not expose Tool breakage or check-bonus policy controls[\s\S]*?unexpectedly dirtied the Recipe draft[\s\S]*?openChecksActivity\(page, 'crafting', 'triggers'\)/,
     'the Recipe Tools check must prove policy-free rows without dirtying the Recipe draft',
   );
   assert.match(

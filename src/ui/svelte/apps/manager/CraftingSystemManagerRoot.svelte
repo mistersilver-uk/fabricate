@@ -103,6 +103,21 @@
     activeCraftingTab as resolveActiveCraftingTab,
     isCraftingRoute as isCraftingView,
   } from './crafting/craftingNav.js';
+  import {
+    CHECKS_VIEWS,
+    activeChecksTab as resolveActiveChecksTab,
+    buildChecksNavItems,
+    checksNavIssueTotal,
+    isChecksRoute as isChecksView,
+    resolveChecksRedirect,
+  } from './checks/checksNav.js';
+  import { evaluateCheckReadiness, readinessModeForSlot } from './checks/checksReadiness.js';
+  import {
+    buildCheckModifierContext,
+    resolveActiveCraftingCheckFormula,
+    resolveActiveGatheringCheckFormula,
+    resolveActiveSalvageCheckFormula,
+  } from '../../../../systems/checkModifierResolver.js';
   import RecipeEditView from './RecipeEditView.svelte';
   import { craftingEffect } from './crafting/craftingVisibility.js';
   import SystemEditView from './SystemEditView.svelte';
@@ -121,6 +136,10 @@
   // blocker banner) force the Validation tab open even when the page is already shown.
   let requestedSystemTab = $state('settings');
   let requestedSystemTabNonce = $state(0);
+  // Deep link into the System Overview page's Modifiers section (issue 1117). The Checks
+  // screen renders the modifier library read-only for every activity and links here, which
+  // is the one navigation that replaces the authoring the Checks card used to do.
+  let requestedSystemModifierSectionNonce = $state(0);
   let selectedRecipeId = $state('');
   let selectedComponentId = $state('');
   let selectedEssenceId = $state('');
@@ -421,9 +440,20 @@
   const gatheringRoutedDirty = $derived(
     JSON.stringify(gatheringRoutedDraft) !== JSON.stringify(gatheringRoutedBaseline)
   );
-  // Which Checks sub-tab is active (crafting | salvage | gathering | validation),
-  // so the shared header Save persists the right draft.
-  let checksActiveTab = $state('crafting');
+  // Which Checks child route is open (crafting | salvage | gathering | validation).
+  // It is DERIVED from the route now (issue 1096), not held: the four activities became
+  // rail routes, so a second copy of "which one is open" would be a source of truth the
+  // rail highlight and the breadcrumb could disagree with.
+  // Which section of that route is open, for a Validation deep link.
+  // Empty until the router asks for one, so the very first deep link TO the roll section is
+  // still a new request rather than one the view has already honoured at mount.
+  let checksActiveSection = $state('');
+  // The REQUEST's identity, bumped on every deep link. `ChecksView` latches on this rather
+  // than on the section name, so asking twice for the same section is two requests: leave
+  // `roll` for Triggers, deep-link to `roll` again, and the second one still lands. Without
+  // it the repeat equalled the latch and was swallowed, stranding the GM on Triggers.
+  let checksSectionRequestNonce = $state(0);
+  let checksMenuExpanded = $state(false);
   // The Graph surface (issue 442) is unimplemented; it stays a disabled placeholder
   // and, as of issue 745, renders only when experimental features are enabled.
   const placeholderViews = [
@@ -532,25 +562,31 @@
     },
   });
 
-  // Which crafting check editor is active for the selected system, and whether it
-  // has unsaved staged edits — drives the single top-right Save button.
-  // Only `routedByCheck` authors the tier-routing routed check; `routedByIngredients`
-  // shares the simple pass/fail slot with `simple`/`alchemy`, so it routes dirty
-  // tracking + Save through the simple draft (`store.saveCraftingCheckSimple`) and its
-  // recipe "Check tier" dropdown falls out of the collapsed 'simple' mode. Collapsing it
-  // here costs nothing elsewhere, because the multi-set and routing behaviours are derived
-  // separately from the RAW `resolutionMode` rather than from this value:
-  // `recipeMultiSetAllowed` gates more than one ingredient/result set, and
-  // `recipeRoutingProvider` picks the routing basis ('check' for routedByCheck,
-  // 'ingredientSet' for routedByIngredients). Both routed modes stay covered there.
-  const craftingCheckMode = $derived(
-    (function _craftingCheckMode(resolution) {
-      if (resolution === 'routedByCheck') return 'routed';
-      if (resolution === 'progressive') return 'progressive';
-      if (['simple', 'alchemy', 'routedByIngredients'].includes(resolution)) return 'simple';
-      return null;
-    })(selectedSystem?.resolutionMode || 'simple')
-  );
+  // WHICH `craftingCheck` sub-config this system actually rolls — the SLOT — and therefore
+  // which draft is edited, tracked dirty, saved by the top-right Save button, and read for
+  // the recipe editor's "Check tier" options.
+  //
+  // IT IS THE ENGINE'S OWN ANSWER (issue 1096), not a second mapping beside it.
+  // `checkModifierResolver` owns `CRAFTING_CHECK_SLOTS` / `ALCHEMY_CHECK_SLOTS`, and the copy
+  // that stood here disagreed with it for exactly one configuration: alchemy at
+  // `checkMode: 'tiered'`, which rolls the ROUTED slot. The Checks route renders the routed
+  // editor there (its own derivation reads `alchemy.checkMode`), so a GM could edit that
+  // draft — while this said `simple`, so the edit was never marked dirty and Save never
+  // wrote it. The rail's readiness badge meanwhile evaluated the untouched simple draft
+  // under routed rules. One derivation is the only way those cannot disagree.
+  //
+  // `null` means the mode rolls NO check: alchemy `checkMode: 'none'`, and any resolution
+  // mode outside the canonical set. Nothing is dirty, nothing is saved and no tier options
+  // are offered, which is the honest answer for a check that never runs.
+  //
+  // Only `routedByCheck` authors the tier-routing routed check; `routedByIngredients` shares
+  // the simple pass/fail slot with `simple`. Collapsing those two here costs nothing
+  // elsewhere, because the multi-set and routing behaviours are derived separately from the
+  // RAW `resolutionMode` rather than from this value: `recipeMultiSetAllowed` gates more than
+  // one ingredient/result set, and `recipeRoutingProvider` picks the routing basis ('check'
+  // for routedByCheck, 'ingredientSet' for routedByIngredients). Both routed modes stay
+  // covered there.
+  const craftingCheckMode = $derived(resolveActiveCraftingCheckFormula(selectedSystem).slot);
   const craftingCheckDirty = $derived(
     (craftingCheckMode === 'routed' && checkRoutedDirty) ||
       (craftingCheckMode === 'simple' && checkSimpleDirty) ||
@@ -579,22 +615,26 @@
   );
   const gatheringCheckSaving = $derived(gatheringProgressiveSaving || gatheringRoutedSaving);
 
-  // Tab-aware Checks dirty/saving/save: the single header Save button persists
-  // whichever check sub-tab is active.
-  const checksDirty = $derived(
-    checksActiveTab === 'salvage'
-      ? salvageCheckDirty
-      : checksActiveTab === 'gathering'
-        ? gatheringCheckDirty
-        : craftingCheckDirty
+  // THE DRAFT MODEL LIVES ABOVE THE ROUTE (issue 1096).
+  //
+  // It used to be tab-aware: `checksDirty` reported only the ACTIVE sub-tab, and the header
+  // Save persisted only that one. That was safe while the four activities were tabs inside
+  // one view, because a switch between them never left the surface. They are ROUTES now, and
+  // one click on `Components` leaves it — so a per-route dirty flag would have let an unsaved
+  // crafting edit walk out of the building while the GM stood on Gathering, with the Unsaved
+  // chip already gone.
+  //
+  // So: ONE dirty set across the four activities, and one plural `Save checks` that persists
+  // every dirty one. The per-activity flags survive as the rail's own markers.
+  const checksDirtyActivities = $derived(
+    [
+      craftingCheckDirty ? 'crafting' : '',
+      salvageCheckDirty ? 'salvage' : '',
+      gatheringCheckDirty ? 'gathering' : '',
+    ].filter(Boolean)
   );
-  const checksSaving = $derived(
-    checksActiveTab === 'salvage'
-      ? salvageCheckSaving
-      : checksActiveTab === 'gathering'
-        ? gatheringCheckSaving
-        : craftingCheckSaving
-  );
+  const checksDirty = $derived(checksDirtyActivities.length > 0);
+  const checksSaving = $derived(craftingCheckSaving || salvageCheckSaving || gatheringCheckSaving);
 
   // Recipe tiers offered to the recipe editor's "Check tier" dropdown, resolved
   // from the active crafting-check mode. Recipe tiers are authored on a RELATIVE
@@ -771,91 +811,156 @@
     });
   }
 
-  async function saveCraftingCheck() {
-    if (!selectedSystemId || craftingCheckSaving || !craftingCheckDirty) return;
-    if (craftingCheckMode === 'routed') {
-      checkRoutedSaving = true;
-      try {
-        await store?.saveCraftingCheckRouted?.(checkRoutedDraft);
-        checkRoutedBaseline = cloneRoutedCheck(checkRoutedDraft);
-      } finally {
-        checkRoutedSaving = false;
-      }
-    } else if (craftingCheckMode === 'simple') {
-      checkSimpleSaving = true;
-      try {
-        await store?.saveCraftingCheckSimple?.(checkSimpleDraft);
-        checkSimpleBaseline = cloneSimpleCheck(checkSimpleDraft);
-      } finally {
-        checkSimpleSaving = false;
-      }
-    } else if (craftingCheckMode === 'progressive') {
-      checkProgressiveSaving = true;
-      try {
-        await store?.saveCraftingCheckProgressive?.(checkProgressiveDraft);
-        checkProgressiveBaseline = cloneProgressiveCheck(checkProgressiveDraft);
-      } finally {
-        checkProgressiveSaving = false;
-      }
+  /**
+   * Run ONE check save and ANSWER WHETHER IT LANDED (issue 1096).
+   *
+   * Every check save used to be `await store?.save…()` and nothing else, which made "did that
+   * work?" an unanswerable question: a store no-op and a rejected `updateSystem` were both
+   * indistinguishable from success, so the route-exit guard's Save branch navigated away from
+   * unsaved work and a rejection escaped as an unhandled promise. The shipped essence and
+   * system-details guards answer it with `result !== false` and are the pattern followed
+   * here, with the rejection caught as well because the three check savers are the only ones
+   * whose store call can reject rather than return.
+   *
+   * The draft is RE-BASELINED only on success, so a failed save leaves the activity dirty —
+   * which is what keeps the rail marker, the Save button and the exit prompt all still
+   * saying there is something to save.
+   *
+   * @param {{ save: () => unknown, rebaseline: () => void, setSaving: (on: boolean) => void }} steps
+   * @returns {Promise<boolean>}
+   */
+  async function persistCheckDraft({ save, rebaseline, setSaving }) {
+    setSaving(true);
+    try {
+      if ((await save()) === false) return false;
+      rebaseline();
+      return true;
+    } catch (error) {
+      console.error('Failed to save check draft', error);
+      return false;
+    } finally {
+      setSaving(false);
     }
+  }
+
+  async function saveCraftingCheck() {
+    if (!selectedSystemId || craftingCheckSaving || !craftingCheckDirty) return true;
+    if (craftingCheckMode === 'routed') {
+      return persistCheckDraft({
+        save: () => store?.saveCraftingCheckRouted?.(checkRoutedDraft),
+        rebaseline: () => {
+          checkRoutedBaseline = cloneRoutedCheck(checkRoutedDraft);
+        },
+        setSaving: (on) => {
+          checkRoutedSaving = on;
+        },
+      });
+    }
+    if (craftingCheckMode === 'simple') {
+      return persistCheckDraft({
+        save: () => store?.saveCraftingCheckSimple?.(checkSimpleDraft),
+        rebaseline: () => {
+          checkSimpleBaseline = cloneSimpleCheck(checkSimpleDraft);
+        },
+        setSaving: (on) => {
+          checkSimpleSaving = on;
+        },
+      });
+    }
+    if (craftingCheckMode === 'progressive') {
+      return persistCheckDraft({
+        save: () => store?.saveCraftingCheckProgressive?.(checkProgressiveDraft),
+        rebaseline: () => {
+          checkProgressiveBaseline = cloneProgressiveCheck(checkProgressiveDraft);
+        },
+        setSaving: (on) => {
+          checkProgressiveSaving = on;
+        },
+      });
+    }
+    // No slot: this resolution mode rolls no crafting check, so there is nothing to persist.
+    return true;
   }
 
   async function saveSalvageCheck() {
-    if (!selectedSystemId || salvageCheckSaving || !salvageCheckDirty) return;
+    if (!selectedSystemId || salvageCheckSaving || !salvageCheckDirty) return true;
     if (salvageResolutionMode === 'routed') {
-      salvageRoutedSaving = true;
-      try {
-        await store?.saveSalvageCheckRouted?.(salvageRoutedDraft);
-        salvageRoutedBaseline = cloneRoutedCheck(salvageRoutedDraft);
-      } finally {
-        salvageRoutedSaving = false;
-      }
-    } else if (salvageResolutionMode === 'progressive') {
-      salvageProgressiveSaving = true;
-      try {
-        await store?.saveSalvageCheckProgressive?.(salvageProgressiveDraft);
-        salvageProgressiveBaseline = cloneProgressiveCheck(salvageProgressiveDraft);
-      } finally {
-        salvageProgressiveSaving = false;
-      }
-    } else {
-      salvageSimpleSaving = true;
-      try {
-        await store?.saveSalvageCheckSimple?.(salvageSimpleDraft);
-        salvageSimpleBaseline = cloneSimpleCheck(salvageSimpleDraft);
-      } finally {
-        salvageSimpleSaving = false;
-      }
+      return persistCheckDraft({
+        save: () => store?.saveSalvageCheckRouted?.(salvageRoutedDraft),
+        rebaseline: () => {
+          salvageRoutedBaseline = cloneRoutedCheck(salvageRoutedDraft);
+        },
+        setSaving: (on) => {
+          salvageRoutedSaving = on;
+        },
+      });
     }
+    if (salvageResolutionMode === 'progressive') {
+      return persistCheckDraft({
+        save: () => store?.saveSalvageCheckProgressive?.(salvageProgressiveDraft),
+        rebaseline: () => {
+          salvageProgressiveBaseline = cloneProgressiveCheck(salvageProgressiveDraft);
+        },
+        setSaving: (on) => {
+          salvageProgressiveSaving = on;
+        },
+      });
+    }
+    return persistCheckDraft({
+      save: () => store?.saveSalvageCheckSimple?.(salvageSimpleDraft),
+      rebaseline: () => {
+        salvageSimpleBaseline = cloneSimpleCheck(salvageSimpleDraft);
+      },
+      setSaving: (on) => {
+        salvageSimpleSaving = on;
+      },
+    });
   }
 
   async function saveGatheringCheck() {
-    if (!selectedSystemId || gatheringCheckSaving || !gatheringCheckDirty) return;
+    if (!selectedSystemId || gatheringCheckSaving || !gatheringCheckDirty) return true;
     if (gatheringResolutionMode === 'routed') {
-      gatheringRoutedSaving = true;
-      try {
-        await store?.saveGatheringCheckRouted?.(gatheringRoutedDraft);
-        gatheringRoutedBaseline = cloneRoutedCheck(gatheringRoutedDraft);
-      } finally {
-        gatheringRoutedSaving = false;
-      }
-    } else if (gatheringResolutionMode === 'progressive') {
-      gatheringProgressiveSaving = true;
-      try {
-        await store?.saveGatheringCheckProgressive?.(gatheringProgressiveDraft);
-        gatheringProgressiveBaseline = cloneProgressiveCheck(gatheringProgressiveDraft);
-      } finally {
-        gatheringProgressiveSaving = false;
-      }
+      return persistCheckDraft({
+        save: () => store?.saveGatheringCheckRouted?.(gatheringRoutedDraft),
+        rebaseline: () => {
+          gatheringRoutedBaseline = cloneRoutedCheck(gatheringRoutedDraft);
+        },
+        setSaving: (on) => {
+          gatheringRoutedSaving = on;
+        },
+      });
+    }
+    if (gatheringResolutionMode === 'progressive') {
+      return persistCheckDraft({
+        save: () => store?.saveGatheringCheckProgressive?.(gatheringProgressiveDraft),
+        rebaseline: () => {
+          gatheringProgressiveBaseline = cloneProgressiveCheck(gatheringProgressiveDraft);
+        },
+        setSaving: (on) => {
+          gatheringProgressiveSaving = on;
+        },
+      });
     }
     // d100 mode has no editable config — nothing to persist.
+    return true;
   }
 
-  // The shared Checks header Save persists whichever sub-tab is active.
+  // The shared Checks header Save persists EVERY dirty activity (issue 1096), not just the
+  // route in view. Sequential rather than concurrent: each of the three saves through the
+  // store and re-baselines its own draft, and the store's publish is a two-phase projection
+  // rebuild that three overlapping writers would race.
+  //
+  // It ANSWERS, and the answer is the conjunction rather than the last one: a Save that
+  // persisted crafting and failed salvage has not saved the checks, and the route-exit guard
+  // must not navigate away from the half that is still dirty. Every dirty activity is still
+  // ATTEMPTED — a crafting failure does not cancel the salvage write — because the GM asked
+  // to save all of them and stopping early would leave a second, unexplained casualty.
   async function saveChecks() {
-    if (checksActiveTab === 'salvage') return saveSalvageCheck();
-    if (checksActiveTab === 'gathering') return saveGatheringCheck();
-    return saveCraftingCheck();
+    let saved = true;
+    if (craftingCheckDirty) saved = (await saveCraftingCheck()) && saved;
+    if (salvageCheckDirty) saved = (await saveSalvageCheck()) && saved;
+    if (gatheringCheckDirty) saved = (await saveGatheringCheck()) && saved;
+    return saved;
   }
 
   function onToggleCheckActive(kind, enabled) {
@@ -1025,10 +1130,12 @@
   const selectedGatheringConditionShortcuts = $derived(
     buildSelectedGatheringConditionShortcuts(selectedSystem, $viewState.gatheringConfig)
   );
-  const selectedGatheringCharacterModifiers = $derived(
-    Array.isArray($viewState.gatheringConfig?.systems?.[selectedSystemId]?.characterModifiers)
-      ? $viewState.gatheringConfig.systems[selectedSystemId].characterModifiers
-      : []
+  // The ONE authored modifier library (issue 1117). It is projected off the SYSTEM, not
+  // the gathering config: crafting, salvage and gathering checks select over it, and the
+  // gathering d100 drop rows, events and stamina costs reference it. Every surface that
+  // reads a modifier reads this one derivation.
+  const selectedSystemModifiers = $derived(
+    Array.isArray(selectedSystem?.modifiers) ? selectedSystem.modifiers : []
   );
   const selectedCurrencyUnits = $derived(
     Array.isArray(selectedSystem?.requirements?.currency?.units)
@@ -1070,23 +1177,23 @@
   );
   async function onAddCharacterModifier(partial) {
     if (!selectedSystemId) return null;
-    return await store.addGatheringCharacterModifier(selectedSystemId, partial);
+    return await store.addSystemModifier(selectedSystemId, partial);
   }
   async function onSeedCharacterModifierPresets() {
     if (!selectedSystemId || !characterModifierPresetsSupported) return;
-    await store.seedGatheringCharacterModifierPresets(selectedSystemId);
+    await store.seedSystemModifierPresets(selectedSystemId);
   }
   async function onUpdateCharacterModifier(modifierId, patch) {
     if (!selectedSystemId) return;
-    await store.updateGatheringCharacterModifier(selectedSystemId, modifierId, patch);
+    await store.updateSystemModifier(selectedSystemId, modifierId, patch);
   }
   async function onDeleteCharacterModifier(modifierId) {
     if (!selectedSystemId) return;
-    await store.deleteGatheringCharacterModifier(selectedSystemId, modifierId);
+    await store.deleteSystemModifier(selectedSystemId, modifierId);
   }
   async function onReorderCharacterModifier(fromIndex, toIndex) {
     if (!selectedSystemId) return;
-    await store.reorderGatheringCharacterModifier(fromIndex, toIndex, selectedSystemId);
+    await store.reorderSystemModifier(fromIndex, toIndex, selectedSystemId);
   }
 
   // Character prerequisites (issue 544) — system-owned pass/fail learning gates.
@@ -1170,7 +1277,7 @@
 
   function characterModifierLibraryEntry(modifierId) {
     if (!modifierId) return null;
-    return selectedGatheringCharacterModifiers.find((entry) => entry.id === modifierId) || null;
+    return selectedSystemModifiers.find((entry) => entry.id === modifierId) || null;
   }
 
   function characterModifierLabelForRef(ref) {
@@ -1197,7 +1304,7 @@
 
   async function onAddDropCharacterModifier(rowId, modifierId = null) {
     if (!editingGatheringTask?.id || !rowId) return;
-    const id = modifierId ?? selectedGatheringCharacterModifiers[0]?.id ?? '';
+    const id = modifierId ?? selectedSystemModifiers[0]?.id ?? '';
     if (!id) return;
     const rows = gatheringTaskDropRows(editingGatheringTask);
     const row = rows.find((entry) => entry.id === rowId);
@@ -1221,7 +1328,7 @@
     const attached = new Set(
       (selectedGatheringDrop?.characterModifiers || []).map((ref) => ref.modifierId).filter(Boolean)
     );
-    return selectedGatheringCharacterModifiers.filter((entry) => {
+    return selectedSystemModifiers.filter((entry) => {
       if (attached.has(entry.id)) return false;
       const label = String(entry.label || '').toLowerCase();
       const id = String(entry.id || '').toLowerCase();
@@ -1240,7 +1347,7 @@
     const attached = new Set(
       (editingGatheringEvent?.characterModifiers || []).map((ref) => ref.modifierId).filter(Boolean)
     );
-    return selectedGatheringCharacterModifiers.filter((entry) => {
+    return selectedSystemModifiers.filter((entry) => {
       if (attached.has(entry.id)) return false;
       const label = String(entry.label || '').toLowerCase();
       const id = String(entry.id || '').toLowerCase();
@@ -1868,6 +1975,93 @@
   );
   const isCraftingRoute = $derived(isCraftingView(currentView));
   const activeCraftingTab = $derived(resolveActiveCraftingTab(currentView));
+
+  // ── The Checks rail GROUP (issue 1096) ───────────────────────────────────────────────
+  //
+  // `Checks` was one flat rail button holding four tabs; it is an expandable group whose
+  // children are routes, exactly like the Gathering group above.
+  //
+  // The badges are a DRAFT PREVIEW: readiness is evaluated against the live drafts the GM
+  // is editing, so a badge clears the moment the edit that clears it is made rather than
+  // when it is saved. The ENABLE gate is a different question and reads committed state —
+  // see the Validation hero, which says so rather than claiming "Ready to enable" for
+  // unsaved work.
+  const checksDraftSystem = $derived({
+    modifiers: selectedSystem?.modifiers || [],
+    craftingCheck: selectedSystem?.craftingCheck || {},
+    salvageCraftingCheck: selectedSystem?.salvageCraftingCheck || {},
+    gatheringCraftingCheck: selectedSystem?.gatheringCraftingCheck || {},
+  });
+  // ONE slot per activity decides BOTH halves of every badge: which draft is evaluated, and
+  // which rules it is evaluated under. Two derivations answered those two questions before
+  // (issue 1096) and disagreed for alchemy at `checkMode: 'tiered'` — the badge evaluated the
+  // untouched SIMPLE draft under ROUTED rules, so it hid criticals the Validation route
+  // reported, breaking the invariant that the dot, the badge and Validation cannot disagree.
+  const salvageCheckSlot = $derived(
+    resolveActiveSalvageCheckFormula({
+      salvageResolutionMode,
+      salvageCraftingCheck: {
+        simple: salvageSimpleDraft,
+        routed: salvageRoutedDraft,
+        progressive: salvageProgressiveDraft,
+      },
+    }).slot
+  );
+  const gatheringCheckSlot = $derived(
+    resolveActiveGatheringCheckFormula(
+      {
+        gatheringCraftingCheck: {
+          progressive: gatheringProgressiveDraft,
+          routed: gatheringRoutedDraft,
+        },
+      },
+      gatheringResolutionMode
+    ).slot
+  );
+  function draftForSlot(slot, drafts) {
+    return slot ? (drafts[slot] ?? null) : null;
+  }
+  function checksIssueCount(activity, slot, drafts) {
+    return evaluateCheckReadiness(draftForSlot(slot, drafts) || {}, {
+      mode: readinessModeForSlot(slot),
+      modifierContext: buildCheckModifierContext(checksDraftSystem, activity, null),
+      activity,
+    }).issues.length;
+  }
+  const checksIssueCounts = $derived({
+    crafting: checksIssueCount('crafting', craftingCheckMode, {
+      simple: checkSimpleDraft,
+      routed: checkRoutedDraft,
+      progressive: checkProgressiveDraft,
+    }),
+    salvage: checksIssueCount('salvage', salvageCheckSlot, {
+      simple: salvageSimpleDraft,
+      routed: salvageRoutedDraft,
+      progressive: salvageProgressiveDraft,
+    }),
+    gathering: checksIssueCount('gathering', gatheringCheckSlot, {
+      progressive: gatheringProgressiveDraft,
+      routed: gatheringRoutedDraft,
+    }),
+  });
+  const checksNavArgs = $derived({
+    features: selectedSystem?.features || {},
+    resolutionMode: selectedSystem?.resolutionMode || 'simple',
+    salvageResolutionMode,
+    gatheringResolutionMode,
+    issueCounts: checksIssueCounts,
+    dirtyActivities: {
+      crafting: craftingCheckDirty,
+      salvage: salvageCheckDirty,
+      gathering: gatheringCheckDirty,
+    },
+  });
+  const checksNavItems = $derived(buildChecksNavItems(checksNavArgs));
+  // The PARENT badge sums the three ACTIVITY children only. Validation's badge is that
+  // same total restated, so adding it in would report every issue twice.
+  const checksNavCount = $derived(checksNavIssueTotal(checksNavItems));
+  const isChecksRoute = $derived(isChecksView(currentView));
+  const checksActiveTab = $derived(resolveActiveChecksTab(currentView) || 'crafting');
   // The Knowledge surface's projection is published TOP-LEVEL, never hung off
   // `selectedSystem` (issue 785): hanging it there would force a `selectedSystem`
   // reference rebuild on every knowledge publish and let a late phase-2 publish
@@ -2185,6 +2379,11 @@
   });
 
   $effect(() => {
+    if (!isChecksRoute || checksMenuExpanded) return;
+    checksMenuExpanded = true;
+  });
+
+  $effect(() => {
     if (!canShowEnvironments) {
       selectedGatheringTaskId = '';
       selectedGatheringDropId = '';
@@ -2459,6 +2658,16 @@
   }
 
   function normalizedActiveView(view, system, environmentsAvailable, essencesAvailable) {
+    // `checks` is RETAINED as a redirect to the first available child (issue 1096), so
+    // existing deep links, the salvage editor's "Manage presets" link and every View Lab
+    // `expectView: 'checks'` still have a defined answer after the split. The target is
+    // resolved from the same nav model the rail renders, so "first available" cannot mean
+    // two different things.
+    if (system && view === 'checks') return resolveChecksRedirect(checksNavArgs);
+    // A child whose feature was switched off while it was open falls back to the same
+    // redirect rather than rendering a route the rail no longer offers.
+    if (system && CHECKS_VIEWS.includes(view) && !checksNavItems.some((item) => item.view === view))
+      return resolveChecksRedirect(checksNavArgs);
     // The standalone `system-overview` route was folded into the `system-edit`
     // page's Validation tab; a stale value (no system selected) falls through to
     // the `systems` library here.
@@ -2539,7 +2748,13 @@
     if (currentView === 'tools') return text('FABRICATE.Admin.Manager.Tools.Title', 'Tools');
     if (currentView === 'tool-edit')
       return text('FABRICATE.Admin.Manager.Tools.EditTitle', 'Edit Tool');
-    if (currentView === 'checks') return text('FABRICATE.Admin.Manager.Checks.Title', 'Checks');
+    // Written as a LOOKUP over four whole keys rather than one interpolated template ending
+    // at the `Checks` segment: `tests/lang-keys-no-orphans.test.js` credits an interpolation
+    // base as a covering PREFIX over its whole subtree, so that single template would have
+    // silently un-orphaned every dead key under the Checks namespace — including the
+    // nineteen this repo tracks deliberately in `tests/lang-known-orphans.js`. The scan reads
+    // COMMENTS too, so this note must not spell that prefix out either.
+    if (isChecksRoute) return text(CHECKS_ROUTE_TITLE_KEYS[checksActiveTab], 'Checks');
     if (currentView === 'environments')
       return text('FABRICATE.Admin.Manager.Environment.Title', 'Environments');
     if (currentView === 'environment-edit')
@@ -2646,7 +2861,7 @@
         'FABRICATE.Admin.Manager.Tools.EditSubtitle',
         'Configure Tool identity, breakage, requirements, and validation.'
       );
-    if (currentView === 'checks')
+    if (isChecksRoute)
       return text(
         'FABRICATE.Admin.Manager.Checks.Subtitle',
         'Configure how crafting, salvage, and gathering attempts are checked for the selected crafting system.'
@@ -2724,8 +2939,7 @@
       return text('FABRICATE.Admin.Manager.Tools.Actions', 'Tools actions');
     if (currentView === 'knowledge')
       return text('FABRICATE.Admin.Manager.Knowledge.Actions', 'Knowledge actions');
-    if (currentView === 'checks')
-      return text('FABRICATE.Admin.Manager.Checks.Actions', 'Checks actions');
+    if (isChecksRoute) return text('FABRICATE.Admin.Manager.Checks.Actions', 'Checks actions');
     if (
       currentView === 'environments' ||
       currentView === 'environment-edit' ||
@@ -3090,11 +3304,71 @@
     const toolsResult = confirmToolsRouteExit(nextView);
     if (isPromise(toolsResult)) {
       return toolsResult.then((value) =>
-        value === false ? false : confirmSystemDetailsRouteExit(nextView)
+        value === false ? false : continueRouteExitAfterChecks(nextView)
       );
     }
     if (toolsResult === false) return false;
+    return continueRouteExitAfterChecks(nextView);
+  }
+
+  function continueRouteExitAfterChecks(nextView) {
+    const checksResult = confirmChecksRouteExit(nextView);
+    if (isPromise(checksResult)) {
+      return checksResult.then((value) =>
+        value === false ? false : confirmSystemDetailsRouteExit(nextView)
+      );
+    }
+    if (checksResult === false) return false;
     return confirmSystemDetailsRouteExit(nextView);
+  }
+
+  /** Reset every check draft to its last saved baseline. */
+  function discardChecksDrafts() {
+    checkRoutedDraft = cloneRoutedCheck(checkRoutedBaseline);
+    checkSimpleDraft = cloneSimpleCheck(checkSimpleBaseline);
+    checkProgressiveDraft = cloneProgressiveCheck(checkProgressiveBaseline);
+    salvageSimpleDraft = cloneSimpleCheck(salvageSimpleBaseline);
+    salvageRoutedDraft = cloneRoutedCheck(salvageRoutedBaseline);
+    salvageProgressiveDraft = cloneProgressiveCheck(salvageProgressiveBaseline);
+    gatheringProgressiveDraft = cloneProgressiveCheck(gatheringProgressiveBaseline);
+    gatheringRoutedDraft = cloneRoutedCheck(gatheringRoutedBaseline);
+  }
+
+  async function finishChecksRouteExit(action) {
+    if (action === 'save') {
+      // Navigation is gated on the SAVE, exactly as the essence and system-details guards
+      // gate theirs: a Save that did not land leaves the GM on the studio with the edit
+      // still in front of them, rather than navigating away from work nothing persisted.
+      return await saveChecks();
+    }
+    if (action === 'discard' || action === true) {
+      discardChecksDrafts();
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * The Checks Studio's route-exit prompt (issue 1096).
+   *
+   * Navigating BETWEEN Checks children never prompts: the drafts live above the route, so
+   * moving from Crafting to Salvage and back preserves them. Leaving the studio for a
+   * non-Checks route with any activity dirty raises the three-way prompt, which names the
+   * dirty activities — the GM may be standing on Gathering while the unsaved edit is on
+   * Crafting.
+   */
+  function confirmChecksRouteExit(nextView) {
+    if (!isChecksRoute || isChecksView(nextView)) return true;
+    if (!checksDirty) return true;
+    const names = checksDirtyActivities.map((activity) =>
+      text(
+        `FABRICATE.Admin.Manager.Checks.Tabs.${activity[0].toUpperCase()}${activity.slice(1)}`,
+        activity
+      )
+    );
+    const confirmation = store?.confirmDiscardDirtyChecksDraft?.(names);
+    if (isPromise(confirmation)) return confirmation.then(finishChecksRouteExit);
+    return finishChecksRouteExit(confirmation);
   }
 
   function surfaceToolsSaveValidationError() {
@@ -3146,6 +3420,7 @@
         view === 'tools' ||
         view === 'tool-edit' ||
         view === 'checks' ||
+        isChecksView(view) ||
         view === 'knowledge') &&
       !selectedSystem
     )
@@ -3243,6 +3518,18 @@
     });
   }
 
+  // Open the System Overview page on its Settings tab with the Modifiers section expanded
+  // and scrolled to (issue 1117). It goes through the SAME route-exit guard every other
+  // navigation here does, so leaving a dirty Checks draft still prompts.
+  function showSystemModifiers() {
+    if (!selectedSystem) return;
+    afterTruthyResult(confirmRouteExit('system-edit'), () => {
+      requestSystemTab('settings');
+      requestedSystemModifierSectionNonce += 1;
+      activeView = 'system-edit';
+    });
+  }
+
   // The standalone overview route was folded into the System Overview page's
   // Validation tab. Anything that asked for the old overview now opens this page
   // with the Validation tab active.
@@ -3300,6 +3587,35 @@
     const id = target.targetId(issue);
     if (!id) return;
     target.open(id);
+  }
+
+  // "{count} issue" / "{count} issues" — the badge must NAME its unit, because a bare
+  // numeral in this column is the record count every other rail entry renders there.
+  const CHECKS_ROUTE_TITLE_KEYS = {
+    crafting: 'FABRICATE.Admin.Manager.Checks.Crafting.PageTitle',
+    salvage: 'FABRICATE.Admin.Manager.Checks.Salvage.PageTitle',
+    gathering: 'FABRICATE.Admin.Manager.Checks.Gathering.PageTitle',
+    validation: 'FABRICATE.Admin.Manager.Checks.Validation.Title',
+  };
+
+  function checksIssueName(count) {
+    const key = count === 1 ? 'IssueCountOne' : 'IssueCountOther';
+    const fallback = count === 1 ? '{count} issue' : '{count} issues';
+    return text(`FABRICATE.Admin.Manager.Checks.Sections.${key}`, fallback).replace(
+      '{count}',
+      String(count)
+    );
+  }
+
+  function toggleChecksMenu() {
+    checksMenuExpanded = !checksMenuExpanded;
+  }
+
+  // Activating the PARENT opens the group and routes to the first available child, which is
+  // what makes the retained `checks` id a redirect rather than a dead route.
+  function activateChecksParent() {
+    checksMenuExpanded = true;
+    setView(resolveChecksRedirect(checksNavArgs));
   }
 
   function backToSystemsBrowser() {
@@ -6057,9 +6373,16 @@
                 text('FABRICATE.Admin.Manager.Tools.Untitled', 'Untitled tool')}</span
             >
           {/if}
-          {#if currentView === 'checks'}
+          {#if isChecksRoute}
             <i class="fas fa-chevron-right" aria-hidden="true"></i>
             <span>{text('FABRICATE.Admin.Manager.Nav.Checks', 'Checks')}</span>
+            <i class="fas fa-chevron-right" aria-hidden="true"></i>
+            <span
+              >{text(
+                `FABRICATE.Admin.Manager.Checks.Tabs.${checksActiveTab[0].toUpperCase()}${checksActiveTab.slice(1)}`,
+                checksActiveTab
+              )}</span
+            >
           {/if}
           {#if currentView === 'system-edit'}
             <i class="fas fa-chevron-right" aria-hidden="true"></i>
@@ -6255,7 +6578,7 @@
             />
           {:else if currentView === 'tags'}
             <!-- no header actions for the tags view -->
-          {:else if currentView === 'checks'}
+          {:else if isChecksRoute}
             {#if checksDirty}
               <Chip tone="warning">{text('FABRICATE.Admin.Manager.Checks.Dirty', 'Unsaved')}</Chip>
             {/if}
@@ -6268,7 +6591,7 @@
             >
               <i class={checksSaving ? 'fas fa-spinner fa-spin' : 'fas fa-save'} aria-hidden="true"
               ></i>
-              <span>{text('FABRICATE.Admin.Manager.Checks.Save', 'Save check')}</span>
+              <span>{text('FABRICATE.Admin.Manager.Checks.Save', 'Save checks')}</span>
             </button>
           {:else if currentView === 'essences'}
             <button type="button" class="manager-button is-primary" onclick={createEssenceDraft}>
@@ -6857,17 +7180,95 @@
             >
             <span class="manager-nav-count">{toolsNavCount}</span>
           </button>
-          <button
-            type="button"
-            class={`manager-nav-button ${currentView === 'checks' ? 'is-active' : ''}`}
-            aria-current={currentView === 'checks' ? 'page' : undefined}
-            onclick={() => setView('checks')}
-          >
-            <i class="fas fa-dice-d20" aria-hidden="true"></i>
-            <span class="manager-nav-label"
-              >{text('FABRICATE.Admin.Manager.Nav.Checks', 'Checks')}</span
+          <div class={`manager-nav-group ${checksMenuExpanded ? 'is-expanded' : ''}`}>
+            <button
+              type="button"
+              class={`manager-nav-button manager-nav-parent ${isChecksRoute ? 'is-active' : ''}`}
+              id="manager-nav-checks"
+              aria-current={isChecksRoute ? 'page' : undefined}
+              aria-expanded={checksMenuExpanded}
+              onclick={activateChecksParent}
             >
-          </button>
+              <i class="fas fa-dice-d20" aria-hidden="true"></i>
+              <span class="manager-nav-label"
+                >{text('FABRICATE.Admin.Manager.Nav.Checks', 'Checks')}</span
+              >
+              <!-- The parent badge is an ISSUE COUNT, not a record count, so it wears the
+                   pill treatment and names its unit. A collapsed rail still renders it —
+                   that is the only signal left when the children are hidden. -->
+              {#if checksNavCount > 0}
+                <span
+                  class="manager-nav-issue-badge"
+                  data-checks-nav-issues="checks"
+                  role="img"
+                  aria-label={checksIssueName(checksNavCount)}>{checksNavCount}</span
+                >
+              {/if}
+            </button>
+            <button
+              type="button"
+              class="manager-nav-toggle"
+              aria-label={checksMenuExpanded
+                ? text('FABRICATE.Admin.Manager.Nav.CollapseChecks', 'Collapse checks menu')
+                : text('FABRICATE.Admin.Manager.Nav.ExpandChecks', 'Expand checks menu')}
+              aria-controls="manager-checks-submenu"
+              aria-expanded={checksMenuExpanded}
+              onclick={toggleChecksMenu}
+            >
+              <i
+                class={checksMenuExpanded ? 'fas fa-chevron-up' : 'fas fa-chevron-down'}
+                aria-hidden="true"
+              ></i>
+            </button>
+            {#if checksMenuExpanded}
+              <div
+                class="manager-nav-submenu"
+                id="manager-checks-submenu"
+                aria-label={text('FABRICATE.Admin.Manager.Checks.Tabs.Label', 'Checks sections')}
+              >
+                {#each checksNavItems as checksItem (checksItem.id)}
+                  <button
+                    type="button"
+                    class={`manager-nav-subitem ${currentView === checksItem.view ? 'is-active' : ''}`}
+                    id={`manager-checks-nav-${checksItem.id}`}
+                    data-checks-nav-item={checksItem.id}
+                    aria-current={currentView === checksItem.view ? 'page' : undefined}
+                    onclick={() => setView(checksItem.view)}
+                  >
+                    <i class={checksItem.icon} aria-hidden="true"></i>
+                    <span class="manager-nav-label"
+                      >{text(checksItem.labelKey, checksItem.labelFallback)}</span
+                    >
+                    <!-- THREE distinguishable markers can land in this column, and they must
+                         not be confusable: a record-count numeral (`.manager-nav-count`,
+                         which Checks never has), an ISSUE badge (a pill naming its unit),
+                         and an UNSAVED marker (a different SHAPE with its own name, not the
+                         same dot in another colour). -->
+                    {#if checksItem.dirty}
+                      <span
+                        class="manager-nav-dirty-marker"
+                        data-checks-nav-dirty={checksItem.id}
+                        role="img"
+                        aria-label={text(
+                          'FABRICATE.Admin.Manager.Checks.Nav.Unsaved',
+                          'Unsaved changes'
+                        )}
+                      ></span>
+                    {/if}
+                    {#if checksItem.issueCount > 0}
+                      <span
+                        class="manager-nav-issue-badge"
+                        data-checks-nav-issues={checksItem.id}
+                        role="img"
+                        aria-label={checksIssueName(checksItem.issueCount)}
+                        >{checksItem.issueCount}</span
+                      >
+                    {/if}
+                  </button>
+                {/each}
+              </div>
+            {/if}
+          </div>
           {#if canShowEnvironments}
             <div class={`manager-nav-group ${gatheringMenuExpanded ? 'is-expanded' : ''}`}>
               <button
@@ -7074,20 +7475,27 @@
           />
         </section>
       </main>
-    {:else if currentView === 'checks' && selectedSystem}
+    {:else if isChecksRoute && selectedSystem}
       <main
         class="manager-main manager-environment-edit-main"
         aria-label={text('FABRICATE.Admin.Manager.Checks.Title', 'Checks')}
       >
-        <section class="manager-environment-editor-shell">
+        <!-- `data-checks-shell` drops the shared editor shell's 12px padding for this route
+             only (issue 1096). The prototype's studio runs edge to edge inside the app
+             window and puts every inset on the pane itself; the shell's padding, the
+             workspace gap and the panel's own inset were stacking into dead space at the
+             body's edges. Marked on the SHELL rather than styled from a descendant, because
+             the padding belongs to the shell and a child cannot remove it. -->
+        <section class="manager-environment-editor-shell" data-checks-shell>
           <ChecksView
+            {foundrySystemId}
             resolutionMode={selectedSystem?.resolutionMode || 'simple'}
             alchemyCheckMode={selectedSystem?.alchemy?.checkMode || 'none'}
             craftingCheck={checkRoutedDraft}
             craftingCheckSimple={checkSimpleDraft}
             craftingCheckProgressive={checkProgressiveDraft}
             craftingConsumption={selectedSystem?.craftingCheck?.consumption || null}
-            checkModifiers={selectedSystem?.checkModifiers || []}
+            modifiers={selectedSystem?.modifiers || []}
             craftingDefaultModifierPolicy={selectedSystem?.craftingCheck?.defaultModifierPolicy ||
               'addAll'}
             craftingDefaultModifierIds={selectedSystem?.craftingCheck?.defaultModifierIds || []}
@@ -7117,6 +7525,11 @@
             breakageAuthority={selectedSystem?.toolBreakage?.authority || 'toolSpecific'}
             features={selectedSystem?.features || {}}
             activation={checkActivation}
+            activity={checksActiveTab}
+            requestedSection={checksActiveSection}
+            requestedSectionNonce={checksSectionRequestNonce}
+            dirty={checksDirty}
+            dirtyActivities={checksDirtyActivities}
             {onUpdateCraftingCheck}
             {onUpdateCraftingCheckSimple}
             {onUpdateCraftingCheckProgressive}
@@ -7131,9 +7544,12 @@
             onUpdateSalvageCheckModifiers={(patch) => store.saveSalvageCheckModifiers?.(patch)}
             onUpdateGatheringCheckModifiers={(patch) => store.saveGatheringCheckModifiers?.(patch)}
             {onUpdateAlchemyFlags}
-            onTabChange={(tab) => {
-              checksActiveTab = tab;
+            onOpenActivity={(activity, section) => {
+              checksActiveSection = section || 'roll';
+              checksSectionRequestNonce += 1;
+              setView(`checks-${activity}`);
             }}
+            onOpenModifierLibrary={showSystemModifiers}
             {onToggleCheckActive}
           />
         </section>
@@ -7151,8 +7567,8 @@
         biomeOptions={gatheringVocabularyOptions('biomes')}
         selectedDropId={selectedGatheringDrop?.id || selectedGatheringDropId}
         rewardRules={selectedGatheringRules}
-        characterModifierLibrary={selectedGatheringCharacterModifiers}
-        checkModifierOptions={selectedSystem?.checkModifiers || []}
+        characterModifierLibrary={selectedSystemModifiers}
+        checkModifierOptions={selectedSystem?.modifiers || []}
         gatheringModifierPolicy={selectedSystem?.gatheringCraftingCheck?.defaultModifierPolicy ||
           'addAll'}
         gatheringModifierMaxPicks={selectedSystem?.gatheringCraftingCheck?.maxModifierPicks ?? null}
@@ -7291,7 +7707,7 @@
           {salvageOutcomeNames}
           {salvageCheckEnabled}
           {salvageCheckTiers}
-          checkModifierOptions={selectedSystem?.checkModifiers || []}
+          checkModifierOptions={selectedSystem?.modifiers || []}
           salvageModifierPolicy={selectedSystem?.salvageCraftingCheck?.defaultModifierPolicy ||
             'addAll'}
           salvageModifierMaxPicks={selectedSystem?.salvageCraftingCheck?.maxModifierPicks ?? null}
@@ -7368,7 +7784,7 @@
         itemTags={selectedSystem?.itemTags || []}
         checkTierOptions={recipeCheckTierOptions}
         minSuccessTierOptions={recipeMinSuccessTierOptions}
-        craftingModifierOptions={selectedSystem?.checkModifiers || []}
+        craftingModifierOptions={selectedSystem?.modifiers || []}
         craftingModifierPolicy={selectedSystem?.craftingCheck?.defaultModifierPolicy || 'addAll'}
         craftingModifierDefaultIds={selectedSystem?.craftingCheck?.defaultModifierIds || []}
         craftingModifierMaxPicks={selectedSystem?.craftingCheck?.maxModifierPicks ?? null}
@@ -7498,13 +7914,15 @@
             }}
             reseedNonce={systemDetailsReseedNonce}
             onToggleFeature={(storeKey, checked) => store.toggleFeature?.(storeKey, checked)}
-            characterModifierLibrary={selectedGatheringCharacterModifiers}
-            {characterModifierPresetsSupported}
-            {onAddCharacterModifier}
-            {onUpdateCharacterModifier}
-            {onDeleteCharacterModifier}
-            {onReorderCharacterModifier}
-            {onSeedCharacterModifierPresets}
+            modifierLibrary={selectedSystemModifiers}
+            modifierPresetsSupported={characterModifierPresetsSupported}
+            {foundrySystemId}
+            onAddModifier={onAddCharacterModifier}
+            onUpdateModifier={onUpdateCharacterModifier}
+            onDeleteModifier={onDeleteCharacterModifier}
+            onReorderModifier={onReorderCharacterModifier}
+            onSeedModifierPresets={onSeedCharacterModifierPresets}
+            requestedSectionNonce={requestedSystemModifierSectionNonce}
             characterPrerequisiteLibrary={selectedCharacterPrerequisites}
             {characterPrerequisitePresetsSupported}
             {onAddCharacterPrerequisite}
@@ -7562,7 +7980,7 @@
          `knowledge` joined it in issue 785 for the opposite reason: the surface OWNS
          its third column (roster · detail), so a fourth would clip the detail pane's
          action cluster at the 1024px minimum with no scrollbar. -->
-    {#if currentView !== 'environment-edit' && currentView !== 'checks' && currentView !== 'system-edit' && currentView !== 'crafting-settings' && currentView !== 'recipe-item-edit' && currentView !== 'component-edit' && currentView !== 'recipe-edit' && currentView !== 'tool-edit' && currentView !== 'knowledge'}
+    {#if currentView !== 'environment-edit' && !isChecksRoute && currentView !== 'system-edit' && currentView !== 'crafting-settings' && currentView !== 'recipe-item-edit' && currentView !== 'component-edit' && currentView !== 'recipe-edit' && currentView !== 'tool-edit' && currentView !== 'knowledge'}
       <aside class="manager-inspector" aria-label={inspectorLabel()}>
         {#if currentView === 'tags' && selectedSystem}
           <section class="manager-inspector-card" data-tags-evidence="at-a-glance">
@@ -8151,8 +8569,8 @@
                                 'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.AddSearchLabel',
                                 'Search character modifiers to add'
                               )}
-                              disabled={selectedGatheringCharacterModifiers.length === 0}
-                              data-tooltip={selectedGatheringCharacterModifiers.length === 0
+                              disabled={selectedSystemModifiers.length === 0}
+                              data-tooltip={selectedSystemModifiers.length === 0
                                 ? text(
                                     'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.LibraryEmptyHint',
                                     'Add a modifier to the system library first to reference it here.'
@@ -8560,8 +8978,8 @@
                             'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.AddSearchLabel',
                             'Search character modifiers to add'
                           )}
-                          disabled={selectedGatheringCharacterModifiers.length === 0}
-                          data-tooltip={selectedGatheringCharacterModifiers.length === 0
+                          disabled={selectedSystemModifiers.length === 0}
+                          data-tooltip={selectedSystemModifiers.length === 0
                             ? text(
                                 'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.LibraryEmptyHint',
                                 'Add a modifier to the system library first to reference it here.'

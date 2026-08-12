@@ -86,10 +86,12 @@ import {
 } from '../../../systems/currencyProfile.js';
 import {
   authoredCheckModifierIds,
+  isRollExpression,
   normalizeModifierPolicy,
   resolveActiveCraftingCheckFormula,
   resolveActiveGatheringCheckFormula,
   resolveActiveSalvageCheckFormula,
+  resolveModifierBounds,
 } from '../../../systems/checkModifierResolver.js';
 import { validateDropRows } from '../../../systems/GatheringEnvironmentStore.js';
 import { evaluateEnvironmentMatch } from '../../../systems/gatheringMatch.js';
@@ -907,17 +909,40 @@ const GATHERING_CHARACTER_MODIFIER_OPERATORS = new Set(['+', '-']);
 // modifier.
 const GATHERING_DROP_MODIFIER_MODES = new Set(['additive', 'multiplicative']);
 
-function _normalizeGatheringCharacterModifier(entry = {}, randomID = _fallbackRandomID) {
+/**
+ * Normalize ONE entry of the unified system modifier library (issue 1117) on the WRITE
+ * path, before it is handed to `updateSystem`.
+ *
+ * This is the store's mirror of `CraftingSystemManager._normalizeModifierLibrary`, which
+ * re-normalizes every write anyway. It exists so an entry the store has just constructed
+ * (an added row, a preset, a patched row) is already the right shape when the projection
+ * re-reads it, not to be the authority — the manager is.
+ *
+ * `min` and `max` are ABSENCE-PRESERVING and are the reason this cannot be written with
+ * `||` or a bare `Number()`: `Number(null)`, `Number('')` and `Number([])` are all `0`,
+ * and `0` is a REAL bound, so a loose coercion would MINT a bound of 0 every time the
+ * editor cleared one. `isRollExpression` is derived rather than read, so a patch cannot
+ * contradict the expression beside it.
+ *
+ * @param {object} entry Raw entry.
+ * @returns {object|null} Normalized entry, or null when it has no usable id.
+ */
+function _normalizeSystemModifier(entry = {}) {
   if (!entry || typeof entry !== 'object') return null;
   const id = entry.id ? String(entry.id) : '';
   if (!id) return null;
   const expression = String(entry.expression ?? '').trim();
-  return {
+  const normalized = {
     id,
-    label: String(entry.label || id),
+    label: String(entry.label ?? '') || id,
     icon: String(entry.icon || 'fa-solid fa-user'),
     expression,
+    isRollExpression: isRollExpression(expression),
   };
+  const { min, max } = resolveModifierBounds(entry);
+  if (min !== null) normalized.min = min;
+  if (max !== null) normalized.max = max;
+  return normalized;
 }
 
 function _normalizeGatheringCharacterModifierReferences(refs, randomID = _fallbackRandomID) {
@@ -1283,12 +1308,10 @@ function _normalizeGatheringConfig(raw = {}, randomID = _fallbackRandomID) {
           ? systemConfig.hazards
           : []
       ).map((event) => _normalizeGatheringEvent(event, randomID)),
-      characterModifiers: (Array.isArray(systemConfig?.characterModifiers)
-        ? systemConfig.characterModifiers
-        : []
-      )
-        .map((entry) => _normalizeGatheringCharacterModifier(entry, randomID))
-        .filter(Boolean),
+      // `characterModifiers` is DELIBERATELY absent (issue 1117): the library moved onto
+      // the crafting system and is projected as `selectedSystem.modifiers` above. This
+      // projection is an allowlist, so omitting the key is what makes the old location
+      // invisible rather than merely stale.
       // Preserve the economy block (stamina/nodes limitation flags + stamina
       // config) so views can read the active flags reactively. Owned/normalized
       // by the service.
@@ -2710,14 +2733,15 @@ function _buildSelectedSystemViewData(
       // longer here: it moved to the system level and is projected below.
       ..._buildCheckModifierSelectionView(selectedSystem.craftingCheck, selectedSystem, 'crafting'),
     },
-    // The ONE system-level check-modifier catalogue (issue 1095). This hand-built
-    // projection is an ALLOWLIST: a field omitted here is INVISIBLE to the UI, however
-    // correctly the normalizer and the write path behave — so without this line the
-    // catalogue editor, all three eligibility pickers and the recipe override control all
-    // read empty. It moved out of `craftingCheck` because salvage and gathering now select
-    // over the same entries.
-    checkModifiers: Array.isArray(selectedSystem.checkModifiers)
-      ? selectedSystem.checkModifiers.map((modifier) => _clonePlain(modifier))
+    // The ONE system-level modifier library (issue 1117). This hand-built projection is an
+    // ALLOWLIST: a field omitted here is INVISIBLE to the UI, however correctly the
+    // normalizer and the write path behave — so without this line the library editor, all
+    // three eligibility pickers, the recipe override control AND every gathering drop-row,
+    // event and stamina-cost modifier picker all read empty. It absorbed both the
+    // check-modifier catalogue (`system.checkModifiers`) and the gathering character-
+    // modifier library (`gatheringConfig.systems[id].characterModifiers`).
+    modifiers: Array.isArray(selectedSystem.modifiers)
+      ? selectedSystem.modifiers.map((modifier) => _clonePlain(modifier))
       : [],
     // Tool-breakage authority (issue 419): surfaced so the Tools page and the
     // check editors can read it back (NOT projected before → invisible to the UI).
@@ -3357,14 +3381,39 @@ export function createAdminStore(services) {
     }
   }
 
-  async function _confirmDiscardDirtyDraft(contentKey, contentFallback) {
+  /**
+   * The ONE route-exit prompt shape, shared by every Svelte-layer draft kind.
+   *
+   * It returns `'save' | 'discard' | 'cancel'` BY CONSTRUCTION — including on the
+   * no-`choiceDialog` fallback path, which returns `'discard' | 'cancel'` — so a caller
+   * built on it gets the three-way "save and continue / discard / cancel" prompt without
+   * choosing to. The boolean `confirmDiscardDirtyToolsDraft` above is the one prompt that
+   * does NOT use this helper, and it must not be copied.
+   *
+   * `replacements` (issue 1096) substitutes `{name}` placeholders into the resolved
+   * content. It exists because a prompt that says "the checks have unsaved changes" cannot
+   * tell a GM standing on Gathering that the unsaved edit is on Crafting — and this prompt
+   * is the last thing they see before that edit is discarded. Substitution happens after
+   * localization, so a translated string carries the same slots.
+   *
+   * @param {string} contentKey
+   * @param {string} contentFallback
+   * @param {Record<string, string>} [replacements]
+   * @returns {Promise<'save'|'discard'|'cancel'>}
+   */
+  async function _confirmDiscardDirtyDraft(contentKey, contentFallback, replacements = {}) {
     const localizeFn = services.localize;
+    const _content = () =>
+      Object.entries(replacements).reduce(
+        (text, [token, value]) => text.replaceAll(`{${token}}`, value),
+        localizeFn?.(contentKey) || contentFallback
+      );
     if (typeof services.choiceDialog !== 'function') {
       // Fall back to the two-way confirm when no three-way dialog is available.
       const confirmed = await services.confirmDialog?.({
         title:
           localizeFn?.('FABRICATE.Admin.Manager.DiscardDirtyTitle') || 'Discard unsaved changes?',
-        content: `<p>${localizeFn?.(contentKey) || contentFallback}</p>`,
+        content: `<p>${_content()}</p>`,
         yes: {
           label: localizeFn?.('FABRICATE.Admin.Manager.DiscardDirtyConfirm') || 'Discard Changes',
           callback: () => true,
@@ -3379,7 +3428,7 @@ export function createAdminStore(services) {
     const action = await services.choiceDialog({
       title:
         localizeFn?.('FABRICATE.Admin.Manager.NavigationDirty.Title') || 'Save unsaved changes?',
-      content: `<p>${localizeFn?.(contentKey) || contentFallback}</p>`,
+      content: `<p>${_content()}</p>`,
       choices: [
         {
           action: 'save',
@@ -3430,6 +3479,28 @@ export function createAdminStore(services) {
     return _confirmDiscardDirtyDraft(
       'FABRICATE.Admin.Manager.SystemEdit.DiscardDirtyContent',
       'The system details have unsaved changes. Save them and continue, or discard them?'
+    );
+  }
+
+  /**
+   * Route-exit prompt for the GM Checks Studio (issue 1096).
+   *
+   * The four activity drafts live ABOVE the four routes, so leaving the studio while any of
+   * them is dirty is one decision about all of them — which is why there is one prompt
+   * rather than three, and why it NAMES the dirty activities: the GM may be standing on
+   * Gathering while the unsaved edit is on Crafting, and a prompt that only said "the
+   * checks" would discard work on a route they never opened.
+   *
+   * Built on the shared helper, so it is the three-way variant by construction.
+   *
+   * @param {string[]} [activities] Localized names of the dirty activities.
+   * @returns {Promise<'save'|'discard'|'cancel'>}
+   */
+  function confirmDiscardDirtyChecksDraft(activities = []) {
+    return _confirmDiscardDirtyDraft(
+      'FABRICATE.Admin.Manager.Checks.DiscardDirtyContent',
+      'These checks have unsaved changes: {activities}. Save them and continue, or discard them?',
+      { activities: activities.join(', ') }
     );
   }
 
@@ -8015,133 +8086,141 @@ export function createAdminStore(services) {
   }
 
   /**
-   * Append a new character modifier entry to the selected system's library.
-   * Returns the normalized entry, or null when the system has no gathering
-   * shell or the proposed id already exists.
+   * Read the selected system's ONE modifier library (issue 1117), or `null` when the
+   * system cannot be resolved.
+   *
+   * Every write below goes through `updateSystem`, which SHALLOW-MERGES the top level, so
+   * a `modifiers` write replaces the whole array wholesale — removing an entry persists
+   * with no `-=` deletion key — while every sibling top-level field is left alone. That is
+   * why these five ops no longer touch the gathering config at all: the library is not
+   * there any more, and a write through `_saveGatheringConfig` would target a key the
+   * gathering normalizer no longer emits.
+   *
+   * @param {string} systemId Target crafting system id.
+   * @returns {{ manager: object, system: object, library: Array<object> }|null}
+   */
+  function _systemModifierContext(systemId) {
+    const systemManager = services.getCraftingSystemManager();
+    const system = systemId ? systemManager?.getSystem?.(systemId) : null;
+    if (!system) return null;
+    return {
+      manager: systemManager,
+      system,
+      library: Array.isArray(system.modifiers) ? system.modifiers : [],
+    };
+  }
+
+  /**
+   * Persist a whole replacement modifier library for one system and re-project.
+   *
+   * @param {string} systemId Target crafting system id.
+   * @param {object} manager The crafting system manager.
+   * @param {Array<object>} next The replacement library.
+   * @returns {Promise<void>}
+   */
+  async function _saveSystemModifierLibrary(systemId, manager, next) {
+    await manager.updateSystem(systemId, { modifiers: next });
+    await refresh();
+  }
+
+  /**
+   * Append a new modifier entry to the selected system's library.
+   * Returns the normalized entry, or null when the system cannot be resolved
+   * or the proposed id already exists.
    *
    * @param {string} [systemId] Target crafting system id.
-   * @param {object} [partial] Partial entry (id, label, icon, expression).
+   * @param {object} [partial] Partial entry (id, label, icon, expression, min, max).
    * @returns {Promise<object|null>}
    */
-  async function addGatheringCharacterModifier(systemId = get(selectedSystemId), partial = {}) {
-    const config = _currentGatheringConfig();
-    const systemConfig = _gatheringSystemConfig(config, systemId);
-    if (!systemConfig) return null;
+  async function addSystemModifier(systemId = get(selectedSystemId), partial = {}) {
+    const context = _systemModifierContext(systemId);
+    if (!context) return null;
     const id = String(partial?.id || _randomID());
-    if ((systemConfig.characterModifiers || []).some((entry) => entry.id === id)) return null;
-    const entry = _normalizeGatheringCharacterModifier(
-      {
-        id,
-        label:
-          partial?.label ||
-          services.localize?.('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.NewLabel') ||
-          'Character modifier',
-        icon: partial?.icon || 'fa-solid fa-user',
-        expression: partial?.expression || '',
-      },
-      _randomID
-    );
+    if (context.library.some((entry) => entry.id === id)) return null;
+    const entry = _normalizeSystemModifier({
+      ...partial,
+      id,
+      label:
+        partial?.label ||
+        services.localize?.('FABRICATE.Admin.Manager.Modifiers.NewLabel') ||
+        'Modifier',
+      icon: partial?.icon || 'fa-solid fa-user',
+      expression: partial?.expression || '',
+    });
     if (!entry) return null;
-    systemConfig.characterModifiers = [...(systemConfig.characterModifiers || []), entry];
-    await _saveGatheringConfig(config);
-    await refresh();
+    await _saveSystemModifierLibrary(systemId, context.manager, [...context.library, entry]);
     return entry;
   }
 
   /**
-   * Update one library character modifier entry by id. Updates that fail
-   * normalization (e.g. no id) preserve the prior entry. Returns true when the
-   * library changed.
+   * Update one modifier entry by id. Updates that fail normalization (e.g. no id)
+   * preserve the prior entry. Returns true when the library changed.
    *
    * @param {string} [systemId] Target crafting system id.
    * @param {string} modifierId Library entry id.
    * @param {object} [updates] Partial replacement fields.
    * @returns {Promise<boolean>}
    */
-  async function updateGatheringCharacterModifier(
-    systemId = get(selectedSystemId),
-    modifierId,
-    updates = {}
-  ) {
-    const config = _currentGatheringConfig();
-    const systemConfig = _gatheringSystemConfig(config, systemId);
-    if (!systemConfig || !modifierId) return false;
-    const list = systemConfig.characterModifiers || [];
-    const next = list.map((entry) =>
-      entry.id === modifierId
-        ? _normalizeGatheringCharacterModifier({ ...entry, ...updates }, _randomID) || entry
-        : entry
+  async function updateSystemModifier(systemId = get(selectedSystemId), modifierId, updates = {}) {
+    const context = _systemModifierContext(systemId);
+    if (!context || !modifierId) return false;
+    const next = context.library.map((entry) =>
+      entry.id === modifierId ? _normalizeSystemModifier({ ...entry, ...updates }) || entry : entry
     );
-    if (next.length === list.length && next.every((entry, index) => entry === list[index]))
-      return false;
-    systemConfig.characterModifiers = next;
-    await _saveGatheringConfig(config);
-    await refresh();
+    if (next.every((entry, index) => entry === context.library[index])) return false;
+    await _saveSystemModifierLibrary(systemId, context.manager, next);
     return true;
   }
 
   /**
-   * Remove one library character modifier entry by id. Row references to the
-   * deleted id are intentionally left intact so the GM can repoint or remove
-   * them at authoring time (the runtime treats unresolved references as
-   * misconfiguration).
+   * Remove one modifier entry by id. References to the deleted id are intentionally left
+   * intact so the GM can repoint or remove them at authoring time (the gathering runtime
+   * treats an unresolved reference as misconfiguration, and the check normalizer drops a
+   * dangling `defaultModifierIds` entry on the next save).
    *
    * @param {string} [systemId] Target crafting system id.
    * @param {string} modifierId Library entry id to remove.
    * @returns {Promise<boolean>}
    */
-  async function deleteGatheringCharacterModifier(systemId = get(selectedSystemId), modifierId) {
-    const config = _currentGatheringConfig();
-    const systemConfig = _gatheringSystemConfig(config, systemId);
-    if (!systemConfig || !modifierId) return false;
-    const next = (systemConfig.characterModifiers || []).filter((entry) => entry.id !== modifierId);
-    if (next.length === (systemConfig.characterModifiers || []).length) return false;
-    systemConfig.characterModifiers = next;
-    await _saveGatheringConfig(config);
-    await refresh();
+  async function deleteSystemModifier(systemId = get(selectedSystemId), modifierId) {
+    const context = _systemModifierContext(systemId);
+    if (!context || !modifierId) return false;
+    const next = context.library.filter((entry) => entry.id !== modifierId);
+    if (next.length === context.library.length) return false;
+    await _saveSystemModifierLibrary(systemId, context.manager, next);
     return true;
   }
 
   /**
-   * Move one library character modifier from `fromIndex` to `toIndex` (issue
-   * 768). The array order IS the persisted order, so the reorder rewrites the
-   * gathering config's characterModifiers array in place and saves through the
-   * existing gathering-config path. Returns false on an invalid/no-op move.
+   * Move one modifier from `fromIndex` to `toIndex` (issue 768). The array order IS the
+   * persisted order. Returns false on an invalid/no-op move.
    *
    * @param {number} fromIndex Source position.
    * @param {number} toIndex Destination position.
    * @param {string} [systemId] Target crafting system id.
    * @returns {Promise<boolean>}
    */
-  async function reorderGatheringCharacterModifier(
-    fromIndex,
-    toIndex,
-    systemId = get(selectedSystemId)
-  ) {
-    const config = _currentGatheringConfig();
-    const systemConfig = _gatheringSystemConfig(config, systemId);
-    if (!systemConfig) return false;
-    const next = _reorderListByIndex(systemConfig.characterModifiers, fromIndex, toIndex);
+  async function reorderSystemModifier(fromIndex, toIndex, systemId = get(selectedSystemId)) {
+    const context = _systemModifierContext(systemId);
+    if (!context) return false;
+    const next = _reorderListByIndex(context.library, fromIndex, toIndex);
     if (!next) return false;
-    systemConfig.characterModifiers = next;
-    await _saveGatheringConfig(config);
-    await refresh();
+    await _saveSystemModifierLibrary(systemId, context.manager, next);
     return true;
   }
 
   /**
    * Idempotently seed the active Foundry game system's preset bundle into the
-   * selected crafting system's character modifier library. Existing ids are
-   * preserved; the return value identifies added vs. skipped presets and
-   * flags unsupported Foundry systems for the caller to surface to the GM.
+   * selected crafting system's modifier library. Existing ids are preserved; the
+   * return value identifies added vs. skipped presets and flags unsupported
+   * Foundry systems for the caller to surface to the GM.
    *
    * @param {string} [systemId] Target crafting system id.
    * @returns {Promise<{added: Array, skipped: Array, unsupported: boolean, foundrySystemId?: string}>}
    */
-  async function seedGatheringCharacterModifierPresets(systemId = get(selectedSystemId)) {
-    const config = _currentGatheringConfig();
-    const systemConfig = _gatheringSystemConfig(config, systemId);
-    if (!systemConfig) return { added: [], skipped: [], unsupported: true };
+  async function seedSystemModifierPresets(systemId = get(selectedSystemId)) {
+    const context = _systemModifierContext(systemId);
+    if (!context) return { added: [], skipped: [], unsupported: true };
     const foundrySystemId =
       typeof services.getFoundrySystemId === 'function'
         ? String(services.getFoundrySystemId() || '')
@@ -8152,21 +8231,21 @@ export function createAdminStore(services) {
     }
     const result = seedCharacterModifierPresets({
       presets,
-      currentLibrary: systemConfig.characterModifiers || [],
+      currentLibrary: context.library,
     });
-    systemConfig.characterModifiers = result.next
-      .map((entry) => _normalizeGatheringCharacterModifier(entry, _randomID))
-      .filter(Boolean);
-    await _saveGatheringConfig(config);
-    await refresh();
+    await _saveSystemModifierLibrary(
+      systemId,
+      context.manager,
+      result.next.map((entry) => _normalizeSystemModifier(entry)).filter(Boolean)
+    );
     return { added: result.added, skipped: result.skipped, unsupported: false, foundrySystemId };
   }
 
-  function _firstCharacterModifierId(systemConfig) {
-    const list = Array.isArray(systemConfig?.characterModifiers)
-      ? systemConfig.characterModifiers
-      : [];
-    return list[0]?.id || '';
+  // The default a freshly added reference points at. It reads the SYSTEM library (issue
+  // 1117), not the gathering config, which is why it takes a system id rather than the
+  // gathering `systemConfig` block its callers already hold.
+  function _firstCharacterModifierId(systemId) {
+    return _systemModifierContext(systemId)?.library?.[0]?.id || '';
   }
 
   function _updateDropRowOnTask(systemConfig, taskId, rowId, mutate) {
@@ -8211,7 +8290,7 @@ export function createAdminStore(services) {
     const systemConfig = _gatheringSystemConfig(config, systemId);
     if (!systemConfig || !taskId || !rowId) return null;
     const modifierId = String(
-      partial?.modifierId || _firstCharacterModifierId(systemConfig) || ''
+      partial?.modifierId || _firstCharacterModifierId(systemId) || ''
     ).trim();
     if (!modifierId) return null;
     let created = null;
@@ -8329,7 +8408,7 @@ export function createAdminStore(services) {
     const systemConfig = _gatheringSystemConfig(config, systemId);
     if (!systemConfig || !eventId) return null;
     const modifierId = String(
-      partial?.modifierId || _firstCharacterModifierId(systemConfig) || ''
+      partial?.modifierId || _firstCharacterModifierId(systemId) || ''
     ).trim();
     if (!modifierId) return null;
     const eventIndex = systemConfig.events.findIndex((event) => event.id === eventId);
@@ -8604,81 +8683,47 @@ export function createAdminStore(services) {
   }
 
   // Which system key each activity's check-modifier SELECTION is persisted under. The
-  // catalogue is not in here: it is top-level and shared (issue 1095).
+  // library is not in here: it is top-level and shared (issues 1095, 1117).
   const CHECK_MODIFIER_ACTIVITY_KEYS = {
     crafting: 'craftingCheck',
     salvage: 'salvageCraftingCheck',
     gathering: 'gatheringCraftingCheck',
   };
 
-  // Persist a check-modifier patch for ONE activity (issues 770, 1055, 1095).
+  // Persist one activity's check-modifier SELECTION (issues 770, 1055, 1095, 1117).
   //
-  // The patch may carry the system-level `checkModifiers` CATALOGUE, the activity's
-  // SELECTION keys (`defaultModifierPolicy`/`defaultModifierIds`/`maxModifierPicks`), or
-  // both — the catalogue card emits whichever the GM just touched. They are split here and
-  // written in ONE `updateSystem` call rather than two: a catalogue delete also drops the
-  // removed id from the default set, and two sequential writes would each re-read the
-  // system, so the second could be built from a pre-first snapshot.
+  // IT NO LONGER CARRIES THE LIBRARY. Until issue 1117 this also accepted a system-level
+  // `checkModifiers` array, because the Checks card authored the entries; the library now
+  // has ONE authoring surface (System settings > Modifiers, through
+  // `_saveSystemModifierLibrary` above) and the Checks card is selection-only. Keeping a
+  // second write path for the same array is exactly how two screens come to disagree about
+  // which wrote last, so the half was removed rather than left dormant.
   //
   // MUST spread the existing activity check block: `updateSystem` shallow-merges only the
   // top level, so a naive `{ craftingCheck: { defaultModifierIds } }` would drop every
   // sibling check field (simple/routed/progressive/consumption) which the normalizer then
-  // re-defaults (silent data loss). The catalogue is a TOP-LEVEL array, so it replaces
-  // wholesale and removing an entry persists without any `-=` deletion.
+  // re-defaults (silent data loss).
   //
-  // THE CATALOGUE HALF IS A KEY TEST **PLUS A VALUE GUARD**, and the reason is not the one
-  // an earlier draft of this comment gave. That draft claimed a truthiness test would read
-  // the card's delete-the-last-entry patch (`{checkModifiers: []}`) as "no catalogue here":
-  // that is simply WRONG on the JavaScript, because `[]` is truthy, and `if (checkModifiers)`
-  // takes the same branch on the same input. The key test and a truthiness test are
-  // UNDISCRIMINATED by construction over every patch this card emits, and no test can
-  // separate them — swapping one for the other leaves the whole suite green.
-  //
-  // `Object.hasOwn` is still the right DEFAULT for a patch-shaped API: presence of the key
-  // is what "this patch is about the catalogue" means, and a falsy-but-authored value
-  // (a future `0`-length sentinel, say) would be a value decision, not an absence.
-  //
-  // What DOES need guarding is the value, and only the key test makes that guard reachable.
-  // `saveSystemCheckModifiers` is exported with no in-repo caller, so `undefined` and `null`
-  // are reachable from the public surface — and either one written through `updateSystem`
-  // hits `_normalizeCheckModifierCatalogue`, whose `Array.isArray(catalogue) ? … : []`
-  // returns an EMPTY catalogue. That silently wipes every entry in the system, for all
-  // three activities at once, on a call that looks like a no-op. A non-array is therefore
-  // not written at all: refusing to persist a value this store cannot read is the same call
-  // `migrateSystemCheckModifierCatalogue` makes about a malformed legacy catalogue.
-  //
-  // `Object.keys(selection).length > 0` is the SELECTION half, and it is what carries a
-  // `maxModifierPicks: null` through: absence means UNLIMITED, so clearing the cap has to be
-  // able to overwrite a stored bound, and a `null` value with its key present is exactly the
-  // patch that does it.
-  //
-  // The empty-`update` early return is what makes a patch of NEITHER half a no-op rather
-  // than a write: without it, `updateSystem(sysId, {})` re-normalizes and re-persists the
-  // whole system — and `refresh()` re-projects it — for a patch that asked for nothing.
+  // `Object.keys(selection).length > 0` is what carries a `maxModifierPicks: null` through:
+  // absence means UNLIMITED, so clearing the cap has to be able to overwrite a stored
+  // bound, and a `null` value with its key present is exactly the patch that does it. It is
+  // also what makes an empty patch a no-op rather than a write: without it,
+  // `updateSystem(sysId, {})` re-normalizes and re-persists the whole system — and
+  // `refresh()` re-projects it — for a patch that asked for nothing.
   async function saveCheckModifiers(activity, patch = {}) {
     const systemManager = services.getCraftingSystemManager();
     const sysId = get(selectedSystemId);
     if (!sysId) return;
     const system = systemManager.getSystem(sysId);
     if (!system) return;
-    const { checkModifiers, ...selection } = patch;
-    const update = {};
-    if (Object.hasOwn(patch, 'checkModifiers') && Array.isArray(checkModifiers)) {
-      update.checkModifiers = checkModifiers;
-    }
     const activityKey = CHECK_MODIFIER_ACTIVITY_KEYS[activity];
-    if (activityKey && Object.keys(selection).length > 0) {
-      update[activityKey] = { ...(system[activityKey] || {}), ...selection };
-    }
-    if (Object.keys(update).length === 0) return;
-    await systemManager.updateSystem(sysId, update);
+    if (!activityKey || Object.keys(patch).length === 0) return;
+    await systemManager.updateSystem(sysId, {
+      [activityKey]: { ...(system[activityKey] || {}), ...patch },
+    });
     await refresh();
   }
 
-  // The system-level catalogue on its own — the one write that is not per-activity,
-  // because all three activities select over the same entries.
-  const saveSystemCheckModifiers = (checkModifiers) =>
-    saveCheckModifiers('crafting', { checkModifiers });
   const saveCraftingCheckModifiers = (patch) => saveCheckModifiers('crafting', patch);
   const saveSalvageCheckModifiers = (patch) => saveCheckModifiers('salvage', patch);
   const saveGatheringCheckModifiers = (patch) => saveCheckModifiers('gathering', patch);
@@ -9686,6 +9731,7 @@ export function createAdminStore(services) {
     confirmDiscardDirtyComponentDraft,
     confirmDiscardDirtyEssenceDraft,
     confirmDiscardDirtySystemDetailsDraft,
+    confirmDiscardDirtyChecksDraft,
     confirmDiscardDirtyRecipeDraft,
     confirmRecipeAction,
     confirmDiscardDirtyGatheringTaskDraft,
@@ -9771,11 +9817,11 @@ export function createAdminStore(services) {
     updateGatheringLibraryEvent,
     deleteGatheringLibraryEvent,
     duplicateGatheringLibraryEvent,
-    addGatheringCharacterModifier,
-    updateGatheringCharacterModifier,
-    deleteGatheringCharacterModifier,
-    reorderGatheringCharacterModifier,
-    seedGatheringCharacterModifierPresets,
+    addSystemModifier,
+    updateSystemModifier,
+    deleteSystemModifier,
+    reorderSystemModifier,
+    seedSystemModifierPresets,
     addCharacterPrerequisite,
     updateCharacterPrerequisite,
     deleteCharacterPrerequisite,
@@ -9793,7 +9839,6 @@ export function createAdminStore(services) {
     saveCraftingCheckActive,
     saveCraftingCheckConsumption,
     saveCraftingCheckModifiers,
-    saveSystemCheckModifiers,
     saveSalvageCheckModifiers,
     saveGatheringCheckModifiers,
     saveSalvageCheckActive,

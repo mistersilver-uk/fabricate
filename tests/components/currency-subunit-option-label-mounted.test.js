@@ -24,9 +24,22 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/fontAwesomeFreeClassicIcons.js',
     'src/ui/svelte/util/iconPickerPopover.js',
     'src/systems/characterPrerequisites.js',
+    // The expression suggestion chips' derivation (issue 1096) and the per-Foundry-system
+    // preset bundle it reads. Both are pure leaves; SystemEditView imports the first,
+    // which imports the second.
+    'src/config/modifierExpressionSuggestions.js',
+    'src/config/gatheringCharacterModifierPresets.js',
     // SystemEditView imports the pure copy-mapping helpers (issue 768); omitting it
     // HANGS this mount (reported as `# cancelled`).
-    'src/systems/characterModifierPrerequisiteCopy.js'
+    'src/systems/characterModifierPrerequisiteCopy.js',
+    // The unified modifier library's bounds pair and roll classification (issue 1117).
+    'src/systems/checkModifierResolver.js',
+    'src/systems/salvageCheckUsability.js',
+    'src/systems/toolCheckBonus.js',
+    'src/utils/checkModifierPicks.js',
+    'src/utils/craftingCheckExpression.js',
+    'src/utils/rollExpressionAverage.js',
+    'src/ui/svelte/components/stepperLabels.js'
   ],
   compiledModules: [
     // The manager's ONE chip (issue 883). A `.svelte` the tree renders but the
@@ -36,6 +49,13 @@ const harness = createMountedComponentHarness({
     // the harness omits HANGS the suite (# cancelled) rather than failing it.
     'src/ui/svelte/apps/manager/EmptyState.svelte',
     'src/ui/svelte/components/IconPicker.svelte',
+    // THE manager's labelled push-button (issue 1096). The Modifiers card and the Tool
+    // Studio header both render through it; an omission HANGS this suite rather than
+    // failing it.
+    'src/ui/svelte/components/ManagerButton.svelte',
+    // The Modifiers section's min/max pair and `@`-sigil expression field (issue 1117).
+    'src/ui/svelte/components/Stepper.svelte',
+    'src/ui/svelte/apps/manager/RollDataExpressionInput.svelte',
     'src/ui/svelte/apps/manager/system/SystemEditorTabs.svelte',
     'src/ui/svelte/apps/manager/system/CharacterPrerequisitesCard.svelte',
     'src/ui/svelte/apps/manager/SystemOverviewView.svelte',

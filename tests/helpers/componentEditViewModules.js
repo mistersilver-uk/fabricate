@@ -26,6 +26,7 @@ export const COMPONENT_EDIT_VIEW_RAW_MODULES = Object.freeze([
   'src/utils/checkModifierPicks.js',
   'src/systems/toolCheckBonus.js',
   'src/utils/craftingCheckExpression.js',
+  'src/utils/rollExpressionAverage.js',
   'src/ui/svelte/util/foundryBridge.js',
   // The ONE derivation of a `<Stepper>`'s three accessible names from its field label
   // (issue 1050); `ComponentEditView` reaches it through the salvage quantity and DC fields.

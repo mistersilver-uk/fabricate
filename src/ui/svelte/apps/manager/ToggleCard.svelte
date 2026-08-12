@@ -45,6 +45,12 @@
     // `data-recipe-locked-state`. Without it the retrofit hits the same wall on the
     // second card that `toggleTitle` clears on the first.
     subAttr = '',
+    // Attribute hook for the SWITCH, the exact counterpart of `subAttr` above and present for
+    // the same reason. `field` already stamps `data-recipe-field`, which reads as the recipe
+    // editor's own vocabulary; a caller outside that editor — the Checks Studio's per-trigger
+    // break-tools card (issue 1096) — needs to name its switch in its own. Absent when unset,
+    // so no existing consumer's markup moves.
+    toggleAttr = '',
     onToggle = () => {},
   } = $props();
 </script>
@@ -71,6 +77,7 @@
     aria-label={toggleLabel || title}
     title={toggleTitle || undefined}
     {disabled}
+    {...toggleAttr ? { [toggleAttr]: '' } : {}}
     onclick={() => onToggle(!on)}
   >
     <span class="manager-status-toggle-track" aria-hidden="true"

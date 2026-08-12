@@ -43,8 +43,8 @@ test('_normalizeCraftingCheck defaults an absent selection to addAll + no ids (b
   assert.deepEqual(result.defaultModifierIds, []);
 });
 
-test('_normalizeCheckModifierCatalogue normalizes entries, dropping malformed ones', () => {
-  const result = makeManager()._normalizeCheckModifierCatalogue([
+test('_normalizeModifierLibrary normalizes entries, dropping malformed ones', () => {
+  const result = makeManager()._normalizeModifierLibrary([
     { id: 'med', label: 'Medicine', expression: '  @abilities.med.mod  ', icon: 'fas fa-staff' },
     { id: '', label: 'no id', expression: '@x' },
     { label: 'missing id', expression: '@y' },
@@ -53,8 +53,17 @@ test('_normalizeCheckModifierCatalogue normalizes entries, dropping malformed on
     'not an object',
   ]);
   assert.deepEqual(result, [
-    { id: 'med', label: 'Medicine', expression: '@abilities.med.mod', icon: 'fas fa-staff' },
-    { id: 'bad', label: '', expression: '' },
+    {
+      id: 'med',
+      label: 'Medicine',
+      expression: '@abilities.med.mod',
+      isRollExpression: false,
+      icon: 'fas fa-staff',
+    },
+    // KEPT, not dropped (issue 1117). The gathering normalizer this replaces dropped an
+    // expression-less entry; the library now has an "Add modifier" button, and an entry that
+    // vanished on save the moment it was created would make that button look broken.
+    { id: 'bad', label: '', expression: '', isRollExpression: false },
   ]);
 });
 
@@ -62,31 +71,38 @@ test('_normalizeCheckModifierCatalogue normalizes entries, dropping malformed on
 // is: only a FINITE number is attached, so every unbounded FORM normalizes to the same
 // key-absent shape. `0` is a real bound and survives — which is why the guard cannot be
 // truthiness.
-test('_normalizeCheckModifierCatalogue attaches min/max only when authored', () => {
-  const [bounded, floored, capped, zeroed] = makeManager()._normalizeCheckModifierCatalogue([
+test('_normalizeModifierLibrary attaches min/max only when authored', () => {
+  const [bounded, floored, capped, zeroed] = makeManager()._normalizeModifierLibrary([
     { id: 'a', label: 'A', expression: '@a', min: -1, max: 5 },
     { id: 'b', label: 'B', expression: '@b', min: 2 },
     { id: 'c', label: 'C', expression: '@c', max: 3 },
     { id: 'd', label: 'D', expression: '@d', min: 0, max: 0 },
   ]);
-  assert.deepEqual(bounded, { id: 'a', label: 'A', expression: '@a', min: -1, max: 5 });
+  assert.deepEqual(bounded, {
+    id: 'a',
+    label: 'A',
+    expression: '@a',
+    isRollExpression: false,
+    min: -1,
+    max: 5,
+  });
   assert.equal(floored.min, 2);
   assert.equal(Object.hasOwn(floored, 'max'), false, 'an unauthored max stays absent');
   assert.equal(capped.max, 3);
   assert.equal(Object.hasOwn(capped, 'min'), false, 'an unauthored min stays absent');
   assert.deepEqual(
     zeroed,
-    { id: 'd', label: 'D', expression: '@d', min: 0, max: 0 },
+    { id: 'd', label: 'D', expression: '@d', isRollExpression: false, min: 0, max: 0 },
     'ZERO is a real bound: a truthiness guard would drop it and silently unbound the entry'
   );
 
   for (const junk of [null, undefined, '', NaN, Infinity, -Infinity, 'three', {}, []]) {
-    const [entry] = makeManager()._normalizeCheckModifierCatalogue([
+    const [entry] = makeManager()._normalizeModifierLibrary([
       { id: 'j', label: 'J', expression: '@j', min: junk, max: junk },
     ]);
     assert.deepEqual(
       entry,
-      { id: 'j', label: 'J', expression: '@j' },
+      { id: 'j', label: 'J', expression: '@j', isRollExpression: false },
       `${String(junk)} is not a bound, so BOTH keys stay absent`
     );
   }
@@ -94,8 +110,8 @@ test('_normalizeCheckModifierCatalogue attaches min/max only when authored', () 
 
 // An inverted pair is PRESERVED VERBATIM rather than repaired. It is a blocking readiness
 // issue the GM must fix; silently swapping the two would roll a number nobody authored.
-test('_normalizeCheckModifierCatalogue preserves an inverted min/max rather than reordering it', () => {
-  const [entry] = makeManager()._normalizeCheckModifierCatalogue([
+test('_normalizeModifierLibrary preserves an inverted min/max rather than reordering it', () => {
+  const [entry] = makeManager()._normalizeModifierLibrary([
     { id: 'a', label: 'A', expression: '@a', min: 5, max: -1 },
   ]);
   assert.equal(entry.min, 5);
@@ -106,7 +122,7 @@ test('the selection keeps only known policies + catalogue-valid default ids', ()
   const system = makeManager()._normalizeSystem({
     id: 's',
     name: 'S',
-    checkModifiers: [
+    modifiers: [
       { id: 'med', label: 'Medicine', expression: '@med' },
       { id: 'alch', label: 'Alchemy', expression: '@alch' },
     ],
@@ -130,7 +146,7 @@ test('all THREE activity checks emit the same selection triple over the system c
   const system = makeManager()._normalizeSystem({
     id: 's',
     name: 'S',
-    checkModifiers: [
+    modifiers: [
       { id: 'med', label: 'Medicine', expression: '@med' },
       { id: 'alch', label: 'Alchemy', expression: '@alch' },
     ],
@@ -217,14 +233,20 @@ test('the modifier card fallbacks match lang/en.json exactly', () => {
     'label + description pairs across the three activity-independent combination rules'
   );
   // SUBJECT_COPY: FOUR key/literal pairs per activity, on THREE activities (issue 1095) —
-  // the per-activity `bySubject` label, its description, its pick-cap hint and its
-  // eligibility intro. Twelve sentences that would otherwise drift one at a time, plus the
-  // three activity-independent eligibility intros that share the `introKey`/`intro` shape.
+  // the per-activity `bySubject` label, its description, its pick-cap hint and the card
+  // DESCRIPTION it shows under that rule. Twelve sentences that would otherwise drift one at
+  // a time, plus the three activity-independent card descriptions that share the shape.
+  //
+  // `leadKey`/`lead` since issue 1096's parity round: that sentence used to be a paragraph of
+  // its own above the rows (`introKey`/`intro`) and is now the card's description, in the
+  // head, because that is where the prototype states it and what it states is rule-keyed.
+  // `bySubject`'s entry in `ELIGIBILITY_COPY` is deliberately EMPTY — the sentence is
+  // per-activity there, so it comes out of `SUBJECT_COPY` — which is why this is 6 and not 7.
   for (const [keyProp, valueProp, expected] of [
     ['labelKey', 'label', 3],
     ['descKey', 'desc', 3],
     ['capKey', 'cap', 3],
-    ['introKey', 'intro', 6],
+    ['leadKey', 'lead', 6],
   ]) {
     assertMirrored(
       [
@@ -244,10 +266,13 @@ test('the modifier card fallbacks match lang/en.json exactly', () => {
   // NOT_ELIGIBLE_COPY tables.
   assertMirrored(
     [...source.matchAll(/\bkey:\s*'([^']+)',\s*(?:label|fallback):\s*'((?:[^'\\]|\\.)*)'/g)],
-    11,
-    'the playerPicks cap hint, the two surviving inert-cause sentences, the four ON ' +
-      'eligibility words, and the FOUR OFF ones — one per rule, because "Not applied" is ' +
-      'the negation of `Applied` and of nothing else'
+    12,
+    'the playerPicks cap hint, the three inert-cause sentences, the four ON ' +
+      'eligibility words, and the four OFF ones — one ENTRY per rule, because "Not applied" ' +
+      'is the negation of `Applied` and of nothing else. Four entries, THREE distinct keys ' +
+      'since issue 1096: the two rules that defer the selection share `Selectable`, because ' +
+      'the rule cards beside them say "the modifiers you mark selectable" in the prototype’s ' +
+      'own words'
   );
   // Everything else the card localizes INLINE, through `text(key, fallback)` — the empty
   // state's two branches, the two bounds faults, the read-only link, the field captions.
@@ -411,35 +436,41 @@ test('_normalizeSystem preserves cap absence, and an authored cap, through a who
 });
 
 // THE OTHER END OF THE MIGRATION'S LOAD-BEARING ORDERING.
-// `migrateSystemCheckModifierCatalogue`'s header names the exact failure this pins: because
-// `_normalizeSystem` is an ALLOWLIST REBUILD with no `...system` spread, a catalogue key it
+// `migrateUnifyModifierLibraries`'s header names the exact failure this pins: because
+// `_normalizeSystem` is an ALLOWLIST REBUILD with no `...system` spread, a library key it
 // does not emit is DELETED on the next save — silently, with no error and nothing
 // recoverable. The migration is defended by its own suite; the normalizer holding the other
-// end was not, and deleting the one-word `checkModifiers,` emit left the entire suite green
-// while every GM's next system save destroyed their catalogue.
-test('_normalizeSystem carries the SYSTEM catalogue through a whole rebuild, bounds and all', () => {
+// end was not, and deleting the one-word `modifiers,` emit left the entire suite green
+// while every GM's next system save destroyed their library.
+test('_normalizeSystem carries the SYSTEM library through a whole rebuild, bounds and all', () => {
   const manager = makeManager();
   const catalogue = [
     {
       id: 'med',
       label: 'Medicine',
       expression: '@abilities.med.mod',
+      isRollExpression: false,
       icon: 'fas fa-staff',
       min: -1,
       max: 5,
     },
-    { id: 'alch', label: 'Alchemy', expression: '@abilities.alch.mod' },
+    {
+      id: 'alch',
+      label: 'Alchemy',
+      expression: '@abilities.alch.mod',
+      isRollExpression: false,
+    },
   ];
   const created = manager._normalizeSystem({
     id: 'sys-cat',
     name: 'S',
-    checkModifiers: catalogue,
+    modifiers: catalogue,
     craftingCheck: { defaultModifierPolicy: 'addAll', defaultModifierIds: ['med', 'alch'] },
     salvageCraftingCheck: { defaultModifierPolicy: 'highest', defaultModifierIds: ['med'] },
     gatheringCraftingCheck: { defaultModifierPolicy: 'bySubject', defaultModifierIds: ['alch'] },
   });
   assert.deepEqual(
-    created.checkModifiers,
+    created.modifiers,
     catalogue,
     'the entries survive the rebuild, and the bounded one keeps BOTH bounds'
   );
@@ -447,7 +478,7 @@ test('_normalizeSystem carries the SYSTEM catalogue through a whole rebuild, bou
   // already-normalized system, so a dropped key survives the first pass on the caller's
   // input and disappears on the round-trip.
   const resaved = manager._normalizeSystem(created);
-  assert.deepEqual(resaved.checkModifiers, catalogue, 'and they survive a re-save of it');
+  assert.deepEqual(resaved.modifiers, catalogue, 'and they survive a re-save of it');
   // The blast radius, stated separately: `validCatalogueIds` is derived from the catalogue,
   // so losing it does not merely lose the entries — every activity's default set is filtered
   // against an empty catalogue and emptied too, on all three checks at once.

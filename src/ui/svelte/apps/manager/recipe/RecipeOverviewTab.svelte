@@ -71,7 +71,7 @@
     // auto-hides everywhere else.
     minSuccessTierOptions = [],
     // Per-recipe crafting-check modifier SELECTION (issue 770, reshaped by issue 1055).
-    // `craftingModifierOptions` is the system's `checkModifiers` catalogue ({id,label});
+    // `craftingModifierOptions` is the system's unified `modifiers` library ({id,label});
     // an empty catalogue hides the whole surface. `craftingModifierDefaultIds` is the
     // system's default eligible set, which the Inherit state NAMES rather than describes
     // abstractly.

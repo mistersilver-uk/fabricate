@@ -518,22 +518,72 @@ export const VIEW_LAB_CASES = Object.freeze([
     id: 'manager-system-edit-lists',
     label: 'Manager — System edit lists',
     smokeLabels: ['manager-system-edit-lists'],
-    // The three settings-list cards together — Character modifiers, Character prerequisites and
+    // The three settings-list cards together — Modifiers, Character prerequisites and
     // Currency Units — with one modifier open and its IconPicker down, and the Currency Units
-    // section collapsed to show whole-section collapse. That needs ONE system carrying all three,
-    // and herbalism is the only one that can: the modifiers card is gated on `gathering`, which
-    // Runework (the currency system) does not have.
+    // section collapsed to show whole-section collapse. Herbalism carries all three and is
+    // the system whose Modifiers library the checks screens select over. (The card is no
+    // longer gated on `gathering`, per issue 1117 — it now holds every CHECK modifier too —
+    // but herbalism remains the fixture with a populated library.)
     reaches: 'exact',
     query: { system: 'lab-herbalism' },
     steps: [
       'System Overview',
       { selector: '#system-tab-settings' },
       { selector: '[data-section-collapse="currency"]' },
-      { selector: '[data-system-character-modifier] [data-toggle-character-modifier]' },
-      { selector: '[data-system-character-modifier] .essence-icon-picker-trigger' },
-      { selector: '[data-system-character-modifiers]', scroll: true },
+      { selector: '[data-system-modifier] [data-toggle-modifier]' },
+      { selector: '[data-system-modifier] .essence-icon-picker-trigger' },
+      // Anchored on the card's TITLE, not the card. `scrollIntoViewIfNeeded` lands an
+      // over-tall element's BOTTOM edge, and issue 1117 made this section taller (a bounds
+      // row and its hint per open entry), which pushed the renamed "Modifiers" heading off
+      // the top of the frame. The title anchors it from the top instead — the same fix the
+      // checks-entries case records for the same cause.
+      { selector: '[data-system-modifiers] .manager-card-title', scroll: true },
     ],
     expectView: 'system-edit',
+    // THE ONE AUTHORING SURFACE (issue 1117), asserted on the fields it ABSORBED from the retired
+    // Checks-tab editor rather than only on the section it already had: the open row's `min`
+    // Stepper is what proves the check-only bounds pair reached this card, and it is the only
+    // frame in the registry that can show it now that no Checks route authors an entry.
+    // `hb-mod-medicine` is the world's only BOUNDED entry, so this frame carries real values
+    // rather than two `Unbounded` placeholders.
+    expectSelector:
+      '.fabricate-manager [data-system-modifiers]' +
+      ':has([data-system-modifier-bounds] [data-system-modifier-field="min"])',
+    position: { width: 1280, height: 980 },
+    kinds: ['manager', 'system-edit'],
+    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/SystemEditView\.svelte$/],
+  }),
+  managerCase({
+    id: 'manager-system-edit-modifier-rolls',
+    label: 'Manager — System edit rolling modifier',
+    // BEYOND the smoke: the walk opens no modifier entry at all, and `manager-system-edit-lists`
+    // opens the FIRST one, which is flat. Nothing anywhere framed a rolling entry.
+    reaches: 'beyond',
+    smokeLabels: [],
+    // THE STATE ISSUE 1118 CREATES. A check accepts dice now, so `hb-mod-luck` (`1d4`, capped at
+    // +3) is a first-class entry rather than one the surface warns about: the row's "Rolls dice"
+    // chip is neutral, the open editor's roll note says the dice reach the check's own roll and
+    // that a competing rule ranks the entry by its average, and the bounds pair beside it clamps
+    // the ROLLED result. The retired copy said the opposite of all three, so this frame is the
+    // one place the reversal is visible.
+    //
+    // Anchored on the OPEN ROW rather than on the card title: the note and the bounds pair are
+    // what this frame exists for, and `manager-system-edit-lists` already frames the card from
+    // its heading.
+    query: { system: 'lab-herbalism' },
+    steps: [
+      'System Overview',
+      { selector: '#system-tab-settings' },
+      { selector: '[data-section-collapse="currency"]' },
+      { selector: '[data-system-modifier="hb-mod-luck"] [data-toggle-modifier]' },
+      { selector: '[data-system-modifier="hb-mod-luck"]', scroll: true },
+    ],
+    expectView: 'system-edit',
+    // The roll NOTE keyed to this entry is the assertion, because it is the element the retired
+    // rule's copy occupied and the only one that cannot render if the note is dropped.
+    expectSelector:
+      '.fabricate-manager [data-system-modifiers]' +
+      ':has([data-system-modifier-roll-note="hb-mod-luck"])',
     position: { width: 1280, height: 980 },
     kinds: ['manager', 'system-edit'],
     sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/SystemEditView\.svelte$/],
@@ -642,7 +692,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     query: {},
     steps: [
       'Checks',
-      { selector: '#checks-tab-crafting' },
+      { selector: '#manager-checks-nav-crafting' },
       { selector: '[data-check-roll-formula]', fill: '' },
       // The Checks view is a STAGED editor: typing only marks the draft dirty, and the browser's
       // check pills read the PERSISTED system. Without this the case cleared the field, navigated
@@ -1032,7 +1082,8 @@ export const VIEW_LAB_CASES = Object.freeze([
     query: { system: 'lab-herbalism' },
     steps: [
       'Checks',
-      { selector: '#checks-tab-crafting' },
+      { selector: '#manager-checks-nav-crafting' },
+      { selector: '#checks-section-modifiers' },
       { selector: '[data-crafting-modifier-policy-option="bySubject"] input' },
       'Crafting',
       { selector: '[data-recipe-edit="hb-r-kiln"]' },
@@ -1082,7 +1133,8 @@ export const VIEW_LAB_CASES = Object.freeze([
     query: { system: 'lab-herbalism' },
     steps: [
       'Checks',
-      { selector: '#checks-tab-crafting' },
+      { selector: '#manager-checks-nav-crafting' },
+      { selector: '#checks-section-modifiers' },
       { selector: '[data-crafting-modifier-policy-option="bySubject"] input' },
       { selector: '[data-crafting-modifier-max-picks-input]', fill: '' },
       'Crafting',
@@ -1123,7 +1175,8 @@ export const VIEW_LAB_CASES = Object.freeze([
     query: { system: 'lab-herbalism' },
     steps: [
       'Checks',
-      { selector: '#checks-tab-crafting' },
+      { selector: '#manager-checks-nav-crafting' },
+      { selector: '#checks-section-modifiers' },
       { selector: '[data-crafting-modifier-policy-option="bySubject"] input' },
       { selector: '[data-crafting-modifier-max-picks-input]', fill: '5' },
       'Crafting',
@@ -1149,7 +1202,8 @@ export const VIEW_LAB_CASES = Object.freeze([
     query: { system: 'lab-herbalism' },
     steps: [
       'Checks',
-      { selector: '#checks-tab-crafting' },
+      { selector: '#manager-checks-nav-crafting' },
+      { selector: '#checks-section-modifiers' },
       { selector: '[data-crafting-modifier-policy-option="bySubject"] input' },
       { selector: '[data-crafting-modifier-max-picks-input]', fill: '3' },
       'Crafting',
@@ -1228,13 +1282,14 @@ export const VIEW_LAB_CASES = Object.freeze([
     query: { system: 'lab-herbalism' },
     steps: [
       'Checks',
-      { selector: '#checks-tab-crafting' },
+      { selector: '#manager-checks-nav-crafting' },
       // Clearing the field reaches `noFormula`: a check slot that exists and rolls nothing.
       { selector: '[data-check-roll-formula]', fill: '' },
       { selector: '[data-checks-save]' },
+      { selector: '#checks-section-modifiers' },
       { selector: '[data-crafting-modifier-inert]', scroll: true },
     ],
-    expectView: 'checks',
+    expectView: 'checks-crafting',
     // The CAUSE, not just the notice. Both causes render through the same element with the
     // same chrome, so a presence-only assertion would photograph the wrong sentence.
     expectSelector: '.fabricate-manager [data-crafting-modifier-inert="noFormula"]',
@@ -1262,8 +1317,13 @@ export const VIEW_LAB_CASES = Object.freeze([
     query: { system: 'lab-herbalism' },
     steps: [
       'Checks',
-      { selector: '#checks-tab-crafting' },
+      { selector: '#manager-checks-nav-crafting' },
+      { selector: '#checks-section-modifiers' },
       { selector: '[data-crafting-modifier-policy-option="bySubject"] input' },
+      // Back to The roll to clear the formula: the field and the catalogue it makes inert
+      // are two SECTIONS apart now (issue 1096), and a step that stayed on Modifiers would
+      // find no formula field and abort the case.
+      { selector: '#checks-section-roll' },
       { selector: '[data-check-roll-formula]', fill: '' },
       { selector: '[data-checks-save]' },
       'Crafting',
@@ -1770,8 +1830,8 @@ export const VIEW_LAB_CASES = Object.freeze([
     smokeLabels: ['manager-checks-gathering'],
     reaches: 'exact',
     query: {},
-    steps: ['Checks', { selector: '#checks-tab-gathering' }],
-    expectView: 'checks',
+    steps: ['Checks', { selector: '#manager-checks-nav-gathering' }],
+    expectView: 'checks-gathering',
     kinds: ['manager', 'checks'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/checks\//,
@@ -1784,8 +1844,8 @@ export const VIEW_LAB_CASES = Object.freeze([
     smokeLabels: ['manager-checks-validation'],
     reaches: 'exact',
     query: {},
-    steps: ['Checks', { selector: '#checks-tab-validation' }],
-    expectView: 'checks',
+    steps: ['Checks', { selector: '#manager-checks-nav-validation' }],
+    expectView: 'checks-validation',
     kinds: ['manager', 'checks'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/checks\//,
@@ -1811,14 +1871,14 @@ export const VIEW_LAB_CASES = Object.freeze([
     query: { system: 'lab-herbalism' },
     steps: [
       'Checks',
-      { selector: '#checks-tab-crafting' },
+      { selector: '#manager-checks-nav-crafting' },
       // A placement the shim REFUSES, so the whole formula is discarded: critical, not the
       // ignorable warning an additive placement raises.
       { selector: '[data-check-roll-formula]', fill: '1d20 * @craftingmod' },
-      { selector: '#checks-tab-validation' },
+      { selector: '#manager-checks-nav-validation' },
       { selector: '[data-issue="retiredPlaceholderBreaksFormula"]', scroll: true },
     ],
-    expectView: 'checks',
+    expectView: 'checks-validation',
     // The CRITICAL id specifically. A presence-only assertion would be satisfied by the
     // warning, which is the other half of the split and says the opposite thing.
     expectSelector: '.fabricate-manager [data-issue="retiredPlaceholderBreaksFormula"]',
@@ -1828,14 +1888,139 @@ export const VIEW_LAB_CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/.*Check/,
     ],
   }),
+  // ── The GM Checks Studio IA (issue 1096) ──────────────────────────────────────────────
+  //
+  // Six states the old four-tab surface had no shape for, and every one of them is a claim
+  // this change makes that only a photograph settles.
+  managerCase({
+    id: 'manager-checks-rail-group',
+    label: 'Manager — Checks rail group expanded',
+    reaches: 'beyond',
+    smokeLabels: [],
+    // Jewelry is the system whose SALVAGE is routed with no authored check, so salvage
+    // carries a real readiness issue: the parent badge, the salvage child badge and the
+    // Validation child badge are all visible together, which is the whole rule the frame
+    // has to settle (the parent sums the ACTIVITY children only, and Validation restates
+    // that total rather than adding to it).
+    query: { system: 'lab-jewelry' },
+    steps: ['Checks'],
+    expectView: 'checks-crafting',
+    expectSelector: '.fabricate-manager [data-checks-nav-issues="checks"]',
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/checks\//,
+      /^src\/ui\/svelte\/apps\/manager\/.*Check/,
+    ],
+    kinds: ['manager', 'checks'],
+  }),
+  managerCase({
+    id: 'manager-checks-rail-dirty',
+    label: 'Manager — Checks rail dirty marker beside an issue badge',
+    reaches: 'beyond',
+    smokeLabels: [],
+    // THE THREE-MARKER COLUMN. An unsaved edit is staged on Crafting, then the GM moves to
+    // Salvage — so the rail shows a DIRTY marker on a route they are not standing on, an
+    // ISSUE badge on another, and the record-count numerals of every non-Checks entry above.
+    // The drafts living above the route is what makes this state reachable at all; under the
+    // old per-tab model the edit would have been abandoned by the move.
+    query: { system: 'lab-jewelry' },
+    steps: [
+      'Checks',
+      { selector: '#manager-checks-nav-crafting' },
+      { selector: '[data-check-roll-formula]', fill: '1d20 + @prof + 2' },
+      { selector: '#manager-checks-nav-salvage' },
+    ],
+    expectView: 'checks-salvage',
+    expectSelector: '.fabricate-manager [data-checks-nav-dirty="crafting"]',
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/checks\//,
+      /^src\/ui\/svelte\/apps\/manager\/.*Check/,
+    ],
+    kinds: ['manager', 'checks'],
+  }),
+  managerCase({
+    id: 'manager-checks-section-badged-and-dotted',
+    label: 'Manager — Checks section with a count AND a warning dot',
+    reaches: 'beyond',
+    smokeLabels: [],
+    // No frame in the prototype shows a section carrying BOTH markers, and they occupy the
+    // same slot, so this is the one that proves they do not collide. Runework is routed by
+    // check with THREE authored tiers — the count the header badge reads — and blanking the
+    // first one's NAME raises `unnamedOutcome`, which buckets to Outcomes, the section that
+    // already carries the tier count.
+    //
+    // The tier it blanks is the TOP one, so this frame's strongest band is captioned with
+    // nothing. That is correct for what this case photographs and wrong for anything about
+    // band NAMES: `coverage-mode-routed-check-checks` is the frame that shows those.
+    query: { system: 'lab-runework' },
+    steps: [
+      'Checks',
+      { selector: '#manager-checks-nav-crafting' },
+      { selector: '#checks-section-outcomes' },
+      { selector: '[data-outcome-name]', fill: '' },
+    ],
+    expectView: 'checks-crafting',
+    expectSelector: '.fabricate-manager [data-checks-section-dot="outcomes"]',
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/checks\//,
+      /^src\/ui\/svelte\/apps\/manager\/.*Check/,
+    ],
+    kinds: ['manager', 'checks'],
+  }),
+  managerCase({
+    id: 'manager-checks-off',
+    label: 'Manager — Checks crafting switched off',
+    reaches: 'beyond',
+    smokeLabels: [],
+    // Reached by TURNING THE CHECK OFF rather than by a fixture whose check is already off:
+    // every lab system authors an enabled check, and a seventh system carrying a disabled one
+    // would change the system count every other manager frame is composed against. Jewelry's
+    // `routedByIngredients` check is the optional one, so its rail toggle is live.
+    query: { system: 'lab-jewelry' },
+    steps: [
+      'Checks',
+      { selector: '#manager-checks-nav-crafting' },
+      { selector: '[data-checks-active-toggle]' },
+    ],
+    expectView: 'checks-crafting',
+    expectSelector: '.fabricate-manager [data-checks-off-empty]',
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/checks\//,
+      /^src\/ui\/svelte\/apps\/manager\/.*Check/,
+    ],
+    kinds: ['manager', 'checks'],
+  }),
+  managerCase({
+    id: 'manager-checks-stacked-floor',
+    label: 'Manager — Checks stacked at the declared floor',
+    reaches: 'beyond',
+    smokeLabels: [],
+    // THE 1024x640 DECLARED FLOOR, and it is STACKED there rather than a side rail: the
+    // shipped `fabricate-manager` container ladder restacks `.manager-body` to one column at
+    // 1120, so at the floor every panel is reached by scrolling the body. An acceptance that
+    // described a side rail at this width would have been read as a defect in the frame.
+    query: { system: 'lab-runework' },
+    steps: ['Checks', { selector: '#manager-checks-nav-crafting' }],
+    expectView: 'checks-crafting',
+    expectSelector: '.fabricate-manager [data-checks-rail="crafting"]',
+    position: { width: 1024, height: 640 },
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/checks\//,
+      /^src\/ui\/svelte\/apps\/manager\/.*Check/,
+    ],
+    kinds: ['manager', 'checks', 'responsive'],
+  }),
   managerCase({
     id: 'manager-checks-crafting-consumption',
     label: 'Manager — Checks crafting consumption',
     smokeLabels: ['manager-checks-crafting-consumption'],
     reaches: 'exact',
     query: {},
-    steps: ['Checks', { selector: '#checks-tab-crafting' }],
-    expectView: 'checks',
+    steps: [
+      'Checks',
+      { selector: '#manager-checks-nav-crafting' },
+      { selector: '#checks-section-on-failure' },
+    ],
+    expectView: 'checks-crafting',
     kinds: ['manager', 'checks'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/checks\//,
@@ -1874,7 +2059,8 @@ export const VIEW_LAB_CASES = Object.freeze([
     query: { system: 'lab-herbalism' },
     steps: [
       'Checks',
-      { selector: '#checks-tab-crafting' },
+      { selector: '#manager-checks-nav-crafting' },
+      { selector: '#checks-section-modifiers' },
       { selector: '[data-crafting-modifier-max-picks-input]', fill: '' },
       // RE-ANCHORED (issue 1095 review). `[data-crafting-modifier-defaults]` was the anchor while
       // it was the pill row directly under "Default modifiers"; this change turned it into the
@@ -1893,14 +2079,20 @@ export const VIEW_LAB_CASES = Object.freeze([
       // the entry editor's own frame.
       { selector: '[data-crafting-modifier-max-picks]', scroll: true },
     ],
-    expectView: 'checks',
-    // Two things at once, on the one card. `bySubject` is the FOURTH option — the one the redesign
-    // restored, the one that makes the row count even, and the only one whose absence would
-    // silently turn the 2x2 this frame is evidence for back into a three-across row. The
-    // `unlimited` cap reading is the other half, and asserting the VALUE rather than the field's
-    // presence is what separates this frame from its bounded sibling.
+    expectView: 'checks-crafting',
+    // Two things at once, on the one card — and that card is `How they combine`, which issue
+    // 1096's parity round split out of the catalogue card. This selector named
+    // `[data-crafting-modifier-catalogue]`, which is now the LIBRARY card and contains neither
+    // the rule grid nor the cap: left alone it would match nothing, and a registry selector
+    // that matches nothing fails the capture job whole and publishes NO frames at all.
+    //
+    // `bySubject` is the FOURTH option — the one the redesign restored, the one that makes the
+    // row count even, and the only one whose absence would silently turn the 2x2 this frame is
+    // evidence for back into a three-across row. The `unlimited` cap reading is the other half,
+    // and asserting the VALUE rather than the field's presence is what separates this frame
+    // from its bounded sibling.
     expectSelector:
-      '.fabricate-manager [data-crafting-modifier-catalogue]' +
+      '.fabricate-manager [data-crafting-modifier-policy-card]' +
       ':has([data-crafting-modifier-policy-option="bySubject"])' +
       ':has([data-crafting-modifier-max-picks="unlimited"])',
     kinds: ['manager', 'checks'],
@@ -1927,7 +2119,8 @@ export const VIEW_LAB_CASES = Object.freeze([
     query: { system: 'lab-herbalism' },
     steps: [
       'Checks',
-      { selector: '#checks-tab-crafting' },
+      { selector: '#manager-checks-nav-crafting' },
+      { selector: '#checks-section-modifiers' },
       { selector: '[data-crafting-modifier-policy-option="bySubject"] input' },
       { selector: '[data-crafting-modifier-max-picks-input]', fill: '1' },
       // The CAP FIELD, which is this case's whole subject and the card's last element, so the
@@ -1937,7 +2130,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       // The entries have their own case (`manager-checks-crafting-modifier-entries`).
       { selector: '[data-crafting-modifier-max-picks]', scroll: true },
     ],
-    expectView: 'checks',
+    expectView: 'checks-crafting',
     // The VALUE, not the presence of a field: a fill that silently did not land leaves the field
     // rendered and blank, which is the sibling frame published under this name.
     expectSelector: '.fabricate-manager [data-crafting-modifier-max-picks="1"]',
@@ -1954,45 +2147,54 @@ export const VIEW_LAB_CASES = Object.freeze([
     // two sibling cases above frame the rule grid and the cap rather than the entries.
     reaches: 'beyond',
     smokeLabels: [],
-    // THE ENTRY EDITOR, which is what actually grew in issue 1095 and what its siblings can no
-    // longer show: a row is now icon + label, expression + delete, a `min`/`max` Stepper pair on
-    // its own line, and an eligibility checkbox with its state word. Four lines, not two.
+    // THE CRAFTING ROWS, and since issue 1117 what they show is the ABSENCE of an editor.
+    // This case framed the entry editor while crafting owned the entries; crafting now renders
+    // the library read-only exactly as salvage and gathering do, so the frame's job is to prove
+    // that symmetry on the one activity that used to be special — the identity/expression
+    // read-out, the bounds chip on the world's only bounded entry, and the deep link that
+    // replaces the add button.
     //
-    // Anchored on the FIRST row rather than on the rows container, and the difference is the
-    // whole point: `scrollIntoViewIfNeeded` lands an over-tall container's BOTTOM edge, so
-    // anchoring the container frames the last entries and drops the eligibility sentence that
-    // now sits above the first one. Anchoring the first row frames the card from its top.
-    //
-    // `hb-mod-medicine` is the world's only BOUNDED entry, so this is also the only frame of the
-    // authoring pair carrying real values rather than two `Unbounded` placeholders.
+    // Anchored on the card's TITLE (issue 1096's parity round), not on its first row.
+    // `scrollIntoViewIfNeeded` lands an over-tall element's BOTTOM edge, so anchoring the rows
+    // container frames the last entries; anchoring the first ROW was the previous fix and it
+    // now drops the card HEAD — which is where the rebuild put the deep link and the rule's own
+    // sentence, and is therefore half of what this frame exists to show. The title anchors it
+    // from the top, the same fix `manager-system-edit-lists` records for the same cause.
     query: { system: 'lab-herbalism' },
     steps: [
       'Checks',
-      { selector: '#checks-tab-crafting' },
-      { selector: '[data-crafting-modifier-row="hb-mod-medicine"]', scroll: true },
+      { selector: '#manager-checks-nav-crafting' },
+      { selector: '#checks-section-modifiers' },
+      {
+        selector: '[data-crafting-modifier-catalogue="crafting"] .manager-checks-card-title',
+        scroll: true,
+      },
     ],
-    expectView: 'checks',
-    // The eligibility sentence ABOVE the rows, and a row carrying the bounds pair. Asserting the
-    // sentence's own hook is what would catch it moving back below the rule grid, which is where
-    // it sat until this change and where it read as a footnote about the pick cap.
+    expectView: 'checks-crafting',
+    // THE WHOLE OF THE REBUILT CARD, clause by clause, because each clause is a thing that
+    // shipped wrong and could come back: the rule's sentence in the head's description slot,
+    // the read-only expression, the bounds chip ON the row, the deep link (which was a
+    // full-width button at the foot), and the library note that now CLOSES the card instead of
+    // opening it.
     expectSelector:
       '.fabricate-manager [data-crafting-modifier-catalogue="crafting"]' +
-      ':has([data-crafting-modifier-defaults])' +
-      ':has([data-crafting-modifier-bounds="hb-mod-medicine"] ' +
-      '[data-crafting-modifier-field="min"])',
+      ':has(.manager-checks-card-head [data-crafting-modifier-defaults])' +
+      ':has([data-crafting-modifier-readonly="expression"])' +
+      ':has(.manager-modifier-readonly-row .manager-modifier-bounds-chip)' +
+      ':has(.manager-checks-card-head [data-crafting-modifier-edit-link])' +
+      ':has([data-crafting-modifier-library-note])',
     kinds: ['manager', 'checks'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/checks\//,
       /^src\/ui\/svelte\/apps\/manager\/.*Check/,
     ],
   }),
-  // ── the OTHER TWO activities' catalogue cards (issue 1095) ──────────────────────────────────
+  // ── the OTHER TWO activities' modifier cards (issues 1095, 1117) ────────────────────────────
   //
-  // The card is activity-aware and only its ENTRY EDITOR is gated: salvage and gathering render
-  // each entry READ-ONLY, with a bounds chip and a link back to the crafting tab, while the
-  // per-entry eligibility control and the rule grid stay fully editable. That read-only row is a
-  // shape nothing else in the registry draws — the crafting frames above show the editor — and
-  // before these two cases there was no `manager-checks-salvage*` case in the registry at all.
+  // Every activity renders the library READ-ONLY now, with a bounds chip and a link to the system
+  // editor, while the per-entry eligibility control and the rule grid stay fully editable. What
+  // distinguishes these two frames from the crafting one above is therefore their SELECTION and
+  // their notices, not their editability — which is exactly the asymmetry issue 1117 removed.
   //
   // Both run on `lab-herbalism`, the one system with a catalogue, and both its salvage and its
   // gathering features are on. Their selections DIFFER from crafting's (`labContent.js`), which is
@@ -2002,19 +2204,20 @@ export const VIEW_LAB_CASES = Object.freeze([
     id: 'manager-checks-salvage-modifiers',
     label: 'Manager — Checks salvage modifiers',
     // BEYOND the smoke: the walk never opens the salvage sub-tab of a system carrying a
-    // catalogue, so no counterpart frame of the read-only entry rows exists.
+    // library, so no counterpart frame of these rows exists.
     reaches: 'beyond',
     smokeLabels: [],
     query: { system: 'lab-herbalism' },
     steps: [
       'Checks',
-      { selector: '#checks-tab-salvage' },
+      { selector: '#manager-checks-nav-salvage' },
+      { selector: '#checks-section-modifiers' },
       { selector: '[data-crafting-modifier-rows]', scroll: true },
     ],
-    expectView: 'checks',
-    // THE READ-ONLY ROW, asserted through the one element the editable branch cannot draw. The
-    // `has(...bounds-chip)` clause is the bounds chip's only assertion anywhere: it renders for a
-    // bounded entry alone, and `hb-mod-medicine` is the world's only bounded one.
+    expectView: 'checks-salvage',
+    // THE READ-ONLY ROW, asserted through the one element the retired editable branch could not
+    // draw. The `has(...bounds-chip)` clause pins the bounds chip against the world's only
+    // bounded entry, `hb-mod-medicine`.
     expectSelector:
       '.fabricate-manager [data-crafting-modifier-catalogue="salvage"]' +
       ':has([data-crafting-modifier-readonly="expression"])' +
@@ -2037,10 +2240,11 @@ export const VIEW_LAB_CASES = Object.freeze([
     query: { system: 'lab-herbalism' },
     steps: [
       'Checks',
-      { selector: '#checks-tab-gathering' },
+      { selector: '#manager-checks-nav-gathering' },
+      { selector: '#checks-section-modifiers' },
       { selector: '[data-crafting-modifier-rows]', scroll: true },
     ],
-    expectView: 'checks',
+    expectView: 'checks-gathering',
     // The gathering card carries TWO notices no other activity's does — the check-vs-character
     // modifier disambiguation and the issue-683 dormancy note — and both are stated against real
     // rows here rather than against an empty catalogue.
@@ -2084,7 +2288,8 @@ export const VIEW_LAB_CASES = Object.freeze([
     query: { system: 'lab-herbalism' },
     steps: [
       'Checks',
-      { selector: '#checks-tab-salvage' },
+      { selector: '#manager-checks-nav-salvage' },
+      { selector: '#checks-section-modifiers' },
       { selector: '[data-crafting-modifier-policy-option="bySubject"] input' },
       'Components',
       {
@@ -2117,7 +2322,8 @@ export const VIEW_LAB_CASES = Object.freeze([
     // the same route `manager-gathering-task-editor-normal` takes, after the rule click.
     steps: [
       'Checks',
-      { selector: '#checks-tab-gathering' },
+      { selector: '#manager-checks-nav-gathering' },
+      { selector: '#checks-section-modifiers' },
       { selector: '[data-crafting-modifier-policy-option="bySubject"] input' },
       'Gathering',
       { selector: '#manager-gathering-nav-tasks' },
@@ -2156,13 +2362,17 @@ export const VIEW_LAB_CASES = Object.freeze([
     query: { system: 'lab-herbalism' },
     steps: [
       'Checks',
-      { selector: '#checks-tab-crafting' },
+      { selector: '#manager-checks-nav-crafting' },
+      { selector: '#checks-section-modifiers' },
       { selector: '[data-crafting-modifier-policy]', scroll: true },
     ],
-    expectView: 'checks',
+    expectView: 'checks-crafting',
+    // RE-POINTED at the rule card (issue 1096's parity round). The grid moved out of
+    // `[data-crafting-modifier-catalogue]` into its own `How they combine` card, so the old
+    // descendant selector matches nothing — and a registry selector that matches nothing fails
+    // the capture job whole rather than this one case.
     expectSelector:
-      '.fabricate-manager [data-crafting-modifier-catalogue="crafting"] ' +
-      '[data-crafting-modifier-policy]',
+      '.fabricate-manager [data-crafting-modifier-policy-card] [data-crafting-modifier-policy]',
     position: { width: 1000, height: 720 },
     kinds: ['manager', 'checks', 'responsive'],
     sourceMatches: [
@@ -4653,12 +4863,72 @@ export const VIEW_LAB_CASES = Object.freeze([
     // `rw-ruined` is the LAST tier in Runework's `relativeOutcomes`, and
     // `scrollIntoViewIfNeeded` lands its anchor near the BOTTOM edge, so the whole
     // table sits above it in frame.
+    //
+    // IT IS ALSO THE BAND STRIP'S ONLY EVIDENCE, and the only frame in the registry that
+    // shows a NAMED label on the strongest band (issue 1096). Its sibling
+    // `manager-checks-section-badged-and-dotted` blanks the top tier's name to raise
+    // `unnamedOutcome`, so its top band is captioned with nothing — which is how a band-name
+    // contrast regression on exactly that band reached a published frame set unseen.
     steps: [
       'Checks',
-      { selector: '#checks-tab-crafting' },
+      { selector: '#manager-checks-nav-crafting' },
+      { selector: '#checks-section-outcomes' },
       { selector: '[data-outcome-row="rw-ruined"]', scroll: true },
     ],
-    expectView: 'checks',
+    expectView: 'checks-crafting',
+    // Anchored on the strip's own `<span>` band, so a case that stopped drawing the strip
+    // fails here rather than publishing a frame of the table alone.
+    expectSelector: '.fabricate-manager [data-band-strip-band]',
+    kinds: ['manager', 'checks', 'resolution-mode'],
+    // Deliberately NO pattern for `components/ThresholdBandStrip.svelte`, for the reason
+    // `manager-gathering-stamina-rolls` records about `Stepper`: `BROAD_SIGNAL_PATTERN`
+    // matches `^src/ui/svelte/components/` and `selectRenderFileCases` `continue`s on a
+    // broad-signal file BEFORE consulting any case's `sourceMatches`, so such an entry would
+    // be unreachable. A change to the strip PRIMITIVE therefore publishes the representative
+    // set, and a change to this editor — where the band colours are chosen — publishes this.
+    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/checks\//],
+  }),
+  managerCase({
+    id: 'coverage-mode-routed-check-five-bands',
+    label: 'Coverage — routedByCheck outcome tiers, five bands',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { system: 'lab-runework' },
+    // THE FRAME THAT SHOWS THE WHOLE RAMP (issue 1096). The band ramp has five tones and every
+    // routed check in the fixture world has THREE tiers, so until this case the two ends of the
+    // ramp — the tones a four- or five-tier check reaches and a three-tier one skips — appeared
+    // in no frame at all. A five-band strip is also the only count at which "one tone per band"
+    // and "a tone reused" look different.
+    //
+    // It reaches five tiers by DRIVING the editor rather than by seeding a fifth system: the
+    // fixture world's `ROUTED_CHECK` is read by the salvage routing rows, the section badge
+    // count and both player routed-crafting cases, so widening it would rewrite frames that are
+    // not about this. Two `Add outcome tier` clicks and four typed fields cost nothing outside
+    // case.
+    //
+    // The two new tiers are given DCs OUTSIDE the authored −5/0/+5 span. A new outcome is born
+    // at `dc: 0`, which ties Standard's lower edge, and the strip refuses to draw a tied edge as
+    // a clean seam — so without these the case would photograph the non-contiguous fallback note
+    // and be named for a strip it never rendered.
+    //
+    // `:nth-match()` is Playwright's, not CSS's: the two new rows carry `randomID()` ids, so
+    // there is no stable per-row hook to aim at and position in the authored table is the only
+    // address they have.
+    steps: [
+      'Checks',
+      { selector: '#manager-checks-nav-crafting' },
+      { selector: '#checks-section-outcomes' },
+      { selector: '[data-add-outcome-tier]' },
+      { selector: '[data-add-outcome-tier]' },
+      { selector: ':nth-match([data-outcome-name], 4)', fill: 'Flawless' },
+      { selector: ':nth-match([data-outcome-dc], 4)', fill: '10' },
+      { selector: ':nth-match([data-outcome-success], 4)' },
+      { selector: ':nth-match([data-outcome-name], 5)', fill: 'Slag' },
+      { selector: ':nth-match([data-outcome-dc], 5)', fill: '-10' },
+      { selector: '[data-outcome-band-strip-hint]', scroll: true },
+    ],
+    expectView: 'checks-crafting',
+    expectSelector: '.fabricate-manager [data-band-strip-band]',
     kinds: ['manager', 'checks', 'resolution-mode'],
     sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/checks\//],
   }),
@@ -4682,16 +4952,48 @@ export const VIEW_LAB_CASES = Object.freeze([
     query: { system: 'lab-alchemy' },
     steps: [
       'Checks',
-      { selector: '#checks-tab-crafting' },
+      { selector: '#manager-checks-nav-crafting' },
       { selector: '[data-dc-mode-option="dynamic"] input' },
       { selector: '[data-check-macro-dropzone]', scroll: true },
     ],
-    expectView: 'checks',
+    expectView: 'checks-crafting',
     kinds: ['manager', 'checks'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/checks\/SimpleCraftingCheckEditor\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/ItemDropZone\.svelte$/,
       /^src\/utils\/macroReference\.js$/,
+    ],
+  }),
+  managerCase({
+    id: 'manager-checks-crafting-recipe-tiers',
+    label: 'Manager — Checks crafting recipe tiers',
+    // BEYOND the smoke. The walk never adds a recipe tier, and every simple check in the
+    // fixture world authors none — so the populated list has never been photographed at all.
+    reaches: 'beyond',
+    smokeLabels: [],
+    // THE ROW TREATMENT, which is what issue 1096 changed here: the recipe-tier list was the
+    // last consumer of `.manager-checks-outcome-table` on The roll, drawing boxed inputs in a
+    // grid with a column-header row, while the prototype draws the same list as the Outcomes
+    // screen draws its tiers. An EMPTY list photographs the dashed control and nothing else,
+    // so the case adds two rows to reach the state it is named for.
+    query: {},
+    steps: [
+      'Checks',
+      { selector: '#manager-checks-nav-crafting' },
+      { selector: '[data-add-tier]' },
+      { selector: '[data-add-tier]' },
+      { selector: ':nth-match([data-tier-name], 1)', fill: 'Apprentice work' },
+      { selector: ':nth-match([data-tier-name], 2)', fill: 'Masterwork' },
+      { selector: '[data-tier-row]', scroll: true },
+    ],
+    expectView: 'checks-crafting',
+    // The ROW, not the card: a card that kept its old table would still satisfy a selector
+    // aimed at the section, and the row class is the thing this frame is evidence for.
+    expectSelector: '.fabricate-manager .manager-checks-tier-list [data-tier-row]',
+    kinds: ['manager', 'checks'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/checks\/CheckRecipeTiers\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/checks\/SimpleCraftingCheckEditor\.svelte$/,
     ],
   }),
   managerCase({
@@ -4710,15 +5012,56 @@ export const VIEW_LAB_CASES = Object.freeze([
     query: { system: 'lab-runework' },
     steps: [
       'Checks',
-      { selector: '#checks-tab-crafting' },
+      { selector: '#manager-checks-nav-crafting' },
+      { selector: '#checks-section-triggers' },
+      // The list COLLAPSES (issue 1096), so the subject of this case — the tier-step row — is
+      // not in the document until its trigger is opened. Clicking the head is what a GM does
+      // and is the only way to reach it; without this step the case would fail rather than
+      // quietly photograph a fold, because the anchor below resolves to nothing.
+      { selector: '[data-trigger-disclosure="rw-trig-step-up"]' },
       // Anchored on a NAMED trigger's own tier-step row, never on "the row's last control":
       // which control that is depends on the mode, so a mode change would silently move the
       // anchor. `scrollIntoViewIfNeeded` lands it near the bottom edge, so anchoring the
-      // second (and last) authored trigger frames both cards — the `target` tier select
-      // above and this one's step count — rather than one card and a fold.
+      // second (and last) authored trigger frames both cards — the collapsed one above and
+      // this one's expanded body — rather than one card and a fold.
       { selector: '[data-trigger="rw-trig-step-up"] [data-trigger-tier-step]', scroll: true },
     ],
-    expectView: 'checks',
+    expectView: 'checks-crafting',
+    // The route alone is not enough here: the case is named for a control that only exists
+    // once the disclosure above has actually opened, and a click that no-oped would leave the
+    // right screen showing the wrong state.
+    expectSelector: '[data-trigger="rw-trig-step-up"] [data-trigger-tier-step]',
+    kinds: ['manager', 'checks'],
+    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/checks\/CheckTriggers\.svelte$/],
+  }),
+  managerCase({
+    id: 'manager-checks-crafting-trigger-break-tools',
+    label: 'Manager — Checks crafting trigger break-tools card',
+    // BEYOND the smoke, and a state NO other frame reaches: breaking tools is authored on a
+    // trigger only while the SYSTEM's tool-breakage authority is check-driven, and every
+    // fixture system rests on `toolSpecific`. Without this case the card that issue 1096 gave
+    // that effect — a bordered card with a wrench, a sentence and a switch, where a two-word
+    // pill used to sit — is in no published frame at all.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-runework' },
+    steps: [
+      // The authority is a per-system radio pair on the tools browser, so it is CLICKED rather
+      // than pinned on the fixture — the same route `manager-tool-stress-immune` takes for the
+      // same reason, and the same one the smoke takes.
+      'Tools',
+      { selector: '[data-tool-authority-segment="checkDriven"]' },
+      'Checks',
+      { selector: '#manager-checks-nav-crafting' },
+      { selector: '#checks-section-triggers' },
+      { selector: '[data-trigger-disclosure="rw-trig-step-up"]' },
+      { selector: '[data-trigger="rw-trig-step-up"] [data-trigger-break]', scroll: true },
+    ],
+    expectView: 'checks-crafting',
+    // The subject itself, not the route: the authority click and the disclosure click both have
+    // to have landed, and a frame of the right screen with either one missing would show the
+    // state this case is named for being ABSENT.
+    expectSelector: '[data-trigger="rw-trig-step-up"] [data-trigger-break]',
     kinds: ['manager', 'checks'],
     sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/checks\/CheckTriggers\.svelte$/],
   }),

@@ -203,6 +203,20 @@
   --fab-accent: #E8C6A7;
   --fab-accent-hover: #F1D1B5;
   --fab-accent-strong: #D9B89C;
+
+  /* `--fab-accent-text` (issue 1096) completes the accent family: every SEMANTIC family already
+     ships an ink readable on its own soft fill, and accent shipped only `--fab-on-accent`, the
+     ink for the solid button. The outcome band ramp needs the soft-fill ink, and without it the
+     accent band had to be inked with the accent itself — 4.48:1 in `ironblood-forge`, under AA.
+
+     DERIVED PER THEME, not eyeballed, so each palette's ink is authored the way that palette
+     authors its other four: in oklch, the accent's OWN hue, at the mean lightness of that
+     theme's four existing `*-text` tokens, with the accent's chroma scaled by the mean
+     ink/tone chroma ratio of those same four. The check that this reproduces the convention
+     rather than hitting a threshold: on `-soft` over `--fab-bg-1` each derived accent ink lands
+     INSIDE the range its own theme's four existing inks occupy (here 8.44:1, between danger's
+     7.75 and info's 9.78). `foundry-native` states its own rule instead; see that block. */
+  --fab-accent-text: #F1DBC7;
   --fab-accent-soft: rgb(232 198 167 / 16%);
   --fab-accent-border: rgb(232 198 167 / 48%);
   --fab-on-accent: #111A23;
@@ -324,6 +338,7 @@
   --fab-accent: #63D47B;
   --fab-accent-hover: #72DF89;
   --fab-accent-strong: #3EB95F;
+  --fab-accent-text: #CCEDD0;
   --fab-accent-soft: rgb(99 212 123 / 16%);
   --fab-accent-border: rgb(99 212 123 / 54%);
   --fab-on-accent: #051E0C;
@@ -445,6 +460,7 @@
   --fab-accent: #C58B5A;
   --fab-accent-hover: #D1A37C;
   --fab-accent-strong: #A5754D;
+  --fab-accent-text: #EBC5A7;
   --fab-accent-soft: rgb(197 139 90 / 16%);
   --fab-accent-border: rgb(197 139 90 / 48%);
   --fab-on-accent: #141214;
@@ -566,6 +582,7 @@
   --fab-accent: #C8A36E;
   --fab-accent-hover: #D3B78C;
   --fab-accent-strong: #A88B5F;
+  --fab-accent-text: #EAD5B9;
   --fab-accent-soft: rgb(200 163 110 / 16%);
   --fab-accent-border: rgb(200 163 110 / 48%);
   --fab-on-accent: #161C19;
@@ -687,6 +704,7 @@
   --fab-accent: #9FC5E8;
   --fab-accent-hover: #B6D0EE;
   --fab-accent-strong: #86A6C5;
+  --fab-accent-text: #D1E1F0;
   --fab-accent-soft: rgb(159 197 232 / 16%);
   --fab-accent-border: rgb(159 197 232 / 48%);
   --fab-on-accent: #121824;
@@ -805,11 +823,32 @@
   --fab-text-muted: rgb(182 180 178 / 78%);
   --fab-text-subtle: rgb(182 180 178 / 60%);
   --fab-text-disabled: rgb(148 143 144 / 50%);
-  --fab-accent: #BC8963;
-  --fab-accent-hover: #C1966E;
-  --fab-accent-strong: #A16C60;
-  --fab-accent-soft: rgb(188 137 99 / 14%);
-  --fab-accent-border: rgb(188 137 99 / 42%);
+
+  /* The accent family is a GOLD lane of its own, not the tan one warning and danger already
+     occupy (issue 1096). It used to be `#BC8963` — byte-identical to `--fab-warning` — with
+     `--fab-accent-strong: #A16C60` byte-identical to `--fab-danger`, so the accent role had no
+     colour of its own anywhere in this palette. That was invisible until the outcome band ramp
+     started painting accent and warning side by side and drew them as one band.
+
+     Derived, not picked: the HUE and CHROMA are this theme's own authored gold,
+     `--fab-badge-gold: #C9A15E` (oklch h 79.2, C 0.0975), which is already a step off the tan
+     `--fab-warning` lane (h 57.5); the LIGHTNESS is 0.780, the mean `--fab-accent` lightness
+     across the other six palettes, where foundry-native's 0.671 was the outlier low. Hover and
+     strong take this palette family's mean offsets from accent (+0.048 / -0.078 L on the same
+     hue), so the family moves as one rather than jumping hue under the pointer.
+     `--fab-border*` keeps the tan: that is the theme's chrome tint, not its accent.
+
+     `--fab-accent-text` is `#F3F3F5` because this palette states ONE ink for every semantic —
+     its four existing `*-text` tokens are all that value verbatim. Deriving it the way the
+     other six themes' accent inks are derived lands on `#F8F2EE`, a distance of 0.0103 in
+     OKLab from the theme's own ink, so the convention is kept rather than broken for a
+     rounding difference. */
+  --fab-accent: #D9B06D;
+  --fab-accent-hover: #E9C07C;
+  --fab-accent-strong: #C09855;
+  --fab-accent-text: #F3F3F5;
+  --fab-accent-soft: rgb(217 176 109 / 14%);
+  --fab-accent-border: rgb(217 176 109 / 42%);
   --fab-on-accent: #191813;
   --fab-on-danger: #050403;
   --fab-on-info: #F3F3F5;
@@ -929,6 +968,7 @@
   --fab-accent: #E4C066;
   --fab-accent-hover: #EED592;
   --fab-accent-strong: #C9A94E;
+  --fab-accent-text: #ECDBB5;
   --fab-accent-soft: rgb(228 192 102 / 16%);
   --fab-accent-border: rgb(228 192 102 / 46%);
   --fab-on-accent: #161007;
@@ -1317,10 +1357,33 @@
   overflow: hidden;
   color: var(--fab-mv2-text);
   background: var(--fab-mv2-bg);
+
+  /* THE SCROLLERS (issue 1096, maintainer parity round 2). Nothing in this sheet ever
+     selected a colour for a scrollbar, so every scrolling region in the manager inherited
+     Foundry core's own — which is a dark red. On the Checks Studio that surfaced as TWO
+     thin red vertical rules running the full height of the pane, one at each edge: the nav
+     rail's scroller and the pane's. They read as a debug outline left in, and were reported
+     as one. `scrollbar-gutter: stable` on the pane means its track is drawn whether or not
+     there is anything to scroll, so an unstyled scroller there is always on screen, not an
+     edge case. The value is the prototype's own `.sc` rule — a `--fab-bg-3` thumb on a
+     transparent track — and the parity fixture records it on `pane-background` and
+     `inspector-surface`. */
+  scrollbar-color: var(--fab-bg-3) transparent;
 }
 
 .fabricate-manager * {
   box-sizing: border-box;
+
+  /* THE SCROLLERS, restated per element rather than inherited (issue 1096, round 3).
+
+     The rule above sets `scrollbar-color` on the manager root, and it never reached a single
+     scrolling region: Foundry core states the same property on a UNIVERSAL selector, and a
+     declaration that matches an element DIRECTLY always beats a value inherited from its
+     ancestor — whatever the specificity of the ancestor's rule, and whichever layer either
+     sheet is in. So the pane and the rail went on painting core's dark red while the root
+     carried a value nothing read. Matching core's shape is what makes the value land; the
+     parity fixture records it on `pane-background` and `inspector-surface`. */
+  scrollbar-color: var(--fab-bg-3) transparent;
 }
 
 .fabricate-manager button,
@@ -1679,6 +1742,85 @@
   font-weight: 700;
 }
 
+/* ── The tool studio's treatment, released from its ancestor (issue 1096) ─────────
+   `ManagerButton.svelte` emits `fab-manager-button` beside `manager-button`, and the
+   rules below re-declare the tool studio's values against that class with NO ancestor
+   requirement. That is the whole mechanism: the maintainer ruled the Tool Studio's
+   Back/Delete/Save cluster the AUTHORITY for a manager button, and it looks the way it
+   does only because it sits inside `.manager-tool-edit-actions`. A card elsewhere —
+   the Modifiers card is the reported case — could never match it, because it has no
+   such ancestor and landed on the base control at the app's INHERITED body size.
+   "The fonts differ from the tool studio's" is that missing `font-size`, exactly.
+
+   The values are COPIED from `.manager-tool-edit-actions .manager-button` (and from
+   the `.manager-header-actions` `.is-primary` rule that still wins the padding there),
+   never re-chosen; no new size, spacing or radius scale is introduced. NOTE which
+   block that is: `.manager-header-actions .manager-button` above declares a 38px
+   control, but `.manager-tool-edit-actions .manager-button` is later AND more
+   specific, so what the Tool Studio actually renders is 34px. Copying the 38 would
+   have re-typed the authority instead of adopting it.
+
+   These are declared BEFORE the tool studio's own block on purpose. At equal
+   specificity the later rule wins, so the Tool Studio keeps being styled by its own
+   selectors and converting it is provably a no-op, while every other converted site
+   picks these up. Against the base `.fabricate-manager .manager-button` (0,2,0) this
+   (0,3,0) wins outright, which is what lifts the Modifiers card.
+   `manager-layout.test.js` measures the result in a real browser rather than trusting
+   that arithmetic. */
+.fabricate-manager .manager-button.fab-manager-button {
+  min-height: 34px;
+  padding: 0 var(--fab-space-3);
+  font-size: 0.72rem;
+}
+
+.fabricate-manager .manager-button.fab-manager-button.is-primary {
+  padding: 0 var(--fab-space-4);
+  font-weight: 700;
+}
+
+/* The ghost's RESTING border is the difference that matters: the base `.is-ghost` is
+   borderless until hover, while the tool studio's Back button keeps a border so it
+   reads as a button before the pointer arrives (§F6). */
+.fabricate-manager .manager-button.fab-manager-button.is-ghost {
+  border-color: var(--fab-mv2-border);
+  color: var(--fab-mv2-text-muted);
+  background: transparent;
+}
+
+.fabricate-manager .manager-button.fab-manager-button.is-ghost:not(:disabled):hover {
+  border-color: var(--fab-border);
+  color: var(--fab-text);
+  background: var(--fab-surface-soft);
+}
+
+/* The `dashed` role (issue 1096): the full-width append action at the foot of a list.
+   Measured from the prototype's own "Add outcome tier" and pinned by the Checks Studio
+   parity fixture's `add-tier-button` region. It re-declares `font-size` because the
+   prototype's is 11px, a notch under the 0.72rem (11.52px) toolbar scale — this button
+   sits INSIDE a card's content, not in its chrome. */
+.fabricate-manager .manager-button.fab-manager-button.is-dashed {
+  display: flex;
+  width: 100%;
+
+  /* A pinned HEIGHT, not just a floor: the glyph and the label together measure 35px, so a
+     `min-height` alone let the button stand one pixel over the prototype's 34. */
+  height: 34px;
+  min-height: 34px;
+  padding: 0 var(--fab-space-3);
+  border: 1px dashed var(--fab-border-strong);
+  border-radius: 9px;
+  color: var(--fab-text-muted);
+  background: transparent;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.fabricate-manager .manager-button.fab-manager-button.is-dashed:not(:disabled):hover {
+  border-color: var(--fab-accent-border);
+  color: var(--fab-text);
+  background: var(--fab-surface-soft);
+}
+
 /* Ghost Back button (§F6): quiet, but the design keeps a resting border so it reads
    as a button before hover, not a bare label. */
 .fabricate-manager .manager-header-actions .manager-button.is-ghost {
@@ -1826,6 +1968,12 @@
      short for the pinned label, the scope card and the nav's floor together. Reachability
      there matters more than avoiding a second scrollbar in a window that small. */
   overflow: hidden auto;
+
+  /* And when that backstop DOES engage, the scroller it shows is the LEFT of the two crimson
+     rules the maintainer reported. See the tab panel's block: the thumb colour inherits, the
+     thickness does not. The two declarations are one pair — the overflow decides whether a
+     scroller appears here at all, this decides what it looks like when it does. */
+  scrollbar-width: thin;
 }
 
 .fabricate-manager .manager-rail-toggle {
@@ -1998,7 +2146,7 @@
 }
 
 .fabricate-manager[data-manager-view="environment-edit"] .manager-main,
-.fabricate-manager[data-manager-view="checks"] .manager-main,
+.fabricate-manager[data-manager-view^="checks"] .manager-main,
 .fabricate-manager[data-manager-view="crafting-settings"] .manager-main,
 .fabricate-manager[data-manager-view="recipe-item-edit"] .manager-main,
 .fabricate-manager[data-manager-view="system-edit"] .manager-main {
@@ -2029,13 +2177,21 @@
   min-width: 0;
 }
 
-/* Stacked list of ToggleCards inside a check card (failure consumption policy,
-   alchemy behaviour flags). */
+/* Stacked list of ToggleCards inside a check card (the alchemy behaviour flags). */
 .fabricate-manager .manager-checks-flag-list {
   display: grid;
   gap: var(--fab-space-2);
   margin-top: var(--fab-space-2);
   min-width: 0;
+}
+
+/* On failure's two flags are TOP-LEVEL cards (issue 1096), not a list inside one, so this
+   wrapper paints and offsets nothing: it takes the stack's own gutter, and the four things on
+   that screen — two flag cards and the closing note — sit at one even rhythm. The margin above
+   was the inset under a card heading that no longer exists. */
+.fabricate-manager .manager-checks-flag-list[data-failure-consumption] {
+  gap: var(--fab-space-3);
+  margin-top: 0;
 }
 
 .fabricate-manager .manager-checks-card-head {
@@ -2044,6 +2200,1351 @@
   justify-content: space-between;
   gap: var(--fab-space-2);
   margin-bottom: var(--fab-space-2);
+}
+
+/* ══ Checks Studio visual parity with the standalone prototype (issue 1096) ═══════════
+   Every rule below is a MEASURED value, not a chosen one: `tests/fixtures/checks-studio-parity.json`
+   records the prototype's computed styles per named region, and
+   `tests/components/checks-studio-parity.test.js` renders these rules in Chromium and
+   compares. Change a number here and that gate reds with the region and property named.
+
+   The type sizes here are authored in PX rather than this sheet's usual `rem`, and that is
+   deliberate: the prototype authors px, several of its sizes are half-pixels (10.5, 12.5,
+   8.5), and Stylelint's `number-max-precision: 4` cannot express 10.5/16 = 0.65625 exactly.
+   A rounded `rem` would compute to 10.5008px and red this very gate on a value nobody chose.
+   Exactness is the whole point of the block, so px it is.
+
+   The card is (0,3,0) — `.manager-inspector-card.manager-checks-card` — so it beats the
+   shared `.manager-inspector-card` block ~8000 lines below without depending on source
+   order. The prototype's card carries NO padding of its own: its head and body each own
+   theirs, which is what lets the head sit flush at the top and the tier list run to the
+   card's own edge. */
+.fabricate-manager .manager-inspector-card.manager-checks-card {
+  gap: 0;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--fab-border);
+  border-radius: 11px;
+  background: var(--fab-bg-2);
+}
+
+.fabricate-manager .manager-checks-card > .manager-checks-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-start;
+  gap: var(--fab-space-2);
+  margin: 0;
+  padding: 14px 15px 0;
+}
+
+.fabricate-manager .manager-checks-card-body {
+  padding: 14px;
+}
+
+.fabricate-manager .manager-checks-card-body.is-roomy {
+  padding: 14px 16px;
+}
+
+/* A body whose whole content is a LIST plus the dashed control that extends it. The
+   prototype's recipe-tier card is exactly this, at its own inset and its own 6px rhythm. */
+.fabricate-manager .manager-checks-card-body.is-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 14px;
+}
+
+/* SENTENCE CASE, in the display face, at full text ink. The manager's `.manager-card-title`
+   is an uppercase micro-label at muted ink — correct for the rail's flat section headings
+   and wrong for a card that carries a title AND a description line.
+
+   `h2` as well as `h3`: two of the studio's read-only pages state their subject as a page
+   heading over a kicker, and an uppercase micro-label was as wrong there as on a card. */
+.fabricate-manager h2.manager-checks-card-title,
+.fabricate-manager .manager-checks-card-title {
+  margin: 0;
+  color: var(--fab-text);
+  font-family: var(--fab-font-serif);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.fabricate-manager .manager-checks-card-description {
+  max-width: 640px;
+  margin: 3px 0 0;
+  color: var(--fab-text-muted);
+  font-size: 10.5px;
+  font-weight: 400;
+  line-height: 1.5;
+  text-transform: none;
+}
+
+/* A head whose TITLE ROW carries an action at its right (issue 1096). The prototype puts a
+   card's one action beside its title, not under its body, and the description runs the full
+   head width beneath both. The head is a flex row, so the block holding the title row and
+   the description has to GROW — without this it is content-width and `margin-left: auto` on
+   the action has no slack to spend. */
+.fabricate-manager .manager-checks-card-head-body {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.fabricate-manager .manager-checks-card-heading {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  min-width: 0;
+}
+
+/* The head's action, LINK-STYLED. `ManagerButton` is still the primitive — it owns the
+   `<button>` semantics, the type and the disabled contract — and this is an extra-class
+   rule in the global sheet, which is the adaptation route that component's header names.
+   (0,4,0), because it has to beat `.manager-button.fab-manager-button`'s own 34px control
+   at (0,3,0) without depending on source order.
+
+   The reset is the same one the trigger disclosure states: Foundry's core `button` rule
+   imposes a fixed height, a border and a font, and no mounted test can see it. */
+.fabricate-manager .manager-button.fab-manager-button.manager-checks-card-head-link {
+  appearance: none;
+  -webkit-appearance: none;
+  display: inline-flex;
+  flex: 0 0 auto;
+  gap: 6px;
+  align-items: center;
+  height: auto;
+  min-height: 0;
+  margin-left: auto;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  color: var(--fab-accent);
+  background: none;
+  box-shadow: none;
+  font-family: inherit;
+  font-size: 10.5px;
+  font-weight: 600;
+
+  /* `normal`, not a ratio. The prototype states this link's type as a `font:` shorthand,
+     which resets `line-height` to `normal` — 13px for the manager's face at 10.5px — and the
+     link's own box IS that line box. A ratio of 1.25 computes 13.125px and stands the whole
+     control an eighth of a pixel proud, which is what the parity run reported. */
+  line-height: normal;
+  white-space: nowrap;
+}
+
+.fabricate-manager .manager-button.fab-manager-button.manager-checks-card-head-link > i {
+  font-size: 9px;
+}
+
+.fabricate-manager
+  .manager-button.fab-manager-button.manager-checks-card-head-link:not(:disabled):hover {
+  color: var(--fab-text);
+  background: none;
+  text-decoration: underline;
+}
+
+/* A label for a block INSIDE a card body — the pick cap's, and the only one left on this
+   screen. Sentence case at the prototype's 11.5px/600, in the body face rather than the
+   card title's display face: it names a field, it does not head a card. It is deliberately
+   NOT `.manager-card-title`, which is the manager's uppercase micro-label — the treatment
+   this studio retired from its cards. */
+.fabricate-manager .manager-checks-card-subheading {
+  margin: 0;
+  color: var(--fab-text);
+  font-family: inherit;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+/* The SECTION STRIP's own scale (maintainer parity round 3).
+
+   The strip renders through the shared `.manager-environment-tab-button`, which is tuned for
+   the environment editors: 14px/700 in a 38px tab. Against this studio's 12–13px card type
+   that reads a size too large, and the tab stands 2px short of the prototype's. Every number
+   below is the prototype's own, recorded by `section-tabs` / `section-tab` /
+   `section-tab-active` in the parity fixture — so changing one here reds that gate with the
+   region and property named.
+
+   Scoped to `.manager-checks-sections` and stated at (0,3,0) so it lands without touching the
+   primitive every other tab strip in the manager uses, and without depending on source order
+   against the (0,2,0) base rules. */
+.fabricate-manager .manager-environment-tabs.manager-checks-sections {
+  gap: 2px;
+}
+
+.fabricate-manager .manager-checks-sections .manager-environment-tab-button {
+  min-height: 40px;
+  gap: 7px;
+  padding: 11px 14px;
+  font-size: 12.5px;
+  font-weight: 500;
+}
+
+/* The active tab takes the ACCENT, not full text ink: the prototype separates the two, and
+   the 2px accent underline below it is the same colour. */
+.fabricate-manager .manager-checks-sections .manager-environment-tab-button.is-active {
+  color: var(--fab-accent);
+  font-weight: 600;
+}
+
+/* The PANE heading — the studio's section title, above the cards. It was missing entirely,
+   so the Outcomes screen opened on a card with no statement of what the screen is for. */
+.fabricate-manager .manager-checks-pane-head {
+  margin: 0 0 16px;
+}
+
+.fabricate-manager .manager-checks-pane-title {
+  margin: 0 0 3px;
+  color: var(--fab-text);
+  font-family: var(--fab-font-serif);
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.fabricate-manager .manager-checks-pane-lead {
+  max-width: 600px;
+  margin: 0;
+  color: var(--fab-text-muted);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.55;
+  text-transform: none;
+}
+
+/* ── WHAT THIS MODE DOES: the roll section's opening callout (issue 1096) ────────────
+   The prototype opens The roll with a titled explanation of the resolution mode: a glyph
+   in a rounded tile, the mode's name, one paragraph, and a row of three facts. It is the
+   INFO family, and the only place on this screen that paints one — a mode explanation is
+   a permanent statement about how the surface behaves, which is what `info` is for.
+
+   Not `.manager-callout`: that primitive is one glyph plus one sentence, and widening it
+   to carry a title, a paragraph and a fact list would make one component two shapes. */
+.fabricate-manager .manager-checks-mode-callout {
+  display: flex;
+  align-items: flex-start;
+  gap: 13px;
+  min-width: 0;
+  margin: 0 0 14px;
+  padding: 15px 16px;
+  border: 1px solid var(--fab-info-border);
+  border-radius: 11px;
+  background: var(--fab-info-soft);
+}
+
+/* A DORMANT mode (gathering's routed and progressive, disabled pending issue 683) is not
+   an explanation of a live configuration, so it takes the warning edge the rest of the
+   studio uses for "this reaches nothing". The geometry does not move. */
+.fabricate-manager .manager-checks-mode-callout.is-dormant {
+  border-color: var(--fab-warning-border);
+  background: var(--fab-warning-soft);
+}
+
+.fabricate-manager .manager-checks-mode-callout-icon {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  color: var(--fab-info);
+  background: var(--fab-bg-1);
+  font-size: 14px;
+}
+
+.fabricate-manager .manager-checks-mode-callout.is-dormant .manager-checks-mode-callout-icon {
+  color: var(--fab-warning);
+}
+
+.fabricate-manager .manager-checks-mode-callout-body {
+  min-width: 0;
+}
+
+.fabricate-manager .manager-checks-mode-callout-title {
+  margin: 0;
+  color: var(--fab-text);
+  font-family: var(--fab-font-serif);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.fabricate-manager .manager-checks-mode-callout-lead {
+  margin: 6px 0 0;
+  color: var(--fab-text-muted);
+  font-size: 11.5px;
+  font-weight: 400;
+  line-height: 1.55;
+}
+
+.fabricate-manager .manager-checks-mode-callout-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.fabricate-manager .manager-checks-mode-callout-fact {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--fab-text-subtle);
+  font-size: 10.5px;
+  font-weight: 500;
+}
+
+.fabricate-manager .manager-checks-mode-callout-fact > i {
+  color: var(--fab-info);
+  font-size: 10px;
+}
+
+.fabricate-manager .manager-checks-mode-callout.is-dormant .manager-checks-mode-callout-fact > i {
+  color: var(--fab-warning);
+}
+
+/* The prototype separates a fact's LABEL from its VALUE with a middle dot. It is
+   punctuation rather than content — a screen reader announcing "Check middle-dot
+   Required" is worse than announcing "Check Required" — so it is drawn, not written. */
+.fabricate-manager .manager-checks-mode-callout-fact > b::before {
+  margin-right: 7px;
+  content: "·";
+}
+
+.fabricate-manager .manager-checks-mode-callout-fact > b {
+  color: var(--fab-text-secondary);
+  font-size: 10.5px;
+  font-weight: 600;
+}
+
+/* ── DIFFICULTY: `BASE DC` and `COMPARISON` (issue 1096) ─────────────────────────────
+   The two fields the prototype draws under the DC-source chooser. `BASE DC` is a fixed
+   118px track and `COMPARISON` takes the rest of the row, which is what makes the two
+   read as one number and its rule rather than as two equal choices.
+
+   Both controls are the shared primitives — `Stepper` and `SegmentedControl` — and this
+   block supplies only the SIZE and the micro-label, which is the one thing a layout
+   context may take from a primitive. */
+.fabricate-manager .manager-checks-difficulty-fields {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  min-width: 0;
+}
+
+/* A chooser above the fields; without one the fields are the card's whole body and the
+   margin would be dead space at its top. */
+.fabricate-manager
+  .manager-checks-card
+  .manager-resolution-mode-card
+  + .manager-checks-difficulty-fields {
+  margin-top: 13px;
+}
+
+.fabricate-manager .manager-checks-difficulty-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+
+.fabricate-manager .manager-checks-difficulty-field.is-dc {
+  flex: 0 0 auto;
+
+  /* The shared `Stepper` takes its HEIGHT from the layout context; its border, radius,
+     background and type stay the primitive's own. */
+  width: 118px;
+}
+
+.fabricate-manager .manager-checks-difficulty-field.is-comparison {
+  flex: 1 1 auto;
+}
+
+/* The prototype's micro-label: uppercase, tracked, at the studio's subtle ink. Same
+   treatment as the `WHAT ACTUALLY GETS ROLLED` kicker in the formula card. */
+.fabricate-manager .manager-checks-difficulty-label {
+  color: var(--fab-text-subtle);
+  font-size: 8.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/* The check-type chooser still renders through the shared `RadioCardGroup`; only the
+   checks studio's own scale is restated, at (0,4,0) so it lands without touching the
+   primitive every other screen uses. */
+.fabricate-manager .manager-checks-card .manager-resolution-mode-card.is-config-cards .manager-resolution-option {
+  gap: 11px;
+  padding: 12px 13px;
+  border: 1px solid var(--fab-border);
+  border-radius: 10px;
+  background: var(--fab-bg-0);
+}
+
+.fabricate-manager
+  .manager-checks-card
+  .manager-resolution-mode-card.is-config-cards
+  .manager-resolution-option.is-active {
+  border-color: var(--fab-accent-border);
+  background: var(--fab-accent-soft);
+}
+
+.fabricate-manager
+  .manager-checks-card
+  .manager-resolution-mode-card.is-config-cards
+  .manager-resolution-option-icon {
+  flex: 0 0 28px;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  color: var(--fab-text-subtle);
+  background: var(--fab-bg-2);
+  font-size: 12px;
+}
+
+.fabricate-manager
+  .manager-checks-card
+  .manager-resolution-mode-card.is-config-cards
+  .manager-resolution-option.is-active
+  .manager-resolution-option-icon {
+  color: var(--fab-accent);
+  background: var(--fab-bg-1);
+}
+
+.fabricate-manager .manager-checks-card .manager-resolution-option-name {
+  color: var(--fab-text);
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.fabricate-manager
+  .manager-checks-card
+  .manager-resolution-option.is-active
+  .manager-resolution-option-name {
+  color: var(--fab-accent);
+}
+
+.fabricate-manager .manager-checks-card .manager-resolution-option-desc {
+  color: var(--fab-text-muted);
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1.5;
+}
+
+/* ── The bands card's own "Preview against" control ──────────────────────────────────
+   The rail's `Preview as` is a DIFFERENT control with a different subject (issue 1097).
+   This one selects the record the bands are drawn against and lives with them. */
+.fabricate-manager .manager-checks-preview-against {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.fabricate-manager .manager-checks-preview-against-label {
+  color: var(--fab-text-subtle);
+  font-size: 8.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.fabricate-manager .manager-checks-preview-against select {
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: 260px;
+  height: 30px;
+  padding: 0 9px;
+  border: 1px solid var(--fab-border);
+  border-radius: 8px;
+  color: var(--fab-text);
+  background: var(--fab-bg-1);
+  font-size: 11.5px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+/* ── The tier list ───────────────────────────────────────────────────────────────────
+   A FLEX ROW, not a subgrid table. The prototype has no column headers and no
+   `BREAK TOOLS` column: per-outcome tool breakage is authored on a TRIGGER there (the
+   "Break the required tools" switch inside an expanded trigger), which this studio
+   already ships in `CheckTriggers`. So the column is not deleted work — it is work that
+   lives one section over. */
+.fabricate-manager .manager-checks-tier-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.fabricate-manager .manager-checks-tier-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 8px 11px;
+  border: 1px solid var(--fab-border);
+  border-radius: 9px;
+  background: var(--fab-bg-0);
+}
+
+.fabricate-manager .manager-checks-tier-row.is-invalid {
+  border-color: var(--fab-danger-border);
+}
+
+/* The row being dragged, on the same rule the progressive result list uses: an accent edge
+   and a lifted surface, so a GM can see which row is travelling. */
+.fabricate-manager .manager-checks-tier-row.is-dragging {
+  border-color: var(--fab-accent-border);
+  background: var(--fab-surface-active);
+}
+
+/* THE DRAG HANDLE. A bare grip glyph, as the prototype draws it — but a real `<button>`,
+   because HTML5 drag-and-drop has no keyboard path and a handle only a mouse can use is a
+   reordering affordance half the GMs on this screen cannot reach.
+
+   It goes through `ManagerButton` like every other button in the studio, so this rule is
+   the reset that takes the pill off it: the primitive's padding, border, radius and fill
+   would otherwise draw a 34px control where the prototype draws an 11px glyph. Same shape
+   of override as `.manager-checks-tier-remove` below, which keeps its danger tint. */
+.fabricate-manager .manager-checks-tier-row .manager-checks-tier-grip {
+  appearance: none;
+  -webkit-appearance: none;
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 28px;
+  min-width: 0;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  color: var(--fab-text-disabled);
+  background: transparent;
+  font-size: 11px;
+  cursor: grab;
+}
+
+.fabricate-manager .manager-checks-tier-row .manager-checks-tier-grip:hover {
+  color: var(--fab-text-subtle);
+  background: transparent;
+}
+
+.fabricate-manager .manager-checks-tier-row:active .manager-checks-tier-grip {
+  cursor: grabbing;
+}
+
+/* The catalogue's standing statement about where the list comes from, glyph-led on the same
+   rule as the band strip's hint: a decoration on prose, at the sentence's own size. */
+.fabricate-manager .manager-modifier-catalogue-intro > i {
+  margin-right: var(--fab-space-chip);
+  color: var(--fab-info);
+}
+
+/* The preset row. Each preset is the dashed ADD role, because that is what it does — it
+   appends a row to the list below — and the row wraps rather than scrolling, so a narrow
+   pane stacks them instead of hiding the second one. */
+.fabricate-manager .manager-checks-trigger-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  min-width: 0;
+}
+
+/* (0,4,0), which is what it takes to beat `.manager-button.fab-manager-button.is-dashed`'s
+   pinned full width and 34px height. A preset CHIP hugs its own sentence and sits beside its
+   sibling; the dashed control at the foot of a list spans that list because it extends it.
+   Size and fill only: the dashed edge, radius scale, weight and ink stay the primitive's. */
+.fabricate-manager .manager-checks-trigger-presets .manager-button.fab-manager-button.is-dashed {
+  flex: 0 1 auto;
+  width: auto;
+  height: 30px;
+  min-height: 0;
+  padding: 0 12px;
+  border-radius: 8px;
+  background: var(--fab-bg-0);
+}
+
+/* The band strip's hint sentence, glyph-led. The glyph is a decoration on prose rather
+   than a control, so it takes the sentence's own ink at its own size.
+
+   THE REAL DEFECT (maintainer parity round 4) was never the pixel value: it was that no
+   value here could ever take effect. `.fabricate-manager .manager-muted` (below, in this
+   same sheet) states `margin: var(--fab-space-2xs) 0 0` — a SHORTHAND that zeroes
+   `margin-bottom` — at the same (0,2,0) specificity as a bare `.fabricate-manager
+   [data-outcome-band-strip-hint]` rule, and later in source order, so it always won and the
+   hint's bottom margin computed to 0 regardless of what number this rule declared. That is
+   why the first attempt at this fix (14px) still read as abutting: it was never applied.
+   Scoped to `[data-outcome-bands]` at (0,3,0) so it wins without depending on source order
+   against the (0,2,0) base rule — the same fix shape `.manager-checks-sections
+   .manager-environment-tab-button` uses above for the same reason.
+
+   The VALUE reproduces the prototype's rhythm rather than one of its raw numbers (measured
+   with `scripts/visual-parity`, prototype `.../checks-studio.spec.mjs`, region
+   `band-strip-hint`). There the hint sits 30px above the first tier row: 14px is the
+   wrapping block's own bottom padding (the same "end of this block" separation used
+   everywhere else in this card), then a 10px `TIER / DC ± / COUNTS AS` column-header row,
+   then the list's own 6px inter-row gap before the first real row. This card deliberately
+   drops that header row (issue 1096; see the `outcomes|outcome bands|label:tier` structural
+   exemption), so matching 30px literally would leave an unexplained empty band where a
+   header used to be, and matching only the 14px block-end drops the list's own lead-in
+   rhythm entirely. 20px reproduces BOTH rhythms the prototype actually uses — the 14px block
+   separation and the list's 6px row cadence — without the 10px the header's own text
+   occupied. */
+
+/* Colour and size come from the same measurement, and both were drifting while only the
+   margin was being argued about. `.manager-muted` renders `--fab-text-muted` (74% alpha) at
+   the manager's own 12.48px; the prototype draws this sentence at `--fab-text-subtle`
+   (56% — the SAME hue, so this is an alpha swap between two shipped tokens, not a new
+   colour) and 10.5px. It is a hint about a control, not body copy, and the prototype sizes
+   it accordingly. Measured values, from the `band-strip-hint` parity region. */
+.fabricate-manager [data-outcome-bands] [data-outcome-band-strip-hint] {
+  margin-bottom: 20px;
+  color: var(--fab-text-subtle);
+  font-size: 10.5px;
+}
+
+.fabricate-manager [data-outcome-band-strip-hint] > i {
+  margin-right: var(--fab-space-chip);
+  font-size: 9px;
+}
+
+/* A 12px ROUNDED SQUARE, which is what the prototype draws. The 50% dot this replaces was
+   the same 12px key in a different shape. */
+.fabricate-manager .manager-checks-tier-swatch {
+  display: block;
+  flex: 0 0 auto;
+  width: 12px;
+  height: 12px;
+  border-radius: 4px;
+  background: var(--fab-outcome-swatch, var(--fab-surface-active));
+}
+
+/* The name field, STYLED AS A STEPPER PILL on the maintainer's instruction. The prototype
+   draws it borderless and transparent; the instruction is the authority where the two
+   disagree, and the fixture records the departure as a named exemption rather than
+   dropping the region. */
+.fabricate-manager .manager-checks-tier-row input.manager-checks-tier-name {
+  flex: 1 1 auto;
+  width: auto;
+  min-width: 0;
+  height: 28px;
+  padding: 0 9px;
+  border: 1px solid var(--fab-border);
+  border-radius: 7px;
+  color: var(--fab-text);
+  background: var(--fab-bg-2);
+  font-size: 12.5px;
+  font-weight: 500;
+}
+
+/* The number's label, in the ROW rather than in a column header — which is where the
+   prototype puts it, and what lets the recipe-tier list drop its header row entirely. */
+.fabricate-manager .manager-checks-tier-unit {
+  flex: 0 0 auto;
+  color: var(--fab-text-subtle);
+  font-size: 9px;
+  font-weight: 400;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.fabricate-manager .manager-checks-tier-stepper {
+  flex: 0 0 auto;
+
+  /* The shared `Stepper` takes its HEIGHT from the layout context, which the design
+     system permits; its border, radius, background and type stay the primitive's own. */
+  --fab-stepper-fill-height: 28px;
+
+  width: 118px;
+}
+
+.fabricate-manager .manager-checks-tier-stepper.is-narrow {
+  width: 84px;
+}
+
+/* ── The Success / Failure segmented toggle ─────────────────────────────────────────
+   ONE control with two options and a lit segment, not a button that swaps its own label
+   on click. A click-in-place switch cannot show the state it is NOT in, so a GM reads the
+   current label and has to guess whether it is a reading or a verb.
+
+   The control is the shared `SegmentedControl` at `density="compact"`. All this layout
+   context supplies is a WIDTH, which is the one thing a layout context may take from a
+   primitive; every other value lives in the primitive's own scoped block. */
+.fabricate-manager .manager-checks-tier-row .manager-segmented {
+  flex: 0 0 auto;
+  width: 158px;
+}
+
+/* The studio's remove action: a subtle danger icon button, 28px square, not the manager's
+   34px `.manager-icon-button`. ONE rule for both places this studio draws it — the tier row
+   and the trigger head — rather than a second copy of the same nine declarations, which is
+   what the duplication gate would have counted it as. */
+.fabricate-manager .manager-checks-tier-row .manager-checks-tier-remove,
+.fabricate-manager .manager-checks-trigger-head .manager-checks-trigger-remove {
+  appearance: none;
+  -webkit-appearance: none;
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  min-height: 0;
+  padding: 0;
+  border: 1px solid var(--fab-danger-border);
+  border-radius: 7px;
+  color: var(--fab-danger-text);
+  background: var(--fab-danger-soft);
+  font-size: 10px;
+  cursor: pointer;
+}
+
+/* THE PANE'S OWN SURFACE. `.manager-main` paints `--fab-mv2-surface-1` (`--fab-bg-2`) for
+   the whole manager, which is the CARD shade in the prototype — so the studio's cards were
+   sitting on their own colour and every border between them disappeared. The prototype's
+   pane is the app-window shade, `--fab-bg-1`, one step darker than the cards on it.
+   Scoped to the checks editor: this is a statement about this studio's surfaces, and the
+   other views' backgrounds are not in this change's scope.
+
+   (0,4,0) — deliberately, and this is the FOURTH stacked inset (issue 1096, maintainer
+   inspector comparison). At (0,3,0) this rule tied with
+   `.manager-environment-edit-view[data-environment-editor]` ~14000 lines below, which the
+   checks editor also carries, and lost on source order — so the section strip and the body
+   below it stayed 12px apart across the WHOLE width, which is the dead band above the
+   inspector's documentation pair. The prototype's header block ends where its body grid
+   begins. The `checks-editor-stack-gap` fixture region measures this row gap now, so the
+   tie cannot come back unseen. */
+.fabricate-manager[data-manager-view^="checks"]
+  .manager-environment-edit-view[data-checks-editor] {
+  gap: 0;
+  background: var(--fab-bg-1);
+}
+
+/* ── The studio's own gutters (issue 1096, maintainer parity round 2) ────────────────
+   THREE separate insets were stacking into dead space the prototype does not have: the
+   shared editor shell's 12px padding, the workspace grid's 12px gap, and the tab panel's
+   own 12px scrollbar buffer. Together they read as unintended slack at the body's edges
+   and between the rail, the pane and the inspector.
+
+   The prototype butts its three columns against each other and separates them with a 1px
+   border alone; the pane's own 20/22/26 padding is the only inset in the body. The parity
+   fixture measures all three now — `studio-shell`, `pane-container` and `pane-background`'s
+   own box — so this cannot silently drift back. */
+.fabricate-manager .manager-environment-editor-shell[data-checks-shell] {
+  padding: 0;
+}
+
+.fabricate-manager [data-checks-editor] .manager-environment-workspace {
+  gap: 0;
+}
+
+.fabricate-manager [data-checks-editor] .manager-environment-tab-panel {
+  /* The 12px `padding-right` this replaces was a scrollbar buffer. It is no longer needed:
+     the scroller is styled from tokens below and `scrollbar-gutter: stable` still reserves
+     its own track, so the pane's 22px inset is doing that job with room to spare. */
+  padding: 20px 22px 26px;
+}
+
+/* The section strip runs edge to edge, with its tabs on the pane's own 22px inset — the
+   prototype's header carries `padding: 14px 22px 0` and the strip sits inside it. */
+.fabricate-manager [data-checks-editor] .manager-environment-tabs {
+  padding-right: 22px;
+  padding-left: 22px;
+}
+
+/* ── The right inspector ─────────────────────────────────────────────────────────────
+   TWO authorities, and they do not overlap. The Tool Studio owns the STRUCTURE — flat
+   uppercase section headings (`.manager-kicker`) with cards directly beneath, never a
+   card wrapping each section — and the prototype owns the metrics and the colour. So the
+   rail adopts `.manager-kicker` and restates its scale at the prototype's 9px/700/0.14em
+   in `--fab-text-subtle`.
+
+   (0,4,0), because `.manager-environment-workspace .manager-environment-inspector` further
+   down the sheet is (0,3,0) and would otherwise win on source order and repaint the rail
+   `--fab-bg-3`. */
+.fabricate-manager .manager-environment-workspace .manager-inspector.manager-checks-rail {
+  gap: 12px;
+  padding: 16px 15px 20px;
+  border: 0;
+  border-left: 1px solid var(--fab-border);
+  border-radius: 0;
+  background: var(--fab-bg-0);
+}
+
+.fabricate-manager .manager-checks-rail .manager-inspector-card {
+  gap: var(--fab-space-2);
+  padding: 12px 13px;
+  border: 1px solid var(--fab-border);
+  border-radius: 11px;
+  background: var(--fab-bg-1);
+}
+
+.fabricate-manager .manager-checks-rail .manager-kicker {
+  margin: 0;
+  min-width: 0;
+  color: var(--fab-text-subtle);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+/* THE HEADING ROW. The Tool Studio owns where it sits — flat, above its card — and the
+   prototype owns what it is made of: a leading glyph at the kicker's own ink, and an optional
+   adjunct pushed hard right (the odds panel's die domain, the digest's status chip). A bare
+   text kicker was the shipped reading; the glyph is what makes six of them scannable. */
+.fabricate-manager .manager-checks-rail-head {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+}
+
+.fabricate-manager .manager-checks-rail-head-icon {
+  flex: 0 0 auto;
+  color: var(--fab-text-subtle);
+  font-size: 11px;
+}
+
+.fabricate-manager .manager-checks-rail-head-note {
+  flex: 0 0 auto;
+  margin-left: auto;
+  color: var(--fab-text-subtle);
+  font-size: 9.5px;
+  font-weight: 400;
+  white-space: nowrap;
+}
+
+.fabricate-manager .manager-checks-rail-head > :last-child:not(.manager-kicker, .manager-checks-rail-head-note) {
+  margin-left: auto;
+}
+
+/* The documentation / quickstart pair the prototype opens the rail with. */
+.fabricate-manager .manager-checks-rail-links {
+  display: flex;
+  gap: 8px;
+}
+
+.fabricate-manager .manager-checks-rail-link {
+  display: flex;
+  flex: 1 1 0;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-width: 0;
+  height: 30px;
+  border: 1px solid var(--fab-border);
+  border-radius: 8px;
+  color: var(--fab-text-muted);
+  background: var(--fab-bg-1);
+  font-size: 10.5px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.fabricate-manager .manager-checks-rail-link:hover {
+  border-color: var(--fab-accent-border);
+  color: var(--fab-text);
+}
+
+/* ── The activation card ─────────────────────────────────────────────────────────────
+   The prototype gives this section NO heading: the card is the statement, so it carries the
+   state in its own surface. `is-on` is the success family it paints there; `is-off` keeps the
+   rail's ordinary card, because the prototype never shows an off check and inventing a colour
+   for a state it does not draw is exactly the guessing this parity work exists to end. */
+.fabricate-manager .manager-checks-rail .manager-checks-active-card {
+  gap: 7px;
+  padding: 13px 14px;
+}
+
+.fabricate-manager .manager-checks-rail .manager-checks-active-card.is-on {
+  border-color: var(--fab-success-border);
+  background: var(--fab-success-soft);
+}
+
+/* The switch in this card is a full-width ROW, live or locked. The shared control caps itself
+   at 78px because it normally sits at the end of a list row beside its own label, and a card
+   whose whole content is the switch and its reading is not that: at 78px the card's sentence
+   ellipsised to `Che…`, which is what the cap is for everywhere else and a defect here. */
+.fabricate-manager .manager-checks-active-card .manager-status-toggle {
+  width: 100%;
+  max-width: none;
+}
+
+/* The LOCKED reading reuses the shipped switch's own track and knob — same meaning, same
+   drawing — and adds only that there is nothing to press. */
+.fabricate-manager .manager-status-toggle.is-locked {
+  cursor: default;
+}
+
+.fabricate-manager .manager-checks-active-lock {
+  margin-left: auto;
+  color: var(--fab-text-subtle);
+  font-size: 10px;
+}
+
+/* The reading beside the switch is the CARD's own sentence, not a control label, so it takes
+   the prototype's card type rather than the manager switch's 0.74rem/700 badge type. */
+.fabricate-manager .manager-checks-active-card .manager-status-toggle-label {
+  color: var(--fab-text);
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+/* The rail's PANEL COPY. Two scales, and they are the prototype's own: a panel with nothing
+   in it yet states its subject at 11px in the subtle ink, and the activation card's hint —
+   which qualifies a control right above it — is one step up in the muted ink. */
+.fabricate-manager .manager-checks-rail .manager-muted {
+  margin: 0;
+  color: var(--fab-text-subtle);
+  font-size: 11px;
+  font-weight: 400;
+}
+
+.fabricate-manager .manager-checks-active-card .manager-muted {
+  color: var(--fab-text-muted);
+  font-size: 10.5px;
+}
+
+/* ── The rail's LISTS ────────────────────────────────────────────────────────────────
+   `THIS CHECK` and `ALL CHECKS` are ONE card of compact rows each, not a stack of bordered
+   cards. The shipped reading gave every fact its own 1px card and its own 0.76rem two-line
+   body, which made four facts as tall as the four panels above them put together. */
+.fabricate-manager .manager-checks-rail .manager-inspector-card.is-rail-list {
+  gap: 3px;
+  padding: 9px 11px;
+}
+
+.fabricate-manager .manager-checks-rail-row {
+  /* Foundry's `button` rule sets a fixed height and its own border, and a row is neither.
+     Same reset the tier row's remove control takes. */
+  appearance: none;
+  -webkit-appearance: none;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  min-width: 0;
+
+  /* `height: auto` is the load-bearing half of this reset, not `min-height`. Foundry's core
+     `button` rule sets a FIXED height, which `min-height: 0` does not cancel — so the
+     one-line digest rows happened to fit it and the Validation rail's two-line rows drew on
+     top of each other. A mounted test cannot see this: Foundry's sheet is not in it. */
+  height: auto;
+  min-height: 0;
+  margin: 0;
+  padding: 7px 8px;
+  border: 0;
+  border-radius: 7px;
+
+  /* Declared, not inherited: a `<button>` takes `buttontext` from the UA, so the row's own
+     ink — which `border: 0` still resolves its border colour from — would be the browser's
+     default rather than the rail's. The muted reading lives on the text span below. */
+  color: var(--fab-text);
+  background: none;
+  font-family: inherit;
+  font-size: 10.5px;
+  font-weight: 500;
+  line-height: 1.3;
+  text-align: left;
+}
+
+.fabricate-manager button.manager-checks-rail-row {
+  cursor: pointer;
+}
+
+/* The row itself keeps the rail's own ink, and the muted reading lives on the TEXT — which is
+   how the prototype builds it, and it is not cosmetic here: with `border: 0` the row's border
+   colour still computes to its `color`, so tinting the row would have moved a recorded value
+   nothing draws. */
+.fabricate-manager button.manager-checks-rail-row:hover .manager-checks-rail-row-text {
+  color: var(--fab-text);
+}
+
+.fabricate-manager button.manager-checks-rail-row:hover {
+  background: var(--fab-surface-soft);
+}
+
+.fabricate-manager button.manager-checks-rail-row:focus-visible {
+  outline: 2px solid var(--fab-accent);
+  outline-offset: -2px;
+}
+
+/* A row whose subject the GM has authored reports it in the success family — the prototype's
+   green tick on a fact that is set. A row stating an ABSENCE keeps the subtle ink, because a
+   green "no roll formula yet" would claim the opposite of what it says. */
+.fabricate-manager .manager-checks-rail-row > i:first-child {
+  flex: 0 0 12px;
+  color: var(--fab-text-subtle);
+  font-size: 10px;
+  text-align: center;
+}
+
+.fabricate-manager .manager-checks-rail-row.is-set > i:first-child {
+  color: var(--fab-success);
+}
+
+.fabricate-manager .manager-checks-rail-row-body {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.fabricate-manager .manager-checks-rail-row-text {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--fab-text-muted);
+  font-size: inherit;
+  font-weight: inherit;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* A row that carries a second line is the Validation rail's: its first line names the check
+   rather than reporting a fact, so it takes the prototype's heavier row title. */
+.fabricate-manager .manager-checks-rail-row.is-detailed {
+  padding: 8px;
+}
+
+.fabricate-manager .manager-checks-rail-row.is-detailed .manager-checks-rail-row-text {
+  color: var(--fab-text-secondary);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.fabricate-manager .manager-checks-rail-row-detail {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--fab-text-muted);
+  font-size: 10px;
+  font-weight: 400;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* `--fab-text-disabled` is this theme's 42% ink and the exact value the prototype draws the
+   chevron at. Nothing here is disabled; the token is named for its commonest use, not its
+   only one. */
+.fabricate-manager .manager-checks-rail-row-chevron {
+  flex: 0 0 auto;
+  margin-left: auto;
+  color: var(--fab-text-disabled);
+  font-size: 8px;
+}
+
+/* ── The Modifiers screen's entry rows ────────────────────────────────────────────────
+   ONE ROW PER ENTRY, ON ONE LINE, and every number below is the prototype's own — recorded
+   by the `modifier-entry-row` region and its parts in the parity fixture, so changing one
+   here reds that run with the region and property named.
+
+   These rows went unmeasured until issue 1096's parity round: `modifier-entry-row` was
+   marked `unreachable` because no lab system authored a modifier library, so the card drew
+   its empty sentence and the rows never rendered. Everything around them matched, and the
+   screen reported clean while drawing a two-line bordered sub-card per entry. The lab world
+   seeds a library now (`tests/view-lab/world/labContent.js`), the marking is gone, and the
+   assertion is live.
+
+   Scoped to the studio's catalogue card so the same markup elsewhere is untouched. */
+.fabricate-manager .manager-checks-card .manager-modifier-readonly-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 9px 11px;
+  border: 1px solid var(--fab-border);
+  border-radius: 9px;
+  background: var(--fab-bg-0);
+}
+
+/* The entry's GLYPH TILE, the row's own leading square. Its family is the accent rather
+   than a per-entry tone: a modifier is not a hazard, and the tile exists to make the row
+   scannable by icon, not to grade it. */
+.fabricate-manager .manager-checks-card .manager-modifier-readonly-glyph {
+  display: flex;
+  flex: 0 0 26px;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  color: var(--fab-accent);
+  background: var(--fab-bg-3);
+  font-size: 11px;
+}
+
+.fabricate-manager .manager-checks-card .manager-modifier-readonly-label {
+  flex: 0 0 auto;
+  color: var(--fab-text);
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+/* THE ONE ELASTIC CELL. The expression takes the row's slack, which is what puts the bounds
+   chip and the eligibility control against the row's right edge with no auto margin
+   anywhere — exactly how the prototype lays the row out. `min-width: 0` is load-bearing: a
+   flex item's default `min-width: auto` refuses to shrink below its content, so a long
+   `@`-path would push the pill out of the row instead of ellipsing. */
+.fabricate-manager .manager-checks-card .manager-modifier-readonly-expression {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--fab-text-secondary);
+  background: none;
+  font-family: var(--fab-font-mono);
+  font-size: 11.5px;
+  font-weight: 500;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* THE ROW'S TWO CHIPS ARE NOT STYLED HERE, and that is an OWNERSHIP fact, not merely a
+   cascade one. This sheet is imported at `layer(modules)` — `tests/view-lab/cascade.css`
+   mirrors how Foundry imports a module stylesheet — while Svelte's `css: 'injected'` blocks
+   land UNLAYERED, and an unlayered author declaration beats every layered one no matter how
+   specific the layered selector is. So a rule HERE restating a property `Chip.svelte`'s own
+   scoped block declares cannot win, at any specificity — this exact pair was written here
+   first, at (0,4,0), and the parity run reported the chip still at the shared primitive's
+   padding, radius, fill, size and weight. A rule in a CALLER's own scoped `<style>` is not
+   bound by that: it is unlayered too, so a `:global(...)` block there CAN out-specify
+   `Chip.svelte`'s base rule and render correctly, and one did. That is still a second
+   implementation of the one chip's geometry — exactly what issue 883 retired regardless of
+   whether it renders right — and `manager-layout.test.js`'s hand-rolled-chip ratchet greps
+   every file but `Chip.svelte` for the literal class name for that reason. The chip's
+   parity geometry therefore lives in `Chip.svelte` itself, at `density="row"`.
+   `CraftingModifierCatalogueCard.svelte`'s own scoped block keeps only the row's flex
+   layout context for the two chips, not their geometry. */
+
+/* THE ELIGIBILITY CONTROL, and the pill IS it (issue 1096). It was a `SelectionCheckbox`
+   with an inert `StatusPill` beside it, on a second line of the row.
+
+   The `appearance`/`height`/`box-shadow` reset is not decoration: Foundry's core `button`
+   rule imposes a fixed height, its own border and its own font, and `min-height: 0` does
+   not cancel a fixed `height`. A mounted test cannot see any of that, because Foundry's
+   sheet is not in it — the same reset `.manager-checks-trigger-disclosure` states above,
+   for the same reason. */
+.fabricate-manager .manager-checks-card .manager-modifier-eligibility {
+  appearance: none;
+  -webkit-appearance: none;
+  display: inline-flex;
+  flex: 0 0 auto;
+  gap: 7px;
+  align-items: center;
+  justify-content: center;
+  width: 112px;
+  height: 28px;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--fab-border);
+  border-radius: 7px;
+  color: var(--fab-text-subtle);
+  background: transparent;
+  box-shadow: none;
+  font-family: inherit;
+  font-size: 10.5px;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.fabricate-manager .manager-checks-card .manager-modifier-eligibility.is-on {
+  border-color: var(--fab-accent-border);
+  color: var(--fab-accent);
+  background: var(--fab-accent-soft);
+}
+
+.fabricate-manager .manager-checks-card .manager-modifier-eligibility:hover {
+  border-color: var(--fab-accent-border);
+  color: var(--fab-accent);
+}
+
+.fabricate-manager .manager-checks-card .manager-modifier-eligibility:focus-visible {
+  outline: 2px solid var(--fab-accent);
+  outline-offset: 2px;
+}
+
+/* The state DOT. Colour is never the only carrier — the word beside it changes too — but the
+   dot is what makes the state legible without reading, and an unlit one is a different SHAPE
+   of statement from a lit one at a glance down a column of rows. */
+.fabricate-manager .manager-checks-card .manager-modifier-eligibility-dot {
+  flex: 0 0 auto;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--fab-bg-3);
+}
+
+.fabricate-manager
+  .manager-checks-card
+  .manager-modifier-eligibility.is-on
+  .manager-modifier-eligibility-dot {
+  background: var(--fab-accent);
+}
+
+/* THE NOTE THAT CLOSES THE CARD. Quiet on purpose: the surface fill and the ordinary border,
+   with the glyph carrying the only colour, because it points at another screen rather than
+   reporting a hazard. Same treatment the On failure screen's closing note takes. */
+.fabricate-manager .manager-checks-card .manager-modifier-library-note {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  margin: 0;
+  padding: 11px 12px;
+  border: 1px solid var(--fab-border);
+  border-radius: 9px;
+  color: var(--fab-text-muted);
+  background: var(--fab-surface-soft);
+  font-size: 10.5px;
+  font-weight: 400;
+  line-height: 1.55;
+}
+
+.fabricate-manager .manager-checks-card .manager-modifier-library-note > i {
+  flex: 0 0 auto;
+  margin-top: 1px;
+  color: var(--fab-info);
+  font-size: 11px;
+}
+
+/* THE PICK CAP, as the row the prototype draws: its label and hint on the left, the Stepper
+   on the right, inside the studio's own row box. It was a stacked heading, paragraph and
+   field taking the card body's default rhythm. */
+.fabricate-manager .manager-checks-card .manager-modifier-max-picks {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  margin-top: 14px;
+  padding: 11px 13px;
+  border: 1px solid var(--fab-border);
+  border-radius: 9px;
+  background: var(--fab-bg-0);
+}
+
+.fabricate-manager .manager-checks-card .manager-modifier-max-picks-body {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* Stated on the ELEMENT, not inherited from `.manager-muted`. That class sets
+   `margin: … 0 0` as a shorthand at the same specificity a longhand here would tie with,
+   and the later of two tied declarations wins — which is how a neighbouring hint on this
+   studio's Outcomes screen computed a `margin-bottom` of `0px` while its own rule said
+   otherwise. Nothing here depends on that class. */
+.fabricate-manager .manager-checks-card .manager-modifier-max-picks-hint {
+  margin: 3px 0 0;
+  color: var(--fab-text-muted);
+  font-size: 10px;
+  font-weight: 400;
+  line-height: 1.5;
+}
+
+/* ── The On failure screen's flag cards ───────────────────────────────────────────────
+   `ToggleCard` is the manager's shared status card and the recipe editor's Overview uses it
+   too, so this restates the studio's own metrics through the flag list rather than moving the
+   primitive: the accent tint on the ON state, the 28px icon tile, and the prototype's type. */
+.fabricate-manager .manager-checks-flag-list .manager-recipe-status-card {
+  gap: 12px;
+  padding: 14px 15px;
+  border-radius: 11px;
+}
+
+.fabricate-manager .manager-checks-flag-list .manager-recipe-status-card.is-on {
+  border-color: var(--fab-accent-border);
+  background: var(--fab-accent-soft);
+}
+
+.fabricate-manager .manager-checks-flag-list .manager-recipe-status-icon {
+  display: flex;
+  flex: 0 0 28px;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  color: var(--fab-accent);
+  background: var(--fab-bg-1);
+  font-size: 12px;
+}
+
+.fabricate-manager .manager-checks-flag-list .manager-recipe-status-title {
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.fabricate-manager .manager-checks-flag-list .manager-recipe-status-sub {
+  font-size: 11px;
+}
+
+/* The note the On failure screen ends on, at this studio's metrics. `Callout` is the manager's
+   shared standing-statement strip and its default is the INFO tint; the prototype draws this one
+   quietly — the surface fill and the ordinary border, with the glyph carrying the only colour —
+   because it is a pointer to two other screens rather than a hazard. Same primitive, this
+   studio's metrics, exactly as the flag list above restates `ToggleCard`. */
+.fabricate-manager .manager-callout[data-failure-salvage-note] {
+  gap: 11px;
+  align-items: flex-start;
+  padding: 13px 14px;
+  border-color: var(--fab-border);
+  border-radius: 10px;
+  color: var(--fab-text-muted);
+  background: var(--fab-surface-soft);
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1.55;
+}
+
+.fabricate-manager .manager-callout[data-failure-salvage-note] > i {
+  color: var(--fab-info);
+  font-size: 12px;
+}
+
+/* ── The Validation screen ────────────────────────────────────────────────────────────
+   `EditorValidationSurface` is shared with the recipe editor, so every rule here is scoped to
+   the checks route: same primitive, this studio's metrics. */
+.fabricate-manager .manager-checks-validation-route .manager-recipe-rail-summary {
+  gap: 16px;
+  padding: 19px 20px;
+  border-radius: 11px;
+  background: var(--fab-bg-2);
+}
+
+.fabricate-manager .manager-checks-validation-route .manager-recipe-rail-summary.is-pass {
+  border-color: var(--fab-success-border);
+}
+
+.fabricate-manager .manager-checks-validation-route .manager-recipe-rail-count {
+  height: 34px;
+  padding: 0 13px;
+  border-radius: 9px;
+  background: var(--fab-bg-2);
+}
+
+.fabricate-manager .manager-checks-validation-route .manager-recipe-val-group-label {
+  font-size: 9px;
+  letter-spacing: 0.11em;
+}
+
+.fabricate-manager .manager-checks-validation-route .manager-recipe-val-rows {
+  border-radius: 11px;
+  background: var(--fab-bg-2);
+}
+
+.fabricate-manager .manager-checks-validation-route .manager-recipe-val-row {
+  gap: 11px;
+  padding: 13px 14px;
 }
 
 /* The checks editors' choice selectors (check type, DC source, award mode, alchemy
@@ -2070,22 +3571,48 @@
    DESIGN minimum, the width at which the typeable field is as wide as an unfilled stepper,
    not a hard limit. If a rendered frame overflows, narrow the fixed Start/End pair first —
    they are the least-used columns. */
+
+/* The leading 12px track is the BAND SWATCH: the tier row's own colour on the strip above
+   it, so the ramp on the track has a key. It is the narrowest column by a wide margin
+   because it carries no text and no target — it is a legend, not a control.
+
+   12px, not the 10px it shipped at, because the swatch is a 12x12 DOT: the track is the dot's
+   own diameter, so the four literals below move with the rule that draws it. */
 .fabricate-manager .manager-checks-outcome-table.is-relative {
-  grid-template-columns: minmax(140px, 1fr) 102px 104px 124px 40px;
+  grid-template-columns: 12px minmax(140px, 1fr) 102px 104px 124px 40px;
 }
 
 .fabricate-manager .manager-checks-outcome-table.is-fixed {
-  grid-template-columns: minmax(130px, 1fr) 102px 102px 104px 124px 40px;
+  grid-template-columns: 12px minmax(130px, 1fr) 102px 102px 104px 124px 40px;
 }
 
 /* checkDriven authority drops the per-outcome break-tools column (tool breakage is
    authored via the CheckBreakage editor instead). */
 .fabricate-manager .manager-checks-outcome-table.is-relative.is-no-break {
-  grid-template-columns: minmax(140px, 1fr) 102px 104px 40px;
+  grid-template-columns: 12px minmax(140px, 1fr) 102px 104px 40px;
 }
 
 .fabricate-manager .manager-checks-outcome-table.is-fixed.is-no-break {
-  grid-template-columns: minmax(130px, 1fr) 102px 102px 104px 40px;
+  grid-template-columns: 12px minmax(130px, 1fr) 102px 102px 104px 40px;
+}
+
+/* A 12x12 ROUND DOT in the band's own SATURATED hue — not the mixed fill the band paints
+   (issue 1096). The band is a 26% mix into `--fab-bg-0` because it has to carry a tier NAME at
+   AA; the dot carries no text, so it can show the hue at full strength, and the two read as the
+   same key precisely because the dot is the undiluted version of the band's tone. It also needs
+   no border: a saturated dot separates from the row surface on its own, where the pale 10x24
+   mixed bar it replaced did not and had to be outlined to be seen at all.
+
+   Painted from an inline custom property rather than an inline `background`: the declared
+   fallback means an absent colour paints the neutral surface instead of nothing, and it is the
+   only shape a `color-mix()` survives happy-dom's `cssText` parser in — so the pairing stays
+   testable even though this rule now takes a plain token. */
+.fabricate-manager .manager-checks-outcome-swatch {
+  display: block;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--fab-outcome-swatch, var(--fab-surface-active));
 }
 
 /* Simple-check recipe tiers: Name + DC + remove. */
@@ -2093,26 +3620,219 @@
   grid-template-columns: minmax(140px, 1fr) 102px 40px;
 }
 
-/* Unified per-check trigger editor (issue 419 recombine). Each trigger is a
-   bordered, padded card split into two rows by a divider: the top row carries the
-   condition controls (When / Group / Measure / Is / Value) with the remove button
-   pinned to its top-right; the bottom row carries the Outcome three-way toggle and
-   the optional Break-tools pill. */
-.fabricate-manager .manager-checks-breakage-trigger {
+/* ── A TRIGGER IS A COLLAPSED CARD (issue 419 recombine, redrawn for issue 1096) ──────
+   A trigger card states itself in a HEAD a GM can read at a glance — glyph tile, condition
+   title, effect sentence, result chip, chevron, delete — and hides its controls until that
+   head is clicked. Before this, every trigger drew its whole editor, so three triggers were
+   taller than the pane and authoring a preset looked inert: the card it added landed below a
+   fold nobody could see.
+
+   The list is NOT inside a card of its own. It used to be, under a `Check triggers` heading
+   and description the design never wrote, and the structural parity pass reports such a
+   wrapper as an EXTRA CARD for exactly that reason: a card is a claim about the shape of the
+   screen. The route below paints nothing and only carries the gutter. */
+.fabricate-manager .manager-checks-trigger-route {
   display: grid;
-  gap: var(--fab-space-2);
-  padding: var(--fab-space-2);
+  gap: 8px;
+  min-width: 0;
+}
+
+.fabricate-manager .manager-checks-trigger-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.fabricate-manager .manager-checks-breakage-trigger {
+  min-width: 0;
+  overflow: hidden;
   border: 1px solid var(--fab-border);
-  border-radius: 6px;
+  border-radius: 10px;
+  background: var(--fab-bg-2);
+}
+
+/* The card being EDITED takes the stronger edge, which is the prototype's own distinction
+   between a card being read and a card being authored. */
+.fabricate-manager .manager-checks-breakage-trigger.is-expanded {
+  border-color: var(--fab-border-strong);
+}
+
+.fabricate-manager .manager-checks-trigger-head {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  min-width: 0;
+  padding: 11px 13px;
+}
+
+/* THE WHOLE HEAD IS THE DISCLOSURE. Foundry's core `button` rule sets a fixed height and its
+   own border, and a card head is neither — the same reset the rail's digest rows take, and
+   for the same reason: `min-height: 0` does not cancel a fixed `height`, so a two-line head
+   would draw on top of itself. A mounted test cannot see that; Foundry's sheet is not in it. */
+.fabricate-manager .manager-checks-trigger-disclosure {
+  appearance: none;
+  -webkit-appearance: none;
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: 11px;
+  min-width: 0;
+  height: auto;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+
+  /* Declared, not inherited: a `<button>` takes `buttontext` from the UA, and `border: 0`
+     still resolves the border colour from `color`. */
+  color: var(--fab-text);
+  background: none;
+  box-shadow: none;
+  font-family: inherit;
+  line-height: 1.3;
+  text-align: left;
+}
+
+.fabricate-manager button.manager-checks-trigger-disclosure {
+  cursor: pointer;
+}
+
+/* The effect's glyph tile. Its family is the effect's own — a step up reads info, a step down
+   reads warning — so a list of triggers is scannable by colour before it is read. */
+.fabricate-manager .manager-checks-trigger-glyph {
+  display: flex;
+  flex: 0 0 28px;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  font-size: 12px;
+}
+
+.fabricate-manager .manager-checks-trigger-glyph.is-info {
+  color: var(--fab-info-text);
+  background: var(--fab-info-soft);
+}
+
+.fabricate-manager .manager-checks-trigger-glyph.is-warning {
+  color: var(--fab-warning-text);
+  background: var(--fab-warning-soft);
+}
+
+.fabricate-manager .manager-checks-trigger-glyph.is-success {
+  color: var(--fab-success-text);
+  background: var(--fab-success-soft);
+}
+
+.fabricate-manager .manager-checks-trigger-glyph.is-danger {
+  color: var(--fab-danger-text);
+  background: var(--fab-danger-soft);
+}
+
+.fabricate-manager .manager-checks-trigger-glyph.is-neutral {
+  color: var(--fab-text-subtle);
   background: var(--fab-surface-soft);
 }
 
-/* Top row: condition fields take the available width and wrap; the remove button
-   sits at the top-right, aligned with the first field row. */
-.fabricate-manager .manager-checks-trigger-top {
+.fabricate-manager .manager-checks-trigger-headline {
+  display: block;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* A `<span>`, not a heading: it sits inside the disclosure `<button>`, where a heading is not
+   permitted content. It keeps the card title's own type so the structural parity pass still
+   reads it as a title — that pass classifies presentationally at 12.5px/600. */
+.fabricate-manager .manager-checks-trigger-title {
+  display: block;
+  color: var(--fab-text);
+  font-family: var(--fab-font-serif);
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.fabricate-manager .manager-checks-trigger-lead {
+  display: block;
+  margin-top: 3px;
+  color: var(--fab-text-muted);
+  font-size: 10.5px;
+  font-weight: 400;
+  line-height: 1.5;
+}
+
+/* The result chip: the effect in two words, at the right of the head. Same family as the
+   glyph tile, so the pair reads as one statement. */
+.fabricate-manager .manager-checks-trigger-chip {
+  flex: 0 0 auto;
+  padding: 4px 9px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  font-size: 10px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.fabricate-manager .manager-checks-trigger-chip.is-info {
+  color: var(--fab-info-text);
+  border-color: var(--fab-info-border);
+  background: var(--fab-info-soft);
+}
+
+.fabricate-manager .manager-checks-trigger-chip.is-warning {
+  color: var(--fab-warning-text);
+  border-color: var(--fab-warning-border);
+  background: var(--fab-warning-soft);
+}
+
+.fabricate-manager .manager-checks-trigger-chip.is-success {
+  color: var(--fab-success-text);
+  border-color: var(--fab-success-border);
+  background: var(--fab-success-soft);
+}
+
+.fabricate-manager .manager-checks-trigger-chip.is-danger {
+  color: var(--fab-danger-text);
+  border-color: var(--fab-danger-border);
+  background: var(--fab-danger-soft);
+}
+
+.fabricate-manager .manager-checks-trigger-chevron {
+  flex: 0 0 auto;
+  color: var(--fab-text-subtle);
+  font-size: 10px;
+}
+
+/* Remove button: at the head's right, outside the disclosure — a `<button>` inside a
+   `<button>` is invalid and the DOM the browser builds from it is not the one authored. */
+.fabricate-manager .manager-checks-trigger-remove {
+  flex: 0 0 auto;
+}
+
+/* The expanded body: a darker inset under a hairline, as the prototype draws it, holding the
+   condition, the two effect groups, the break-tools card and the closing quotation. */
+.fabricate-manager .manager-checks-trigger-body {
   display: flex;
-  align-items: flex-start;
-  gap: var(--fab-space-2);
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  padding: 13px;
+  border-top: 1px solid var(--fab-border);
+  background: var(--fab-bg-0);
+}
+
+/* `CONDITION` — the body's own section heading, above the row of fields. */
+.fabricate-manager .manager-checks-trigger-legend {
+  margin: 0;
+  color: var(--fab-text-subtle);
+  font-size: 8.5px;
+  font-weight: 700;
+  letter-spacing: 0.68px;
+  text-transform: uppercase;
 }
 
 .fabricate-manager .manager-checks-breakage-condition {
@@ -2120,33 +3840,124 @@
   flex: 1 1 auto;
   flex-wrap: wrap;
   align-items: flex-end;
-  gap: var(--fab-space-2);
+  gap: 8px;
 }
 
-/* Remove button: top-right of the card, not bottom-aligned with the fields. */
-.fabricate-manager .manager-checks-trigger-remove {
-  flex: 0 0 auto;
+/* THIS STUDIO'S FIELD SCALE, restated in scope rather than moved onto the manager-wide
+   `.manager-field` — the same move `.manager-checks-flag-list` and the Validation route
+   already make with their own shared surfaces. The manager's default control is a 36px box
+   at 0.82rem; the prototype draws this row at 32px and 11.5px, and its labels as 8px
+   uppercase micro-labels rather than as 0.82rem/700 field names. */
+.fabricate-manager .manager-checks-trigger-body .manager-field > span {
+  color: var(--fab-text-subtle);
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.64px;
+  text-transform: uppercase;
 }
 
-/* Hairline divider between the condition row and the effects row. */
-.fabricate-manager .manager-checks-trigger-divider {
-  width: 100%;
-  height: 0;
-  margin: 0;
-  border: 0;
-  border-top: 1px solid var(--fab-border);
+.fabricate-manager .manager-checks-trigger-body .manager-field {
+  gap: 5px;
 }
 
-/* Bottom row: the Outcome toggle and the Break-tools pill, bottom-aligned. */
-.fabricate-manager .manager-checks-trigger-bottom {
+.fabricate-manager .manager-checks-trigger-body .manager-field select,
+.fabricate-manager
+  .manager-checks-trigger-body
+  .manager-field
+  input:not(.fab-stepper-input):not([type="radio"]):not([type="range"]) {
+  height: 32px;
+  padding: 0 8px;
+  border: 1px solid var(--fab-border);
+  border-radius: 7px;
+  background: var(--fab-surface-soft);
+  font-size: 11.5px;
+  font-weight: 500;
+}
+
+/* …but the SELECT takes an OPAQUE fill, and this is a rendering fact rather than a
+   preference (maintainer report, Firefox).
+
+   `--fab-surface-soft` is a 5% overlay. An `<input>` here is already `appearance: none` from
+   the manager's text-control baseline, so a translucent fill composites over the card exactly
+   as drawn. A `<select>` is not: only Chromium takes `appearance: base-select` (the
+   `@supports` block near the top of this sheet), so on every other engine the control is
+   still the PLATFORM widget, which paints its own field background underneath — and a 5%
+   overlay over the platform's light field reads as a near-white control with a pale border.
+   That is the same failure the manager solved once already, which is why every other manager
+   select — `.manager-field select`, `.manager-recipe-field select` — states an opaque fill.
+   This rule brings the trigger dropdowns back onto it. */
+.fabricate-manager .manager-checks-trigger-body .manager-field select {
+  background: var(--fab-mv2-bg);
+}
+
+/* The threshold is the one number on this row a GM reads back, so it takes the heavier
+   reading the prototype gives it. */
+.fabricate-manager .manager-checks-trigger-value input {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.fabricate-manager .manager-checks-trigger-value {
+  flex: 0 0 129px;
+}
+
+/* The effect groups. Each is a labelled field beside its operand, and the row wraps as a
+   unit rather than squeezing a four-segment control narrower than its labels. */
+.fabricate-manager .manager-checks-trigger-effect-row {
   display: flex;
   flex-wrap: wrap;
   align-items: flex-end;
-  gap: var(--fab-space-3);
+  gap: 18px;
 }
 
-.fabricate-manager .manager-checks-trigger-break {
+/* The break-tools card inside a trigger: the shared `ToggleCard` at this studio's metrics,
+   the same restatement the On failure screen's flag list makes. */
+.fabricate-manager .manager-checks-trigger-body .manager-recipe-status-card {
+  gap: 11px;
+  padding: 10px 12px;
+  border-radius: 9px;
+  background: var(--fab-bg-2);
+}
+
+.fabricate-manager .manager-checks-trigger-body .manager-recipe-status-card.is-on {
+  border-color: var(--fab-accent-border);
+  background: var(--fab-accent-soft);
+}
+
+.fabricate-manager .manager-checks-trigger-body .manager-recipe-status-title {
+  font-size: 11.5px;
+}
+
+.fabricate-manager .manager-checks-trigger-body .manager-recipe-status-sub {
+  font-size: 10px;
+}
+
+/* The closing restatement, quotation-marked: the controls above are the parts and this is
+   what they add up to. */
+.fabricate-manager .manager-checks-trigger-quote {
+  display: flex;
+  gap: 9px;
+  margin: 0;
+  min-width: 0;
+  padding: 10px 12px;
+  border-radius: 9px;
+  color: var(--fab-text-muted);
+  background: var(--fab-surface-soft);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.fabricate-manager .manager-checks-trigger-quote > i {
   flex: 0 0 auto;
+  color: var(--fab-text-subtle);
+  font-size: 10px;
+}
+
+/* The standing explanation of why this trigger has no break-tools card. */
+.fabricate-manager .manager-checks-trigger-hint {
+  margin: 0;
+  font-size: 10.5px;
+  line-height: 1.5;
 }
 
 /* (The three-way Outcome toggle used to declare its own track and segment rules here,
@@ -2154,18 +3965,6 @@
    trigger card now renders the shipped `SegmentedControl` primitive, whose track,
    segments and per-option success/danger tints live in that component's own scoped
    styles.) */
-
-/* Tier-step row (issue 975): the trigger's third effect gets its OWN row below the
-   outcome/break row. At the pinned 1280 manager geometry the trigger card has roughly
-   651px, and the outcome toggle plus the break pill already spend about 476px of it —
-   a four-segment control plus an operand does not fit the remainder, and
-   `.manager-checks-trigger-bottom` wraps, so it would wrap at the DEFAULT width. */
-.fabricate-manager .manager-checks-trigger-step-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  gap: var(--fab-space-3);
-}
 
 /* The four-segment mode control hugs its content and wraps as a unit rather than
    being squeezed narrower than its labels. */
@@ -2234,24 +4033,148 @@
   color: var(--fab-mv2-text-muted);
 }
 
-/* Formula + success threshold + comparison on one line. */
-.fabricate-manager .manager-checks-formula-row {
+/* ── The FORMULA card (issue 1096) ───────────────────────────────────────────────────
+   Three stacked parts: the input, the `WHAT ACTUALLY GETS ROLLED` inset, and the
+   suggestion chips. Every value is the prototype's, authored in px for the reason the
+   Checks parity block above states — several of them are half-pixels. */
+.fabricate-manager .manager-checks-formula {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+/* The input WELL, not the input: the field is borderless inside a bordered row that also
+   carries the leading dice glyph and the trailing average, so the three read as one
+   control rather than as a control with two decorations beside it. */
+.fabricate-manager .manager-checks-formula-input {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+  height: 40px;
+  padding: 0 12px;
+  border: 1px solid var(--fab-border);
+  border-radius: 9px;
+  background: var(--fab-surface-soft);
+}
+
+.fabricate-manager .manager-checks-formula-input > i {
+  flex: 0 0 auto;
+  color: var(--fab-accent);
+  font-size: 12px;
+}
+
+.fabricate-manager .manager-checks-formula-input input {
+  flex: 1 1 auto;
+  width: auto;
+  min-width: 0;
+  height: auto;
+  padding: 1px 2px;
+  border: 0;
+  color: var(--fab-text);
+  background: transparent;
+  font-family: var(--fab-font-mono);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+/* The reading, not a control: no border, no fill, and quiet enough that it never competes
+   with the expression it qualifies. */
+.fabricate-manager .manager-checks-formula-average {
+  flex: 0 0 auto;
+  color: var(--fab-text-subtle);
+  font-size: 10px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+/* WHAT ACTUALLY GETS ROLLED. The INFO family, because it is a standing explanation of how
+   the surface behaves rather than a hazard — the same reason the mode callout above the
+   cards is info. */
+.fabricate-manager .manager-checks-formula-resolved {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-width: 0;
+  margin-top: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--fab-info-border);
+  border-radius: 9px;
+  background: var(--fab-info-soft);
+}
+
+.fabricate-manager .manager-checks-formula-resolved > i {
+  flex: 0 0 auto;
+  margin-top: 2px;
+  color: var(--fab-info);
+  font-size: 11px;
+}
+
+.fabricate-manager .manager-checks-formula-resolved-body {
+  min-width: 0;
+}
+
+.fabricate-manager .manager-checks-formula-kicker {
+  margin: 0;
+  color: var(--fab-text-subtle);
+  font-size: 8.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.fabricate-manager .manager-checks-formula-expression {
   display: flex;
   flex-wrap: wrap;
-  align-items: flex-end;
-  gap: var(--fab-space-2);
+  align-items: center;
+  gap: 8px;
+  margin: 6px 0 0;
+  min-width: 0;
 }
 
-.fabricate-manager .manager-checks-formula-field {
-  flex: 1 1 220px;
+.fabricate-manager .manager-checks-formula-base {
+  color: var(--fab-text);
+  font-family: var(--fab-font-mono);
+  font-size: 13px;
+  font-weight: 500;
 }
 
-.fabricate-manager .manager-checks-threshold-field {
-  flex: 0 0 120px;
+.fabricate-manager .manager-checks-formula-join,
+.fabricate-manager .manager-checks-formula-sep {
+  font-size: 11.5px;
+  font-weight: 600;
 }
 
-.fabricate-manager .manager-checks-threshold-mode {
-  flex: 0 0 150px;
+.fabricate-manager .manager-checks-formula-join {
+  color: var(--fab-accent);
+}
+
+.fabricate-manager .manager-checks-formula-sep {
+  color: var(--fab-text-subtle);
+}
+
+/* An applied modifier, as a chip. The ACCENT family: these are the terms the engine adds
+   that the GM did not write, so they are the one thing in the expression that is not the
+   text above it. */
+.fabricate-manager .manager-checks-formula-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border: 1px solid var(--fab-accent-border);
+  border-radius: 7px;
+  color: var(--fab-accent);
+  background: var(--fab-accent-soft);
+  font-size: 11.5px;
+  font-weight: 600;
+}
+
+.fabricate-manager .manager-checks-formula-rule {
+  margin: 6px 0 0;
+  color: var(--fab-text-muted);
+  font-size: 10.5px;
+  font-weight: 400;
+  line-height: 1.5;
 }
 
 /* Dynamic-DC macro drop zone: reuse the dashed component-source drop look with a
@@ -2397,6 +4320,9 @@
   overflow-y: auto;
   max-height: 100%;
   min-height: 0;
+
+  /* See the tab panel's block: the thumb colour inherits, the thickness does not. */
+  scrollbar-width: thin;
 }
 
 .fabricate-manager .manager-character-modifier-card {
@@ -2697,10 +4623,27 @@
   padding: var(--fab-space-2) var(--fab-space-3);
 }
 
+/* A NEW ENTRY'S NAME SAT IN THE MIDDLE OF THE ROW, and the cause is the host, not this rule.
+   Foundry's core `button` rule (`@layer elements.forms` in `css/foundry2.css`) declares
+   `display: flex; justify-content: center; align-items: center`, and this block set `display`
+   without ever restating `justify-content` — so every summary row has been centring its
+   children since it was written. It was invisible because `.manager-modifier-expression` is
+   the row's one elastic child: with an expression present it eats all the free space and
+   centring has nothing to distribute. A FRESH entry has no expression, the `→ path` span is
+   not rendered at all, and the whole row — chevron, glyph and label — jumps to the middle
+   while every authored entry above it stays left. Measured in the View Lab against the real
+   cascade: the label sits 52px from the button's left edge with an expression and 407px
+   without it, and an explicit `flex-start` restores 52px in both states.
+
+   `text-align: left` below does not cover this and never could: it aligns INLINE content
+   inside a box, and this is the flex container distributing its ITEMS. The fix belongs here
+   rather than in forcing an empty entry to render a placeholder path — a row should not have
+   to carry content it does not have in order to line up. */
 .fabricate-manager .manager-modifier-summary {
   flex: 1 1 auto;
   min-width: 0;
   display: flex;
+  justify-content: flex-start;
   align-items: center;
   gap: var(--fab-space-2);
   background: none;
@@ -2757,10 +4700,36 @@
   padding: 0 var(--fab-space-3) var(--fab-space-3);
 }
 
+/* ── Icon · Label · Minimum · Maximum, on ONE line (issue 1096) ──────────────────
+   The bounds pair used to sit on its own row below the expression, as two full-width
+   stepper rows. The maintainer's ruling is that all four short scalars belong on the
+   line above the expression, leaving the one long field the full width.
+
+   Degradation is by WRAP rather than by a container query, deliberately: the editor
+   body is nested several layers inside the settings panel, so the manager container's
+   width is a poor proxy for the width this row actually gets, and a container query
+   adds no specificity to lean on if it were wrong. `flex-wrap` reacts to the real
+   track, and the bounds pair is a single flex ITEM, so min and max always wrap
+   together — a min separated from its max reads as two unrelated fields rather than a
+   range.
+
+   WHO GETS THE SLACK took two corrections from live testing, and the answer is neither
+   of the first two arrangements. Letting Icon and Label grow left the steppers at
+   roughly 70px each, truncating the `Unbounded` placeholder to `Unb` — and that
+   placeholder is the only thing on the control that says an empty bound means NO LIMIT
+   rather than zero. Handing the growth to the bounds instead over-corrected: they took
+   ~325px each while Label, the one field holding FREE TEXT, was left at ~150px, where
+   a seeded entry like `Herbalism Training` truncates in the box the GM types into.
+
+   The settled rule follows from what each field can hold. A bound is a short signed
+   number or the word `Unbounded`, so it has a KNOWN maximum and takes a fixed track. A
+   label is arbitrary text with no maximum, so it takes the surplus. Icon is a
+   fixed-width trigger and grows for nobody. */
 .fabricate-manager .manager-modifier-name-row {
   display: flex;
   align-items: flex-end;
   gap: var(--fab-space-2);
+  flex-wrap: wrap;
 }
 
 .fabricate-manager .manager-modifier-icon-field {
@@ -2768,7 +4737,28 @@
 }
 
 .fabricate-manager .manager-modifier-name-row .manager-modifier-label-field {
-  flex: 1 1 auto;
+  flex: 1 1 22ch;
+  min-width: 0;
+}
+
+.fabricate-manager .manager-modifier-name-row .manager-modifier-bounds-row {
+  display: flex;
+  gap: var(--fab-space-2);
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+/* A FIXED track, wide enough for the longest thing a bound can hold. 148px is measured
+   rather than chosen: the stepper spends ~58px of its box on the two adjuncts, padding
+   and borders, and `Unbounded` needs ~59px of the remainder at this font, so 148px
+   leaves real headroom for a longer translation while still handing every other pixel
+   of the row to the label. The shipped `flex: 0 1 80px` this replaces left 22px of
+   content for those 59px — that is the `Unb` the maintainer saw, and
+   `manager-layout.test.js` reds on exactly that arithmetic. No `min-width`: a floor was
+   tried here and measured inert, because the row wraps the pair onto its own line long
+   before either field could reach it. */
+.fabricate-manager .manager-modifier-name-row .manager-modifier-bound-field {
+  flex: 0 1 148px;
   min-width: 0;
 }
 
@@ -2797,6 +4787,42 @@
   display: flex;
   flex-direction: column;
   gap: var(--fab-space-2);
+}
+
+/* ── Roll-data suggestion chips under the expression (issue 1096) ─────────────────
+   The CHIP is the shipped `.manager-tag-suggestion` — same 16px-glyph-plus-label grid,
+   same success-tinted hover — so this row and the modifier typeahead speak with one
+   voice. Its CONTAINER is not `.manager-tag-suggestions`: that one is the absolutely
+   positioned drop-down panel a typeahead opens over the page, and reusing it here
+   would mean unsetting `position`, `z-index`, `top`, `max-height`, `box-shadow` and
+   the panel surface — fighting a rule rather than reusing it. A static row is a
+   different container for the same chip, which is exactly the relationship
+   `.manager-character-modifier-add-suggestion` already has with the chip. */
+.fabricate-manager .manager-modifier-expression-suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--fab-space-chip);
+  align-items: center;
+  min-width: 0;
+}
+
+/* Three classes (0,3,0) to clear the base chip's `border: 0` and transparent fill at
+   (0,2,0). A resting border is required here and not in the drop-down: inside a panel
+   the chips are enclosed and separated by the panel itself, whereas on the page they
+   are loose controls and have to read as controls before hover. */
+.fabricate-manager .manager-tag-suggestion.manager-modifier-expression-suggestion {
+  flex: 0 1 auto;
+  border: 1px solid var(--fab-mv2-border);
+  background: var(--fab-mv2-surface-1);
+  font-family: var(--fab-font-mono, monospace);
+  font-size: 0.72rem;
+}
+
+.fabricate-manager .manager-modifier-expression-suggestion > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .fabricate-manager .manager-character-modifier-actions {
@@ -5250,8 +7276,15 @@
    had no hover response at all. The affordance belongs on the TRACK,
    which is the part that actually has an edge: its border and fill lift toward the
    text colour, so the switch responds identically in the on, off and danger states
-   and in every theme. A disabled switch does not respond. */
-.fabricate-manager .manager-status-toggle:not(:disabled, .is-disabled):hover .manager-status-toggle-track {
+   and in every theme. A disabled switch does not respond.
+
+   Neither does a LOCKED one (issue 1096). `.manager-status-toggle.is-locked` is the Checks
+   Studio's read-only activation INDICATOR — a `<span role="img">`, not a control — so
+   `:not(:disabled, .is-disabled)` was satisfied and the pointer lit it up like a switch a GM
+   could throw. `:disabled` cannot match a span and `.is-disabled` would be the wrong claim
+   about it (nothing is disabled; there is nothing to press), so the state is excluded by
+   name. */
+.fabricate-manager .manager-status-toggle:not(:disabled, .is-disabled, .is-locked):hover .manager-status-toggle-track {
   border-color: color-mix(in srgb, var(--fab-toggle-track-border) 55%, var(--fab-text));
   background: color-mix(in srgb, var(--fab-toggle-track) 88%, var(--fab-text));
 }
@@ -6911,9 +8944,16 @@
    This list and the `<aside class="manager-inspector">` render condition in
    `CraftingSystemManagerRoot.svelte` are ONE decision expressed twice: release the
    column here without suppressing the aside and its (empty) box wraps to an implicit
-   grid row BELOW the editor instead of vanishing. Keep the two in step. */
+   grid row BELOW the editor instead of vanishing. Keep the two in step.
+
+   The Checks entry is a PREFIX match since issue 1096, because `checks` became four
+   child routes (`checks-crafting` and friends) plus the retained redirect. An exact
+   match went on matching nothing at all: the aside was still suppressed by the root's
+   `!isChecksRoute` guard, so the studio rendered against a ~300px dead strip — the
+   exact regression the comment above says this pairing exists to prevent, arriving
+   from the other direction. */
 .fabricate-manager[data-manager-view="environment-edit"] .manager-body,
-.fabricate-manager[data-manager-view="checks"] .manager-body,
+.fabricate-manager[data-manager-view^="checks"] .manager-body,
 .fabricate-manager[data-manager-view="component-edit"] .manager-body,
 .fabricate-manager[data-manager-view="recipe-edit"] .manager-body,
 .fabricate-manager[data-manager-view="crafting-settings"] .manager-body,
@@ -6923,7 +8963,7 @@
 }
 
 .fabricate-manager[data-manager-view="environment-edit"] .manager-body.is-rail-collapsed,
-.fabricate-manager[data-manager-view="checks"] .manager-body.is-rail-collapsed,
+.fabricate-manager[data-manager-view^="checks"] .manager-body.is-rail-collapsed,
 .fabricate-manager[data-manager-view="component-edit"] .manager-body.is-rail-collapsed,
 .fabricate-manager[data-manager-view="recipe-edit"] .manager-body.is-rail-collapsed,
 .fabricate-manager[data-manager-view="crafting-settings"] .manager-body.is-rail-collapsed,
@@ -10085,7 +12125,11 @@
   appearance: none;
   -webkit-appearance: none;
   display: grid;
-  grid-template-columns: 20px minmax(0, 1fr) auto;
+
+  /* FOUR tracks, not three (issue 1096): a Checks child can carry an unsaved marker AND an
+     issue badge beside its label, and a three-track grid put the second one into the icon
+     cell of the row below it. Every other rail group leaves the extra track empty. */
+  grid-template-columns: 20px minmax(0, 1fr) auto auto;
   align-items: center;
   gap: var(--fab-space-2);
   width: 100%;
@@ -10177,6 +12221,128 @@
 .fabricate-manager .manager-nav-subitem.is-active .manager-nav-count {
   color: var(--fab-mv2-accent);
   font-weight: 700;
+}
+
+/*
+  THREE distinguishable markers share the rail's trailing column (issue 1096), and the
+  whole point is that a GM must be able to tell them apart at a glance and a screen reader
+  must be able to tell them apart at all:
+
+    1. a RECORD COUNT — `.manager-nav-count` above, a bare mono numeral ("Gathering 69");
+    2. an ISSUE COUNT — this pill, which is a filled, bordered shape rather than a bare
+       numeral, and whose `aria-label` names its unit ("1 issue");
+    3. an UNSAVED marker — a small filled dot, a different SHAPE with its own accessible
+       name, not the issue pill in another colour.
+
+  Distinguishing 2 from 3 by colour alone would fail every GM who cannot separate them, so
+  the difference is carried by shape and by name and only reinforced by colour.
+*/
+.fabricate-manager .manager-nav-issue-badge {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 16px;
+  padding: 0 var(--fab-space-1);
+  border: 1px solid var(--fab-warning-border);
+  border-radius: 999px;
+  color: var(--fab-warning-text);
+  background: var(--fab-warning-soft);
+  font-family: var(--fab-font-mono);
+  font-size: 0.58rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+/*
+  Drawn as a BOX rather than as a bullet glyph, and that is not a style preference: an
+  HTML entity for a filled circle is a numeric character reference, which
+  `tests/components/theme-colour-contract.test.js` reads as a hex colour literal and fails.
+*/
+.fabricate-manager .manager-nav-dirty-marker {
+  flex: 0 0 auto;
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--fab-mv2-accent);
+}
+
+/*
+  A collapsed rail keeps the group's parent icon AND its issue badge — that badge is the
+  only signal left once the labels and the children are hidden, so it is deliberately not
+  in the `.manager-nav-count` hide rule above. The per-child markers go with their
+  children.
+*/
+.fabricate-manager .manager-body.is-rail-collapsed .manager-nav-dirty-marker {
+  display: none;
+}
+
+/*
+  The Checks section strip's two markers, on the same rule as the rail's: a count is a bare
+  mono numeral and an issue is a dot with a text accessible name. The dot is a `role="img"`
+  span, so it needs its own box.
+*/
+.fabricate-manager .manager-checks-section-count {
+  flex: 0 0 auto;
+  color: var(--fab-mv2-text-muted);
+  font-family: var(--fab-font-mono);
+  font-size: 0.625rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.fabricate-manager .manager-environment-tab-button.is-active .manager-checks-section-count {
+  color: var(--fab-mv2-accent);
+}
+
+/*
+  The formula token quick-add row (issue 1096): a wrap of small mono chips under the formula
+  field. They are real buttons, so the Foundry `<button>` reset is carried here — the host
+  sheet centres button content and pins a fixed height, which would otherwise make each chip
+  a full-height control in a five-across row.
+*/
+.fabricate-manager .manager-checks-formula-tokens {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--fab-space-chip);
+  min-width: 0;
+  margin-top: var(--fab-space-chip);
+}
+
+.fabricate-manager .manager-checks-formula-token {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: var(--fab-space-chip);
+  width: auto;
+  height: auto;
+  min-height: 22px;
+  padding: 0 var(--fab-space-2);
+  border: 1px solid var(--fab-mv2-border);
+  border-radius: 6px;
+  color: var(--fab-mv2-text-muted);
+  background: transparent;
+  font-family: var(--fab-font-mono);
+  font-size: 0.66rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.fabricate-manager .manager-checks-formula-token:hover {
+  border-color: var(--fab-mv2-accent);
+  color: var(--fab-mv2-text);
+}
+
+.fabricate-manager .manager-checks-section-dot {
+  flex: 0 0 auto;
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--fab-warning);
 }
 
 .fabricate-manager .manager-inspector-card {
@@ -13743,7 +15909,7 @@
   }
 
   .fabricate-manager[data-manager-view="environment-edit"] .manager-body,
-  .fabricate-manager[data-manager-view="checks"] .manager-body,
+  .fabricate-manager[data-manager-view^="checks"] .manager-body,
   .fabricate-manager[data-manager-view="crafting-settings"] .manager-body,
   .fabricate-manager[data-manager-view="books-scrolls"] .manager-body,
   .fabricate-manager[data-manager-view="recipe-item-edit"] .manager-body,
@@ -13757,7 +15923,15 @@
     overflow: visible;
   }
 
-  .fabricate-manager .manager-environment-workspace,
+  /* The workspace releases its 300px side rail through the TOKEN its base rule reads, not
+     through `grid-template-columns`: that base rule is declared later in this file and a
+     container query adds no specificity, so the direct property tied and lost. See the base
+     rule for the band this left broken. Its two siblings below are declared EARLIER in the
+     file, so their direct override still wins and stays as it is. */
+  .fabricate-manager .manager-environment-workspace {
+    --fab-env-workspace-grid: minmax(0, 1fr);
+  }
+
   .fabricate-manager .manager-tags-categories-workspace,
   .fabricate-manager .manager-environment-details-grid {
     grid-template-columns: minmax(0, 1fr);
@@ -16172,9 +18346,22 @@
   margin-left: var(--fab-space-2xs);
 }
 
+/* The editor workspace: tab panel + 300px side rail.
+
+   THE COLUMN TRACK IS A TOKEN, and that is not decoration (issue 1096). The narrow override
+   for this element lives in the `@container fabricate-manager (max-width: 1120px)` block
+   ~2400 lines ABOVE, and a container query adds no specificity — so an override written as
+   `grid-template-columns` there tied (0,2,0) with this rule and LOST on source order alone.
+   It was dead for its whole life: between 1120 and 961 the body restacked to one column while
+   this stayed a 300px side rail, and the DECLARED 1024x640 FLOOR sits inside that band, so
+   the studio was a side rail at the one width its acceptance frame photographs. Setting a
+   custom property instead cannot tie: this rule never declares
+   `--fab-env-workspace-grid`, so the query's declaration is unopposed wherever it applies,
+   whichever order the two are read in. `--fab-env-comp-grid` in the same file is the
+   precedent. */
 .fabricate-manager .manager-environment-workspace {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 300px;
+  grid-template-columns: var(--fab-env-workspace-grid, minmax(0, 1fr) 300px);
   gap: var(--fab-space-3);
   min-width: 0;
   min-height: 0;
@@ -16195,6 +18382,13 @@
      renders an overlay-style scrollbar that ignores `scrollbar-gutter`. */
   scrollbar-gutter: stable;
   padding-right: var(--fab-space-3);
+
+  /* `scrollbar-color` inherits from the app root; `scrollbar-width` does NOT, so each
+     scrolling region names it (issue 1096). Declared HERE, inside the panel's own block,
+     rather than in a grouped rule of its own: `manager-layout.test.js` resolves a selector
+     to its FIRST block in this sheet, so an earlier one-line rule would have become the
+     block every assertion about this panel then read. */
+  scrollbar-width: thin;
 }
 
 .fabricate-manager .manager-environment-workspace .manager-environment-inspector {
@@ -17551,9 +19745,9 @@
 }
 
 @container fabricate-manager (max-width: 960px) {
-  .fabricate-manager .manager-environment-workspace {
-    grid-template-columns: minmax(0, 1fr);
-  }
+  /* The workspace's single-column restack is NOT repeated here. It belongs to the 1120 block
+     above, and 960 is inside 1120 — this copy only existed because the 1120 one never
+     applied, which made it look like the breakpoint. */
 
   .fabricate-manager .manager-environment-overview-duo,
   .fabricate-manager .manager-environment-context-split {

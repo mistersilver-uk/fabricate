@@ -622,24 +622,28 @@ There is **no** gathering-scoped tools store; the 0.7.0 migration (`migrateTools
 2. Library tools follow the existing `Tool` validation contract (`src/models/Tool.js`); persistence layer normalisation never rejects, but Save in the editor blocks until every tool passes `Tool.validate()`.
 3. Crafting systems without a `tools` array normalize to `tools: []` on load.
 4. The Manager authors tools into the system-owned library; the same library backs the recipe/step/ingredient-set/salvage tool gate, the canvas interactable browser, and gathering.
-5. The runtime `composeEnvironment` (`GatheringRichStateService`) sources the library from `system.tools` and exposes it as a non-enumerable `__libraryTools` Map keyed by tool id on the composed environment, alongside `__libraryCharacterModifiers`.
+5. The runtime `composeEnvironment` (`GatheringRichStateService`) sources the library from `system.tools` and exposes it as a non-enumerable `__libraryTools` Map keyed by tool id on the composed environment, alongside `__libraryCharacterModifiers` — which is sourced the same way, from `system.modifiers` (issue 1117), with a live registry lookup by id as the fallback for a caller that holds no system.
 Gathering runtime consumers resolve task `toolIds` through this map before actor inventory checks, terminal breakage planning, terminal breakage application, and `usedTools` evidence.
 6. The library is per crafting system.
 Tools are not shared across crafting systems.
 
-## Check Modifiers Versus Character Modifiers
+## One Library, Two Arithmetics
 
-A gathering system may now carry TWO named-modifier concepts and they are not interchangeable (issue 1095).
+A system authors modifiers in exactly ONE place (issue 1117): `CraftingSystem.modifiers`, edited in System settings › Modifiers.
+Issue 1095 had left a gathering system with TWO named-modifier libraries in two near-identical shapes; the shapes are now one, because "a named actor-driven expression" is one concept and authoring it twice let a GM define Medicine as two unrelated records.
 
-`gatheringConfig.systems[systemId].characterModifiers` (§Gathering Character Modifiers below) applies to the **d100** path only, references are per drop row and per event, and each contributes as a percentage-point delta or a multiplicative factor of the drop chance.
-It is unchanged by this change and it does **not** participate in `progressive` or `routed`.
+**What remains distinct is how each CONSUMER reads an entry, and that distinction is real.**
+A **gathering drop-row or event reference** (§Gathering Character Modifiers below) applies to the **d100** path only, is authored per drop row and per event, and contributes a percentage-point delta or a multiplicative factor of the drop chance.
+A **check-modifier selection**, made by `gatheringCraftingCheck`'s own `{defaultModifierPolicy, defaultModifierIds, maxModifierPicks?}` triple over the same library, applies to the **formula-rolled** modes and contributes additive `[Modifiers]` terms on the roll — one flat `+ N` term and one `+ (…)` term per rolling entry; it is inert in `d100` and reports the cause `noModifierSupport` — that mode's check IS the d100 rolled against each drop's chance, and the inert cause names the absent modifier seam rather than claiming the mode rolls nothing.
+The two arithmetics stay incompatible — unifying the LIBRARY does not unify them — so an entry is a shared definition, never a shared application.
 
-`CraftingSystem.checkModifiers`, selected by `gatheringCraftingCheck`'s own `{defaultModifierPolicy, defaultModifierIds, maxModifierPicks?}` triple, applies to the **formula-rolled** modes and contributes as an additive `+ N[Modifiers]` term on the roll; it is inert in `d100` and reports the cause `noCheck`.
-The two arithmetics are incompatible, so they are not unified here.
+**A ROLL-SHAPED expression is legal for BOTH consumers** (issue 1118).
+A drop row evaluates the expression and applies the result; a check appends the DICE to its roll formula, so the authored variance survives to the roll.
+The two consumers still read an entry differently — a delta on a chance, against a term in a formula — but neither refuses a roll.
+The blocking `modifierRollExpression` readiness issue issue 1117 raised is RETIRED; the two BOUNDS faults are unaffected, and for a rolling entry they clamp the rolled result rather than a resolved number.
 
-**The disambiguation is a naming requirement, binding regardless of co-location.**
-No surface shows both — check modifiers live under Checks › Gathering › Modifiers, character modifiers on drop rows and events — so a requirement phrased as "every surface that can show both must name which it is showing" would be vacuous.
-Instead: the GM-facing section label is **"Check modifiers"** on every activity, and the gathering library keeps **"Character modifiers"**, so the two are told apart by name rather than by a sentence on one screen.
+**The disambiguation is now a naming requirement about SECTIONS, not libraries.**
+The GM-facing section label on a Checks route is **"Check modifiers"** because what that route authors is a selection; the drop-row and event sections keep **"Character modifiers"** because what they author is a reference with its own arithmetic; and the one authoring surface is labelled simply **"Modifiers"**, because it is neither — it is the library both read.
 
 **The check-modifier seam on gathering is DORMANT.**
 `_libraryTaskToRuntimeTask` hardcodes `resolutionMode: 'd100'` pending issue 683 and `GatheringEconomyView` renders `progressive` and `routed` disabled, so no GM-selectable configuration reaches `runFormulaRouted` or `runFormulaProgressive` today.
@@ -650,18 +654,11 @@ The capability activates when 683 lands; no separate follow-up issue is opened.
 
 ### Purpose
 
-Represent reusable actor-driven modifiers that a GM can apply to d100 drop rows and events for one crafting system.
+Represent a d100 drop row's or event's REFERENCE into the system's one modifier library, with its own operator and bounds.
 
 ### Properties
 
-```js
-GatheringCharacterModifier = {
-  id: string,
-  label: string,
-  icon: string,
-  expression: string,
-}
-```
+The library entry itself is `CraftingSystem.modifiers[]` (§data-models); this section owns only the reference shape and the arithmetic it drives.
 
 Character modifier row references use this shape:
 
@@ -678,10 +675,12 @@ GatheringCharacterModifierReference = {
 
 ### Requirements
 
-1. Character modifier libraries are scoped to one crafting system at `gatheringConfig.systems[systemId].characterModifiers`.
-2. New system gathering shells initialize `characterModifiers` to an empty array.
+1. References resolve against the ONE system-level library `CraftingSystem.modifiers` (issue 1117).
+The gathering config carries no library of its own: `gatheringConfig.systems[systemId].characterModifiers` is retired, the `1.23.0` migration merges it up, and the gathering config normalizer — an allowlist rebuild — no longer emits the key.
+2. A new system's library is empty.
 Presets are never seeded automatically.
 3. Fabricate may provide opt-in preset seeding for recognized Foundry systems such as `dnd5e` and `pf2e`; seeding skips existing ids and leaves seeded entries editable.
+It seeds into the one system library, from the one authoring surface.
 4. Drop row and event references resolve against the selected gathering actor using the effective expression — the row `expressionOverride` when present, otherwise the library entry `expression`.
 Character modifiers are formula-only: there is no provider discriminator and no macro support on this surface.
 5. Operators are restricted to `+` and `-`; the operator defines the direction of the contribution.

@@ -1,14 +1,23 @@
 /**
- * The check-modifier CATALOGUE card and the Validation tab's per-activity wiring, MOUNTED
- * (issue 1095).
+ * The modifier SELECTION card and the Validation tab's per-activity wiring, MOUNTED
+ * (issues 1095, 1117, 1096).
  *
- * Two things shipped unpinned and are pinned here:
+ * ISSUE 1096's PARITY ROUND rebuilt this surface against the design prototype, and what it
+ * changed is mostly INVISIBLE to a frame, which is why so much of it is pinned here: the
+ * eligibility pill became the real control (a checkbox went away, and the accessible name, the
+ * pressed state and the description all moved onto the pill), the deep link moved into the card
+ * head, the library note moved to the foot, `How they combine` became its own card, and the
+ * `bySubject` eligibility vocabulary collapsed onto `playerPicks`'s.
  *
- *  1. THE BOUNDS AUTHORING UI. `data-crafting-modifier-bounds` and
- *     `data-crafting-modifier-bounds-invalid` could both be deleted with the suite green, and
- *     neither selector appeared anywhere in `tests/` or `scripts/`. The bounds pair is the
- *     whole of the new per-entry clamp's authoring surface, and the invalid note is the only
- *     place a GM is told, where they authored it, that the entry now contributes nothing.
+ * Two further things shipped unpinned and are pinned here:
+ *
+ *  1. THE READ-ONLY LIBRARY ROWS. Issue 1117 removed the entry editor from this card on
+ *     EVERY activity, crafting included: the library has one authoring surface (System
+ *     settings › Modifiers) and this screen selects over it. What is pinned is that no
+ *     activity renders an editor, that every activity renders the identity/expression/bounds
+ *     read-out, and that each carries the deep link to the surface that does author it. The
+ *     per-row bounds FAULT note stays — it is the only place a GM is told, on the screen that
+ *     applies the entry, that it now contributes nothing.
  *  2. THE `modifierContext` WIRING. `ChecksView` builds one context per activity and hands it
  *     to that activity's readiness section. The three rules are proven as RULES in
  *     `checks-readiness.test.js`, but the seam that delivers them was not: setting any of the
@@ -45,6 +54,9 @@ const harness = createMountedComponentHarness({
     ...CHECKS_TREE_COMPILED_MODULES,
     'src/ui/svelte/apps/manager/ItemDropZone.svelte',
     'src/ui/svelte/apps/manager/SegmentedControl.svelte',
+    'src/ui/svelte/components/ManagerButton.svelte',
+    'src/ui/svelte/apps/manager/checks/CheckDcMacroCard.svelte',
+    'src/ui/svelte/apps/manager/checks/CheckDifficultyCard.svelte',
     'src/ui/svelte/apps/manager/checks/CheckFormulaFields.svelte',
     'src/ui/svelte/apps/manager/checks/CheckRecipeTiers.svelte',
     'src/ui/svelte/apps/manager/checks/CheckTriggers.svelte',
@@ -52,6 +64,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/checks/SimpleCraftingCheckEditor.svelte',
     'src/ui/svelte/apps/manager/checks/ProgressiveCraftingCheckEditor.svelte',
     'src/ui/svelte/apps/manager/checks/CheckAwardMode.svelte',
+    'src/ui/svelte/apps/manager/checks/CheckModeCallout.svelte',
     'src/ui/svelte/apps/manager/checks/ChecksView.svelte',
   ],
   componentPath: 'src/ui/svelte/apps/manager/checks/ChecksView.svelte',
@@ -71,15 +84,19 @@ const CATALOGUE = [
   { id: 'huge', label: 'Huge', expression: '@abilities.her.mod', min: 1e21 },
 ];
 
-function mountChecks(props = {}) {
-  return harness.mount({
+// The four activities became rail ROUTES and the five sections became the strip
+// (issue 1096), so `activity` is a prop and the catalogue card lives on the Modifiers
+// section. Every mount here is about the catalogue, so the default lands on it.
+async function mountChecks(props = {}) {
+  const target = await harness.mount({
+    activity: 'crafting',
     resolutionMode: 'simple',
     craftingCheckSimple: SIMPLE_CHECK,
     salvageCheckSimple: SIMPLE_CHECK,
     gatheringResolutionMode: 'd100',
     features: { salvage: true, gathering: true },
     activation: {},
-    checkModifiers: CATALOGUE,
+    modifiers: CATALOGUE,
     craftingDefaultModifierPolicy: 'addAll',
     craftingDefaultModifierIds: ['med'],
     salvageDefaultModifierPolicy: 'addAll',
@@ -88,11 +105,15 @@ function mountChecks(props = {}) {
     gatheringDefaultModifierIds: ['huge'],
     ...props,
   });
+  if (target.querySelector('#checks-section-modifiers')) await openSection(target, 'modifiers');
+  return target;
 }
 
-/** Click a checks sub-tab by id and let the panel render. */
-async function openTab(target, tab) {
-  target.querySelector(`[data-checks-tab-button="${tab}"]`).click();
+/** Click one of the five section-strip buttons and let the panel render. */
+async function openSection(target, section) {
+  const button = target.querySelector(`#checks-section-${section}`);
+  assert.ok(button, `the section strip should offer "${section}"`);
+  button.click();
   await new Promise((done) => setTimeout(done, 0));
   return target;
 }
@@ -101,29 +122,46 @@ describe('the check-modifier catalogue card (mounted)', () => {
   before(() => harness.setup());
   after(() => harness.teardown());
 
-  it('renders a min/max stepper pair per entry, on the activity that OWNS the catalogue', async () => {
-    const target = await mountChecks();
-    const rows = target.querySelectorAll(
-      '[data-crafting-modifier-catalogue="crafting"] [data-crafting-modifier-bounds]'
-    );
-    assert.equal(rows.length, CATALOGUE.length, 'every entry gets the bounds pair');
-    const first = rows[0];
-    assert.equal(first.dataset.craftingModifierBounds, 'med', 'the row is keyed by entry id');
-    assert.ok(
-      Boolean(first.querySelector('[data-crafting-modifier-field="min"]')),
-      'the minimum is authorable'
-    );
-    assert.ok(
-      Boolean(first.querySelector('[data-crafting-modifier-field="max"]')),
-      'and so is the maximum'
-    );
-    assert.equal(
-      first.querySelector('[data-crafting-modifier-field="min"]').value,
-      '-1',
-      'a stored bound renders as its value, not as a blank'
-    );
-    harness.remount();
-  });
+  // ISSUE 1117 — NO ACTIVITY AUTHORS AN ENTRY, and the assertion runs over all three so
+  // "crafting is special" cannot come back on one of them. The editor's absence is asserted
+  // by its own hooks, not by the presence of the read-only row: a card rendering BOTH would
+  // pass a read-only-row-only check.
+  for (const activity of ['crafting', 'salvage', 'gathering']) {
+    it(`renders the library READ-ONLY on ${activity}, with no entry editor at all`, async () => {
+      const target = await mountChecks({ activity });
+      const card = target.querySelector(`[data-crafting-modifier-catalogue="${activity}"]`);
+      assert.ok(Boolean(card), `${activity} renders the modifier card`);
+
+      const rows = card.querySelectorAll('[data-crafting-modifier-readonly="label"]');
+      assert.equal(rows.length, CATALOGUE.length, 'every entry is read out');
+      assert.equal(rows[0].textContent.trim(), 'Medicine');
+      assert.equal(
+        card.querySelector('[data-crafting-modifier-readonly="expression"]').textContent.trim(),
+        '@abilities.med.mod'
+      );
+
+      for (const editorHook of [
+        '[data-crafting-modifier-field="label"]',
+        '[data-crafting-modifier-field="expression"]',
+        '[data-crafting-modifier-field="min"]',
+        '[data-crafting-modifier-field="max"]',
+        '[data-crafting-modifier-bounds]',
+        '[data-crafting-modifier-remove]',
+        '[data-crafting-modifier-add]',
+      ]) {
+        assert.ok(
+          !card.querySelector(editorHook),
+          `${activity}: ${editorHook} is authoring, and this screen no longer authors`
+        );
+      }
+
+      assert.ok(
+        Boolean(card.querySelector('[data-crafting-modifier-edit-link]')),
+        `${activity}: the deep link to the one authoring surface is what replaces the editor`
+      );
+      harness.remount();
+    });
+  }
 
   it('says at the ROW which entries are blocked, and names the right fault for each', async () => {
     const target = await mountChecks();
@@ -148,24 +186,25 @@ describe('the check-modifier catalogue card (mounted)', () => {
     harness.remount();
   });
 
-  it('branches its empty state on who owns the entries', async () => {
-    const target = await mountChecks({ checkModifiers: [] });
-    const crafting = target.querySelector(
-      '[data-crafting-modifier-catalogue="crafting"] [data-crafting-modifier-empty]'
-    );
-    assert.equal(crafting.dataset.craftingModifierEmpty, 'editable');
-    assert.match(crafting.textContent, /Add one/, 'crafting has the add button this names');
-
-    await openTab(target, 'salvage');
-    const salvage = target.querySelector(
-      '[data-crafting-modifier-catalogue="salvage"] [data-crafting-modifier-empty]'
-    );
-    assert.equal(salvage.dataset.craftingModifierEmpty, 'linked');
-    assert.ok(
-      !/Add one/.test(salvage.textContent),
-      'salvage has no add button at all, so "Add one" told the GM to do something this ' +
-        'screen cannot do — directly above a button offering the crafting tab instead'
-    );
+  // ONE empty state, on every activity (issue 1117). It branched while crafting owned the
+  // entries — "Add one" was true there and false on the other two, directly above a button
+  // offering the crafting tab instead. Nothing on this screen adds one now, so the sentence
+  // is the same everywhere and it names the surface that does.
+  it('gives every activity the same empty state, naming the one authoring surface', async () => {
+    for (const activity of ['crafting', 'salvage', 'gathering']) {
+      harness.remount();
+      const target = await mountChecks({ activity, modifiers: [] });
+      const empty = target.querySelector(
+        `[data-crafting-modifier-catalogue="${activity}"] [data-crafting-modifier-empty]`
+      );
+      assert.equal(empty.dataset.craftingModifierEmpty, 'linked');
+      assert.match(empty.textContent, /System settings/, `${activity}: it names where to go`);
+      assert.ok(
+        !/Add one/.test(empty.textContent),
+        `${activity}: no screen here adds one, so "Add one" would be an instruction it ` +
+          'cannot carry out'
+      );
+    }
     harness.remount();
   });
 
@@ -184,13 +223,18 @@ describe('the check-modifier catalogue card (mounted)', () => {
     harness.remount();
   });
 
-  it('gives the not-selected state one word per RULE, not one word for four', async () => {
-    const seen = new Set();
+  // THREE WORDS, one per KIND of rule (issue 1096). It was four: `bySubject` owned `Picked per
+  // subject` / `Not picked by default`. The prototype gives both DEFERRING rules the same pair,
+  // and that is forced rather than preferred — its `By recipe` description, which this card now
+  // ships verbatim, reads "from the modifiers you mark SELECTABLE", so a row saying anything
+  // else makes the sentence beside it untrue about the control it names.
+  it('gives the not-selected state one word per KIND of rule, and the two deferring rules share', async () => {
+    const seen = new Map();
     for (const [policy, on, off] of [
-      ['addAll', /Applied/, /Not applied/],
-      ['highest', /Considered/, /Not considered/],
-      ['playerPicks', /Selectable/, /Not selectable/],
-      ['bySubject', /Picked per subject/, /Not picked/],
+      ['addAll', /^Applied$/, /^Not applied$/],
+      ['highest', /^Considered$/, /^Not considered$/],
+      ['playerPicks', /^Selectable$/, /^Not selectable$/],
+      ['bySubject', /^Selectable$/, /^Not selectable$/],
     ]) {
       harness.remount();
       const target = await mountChecks({ craftingDefaultModifierPolicy: policy });
@@ -203,34 +247,146 @@ describe('the check-modifier catalogue card (mounted)', () => {
         .textContent.trim();
       assert.match(selected, on, `${policy}: the ON word`);
       assert.match(notSelected, off, `${policy}: the OFF word answers the ON one`);
-      seen.add(notSelected);
+      seen.set(policy, notSelected);
     }
-    assert.equal(seen.size, 4, 'four rules, four OFF words — none reused');
+    assert.equal(
+      new Set(seen.values()).size,
+      3,
+      'three OFF words over four rules — reused ONLY by the two that defer the selection'
+    );
+    assert.equal(
+      seen.get('bySubject'),
+      seen.get('playerPicks'),
+      'the two deferring rules say the same thing because the rule card beside them does'
+    );
     harness.remount();
   });
 
-  it('hides the eligibility pill from assistive tech, because the checkbox already says it', async () => {
+  // THE PILL IS THE CONTROL (issue 1096). It was presentational, sat beside a
+  // `SelectionCheckbox`, and was hidden from assistive technology because the checkbox already
+  // carried the state word. The prototype draws one control per row, so the checkbox is gone and
+  // the pill is a real toggle button — which means the accessible name, the pressed state and
+  // the description all have to move onto it, and none of that is visible in a frame.
+  it('makes the pill the real control: a toggle button, named, pressed and described', async () => {
     const target = await mountChecks();
-    const row = target.querySelector(
-      '[data-crafting-modifier-catalogue="crafting"] [data-crafting-modifier-eligibility="med"]'
-    );
-    const input = row.querySelector('[data-crafting-modifier-eligibility-input="med"]');
+    const card = target.querySelector('[data-crafting-modifier-catalogue="crafting"]');
+    const pill = card.querySelector('[data-crafting-modifier-eligibility="med"]');
+    assert.equal(pill.tagName, 'BUTTON', 'a control a keyboard can reach and activate');
+    assert.equal(pill.getAttribute('type'), 'button', 'never a submit inside a form-adjacent card');
+    assert.equal(pill.getAttribute('aria-pressed'), 'true', 'the selected entry reads as pressed');
     assert.match(
-      input.getAttribute('aria-label'),
+      pill.getAttribute('aria-label'),
       /Medicine — Applied/,
-      'the CHECKBOX carries the accessible name, state word included'
-    );
-    const pill = row.querySelector('[data-status-pill]');
-    assert.ok(Boolean(pill), 'the pill still renders for sighted users');
-    assert.equal(
-      pill.closest('[aria-hidden="true"]') === null,
-      false,
-      'and is hidden from a reader, which would otherwise hear "Applied" twice'
+      'the pill carries the row’s accessible name, state word included — nothing else can now'
     );
     assert.ok(
-      Boolean(target.querySelector(`#${input.getAttribute('aria-describedby')}`)),
-      'its description resolves to the active rule’s eligibility sentence, so "Applied" ' +
-        'means something to a reader who never sees the rule grid'
+      Boolean(target.querySelector(`#${pill.getAttribute('aria-describedby')}`)),
+      'its description resolves to the active rule’s sentence, so "Applied" means something ' +
+        'to a reader who never sees the rule grid'
+    );
+    assert.equal(
+      card.querySelector('[data-crafting-modifier-eligibility="huge"]').getAttribute('aria-pressed'),
+      'false',
+      'and an unselected entry reads as unpressed rather than merely differently coloured'
+    );
+
+    // NO NESTED CONTROL, in either direction. An interactive control inside an interactive one
+    // lands DOM the browser did not build as authored, and the retired checkbox is exactly what
+    // a partial conversion would leave behind.
+    assert.ok(!pill.querySelector('button, input, a'), 'nothing interactive nests inside the pill');
+    assert.ok(
+      !card.querySelector('input[type="checkbox"]'),
+      'the checkbox is gone — two controls for one decision is what this replaces'
+    );
+    harness.remount();
+  });
+
+  it('toggles the eligible set from the pill, both ways', async () => {
+    const patches = [];
+    const target = await mountChecks({
+      onUpdateCraftingCheckModifiers: (patch) => patches.push(patch),
+    });
+    const card = target.querySelector('[data-crafting-modifier-catalogue="crafting"]');
+    card.querySelector('[data-crafting-modifier-eligibility="huge"]').click();
+    card.querySelector('[data-crafting-modifier-eligibility="med"]').click();
+    assert.deepEqual(
+      patches,
+      [{ defaultModifierIds: ['med', 'huge'] }, { defaultModifierIds: [] }],
+      'clicking an unselected entry adds it and clicking a selected one removes it — the ' +
+        'pill IS the write, not a label beside one'
+    );
+    harness.remount();
+  });
+
+  // THE SHAPE OF THE SCREEN, which no per-element assertion can state. Each clause below is
+  // something that shipped in the wrong PLACE rather than missing: the deep link sat at the foot
+  // of the rows in the slot every other list here fills with its add-a-row control, the library
+  // note opened the card instead of closing it, and `How they combine` was an uppercase
+  // micro-label inside the catalogue card rather than a card of its own.
+  it('puts the deep link in the card HEAD and the library note at the FOOT', async () => {
+    const target = await mountChecks();
+    const card = target.querySelector('[data-crafting-modifier-catalogue="crafting"]');
+    const link = card.querySelector('[data-crafting-modifier-edit-link]');
+    assert.ok(
+      Boolean(link.closest('.manager-checks-card-head')),
+      'the one action this card has sits beside its title, not under its rows'
+    );
+    const rows = card.querySelector('[data-crafting-modifier-rows]');
+    assert.ok(!rows.contains(link), 'and is not a member of the list it cannot extend');
+
+    const note = card.querySelector('[data-crafting-modifier-library-note]');
+    assert.ok(Boolean(note), 'the library note still states where the entries are authored');
+    assert.equal(
+      rows.lastElementChild,
+      note,
+      'and CLOSES the card: it qualifies the rows, so it is read after them, not before'
+    );
+    harness.remount();
+  });
+
+  it('gives `How they combine` its own studio card, with a title and a description', async () => {
+    const target = await mountChecks();
+    const policyCard = target.querySelector('[data-crafting-modifier-policy-card]');
+    assert.ok(Boolean(policyCard), 'the combination rule is a card, not a kicker inside one');
+    assert.ok(
+      policyCard.classList.contains('manager-checks-card'),
+      'and it wears the studio card contract, which is what strips the inspector inset'
+    );
+    assert.equal(
+      policyCard.querySelector('.manager-checks-card-title').textContent.trim(),
+      'How they combine',
+      'a sentence-case title, not an uppercase micro-label'
+    );
+    assert.ok(
+      Boolean(policyCard.querySelector('.manager-checks-card-description')),
+      'with the description every other studio card head carries'
+    );
+    const catalogue = target.querySelector('[data-crafting-modifier-catalogue="crafting"]');
+    assert.ok(
+      !catalogue.contains(policyCard),
+      'two sibling cards — a card nested in a card is not what the stack gutter separates'
+    );
+    // The pick cap belongs to the rules it bounds, so it travels with them.
+    assert.ok(
+      !catalogue.querySelector('[data-crafting-modifier-max-picks]'),
+      'and the cap is not left behind in the library card'
+    );
+    harness.remount();
+  });
+
+  it('keeps the pick cap with the rules it bounds, under a selecting rule only', async () => {
+    const target = await mountChecks({ craftingDefaultModifierPolicy: 'playerPicks' });
+    const cap = target.querySelector('[data-crafting-modifier-max-picks]');
+    assert.ok(
+      Boolean(cap?.closest('[data-crafting-modifier-policy-card]')),
+      'the cap bounds the two deferring rules, so it sits in the card that chooses them'
+    );
+    harness.remount();
+    const nonSelecting = await mountChecks({ craftingDefaultModifierPolicy: 'addAll' });
+    assert.ok(
+      !nonSelecting.querySelector('[data-crafting-modifier-max-picks]'),
+      'and is absent under a rule where nobody selects — a cap on no selection is a control ' +
+        'with no effect'
     );
     harness.remount();
   });
@@ -250,7 +406,7 @@ describe('the Validation tab reads each activity’s OWN modifier context', () =
   }
 
   it('reports each activity’s own broken entry, in its own section', async () => {
-    const target = await openTab(await mountChecks(), 'validation');
+    const target = await mountChecks({ activity: 'validation' });
     assert.ok(
       Boolean(target.querySelector('[data-checks-validation-section="crafting"]')),
       'the crafting section renders'
@@ -282,11 +438,19 @@ describe('the Validation tab reads each activity’s OWN modifier context', () =
   });
 
   it('reports the gathering d100 selection as reaching no roll at all', async () => {
-    const target = await openTab(await mountChecks(), 'validation');
+    const target = await mountChecks({ activity: 'validation' });
     assert.ok(
-      issuesIn(target, 'gathering').includes('modifiersInertNoCheck'),
-      'the fixed d100 roll has no formula, so a gathering selection applies to nothing — ' +
+      issuesIn(target, 'gathering').includes('modifiersInertNoModifierSupport'),
+      'the fixed d100 roll takes no modifiers, so a gathering selection applies to nothing — ' +
         'this section is the ONE owned path for saying so'
+    );
+    // NOT the mode-rolls-nothing sentence. The d100 rolled against each drop's chance IS
+    // this mode's check; only the seam to add modifiers to it is missing. Naming the wrong
+    // cause here told the GM to switch to a mode that rolls — and gathering's two such
+    // modes are exactly the ones rendered disabled.
+    assert.ok(
+      !issuesIn(target, 'gathering').includes('modifiersInertNoCheck'),
+      'gathering d100 must not claim its mode rolls no check'
     );
     assert.ok(
       !issuesIn(target, 'crafting').includes('modifiersInertNoCheck'),
@@ -296,10 +460,11 @@ describe('the Validation tab reads each activity’s OWN modifier context', () =
   });
 
   it('says nothing about modifiers when an activity selects none', async () => {
-    const target = await openTab(
-      await mountChecks({ salvageDefaultModifierIds: [], gatheringDefaultModifierIds: [] }),
-      'validation'
-    );
+    const target = await mountChecks({
+      activity: 'validation',
+      salvageDefaultModifierIds: [],
+      gatheringDefaultModifierIds: [],
+    });
     for (const subsystem of ['salvage', 'gathering']) {
       assert.deepEqual(
         issuesIn(target, subsystem).filter((id) => id.startsWith('modifier')),

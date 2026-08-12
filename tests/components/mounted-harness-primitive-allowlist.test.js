@@ -67,6 +67,29 @@ const SHARED_PRIMITIVES = [
   // mounted tree, and this is the guard that turns the resulting omission into a failure
   // instead of a hung suite.
   'src/ui/svelte/apps/manager/InspectorActionButton.svelte',
+  // The product's ONE horizontal fill bar, ONE threshold band strip and ONE row disclosure
+  // (issue 1096). `FillBar` is the sharpest of the three: `ui-integration/spec.md` records
+  // five hand-rolled copies of that shape as a live non-conformance, so every future
+  // conversion drops it into another mounted tree — the gathering player suites already
+  // pulled it in through `ChanceBar`'s rebuild, and four more sites are named debt.
+  // `RowDisclosure` is NO LONGER ON THIS LIST (issue 1096, maintainer parity round). Its
+  // one consumer was the Checks right rail's two collapsible panels, and the maintainer
+  // removed those: the prototype has no disclosure anywhere in that rail. It therefore has
+  // ZERO consumers today, which is precisely the state the reachability guard below exists
+  // to report — so it comes off the list rather than the guard being loosened for it. The
+  // component and `row-disclosure-mounted.test.js` are left in place: the collapsed TRIGGER
+  // card named in `ui-integration/spec.md` is still its intended second site, and it goes
+  // back on this list the moment something renders it. If that site is abandoned, the
+  // component is dead code and should be deleted outright.
+  'src/ui/svelte/components/FillBar.svelte',
+  'src/ui/svelte/components/ThresholdBandStrip.svelte',
+  // THE manager's labelled push-button (issue 1096). It is the sharpest entry on this list
+  // after `Chip`: `manager-button` is a CSS convention repeated across more than sixty
+  // components, so every step of the conversion sweep drops this primitive into another
+  // mounted tree. Two screens use it today — the Modifiers card in `SystemEditView` and the
+  // Tool Studio header, which is the authority the primitive reproduces — and they already
+  // sit in four different mounted trees between them.
+  'src/ui/svelte/components/ManagerButton.svelte',
 ];
 
 // `import X from './Y.svelte'` — the only form the mount harnesses' temp tree resolves.
@@ -289,14 +312,33 @@ test('every inspected suite resolves at least one real component, so none passes
   );
 });
 
-test('the shared primitives are reachable from the manager root, so the guard has teeth', () => {
+// The declared APPLICATION ROOTS a shared primitive may live under.
+//
+// It was one root — the manager's — and `ui-integration/spec.md` §Shared product UI
+// primitives recorded that as a live non-conformance in as many words: the rule's subject
+// is "every product surface, the GM manager and the player crafting, alchemy, gathering,
+// inventory and Journal surfaces alike", while the allowlist that encodes "this is a shared
+// primitive" was structurally manager-scoped. `FillBar` is the first entry the rule always
+// admitted and the guard could not: it lives under `ChanceBar`, in the player gathering app,
+// and nothing in the manager renders it. Widening to a declared root SET is the fix that
+// spec names, and it is a widening rather than a weakening — a primitive must still be
+// reachable from a real application root, just not from that one.
+const APPLICATION_ROOTS = [
+  'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte',
+  'src/ui/svelte/apps/gathering/GatheringView.svelte',
+];
+
+test('the shared primitives are reachable from a declared application root, so the guard has teeth', () => {
   // If this ever stops holding, the guard above is vacuous and the walk needs revisiting.
-  const rootClosure = closures.get('src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte');
-  assert.ok(rootClosure, 'the manager root is a tracked component');
+  const rootClosures = APPLICATION_ROOTS.map((root) => {
+    const closure = closures.get(root);
+    assert.ok(closure, `${root} is a tracked component`);
+    return closure;
+  });
   for (const primitive of SHARED_PRIMITIVES) {
     assert.ok(
-      rootClosure.has(primitive),
-      `${primitive} should be reachable from the manager root's static graph`
+      rootClosures.some((closure) => closure.has(primitive)),
+      `${primitive} should be reachable from at least one declared application root`
     );
   }
 });

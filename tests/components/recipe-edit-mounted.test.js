@@ -73,6 +73,9 @@ const RAW_MODULES = [
   // the graph the validator walks.
   'src/systems/toolCheckBonus.js',
   'src/utils/craftingCheckExpression.js',
+  // …and issue 1118 a FOURTH: the resolver ranks a rolling modifier by the deterministic
+  // average this import-free leaf computes.
+  'src/utils/rollExpressionAverage.js',
   // …and issue 1095 a third: `resolveActiveSalvageCheckFormula` delegates to the ONE
   // salvage `(mode, checkUsable)` derivation rather than re-deriving the pair.
   'src/systems/salvageCheckUsability.js',

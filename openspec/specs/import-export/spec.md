@@ -24,7 +24,8 @@ From `data-models/spec.md`:
 
 - `CraftingSystem` and its `recipeItemDefinitions`, `tools`, `gatheringRealms`.
 - The `gatheringEnvironments` world setting (per-system environment records).
-- The `gatheringConfig` world setting (per-system `rules`, `conditions`, `vocabularies`, `economy`, reusable `tasks`, reusable `events`, `characterModifiers`).
+- The `gatheringConfig` world setting (per-system `rules`, `conditions`, `vocabularies`, `economy`, reusable `tasks`, reusable `events`).
+  The modifier library moved onto the crafting system in issue 1117 and is exported with it.
 - The excluded `gatheringParties` world setting.
 
 ## Requirements
@@ -132,10 +133,12 @@ Terminating the progress indicator on failure MUST NOT suppress, wrap, or alter 
 
 For supported authoring data, a single-store keep-mode `export → import → export` MUST be equivalent modulo the volatile envelope fields `exportedAt` and `fabricateVersion`.
 `craftingCheck.maxModifierPicks` MUST round-trip through `export → import → export` under keep mode, and an ABSENT cap MUST stay absent for every rule the derivation above does not stamp — absence is the "unlimited" value, so writing a bound where the source had none would truncate recipe picks the bundle carries.
-`CraftingSystem.checkModifiers` — the ONE system-level catalogue (issue 1095), with each entry's absence-preserving `min` / `max` — MUST round-trip under keep mode, as MUST each of the three activity checks' `defaultModifierPolicy` / `defaultModifierIds` / `maxModifierPicks` selection triple.
+`CraftingSystem.modifiers` — the ONE system-level modifier library (issues 1095, 1117), with each entry's absence-preserving `min` / `max` — MUST round-trip under keep mode, as MUST each of the three activity checks' `defaultModifierPolicy` / `defaultModifierIds` / `maxModifierPicks` selection triple.
 `buildExportPayload` deep-clones the system, so the top-level catalogue round-trips for free once `_normalizeSystem` emits it there; an entry that authored NEITHER bound MUST come back with neither key, because a `min: 0` acquired in transit is a legal-looking catalogue that silently zeroes the modifier.
 Every SUBJECT pick MUST round-trip, including an AUTHORED EMPTY array, which is distinct from an absent one: `Recipe.craftingModifier.modifierIds`, `Component.salvage.checkModifierIds` and `GatheringTask.checkModifierIds`.
-A bundle carrying the pre-1095 `craftingCheck.checkModifiers` or the legacy `byRecipe` token is upcast by the export-payload transforms (`applySystemCheckModifierCatalogue`) and is NOT required to round-trip in its legacy form.
+A bundle carrying the pre-1095 `craftingCheck.checkModifiers`, the pre-1117 `CraftingSystem.checkModifiers`, a gathering-slice `characterModifiers` library, or the legacy `byRecipe` token is upcast by the export-payload transforms (`applySystemCheckModifierCatalogue`, then `applyUnifiedModifierLibrary`) and is NOT required to round-trip in its legacy form.
+The two run in that order because it is observable: the merge reads only the system-level key, so running it first would merge an empty catalogue out of a pre-1095 bundle and then retire it.
+The gathering slice therefore carries NO `characterModifiers` on export, and a re-keyed entry's references inside the slice are rewritten with it.
 A legacy recipe-level `craftingModifier.policy` in a source bundle is inert and is not required to round-trip: `Recipe._normalizeCraftingModifier` drops it on read (see `data-models/spec.md` requirement 13a), and no resolver consults it.
 
 ## Out of Scope
