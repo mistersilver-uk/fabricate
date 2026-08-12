@@ -44,6 +44,7 @@ import {
 } from '../src/ui/svelte/apps/manager/checks/checkOdds.js';
 import { MacroExecutor } from '../src/utils/MacroExecutor.js';
 import { recordedRollDouble } from './helpers/recordedRollParse.js';
+import { reduceRollExpression } from '../src/utils/rollExpressionAverage.js';
 
 const repoRoot = resolve(import.meta.dirname, '..');
 
@@ -79,20 +80,24 @@ function installRoll({ face = 9 } = {}) {
       this.terms = [];
     }
 
+    // REDUCED, never summed by regex. The previous version masked the flavour and added up
+    // every number it could see, which reads `min(max((1d8), -1), 6)` as `9 - 1 + 6` — so a
+    // clamped rolling check modifier gave the simulator a total no roll can produce, and the
+    // histogram beside it would have been graded against that. `reduceRollExpression` is the
+    // shipped walk, pinned to one face per die, so this double rolls what Foundry rolls.
     async evaluate() {
       const resolved = Roll.replaceFormulaData(this.formula, this.data, { missing: '0' });
-      const masked = resolved.replaceAll(/\[[^\]]*]/g, '');
-      let total = 0;
-      const rolled = masked.replaceAll(/(\d*)d(\d+)/gi, (_match, count) => {
-        const number = count === '' ? 1 : Number(count);
-        const results = Array.from({ length: number }, () => ({ result: face, active: true }));
-        this.dice.push({ number, faces: 20, results, total: face * number });
-        return String(face * number);
+      const { value } = reduceRollExpression(resolved, {
+        dieValue: ({ count, faces }) => {
+          const number = Number.isFinite(count) ? count : 1;
+          const sides = Number(faces);
+          if (!Number.isInteger(sides)) return undefined;
+          const results = Array.from({ length: number }, () => ({ result: face, active: true }));
+          this.dice.push({ number, faces: sides, results, total: face * number });
+          return face * number;
+        },
       });
-      for (const [, sign, value] of rolled.matchAll(/([+-]?)\s*(\d+)/g)) {
-        total += (sign === '-' ? -1 : 1) * Number(value);
-      }
-      this.total = total;
+      this.total = value;
       return this;
     }
 
@@ -448,6 +453,12 @@ describe('checkPreview: the terse breakdown line', () => {
 // So the fixture below is deliberately the opposite: a NON-EMPTY catalogue with a NON-ZERO
 // resolved scalar, asserted to be non-zero before anything else is claimed.
 describe('checkPreview: the histogram enumerates the formula the simulator rolls', () => {
+  /** The inclusive range of totals an enumerated space reaches. */
+  function domainOf(verdict) {
+    const totals = verdict.outcomes.map((outcome) => outcome.total);
+    return { min: Math.min(...totals), max: Math.max(...totals) };
+  }
+
   /** A system whose crafting check applies one catalogued modifier worth a flat +2. */
   const SYSTEM_WITH_CATALOGUE = {
     // `system.modifiers` since issue 1117: the ONE authored modifier library.
@@ -491,7 +502,11 @@ describe('checkPreview: the histogram enumerates the formula the simulator rolls
       result.data.resolvedFormula,
       'the enumerated formula IS the one the runner resolved and rolled'
     );
-    assert.equal(verdict.remainder, 5, '3 from the tool term and 2 from the catalogue');
+    assert.deepEqual(
+      domainOf(verdict),
+      { min: 6, max: 25 },
+      '3 from the tool term and 2 from the catalogue move the whole domain'
+    );
   });
 
   it('puts the simulator’s rolled total INSIDE the enumerated domain', async () => {
@@ -501,7 +516,7 @@ describe('checkPreview: the histogram enumerates the formula the simulator rolls
     const verdict = describeFormulaEnumerability(plan.formula, ACTOR, {
       craftingModifier: plan.args.craftingModifier,
     });
-    const domain = { min: 1 + verdict.remainder, max: verdict.faces + verdict.remainder };
+    const domain = domainOf(verdict);
     assert.deepEqual(domain, { min: 6, max: 25 });
     assert.equal(result.data.total, 14, 'a natural 9 plus the two appended terms');
     assert.ok(
@@ -514,21 +529,136 @@ describe('checkPreview: the histogram enumerates the formula the simulator rolls
     installRoll({ face: 9 });
     const plan = planWithCatalogue();
     const withCatalogue = enumeratePassFailOdds({
-      faces: 20,
-      remainder: describeFormulaEnumerability(plan.formula, ACTOR, {
+      outcomes: describeFormulaEnumerability(plan.formula, ACTOR, {
         craftingModifier: plan.args.craftingModifier,
-      }).remainder,
+      }).outcomes,
       args: { dc: 12, comparison: 'meet', triggers: [] },
     });
     const withoutIt = enumeratePassFailOdds({
-      faces: 20,
-      remainder: describeFormulaEnumerability(plan.formula, ACTOR).remainder,
+      outcomes: describeFormulaEnumerability(plan.formula, ACTOR).outcomes,
       args: { dc: 12, comparison: 'meet', triggers: [] },
     });
     assert.notDeepEqual(
       withCatalogue.map((row) => [row.id, row.count]),
       withoutIt.map((row) => [row.id, row.count]),
       'a histogram blind to the scalar reports a different chance of success'
+    );
+  });
+
+  // ── A MODIFIER THAT ROLLS, WITH BOUNDS ───────────────────────────────────────────
+  //
+  // The flat case above is the easy half. A check modifier may ROLL, and its bounds are
+  // expressed IN the formula rather than around it — `min(max((1d8), -1), 6)[Modifiers]` —
+  // so the appended term is a function term with a die inside it. Two things go wrong at
+  // once for an enumerator that reads the string instead of the expression:
+  //
+  //   1. The clamp's BOUND ARGUMENTS `-1` and `6` are read as flat addends of the roll, so
+  //      the whole domain shifts by `+5`.
+  //   2. The modifier's die is read as a plain group of its own, so the enumerated space is
+  //      `1d20` convolved with a full `1d8` rather than with the `1..6` the clamp allows —
+  //      two faces too wide.
+  //
+  // Neither shows up as a crash, an empty panel or a misshapen chart. The histogram stays
+  // monotone, correctly ordered and plausibly labelled, and is simply wrong. So it is graded
+  // against an ORACLE computed here from first principles, not against the enumerator's own
+  // arithmetic re-spelled.
+  /** A system whose crafting check applies one catalogued modifier that ROLLS `1d8`, clamped to `[-1, 6]`. */
+  const SYSTEM_WITH_ROLLING_CATALOGUE = {
+    modifiers: [{ id: 'mod-charm', label: 'Charm', expression: '1d8', min: -1, max: 6 }],
+    craftingCheck: { defaultModifierPolicy: 'addAll', defaultModifierIds: ['mod-charm'] },
+  };
+
+  function planWithRollingCatalogue() {
+    return buildPreviewCheckArgs({
+      activity: 'crafting',
+      mode: 'simple',
+      draft: { rollFormula: '1d20', dc: 12, thresholdMode: 'meet' },
+      system: SYSTEM_WITH_ROLLING_CATALOGUE,
+      actor: ACTOR,
+      toolTerms: [{ value: 3, label: 'Tools' }],
+    });
+  }
+
+  it('NON-VACUITY: the rolling catalogue appends a CLAMPED DIE, not a scalar', () => {
+    installRoll({ face: 9 });
+    const plan = planWithRollingCatalogue();
+    assert.equal(
+      resolveRolledFormula(plan.formula, ACTOR, plan.args.craftingModifier),
+      '1d20 + 3[Tools] + min(max((1d8), -1), 6)[Modifiers]',
+      'the bounds are IN the formula, which is what puts a die inside a function term'
+    );
+  });
+
+  it('enumerates a CLAMPED DICE modifier exactly, against an independent oracle', () => {
+    installRoll({ face: 9 });
+    const plan = planWithRollingCatalogue();
+    const verdict = describeFormulaEnumerability(plan.formula, ACTOR, {
+      craftingModifier: plan.args.craftingModifier,
+    });
+    assert.equal(verdict.enumerable, true, `enumerable (got ${verdict.reason})`);
+    assert.deepEqual(verdict.dice, [{ faces: 20 }, { faces: 8 }], 'both dice, in reading order');
+    assert.equal(verdict.combinations, 160);
+
+    // THE ORACLE. Computed from the clamp's own definition rather than from anything the
+    // module under test does, so a bug shared between the enumerator and this expectation is
+    // not possible.
+    const oracle = new Map();
+    for (let d20 = 1; d20 <= 20; d20 += 1) {
+      for (let d8 = 1; d8 <= 8; d8 += 1) {
+        const total = d20 + 3 + Math.min(Math.max(d8, -1), 6);
+        oracle.set(total, (oracle.get(total) ?? 0) + 1);
+      }
+    }
+    const enumerated = new Map();
+    for (const outcome of verdict.outcomes) {
+      enumerated.set(outcome.total, (enumerated.get(outcome.total) ?? 0) + 1);
+    }
+    assert.deepEqual(
+      [...enumerated].toSorted(([a], [b]) => a - b),
+      [...oracle].toSorted(([a], [b]) => a - b),
+      'every total, and how often it comes up'
+    );
+    assert.deepEqual(domainOf(verdict), { min: 5, max: 29 }, '1+3+1 up to 20+3+6');
+  });
+
+  it('and the two ways of getting it wrong are BOTH excluded, by number', () => {
+    // The negative control the case above needs. `{ min: 5, max: 29 }` on its own is a
+    // number a wrong enumerator could stumble onto; these are the two specific wrong answers
+    // a string scan produces, stated so that landing on either fails here by name.
+    installRoll({ face: 9 });
+    const plan = planWithRollingCatalogue();
+    const domain = domainOf(
+      describeFormulaEnumerability(plan.formula, ACTOR, {
+        craftingModifier: plan.args.craftingModifier,
+      })
+    );
+    assert.notDeepEqual(
+      domain,
+      { min: 12, max: 36 },
+      'NOT `1d20 ⊕ 1d8` with the bounds -1 and 6 added as flat addends (+8 on top of the tools)'
+    );
+    assert.notDeepEqual(
+      domain,
+      { min: 5, max: 31 },
+      'NOT the unclamped `1d8`, whose top face reaches two further than the clamp allows'
+    );
+  });
+
+  it('and the SIMULATOR lands inside that space, which is the claim the name makes', async () => {
+    // The whole point of the suite: the histogram and the readout describe ONE formula. The
+    // runner rolls a 9 on every die here, so its total is `9 + 3 + min(max(9, -1), 6) = 18`
+    // — the clamp biting is itself observable, because an unclamped 9 would total 21.
+    installRoll({ face: 9 });
+    const plan = planWithRollingCatalogue();
+    const result = await runCheckPreview(plan);
+    const verdict = describeFormulaEnumerability(plan.formula, ACTOR, {
+      craftingModifier: plan.args.craftingModifier,
+    });
+    assert.equal(verdict.display, result.data.resolvedFormula, 'ONE formula, both surfaces');
+    assert.equal(result.data.total, 18, 'the clamp holds the modifier at +6');
+    assert.ok(
+      verdict.outcomes.some((outcome) => outcome.total === result.data.total),
+      `the rolled total ${result.data.total} must be a total the histogram counted`
     );
   });
 

@@ -58,7 +58,6 @@
  * failing whole on this one panel.
  */
 
-import { evaluateNumericExpression } from '../../../../../systems/checkModifierResolver.js';
 import {
   classifyCheckTotal,
   resolveCheckFormulaDisplay,
@@ -67,6 +66,7 @@ import {
   rolledDiceGroups,
 } from '../../../../../systems/checkRoll.js';
 import { resolveProgressiveAward } from '../../../../../utils/progressiveAward.js';
+import { reduceRollExpression } from '../../../../../utils/rollExpressionAverage.js';
 
 /**
  * Why a formula is not enumerable. Discriminated so each refusal is testable on its own
@@ -84,7 +84,7 @@ import { resolveProgressiveAward } from '../../../../../utils/progressiveAward.j
 export const ODDS_REASONS = Object.freeze({
   parseThrew: 'parse-threw',
   noDice: 'no-dice',
-  multipleDieGroups: 'multiple-die-groups',
+  tooManyOutcomes: 'too-many-outcomes',
   dieModifiers: 'die-modifiers',
   nonUnitCount: 'non-unit-count',
   nonIntegerFaces: 'non-integer-faces',
@@ -106,11 +106,18 @@ export const ODDS_REASONS = Object.freeze({
  */
 export const SANDBOX_ABSENT = 'no-sandbox-order';
 
-/** A Foundry flavour annotation (`+ 3[Tools]`). Inert label text, never a value. */
-const FLAVOUR_SPAN = /\[[^\]]*]/g;
+/**
+ * The largest joint outcome space this will walk.
+ *
+ * The enumeration is a cartesian product, so it grows multiplicatively: a `1d20` check with a
+ * `1d8` modifier is 160 assignments and `1d100 + 1d100` is 10 000. The cap REFUSES rather
+ * than sampling, because a sampled histogram is the approximation this whole module exists to
+ * avoid — and it refuses with a stated reason, so the panel says why instead of going blank.
+ */
+const MAX_ENUMERATED_OUTCOMES = 50_000;
 
-/** The `NdS` substring of an already-validated single-die formula. */
-const DIE_SUBSTRING = /\d*d\d+/i;
+/** Foundry's non-numeric denominations, whose faces are not values (`1df`, `1dc`). */
+const NON_NUMERIC_DENOMINATION = /^[fc]$/i;
 
 const refuse = (reason) => ({ enumerable: false, reason });
 
@@ -153,59 +160,117 @@ function isStringTermLike(term) {
 }
 
 /**
- * Refuse the single die term unless it is one unmodified numeric die.
+ * Refuse the non-die remainder for a STRING TERM only.
  *
- * @param {object} die The sole dice term.
- * @returns {?{enumerable: false, reason: string}} A refusal, or null when it passes.
- */
-function refuseDieShape(die) {
-  if (die.modifiers.length > 0) return refuse(ODDS_REASONS.dieModifiers);
-  if (!Number.isInteger(die.number) || die.number !== 1) {
-    return refuse(ODDS_REASONS.nonUnitCount);
-  }
-  if (!Number.isInteger(die.faces) || die.faces < 1) {
-    return refuse(ODDS_REASONS.nonIntegerFaces);
-  }
-  if (die.denomination !== `d${die.faces}`) {
-    return refuse(ODDS_REASONS.nonNumericDenomination);
-  }
-  return null;
-}
-
-/**
- * Refuse the non-die remainder unless every term of it is deterministic.
+ * It used to refuse every non-deterministic term, and that is exactly the rule this change
+ * lifts. `RollParser.flattenTree` pushes a parenthetical, function or pool term WHOLE, so a
+ * blanket determinism test refused every formula with a die inside brackets — which, since a
+ * check modifier may roll and its bounds are expressed IN the formula
+ * (`min(max((1d8), -1), 6)[Modifiers]`), is now every system carrying a bounded rolling
+ * modifier. Those formulas are perfectly enumerable; they are simply not "one die plus a flat
+ * number", and abstaining on them left the panel blank for a feature that had just shipped.
  *
- * @param {Array<object>} terms Every parsed term except the die.
+ * What survives is the `StringTerm` refusal, because that is the one shape whose
+ * `isDeterministic` LIES: it answers `true` for a string Foundry then throws on at evaluate.
+ *
+ * @param {Array<object>} terms Every parsed term except the dice.
  * @returns {?{enumerable: false, reason: string}} A refusal, or null when it passes.
  */
 function refuseRemainder(terms) {
-  // Determinism first, which decides PRECEDENCE for a remainder carrying both a string term
-  // and a rolled one. It is NOT what keeps `1d20 + (2d6)` off the string-term branch —
-  // {@link isStringTermLike} does that, by excluding a parenthetical outright — because a
-  // DETERMINISTIC parenthetical (`1d20 + (2)`) passes this test and would then be refused
-  // as a string term by any looser predicate.
-  if (terms.some((term) => term?.isDeterministic !== true)) {
-    return refuse(ODDS_REASONS.nonDeterministicRemainder);
-  }
   if (terms.some((term) => isStringTermLike(term))) return refuse(ODDS_REASONS.stringTerm);
   return null;
 }
 
 /**
- * The deterministic part of the formula, as a number.
+ * The dice this formula rolls, in READING ORDER, or the reason it cannot be enumerated.
  *
- * Read off the RESOLVED display rather than re-walking the parse tree: the display is
- * the `@`-substituted string the simulator itself shows, so the histogram and the
- * readout can never disagree about what the modifiers came to. Flavour spans are lifted
- * out first — a tool named "Anvil d20 of Power" would otherwise contribute a die term
- * out of its own label — and the single validated die is replaced by zero.
+ * IT DOES NOT SCAN THE STRING FOR `NdS`, and that is the whole point. Such a scan splits on
+ * whitespace, operators, parentheses and commas, so `min(max((1d8), -1), 6)[Modifiers]` hands
+ * back the clamp's BOUND ARGUMENTS — `-1` and `6` — as though they were flat addends of the
+ * roll. The enumerated domain then comes out shifted by `+5` and two faces too wide against
+ * the true `1d20` plus a clamped `1d8`, and the histogram it draws is monotone, correctly
+ * shaped, plausibly labelled and wrong. That is the worst thing this surface can do, because
+ * nothing about it looks broken.
+ *
+ * So the dice are found by the SAME recursive-descent reader that reduces the expression —
+ * {@link reduceRollExpression}'s `dieValue` hook — which knows a function argument from a
+ * top-level addend because it parsed both. One reader, two questions.
+ *
+ * That reader also asserts END OF INPUT, which is the other half of trusting it: it refuses a
+ * reduction it could not fully consume, so a shape it does not understand cannot quietly
+ * reduce through a prefix of itself.
+ *
+ * @param {string} display The `@`-resolved formula, flavour and all.
+ * @returns {{dice: Array<{faces: number}>} | {enumerable: false, reason: string}} The plan.
+ */
+function planDice(display) {
+  const dice = [];
+  let refusal = null;
+  const probe = reduceRollExpression(display, {
+    dieValue: ({ count, faces, modifiers }) => {
+      // ONE unmodified numeric die per group, which is the only shape whose faces are uniform
+      // and equally likely. Foundry declares seventeen die modifiers and every one of them
+      // either reweights the faces, unbounds the support, or changes what `total` means, so a
+      // modified pool is refused rather than charted as though it were flat.
+      if (modifiers !== '') refusal ??= ODDS_REASONS.dieModifiers;
+      else if (count !== 1) refusal ??= ODDS_REASONS.nonUnitCount;
+      else if (NON_NUMERIC_DENOMINATION.test(faces)) {
+        // `FateDie` reports `faces: 3` and `Coin` reports `2`, so both are perfectly integral
+        // and are told apart from a numbered die by DENOMINATION alone. Reporting "the faces
+        // are not an integer" for either would be a false statement about the die.
+        refusal ??= ODDS_REASONS.nonNumericDenomination;
+      } else if (!Number.isInteger(Number(faces)) || Number(faces) < 1) {
+        refusal ??= ODDS_REASONS.nonIntegerFaces;
+      } else {
+        dice.push({ faces: Number(faces) });
+        // The probe pass only has to prove the expression REDUCES; the mean is as good a
+        // stand-in as any single face for that, and no caller ever sees this value.
+        return (Number(faces) + 1) / 2;
+      }
+      return NaN;
+    },
+  });
+  if (refusal) return refuse(refusal);
+  // A finite value is the reader's own statement that it consumed the WHOLE expression and
+  // that every part of it reduced — the end-of-input assertion included.
+  if (!Number.isFinite(probe.value)) return refuse(ODDS_REASONS.nonDeterministicRemainder);
+  if (dice.length === 0) return refuse(ODDS_REASONS.noDice);
+  return { dice };
+}
+
+/**
+ * Walk the joint face space, reducing the expression once per assignment.
+ *
+ * EXACT, never sampled and never approximated: every assignment is equally likely, so the
+ * bucket counts are the real distribution — including through a clamp, where the reduction
+ * `min(max((3), -1), 6)` answers 3 and `min(max((8), -1), 6)` answers 6. That is what makes a
+ * bounded `1d8` modifier chart as the `1..6` it actually contributes rather than as the
+ * `1..8` its die names.
  *
  * @param {string} display The `@`-resolved formula.
- * @returns {number} The remainder, or NaN when it does not reduce.
+ * @param {Array<{faces: number}>} dice The dice, in reading order.
+ * @returns {Array<{total: number, diceGroups: Array<object>}>} One outcome per assignment.
  */
-function resolveRemainder(display) {
-  const masked = String(display ?? '').replaceAll(FLAVOUR_SPAN, '');
-  return evaluateNumericExpression(masked.replace(DIE_SUBSTRING, '0'));
+function enumerateOutcomes(display, dice) {
+  const outcomes = [];
+  const assignment = dice.map(() => 1);
+  for (;;) {
+    let ordinal = 0;
+    const { value } = reduceRollExpression(display, {
+      // Positional, and the reader's order is deterministic, so the k-th call is the same die
+      // on every pass.
+      dieValue: () => assignment[ordinal++],
+    });
+    outcomes.push({ total: value, diceGroups: diceGroupsFor(dice, assignment) });
+    // An odometer over the faces, least-significant die last.
+    let carry = dice.length - 1;
+    while (carry >= 0 && assignment[carry] === dice[carry].faces) {
+      assignment[carry] = 1;
+      carry -= 1;
+    }
+    if (carry < 0) return outcomes;
+    assignment[carry] += 1;
+  }
 }
 
 /**
@@ -263,80 +328,104 @@ export function describeFormulaEnumerability(
   }
   if (!Array.isArray(terms)) return refuse(ODDS_REASONS.parseThrew);
 
-  const dice = terms.filter((term) => isDiceTermLike(term));
-  if (dice.length > 1) return refuse(ODDS_REASONS.multipleDieGroups);
-  if (dice.length === 0) {
-    // ORDER MATTERS. `flattenTree` pushes a parenthetical, function or pool term WHOLE,
-    // so `max(1d20,5)` and `{1d20,1d12}kh` reach here with no TOP-LEVEL die at all — and
-    // answering them "this formula rolls no dice of its own" would be a false statement
-    // about a formula that plainly rolls some. A non-deterministic remainder is the
-    // accurate reading; `no-dice` is reserved for a formula that really is all arithmetic.
-    return refuseRemainder(terms) ?? refuse(ODDS_REASONS.noDice);
+  // The one shape whose `isDeterministic` lies. Everything else about the formula is decided
+  // by the reader below, which — unlike `flattenTree`'s top-level term list — sees inside a
+  // parenthetical, a function and a pool.
+  const stringRefusal = refuseRemainder(terms.filter((term) => !isDiceTermLike(term)));
+  if (stringRefusal) return stringRefusal;
+
+  // The ONE fact the reader cannot state, kept for its own sake rather than as a second
+  // opinion: `1d(1d4)` puts an EXPRESSION where the faces go, so Foundry answers with a die
+  // whose `faces` is `undefined` until it is evaluated, and the reader — whose faces
+  // production is digits or a configured denomination — simply does not recognise the token
+  // as a die at all. Left to it, that formula would be reported as an expression that does
+  // not reduce, which is true and unhelpful. Nothing else is checked here.
+  const nonIntegerFaces = terms
+    .filter((term) => isDiceTermLike(term))
+    .some((die) => !Number.isInteger(die.faces));
+  if (nonIntegerFaces) return refuse(ODDS_REASONS.nonIntegerFaces);
+
+  const plan = planDice(display.display);
+  if (plan.enumerable === false) return plan;
+
+  const combinations = plan.dice.reduce((product, die) => product * die.faces, 1);
+  if (combinations > MAX_ENUMERATED_OUTCOMES) return refuse(ODDS_REASONS.tooManyOutcomes);
+
+  const outcomes = enumerateOutcomes(display.display, plan.dice);
+  if (outcomes.some((outcome) => !Number.isFinite(outcome.total))) {
+    // Every assignment reduced during the probe pass, so a non-finite total here means the
+    // reduction is not a function of the faces alone — a division by a die that rolled a
+    // zero, say. Refusing the WHOLE histogram beats charting the assignments that worked.
+    return refuse(ODDS_REASONS.nonDeterministicRemainder);
   }
 
-  const shapeRefusal = refuseDieShape(dice[0]);
-  if (shapeRefusal) return shapeRefusal;
-
-  const remainderRefusal = refuseRemainder(terms.filter((term) => !isDiceTermLike(term)));
-  if (remainderRefusal) return remainderRefusal;
-
-  const remainder = resolveRemainder(display.display);
-  if (!Number.isFinite(remainder)) return refuse(ODDS_REASONS.nonDeterministicRemainder);
-
-  return { enumerable: true, faces: dice[0].faces, remainder, display: display.display };
+  return {
+    enumerable: true,
+    dice: plan.dice,
+    // `faces` survives for the single-die reading the rail heading names (`all 20 faces`); a
+    // multi-die formula has a COMBINATION count instead, which is a different sentence.
+    faces: plan.dice.length === 1 ? plan.dice[0].faces : null,
+    combinations,
+    outcomes,
+    display: display.display,
+  };
 }
 
 /**
- * The per-face dice bag, built through the PRODUCTION code path.
+ * The per-assignment dice bag, built through the PRODUCTION code path.
  *
- * `resolveForcedOutcome` and `applyTierStepTriggers` both read `data.diceGroups`, and a
- * bag that omits `results` or spells `group` differently makes every natural-20 trigger
- * silently invisible to the histogram — while STILL matching a hand-computed
- * distribution for a check with no triggers. So the shape is not restated here; a
- * one-die roll-shaped object goes through {@link rolledDiceGroups}.
+ * `resolveForcedOutcome` and `applyTierStepTriggers` both read `data.diceGroups`, and a bag
+ * that omits `results` or spells `group` differently makes every natural-20 trigger silently
+ * invisible to the histogram — while STILL matching a hand-computed distribution for a check
+ * with no triggers. So the shape is not restated here; a roll-shaped object goes through
+ * {@link rolledDiceGroups}.
  *
- * @param {number} faces The die's face count.
- * @param {number} face The rolled face.
- * @returns {Array<object>} The dice-group bag for that face.
+ * EVERY die is in the bag, a rolling check modifier's included, because that is what the
+ * engine's own bag holds: modifier terms are APPENDED, so the authored dice keep the group
+ * ids they always had and a trigger keyed on group 0 still means the same die.
+ *
+ * @param {Array<{faces: number}>} dice The dice, in reading order.
+ * @param {Array<number>} assignment The face each die shows.
+ * @returns {Array<object>} The dice-group bag for that assignment.
  */
-function diceGroupsForFace(faces, face) {
+function diceGroupsFor(dice, assignment) {
   return rolledDiceGroups({
-    dice: [{ number: 1, faces, total: face, results: [{ result: face, active: true }] }],
+    dice: dice.map((die, index) => ({
+      number: 1,
+      faces: die.faces,
+      total: assignment[index],
+      results: [{ result: assignment[index], active: true }],
+    })),
   });
 }
 
 /**
  * A percentage, to one decimal place, that still sums to 100 across a partition.
  *
- * @param {number} count Faces in this bucket.
- * @param {number} faces Total faces.
+ * @param {number} count Outcomes in this bucket.
+ * @param {number} total Outcomes in the whole enumerated space.
  * @returns {number} The percentage.
  */
-function percentOf(count, faces) {
-  return Math.round((count / faces) * 1000) / 10;
+function percentOf(count, total) {
+  return Math.round((count / total) * 1000) / 10;
 }
 
 /**
- * Bucket every face of an enumerable routed check through the engine's own classifier.
+ * Bucket every enumerated outcome of a routed check through the engine's own classifier.
  *
  * @param {object} params Params.
- * @param {number} params.faces The die's face count.
- * @param {number} params.remainder The deterministic remainder.
+ * @param {Array<{total: number, diceGroups: Array<object>}>} params.outcomes The enumerated
+ *   outcome space, one entry per equally-likely assignment of faces.
  * @param {object} params.args The classifier arguments (`type`, `dc`, `comparison`,
  *   both outcome lists, `triggers`, `clampToNearest`, `minOutcomeId`).
  * @returns {Array<{id: string, name: string, success: boolean, count: number,
  *   percent: number}>} One bucket per reachable tier, in the classifier's own tier
  *   order, with zero-probability tiers omitted.
  */
-export function enumerateRoutedOdds({ faces, remainder, args }) {
+export function enumerateRoutedOdds({ outcomes, args }) {
   const buckets = new Map();
-  for (let face = 1; face <= faces; face += 1) {
-    const total = face + remainder;
-    const classified = classifyCheckTotal({
-      ...args,
-      total,
-      diceGroups: diceGroupsForFace(faces, face),
-    });
+  for (const outcome of outcomes) {
+    const classified = classifyCheckTotal({ ...args, ...outcome });
     const id = classified.matched?.id ?? '';
     const existing = buckets.get(id);
     if (existing) {
@@ -352,12 +441,12 @@ export function enumerateRoutedOdds({ faces, remainder, args }) {
   }
   return [...buckets.values()].map((bucket) => ({
     ...bucket,
-    percent: percentOf(bucket.count, faces),
+    percent: percentOf(bucket.count, outcomes.length),
   }));
 }
 
 /**
- * Bucket every face of an enumerable pass/fail check.
+ * Bucket every enumerated outcome of a pass/fail check.
  *
  * It mirrors {@link runFormulaPassFail}'s own two decisions — a matched forced outcome
  * first, then the comparison — rather than only the comparison, because a trigger that
@@ -365,25 +454,21 @@ export function enumerateRoutedOdds({ faces, remainder, args }) {
  * it.
  *
  * @param {object} params Params.
- * @param {number} params.faces The die's face count.
- * @param {number} params.remainder The deterministic remainder.
+ * @param {Array<{total: number, diceGroups: Array<object>}>} params.outcomes The enumerated
+ *   outcome space.
  * @param {object} params.args `{ dc, comparison, triggers }`.
  * @returns {Array<{id: string, name: string, success: boolean, count: number,
  *   percent: number}>} At most two buckets, failure first, zero-probability omitted.
  */
-export function enumeratePassFailOdds({ faces, remainder, args }) {
+export function enumeratePassFailOdds({ outcomes, args }) {
   const tally = { failure: 0, success: 0 };
-  for (let face = 1; face <= faces; face += 1) {
-    const total = face + remainder;
-    const forced = resolveForcedOutcome(args.triggers, {
-      total,
-      diceGroups: diceGroupsForFace(faces, face),
-    });
+  for (const outcome of outcomes) {
+    const forced = resolveForcedOutcome(args.triggers, outcome);
     const passed = forced
       ? forced.disposition === 'success'
       : args.comparison === 'exceed'
-        ? total > args.dc
-        : total >= args.dc;
+        ? outcome.total > args.dc
+        : outcome.total >= args.dc;
     tally[passed ? 'success' : 'failure'] += 1;
   }
   return ['failure', 'success']
@@ -393,12 +478,12 @@ export function enumeratePassFailOdds({ faces, remainder, args }) {
       name: '',
       success: key === 'success',
       count: tally[key],
-      percent: percentOf(tally[key], faces),
+      percent: percentOf(tally[key], outcomes.length),
     }));
 }
 
 /**
- * Bucket every face of an enumerable progressive check by AWARD COUNT.
+ * Bucket every enumerated outcome of a progressive check by AWARD COUNT.
  *
  * A progressive check has no tiers to land on: its total is a budget spent down an
  * ordered list of result difficulties, so the only outcome a GM can read off it is how
@@ -406,29 +491,29 @@ export function enumeratePassFailOdds({ faces, remainder, args }) {
  * same loop crafting, salvage and gathering all award through — not a second
  * implementation of the same three award modes.
  *
- * A face that awards nothing is a real outcome (`0 of 4`) and IS listed; a count no face
- * can reach is not, and is omitted.
+ * An outcome that awards nothing is a real outcome (`0 of 4`) and IS listed; a count no
+ * outcome can reach is not, and is omitted.
  *
  * @param {object} params Params.
- * @param {number} params.faces The die's face count.
- * @param {number} params.remainder The deterministic remainder.
+ * @param {Array<{total: number, diceGroups: Array<object>}>} params.outcomes The enumerated
+ *   outcome space.
  * @param {Array<number>} params.difficulties The record's ordered result difficulties.
  * @param {'equal'|'exceed'|'partial'} [params.awardMode] The check's award mode.
  * @returns {Array<{id: string, awarded: number, of: number, count: number,
  *   percent: number}>} One bucket per reachable award count, ascending.
  */
-export function enumerateProgressiveOdds({ faces, remainder, difficulties, awardMode = 'equal' }) {
+export function enumerateProgressiveOdds({ outcomes, difficulties, awardMode = 'equal' }) {
   const results = (Array.isArray(difficulties) ? difficulties : []).map((difficulty, index) => ({
     index,
     difficulty,
   }));
   const tally = new Map();
-  for (let face = 1; face <= faces; face += 1) {
+  for (const outcome of outcomes) {
     const { awarded } = resolveProgressiveAward({
       results,
       // The engines normalize the budget before the loop; a negative roll total awards
       // nothing rather than reading as a credit.
-      initialRemaining: Math.max(0, face + remainder),
+      initialRemaining: Math.max(0, outcome.total),
       costFor: (result) => Number(result.difficulty),
       awardMode,
       invalidCost: 'skip',
@@ -442,6 +527,6 @@ export function enumerateProgressiveOdds({ faces, remainder, difficulties, award
       awarded,
       of: results.length,
       count,
-      percent: percentOf(count, faces),
+      percent: percentOf(count, outcomes.length),
     }));
 }

@@ -38,7 +38,7 @@
   let {
     /**
      * The enumeration view-model built by the route:
-     * `{ enumerable, reason, faces, rows: [{ id, label, percent, success }] }`.
+     * `{ enumerable, reason, faces, combinations, rows: [{ id, label, percent, success }] }`.
      */
     odds = null,
   } = $props();
@@ -60,9 +60,9 @@
       'FABRICATE.Admin.Manager.Checks.Odds.ReasonNoDice',
       'This formula rolls no dice of its own, so there is nothing to chart.',
     ],
-    [ODDS_REASONS.multipleDieGroups]: [
-      'FABRICATE.Admin.Manager.Checks.Odds.ReasonMultipleDieGroups',
-      'This formula rolls more than one group of dice. Chances are listed for a single die only.',
+    [ODDS_REASONS.tooManyOutcomes]: [
+      'FABRICATE.Admin.Manager.Checks.Odds.ReasonTooManyOutcomes',
+      'This formula rolls too many dice to work every combination out exactly, and an estimate here would be worse than none.',
     ],
     [ODDS_REASONS.dieModifiers]: [
       'FABRICATE.Admin.Manager.Checks.Odds.ReasonDieModifiers',

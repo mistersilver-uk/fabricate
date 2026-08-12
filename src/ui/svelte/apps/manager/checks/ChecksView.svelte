@@ -971,11 +971,15 @@
   // The reachable total range, which is what the simple check's two-band strip is drawn
   // across. Null when the formula is not enumerable; the editor then falls back to a
   // window around the DC rather than drawing a track it cannot justify.
-  const previewTrack = $derived(
-    enumeration.enumerable
-      ? { min: 1 + enumeration.remainder, max: enumeration.faces + enumeration.remainder }
-      : { min: null, max: null }
-  );
+  const previewTrack = $derived.by(() => {
+    if (!enumeration.enumerable) return { min: null, max: null };
+    // THE REACHABLE TOTALS, read off the enumeration rather than recomputed as
+    // `1 + remainder .. faces + remainder`. There is no single remainder any more: a bounded
+    // rolling check modifier contributes a clamped die, so the floor and ceiling are the
+    // extremes of the joint space and nothing shorter states them.
+    const totals = enumeration.outcomes.map((outcome) => outcome.total);
+    return { min: Math.min(...totals), max: Math.max(...totals) };
+  });
 
   /**
    * The odds view-model. Every branch either enumerates or states why it did not.
@@ -988,20 +992,19 @@
     if (enumeration.enumerable !== true) {
       return { kind, enumerable: false, reason: enumeration.reason };
     }
-    const { faces, remainder } = enumeration;
+    const { faces, combinations, outcomes } = enumeration;
     if (kind === 'routed') {
-      const rows = enumerateRoutedOdds({ faces, remainder, args: previewPlan.args }).map((row) => ({
+      const rows = enumerateRoutedOdds({ outcomes, args: previewPlan.args }).map((row) => ({
         id: row.id || 'unrouted',
         label: row.name || unroutedLabel,
         percent: row.percent,
         success: row.success,
       }));
-      return { kind, enumerable: true, faces, rows };
+      return { kind, enumerable: true, faces, combinations, rows };
     }
-    if (kind === 'progressive') return buildProgressiveOdds(faces, remainder);
+    if (kind === 'progressive') return buildProgressiveOdds(outcomes, faces, combinations);
     const rows = enumeratePassFailOdds({
-      faces,
-      remainder,
+      outcomes,
       args: {
         dc: previewPlan.dc,
         comparison: previewPlan.args.thresholdMode === 'exceed' ? 'exceed' : 'meet',
@@ -1015,7 +1018,7 @@
       percent: row.percent,
       success: row.success,
     }));
-    return { kind, enumerable: true, faces, rows };
+    return { kind, enumerable: true, faces, combinations, rows };
   }
 
   /**
@@ -1026,17 +1029,17 @@
    * outcome. An empty sandbox is a stated absence with the control named, never an invented
    * sample — see `src/systems/progressiveCheckSandbox.js`.
    *
-   * @param {number} faces The die's face count.
-   * @param {number} remainder The deterministic remainder.
+   * @param {Array<object>} outcomes The enumerated outcome space.
+   * @param {?number} faces The die's face count, for a single-die formula.
+   * @param {number} combinations How many assignments the space holds.
    * @returns {object} The model.
    */
-  function buildProgressiveOdds(faces, remainder) {
+  function buildProgressiveOdds(outcomes, faces, combinations) {
     if (previewDifficulties.length === 0) {
       return { kind: 'progressive', enumerable: false, reason: SANDBOX_ABSENT };
     }
     const rows = enumerateProgressiveOdds({
-      faces,
-      remainder,
+      outcomes,
       difficulties: previewDifficulties,
       awardMode: activeCheck?.awardMode || 'equal',
     }).map((row) => ({
@@ -1047,7 +1050,7 @@
       percent: row.percent,
       success: row.awarded > 0,
     }));
-    return { kind: 'progressive', enumerable: true, faces, rows };
+    return { kind: 'progressive', enumerable: true, faces, combinations, rows };
   }
 
   const oddsModel = $derived(buildOddsModel());

@@ -48,31 +48,54 @@ function describe14365(formula, actor = ACTOR) {
   return describeFormulaEnumerability(formula, actor, { Roll: REAL });
 }
 
+/**
+ * The View Lab's own `Roll`, which parses ANY formula rather than replaying a recording.
+ *
+ * The bucketing suites below need spaces the recording does not hold (`1d20 + 100`), and
+ * they must not hand-build a `{ total, diceGroups }` list to get one: a bag spelled by hand
+ * is exactly the second model this module refuses to keep. This double is graded against the
+ * recording by `the View Lab Roll double agrees with the recorded 14.365 output`, so a space
+ * taken through it is a space taken through the production enumerator.
+ */
+const LAB_ROLL = createLabRoll({
+  random: () => 0.5,
+  replaceFormulaData: REAL.replaceFormulaData,
+  validate: REAL.validate,
+});
+
+/** The enumerated outcome space of a formula, asserted to exist before it is used. */
+function spaceOf(formula, actor = ACTOR) {
+  const verdict = describeFormulaEnumerability(formula, actor, { Roll: LAB_ROLL });
+  assert.equal(verdict.enumerable, true, `${formula} enumerates (got ${verdict.reason})`);
+  return verdict;
+}
+
+/** The inclusive range of totals a verdict's space reaches. */
+function domainOf(verdict) {
+  const totals = verdict.outcomes.map((outcome) => outcome.total);
+  return { min: Math.min(...totals), max: Math.max(...totals) };
+}
+
 describe('checkOdds: the positive whitelist, graded against recorded Foundry 14.365 output', () => {
-  it('accepts a plain single die and reports the deterministic remainder', () => {
-    assert.deepEqual(describe14365('1d20 + 5'), {
-      enumerable: true,
-      faces: 20,
-      remainder: 5,
-      display: '1d20 + 5',
-    });
-    assert.deepEqual(describe14365('1d12 + 2'), {
-      enumerable: true,
-      faces: 12,
-      remainder: 2,
-      display: '1d12 + 2',
-    });
+  it('accepts a plain single die and enumerates the totals it reaches', () => {
+    const d20 = describe14365('1d20 + 5');
+    assert.equal(d20.enumerable, true, `enumerable (got ${d20.reason})`);
+    assert.deepEqual(d20.dice, [{ faces: 20 }]);
+    assert.equal(d20.combinations, 20, 'one assignment per face');
+    assert.deepEqual(domainOf(d20), { min: 6, max: 25 });
+    assert.equal(d20.display, '1d20 + 5');
+
+    const d12 = describe14365('1d12 + 2');
+    assert.deepEqual(d12.dice, [{ faces: 12 }]);
+    assert.deepEqual(domainOf(d12), { min: 3, max: 14 });
   });
 
   it('accepts a formula carrying a RESOLVABLE @ key, resolved against the previewed actor', () => {
     // Not a bare literal remainder: `@prof` is 3 for this actor, and the remainder has to
     // be read off the resolved display rather than off the parse.
-    assert.deepEqual(describe14365('1d20 + @prof'), {
-      enumerable: true,
-      faces: 20,
-      remainder: 3,
-      display: '1d20 + 3',
-    });
+    const verdict = describe14365('1d20 + @prof');
+    assert.equal(verdict.display, '1d20 + 3');
+    assert.deepEqual(domainOf(verdict), { min: 4, max: 23 }, '`@prof` is 3 for this actor');
   });
 
   it('accepts the flavoured appended terms every REAL previewed formula carries', () => {
@@ -94,7 +117,11 @@ describe('checkOdds: the positive whitelist, graded against recorded Foundry 14.
     assert.equal(plan.formula, '1d20 + 3[Tools] + 2[Modifiers]');
     const verdict = describe14365(plan.formula);
     assert.equal(verdict.enumerable, true, `enumerable (got ${verdict.reason})`);
-    assert.equal(verdict.remainder, 5, 'both flavoured terms count toward the remainder');
+    assert.deepEqual(
+      domainOf(verdict),
+      { min: 6, max: 25 },
+      'both flavoured terms move the whole domain, and neither is read as a die'
+    );
 
     // ACCEPTANCE IS PINNED DIRECTLY: the same fixture with the offending term removed
     // enumerates too, so "it accepted" cannot be a coincidence of the shorter string.
@@ -105,18 +132,32 @@ describe('checkOdds: the positive whitelist, graded against recorded Foundry 14.
     // `ParentheticalTerm` carries a string `term` exactly as `StringTerm` does (recorded
     // from 14.365), so a predicate that told them apart by that field alone would refuse
     // `1d20 + (2)` — a formula real Foundry evaluates to a fixed number — as a stray word.
-    assert.deepEqual(describe14365('1d20 + (2)'), {
-      enumerable: true,
-      faces: 20,
-      remainder: 2,
-      display: '1d20 + (2)',
-    });
-    // …and its non-deterministic sibling is still refused, with the reason that names the
-    // dice inside it rather than the string field it happens to share.
+    const deterministic = describe14365('1d20 + (2)');
+    assert.equal(deterministic.enumerable, true, `enumerable (got ${deterministic.reason})`);
+    assert.deepEqual(domainOf(deterministic), { min: 3, max: 22 });
+    // …and its ROLLING sibling is refused for what is actually wrong with it — a `2d6` is
+    // eleven outcomes on a triangular distribution, not a shape this enumerates — rather
+    // than for the string field a parenthetical happens to share with `StringTerm`.
     assert.deepEqual(describe14365('1d20 + (2d6)'), {
       enumerable: false,
-      reason: ODDS_REASONS.nonDeterministicRemainder,
+      reason: ODDS_REASONS.nonUnitCount,
     });
+  });
+
+  it('ENUMERATES A DIE INSIDE A FUNCTION, which is what a bounded check modifier is', () => {
+    // THE CASE THIS ENUMERATOR WAS REBUILT FOR. A rolling check modifier's bounds are
+    // expressed IN the formula — `min(max((1d8), -1), 6)[Modifiers]` — so every system with
+    // one authored a formula whose dice are not all top-level. `RollParser.flattenTree`
+    // pushes a function term WHOLE, so the old top-level determinism test refused the lot.
+    const verdict = describe14365('1d20 + min(max((1d8), -1), 6)[Modifiers]');
+    assert.equal(verdict.enumerable, true, `enumerable (got ${verdict.reason})`);
+    assert.deepEqual(verdict.dice, [{ faces: 20 }, { faces: 8 }], 'BOTH dice, in reading order');
+    assert.equal(verdict.faces, null, 'and no single face count, because there is no one die');
+    assert.equal(verdict.combinations, 160);
+    // THE CLAMP IS APPLIED, not merely parsed around: the `1d8` contributes 1..6, so the
+    // domain is `1+1 .. 20+6`. A string scan reads the bound arguments `-1` and `6` as flat
+    // addends and answers `7 .. 33` — monotone, correctly shaped and wrong by five.
+    assert.deepEqual(domainOf(verdict), { min: 2, max: 26 });
   });
 });
 
@@ -131,11 +172,8 @@ describe('checkOdds: every refusal carries its OWN reason code', () => {
     ['1d(1d4)', ODDS_REASONS.nonIntegerFaces],
     ['1df', ODDS_REASONS.nonNumericDenomination],
     ['1dc', ODDS_REASONS.nonNumericDenomination],
-    ['1d20 + 1d6', ODDS_REASONS.multipleDieGroups],
     ['5 + 3', ODDS_REASONS.noDice],
-    ['max(1d20,5)', ODDS_REASONS.nonDeterministicRemainder],
-    ['1d20 + (2d6)', ODDS_REASONS.nonDeterministicRemainder],
-    ['{1d20,1d12}kh', ODDS_REASONS.nonDeterministicRemainder],
+    ['1d20 + (2d6)', ODDS_REASONS.nonUnitCount],
     ['1d20 + prof', ODDS_REASONS.stringTerm],
     ['1d20 +', ODDS_REASONS.parseThrew],
     ['1d20 + (', ODDS_REASONS.parseThrew],
@@ -147,6 +185,39 @@ describe('checkOdds: every refusal carries its OWN reason code', () => {
       assert.deepEqual(describe14365(formula), { enumerable: false, reason });
     });
   }
+
+  it('ACCEPTS the three shapes that used to be refused for holding dice in a container', () => {
+    // The counter-list to the table above, and the point of it: `multiple-die-groups` is
+    // retired, and `max(1d20,5)`, `1d20 + 1d6` and `{1d20,1d12}kh` are all exactly
+    // enumerable. Each is checked by its DOMAIN rather than by the verdict flag, so a
+    // predicate that said yes and then charted the wrong space would fail here.
+    const clamped = describe14365('max(1d20,5)');
+    assert.deepEqual(domainOf(clamped), { min: 5, max: 20 }, 'the floor is applied');
+    const two = describe14365('1d20 + 1d6');
+    assert.equal(two.combinations, 120);
+    assert.deepEqual(domainOf(two), { min: 2, max: 26 });
+    const pool = describe14365('{1d20,1d12}kh');
+    assert.deepEqual(domainOf(pool), { min: 1, max: 20 }, 'keep-highest of the two members');
+  });
+
+  it('refuses a space too large to walk, rather than sampling one', () => {
+    // A cap is a REFUSAL with a stated reason, because a sampled histogram is the
+    // approximation this whole module exists to avoid. `1d100 + 1d100 + 1d100` is a million
+    // assignments; the two-die case beneath the cap proves the refusal is the SIZE and not
+    // the die count.
+    // The pair BRACKETS the cap: 10 000 assignments are walked and 1 000 000 are refused, so
+    // neither arm can pass on a cap that has been moved.
+    assert.equal(spaceOf('1d100 + 1d100').combinations, 10_000);
+    assert.deepEqual(
+      describeFormulaEnumerability('1d100 + 1d100 + 1d100', ACTOR, {
+        Roll: LAB_ROLL,
+      }),
+      {
+        enumerable: false,
+        reason: ODDS_REASONS.tooManyOutcomes,
+      }
+    );
+  });
 
   it('returns a not-enumerable RESULT for a mid-edit formula rather than throwing', () => {
     // `Roll.parse` calls the compiled peggy grammar with no `try`, so an unwrapped
@@ -256,7 +327,7 @@ describe('checkOdds: routed bucketing matches a hand-computed distribution', () 
     // Thresholds are 2 / 7 / 12 / 17 / 22 with `clampToNearest`, so totals 1–6 clamp to
     // Ruined, 7–11 are Flawed, 12–16 Success, 17–21 Fine, 22+ Masterwork. With no
     // remainder the totals ARE the faces: 6 / 5 / 5 / 4 / 0.
-    const rows = enumerateRoutedOdds({ faces: 20, remainder: 0, args: routedArgs() });
+    const rows = enumerateRoutedOdds({ outcomes: spaceOf('1d20').outcomes, args: routedArgs() });
     assert.deepEqual(
       rows.map((row) => [row.id, row.count, row.percent]),
       [
@@ -269,7 +340,7 @@ describe('checkOdds: routed bucketing matches a hand-computed distribution', () 
   });
 
   it('OMITS a zero-probability tier rather than charting an empty bar', () => {
-    const rows = enumerateRoutedOdds({ faces: 20, remainder: 0, args: routedArgs() });
+    const rows = enumerateRoutedOdds({ outcomes: spaceOf('1d20').outcomes, args: routedArgs() });
     assert.ok(
       !rows.some((row) => row.id === 'masterwork'),
       'no face reaches 22, so Masterwork is not listed at all'
@@ -277,7 +348,10 @@ describe('checkOdds: routed bucketing matches a hand-computed distribution', () 
   });
 
   it('shifts every bucket by the remainder', () => {
-    const rows = enumerateRoutedOdds({ faces: 20, remainder: 10, args: routedArgs() });
+    const rows = enumerateRoutedOdds({
+      outcomes: spaceOf('1d20 + 10').outcomes,
+      args: routedArgs(),
+    });
     assert.deepEqual(
       rows.map((row) => [row.id, row.count]),
       [
@@ -290,7 +364,7 @@ describe('checkOdds: routed bucketing matches a hand-computed distribution', () 
   });
 
   it('derives its caption from the enumerated space, so a d12 reads twelve', () => {
-    const rows = enumerateRoutedOdds({ faces: 12, remainder: 0, args: routedArgs() });
+    const rows = enumerateRoutedOdds({ outcomes: spaceOf('1d12').outcomes, args: routedArgs() });
     assert.equal(
       rows.reduce((sum, row) => sum + row.count, 0),
       12,
@@ -315,10 +389,9 @@ describe('checkOdds: the per-face dice bag comes from the production code path',
 
   it('routes a natural 20 and a natural 1 to the forced tiers', () => {
     const rows = enumerateRoutedOdds({
-      faces: 20,
-      // A remainder that would otherwise put BOTH faces in the middle of the range, so the
+      // An offset that would otherwise put BOTH faces in the middle of the range, so the
       // forced routing is the only thing that can produce these two buckets.
-      remainder: 5,
+      outcomes: spaceOf('1d20 + 5').outcomes,
       args: routedArgs({ triggers: NAT_TRIGGERS }),
     });
     const byId = Object.fromEntries(rows.map((row) => [row.id, row]));
@@ -349,8 +422,7 @@ describe('checkOdds: pass/fail and progressive bucketing', () => {
   it('splits a pass/fail check on the comparison', () => {
     assert.deepEqual(
       enumeratePassFailOdds({
-        faces: 20,
-        remainder: 0,
+        outcomes: spaceOf('1d20').outcomes,
         args: { dc: 15, comparison: 'meet', triggers: [] },
       }).map((row) => [row.id, row.count]),
       [
@@ -360,8 +432,7 @@ describe('checkOdds: pass/fail and progressive bucketing', () => {
     );
     assert.deepEqual(
       enumeratePassFailOdds({
-        faces: 20,
-        remainder: 0,
+        outcomes: spaceOf('1d20').outcomes,
         args: { dc: 15, comparison: 'exceed', triggers: [] },
       }).map((row) => [row.id, row.count]),
       [
@@ -374,8 +445,7 @@ describe('checkOdds: pass/fail and progressive bucketing', () => {
 
   it('honours a forced outcome on a pass/fail check', () => {
     const rows = enumeratePassFailOdds({
-      faces: 20,
-      remainder: 100,
+      outcomes: spaceOf('1d20 + 100').outcomes,
       args: {
         dc: 15,
         comparison: 'meet',
@@ -408,8 +478,7 @@ describe('checkOdds: pass/fail and progressive bucketing', () => {
     // Four results costing 5 each, `equal` mode, `1d20 + 4` → budgets 5..24, so a face can
     // pay for 1, 2, 3 or 4 results and NEVER for none.
     const rows = enumerateProgressiveOdds({
-      faces: 20,
-      remainder: 4,
+      outcomes: spaceOf('1d20 + 4').outcomes,
       difficulties: [5, 5, 5, 5],
       awardMode: 'equal',
     });
@@ -427,8 +496,7 @@ describe('checkOdds: pass/fail and progressive bucketing', () => {
 
   it('lists an award of NOTHING when it is reachable, because that is a real outcome', () => {
     const rows = enumerateProgressiveOdds({
-      faces: 20,
-      remainder: 0,
+      outcomes: spaceOf('1d20').outcomes,
       difficulties: [12, 12],
       awardMode: 'equal',
     });
@@ -442,15 +510,14 @@ describe('checkOdds: pass/fail and progressive bucketing', () => {
   });
 
   it('reads the award MODE rather than assuming one', () => {
+    const outcomes = spaceOf('1d20').outcomes;
     const equal = enumerateProgressiveOdds({
-      faces: 20,
-      remainder: 0,
+      outcomes,
       difficulties: [10, 10],
       awardMode: 'equal',
     });
     const partial = enumerateProgressiveOdds({
-      faces: 20,
-      remainder: 0,
+      outcomes,
       difficulties: [10, 10],
       awardMode: 'partial',
     });
@@ -461,4 +528,3 @@ describe('checkOdds: pass/fail and progressive bucketing', () => {
     );
   });
 });
-

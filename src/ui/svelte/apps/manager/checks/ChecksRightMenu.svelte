@@ -227,12 +227,24 @@
   // NOTHING when it abstains; the regex survives only for a rail mounted without one.
   const oddsDomain = $derived.by(() => {
     if (odds) {
+      if (odds.enumerable !== true) return '';
+      // TWO SENTENCES, because they are two different facts. One die has FACES and the
+      // histogram walked each of them; a formula carrying a rolling check modifier on top of
+      // its own die has a joint space, and calling 160 assignments "faces" would name a die
+      // with 160 sides that nothing rolls.
       const faces = Number(odds.faces);
-      if (odds.enumerable !== true || !Number.isFinite(faces)) return '';
-      return text('FABRICATE.Admin.Manager.Checks.Odds.Faces', 'all {faces} faces').replace(
-        '{faces}',
-        String(faces)
-      );
+      if (Number.isFinite(faces)) {
+        return text('FABRICATE.Admin.Manager.Checks.Odds.Faces', 'all {faces} faces').replace(
+          '{faces}',
+          String(faces)
+        );
+      }
+      const combinations = Number(odds.combinations);
+      if (!Number.isFinite(combinations)) return '';
+      return text(
+        'FABRICATE.Admin.Manager.Checks.Odds.Combinations',
+        'all {count} combinations'
+      ).replace('{count}', String(combinations));
     }
     const match = /(?:^|[^\w.])\d*d(\d+)/i.exec(activeCheck?.rollFormula ?? '');
     if (!match) return '';

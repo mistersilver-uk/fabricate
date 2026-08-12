@@ -446,6 +446,28 @@ describe('the simple check’s two-band strip', () => {
     assert.equal(handles[0].getAttribute('aria-valuemax'), '19');
   });
 
+  it('scales the track to the REACHABLE TOTALS once a formula resolves', async () => {
+    // The fallback above is a window around the DC, drawn because the formula does not reduce
+    // for "No actor". With one chosen it does, and the track is then the enumerated space's
+    // own floor and ceiling — `1d20 + @prof` at `prof: 3` reaches 4 through 23. It is read
+    // off the enumeration rather than computed as `1 + remainder .. faces + remainder`,
+    // because a formula carrying a bounded rolling modifier has no single remainder to add.
+    const root = await mountChecks({
+      resolutionMode: 'simple',
+      craftingCheck: null,
+      craftingCheckSimple: SIMPLE_CHECK,
+      requestedSection: 'outcomes',
+      requestedSectionNonce: 1,
+    });
+    await choose(root.querySelector('[data-checks-preview-actor]'), 'sera');
+    const handle = root.querySelector('[data-simple-band-strip] [data-band-strip-handle]');
+    // The HANDLE's range is the track inset by one on each side — a boundary that sat on the
+    // track's own floor would leave the failure band no width at all — so a track of `4..23`
+    // reads `5..22` here.
+    assert.equal(handle.getAttribute('aria-valuemin'), '5', 'a track floored at the total 4');
+    assert.equal(handle.getAttribute('aria-valuemax'), '22', 'and ceilinged at the total 23');
+  });
+
   it('writes the check’s own DC when the handle is keyed', async () => {
     const changes = [];
     const root = await mountChecks({

@@ -5000,6 +5000,7 @@
           "Odds": {
             "Title": "Chance per outcome",
             "Faces": "all {faces} faces",
+            "Combinations": "all {count} combinations",
             "NoCheck": "This activity resolves without a roll, so there are no chances to list.",
             "NoOutcomes": "Add outcome bands to see how often each one comes up.",
             "Unrouted": "No outcome",
@@ -5007,7 +5008,7 @@
             "ReasonNoSandboxOrder": "A progressive check is counted in results awarded. Type an order of result difficulties under “Preview as” to see how often each count comes up.",
             "ReasonParseThrew": "This formula is not complete yet, so it cannot be read.",
             "ReasonNoDice": "This formula rolls no dice of its own, so there is nothing to chart.",
-            "ReasonMultipleDieGroups": "This formula rolls more than one group of dice. Chances are listed for a single die only.",
+            "ReasonTooManyOutcomes": "This formula rolls too many dice to work every combination out exactly, and an estimate here would be worse than none.",
             "ReasonDieModifiers": "This die carries a modifier (keep, reroll, explode, clamp), which changes the spread of results.",
             "ReasonNonUnitCount": "This formula rolls several dice at once, so its results are not evenly spread. Chances are listed for a single die only.",
             "ReasonNonIntegerFaces": "The number of faces on this die is itself rolled, so the outcome space is not fixed.",
