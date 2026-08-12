@@ -257,9 +257,16 @@ describe('the previewed record drives the band strip, not the check’s own DC',
     assert.deepEqual(ticks(), ['15', '20', '25'], 'the same offsets against a DC of 20');
   });
 
-  it('is ONE selection: the Outcomes card’s own selector writes the rail’s', async () => {
+  it('is ONE selection: the Outcomes card’s own PREVIEW AGAINST writes the rail’s', async () => {
+    // The Outcomes card ships its own record selector, on the stated reading that the record
+    // is the bands' subject and the actor is the rail's. Both halves of that are right; a
+    // SECOND COPY OF THE STATE is not, because the simulator this change ships previews
+    // against the same record. Two copies is how a strip anchored to `Rare Craft` comes to
+    // sit beside a readout rolling against `Uncommon Craft`, on one screen, with no data
+    // change between them — the same class of defect as a histogram that charts a formula
+    // nothing rolls. So the selection is the route's, and both controls report to it.
     const root = await mountChecks({ requestedSection: 'outcomes', requestedSectionNonce: 1 });
-    await choose(root.querySelector('[data-outcome-band-record]'), 'rare');
+    await choose(root.querySelector('[data-preview-against-select]'), 'rare');
     assert.equal(
       root.querySelector('[data-checks-preview-record]').value,
       'rare',
@@ -267,10 +274,13 @@ describe('the previewed record drives the band strip, not the check’s own DC',
     );
   });
 
-  it('names the previewed DC in the outcome-bands lead', async () => {
+  it('and the rail’s writes the Outcomes card’s, which is the other direction', async () => {
+    // Asserted separately because ONE state and TWO independent states are only told apart by
+    // driving both ends: a card that merely reported upward without reading back would pass
+    // the case above and still drift the moment the rail was used.
     const root = await mountChecks({ requestedSection: 'outcomes', requestedSectionNonce: 1 });
-    await choose(root.querySelector('[data-outcome-band-record]'), 'rare');
-    assert.match(root.querySelector('[data-outcome-band-strip-lead]').textContent, /DC 20/);
+    await choose(root.querySelector('[data-checks-preview-record]'), 'rare');
+    assert.equal(root.querySelector('[data-preview-against-select]').value, 'rare');
   });
 });
 
