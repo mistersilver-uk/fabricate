@@ -362,7 +362,12 @@ describe('the outcome-preview readout', () => {
 });
 
 describe('the odds histogram', () => {
-  it('enumerates the faces and derives its caption from that space', async () => {
+  it('enumerates the faces, and the rail heading names that space rather than guessing it', async () => {
+    // The `all N faces` adjunct is issue 1096's heading slot and its fallback is a REGEX over
+    // the authored formula. Since issue 1118 the formula that is ROLLED can carry a check
+    // modifier's die the authored one does not, so the adjunct reads the enumerator's own
+    // answer where there is one — a heading naming a domain the panel beneath it refuses to
+    // chart is the same class of lie the histogram itself is guarded against.
     const root = await mountChecks();
     await choose(root.querySelector('[data-checks-preview-actor]'), 'sera');
     assert.equal(
@@ -370,10 +375,25 @@ describe('the odds histogram', () => {
       'enumerated'
     );
     assert.equal(
-      root.querySelector('[data-checks-odds-caption]').textContent.trim(),
+      root.querySelector('[data-checks-odds-domain]').textContent.trim(),
       'all 20 faces',
       'DERIVED from the enumerated space, never hard-coded'
     );
+  });
+
+  it('and the heading says NOTHING at all when the panel abstains', async () => {
+    // `2d20 + @prof` still NAMES a d20, so the regex fallback answers `all 20 faces` for it
+    // while the panel beneath refuses to chart it at all. That disagreement is the whole
+    // reason the adjunct reads the view-model, so it is the case that tells the two apart.
+    const root = await mountChecks({
+      craftingCheck: { ...ROUTED_CHECK, rollFormula: '2d20 + @prof' },
+    });
+    await choose(root.querySelector('[data-checks-preview-actor]'), 'sera');
+    assert.equal(
+      root.querySelector('[data-checks-odds-state]').getAttribute('data-checks-odds-state'),
+      'not-enumerable'
+    );
+    assert.equal(root.querySelector('[data-checks-odds-domain]'), null);
   });
 
   it('renders every bar through the shipped FillBar rather than a sixth hand-rolled one', async () => {
@@ -453,10 +473,6 @@ describe('the modifier context reaches the derivations that DESCRIBE the roll', 
     // scalar itself, so every derivation that DESCRIBES the roll has to be handed that context
     // too. A histogram blind to it charts `1d20 + @prof` beside a readout rolling
     // `1d20 + @prof + 2[Modifiers]`, on one screen, for one check.
-    //
-    // This USED to be asserted on the `avg N` annotation, which was the cheapest observable
-    // while this change owned one. It does not own one any more, and the histogram is the
-    // better subject in any case: `avg` is one number and the histogram is every bucket.
     const percents = async (props) => {
       const root = await mountChecks(props);
       await choose(root.querySelector('[data-checks-preview-actor]'), 'sera');

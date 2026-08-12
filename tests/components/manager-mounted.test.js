@@ -17319,33 +17319,38 @@ describe('CraftingSystemManager mounted behavior', () => {
     }
   });
 
-  it('names the die domain the odds panel will enumerate, from the check’s own formula', async () => {
+  it('names the domain the odds panel ACTUALLY enumerated, never a die it merely mentions', async () => {
     // The prototype's `CHANCE PER OUTCOME` heading carries `all 20 faces` hard right. It is a
-    // fact about THIS check's die, so it is derived from the formula rather than stated — a
-    // fixed "20" beside a 2d6 check would be a claim about a check that does not roll a d20.
+    // fact about the space the histogram beneath it walked, so it is derived rather than
+    // stated — a fixed "20" beside a 2d6 check would be a claim about a check that does not
+    // roll a d20.
+    //
+    // IT READS THE PANEL, NOT THE FORMULA (issue 1097). This assertion used to expect
+    // `all 6 faces` for `2d6 + @prof`, off a regex that finds the first `NdS` in the AUTHORED
+    // string. That was the only derivation available while the panel was a slot; now that the
+    // panel is real it ABSTAINS on `2d6` — eleven outcomes on a triangular distribution are
+    // not six uniform faces — and prints "chances are listed for a single die only". A
+    // heading reading `all 6 faces` directly above that sentence is a contradiction on one
+    // screen, which is the exact defect class this change exists to remove. The regex is kept
+    // as the fallback for a rail mounted without a view-model and is unreachable here.
     await mountChecks([], routedCraftingOptions('1d20 + @prof'));
     await openChecksActivity('crafting');
-    assert.equal(
-      target.querySelector('[data-checks-odds-domain]')?.textContent.trim(),
-      'all 20 faces',
-      'a d20 check enumerates twenty faces'
-    );
-
-    await mountChecks([], routedCraftingOptions('2d6 + @prof'));
-    await openChecksActivity('crafting');
-    assert.equal(
-      target.querySelector('[data-checks-odds-domain]')?.textContent.trim(),
-      'all 6 faces',
-      'and a 2d6 check names its own die, not the d20'
-    );
-
-    // No die, no domain. The heading states nothing rather than a number nothing supports.
-    await mountChecks([], routedCraftingOptions('@prof'));
-    await openChecksActivity('crafting');
-    assert.ok(
-      !target.querySelector('[data-checks-odds-domain]'),
-      'a formula that rolls no die names no domain'
-    );
+    // This suite installs no dice engine, so the enumerator refuses every formula here for
+    // want of one. That is exactly the condition the arms below measure, and the POSITIVE
+    // arm — a real d20 check whose heading reads `all 20 faces` — is asserted in
+    // `tests/components/check-preview-mounted.test.js`, which does install one.
+    for (const formula of ['1d20 + @prof', '2d6 + @prof', '@prof']) {
+      await mountChecks([], routedCraftingOptions(formula));
+      await openChecksActivity('crafting');
+      assert.ok(
+        target.querySelector('[data-checks-odds-state="not-enumerable"]'),
+        `${formula}: the panel abstains without a dice engine`
+      );
+      assert.ok(
+        !target.querySelector('[data-checks-odds-domain]'),
+        `${formula}: and the heading names no domain the panel did not walk — not even for the d20 the regex fallback would have found`
+      );
+    }
   });
 
   it('names each mode in the ALL CHECKS rail the way its own picker names it', async () => {
