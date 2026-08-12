@@ -2801,6 +2801,7 @@
    rhythm entirely. 20px reproduces BOTH rhythms the prototype actually uses — the 14px block
    separation and the list's 6px row cadence — without the 10px the header's own text
    occupied. */
+
 /* Colour and size come from the same measurement, and both were drifting while only the
    margin was being argued about. `.manager-muted` renders `--fab-text-muted` (74% alpha) at
    the manager's own 12.48px; the prototype draws this sentence at `--fab-text-subtle`
@@ -11944,6 +11945,42 @@
   min-width: 0;
 }
 
+/*
+  THE NAV IS THE RAIL'S SCROLLER.
+
+  Every rule that gave the rail a scroller lived in an `inline-size` container query — the
+  stacked 1120px block and the per-view 831px ones — so a window that is WIDE but SHORT never
+  reached one. The rail's height is definite (the shell's `1fr` row), it carries
+  `overflow: hidden` from the grouped region rule, and the nav declared no overflow of its own:
+  once the section list outgrew the rail the bottom entries were clipped away with no way to
+  reach them. Reducing the window height was enough.
+
+  This is the roster idiom (`.manager-knowledge-roster-scroll`): the column stays
+  `overflow: hidden` + `min-height: 0` and ONE child inside it grows and scrolls. The nav is
+  that child, so the rail's section label and its crafting-system card — which carries the
+  collapse toggle — stay pinned above a scrolling list rather than scrolling away with it.
+
+  A standalone block rather than declarations in the grouped rule above: `.manager-rail-block`
+  and `.manager-inspector-card` share that rule and must NOT grow. This is also the first block
+  in the sheet for this selector, which is the one `manager-layout.test.js` resolves it to.
+
+  `min-height` is a FLOOR, not a size — roughly two rows plus the gap. It stops the pinned
+  blocks above squeezing the nav to nothing in an extremely short rail; past that point the
+  rail's own backstop scroller takes over.
+*/
+.fabricate-manager .manager-nav {
+  flex: 1 1 auto;
+  min-height: 96px;
+  overflow: hidden auto;
+}
+
+/* The two blocks above the nav are not the scroller, so they must not absorb its shrink —
+   a flex item defaults to `flex-shrink: 1` and would otherwise compress instead. */
+.fabricate-manager .manager-rail > .manager-rail-title,
+.fabricate-manager .manager-rail > .manager-rail-block {
+  flex: 0 0 auto;
+}
+
 /* Section and card titles are SERIF (issue 643): the typographic contract sets
    names and headings in Spectral and every numeric in JetBrains Mono. The uppercase
    micro-label geometry is unchanged — only the family moves. */
@@ -15798,6 +15835,16 @@
     overflow: hidden auto;
     border-right: 0;
     border-bottom: 1px solid var(--fab-mv2-border);
+  }
+
+  /* Hand the scrolling back to the rail here. Stacked, the rail is already a bounded 232px
+     strip; if the nav kept the scroller it would grow to that cap and scroll the list inside
+     whatever the pinned label and scope card left of it — a much smaller window than the strip
+     the rule above deliberately built. This also covers the per-view 831px rail overrides,
+     which are nested inside this breakpoint. */
+  .fabricate-manager .manager-nav {
+    flex: 0 0 auto;
+    overflow: visible;
   }
 
   .fabricate-manager .manager-inspector {
