@@ -44,6 +44,7 @@ When an optional check is switched off, the page collapses to a single section o
 
 Fabricate checks each activity page as you edit it.
 A section with something to fix carries a dot on the strip, and the same issue is counted on that activity's entry in the rail.
+Open that section and it states each of its own issues in full, in the same words the **Validation** page uses, so a dot never leaves you to go looking for what it meant.
 The **Checks** entry itself totals the counts of the activity pages it is showing you, so a hidden feature's stale issues never badge a page you cannot open to clear them.
 **Validation** restates that same total, so it is never added on top of it.
 
@@ -98,6 +99,7 @@ No ingredients, currency, or Tools are consumed, and no run is recorded.
 This interactive prompt is the default when you craft from the Crafting tab, salvage from the Salvage tab, or gather from the Gathering screen.
 It applies to the crafting, salvage, and gathering checks that run through the shared check step.
 A bulk salvage prompts once for the whole batch, and applies that one answer to every roll in it.
+That one prompt sets the bonus, the roll mode and advantage only.
 See [Salvage]({% link salvage.md %}) for the batch behaviour.
 Some rolls never prompt:
 
@@ -110,7 +112,10 @@ Macros and automation that call Fabricate directly keep the original silent beha
 ## Check modifiers
 
 A crafting check can add in named modifiers read from the crafter — a Medicine bonus, a Herbalism kit — without you writing anything into the roll formula.
-Fabricate resolves the eligible modifiers to one number and adds it to the roll as a single flavoured term, so a roll of `1d20 + 2` with a `+3` modifier is rolled and reported as `1d20 + 2 + 3[Modifiers]`.
+Fabricate adds the eligible modifiers to the roll itself, each labelled so the chat card shows where the numbers came from.
+The ones that work out to a plain number are summed into one term, so a roll of `1d20 + 2` with a `+3` modifier is rolled and reported as `1d20 + 2 + 3[Modifiers]`.
+Each modifier that rolls dice is added as its own term beside it, so its dice stay attributable to it.
+A `+3` modifier and a `1d4` one together give `1d20 + 2 + 3[Modifiers] + (1d4)[Modifiers]`.
 The modifiers themselves live in **one library per crafting system**, on the **Modifiers** card of the system's **System settings** page.
 The **Modifiers** section of each Checks page then decides which of them that activity applies and how they combine.
 Its **Named modifiers** card lists the library and carries the switch that marks an entry eligible.
@@ -126,7 +131,7 @@ See [One library, three activities](#one-library-three-activities).
 **No Checks page edits an entry**, Crafting included.
 Each shows the library read-only and links to System settings › Modifiers.
 
-Because an eligible modifier never appears in the formula you type, the **The roll** section restates it for you.
+Because an eligible modifier never appears in the formula you type, **The roll** section restates it for you.
 Under the formula field, **What actually gets rolled** shows the same formula with each applied modifier beside it and names the rule that combines them.
 
 ### Defining modifiers
@@ -201,7 +206,7 @@ What it has no room for yet is a modifier added to that roll, so the notice stat
 
 ### Combination rule
 
-The **Combination rule** setting on the **Check modifiers** card decides how the eligible modifiers combine into the one number added to the roll.
+The **Combination rule** setting on the **How they combine** card decides how the eligible modifiers combine into what is added to the roll.
 It also decides **who chooses them, and when**.
 
 <!-- markdownlint-disable markdownlint-sentences-per-line -->
@@ -209,7 +214,7 @@ It also decides **who chooses them, and when**.
 | Combination rule | Who chooses | What it does | When you would want it |
 |:-----------------|:------------|:-------------|:------------------------|
 | **Add all** | Nobody. The system's default set applies as it stands. | Sums every modifier in the default set. | The recipe rewards stacking every relevant skill or tool bonus at once. |
-| **Highest** | Nobody. The system's default set applies as it stands. | Uses only the single largest modifier in the default set, as a plain number, not a keep-highest dice roll. | Several skills can substitute for each other, and only the best should count. |
+| **Highest** | Nobody. The system's default set applies as it stands. | Adds only the single best modifier in the default set. Best means highest on average, so a `1d4` beats a flat `+2`, and a winner that rolls dice is added as dice. It is not a keep-highest dice roll across the set. | Several skills can substitute for each other, and only the best should count. |
 | **By recipe** / **By component** / **By gathering task** | You do, per record, on that record's own editor. | Sums the modifiers that record picked. | Different recipes (or components, or gathering tasks) in one system draw on different skills, and you want to decide that once, while authoring the record. |
 | **Player picks** | The player does, at roll time. | Sums the modifiers the player picked. | You want the player to decide, in the moment, which of their skills they are relying on for that attempt. |
 
@@ -220,7 +225,8 @@ Neither a recipe nor a player can change it, and neither can pick modifiers unde
 Choosing the by-record rule or **Player picks** hands out the *selection*, never the rule.
 
 Each of the three activities — Crafting, Salvage and Gathering — carries its **own** combination rule, default set and pick cap, over **one shared library**.
-The library is authored once, in System settings › Modifiers; all three Checks cards show the same entries read-only and let you decide which of them apply there and how they combine.
+The library is authored once, in System settings › Modifiers.
+All three **Modifiers** sections show the same entries read-only and let you decide which of them apply there and how they combine.
 The by-record rule is one rule with three labels: it reads **By recipe** on Crafting, **By component** on Salvage and **By gathering task** on Gathering, because the record doing the picking is different on each.
 
 ### The default eligible set
@@ -253,7 +259,7 @@ Only that entry is refused; the other modifiers on the roll are unaffected.
 ### One library, three activities
 
 Crafting, Salvage and Gathering all select over the same library.
-Each card shows every entry read-only — its name, its expression and a bounds chip such as `-1 to +6` — with a link to System settings › Modifiers to edit them.
+Each **Named modifiers** card shows every entry read-only — its name, its expression and a bounds chip such as `-1 to +6` — with a link to System settings › Modifiers to edit them.
 What each activity *does* own is fully editable there: which entries apply, how they combine, and the pick cap.
 
 **Gathering is not switched on yet.**
@@ -304,7 +310,7 @@ The picks are summed at roll time, and nothing is asked of the player.
 The control appears only when the system's combination rule is **By recipe** and the system has at least one entry in its Modifiers library.
 Salvage and Gathering have the same control on the component editor's Salvage section and in the gathering task editor, under their own activity's rule.
 Under **Add all**, **Highest**, or **Player picks** the recipe has nothing to choose, so the tab shows nothing at all rather than a control the system would ignore.
-Open the **Checks** page for that recipe's system and look at the **Combination rule** on its **Check modifiers** section.
+Open **Checks › Crafting** for that recipe's system and look at the **Combination rule** on the **Modifiers** section.
 If the rule is already **By recipe** and the control is still missing, the recipe's Overview tab shows a banner in its place naming which of the causes in [When check modifiers do nothing](#when-check-modifiers-do-nothing) applies.
 
 Switching the system away from the by-record rule does not delete anything a record picked.
@@ -315,6 +321,8 @@ The picks stay stored and simply stop being consulted; switch back and they appl
 **Player picks** is the only combination rule that is not decided until the dice are about to be rolled.
 It only prompts the player when all of the following are true for that attempt: the roll happens through the interactive dialog described above, the active check has a roll formula, the system's combination rule is **Player picks**, and at least two modifiers are eligible.
 When any of those is not true, for example a system with only one eligible modifier, or a Macro rolling the check directly, the check resolves without a prompt to the best selection the player could legally have made.
+A bulk salvage is one of those cases.
+Its single batch prompt never asks for modifiers, so every roll in the batch applies that same best selection.
 
 **Crafting and salvage prompt, and gathering does not yet.**
 A gathering check under **Player picks** still applies the best selection the player could legally have made, and gains its prompt when progressive and routed gathering ship.
@@ -373,7 +381,11 @@ The numbers in the tier rows remain the authority, and the strip and the rows ed
 A handle can never be dragged past its neighbour, so moving one narrows a tier and never reorders your tiers.
 The outermost values have no handle at all, because they are not transitions between two tiers.
 The bottom of the first tier and the top of the last are set in the rows.
-On a relative check the handles read the difficulty numbers the offsets resolve to against the check's own DC, while the rows read the offsets you authored.
+On a relative check the handles read the difficulty numbers the offsets resolve to, while the rows read the offsets you authored.
+**Preview against**, above the strip, chooses which difficulty they resolve against.
+It offers the check's own DC, which is the default, and each named difficulty tier the check carries, each labelled with its DC.
+It appears only once the check has at least one tier to offer, and it is a reading aid alone.
+Choosing one re-labels the strip and changes nothing you have authored.
 
 Fixed tiers must not overlap, and must leave no value between the lowest and the highest belonging to no tier.
 Either fault makes the tiers impossible to draw as one strip, so the strip steps aside with a note and leaves the rows to edit.
