@@ -4942,8 +4942,11 @@ function shortWindowRailMarkup(navItems) {
 }
 
 async function readShortWindowRailGeometry({ width = 1280, height = 560, navItems = 14 } = {}) {
-  const browser = await chromium.launch();
-  const page = await browser.newPage({ viewport: { width, height }, deviceScaleFactor: 1 });
+  const context = await sharedBrowser.newContext({
+    viewport: { width, height },
+    deviceScaleFactor: 1,
+  });
+  const page = await context.newPage();
   try {
     await page.setContent(
       `<style>${css}</style><style>html,body{margin:0}</style><div style="width:${width}px;height:${height}px">${shortWindowRailMarkup(navItems)}</div>`
@@ -4978,7 +4981,7 @@ async function readShortWindowRailGeometry({ width = 1280, height = 560, navItem
       };
     });
   } finally {
-    await browser.close();
+    await context.close();
   }
 }
 
