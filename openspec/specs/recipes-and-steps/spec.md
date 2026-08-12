@@ -198,6 +198,44 @@ A presence-only match is spared from usage/breakage and recorded as skipped, and
    until the gate matures), so the same misconfiguration detected at FINISH records a step
    FAILURE with no refund and still reports failure — never a false success with zero items.
 
+3. **A FAILED check resolves an authored FAILURE result group when the policy permits it**
+   (`craftingCheck.failureResultPolicy`, `data-models` requirement 35).
+   Both crafting failure branches do this — the immediate one in `craft()` and the timed
+   recorder in `_finishTimedStep` — through ONE producer, because a delay is a scheduling
+   property and not a different set of outcomes.
+   Under `never` the branch short-circuits BEFORE resolution is asked at all, so a failed
+   craft walks no result model and nothing can observe a selection that was never made.
+
+   **The award is an ALLOWLIST over the resolution disposition, never a fall-through.**
+   Only `fail` (the reserved `role: 'failure'` group of `simple` / alchemy-`simple`,
+   selected BY ROLE) and `failure` (the group a `routedByCheck` recipe assigned to a
+   failure-marked outcome tier) may be produced on a failed check.
+   This is not a formality: under `routedByCheck` a step with exactly ONE result group takes
+   the single-group exemption, which was written for the success path and returns that group
+   with `disposition: 'success'` for any non-keyword outcome — including the `null` outcome a
+   failed check carries — so producing on anything else hands a failed craft its full SUCCESS
+   output. `routedByIngredients` is excluded on the same grounds: it routes by the chosen
+   ingredient set and reports no disposition, so a failed craft would award the set's normal
+   result.
+   A routed failing tier that no result group lists resolves to `unrouted-tier`, which is not
+   on the allowlist: it produces nothing, and it does NOT convert the craft into a
+   misconfiguration abort, because the failure consumption policy has already been applied
+   and there is nothing left to abort cleanly.
+
+   **The award is REPORTED on every seam the success award is**: the created records are
+   threaded into the run record's `createdResults` through the SAME mapper the success path
+   uses (that record persists into the actor's run-container flag, so an empty list beside
+   real items is a durable contradiction), passed to the crafting chat card — whose failure
+   branch gained a results section shared with salvage — and returned as `results` rather
+   than `null`, with the additive `disposition: 'produced-on-failure'` discriminator attached
+   only when something was produced, so a failure awarding nothing is unchanged in every
+   observable way.
+
+   **It decides nothing about COST.** Consumption and tool breakage are governed by
+   `craftingCheck.consumption` and are applied BEFORE the award; a failure AWARD and a
+   failure COST are separate decisions, and a recipe may award on failure while returning
+   its ingredients.
+
 ### Apply Effects
 
 1. Consume ingredients and apply tool usage/breakage (destroying or flagging-broken exhausted tools) according to success/failure policy.

@@ -181,6 +181,30 @@ function mapConsumedIngredientRef({ item, quantity }) {
 }
 
 /**
+ * Map one CRAFTED result document to the persisted run-record `createdResults` shape.
+ *
+ * ONE shape, THREE writers (issue 1098): the success path, the immediate failure branch
+ * and the timed failure recorder. The success path has always written this literal; the
+ * two failure writers are new and write THE SAME SHAPE through this mapper rather than a
+ * lookalike, because the record lands in the actor's Fabricate run-container flag and a
+ * failure run whose `createdResults` disagreed with the items on the actor would be a
+ * durable contradiction — the Journal history reporting an empty award beside real loot.
+ *
+ * @param {object} item the created Item document
+ * @param {object} craftingActor the actor it was created on
+ * @returns {{actorUuid: string, itemUuid: string, quantity: number, name: string|null, img: string|null}}
+ */
+function craftedResultRecord(item, craftingActor) {
+  return {
+    actorUuid: craftingActor.uuid,
+    itemUuid: item.uuid,
+    quantity: awardedQuantityOf(item),
+    name: item.name ?? null,
+    img: item.img ?? null,
+  };
+}
+
+/**
  * Map one salvage award record to the persisted run-record `createdResults` shape.
  *
  * ONE shape, TWO branches (issue 1098). The success branch has always written this; the
@@ -379,6 +403,37 @@ export class CraftingEngine {
    */
   _isMisconfigurationDisposition(disposition) {
     return ['misconfiguration', 'unrouted-tier', 'error'].includes(disposition);
+  }
+
+  /**
+   * Does this resolution `meta.disposition` identify an authored FAILURE output?
+   *
+   * THE FAILURE AWARD IS AN ALLOWLIST, NEVER A FALL-THROUGH (issue 1098), and this is the
+   * crafting analogue of the by-ROLE-never-by-index rule the salvage failure branch
+   * follows. Resolution reports what it selected and WHY; only the two dispositions that
+   * mean "this is the failure output" may be produced on a failed check.
+   *
+   * The trap this closes is live rather than theoretical. Under `routedByCheck` a step
+   * with exactly ONE result group takes the single-group exemption, which was written for
+   * the success path and returns that group with `disposition: 'success'` for any
+   * non-keyword outcome — including the `null` outcome a failed check carries. Producing
+   * on anything but this allowlist therefore hands a failed craft its full SUCCESS output.
+   * `routedByIngredients` is excluded for the same reason: it routes by the chosen
+   * ingredient set and reports no disposition at all, so a failed craft would award the
+   * set's normal result.
+   *
+   *  - `'fail'` — the reserved `role: 'failure'` group of `simple` / alchemy-`simple`,
+   *    selected BY ROLE by `_resolveSimpleResultGroups` (which never indexes), and the
+   *    empty-groups reading a recipe authoring no failure output produces.
+   *  - `'failure'` — the group a `routedByCheck` recipe assigned to a failure-marked
+   *    outcome tier, returned by `_routeByTierAssignment` only where the policy permits.
+   *
+   * @param {string|null|undefined} disposition
+   * @returns {boolean}
+   * @private
+   */
+  _isFailureAwardDisposition(disposition) {
+    return ['fail', 'failure'].includes(disposition);
   }
 
   /**
@@ -871,6 +926,20 @@ export class CraftingEngine {
         } catch (consumptionError) {
           console.error('Fabricate | Error during failure-path consumption:', consumptionError);
         }
+        // THE FAILURE AWARD (issue 1098). It runs AFTER consumption and breakage, so the
+        // essence snapshot the reserved output transfers from is the one the attempt
+        // actually spent — and so a failure that awards nothing is unchanged in every
+        // observable way.
+        const failureResults = await this._produceCraftingFailureResults({
+          craftingActor,
+          executionRecipe,
+          step,
+          ingredientSet,
+          consumedItems: consumedOnFail,
+          toolItems: toolValidation.tools,
+          checkResult,
+          resultGroupId: options?.resultGroupId || null,
+        });
         if (runManager && run) {
           await runManager.completeStepFailure(
             craftingActor,
@@ -888,6 +957,12 @@ export class CraftingEngine {
               },
               consumedIngredients: consumedOnFail.map(mapConsumedIngredientRef),
               usedTools: usedToolsOnFail,
+              // In the SUCCESS branch's shape, through the same mapper: the record lands
+              // in the actor's run-container flag, so an empty list beside real items is a
+              // durable contradiction rather than a cosmetic gap.
+              createdResults: failureResults.map((item) =>
+                craftedResultRecord(item, craftingActor)
+              ),
             }
           );
         }
@@ -897,15 +972,21 @@ export class CraftingEngine {
           recipe,
           consumedIngredients: consumedOnFail,
           tools: usedToolPairs,
-          createdResults: [],
+          // The card's failure branch renders these under its own results section; an
+          // empty list leaves every existing failure card byte-for-byte unchanged.
+          createdResults: failureResults,
           failureReason: checkResult.message || 'Crafting check failed',
           rollValue: rollTotalForCard(checkResult),
           tierStep: tierStepForCard(checkResult),
         });
         return {
           success: false,
-          results: null,
+          // `null` when nothing was awarded — what every existing caller reads as "a
+          // failed craft produced nothing". The discriminator is attached only when
+          // something WAS produced, so today's failure return is unchanged.
+          results: failureResults.length > 0 ? failureResults : null,
           message: checkResult.message || 'Crafting check failed',
+          ...(failureResults.length > 0 && { disposition: 'produced-on-failure' }),
         };
       }
       if (
@@ -1096,13 +1177,9 @@ export class CraftingEngine {
           },
           consumedIngredients: consumedItems.map(mapConsumedIngredientRef),
           usedTools,
-          createdResults: (resultItems || []).map((item) => ({
-            actorUuid: craftingActor.uuid,
-            itemUuid: item.uuid,
-            quantity: awardedQuantityOf(item),
-            name: item.name ?? null,
-            img: item.img ?? null,
-          })),
+          createdResults: (resultItems || []).map((item) =>
+            craftedResultRecord(item, craftingActor)
+          ),
         });
       }
       // Step resolved: a multi-step recipe keeps an active run for the next step; a
@@ -1535,6 +1612,21 @@ export class CraftingEngine {
       } catch (breakageError) {
         console.error('Fabricate | Error during timed-step failure tool breakage:', breakageError);
       }
+      // THE FAILURE AWARD, timed twin (issue 1098). A timed craft that fails must produce
+      // what an immediate one would: the delay is a scheduling property, not a different
+      // set of outcomes. The START snapshot (`resolvedEssences`) is threaded because the
+      // source items are already gone by the time this runs — the same reason the alchemy
+      // timed twin takes it.
+      const failureResults = await this._produceCraftingFailureResults({
+        craftingActor,
+        executionRecipe,
+        step,
+        ingredientSet,
+        consumedItems,
+        toolItems,
+        checkResult,
+        precomputedEssences: resolvedEssences,
+      });
       await runManager.completeStepFailure(craftingActor, run, stepIndex, message, {
         selectedIngredientSetId: ingredientSet?.id,
         lastCheckResult: {
@@ -1546,6 +1638,7 @@ export class CraftingEngine {
         },
         consumedIngredients: consumedRunRefs,
         usedTools,
+        createdResults: failureResults.map((item) => craftedResultRecord(item, craftingActor)),
       });
       await this._postCraftChatMessage({
         success: false,
@@ -1553,12 +1646,20 @@ export class CraftingEngine {
         recipe,
         consumedIngredients: consumedItems,
         tools: usedToolPairs,
-        createdResults: [],
+        createdResults: failureResults,
         failureReason: message,
         rollValue: rollTotalForCard(checkResult),
         tierStep: tierStepForCard(checkResult),
       });
-      return { resolved: true, result: { success: false, results: null, message } };
+      return {
+        resolved: true,
+        result: {
+          success: false,
+          results: failureResults.length > 0 ? failureResults : null,
+          message,
+          ...(failureResults.length > 0 && { disposition: 'produced-on-failure' }),
+        },
+      };
     };
 
     if (!checkResult.success) {
@@ -1684,13 +1785,7 @@ export class CraftingEngine {
       },
       consumedIngredients: consumedRunRefs,
       usedTools,
-      createdResults: (resultItems || []).map((item) => ({
-        actorUuid: craftingActor.uuid,
-        itemUuid: item.uuid,
-        quantity: awardedQuantityOf(item),
-        name: item.name ?? null,
-        img: item.img ?? null,
-      })),
+      createdResults: (resultItems || []).map((item) => craftedResultRecord(item, craftingActor)),
     });
 
     const visibilityService = game.fabricate?.getRecipeVisibilityService?.();
@@ -1733,6 +1828,106 @@ export class CraftingEngine {
             : `Completed ${stepLabel} for ${recipe.name}`,
       },
     };
+  }
+
+  /**
+   * Produce the authored FAILURE result for a failed crafting check (issue 1098), or
+   * nothing — the crafting twin of the salvage failure award, and the seam both crafting
+   * failure paths (the immediate `craft()` branch and the timed `_finishTimedStep` one)
+   * call so the two cannot diverge.
+   *
+   * ## `never` short-circuits BEFORE any group is selected
+   *
+   * The policy gate is here, not inside the resolver, and it is the FIRST thing this
+   * method does. Under `never` no resolution runs at all, so a failed craft is
+   * byte-for-byte what it was: no group is chosen and then discarded, and nothing can
+   * observe a selection that was never made.
+   *
+   * `perRecord` and `always` are ONE predicate — {@link activityPermitsFailureResults} —
+   * and deliberately not two branches: the policy SELECTS an authored failure output and
+   * never fabricates one, so a second branch could only differ by inventing an output the
+   * recipe never authored. A recipe authoring none produces nothing under either.
+   *
+   * ## Which authored output, per mode
+   *
+   * Resolution is the SAME `_createResultItems` the success path uses, so there is no
+   * second routing derivation to drift: `simple` and alchemy-`simple` resolve the
+   * reserved `role: 'failure'` group (by ROLE — those branches never index), and
+   * `routedByCheck` resolves the group assigned to the failure-marked outcome tier, which
+   * `ResolutionModeService` returns with `disposition: 'failure'`.
+   * `routedByIngredients` and `progressive` have no tier to mark and resolve nothing.
+   *
+   * ## Only a FAILURE disposition is produced, and nothing else becomes one
+   *
+   * The award is gated on {@link _isFailureAwardDisposition} BEFORE any item is created —
+   * see that method for the single-group exemption this closes, which would otherwise
+   * hand a failed routed craft its full SUCCESS output.
+   *
+   * A routed failing tier that no result group lists resolves to `unrouted-tier`, which is
+   * not on the allowlist: it produces nothing, and it does NOT convert the craft into a
+   * misconfiguration abort either, because the caller has already applied the failure
+   * consumption policy and there is nothing left to abort cleanly. The craft records the
+   * failure it already had.
+   *
+   * IT DECIDES NOTHING ABOUT COST. Consumption and tool breakage are governed by
+   * `craftingCheck.consumption` and are applied by the caller BEFORE this runs; a failure
+   * AWARD and a failure COST are separate decisions and this method reads neither toggle.
+   *
+   * @returns {Promise<Array>} the created result documents, or `[]`
+   * @private
+   */
+  async _produceCraftingFailureResults({
+    craftingActor,
+    executionRecipe,
+    step,
+    ingredientSet,
+    consumedItems,
+    toolItems,
+    checkResult,
+    resultGroupId = null,
+    precomputedEssences = null,
+    essenceEnabled = null,
+  }) {
+    if (!activityPermitsFailureResults(this._getRecipeSystem(executionRecipe), 'crafting')) {
+      return [];
+    }
+    try {
+      // PREFLIGHT THE DISPOSITION BEFORE CREATING ANYTHING. Resolution is a pure,
+      // deterministic read of the recipe/step/ingredient set/check result, so asking it
+      // twice agrees with itself — the same argument the pre-consumption misconfiguration
+      // gate in `craft()` already makes for resolving ahead of mutation. Asking after
+      // creation would be too late: the items would already be on the actor.
+      const resolutionService =
+        this.resolutionModeService || game.fabricate?.getResolutionModeService?.();
+      if (typeof resolutionService?.resolveResultGroups !== 'function') return [];
+      const preflight = resolutionService.resolveResultGroups({
+        recipe: executionRecipe,
+        step,
+        ingredientSet,
+        checkResult,
+        selectedResultGroupId: resultGroupId,
+      });
+      if (!this._isFailureAwardDisposition(preflight?.meta?.disposition)) return [];
+
+      const { items } = await this._createResultItems(
+        craftingActor,
+        executionRecipe,
+        step,
+        ingredientSet,
+        consumedItems,
+        toolItems,
+        checkResult,
+        resultGroupId,
+        { precomputedEssences, essenceEnabled }
+      );
+      return Array.isArray(items) ? items : [];
+    } catch (error) {
+      // A failed craft that cannot build its failure output still has to RECORD the
+      // failure the caller is in the middle of writing. Throwing here would abandon the
+      // run mid-write, after consumption, which is strictly worse than awarding nothing.
+      console.error('Fabricate | Error producing crafting failure results:', error);
+      return [];
+    }
   }
 
   /**
