@@ -77,6 +77,14 @@ const TOLERATED_WARNINGS = [
 
 const LAUNCH_ARGS = ['--use-gl=angle', '--use-angle=swiftshader', '--force-color-profile=srgb'];
 const READY_TIMEOUT_MS = 20_000;
+// Playwright's default `page.goto` timeout is 30s, and that is NOT enough for the FIRST
+// navigation against a cold Vite server: the dep optimiser has to build the lab's whole
+// module graph before it serves anything, measured at ~90s in a fresh checkout. Every case
+// then failed at `page.goto` before rendering a pixel, which reads as "the View Lab is
+// broken" rather than "the server was still warming up" — it cost one round to diagnose.
+// Subsequent navigations are served from the warm cache and finish in well under a second,
+// so this ceiling only ever binds once per run.
+const NAVIGATION_TIMEOUT_MS = 150_000;
 
 /**
  * Vite is loaded through an indirect specifier so that neither a static nor a literal dynamic
@@ -272,12 +280,47 @@ function escapeForRegExp(value) {
   return value.replaceAll(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
 }
 
+/**
+ * Navigate a throwaway page once so Vite's dependency optimiser builds the lab's module
+ * graph BEFORE any case is timed. Measured at ~90s in a fresh checkout, against a
+ * Playwright default of 30s — so without this the first case fails at its readiness wait
+ * having rendered nothing, and the run reports the harness as broken.
+ *
+ * Deliberately swallows its own failure: this is a warm-up, not a check. If the server is
+ * genuinely unreachable the first real case will say so with its own, accurate message,
+ * and a warm-up that could abort the run would be a second thing to diagnose.
+ *
+ * @param {import('playwright').Browser} browser
+ * @param {string} baseUrl
+ * @returns {Promise<void>}
+ */
+async function warmUpLabServer(browser, baseUrl) {
+  const context = await browser.newContext(BROWSER_CONTEXT);
+  try {
+    const page = await context.newPage();
+    await page.goto(`${baseUrl}${MOUNT_PATH}`, {
+      waitUntil: 'load',
+      timeout: NAVIGATION_TIMEOUT_MS,
+    });
+  } catch {
+    // Intentionally ignored — see above.
+  } finally {
+    await context.close();
+  }
+}
+
 async function renderPage(
   browser,
   baseUrl,
   { appId, query, label, steps = [], expectView = null, expectTab = null, expectSelector = null }
 ) {
   const context = await browser.newContext(BROWSER_CONTEXT);
+  // Every wait in this harness, not only the ones that name a timeout: against a COLD Vite
+  // server the dep optimiser rebuilds the lab's module graph before it serves anything, so
+  // the first case's readiness wait blows Playwright's 30s default long before the page is
+  // able to answer. Raising only `page.goto` moved the failure to `waitForFunction` rather
+  // than fixing it. A warm run never approaches this ceiling — see `warmUpLabServer`.
+  context.setDefaultTimeout(NAVIGATION_TIMEOUT_MS);
   const page = await context.newPage();
   // `mkdtemp` rather than a fixed name in `tmpdir()`: the old path was predictable, and a harness
   // that writes a predictable path in a shared directory is a symlink-swap away from writing
@@ -324,7 +367,10 @@ async function renderPage(
 
   try {
     const search = new URLSearchParams({ app: appId, ...query }).toString();
-    await page.goto(`${baseUrl}${MOUNT_PATH}?${search}`, { waitUntil: 'load' });
+    await page.goto(`${baseUrl}${MOUNT_PATH}?${search}`, {
+      waitUntil: 'load',
+      timeout: NAVIGATION_TIMEOUT_MS,
+    });
     // These two callbacks are serialized into the PAGE, not run here, so they reach for
     // `globalThis.document` - the Node lint scope has no `document` binding.
     await page.waitForFunction(
@@ -621,6 +667,14 @@ async function commandApps() {
 
   const server = await startLabServer();
   const browser = await chromium.launch({ headless: true, args: LAUNCH_ARGS });
+  // Pay Vite's cold dep-optimise ONCE, on a throwaway page, before any case is timed.
+  // Without it the first case absorbs a ~90s server build inside its own readiness wait and
+  // fails at whatever ceiling that wait happens to name — which reads as "the View Lab is
+  // broken" rather than "the server was still warming up", and cost a full round to
+  // diagnose. A warm server answers in well under a second, so this is a one-off cost, and
+  // a failure here is deliberately NOT fatal: it means the run proceeds and the first case
+  // reports the real error rather than this one.
+  await warmUpLabServer(browser, server.baseUrl);
   const rendered = [];
   const failures = [];
   try {
