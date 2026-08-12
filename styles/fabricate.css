@@ -3300,16 +3300,22 @@
   text-overflow: ellipsis;
 }
 
-/* THE ROW'S TWO CHIPS ARE NOT STYLED HERE, and that is a cascade fact rather than a
-   preference. This sheet is imported at `layer(modules)` — `tests/view-lab/cascade.css`
+/* THE ROW'S TWO CHIPS ARE NOT STYLED HERE, and that is an OWNERSHIP fact, not merely a
+   cascade one. This sheet is imported at `layer(modules)` — `tests/view-lab/cascade.css`
    mirrors how Foundry imports a module stylesheet — while Svelte's `css: 'injected'` blocks
    land UNLAYERED, and an unlayered author declaration beats every layered one no matter how
-   specific the layered selector is. So a rule here restating a property `Chip.svelte`'s own
-   scoped block declares cannot win, at any specificity. This exact pair was written here
+   specific the layered selector is. So a rule HERE restating a property `Chip.svelte`'s own
+   scoped block declares cannot win, at any specificity — this exact pair was written here
    first, at (0,4,0), and the parity run reported the chip still at the shared primitive's
-   padding, radius, fill, size and weight; an unlayered probe carrying the identical selector
-   landed immediately. The chip's parity geometry therefore lives in
-   `CraftingModifierCatalogueCard.svelte`'s own scoped block, which is unlayered too. */
+   padding, radius, fill, size and weight. A rule in a CALLER's own scoped `<style>` is not
+   bound by that: it is unlayered too, so a `:global(...)` block there CAN out-specify
+   `Chip.svelte`'s base rule and render correctly, and one did. That is still a second
+   implementation of the one chip's geometry — exactly what issue 883 retired regardless of
+   whether it renders right — and `manager-layout.test.js`'s hand-rolled-chip ratchet greps
+   every file but `Chip.svelte` for the literal class name for that reason. The chip's
+   parity geometry therefore lives in `Chip.svelte` itself, at `density="row"`.
+   `CraftingModifierCatalogueCard.svelte`'s own scoped block keeps only the row's flex
+   layout context for the two chips, not their geometry. */
 
 /* THE ELIGIBILITY CONTROL, and the pill IS it (issue 1096). It was a `SelectionCheckbox`
    with an inert `StatusPill` beside it, on a second line of the row.

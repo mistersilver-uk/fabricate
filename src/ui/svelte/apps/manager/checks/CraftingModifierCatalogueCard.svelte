@@ -572,8 +572,7 @@
           data-crafting-modifier-readonly="expression">{modifier.expression || '—'}</code
         >
         {#if boundsChipLabel(modifier)}
-          <Chip tone="neutral" mono class="manager-modifier-bounds-chip"
-            >{boundsChipLabel(modifier)}</Chip
+          <Chip density="row" class="manager-modifier-bounds-chip">{boundsChipLabel(modifier)}</Chip
           >
         {/if}
         {#if modifier.isRollExpression}
@@ -582,7 +581,7 @@
                the dice reach the roll, animate and show on the card. It was `warning` while
                a check could only append a scalar and readiness blocked such an entry; that
                rule is retired, so the tone follows it. -->
-          <Chip tone="neutral" class="manager-modifier-roll-chip" data-crafting-modifier-roll
+          <Chip density="row" class="manager-modifier-roll-chip" data-crafting-modifier-roll
             >{text('FABRICATE.Admin.Manager.Checks.Crafting.ModifierRollTag', 'Rolls dice')}</Chip
           >
         {/if}
@@ -753,36 +752,27 @@
     container-type: inline-size;
   }
 
-  /* ── THE ROW'S CHIPS, AND WHY THEY ARE STYLED HERE ────────────────────────────────────
-     `Chip` is still the primitive — this restates its GEOMETRY for this row, exactly as the
-     manager restates `ToggleCard`'s and `Callout`'s elsewhere in this studio — but the rule
-     cannot live in `styles/fabricate.css`, and that is a cascade fact rather than a
-     preference.
+  /* ── THE ROW'S CHIPS ARE `Chip` AT `density="row"`, NOT STYLED HERE ───────────────────
+     A first pass restated the row scale's GEOMETRY here — padding, radius, fill, colour,
+     type — the way the manager restates `ToggleCard`'s and `Callout`'s elsewhere in this
+     studio, by pairing the chip primitive's own root class with each chip's `class` prop
+     inside a local `:global(...)` rule. It RENDERED correctly: this block and `Chip.svelte`'s
+     own scoped block are both unlayered — `styles/fabricate.css` imports at `layer(modules)`
+     (Foundry imports a module stylesheet into that layer; `tests/view-lab/cascade.css`
+     mirrors it) and could never have won this fight, but a caller's OWN scoped `<style>` is
+     not that sheet — so ordinary specificity decided it, and the four-class local rule beat
+     the primitive's own two-or-three. That is exactly the problem: a second,
+     correctly-rendering implementation of the one chip's geometry is what issue 883 retired,
+     and `manager-layout.test.js`'s hand-rolled-chip ratchet greps every file but the
+     primitive's own for that root class for that reason — rendering right was never the bar,
+     one owner is. `Chip.svelte`'s `density="row"` prop is that one owner's variant.
 
-     That sheet is imported at `layer(modules)` (Foundry imports a module stylesheet into
-     that layer; `tests/view-lab/cascade.css` mirrors it), while Svelte's `css: 'injected'`
-     blocks land UNLAYERED — and an unlayered author declaration beats a layered one no
-     matter how specific the layered selector is. The pair below was written in the global
-     sheet first, at (0,4,0), and the parity run still reported the chip at the shared
-     primitive's own padding, radius, fill, height and weight; an unlayered probe carrying
-     the identical selector landed immediately.
-
-     `:global(...)` under a scoped ancestor compiles to
-     `.manager-modifier-readonly-row.svelte-<hash> .manager-chip.manager-modifier-*` — four
-     classes, unlayered — so it beats `Chip.svelte`'s own `.manager-chip.svelte-<hash>` on
-     specificity within the same layer, and it cannot reach a chip outside this row. */
-  .manager-modifier-readonly-row :global(.manager-chip.manager-modifier-bounds-chip),
-  .manager-modifier-readonly-row :global(.manager-chip.manager-modifier-roll-chip) {
+     What stays here is layout CONTEXT rather than the chip's own geometry: `flex: 0 0 auto`
+     keeps both chips from shrinking below their content when the row is narrow, which is a
+     property of this row's flex layout, not of a chip. */
+  .manager-modifier-readonly-row :global(.manager-modifier-bounds-chip),
+  .manager-modifier-readonly-row :global(.manager-modifier-roll-chip) {
     flex: 0 0 auto;
-    min-height: 22px;
-    padding: 0 9px;
-    border: 1px solid var(--fab-border);
-    border-radius: 999px;
-    color: var(--fab-text-secondary);
-    background: var(--fab-bg-2);
-    font-size: 10px;
-    font-weight: 600;
-    white-space: nowrap;
   }
 
   /* THE RULE GRID'S OWN GUTTER, on this card only. `RadioCardGroup` is shared and its 12px

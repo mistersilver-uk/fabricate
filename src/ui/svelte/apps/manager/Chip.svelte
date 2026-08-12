@@ -47,6 +47,22 @@
      component INSTANCE, not its node, so a caller that must measure or focus the chip
      — `SearchablePopover` positions its popover off the trigger's bounding box and
      restores focus to it on close — has no other way to reach it.
+   - density: 'default' (the manager's one chip scale) or 'row' — the Checks Studio
+     modifier row's own scale for an in-line annotation chip (the bounds chip, the
+     "Rolls dice" chip), taken from the prototype (issue 1096). `styles/fabricate.css`
+     cannot state it: that sheet imports at `layer(modules)` while this component's
+     `css: 'injected'` block lands UNLAYERED (svelte.config.js), and an unlayered
+     declaration beats a layered one no matter how specific the layered selector is
+     written. A caller's OWN scoped block is unlayered too, so a `:global(...)` override
+     written there can out-specify this component's base rule and visually work — that is
+     exactly what `CraftingModifierCatalogueCard.svelte` did before this prop existed —
+     but it is still a second, parallel implementation of the one chip's geometry, which
+     is precisely what issue 883 retired and what `manager-layout.test.js`'s hand-rolled-
+     chip ratchet exists to catch: rendering right is not the bar, one owner is. So
+     `density` is the variant-on-the-primitive escape hatch `SegmentedControl`'s own
+     `density` prop is, for the identical reason: a layout context may still size a
+     chip's POSITION (a caller sets `flex-shrink` etc. from outside), but never its own
+     geometry.
 
   Every other attribute — `title`, `aria-label`, `role`, `data-*` hooks, `onclick`,
   `type`, `disabled` — is forwarded through the rest spread, so a call site is not
@@ -61,6 +77,7 @@
     swatch = '',
     class: extraClass = '',
     truncate = false,
+    density = 'default',
     element = $bindable(null),
     children,
     ...rest
@@ -107,6 +124,7 @@
       safeSwatch ? 'has-swatch' : '',
       mono ? 'is-mono' : '',
       truncate ? 'is-truncated' : '',
+      density === 'row' ? 'is-row' : '',
       extraClass,
     ]
       .filter(Boolean)
@@ -284,6 +302,31 @@
   .manager-chip.is-neutral {
     border-color: var(--fab-border);
     color: var(--fab-text-muted);
+  }
+
+  /* ROW density (issue 1096): the Checks Studio modifier row's in-line annotation chip
+     — the bounds chip ("-1 to +5") and the "Rolls dice" chip — sits at a scale the
+     prototype draws slightly taller and cooler than the manager-wide default: a 22px
+     pill, 10px/600 text in the SECONDARY ink, on the raised `--fab-bg-2` surface. Values
+     are read off `scripts/visual-parity`'s `modifier-row-bounds-chip` fixture, not
+     chosen here. This is a VARIANT ON THE PRIMITIVE, not a caller override, for the
+     reason `density` documents above: a caller COULD out-specify the base rule with its
+     own unlayered `:global(...)` block, and one did, but a second implementation of the
+     one chip's geometry is what issue 883 retired regardless of whether it renders
+     correctly — `manager-layout.test.js`'s hand-rolled-chip ratchet enforces that this is
+     the one place a chip's own geometry may be declared. Written after every tone rule so
+     a call site that also sets `tone` still gets the row's own colour, though no call
+     site does both today. `border` is unchanged from the base rule, so it is not
+     restated here. */
+  .manager-chip.is-row {
+    min-height: 22px;
+    padding: 0 9px;
+    border-radius: 999px;
+    color: var(--fab-text-secondary);
+    background: var(--fab-bg-2);
+    font-size: 10px;
+    font-weight: 600;
+    white-space: nowrap;
   }
 
   /* The colour DOT (issue 1036). One rule, painting the leading span from the
