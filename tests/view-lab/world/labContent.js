@@ -2863,6 +2863,13 @@ const ROUTED_CHECK = Object.freeze({
       ],
     },
   },
+  // THE SELECTION THE PARITY SUBJECT IS MEASURED ON. `addAll` over all three entries is the
+  // prototype's own resting state for this screen — three rows, each with its bounds chip, each
+  // reading `Applied` — so the shipped card and the design can be compared row for row rather
+  // than through an empty state. It is also the rule that leaves every runework recipe frame
+  // alone: the per-recipe picker renders under `bySubject` and under nothing else.
+  defaultModifierPolicy: 'addAll',
+  defaultModifierIds: ['rw-mod-rune-lore', 'rw-mod-steady-hand', 'rw-mod-chisel'],
 });
 
 /**
@@ -2888,6 +2895,13 @@ const ROUTED_SALVAGE_CHECK = Object.freeze({
       { id: 'rw-salv-ruined', name: 'Ruined', success: false, breakTools: true, dc: -5 },
     ],
   },
+  // TWO of the three, on the SAME rule crafting uses, and the omission is the whole point: the
+  // eligibility control has two readings and crafting's frame shows only the `Applied` one.
+  // Leaving `rw-mod-chisel` out puts `Not applied` on screen beside its companion, on the one
+  // system whose rows the parity pass measures, without touching the crafting screen it
+  // measures them on.
+  defaultModifierPolicy: 'addAll',
+  defaultModifierIds: ['rw-mod-rune-lore', 'rw-mod-steady-hand'],
 });
 
 /**
@@ -3050,6 +3064,60 @@ const HERBALISM_CHECK_MODIFIERS = Object.freeze([
     // DIFFERENT values to show a choice rather than a row of interchangeable chips, and
     // `maxModifierPicks` below is sized to that set (four since issue 1118 review added the
     // rolling `hb-mod-luck` to it).
+  },
+]);
+
+/**
+ * RUNEWORK'S OWN modifier library, and the reason it exists is a gate that could not fail.
+ *
+ * `modifier-entry-row` sat in the Checks Studio parity spec marked `unreachable`, on the stated
+ * grounds that no lab system authored a `CraftingSystem.modifiers` library — so the card drew its
+ * "no modifiers yet" sentence, the rows never rendered, and NOTHING about them was ever measured.
+ * Everything around them matched, so the modifiers screen reported clean while shipping a
+ * two-line sub-card per entry where the design draws one row. A region nobody can render is a
+ * region nobody is checking, and this library is what turns the assertion back on.
+ *
+ * It goes on RUNEWORK rather than on herbalism because runework is the system the parity subject
+ * boots (`routedByCheck` + a relative check is the mode the prototype draws), and because
+ * herbalism's five entries are sized to frames that already have jobs — the player roll prompt
+ * needs its three distinct flat values, and re-pointing the parity subject at herbalism would
+ * measure a screen no case photographs.
+ *
+ * Three entries, every one of them bounded `-1 to +5`, and every one of them selected below:
+ * three rows all carrying the bounds chip and all reading `Applied` is the resting state the
+ * prototype's own Modifiers screen draws, so the two documents can be laid side by side. The
+ * NOT-applied reading is depicted by runework's salvage selection, which deliberately leaves one
+ * entry out.
+ *
+ * The rule is `addAll`, which is what keeps this library free: `RecipeOverviewTab` gates its
+ * per-recipe picker on `bySubject`, so a non-selecting rule adds no control to any of runework's
+ * already-captured recipe frames. Every icon is Font Awesome FREE — Foundry bundles Pro, but a
+ * community package is not licensed to use one.
+ */
+const RUNEWORK_CHECK_MODIFIERS = Object.freeze([
+  {
+    id: 'rw-mod-rune-lore',
+    label: 'Rune lore',
+    icon: 'fa-solid fa-book-open',
+    expression: '@abilities.int.mod',
+    min: -1,
+    max: 5,
+  },
+  {
+    id: 'rw-mod-steady-hand',
+    label: 'Steady hand',
+    icon: 'fa-solid fa-hand',
+    expression: '@abilities.dex.mod',
+    min: -1,
+    max: 5,
+  },
+  {
+    id: 'rw-mod-chisel',
+    label: 'Inscriber’s chisel',
+    icon: 'fa-solid fa-pen-nib',
+    expression: '@prof',
+    min: -1,
+    max: 5,
   },
 ]);
 
@@ -3382,6 +3450,9 @@ export function buildLabContent() {
       recipeItemDefinitions: [],
       tools: RUNEWORK_TOOLS,
       characterPrerequisites: RUNEWORK_PREREQUISITES,
+      // The SECOND system carrying a modifier library, and the first whose rows anything
+      // measures — see `RUNEWORK_CHECK_MODIFIERS` for why the parity subject needed one.
+      modifiers: RUNEWORK_CHECK_MODIFIERS,
       gatheringRealms: [],
       gatheringRealmSettings: { revealMode: 'alwaysVisible', modifierVisibility: 'visible' },
       // The world's CURRENCY system, and runework carries it because nothing else does.
