@@ -593,36 +593,44 @@
             </select>
           </div>
         {/if}
-        <ThresholdBandStrip
-          binding={type === 'fixed' ? 'fixed' : 'relative'}
-          bands={bandStripBands}
-          {previewDc}
-          {previewLabel}
-          groupLabel={text('FABRICATE.Admin.Manager.Checks.Crafting.BandsTitle', 'Outcome bands')}
-          boundaryLabel={(band, nextBand) =>
-            text(
-              'FABRICATE.Admin.Manager.Checks.Crafting.BandsBoundary',
-              'Threshold between {from} and {to}'
-            )
-              .replace('{from}', band?.name || '')
-              .replace('{to}', nextBand?.name || '')}
-          fallbackNote={text(
-            'FABRICATE.Admin.Manager.Checks.Crafting.BandsFallback',
-            'These tiers leave a gap or overlap, so they cannot be drawn as one continuous strip. Edit the numbers in the rows below; the strip returns once the ranges meet.'
-          )}
-          dataAttr="data-outcome-band-strip"
-          onChange={applyBandStripChange}
-        />
-        <p class="manager-muted" data-outcome-band-strip-hint>
-          <!-- The pointer glyph leads the sentence, as the prototype draws it: the hint is
-               about a DIRECT-MANIPULATION affordance, and a glyph naming the pointer is what
-               separates it from the paragraphs of prose elsewhere on the screen. -->
-          <i class="fas fa-arrow-pointer" aria-hidden="true"></i>
-          {text(
-            'FABRICATE.Admin.Manager.Checks.Crafting.BandsHint',
-            'Drag or arrow-key a band edge to move its threshold, or type the numbers below. The numbers are the authority.'
-          )}
-        </p>
+        <!-- THE STRIP AND ITS HINT ARE FOR A CHECK THAT HAS TIERS. Both rendered
+             unconditionally, and both say something FALSE when there are none: the strip
+             cannot resolve an empty set, so it fell back to "these tiers leave a gap or
+             overlap" about tiers that do not exist, and the hint invited a GM to drag a band
+             edge on a strip with no edges. The zero state's own sentence and its add control
+             are below, and they are the whole message that state has. -->
+        {#if outcomes.length > 0}
+          <ThresholdBandStrip
+            binding={type === 'fixed' ? 'fixed' : 'relative'}
+            bands={bandStripBands}
+            {previewDc}
+            {previewLabel}
+            groupLabel={text('FABRICATE.Admin.Manager.Checks.Crafting.BandsTitle', 'Outcome bands')}
+            boundaryLabel={(band, nextBand) =>
+              text(
+                'FABRICATE.Admin.Manager.Checks.Crafting.BandsBoundary',
+                'Threshold between {from} and {to}'
+              )
+                .replace('{from}', band?.name || '')
+                .replace('{to}', nextBand?.name || '')}
+            fallbackNote={text(
+              'FABRICATE.Admin.Manager.Checks.Crafting.BandsFallback',
+              'These tiers leave a gap or overlap, so they cannot be drawn as one continuous strip. Edit the numbers in the rows below; the strip returns once the ranges meet.'
+            )}
+            dataAttr="data-outcome-band-strip"
+            onChange={applyBandStripChange}
+          />
+          <p class="manager-muted" data-outcome-band-strip-hint>
+            <!-- The pointer glyph leads the sentence, as the prototype draws it: the hint is
+                 about a DIRECT-MANIPULATION affordance, and a glyph naming the pointer is what
+                 separates it from the paragraphs of prose elsewhere on the screen. -->
+            <i class="fas fa-arrow-pointer" aria-hidden="true"></i>
+            {text(
+              'FABRICATE.Admin.Manager.Checks.Crafting.BandsHint',
+              'Drag or arrow-key a band edge to move its threshold, or type the numbers below. The numbers are the authority.'
+            )}
+          </p>
+        {/if}
 
         {#if outcomes.length === 0}
           <p class="manager-muted" data-outcomes-empty>

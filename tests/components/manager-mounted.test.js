@@ -4109,6 +4109,23 @@ describe('CraftingSystemManager mounted behavior', () => {
         Boolean(add),
         'an instruction to add tiers must come with the control that adds one'
       );
+      // ...and the zero state says NOTHING ELSE. Both of these rendered unconditionally and
+      // both are false with no tiers: the strip cannot resolve an empty set, so it fell back
+      // to "these tiers leave a gap or overlap" about tiers that do not exist, and the hint
+      // invited a GM to drag a band edge on a strip that has no edges. Asserted by ABSENCE
+      // because presence is what shipped — a test that only checked the empty sentence and the
+      // add control passed with both lies on screen beside them.
+      assert.equal(
+        target.querySelector('[data-outcome-band-strip]'),
+        null,
+        'a strip with no bands claims a gap or overlap between tiers that do not exist'
+      );
+      assert.equal(
+        target.querySelector('[data-outcome-band-strip-hint]'),
+        null,
+        'and the drag hint names an affordance the zero state does not offer'
+      );
+
       add.click();
       flushSync();
       assert.equal(
