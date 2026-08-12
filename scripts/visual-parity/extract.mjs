@@ -21,8 +21,8 @@ import { pathToFileURL } from 'node:url';
 
 import { chromium } from 'playwright';
 
-import { IN_PAGE_PRELUDE } from './lib/measure.js';
-import { DEFAULT_PROPERTY_GROUPS, validateSpec } from './lib/schema.js';
+import { installRuntime } from './lib/page-runtime.js';
+import { DEFAULT_PROPERTY_GROUPS, sharedEdges, validateSpec } from './lib/schema.js';
 
 function argument(name, fallback = null) {
   const index = process.argv.indexOf(`--${name}`);
@@ -62,6 +62,7 @@ async function main() {
     deviceScaleFactor: 1,
   });
   const measured = {};
+  const alignments = {};
   try {
     await page.goto(pathToFileURL(resolve(process.cwd(), spec.prototype.path)).href, {
       waitUntil: 'load',
@@ -70,6 +71,7 @@ async function main() {
       await page.waitForSelector(spec.prototype.readySelector, { timeout: 60_000 });
     }
     await page.waitForTimeout(spec.prototype.settleMs ?? 1500);
+    await installRuntime(page);
 
     // A region is measured on the screen it says it is measured on, which is not always the
     // screen it BELONGS to: shell chrome and a persistent side rail belong to themselves and
@@ -83,38 +85,59 @@ async function main() {
 
     for (const [screen, regions] of byScreen) {
       await spec.navigate(page, screen);
-      const values = await page.evaluate(
-        ({ regionSpecs, groups, prelude, helpers }) => {
-          // and a string only because it has to cross the page boundary into `evaluate`.
-          const readRegion = new Function(`${prelude}\nreturn readRegion;`)();
-
-          const scope = new Function(`return (${helpers});`)();
-          const out = {};
-          for (const region of regionSpecs) {
-            const fn = new Function(...Object.keys(scope), `return (${region.locator});`);
-            const el = fn(...Object.values(scope));
-            if (!el) throw new Error(`region ${region.name}: locator resolved to nothing`);
-            out[region.name] = {
-              tag: el.tagName.toLowerCase(),
-              properties: readRegion(
-                el,
-                region.groups,
-                groups,
-                region.effectiveBackground === true
-              ),
-            };
-          }
-          return out;
-        },
+      // ALIGNMENT is DERIVED, never declared. The fixture records which edges this prototype
+      // actually shares between a group's members, so the comparison can only ever demand an
+      // alignment the design draws — and stops demanding it the moment the design stops.
+      const groups = (spec.alignments ?? []).filter(
+        (group) => (group.measuredOn ?? group.screen) === screen
+      );
+      const locatorOf = (name) => spec.regions.find((region) => region.name === name).locator;
+      const result = await page.evaluate(
+        (payload) => globalThis.__fabricateParity.measure(payload),
         {
-          regionSpecs: regions,
-          groups: propertyGroups,
-          prelude: IN_PAGE_PRELUDE,
-          helpers: spec.helpersSource,
+          regions: Object.fromEntries(
+            regions.map((region) => [
+              region.name,
+              {
+                locator: region.locator,
+                groups: region.groups,
+                effectiveBackground: region.effectiveBackground === true,
+              },
+            ])
+          ),
+          alignments: Object.fromEntries(
+            groups.map((group) => [
+              group.name,
+              Object.fromEntries(group.regions.map((name) => [name, locatorOf(name)])),
+            ])
+          ),
+          propertyGroups,
         }
       );
-      Object.assign(measured, values);
-      process.stdout.write(`  ${screen}: ${regions.length} regions\n`);
+      for (const [name, region] of Object.entries(result.regions)) {
+        if (region.missing) throw new Error(`region ${name}: its locator resolved to nothing`);
+        measured[name] = region;
+      }
+      for (const group of groups) {
+        const found = result.alignments[group.name];
+        if (found.missing.length > 0) {
+          throw new Error(
+            `alignment ${group.name}: ${found.missing.join(', ')} resolved to nothing`
+          );
+        }
+        alignments[group.name] = {
+          screen: group.screen,
+          measuredOn: screen,
+          regions: group.regions,
+          edges: group.edges,
+          shared: sharedEdges(found.edges, group.edges),
+        };
+      }
+      process.stdout.write(
+        `  ${screen}: ${regions.length} regions` +
+          (groups.length > 0 ? `, ${groups.length} alignment groups` : '') +
+          '\n'
+      );
     }
   } finally {
     await browser.close();
@@ -133,6 +156,7 @@ async function main() {
     },
     screens: spec.screens,
     propertyGroups,
+    alignments,
     regions: Object.fromEntries(
       spec.regions.map((region) => {
         const entry = {

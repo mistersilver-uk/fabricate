@@ -17,16 +17,17 @@ That gap is how a whole studio shipped with the wrong card treatment, the wrong 
 
 ```sh
 node scripts/visual-parity/extract.mjs --spec <spec.mjs> --out <fixture.json>
-node scripts/visual-parity/compare.mjs --spec <spec.mjs> --fixture <fixture.json>
+node scripts/visual-parity/compare.mjs --spec <spec.mjs> --fixture <fixture.json> [--screen <name>]
 node scripts/visual-parity/inventory.mjs --spec <spec.mjs> [--screen <name>] [--dump]
 ```
 
 `extract` drives the prototype in real Chromium and records `getComputedStyle` per named region.
-`compare` renders the subject — the real stylesheet plus the real compiled scoped CSS of every primitive involved — and reports every difference, exiting non-zero on any.
-`inventory` is the **structural** pass: it walks the prototype's own element tree and fails on every landmark the subject has no counterpart for.
+`compare` boots the **real app**, drives it to each screen and reports every computed-style difference, exiting non-zero on any.
+`inventory` is the **structural** pass: it walks the prototype's own element tree and fails on every landmark the subject has no counterpart for, against that same real app.
 
 Run **both** halves.
 They answer different questions, and neither can answer the other's.
+Both boot ONE live subject through the same machinery (`lib/subject.js`, `lib/view-lab.js`), so there is no second implementation of "render the app and drive it to a screen" for one of them to fall behind.
 
 Put the spec and the fixture under `tmp/` (gitignored), beside the prototype.
 
@@ -41,7 +42,7 @@ A value that *is* width-derived is recorded as an exemption rather than as a num
 
 **A parity gate that only measures what both sides have will always report green on something one side is missing.**
 
-`compare` measures computed styles of regions that exist on BOTH sides.
+`compare` measures computed styles of regions that exist on BOTH sides, and pointing it at the real app does not change that.
 That shape of gate is structurally blind to three things, and all three shipped here behind a green run: an element present in the prototype and **absent** in the subject; a control sitting in the **wrong card**; and a **missing affordance** on a row that otherwise measures identically.
 Nine named regions on one screen reported *no drift* while a whole callout card was off the screen, the DC and comparison controls had migrated into the formula card, and every tier row had lost its drag handle.
 
@@ -76,13 +77,44 @@ The escape hatch is an exemption with a stated reason — a decision someone mad
 
 What survives all of that is exactly the class of defect the pass exists for.
 
-### Its subject must be the REAL app, not the markup fixture
+### BOTH passes measure the REAL app
 
-This is the single most important decision in the pass, so state it as a rule rather than as a preference: **a structural pass run against a mirror can only report what its author already knew was missing.**
+State it as a rule rather than as a preference: **a pass run against a mirror can only report what its author already knew.**
 
-`compare`'s subject is a hand-authored markup fixture, and a fixture is a mirror of what its author believed the app renders.
-Point the structural pass at that and it re-reads those beliefs back to you — which is exactly how a screen came to ship with a whole callout card absent behind a green run.
-So the spec supplies `inventory.subject.open(browser)` / `.navigate(page, screen)` and points them at whatever renders the shipped components — in this repository, the View Lab, which boots once and reaches every section as a tab of one window.
+`compare` used to render a hand-authored markup fixture.
+A fixture is a mirror of what its author believed the app renders, and **a hand-maintained mirror does not fail — it drifts.**
+It drifts in the way nobody looks for, too.
+This one did not merely keep a stale class: its `roll` screen modelled `SimpleCraftingCheckEditor`'s static-DC card, which was never broken, and never modelled `CraftingCheckEditor`'s routed tier list at all.
+When that list shipped wrapped in the bare `.manager-inspector-card` shell — 12px of padding the studio card contract exists to strip, insetting every tier row past the Difficulty card above it — the comparison reported *no drift*, because **it could not be wrong about a component it did not model.**
+A maintainer caught it by eye.
+
+So the mirror is retired.
+The spec supplies `subject.open(browser)` / `subject.navigate(page, screen)`, both passes share that one session, and every region is a locator against the shipped component tree.
+In this repository the subject is the View Lab, which boots once and reaches every section as a tab of one window (`lib/view-lab.js`).
+
+Two consequences worth expecting the first time you re-point a spec:
+
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
+
+- **Everything the mirror was wrong about arrives at once.** The mirror had been standing in for the app on every screen, so its every optimism was invisible. Re-pointing this spec turned one green run into 17 findings — a card that never carried the studio card class, a rows container with none of the prototype's inset, and host chrome painting a scrollbar colour no markup harness could ever have seen.
+- **The app needs a STATE, and reaching it is part of navigating.** An empty list draws no row treatment. Seed that state in `subject.open`, not in `navigate`: a gate whose findings depend on which screen ran first reports something different every time somebody adds a region.
+
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
+
+### A region the app cannot show
+
+Sometimes the lab's world genuinely cannot put a region on screen — a library with no entries renders no row.
+That is a constraint, not drift, and it is recorded the way every other constraint here is: with a stated reason.
+
+```js
+'modifier-entry-row': {
+  locator: '.manager-modifier-readonly-row',
+  unreachable: 'WORLD GAP, not drift. A modifier row is drawn per entry of the SYSTEM’s …',
+},
+```
+
+The locator is still required, and the absence is still **asserted**: the moment the app starts rendering that element the run fails, telling you to delete the note.
+An excuse that outlives the constraint is the same defect as an exemption that outlives the difference.
 
 ### Recording a structural exemption
 
@@ -105,27 +137,43 @@ A spec is an ES module exporting:
 | `prototype` | `{ path, viewport, readySelector, settleMs }` for the prototype document. |
 | `screens` | The **closed set** of screen names. |
 | `navigate(page, screen)` | Drives the prototype to that screen. |
-| `helpersSource` | An expression string evaluating to an object of in-page locator helpers. |
 | `regions` | `{ name, screen, measuredOn?, groups, locator, effectiveBackground? }` per region. |
-| `subject` | The app under test: `viewport`, `stylesheets`, `screens` (name → markup), `selectors` (region → `{ selector }`), `requiredAncestors`, `chromeSweep`. |
-| `inventory` | The structural pass: `roots` (screen → `{ prototype, subject, measuredOn? }`), `subject.open`, `subject.navigate`, optional `limits`. |
+| `alignments` | `{ name, screen, measuredOn?, edges, regions }` per edge-alignment group. |
+| `subject` | The real app: `viewport`, `root`, `open(browser)`, `navigate(page, screen)`, `locators` (region → `{ locator, effectiveBackground?, unreachable? }`), `requiredAncestors`, `chromeSweep`. |
+| `inventory` | The structural pass: `roots` (screen → `{ prototype, subject, measuredOn? }`) and optional `limits`. |
 | `inventoryExemptions` | Accepted structural divergences, key → reason. |
-
-`helpersSource` and `locator` are **strings** because they have to cross into `page.evaluate`, where the spec's own scope does not exist.
 
 A region declares property **groups** rather than properties, so adding a region cannot quietly record a narrower set than its siblings.
 The groups are in `lib/schema.js`; a spec may extend or replace them.
 
+### A locator is DATA, never an expression
+
+A locator is a CSS selector string, or a list of **steps** from a closed vocabulary: `select`, `children`, `where`, `at`, `child`, `parent`, `sibling`.
+`where` filters on `tag`, `text`, `rect`, `style`, `styleNot`, `has`, `childCount` and `leaf`, and an unknown key **fails** rather than filtering nothing.
+
+```js
+const rail = [
+  { op: 'select', css: 'div.sc' },
+  { op: 'where', rect: { minWidth: 301, maxWidth: 359, minLeft: 1151, minHeight: 301 } },
+];
+const pane = [...rail, { op: 'sibling', offset: -1 }];
+```
+
+Compose them in the spec, in **Node**, with whatever little builders read best; what crosses into the page is a list of plain objects.
+
+They used to be JavaScript expressions handed across as source and reconstituted in the page with `new Function`, which SonarCloud rightly flags (`javascript:S1523`) — and the flag was pointing at something real rather than at a serialisation trick.
+A fixture that can express any code can express a locator that does something other than locate, and nothing in the schema could tell the two apart.
+Nothing crosses that boundary as text now: `page.evaluate` is handed real functions (`lib/page-runtime.js`), which is all it ever needed.
+
 ### Adding a screen
 
 1. Add its name to `screens`.
-2. Teach `navigate` how to reach it.
-3. Add its regions with `screen: '<name>'`.
-4. Add its markup under `subject.screens` and its selectors under `subject.selectors`.
-5. Add its root pair under `inventory.roots`.
-6. Re-extract, then compare, then inventory.
+2. Teach `navigate` how to reach it, and `subject.navigate` how to reach its counterpart.
+3. Add its regions with `screen: '<name>'`, and their subject locators under `subject.locators`.
+4. Add its root pair under `inventory.roots`.
+5. Re-extract, then compare, then inventory.
 
-Step 1 alone makes both gates **fail** until steps 3 and 5 are done, which is the point.
+Step 1 alone makes both gates **fail** until steps 3 and 4 are done, which is the point.
 
 ### Recording an exemption
 
@@ -143,6 +191,34 @@ The comparator refuses an exemption shorter than 40 characters and refuses one n
 
 An exemption should be a constraint you hit, not a difference you chose to keep.
 
+## A per-region value cannot see a RELATIONSHIP
+
+**Every region on a screen can measure exactly right and still sit in the wrong place.**
+
+An inset applied by an ancestor moves a whole subtree and changes none of the subtree's own computed values.
+That is the defect this harness shipped: a tier list wrapped in a card shell with 12px of padding it should not have had.
+The rows' padding was right, their gap was right, their border was right, and they sat 12px inside the card above them.
+
+An **alignment group** states the relationship, and it is **derived, never declared**:
+
+```js
+export const alignments = [
+  { name: 'roll-card-bodies', screen: 'roll', edges: ['left', 'right'],
+    regions: ['roll-card-body', 'roll-tier-inset'] },
+];
+```
+
+The extractor measures those regions' edges **in the prototype** and records which of them the prototype actually shares; the comparator asserts only those.
+A group can therefore never demand an alignment the design does not draw, and it stops demanding one the moment the design stops.
+Both members must be measured on the same screen — two boxes that were never on screen together share no edge — and the tolerance is half a pixel, which is the resolution of the question rather than a tolerance band on a value.
+
+The report names both ends and the gap:
+
+```text
+[roll] alignment "roll-card-bodies".left: the prototype lines these up and the subject insets
+  "roll-tier-inset" 12.0px from "roll-card-body" (roll-card-body 464.0, roll-tier-inset 476.0)
+```
+
 ## The traps, stated as traps
 
 Each of these has already cost a round.
@@ -155,13 +231,14 @@ Each of these has already cost a round.
 - **A landmark nobody can SEE is not a landmark.** A mockup routinely carries a hidden branch of an alternative state, and a walk that reads a `display: none` subtree will demand the subject build a control the prototype does not draw. The classifier skips `display: none` and `visibility: hidden`, and deliberately does NOT skip the clip-path visually-hidden idiom, whose content is announced.
 - **A heading is a heading.** A presentational test — weight and size — is all a styled-components prototype can offer, and it is exactly the assumption such a prototype invites. It is wrong about the subject: a card headed by an UPPERCASE MICRO-LABEL, which is this manager's own inspector convention, sits far below any size floor, so the card read as titleless, folded into its parent, and was reported MISSING while on screen. A real `h1`–`h6` counts as a title whatever it measures.
 - **Measuring both sides cannot see one side's absence.** A region that is missing is either not in the map (nothing is asserted) or one line about a selector, and a region nobody named is invisible either way. `inventory.mjs` is the complement, and the section above states the rule it exists for.
-- **A subject that is a mirror of the app cannot report what the app lacks.** The structural pass points at the real app for exactly this reason; running it against the markup fixture would be running it against its own author's beliefs.
+- **A subject that is a mirror of the app cannot report what the app lacks.** Both passes point at the real app for exactly this reason; running either against a markup fixture is running it against its own author's beliefs.
 - **A gate that covers two screens out of six reads as coverage.** The closed `screens` set, and the requirement that every screen owns at least one region, is what turns an unmeasured screen into a failure instead of a silence.
-- **Scoped component CSS.** Svelte compiles `.foo` to `.foo.svelte-<hash>` and injects it *after* the global sheet. A harness loading only the global stylesheet measures an unstyled control and passes on values the app never renders. Load the compiled scoped CSS **and** stamp the hash onto the markup (`tests/helpers/scoped-component-css.js`).
+- **Every region right, the screen wrong.** A per-region comparison cannot express a relationship BETWEEN two regions, and an ancestor's inset changes no value inside the subtree it moves. `alignments` is the rule for that class; the section above states it.
+- **A region resolved against the whole document.** The app under measurement is one window of a running product, and a document-wide `querySelector` will answer a region with a nav item or a neighbouring panel wearing the same class. Declare `subject.root`; every locator resolves inside it.
 - **`column-gap: normal` IS zero** on a grid or flex container. That is the one normalisation `sameComputedValue` performs, and it is a CSS fact rather than a tolerance. Nothing else is normalised: a tolerance band on colours or lengths is the beginning of a gate that cannot fail.
 - **Row gaps.** `columnGap` alone cannot see a stacking gutter, which is exactly where dead space hides. The `gap` group covers both axes.
 - **Icon fonts.** An icon's weight and text-transform come from the icon font's own sheet, which the harness usually does not load, so recording them compares the harness to itself. Use the `glyph` group (colour and size only).
-- **A subject markup fixture is a hand-maintained mirror.** It keeps rendering a class the component stopped emitting, and the harness goes on measuring something the app no longer draws. Keep the markup honest against the real components, and prefer selectors and classes copied from them.
+- **A hand-maintained mirror does not fail — it DRIFTS, and it can drift into modelling a component that was never broken.** That is the lesson this harness paid the most for. The retired markup fixture's `roll` screen modelled a card belonging to a component the screen under test does not even render, so the one component that WAS broken had no representation at all and the run was green about it. Keeping a mirror honest by hand is the part that fails; both passes measure the app now.
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 
@@ -175,11 +252,24 @@ Worked controls, all currently passing:
 | Delete every region of one screen | `screen "<name>" has no regions` |
 | Shorten an exemption's reason | `an exemption needs a stated reason` |
 | Exempt an unmeasured property | `exempts a property this region does not measure` |
-| Remove a required ancestor from the markup | `missing required ancestor "<selector>"` |
+| Break the real ancestor chain | `missing required ancestor "<selector>"` |
 | Paint a chrome element a forbidden colour | `chrome sweep: … border-left` |
 | Delete a shipped card from the real component | `MISSING CARD "<its title>"` |
 | Give a screen no `inventory.roots` entry | `screen "<name>" has no inventory root on both sides` |
 | Exempt a landmark the prototype does not draw | `names a landmark this prototype does not draw` |
+| Give a locator step an op the vocabulary has no entry for | `a locator is data, never an expression` |
+| Render an `unreachable` region after all | `is marked unreachable, but the app renders it now` |
+| Restore a card-contract class the studio strips padding with | `alignment "<name>".left: … insets "<region>" 12.0px from "<region>"` |
 
-The card control is the one that matters most, because it is the failure this pass was added for.
-Worked on this repository by gating `CraftingCheckEditor`'s check-type card off: the pass went from reporting that card as matched to `MISSING CARD "Check type" … the subject has no card with that title`, and restoring it returned the run to its previous findings.
+Two of these matter most, because each is a failure this harness was extended for.
+
+**The card control**, worked by gating `CraftingCheckEditor`'s check-type card off: the pass went from reporting that card as matched to `MISSING CARD "Check type" … the subject has no card with that title`, and restoring it returned the run to its previous findings.
+
+**The alignment control**, worked by reverting the same component's tier-list wrapper from `manager-inspector-card manager-checks-card` to the bare `manager-inspector-card` — the defect that motivated pointing this pass at the real app.
+The run named it twice, in the region and in the relationship:
+
+```text
+[roll] roll-tier-card.paddingLeft: subject 12px !== prototype 0px
+[roll] alignment "roll-card-bodies".left: the prototype lines these up and the subject insets
+  "roll-tier-inset" 12.0px from "roll-card-body" (roll-card-body 464.0, roll-tier-inset 476.0)
+```

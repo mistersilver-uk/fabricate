@@ -50,6 +50,8 @@
  * CARD, a control in the WRONG PARENT, and a missing AFFORDANCE.
  */
 
+import { locatorProblems } from './schema.js';
+
 /** Prose starts here. A landmark is a name, not a sentence. */
 export const MAX_LABEL_LENGTH = 40;
 
@@ -57,200 +59,15 @@ export const MAX_LABEL_LENGTH = 40;
 export const MINIMUM_REASON_LENGTH = 40;
 
 /**
- * The in-page enumerator, as a SOURCE STRING because it has to cross into `page.evaluate`.
+ * The ENUMERATOR itself lives in `page-runtime.js`, because it runs inside the measured
+ * document and both documents are enumerated by that one function — which is what makes "the
+ * prototype and the subject were read the same way" a fact rather than a hope. It used to live
+ * here as a SOURCE STRING reconstituted in the page with `new Function`; nothing crosses that
+ * boundary as text any more.
  *
- * Both sides are enumerated by this one function, which is what makes "the prototype and the
- * subject were read the same way" a fact rather than a hope.
+ * What stays here is the part that runs in Node: the thresholds, the comparison, and the rules
+ * that keep an exemption honest.
  */
-/* eslint-disable unicorn/no-incorrect-template-string-interpolation --
-   This template literal is SOURCE CODE crossing into `page.evaluate`, not a message, and
-   every `{L}` / `{N}` below is a Unicode property escape inside a regular expression rather
-   than an interpolation missing its `$`. `String.raw` is not an option for it either: the
-   block carries escaped backticks, which a raw string cannot express. */
-export const COLLECT_INVENTORY_SOURCE = `
-function collectInventory(root, limits) {
-  const MAX_LABEL = limits.maxLabelLength;
-  const MIN_CARD_WIDTH_RATIO = limits.minCardWidthRatio;
-  const MIN_CARD_RADIUS = limits.minCardRadius;
-  const MIN_TITLE_WEIGHT = limits.minTitleWeight;
-  const MIN_TITLE_SIZE = limits.minTitleSize;
-
-  const px = (value) => Number.parseFloat(value) || 0;
-
-  // A landmark's KEY. Lower-cased, whitespace-collapsed, and every digit run replaced by '#'
-  // so a count is not mistaken for copy. Leading/trailing punctuation goes because the
-  // prototype separates facts with a middle dot that the subject may render as a border.
-  const normalise = (raw) =>
-    String(raw)
-      .replace(/\\s+/g, ' ')
-      .trim()
-      .toLowerCase()
-      .replace(/\\d+/g, '#')
-      .replace(/^[^\\p{L}\\p{N}#@]+/u, '')
-      .replace(/[^\\p{L}\\p{N}#%)]+$/u, '')
-      .trim();
-
-  // The element's OWN text: direct text-node children only, so a container never inherits
-  // its descendants' words and every sentence is attributed once.
-  const ownText = (el) =>
-    [...el.childNodes]
-      .filter((node) => node.nodeType === 3)
-      .map((node) => node.textContent)
-      .join(' ')
-      .replace(/\\s+/g, ' ')
-      .trim();
-
-  // WORLD CONTENT is not design. A roll-data path, a dice expression and a bare number are
-  // all authored per world, so a gate that compared them would fail on every world that is
-  // not the mockup's — which is every world. Applied to the NORMALISED key, because the chips
-  // that carry them are drawn with a leading '+' the raw text starts with.
-  const isDataKey = (key) =>
-    key.includes('@') || /^[#d\\s+-]+$/.test(key) || !/\\p{L}/u.test(key);
-
-  const isLabelText = (raw) => {
-    if (!raw || raw.length > MAX_LABEL) return false;
-    return /\\p{L}/u.test(raw);
-  };
-
-  // Font Awesome is the ONE vocabulary both documents share: the prototype writes
-  // 'fa-solid fa-grip-vertical' and the subject 'fas fa-grip-vertical'. Style and sizing
-  // tokens are dropped; the icon name is kept.
-  const STYLE_TOKENS = new Set([
-    'fa', 'fas', 'far', 'fal', 'fab', 'fad', 'fak',
-    'fa-solid', 'fa-regular', 'fa-light', 'fa-thin', 'fa-duotone', 'fa-brands', 'fa-sharp',
-    'fa-fw', 'fa-fixed-width', 'fa-spin', 'fa-pulse', 'fa-lg', 'fa-sm', 'fa-xs',
-    'fa-2x', 'fa-3x', 'fa-inverse', 'fa-border', 'fa-stack',
-  ]);
-  const iconNames = (el) => {
-    const classes = typeof el.className === 'string' ? el.className.split(/\\s+/) : [];
-    return classes.filter((token) => token.startsWith('fa-') && !STYLE_TOKENS.has(token));
-  };
-
-  const rootWidth = root.clientWidth || root.getBoundingClientRect().width || 1;
-
-  // A HEADING is a heading. Two rules, because the two documents say it differently:
-  //
-  //  - a real \`h1\`–\`h6\` element, which is what the subject uses — including for a card whose
-  //    heading is an UPPERCASE MICRO-LABEL rather than a sentence-case title, which is this
-  //    product's own inspector convention and is far below the presentational size floor;
-  //  - a presentational one, which is all the prototype has: it is a styled-components
-  //    document with no heading elements at all, so weight and size are the only signal.
-  //
-  // Without the first rule a card headed by a micro-label reads as having no title, folds
-  // into its parent, and is then reported MISSING while sitting on the screen.
-  const isTitleLeaf = (el, text) => {
-    if (!isLabelText(text)) return false;
-    if (/^h[1-6]$/.test(el.tagName.toLowerCase())) return true;
-    const cs = getComputedStyle(el);
-    return (
-      Number.parseInt(cs.fontWeight, 10) >= MIN_TITLE_WEIGHT && px(cs.fontSize) >= MIN_TITLE_SIZE
-    );
-  };
-
-  // A CARD is a bordered, rounded, near-full-width container that OWNS A TITLE. The title
-  // requirement is what separates a card from a list row: the prototype's tier rows are 97%
-  // of the pane wide with a 9px radius and a 1px border, and the only thing that tells them
-  // apart from a card is that their name is an <input> rather than a heading.
-  const isCard = (el) => {
-    const cs = getComputedStyle(el);
-    if (cs.borderTopStyle === 'none' || px(cs.borderTopWidth) < 1) return false;
-    if (px(cs.borderTopLeftRadius) < MIN_CARD_RADIUS) return false;
-    const width = el.getBoundingClientRect().width;
-    if (width < rootWidth * MIN_CARD_WIDTH_RATIO) return false;
-    return true;
-  };
-
-  // The nearest enclosing card of an element, stopping at the root.
-  const cards = [];
-  const loose = { labels: [], glyphs: [] };
-
-  const walk = (el, cardStack) => {
-    // A landmark NOBODY CAN SEE is not a landmark. A mockup routinely carries a hidden
-    // branch of an alternative state — this one hides a second hint sentence behind
-    // \`display: none\` — and a walk that read it would demand the subject build a control
-    // the prototype does not draw. \`visibility: hidden\` goes with it; the clip-path
-    // visually-hidden idiom deliberately does NOT, because that content is announced.
-    const display = getComputedStyle(el);
-    if (display.display === 'none' || display.visibility === 'hidden') return;
-
-    let ownCard = null;
-    if (el !== root && isCard(el)) {
-      // Provisional: a candidate with no title of its own is not a card, and its contents
-      // belong to the card above it.
-      ownCard = {
-        element: el,
-        title: '',
-        rawTitle: '',
-        path: [],
-        labels: [],
-        glyphs: [],
-      };
-    }
-    const target = ownCard ?? cardStack[cardStack.length - 1] ?? null;
-    const nextStack = ownCard ? [...cardStack, ownCard] : cardStack;
-
-    const text = ownText(el);
-    if (isLabelText(text)) {
-      const key = normalise(text);
-      if (!key || isDataKey(key)) {
-        // nothing to record
-      } else if (target && !target.title && isTitleLeaf(el, text)) {
-        target.title = key;
-        target.rawTitle = text;
-      } else if (key && target) {
-        target.labels.push(key);
-      } else if (key) {
-        loose.labels.push(key);
-      }
-    }
-    for (const icon of iconNames(el)) {
-      if (target) target.glyphs.push(icon);
-      else loose.glyphs.push(icon);
-    }
-
-    for (const child of el.children) walk(child, nextStack);
-
-    if (ownCard) {
-      if (ownCard.title) {
-        ownCard.path = [...cardStack.filter((c) => c.title).map((c) => c.title), ownCard.title];
-        cards.push(ownCard);
-      } else {
-        // A titleless candidate is a ROW, not a card: fold what it collected into its parent
-        // so nothing is lost and no phantom card is reported.
-        const parent = cardStack[cardStack.length - 1] ?? null;
-        if (parent) {
-          parent.labels.push(...ownCard.labels);
-          parent.glyphs.push(...ownCard.glyphs);
-        } else {
-          loose.labels.push(...ownCard.labels);
-          loose.glyphs.push(...ownCard.glyphs);
-        }
-      }
-    }
-  };
-
-  walk(root, []);
-
-  // Document order, which the post-order walk above does not produce.
-  cards.sort((a, b) => {
-    const relation = a.element.compareDocumentPosition(b.element);
-    if (relation & Node.DOCUMENT_POSITION_FOLLOWING) return -1;
-    if (relation & Node.DOCUMENT_POSITION_PRECEDING) return 1;
-    return 0;
-  });
-
-  const dedupe = (values) => [...new Set(values)];
-  return {
-    cards: cards.map((card) => ({
-      title: card.title,
-      rawTitle: card.rawTitle,
-      path: card.path,
-      labels: dedupe(card.labels),
-      glyphs: dedupe(card.glyphs),
-    })),
-    loose: { labels: dedupe(loose.labels), glyphs: dedupe(loose.glyphs) },
-  };
-}`;
 
 /** The thresholds the classifier uses, exported so a spec can state its own. */
 export const DEFAULT_INVENTORY_LIMITS = Object.freeze({
@@ -517,12 +334,17 @@ export function inventoryCoverageProblems(spec) {
   if (!roots) return ['spec.inventory.roots is missing: the structural pass has nothing to walk'];
   for (const screen of spec?.screens ?? []) {
     const entry = roots[screen];
-    if (!entry?.prototype || !entry?.subject) {
+    if (entry?.prototype && entry.subject) {
       problems.push(
-        `screen "${screen}" has no inventory root on both sides: an unwalked screen must ` +
-          `FAIL, not pass silently`
+        ...locatorProblems(entry.prototype, `inventory root "${screen}" (prototype)`),
+        ...locatorProblems(entry.subject, `inventory root "${screen}" (subject)`)
       );
+      continue;
     }
+    problems.push(
+      `screen "${screen}" has no inventory root on both sides: an unwalked screen must ` +
+        `FAIL, not pass silently`
+    );
   }
   for (const screen of Object.keys(roots)) {
     if (!(spec?.screens ?? []).includes(screen)) {

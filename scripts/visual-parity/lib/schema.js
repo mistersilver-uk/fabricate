@@ -18,10 +18,116 @@
  *    the run green, which is how a parity gate stops gating without anyone noticing.
  * 3. **An exemption must name a property the region actually measures.** Otherwise a region
  *    can drop the property and keep the exemption, and the pair reads as covered.
+ * 4. **A per-region value cannot see a RELATIONSHIP between two regions.** Every region on a
+ *    screen can measure exactly right and still sit in the wrong place relative to its
+ *    neighbour, because an inset applied by an ancestor moves a whole subtree and changes
+ *    none of its own computed values. `alignments` is the rule for that class, and it is
+ *    DERIVED from the prototype rather than declared: a group asserts a shared edge only
+ *    where the prototype actually shares one.
  */
 
 /** The shortest reason that can plausibly say WHY. Shorter than this is a placeholder. */
 export const MINIMUM_REASON_LENGTH = 40;
+
+/**
+ * How far apart two edges may sit and still be "the same edge".
+ *
+ * This is NOT a tolerance band on a measured value — those are forbidden here, because they
+ * are the beginning of a gate that cannot fail. It is the resolution of the question being
+ * asked: two boxes laid out by independent rules land on fractional device pixels, and a
+ * shared edge is a claim about layout intent rather than about a float. Half a pixel is an
+ * order of magnitude below the smallest spacing token this design system owns (4px), so no
+ * spacing mistake can hide under it — the inset that motivated the rule was 12px.
+ */
+export const EDGE_TOLERANCE_PX = 0.5;
+
+/** The edges a group may be asserted on. Vertical rhythm is a different question. */
+export const ALIGNABLE_EDGES = Object.freeze(['left', 'right']);
+
+/**
+ * The CLOSED locator vocabulary.
+ *
+ * A locator is a CSS selector string, or a list of steps drawn from these operations. It is
+ * DATA rather than an expression, and that is a security property as much as a readability
+ * one: locators used to be JavaScript source reconstituted in the page with `new Function`, so
+ * a fixture could express anything a script can. Data that selects, walks and filters cannot.
+ *
+ * - `select`   `{ css }`                  — every descendant matching a CSS selector.
+ * - `children` `{}`                       — the element children of the current nodes.
+ * - `where`    `{ tag, text, rect, style, styleNot, has, childCount, leaf }` — filter.
+ * - `at`       `{ index }`                — one candidate, negative counting from the end.
+ * - `child`    `{ index }`                — each node's nth child, negative from the end.
+ * - `parent`   `{ times }`                — walk up.
+ * - `sibling`  `{ offset }`               — walk sideways, negative for previous.
+ */
+export const LOCATOR_OPS = Object.freeze([
+  'select',
+  'children',
+  'where',
+  'at',
+  'child',
+  'parent',
+  'sibling',
+]);
+
+/** The keys a `where` step may carry. Anything else is a typo that would filter nothing. */
+export const WHERE_KEYS = Object.freeze([
+  'op',
+  'tag',
+  'text',
+  'rect',
+  'style',
+  'styleNot',
+  'has',
+  'childCount',
+  'leaf',
+]);
+
+/**
+ * Validate one locator's shape.
+ *
+ * A malformed step is worse than a missing one: `STEPS[step.op]` would throw deep inside the
+ * page, and an unknown `where` key would filter nothing at all and quietly widen the locator.
+ *
+ * @param {string|object[]} locator The locator to check.
+ * @param {string} label What to call it in a message.
+ * @returns {string[]} Problems, empty when the locator is usable.
+ */
+export function locatorProblems(locator, label) {
+  if (typeof locator === 'string') {
+    return locator.trim().length === 0 ? [`${label}: the CSS selector is empty`] : [];
+  }
+  if (!Array.isArray(locator) || locator.length === 0) {
+    return [`${label}: a locator is a CSS selector or a non-empty list of steps`];
+  }
+  const problems = [];
+  for (const [index, step] of locator.entries()) {
+    if (!LOCATOR_OPS.includes(step?.op)) {
+      problems.push(
+        `${label}: step ${index} has op "${step?.op}", which is not one of ` +
+          `${LOCATOR_OPS.join(', ')} — a locator is data, never an expression`
+      );
+      continue;
+    }
+    if (step.op === 'select' && !step.css) problems.push(`${label}: step ${index} has no css`);
+    if (step.op === 'where') {
+      for (const key of Object.keys(step)) {
+        if (!WHERE_KEYS.includes(key)) {
+          problems.push(
+            `${label}: step ${index} filters on "${key}", which no filter reads — it would ` +
+              `match everything and widen the locator silently`
+          );
+        }
+      }
+    }
+    for (const key of ['index', 'offset']) {
+      if (Object.hasOwn(step, key) && !Number.isInteger(step[key])) {
+        problems.push(`${label}: step ${index}'s ${key} must be an integer`);
+      }
+    }
+  }
+  return problems;
+}
 
 /**
  * Property groups a region may ask for, keyed by name.
@@ -74,10 +180,108 @@ export function validateSpec(spec) {
     if (!Array.isArray(region.groups) || region.groups.length === 0) {
       problems.push(`region ${region.name}: declares no property groups`);
     }
-    if (!region.locator) problems.push(`region ${region.name}: declares no locator`);
+    if (region.locator) {
+      problems.push(...locatorProblems(region.locator, `region ${region.name}`));
+    } else {
+      problems.push(`region ${region.name}: declares no locator`);
+    }
   }
-  problems.push(...coverageProblems(spec?.screens ?? [], spec?.regions ?? []));
+  problems.push(
+    ...coverageProblems(spec?.screens ?? [], spec?.regions ?? []),
+    ...alignmentProblems(spec)
+  );
   return problems;
+}
+
+/**
+ * Every alignment group names declared regions, on one screen, on edges that exist.
+ *
+ * The same-screen rule is the one that matters: a group whose members are measured on
+ * different screens would compare two boxes that were never on screen together, and produce a
+ * confident number about nothing.
+ *
+ * @param {object} spec Loaded spec module.
+ * @returns {string[]} Problems, empty when every group is usable.
+ */
+export function alignmentProblems(spec) {
+  const problems = [];
+  const byName = new Map((spec?.regions ?? []).map((region) => [region.name, region]));
+  const screens = new Set(spec?.screens);
+  for (const group of spec?.alignments ?? []) {
+    if (!group?.name) {
+      problems.push('an alignment group has no name');
+      continue;
+    }
+    if (!screens.has(group.screen)) {
+      problems.push(`alignment "${group.name}": screen "${group.screen}" is not in spec.screens`);
+    }
+    const members = group.regions ?? [];
+    if (members.length < 2) {
+      problems.push(`alignment "${group.name}": needs at least two regions to share an edge`);
+    }
+    for (const side of group.edges ?? []) {
+      if (!ALIGNABLE_EDGES.includes(side)) {
+        problems.push(
+          `alignment "${group.name}": edge "${side}" is not one of ${ALIGNABLE_EDGES.join(', ')}`
+        );
+      }
+    }
+    if ((group.edges ?? []).length === 0) {
+      problems.push(`alignment "${group.name}": declares no edges`);
+    }
+    const on = group.measuredOn ?? group.screen;
+    for (const member of members) {
+      const region = byName.get(member);
+      if (!region) {
+        problems.push(`alignment "${group.name}": region "${member}" is not declared`);
+        continue;
+      }
+      const regionOn = region.measuredOn ?? region.screen;
+      if (regionOn !== on) {
+        problems.push(
+          `alignment "${group.name}": region "${member}" is measured on "${regionOn}", not on ` +
+            `"${on}" — two boxes that were never on screen together share no edge`
+        );
+      }
+    }
+  }
+  return problems;
+}
+
+/**
+ * Which of the asked-for edges a set of boxes actually shares.
+ *
+ * @param {Record<string, {left: number, right: number}>} edges Region name → its box edges.
+ * @param {string[]} sides Edges to test.
+ * @returns {Record<string, boolean>} Side → whether every box agrees on it.
+ */
+export function sharedEdges(edges, sides) {
+  const shared = {};
+  for (const side of sides) shared[side] = edgeSpread(edges, side).delta <= EDGE_TOLERANCE_PX;
+  return shared;
+}
+
+/**
+ * The widest disagreement about one edge, and who is at each end of it.
+ *
+ * Naming both ends is what makes the report actionable: "these two do not line up" is a fact
+ * about a pair, and a report that named only the group would send a reader to measure it again.
+ *
+ * @param {Record<string, {left: number, right: number}>} edges Region name → its box edges.
+ * @param {string} side Edge to test.
+ * @returns {{delta: number, low: string, high: string, values: Record<string, number>}} Spread.
+ */
+export function edgeSpread(edges, side) {
+  const values = Object.fromEntries(Object.entries(edges).map(([name, box]) => [name, box[side]]));
+  const entries = Object.entries(values).sort((left, right) => left[1] - right[1]);
+  const low = entries[0];
+  const high = entries.at(-1);
+  return {
+    delta: entries.length === 0 ? 0 : Math.abs(high[1] - low[1]),
+    low: low?.[0] ?? '',
+    high: high?.[0] ?? '',
+    values,
+  };
 }
 
 /**

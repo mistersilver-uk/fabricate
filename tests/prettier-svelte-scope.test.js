@@ -115,9 +115,14 @@ const GATE_TARGETS = [
   // The STRUCTURAL pass, which is what lets the harness see absence at all: a comparison
   // of computed styles can only ever measure regions that exist on both sides.
   'scripts/visual-parity/inventory.mjs',
-  'scripts/visual-parity/lib/measure.js',
+  // The PAGE-SIDE runtime: every routine that runs inside the measured document, as real
+  // code. It used to cross into the page as source strings reconstituted with `new Function`.
+  'scripts/visual-parity/lib/page-runtime.js',
   'scripts/visual-parity/lib/schema.js',
   'scripts/visual-parity/lib/inventory.js',
+  // The ONE live subject both passes measure, and the View Lab boot behind it.
+  'scripts/visual-parity/lib/subject.js',
+  'scripts/visual-parity/lib/view-lab.js',
   'eslint.config.js',
 ];
 const FORMAT_ARGV = ['prettier', '--write', ...GATE_TARGETS];

@@ -19,14 +19,15 @@ import { pathToFileURL } from 'node:url';
 import { chromium } from 'playwright';
 
 import {
-  COLLECT_INVENTORY_SOURCE,
   DEFAULT_INVENTORY_LIMITS,
   compareInventories,
   inventoryCoverageProblems,
   inventoryExemptionProblems,
   observableKeys,
 } from './lib/inventory.js';
+import { installRuntime } from './lib/page-runtime.js';
 import { validateSpec } from './lib/schema.js';
+import { openLiveSubject, subjectProblems } from './lib/subject.js';
 
 function argument(name, fallback = null) {
   const index = process.argv.indexOf(`--${name}`);
@@ -41,34 +42,19 @@ function flag(name) {
  * Enumerate one root's landmarks in the page it is rendered in.
  *
  * @param {object} page Playwright page.
- * @param {string} locator Expression resolving the root, evaluated against `helpers`.
- * @param {string|null} helpers In-page helper source, or null for a bare selector.
+ * @param {string|object[]} locator CSS selector or step list resolving the root.
  * @param {object} limits Classifier thresholds.
  * @returns {Promise<object>} `{ cards, loose }`.
  */
-async function inventoryOf(page, locator, helpers, limits) {
-  return page.evaluate(
-    ({ source, locatorSource, helperSource, thresholds }) => {
-      const collect = new Function(`${source}\nreturn collectInventory;`)();
-      let root;
-      if (helperSource) {
-        const scope = new Function(`return (${helperSource});`)();
-        root = new Function(...Object.keys(scope), `return (${locatorSource});`)(
-          ...Object.values(scope)
-        );
-      } else {
-        root = globalThis.document.querySelector(locatorSource);
-      }
-      if (!root) throw new Error(`inventory root "${locatorSource}" resolved to nothing`);
-      return collect(root, thresholds);
-    },
-    {
-      source: COLLECT_INVENTORY_SOURCE,
-      locatorSource: locator,
-      helperSource: helpers,
-      thresholds: limits,
-    }
+async function inventoryOf(page, locator, limits) {
+  const result = await page.evaluate(
+    (payload) => globalThis.__fabricateParity.inventoryOf(payload),
+    { locator, limits }
   );
+  if (result.missingRoot) {
+    throw new Error(`inventory root ${JSON.stringify(locator)} resolved to nothing`);
+  }
+  return result;
 }
 
 function describe(inventory) {
@@ -97,7 +83,11 @@ async function main() {
   const only = argument('screen');
   const dump = flag('dump');
 
-  const problems = [...validateSpec(spec), ...inventoryCoverageProblems(spec)];
+  const problems = [
+    ...validateSpec(spec),
+    ...subjectProblems(spec),
+    ...inventoryCoverageProblems(spec),
+  ];
   if (problems.length > 0) {
     process.stdout.write(`GATE PROBLEMS\n  ${problems.join('\n  ')}\n`);
     return 1;
@@ -124,20 +114,20 @@ async function main() {
       await prototypePage.waitForSelector(spec.prototype.readySelector, { timeout: 60_000 });
     }
     await prototypePage.waitForTimeout(spec.prototype.settleMs ?? 1500);
+    await installRuntime(prototypePage);
 
-    subject = await spec.inventory.subject.open(browser);
+    // THE SAME LIVE SUBJECT the computed-style pass measures, booted by the same machinery.
+    // Two implementations of "render the real app and drive it to a screen" would be two
+    // things to keep honest, and the pass that fell behind would be the one nobody noticed.
+    subject = await openLiveSubject(browser, spec);
+    await installRuntime(subject.page);
 
     for (const screen of screens) {
       const roots = spec.inventory.roots[screen];
       await spec.navigate(prototypePage, roots.measuredOn ?? screen);
-      const prototypeInventory = await inventoryOf(
-        prototypePage,
-        roots.prototype,
-        spec.helpersSource,
-        limits
-      );
-      await spec.inventory.subject.navigate(subject.page, roots.measuredOn ?? screen);
-      const subjectInventory = await inventoryOf(subject.page, roots.subject, null, limits);
+      const prototypeInventory = await inventoryOf(prototypePage, roots.prototype, limits);
+      const subjectPage = await subject.show(roots.measuredOn ?? screen);
+      const subjectInventory = await inventoryOf(subjectPage, roots.subject, limits);
 
       for (const key of observableKeys(screen, prototypeInventory, subjectInventory)) {
         observed.add(key);
@@ -162,7 +152,7 @@ async function main() {
       );
     }
   } finally {
-    if (subject?.dispose) await subject.dispose();
+    if (subject) await subject.dispose();
     await browser.close();
   }
 

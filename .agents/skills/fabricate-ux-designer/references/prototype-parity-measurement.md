@@ -25,13 +25,39 @@ Two things about it are worth carrying into a review rather than rediscovering:
 
 <!-- markdownlint-disable markdownlint-sentences-per-line -->
 
-- **Its subject must be the real app.** A structural pass run against a mirror can only report what its author already knew was missing — and `compare.mjs`'s subject is a hand-authored markup fixture, which is precisely a mirror of what its author believed the app renders. Point the structural pass at whatever renders the shipped components instead; here, the View Lab. This is the decision the whole pass stands or falls on.
+- **Both passes measure the real app.** A pass run against a mirror can only report what its author already knew. `compare.mjs` used to render a hand-authored markup fixture; it does not any more, and the reason is the next section.
 - **It reports EXTRAS without failing on them.** The assertion is one-directional on purpose: a product legitimately says more than a mockup, and a gate that failed on the difference would be switched off within a day.
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 
 So: a green `compare` is evidence about the values of what is on screen, and about nothing else.
 Ask for the `inventory` run before accepting "the screen matches the prototype".
+
+## A hand-maintained mirror does not fail — it drifts
+
+This is the lesson worth carrying furthest, because it cost a shipped layout defect after the harness existed and was green.
+
+`compare.mjs`'s subject used to be a markup fixture: a hand-written copy of what its author believed the components render.
+The obvious failure mode is the boring one — the copy keeps a class the component stopped emitting.
+The one that actually happened is worse.
+The fixture's roll screen modelled `SimpleCraftingCheckEditor`'s static-DC card, a component that screen does not even render and that was never broken, and it never modelled `CraftingCheckEditor`'s routed tier list at all.
+So when that list shipped in the wrong card shell — 12px of padding insetting every tier row past the card above it — the run reported *no drift*, **because it could not be wrong about a component it did not model.**
+The structural pass, which does point at the real app, missed it too: it asserts cards, labels and glyphs, and an inset leaves every landmark exactly where it was.
+
+Read the general rule off that rather than the instance: **a mirror you have to keep honest by hand will drift, and it will drift in the direction nobody is checking.**
+If a harness's subject is a copy of the thing under test, its green runs are evidence about the copy.
+
+Two consequences the harness now encodes, both worth asking for in a review:
+
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
+
+- **Every region can measure right while the screen is wrong.** An inset applied by an ancestor moves a whole subtree and changes none of its computed values, so no per-region comparison can express it. `alignments` states the relationship between regions instead, and derives from the prototype which edges it may demand.
+- **The app needs a state, and reaching it is part of the measurement.** An empty list draws no row treatment. A run that seeds that state says so; a run that quietly measures the empty screen is measuring a screen the prototype has no counterpart for.
+
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
+
+Expect a re-pointed harness to arrive with a pile of findings the mirror had been absorbing.
+This one went from one green run to seventeen, including host chrome painting a scrollbar colour no markup harness could ever have seen.
 
 ## When to reach for it
 
@@ -60,12 +86,13 @@ These are the ones that make a parity claim untrue while looking true.
 The README states each as a trap; a reviewer should treat any of them as grounds to disbelieve a green run.
 
 - Only the **computed-style** pass was run, so nothing asked whether anything is missing (see above).
-- The structural pass ran against the **markup fixture** rather than the real app, so it could only confirm its author's beliefs.
-- The harness renders the panel under test rather than the **real ancestor chain**, so an inset above it is unmeasurable.
+- Either pass ran against a **markup fixture** rather than the real app, so it could only confirm its author's beliefs.
+- The harness starts at the panel under test rather than the **real ancestor chain**, so an inset above it is unmeasurable.
 - A region compares two **transparent** backgrounds, which passes on any background at all.
 - The fixture covers **some screens** and reads as coverage.
 - An **exemption** carries no reason, so a value someone deleted is indistinguishable from a difference someone decided.
-- The harness loads the global stylesheet but not the **compiled scoped CSS** of the primitives on screen, and measures controls the app never renders that way.
+- Every region is measured and no **relationship** is, so a subtree that moved as a whole reads as green.
+- A region resolves against the **whole document** rather than inside the app window, and answers with whatever else wears that class.
 
 ## Relationship to the rest of the UX evidence rules
 
