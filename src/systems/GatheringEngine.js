@@ -2,7 +2,9 @@ import { DEFAULT_GATHERING_EVENT_IMG } from '../gatheringImageDefaults.js';
 import {
   classifyGatheringToolStates,
   resolvePresentComponentIds,
+  resolvePresentToolIds,
 } from '../gatheringToolRuntime.js';
+import { resolveToolDisplayImage, resolveToolDisplayName } from '../models/toolDisplay.js';
 import {
   buildInteractiveRollOptions,
   promptCheckRoll,
@@ -1584,11 +1586,12 @@ export class GatheringEngine {
 
     const resolved = states.map(({ tool, state }) => {
       const component = componentsById.get(stringOrNull(tool?.componentId)) ?? null;
-      const name =
-        stringOrNull(tool?.label) ||
-        stringOrEmpty(component?.name) ||
-        this.localize(UNKNOWN_TOOL_LABEL_KEY);
-      const img = stringOrNull(component?.img) || DEFAULT_TOOL_IMG;
+      // The shared `data-models` requirement-13 precedence: authored label, then the
+      // registration snapshot, then the linked component. Consulting the component alone
+      // rendered "Unknown tool" + the item-bag glyph for every item-sourced Tool, which
+      // carries `componentId: null` by construction (issue 1119).
+      const name = resolveToolDisplayName(tool, component, this.localize(UNKNOWN_TOOL_LABEL_KEY));
+      const img = resolveToolDisplayImage(tool, component);
       return {
         id: stringOrNull(tool?.id) || stringOrNull(tool?.componentId),
         name,
@@ -1666,11 +1669,13 @@ export class GatheringEngine {
     // Fallback: treat a tool as satisfied when virtually present (canvas Tool).
     // System-scoped: a present tool only counts when the active tool's systemId
     // matches this task's crafting system (componentId is a per-system id).
-    const presentSet = resolvePresentComponentIds({
-      presentTools,
-      systemId: system?.id ?? task?.craftingSystemId ?? null,
-    });
-    const missing = tools.filter((tool) => !presentSet.has(tool?.componentId));
+    const presentScope = { presentTools, systemId: system?.id ?? task?.craftingSystemId ?? null };
+    const presentSet = resolvePresentComponentIds(presentScope);
+    // An item-sourced Tool station has no componentId to key on (issue 1119).
+    const presentToolSet = resolvePresentToolIds(presentScope);
+    const missing = tools.filter(
+      (tool) => !presentToolSet.has(tool?.id) && !presentSet.has(tool?.componentId)
+    );
     return missing.length === 0
       ? { available: true, missing: [], failedRequirements: [] }
       : { available: false, missing, failedRequirements: [] };

@@ -569,6 +569,9 @@ function compileManagerRoot() {
     'src/systems/characterPrerequisites.js',
     'src/systems/toolCheckBonus.js',
     'src/ui/svelte/apps/manager/tools/toolStudio.js',
+    // `toolStudio.js` delegates the Tool display precedence to this layering-neutral leaf
+    // so the engines and chat cards can reuse it too (issue 1119).
+    'src/models/toolDisplay.js',
     // The Essence Studio's presentation adapter (issue 1036) — the sibling of the line
     // above, and imported by five of the eight components registered in the compile loop.
     'src/ui/svelte/apps/manager/essences/essenceStudio.js',

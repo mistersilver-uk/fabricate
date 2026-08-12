@@ -269,10 +269,20 @@ describe('SvelteFabricateApp shell window', () => {
         'the threading boundary also reads the active tool systemId for scoping'
       );
       assert.ok(
-        appSource.includes(
-          'return componentId && systemId ? { systemId, componentIds: [componentId] } : null;'
-        ),
-        'the payload carries both systemId and componentIds so matching is system-scoped'
+        appSource.includes('const toolId = this._activeCanvasTool?.toolId;'),
+        'the threading boundary also reads the library tool id (issue 1119)'
+      );
+      // Issue 1119: an item-sourced Tool carries `componentId: null`, so a componentId-only
+      // payload was inert for every station the Tool Studio can author. The payload now
+      // carries BOTH id kinds, still scoped by systemId (both ids are per-system).
+      assert.ok(
+        appSource.includes('if (!systemId || (!componentId && !toolId)) return null;'),
+        'the payload is inert only when the system or BOTH ids are missing'
+      );
+      assert.ok(
+        appSource.includes('componentIds: componentId ? [componentId] : [],') &&
+          appSource.includes('toolIds: toolId ? [toolId] : [],'),
+        'the payload carries systemId, componentIds and toolIds so matching stays system-scoped'
       );
     });
 

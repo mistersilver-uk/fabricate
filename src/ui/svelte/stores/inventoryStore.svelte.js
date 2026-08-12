@@ -65,11 +65,29 @@ const VALID_SORTS = new Set(['name', 'quantity', 'type']);
  */
 function matchesQuery(row, query) {
   if (query.length === 0) return true;
-  if (String(row?.name ?? '').toLowerCase().includes(query)) return true;
+  if (
+    String(row?.name ?? '')
+      .toLowerCase()
+      .includes(query)
+  )
+    return true;
   const tags = Array.isArray(row?.tags) ? row.tags : [];
-  if (tags.some((tag) => String(tag ?? '').toLowerCase().includes(query))) return true;
+  if (
+    tags.some((tag) =>
+      String(tag ?? '')
+        .toLowerCase()
+        .includes(query)
+    )
+  )
+    return true;
   const essences = Array.isArray(row?.essences) ? row.essences : [];
-  if (essences.some((essence) => String(essence?.name ?? '').toLowerCase().includes(query)))
+  if (
+    essences.some((essence) =>
+      String(essence?.name ?? '')
+        .toLowerCase()
+        .includes(query)
+    )
+  )
     return true;
   return false;
 }
@@ -328,9 +346,16 @@ function buildBulkReport(mode, snapshot, result) {
 function matchesFilter(row, filter) {
   switch (filter) {
     case 'components':
-      // Books (recipe items) and essence rows are their own pills, so the
-      // Components pill lists only true crafting components.
-      return row?.isEssenceSource !== true && row?.isRecipeItem !== true;
+      // Books (recipe items), essence rows and tool-only cards are their own pills, so
+      // the Components pill lists only true crafting components.
+      //
+      // `isToolOnly` (issue 1119) is deliberately a NEGATIVE test, matching its siblings: a
+      // positive `isComponent === true` would silently drop every hand-built row that omits
+      // the flag. A component that is ALSO a registered tool has `isToolOnly: false` and so
+      // still lists under both this pill and Tools.
+      return (
+        row?.isEssenceSource !== true && row?.isRecipeItem !== true && row?.isToolOnly !== true
+      );
     case 'essences':
       return row?.isEssenceSource === true;
     case 'tools':
@@ -424,7 +449,8 @@ export function createInventoryStore({ services } = {}) {
       return true;
     });
     // Explicit comparator (never a bare `.sort()`).
-    const byName = (left, right) => String(left?.name ?? '').localeCompare(String(right?.name ?? ''));
+    const byName = (left, right) =>
+      String(left?.name ?? '').localeCompare(String(right?.name ?? ''));
     if (sort === 'quantity') {
       return [...filtered].sort(
         (left, right) =>
@@ -524,7 +550,10 @@ export function createInventoryStore({ services } = {}) {
     const stages = Array.isArray(salvage?.stages) ? salvage.stages : [];
     if (stages.length === 0) return stages;
     if (salvage.allowPlayerResultReorder === false) return stages;
-    const key = progressiveOrderKey({ scope: 'salvage', id: salvageOrderId(selectedParticipation) });
+    const key = progressiveOrderKey({
+      scope: 'salvage',
+      id: salvageOrderId(selectedParticipation),
+    });
     if (!key) return stages;
 
     const ordered = applyPlayerResultOrder(stages, progressiveOrders[key] ?? null);
@@ -591,7 +620,8 @@ export function createInventoryStore({ services } = {}) {
         // row — so a bulk run already respects each row's own order. The panel surfaces
         // it because nothing else on this screen tells the player that (issue 859).
         mode: salvage?.mode ?? null,
-        allowsReorder: salvage?.mode === 'progressive' && salvage?.allowPlayerResultReorder !== false,
+        allowsReorder:
+          salvage?.mode === 'progressive' && salvage?.allowPlayerResultReorder !== false,
         yieldRows: blockedReason === null ? yieldRowsFor(salvage) : [],
       };
     })
@@ -695,7 +725,10 @@ export function createInventoryStore({ services } = {}) {
    *   the i18n, and reads the moved stage's name BEFORE the move)
    */
   function reorderSalvageStage(index, target, announcement = '') {
-    const key = progressiveOrderKey({ scope: 'salvage', id: salvageOrderId(selectedParticipation) });
+    const key = progressiveOrderKey({
+      scope: 'salvage',
+      id: salvageOrderId(selectedParticipation),
+    });
     if (!key || selectedParticipation?.salvage?.allowPlayerResultReorder === false) return;
 
     const current = orderedSalvageStages;
@@ -733,7 +766,9 @@ export function createInventoryStore({ services } = {}) {
       : [];
     if (stages.length === 0) return false;
     const ordered = orderedSalvageStages;
-    return ordered.length === stages.length && ordered.some((stage, i) => stage.id !== stages[i].id);
+    return (
+      ordered.length === stages.length && ordered.some((stage, i) => stage.id !== stages[i].id)
+    );
   });
 
   /**
@@ -751,7 +786,10 @@ export function createInventoryStore({ services } = {}) {
    *   the i18n)
    */
   function resetSalvageOrder(announcement = '') {
-    const key = progressiveOrderKey({ scope: 'salvage', id: salvageOrderId(selectedParticipation) });
+    const key = progressiveOrderKey({
+      scope: 'salvage',
+      id: salvageOrderId(selectedParticipation),
+    });
     if (!key || selectedParticipation?.salvage?.allowPlayerResultReorder === false) return;
 
     progressiveOrders = { ...progressiveOrders, [key]: [] };
@@ -1068,9 +1106,8 @@ export function createInventoryStore({ services } = {}) {
       return null;
     }
     return (
-      systems.find(
-        (entry) => entry?.systemId === systemId && entry?.componentId === componentId
-      ) ?? null
+      systems.find((entry) => entry?.systemId === systemId && entry?.componentId === componentId) ??
+      null
     );
   }
 

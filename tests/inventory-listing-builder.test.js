@@ -64,9 +64,13 @@ function makeBuilder({ systems, recipes = [] } = {}) {
           filters?.craftingSystemId === undefined || r.craftingSystemId === filters.craftingSystemId
       );
     },
+    // Mirrors the real `RecipeManager.toolMatchesItem` snapshot-name fallback ordering
+    // (issue 561): the tool's OWN snapshot name first, then the linked component's name.
+    // An item-sourced tool carries `componentId: null`, so a component-only fake could not
+    // represent one at all — which is the fixture-shaped form of the issue-1119 blind spot.
     toolMatchesItem: (_recipe, tool, candidate) => {
-      const component = componentsById.get(tool?.componentId);
-      return !!component && candidate?.name === component.name;
+      const fallbackName = tool?.name || componentsById.get(tool?.componentId)?.name || '';
+      return !!fallbackName && candidate?.name === fallbackName;
     },
   };
   const craftingSystemManager = { getSystems: () => systemList };
@@ -2137,5 +2141,88 @@ describe('InventoryListingBuilder - salvage entity-tier visibility gate (#703)',
     assert.equal(salvage.misconfigured, true);
     assert.equal(salvage.misconfiguredReason, 'simpleMultiGroup');
     assert.equal(system.components[0].salvage.enabled, true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Issue 1119 — item-sourced tools in the player inventory.
+//
+// Since issue 561 a Tool registered from an Item uuid carries `componentId: null` and holds its
+// identity in its own source refs plus a `name`/`img` snapshot. `upsertTool` force-nulls
+// `componentId` for any item source and the Tool Studio offers nothing else, so this is the ONLY
+// shape a GM can author today. Every fixture above pairs a tool with a `componentId` — that is the
+// blind spot in fixture form, and it is why the builder's component-only projection shipped.
+// ---------------------------------------------------------------------------
+
+function rowByTool(listing, toolId) {
+  return listing.rows.find((row) => row.toolId === toolId) ?? null;
+}
+
+// A first-class item-sourced Tool: no componentId, its own display snapshot.
+function itemSourcedTool(overrides = {}) {
+  return {
+    id: 't-pick',
+    componentId: null,
+    name: "Miner's Pick",
+    img: 'icons/pick.webp',
+    description: 'A heavy steel pickaxe.',
+    registeredItemUuid: 'Item.minerspick',
+    ...overrides,
+  };
+}
+
+describe('InventoryListingBuilder — item-sourced tools (issue 1119)', () => {
+  it('lists an owned item-sourced tool that is not a managed component', () => {
+    const system = makeSystem({ tools: [{ id: 't1', componentId: 'c3' }, itemSourcedTool()] });
+    const { builder } = makeBuilder({ systems: [system] });
+    const listing = builder.buildListing({
+      craftingActor: actor('a1', 'Akra', [item("Miner's Pick", 1), item('Iron', 2)]),
+    });
+
+    const pick = rowByTool(listing, 't-pick');
+    assert.notEqual(pick, null, 'an owned item-sourced tool must produce an inventory row');
+    assert.equal(pick.isTool, true);
+    assert.equal(pick.isToolOnly, true, 'it backs no component, so it is a tool-only card');
+    assert.equal(pick.componentId, null);
+    assert.equal(pick.name, "Miner's Pick", 'display resolves through the snapshot');
+    assert.equal(pick.totalQuantity, 1);
+  });
+
+  it('projects a system that has tools and zero components', () => {
+    const system = makeSystem({
+      components: [],
+      tools: [itemSourcedTool()],
+      essenceDefinitions: [],
+    });
+    const { builder } = makeBuilder({ systems: [system] });
+    const listing = builder.buildListing({
+      craftingActor: actor('a1', 'Akra', [item("Miner's Pick", 1)]),
+    });
+    assert.notEqual(
+      rowByTool(listing, 't-pick'),
+      null,
+      'a tools-only system must still project its owned tools'
+    );
+  });
+
+  it('yields exactly one row for a whetstone that is both a component and a tool', () => {
+    // `c3` (Hammerhead) is a managed component AND the snapshot name of an item-sourced tool,
+    // so one owned document resolves to both. `_normalizeSystem` derives source refs onto
+    // component-linked tools on every load, so this overlap is the common case, not an edge one.
+    const system = makeSystem({
+      tools: [itemSourcedTool({ id: 't-whet', name: 'Hammerhead', img: null })],
+    });
+    const { builder } = makeBuilder({ systems: [system] });
+    const listing = builder.buildListing({
+      craftingActor: actor('a1', 'Akra', [item('Hammerhead', 1)]),
+    });
+
+    const matching = listing.rows.filter((row) => row.name === 'Hammerhead');
+    assert.equal(matching.length, 1, 'a whetstone must not produce a second row');
+    const whetstone = matching[0];
+    assert.equal(whetstone.componentId, 'c3', 'the component identity stays primary');
+    assert.equal(whetstone.isTool, true, 'and it is badged as a tool');
+    assert.equal(whetstone.isToolOnly, false);
+    assert.equal(whetstone.systems.length, 1, 'one systems[] entry, not two');
   });
 });

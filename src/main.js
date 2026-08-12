@@ -3,6 +3,12 @@
 // loads the stylesheet via module.json's "styles" field instead.
 import '../styles/fabricate.css';
 
+import {
+  TOOL_IMAGE_SENTINEL,
+  linkedComponentFor,
+  resolveToolDisplayImage,
+  resolveToolDisplayName,
+} from './models/toolDisplay.js';
 import { RecipeManager } from './systems/RecipeManager.js';
 import { CompendiumImporter } from './systems/CompendiumImporter.js';
 import { CraftingEngine } from './systems/CraftingEngine.js';
@@ -2768,8 +2774,10 @@ class Fabricate {
 
   /**
    * Resolve a system library tool to `{ id, name, img }` for the Journal step
-   * detail. The display name prefers the tool's authored label, falling back to
-   * the referenced component's name, then the raw id.
+   * detail, through the shared `data-models` requirement-13 precedence: authored
+   * label, then the registration snapshot, then the referenced component, then the
+   * raw id. The snapshot rung is load-bearing — without it an item-sourced Tool
+   * (`componentId: null` by construction) printed its raw id (issue 1119).
    * @private
    */
   _resolveJournalTool(systemId, toolId) {
@@ -2777,11 +2785,14 @@ class Fabricate {
     if (!system || !toolId) return null;
     const tool = (system.tools || []).find((entry) => entry?.id === toolId);
     if (!tool) return null;
-    const component = (system.components || []).find((entry) => entry?.id === tool.componentId);
+    const component = linkedComponentFor(tool, system.components || []);
+    const img = resolveToolDisplayImage(tool, component);
     return {
       id: tool.id,
-      name: tool.label || component?.name || tool.id,
-      img: component?.img || null,
+      name: resolveToolDisplayName(tool, component, tool.id),
+      // The Journal renders its own default artwork, so the generic sentinel stays
+      // null rather than being baked in here.
+      img: img === TOOL_IMAGE_SENTINEL ? null : img,
     };
   }
 

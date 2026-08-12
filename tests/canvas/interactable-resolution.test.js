@@ -47,9 +47,32 @@ test('buildActiveCanvasTool produces the normalized { componentId, systemId, too
   );
 });
 
-test('buildActiveCanvasTool returns null when the tool has no componentId', () => {
-  assert.equal(buildActiveCanvasTool({ systemId: 'sysA', toolId: 'tool-1', tool: { componentId: '  ' } }), null);
-  assert.equal(buildActiveCanvasTool({ systemId: 'sysA', toolId: 'tool-1', tool: null }), null);
+// Issue 1119: the station's identity is its LIBRARY TOOL ID, not the linked component.
+// Requiring a componentId returned null for every item-sourced Tool — the only kind the
+// Tool Studio can author — and the caller answered that null with a silent activation
+// denial, so every Tool station a GM could build was dead on click.
+test('buildActiveCanvasTool builds a payload for an item-sourced tool (no componentId)', () => {
+  assert.deepEqual(
+    buildActiveCanvasTool({ systemId: 'sysA', toolId: 'tool-1', tool: { componentId: null } }),
+    { componentId: '', systemId: 'sysA', toolId: 'tool-1', label: '' }
+  );
+  // A blank/absent componentId is not a reason to refuse when the tool id is present.
+  assert.deepEqual(
+    buildActiveCanvasTool({ systemId: 'sysA', toolId: 'tool-1', tool: { componentId: '  ' } }),
+    { componentId: '', systemId: 'sysA', toolId: 'tool-1', label: '' }
+  );
+  assert.deepEqual(buildActiveCanvasTool({ systemId: 'sysA', toolId: 'tool-1', tool: null }), {
+    componentId: '',
+    systemId: 'sysA',
+    toolId: 'tool-1',
+    label: '',
+  });
+});
+
+test('buildActiveCanvasTool returns null only when neither a tool id nor a componentId resolves', () => {
+  assert.equal(buildActiveCanvasTool({ systemId: 'sysA', toolId: '  ', tool: { componentId: '' } }), null);
+  assert.equal(buildActiveCanvasTool({ systemId: 'sysA' }), null);
+  assert.equal(buildActiveCanvasTool(), null);
 });
 
 test('buildActiveCanvasTool defaults a missing label to an empty string', () => {

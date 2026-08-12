@@ -1,6 +1,15 @@
 import { getFabricateFlag, setFabricateFlag, stampItemDataRoleIdentity } from '../config/flags.js';
-import { isToolBroken, resolvePresentComponentIds } from '../gatheringToolRuntime.js';
+import {
+  isToolBroken,
+  resolvePresentComponentIds,
+  resolvePresentToolIds,
+} from '../gatheringToolRuntime.js';
 import { Tool } from '../models/Tool.js';
+import {
+  TOOL_IMAGE_SENTINEL,
+  resolveToolDisplayImage,
+  resolveToolDisplayName,
+} from '../models/toolDisplay.js';
 import {
   applyToolUsageAndBreakage,
   createToolReplacementCreator,
@@ -2969,10 +2978,10 @@ export class CraftingEngine {
     }
 
     const toolItems = [];
-    const presentSet = resolvePresentComponentIds({
-      presentTools,
-      systemId: recipe?.craftingSystemId ?? null,
-    });
+    const presentScope = { presentTools, systemId: recipe?.craftingSystemId ?? null };
+    const presentSet = resolvePresentComponentIds(presentScope);
+    // An item-sourced Tool station has no componentId to key on (issue 1119).
+    const presentToolSet = resolvePresentToolIds(presentScope);
 
     for (const tool of tools) {
       // Durable-identity selection (issue 557): PREFER an owned item that matches the
@@ -3011,7 +3020,7 @@ export class CraftingEngine {
         // durable-identity match is breakable.
         const breakable = hasIdentityMatcher ? identityItem != null : true;
         toolItems.push({ tool, item: found, breakable });
-      } else if (presentSet.has(tool?.componentId)) {
+      } else if (presentToolSet.has(tool?.id) || presentSet.has(tool?.componentId)) {
         // Virtual-present: satisfied by the active canvas Tool, no owned item.
         toolItems.push({ tool, item: null, virtual: true });
       } else {
@@ -3110,6 +3119,7 @@ export class CraftingEngine {
             itemUuid: null,
             quantity: 1,
             componentId: tool.componentId ?? null,
+            toolId: tool.id ?? null,
             broken: false,
             authority,
             virtual: true,
@@ -3136,6 +3146,7 @@ export class CraftingEngine {
             itemUuid: item?.uuid ?? null,
             quantity: 1,
             componentId: tool.componentId ?? null,
+            toolId: tool.id ?? null,
             broken: false,
             authority,
             spared: true,
@@ -3190,6 +3201,7 @@ export class CraftingEngine {
         itemUuid: entry.itemRef?.itemUuid ?? null,
         quantity: entry.itemRef?.quantity ?? 1,
         componentId: entry.componentId ?? null,
+        toolId: entry.toolId ?? null,
         broken: entry.broken === true,
         ...extra,
       });
@@ -4817,12 +4829,27 @@ export class CraftingEngine {
       const key = componentId || pair.item?.uuid || pair.item?.name || null;
       if (key && seen.has(key)) continue;
       if (key) seen.add(key);
+      // `data-models` requirement 13: the authored label and the registration snapshot
+      // both outrank the linked component, and the matched item is the last resort. The
+      // previous component-then-item ordering skipped an authored `label` entirely and
+      // printed the raw item name for every item-sourced Tool (issue 1119).
       entries.push({
-        name: component?.name || pair.item?.name || '',
-        img: component?.img || pair.item?.img || '',
+        name: resolveToolDisplayName(pair.tool, component, '') || pair.item?.name || '',
+        img: this._toolChatImage(pair.tool, component) || pair.item?.img || '',
       });
     }
     return entries;
+  }
+
+  /**
+   * The requirement-13 image for a chat chip, with the generic item-bag sentinel mapped
+   * back to empty so the caller's own last-resort fallback (the matched item's artwork)
+   * still applies rather than being pre-empted by a placeholder.
+   * @private
+   */
+  _toolChatImage(tool, component) {
+    const img = resolveToolDisplayImage(tool, component);
+    return img === TOOL_IMAGE_SENTINEL ? '' : img;
   }
 
   /**
@@ -4836,18 +4863,25 @@ export class CraftingEngine {
     const componentById = new Map(
       (system?.components || []).map((component) => [component?.id, component])
     );
+    // The evidence carries `toolId` (issue 1119) precisely so this card can reach the Tool.
+    // Resolving `componentId` alone produced BLANK entries — not even a fallback — for an
+    // item-sourced Tool, which has no component to name.
+    const toolById = new Map(
+      (Array.isArray(system?.tools) ? system.tools : []).map((tool) => [tool?.id, tool])
+    );
     const entries = [];
     const seen = new Set();
     for (const record of usedTools || []) {
       if (record?.broken !== true) continue;
       const componentId = record.componentId || null;
       const component = componentId ? componentById.get(componentId) : null;
-      const key = componentId || record.itemUuid || null;
+      const tool = record.toolId ? (toolById.get(record.toolId) ?? null) : null;
+      const key = record.toolId || componentId || record.itemUuid || null;
       if (key && seen.has(key)) continue;
       if (key) seen.add(key);
       entries.push({
-        name: component?.name || '',
-        img: component?.img || '',
+        name: resolveToolDisplayName(tool, component, ''),
+        img: this._toolChatImage(tool, component),
       });
     }
     return entries;

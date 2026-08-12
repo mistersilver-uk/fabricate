@@ -1613,9 +1613,11 @@ Tool = {
    Resolution failure, missing creation API, a throw, and null/empty creation preserve the original and are not reported as `replaced`.
    Component targets receive managed Component identity, while direct Item targets preserve source Item identity without fabricated Component identity.
 8. `flags.fabricate.toolBroken === true` on an owned item disqualifies it from satisfying a tool's presence gate until the flag is cleared.
-9. A **virtual-present** Tool injected by a canvas Tool station (keyed by `componentId`, system-scoped via `presentTools = { systemId, componentIds }`) satisfies a Tool prerequisite without the actor owning the item and is excluded from usage and breakage.
-   The match fires only when the evaluated recipe/task's own crafting system equals the active tool's `systemId`.
-   Canvas virtual-presence stays keyed by `componentId`: an item-sourced tool (`componentId: null`) does NOT participate in canvas virtual-presence in this change (re-keying virtual-presence onto `toolId` is tracked separately).
+9. A **virtual-present** Tool injected by a canvas Tool station (system-scoped via `presentTools = { systemId, componentIds, toolIds }`) satisfies a Tool prerequisite without the actor owning the item and is excluded from usage and breakage.
+   The match fires only when the evaluated recipe/task's own crafting system equals the active tool's `systemId`, because both id kinds are per-system.
+   Virtual presence is keyed by the station's **library `toolId`** as well as any linked `componentId`, so an item-sourced Tool participates on the same terms as a component-linked one (issue 1119).
+   Keying on `componentId` alone is invalid: a station built from an item-sourced Tool then resolves to no payload at all, and the activation is refused — silently, in the shipped 1.8.0 behaviour — even though the station places and renders correctly.
+   A station whose Tool cannot be resolved denies activation with a routed, player-facing reason; it never answers a click with no response.
 10. An owned item is selected for tool **usage OR breakage** — both, not breakage alone — only when it matches the tool by **durable-identity matching** against the tool's OWN identity.
     Durable-identity matching means: (a) the durable per-system tool-identity flag `flags.fabricate.roles[systemId].toolId`, OR (b) the item's own `uuid` or compendium source (`_stats.compendiumSource` / `flags.core.sourceId`) intersecting the tool's source references.
     Tools have no legacy scalar identity tier.
@@ -1630,12 +1632,19 @@ Tool = {
     The upsert rejects non-Item Documents, stages the description/name/image/source snapshots, clears only a changed old Tool role leaf, stamps the new leaf, and persists one normalized Tool atomically.
 12. Tool **presence** matching resolves the owned item against the system Tools library by the tool's own source references (durable `roles[systemId].toolId` first, then source-ref intersection including the transitive `_stats.duplicateSource`, then the tool's snapshot-name fallback), not through a managed component.
     Tool **usage/breakage** selection matches by durable identity against the Tool's own identity per requirement 10.
+    EVERY surface that answers "is this owned item a Tool, and which Tool is it" resolves through that shared matcher — the crafting and gathering tool gates, the canvas item-drop resolver, and the player Inventory listing (`InventoryListingBuilder`).
+    Consulting `componentId` alone is invalid, for the same reason requirement 13 gives for display: a first-class item-sourced Tool carries `componentId: null`, so a component-only resolver finds nothing for a Tool whose identity is fully populated.
+    That asymmetry — stated for display but left unstated for identity — is why the player Inventory kept a component-only projection through both issue 561 and issue 976, listing no row at all for an owned item-sourced Tool (issue 1119).
+    A surface that resolves PRESENCE must use the wide matcher rather than the narrow durable-identity gate, so an item that satisfies the crafting tool gate is never absent from the surfaces that report what the player is carrying.
 13. A Tool's displayed name and image resolve by ONE precedence at every surface: the user-authored `label` (trimmed) when non-empty, then the registration display snapshot (`name` / `img`), then the linked managed component's `name` / `img` when `componentId` resolves, then a localized fallback name and the generic `icons/svg/item-bag.svg` sentinel.
     The snapshot outranks the linked component deliberately, because a Tool that is also a managed component keeps `componentId` populated (requirement 1) and its own snapshot is the more specific identity.
     Consulting `componentId` alone is invalid: a first-class item-sourced Tool carries `componentId: null`, so a component-only resolver renders the fallback name and the item-bag sentinel for a Tool whose identity is fully populated (issue 976).
     A surface that renders the Tool's description resolves it the same way — the snapshot `description` first, then the linked component's — because the same omission blanks a populated description.
     `label` is never substituted into the snapshot and the snapshot is never written back to `label`; they are distinct fields per requirement 1.
-    The reference implementation is `toolDisplayName` / `toolDisplayImage` / `toolDescription` (`src/ui/svelte/apps/manager/tools/toolStudio.js`); a surface that receives the component lookup pre-flattened may re-derive the same ordering, but must not reorder or drop a rung.
+    The reference implementation is `resolveToolDisplayName` / `resolveToolDisplayImage` / `resolveToolDescription` (`src/models/toolDisplay.js`), which `toolStudio.js` re-exports unchanged; a surface that receives the component lookup pre-flattened may re-derive the same ordering, but must not reorder or drop a rung.
+    The precedence lives beside the `Tool` model rather than under the manager UI because the bound surfaces include engines, chat cards and the Run Journal projection, which cannot import from `src/ui/**` without inverting the layering — being unable to reach the reference implementation is what caused five further surfaces to re-derive it wrongly after issue 976 (issue 1119).
+    Non-UI surfaces are bound by the same ordering: a chat card, a chat evidence projection, and the Run Journal step detail each render the Tool's own identity, never the linked component's alone and never the matched item's name ahead of an authored `label`.
+    Breakage evidence records carry `toolId` alongside `componentId` precisely so a chat card can reach the Tool; without it the salvage card had no route back and emitted blank entries.
 
 ### Validation Matrix
 

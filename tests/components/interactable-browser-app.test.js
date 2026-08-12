@@ -233,13 +233,25 @@ describe('InteractableBrowserRoot body', () => {
       rootSource.includes('services?.getComponentForSystem?.(selectedSystemId, tool.componentId)'),
       'looks up the managed component via the services bag'
     );
+    // Issue 1119: this surface must ROUTE THROUGH the shared `data-models` requirement-13
+    // precedence rather than re-deriving it. The old inline `label → component.name`
+    // ordering omitted the registration snapshot, so every item-sourced Tool (which carries
+    // `componentId: null` by construction) rendered "Unnamed tool" + the item-bag sentinel.
     assert.ok(
-      rootSource.includes('const componentName = component?.name;') && rootSource.includes('return String(componentName);'),
-      'tool display name falls back to the component name when label is empty'
+      rootSource.includes("from '../../../models/toolDisplay.js'"),
+      'resolves tool identity through the shared display-precedence module'
     );
     assert.ok(
-      rootSource.includes('return component?.img || DEFAULT_TOOL_IMAGE;'),
-      'tool image resolves from the component img with a sensible default'
+      rootSource.includes('return resolveToolDisplayName('),
+      'tool display name delegates to the shared precedence (label → snapshot → component → fallback)'
+    );
+    assert.ok(
+      !rootSource.includes('const componentName = component?.name;'),
+      'does not re-derive a component-only display name alongside the shared helper'
+    );
+    assert.ok(
+      rootSource.includes('img: resolveToolDisplayImage(tool, component)'),
+      'tool image resolves through the shared precedence (snapshot → component → sentinel)'
     );
     assert.ok(
       rootSource.includes('<img class="fab-ib-row-thumb" src={tool.img}'),
