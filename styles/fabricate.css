@@ -4614,10 +4614,27 @@
   padding: var(--fab-space-2) var(--fab-space-3);
 }
 
+/* A NEW ENTRY'S NAME SAT IN THE MIDDLE OF THE ROW, and the cause is the host, not this rule.
+   Foundry's core `button` rule (`@layer elements.forms` in `css/foundry2.css`) declares
+   `display: flex; justify-content: center; align-items: center`, and this block set `display`
+   without ever restating `justify-content` — so every summary row has been centring its
+   children since it was written. It was invisible because `.manager-modifier-expression` is
+   the row's one elastic child: with an expression present it eats all the free space and
+   centring has nothing to distribute. A FRESH entry has no expression, the `→ path` span is
+   not rendered at all, and the whole row — chevron, glyph and label — jumps to the middle
+   while every authored entry above it stays left. Measured in the View Lab against the real
+   cascade: the label sits 52px from the button's left edge with an expression and 407px
+   without it, and an explicit `flex-start` restores 52px in both states.
+
+   `text-align: left` below does not cover this and never could: it aligns INLINE content
+   inside a box, and this is the flex container distributing its ITEMS. The fix belongs here
+   rather than in forcing an empty entry to render a placeholder path — a row should not have
+   to carry content it does not have in order to line up. */
 .fabricate-manager .manager-modifier-summary {
   flex: 1 1 auto;
   min-width: 0;
   display: flex;
+  justify-content: flex-start;
   align-items: center;
   gap: var(--fab-space-2);
   background: none;
