@@ -1688,6 +1688,40 @@ export const VIEW_LAB_CASES = Object.freeze([
     ],
   }),
   managerCase({
+    id: 'manager-components-bulk-delete-armed',
+    label: 'Manager — Components bulk delete armed',
+    reaches: 'beyond',
+    smokeLabels: [],
+    // The ARMED half of the set delete (issue 1129), the twin of
+    // `manager-essences-bulk-delete-armed`. The first click only ARMS, so this frame shows
+    // `Confirm delete` beside the impact statement it is a confirmation OF, with nothing
+    // written.
+    //
+    // Two frames rather than one because the two states are the point: an impact statement
+    // rendered BEFORE arming, and an arm that is a second, separate act. A single frame of
+    // the idle button would not show that the destructive step is gated at all.
+    query: {},
+    steps: [
+      'Components',
+      { selector: 'label:has(input[data-component-select="sm-iron-ore"])' },
+      { selector: 'label:has(input[data-component-select="sm-copper-ore"])' },
+      // The BUTTON, not the card: `ArmedDangerButton` stamps `data-arm-token` on the control
+      // it arms, so this cannot drift onto a wrapper the way a class selector could.
+      { selector: '[data-arm-token="delete-components"]' },
+    ],
+    expectView: 'components',
+    // Armed is a STATE, and a frame that merely re-photographed the idle button would be
+    // indistinguishable from the bulk-edit case above.
+    expectSelector: '.fabricate-manager [data-arm-token="delete-components"][data-armed="true"]',
+    kinds: ['manager', 'components'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/Component/,
+      /^src\/ui\/svelte\/apps\/manager\/components?\//,
+      /^src\/utils\/recipeComponentReferences\.js$/,
+      BULK_EDIT_CHROME_PATTERN,
+    ],
+  }),
+  managerCase({
     id: 'manager-components-bulk-edit-unstaged',
     label: 'Manager — Components bulk edit unstaged',
     smokeLabels: ['manager-components-bulk-edit-unstaged'],
