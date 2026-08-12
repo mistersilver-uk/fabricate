@@ -5242,6 +5242,76 @@ export const VIEW_LAB_CASES = Object.freeze([
     kinds: ['manager', 'checks'],
     sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/checks\/SimpleCraftingCheckEditor\.svelte$/],
   }),
+  managerCase({
+    id: 'manager-checks-crafting-outcomes-empty',
+    label: 'Manager — Checks crafting Outcomes with zero tiers',
+    // BEYOND the smoke. The walk never empties an outcome table, and every routed check in the
+    // fixture world authors three tiers, so the state a routed check STARTS in was in no frame
+    // at all.
+    reaches: 'beyond',
+    smokeLabels: [],
+    // THE DEAD END THAT WAS FIXED (issue 1097 follow-up, maintainer report). `Add outcome tier`
+    // used to be the last child of `.manager-checks-tier-list`, which only renders when at least
+    // one tier exists — so a zero-tier routed check displayed "No outcome tiers yet. Add the
+    // tiers this check routes results into." and offered nothing to press. Every frame in the
+    // registry photographed a POPULATED table, so the dead end was invisible to capture and its
+    // repair is invisible without this.
+    //
+    // Reached by SWITCHING ALCHEMY TO TIERED rather than by deleting Runework's three tiers or
+    // by seeding a sixth system. `lab-alchemy` carries the shared frozen `SIMPLE_CHECK`, which
+    // authors no `routed` block at all, so `tiered` is the one route in this world where zero
+    // tiers is the check's own resting state rather than the residue of three delete clicks —
+    // and it is the second of the two states the fix's own comment names. It costs one click
+    // and no fixture change: seeding `checkMode: 'tiered'` on the fixture instead would flip
+    // every already-captured alchemy frame off the Simple two-slot Results editor
+    // `labContent.js` records as load-bearing, and raise a permanent no-tiers validation warning
+    // on the Validation frames.
+    query: { system: 'lab-alchemy' },
+    steps: [
+      'Checks',
+      { selector: '#manager-checks-nav-crafting' },
+      // The mode radio group renders only on The roll section, which is where the route lands.
+      { selector: '[data-crafting-alchemy-checkmode-option="tiered"] input' },
+      { selector: '#checks-section-outcomes' },
+      { selector: '[data-add-outcome-tier]', scroll: true },
+    ],
+    expectView: 'checks-crafting',
+    // THE FIX ITSELF, as a selector: the add control has to be a SIBLING of the empty sentence,
+    // which is what taking it out of the list's `{#if}` made it. Anchoring on either hook alone
+    // would pass on the broken markup — the sentence rendered fine before, and the control still
+    // exists whenever a tier does — so the sibling combinator is the assertion, not decoration.
+    expectSelector: '.fabricate-manager [data-outcomes-empty] ~ [data-add-outcome-tier]',
+    kinds: ['manager', 'checks'],
+    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/checks\/CraftingCheckEditor\.svelte$/],
+  }),
+  managerCase({
+    id: 'manager-checks-crafting-alchemy-behaviour',
+    label: 'Manager — Checks crafting alchemy behaviour card',
+    // BEYOND the smoke. The walk never opens an alchemy system's On failure section, so there is
+    // no counterpart frame to fall short of.
+    reaches: 'beyond',
+    smokeLabels: [],
+    // A CARD NO FRAME REACHED. `data-alchemy-behaviour` renders only for a system whose
+    // resolution mode is `alchemy`, and only on On failure — every other crafting route draws
+    // the two-toggle `data-failure-consumption` list there instead. `lab-alchemy` is the
+    // world's alchemy system with a check mode set, so it is the only route to this card, and
+    // its intro sentence (corrected in issue 1097 to name The roll section rather than pointing
+    // "above" at a card this screen no longer shows beside it) is what the frame is evidence for.
+    query: { system: 'lab-alchemy' },
+    steps: [
+      'Checks',
+      { selector: '#manager-checks-nav-crafting' },
+      { selector: '#checks-section-on-failure' },
+      { selector: '[data-alchemy-behaviour]', scroll: true },
+    ],
+    expectView: 'checks-crafting',
+    // The card, which is the subject and exists in no other state — not one of its toggles.
+    // A deeper anchor would fail the capture job WHOLE, and publish nothing, the day a flag is
+    // added or renamed inside a card whose SENTENCE is what this frame is about.
+    expectSelector: '.fabricate-manager [data-alchemy-behaviour]',
+    kinds: ['manager', 'checks'],
+    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/checks\/ChecksView\.svelte$/],
+  }),
   // Player recipe detail, one per resolution mode. Each mode draws a DIFFERENT body — the routed
   // ones a route rail, progressive a stage rail, simple a plain ingredient list — so the four
   // frames together are the only side-by-side evidence that a change to one did not move another.
