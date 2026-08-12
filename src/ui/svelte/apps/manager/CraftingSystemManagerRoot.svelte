@@ -259,9 +259,6 @@
   // User-facing failure text for the gathering-event editor, rendered by the header toolbar
   // beside Save (issue 919).
   let gatheringEventSaveError = $state('');
-  let toolsComponentSearchTerm = $state('');
-  let toolsComponentPageIndex = $state(0);
-  let toolsComponentPageSize = $state(6);
   let toolEditorActiveTab = $state('overview');
   let toolValidationFocusNonce = $state(0);
 
@@ -876,18 +873,6 @@
     recipeCategories: selectedSystem?.categories?.length || 0,
   });
   const itemCards = $derived($viewState.itemCards || []);
-  const toolsComponentCards = $derived(Array.isArray(itemCards) ? itemCards : []);
-  const toolsNormalizedComponentSearchTerm = $derived(
-    toolsComponentSearchTerm.trim().toLowerCase()
-  );
-  const toolsFilteredComponentCards = $derived(
-    toolsComponentCards.filter((item) => {
-      const name = String(item?.name || '').toLowerCase();
-      return (
-        !toolsNormalizedComponentSearchTerm || name.includes(toolsNormalizedComponentSearchTerm)
-      );
-    })
-  );
   const tagCategoryUsage = $derived(
     buildTagCategoryUsage(selectedSystem, $viewState.recipes || [], itemCards)
   );
@@ -2244,14 +2229,6 @@
   $effect(() => {
     services?.registerToolDirtyGuard?.(() => confirmToolsRouteExit('close'));
     return () => services?.registerToolDirtyGuard?.(null);
-  });
-
-  $effect(() => {
-    if (
-      toolsComponentPageIndex > 0 &&
-      toolsComponentPageIndex * toolsComponentPageSize >= toolsFilteredComponentCards.length
-    )
-      toolsComponentPageIndex = 0;
   });
 
   function text(key, fallback) {

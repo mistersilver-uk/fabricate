@@ -127,7 +127,7 @@ export function resolveMostSpecificSignatureMatch(candidates) {
 function toolDisplayReference(tool, recipe = null, recipeManager = null) {
   const name = tool?.label || tool?.name;
   if (name) return name;
-  const componentId = tool?.componentId || tool?.systemItemId;
+  const componentId = tool?.componentId;
   const resolved = recipeManager?.resolveComponentName?.(recipe, componentId);
   if (resolved) return resolved;
   return componentId || tool?.id || 'unknown';
@@ -4824,7 +4824,7 @@ export class CraftingEngine {
     for (const pair of tools || []) {
       // Skip virtual-present canvas tools (no owned item) — no chip to render.
       if (!pair?.item) continue;
-      const componentId = pair.tool?.componentId || pair.tool?.systemItemId || null;
+      const componentId = pair.tool?.componentId || null;
       const component = componentId ? componentById.get(componentId) : null;
       const key = componentId || pair.item?.uuid || pair.item?.name || null;
       if (key && seen.has(key)) continue;
