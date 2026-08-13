@@ -50,6 +50,18 @@ const CORPUS_ROW_SERIES = Object.freeze([25, 50, 100]);
 const ALCHEMY_ROWS = 100;
 
 /**
+ * Rows the GM recipe-browser case is bounded to.
+ *
+ * Bounded hard, and by the PRE-FIX cost rather than the post-fix one. Before issue 1074 the
+ * row projection ran one full O(sets²) audit per row, so this case is O(rows³): measured on
+ * this checkout at 23 ms for 25 rows, 1.27 s for 100 and 10.4 s for 200. Two hundred is the
+ * largest bound at which a regression re-exposes itself in seconds rather than in hours,
+ * which is what makes this a guard a reviewer can actually run rather than one that would
+ * only ever be skipped. Post-fix it is a fraction of a second.
+ */
+const GM_ROWS = 200;
+
+/**
  * Recipes the adversarial ingredient-solver case runs.
  *
  * Bounded hard. Each rich recipe carries 3 sets x 3 groups x 3 options, and every matcher
@@ -410,6 +422,44 @@ function alchemyCases() {
       },
       run: (world) => world.signatureValidator.validateSystem(world.system.id),
       counts: (_world, result) => ({ conflicts: result.conflicts.length }),
+    },
+    {
+      id: 'adminRecipeRows.buildRecipeList',
+      profile: 'alchemy-signatures',
+      description:
+        'The GM recipe browser open over the signature corpus, bounded to ' +
+        `${GM_ROWS} rows. Each row derives \`enableBlocked\` through ` +
+        '`canActivateRecipe`, which before issue 1074 ran one FULL system audit and copied ' +
+        'the whole recipe corpus PER ROW. The three counters below are the criteria: one ' +
+        'report build, one audit worth of comparisons, and a bounded number of corpus copies.',
+      setup: (context) => {
+        const recipes = hydrateRecipes(context.modules, context.fixture.recipes.slice(0, GM_ROWS));
+        const world = worldFor(context, { recipes });
+        // A corpus copy is a `getRecipes` call that materialises a cohort array. Counted on
+        // the manager rather than inside `src/`, matching how every other fixture-side
+        // counter here rides on the inputs instead of the code under measurement.
+        const readRecipes = world.recipeManager.getRecipes.bind(world.recipeManager);
+        world.recipeManager.getRecipes = (filters) => {
+          context.counters.bump('recipeCorpusCopies');
+          return readRecipes(filters);
+        };
+        // The signature counters are module-level and process-global, so they are zeroed
+        // here — between `setup` and the single counted `run` — rather than read as a delta.
+        world.modules.signatureCounters.reset();
+        return world;
+      },
+      run: (world) =>
+        world.modules.recipeRowProjection.buildRecipeList(
+          world.craftingSystemManager,
+          world.recipeManager,
+          world.system,
+          ''
+        ),
+      counts: (world, list) => ({
+        rows: list.recipes.length,
+        blockedRows: list.recipes.filter((row) => row.enableBlocked).length,
+        ...world.modules.signatureCounters.read(),
+      }),
     },
     {
       id: 'alchemyListing.buildListing',

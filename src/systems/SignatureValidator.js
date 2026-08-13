@@ -19,6 +19,50 @@
  */
 import { getMatchHandler } from '../models/match/matchTypes.js';
 
+import { AlchemySignatureReport } from './AlchemySignatureReport.js';
+
+// ---------------------------------------------------------------------------
+// Instrumentation
+// ---------------------------------------------------------------------------
+
+/**
+ * Module-level operation counters, mirroring `src/utils/definitionIndex.js` (issue 1074).
+ *
+ * The pair-comparison count is the number issue 1074 has to move, and it cannot be
+ * observed from outside: the row path constructs its own validator deep inside
+ * `RecipeManager`, so a per-instance wrapper in the benchmark harness can only see the
+ * instances the harness itself built. A module counter sees every comparison the process
+ * makes, which is exactly the claim under test — "a candidate is compared with an indexed
+ * cohort, not with every pair in the system".
+ *
+ * `reportBuilds` is its companion: a cache that avoided comparisons by answering a STALE
+ * question would move the first number and not the second, so both are reported.
+ */
+const _counters = {
+  signatureComparisons: 0,
+  reportBuilds: 0,
+};
+
+/**
+ * A snapshot of the signature counters.
+ *
+ * @returns {{signatureComparisons: number, reportBuilds: number}}
+ */
+export function readSignatureCounters() {
+  return { ..._counters };
+}
+
+/**
+ * Zero the signature counters. Call before a measured region; they are process-global and
+ * monotonic otherwise.
+ *
+ * @returns {void}
+ */
+export function resetSignatureCounters() {
+  _counters.signatureComparisons = 0;
+  _counters.reportBuilds = 0;
+}
+
 /**
  * All coverage masks an option can contribute: every union of between 1 and
  * `capacity` DISTINCT component coverage masks drawn from the option. A
@@ -276,6 +320,8 @@ export class SignatureValidator {
    * @returns {boolean}
    */
   signaturesOverlap(entryA, entryB) {
+    _counters.signatureComparisons += 1;
+
     // A set carrying no groups, or a group no component can satisfy, is
     // unsatisfiable: it can never match a submission at runtime, so it cannot be
     // the source of any ambiguity and never conflicts with another set.
@@ -341,36 +387,90 @@ export class SignatureValidator {
    * @returns {{ valid: boolean, conflicts: object[] }}
    */
   validateSystem(systemId) {
+    const compiled = this.compileSystemEntries(systemId);
+    if (!compiled) return { valid: true, conflicts: [] };
+
+    const conflicts = this._auditEntries(compiled.entries, compiled.components);
+    return {
+      valid: conflicts.length === 0,
+      conflicts,
+    };
+  }
+
+  /**
+   * Flatten a system's ENABLED recipes into `(recipe, ingredient set)` entries, with the
+   * facts an incremental re-check needs to reproduce a full audit's ordering.
+   *
+   * Each entry tracks its set's 1-based POSITION within its recipe so a conflict can be
+   * reported by position (issue 550) — never by the raw Foundry set id, which is opaque to
+   * the user and cannot be mapped back to anything in the editor. A set's author-given
+   * `name` (when present) is safe to show; an absent name falls back to the position, NOT
+   * the id.
+   *
+   * `cohortIndexByRecipeId` covers the WHOLE cohort, disabled recipes included, because
+   * the enable-time gate substitutes a currently-disabled candidate into the scan and needs
+   * to know where in the audit order it would have landed.
+   *
+   * @param {string} systemId
+   * @returns {{system: object, components: object[], entries: object[],
+   *   cohortIndexByRecipeId: Map<*, number>}|null} `null` for an unknown system.
+   */
+  compileSystemEntries(systemId) {
     const system = this._csm.getSystem(systemId);
-    if (!system) return { valid: true, conflicts: [] };
+    if (!system) return null;
 
-    const recipes = (this._csm.getRecipesForSystem(systemId) || []).filter(
-      (recipe) => recipe?.enabled
-    );
+    const cohort = this._csm.getRecipesForSystem(systemId) || [];
     const components = this._csm.getComponentsForSystem(systemId) || [];
-    const conflicts = [];
-
-    // Collect all (recipe, ingredientSet, signature) entries. Track each set's
-    // 1-based POSITION within its recipe so a conflict can be reported by
-    // position (issue 550) — never by the raw Foundry set id, which is opaque to
-    // the user and cannot be mapped back to anything in the editor. A set's
-    // author-given `name` (when present) is safe to show; an absent name falls
-    // back to the position, NOT the id.
     const entries = [];
-    for (const recipe of recipes) {
-      for (const [index, set] of (recipe.ingredientSets || []).entries()) {
-        entries.push({
-          recipe: { id: recipe.id, name: recipe.name },
-          setId: set.id,
-          setPosition: index + 1,
-          setName: set.name || null,
-          signature: this.computeSignature(set, components),
-          groupOptions: this.computeGroupOptions(set, components),
-        });
-      }
+    const cohortIndexByRecipeId = new Map();
+    for (const [cohortIndex, recipe] of cohort.entries()) {
+      cohortIndexByRecipeId.set(recipe?.id, cohortIndex);
+      // The scan is scoped to enabled recipes — the exact complement of the runtime
+      // matcher's `if (!recipe.enabled) continue;` skip.
+      if (!recipe?.enabled) continue;
+      entries.push(...this.compileRecipeEntries(recipe, components, cohortIndex));
     }
+    return { system, components, entries, cohortIndexByRecipeId };
+  }
 
-    // Pairwise comparison — skip same-recipe comparisons only if same set
+  /**
+   * Compile ONE recipe's ingredient sets into audit entries.
+   *
+   * Shared by the full audit and by the enable-time candidate check, so a candidate is
+   * always compiled exactly as the audit would have compiled it (issue 1074).
+   *
+   * @param {object} recipe
+   * @param {object[]} components
+   * @param {number} [cohortIndex] The recipe's position in the unfiltered system cohort.
+   * @returns {object[]}
+   */
+  compileRecipeEntries(recipe, components, cohortIndex = 0) {
+    return (recipe?.ingredientSets || []).map((set, index) => ({
+      recipe: { id: recipe.id, name: recipe.name },
+      setId: set.id,
+      setPosition: index + 1,
+      setName: set.name || null,
+      signature: this.computeSignature(set, components),
+      groupOptions: this.computeGroupOptions(set, components),
+      cohortIndex,
+      setIndex: index,
+    }));
+  }
+
+  /**
+   * The UNPRUNED pairwise audit — every pair, in `i < j` order.
+   *
+   * Deliberately left unpruned while {@link AlchemySignatureReport} answers a candidate
+   * from an inverted index: the two are differentially tested against each other, and an
+   * oracle that shared the optimisation could not falsify it.
+   *
+   * @param {object[]} entries
+   * @param {object[]} components
+   * @returns {object[]}
+   * @private
+   */
+  _auditEntries(entries, components) {
+    const conflicts = [];
     for (let i = 0; i < entries.length; i++) {
       for (let j = i + 1; j < entries.length; j++) {
         const a = entries[i];
@@ -380,41 +480,75 @@ export class SignatureValidator {
         if (a.recipe.id === b.recipe.id && a.setId === b.setId) continue;
 
         if (this.signaturesOverlap(a, b)) {
-          const componentNames = this._overlapComponentNames(a, b, components);
-          const setA = a.setName || String(a.setPosition);
-          const setB = b.setName || String(b.setPosition);
-          const componentsLabel = componentNames.join(', ');
-          conflicts.push({
-            recipeA: a.recipe,
-            ingredientSetA: a.setId,
-            recipeB: b.recipe,
-            ingredientSetB: b.setId,
-            // Stable code + human-readable params so the UI can localize the
-            // conflict (issue 550), mirroring the `systemValidation` issue-code
-            // pattern. `setA`/`setB` are author names or 1-based positions;
-            // `components` are managed-component NAMES — never raw ids.
-            code: 'signatureCollision',
-            params: {
-              recipeA: a.recipe.name,
-              recipeB: b.recipe.name,
-              setA,
-              setB,
-              components: componentsLabel,
-            },
-            // Default English for headless/console callers. Keeps the recipe
-            // names and the "Overlapping signatures" phrase (no set id).
-            message: componentsLabel
-              ? `Overlapping signatures between "${a.recipe.name}" and "${b.recipe.name}" (shared components: ${componentsLabel})`
-              : `Overlapping signatures between "${a.recipe.name}" and "${b.recipe.name}"`,
-          });
+          conflicts.push(this.describeConflict(a, b, components));
         }
       }
     }
+    return conflicts;
+  }
 
+  /**
+   * The reported conflict for one overlapping pair, `entryA` being the side a full audit's
+   * `i < j` walk would have visited first.
+   *
+   * @param {object} entryA
+   * @param {object} entryB
+   * @param {object[]} components
+   * @returns {object}
+   */
+  describeConflict(entryA, entryB, components) {
+    const componentNames = this._overlapComponentNames(entryA, entryB, components);
+    const setA = entryA.setName || String(entryA.setPosition);
+    const setB = entryB.setName || String(entryB.setPosition);
+    const componentsLabel = componentNames.join(', ');
     return {
-      valid: conflicts.length === 0,
-      conflicts,
+      recipeA: entryA.recipe,
+      ingredientSetA: entryA.setId,
+      recipeB: entryB.recipe,
+      ingredientSetB: entryB.setId,
+      // Stable code + human-readable params so the UI can localize the
+      // conflict (issue 550), mirroring the `systemValidation` issue-code
+      // pattern. `setA`/`setB` are author names or 1-based positions;
+      // `components` are managed-component NAMES — never raw ids.
+      code: 'signatureCollision',
+      params: {
+        recipeA: entryA.recipe.name,
+        recipeB: entryB.recipe.name,
+        setA,
+        setB,
+        components: componentsLabel,
+      },
+      // Default English for headless/console callers. Keeps the recipe
+      // names and the "Overlapping signatures" phrase (no set id).
+      message: componentsLabel
+        ? `Overlapping signatures between "${entryA.recipe.name}" and "${entryB.recipe.name}" (shared components: ${componentsLabel})`
+        : `Overlapping signatures between "${entryA.recipe.name}" and "${entryB.recipe.name}"`,
     };
+  }
+
+  /**
+   * Compile the whole system into a reusable {@link AlchemySignatureReport}: the audit's
+   * entries, its conflicts, and the cohort map an incremental candidate check needs.
+   *
+   * This is the COLD build — it costs exactly one full audit, which is the budget issue
+   * 1074's acceptance criteria allow per revision. `RecipeManager` owns the revision guard
+   * that decides when to call it.
+   *
+   * @param {string} systemId
+   * @returns {AlchemySignatureReport|null} `null` for an unknown system.
+   */
+  compileReport(systemId) {
+    const compiled = this.compileSystemEntries(systemId);
+    if (!compiled) return null;
+    _counters.reportBuilds += 1;
+    return new AlchemySignatureReport({
+      systemId,
+      validator: this,
+      components: compiled.components,
+      entries: compiled.entries,
+      cohortIndexByRecipeId: compiled.cohortIndexByRecipeId,
+      conflicts: this._auditEntries(compiled.entries, compiled.components),
+    });
   }
 
   /**
