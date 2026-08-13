@@ -5473,6 +5473,15 @@ export class CraftingSystemManager {
    * persistence-level blocker would throw partway through the loop with `components` and
    * `essenceDefinitions` already mutated in memory, some recipes written, and nothing persisted.
    *
+   * ── ONE REFERENCE CLASS IS DELIBERATELY LEFT DANGLING ─────────────────────────────
+   * A SURVIVING component's `salvage.resultGroups[].results` may name a deleted component,
+   * and nothing here repairs it — the shipped `deleteItem` did not either, and this method
+   * preserves that behaviour rather than widening the blast radius of a bug fix.
+   * `_cleanupSalvageRunsForComponent` covers actor RUN HISTORY only, which is a different
+   * store. The consequence is bounded and visible: the impact statement the bulk panel shows
+   * claims no salvage coverage, so it does not promise a repair that does not happen. Closing
+   * it changes what a delete does to stored components and warrants its own issue.
+   *
    * @param {string} systemId
    * @param {Iterable<string>} componentIds
    * @returns {Promise<{deleted: number, componentIds: string[], removedNames: string[],

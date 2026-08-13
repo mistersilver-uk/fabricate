@@ -159,12 +159,22 @@ export function recipeLostItsShape(updated) {
  *     afterthought;
  *  5. the same filter-then-drop over `resultGroups[].results` and the legacy flat `results`.
  *
- * Returns a NEW json rather than mutating, and reports whether anything actually changed so
- * the caller can skip an untouched recipe instead of re-saving it.
+ * Returns a NEW json rather than mutating.
+ *
+ * **`changed` is `recipeReferencesAnyComponent(recipe, ids)`, not a diff of the two JSONs**,
+ * and the distinction is worth stating because the two are not the same predicate. Under the
+ * result-`match` gap recorded in the header, a recipe can be DETECTED as referencing a deleted
+ * component and come back with an identical body, so `changed` answers "was there anything
+ * here to strip", not "did the bytes move". It exists so a caller that has NOT already
+ * filtered can skip a recipe rather than re-save it; both production callers filter through
+ * the same predicate first ({@link CraftingSystemManager#_stripComponentsFromRecipes} and
+ * {@link describeComponentDeleteImpact}), so both discard it. Do not treat a `changed: true`
+ * as proof the rewrite altered the recipe.
  *
  * @param {object} recipe a `Recipe` instance or a plain recipe object.
  * @param {Set<string>|Iterable<string>} componentIds
- * @returns {{json: object, changed: boolean}}
+ * @returns {{json: object, changed: boolean}} the rewritten json, and whether the recipe
+ *   referenced any of `componentIds` before the rewrite.
  */
 export function stripComponentsFromRecipeJson(recipe, componentIds) {
   const ids = componentIds instanceof Set ? componentIds : new Set(componentIds || []);
