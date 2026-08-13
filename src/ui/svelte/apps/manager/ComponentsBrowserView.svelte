@@ -510,8 +510,14 @@
     no visual pressed state, and the direction button sat at the boxy base
     `.manager-button` scale the Recipe Studio already documented fixing.
   -->
+  <!-- `tabindex="-1"` makes this landmark a FOCUS TARGET without making it a tab stop
+       (issue 1157) — see the twin note in `EssenceBrowserView`. The manager root lands the
+       keyboard here when an action empties the bulk selection and unmounts the panel that
+       was acted on, addressing it through `data-component-toolbar`. -->
   <section
     class="manager-toolbar manager-component-toolbar"
+    tabindex="-1"
+    data-component-toolbar
     aria-label={text('FABRICATE.Admin.Manager.Component.Filters', 'Component filters')}
   >
     <div class="manager-component-filter-row">

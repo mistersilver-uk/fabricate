@@ -141,6 +141,8 @@ const shell = createMountedComponentHarness({
 const card = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-bulk-delete-card-',
+  // Issue 1157 gave the card one raw import: the shared focus/announce ordering rule.
+  rawModules: ['src/ui/svelte/util/announceAfterFocus.js'],
   compiledModules: ['src/ui/svelte/apps/manager/ArmedDangerButton.svelte', CARD_PATH],
   componentPath: CARD_PATH,
 });

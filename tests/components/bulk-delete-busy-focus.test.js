@@ -44,6 +44,10 @@ const CARD_PATH = 'src/ui/svelte/apps/manager/BulkDeleteCard.svelte';
 const card = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-bulk-delete-focus-',
+  // The card's ONE shared leaf (issue 1157): the "move the keyboard, then announce" ordering
+  // rule it shares with the manager root. A static import, so the harness's closure validator
+  // throws without it.
+  rawModules: ['src/ui/svelte/util/announceAfterFocus.js'],
   compiledModules: ['src/ui/svelte/apps/manager/ArmedDangerButton.svelte', CARD_PATH],
   componentPath: CARD_PATH,
 });

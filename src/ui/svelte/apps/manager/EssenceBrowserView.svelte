@@ -256,8 +256,15 @@
 </script>
 
 <main class="manager-main" aria-label={text('FABRICATE.Admin.Manager.Essence.Title', 'Essences')}>
+  <!-- `tabindex="-1"` makes this landmark a FOCUS TARGET without making it a tab stop
+       (issue 1157). Emptying the bulk selection unmounts the panel and the Clear that was
+       pressed, and the manager root puts the keyboard here: an inert element, so Space still
+       scrolls, with an accessible name that says where the GM now is and the whole selection
+       register one Tab away. The root addresses it through `data-essence-toolbar`. -->
   <section
     class="manager-toolbar manager-essence-toolbar"
+    tabindex="-1"
+    data-essence-toolbar
     aria-label={text('FABRICATE.Admin.Manager.Essence.Filters', 'Essence filters')}
   >
     <div class="manager-essence-filter-row">

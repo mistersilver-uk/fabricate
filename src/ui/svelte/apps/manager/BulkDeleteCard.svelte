@@ -79,9 +79,12 @@
      toast, which is not a live region this module controls. Setting it also returns focus
      to the re-enabled control WHEN FOCUS IS STILL ON `<body>`, where the confirm's own
      `disabled` left it — a GM who tabbed into the browser's search field while the write was
-     running keeps their place (issue 1157). A SUCCESSFUL delete unmounts this card, so its
-     outcome cannot be announced from here: the caller's toast and the manager-level live
-     region `CraftingSystemManagerRoot` renders are the surviving feedback for it.
+     running keeps their place (issue 1157) — and it does so BEFORE the sentence is written
+     into the region, not after, because a focus change cancels pending polite speech. That
+     order is the shared rule in `util/announceAfterFocus.js`. A SUCCESSFUL delete unmounts
+     this card, so its outcome cannot be announced from here: the caller's toast and the
+     manager-level live region `CraftingSystemManagerRoot` renders are the surviving feedback
+     for it.
    - token: the arm token, and the STEM OF BOTH GENERATED IDS. One component now renders in
      three panels and a manager view can hold more than one at a time, so hardcoding
      `id="bulk-delete-impact"` would collide the moment it does.
@@ -96,6 +99,7 @@
 -->
 <script>
   import ArmedDangerButton from './ArmedDangerButton.svelte';
+  import { announceAfterFocusMove } from '../../util/announceAfterFocus.js';
 
   let {
     heading = '',
@@ -165,47 +169,87 @@
   let announcedOutcome = '';
   let control = $state(null);
 
+  // Only the OUTCOME sentence is spoken late (see `speakOutcome`), and a sentence still
+  // waiting on its timer must never land on top of a transition that has since happened —
+  // a GM who re-arms inside that window would hear the refusal over the arm. Every
+  // assignment therefore goes through here, and the deferred one only speaks while it is
+  // still the most recent thing this card was asked to say.
+  let announcementTicket = 0;
+
+  function say(next) {
+    announcementTicket += 1;
+    announcement = next;
+  }
+
+  /**
+   * Restore focus to the control after an awaited write left the card mounted.
+   *
+   * ONLY WHEN FOCUS IS ACTUALLY NOWHERE (issue 1157). The restore was unconditional, so a GM
+   * who tabbed into the browser's search field while the write was in flight was yanked back
+   * out of it by its result. `<body>` is where the confirm's own `disabled` left them —
+   * measured in Chromium by `bulk-delete-busy-focus.test.js` — and it is the only state
+   * worth rescuing; anything else is a place they chose.
+   *
+   * @returns {boolean} true only when focus actually moved, which is what decides whether the
+   *   announcement has a focus utterance to queue behind. `ArmedDangerButton` exports
+   *   `focus()` and not its element, so the move is observed as a CHANGE OF `activeElement`
+   *   rather than by identity — a control still disabled for any reason takes no focus, and
+   *   an outcome nobody was moved for is spoken immediately.
+   */
+  function restoreFocusToControl() {
+    if (typeof document === 'undefined') return false;
+    const active = document.activeElement;
+    if (active && active !== document.body && active.isConnected !== false) return false;
+    control?.focus?.();
+    return document.activeElement !== active;
+  }
+
+  /**
+   * Announce an outcome, AFTER the focus restore rather than before it.
+   *
+   * The confirm disabled the control, which moved focus to `document.body`; re-enabling it
+   * does not bring focus back, so the GM who is being told the delete was refused is told it
+   * from nowhere in particular. Both halves are deferred past this flush because the control
+   * is re-enabled in the same one and `focus()` on a still-disabled button does nothing.
+   *
+   * The ORDER between them is the shared rule in `util/announceAfterFocus.js`: a focus change
+   * cancels pending `polite` speech, so a sentence written before the hop is a sentence the
+   * GM may never hear. `CraftingSystemManagerRoot` obeys the same rule for the actions that
+   * unmount this card entirely.
+   */
+  function speakOutcome(outcome) {
+    announcementTicket += 1;
+    const ticket = announcementTicket;
+    announceAfterFocusMove(restoreFocusToControl, () => {
+      if (ticket === announcementTicket) announcement = outcome;
+    });
+  }
+
   $effect(() => {
     const outcome = String(outcomeAnnouncement || '');
     if (busy === true) {
       wasArmed = false;
       announcedOutcome = '';
-      announcement = '';
+      say('');
       return;
     }
     if (armed === true) {
       wasArmed = true;
       announcedOutcome = '';
-      announcement = armedAnnouncement;
+      say(armedAnnouncement);
       return;
     }
     if (outcome && outcome !== announcedOutcome) {
       announcedOutcome = outcome;
       wasArmed = false;
-      announcement = outcome;
-      // The confirm disabled the control, which moved focus to `document.body`; re-enabling
-      // it does not bring focus back, so the GM who is being told the delete was refused is
-      // told it from nowhere in particular. Deferred past this flush because the control is
-      // re-enabled in the same one and `focus()` on a still-disabled button does nothing.
-      //
-      // ONLY WHEN FOCUS IS ACTUALLY NOWHERE (issue 1157). The restore was unconditional, so
-      // a GM who tabbed into the browser's search field while the write was in flight was
-      // yanked back out of it by its result. `<body>` is where the disable left them and is
-      // the only state worth rescuing; anything else is a place they chose.
-      queueMicrotask(() => {
-        if (typeof document !== 'undefined') {
-          const active = document.activeElement;
-          if (active && active !== document.body && active.isConnected !== false) return;
-        }
-        control?.focus?.();
-      });
+      speakOutcome(outcome);
       return;
     }
     if (outcome) return;
     announcedOutcome = '';
     const cancelled = wasArmed === true;
     wasArmed = false;
-    announcement = cancelled ? disarmedAnnouncement : '';
+    say(cancelled ? disarmedAnnouncement : '');
   });
 
   // Spread, following `BulkEditPanelShell`'s hook idiom: the attribute NAME is a parameter, so

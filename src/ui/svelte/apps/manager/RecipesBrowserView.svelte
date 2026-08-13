@@ -430,8 +430,14 @@
   what the breadcrumb and the titlebar's gold system badge already said.
 -->
 <main class="manager-main" aria-label={text('FABRICATE.Admin.Manager.Nav.Recipes', 'Recipes')}>
+  <!-- `tabindex="-1"` makes this landmark a FOCUS TARGET without making it a tab stop
+       (issue 1157) — see the twin note in `EssenceBrowserView`. The manager root lands the
+       keyboard here when an action empties the bulk selection and unmounts the panel that
+       was acted on, addressing it through `data-recipe-toolbar`. -->
   <section
     class="manager-toolbar manager-recipe-toolbar"
+    tabindex="-1"
+    data-recipe-toolbar
     aria-label={text('FABRICATE.Admin.Manager.Recipe.Filters', 'Recipe filters')}
   >
     <div class="manager-recipe-filter-row">
