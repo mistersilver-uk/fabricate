@@ -267,7 +267,8 @@ describe('recipe bulk edit model — countRecipeBookMembership', () => {
   // would disable Remove for a book the GM can see on every one of those rows.
   //
   // The rows below are what `_buildRecipeList` projects for such a system:
-  // `recipeItemIds` comes from `_recipeItemDefinitionsContaining`, which IS basis-aware.
+  // `recipeItemIds` comes from `recipeItemDefinitionsContaining` (`utils/recipeItemMembership.js`),
+  // which takes the basis as a parameter and is therefore basis-aware.
   // `tests/recipe-book-membership-basis.test.js` proves that projection against a real
   // legacy-basis store; this case proves the counter reads it rather than the definition.
   it('reads each row\'s basis-aware recipeItemIds, never a definition\'s own recipeIds', () => {
