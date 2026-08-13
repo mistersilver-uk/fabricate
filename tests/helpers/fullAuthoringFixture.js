@@ -119,6 +119,12 @@ export function buildFullAuthoringFixture() {
     craftingCheck: {
       enabled: true,
       simple: { rollFormula: '1d20 + @abilities.med.mod', dc: 14 },
+      // Issue 1098. NON-DEFAULT on every activity: the read-time default is `perRecord`,
+      // so a fixture authoring it would be no oracle at all — a normalizer that dropped
+      // the key entirely would round-trip identically. The three checks deliberately
+      // carry DIFFERENT values so a normalizer emitting one activity's policy onto
+      // another (three whitelist rebuilds, one shared derivation) is visible too.
+      failureResultPolicy: 'always',
       defaultModifierPolicy: 'bySubject',
       defaultModifierIds: ['mod-medicine'],
       maxModifierPicks: 2,
@@ -126,6 +132,13 @@ export function buildFullAuthoringFixture() {
     salvageCraftingCheck: {
       enabled: true,
       simple: { rollFormula: '1d20', dc: 12 },
+      failureResultPolicy: 'never',
+      // Salvage's failure CONSUMPTION block, persisted since 1.7.0 and — until issue
+      // 1098 — reachable from no editor and projected nowhere. Both values are the
+      // NON-DEFAULT one: `consumeComponentOnFail` defaults TRUE via `!== false`, so a
+      // dropped field is INVERTED rather than merely absent, and `breakToolsOnFail`
+      // defaults FALSE.
+      consumption: { consumeComponentOnFail: false, breakToolsOnFail: true },
       defaultModifierPolicy: 'highest',
       defaultModifierIds: ['mod-medicine', 'mod-alchemy'],
       maxModifierPicks: 1,
@@ -133,6 +146,7 @@ export function buildFullAuthoringFixture() {
     gatheringCraftingCheck: {
       enabled: true,
       routed: { rollFormula: '1d20', dc: 12 },
+      failureResultPolicy: 'always',
       defaultModifierPolicy: 'bySubject',
       defaultModifierIds: ['mod-alchemy'],
       maxModifierPicks: 3,
@@ -427,6 +441,27 @@ export const REQUIRED_FIXTURE_FEATURES = Object.freeze([
           Number.isInteger(check.maxModifierPicks)
         );
       }),
+  ],
+  // ── issue 1098: the failure-result policy and salvage's failure consumption ───────
+  [
+    'all THREE activity checks carry a NON-DEFAULT failureResultPolicy',
+    (f) =>
+      ['craftingCheck', 'salvageCraftingCheck', 'gatheringCraftingCheck'].every((key) => {
+        const policy = (f.system[key] ?? {}).failureResultPolicy;
+        // `perRecord` is the read-time default, so it is not an oracle: a normalizer
+        // that dropped the key would produce it and this predicate would still pass.
+        return policy === 'never' || policy === 'always';
+      }),
+  ],
+  [
+    'salvage authors BOTH failure-consumption flags at their non-default values',
+    (f) => {
+      const consumption = (f.system.salvageCraftingCheck ?? {}).consumption ?? {};
+      // `consumeComponentOnFail` defaults TRUE (`!== false`), so `false` is the only
+      // value that catches a projection or normalizer dropping it; `breakToolsOnFail`
+      // defaults FALSE, so `true` is.
+      return consumption.consumeComponentOnFail === false && consumption.breakToolsOnFail === true;
+    },
   ],
   [
     'a component authors an EMPTY salvage check-modifier pick',

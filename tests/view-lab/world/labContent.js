@@ -2566,6 +2566,13 @@ function systemRules(eventVisibility) {
 const SIMPLE_CHECK = Object.freeze({
   enabled: true,
   consumption: { consumeIngredientsOnFail: false, breakToolsOnFail: false },
+  // AUTHORED, not left absent (issue 1098). The `1.25.0` migration seeds `never` onto every
+  // check block it finds without one, and the lab boots the REAL runner over these fixtures
+  // with no `migrationVersion` — so every migration runs on every lab build and an absence
+  // here would be photographed as the seeded value rather than the authored one
+  // (`tests/view-lab-world-migration.test.js` fails the build for exactly that). This is the
+  // read-time default stated explicitly: the value a system created after the upgrade gets.
+  failureResultPolicy: 'perRecord',
   simple: { rollFormula: '1d20 + @abilities.int.mod', thresholds: { success: 12 } },
 });
 
@@ -2589,6 +2596,11 @@ const SIMPLE_CHECK = Object.freeze({
 const SMITHING_CHECK = Object.freeze({
   enabled: true,
   consumption: { consumeIngredientsOnFail: false, breakToolsOnFail: false },
+  // THE NON-DEFAULT SELECTION, and the only system that carries it (issue 1098). A frame of
+  // the On-failure section is only evidence that the control reflects persisted state if at
+  // least one world system selects something other than the default, so this is the world's
+  // `never` — a failed forging produces nothing at all.
+  failureResultPolicy: 'never',
   simple: {
     rollFormula: '1d20 + @abilities.int.mod',
     thresholds: { success: 12 },
@@ -2808,6 +2820,11 @@ const TIDEWRACK_RECIPES = [
 const ROUTED_CHECK = Object.freeze({
   enabled: true,
   consumption: { consumeIngredientsOnFail: true, breakToolsOnFail: false },
+  // `always` (issue 1098, decision 7), and this is the world's ONE permitting routed check.
+  // It is what makes the `rw-ruined` failure tier below ASSIGNABLE in the recipe editor's
+  // result-group card: under `never` the picker offers success tiers only, so the frame that
+  // proves decision 7 could not exist. A failed rune-cut yields ruined stock.
+  failureResultPolicy: 'always',
   routed: {
     type: 'relative',
     rollFormula: '1d20 + @abilities.int.mod',
@@ -2883,7 +2900,18 @@ const ROUTED_CHECK = Object.freeze({
  */
 const ROUTED_SALVAGE_CHECK = Object.freeze({
   enabled: true,
-  consumption: { consumeIngredientsOnFail: true, breakToolsOnFail: false },
+  // SALVAGE'S OWN consumption keys, which are NOT crafting's (issue 1098). The two
+  // `consumeIngredientsOnFail`/`breakToolsOnFail` values below were the crafting spelling and
+  // the salvage normalizer never read them; `consumeComponentOnFail` is the salvage key, it
+  // defaults TRUE, and `false` is therefore the only value a frame can prove was persisted
+  // rather than defaulted. The Salvage On-failure section is these two controls' FIRST
+  // authoring surface.
+  consumption: {
+    consumeIngredientsOnFail: true,
+    breakToolsOnFail: true,
+    consumeComponentOnFail: false,
+  },
+  failureResultPolicy: 'always',
   routed: {
     type: 'relative',
     rollFormula: '1d20 + @abilities.int.mod',
@@ -2914,6 +2942,7 @@ const ROUTED_SALVAGE_CHECK = Object.freeze({
 const PROGRESSIVE_SALVAGE_CHECK = Object.freeze({
   enabled: true,
   consumption: { consumeIngredientsOnFail: false, breakToolsOnFail: false },
+  failureResultPolicy: 'perRecord',
   progressive: {
     rollFormula: '1d20 + @abilities.int.mod',
     thresholds: { success: 10 },
@@ -3131,6 +3160,7 @@ const RUNEWORK_CHECK_MODIFIERS = Object.freeze([
 const PROGRESSIVE_CHECK = Object.freeze({
   enabled: true,
   consumption: { consumeIngredientsOnFail: false, breakToolsOnFail: false },
+  failureResultPolicy: 'perRecord',
   progressive: {
     // The formula carried the retired check-modifier placeholder until issue 1094, because
     // `CraftingEngine._buildInteractiveModifierChoice` used to gate the `playerPicks` prompt on
@@ -3254,6 +3284,10 @@ const PROGRESSIVE_CHECK = Object.freeze({
  * `manager-checks-gathering-modifiers` exists to photograph.
  */
 const HERBALISM_GATHERING_CHECK = Object.freeze({
+  // Authored even though gathering's whole failure-result path ships DORMANT pending issue
+  // 683 (decision 8): the gathering On-failure section renders this control beside the
+  // dormancy notice, so the frame has to photograph a persisted value.
+  failureResultPolicy: 'perRecord',
   defaultModifierPolicy: 'addAll',
   defaultModifierIds: ['hb-mod-nature', 'hb-mod-tools'],
 });

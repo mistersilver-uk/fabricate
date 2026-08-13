@@ -1570,10 +1570,62 @@ threshold/outcome-tier configuration) drives resolution:
 4. A failing tier, or no tier name, takes the failure path.
 5. A succeeding tier name must match exactly one `ResultGroup.name` under
    trim-normalized, case-insensitive comparison; the matched group is awarded.
-6. If a succeeding tier name matches no result group, the attempt resolves to a
-   terminal failure (no group is awarded).
+6. If a succeeding tier name matches no result group, the attempt resolves to the
+   MISCONFIGURED disposition `ROUTED_TIER_UNROUTED`, not to a terminal failure.
+   Gathering routes by NAME, so renaming a tier on the system silently unroutes every
+   task whose groups were named for the old tier; reporting it as misconfigured surfaces
+   the drift on the first roll and — because a misconfigured outcome becomes a blocked
+   start before any commit — costs the player nothing.
+   **A misconfigured outcome never participates in failure awarding** (issue 1098): under
+   `always` the stale "terminal failure" reading would have turned authoring drift into
+   failure loot.
 7. A routed task with no system routed `rollFormula` reports a GM-fix-required
    misconfiguration diagnostic and does not resolve.
+
+### Failure-Result Path
+
+`gatheringCraftingCheck.failureResultPolicy` governs whether a failed gathering check may
+produce a result, and gathering has the path that makes it meaningful:
+`_resolveRoutedFormulaOutcome` carries a matched FAILURE tier's result group through
+instead of returning bare.
+
+**The award gate is MIRRORED, and BOTH halves are policy-gated together.**
+`_terminalSideEffectPlan` carries an `outcome.status === 'succeeded'` gate around result
+PLANNING and `_commitTerminalSideEffects` carries the identical gate around result
+CREATION; both run in sequence on both flows, and the plan's `createdResults` is what
+feeds the run record, the API response and the chat card.
+Gating only the commit half creates items on the actor that the run record, the response
+and the chat card all report as zero — a state an item-count-only assertion cannot detect.
+
+**Four dispositions never participate in failure awarding, whatever the policy:**
+
+1. A `failureOnBreak`-flipped attempt — the tool-breakage realm rule sets
+   `status = 'failed'` and clears `resultGroups`.
+   That is a VOIDED SUCCESS, not an authored failure.
+2. A `null` outcome name — a fixed-tier total outside every authored range.
+   There is no tier, so there is no authored failure output to select.
+3. A `ROUTED_TIER_UNROUTED` misconfigured outcome (item 6 above).
+4. Every `d100` outcome.
+   The d100 resolver's `failureWithEvent` policy returns a failed outcome that still
+   carries its matched drop rows, so only the routed failure seam's own opt-in marker —
+   never the presence of groups — admits an outcome to this path.
+
+Gathering has no consumption block and gains none; `task.failureOutcome` dispatches
+through `_applyFailureFeedback` exactly as before and **is emitted by ALL THREE
+gathering-task rebuilds** — both library whitelist rebuilds AND the engine-facing runtime
+task builder — where it was emitted by none, so the field was unpersisted AND unread at
+roll time.
+The Checks Studio's gathering On-failure section cross-references it read-only.
+The `d100` branch is untouched.
+
+**THE WHOLE PATH SHIPS DORMANT.** `_libraryTaskToRuntimeTask` hardcodes
+`resolutionMode: 'd100'` and synthesizes a single result group, and `GatheringEconomyView`
+renders `progressive` and `routed` disabled — both pending issue 683 — so no configuration
+a GM can select reaches this path today.
+The persisted shape, all three rebuilds, the projection and the UI land now, and the
+On-failure section renders the same inert notice `d100` gets on Modifiers, **naming that
+reason**.
+The capability activates when 683 lands.
 
 ### Reserved Keywords
 

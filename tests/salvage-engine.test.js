@@ -2503,3 +2503,208 @@ test('salvage(): a genuine no-result success carries NO waiting flag', async () 
   assert.equal(result.waiting, undefined);
   assert.deepEqual(result.results, [], 'it resolved; it just had nothing to award');
 });
+
+// ---------------------------------------------------------------------------
+// Group 8 (issue 1098): the FAILURE AWARD — a capability salvage never had.
+//
+// Until this issue `salvage()` returned inside `if (!checkResult.success)` BEFORE
+// `_resolveSalvageResultGroups`, so a failed salvage awarded nothing whatever a component
+// authored. Two canonical statements and one in-code comment said that was deliberate;
+// all three are retracted, and this group is what makes the retraction checkable.
+//
+// EVERY TEST HERE DRIVES `salvage()`, never `_resolveSalvageResultGroups` alone. The
+// resolver could select the right group and the branch still report an empty award on
+// three separate seams — the run record, the chat card and the return value — and a
+// resolver-level test cannot see any of them.
+// ---------------------------------------------------------------------------
+
+/** A component whose CLAMPED groups are [success, failure] — CF1's trap, exactly. */
+function makeFailureAwardComponent() {
+  return makeComponent({
+    name: 'Test Component',
+    resultGroups: [
+      {
+        id: 'rg-success',
+        name: 'Scraps',
+        results: [{ id: 'r-success', componentId: 'success-comp', quantity: 1 }],
+      },
+      {
+        id: 'rg-failure',
+        role: 'failure',
+        name: 'Ruined scraps',
+        results: [{ id: 'r-failure', componentId: 'failure-comp', quantity: 1 }],
+      },
+    ],
+  });
+}
+
+function makeFailureAwardSetup(failureResultPolicy) {
+  const fakeResolutionService = {
+    validateSalvage: () => ({ valid: true, errors: [] }),
+    resolveResultGroups: () => ({ groups: [], meta: {} }),
+  };
+  const engine = makeEngine({ resolutionModeService: fakeResolutionService });
+  engine._runSalvageCraftingCheck = async () => ({
+    success: false,
+    message: 'Roll failed',
+    outcome: 'fail',
+    value: 4,
+    data: {},
+  });
+  const compItem = makeItem('comp-item', 'Test Component', 1);
+  const actor = makeActor('actor-1', [compItem]);
+  const component = makeFailureAwardComponent();
+  const system = makeSystem({
+    // The two AWARDED components have to be in the library: `_createSingleResult` resolves
+    // a result's `componentId` against `system.components` and returns null when it cannot,
+    // so a fixture that omitted them would report "nothing was awarded" for the wrong reason.
+    components: [
+      component,
+      { id: 'success-comp', name: 'Scraps' },
+      { id: 'failure-comp', name: 'Ruined scraps' },
+    ],
+    salvageCraftingCheck: {
+      enabled: true,
+      failureResultPolicy,
+      progressive: null,
+      // Nothing is consumed and no tool breaks, so the ONLY thing this group can be
+      // observing is the award itself.
+      consumption: { consumeComponentOnFail: false, breakToolsOnFail: false },
+    },
+  });
+  system.features.chatOutput = true;
+  const salvageRunManager = setupGame(system, actor);
+  return { engine, actor, component, system, salvageRunManager };
+}
+
+test('salvage(): a failed check under always awards the reserved failure group, never the success one', async (t) => {
+  captureSalvageChat(t);
+  const { engine, actor, component, system } = makeFailureAwardSetup('always');
+
+  const result = await engine.salvage(actor.uuid, system.id, component.id);
+
+  assert.equal(result.success, false, 'it is still a FAILED salvage');
+  // CF1's trap, asserted directly. `resultGroups[0]` is the SUCCESS group by the
+  // `_normalizeSalvage` retain-one clamp, so an index-based selection — which is exactly
+  // what `slice(0, 1)` would have produced — awards the full success salvage output on a
+  // failed check. The NAMES distinguish the two: a length-only assertion cannot.
+  assert.equal(actor.createdItems.length, 1, 'exactly one item was awarded');
+  assert.equal(
+    actor.createdItems[0].name,
+    'Ruined scraps',
+    'the FAILURE group was awarded, selected by role rather than by index'
+  );
+});
+
+test('salvage(): the failure award is reported on the return value, the run record AND the chat card', async (t) => {
+  const created = captureSalvageChat(t);
+  const { engine, actor, component, system } = makeFailureAwardSetup('always');
+
+  const result = await engine.salvage(actor.uuid, system.id, component.id);
+
+  // 1. THE RETURN VALUE — what the bulk-salvage surfaces read. A null here would report
+  //    "produced nothing" to every caller while items sat on the actor.
+  assert.ok(Array.isArray(result.results), 'results is an array, not null');
+  assert.equal(result.results.length, 1);
+
+  // 2. THE RUN RECORD — it persists into the actor's Fabricate run-container flag, so an
+  //    empty `createdResults` beside real items is a DURABLE contradiction, not a gap.
+  const failed = result.salvageRun;
+  assert.equal(failed.status, 'failed', 'the run completed as failed');
+  assert.equal(failed.createdResults.length, 1, 'the award is in the run record');
+  assert.equal(
+    failed.createdResults[0].componentId,
+    'failure-comp',
+    'in the SUCCESS branch shape — carrying the component id, not just a uuid'
+  );
+
+  // 3. THE RENDERED CHAT CARD, read as HTML rather than as the arguments passed to the
+  //    poster. `buildResultCard`'s failure branch built its sections from `model.consumed`
+  //    and `model.tools` ONLY and never read `model.results`, so a threaded award rendered
+  //    as nothing — an argument-level assertion passes on a card that shows nothing.
+  const card = created.find((payload) => String(payload.content).includes(SALVAGE_CARD_MARKUP));
+  assert.ok(card, 'the salvage card was posted');
+  assert.match(String(card.content), /Ruined scraps/, 'the failure card renders the awarded item');
+});
+
+test('salvage(): a failed check under never awards nothing and posts the card it always posted', async (t) => {
+  const created = captureSalvageChat(t);
+  const { engine, actor, component, system } = makeFailureAwardSetup('never');
+
+  const result = await engine.salvage(actor.uuid, system.id, component.id);
+
+  assert.equal(result.results, null, 'the return value is byte-for-byte the pre-1098 one');
+  assert.equal(actor.createdItems.length, 0, 'nothing was created on the actor');
+  assert.equal(result.salvageRun.status, 'failed');
+  assert.deepEqual(result.salvageRun.createdResults, []);
+  const card = created.find((payload) => String(payload.content).includes(SALVAGE_CARD_MARKUP));
+  assert.ok(!String(card.content).includes('Ruined scraps'), 'and the card shows no award');
+});
+
+test('salvage(): always on a component authoring NO failure group produces nothing', async (t) => {
+  captureSalvageChat(t);
+  const { engine, actor, component, system } = makeFailureAwardSetup('always');
+  // The policy SELECTS an authored failure output; it never fabricates one.
+  component.salvage.resultGroups = component.salvage.resultGroups.filter(
+    (group) => group.role !== 'failure'
+  );
+
+  const result = await engine.salvage(actor.uuid, system.id, component.id);
+
+  assert.equal(result.results, null);
+  assert.equal(actor.createdItems.length, 0, 'and emphatically not the success group');
+});
+
+test('_resolveSalvageResultGroups: the disposition argument selects by ROLE on failure and by INDEX on success', () => {
+  const engine = makeEngine();
+  const component = makeFailureAwardComponent();
+  const system = makeSystem({ salvageResolutionMode: 'simple' });
+
+  // The DEFAULT is byte-for-byte the pre-1098 behaviour, for every existing caller.
+  assert.deepEqual(
+    engine._resolveSalvageResultGroups(component, system, null).map((group) => group.id),
+    ['rg-success']
+  );
+  assert.deepEqual(
+    engine
+      ._resolveSalvageResultGroups(component, system, null, null, 'failure')
+      .map((group) => group.id),
+    ['rg-failure']
+  );
+
+  // No reserved group authored → nothing, rather than the success group at index 0.
+  const successOnly = makeComponent({
+    resultGroups: [{ id: 'rg-success', name: 'Scraps', results: [] }],
+  });
+  assert.deepEqual(
+    engine._resolveSalvageResultGroups(successOnly, system, null, null, 'failure'),
+    []
+  );
+
+  // Progressive has one success group against a budget and no tier to mark, so a failure
+  // selects nothing whatever the policy says.
+  const progressiveSystem = makeSystem({ salvageResolutionMode: 'progressive' });
+  assert.deepEqual(
+    engine._resolveSalvageResultGroups(component, progressiveSystem, { value: 99 }, null, 'failure'),
+    []
+  );
+});
+
+test('_resolveSalvageResultGroups: routed selects the FAILING tier name through outcomeRouting', () => {
+  const engine = makeEngine();
+  const component = makeComponent({
+    resultGroups: [
+      { id: 'rg-good', name: 'Good', results: [] },
+      { id: 'rg-ruined', name: 'Ruined', results: [] },
+    ],
+  });
+  component.salvage.outcomeRouting = { Masterwork: 'rg-good', Ruined: 'rg-ruined' };
+  const system = makeSystem({ salvageResolutionMode: 'routed' });
+
+  assert.deepEqual(
+    engine
+      ._resolveSalvageResultGroups(component, system, { outcome: 'Ruined' }, null, 'failure')
+      .map((group) => group.id),
+    ['rg-ruined']
+  );
+});

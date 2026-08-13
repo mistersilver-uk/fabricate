@@ -1688,6 +1688,85 @@ export const VIEW_LAB_CASES = Object.freeze([
     ],
   }),
   managerCase({
+    id: 'manager-components-bulk-delete-idle',
+    label: 'Manager — Components bulk delete idle',
+    reaches: 'beyond',
+    smokeLabels: [],
+    // The UNARMED face of the set delete (issue 1129), and the frame that actually
+    // photographs the impact statement.
+    //
+    // The bulk-edit cases above do NOT photograph it "for free". The delete card sits below
+    // the panel shell and below the sticky Apply dock, which puts it under the rail's fold at
+    // the registry's 1280x820 position — measured on the published
+    // `manager-components-bulk-edit-unstaged` frame, where the rail ends at the essence grid
+    // and the card is simply absent. The armed case only shows it because CLICKING the button
+    // scrolls it into view, and that frame shows the armed state by definition.
+    //
+    // Hence the explicit `scroll` step: `frame.screenshot()` does not scroll nested overflow
+    // containers, so without it the card is out of frame while every assertion still passes.
+    //
+    // `sm-iron-ingot` is selected on PURPOSE, and the choice is load-bearing. Through the real
+    // describer the lab fixture yields 7 recipes rewritten and 3 of them disabled, so this is
+    // the only frame in the registry that photographs the DISABLED row at all — the armed twin
+    // below selects iron+copper ore, which computes 2 / 1 / 0 and therefore photographs the
+    // zero-gating instead. Between the two, every branch of the impact list has a frame.
+    // Selecting an ore here as well would leave the card's most consequential sentence, and the
+    // one this round rewrote, with no visual evidence anywhere.
+    query: {},
+    steps: [
+      'Components',
+      { selector: 'label:has(input[data-component-select="sm-iron-ingot"])' },
+      { selector: '[data-component-bulk-delete-card]', scroll: true },
+    ],
+    expectView: 'components',
+    // UNARMED is the state under test, and `data-armed="false"` is what separates this frame
+    // from its armed twin below — an `expectSelector` naming only the card would pass on
+    // either.
+    expectSelector: '.fabricate-manager [data-arm-token="delete-components"][data-armed="false"]',
+    kinds: ['manager', 'components'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/Component/,
+      /^src\/ui\/svelte\/apps\/manager\/components?\//,
+      /^src\/utils\/recipeComponentReferences\.js$/,
+      BULK_EDIT_CHROME_PATTERN,
+    ],
+  }),
+  managerCase({
+    id: 'manager-components-bulk-delete-armed',
+    label: 'Manager — Components bulk delete armed',
+    reaches: 'beyond',
+    smokeLabels: [],
+    // The ARMED half of the set delete (issue 1129), the twin of
+    // `manager-essences-bulk-delete-armed`. The first click only ARMS, so this frame shows
+    // `Confirm delete` beside the impact statement it is a confirmation OF, with nothing
+    // written.
+    //
+    // Two frames rather than one because the two states are the point: the idle sibling
+    // directly above shows the impact statement rendered BEFORE arming, and this one shows
+    // that the arm is a second, separate act. Either frame alone would leave half of the
+    // pairing — statement plus arm — unphotographed.
+    query: {},
+    steps: [
+      'Components',
+      { selector: 'label:has(input[data-component-select="sm-iron-ore"])' },
+      { selector: 'label:has(input[data-component-select="sm-copper-ore"])' },
+      // The BUTTON, not the card: `ArmedDangerButton` stamps `data-arm-token` on the control
+      // it arms, so this cannot drift onto a wrapper the way a class selector could.
+      { selector: '[data-arm-token="delete-components"]' },
+    ],
+    expectView: 'components',
+    // Armed is a STATE, and a frame that merely re-photographed the idle button would be
+    // indistinguishable from the bulk-edit case above.
+    expectSelector: '.fabricate-manager [data-arm-token="delete-components"][data-armed="true"]',
+    kinds: ['manager', 'components'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/Component/,
+      /^src\/ui\/svelte\/apps\/manager\/components?\//,
+      /^src\/utils\/recipeComponentReferences\.js$/,
+      BULK_EDIT_CHROME_PATTERN,
+    ],
+  }),
+  managerCase({
     id: 'manager-components-bulk-edit-unstaged',
     label: 'Manager — Components bulk edit unstaged',
     smokeLabels: ['manager-components-bulk-edit-unstaged'],
@@ -2050,6 +2129,94 @@ export const VIEW_LAB_CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/checks\//,
       /^src\/ui\/svelte\/apps\/manager\/.*Check/,
+    ],
+  }),
+  managerCase({
+    id: 'manager-checks-salvage-on-failure',
+    label: 'Manager — Checks salvage on failure',
+    // BEYOND the smoke, and beyond every previous build: this SECTION HAS NEVER EXISTED.
+    // Until issue 1098 the salvage route's On-failure section rendered the shared "nothing
+    // to set here" empty state, which was true of the screen and false of the data —
+    // `consumeComponentOnFail` and `breakToolsOnFail` have been persisted since 1.7.0 and
+    // were reachable from no editor at all.
+    //
+    // `lab-runework` is the system that authors BOTH of them at their non-default values
+    // (`consumeComponentOnFail: false`, `breakToolsOnFail: true`), so the frame photographs
+    // persisted state rather than two defaults, and its salvage policy is `always`.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-runework' },
+    steps: [
+      'Checks',
+      { selector: '#manager-checks-nav-salvage' },
+      { selector: '#checks-section-on-failure' },
+    ],
+    expectView: 'checks-salvage',
+    expectSelector:
+      '.fabricate-manager [data-failure-result-policy="salvage"]' +
+      ' ~ [data-salvage-failure-consumption]',
+    kinds: ['manager', 'checks'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/checks\//,
+      /^src\/ui\/svelte\/apps\/manager\/.*Check/,
+    ],
+  }),
+  managerCase({
+    id: 'manager-checks-gathering-on-failure',
+    label: 'Manager — Checks gathering on failure',
+    // The activity that renders the policy and NO consumption toggles, because it has no
+    // consumption block — plus the dormancy notice naming issue 683 and the read-only
+    // `task.failureOutcome` cross-reference in its no-record state. The absence of the
+    // toggles is the subject as much as the presence of the policy, and an absence is only
+    // judgeable from a photograph.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-herbalism' },
+    steps: [
+      'Checks',
+      { selector: '#manager-checks-nav-gathering' },
+      { selector: '#checks-section-on-failure' },
+    ],
+    expectView: 'checks-gathering',
+    expectSelector:
+      '.fabricate-manager [data-checks-panel="gathering"]' +
+      ':has([data-failure-result-policy="gathering"])' +
+      ':has([data-gathering-failure-dormant])' +
+      ':has([data-gathering-failure-outcome-empty])' +
+      ':not(:has([data-salvage-failure-consumption]))' +
+      ':not(:has([data-failure-consumption]))',
+    kinds: ['manager', 'checks'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/checks\//,
+      /^src\/ui\/svelte\/apps\/manager\/.*Check/,
+    ],
+  }),
+  managerCase({
+    id: 'manager-recipe-edit-results-failure-tier',
+    label: 'Manager — Recipe edit results failure tier',
+    // DECISION 7, and the only frame of it: a routed-by-check recipe's result-group card
+    // offering a FAILURE-MARKED outcome tier, which is reachable only because
+    // `lab-runework`'s crafting check authors `failureResultPolicy: 'always'`. Under the
+    // `never` every other routed system would carry, the picker offers success tiers only
+    // and this frame would be indistinguishable from `coverage-mode-routed-check-results`.
+    //
+    // The selector names `rw-ruined` — the world's one `success: false` tier —
+    // rather than counting options, because a count would pass on three success tiers.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-runework' },
+    steps: [
+      'Crafting',
+      { selector: '.manager-icon-button[aria-label^="Edit"]' },
+      { selector: '#recipe-tab-results' },
+      { selector: '[data-recipe-add="routing-option"]' },
+    ],
+    expectView: 'recipe-edit',
+    kinds: ['manager', 'recipes', 'resolution-mode'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/recipe\//,
+      /^src\/systems\/ResolutionModeService\.js$/,
+      /^src\/utils\/routedOutcomeKeywords\.js$/,
     ],
   }),
   managerCase({
@@ -5429,33 +5596,31 @@ export const VIEW_LAB_CASES = Object.freeze([
   //
   // So light differs from dark in the window header bar, and that is what this pair covers.
   //
-  // What it does NOT cover is a heading-colour leak, and the mechanism is INHERITANCE rather than
-  // per-component colours — do not restate it as "the components set their own". Neither headline
-  // heading declares a `color` at all: the manager's `h2.manager-title` comes from
-  // `src/ui/svelte/apps/manager/SystemsBrowserView.svelte`, which has no `<style>` block, and no
-  // `.manager-title` rule in `styles/fabricate.css` sets `color`; the player's
-  // `h2.crafting-detail-name` comes from `src/ui/svelte/apps/crafting/RecipeDetailHeader.svelte`,
-  // whose scoped rule sets size and truncation only. Each inherits its colour from a Fabricate
-  // ancestor INSIDE `.window-content`, which is closer to the heading than anything core puts on
-  // the window frame or the body. For the manager that ancestor is the root itself,
-  // `.fabricate-manager`. For the player the shell root `.fabricate-app-shell` in
-  // `src/ui/svelte/apps/FabricateAppRoot.svelte` sets `color: var(--fab-text)` for every tab, and
-  // in this frame a nearer rule — `.crafting-view-grid` in
-  // `src/ui/svelte/apps/crafting/CraftingView.svelte` — re-declares the same value, so either one
-  // would do the job. Do not assume the shell root is the NEAREST colour source on the player
-  // side — on this tab it is not — so chase a heading-colour leak by walking the chain from the
-  // heading up, rather than by editing the shell and waiting for something to move.
+  // It also covers a heading-colour leak, which it did not when this comment was first written.
+  // The paragraph here used to say the mechanism was INHERITANCE and that the leak lived "on the
+  // surfaces no Fabricate root colour reaches". That reading was wrong, and it was wrong in the
+  // direction that hides the defect: it sent a reader up the ancestor chain looking for a missing
+  // Fabricate colour, when nothing up that chain was missing one. Both headline headings did
+  // inherit `--fab-text` correctly, and both still rendered `#111111`.
   //
-  // NOT VERIFIED: whether core also sets a `color` on the heading ELEMENT (`h1`–`h6`) under
-  // `theme-light`. Proximity is no defence against that — a rule matching the heading itself
-  // beats an ancestor's inherited value — so such a heading would leak here. A plain checkout
-  // has no `foundry2.css` to read (the `.foundry-chrome` cache is populated only by an explicit
-  // harvest, see `scripts/lib/foundryChromeCache.js`), which is also why reason 2 above is an
-  // older probe rather than something re-checked on every change. Harvest the chrome and grep
-  // `css/foundry2.css` for a heading-element `color` under the light theme to settle both.
+  // The `NOT VERIFIED` note that followed it asked the right question, and the answer is yes.
+  // Core's `@layer elements.typography` sets `color` on the heading ELEMENT — `h1`/`h2` take
+  // `--color-text-emphatic`, `h3` takes `--color-text-primary` — and a declaration matching the
+  // element beats an inherited value from any ancestor, however near. Under `theme-light` those
+  // resolve to `--color-dark-1`/`--color-dark-2`, so the headings went dark-on-dark. Core ships
+  // an antidote (`body.game .app h1,…,h6 { color: inherit }`) but scopes it to the ApplicationV1
+  // `.app` class, which no Fabricate window carries.
   //
-  // Either way, do not read these frames as proof the leak is gone. Issue 972 owns it, and it
-  // lives on the surfaces no Fabricate root colour reaches.
+  // Issue 972 fixed that with a `.fabricate :where(.window-content) h1,…,h6` normalization in
+  // `styles/fabricate.css`, so these two frames now guard a cascade that is actually correct.
+  // What makes them worth keeping is that they are still the only frames rendered under
+  // `theme-light`: the normalization is what stops core's theme reaching a heading, and if it
+  // regresses, this pair is where it shows.
+  //
+  // The general lesson survives its wrong example. When a Fabricate surface takes a Foundry
+  // colour, check for a rule matching the ELEMENT before walking the ancestor chain — proximity
+  // is no defence, and an ancestor that looks correct proves nothing about what the element
+  // itself matched.
   playerCase({
     id: 'coverage-theme-light-player',
     label: 'Coverage — player app in Foundry light-theme chrome, dark Fabricate surfaces',

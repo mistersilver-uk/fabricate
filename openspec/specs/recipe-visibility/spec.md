@@ -444,6 +444,19 @@ Learned entries are therefore INDEPENDENT of currently-owned copies, and a surfa
 A UI surfacing learned knowledge MUST resolve the source display name through the recipe's **member recipe-item definition** when the copy is gone.
 The full ladder is: a still-owned copy's name, else the member definition's name rendered as "no longer owned", else the trailing uuid segment, else a "learned by crafting" statement for the `null` `sourceItemUuid` every `learnRecipeOnCraft` entry carries.
 
+### Recipe And System Id Constraint
+
+A **recipe id** is a durable-flag MAP KEY: it is interpolated into the per-actor `learnedRecipes` and `discoveryProgress` maps, which are written through a flattened `Document#update` path where every dot separates an object segment.
+A **crafting-system id** is one for the same reason (`roles.<systemId>.componentId` and its `toolId` / `recipeItemDefinitionId` siblings).
+
+Both MUST therefore satisfy `isSafeFlagKeySegment` (`/^[A-Za-z0-9_-]+$/`) and are refused **at intake**, loudly, naming the offending id: `RecipeManager.createRecipe` for a recipe and `CraftingSystemManager.createSystem` for a system.
+`foundry.utils.randomID()` always satisfies the pattern, so the constraint can only fire for an imported or hand-authored id; the compendium importer already isolates a per-recipe failure into its import report.
+Neither id is ever rewritten to make it safe — recipe books, Required Knowledge, learned entries, tools, and gathering config all reference these ids — so the only outcomes are acceptance and refusal.
+The edit paths cannot smuggle one past the guard: `updateRecipe` and `updateSystem` both pin the id to the record being updated and ignore any `id` in the payload.
+
+Refusal at intake is the **complete** fix for the nesting hazard described in Reading A Recipe-Id-Keyed Flag Map; reader-side repair is the best-effort half, for worlds that already carry such an id.
+Loading an existing world MUST NOT route through either guard — rehydration goes through `Recipe.fromJSON` and `_normalizeSystem`, never through the create paths — because retroactively refusing an id a previous version accepted would brick the affected world rather than repair it.
+
 ### Learn Prerequisite
 
 A recipe item's learn cap may name **Required Knowledge** (`caps.learn.prerequisiteIds`, a list of recipe ids, resolved per Recipe-Item Cap Resolution; folds a legacy single `caps.learn.prerequisite` string on normalize).
@@ -615,9 +628,11 @@ It is the shared mutation behind the GM reset API and the Knowledge surface's pe
 
 - Deletion is an explicit, reload-safe `-=` flag-key removal at the **full doubly-nested** path `Actor.flags.fabricate.fabricate.learnedRecipes.-=<recipeId>` (and, when clearing discovery, `Actor.flags.fabricate.fabricate.discoveryProgress.-=<recipeId>`), batched into a single `Actor#update`.
 It must NOT prune by rebuilding a filtered map through `setFlag` as the sole write — that merge never removes keys, so the entry resurrects on reload (the `deleteRemovedActiveRunFlags` doctrine); a shallow `flags.fabricate.learnedRecipes.-=<id>` silently no-ops.
-- Dotted (imported) recipe ids that `expandObject` would mis-split on `.` (`isSafeFlagKeySegment` is false) route to a **two-step delete-then-write fallback**: the parent key is dropped first (`await actor.update({ 'flags.fabricate.fabricate.-=learnedRecipes': null })`), then the retained map is re-written (`await _setLearnedMap(actor, retainedMap)`).
+- An id routes to a **two-step delete-then-write fallback** whenever a batched `-=<id>` key would destroy anything other than that id's own entry: the parent key is dropped first (`await actor.update({ 'flags.fabricate.fabricate.-=learnedRecipes': null })`), then the retained map is re-written (`await _setLearnedMap(actor, retainedMap)`).
 These are two sequential awaited operations, never one order-dependent update — `mergeObject`/`_migrateDeletionKey` may process the deletion after the insertion and wipe the whole map.
-The same two-step applies to `discoveryProgress` when clearing discovery and any scoped id is dotted.
+The same two-step applies to `discoveryProgress` when clearing discovery.
+Two conditions each force it, and the second is NOT the dotted-id case: the id is not a safe flag-key segment, so `-=<id>` cannot address it; **or** another entry nests inside it, because ids `a` and `a.b` share one persisted node and `-=a` is a well-formed key that removes recipe `a.b` along with it.
+The retained map is rebuilt from the **entry view** below, never by filtering `Object.entries` of the raw store against the cleared ids — that comparison puts nested first segments on one side and recipe ids on the other, matches nothing, and writes the just-deleted entry straight back.
 A retained entry whose own id contains a dot re-splits on the step-2 rewrite exactly as the original learn write did — a known fidelity limit of dotted retained ids, not an expandObject-safe guarantee.
 - `freeLearnBudget` defaults ON for the reset/erase grains (respec/amnesia must let the actor re-learn) and is passed OFF for the recipe-deletion cleanup path.
 When on, each cleared learned entry frees one consumed learn slot against a **still-held** source copy, reading its **current** `learnScope`: `perInstance` decrements the held item's `Item.flags.fabricate.recipeItemLearning.learnedCount`; `total` decrements the `recipeItemPartyLearnPool` key (a new GM-authoritative `decrement`, symmetric with `increment`, floored at 0, non-GM degrades safely).
@@ -630,6 +645,33 @@ The off-by-default `clearDiscovery` option also clears the recipe's discovery ke
 That asymmetry is deliberate and MUST be disclosed to the GM at the point the reset grain is chosen.
 Reset-one-system clears every learned entry whose recipe belongs to the system (via `getRecipe(id).craftingSystemId`) plus its scoped `discoveryProgress`, and **leaves orphan learned keys (unresolvable recipe) in place** — they cannot be attributed to a system.
 Reset-all-systems clears every learned key **including orphans**, plus every `discoveryProgress` entry.
+
+#### Reading a recipe-id-keyed flag map
+
+`learnedRecipes` and `discoveryProgress` are both keyed by recipe id, and NEITHER is persisted as the flat `{ id: entry }` object it is written as.
+`Document#update` dot-expands the whole nested **value tree** of an `ObjectField`, so an id containing a `.` is stored as a subtree: `{ 'imported.recipe.id': entry }` persists as `{ imported: { recipe: { id: entry } } }`.
+Both supported builds do this, by different routes — V14 inside the field (`ObjectField#_cleanType` → `SchemaField.expandObject`, recursing into every nested plain object) and V13 one level up (`DataModel#updateSource` replaces `changes` with `expandObject(changes)` whenever any top-level key contains a dot, and V13's `expandObject` re-splits keys at every depth).
+Fabricate always writes the dotted `flags.fabricate.fabricate.<key>` path, so the V13 guard always fires and the persisted shape is the same on both.
+
+Every reader of either map — the recipe-deletion cascade, the deletion primitive's existence check, its budget lookup, its retained-map rebuild, the per-system and reset-all id enumerations, and the GM panel's learner index — MUST derive ids from a shared **entry-boundary** reader rather than from the map's top level.
+Reading the top level yields a dotted id's FIRST SEGMENT, which names no recipe; the cascade therefore classified it as stale and issued `-=imported`, destroying every sibling entry under that segment whose recipe still existed.
+The panel-facing learner index and the cascade MUST agree on the ids they see, or the GM surface reports learners the mutation does not act on.
+
+The reader recognises an entry by its own **marker fields** — `learnedAt` / `sourceItemUuid` for learned entries, `progress` / `fragments` / `discoveredAt` / `manuallySet` for discovery entries — so it is parameterised on the shape rather than hard-coding one map's fields.
+Two alternatives are specifically excluded.
+`foundry.utils.flattenObject` is not the inverse of the expansion: it recurses to non-object leaves, so it yields `plainid.learnedAt` rather than `plainid`, no key reads as a recipe id, and every actor's whole map is deleted on any recipe deletion.
+Longest-prefix matching against the known recipe ids cannot find an **orphan** entry, whose id is by definition absent from that set — and orphans are the cascade's only input.
+A learned entry is therefore **scalar-only** by contract: a plain-object-valued field added to one would be walked as a nested recipe id and dropped from the entry view.
+
+Reader-side repair is explicitly **best-effort**, because the id → storage mapping is not injective and some inputs lose data before any reader runs:
+
+- Learning `a` and then `a.b` is recoverable — `a`'s fields are scalars and `b` is not, so entry-shape detection separates them.
+- Learning `a.b` and then `a` is **not**: writing `a` replaces the whole node and `a.b` is gone from storage.
+- Learning `a` and then `a.learnedAt` leaves both entries addressable but destroys recipe `a`'s own `learnedAt` timestamp, which the collision overwrote.
+The reader reports `a` without a `learnedAt` rather than presenting the colliding entry as `a`'s timestamp.
+
+The invariant this establishes is that **no surviving learner's entry is destroyed**, not that a dotted id round-trips normalized.
+The complete fix is at the write boundary (see Recipe And System Id Constraint), and repair exists for worlds that already carry such an id.
 
 ### GM-Only Knowledge Reset API
 
@@ -687,6 +729,8 @@ If `recipeItemDefinition.originItemUuid` no longer resolves to a template:
 - Remove corresponding learned entries from all actors.
 - The removal uses the explicit `-=` deletion primitive (`forgetLearnedRecipes`) called with `freeLearnBudget: false` — recipe deletion is content management, not an in-fiction un-learn, so it must not refund any consumed learn budget.
 `cleanupLearnedRecipes` is rerouted onto that primitive, fixing the prior filtered-map `setFlag` rebuild that MERGED and therefore never actually deleted the stale keys (they resurrected on reload).
+- The stale set is derived through the entry-boundary reader (see Reading A Recipe-Id-Keyed Flag Map), so deleting one recipe removes **only** that recipe's entry.
+An actor holding entries for several recipes whose ids share a leading segment keeps every entry whose recipe still exists, and an actor with no stale entry is not written to at all.
 
 ### Visibility Mode Change
 
@@ -695,6 +739,12 @@ If `recipeItemDefinition.originItemUuid` no longer resolves to a template:
 
 ## Testing Requirements
 
+- The document doubles backing these tests MUST expand the nested value tree — in the constructor seed, `setFlag`, and `update` alike — so a fixture written with a dotted id is stored in the shape Foundry really persists it in.
+Expanding only the write paths leaves the seed lying, and a double storing a dotted key verbatim reports a false pass for any code path that only exists to handle nesting.
+- Unit tests asserting a dotted id's persisted shape MUST assert it **post-reload**, against the nested storage, rather than against the update payload.
+- Unit tests that deleting one recipe forgets only its own entry, that siblings sharing a leading id segment survive, that an id which is a strict prefix of another resolves to the right entry in both deletion directions, and that the unrecoverable collisions are asserted as losses rather than silently mishandled.
+- A unit test that the panel-facing learner index counts a learner whose recipe id is dotted, agreeing with the deletion cascade.
+- Unit tests that a dotted recipe id and a dotted crafting-system id are refused at intake, and that a world already holding one still loads.
 - Unit tests for listing behaviour in `global`, `player`, and `knowledge` list modes.
 - Unit tests for matching by UUID and by `resolveSourceUuid` — covering both `_stats.compendiumSource` (v12+) and `flags.core.sourceId` (legacy fallback) independently.
 - Unit tests for limited-use exhaustion and deterministic matched-item selection.

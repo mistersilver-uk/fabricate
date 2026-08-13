@@ -28,7 +28,13 @@
      the owner's invariant — one token exists at a time).
    - idleLabel / armedLabel: button copy per state.
    - idleIcon / armedIcon: Font Awesome classes per state.
-   - idleAriaLabel / armedAriaLabel: consequence sentences per state.
+   - idleAriaLabel / armedAriaLabel: consequence sentences per state. Each MUST contain
+     its state's visible label, because WCAG 2.5.3 Label in Name makes a control whose
+     name omits the visible string unactivatable by speech input.
+   - describedBy: OPTIONAL id of an element describing the consequence — the bulk panels'
+     impact list. Omitted by default, so the row call sites (Knowledge, the browsers)
+     render exactly the markup they did before it existed; a bare `aria-describedby=""`
+     would point at nothing and is what the `|| undefined` below avoids.
    - disabled: disables both arming and confirming.
    - onArm(token) / onDisarm(token) / onConfirm(token).
 -->
@@ -42,6 +48,7 @@
     armedIcon = 'fas fa-triangle-exclamation',
     idleAriaLabel = '',
     armedAriaLabel = '',
+    describedBy = '',
     disabled = false,
     onArm = () => {},
     onDisarm = () => {},
@@ -82,6 +89,7 @@
   data-armed={armed ? 'true' : 'false'}
   data-arm-token={token}
   aria-label={consequence}
+  aria-describedby={describedBy || undefined}
   title={consequence}
   {disabled}
   onclick={handleClick}
