@@ -27,8 +27,8 @@ import { parsePlainDiceGroups, parseDiceGroups } from '../utils/craftingCheckExp
 import {
   advanceDefinitionRevision,
   findById,
-  findByRecipeId,
   getDefinitionIndex,
+  indexedMembershipLookups,
 } from '../utils/definitionIndex.js';
 import { normalizeFailureResultPolicy } from '../utils/failureResultPolicy.js';
 import { plainTextDescription, descriptionTextCandidate } from '../utils/plainTextDescription.js';
@@ -48,6 +48,10 @@ import {
   selectLearnerActorIds,
 } from '../utils/recipeDeleteImpact.js';
 import { recipeReferencesEssence } from '../utils/recipeEssenceReferences.js';
+import {
+  recipeItemDefinitionsContaining,
+  resolveLegacyMembershipDefinition,
+} from '../utils/recipeItemMembership.js';
 import { resolveRecipeCheckTierOptions } from '../utils/routedOutcomeKeywords.js';
 import {
   getCompendiumSourceUuid,
@@ -3196,10 +3200,14 @@ export class CraftingSystemManager {
    * 1.13.0 migration deliberately preserved.
    *
    * Builds the legacy definition index (see
-   * {@link CraftingSystemManager#_indexRecipeItemDefinitionsForLegacySeed}), then
-   * resolves each recipe against it (see
-   * {@link CraftingSystemManager#_resolveLegacyMembershipDefinition} for the resolution
-   * order this seed relies on).
+   * {@link CraftingSystemManager#_indexRecipeItemDefinitionsForLegacySeed}), then resolves
+   * each recipe against it through the shared membership leaf's
+   * `resolveLegacyMembershipDefinition` (issue 1155) — the same legacy resolution order,
+   * and the same deliberate refusal to fall through on a dangling `recipeItemId`, that
+   * every legacy READER resolves by. It must be the same function, not merely the same
+   * shape: a seed that resolved membership differently from the readers would CHANGE
+   * resolved membership at the moment the basis switches, which is the one thing this
+   * seed exists to prevent.
    *
    * @param {object} system A live normalized system from the in-memory map.
    * @returns {boolean} `true` when at least one definition gained a member.
@@ -3213,6 +3221,13 @@ export class CraftingSystemManager {
     if (definitions.length === 0) return false;
 
     const { byId, bySource } = this._indexRecipeItemDefinitionsForLegacySeed(definitions);
+    // The seed's own indexes, handed to the shared rule as DATA ACCESS. The rule stays one
+    // implementation; only the way a definition is found differs, because this path
+    // resolves every recipe in the system in one pass rather than one recipe per read.
+    const legacyLookups = {
+      byDefinitionId: (_definitions, definitionId) => byId.get(definitionId) ?? null,
+      byOriginItemUuid: (_definitions, originItemUuid) => bySource.get(originItemUuid) ?? null,
+    };
 
     const recipes = this.recipeManager?.getRecipes?.({ craftingSystemId: system.id }) ?? [];
     let seeded = false;
@@ -3220,7 +3235,7 @@ export class CraftingSystemManager {
       const recipeId = String(recipe?.id || '').trim();
       if (!recipeId) continue;
 
-      const definition = this._resolveLegacyMembershipDefinition(recipe, byId, bySource);
+      const definition = resolveLegacyMembershipDefinition(definitions, recipe, legacyLookups);
       if (!definition || definition.recipeIds.includes(recipeId)) continue;
 
       definition.recipeIds.push(recipeId);
@@ -3256,36 +3271,6 @@ export class CraftingSystemManager {
       if (source && !bySource.has(source)) bySource.set(source, def);
     }
     return { byId, bySource };
-  }
-
-  /**
-   * Resolve which recipe item definition a recipe belongs to under the LEGACY scalar
-   * membership basis, for
-   * {@link CraftingSystemManager#_seedMembershipFromLegacyScalars}.
-   *
-   * Resolution order mirrors the legacy READERS (see
-   * `_getRecipeObjectsReferencingRecipeItemDefinition`'s fallback, and the identical
-   * branch in `getRecipeItemDefinitionsContaining`, `RecipeVisibilityService` and
-   * `InventoryListingBuilder`): a present `recipeItemId` resolves by definition id and
-   * the uuid branch is NOT consulted even when that id names nothing, and only an
-   * ABSENT `recipeItemId` falls through to `linkedRecipeItemUuid` against a
-   * definition's `originItemUuid`. Falling through on a dangling id (as the 1.13.0
-   * migration does) would seed a membership the legacy basis never resolved, which is
-   * precisely the change of resolved membership this seed exists to prevent —
-   * deliberately, a dangling id does NOT fall through.
-   *
-   * @param {object} recipe A recipe object being resolved.
-   * @param {Map<string, object>} byId Definitions indexed by their own id.
-   * @param {Map<string, object>} bySource Definitions indexed by `originItemUuid`.
-   * @returns {object|null} The matching definition, or `null` when none resolves.
-   * @private
-   */
-  _resolveLegacyMembershipDefinition(recipe, byId, bySource) {
-    const recipeItemId = String(recipe?.recipeItemId || '').trim();
-    if (recipeItemId) return byId.get(recipeItemId) || null;
-
-    const legacyUuid = String(recipe?.linkedRecipeItemUuid || '').trim();
-    return legacyUuid ? bySource.get(legacyUuid) || null : null;
   }
 
   // Merge a caps patch over the stored caps sub-block while keeping the legacy/new
@@ -3962,35 +3947,29 @@ export class CraftingSystemManager {
   }
 
   // Forward membership query (issue 511 many-to-many): the definitions of `systemId`
-  // that contain `recipeId`. Canonical read is each definition's `recipeIds[]`; while the
-  // system's `membershipResolvesByRecipeIds` marker is unset it falls back to resolving
-  // the recipe's legacy reverse ref (`recipeItemId` / `linkedRecipeItemUuid`) to its book.
+  // that contain `recipeId`. The rule itself — canonical `recipeIds[]`, then the legacy
+  // reverse ref while the system's `membershipResolvesByRecipeIds` marker is unset — is
+  // `utils/recipeItemMembership.js`, which every other membership reader also asks
+  // (issue 1155). `indexedMembershipLookups` keeps the `recipeIds[]` leg on the retained
+  // `recipeId -> definitions` index (issue 1076) rather than a per-check linear scan.
+  //
+  // `{ id: recipeId }` stands in for a recipe the manager cannot resolve, so a stale id
+  // still answers from the definitions that list it and simply resolves no legacy scalar
+  // — the order the previous inline implementation got by looking the recipe up lazily.
   getRecipeItemDefinitionsContaining(systemId, recipeId) {
     const system = this.getSystem(systemId);
     if (!system || !recipeId) return [];
-    const rid = String(recipeId);
     const definitions = Array.isArray(system.recipeItemDefinitions)
       ? system.recipeItemDefinitions
       : [];
 
-    // Reverse membership is a retained `recipeId -> definitions` index (issue 1076), not a
-    // filter over every definition per access check. The buckets keep array order, so the
-    // returned list is identical to the filter's; it is copied because the bucket is shared.
-    const byMembership = findByRecipeId(getDefinitionIndex(definitions), rid);
-    if (byMembership.length > 0) return [...byMembership];
-
-    // Only fall back while the system has not resolved by `recipeIds` (issue 1011). Read
-    // the marker; never re-derive it from the arrays.
-    if (system.membershipResolvesByRecipeIds === true) return [];
-
-    const recipe = this.recipeManager?.getRecipe?.(recipeId);
-    if (!recipe) return [];
-    const recipeItemId = String(recipe.recipeItemId || '').trim();
-    const legacyUuid = String(recipe.linkedRecipeItemUuid || '').trim();
-    return definitions.filter((def) => {
-      if (recipeItemId) return String(def.id) === recipeItemId;
-      return !!legacyUuid && String(def.originItemUuid || '') === legacyUuid;
-    });
+    const recipe = this.recipeManager?.getRecipe?.(recipeId) ?? { id: recipeId };
+    return recipeItemDefinitionsContaining(
+      definitions,
+      recipe,
+      system.membershipResolvesByRecipeIds,
+      indexedMembershipLookups
+    );
   }
 
   _assertUniqueComponentSources(system, item, excludeItemId = null) {

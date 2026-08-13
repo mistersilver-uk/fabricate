@@ -25,14 +25,17 @@
  *
  * **This module is a leaf on purpose.** It is imported by a store the mounted Svelte
  * suites pull in, so its own imports are held to `config/flags.js`,
- * `systems/writableActors.js` (zero imports) and `systems/recipeKeyedFlagEntries.js`
- * (whose sole import is `config/flags.js`, already here); anything heavier would land in
- * every mounted component's dependency closure. It reads no Foundry global and mutates
- * nothing it is handed — the caller applies the plan.
+ * `systems/writableActors.js` (zero imports), `systems/recipeKeyedFlagEntries.js`
+ * (whose sole import is `config/flags.js`, already here) and `utils/recipeItemMembership.js`
+ * (zero imports); anything heavier would land in every mounted component's dependency
+ * closure. It reads no Foundry global and mutates nothing it is handed — the caller
+ * applies the plan.
  */
 import { getFabricateFlag } from '../config/flags.js';
 import { readLearnedRecipeEntries } from '../systems/recipeKeyedFlagEntries.js';
 import { selectWritableActors } from '../systems/writableActors.js';
+
+import { recipeItemDefinitionsContaining } from './recipeItemMembership.js';
 
 const ZERO_IMPACT = Object.freeze({
   deletable: 0,
@@ -52,69 +55,18 @@ function toArray(value) {
 }
 
 /**
- * Which recipe item definitions CONTAIN a recipe, under the supplied membership basis.
- *
- * The basis is a PARAMETER rather than an inference (issue 1011): the "any definition has
- * a non-empty `recipeIds`" predicate this replaced flipped in both directions, so the
- * caller threads the system's own marker down.
- *
- * ── THE MEMBERSHIP RULE IS MAINTAINED IN FOUR PLACES, AND THIS IS ONE OF THEM ─────
- * Do not read "mirrors X exactly" below as a statement about two functions. As of issue
- * 1132 the same rule is implemented at four sites, and they are ALREADY unmirrored:
- *
- *   1. this function;
- *   2. `CraftingSystemManager.getRecipeItemDefinitionsContaining`;
- *   3. `CraftingSystemManager._resolveLegacyMembershipDefinition`;
- *   4. `adminRecipeRowProjection._recipeItemDefinitionsContaining` — which has NO
- *      `linkedRecipeItemUuid` → `originItemUuid` leg, while the other three do.
- *
- * Any change to what "this recipe item contains this recipe" means is a change to all four.
- * Routing 2 and 4 through this leaf is the right end state and is a real refactor with its
- * own regression surface, so it is deliberately NOT attempted here; it is recorded as the
- * maintenance obligation it is rather than discovered from a defect later.
- *
- * The legacy leg mirrors `CraftingSystemManager._resolveLegacyMembershipDefinition`
- * exactly, including its deliberate refusal to fall through: a PRESENT `recipeItemId`
- * resolves by definition id and the `linkedRecipeItemUuid` branch is not consulted even
- * when that id names nothing, because falling through on a dangling id would state a
- * membership the legacy basis never resolved.
- *
- * @param {object[]} definitions A system's `recipeItemDefinitions`.
- * @param {object} recipe A recipe object (or its JSON).
- * @param {boolean} membershipResolvesByRecipeIds The system's basis marker.
- * @returns {object[]} The containing definitions; never null.
- */
-function definitionsContaining(definitions, recipe, membershipResolvesByRecipeIds) {
-  const recipeId = trimmed(recipe?.id);
-  if (!recipeId) return [];
-
-  const byMembership = definitions.filter((definition) =>
-    toArray(definition?.recipeIds).some((id) => trimmed(id) === recipeId)
-  );
-  if (byMembership.length > 0) return byMembership;
-  if (membershipResolvesByRecipeIds === true) return [];
-
-  const recipeItemId = trimmed(recipe?.recipeItemId);
-  if (recipeItemId) {
-    const byId = definitions.find((definition) => trimmed(definition?.id) === recipeItemId);
-    return byId ? [byId] : [];
-  }
-
-  const legacyUuid = trimmed(recipe?.linkedRecipeItemUuid);
-  if (!legacyUuid) return [];
-  const bySource = definitions.find(
-    (definition) => trimmed(definition?.originItemUuid) === legacyUuid
-  );
-  return bySource ? [bySource] : [];
-}
-
-/**
  * Plan the recipe-item membership prune for a set of recipes about to be deleted.
  *
  * PURE: it neither mutates the definitions it is handed nor persists anything. The caller
  * applies `prunes` — `CraftingSystemManager.deleteRecipes` writes each `recipeIds` array
  * through its own `_normalizeMembershipRecipeIds`, because the six membership readers all
  * match by exact string equality and a differently-shaped array silently stops matching.
+ *
+ * `affectedIds` is basis-aware because it asks the shared membership leaf
+ * ({@link module:utils/recipeItemMembership.recipeItemDefinitionsContaining}), which is
+ * the SAME function every other membership reader asks (issue 1155) — so the delete
+ * card's "2 books & scrolls will lose them" and the browser row's book column cannot name
+ * different books for one recipe, which they could before that unification.
  *
  * @param {object[]} definitions A system's `recipeItemDefinitions`.
  * @param {object[]} recipes The recipes being deleted, already resolved.
@@ -140,7 +92,11 @@ export function planRecipeItemMembershipPrune(definitions, recipes, membershipRe
     const recipeId = trimmed(recipe?.id);
     if (!recipeId) continue;
     doomed.add(recipeId);
-    for (const definition of definitionsContaining(defs, recipe, membershipResolvesByRecipeIds)) {
+    for (const definition of recipeItemDefinitionsContaining(
+      defs,
+      recipe,
+      membershipResolvesByRecipeIds
+    )) {
       affected.add(trimmed(definition.id));
     }
   }

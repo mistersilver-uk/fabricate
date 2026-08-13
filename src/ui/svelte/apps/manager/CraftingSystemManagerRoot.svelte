@@ -1881,7 +1881,7 @@
   // disabled states are derived from.
   //
   // Derived from the same PROJECTED ROWS, and that is the load-bearing part. Each row's
-  // `recipeItemIds` comes from `_recipeItemDefinitionsContaining`, which takes the system's
+  // `recipeItemIds` comes from `recipeItemDefinitionsContaining`, which takes the system's
   // `membershipResolvesByRecipeIds` marker as a parameter and is therefore basis-aware.
   // Counting from `recipeItemDefinitions[].recipeIds` instead would report "holds none
   // selected" on every legacy-basis system — where membership still resolves through the

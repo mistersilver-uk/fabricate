@@ -129,17 +129,20 @@ function _legacyRecipeItemIndex(recipeList) {
 // name/img/type plus their derived `recipes[]` and `learnedByCount`. Called once
 // per refresh from the async phase; `fromUuid` resolution is batched.
 //
-// This is the SIXTH recipe-book membership reader, and the second of the pair the admin
-// projection owns: it answers the same many-to-many from the BOOK's side, where
-// `_recipeItemDefinitionsContaining` (now in the sibling `adminRecipeRowProjection.js`)
+// This is the recipe-book membership reader that answers the same many-to-many from the
+// BOOK's side, where the shared `recipeItemDefinitionsContaining`
+// (`utils/recipeItemMembership.js`, asked by `adminRecipeRowProjection.buildRecipeList`)
 // answers it from the RECIPE's. Like that one, it takes the basis as a PARAMETER threaded
 // from the raw manager system rather than inferring it — the inference available here
 // would have been per DEFINITION ("this book's `recipeIds` is empty, so it must be
 // un-migrated"), which is the retired system-wide predicate at definition scope.
 //
+// It is NOT a second implementation of the membership rule and must not become one: it
+// resolves ids the recipe-side projection already derived, in the opposite direction.
+//
 // The parameter is BELT AND BRACES at this call site, and saying so is more useful than
 // overstating it: `recipes` is the PROJECTED recipe list, whose `recipeItemId`
-// `buildRecipeList` derives from `_recipeItemDefinitionsContaining` rather than copying
+// `buildRecipeList` derives from `recipeItemDefinitionsContaining` rather than copying
 // the raw legacy scalar. So on a marked system an emptied book's former members already
 // carry `recipeItemId: ''`, and `_legacyRecipeItemIndex` could not resurrect them even if
 // this guard were dropped — the basis decision has already been taken upstream. What the
@@ -165,7 +168,7 @@ export async function enrichRecipeItemLibrary(
   const recipeList = Array.isArray(recipes) ? recipes : [];
   const recipeById = new Map();
   for (const recipe of recipeList) recipeById.set(String(recipe?.id), recipe);
-  // `=== true` exactly as `_recipeItemDefinitionsContaining` tests it: a missing boolean
+  // `=== true` exactly as `recipeItemDefinitionsContaining` tests it: a missing boolean
   // fails to LEGACY, which is the safe direction, and `null` is what the index being
   // absent means downstream.
   const legacyIndex =

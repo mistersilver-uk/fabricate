@@ -24,6 +24,7 @@
  */
 import { ingredientSetToolsAreActive } from '../../../systems/toolCheckBonus.js';
 import { normalizeRecipeCategory } from '../../../utils/recipeCategories.js';
+import { recipeItemDefinitionsContaining } from '../../../utils/recipeItemMembership.js';
 
 /**
  * Build a human-readable visibility summary for a recipe row.
@@ -324,7 +325,12 @@ export function buildRecipeList(systemManager, recipeManager, selectedSystem, re
     // `selectedSystem` here is the RAW manager system (`getSystems()`), not the
     // hand-built viewState projection, so the membership-basis marker is reachable
     // without adding it to that allowlist (issue 1011).
-    const containingDefinitions = _recipeItemDefinitionsContaining(
+    //
+    // The rule is the shared leaf every membership reader asks (issue 1155). This row
+    // used to carry a LOCAL copy of it with no `linkedRecipeItemUuid` → `originItemUuid`
+    // leg, so on an un-migrated world the browser's book column and the delete card's
+    // impact statement could name different books for the same recipe.
+    const containingDefinitions = recipeItemDefinitionsContaining(
       selectedSystem.recipeItemDefinitions,
       recipe,
       selectedSystem.membershipResolvesByRecipeIds
@@ -479,23 +485,3 @@ export function withoutDerivedRecipeProjectionFields(updates) {
   return stripped;
 }
 
-// The recipe-item definitions of a system that CONTAIN a recipe (issue 511
-// many-to-many). Canonical read is each definition's `recipeIds[]`; only while the
-// system's membership-basis marker is unset does it fall back to the recipe's book-only
-// `recipeItemId`.
-//
-// The basis is a PARAMETER, not re-derived here (issue 1011). This is a module-scope
-// pure helper with no system in scope, and the "any definition has a non-empty
-// recipeIds" inference it used to run flipped in both directions — so the caller threads
-// `system.membershipResolvesByRecipeIds` down from the raw manager system.
-function _recipeItemDefinitionsContaining(definitions, recipe, membershipResolvesByRecipeIds) {
-  const defs = Array.isArray(definitions) ? definitions : [];
-  const rid = String(recipe?.id || '');
-  const byMembership = defs.filter((def) =>
-    (Array.isArray(def.recipeIds) ? def.recipeIds : []).some((id) => String(id) === rid)
-  );
-  if (byMembership.length > 0) return byMembership;
-  if (membershipResolvesByRecipeIds === true) return [];
-  const recipeItemId = String(recipe?.recipeItemId || '').trim();
-  return recipeItemId ? defs.filter((def) => String(def.id) === recipeItemId) : [];
-}

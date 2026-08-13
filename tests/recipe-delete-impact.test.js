@@ -103,8 +103,9 @@ describe('planRecipeItemMembershipPrune', () => {
   });
 
   it('does not fall through to the uuid leg when a scalar names nothing', () => {
-    // Mirrors `_resolveLegacyMembershipDefinition`: a PRESENT `recipeItemId` resolves by
-    // definition id and the uuid branch is never consulted, even when that id dangles.
+    // The shared rule's refusal to fall through (`utils/recipeItemMembership.js`): a
+    // PRESENT `recipeItemId` resolves by definition id and the uuid branch is never
+    // consulted, even when that id dangles.
     const plan = planRecipeItemMembershipPrune(
       definitions(),
       [recipe('r', { recipeItemId: 'book-gone', linkedRecipeItemUuid: BOOK_A_UUID })],
