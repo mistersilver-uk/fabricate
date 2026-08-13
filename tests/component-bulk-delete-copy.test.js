@@ -203,6 +203,34 @@ describe('1129/copy the singular delete dialog states the same arithmetic', () =
   });
 });
 
+describe('1156/copy the component delete dialog uses correct verb agreement at disabled: 1', () => {
+  it('uses singular "is" when disabled count is 1', () => {
+    const sentence = interpolate(deleteConfirm.ContentDisabledOne, {
+      name: 'Iron',
+      recipes: 2,
+    });
+    assert.match(
+      sentence,
+      /1 of those recipes is enabled today/,
+      'singular verb "is" at disabled: 1'
+    );
+    assert.ok(!sentence.includes('are enabled today'), 'not plural "are"');
+    assert.match(sentence, /2 recipe\(s\)/);
+    assert.match(sentence, /Iron/);
+  });
+
+  it('reads the ContentDisabledOne string in full at disabled: 1', () => {
+    const sentence = interpolate(deleteConfirm.ContentDisabledOne, {
+      name: 'Iron',
+      recipes: 2,
+    });
+    assert.equal(
+      sentence,
+      'Delete component Iron? 2 recipe(s) will be rewritten, and 1 of those recipes is enabled today and will be disabled. Deleting is permanent — a component you recreate is a new component.'
+    );
+  });
+});
+
 // Issue 1156: the singular delete dialog stated both consequence figures unconditionally, so
 // the commonest single delete of all — a component no recipe references — read "This rewrites
 // 0 recipe(s) and disables 0 of them." The recipe dialog fixed this for its own three

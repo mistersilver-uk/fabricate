@@ -187,3 +187,46 @@ describe('1156/copy the essence delete dialog omits zero consequences', () => {
     assert.equal(interpolate(deleteConfirm.Title, { name: 'Fire' }), 'Delete Fire?');
   });
 });
+
+describe('1156/copy the essence delete dialog uses correct verb agreement at recipes: 1', () => {
+  const deleteConfirm = lang.FABRICATE.Admin.Manager.Essence.DeleteConfirm;
+
+  it('uses singular "requires" in ContentRecipesOne when recipes count is 1', () => {
+    const sentence = interpolate(deleteConfirm.ContentRecipesOne, { name: 'Fire' });
+    assert.match(
+      sentence,
+      /1 recipe\(s\) that requires it/,
+      'singular verb "requires" at recipes: 1'
+    );
+    assert.ok(!sentence.includes('that require it'), 'not plural "require"');
+    assert.match(sentence, /Fire/);
+  });
+
+  it('reads the ContentRecipesOne string in full', () => {
+    const sentence = interpolate(deleteConfirm.ContentRecipesOne, { name: 'Fire' });
+    assert.equal(
+      sentence,
+      'Delete essence Fire? 1 recipe(s) that requires it will be rewritten. Deleting is permanent — an essence you recreate is a new essence.'
+    );
+  });
+
+  it('uses singular "requires" in ContentOne when recipes count is 1 and components are present', () => {
+    const sentence = interpolate(deleteConfirm.ContentOne, { name: 'Fire', components: 2 });
+    assert.match(
+      sentence,
+      /1 recipe\(s\) that requires it/,
+      'singular verb "requires" at recipes: 1'
+    );
+    assert.ok(!sentence.includes('that require it'), 'not plural "require"');
+    assert.match(sentence, /2 component\(s\)/);
+    assert.match(sentence, /Fire/);
+  });
+
+  it('reads the ContentOne string in full when recipes: 1 and components: 2', () => {
+    const sentence = interpolate(deleteConfirm.ContentOne, { name: 'Fire', components: 2 });
+    assert.equal(
+      sentence,
+      'Delete essence Fire? It will be removed from 2 component(s), and 1 recipe(s) that requires it will be rewritten. Deleting is permanent — an essence you recreate is a new essence.'
+    );
+  });
+});

@@ -3401,9 +3401,9 @@ describe('createAdminStore', () => {
       await store.deleteComponent('iron');
 
       const call = localizations.find(
-        (entry) => entry.key === 'FABRICATE.Admin.Manager.Component.DeleteConfirm.Content'
+        (entry) => entry.key === 'FABRICATE.Admin.Manager.Component.DeleteConfirm.ContentDisabledOne'
       );
-      assert.ok(call, 'the combined branch is localized');
+      assert.ok(call, 'the combined branch with singular disabled is localized');
       assert.deepEqual(call.data, { name: 'Iron', recipes: 1, disabled: 1 });
     });
 
