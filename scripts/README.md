@@ -326,6 +326,31 @@ The fixtures are issue 1071's, imported rather than re-generated, so the Foundry
 and headless layers measure the same corpus.
 `FOUNDRY_PERF_FIXTURE` selects one (`simple-corpus`, `held-inventory`, …).
 
+Measured against those fixtures, the three writes hold at every scale:
+
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
+
+| Fixture | Recipes | Components | Actors | `craftingSystems` bytes | `recipes` bytes | Writes |
+|---|---|---|---|---|---|---|
+| `simple-corpus` | 10,000 | 5,000 | 2 | 1,973,024 | 7,177,534 | 2 settings + 1 actor create |
+| `held-inventory` (point 0) | 6 | 5,000 | 3 | 1,973,024 | 4,183 | 2 settings + 1 actor create |
+
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
+
+**The held-inventory axis is a series, and `FOUNDRY_PERF_INVENTORY` picks the
+point.**
+`held-inventory` varies 100 / 500 / 1,000 held stacks against the same
+5,000-component library, and a bare `fixture.inventory` is only its *first* point.
+Seeding that unconditionally would run the whole profile at 100 stacks while
+reporting it under the axis's name — the cheapest point of the axis, named after
+the axis.
+The chosen point and the series length are recorded on every run.
+
+The chosen inventory point's composition is recomputed from the translated
+payloads rather than copied from the fixture's own declaration, so a translation
+bug that dropped every flag shows up as a mix that disagrees with the fixture
+instead of being masked by the fixture restating what it intended.
+
 The seeded world is then **reloaded** before anything is timed, so the startup
 measurement is taken against the seeded corpus rather than the empty world the
 container booted into.
@@ -386,6 +411,7 @@ A moved duration may only be a fact about the machine.
 |---|---|---|
 | `FOUNDRY_PERF_FIXTURE` | `simple-corpus` | Which issue-1071 scale profile to seed. |
 | `FOUNDRY_PERF_SEED` | issue 1071's default | Fixture seed; the fixture is reproducible from `{profile, seed}` alone. |
+| `FOUNDRY_PERF_INVENTORY` | `0` | Which point of a held-inventory series to seed (100 / 500 / 1,000 stacks). Ignored by corpus-axis fixtures, which have no series. |
 | `FOUNDRY_PERF_IMPORT_LIMIT` | `200` | Recipes the import scenario imports. Bounded because import is quadratic today (issue 1086). |
 | `FOUNDRY_PERF_TRACE` | unset | `1` exports a Chrome DevTools trace. |
 | `FOUNDRY_PERF_SECOND_CLIENT` | unset | `0` skips the cross-client propagation scenario. |
