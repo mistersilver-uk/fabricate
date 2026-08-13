@@ -169,14 +169,11 @@
   // GM chose NOT to destroy it on break, so this must not read like that rule firing.
   function onBulkDestroy() {
     return store?.bulkDestroy?.({
-      // `window: { title }`, NEVER a top-level `title`. `services.confirmDialog`
-      // (`src/ui/foundryCompat.js`) forwards its options bag to `DialogV2.confirm`
-      // untouched, and DialogV2 reads its frame title from `window.title` — so a
-      // top-level title is silently dropped and the one destructive confirmation in
-      // this tab renders with a BLANK title bar. Fixed here rather than in
-      // `confirmDialog` on purpose: every manager-side caller passes a top-level
-      // title too, so absorbing it centrally would retitle ~25 confirms this change
-      // does not own. Those are tracked as their own follow-up.
+      // `window: { title }` is the shape DialogV2 reads its frame title from — the
+      // canonical one, kept explicit here. Issue 1154 took the follow-up this comment
+      // used to defer: `normalizeConfirmOptions` (`svelte/util/foundryBridge.js`) now
+      // maps a top-level `title` onto it for every confirm seam, so the manager-side
+      // callers this could not retitle at the time are covered centrally.
       window: {
         title: localize('FABRICATE.App.Inventory.Bulk.DestroyTitle', {
           components: bulkComponentsText,

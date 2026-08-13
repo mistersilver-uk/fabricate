@@ -82,8 +82,8 @@ Check the assigned target's base-relative Foundry-facing diff against the real F
 - `Hooks.on` / `Hooks.once` correctness and timing (`init`, `ready`, `updateWorldTime`, and the V13 `updateToken` move-animation trap where the placeable centre lags the document).
 - runtime globals `game` / `ui` / `Hooks` / `CONFIG` are referenced, never imported.
 - document, `ApplicationV2`, `DialogV2`, and sheet APIs, including `sheet.changeTab(tabName, groupName)` for tab switches.
-A `DialogV2.confirm` dialog renders no window-title chrome, so a test or harness must assert on the body copy or the button labels, never on a window title.
-Wire `yes: { label, callback }` when an action verb is wanted on the confirm button (for example "Disable"); a bare `yes: () => …` renders a generic "Yes".
+A `DialogV2.confirm` dialog's title comes from `options.window.title` and is rendered into the standard framed `<h1 class="window-title">` via `innerText` (V13.351 and V14.365: `window.frame` defaults `true`, `DialogV2` neither overrides `window.title` nor defines `_renderFrame`), so it must be passed raw and unescaped — an already-HTML-escaped string renders its literal entities (e.g. `&#39;`) — and a test or harness can assert on it freely.
+Wire `yes: { label, callback }` when an action verb is wanted on the confirm button (for example "Disable"); a bare `yes: () => …` renders a generic "Yes" label and discards the callback too, so the dialog's affirmative click resolves with the library default rather than that function.
 - UUID resolution, flags (e.g. preserving `flags.core.sourceId`), and settings registration under the `fabricate.*` namespace.
 - Separate sequential settings, flag, or document API calls that together enforce one invariant: require a complete pre-state snapshot, ordered writes, reverse-order compensation that restores key presence as well as value, explicit reporting of compensation failures, and tests for same-primary-value repair plus every write and compensation boundary.
 A single atomic or batched document API operation does not require application-level compensation merely because it writes several documents.

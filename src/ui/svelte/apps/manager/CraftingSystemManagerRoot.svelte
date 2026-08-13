@@ -3967,6 +3967,7 @@
     const confirmed = await store.confirmRecipeAction?.({
       title: localize('FABRICATE.Admin.Manager.Recipe.RevertToSingleStepTitle'),
       content: localize('FABRICATE.Admin.Manager.Recipe.RevertToSingleStepContent', { name }),
+      confirmLabel: localize('FABRICATE.Admin.Manager.Recipe.RevertToSingleStepConfirm'),
     });
     if (!confirmed) return false;
     patchRecipeDraft({ steps: [] });
@@ -4043,6 +4044,7 @@
     const confirmed = await store.confirmRecipeAction?.({
       title: localize('FABRICATE.Admin.Manager.Recipe.DeleteStepTitle'),
       content: localize('FABRICATE.Admin.Manager.Recipe.DeleteStepContent', { name, alsoDeleted }),
+      confirmLabel: localize('FABRICATE.Admin.Manager.Recipe.DeleteStep'),
     });
     if (!confirmed) return false;
     patchRecipeDraft({ steps: steps.filter((entry) => entry?.id !== stepId) });

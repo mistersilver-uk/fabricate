@@ -273,7 +273,8 @@ export const KNOWN_ORPHANS = [
   'FABRICATE.Admin.Manager.Crafting.CraftingTabs.Recipes',
   'FABRICATE.Admin.Manager.CurrencyUnits.NoActorPath',
   'FABRICATE.Admin.Manager.CurrencyUnits.SpendStrategyHint',
-  'FABRICATE.Admin.Manager.Delete',
+  // 'FABRICATE.Admin.Manager.Delete' was wired up by issue 1154 — it is the shared
+  // affirmative label on every destructive confirm the admin store raises.
   'FABRICATE.Admin.Manager.DisableEnvironment',
   'FABRICATE.Admin.Manager.Economy.DepletedSwapImage',
   'FABRICATE.Admin.Manager.Economy.NodeApply',
