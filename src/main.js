@@ -3057,10 +3057,10 @@ class Fabricate {
    *
    * Routes through `CraftingSystemManager.deleteRecipes` (issue 1132) so this documented
    * public API and the GM studio cannot disagree about what deleting a recipe reaches: the
-   * recipe-item membership prune cascades here too, in one `recipes` write, one
-   * `craftingSystems` write and one actor-flag pass. The singular
-   * `ui.notifications.info` is unchanged — `RecipeManager.deleteRecipes` raises it for a
-   * one-recipe set.
+   * recipe-item membership prune cascades here too, in one `recipes` write, at most one
+   * `craftingSystems` write and one actor-flag clean-up (itself two writable-actor walks,
+   * not one pass). The singular `ui.notifications.info` is unchanged —
+   * `RecipeManager.deleteRecipes` raises it for a one-recipe set.
    *
    * The system id comes from the recipe itself; a recipe whose `craftingSystemId` names no
    * system still deletes, and prunes nothing.
