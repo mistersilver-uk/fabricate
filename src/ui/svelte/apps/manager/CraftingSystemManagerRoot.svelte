@@ -4565,9 +4565,16 @@
         // live region and focus goes back to the control. The store has already raised the
         // Foundry toast; a toast is not a live region, so without this the GM's keyboard is
         // on `<body>` and nothing at all has been said.
+        //
+        // This branch covers TWO outcomes the store's own `deleteRecipes` cannot let this
+        // caller tell apart: a concurrent client already deleted the same recipes (a
+        // WARNING — nothing failed), and a refused write (an ERROR, already toasted). Both
+        // return the identical zero result, so a single neutral sentence is used rather than
+        // the "Failed" wording that was false on the more reachable of the two (issue 1132,
+        // review round 2).
         recipeBulkDeleteOutcome = text(
-          'FABRICATE.Admin.Manager.Recipe.BulkEdit.DeleteFailed',
-          'Failed to delete the selected recipes.'
+          'FABRICATE.Admin.Manager.BulkEdit.DeleteNoneDeleted',
+          'Nothing was deleted. The selection is unchanged.'
         );
         return false;
       }

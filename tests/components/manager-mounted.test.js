@@ -8449,7 +8449,11 @@ describe('CraftingSystemManager mounted behavior', () => {
   // selection intact, so an assistive-technology user was left on `<body>` beside a
   // re-enabled button with nothing said: the store's Foundry toast is not a live region this
   // module controls, and nothing distinguished "deleted" from "refused".
-  it('announces the refusal through the card live region and re-arms nothing', async () => {
+  it('announces the reached-nothing outcome through the card live region and re-arms nothing', async () => {
+    // The zero result is returned on BOTH a concurrent no-op and a refused write (the store
+    // cannot tell them apart from here), and the store's own toast for the former says
+    // nothing failed — so the region must not claim a failure either (issue 1132, review
+    // round 2).
     await deleteSelectedRecipeRows(['r1'], {
       deleteRecipesResult: {
         deleted: 0,
@@ -8462,7 +8466,7 @@ describe('CraftingSystemManager mounted behavior', () => {
 
     const region = target.querySelector('[data-recipe-bulk-delete-announce]');
     assert.ok(Boolean(region), 'the card is still mounted, so the region is there to speak');
-    assert.match(region.textContent, /Failed to delete the selected recipes/);
+    assert.match(region.textContent, /Nothing was deleted\. The selection is unchanged\./);
     assert.equal(recipeDeleteButton().getAttribute('data-armed'), 'false');
   });
 

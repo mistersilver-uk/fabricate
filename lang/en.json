@@ -1905,7 +1905,8 @@
           "Unlock": "Unlock",
           "LeaveUnchanged": "Leave unchanged",
           "Deleting": "Deleting…",
-          "DeleteCancelled": "Delete cancelled. Nothing was deleted."
+          "DeleteCancelled": "Delete cancelled. Nothing was deleted.",
+          "DeleteNoneDeleted": "Nothing was deleted. The selection is unchanged."
         },
         "Recipe": {
           "Kicker": "Recipes View",
