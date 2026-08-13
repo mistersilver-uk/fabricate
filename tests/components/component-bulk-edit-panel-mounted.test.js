@@ -614,9 +614,10 @@ describe('ComponentBulkEditPanel set delete (issue 1129)', () => {
       `"${button.getAttribute('aria-label')}" must open with "${visible}"`
     );
     assert.match(button.getAttribute('aria-label'), /3 component\(s\) and 2 recipe\(s\)/);
-    // It ENDS with the irreversibility, like its essence and recipe siblings. This panel
-    // carries no standing hint, so the armed accessible name is the only place a
-    // screen-reader user is told a component delete is permanent (issue 1132, review round).
+    // It ENDS with the irreversibility, like its recipe sibling — the only one of the three
+    // that stated it. This panel carries no standing hint, so the armed accessible name is
+    // the only place a screen-reader user is told a component delete is permanent; essence
+    // remains the one outlier, deliberately left alone (issue 1132, review round 2).
     assert.match(button.getAttribute('aria-label'), /cannot be undone/i);
   });
 

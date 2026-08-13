@@ -297,8 +297,10 @@
   // It ENDS with the irreversibility, and that is not decoration (issue 1132, review round).
   // The name a screen-reader user hears on the armed face is the only place the permanence
   // of a component delete is stated at all — this panel carries no standing hint — and the
-  // string was a bare count fragment with no full stop while both essence and recipe pairs
-  // ended "This cannot be undone." Deleting components is no less permanent than either.
+  // string was a bare count fragment with no full stop while the recipe pair — the only one
+  // of the three that stated it — ended "This cannot be undone." Component now matches it;
+  // essence remains the one outlier, deliberately left alone (issue 1132, review round 2).
+  // Deleting components is no less permanent than either.
   const deleteArmedAriaLabel = $derived(
     format(
       'FABRICATE.Admin.Manager.Component.BulkEdit.DeleteConfirmAria',
