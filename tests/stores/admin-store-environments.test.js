@@ -1177,6 +1177,33 @@ describe('adminStore gathering environments tab state', () => {
     assert.deepEqual(services._environments.map(environment => environment.id), ['environment-a']);
   });
 
+  // `ApplicationV2` assigns the window title through `innerText`, so an already-escaped
+  // string surfaces its entity literally: an environment named `Traveler's Wood` would
+  // open a window titled `Delete Traveler&#39;s Wood?` (issue 1154 review). The name must
+  // be RAW in the title and escaped only in the HTML content.
+  it('puts a raw, unescaped environment name in the delete confirm title', async () => {
+    const services = createServices({
+      systems: [makeSystem({ id: 'system-a', features: { gathering: true } })],
+      environments: [makeEnvironment({ id: 'environment-a', name: "Traveler's Wood" })],
+      confirmResult: false
+    });
+    const store = createAdminStore(services);
+
+    await store.selectSystem('system-a');
+    await store.deleteEnvironmentDraft('environment-a');
+
+    assert.equal(services._confirmCalls.length, 1);
+    assert.equal(services._confirmCalls[0].title, "Delete Traveler's Wood?");
+    assert.ok(
+      !services._confirmCalls[0].title.includes('&#39;'),
+      'the title must not carry an HTML entity'
+    );
+    assert.ok(
+      services._confirmCalls[0].content.includes('&#39;'),
+      'the HTML content stays escaped'
+    );
+  });
+
   it('uses only the delete confirmation for a dirty selected persisted environment and preserves the draft when declined', async () => {
     const services = createServices({
       systems: [makeSystem({ id: 'system-a', features: { gathering: true } })],

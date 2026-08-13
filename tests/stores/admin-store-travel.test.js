@@ -440,6 +440,34 @@ describe('adminStore travel section', () => {
     store.destroy();
   });
 
+  // Same regression as deleteParty's title case (issue 1154 review), but this one's actor
+  // name feeds BOTH the title and the content, so the title must use the raw name while
+  // the content keeps the escaped one for the same name.
+  it('addOrMovePartyMember puts a raw, unescaped actor name in the confirm title', async () => {
+    const { services, confirmCalls } = createServices({
+      parties: [
+        { id: 'p1', name: 'Vanguard', enabled: true, memberActorUuids: [], travelActorUuid: null, currentRealmOverrides: {} },
+        { id: 'p2', name: 'Rearguard', enabled: true, memberActorUuids: ['Actor.a'], travelActorUuid: null, currentRealmOverrides: {} }
+      ],
+      actors: [{ uuid: 'Actor.a', id: 'a', name: "Aria O'Doyle", img: '' }],
+      confirmResult: true
+    });
+    const originalLocalize = services.localize;
+    services.localize = (key, data) =>
+      key === 'FABRICATE.Admin.Manager.Travel.MoveMemberTitle' ||
+      key === 'FABRICATE.Admin.Manager.Travel.MoveMemberContent'
+        ? undefined
+        : originalLocalize(key, data);
+    const store = createAdminStore(services);
+    await flush();
+    await store.addOrMovePartyMember('p1', 'Actor.a');
+    await flush();
+    assert.equal(confirmCalls[0].title, "Move Aria O'Doyle?");
+    assert.ok(!confirmCalls[0].title.includes('&#39;'), 'the title must not carry an HTML entity');
+    assert.ok(confirmCalls[0].content.includes('&#39;'), 'the HTML content stays escaped');
+    store.destroy();
+  });
+
   it('deleteParty confirms via confirmDialog before deleting', async () => {
     const { services, calls, confirmCalls } = createServices({
       parties: [{ id: 'p1', name: 'Vanguard', enabled: false, memberActorUuids: [], travelActorUuid: null, currentRealmOverrides: {} }]
@@ -464,6 +492,32 @@ describe('adminStore travel section', () => {
     await flush();
     assert.equal(confirmCalls.length, 1);
     assert.equal(calls.delete.length, 0);
+    store.destroy();
+  });
+
+  // `ApplicationV2` assigns the window title through `innerText`, so an already-escaped
+  // string surfaces its entity literally: a party named `Dragon's Lair` would open a
+  // window titled `Delete Dragon&#39;s Lair?` (issue 1154 review). The name must be RAW in
+  // the title and escaped only in the HTML content. Localize is forced to fall through to
+  // the hardcoded English template for just these two keys so the raw name reaches the
+  // fallback string this assertion is pinning.
+  it('deleteParty puts a raw, unescaped party name in the confirm title', async () => {
+    const { services, confirmCalls } = createServices({
+      parties: [{ id: 'p1', name: "Dragon's Lair", enabled: false, memberActorUuids: [], travelActorUuid: null, currentRealmOverrides: {} }]
+    });
+    const originalLocalize = services.localize;
+    services.localize = (key, data) =>
+      key === 'FABRICATE.Admin.Manager.Travel.DeletePartyTitle' ||
+      key === 'FABRICATE.Admin.Manager.Travel.DeletePartyContent'
+        ? undefined
+        : originalLocalize(key, data);
+    const store = createAdminStore(services);
+    await flush();
+    await store.deleteParty('p1');
+    await flush();
+    assert.equal(confirmCalls[0].title, "Delete Dragon's Lair?");
+    assert.ok(!confirmCalls[0].title.includes('&#39;'), 'the title must not carry an HTML entity');
+    assert.ok(confirmCalls[0].content.includes('&#39;'), 'the HTML content stays escaped');
     store.destroy();
   });
 
@@ -532,6 +586,27 @@ describe('adminStore travel section', () => {
     assert.equal(calls.realmDelete.length, 1);
     assert.equal(calls.realmDelete[0].collaborators.hasEnv, true);
     assert.equal(calls.realmDelete[0].collaborators.hasParty, true);
+    store.destroy();
+  });
+
+  // Same regression as deleteParty's title case (issue 1154 review).
+  it('deleteRealm puts a raw, unescaped realm name in the confirm title', async () => {
+    const { services, confirmCalls } = createServices({
+      realms: [{ id: 'r1', name: "Traveler's Rest", enabled: true, secret: false, biomes: [] }]
+    });
+    const originalLocalize = services.localize;
+    services.localize = (key, data) =>
+      key === 'FABRICATE.Admin.Manager.Travel.Realms.DeleteTitle' ||
+      key === 'FABRICATE.Admin.Manager.Travel.Realms.DeleteContent'
+        ? undefined
+        : originalLocalize(key, data);
+    const store = createAdminStore(services);
+    await flush();
+    await store.deleteRealm('system-a', 'r1');
+    await flush();
+    assert.equal(confirmCalls[0].title, "Delete Traveler's Rest?");
+    assert.ok(!confirmCalls[0].title.includes('&#39;'), 'the title must not carry an HTML entity');
+    assert.ok(confirmCalls[0].content.includes('&#39;'), 'the HTML content stays escaped');
     store.destroy();
   });
 

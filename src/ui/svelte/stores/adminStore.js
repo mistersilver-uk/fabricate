@@ -2413,9 +2413,10 @@ export function createAdminStore(services) {
   async function confirmRecipeAction({ title, content, confirmLabel } = {}) {
     // `label` is OMITTED, never set to undefined, when a caller supplies none:
     // `mergeObject` iterates the keys it is handed, so `label: undefined` OVERWRITES
-    // the default with nothing and renders a BLANK button — strictly worse than the
-    // generic default it was meant to replace. (Executed against both builds'
-    // `mergeObject`.)
+    // the default with nothing, and `_renderButtons` sets `span.innerText = _loc(label)`;
+    // `localize` returns its `stringId` argument unchanged when no translation is found, so
+    // the button renders the literal word "undefined" — strictly worse than the generic
+    // default it was meant to replace. (Executed against both builds' `mergeObject`.)
     const yes = { callback: () => true };
     if (confirmLabel) yes.label = confirmLabel;
     const confirmed = await services.confirmDialog?.({
@@ -2760,14 +2761,19 @@ export function createAdminStore(services) {
         const partyStore = getPartyStore();
         if (!partyStore) return false;
         const party = partyStore.get?.(partyId);
-        const name = _escapeHtml(party?.name || partyId);
+        // The name is raw in the TITLE (ApplicationV2 assigns it through `innerText`, so
+        // escaping there would surface a literal `&#39;`) and escaped in the CONTENT, which
+        // is HTML.
+        const name = String(party?.name || partyId);
+        const escapedName = _escapeHtml(name);
         const confirmed = await services.confirmDialog?.({
           title:
             services.localize?.('FABRICATE.Admin.Manager.Travel.DeletePartyTitle', { name }) ||
             `Delete ${name}?`,
           content: `<p>${
-            services.localize?.('FABRICATE.Admin.Manager.Travel.DeletePartyContent', { name }) ||
-            `Delete Fabricate party <strong>${name}</strong>?`
+            services.localize?.('FABRICATE.Admin.Manager.Travel.DeletePartyContent', {
+              name: escapedName,
+            }) || `Delete Fabricate party <strong>${escapedName}</strong>?`
           }</p>`,
           ..._deleteConfirmButtons(),
         });
@@ -2791,9 +2797,13 @@ export function createAdminStore(services) {
             party.memberActorUuids.includes(uuid)
         );
         if (source) {
-          const actorName = _escapeHtml(
+          // The actor name is raw in the TITLE (ApplicationV2 assigns it through `innerText`,
+          // so escaping there would surface a literal `&#39;`) and escaped in the CONTENT,
+          // which is HTML.
+          const actorName = String(
             getActorOptions().find((actor) => actor.uuid === uuid)?.name || uuid
           );
+          const escapedActorName = _escapeHtml(actorName);
           const sourceName = _escapeHtml(source.name || source.id);
           const targetName = _escapeHtml(partyStore.get?.(targetPartyId)?.name || targetPartyId);
           const confirmed = await services.confirmDialog?.({
@@ -2803,11 +2813,11 @@ export function createAdminStore(services) {
               }) || `Move ${actorName}?`,
             content: `<p>${
               services.localize?.('FABRICATE.Admin.Manager.Travel.MoveMemberContent', {
-                actor: actorName,
+                actor: escapedActorName,
                 from: sourceName,
                 to: targetName,
               }) ||
-              `Move <strong>${actorName}</strong> from <strong>${sourceName}</strong> to <strong>${targetName}</strong>?`
+              `Move <strong>${escapedActorName}</strong> from <strong>${sourceName}</strong> to <strong>${targetName}</strong>?`
             }</p>`,
             // Not a delete: moving a member is reversible, and the affirmative names the
             // move rather than borrowing the destructive verb.
@@ -2966,7 +2976,11 @@ export function createAdminStore(services) {
         const realmStore = getRealmStore();
         if (!realmStore || !systemId) return false;
         const realm = realmStore.get?.(systemId, realmId);
-        const name = _escapeHtml(realm?.name || realmId);
+        // The name is raw in the TITLE (ApplicationV2 assigns it through `innerText`, so
+        // escaping there would surface a literal `&#39;`) and escaped in the CONTENT, which
+        // is HTML.
+        const name = String(realm?.name || realmId);
+        const escapedName = _escapeHtml(name);
         // Collect referenced-by evidence WITHOUT deleting first: GatheringRealmStore.delete
         // returns it post-delete, but we surface it in the confirm copy beforehand by
         // probing the collaborators the store uses.
@@ -2986,8 +3000,9 @@ export function createAdminStore(services) {
             services.localize?.('FABRICATE.Admin.Manager.Travel.Realms.DeleteTitle', { name }) ||
             `Delete ${name}?`,
           content: `<p>${
-            services.localize?.('FABRICATE.Admin.Manager.Travel.Realms.DeleteContent', { name }) ||
-            `Delete realm <strong>${name}</strong>?`
+            services.localize?.('FABRICATE.Admin.Manager.Travel.Realms.DeleteContent', {
+              name: escapedName,
+            }) || `Delete realm <strong>${escapedName}</strong>?`
           }</p>${refLine}`,
           ..._deleteConfirmButtons(),
         });
@@ -5564,13 +5579,16 @@ export function createAdminStore(services) {
     const targetEnvironment =
       currentEnvironments.find((environment) => environment.id === targetId) ||
       get(environmentDraft);
-    const environmentName = targetEnvironment?.name || targetId;
+    // The name is raw in the TITLE (ApplicationV2 assigns it through `innerText`, so
+    // escaping there would surface a literal `&#39;`) and escaped in the CONTENT, which is
+    // HTML.
+    const environmentName = String(targetEnvironment?.name || targetId);
     const escapedEnvironmentName = _escapeHtml(environmentName);
     const confirmed = await services.confirmDialog?.({
       title:
         services.localize?.('FABRICATE.Admin.Environments.DeleteTitle', {
-          name: escapedEnvironmentName,
-        }) || `Delete ${escapedEnvironmentName}?`,
+          name: environmentName,
+        }) || `Delete ${environmentName}?`,
       content: `<p>${
         services.localize?.('FABRICATE.Admin.Environments.DeleteContent', {
           name: escapedEnvironmentName,
@@ -6491,10 +6509,10 @@ export function createAdminStore(services) {
       title:
         services.localize?.('FABRICATE.Admin.Manager.Essence.DeleteConfirm.Title', { name }) ||
         `Delete ${name}?`,
-      // Content is #1156's builder, which omits consequences whose count is zero rather
-      // than stating "0 component(s)"; the buttons are #1154's, so the affirmative names
-      // the action instead of reading "Yes". The two are orthogonal — one is what the
-      // dialog says, the other is what its controls are called.
+      // Content is issue 1156's builder, which omits consequences whose count is zero
+      // rather than stating "0 component(s)"; the buttons are issue 1154's, so the
+      // affirmative names the action instead of reading "Yes". The two are orthogonal —
+      // one is what the dialog says, the other is what its controls are called.
       content: `<p>${_essenceDeleteDialogContent(name, impact)}</p>`,
       ..._deleteConfirmButtons(),
     });
@@ -9023,7 +9041,8 @@ export function createAdminStore(services) {
       title:
         services.localize?.('FABRICATE.Admin.Manager.Component.DeleteConfirm.Title', { name }) ||
         `Delete ${name}?`,
-      // As above: #1156's zero-omitting content, #1154's named affirmative button.
+      // As above: issue 1156's zero-omitting content, issue 1154's named affirmative
+      // button.
       content: `<p>${_componentDeleteDialogContent(name, impact)}</p>`,
       ..._deleteConfirmButtons(),
     });

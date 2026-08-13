@@ -197,7 +197,7 @@ A destructive or irreversible action confirms through the shared confirm seam, w
 
 That confirmation states two things, and neither is left to a platform default.
 It renders a TITLE naming what is at stake, and its affirmative button names the ACTION — Delete, Reset, Move, Change mode — never the generic _Yes_.
-Both are localized keys.
+Both are localized keys at every call site but one — the gathering library record delete confirm still builds its title and body from hardcoded English, a deliberately deferred gap rather than the shipped norm.
 An untitled confirm, or one whose affirmative reads _Yes_, is not an acceptable rendering of a destructive action however accurate its body text, because the two controls a GM actually reads before committing say nothing about what is about to happen.
 
 The seam maps a caller's title onto the window title and accepts a callback-only button, so no call site can silently lose either.
