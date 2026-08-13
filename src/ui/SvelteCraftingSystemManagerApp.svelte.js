@@ -705,7 +705,9 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
         },
         // Commit the mapping modal's per-folder decisions: import each non-skipped
         // folder's items, then apply that folder's category/tags to the freshly imported
-        // component set via the shared set-apply primitive (one save() per folder).
+        // component set via the shared set-apply primitive. The whole run — every folder's
+        // items and every folder's set-apply — costs ONE `craftingSystems` write (issue
+        // 1086), not one per item plus one per folder.
         commitImportFolderMapping: async (systemId, decisions) => {
           const systemManager = game.fabricate.getCraftingSystemManager();
           if (!systemId) {
@@ -780,18 +782,16 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
               );
               return;
             }
-            let added = 0;
-            let updated = 0;
-            let skipped = 0;
-            const sourceFallbacks = [];
-            for (const itemUuid of itemUuids) {
-              const result = await systemManager.addItemFromUuid(systemId, itemUuid);
-              if (result.action === 'added') added++;
-              else if (result.action === 'updated') updated++;
-              else skipped++;
-              if (Array.isArray(result.sourceFallbacks))
-                sourceFallbacks.push(...result.sourceFallbacks);
-            }
+            // One unmapped decision — no category, no tags — is exactly this flat folder
+            // import, so it delegates to the shared commit loop rather than carrying a
+            // second copy of it. That is what gives the plain folder drop the single
+            // batched `craftingSystems` write the mapping commit has (issue 1086): this
+            // branch used to save the whole corpus once per imported item.
+            const { added, updated, skipped, sourceFallbacks } = await applyFolderImportDecisions(
+              systemManager,
+              systemId,
+              [{ itemUuids }]
+            );
             ui.notifications.info(
               localize('FABRICATE.Admin.Items.FolderImportSummary', {
                 added,

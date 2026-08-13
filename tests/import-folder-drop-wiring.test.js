@@ -13,6 +13,7 @@
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 
 import {
   collectWorldFolderGroups,
@@ -215,4 +216,182 @@ test('a decision with no category and no tags still imports but applies nothing'
   const component = manager.getSystem('sys1').components[0];
   assert.equal(component.category, 'general');
   assert.deepEqual(component.tags, []);
+});
+
+// ── (c) write amplification (issue 1086) ─────────────────────────────────────
+//
+// `save()` replaces the WHOLE `craftingSystems` world setting and replicates it to every
+// connected client, so a per-item save makes a folder import quadratic in corpus size.
+// These are counter assertions, not timings: the invariant is the number of corpus
+// writes, and it must grow with neither the item count nor the folder count.
+
+const BASE_FROM_UUID = globalThis.fromUuid;
+
+/** Resolve `Item.bulk-<n>` to a synthetic Item, falling back to the shared fixtures. */
+function installBulkUuidResolver(overrides = {}) {
+  globalThis.fromUuid = async (uuid) => {
+    if (Object.hasOwn(overrides, uuid)) return overrides[uuid];
+    if (String(uuid).startsWith('Item.bulk-')) {
+      return { documentName: 'Item', name: `Bulk ${uuid}`, img: 'bulk.png' };
+    }
+    return BASE_FROM_UUID(uuid);
+  };
+}
+
+/** Replace a manager's `save` with a counting stub; returns the record. */
+function countCorpusWrites(manager) {
+  const record = { calls: 0 };
+  manager.save = async () => {
+    record.calls += 1;
+  };
+  return record;
+}
+
+/** `folders` decisions of `perFolder` items each, every folder carrying a mapping. */
+function mappedDecisions(folders, perFolder, prefix) {
+  return Array.from({ length: folders }, (_, folderIndex) => ({
+    itemUuids: Array.from(
+      { length: perFolder },
+      (_, itemIndex) => `Item.bulk-${prefix}-${folderIndex}-${itemIndex}`
+    ),
+    category: 'Reagent',
+    addTags: ['herb'],
+  }));
+}
+
+test('folder import commit — ONE corpus write for the whole run, whatever the item and folder count', async () => {
+  installBulkUuidResolver();
+
+  const small = buildManager();
+  const smallWrites = countCorpusWrites(small);
+  const smallSummary = await applyFolderImportDecisions(small, 'sys1', mappedDecisions(1, 2, 's'));
+
+  const large = buildManager();
+  const largeWrites = countCorpusWrites(large);
+  const largeSummary = await applyFolderImportDecisions(large, 'sys1', mappedDecisions(3, 10, 'l'));
+
+  globalThis.fromUuid = BASE_FROM_UUID;
+
+  assert.equal(smallSummary.added, 2, 'the small run must actually import its items');
+  assert.equal(largeSummary.added, 30, 'the large run must actually import its items');
+  assert.equal(smallWrites.calls, 1, 'a 1-folder / 2-item run writes the corpus once');
+  assert.equal(largeWrites.calls, 1, 'a 3-folder / 30-item run writes the corpus once');
+  assert.equal(
+    largeWrites.calls,
+    smallWrites.calls,
+    'the write count must be independent of both the item count and the folder count'
+  );
+  // Unbatched this run cost 30 item writes PLUS 3 per-folder set-apply writes, so the
+  // per-folder mapping is inside the bound too, not just the import loop.
+  const components = large.getSystem('sys1').components;
+  assert.equal(components.length, 30);
+  assert.ok(
+    components.every((component) => component.category === 'Reagent'),
+    'the single write must carry every folder mapping'
+  );
+});
+
+test('folder import commit — the collaborators still write per call when nothing batches them (positive control)', async () => {
+  installBulkUuidResolver();
+  const manager = buildManager();
+  const writes = countCorpusWrites(manager);
+
+  // The same four imports the commit loop would make, issued directly at the default
+  // `persist`. The counter DOES move with item count here, which is what makes the
+  // `calls === 1` above a statement about batching rather than a stub that never fires.
+  const ids = [];
+  for (const uuid of ['Item.bulk-c-0', 'Item.bulk-c-1', 'Item.bulk-c-2', 'Item.bulk-c-3']) {
+    const result = await manager.addItemFromUuid('sys1', uuid);
+    ids.push(result.item.id);
+  }
+  assert.equal(writes.calls, 4, 'each single-item import persists immediately, one write each');
+
+  // And the set-apply primitive still persists on its own, so the new `persist` option did
+  // not silently un-persist the GM browser's one-shot bulk edit.
+  await manager.applyBulkEditToComponents('sys1', ids, { category: 'Reagent' });
+  assert.equal(writes.calls, 5, 'an unbatched bulk edit still issues its own write');
+
+  globalThis.fromUuid = BASE_FROM_UUID;
+});
+
+test('folder import commit — an all-skipped, unmapped re-drop writes the corpus zero times', async () => {
+  installBulkUuidResolver();
+  const manager = buildManager();
+  const decisions = [{ itemUuids: ['Item.bulk-r-0', 'Item.bulk-r-1'], category: '', addTags: [] }];
+  await applyFolderImportDecisions(manager, 'sys1', decisions);
+
+  const writes = countCorpusWrites(manager);
+  const summary = await applyFolderImportDecisions(manager, 'sys1', decisions);
+
+  globalThis.fromUuid = BASE_FROM_UUID;
+
+  assert.equal(summary.skipped, 2);
+  assert.equal(writes.calls, 0, 'nothing changed in the corpus, so nothing is written');
+});
+
+test('folder import commit — a mid-run failure flushes what was imported and still throws', async () => {
+  installBulkUuidResolver({
+    'Item.bulk-f-3': { documentName: 'Actor', name: 'Not an item' },
+  });
+  const manager = buildManager();
+  const writes = countCorpusWrites(manager);
+
+  await assert.rejects(
+    () =>
+      applyFolderImportDecisions(manager, 'sys1', [
+        {
+          itemUuids: ['Item.bulk-f-0', 'Item.bulk-f-1', 'Item.bulk-f-2', 'Item.bulk-f-3'],
+          category: '',
+          addTags: [],
+        },
+      ]),
+    /Cannot add non-Item document/,
+    'the failure must still surface to the caller'
+  );
+
+  globalThis.fromUuid = BASE_FROM_UUID;
+
+  assert.equal(writes.calls, 1, 'the partial run is flushed by exactly one write');
+  assert.equal(
+    manager.getSystem('sys1').components.length,
+    3,
+    'the imports preceding the failure must be persisted, not lost'
+  );
+});
+
+// ── (d) the plain folder drop delegates to the batched commit loop ────────────
+//
+// `SvelteCraftingSystemManagerApp`'s `onDropItem` Folder branch is not importable in
+// isolation (the module builds a Foundry ApplicationV2 subclass at import time), and the
+// `onDropItem` integration tests elsewhere exercise a hand-written MIRROR of it — which
+// keeps passing however the real branch is written. This pins the real file: the branch
+// must delegate to the batched `applyFolderImportDecisions` and must not re-inline a
+// per-item import loop, which is what made a folder drop quadratic.
+
+const APP_SOURCE = readFileSync(
+  new URL('../src/ui/SvelteCraftingSystemManagerApp.svelte.js', import.meta.url),
+  'utf8'
+);
+
+test('the app folder drop delegates to applyFolderImportDecisions and does not loop addItemFromUuid', () => {
+  const folderBranch = APP_SOURCE.slice(
+    APP_SOURCE.indexOf("if (data?.type === 'Folder')"),
+    APP_SOURCE.indexOf('// Single item drop')
+  );
+  assert.ok(folderBranch.length > 0, 'the Folder branch of onDropItem must still be findable');
+  assert.ok(
+    folderBranch.includes('applyFolderImportDecisions('),
+    'the Folder branch must delegate to the batched commit loop'
+  );
+  assert.ok(
+    !folderBranch.includes('addItemFromUuid('),
+    'the Folder branch must not re-inline a per-item import loop'
+  );
+  // The single-item drop path is deliberately NOT batched: it is its own batch of one and
+  // must keep persisting immediately, so exactly one direct call survives in the file.
+  assert.equal(
+    APP_SOURCE.split('addItemFromUuid(').length - 1,
+    1,
+    'only the single-item drop may call addItemFromUuid directly'
+  );
 });
