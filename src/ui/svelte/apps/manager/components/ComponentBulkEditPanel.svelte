@@ -28,6 +28,12 @@
   arms. Do not substitute a `confirmDialog`, and do not remove the impact list and leave the
   arm — the carve-out is the pair, not the button.
 
+  The card is the shared `BulkDeleteCard` primitive (issue 1132), which is where the pairing,
+  the description association, the live region, the zero-row gate, the busy face and the
+  scoped CSS now live. The `data-component-bulk-*` hook names survive the move as `*Attr`
+  overrides, so the mounted suites, the smoke selectors and the View Lab cases are untouched.
+  What is left here is what is about COMPONENTS: the four sentences and the impact prop.
+
   The pairing is also wired for assistive tech rather than left to proximity: the impact list
   carries an id and is the button's `aria-describedby`, and arming — which changes the
   button's label and name UNDER FOCUS, where a name change is not reliably announced — is
@@ -35,7 +41,8 @@
 
   A count of ZERO is omitted rather than rendered. The components row always renders; the
   recipe rows appear only when they have something to say, so the commonest selection of all
-  (components no recipe names) states one fact instead of one fact and two noughts.
+  (components no recipe names) states one fact instead of one fact and two noughts. That rule
+  is the primitive's now, expressed as a `count` on each consequence row.
 
   ── NOTHING IS WRITTEN UNTIL APPLY ────────────────────────────────────────────────
   Every control stages into a draft the CALLER owns; the browser rows do not change while
@@ -89,7 +96,7 @@
    - onArmDelete() / onDisarmDelete() / onDelete(ids).
 -->
 <script>
-  import ArmedDangerButton from '../ArmedDangerButton.svelte';
+  import BulkDeleteCard from '../BulkDeleteCard.svelte';
   import Chip from '../Chip.svelte';
   import Callout from '../Callout.svelte';
   import BulkEditPanelShell from '../BulkEditPanelShell.svelte';
@@ -286,10 +293,18 @@
   // follow it — "Confirm deleting 3 component(s)…" does not contain "Confirm delete" and
   // was therefore unactivatable by voice. The idle pair needs no such reordering: its
   // `…DeleteAria*` sibling is the visible label verbatim.
+  //
+  // It ENDS with the irreversibility, and that is not decoration (issue 1132, review round).
+  // The name a screen-reader user hears on the armed face is the only place the permanence
+  // of a component delete is stated at all — this panel carries no standing hint — and the
+  // string was a bare count fragment with no full stop while the recipe pair — the only one
+  // of the three that stated it — ended "This cannot be undone." Component now matches it;
+  // essence remains the one outlier, deliberately left alone (issue 1132, review round 2).
+  // Deleting components is no less permanent than either.
   const deleteArmedAriaLabel = $derived(
     format(
       'FABRICATE.Admin.Manager.Component.BulkEdit.DeleteConfirmAria',
-      'Confirm delete — {count} component(s), {recipes} recipe(s)',
+      'Confirm delete — {count} component(s) and {recipes} recipe(s) affected. This cannot be undone.',
       { count: impact.deletable, recipes: impact.recipesRewritten }
     )
   );
@@ -298,14 +313,22 @@
   // its own polite region instead. It empties on disarm, which is also what makes a
   // RE-arm announce: the region's text has to change to be spoken.
   const deleteArmedAnnouncement = $derived(
-    deleteArmed === true
-      ? format(
-          'FABRICATE.Admin.Manager.Component.BulkEdit.DeleteArmedAnnouncement',
-          'Delete armed. Activate again to delete {count} component(s) and rewrite {recipes} recipe(s).',
-          { count: impact.deletable, recipes: impact.recipesRewritten }
-        )
-      : ''
+    format(
+      'FABRICATE.Admin.Manager.Component.BulkEdit.DeleteArmedAnnouncement',
+      'Delete armed. Activate again to delete {count} component(s) and rewrite {recipes} recipe(s).',
+      { count: impact.deletable, recipes: impact.recipesRewritten }
+    )
   );
+  // Four sentences, four different questions, and the last three are gated on their own count
+  // by the card. The subject row carries no `count`, so it always renders: it is the statement
+  // of what the button does, and a card that states nothing has lost the pairing the arm
+  // depends on. `disabled` is the SUBSET of `recipes`, so the two are gated independently —
+  // rewriting recipes without disabling any is the ordinary outcome.
+  const deleteImpactRows = $derived([
+    { key: 'components', text: impactComponentsLabel },
+    { key: 'recipes', text: impactRecipesLabel, count: impact.recipesRewritten },
+    { key: 'disabled', text: impactDisabledLabel, count: impact.recipesDisabled },
+  ]);
   // `Unchanged`, NOT "Leave unchanged". This label sits on a `<button>` whose activation
   // ARMS the axis, so an imperative reading ("leave unchanged") names the opposite of what
   // pressing it does — a GM who wants essences untouched would click it and stage the
@@ -641,79 +664,48 @@
   panel's primary action, and a destructive action inside the same card would read as a
   second way of applying the staged edit. The Essence Studio's card is the twin.
 -->
-<section
-  class="manager-inspector-card manager-component-bulk-delete"
-  data-component-bulk-delete-card
->
-  <div class="manager-edit-card-heading">
-    <h3 class="manager-card-title">
-      {text(
-        'FABRICATE.Admin.Manager.Component.BulkEdit.DeleteHeading',
-        'Delete selected components'
-      )}
-    </h3>
-  </div>
+<!--
+  Stated BEFORE the action is armed, and recomputed from the selection because the impact prop
+  is re-derived by the owner whenever the selected set changes.
 
-  <!--
-    Stated BEFORE the action is armed, and recomputed from the selection because the impact
-    prop is re-derived by the owner whenever the selected set changes.
+  `recipes rewritten` is a count of DISTINCT recipes, never a per-component sum — a recipe
+  naming two selected components is rewritten once — and `disabled` is the SUBSET of those left
+  with no ingredient sets or no results. `describeComponentDeleteImpact` owns that arithmetic
+  and counts through the very functions the delete executes through; this component only
+  renders it.
 
-    Three numbers, three different questions. `recipes rewritten` is a count of DISTINCT
-    recipes, never a per-component sum — a recipe naming two selected components is rewritten
-    once — and `disabled` is the SUBSET of those left with no ingredient sets or no results.
-    `describeComponentDeleteImpact` owns that arithmetic and counts through the very functions
-    the delete executes through; this component only renders it.
-  -->
-  <ul
-    id="component-bulk-delete-impact"
-    class="manager-component-bulk-impact"
-    data-component-bulk-impact
-  >
-    <li data-component-bulk-impact-row="components">
-      {impactComponentsLabel}
-    </li>
-    <!--
-      A ZERO row is omitted rather than stated. "0 recipes will be rewritten." is noise on the
-      commonest selection there is — components no recipe names — and it pushes the one number
-      that always matters, the component count, into a list of mostly nothing. The components
-      row is unconditional: it is the statement of what the button does, and a delete card that
-      states nothing has lost the pairing the arm depends on.
-    -->
-    {#if impact.recipesRewritten > 0}
-      <li data-component-bulk-impact-row="recipes">
-        {impactRecipesLabel}
-      </li>
-    {/if}
-    {#if impact.recipesDisabled > 0}
-      <li data-component-bulk-impact-row="disabled">
-        {impactDisabledLabel}
-      </li>
-    {/if}
-  </ul>
-
-  <!--
-    The impact list is the button's DESCRIPTION, not merely adjacent to it: `aria-describedby`
-    is what makes a screen-reader user hear the consequence when they arrive at the control,
-    rather than only if they happen to have read the list on the way past.
-  -->
-  <ArmedDangerButton
-    token="delete-components"
-    armed={deleteArmed === true}
-    disabled={impact.deletable === 0 || inert}
-    idleLabel={deleteLabel}
-    armedLabel={text('FABRICATE.Admin.Manager.Component.BulkEdit.DeleteConfirm', 'Confirm delete')}
-    idleAriaLabel={deleteAriaLabel}
-    armedAriaLabel={deleteArmedAriaLabel}
-    describedBy="component-bulk-delete-impact"
-    onArm={onArmDelete}
-    onDisarm={onDisarmDelete}
-    onConfirm={() => onDelete(impact.deletableIds)}
-  />
-
-  <p class="visually-hidden" aria-live="polite" data-component-bulk-delete-announce>
-    {deleteArmedAnnouncement}
-  </p>
-</section>
+  `busy` is the caller's own `deleting` flag and is NOT folded into `disabled` here: the card
+  needs to tell an in-flight write apart from an inert one to render the third face at all.
+  `applying` still inerts the control, because a staged apply and a delete must not race.
+-->
+<BulkDeleteCard
+  token="delete-components"
+  heading={text(
+    'FABRICATE.Admin.Manager.Component.BulkEdit.DeleteHeading',
+    'Delete selected components'
+  )}
+  rows={deleteImpactRows}
+  idleLabel={deleteLabel}
+  armedLabel={text('FABRICATE.Admin.Manager.Component.BulkEdit.DeleteConfirm', 'Confirm delete')}
+  busyLabel={text('FABRICATE.Admin.Manager.BulkEdit.Deleting', 'Deleting…')}
+  idleAriaLabel={deleteAriaLabel}
+  armedAriaLabel={deleteArmedAriaLabel}
+  armedAnnouncement={deleteArmedAnnouncement}
+  disarmedAnnouncement={text(
+    'FABRICATE.Admin.Manager.BulkEdit.DeleteCancelled',
+    'Delete cancelled. Nothing was deleted.'
+  )}
+  armed={deleteArmed === true}
+  busy={deleting === true}
+  disabled={impact.deletable === 0 || applying === true}
+  cardAttr="data-component-bulk-delete-card"
+  impactAttr="data-component-bulk-impact"
+  rowAttr="data-component-bulk-impact-row"
+  announceAttr="data-component-bulk-delete-announce"
+  onArm={onArmDelete}
+  onDisarm={onDisarmDelete}
+  onConfirm={() => onDelete(impact.deletableIds)}
+/>
 
 <style>
   /* Manager-scoped by PLACEMENT — this component lives under `apps/manager/`, so
@@ -762,52 +754,17 @@
     line-height: 1.3;
   }
 
-  .manager-component-bulk-delete {
-    display: flex;
-    flex-direction: column;
-    gap: var(--fab-space-2);
-  }
+  /* The delete card's three rules used to be a deliberate SECOND COPY of the Essence Studio's
+     identical blocks, kept rather than extracted in issue 1129 with the note that "a shared
+     `BulkDeleteCard` component is the honest extraction, but it reshapes two shipped studios
+     and belongs to its own change". That change is issue 1132, and the rules moved to
+     `BulkDeleteCard.svelte` with the markup they style.
 
-  /* The armed danger button reads at the shared inspector-action label size, for the reason
-     recorded on the Essence Studio's twin: `ArmedDangerButton` renders a bare
-     `.manager-button`, which carries no font-size of its own and so inherits the app's body
-     size — visibly chunkier than every other right-rail control. Scoped to this card only, so
-     the row-level `ArmedDangerButton` uses elsewhere in the manager are untouched, and only
-     the type scale changes — the danger/armed colour treatment from `styles/fabricate.css`
-     is untouched.
-
-     THIS RULE AND THE `-impact` RULE BELOW ARE DELIBERATE SECOND COPIES of the Essence
-     Studio's identical blocks, and were reviewed for extraction and kept (issue 1129). The
-     two candidate destinations both cost more than the duplication saves:
-
-      - `styles/fabricate.css` re-routes any future edit to the broad `theme-or-global-ui`
-        recipe in `scripts/ui-pr-screenshot-evidence.mjs`, which is the exact outcome the
-        block comment at the top of this `<style>` exists to prevent;
-      - `ArmedDangerButton` itself would need a size variant prop, which changes the Essence
-        Studio's markup and its own capture routing for a change that is not about essences.
-
-     A shared `BulkDeleteCard` component is the honest extraction, but it reshapes two
-     shipped studios and belongs to its own change rather than to this one. The duplication
-     is two short rules in scoped Svelte `<style>` blocks, which SonarCloud does not analyse,
-     so nothing but the reader pays for it. */
-  .manager-component-bulk-delete :global(.manager-button) {
-    min-height: 34px;
-    padding: 0 var(--fab-space-3);
-    font-size: 0.72rem;
-    font-weight: 700;
-  }
-
-  /* WEIGHT, not size: this is the sentence the GM is asked to act on, so it takes the
-     secondary text colour and a heavier face to read as a statement rather than a footnote,
-     while keeping the small type because the card is a rail and not a dialog. */
-  .manager-component-bulk-impact {
-    display: flex;
-    flex-direction: column;
-    gap: var(--fab-space-2xs);
-    margin: 0;
-    padding-left: var(--fab-space-4);
-    color: var(--fab-text-secondary);
-    font-size: 0.72rem;
-    font-weight: 600;
-  }
+     They could not be left behind. Svelte scoping is per component, so the moment that
+     `<section>` rendered from the primitive these selectors matched nothing and the rendered
+     result would have been the issue 1036 defect back in every studio at once. Nor did they go
+     to `styles/fabricate.css`, for the reason 1129 already recorded: a global rule re-routes
+     every future edit to the broad `theme-or-global-ui` recipe in
+     `scripts/ui-pr-screenshot-evidence.mjs`, which is what the block comment at the top of this
+     `<style>` exists to prevent. */
 </style>

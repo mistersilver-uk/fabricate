@@ -27,6 +27,7 @@ import { describe, it } from 'node:test';
 
 import {
   describeBulkSelection,
+  normalizeSelectionIds,
   pruneBulkSelection,
   setBulkSelection,
   toggleBulkSelection,
@@ -128,5 +129,25 @@ describe('bulk selection model (issue 772) — the selection set', () => {
     assert.equal(toggleComponentSelection, toggleBulkSelection);
     assert.equal(setComponentSelection, setBulkSelection);
     assert.equal(pruneComponentSelection, pruneBulkSelection);
+  });
+});
+
+describe('bulk selection model (issue 1132) — the id coercion', () => {
+  // IT TRIMS, and that is not cosmetic. `describeRecipeDeleteImpact` — the leaf the recipe
+  // set delete's STATEMENT counts through — trims the ids it is handed, while the WRITE
+  // normalizes through here. The two sides therefore disagreed about `' r1 '`: the card
+  // stated `deletable: 1` and the write reported `deleted: 0`. Unreachable through the
+  // shipped callers, which forward the describer's already-trimmed ids, and closed anyway,
+  // because the whole design rests on the two sides being unable to disagree.
+  it('trims, so the describer and the writer cannot mean different ids', () => {
+    assert.deepEqual(normalizeSelectionIds([' r1 ', 'r2	']), ['r1', 'r2']);
+  });
+
+  it('still de-duplicates AFTER trimming, so padding cannot smuggle a second copy in', () => {
+    assert.deepEqual(normalizeSelectionIds(['r1', ' r1']), ['r1']);
+  });
+
+  it('drops a whitespace-only id rather than keeping an empty one', () => {
+    assert.deepEqual(normalizeSelectionIds(['  ', 'r1']), ['r1']);
   });
 });

@@ -38,7 +38,7 @@ describe('1129/copy component bulk-delete two-count strings', () => {
   it('DeleteConfirmAria reads correctly with both counts at 1', () => {
     assert.equal(
       interpolate(bulkEdit.DeleteConfirmAria, { count: 1, recipes: 1 }),
-      'Confirm delete — 1 component(s), 1 recipe(s)',
+      'Confirm delete — 1 component(s) and 1 recipe(s) affected. This cannot be undone.',
       'not "1 components" / "1 recipes"'
     );
   });
@@ -46,8 +46,17 @@ describe('1129/copy component bulk-delete two-count strings', () => {
   it('DeleteConfirmAria still carries both counts when neither is 1', () => {
     assert.equal(
       interpolate(bulkEdit.DeleteConfirmAria, { count: 4, recipes: 2 }),
-      'Confirm delete — 4 component(s), 2 recipe(s)'
+      'Confirm delete — 4 component(s) and 2 recipe(s) affected. This cannot be undone.'
     );
+  });
+
+  // IT STATES THE IRREVERSIBILITY, like its essence and recipe siblings (issue 1132, review
+  // round). This panel carries no standing hint, so the armed accessible name is the ONLY
+  // place a screen-reader user is told that deleting components is permanent — and it was a
+  // bare count fragment with no full stop while both other studios ended "This cannot be
+  // undone." Deleting components is no less permanent than deleting an essence.
+  it('the armed accessible name states that the delete cannot be undone', () => {
+    assert.match(bulkEdit.DeleteConfirmAria, /cannot be undone/i);
   });
 
   // WCAG 2.5.3 Label in Name. A speech-input user activates a control by saying what they

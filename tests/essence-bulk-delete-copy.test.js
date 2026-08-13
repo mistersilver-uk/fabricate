@@ -43,7 +43,7 @@ describe('1036/copy essence bulk-delete two-count strings', () => {
   it('DeleteConfirmAria reads correctly with both counts at 1', () => {
     assert.equal(
       interpolate(bulkEdit.DeleteConfirmAria, { count: 1, recipes: 1 }),
-      'Confirm deleting 1 essence definition(s) and rewriting 1 recipe(s)',
+      'Confirm delete — 1 essence definition(s) will be deleted and 1 recipe(s) rewritten',
       'not "1 essence definitions" / "1 recipes" — the shipped defect'
     );
   });
@@ -51,7 +51,7 @@ describe('1036/copy essence bulk-delete two-count strings', () => {
   it('DeleteConfirmAria still carries both counts when neither is 1', () => {
     assert.equal(
       interpolate(bulkEdit.DeleteConfirmAria, { count: 2, recipes: 3 }),
-      'Confirm deleting 2 essence definition(s) and rewriting 3 recipe(s)'
+      'Confirm delete — 2 essence definition(s) will be deleted and 3 recipe(s) rewritten'
     );
   });
 
@@ -67,5 +67,48 @@ describe('1036/copy essence bulk-delete two-count strings', () => {
   it('Deleted still carries both counts when neither is 1', () => {
     const sentence = interpolate(bulkEdit.Deleted, { count: 3, recipes: 2 });
     assert.equal(sentence, 'Deleted 3 essence(s) and rewrote 2 recipe(s).');
+  });
+});
+
+// WCAG 2.5.3 Label in Name (issue 1132). A speech-input user activates a control by saying what
+// they can READ, so the accessible name has to CONTAIN the visible label string. Both essence
+// faces failed, and the conversion onto the shared `BulkDeleteCard` is what forced the audit:
+//
+//  - the ARMED name opened "Confirm deleting …" beside a button reading "Confirm delete";
+//  - the IDLE PLURAL name read "Delete 3 essence definitions" beside "Delete 3 essences". The
+//    `…One` branch passed only by luck — "Delete 1 essence definition" happens to contain
+//    "Delete 1 essence" — which is precisely why it is asserted here rather than assumed.
+//
+// The component twin's identical block is in `component-bulk-delete-copy.test.js`; both are
+// pinned per FACE, because the pair is one label edit away from breaking the same way again.
+describe('1132/copy essence bulk-delete names contain their visible labels', () => {
+  it('the ARMED accessible name contains, and leads with, the armed label', () => {
+    const name = interpolate(bulkEdit.DeleteConfirmAria, { count: 4, recipes: 2 });
+    assert.ok(
+      name.includes(bulkEdit.DeleteConfirm),
+      `"${name}" must contain the visible label "${bulkEdit.DeleteConfirm}"`
+    );
+    assert.ok(name.startsWith(bulkEdit.DeleteConfirm), 'and lead with it, so it is said first');
+  });
+
+  it('the IDLE accessible name contains the idle visible label at both counts', () => {
+    assert.ok(
+      interpolate(bulkEdit.DeleteAria, { count: 3 }).includes(
+        interpolate(bulkEdit.Delete, { count: 3 })
+      ),
+      'the plural pair — the half that shipped broken'
+    );
+    assert.ok(bulkEdit.DeleteAriaOne.includes(bulkEdit.DeleteOne), 'and the singular pair');
+  });
+
+  it('the armed announcement names the consequence, not just the state', () => {
+    // The card renders a live region on every studio now, so the Essence Studio needs something
+    // for it to say: a region that exists and never speaks is an affordance that lies. A bare
+    // "armed" would tell a screen-reader user that something changed but not what confirming
+    // would do.
+    const announcement = interpolate(bulkEdit.DeleteArmedAnnouncement, { count: 3, recipes: 2 });
+    assert.match(announcement, /3 essence definition\(s\)/);
+    assert.match(announcement, /2 recipe\(s\)/);
+    assert.match(announcement, /again/i, 'and says a SECOND activation is what deletes');
   });
 });

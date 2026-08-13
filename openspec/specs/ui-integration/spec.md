@@ -214,6 +214,15 @@ A bulk edit panel's CHROME renders through one shared panel-chrome primitive set
 The noun-bearing strings (the hero's count sentence, the Apply label), the axes a studio stages, and the test and screenshot hook names are parameters of those primitives — what a studio STAGES is its own, the chrome around it is not.
 A studio that hand-rolls its own header, hero, section scale or Apply is a second bulk-edit panel design and is not an acceptable rendering, however closely it copies the first.
 
+A bulk-delete card renders through one shared primitive alongside that chrome, and the accessibility contract is a property of the PRIMITIVE rather than of each studio.
+The subject row — the count of what is being deleted — always renders, while a consequence row whose count is zero is omitted rather than stated as zero.
+The accessible name of each face contains its visible label, so a speech-input user can activate the control by saying what they can read; the impact statement is programmatically associated with the armed control rather than merely adjacent to it; arming is announced through a live region that exists in the document before it has any text, and disarming without confirming is announced through that same region rather than the region simply falling silent, because clearing a live region announces nothing and the control's accessible name changes under focus at the exact moment the GM stops hearing about it; and the control shows a distinct in-progress face for the duration of the write, driven by the caller's own in-flight state and never derived from the armed state.
+A studio that hand-rolls a fourth delete card is a second design for the same affordance and is not an acceptable rendering.
+
+A bulk edit panel may render a sibling card after the shell.
+Apply's dock then clamps to the panel's own box rather than to the rail's bottom edge, and that is accepted.
+What is required is that Apply's border box stays wholly within the scrollport at every scroll offset; the guarantee holds while the sibling is shorter than the scrollport, and a sibling taller than it is a reachability failure rather than an accepted configuration.
+
 #### Segmented controls
 
 Every mutually-exclusive inline choice in the manager renders through one shared segmented-control primitive: real radios in a `role="radiogroup"`, visually hidden but focusable, with `<label>` segments as the visible surface.
@@ -934,6 +943,7 @@ Capabilities:
   The statement reports how many essence definitions will be deleted, how many components carry one or more of the SELECTED essences, and how many recipes will be rewritten.
   The component number is counted over the whole selection as a DISTINCT-carrier union: a component carrying two selected essences counts once, because the cascade strips it in one pass, so the copy says "one or more of the selected essences" rather than a per-essence sum.
   The two carrier numbers are counts of DISTINCT carriers, so neither exceeds what the cascade will touch.
+  A carrier number of zero is omitted rather than stated as zero; the essence count always renders, because the impact statement is what the armed confirmation is paired with and a card stating nothing has lost that pairing.
 - The set delete uses the two-step armed confirmation rather than a modal dialog.
   This is a deliberate exception to the reserved-for-bulk-actions dialog rule, taken on an explicit maintainer decision, and it is paired with the impact statement above.
 - Manager source-state language is `linked`, `missing`, `stale`, and `none`; stale source evidence must remain readable until the GM clears or repairs it.
@@ -1171,6 +1181,37 @@ One action applies every staged axis to every selected recipe; it names the numb
 Applying persists through a single set-apply write — at most one `recipes` world write and at most one `craftingSystems` world write, and none for an axis that changed nothing — applies every ungated axis to a recipe whose enable is refused, reports the number of recipes changed, the number of enables refused, and the recipe-item memberships added and removed, then clears the selection and the staged changes, returning the rail to the single-recipe inspector.
 The membership figures count MEMBERSHIP EDGES — one per recipe added to or removed from an item — not the number of items whose membership changed, and they exclude the basis-carry-across the first membership write performs.
 Every part of that report composes; none replaces another, so a batch that moved membership still reports any enables the activation gate refused.
+The set delete specified below is the panel's other exit and ends the same way, so the panel has exactly two terminal actions and both return the rail to the single-recipe inspector.
+
+**Recipe Studio — set delete.**
+
+The recipe browser's bulk edit panel offers a set DELETE, rendered below the panel shell rather than inside it, so a destructive action never reads as a second way of applying the staged edit.
+The set delete exists because the panel swap above otherwise removes the only delete affordance at exactly the moment the GM has selected the rows they want removed; Edit and Duplicate stay inspector-only, because neither is destructive and neither has an impact worth stating.
+
+The delete states its impact BEFORE it is armed and recomputes it when the selection changes: how many recipes will be deleted, how many recipe items will no longer contain them, and how many characters will lose the learned knowledge.
+The recipe figure is the number of selected ids that RESOLVE to a recipe, not the size of the selection, because a stale id must not inflate the stated count above what the write performs.
+The recipe-item figure counts DISTINCT RECIPE ITEMS — two selected recipes in one recipe item is one recipe item — expressly unlike the bulk-edit membership figures above, which count MEMBERSHIP EDGES.
+It is basis-aware and may therefore exceed the number of definitions the write actually rewrites: on a system resolving membership through the legacy per-recipe scalar the item genuinely stops containing the recipe, and nothing is rewritten because nothing dangles.
+The character figure is a DISTINCT union of the actors the deleting client may write, resolved through the same scope the deletion cascade uses, so the two sides count the same set by construction.
+Its FRESHNESS is bounded rather than instantaneous: the count is read from a cached learned-knowledge index, rebuilt whenever the studio's data is re-read and whenever an actor write has marked it stale, not re-derived on every render.
+A character who learns one of the selected recipes at the instant the card is on screen and untouched is therefore not necessarily counted until the card next recomputes, and the number the write performs is recomputed at write time regardless.
+The cascade may also clear learned entries the figure did not count, because the clean-up it runs removes every entry naming a recipe that no longer exists — so a world carrying pre-existing orphans has them swept too, and the figure is the number this delete makes forgotten rather than the total number of entries the pass touches.
+A consequence figure of zero is omitted rather than stated as zero; the recipe count always renders, because the impact statement is what the armed confirmation is paired with and a card stating nothing has lost that pairing.
+Each consequence figure is gated on ITS OWN count, on the card and in the single-recipe confirmation alike, so the commonest single delete of all — in one recipe item, learned by nobody — states neither nought.
+Both consequence statements are worded in the FUTURE and carry no pronoun standing for the recipes, because the recipe count, the recipe-item count and the character count vary independently and a statement agreeing with a count it does not branch on reads wrong on ordinary selections.
+One countable noun names the recipe-item figure across the card, the confirmation, the completion message and the control's accessible name; `recipe item` remains the canonical noun of this specification, and the surface may use the `Books & Scrolls` display name provided it uses it everywhere in the interaction.
+The card additionally carries a standing, always-rendered sentence that deleting is permanent and a recreated recipe is a new recipe, and qualifies the character figure with the fact that a character does not get their learn slot back — a property rather than a count, which no numbered row can carry and which a GM reading "will forget" would otherwise reasonably read as re-teachable.
+
+Deletion is WARNED, not BLOCKED: no recipe is refused and no set member is skipped on account of the recipe items containing it or the characters who have learned it.
+The set delete uses the two-step armed confirmation rather than a modal dialog, paired with the impact statement above; the armed token is dropped whenever the selection changes at all, because an arm is a statement about a specific set, while a staged bulk edit survives a selection change that leaves the selection non-empty.
+The set write persists through AT MOST one recipes write and AT MOST one crafting-system write regardless of set size, in that order, followed by one actor-flag clean-up for the whole set rather than one per recipe.
+The crafting-system write and the crafting-systems change signal are both skipped when the prune rewrote no definition, which on a legacy-basis system is every time; the recipes change signal is emitted for the delete itself.
+The actor-flag clean-up is one clean-up, not one write pass: it clears the run store and the learned-recipe store, each over the actors the deleting client may write.
+On success it clears the selection and returns the rail to the single-recipe inspector; because that exit unmounts the panel, the completion message is the only surviving feedback and reports every non-zero outcome — recipes deleted, recipe items that no longer contain them, and characters who forgot them.
+The recipe-item figure it reports is the one the impact statement promised, not the number of definitions the write rewrote, so a legacy-basis delete does not report having done less than it stated.
+A write that deleted nothing reports no success, leaves the selection intact and returns the control to its idle face rather than leaving it in progress, and tells the GM that nothing was deleted — whether the write failed or simply reached nothing, which a concurrent client deleting the same recipes between the statement and the click produces without any failure at all.
+That outcome is announced through the card's own live region and focus is returned to the re-enabled control, because confirming disables the control and so moves focus to the document body; disarming without confirming is announced through the same region, since it changes the control's accessible name while it holds focus.
+The single-recipe delete states the same arithmetic in its confirmation, from the same computation, so the two forms cannot report different numbers for the same recipe.
 
 ### Books & Scrolls Surface
 

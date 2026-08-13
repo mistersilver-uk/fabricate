@@ -58,6 +58,10 @@ const panel = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/BulkEditPanelShell.svelte',
     'src/ui/svelte/apps/manager/BulkEditSection.svelte',
     'src/ui/svelte/apps/manager/BulkEditSelect.svelte',
+    // The shared set-delete card and the armed control inside it (issue 1132). Both are
+    // STATIC imports of the panel, so the closure validator throws on an omission.
+    'src/ui/svelte/apps/manager/BulkDeleteCard.svelte',
+    'src/ui/svelte/apps/manager/ArmedDangerButton.svelte',
     'src/ui/svelte/apps/manager/recipes/RecipeBulkEditPanel.svelte'
   ],
   componentPath: 'src/ui/svelte/apps/manager/recipes/RecipeBulkEditPanel.svelte'
@@ -896,5 +900,152 @@ describe('RecipeBulkEditPanel in-flight apply (issue 1010)', () => {
       true,
       'and Apply is inert even though the draft has changes'
     );
+  });
+});
+
+/*
+ * ── THE SET DELETE (issue 1132) ──────────────────────────────────────────────────
+ * The card itself is `BulkDeleteCard`, and its behaviours — the zero-row gate, the subject
+ * row's exemption, the description association, the live region, the busy face — are proved
+ * ONCE in `bulk-delete-card-mounted.test.js`. What is proved here is this panel's WIRING to
+ * it, which is the half that can silently drift per studio: the hook names, the row KEYS, the
+ * three sentences the impact prop turns into, and which ids the confirm hands back.
+ */
+const deleteCard = (root) => root.querySelector('[data-recipe-bulk-delete-card]');
+const deleteButton = (root) => deleteCard(root).querySelector('.manager-button.is-danger');
+const impactRow = (root, key) => root.querySelector(`[data-recipe-bulk-impact-row="${key}"]`);
+
+const FULL_IMPACT = {
+  deletable: 3,
+  deletableIds: ['r1', 'r2', 'r3'],
+  recipeItemsAffected: 2,
+  recipeItemIds: ['book-alchemy', 'book-forge'],
+  learnersAffected: 4,
+  learnerIds: ['a1', 'a2', 'a3', 'a4']
+};
+
+describe('RecipeBulkEditPanel set delete (issue 1132)', () => {
+  it('renders the card under the shell, with this studio\'s hook names', async () => {
+    const { root } = await mountPanel({ deleteImpact: FULL_IMPACT });
+
+    assert.ok(Boolean(deleteCard(root)), 'the panel renders no delete card at all');
+    assert.ok(
+      Boolean(root.querySelector('[data-recipe-bulk-impact]')),
+      'the impact list keeps the `data-recipe-bulk-*` convention every other hook in this panel uses'
+    );
+    assert.ok(Boolean(root.querySelector('[data-recipe-bulk-delete-announce]')));
+    // The card is a SIBLING of the shell, not a child of it: a destructive action inside the
+    // shell would read as a second way of applying the staged edit.
+    const panelEl = root.querySelector('[data-recipe-bulk-panel]');
+    assert.ok(Boolean(panelEl), 'the shell is absent, so "sibling" would be unfalsifiable');
+    assert.equal(
+      panelEl.contains(deleteCard(root)),
+      false,
+      'the delete card is INSIDE the shell, where it reads as a second Apply'
+    );
+  });
+
+  it('turns the impact prop into three sentences, keyed for the suites that query them', async () => {
+    const { root } = await mountPanel({ deleteImpact: FULL_IMPACT });
+
+    assert.match(impactRow(root, 'recipes').textContent, /3 recipes will be deleted\./);
+    assert.match(
+      impactRow(root, 'items').textContent,
+      /Will be removed from 2 books & scrolls\./
+    );
+    assert.match(impactRow(root, 'learners').textContent, /Will be forgotten by 4 characters/);
+    // The qualifier is the load-bearing half of the learners sentence: the learn slot is
+    // spent by the same act the number counts.
+    assert.match(
+      impactRow(root, 'learners').textContent,
+      /spent learn slots are not given back/
+    );
+  });
+
+  it('always states the permanence, which is a PROPERTY and has no count to gate it on', async () => {
+    // It is also what stops the card degrading to a bare heading and an arm when both
+    // consequence rows are zero-gated away — the state the next test reaches.
+    const { root } = await mountPanel({ deleteImpact: FULL_IMPACT });
+    assert.match(
+      deleteCard(root).textContent,
+      /Deleting is permanent\. A recipe you recreate is a new recipe\./
+    );
+  });
+
+  it('omits a consequence row at zero while the subject row and the hint stay', async () => {
+    const { root } = await mountPanel({
+      deleteImpact: { ...FULL_IMPACT, deletable: 1, recipeItemsAffected: 0, learnersAffected: 0 }
+    });
+
+    assert.match(impactRow(root, 'recipes').textContent, /1 recipe will be deleted\./);
+    assert.ok(!impactRow(root, 'items'), '"0 books & scrolls will lose them." is noise');
+    assert.ok(!impactRow(root, 'learners'), 'and so is "0 characters will forget them"');
+    assert.match(deleteCard(root).textContent, /Deleting is permanent/);
+  });
+
+  it('singularizes every sentence at a count of one', async () => {
+    const { root } = await mountPanel({
+      deleteImpact: {
+        deletable: 1,
+        deletableIds: ['r1'],
+        recipeItemsAffected: 1,
+        recipeItemIds: ['book-alchemy'],
+        learnersAffected: 1,
+        learnerIds: ['a1']
+      }
+    });
+
+    assert.match(impactRow(root, 'recipes').textContent, /1 recipe will be deleted\./);
+    assert.match(
+      impactRow(root, 'items').textContent,
+      /Will be removed from 1 book or scroll\./
+    );
+    assert.match(impactRow(root, 'learners').textContent, /Will be forgotten by 1 character/);
+    assert.match(deleteButton(root).textContent, /Delete 1 recipe/);
+  });
+
+  it('hands the confirm the RESOLVED ids, not the selection', async () => {
+    // A stale selected id names no recipe, `RecipeManager.deleteRecipe` throws for one, and
+    // the browser prunes it only when the projection republishes — a different moment from
+    // the click. `deletableIds` is the describer's answer to that, and this is the wiring
+    // that makes the button act on it.
+    const deleted = [];
+    const { root } = await mountPanel({
+      deleteImpact: { ...FULL_IMPACT, deletable: 2, deletableIds: ['r1', 'r3'] },
+      onArmDelete: () => {},
+      onDelete: (ids) => deleted.push([...ids])
+    });
+
+    await panel.setProps({ deleteArmed: true });
+    deleteButton(root).click();
+    flushSync();
+    assert.deepEqual(deleted, [['r1', 'r3']]);
+  });
+
+  it('is inert when nothing resolves, and while a staged apply is in flight', async () => {
+    const { root } = await mountPanel({
+      deleteImpact: { ...FULL_IMPACT, deletable: 0, deletableIds: [] }
+    });
+    assert.equal(deleteButton(root).disabled, true, 'a fully stale selection deletes nothing');
+
+    await panel.setProps({ deleteImpact: FULL_IMPACT, applying: true });
+    assert.equal(
+      deleteButton(root).disabled,
+      true,
+      'a staged apply and a delete must not race each other'
+    );
+  });
+
+  it('renders the busy face from the caller\'s own flag, not from the arm', async () => {
+    // `deleting` is the owner's in-flight flag. Passing `armed: false` alongside it is the
+    // state a real browser reaches within a frame of the write starting — disabling a focused
+    // button blurs it, and `ArmedDangerButton` disarms on blur — so a busy face read off the
+    // arm would show "Delete 3 recipes" for the whole write. See
+    // `bulk-delete-busy-focus.test.js` for that blur, measured in Chromium.
+    const { root } = await mountPanel({ deleteImpact: FULL_IMPACT });
+    await panel.setProps({ deleting: true, deleteArmed: false });
+
+    assert.match(deleteButton(root).textContent, /Deleting…/);
+    assert.equal(deleteButton(root).disabled, true);
   });
 });

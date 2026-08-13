@@ -3054,14 +3054,35 @@ class Fabricate {
 
   /**
    * Delete a recipe by ID.
+   *
+   * Routes through `CraftingSystemManager.deleteRecipes` (issue 1132) so this documented
+   * public API and the GM studio cannot disagree about what deleting a recipe reaches: the
+   * recipe-item membership prune cascades here too, in one `recipes` write, at most one
+   * `craftingSystems` write and one actor-flag clean-up (itself two writable-actor walks,
+   * not one pass). The singular `ui.notifications.info` is unchanged —
+   * `RecipeManager.deleteRecipes` raises it for a one-recipe set.
+   *
+   * The system id comes from the recipe itself; a recipe whose `craftingSystemId` names no
+   * system still deletes, and prunes nothing.
+   *
+   * **API change:** this used to return `undefined`.
+   *
    * @param {string} recipeId - The recipe ID to delete
+   * @returns {Promise<{deleted: number, recipeIds: string[], recipeItemsAffected: number,
+   *   recipeItemsRewritten: number, learnersAffected: number}>}
+   * @throws {Error} When Fabricate is not initialized, or `recipeId` names no recipe.
    */
   async deleteRecipe(recipeId) {
     if (!this.ready) {
       throw new Error('Fabricate not initialized');
     }
 
-    return await this.recipeManager.deleteRecipe(recipeId);
+    const recipe = this.recipeManager.getRecipe(recipeId);
+    if (!recipe) {
+      throw new Error(`Recipe ${recipeId} not found`);
+    }
+
+    return await this.craftingSystemManager.deleteRecipes(recipe.craftingSystemId, [recipeId]);
   }
 }
 

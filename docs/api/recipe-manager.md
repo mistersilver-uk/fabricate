@@ -75,7 +75,26 @@ Also cleans up associated runs and learned entries.
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 
-**Returns:** `Promise<void>`
+**Returns:** `Promise<object>`
+
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
+
+| Field | Type | Description |
+|:------|:-----|:------------|
+| `deleted` | `number` | Recipes actually deleted. `0` when the id resolved to nothing. |
+| `recipeIds` | `string[]` | The ids that were deleted. |
+| `recipeItemsAffected` | `number` | Books and scrolls that carried the recipe and no longer offer it. Counted on either membership basis. |
+| `recipeItemsRewritten` | `number` | Recipe item definitions the prune actually rewrote. `0` on a legacy-basis system, where the membership lived on the recipe and dies with it. |
+| `learnersAffected` | `number` | Characters, among those the calling client may write, who had learned the recipe. |
+
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
+
+`recipeItemsAffected` and `recipeItemsRewritten` are deliberately separate numbers.
+The first is what a GM needs to hear; the second is what the write did.
+They are equal on the `recipeIds` membership basis and differ on the legacy basis.
+
+This previously returned `Promise<void>`.
+The change is additive — the returned object is truthy, so a caller testing the result for success is unaffected.
 
 When `notify` is not `false`, recipe create, update, and delete calls emit the same single-recipe success notifications as the UI.
 

@@ -71,13 +71,20 @@ export function normalizeBulkStatus(value) {
  * string is rejected rather than spread, since spreading one yields its characters and a
  * single id passed where a list was expected would silently become several.
  *
+ * It TRIMS, which is not cosmetic: `describeRecipeDeleteImpact` — the leaf the recipe set
+ * delete's STATEMENT counts through — trims the ids it is handed, while the WRITE normalizes
+ * through here. `' r1 '` therefore stated `deletable: 1` and wrote `deleted: 0` (issue 1132,
+ * review round). Unreachable through the shipped callers, which forward the describer's
+ * already-trimmed `deletableIds`, and closed anyway because the whole design rests on the
+ * two sides being unable to disagree about which ids they mean.
+ *
  * @param {Set<string> | string[] | Iterable<string> | undefined} value
  * @returns {string[]}
  */
 export function normalizeSelectionIds(value) {
   if (!value || typeof value === 'string') return [];
   const source = Array.isArray(value) ? value : [...value];
-  return [...new Set(source.map((id) => String(id ?? '')).filter(Boolean))];
+  return [...new Set(source.map((id) => String(id ?? '').trim()).filter(Boolean))];
 }
 
 /**

@@ -53,8 +53,11 @@ const panel = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/BulkEditPanelShell.svelte',
     'src/ui/svelte/apps/manager/BulkEditSection.svelte',
     'src/ui/svelte/apps/manager/BulkEditSelect.svelte',
-    // The set delete's two-state arm/confirm control (issue 1129).
+    // The set delete's arm/confirm control (issue 1129) and the shared card that now renders
+    // it (issue 1132). Both are STATIC imports of the component under test; omitting either
+    // HANGS this suite as `# cancelled` rather than failing it.
     'src/ui/svelte/apps/manager/ArmedDangerButton.svelte',
+    'src/ui/svelte/apps/manager/BulkDeleteCard.svelte',
     'src/ui/svelte/apps/manager/components/EssenceQuantityCard.svelte',
     'src/ui/svelte/apps/manager/components/ComponentBulkEditPanel.svelte'
   ],
@@ -574,7 +577,7 @@ describe('ComponentBulkEditPanel set delete (issue 1129)', () => {
     assert.equal(live.textContent.trim(), '', 'which says nothing while the control is idle');
   });
 
-  it('announces the consequence when the owner arms it, and falls silent on disarm', async () => {
+  it('announces the consequence when the owner arms it, and the CANCELLATION on disarm', async () => {
     const { root } = await mountWithDelete();
     const live = () => deleteCard(root).querySelector('[data-component-bulk-delete-announce]');
 
@@ -583,13 +586,18 @@ describe('ComponentBulkEditPanel set delete (issue 1129)', () => {
     assert.match(live().textContent, /3 component\(s\)/, 'it names what confirming would do');
     assert.match(live().textContent, /again/i, 'and that a SECOND activation is the delete');
 
+    // Escape and click-away both disarm while the button still HOLDS FOCUS and change its
+    // accessible name under it — which is the whole reason this region exists. Emptying it
+    // announced nothing, so the one gesture that CANCELS a destructive action was the only
+    // one that said nothing at all (issue 1132, review round). The text still changes, so a
+    // re-arm is still announced.
     await panel.setProps({ deleteArmed: false });
     flushSync();
-    assert.equal(
-      live().textContent.trim(),
-      '',
-      'emptying on disarm is also what makes a RE-arm announce'
-    );
+    assert.equal(live().textContent.trim(), 'Delete cancelled. Nothing was deleted.');
+
+    await panel.setProps({ deleteArmed: true });
+    flushSync();
+    assert.match(live().textContent, /again/i, 'and a RE-arm still announces');
   });
 
   it('gives the ARMED control a name containing its visible label (WCAG 2.5.3)', async () => {
@@ -605,7 +613,12 @@ describe('ComponentBulkEditPanel set delete (issue 1129)', () => {
       button.getAttribute('aria-label').startsWith(visible),
       `"${button.getAttribute('aria-label')}" must open with "${visible}"`
     );
-    assert.match(button.getAttribute('aria-label'), /3 component\(s\), 2 recipe\(s\)/);
+    assert.match(button.getAttribute('aria-label'), /3 component\(s\) and 2 recipe\(s\)/);
+    // It ENDS with the irreversibility, like its recipe sibling — the only one of the three
+    // that stated it. This panel carries no standing hint, so the armed accessible name is
+    // the only place a screen-reader user is told a component delete is permanent; essence
+    // remains the one outlier, deliberately left alone (issue 1132, review round 2).
+    assert.match(button.getAttribute('aria-label'), /cannot be undone/i);
   });
 
   it('reports three numbers that are three different questions', async () => {

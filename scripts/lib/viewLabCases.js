@@ -94,6 +94,22 @@ const BULK_EDIT_CHROME_PATTERN =
   /^src\/ui\/svelte\/apps\/manager\/Bulk(?:SelectionToolbar|EditPanelShell|EditSection|EditSelect)\.svelte$/;
 
 /**
+ * The shared bulk-DELETE card (issue 1132): the heading, impact statement, standing hint and
+ * armed control every studio's set delete renders.
+ *
+ * Separate from `BULK_EDIT_CHROME_PATTERN` because the two select DIFFERENT frames. The chrome
+ * appears in every bulk-edit frame; this card is below the sticky Apply dock and under the rail's
+ * fold, so the only frames that photograph it at all are the four `*-bulk-delete-*` cases, each of
+ * which scrolls or clicks it into view. Attributing it to the bulk-EDIT frames would publish a
+ * frame in which the changed component is not visible.
+ *
+ * Not in `MANAGER_PRIMITIVES` either, for the reason stated above: a broad signal is claim-exempt
+ * and routes to the representative set, and this component has exactly the delete frames as its
+ * consumers, so targeting is both possible and honest.
+ */
+const BULK_DELETE_CARD_PATTERN = /^src\/ui\/svelte\/apps\/manager\/BulkDeleteCard\.svelte$/;
+
+/**
  * The trigger set the three `manager-recipes-bulk-edit*` frames share (issue 1010).
  *
  * The first two patterns are the recipe browser's own pair, exactly as every other recipe case
@@ -956,6 +972,89 @@ export const VIEW_LAB_CASES = Object.freeze([
     kinds: ['manager', 'recipes'],
     sourceMatches: RECIPE_BULK_EDIT_MATCHES,
   }),
+  // ── The Recipe Studio's set delete (issue 1132) ────────────────────────────────────
+  //
+  // BOTH FRAMES RUN ON HERBALISM, NOT ON THE FLAGSHIP SMITHING LIBRARY every other recipe case
+  // photographs, and the choice is the whole reason these frames say anything. The card states
+  // three numbers and two of them are unreachable on smithing: no actor has learned a smithing
+  // recipe (`labActors.js` teaches only `hb-*`), and smithing is deliberately on the LEGACY
+  // membership basis with both its books' `recipeIds` absent, so its recipe-item figure comes
+  // from a single legacy scalar. Photographed there the card would render its subject row and
+  // one gated-away consequence, which is the state the Component Studio's frames already show.
+  //
+  // Herbalism is knowledge-gated and modern-basis: `hb-book` holds healing, salve and grind,
+  // Idrin has learned healing and salve, and Vosk has learned oil. The selection below is
+  // therefore 3 recipes / 1 recipe item / 2 characters — every row rendered, and the recipe
+  // count deliberately DISAGREEING with the item count, which is the state the corrected copy
+  // exists for. The delta's authored "1 book or scroll will lose it." would read as a lie in
+  // this exact frame.
+  managerCase({
+    id: 'manager-recipes-bulk-delete-idle',
+    label: 'Manager — Recipes bulk delete idle',
+    smokeLabels: [],
+    reaches: 'beyond',
+    // The UNARMED face: the impact statement and the standing permanence hint, rendered BEFORE
+    // the control is armed. That pairing is the entire justification for this action arming
+    // instead of raising a `confirmDialog`, so it is the frame the carve-out rests on.
+    //
+    // The explicit `scroll` step is not optional. The card sits below the panel shell and below
+    // the sticky Apply dock, which puts it under the rail's fold at the registry's 1280x820
+    // position, and `frame.screenshot()` does not scroll nested overflow containers — without it
+    // the card is out of frame while every assertion still passes. The Component Studio's idle
+    // twin records the same measurement.
+    query: { system: 'lab-herbalism' },
+    steps: [
+      'Crafting',
+      { selector: 'label:has(input[data-recipe-select="hb-r-healing"])' },
+      { selector: 'label:has(input[data-recipe-select="hb-r-salve"])' },
+      { selector: 'label:has(input[data-recipe-select="hb-r-oil"])' },
+      { selector: '[data-recipe-bulk-delete-card]', scroll: true },
+    ],
+    expectView: 'recipes',
+    // UNARMED is the state under test, and `data-armed="false"` is what separates this frame
+    // from its armed twin below — a selector naming only the card would pass on either.
+    expectSelector: '.fabricate-manager [data-arm-token="delete-recipes"][data-armed="false"]',
+    kinds: ['manager', 'recipes'],
+    sourceMatches: [
+      ...RECIPE_BULK_EDIT_MATCHES,
+      /^src\/utils\/recipeDeleteImpact\.js$/,
+      BULK_DELETE_CARD_PATTERN,
+    ],
+  }),
+  managerCase({
+    id: 'manager-recipes-bulk-delete-armed',
+    label: 'Manager — Recipes bulk delete armed',
+    smokeLabels: [],
+    reaches: 'beyond',
+    // The ARMED half, and the frame whose final step clicks INSIDE the delete card. The first
+    // click only arms, so this shows `Confirm delete` beside the impact statement it is a
+    // confirmation OF, with nothing written.
+    //
+    // Two frames rather than one because the two states are the point: the idle sibling shows
+    // the statement rendered before arming, and this one shows that the arm is a second,
+    // separate act. Either alone leaves half of the pairing unphotographed.
+    query: { system: 'lab-herbalism' },
+    steps: [
+      'Crafting',
+      { selector: 'label:has(input[data-recipe-select="hb-r-healing"])' },
+      { selector: 'label:has(input[data-recipe-select="hb-r-salve"])' },
+      { selector: 'label:has(input[data-recipe-select="hb-r-oil"])' },
+      // The BUTTON, not the card: `ArmedDangerButton` stamps `data-arm-token` on the control it
+      // arms, so this cannot drift onto a wrapper the way a class selector could. Clicking also
+      // scrolls it into view, which is why this case needs no `scroll` step.
+      { selector: '[data-arm-token="delete-recipes"]' },
+    ],
+    expectView: 'recipes',
+    // Armed is a STATE, and a frame that merely re-photographed the idle button would be
+    // indistinguishable from the idle case above.
+    expectSelector: '.fabricate-manager [data-arm-token="delete-recipes"][data-armed="true"]',
+    kinds: ['manager', 'recipes'],
+    sourceMatches: [
+      ...RECIPE_BULK_EDIT_MATCHES,
+      /^src\/utils\/recipeDeleteImpact\.js$/,
+      BULK_DELETE_CARD_PATTERN,
+    ],
+  }),
   managerCase({
     id: 'manager-crafting-group-expanded',
     label: 'Manager — Crafting group expanded',
@@ -1729,6 +1828,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/components?\//,
       /^src\/utils\/recipeComponentReferences\.js$/,
       BULK_EDIT_CHROME_PATTERN,
+      BULK_DELETE_CARD_PATTERN,
     ],
   }),
   managerCase({
@@ -1764,6 +1864,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/components?\//,
       /^src\/utils\/recipeComponentReferences\.js$/,
       BULK_EDIT_CHROME_PATTERN,
+      BULK_DELETE_CARD_PATTERN,
     ],
   }),
   managerCase({
@@ -2856,6 +2957,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/essences\//,
       /^src\/ui\/svelte\/util\/(?:essenceIcons|managerColorTokens)\.js$/,
       /^src\/utils\/essence(?:BrowserModel|BulkEditModel|Validation)\.js$/,
+      BULK_DELETE_CARD_PATTERN,
     ],
   }),
   managerCase({
