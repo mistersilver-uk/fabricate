@@ -91,11 +91,15 @@ export const DISCOVERY_PROGRESS_ENTRY_FIELDS = Object.freeze([
 // one Foundry could have written.
 const MAX_DEPTH = 32;
 
-// A container the expansion could have created. Arrays are deliberately excluded: a
-// `discoveryProgress` entry's `fragments` is an array and is an entry FIELD, never a
-// nested id segment.
+// A container the expansion could have created — matching Foundry's own `getType(v) ===
+// "Object"` test, which is what decides whether `expandObject` recurses. Arrays are
+// deliberately excluded: a `discoveryProgress` entry's `fragments` is an array and is an
+// entry FIELD, never a nested id segment. So is any class instance, which Foundry would
+// have passed through whole rather than nesting into.
 function isPlainRecord(value) {
-  return !!value && typeof value === 'object' && !Array.isArray(value);
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const proto = Object.getPrototypeOf(value);
+  return proto === Object.prototype || proto === null;
 }
 
 function isEntryShaped(node, entryFields) {
