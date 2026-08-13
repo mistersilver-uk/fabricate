@@ -116,12 +116,12 @@
       "description": "The player crafting open over 25 rows against a token 20-stack inventory. The CORPUS axis of the same path the held-inventory profile varies by held stacks.",
       "counts": {
         "componentCandidatesExamined": 277950,
-        "craftingActorItemsReads": 125,
-        "craftingActorItemsScanned": 1250,
+        "craftingActorItemsReads": 100,
+        "craftingActorItemsScanned": 1000,
         "identityCandidatesExamined": 5600,
         "identityIndexBuilds": 2,
-        "sourceActor0ItemsReads": 125,
-        "sourceActor0ItemsScanned": 1250,
+        "sourceActor0ItemsReads": 100,
+        "sourceActor0ItemsScanned": 1000,
         "listedRecipes": 25,
         "availableRecipes": 5
       }
@@ -130,12 +130,12 @@
       "description": "The player crafting open over 50 rows against a token 20-stack inventory. The CORPUS axis of the same path the held-inventory profile varies by held stacks.",
       "counts": {
         "componentCandidatesExamined": 609650,
-        "craftingActorItemsReads": 250,
-        "craftingActorItemsScanned": 2500,
+        "craftingActorItemsReads": 200,
+        "craftingActorItemsScanned": 2000,
         "identityCandidatesExamined": 6200,
         "identityIndexBuilds": 1,
-        "sourceActor0ItemsReads": 250,
-        "sourceActor0ItemsScanned": 2500,
+        "sourceActor0ItemsReads": 200,
+        "sourceActor0ItemsScanned": 2000,
         "listedRecipes": 50,
         "availableRecipes": 5
       }
@@ -144,12 +144,12 @@
       "description": "The player crafting open over 100 rows against a token 20-stack inventory. The CORPUS axis of the same path the held-inventory profile varies by held stacks.",
       "counts": {
         "componentCandidatesExamined": 1434300,
-        "craftingActorItemsReads": 500,
-        "craftingActorItemsScanned": 5000,
+        "craftingActorItemsReads": 400,
+        "craftingActorItemsScanned": 4000,
         "identityCandidatesExamined": 7400,
         "identityIndexBuilds": 1,
-        "sourceActor0ItemsReads": 500,
-        "sourceActor0ItemsScanned": 5000,
+        "sourceActor0ItemsReads": 400,
+        "sourceActor0ItemsScanned": 4000,
         "listedRecipes": 100,
         "availableRecipes": 5
       }

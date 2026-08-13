@@ -330,6 +330,17 @@ const SITE_MAPPING = [
     sites: 1,
   },
   {
+    // The snapshot's per-system tallies (issue 1077). It counts held UNITS, not stacks, for
+    // both the per-component quantity and the per-tag quantity the optimistic availability
+    // projection compares against, so it must read through the configured accessor exactly
+    // as the listing builders do — a snapshot counting raw documents would report a
+    // different "have" than the listing shows for every stackable system.
+    site: 'inventorySnapshot component/tag tallies',
+    file: 'src/systems/inventorySnapshot.js',
+    accessor: 'readStackQuantity',
+    sites: 1,
+  },
+  {
     // Bulk destroy removes WHOLE STACKS, so the pre-delete capture has to read the
     // stack count through the configured accessor — `unitsDeleted` is derived from it.
     // `updateStackQuantity` is deliberately absent: a delete is not a schema-filtered

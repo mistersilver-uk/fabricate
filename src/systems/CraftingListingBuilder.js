@@ -217,6 +217,27 @@ export class CraftingListingBuilder {
   }
 
   /**
+   * Whether this recipe's book knowledge is exhausted.
+   *
+   * The already-evaluated `access.knowledge` is handed BACK to the service, which answers
+   * from it when it carries evidence and rescans only when it does not (issue 1077). Passing
+   * it rather than branching here keeps one owner for the exhaustion rule: a listing that
+   * re-derived "owned some, all spent" locally would be a second copy of a per-book cap rule
+   * that has already changed once (issue 511).
+   * @private
+   */
+  _isKnowledgeExhausted(access, recipe, craftingActor, knowledgeSources) {
+    return (
+      this.recipeVisibility?.isKnowledgeItemExhausted?.({
+        recipe,
+        craftingActor,
+        componentSourceActors: knowledgeSources,
+        knowledge: access?.knowledge ?? null,
+      }) === true
+    );
+  }
+
+  /**
    * Project a single visible recipe into its `RecipeListingModel`.
    * @private
    */
@@ -334,13 +355,14 @@ export class CraftingListingBuilder {
       firstStepSets?.[0] ??
       null;
 
+    // Book-knowledge exhaustion. `getVisibleRecipes` has ALREADY collected this recipe's
+    // owned copies and filtered them by their own books' caps, so when it handed back a
+    // knowledge result the answer is two numbers on that result rather than a second
+    // corpus-wide candidate walk (issue 1077). The rescan remains for the modes that
+    // produce no knowledge result at all — a `global`-mode or teaser recipe never evaluates
+    // knowledge, and dropping its exhausted state would silently retire the badge.
     const exhausted =
-      !isGM &&
-      this.recipeVisibility?.isKnowledgeItemExhausted?.({
-        recipe,
-        craftingActor,
-        componentSourceActors: knowledgeSources,
-      }) === true;
+      !isGM && this._isKnowledgeExhausted(access, recipe, craftingActor, knowledgeSources);
 
     const browseStatus = this._deriveBrowseStatus({ reason, canCraftMaterials, exhausted });
     const blockingReasons = this._blockingReasons(browseStatus);
