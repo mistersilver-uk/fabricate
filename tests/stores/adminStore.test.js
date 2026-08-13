@@ -150,7 +150,13 @@ function createMockServices(overrides = {}) {
         recipes.some((r) => r.id === id)
       );
       for (const id of ids) await mockRecipeManager.deleteRecipe(id);
-      return { deleted: ids.length, recipeIds: ids, recipeItemsPruned: 0, learnersAffected: 0 };
+      return {
+        deleted: ids.length,
+        recipeIds: ids,
+        recipeItemsAffected: 0,
+        recipeItemsRewritten: 0,
+        learnersAffected: 0,
+      };
     },
   };
 
@@ -2542,7 +2548,13 @@ describe('createAdminStore', () => {
         ...origSystemManager,
         deleteRecipes: async (systemId, recipeIds) => {
           setCall = { systemId, recipeIds };
-          return { deleted: 0, recipeIds: [], recipeItemsPruned: 0, learnersAffected: 0 };
+          return {
+            deleted: 0,
+            recipeIds: [],
+            recipeItemsAffected: 0,
+            recipeItemsRewritten: 0,
+            learnersAffected: 0,
+          };
         },
       });
       const store = createAdminStore(services);
