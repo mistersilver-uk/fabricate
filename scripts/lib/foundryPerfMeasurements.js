@@ -200,7 +200,10 @@ export const PERF_MEASUREMENTS = Object.freeze([
     title: 'Persistence comparison experiments from issue 1079',
     classes: [MEASUREMENT_CLASS.TIMING, MEASUREMENT_CLASS.INVARIANT],
     status: MEASUREMENT_STATUS.DEFERRED,
-    blockedBy: 'issue 1079 — the prototypes it would compare do not exist yet',
+    blockedBy:
+      'issue 1080 — issue 1079 HAS run and chose a backend, but its prototypes were ' +
+      'deliberately not versioned (see ADR 0001, Provenance), so there is no adapter here to ' +
+      'measure until 1080 implements the selected one',
     detail:
       'Issue 1073 asks for these "where prototyped". Nothing is prototyped: issue 1079 has not ' +
       'run, and issue 1089 (the repository abstraction the alternatives would plug into) has not ' +

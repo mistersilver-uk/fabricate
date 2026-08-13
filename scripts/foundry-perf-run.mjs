@@ -163,9 +163,53 @@ async function bootToReadyWorld(page, userLabel) {
     timeout: 120_000,
   });
   await clearBlockingOverlays(page);
+
+  if (await activateFabricateIfNeeded(page)) {
+    // Activation only takes effect on the next page load, so re-join and wait again.
+    await page.reload({ waitUntil: 'load', timeout: 120_000 });
+    await joinWorldSession(page, { userLabel, reporter });
+    await page.waitForFunction(() => typeof game !== 'undefined' && game.ready === true, null, {
+      timeout: 120_000,
+    });
+    await clearBlockingOverlays(page);
+  }
+
   await page.waitForFunction(() => globalThis.game?.fabricate?.ready === true, null, {
     timeout: 180_000,
   });
+}
+
+/**
+ * Enable the Fabricate module when the world has it installed but not active.
+ *
+ * WITHOUT THIS THE PERF PROFILE CANNOT BOOT A FRESH WORLD, and the failure is silent about its
+ * cause: `scripts/foundry-setup-data.mjs` copies the built module into `Data/modules/fabricate/`
+ * and the fixture world's `world.json` declares no `modules` array, so a freshly copied world has
+ * the module INSTALLED and INACTIVE. `game.fabricate` is then never defined, and the wait above
+ * times out after three minutes reporting only `page.waitForFunction: Timeout 180000ms exceeded` —
+ * which reads as "Fabricate is slow to initialise", the opposite of what happened.
+ *
+ * `scripts/foundry-test-run.mjs` has carried this step since the smoke harness was written; the
+ * perf profile (issue 1073) did not inherit it, so it only ever succeeded against a world some
+ * earlier smoke run had already activated. Found and fixed by issue 1079, which needed the profile
+ * to run.
+ *
+ * @param {object} page
+ * @returns {Promise<boolean>} Whether activation was performed and a reload is required.
+ */
+async function activateFabricateIfNeeded(page) {
+  const active = await page.evaluate(
+    () => globalThis.game?.modules?.get('fabricate')?.active === true
+  );
+  if (active) return false;
+
+  log('Fabricate module is installed but not active. Activating...\n');
+  await page.evaluate(async () => {
+    const configuration = game.settings.get('core', 'moduleConfiguration') ?? {};
+    configuration.fabricate = true;
+    await game.settings.set('core', 'moduleConfiguration', configuration);
+  });
+  return true;
 }
 
 /**
@@ -362,6 +406,36 @@ async function walkScenarios(context) {
 }
 
 /**
+ * The player user the second client joins as.
+ *
+ * A FRESH WORLD HAS NO PLAYER. `scripts/foundry-setup-data.mjs` copies a world whose `world.json`
+ * declares nothing but an id, a core version and a system, and Foundry creates exactly one
+ * Gamemaster on first launch. The GM context holds that user, so a second context finds an empty
+ * user select and reports `User select has no joinable options yet` — which reads as a boot flake
+ * and is in fact a world that never had a second user.
+ *
+ * `scripts/foundry-test-run.mjs` creates its own player users for the same reason (`Fabricate
+ * Gatherer`, `Fabricate Observer`); the perf profile (issue 1073) did not, so every cross-client
+ * measurement it declares reported `unavailable` on a fresh world. Found and fixed by issue 1079,
+ * whose `persistence-experiments` scenario needs a real receiver to read a delivered payload from.
+ */
+const PERF_PLAYER_NAME = 'Player1';
+
+/**
+ * Create the player user the propagation and persistence scenarios join as, if it is missing.
+ *
+ * @param {object} page A page already joined as Gamemaster.
+ */
+async function ensurePlayerUser(page) {
+  const created = await page.evaluate(async (name) => {
+    if (game.users.some((user) => user.name === name)) return false;
+    await globalThis.User.createDocuments([{ name, role: CONST.USER_ROLES.PLAYER, password: '' }]);
+    return true;
+  }, PERF_PLAYER_NAME);
+  if (created) log(`Created player user "${PERF_PLAYER_NAME}" for the cross-client scenarios.\n`);
+}
+
+/**
  * Join a second browser context as a player, for the propagation scenario.
  *
  * @param {object} browser
@@ -372,7 +446,7 @@ async function joinSecondClient(browser) {
     const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
     await suppressTours(context);
     const page = await context.newPage();
-    await bootToReadyWorld(page, 'Player1');
+    await bootToReadyWorld(page, PERF_PLAYER_NAME);
     return { context, page };
   } catch (error) {
     log(`Second client did not join (${error.message}); propagation will report unavailable.\n`);
@@ -460,6 +534,7 @@ async function main() {
 
   try {
     await bootToReadyWorld(page, 'Gamemaster');
+    await ensurePlayerUser(page);
 
     log(`Seeding ${seed.invariant.recipes} recipes / ${seed.invariant.components} components...\n`);
     const applied = await applySeed(page, seed);
