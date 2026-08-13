@@ -25,110 +25,110 @@
     {
       "index": 0,
       "key": "craftingSystems",
-      "bytes": 3010,
-      "sha256": "38e52766b41144a5a7d3abd3ef87af419e73427cfd7901940476dc38534f2b86"
+      "bytes": 3112,
+      "sha256": "165787ebab1bea87b4cbe082119aa765c8654d7085e6bc85e95ae9679de0b89d"
     },
     {
       "index": 1,
       "key": "craftingSystems",
-      "bytes": 6017,
-      "sha256": "1290685af49b066de0d7be1675161039bbfca6dda00d7ca035bb11ce799582cf"
+      "bytes": 6221,
+      "sha256": "0080618b867385cb28347a866f67756470b2d8a20b1b16cd43365dc9afe70539"
     },
     {
       "index": 2,
       "key": "craftingSystems",
-      "bytes": 6479,
-      "sha256": "2d5f60e30b0b15f5ba4966ea4bcd9913bf8c26d3834445e351648e370d9e7662"
+      "bytes": 6683,
+      "sha256": "75922a23c41a79f5bc25cf2e201edeb33322cc3255076e4796c096b70edfda2e"
     },
     {
       "index": 3,
       "key": "craftingSystems",
-      "bytes": 6859,
-      "sha256": "8032540f4f68ee674213fe4d926cffb582e203b93806f3383957a8de6992e9b9"
+      "bytes": 7063,
+      "sha256": "0f9c08f22913322df62b7efaa5bee7f730e2d3e51dfc336c34dca8a249dfca42"
     },
     {
       "index": 4,
       "key": "craftingSystems",
-      "bytes": 7222,
-      "sha256": "d659e2240b08064d58aa35fddcfdda7c98da80d5acac95be3103f2653776ad5e"
+      "bytes": 7426,
+      "sha256": "79cbe338e9206256da10756655df6a7176a392a42202bcf802e0524f20d5d012"
     },
     {
       "index": 5,
       "key": "craftingSystems",
-      "bytes": 7590,
-      "sha256": "4aa5c31761b5a279200dd1099492b7ca66f5a446b12c0139d6beb5610eac0f46"
+      "bytes": 7794,
+      "sha256": "e029636618cb803afc030186d2ff5773805daeec4b061c62f903ec02f9e5d322"
     },
     {
       "index": 6,
       "key": "craftingSystems",
-      "bytes": 7953,
-      "sha256": "6ccfaddb95b7b7f4e223e90f4f08d205d34bc6f1400730f378a4e76bca3a815c"
+      "bytes": 8157,
+      "sha256": "c5db7946be8e9df0a2e22c1fc7066b58d0a5e6275ad9d1f2a6a064180828aaa2"
     },
     {
       "index": 7,
       "key": "craftingSystems",
-      "bytes": 7970,
-      "sha256": "df032f06b741da3b3267f7296bd5274f49aa4c85fe3d4a9315adf4604015a7df"
+      "bytes": 8174,
+      "sha256": "43e7baf7e445d9f2f0e445aba33468558b82234b0d4d86afa811f6166f84c599"
     },
     {
       "index": 8,
       "key": "recipes",
-      "bytes": 1766,
-      "sha256": "2c3e08deccf7e039a5e64940070606f8216d70481d9ccc568ce5e01ff2290348"
+      "bytes": 967,
+      "sha256": "c6ff2ac5dffd2df4128384dd21361aac6db4e716ffa99255fe0f8be5f51e26ee"
     },
     {
       "index": 9,
       "key": "recipes",
-      "bytes": 3523,
-      "sha256": "5a6f0ebe838dfb1a4bf05e2b6f3d256dceca17b1755c3a39e2d940c620c7311d"
+      "bytes": 1927,
+      "sha256": "50712a9fd7b04c3938fd96c1449445831f948412e0ffacaf1ff36a4b94ea4af5"
     },
     {
       "index": 10,
       "key": "recipes",
-      "bytes": 5286,
-      "sha256": "4296ee3f92d7a29f658bc5f68acb8912721f9b22883ef6e223dcd5f93a4bf397"
+      "bytes": 2891,
+      "sha256": "562f54d26c2cd2d408b6df05b04fa3f83fc3f53d7eb42f5661dc495ba859ff80"
     },
     {
       "index": 11,
       "key": "recipes",
-      "bytes": 5307,
-      "sha256": "e929ed637303371adf76b931d77b29b7a3c9d3e0b21dc1e3519e01845ade1be5"
+      "bytes": 2929,
+      "sha256": "15dd1d364cfa0fa003346c7965af971891fc7236f1f76155f17fc589ec41c9d1"
     },
     {
       "index": 12,
       "key": "recipes",
-      "bytes": 7085,
-      "sha256": "d49433b80bb648c8ab7bcce1543e7041ff10c546c5ac756510c08d256b3b953c"
+      "bytes": 3925,
+      "sha256": "689b95ff6f15490357255bbf7283b122c1e791d095b66f2181eec0bf9446a9ae"
     },
     {
       "index": 13,
       "key": "recipes",
-      "bytes": 5307,
-      "sha256": "0e5955b46dc93bfdc6e208af34c4e7956f92c8b48e2f4c4baa6a155d1dfe118c"
+      "bytes": 2927,
+      "sha256": "e790561bc35a48988e385c37b2c8e392054ae6a6e8f63d19e0567ad8c4968521"
     },
     {
       "index": 14,
       "key": "craftingSystems",
-      "bytes": 7602,
-      "sha256": "9b8984c083678db25a0c95177c11dd82952d926e7acdb3938b2cc7ea25062953"
+      "bytes": 7806,
+      "sha256": "1906e4f4fa2b8611497ebdf6dd77e84e1c350584dbbf51cfc3498f8cd80671bb"
     },
     {
       "index": 15,
       "key": "craftingSystems",
-      "bytes": 7367,
-      "sha256": "9aa84109018ed19dbbfca2e5bdbedeed53ec7206b12e455f1971c6d940f9db71"
+      "bytes": 7571,
+      "sha256": "31aa6b14858cbdd513b1f01f4653fe3c2f3db1bc9a86af2f15e8e9d1162587c8"
     },
     {
       "index": 16,
       "key": "recipes",
-      "bytes": 3531,
-      "sha256": "7c2757d0079b16d8133a97656f135f71c200f8477fec451bacf78892e1ffd4c6"
+      "bytes": 1933,
+      "sha256": "5d2e74b605ed251abfab1acb986eb40c1f1f0f873c31c9737a12a0580d7f6983"
     },
     {
       "index": 17,
       "key": "craftingSystems",
-      "bytes": 3997,
-      "sha256": "24af4ac2c562b58a9049dbe9d56177d183527fb0be8bf1417c9cda1334d94f13"
+      "bytes": 4099,
+      "sha256": "9405d48af04c8fc560241040f618c13e7bac4f49145737aa8acefa035ee592ea"
     }
   ],
   "finalCorpus": {
@@ -206,6 +206,7 @@
             "consumeIngredientsOnFail": true,
             "breakToolsOnFail": false
           },
+          "failureResultPolicy": "perRecord",
           "progressive": {
             "awardMode": "equal",
             "rollFormula": "",
@@ -255,6 +256,7 @@
             "consumeComponentOnFail": true,
             "breakToolsOnFail": false
           },
+          "failureResultPolicy": "perRecord",
           "simple": {
             "rollFormula": "",
             "dc": 15,
@@ -296,6 +298,7 @@
         },
         "gatheringCraftingCheck": {
           "enabled": false,
+          "failureResultPolicy": "perRecord",
           "progressive": {
             "awardMode": "equal",
             "rollFormula": "",
@@ -400,24 +403,9 @@
       {
         "id": "recipe-blade",
         "name": "Iron Blade",
-        "description": "",
-        "img": "icons/sundries/documents/blueprint-recipe-alchemical.webp",
-        "category": "general",
         "craftingSystemId": "alpha",
-        "system": "all",
-        "tags": [],
         "enabled": true,
-        "allowPlayerResultReorder": true,
-        "locked": false,
-        "recipeItemId": null,
-        "linkedRecipeItemUuid": null,
-        "visibility": null,
-        "access": {
-          "characterIds": [],
-          "playerIds": []
-        },
         "complex": false,
-        "steps": [],
         "ingredientSets": [
           {
             "id": "set-blade",
@@ -477,65 +465,19 @@
             ]
           }
         ],
-        "toolIds": [],
-        "timeRequirement": null,
-        "results": [
-          {
-            "id": "result-blade",
-            "componentId": null,
-            "systemItemId": null,
-            "itemUuid": "Item.output-blade",
-            "quantity": 1,
-            "propertyMacroUuid": null
-          }
-        ],
-        "isVariable": false,
-        "transferEffects": false,
-        "outcomeRouting": null,
-        "resultSelection": null,
-        "checkTierId": null,
-        "minSuccessOutcomeId": null,
-        "craftingModifier": null,
-        "currencyCost": null,
-        "teaser": {
-          "enabled": true,
-          "hiddenFields": [
-            "ingredients",
-            "results",
-            "description"
-          ],
-          "revealThreshold": 100,
-          "teaserDescription": ""
-        },
         "metadata": {
           "created": 1760000000000,
           "modified": 1760000000000,
           "author": "Golden GM",
           "version": "1.0.0"
-        },
-        "importSource": null
+        }
       },
       {
         "id": "recipe-hinge",
         "name": "Iron Hinge",
-        "description": "",
-        "img": "icons/sundries/documents/blueprint-recipe-alchemical.webp",
-        "category": "general",
         "craftingSystemId": "alpha",
-        "system": "all",
-        "tags": [],
         "enabled": true,
-        "allowPlayerResultReorder": true,
-        "locked": false,
-        "recipeItemId": null,
-        "linkedRecipeItemUuid": null,
-        "visibility": null,
-        "access": {
-          "characterIds": [],
-          "playerIds": []
-        },
         "complex": false,
-        "steps": [],
         "ingredientSets": [
           {
             "id": "set-hinge",
@@ -595,43 +537,12 @@
             ]
           }
         ],
-        "toolIds": [],
-        "timeRequirement": null,
-        "results": [
-          {
-            "id": "result-hinge",
-            "componentId": null,
-            "systemItemId": null,
-            "itemUuid": "Item.output-hinge",
-            "quantity": 1,
-            "propertyMacroUuid": null
-          }
-        ],
-        "isVariable": false,
-        "transferEffects": false,
-        "outcomeRouting": null,
-        "resultSelection": null,
-        "checkTierId": null,
-        "minSuccessOutcomeId": null,
-        "craftingModifier": null,
-        "currencyCost": null,
-        "teaser": {
-          "enabled": true,
-          "hiddenFields": [
-            "ingredients",
-            "results",
-            "description"
-          ],
-          "revealThreshold": 100,
-          "teaserDescription": ""
-        },
         "metadata": {
           "created": 1760000000000,
           "modified": 1760000000000,
           "author": "Golden GM",
           "version": "1.0.0"
-        },
-        "importSource": null
+        }
       }
     ]
   }
