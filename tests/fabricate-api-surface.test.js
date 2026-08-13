@@ -75,10 +75,15 @@ test('Fabricate gates matured timed gathering runs to the primary GM', () => {
 });
 
 test('Fabricate wires RecipeManager to the live crafting-system manager', () => {
+  // BOTH seams are pinned. `getCraftingSystem` resolves one system; `getCraftingSystemManager`
+  // (issue 1072) is the manager itself, which the twelve paths that used to read
+  // `game.fabricate` inline now route through — including `_validateSignatures`. Losing that
+  // second line would silently send those paths back to the `ready`-hook global, where they
+  // cannot be instrumented, cached or indexed by the performance programme.
   assert.match(
     mainSource,
-    /this\.recipeManager\s*=\s*new RecipeManager\(\{\s*getCraftingSystem:\s*\(systemId\)\s*=>\s*this\.craftingSystemManager\?\.getSystem\?\.\(systemId\)\s*\?\?\s*null,?\s*\}\)/s,
-    'RecipeManager production initialization should receive the live crafting-system resolver'
+    /this\.recipeManager\s*=\s*new RecipeManager\(\{\s*getCraftingSystem:\s*\(systemId\)\s*=>\s*this\.craftingSystemManager\?\.getSystem\?\.\(systemId\)\s*\?\?\s*null,\s*getCraftingSystemManager:\s*\(\)\s*=>\s*this\.craftingSystemManager\s*\?\?\s*null,?\s*\}\)/s,
+    'RecipeManager production initialization should receive the live crafting-system resolver and manager'
   );
 });
 

@@ -2362,6 +2362,47 @@ export class CraftingSystemManager {
     return this.systems.get(systemId) || null;
   }
 
+  /**
+   * The ENABLED-and-disabled recipe set belonging to a system.
+   *
+   * Half of the `{getSystem, getRecipesForSystem, getComponentsForSystem}` contract
+   * {@link SignatureValidator} has always documented but which no runtime object
+   * implemented — seven call sites hand-rolled an ad-hoc adapter closure instead, so
+   * there was no runtime method a counter could attach to and no single definition of
+   * "the recipes of a system" (issue 1072). Several of those adapters are NOT
+   * equivalent to this one and deliberately stay: the enable-time gate substitutes the
+   * candidate recipe, and the migration/validation paths pass a JSON snapshot rather
+   * than the live store. They now differ from a named baseline instead of from each other.
+   *
+   * Filtering (`enabled`) is the validator's own job — it scopes its scan to enabled
+   * recipes itself — so this accessor stays unfiltered and callers do not each re-decide.
+   *
+   * @param {string} systemId
+   * @returns {object[]}
+   */
+  getRecipesForSystem(systemId) {
+    if (!systemId) return [];
+    return this.recipeManager?.getRecipes?.({ craftingSystemId: systemId }) ?? [];
+  }
+
+  /**
+   * The managed component library of a system — the other half of the
+   * {@link SignatureValidator} contract (issue 1072).
+   *
+   * Returns the LIVE array rather than a copy, matching every adapter closure this
+   * replaces (`system.components || []`). {@link getEssenceDefinitions} above copies,
+   * but changing that here would be a silent behaviour change on the signature path
+   * and a per-call O(components) allocation on the exact scan this issue exists to
+   * bound. Callers must not mutate it.
+   *
+   * @param {string} systemId
+   * @returns {object[]}
+   */
+  getComponentsForSystem(systemId) {
+    const system = this.getSystem(systemId);
+    return Array.isArray(system?.components) ? system.components : [];
+  }
+
   getEssenceDefinitions(systemId) {
     const system = this.getSystem(systemId);
     if (!system) return [];

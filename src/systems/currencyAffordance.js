@@ -27,13 +27,21 @@ import {
 
 /**
  * Read the recipe's crafting-system currency config (`requirements.currency`).
+ * @param {object} recipe
+ * @param {{ getCraftingSystemManager?: () => object }} [seams]
  * @returns {{ enabled: boolean, spendStrategy: string, providerId: string, macros: object,
  *   units: object[], system: object }|null}
  */
-export function getCurrencyRequirementConfig(recipe) {
+export function getCurrencyRequirementConfig(recipe, seams = {}) {
   const systemId = recipe?.craftingSystemId;
   if (!systemId) return null;
-  const systemManager = game.fabricate?.getCraftingSystemManager?.();
+  // Seam-first, global-fallback (issue 1072). `evaluateCraftability` runs this once per
+  // recipe on the player listing path, so it is part of the corpus-scaled read this
+  // programme instruments — and a caller that has injected its system manager should not
+  // silently reach past it to a `ready`-hook global here. The fallback keeps every
+  // existing caller (and the whole engine spend path) byte-for-byte unchanged.
+  const systemManager =
+    seams.getCraftingSystemManager?.() ?? game.fabricate?.getCraftingSystemManager?.();
   const system = systemManager?.getSystem(systemId);
   if (!system) return null;
 
@@ -58,7 +66,8 @@ export function getCurrencyRequirementConfig(recipe) {
  * spender; `actorProperty` (default) is the generic property spender.
  *
  * @param {{ spendStrategy?: string, macros?: object }} config
- * @param {{ actorInventoryCoinSpender?: object|null, actorPropertyCoinSpender?: object|null }} [seams]
+ * @param {{ actorInventoryCoinSpender?: object|null, actorPropertyCoinSpender?: object|null,
+ *   getCraftingSystemManager?: () => object }} [seams]
  */
 export function resolveCoinSpender(config = {}, seams = {}) {
   if (config.spendStrategy === 'actorInventory') {
@@ -82,10 +91,11 @@ export function resolveCoinSpender(config = {}, seams = {}) {
  * config is absent, and `{ error }` when the profile is invalid.
  *
  * @param {object} recipe
- * @param {{ actorInventoryCoinSpender?: object|null, actorPropertyCoinSpender?: object|null }} [seams]
+ * @param {{ actorInventoryCoinSpender?: object|null, actorPropertyCoinSpender?: object|null,
+ *   getCraftingSystemManager?: () => object }} [seams]
  */
 export function resolveCurrencyContext(recipe, seams = {}) {
-  const config = getCurrencyRequirementConfig(recipe);
+  const config = getCurrencyRequirementConfig(recipe, seams);
   if (!config?.enabled) return { enabled: false };
 
   const profile = validateCurrencyProfile(config.units || [], {
@@ -112,7 +122,8 @@ export function resolveCurrencyContext(recipe, seams = {}) {
  *
  * @param {object|null} craftingActor
  * @param {object} recipe
- * @param {{ actorInventoryCoinSpender?: object|null, actorPropertyCoinSpender?: object|null }} [seams]
+ * @param {{ actorInventoryCoinSpender?: object|null, actorPropertyCoinSpender?: object|null,
+ *   getCraftingSystemManager?: () => object }} [seams]
  * @returns {(match: object) => boolean}
  */
 export function buildCurrencyAffordProbe(craftingActor, recipe, seams = {}) {

@@ -10,6 +10,12 @@
  *   - getSystem(systemId)
  *   - getRecipesForSystem(systemId)
  *   - getComponentsForSystem(systemId)
+ *
+ * `CraftingSystemManager` implements all three (issue 1072) — until then the contract was
+ * documented here but implemented nowhere, and every caller supplied an ad-hoc adapter
+ * closure. Adapters remain legitimate where the source genuinely is not the live store:
+ * the enable-time gate substitutes the candidate recipe, and the validation/migration
+ * paths pass a JSON snapshot of a system that has not been persisted yet.
  */
 import { getMatchHandler } from '../models/match/matchTypes.js';
 

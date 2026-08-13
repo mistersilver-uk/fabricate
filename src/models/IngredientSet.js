@@ -262,7 +262,8 @@ export class IngredientSet {
    *   plan: Array<{item: Item, quantity: number, ingredient: Ingredient, essenceGroupIds?: string[]}>,
    *   currencySpends: Array<{unit: string, amount: number, ingredient: Ingredient}>,
    *   missingGroups: Array<object>, essenceAllocation: Record<string, number>,
-   *   essencePool: object|null }}
+   *   essencePool: object|null,
+   *   searchStats: {nodes: number, capHit: boolean} }}
    */
   resolveIngredientSelection(
     availableItems,
@@ -290,7 +291,17 @@ export class IngredientSet {
     // today is returned byte-identical (zero churn); only a recipe greedy wrongly
     // rejected gains a newly found alternative.
     const search = this._searchAssignment(availableItems, matcher, ctx);
-    if (search.selection) return search.selection;
+
+    // The solver's own cost, surfaced rather than discarded (issue 1072). `nodes` is the
+    // ONLY deterministic measure of assignment work: the node cap bounds nodes, not work,
+    // because each node copies and restores the whole available-item ledger, so per-node
+    // cost is O(inventory) and the wall clock of a resolve is a product of two terms a
+    // timing assertion cannot separate. A regression guard asserts `nodes`; #1083's
+    // indexed fast paths are expected to lower it, and nothing else can observe that.
+    // Frozen so a consumer cannot mutate a shared statistic, and attached on BOTH exits
+    // so a caller never has to branch on which one produced the result.
+    const searchStats = Object.freeze({ nodes: search.nodes, capHit: search.capHit });
+    if (search.selection) return { ...search.selection, searchStats };
 
     // Proven unsatisfiable, or the generous search bound was reached (a safeguard
     // degradation that is never worse than the pre-663 behaviour and never
@@ -303,7 +314,7 @@ export class IngredientSet {
           '(a satisfiable assignment may be missed for this pathological input).'
       );
     }
-    return this._resolveGreedy(availableItems, matcher, ctx);
+    return { ...this._resolveGreedy(availableItems, matcher, ctx), searchStats };
   }
 
   /**
