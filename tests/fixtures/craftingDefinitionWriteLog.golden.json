@@ -1,0 +1,638 @@
+{
+  "steps": [
+    "initialize",
+    "createSystem:alpha",
+    "createSystem:beta",
+    "updateSystem:alpha:essences",
+    "createItem:alpha:0",
+    "createItem:alpha:1",
+    "createItem:alpha:2",
+    "createItem:beta:0",
+    "updateItem:alpha:1",
+    "createRecipe:blade",
+    "createRecipe:nail",
+    "createRecipe:tonic",
+    "updateRecipe:nail",
+    "batch:create+update+save",
+    "deleteRecipe:nail",
+    "deleteItem:alpha:2",
+    "deleteEssence:alpha:earth",
+    "deleteSystem:beta",
+    "reload:false:false"
+  ],
+  "writeCount": 18,
+  "writes": [
+    {
+      "index": 0,
+      "key": "craftingSystems",
+      "bytes": 3010,
+      "sha256": "38e52766b41144a5a7d3abd3ef87af419e73427cfd7901940476dc38534f2b86"
+    },
+    {
+      "index": 1,
+      "key": "craftingSystems",
+      "bytes": 6017,
+      "sha256": "1290685af49b066de0d7be1675161039bbfca6dda00d7ca035bb11ce799582cf"
+    },
+    {
+      "index": 2,
+      "key": "craftingSystems",
+      "bytes": 6479,
+      "sha256": "2d5f60e30b0b15f5ba4966ea4bcd9913bf8c26d3834445e351648e370d9e7662"
+    },
+    {
+      "index": 3,
+      "key": "craftingSystems",
+      "bytes": 6859,
+      "sha256": "8032540f4f68ee674213fe4d926cffb582e203b93806f3383957a8de6992e9b9"
+    },
+    {
+      "index": 4,
+      "key": "craftingSystems",
+      "bytes": 7222,
+      "sha256": "d659e2240b08064d58aa35fddcfdda7c98da80d5acac95be3103f2653776ad5e"
+    },
+    {
+      "index": 5,
+      "key": "craftingSystems",
+      "bytes": 7590,
+      "sha256": "4aa5c31761b5a279200dd1099492b7ca66f5a446b12c0139d6beb5610eac0f46"
+    },
+    {
+      "index": 6,
+      "key": "craftingSystems",
+      "bytes": 7953,
+      "sha256": "6ccfaddb95b7b7f4e223e90f4f08d205d34bc6f1400730f378a4e76bca3a815c"
+    },
+    {
+      "index": 7,
+      "key": "craftingSystems",
+      "bytes": 7970,
+      "sha256": "df032f06b741da3b3267f7296bd5274f49aa4c85fe3d4a9315adf4604015a7df"
+    },
+    {
+      "index": 8,
+      "key": "recipes",
+      "bytes": 1766,
+      "sha256": "2c3e08deccf7e039a5e64940070606f8216d70481d9ccc568ce5e01ff2290348"
+    },
+    {
+      "index": 9,
+      "key": "recipes",
+      "bytes": 3523,
+      "sha256": "5a6f0ebe838dfb1a4bf05e2b6f3d256dceca17b1755c3a39e2d940c620c7311d"
+    },
+    {
+      "index": 10,
+      "key": "recipes",
+      "bytes": 5286,
+      "sha256": "4296ee3f92d7a29f658bc5f68acb8912721f9b22883ef6e223dcd5f93a4bf397"
+    },
+    {
+      "index": 11,
+      "key": "recipes",
+      "bytes": 5307,
+      "sha256": "e929ed637303371adf76b931d77b29b7a3c9d3e0b21dc1e3519e01845ade1be5"
+    },
+    {
+      "index": 12,
+      "key": "recipes",
+      "bytes": 7085,
+      "sha256": "d49433b80bb648c8ab7bcce1543e7041ff10c546c5ac756510c08d256b3b953c"
+    },
+    {
+      "index": 13,
+      "key": "recipes",
+      "bytes": 5307,
+      "sha256": "0e5955b46dc93bfdc6e208af34c4e7956f92c8b48e2f4c4baa6a155d1dfe118c"
+    },
+    {
+      "index": 14,
+      "key": "craftingSystems",
+      "bytes": 7602,
+      "sha256": "9b8984c083678db25a0c95177c11dd82952d926e7acdb3938b2cc7ea25062953"
+    },
+    {
+      "index": 15,
+      "key": "craftingSystems",
+      "bytes": 7367,
+      "sha256": "9aa84109018ed19dbbfca2e5bdbedeed53ec7206b12e455f1971c6d940f9db71"
+    },
+    {
+      "index": 16,
+      "key": "recipes",
+      "bytes": 3531,
+      "sha256": "7c2757d0079b16d8133a97656f135f71c200f8477fec451bacf78892e1ffd4c6"
+    },
+    {
+      "index": 17,
+      "key": "craftingSystems",
+      "bytes": 3997,
+      "sha256": "24af4ac2c562b58a9049dbe9d56177d183527fb0be8bf1417c9cda1334d94f13"
+    }
+  ],
+  "finalCorpus": {
+    "craftingSystems": [
+      {
+        "id": "alpha",
+        "name": "Alpha Forge",
+        "description": "The primary forge.",
+        "enabled": true,
+        "resolutionMode": "simple",
+        "features": {
+          "recipeCategories": true,
+          "categories": true,
+          "itemTags": true,
+          "essences": false,
+          "multiStepRecipes": false,
+          "propertyMacros": false,
+          "craftingChecks": false,
+          "outcomeRouting": false,
+          "effectTransfer": false,
+          "gathering": false,
+          "salvage": true,
+          "chatOutput": true,
+          "itemPiles": false,
+          "refundOnPlayerCancel": true
+        },
+        "itemTags": [],
+        "visibilityMode": "knowledge",
+        "recipeVisibility": {
+          "listMode": "global",
+          "knowledge": {
+            "mode": "itemOrLearned",
+            "learn": {
+              "dragDropEnabled": true
+            }
+          }
+        },
+        "requirements": {
+          "time": {
+            "enabled": true
+          },
+          "currency": {
+            "enabled": false,
+            "spendStrategy": "actorProperty",
+            "providerId": "",
+            "macros": {
+              "canAfford": "",
+              "increment": "",
+              "decrement": ""
+            },
+            "units": []
+          }
+        },
+        "essenceDefinitions": [
+          {
+            "id": "fire",
+            "name": "Fire",
+            "description": "Heat",
+            "icon": "fas fa-mortar-pestle",
+            "colorToken": null,
+            "enabled": true,
+            "propertyMacroUuid": null,
+            "sourceComponentId": null,
+            "sourceItemUuid": null,
+            "associatedSystemItemId": null
+          }
+        ],
+        "recipeItemDefinitions": [],
+        "membershipResolvesByRecipeIds": false,
+        "modifiers": [],
+        "craftingCheck": {
+          "enabled": false,
+          "mode": "passFail",
+          "consumption": {
+            "consumeIngredientsOnFail": true,
+            "breakToolsOnFail": false
+          },
+          "progressive": {
+            "awardMode": "equal",
+            "rollFormula": "",
+            "checkBreakage": {
+              "triggers": []
+            }
+          },
+          "outcomes": [
+            "fail",
+            "pass"
+          ],
+          "routed": {
+            "type": "relative",
+            "rollFormula": "",
+            "dc": 15,
+            "thresholdMode": "meet",
+            "dcMode": "static",
+            "macroUuid": null,
+            "tiers": [],
+            "relativeOutcomes": [],
+            "fixedOutcomes": [],
+            "checkBreakage": {
+              "triggers": []
+            }
+          },
+          "simple": {
+            "rollFormula": "",
+            "dc": 15,
+            "thresholdMode": "meet",
+            "dcMode": "static",
+            "tiers": [],
+            "macroUuid": null,
+            "checkBreakage": {
+              "triggers": []
+            }
+          },
+          "defaultModifierPolicy": "addAll",
+          "defaultModifierIds": []
+        },
+        "salvageResolutionMode": "simple",
+        "toolBreakage": {
+          "authority": "toolSpecific"
+        },
+        "salvageCraftingCheck": {
+          "enabled": false,
+          "consumption": {
+            "consumeComponentOnFail": true,
+            "breakToolsOnFail": false
+          },
+          "simple": {
+            "rollFormula": "",
+            "dc": 15,
+            "thresholdMode": "meet",
+            "dcMode": "static",
+            "tiers": [],
+            "macroUuid": null,
+            "checkBreakage": {
+              "triggers": []
+            }
+          },
+          "routed": {
+            "type": "relative",
+            "rollFormula": "",
+            "dc": 15,
+            "thresholdMode": "meet",
+            "dcMode": "static",
+            "macroUuid": null,
+            "tiers": [],
+            "relativeOutcomes": [],
+            "fixedOutcomes": [],
+            "checkBreakage": {
+              "triggers": []
+            }
+          },
+          "progressive": {
+            "awardMode": "equal",
+            "rollFormula": "",
+            "checkBreakage": {
+              "triggers": []
+            }
+          },
+          "outcomes": [
+            "fail",
+            "pass"
+          ],
+          "defaultModifierPolicy": "addAll",
+          "defaultModifierIds": []
+        },
+        "gatheringCraftingCheck": {
+          "enabled": false,
+          "progressive": {
+            "awardMode": "equal",
+            "rollFormula": "",
+            "checkBreakage": {
+              "triggers": []
+            }
+          },
+          "routed": {
+            "type": "relative",
+            "rollFormula": "",
+            "dc": 15,
+            "thresholdMode": "meet",
+            "dcMode": "static",
+            "macroUuid": null,
+            "tiers": [],
+            "relativeOutcomes": [],
+            "fixedOutcomes": [],
+            "checkBreakage": {
+              "triggers": []
+            }
+          },
+          "defaultModifierPolicy": "addAll",
+          "defaultModifierIds": []
+        },
+        "alchemy": null,
+        "teaserConfig": {
+          "enabled": false,
+          "discoveryMode": "threshold",
+          "fragments": []
+        },
+        "componentCategories": [],
+        "categoryIcons": {},
+        "componentCategoryIcons": {},
+        "categories": [],
+        "tags": [],
+        "essences": [
+          "fire"
+        ],
+        "enableTags": true,
+        "enableEssences": false,
+        "enableCategories": true,
+        "enableMultiStepRecipes": false,
+        "components": [
+          {
+            "id": "alpha-c0",
+            "name": "Iron Ore",
+            "img": "icons/svg/item-bag.svg",
+            "description": "",
+            "originItemUuid": "Item.alpha-c0",
+            "registeredItemUuid": "Item.alpha-c0",
+            "aliasItemUuids": [],
+            "tier": null,
+            "category": "general",
+            "tags": [],
+            "essences": {
+              "fire": 1
+            },
+            "salvage": {
+              "enabled": false,
+              "allowPlayerResultReorder": true,
+              "ingredientQuantity": 1,
+              "dcOverride": null,
+              "toolIds": [],
+              "resultGroups": []
+            }
+          },
+          {
+            "id": "alpha-c1",
+            "name": "Hardwood Charcoal",
+            "img": "icons/svg/item-bag.svg",
+            "description": "",
+            "originItemUuid": "Item.alpha-c1",
+            "registeredItemUuid": "Item.alpha-c1",
+            "aliasItemUuids": [],
+            "tier": null,
+            "category": "general",
+            "tags": [],
+            "essences": {
+              "fire": 3
+            },
+            "salvage": {
+              "enabled": false,
+              "allowPlayerResultReorder": true,
+              "ingredientQuantity": 1,
+              "dcOverride": null,
+              "toolIds": [],
+              "resultGroups": []
+            }
+          }
+        ],
+        "tools": [],
+        "characterPrerequisites": [],
+        "gatheringRealms": [],
+        "gatheringRealmSettings": {
+          "enabled": false,
+          "revealMode": "manual",
+          "modifierVisibility": "visible"
+        }
+      }
+    ],
+    "recipes": [
+      {
+        "id": "recipe-blade",
+        "name": "Iron Blade",
+        "description": "",
+        "img": "icons/sundries/documents/blueprint-recipe-alchemical.webp",
+        "category": "general",
+        "craftingSystemId": "alpha",
+        "system": "all",
+        "tags": [],
+        "enabled": true,
+        "allowPlayerResultReorder": true,
+        "locked": false,
+        "recipeItemId": null,
+        "linkedRecipeItemUuid": null,
+        "visibility": null,
+        "access": {
+          "characterIds": [],
+          "playerIds": []
+        },
+        "complex": false,
+        "steps": [],
+        "ingredientSets": [
+          {
+            "id": "set-blade",
+            "name": "",
+            "ingredientGroups": [
+              {
+                "id": "group-blade",
+                "name": "Ingredients",
+                "options": [
+                  {
+                    "match": null,
+                    "componentId": null,
+                    "systemItemId": null,
+                    "itemUuid": "Item.alpha-c0",
+                    "quantity": 2,
+                    "tag": null,
+                    "alternatives": [],
+                    "extractEffects": false,
+                    "effectFilter": null
+                  }
+                ]
+              }
+            ],
+            "ingredients": [
+              {
+                "match": null,
+                "componentId": null,
+                "systemItemId": null,
+                "itemUuid": "Item.alpha-c0",
+                "quantity": 2,
+                "tag": null,
+                "alternatives": [],
+                "extractEffects": false,
+                "effectFilter": null
+              }
+            ],
+            "essences": {},
+            "toolIds": [],
+            "resultMapping": [],
+            "resultGroupId": null
+          }
+        ],
+        "resultGroups": [
+          {
+            "id": "results-blade",
+            "name": "Result Group 1",
+            "checkOutcomeIds": [],
+            "results": [
+              {
+                "id": "result-blade",
+                "componentId": null,
+                "systemItemId": null,
+                "itemUuid": "Item.output-blade",
+                "quantity": 1,
+                "propertyMacroUuid": null
+              }
+            ]
+          }
+        ],
+        "toolIds": [],
+        "timeRequirement": null,
+        "results": [
+          {
+            "id": "result-blade",
+            "componentId": null,
+            "systemItemId": null,
+            "itemUuid": "Item.output-blade",
+            "quantity": 1,
+            "propertyMacroUuid": null
+          }
+        ],
+        "isVariable": false,
+        "transferEffects": false,
+        "outcomeRouting": null,
+        "resultSelection": null,
+        "checkTierId": null,
+        "minSuccessOutcomeId": null,
+        "craftingModifier": null,
+        "currencyCost": null,
+        "teaser": {
+          "enabled": true,
+          "hiddenFields": [
+            "ingredients",
+            "results",
+            "description"
+          ],
+          "revealThreshold": 100,
+          "teaserDescription": ""
+        },
+        "metadata": {
+          "created": 1760000000000,
+          "modified": 1760000000000,
+          "author": "Golden GM",
+          "version": "1.0.0"
+        },
+        "importSource": null
+      },
+      {
+        "id": "recipe-hinge",
+        "name": "Iron Hinge",
+        "description": "",
+        "img": "icons/sundries/documents/blueprint-recipe-alchemical.webp",
+        "category": "general",
+        "craftingSystemId": "alpha",
+        "system": "all",
+        "tags": [],
+        "enabled": true,
+        "allowPlayerResultReorder": true,
+        "locked": false,
+        "recipeItemId": null,
+        "linkedRecipeItemUuid": null,
+        "visibility": null,
+        "access": {
+          "characterIds": [],
+          "playerIds": []
+        },
+        "complex": false,
+        "steps": [],
+        "ingredientSets": [
+          {
+            "id": "set-hinge",
+            "name": "",
+            "ingredientGroups": [
+              {
+                "id": "group-hinge",
+                "name": "Ingredients",
+                "options": [
+                  {
+                    "match": null,
+                    "componentId": null,
+                    "systemItemId": null,
+                    "itemUuid": "Item.alpha-c0",
+                    "quantity": 2,
+                    "tag": null,
+                    "alternatives": [],
+                    "extractEffects": false,
+                    "effectFilter": null
+                  }
+                ]
+              }
+            ],
+            "ingredients": [
+              {
+                "match": null,
+                "componentId": null,
+                "systemItemId": null,
+                "itemUuid": "Item.alpha-c0",
+                "quantity": 2,
+                "tag": null,
+                "alternatives": [],
+                "extractEffects": false,
+                "effectFilter": null
+              }
+            ],
+            "essences": {},
+            "toolIds": [],
+            "resultMapping": [],
+            "resultGroupId": null
+          }
+        ],
+        "resultGroups": [
+          {
+            "id": "results-hinge",
+            "name": "Result Group 1",
+            "checkOutcomeIds": [],
+            "results": [
+              {
+                "id": "result-hinge",
+                "componentId": null,
+                "systemItemId": null,
+                "itemUuid": "Item.output-hinge",
+                "quantity": 1,
+                "propertyMacroUuid": null
+              }
+            ]
+          }
+        ],
+        "toolIds": [],
+        "timeRequirement": null,
+        "results": [
+          {
+            "id": "result-hinge",
+            "componentId": null,
+            "systemItemId": null,
+            "itemUuid": "Item.output-hinge",
+            "quantity": 1,
+            "propertyMacroUuid": null
+          }
+        ],
+        "isVariable": false,
+        "transferEffects": false,
+        "outcomeRouting": null,
+        "resultSelection": null,
+        "checkTierId": null,
+        "minSuccessOutcomeId": null,
+        "craftingModifier": null,
+        "currencyCost": null,
+        "teaser": {
+          "enabled": true,
+          "hiddenFields": [
+            "ingredients",
+            "results",
+            "description"
+          ],
+          "revealThreshold": 100,
+          "teaserDescription": ""
+        },
+        "metadata": {
+          "created": 1760000000000,
+          "modified": 1760000000000,
+          "author": "Golden GM",
+          "version": "1.0.0"
+        },
+        "importSource": null
+      }
+    ]
+  }
+}
