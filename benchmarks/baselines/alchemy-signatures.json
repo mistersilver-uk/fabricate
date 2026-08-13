@@ -32,6 +32,8 @@
       "description": "The pairwise enabled-signature audit over 2,000 signatures. The comparison counter is the number #1074 must move; the wall clock at full 5,000 scale is unobtainable.",
       "counts": {
         "componentCandidatesExamined": 4400000,
+        "identityCandidatesExamined": 0,
+        "identityIndexBuilds": 0,
         "signatureComparisons": 1999000,
         "conflicts": 8800
       }
@@ -39,9 +41,11 @@
     "alchemyListing.buildListing": {
       "description": "The alchemy workbench open, bounded to 100 rows of the signature corpus.",
       "counts": {
-        "componentCandidatesExamined": 14021,
+        "componentCandidatesExamined": 7000,
         "craftingActorItemsReads": 2,
         "craftingActorItemsScanned": 20,
+        "identityCandidatesExamined": 506,
+        "identityIndexBuilds": 1,
         "sourceActor0ItemsReads": 2,
         "sourceActor0ItemsScanned": 20,
         "knownRecipes": 0,

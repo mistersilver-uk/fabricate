@@ -82,18 +82,23 @@ series:
 
 | Series | 1st point | 2nd point | 3rd point |
 |---|---|---|---|
-| Corpus axis (rows, 20 held stacks) | 25 rows → 249 ms | 50 rows → 497 ms | 100 rows → 998 ms |
-| Inventory axis (held stacks, 6 rows) | 100 stacks → 299 ms | 500 stacks → 1,476 ms | 1,000 stacks → 2,961 ms |
+| Corpus axis (rows, 20 held stacks) | 25 rows → 17.8 ms | 50 rows → 36.0 ms | 100 rows → 81.0 ms |
+| Inventory axis (held stacks, 6 rows) | 100 stacks → 5.8 ms | 500 stacks → 11.3 ms | 1,000 stacks → 18.9 ms |
 
 <!-- markdownlint-enable MD013 -->
 
-Both are linear in their own axis, which is exactly the
-`recipes × items × components` product `evaluateCraftability` pays: it
-re-flattens `sourceActors.flatMap((actor) => [...actor.items])` once per recipe
-and resolves identity per item against the whole library.
-The class-1 counters make that visible without a clock — the inventory series
-records 8.7 M / 48.4 M / 99.0 M `componentCandidatesExamined` and a flat 30
-`craftingActorItemsReads` for 6 rows, i.e. five re-reads per row.
+Both are still linear in their own axis, and the inventory axis is the one issue
+1076 changed: it measured 299 / 1,476 / 2,961 ms before identity resolution
+became index-backed, against 5.8 / 11.3 / 18.9 ms after.
+What survives is the `recipes × items` half `evaluateCraftability` pays — it
+re-flattens `sourceActors.flatMap((actor) => [...actor.items])` once per
+recipe — and what went is the `× components` factor.
+The class-1 counters make that visible without a clock: the inventory series
+recorded 8.7 M / 48.4 M / 99.0 M `componentCandidatesExamined` before and
+74 k / 111 k / 156 k combined `componentCandidatesExamined` +
+`identityCandidatesExamined` after, with the same flat 30
+`craftingActorItemsReads` for 6 rows — i.e. five re-reads per row, untouched,
+because that is #1077's term rather than this one's.
 
 ### Most held items resolve to NO component, and that is deliberate
 
@@ -104,23 +109,34 @@ An inventory made entirely of registered components exercises the *cheap*
 identity tier: a durable `flags.fabricate.roles[systemId].componentId` hits on
 tier 1 and stops.
 An ordinary item — mundane gear, ammo, loot, most of a real character sheet —
-carries no Fabricate flags, falls through both durable tiers, fails the
-source-reference intersection after scanning the whole library, and then pays a
-*second* full scan in the name fallback before returning `null`.
+carries no Fabricate flags, and before issue 1076 it fell through both durable
+tiers, failed the source-reference intersection after scanning the whole library,
+and then paid a *second* full scan in the name fallback before returning `null`.
 
-Measured here against a 5,000-component library at 1,000 held stacks:
+Measured here against a 5,000-component library at 1,000 held stacks, before and
+after that issue made every tier a `Map` lookup:
 
 <!-- markdownlint-disable MD013 -->
 
-| Case | Median | `componentCandidatesExamined` |
+| Case | Median before → after | Examinations before → after |
 |---|---|---|
-| `identity.resolveComponentForItem.hit@1000` (200 durable items) | 0.52 ms | 30,100 |
-| `identity.resolveComponentForItem.miss@1000` (700 unmatched items) | 121.8 ms | 3,500,000 |
-| `identity.findMatchingComponent.miss@1000` (same, plus name fallback) | 259.3 ms | 7,000,000 |
+| `identity.resolveComponentForItem.hit@1000` (200 durable items) | 0.52 → 0.02 ms | 30,100 → 5,200 |
+| `identity.resolveComponentForItem.miss@1000` (700 unmatched items) | 121.8 → 0.21 ms | 3,500,000 → 5,000 |
+| `identity.findMatchingComponent.miss@1000` (same, plus name fallback) | 259.3 → 0.34 ms | 7,000,000 → 5,000 |
 
 <!-- markdownlint-enable MD013 -->
 
-A 100%-component benchmark inventory hides that entirely.
+The residual 5,000 is one index build over the 5,000-component library, paid once
+and then warm; the per-item cost after it is zero examinations for a miss and one
+for a hit.
+The "after" column reads `identityCandidatesExamined`, which
+`definitionIndex` reports itself.
+That counter exists because the fixture-side `countingCandidates` array can only
+see a scan expressed as `find`/`filter`/`some`, so an index-backed resolver would
+otherwise report a triumphant zero for work that is genuinely still O(library)
+once per build.
+
+A 100%-component benchmark inventory hides the miss path entirely.
 `tests/benchmark-harness.test.js` asserts the majority-unmatched property so a
 future edit cannot quietly turn it into the misleading case.
 
@@ -153,19 +169,25 @@ yields 3,568.
 
 ### `held-inventory` pins its recipe corpus at 6 rows
 
-At 1,000 held stacks against 5,000 components, `evaluateCraftability` costs
-~137 ms per recipe, so a 20-row open measures ~11 s and a 10,000-row open would
-take roughly 23 minutes.
-Six rows still produce nine-figure counters and a clean series, and keep the
-drift test's re-derivation inside `npm test`.
+The ceiling was set when `evaluateCraftability` cost ~137 ms per recipe at 1,000
+held stacks against 5,000 components, so a 20-row open measured ~11 s and a
+10,000-row open would have taken roughly 23 minutes.
+Issue 1076 took the `× components` factor out of that, and six rows now measure
+18.9 ms in total — but the bound stays, because the surviving `recipes × items`
+re-flattening (#1077's term) is still a product and the series has to keep
+varying exactly one axis.
+Six rows still produce six-figure counters and a clean series, and keep the drift
+test's re-derivation inside `npm test`.
 
 ### `ingredientSet.resolveIngredientSelection` is bounded at 12 recipes
 
 Each rich recipe carries 3 sets × 3 groups × 3 options and every matcher
-invocation costs a full 5,000-component candidate scan.
-Two hundred recipes measured 38 s and 1.03 **billion** candidate examinations.
+invocation used to cost a full 5,000-component candidate scan.
+Two hundred recipes measured 38 s and 1.03 **billion** candidate examinations
+before issue 1076 made identity resolution index-backed.
 Twelve keeps the same shape and the same per-node signal at a cost the drift test
-can re-derive.
+can re-derive, and the bound stays because the solver's own per-node
+`O(inventory)` ledger copy (#1083) is untouched by that work.
 
 ## Fixture construction: literals versus real models
 
