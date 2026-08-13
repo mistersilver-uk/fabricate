@@ -36,6 +36,7 @@ import {
   prepareForImport,
   makeExportFilename,
 } from '../../../systems/CraftingSystemExporter.js';
+import { readLearnedRecipeEntries } from '../../../systems/recipeKeyedFlagEntries.js';
 import { recipeReferencesEssence } from '../../../utils/recipeEssenceReferences.js';
 import { describeEssenceDeleteImpact } from '../../../utils/essenceBulkEditModel.js';
 import { describeComponentDeleteImpact } from '../../../utils/recipeComponentReferences.js';
@@ -2095,6 +2096,12 @@ async function _resolveRecipeItemSource(uuid) {
 // `actor.flags.fabricate.learnedRecipes` read resolved to `undefined` in a real
 // world and "Learned by" was permanently 0. `getFabricateFlag` also try/catches
 // `getFlag`'s inactive-scope throw.
+//
+// The ids come from the shared ENTRY-BOUNDARY reader, not `Object.keys` (issue 1143).
+// `Document#update` nests a dotted recipe id into a subtree, so the top level yields the
+// id's first segment and this panel under-reported learners for such a recipe while the
+// deletion cascade — reading through the same reader — acted on the real id. Both must
+// answer with the same ids or the GM surface and the mutation disagree.
 function _buildLearnedRecipeActorIndex() {
   const index = new Map();
   const raw = globalThis.game?.actors;
@@ -2109,7 +2116,7 @@ function _buildLearnedRecipeActorIndex() {
     const learned = getFabricateFlag(actor, 'learnedRecipes', null);
     if (!learned || typeof learned !== 'object') continue;
     const actorId = actor.id || actor._id || '';
-    for (const recipeId of Object.keys(learned)) {
+    for (const recipeId of readLearnedRecipeEntries(learned).keys()) {
       if (!index.has(recipeId)) index.set(recipeId, new Set());
       index.get(recipeId).add(actorId);
     }
