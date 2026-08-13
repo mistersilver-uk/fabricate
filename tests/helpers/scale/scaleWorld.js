@@ -61,6 +61,7 @@ export async function loadBenchmarkModules() {
     componentBrowserModule,
     paginationModule,
     graphModule,
+    recipeRowProjectionModule,
   ] = await Promise.all([
     import('../../../src/systems/RecipeManager.js'),
     import('../../../src/systems/CraftingSystemManager.js'),
@@ -81,6 +82,7 @@ export async function loadBenchmarkModules() {
     import('../../../src/utils/componentBrowserModel.js'),
     import('../../../src/utils/browserPagination.js'),
     import('../../../src/ui/svelte/util/recipeGraphBuilder.js'),
+    import('../../../src/ui/svelte/stores/adminRecipeRowProjection.js'),
   ]);
 
   cachedModules = {
@@ -104,6 +106,13 @@ export async function loadBenchmarkModules() {
     componentBrowser: componentBrowserModule,
     pagination: paginationModule,
     graph: graphModule,
+    // The GM recipe-browser row projection. A pure leaf under `stores/` with no `.svelte`
+    // import, extracted by issue 1090 precisely so a benchmark can call it directly.
+    recipeRowProjection: recipeRowProjectionModule,
+    signatureCounters: {
+      read: signatureValidatorModule.readSignatureCounters,
+      reset: signatureValidatorModule.resetSignatureCounters,
+    },
   };
   return cachedModules;
 }

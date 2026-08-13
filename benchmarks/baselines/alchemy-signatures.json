@@ -38,6 +38,19 @@
         "conflicts": 8800
       }
     },
+    "adminRecipeRows.buildRecipeList": {
+      "description": "The GM recipe browser open over the signature corpus, bounded to 200 rows. Each row derives `enableBlocked` through `canActivateRecipe`, which before issue 1074 ran one FULL system audit and copied the whole recipe corpus PER ROW. The three counters below are the criteria: one report build, one audit worth of comparisons, and a bounded number of corpus copies.",
+      "counts": {
+        "componentCandidatesExamined": 1200000,
+        "identityCandidatesExamined": 0,
+        "identityIndexBuilds": 0,
+        "recipeCorpusCopies": 3,
+        "rows": 200,
+        "blockedRows": 200,
+        "signatureComparisons": 19900,
+        "reportBuilds": 1
+      }
+    },
     "alchemyListing.buildListing": {
       "description": "The alchemy workbench open, bounded to 100 rows of the signature corpus.",
       "counts": {
