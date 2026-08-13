@@ -77,7 +77,17 @@ export async function runProfileCases({ fixture, modules, cases, reps, onProgres
 
     // ---- counted pass (also the warm-up) ----------------------------------------
     counters.reset();
+    // The fixture-side `countingCandidates` array can only see a scan expressed as
+    // `find`/`filter`/`some`, so once identity resolution became index-backed (issue 1076)
+    // it would have reported a triumphant zero for work that is genuinely still O(library)
+    // once per index build. `definitionIndex` therefore carries its OWN counter, and it is
+    // folded into the same class-1 bag here so a baseline shows both halves rather than a
+    // number that stopped being able to move.
+    modules.definitionIndex.resetIdentityCounters();
     const result = await benchmarkCase.run(state);
+    const identity = modules.definitionIndex.readIdentityCounters();
+    counters.bump('identityCandidatesExamined', identity.candidatesExamined);
+    counters.bump('identityIndexBuilds', identity.indexBuilds);
     const caseCounts = benchmarkCase.counts ? benchmarkCase.counts(state, result, counters) : {};
     class1[benchmarkCase.id] = {
       description: benchmarkCase.description,

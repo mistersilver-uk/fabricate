@@ -4,6 +4,14 @@
 import { getFabricateFlag, isSafeFlagKeySegment } from '../config/flags.js';
 import { hasStackQuantity } from '../systems/itemStackQuantity.js';
 
+import { findById, findBySourceRefs, getDefinitionIndex } from './definitionIndex.js';
+import { getItemMatchUuids, pushUniqueReference } from './sourceReferenceUnion.js';
+
+// Re-exported at its historical spelling so the eleven existing importers of
+// `getItemMatchUuids` from this module are unaffected by the extraction that broke the
+// `sourceUuid` <-> `definitionIndex` import cycle. See `sourceReferenceUnion`.
+export { getItemMatchUuids } from './sourceReferenceUnion.js';
+
 /**
  * Resolve the compendium source UUID of a Foundry item document.
  *
@@ -45,13 +53,6 @@ export function getDuplicateSourceUuid(item) {
   return item._stats?.duplicateSource || item.system?._stats?.duplicateSource || null;
 }
 
-function pushUnique(target, value) {
-  if (typeof value !== 'string') return;
-  const trimmed = value.trim();
-  if (!trimmed || target.includes(trimmed)) return;
-  target.push(trimmed);
-}
-
 /**
  * Collect the UUIDs that may identify a Foundry item instance and its canonical source.
  *
@@ -67,9 +68,9 @@ function pushUnique(target, value) {
 export function getItemSourceReferences(item) {
   const refs = [];
   if (!item || typeof item !== 'object') return refs;
-  pushUnique(refs, item.uuid);
-  pushUnique(refs, getCompendiumSourceUuid(item));
-  pushUnique(refs, getDuplicateSourceUuid(item));
+  pushUniqueReference(refs, item.uuid);
+  pushUniqueReference(refs, getCompendiumSourceUuid(item));
+  pushUniqueReference(refs, getDuplicateSourceUuid(item));
   return refs;
 }
 
@@ -94,48 +95,9 @@ export function getItemSourceReferences(item) {
 export function getItemIdentityReferences(item) {
   const refs = [];
   if (!item || typeof item !== 'object') return refs;
-  pushUnique(refs, item.uuid);
-  pushUnique(refs, getCompendiumSourceUuid(item));
+  pushUniqueReference(refs, item.uuid);
+  pushUniqueReference(refs, getCompendiumSourceUuid(item));
   return refs;
-}
-
-/**
- * Collect every UUID reference a registered ENTRY can use for runtime matching.
- *
- * The argument is a registered-entry object — a component, a recipe-item
- * definition, or a first-class tool — NOT a live Foundry Item document. All three
- * kinds carry the same source-reference field shape, so the same union serves them
- * all; use {@link getItemSourceReferences} / {@link getItemIdentityReferences} for a
- * live Item document instead.
- *
- * @param {object|null} entry - Registered-entry object with source UUID fields
- * @returns {string[]} Unique UUID references across registeredItemUuid, originItemUuid, and aliasItemUuids
- */
-export function getItemMatchUuids(entry) {
-  const refs = [];
-  if (!entry || typeof entry !== 'object') return refs;
-  pushUnique(refs, entry.registeredItemUuid);
-  pushUnique(refs, entry.originItemUuid);
-  if (Array.isArray(entry.aliasItemUuids)) {
-    for (const ref of entry.aliasItemUuids) pushUnique(refs, ref);
-  }
-  return refs;
-}
-
-/**
- * Whether an item's raw source-reference chain intersects a component's — the
- * durable-flag-agnostic tail of component matching. Kept as an INTERNAL helper
- * only: the exported `itemMatchesComponentSource` pairwise matcher was retired in
- * favour of the list-aware, system-scoped {@link resolveComponentForItem}, which
- * owns identity/exclusivity. This helper is the resolver's raw-reference
- * fall-through tier and nothing else.
- *
- * @param {Set<string>} itemRefs - The item's precomputed source-reference set.
- * @param {object|null} component - Component-like object with source UUID fields.
- * @returns {boolean} True when the item's refs overlap the component's source refs.
- */
-function itemSourceRefsIntersectComponent(itemRefs, component) {
-  return getItemMatchUuids(component).some((ref) => itemRefs.has(ref));
 }
 
 // Systems already warned-about, so a per-item resolve loop emits at most one console
@@ -196,6 +158,11 @@ function claimedRoleId(item, systemId, roleKey) {
  *      the whole `fabricate` namespace as a spurious id (`normalizeFlagKey(null)` returns
  *      `'fabricate'`), so the tier is guarded out entirely for a null key.
  *
+ * Both tiers read the retained {@link module:definitionIndex} `byId` facet rather than
+ * scanning: it is built first-insert-wins in array order, so `Map.get` returns exactly the
+ * definition `candidates.find((def) => def && def.id === claimed)` returned, including when
+ * two candidates share an id.
+ *
  * @param {Item|object|null} item
  * @param {Array<object>} candidates - The candidate definition set of ONE system.
  * @param {string|null|undefined} systemId
@@ -205,8 +172,9 @@ function claimedRoleId(item, systemId, roleKey) {
 function durableClaimedFromSet(item, candidates, systemId, { roleKey, legacyScalarKey }) {
   // Tier 1: durable per-system identity map.
   const roleId = claimedRoleId(item, systemId, roleKey);
+  const index = getDefinitionIndex(candidates);
   if (roleId != null) {
-    const byRole = candidates.find((def) => def && def.id === roleId);
+    const byRole = findById(index, roleId);
     if (byRole) return byRole;
   }
 
@@ -216,7 +184,7 @@ function durableClaimedFromSet(item, candidates, systemId, { roleKey, legacyScal
   if (legacyScalarKey != null) {
     const legacyId = getFabricateFlag(item, legacyScalarKey, null);
     if (legacyId != null) {
-      const byLegacy = candidates.find((def) => def && def.id === legacyId);
+      const byLegacy = findById(index, legacyId);
       if (byLegacy) return byLegacy;
     }
   }
@@ -325,12 +293,12 @@ export function resolveComponentForItem(item, components, systemId) {
   const durable = durableClaimedComponent(item, candidates, systemId);
   if (durable) return durable;
 
-  // Tier 3: raw source-reference intersection.
-  const itemRefs = new Set(getItemSourceReferences(item));
-  if (itemRefs.size === 0) return null;
-  return (
-    candidates.find((component) => itemSourceRefsIntersectComponent(itemRefs, component)) || null
-  );
+  // Tier 3: raw source-reference intersection, resolved through the retained reverse map.
+  // `findBySourceRefs` returns the EARLIEST candidate in array order carrying any of the
+  // item's refs, which is what the outer-loop `candidates.find(...)` returned.
+  const itemRefs = getItemSourceReferences(item);
+  if (itemRefs.length === 0) return null;
+  return findBySourceRefs(getDefinitionIndex(candidates), itemRefs);
 }
 
 // ---------------------------------------------------------------------------
@@ -373,11 +341,9 @@ export function resolveToolForItem(item, tools, systemId) {
   });
   if (durable) return durable;
 
-  const itemRefs = new Set(getItemSourceReferences(item));
-  if (itemRefs.size === 0) return null;
-  return (
-    candidates.find((tool) => getItemMatchUuids(tool).some((ref) => itemRefs.has(ref))) || null
-  );
+  const itemRefs = getItemSourceReferences(item);
+  if (itemRefs.length === 0) return null;
+  return findBySourceRefs(getDefinitionIndex(candidates), itemRefs);
 }
 
 /**
@@ -434,11 +400,9 @@ export function itemIsToolByDurableIdentity(item, tool, tools, systemId) {
   });
   if (durable) return durable.id === tool.id;
 
-  const itemRefs = new Set(getItemIdentityReferences(item));
-  if (itemRefs.size === 0) return false;
-  const resolved =
-    candidates.find((candidate) => getItemMatchUuids(candidate).some((ref) => itemRefs.has(ref))) ||
-    null;
+  const itemRefs = getItemIdentityReferences(item);
+  if (itemRefs.length === 0) return false;
+  const resolved = findBySourceRefs(getDefinitionIndex(candidates), itemRefs);
   return resolved != null && resolved.id === tool.id;
 }
 
@@ -550,20 +514,21 @@ export function matchRecipeItemDefinition(item, definitions, systemId) {
   // Tiers 2/3/4 test membership in the definition's UNION of source refs (its
   // `registeredItemUuid` + `originItemUuid` + aliases), so a compendium-imported book
   // resolves whether the owned copy was dragged from the compendium item or the
-  // imported world item. Unchanged from the pre-#567 fall-through.
-  const uuid = typeof item.uuid === 'string' ? item.uuid : null;
-  const compendium = getCompendiumSourceUuid(item);
-  const duplicate = getDuplicateSourceUuid(item);
-  const refSets = new Map(defs.map((def) => [def, new Set(getItemMatchUuids(def))]));
-  const predicates = {
-    uuid: (def) => uuid != null && refSets.get(def).has(uuid),
-    compendium: (def) => compendium != null && refSets.get(def).has(compendium),
-    duplicate: (def) => duplicate != null && refSets.get(def).has(duplicate),
+  // imported world item. Unchanged from the pre-#567 fall-through, except that the
+  // per-call `Map` of ref sets — an O(definitions) build on EVERY match — is now the
+  // retained index, and each tier is one reverse-map lookup.
+  const index = getDefinitionIndex(defs);
+  const refByTier = {
+    uuid: typeof item.uuid === 'string' ? item.uuid : null,
+    compendium: getCompendiumSourceUuid(item),
+    duplicate: getDuplicateSourceUuid(item),
   };
 
   for (const tier of RECIPE_ITEM_MATCH_TIERS) {
     if (tier === 'identity') continue;
-    const definition = defs.find(predicates[tier]);
+    const ref = refByTier[tier];
+    if (ref == null) continue;
+    const definition = findBySourceRefs(index, [ref]);
     if (definition) return { definition, tier };
   }
   return empty;
