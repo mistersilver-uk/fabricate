@@ -32,6 +32,7 @@ export const SALVAGE_CHAT_KEYS = Object.freeze({
   tierStepTarget: 'FABRICATE.Chat.TierStepTarget',
   failureReason: 'FABRICATE.Chat.FailureReason',
   consumedOnFailure: 'FABRICATE.Chat.ConsumedOnFailure',
+  producedOnFailure: 'FABRICATE.Chat.ProducedOnFailure',
 });
 
 /**

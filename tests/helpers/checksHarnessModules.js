@@ -64,6 +64,10 @@ export const CHECKS_TREE_RAW_MODULES = Object.freeze([
   // import-free leaf computes, and the same walk is what tells it a modifier rolls at all.
   'src/utils/rollExpressionAverage.js',
   'src/utils/routedOutcomeKeywords.js',
+  // Issue 1098: `routedOutcomeKeywords.js` now reads the failure-result policy to decide
+  // which outcome tiers a result-authoring control may offer, so this leaf joins the
+  // closure with it.
+  'src/utils/failureResultPolicy.js',
   // The formula field's quick-add chips are DERIVED from the active world through this
   // module rather than hard-coded (issue 1096), so the whole checks tree now imports it.
   'src/config/modifierExpressionSuggestions.js',
@@ -142,6 +146,9 @@ export const CHECKS_TREE_COMPILED_MODULES = Object.freeze([
   // `portal.js`) is already declared here for other reasons.
   'src/ui/svelte/apps/manager/SearchablePopover.svelte',
   'src/ui/svelte/apps/manager/ToggleCard.svelte',
+  // The On-failure section's failure-result policy card (issue 1098), rendered by all
+  // three activity routes and by the alchemy branch through one snippet in `ChecksView`.
+  'src/ui/svelte/apps/manager/checks/CheckFailurePolicy.svelte',
   'src/ui/svelte/apps/manager/checks/CheckOddsPanel.svelte',
   'src/ui/svelte/apps/manager/checks/CheckOutcomePreview.svelte',
   'src/ui/svelte/apps/manager/checks/ChecksEditorTabs.svelte',

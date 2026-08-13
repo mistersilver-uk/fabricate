@@ -16,6 +16,8 @@
  * `src/systems` without a layering violation.
  */
 
+import { permitsFailureResults } from './failureResultPolicy.js';
+
 export const FAIL_KEYWORDS = Object.freeze(['fail', 'failed', 'failure', 'f']);
 
 export const MISS_KEYWORDS = Object.freeze([
@@ -136,6 +138,32 @@ export function routedOutcomeTierOptions(routed) {
   return (Array.isArray(tiers) ? tiers : [])
     .filter((tier) => tier?.id)
     .map((tier) => ({ id: tier.id, name: tier.name || tier.id }));
+}
+
+/**
+ * The outcome-tier options a RESULT-AUTHORING control may offer, chosen by the owning
+ * activity's failure-result policy (issue 1098, decision 7).
+ *
+ * It is a SWAP between the two functions above, not a third derivation: `never` reads
+ * {@link routedSuccessTierOptions} and a permitting policy reads
+ * {@link routedOutcomeTierOptions}, which already serves the library inspector. The
+ * picker and `recipeReadiness.collectRoutedCheckIssues` both call this, so the control
+ * can never offer a tier the validator calls unroutable — and neither can offer one
+ * `ResolutionModeService._resolveRoutedTierId` refuses to resolve, because all three read
+ * the same policy.
+ *
+ * `minSuccessOutcomeId` is deliberately NOT a caller: it names a minimum SUCCESS tier, a
+ * failure-marked tier is never a candidate for it, and its picker keeps reading the
+ * success-filtered set under every policy value.
+ *
+ * @param {?{type?: string, relativeOutcomes?: Array, fixedOutcomes?: Array}} routed
+ * @param {*} failureResultPolicy the owning activity check's policy
+ * @returns {Array<{id: string, name: string}>}
+ */
+export function routedTierOptionsForPolicy(routed, failureResultPolicy) {
+  return permitsFailureResults(failureResultPolicy)
+    ? routedOutcomeTierOptions(routed)
+    : routedSuccessTierOptions(routed);
 }
 
 /**
@@ -272,4 +300,32 @@ export function routedOutcomeTierNames(routed) {
   return (Array.isArray(tiers) ? tiers : [])
     .map((tier) => String(tier?.name || '').trim())
     .filter((name) => name.length > 0);
+}
+
+/**
+ * The tier NAMES a routed-salvage `outcomeRouting` select may offer, chosen by the salvage
+ * failure-result policy (issue 1098, decision 7) — the name-keyed twin of
+ * {@link routedTierOptionsForPolicy}.
+ *
+ * {@link routedOutcomeTierNames} is unfiltered, so that select has always offered failure
+ * tier names; until this issue they were DEAD OPTIONS, because `CraftingEngine.salvage()`
+ * returned before `_resolveSalvageResultGroups` on a failed check and nothing ever routed
+ * through them. Now they route when the policy permits, and are hidden when it does not.
+ *
+ * The VALIDATOR is deliberately not made policy-conditional alongside it:
+ * `ResolutionModeService.validateSalvage` reads the unfiltered names, and an assignment
+ * authored under a permitting policy must not become a validation ERROR when the GM
+ * switches to `never` — it stops being offered and stops routing, and returns when the
+ * policy permits. That is the same non-destructive rule `ResultGroup.checkOutcomeIds`
+ * follows on the crafting side.
+ *
+ * @param {?{type?: string, relativeOutcomes?: Array, fixedOutcomes?: Array}} routed
+ * @param {*} failureResultPolicy the salvage check's policy
+ * @returns {Array<string>}
+ */
+export function routedOutcomeTierNamesForPolicy(routed, failureResultPolicy) {
+  const names = routedOutcomeTierNames(routed);
+  if (permitsFailureResults(failureResultPolicy)) return names;
+  const successNames = new Set(routedSuccessTierOptions(routed).map((tier) => tier.name));
+  return names.filter((name) => successNames.has(name));
 }

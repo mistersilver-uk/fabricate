@@ -24,6 +24,7 @@ import {
   normalizeCustomComponentCategories,
 } from '../utils/componentCategories.js';
 import { parsePlainDiceGroups, parseDiceGroups } from '../utils/craftingCheckExpression.js';
+import { normalizeFailureResultPolicy } from '../utils/failureResultPolicy.js';
 import { plainTextDescription, descriptionTextCandidate } from '../utils/plainTextDescription.js';
 import {
   normalizeCustomRecipeCategories,
@@ -596,6 +597,28 @@ export class CraftingSystemManager {
     };
   }
 
+  /**
+   * The FAILURE-RESULT POLICY (issue 1098) — may a failed check produce a result at all.
+   *
+   * ONE derivation, THREE callers: `_normalizeCraftingCheck`,
+   * `_normalizeSalvageCraftingCheck` and `_normalizeGatheringCraftingCheck`. Each of
+   * those is a WHITELIST REBUILD, so a key emitted by two of them and not the third is
+   * dropped from that one activity the next time a system is saved — silently, and in
+   * one direction only. Routing all three through this method is what stops that.
+   *
+   * A newly-created system defaults to `perRecord` and an absent or unrecognized value
+   * normalizes to `perRecord` on read (the `toolBreakage.authority` precedent). An
+   * UPGRADED world never sees that default: the `1.25.0` seed migration writes `never`
+   * onto every check block already on disk, so no existing world changes behaviour.
+   *
+   * @param {*} value raw persisted value
+   * @returns {'never'|'perRecord'|'always'}
+   * @private
+   */
+  _normalizeFailureResultPolicy(value) {
+    return normalizeFailureResultPolicy(value);
+  }
+
   _normalizeCraftingCheck(check = {}, validCatalogueIds = new Set()) {
     const outcomes = Array.isArray(check?.outcomes) ? check.outcomes : [];
     const normalizedOutcomes = outcomes
@@ -624,6 +647,10 @@ export class CraftingSystemManager {
           (check?.consumption?.breakToolsOnFail ?? check?.consumption?.consumeCatalystsOnFail) ===
           true,
       },
+      // The ORTHOGONAL produce/do-not-produce axis (issue 1098). A sibling of
+      // `consumption`, not a member of it: consumption answers what a failed check
+      // COSTS, this answers what it PRODUCES.
+      failureResultPolicy: this._normalizeFailureResultPolicy(check?.failureResultPolicy),
       progressive: this._normalizeProgressiveCraftingCheck(check?.progressive),
       outcomes: normalizedOutcomes.length > 0 ? [...new Set(normalizedOutcomes)] : ['fail', 'pass'],
       routed: this._normalizeRoutedCraftingCheck(check?.routed),
@@ -1249,6 +1276,12 @@ export class CraftingSystemManager {
           (normalizedCheck.consumption?.breakToolsOnFail ??
             normalizedCheck.consumption?.consumeCatalystsOnFail) === true,
       },
+      // The ORTHOGONAL produce/do-not-produce axis (issue 1098), and on salvage it is a
+      // NEW CAPABILITY rather than a gate on an existing one: until this issue a failed
+      // salvage awarded nothing unconditionally. See `_normalizeSalvage` for the
+      // reserved `role: 'failure'` group this policy makes live, and
+      // `CraftingEngine._resolveSalvageResultGroups`, which selects it BY ROLE.
+      failureResultPolicy: this._normalizeFailureResultPolicy(normalizedCheck.failureResultPolicy),
       // Salvage reuses the crafting check sub-object shapes so the Checks-tab
       // editors are shared. The simple/routed default DC is the sub-object's `dc`;
       // a per-component override lives on `component.salvage.dcOverride`. Tiers and
@@ -1273,6 +1306,13 @@ export class CraftingSystemManager {
     const source = !check || typeof check !== 'object' ? {} : check;
     return {
       enabled: source.enabled === true,
+      // The ORTHOGONAL produce/do-not-produce axis (issue 1098). Gathering has no
+      // consumption block at all, so this is the ONLY failure axis it carries — and the
+      // path it governs ships DORMANT: `_libraryTaskToRuntimeTask` hardcodes
+      // `resolutionMode: 'd100'` and `GatheringEconomyView` renders both formula-rolled
+      // modes disabled, both pending issue 683. The shape lands now so the capability is
+      // complete when 683 flips the switch.
+      failureResultPolicy: this._normalizeFailureResultPolicy(source.failureResultPolicy),
       progressive: this._normalizeProgressiveCraftingCheck(source.progressive),
       routed: this._normalizeRoutedCraftingCheck(source.routed),
       // Gathering's OWN selection over the system catalogue (issue 1095). It applies to
@@ -2023,13 +2063,22 @@ export class CraftingSystemManager {
    * Normalize a component's salvage config. In Simple salvage mode this enforces the
    * group-count invariant (issue 764) via a SUCCESS-FIRST retain-one clamp: at most one
    * success group (`role !== 'failure'`) at `resultGroups[0]` — the group the engine
-   * awards via `slice(0, 1)`, no role filter (`CraftingEngine._resolveSalvageResultGroups`)
+   * awards ON SUCCESS via `slice(0, 1)`, no role filter
+   * (`CraftingEngine._resolveSalvageResultGroups` under `disposition: 'success'`)
    * — plus at most one reserved `role: 'failure'` group, tolerated ONLY when the Simple
    * salvage check slot has an authored roll formula. A failure-first `[failure, success]`
    * input (which import/copy/migration can carry, though the editor never authors it) is
    * re-ordered so the success group lands at index 0; a failure-only config has NO success
-   * group and clamps `enabled` to false. The reserved-failure tolerance is a DATA-MODEL /
-   * VALIDATION ALLOWANCE ONLY — salvage Simple never awards or routes to a failure group.
+   * group and clamps `enabled` to false.
+   *
+   * THE RESERVED-FAILURE TOLERANCE IS A LIVE CAPABILITY (issue 1098, decision 5). It was
+   * a data-model / validation allowance only, and the claim that salvage Simple never
+   * awards or routes to a failure group is RETRACTED: when
+   * `salvageCraftingCheck.failureResultPolicy` permits results on failure, the salvage
+   * failure branch resolves this group and awards it. Both clamps are UNCHANGED, and the
+   * ordering guarantee becomes MORE load-bearing rather than less — the SUCCESS branch
+   * still selects `resultGroups[0]` BY INDEX, so the FAILURE branch must select BY ROLE,
+   * never by index, or a failed check would award the full success salvage output.
    *
    * The clamp only applies with a Simple salvage-mode context: `salvageResolutionMode`
    * absent (a bare unit fixture or non-system caller) leaves groups untouched and keeps
@@ -2095,14 +2144,19 @@ export class CraftingSystemManager {
       const successGroup = normalizedGroups.find((g) => g.role !== 'failure');
       const failureGroup = normalizedGroups.find((g) => g.role === 'failure');
       const clamped = [];
-      // Success group ALWAYS at index 0 — the engine awards `slice(0, 1)` with no role
-      // filter, so a failure-first input is re-ordered here rather than awarding failure.
+      // Success group ALWAYS at index 0 — the engine's SUCCESS award is `slice(0, 1)`
+      // with no role filter, so a failure-first input is re-ordered here rather than
+      // awarding the failure group on a passed check. Unchanged by issue 1098: the
+      // failure award added there selects BY ROLE and never by index, precisely so this
+      // ordering guarantee stays the only thing the success branch has to rely on.
       if (successGroup) clamped.push(successGroup);
       // Reserved failure group tolerated ONLY with an authored Simple check formula.
       if (failureGroup && salvageSimpleCheckHasFormula === true) clamped.push(failureGroup);
       resultGroups = clamped;
       // A Simple config with no success group (e.g. a lone `role: 'failure'` group)
-      // cannot be enabled — `slice(0, 1)` would otherwise award the failure group.
+      // cannot be enabled — the success branch's `slice(0, 1)` would otherwise award the
+      // failure group on a PASSED check. Unchanged by issue 1098, which gives the failure
+      // branch its own role-keyed selection rather than relaxing this clamp.
       enabled = salvage.enabled === true && successGroup != null;
     }
 

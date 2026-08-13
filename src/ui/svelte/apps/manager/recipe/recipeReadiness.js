@@ -305,7 +305,11 @@ function collectRequirementOverlapIssues(executionSteps, isMultiStep, systemComp
  *
  * @param {object[]} executionSteps
  * @param {boolean} isMultiStep
- * @param {RoutedOutcomeTier[]} routedOutcomeTierOptions Success-filtered `{id,name}`.
+ * @param {RoutedOutcomeTier[]} routedOutcomeTierOptions POLICY-CONDITIONAL `{id,name}`
+ *   (issue 1098, decision 7): success-filtered when the crafting failure-result policy
+ *   forbids failure results, unfiltered when it permits them. It is passed in rather than
+ *   derived here precisely so this validator and the recipe editor's picker read ONE set —
+ *   a tier the editor offers can never be one this function calls unroutable.
  * @returns {{ issues: ReadinessIssue[], checks: ReadinessCheck[] }}
  */
 function collectRoutedCheckIssues(executionSteps, isMultiStep, routedOutcomeTierOptions) {
@@ -451,8 +455,9 @@ function collectAlchemyReadiness(recipe, alchemy, signatureConflicts) {
  *   provider (`'check'` for routed check-mode); the routed warnings only fire when
  *   it is `'check'`.
  * @param {RoutedOutcomeTier[]} [options.routedOutcomeTierOptions] The system's
- *   success-filtered routed-check outcome tiers (`{id,name}`), used to flag
- *   unrouted groups and unproduced tiers.
+ *   POLICY-CONDITIONAL routed-check outcome tiers (`{id,name}`) — success-filtered under
+ *   a forbidding failure-result policy, unfiltered under a permitting one (issue 1098) —
+ *   used to flag unrouted groups and unproduced tiers.
  * @param {{ checkMode?: string }|null} [options.alchemy] Alchemy context for an
  *   alchemy system (`{ checkMode }`); null/absent for every other mode. Drives the
  *   alchemy result-selection and signature-collision enable blockers (issue 549).

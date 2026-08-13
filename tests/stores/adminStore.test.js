@@ -8306,3 +8306,167 @@ describe('createAdminStore — gathering economy', () => {
     assert.equal(get(store.viewState).gatheringConfig.systems.sys1.economy.stamina.enabled, false);
   });
 });
+
+// ---------------------------------------------------------------------------
+// The FAILURE-RESULT POLICY and salvage's failure CONSUMPTION (issue 1098)
+//
+// `_buildSelectedSystemViewData` is a hand-built ALLOWLIST: a field omitted there is
+// INVISIBLE to the UI however correctly the normalizer and the write path behave. These
+// tests drive the REAL projection and the REAL savers, because that is the only place the
+// omission shows up.
+// ---------------------------------------------------------------------------
+
+describe('createAdminStore — failure-result policy (issue 1098)', () => {
+  /** Project a raw system through the real store and read one activity's check back. */
+  async function projectChecks(mutate) {
+    const services = createMockServices();
+    const sys = services._getSystemsMutable().find((s) => s.id === 'sys1');
+    mutate(sys);
+    const store = createAdminStore(services);
+    await store.refresh();
+    return get(store.viewState).selectedSystem;
+  }
+
+  it('projects failureResultPolicy on ALL THREE activity checks, at non-default values', async () => {
+    const selected = await projectChecks((sys) => {
+      sys.craftingCheck = { mode: 'passFail', failureResultPolicy: 'always' };
+      sys.salvageCraftingCheck = { failureResultPolicy: 'never' };
+      sys.gatheringCraftingCheck = { failureResultPolicy: 'always' };
+    });
+
+    // Each is a DIFFERENT value from its neighbour, so a projection reading one activity's
+    // policy onto another is visible rather than accidentally correct.
+    assert.equal(selected.craftingCheck.failureResultPolicy, 'always');
+    assert.equal(selected.salvageCraftingCheck.failureResultPolicy, 'never');
+    assert.equal(selected.gatheringCraftingCheck.failureResultPolicy, 'always');
+  });
+
+  it('projects an absent or unrecognized policy as the read-time default', async () => {
+    const selected = await projectChecks((sys) => {
+      sys.craftingCheck = { mode: 'passFail' };
+      sys.salvageCraftingCheck = { failureResultPolicy: 'sometimes' };
+      sys.gatheringCraftingCheck = {};
+    });
+
+    for (const key of ['craftingCheck', 'salvageCraftingCheck', 'gatheringCraftingCheck']) {
+      assert.equal(selected[key].failureResultPolicy, 'perRecord', key);
+    }
+  });
+
+  // Salvage's consumption block was persisted since 1.7.0 and projected NOWHERE, which is
+  // why the Salvage On-failure section could not exist. Both of its defaults are traps.
+  it('projects salvage consumption, mirroring BOTH of the normalizer trap defaults', async () => {
+    // `consumeComponentOnFail` defaults TRUE via `!== false`, so dropping it INVERTS an
+    // authored `false` rather than merely losing it — a default-valued fixture is no oracle.
+    const authored = await projectChecks((sys) => {
+      sys.salvageCraftingCheck = {
+        consumption: { consumeComponentOnFail: false, breakToolsOnFail: true },
+      };
+    });
+    assert.equal(authored.salvageCraftingCheck.consumption.consumeComponentOnFail, false);
+    assert.equal(authored.salvageCraftingCheck.consumption.breakToolsOnFail, true);
+
+    // Absence reads as the default-ON, which is the state most systems are in.
+    const absent = await projectChecks((sys) => {
+      sys.salvageCraftingCheck = { consumption: {} };
+    });
+    assert.equal(absent.salvageCraftingCheck.consumption.consumeComponentOnFail, true);
+    assert.equal(absent.salvageCraftingCheck.consumption.breakToolsOnFail, false);
+  });
+
+  it('reads breakToolsOnFail NEW-THEN-LEGACY, so a pre-1.7.0 system is not flipped ON→OFF', async () => {
+    // A system authored before the 1.7.0 rename carries ONLY `consumeCatalystsOnFail`. A
+    // projection reading the new key alone would render the toggle OFF, and the first save
+    // from that screen would persist the GM's setting as OFF — silently, and for a setting
+    // they never touched.
+    const legacyOnly = await projectChecks((sys) => {
+      sys.salvageCraftingCheck = { consumption: { consumeCatalystsOnFail: true } };
+    });
+    assert.equal(
+      legacyOnly.salvageCraftingCheck.consumption.breakToolsOnFail,
+      true,
+      'the legacy alias is honoured by the projection exactly as by the normalizer'
+    );
+
+    // …and an explicit NEW-key value wins over the legacy one, in both directions.
+    const bothKeys = await projectChecks((sys) => {
+      sys.salvageCraftingCheck = {
+        consumption: { breakToolsOnFail: false, consumeCatalystsOnFail: true },
+      };
+    });
+    assert.equal(bothKeys.salvageCraftingCheck.consumption.breakToolsOnFail, false);
+  });
+
+  /** Capture the `updateSystem` payload a saver writes. */
+  async function captureSave(run) {
+    let updateArgs = null;
+    const services = createMockServices();
+    // Seed a sibling on every check block. The saver has to carry it through
+    // `updateSystem`'s shallow top-level merge, and a fixture with nothing beside the
+    // policy could not tell a spread saver from one that replaced the whole block.
+    const raw = services._getSystemsMutable().find((s2) => s2.id === 'sys1');
+    raw.craftingCheck = { ...(raw.craftingCheck || {}), enabled: true };
+    raw.salvageCraftingCheck = {
+      enabled: true,
+      consumption: { consumeComponentOnFail: false },
+    };
+    raw.gatheringCraftingCheck = { enabled: true };
+    const origManager = services.getCraftingSystemManager();
+    services.getCraftingSystemManager = () => ({
+      ...origManager,
+      updateSystem: async (id, updates) => {
+        updateArgs = { id, updates };
+        await origManager.updateSystem(id, updates);
+      },
+    });
+    const store = createAdminStore(services);
+    await store.selectSystem('sys1');
+    await run(store);
+    return updateArgs;
+  }
+
+  it('each activity saver writes its OWN check block and preserves every sibling', async () => {
+    // `updateSystem` shallow-merges the TOP level only, so a saver that did not spread
+    // `existing` would drop every sibling of the policy and the normalizer would then
+    // re-default them — silent data loss, and the reason this is asserted on a SIBLING
+    // rather than by reading the saver.
+    const cases = [
+      ['craftingCheck', (store) => store.saveCraftingCheckFailureResultPolicy('always')],
+      ['salvageCraftingCheck', (store) => store.saveSalvageCheckFailureResultPolicy('always')],
+      ['gatheringCraftingCheck', (store) => store.saveGatheringCheckFailureResultPolicy('never')],
+    ];
+    for (const [key, run] of cases) {
+      const args = await captureSave(run);
+      assert.ok(args, `${key}: the saver wrote`);
+      assert.ok(args.updates[key], `${key}: it wrote its own block`);
+      assert.ok(
+        Object.hasOwn(args.updates[key], 'failureResultPolicy'),
+        `${key}: carrying the policy`
+      );
+      // The sibling every check block has. Its survival is what proves `existing` was spread.
+      assert.ok(
+        Object.hasOwn(args.updates[key], 'enabled'),
+        `${key}: and every sibling of the policy survives the shallow merge`
+      );
+    }
+  });
+
+  it('an unrecognized policy is normalized by the saver rather than persisted', async () => {
+    const args = await captureSave((store) => store.saveCraftingCheckFailureResultPolicy('bogus'));
+    assert.equal(args.updates.craftingCheck.failureResultPolicy, 'perRecord');
+  });
+
+  it('the salvage consumption saver spreads the block AND its nested sub-object', async () => {
+    const args = await captureSave((store) =>
+      store.saveSalvageCheckConsumption({ breakToolsOnFail: true })
+    );
+    assert.equal(args.updates.salvageCraftingCheck.consumption.breakToolsOnFail, true);
+    // The UNTOUCHED flag has to survive too: it defaults TRUE, so losing it would present
+    // as an inversion the next time the normalizer read the block.
+    assert.ok(
+      Object.hasOwn(args.updates.salvageCraftingCheck.consumption, 'consumeComponentOnFail'),
+      'the sibling consumption flag is carried, not re-defaulted'
+    );
+    assert.ok(Object.hasOwn(args.updates.salvageCraftingCheck, 'enabled'));
+  });
+});

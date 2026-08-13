@@ -1267,6 +1267,7 @@
       "Roll": "Roll",
       "FailureReason": "Reason",
       "ConsumedOnFailure": "Consumed on Failure",
+      "ProducedOnFailure": "Produced on Failure",
       "GatherSuccess": "Gathering Successful",
       "GatherFailure": "Gathering Failed",
       "GatherActor": "Gatherer",
@@ -2170,6 +2171,7 @@
           "RoutingSearchOutcomeTiers": "Search outcomes...",
           "RoutingNoOutcomeTiers": "Define outcome tiers in the routed crafting check first.",
           "RoutingNoSuccessOutcomeTiers": "No outcome tier is marked as a Success. Mark one as Success in the crafting check to route a result set to it.",
+          "RoutingNoSuccessOutcomeTiersPolicy": "Every outcome tier on this check is a failure, and this system produces nothing on a failed check. Mark a tier as a Success, or let failed checks produce a result on the crafting check’s On failure section.",
           "RoutingRemove": "Remove",
           "AddResultItem": "Add item",
           "RemoveResultItem": "Remove item",
@@ -5093,7 +5095,37 @@
           "RecordNoun": {
             "Crafting": "recipe",
             "Salvage": "salvageable item",
-            "Gathering": "gathering task"
+            "Gathering": "gathering task",
+            "CraftingPlural": "Recipes",
+            "SalvagePlural": "Salvageable items",
+            "GatheringPlural": "Gathering tasks"
+          },
+          "FailureResults": {
+            "Heading": "Produce a result on a failed check",
+            "Intro": "Whether a failed check can still produce something — a ruined ingot, a torn hide, scraps.",
+            "Never": "Never",
+            "NeverDesc": "A failed check produces nothing at all.",
+            "PerRecord": "Decided per {record}",
+            "PerRecordDesc": "Each {record} chooses for itself, so most fail with nothing while a few still yield a failure result.",
+            "Always": "Always",
+            "AlwaysDesc": "Every failed check produces its failure result. {records} without one produce nothing.",
+            "InertRoutedByIngredients": "In routed-by-ingredients mode the check has no outcome tiers to mark as failures, so nothing here can be produced on a failed check. This setting is kept, and applies again if you switch to a mode that has them.",
+            "InertProgressive": "A progressive check spends its rolled value down one ordered list of results, so it has no failure outcome to produce. This setting is kept, and applies again if you switch to a mode that has one.",
+            "InertGatheringD100": "The d100 gathering roll has no failure outcome to produce — and routed and progressive gathering are not available yet. This setting is kept and takes effect when they are.",
+            "GatheringDormant": "Routed and progressive gathering are still being built, so nothing on this screen changes what a failed gathering attempt does yet. What you set here is kept and takes effect when they arrive.",
+            "FailureOutcomeTitle": "Failure feedback",
+            "FailureOutcomeLead": "A gathering task can say what happens when an attempt turns up nothing — a line of text, or a macro. It is authored on the task itself.",
+            "FailureOutcomeNoRecord": "Choose a gathering task under Preview as to open its failure feedback.",
+            "FailureOutcomeText": "Text",
+            "FailureOutcomeMacro": "Macro",
+            "FailureOutcomeNone": "Not set",
+            "FailureOutcomeOpen": "Open this task"
+          },
+          "SalvageFailure": {
+            "ConsumeComponentOnFail": "Consume the item on a failed check",
+            "ConsumeComponentOnFailDesc": "The item being salvaged is used up even when the salvage check fails. On by default.",
+            "BreakToolsOnFail": "Break tools on a failed check",
+            "BreakToolsOnFailDesc": "Required tools break when the salvage check fails. Off by default."
           }
         },
         "Access": {
