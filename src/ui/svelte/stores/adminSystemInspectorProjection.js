@@ -104,6 +104,12 @@ async function _resolveRecipeItemSource(uuid) {
 // `actor.flags.fabricate.learnedRecipes` read resolved to `undefined` in a real
 // world and "Learned by" was permanently 0. `getFabricateFlag` also try/catches
 // `getFlag`'s inactive-scope throw.
+//
+// The ids come from the shared ENTRY-BOUNDARY reader, not `Object.keys` (issue 1143).
+// `Document#update` nests a dotted recipe id into a subtree, so the top level yields the
+// id's first segment and this panel under-reported learners for such a recipe while the
+// deletion cascade — reading through the same reader — acted on the real id. Both must
+// answer with the same ids or the GM surface and the mutation disagree.
 function _buildLearnedRecipeActorIndex() {
   const index = new Map();
   const raw = globalThis.game?.actors;
