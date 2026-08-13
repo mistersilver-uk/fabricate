@@ -10519,6 +10519,27 @@ describe('CraftingSystemManager mounted behavior', () => {
     }
   }
 
+  // Issue 1144 — the essence toast did not carry `recipesDisabled` at all before this fix.
+  // Mirrors 'reports the DISABLED recipes in the toast, the most consequential outcome' and
+  // 'drops the disable clause entirely when nothing was disabled' from the component suite.
+  it('reports the DISABLED recipes in the essence toast, the most consequential outcome', async () => {
+    const { messages } = await deleteSelectedEssenceRows(['water'], {
+      deleteEssencesResult: { deleted: 1, recipesUpdated: 3, recipesDisabled: 1 },
+    });
+
+    assert.deepEqual(messages, [
+      'Deleted 1 essence(s) and rewrote 3 recipe(s), disabling 1 of them.',
+    ]);
+  });
+
+  it('drops the disable clause entirely from the essence toast when nothing was disabled', async () => {
+    const { messages } = await deleteSelectedEssenceRows(['water'], {
+      deleteEssencesResult: { deleted: 1, recipesUpdated: 2, recipesDisabled: 0 },
+    });
+
+    assert.deepEqual(messages, ['Deleted 1 essence(s) and rewrote 2 recipe(s).']);
+  });
+
   it('reports NO essence success and keeps the selection when the write deleted nothing', async () => {
     // The store returns its zero result — an OBJECT, and therefore truthy — on a failed
     // write, after raising its own error toast. A bare `if (!result)` guard lets that through
