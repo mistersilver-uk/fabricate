@@ -4896,13 +4896,27 @@
     }
   }
 
+  // `recipesDisabled` is the most consequential outcome of the three — recipes the GM's
+  // players could craft this morning and cannot craft now — and the toast is the ONLY
+  // feedback that survives the panel unmounting on a successful delete. It is reported when
+  // non-zero, and the zero case takes the shorter sentence rather than trailing ", disabling
+  // 0 of them", which reads as a warning about nothing. Mirrors `componentBulkDeletedMessage`.
   function essenceBulkDeletedMessage(result) {
-    return text(
-      'FABRICATE.Admin.Manager.Essence.BulkEdit.Deleted',
-      'Deleted {count} essence(s) and rewrote {recipes} recipe(s).'
-    )
+    const disabled = Number(result?.recipesDisabled) || 0;
+    const template =
+      disabled > 0
+        ? text(
+            'FABRICATE.Admin.Manager.Essence.BulkEdit.DeletedWithDisabled',
+            'Deleted {count} essence(s) and rewrote {recipes} recipe(s), disabling {disabled} of them.'
+          )
+        : text(
+            'FABRICATE.Admin.Manager.Essence.BulkEdit.Deleted',
+            'Deleted {count} essence(s) and rewrote {recipes} recipe(s).'
+          );
+    return template
       .replace('{count}', Number(result?.deleted) || 0)
-      .replace('{recipes}', Number(result?.recipesUpdated) || 0);
+      .replace('{recipes}', Number(result?.recipesUpdated) || 0)
+      .replace('{disabled}', disabled);
   }
 
   function selectEnvironment(environmentId = selectedEnvironment?.id) {

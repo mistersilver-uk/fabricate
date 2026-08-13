@@ -6268,9 +6268,15 @@ export class CraftingSystemManager {
    * {@link CraftingSystemManager#deleteEssence} strips the essence from every carrying component
    * and the caller deletes every selected id, stating the component and recipe impact first.
    *
+   * `recipesDisabled` mirrors {@link CraftingSystemManager#deleteComponents}: it counts recipes
+   * this call took from enabled to disabled — a recipe that was already disabled is not
+   * counted, because the number exists to warn about craftability the GM is about to lose, not
+   * to restate what was already off.
+   *
    * @param {string} systemId
    * @param {Iterable<string>} essenceIds
-   * @returns {Promise<{deleted: number, essenceIds: string[], recipesUpdated: number}>}
+   * @returns {Promise<{deleted: number, essenceIds: string[], recipesUpdated: number,
+   *   recipesDisabled: number}>}
    */
   async deleteEssences(systemId, essenceIds) {
     this._assertGM('delete essences');
@@ -6280,7 +6286,9 @@ export class CraftingSystemManager {
     const definitions = Array.isArray(system.essenceDefinitions) ? system.essenceDefinitions : [];
     const requested = new Set(normalizeSelectionIds(essenceIds));
     const removed = definitions.filter((def) => requested.has(String(def?.id ?? '')));
-    if (removed.length === 0) return { deleted: 0, essenceIds: [], recipesUpdated: 0 };
+    if (removed.length === 0) {
+      return { deleted: 0, essenceIds: [], recipesUpdated: 0, recipesDisabled: 0 };
+    }
 
     const removedIds = removed.map((def) => String(def.id));
     const removedIdSet = new Set(removedIds);
@@ -6298,7 +6306,10 @@ export class CraftingSystemManager {
       }
     }
 
-    const recipesUpdated = await this._stripEssencesFromRecipes(systemId, removedIds);
+    const { recipesUpdated, recipesDisabled } = await this._stripEssencesFromRecipes(
+      systemId,
+      removedIds
+    );
 
     await this.save({ put: system });
     this._notifySystemsChanged();
@@ -6311,7 +6322,7 @@ export class CraftingSystemManager {
 
     await this._reconcileAlchemySignaturesAfterDeletion(system);
 
-    return { deleted: removedIds.length, essenceIds: removedIds, recipesUpdated };
+    return { deleted: removedIds.length, essenceIds: removedIds, recipesUpdated, recipesDisabled };
   }
 
   /**
@@ -6322,7 +6333,7 @@ export class CraftingSystemManager {
    *
    * @param {string} systemId
    * @param {string[]} removedIds
-   * @returns {Promise<number>} how many recipes were rewritten.
+   * @returns {Promise<{recipesUpdated: number, recipesDisabled: number}>}
    * @private
    */
   async _stripEssencesFromRecipes(systemId, removedIds) {
@@ -6334,6 +6345,7 @@ export class CraftingSystemManager {
           removedIds.some((essenceId) => recipeReferencesEssence(recipe, essenceId))
       );
 
+    let recipesDisabled = 0;
     for (const recipe of recipes) {
       const updated = recipe.toJSON();
       for (const essenceId of removedIds) {
@@ -6343,7 +6355,10 @@ export class CraftingSystemManager {
           ingredientSets: this._stripEssenceFromSets(step.ingredientSets, essenceId),
         }));
       }
-      if (this._recipeLostItsShape(updated)) updated.enabled = false;
+      if (this._recipeLostItsShape(updated)) {
+        if (updated.enabled !== false) recipesDisabled += 1;
+        updated.enabled = false;
+      }
 
       await this.recipeManager.updateRecipe(recipe.id, updated, {
         persist: false,
@@ -6354,7 +6369,7 @@ export class CraftingSystemManager {
     }
 
     if (recipes.length > 0) await this.recipeManager.save();
-    return recipes.length;
+    return { recipesUpdated: recipes.length, recipesDisabled };
   }
 
   /**

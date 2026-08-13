@@ -938,7 +938,8 @@ Capabilities:
 - Manager allows essence deletion regardless of component usage: deletion is WARNED, not BLOCKED, because the cascade strips the essence from every carrying component and rewrites every referencing recipe.
   No delete is refused, and no set member is skipped, on account of the components carrying the essence, and the browser row shows the component count plainly with no delete-blocked marker.
   Both delete forms state their impact before the GM commits.
-  The single delete's confirmation states how many components the essence is removed from and how many recipes are rewritten.
+  The single delete's confirmation states how many components the essence is removed from and how many recipes are rewritten, worded in the FUTURE because the essence still exists as the GM reads it.
+  Each consequence figure is gated on its own count, so the commonest single delete of all — carried by no component and required by no recipe — states neither nought.
 - A set delete states its impact before it is armed, and recomputes it when the selection changes.
   The statement reports how many essence definitions will be deleted, how many components carry one or more of the SELECTED essences, and how many recipes will be rewritten.
   The component number is counted over the whole selection as a DISTINCT-carrier union: a component carrying two selected essences counts once, because the cascade strips it in one pass, so the copy says "one or more of the selected essences" rather than a per-essence sum.
@@ -1866,7 +1867,7 @@ The GM component surfaces: the component browser and the component editor.
     The set delete uses the two-step armed confirmation rather than a modal dialog, paired with the impact statement above; the armed token is dropped whenever the selection changes at all, because an arm is a statement about a specific set.
     The set write persists through a single crafting-system write and a single recipes write regardless of set size, then clears the selection and returns the rail to the single-component inspector.
     Because that exit unmounts the panel, the completion message is the only surviving feedback and reports what happened — components deleted, recipes rewritten, and, when non-zero, recipes disabled — while a write that deleted nothing reports no success and leaves the selection intact.
-    The single-component delete states the same arithmetic in its confirmation, from the same computation, so the two forms cannot report different numbers for the same component.
+    The single-component delete states the same arithmetic in its confirmation, from the same computation, so the two forms cannot report different numbers for the same component, worded in the FUTURE and gated on its own count so the commonest single delete of all — referenced by no recipe — states neither nought.
 
 ## Step Editor
 

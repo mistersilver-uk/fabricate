@@ -3304,6 +3304,109 @@ describe('createAdminStore', () => {
       assert.deepEqual(deletedArgs, { sysId: 'sys1', itemId: 'comp-1' });
     });
 
+    // ── Issue 1156: the singular delete dialog omits a stated-zero consequence, per
+    // consequence — the component sibling of the recipe dialog's #1152 fix. ─────────────────
+
+    /** A recipe referencing `componentIds` as ingredient options and `resultId` as its result. */
+    function componentRecipe(id, { componentIds = [], resultId = 'output' } = {}) {
+      return {
+        id,
+        craftingSystemId: 'sys1',
+        enabled: true,
+        ingredientSets: [
+          {
+            id: `${id}-set`,
+            ingredientGroups: [
+              { id: `${id}-group`, options: componentIds.map((c) => ({ componentId: c })) },
+            ],
+          },
+        ],
+        resultGroups: [{ id: `${id}-rg`, results: [{ componentId: resultId }] }],
+        toJSON() {
+          return { ...this };
+        },
+      };
+    }
+
+    function servicesWithComponentAndRecipes(items, recipes) {
+      const localizations = [];
+      const services = createMockServices({
+        localize: (key, data) => {
+          localizations.push({ key, data });
+          return key;
+        },
+      });
+      const sys = services.getCraftingSystemManager().getSystem('sys1');
+      if (sys) sys.items = items;
+      services.getRecipeManager = () => ({
+        getRecipes: (filter) =>
+          filter?.craftingSystemId
+            ? recipes.filter((r) => r.craftingSystemId === filter.craftingSystemId)
+            : recipes,
+        getRecipe: (id) => recipes.find((r) => r.id === id) || null,
+        updateRecipe: async () => {},
+      });
+      return { services, localizations };
+    }
+
+    it('deleteComponent selects the plain branch when no recipe references it', async () => {
+      const { services, localizations } = servicesWithComponentAndRecipes(
+        [makeItem({ id: 'iron', name: 'Iron' })],
+        []
+      );
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      await store.deleteComponent('iron');
+
+      const plain = localizations.find(
+        (call) => call.key === 'FABRICATE.Admin.Manager.Component.DeleteConfirm.ContentPlain'
+      );
+      assert.ok(plain, 'the plain branch is localized when there is nothing to state');
+      assert.deepEqual(plain.data, { name: 'Iron', recipes: 0, disabled: 0 });
+    });
+
+    it('deleteComponent selects the recipes-only branch when the rewritten recipe stays craftable', async () => {
+      const { services, localizations } = servicesWithComponentAndRecipes(
+        [makeItem({ id: 'iron', name: 'Iron' })],
+        [componentRecipe('r1', { componentIds: ['iron', 'tin'] })]
+      );
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      await store.deleteComponent('iron');
+
+      const call = localizations.find(
+        (entry) => entry.key === 'FABRICATE.Admin.Manager.Component.DeleteConfirm.ContentRecipes'
+      );
+      assert.ok(call, 'the recipes-only branch is localized');
+      assert.deepEqual(call.data, { name: 'Iron', recipes: 1, disabled: 0 });
+      assert.equal(
+        localizations.some(
+          (entry) => entry.key === 'FABRICATE.Admin.Manager.Component.DeleteConfirm.Content'
+        ),
+        false,
+        'the combined branch is never reached when nothing is disabled'
+      );
+    });
+
+    it('deleteComponent selects the combined branch when a recipe is disabled', async () => {
+      // `iron` is the recipe's ONLY ingredient option AND its only result, so stripping it
+      // leaves the recipe with no ingredient sets and no results — `recipeLostItsShape` clamps
+      // it to disabled.
+      const { services, localizations } = servicesWithComponentAndRecipes(
+        [makeItem({ id: 'iron', name: 'Iron' })],
+        [componentRecipe('r1', { componentIds: ['iron'], resultId: 'iron' })]
+      );
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      await store.deleteComponent('iron');
+
+      const call = localizations.find(
+        (entry) => entry.key === 'FABRICATE.Admin.Manager.Component.DeleteConfirm.ContentDisabledOne'
+      );
+      assert.ok(call, 'the combined branch with singular disabled is localized');
+      assert.deepEqual(call.data, { name: 'Iron', recipes: 1, disabled: 1 });
+    });
+
     // ── The set delete (issue 1129) ──────────────────────────────────────────────
     //
     // The store half is a passthrough with NO confirmDialog: the panel arms beside an impact
