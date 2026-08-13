@@ -1070,6 +1070,53 @@
 }
 
 /* ==========================================
+   Every Fabricate window
+   ========================================== */
+
+/* Heading normalization for every Fabricate window (issue 972).
+ *
+ * Core's `@layer elements.typography` styles bare `h1`-`h6` with its OWN font and colour
+ * (`font-family: var(--font-h2)`, `color: var(--color-text-emphatic)`, and so on). A declaration
+ * that matches the element always beats a colour inherited from an ancestor, so a heading that
+ * declares neither takes Foundry's, not Fabricate's - whatever the layer, and however close the
+ * Fabricate ancestor sits.
+ *
+ * Core ships its own antidote for exactly this, `body.game .app h1,…,h6 { color: inherit }` in
+ * `@layer compatibility` - but that selector is the ApplicationV1 `.app` class. Every Fabricate
+ * window is ApplicationV2, so its root carries `application` and core's reset never matches. This
+ * rule is the V2 counterpart core does not ship.
+ *
+ * MEASURED, not assumed: probing the rendered windows in the View Lab under both core themes
+ * shows exactly two properties reaching a Fabricate heading - `color` and `font-family`. Size,
+ * weight, line-height and margins are already component-declared everywhere. So this resets those
+ * two and nothing else; adding `font-weight: inherit` would silently un-bold every heading that
+ * relies on the UA default, and `font-size: inherit` would shrink every heading with no declared
+ * size.
+ *
+ * `color: inherit` rather than `var(--fab-text)` so a heading inside a tinted callout takes that
+ * callout's colour exactly as its sibling text does.
+ *
+ * Two selector details carry weight:
+ *
+ *   - `:where(.window-content)` scopes this to the app's own content and leaves core's window
+ *     chrome alone - the `h1.window-title` in the frame is core's to colour, not ours. `:where()`
+ *     contributes NOTHING to specificity, which is what keeps that scoping free.
+ *   - The result is (0,1,1), deliberately below the (0,2,0) of a Svelte scoped rule
+ *     (`.manager-title.svelte-<hash>`). This is a floor that components override, never a rule
+ *     that overrides them - which is what lets `.fabricate-manager .manager-title` keep opting
+ *     the manager's titles back into `var(--fab-font-serif)` below.
+ */
+.fabricate :where(.window-content) h1,
+.fabricate :where(.window-content) h2,
+.fabricate :where(.window-content) h3,
+.fabricate :where(.window-content) h4,
+.fabricate :where(.window-content) h5,
+.fabricate :where(.window-content) h6 {
+  font-family: var(--font-primary);
+  color: inherit;
+}
+
+/* ==========================================
    Unified Fabricate shell (4-tab window)
    ========================================== */
 
@@ -1599,15 +1646,6 @@
   color: var(--fab-mv2-text-muted);
   background: var(--fab-overlay-light-04);
   cursor: default;
-}
-
-.fabricate-manager h1,
-.fabricate-manager h2,
-.fabricate-manager h3,
-.fabricate-manager h4,
-.fabricate-manager h5,
-.fabricate-manager h6 {
-  font-family: var(--font-primary);
 }
 
 .fabricate-manager button:focus,
