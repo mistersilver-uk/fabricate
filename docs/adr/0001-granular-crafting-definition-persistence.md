@@ -7,8 +7,8 @@ nav_order: 1
 
 # ADR 0001 — Granular crafting-definition persistence
 
-**Status:** Proposed.
-The comparison, the measurements and the recommendation below are complete; the *Decision* section is deliberately empty and belongs to the maintainer.
+**Status:** Accepted — **B(1), one `world` setting key per record**, which is not the option this spike recommended.
+The comparison, the measurements and the recommendation below record the evidence; the *Decision* section records the maintainer's selection against it and the condition on which that selection rests.
 
 **Context:** issue 1070 (performance programme), issue 1079 (this spike).
 **Depends on:** issue 1088 (runtime feasibility probe), issue 1089 (repository seam), issue 1071 (headless benchmark harness), issue 1073 (Foundry perf profile).
@@ -538,13 +538,50 @@ It removes the whole-corpus write and the concurrent-write clobber, which are th
 
 ## Decision
 
-> **This section belongs to the maintainer and is deliberately empty.**
->
-> Selecting a production architecture is a judgement call, not an agent deliverable.
-> The prototypes, measurements, comparison matrix and recommendation above are the agent scope;
-> the selection is not.
->
-> Once written, issue 1080 is rewritten to the chosen backend and the other branch is deleted.
+**Selected: B(1) — one `world` setting key per record.**
+This is not the option recommended above, and the reasoning below is the maintainer's rather than the spike's.
+
+### Why
+
+**World settings are the established way for a Foundry module to hold non-user-facing state, and they are how Fabricate already works.**
+The corpus lives there today, every one of the 35 registered migrations reads and writes it there, and import/export is defined against it.
+B(1) changes the granularity of that storage and nothing else about its nature, so migrations, import/export and the mental model all stay where they are.
+
+**A visible pack of unreadable `JournalEntry` records is a cost this project will not pay.**
+Issue 1088 Q6 established that there is no API to hide a pack from a GM — pack configuration offers only `folder`, `sort`, `locked` and `ownership`, and a GM short-circuits to OWNER.
+Every GM would therefore see a sidebar compendium full of documents that are meaningless to open, permanently, in exchange for a connect-time saving.
+That is a real and daily cost against a benefit measured in a payload most worlds will never approach.
+
+**B(1) does not preclude A+.**
+Issue 1089 landed a `CraftingDefinitionRepository` interface precisely so the backend can change without rewriting callers, and this ADR's measurements remain valid the day that trade looks different.
+Choosing B(1) now is reversible; the sidebar cost of A+ is not, once GMs have worlds built on it.
+
+### The kill criterion this option fired, recorded rather than waived
+
+**B(1) fired its second kill criterion above, and the decision is taken with that in view.**
+Its live-corrected connect payload extrapolates to **≈15.6 MB against the baseline's 12.21 MB — 28% worse** — because a `Setting` document carries a measured 340-byte envelope and 10,000 of them add ≈3.4 MB of pure overhead.
+It also costs **50 server round trips** for a 50-record bulk import where every other granular arm costs 1, and its partial-failure mode is real: the prototype run tore after 5 of 10 keys, leaving the write half-applied with no manifest to reconcile against.
+
+**So this decision rests on a condition, and the condition is falsifiable.**
+B(1) is sufficient if real worlds sit far enough below 10,000 records that the per-key envelope never accumulates to the crossover — which is at roughly **the point where key count × 340 bytes exceeds the whole-array saving**, and is therefore a function of corpus size, not of taste.
+Issue 1080 MUST measure the connect payload at the corpus sizes real installations actually reach, and MUST record the crossover point at which B(1) becomes worse than doing nothing.
+If a supported corpus crosses it, this ADR is superseded rather than amended, and A+ is the option already measured and waiting.
+
+### Scope: components as well as recipes
+
+**The change extends to components, and that is a different shape of work from recipes.**
+Recipes are already a top-level array in the `recipes` setting, so B(1) splits an existing collection into per-record keys.
+Components are **nested inside each crafting system** (`system.components`) in the single `craftingSystems` setting, alongside tools, essences and recipe-item definitions — so one component edit currently rewrites every system in the world.
+Extending B(1) to components therefore requires extracting them from their container into records of their own before they can be keyed, which is a data-model change with its own migration, and not merely a persistence-granularity change.
+
+Issue 1080 owns both, and should sequence them separately: recipes first, because the collection already exists, and components second, because the extraction is the larger risk.
+The same question then applies to tools, essences and recipe-item definitions, which share the container and the same whole-corpus write.
+
+### What this changes about the sections above
+
+The recommendation, the comparison matrix and every measurement stand as recorded — they are the evidence this decision was taken against, not a competing conclusion, and they should not be edited to agree with it.
+Issue 1092's replacement transport is **not** required: B(1) supports `readReplicatedSnapshot()`, so `reload()` keeps working exactly as it does today, which is one of the costs A+ would have imposed.
+Issue 1080 is rewritten to B(1).
 
 ---
 
