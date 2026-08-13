@@ -24,6 +24,12 @@ import {
   normalizeCustomComponentCategories,
 } from '../utils/componentCategories.js';
 import { parsePlainDiceGroups, parseDiceGroups } from '../utils/craftingCheckExpression.js';
+import {
+  advanceDefinitionRevision,
+  findById,
+  findByRecipeId,
+  getDefinitionIndex,
+} from '../utils/definitionIndex.js';
 import { normalizeFailureResultPolicy } from '../utils/failureResultPolicy.js';
 import { plainTextDescription, descriptionTextCandidate } from '../utils/plainTextDescription.js';
 import {
@@ -67,6 +73,7 @@ import { normalizeGatheringRealmList, normalizeGatheringRealmSettings } from './
 import { normalizePreviewSandbox } from './progressiveCheckSandbox.js';
 import { RecipeActivationError } from './RecipeActivationError.js';
 import { RecipePersistenceError } from './RecipePersistenceError.js';
+import { corpusChanged, REVISION_SCOPES, RevisionRegistry } from './revisionTokens.js';
 import { SettingsCraftingDefinitionRepository } from './SettingsCraftingDefinitionRepository.js';
 import { SignatureValidator } from './SignatureValidator.js';
 
@@ -100,6 +107,9 @@ export class CraftingSystemManager {
     this.recipeManager = recipeManager;
     this.systems = new Map();
     this.initialized = false;
+    // The revision-token registry this manager mints from (issue 1076). Per manager, never
+    // a module singleton.
+    this._revisions = new RevisionRegistry();
     // Shares THIS map rather than mirroring it, and hydrates through the manager's own
     // `_normalizeSystem`. That normalizer is a WHITELIST REBUILD — a key it does not
     // emit is dropped from storage on the next save — so the repository must call it
@@ -2365,6 +2375,17 @@ export class CraftingSystemManager {
    * @param {import('./CraftingDefinitionRepository.js').DefinitionChange} [change]
    */
   async save(change = null) {
+    // The revision-token advance point for the system domain (issue 1076). `save()` is
+    // this manager's single persistence chokepoint — every mutating method ends here, and
+    // it is already the seam 30 test files replace — so announcing the change once, here,
+    // beats auditing every mutating method for a missing advance. A whole-corpus save
+    // (`change === null`, which is what a `persist: false` batch flushes with) advances
+    // every system, because it is exactly the case where the manager was not told what
+    // moved.
+    if (change?.put?.id != null) this._advanceSystemRevision(change.put.id);
+    else if (change?.delete != null) this._advanceSystemRevision(change.delete);
+    else if (change?.batch) this._advanceSystemRevision(...[...change.batch].map((r) => r?.id));
+    else this._advanceSystemRevision(...this.systems.keys());
     await applyDefinitionChange(this._repository, change, this.systems.values());
   }
 
@@ -2381,7 +2402,6 @@ export class CraftingSystemManager {
    *   the writing client, whose map already holds the saved data).
    */
   reload() {
-    const before = JSON.stringify([...this.systems.values()]);
     // Optional repository capability: `null` means the backend has no synchronous
     // replicated snapshot to read (see `CraftingDefinitionRepository`), so reloading
     // is a no-op rather than a wrong answer.
@@ -2391,9 +2411,45 @@ export class CraftingSystemManager {
     for (const normalized of saved) {
       next.set(normalized.id, normalized);
     }
+    // Change detection without serializing the corpus (issue 1076): record by record, with
+    // a reference fast path, short-circuiting at the first difference. The systems are
+    // already plain normalized objects, so they need no projection. A reload that finds no
+    // change advances no revision token.
+    const changed = corpusChanged(this.systems.values(), next.values());
     this.systems = next;
     this.initialized = true;
-    return before !== JSON.stringify([...this.systems.values()]);
+    if (changed) {
+      this._advanceSystemRevision(...next.keys());
+    }
+    return changed;
+  }
+
+  /**
+   * The current revision token of one scope (issue 1076).
+   *
+   * The read half of the contract documented in {@link module:revisionTokens}. Consumers
+   * hold a token and compare it with `===`; they never advance one.
+   *
+   * @param {string} [scope] A member of `REVISION_SCOPES`, defaulting to the whole
+   *   crafting-system domain.
+   * @returns {number}
+   */
+  revision(scope = REVISION_SCOPES.systems) {
+    return this._revisions.read(scope);
+  }
+
+  /**
+   * Advance the crafting-system revision tokens after a mutation.
+   *
+   * @param {...(string|null|undefined)} systemIds The systems this mutation touched.
+   * @returns {void}
+   * @private
+   */
+  _advanceSystemRevision(...systemIds) {
+    const scopes = systemIds
+      .filter((systemId) => systemId != null)
+      .map((systemId) => REVISION_SCOPES.system(systemId));
+    this._revisions.advance(REVISION_SCOPES.systems, ...scopes);
   }
 
   getSystems() {
@@ -2451,10 +2507,21 @@ export class CraftingSystemManager {
     return Array.isArray(system.essenceDefinitions) ? [...system.essenceDefinitions] : [];
   }
 
+  /**
+   * One essence definition by id.
+   *
+   * Reads the retained `byId` facet of {@link module:definitionIndex} rather than scanning
+   * (issue 1076). The facet is built first-insert-wins in array order, so a duplicate id
+   * resolves to the same definition the previous `.find()` returned.
+   *
+   * @param {string} systemId
+   * @param {string} essenceId
+   * @returns {object|null}
+   */
   getEssenceDefinition(systemId, essenceId) {
     const system = this.getSystem(systemId);
     if (!system || !essenceId) return null;
-    return (system.essenceDefinitions || []).find((def) => def.id === essenceId) || null;
+    return findById(getDefinitionIndex(system.essenceDefinitions), essenceId);
   }
 
   getRecipeItemDefinitions(systemId) {
@@ -2463,10 +2530,18 @@ export class CraftingSystemManager {
     return Array.isArray(system.recipeItemDefinitions) ? [...system.recipeItemDefinitions] : [];
   }
 
+  /**
+   * One recipe-item (book/scroll) definition by id — indexed exactly as
+   * {@link CraftingSystemManager#getEssenceDefinition} is (issue 1076).
+   *
+   * @param {string} systemId
+   * @param {string} recipeItemId
+   * @returns {object|null}
+   */
   getRecipeItemDefinition(systemId, recipeItemId) {
     const system = this.getSystem(systemId);
     if (!system || !recipeItemId) return null;
-    return (system.recipeItemDefinitions || []).find((def) => def.id === recipeItemId) || null;
+    return findById(getDefinitionIndex(system.recipeItemDefinitions), recipeItemId);
   }
 
   getRecipesUsingRecipeItemDefinition(systemId, recipeItemId) {
@@ -2688,6 +2763,10 @@ export class CraftingSystemManager {
       existing.img = snapshot.img;
       existing.description = snapshot.description;
       existing.originItemUuid = snapshot.originItemUuid;
+      // An element's indexed fields (`name`, source refs) changed at constant array
+      // length, which neither the array-identity nor the length clause of the
+      // `definitionIndex` invalidation rule can see. Advance explicitly.
+      advanceDefinitionRevision(system.recipeItemDefinitions);
 
       await this.save({ put: system });
       // A source-uuid change is a re-point: clear ONLY the durable per-system leaf off the old
@@ -2707,6 +2786,7 @@ export class CraftingSystemManager {
       new Set(recipeItemDefinitions.map((def) => def.id))
     );
     recipeItemDefinitions.push(item);
+    advanceDefinitionRevision(recipeItemDefinitions);
     system.recipeItemDefinitions = recipeItemDefinitions;
 
     if (roleFlagKey) await this._stampSourceIdentity(source, roleFlagKey, item.id);
@@ -3051,6 +3131,9 @@ export class CraftingSystemManager {
       this._seedMembershipFromLegacyScalars(system);
       definition.recipeIds = this._normalizeMembershipRecipeIds(patch.recipeIds);
       system.membershipResolvesByRecipeIds = true;
+      // `recipeIds` backs the reverse membership index, and it was rewritten in place on
+      // an element of an array whose identity and length are unchanged (issue 1076).
+      advanceDefinitionRevision(system.recipeItemDefinitions);
     }
 
     const capsPatch = patch?.caps || {};
@@ -3143,6 +3226,9 @@ export class CraftingSystemManager {
       definition.recipeIds.push(recipeId);
       seeded = true;
     }
+    // Membership was seeded into elements in place, so the reverse membership index must
+    // be rebuilt on the next read (issue 1076).
+    if (seeded) advanceDefinitionRevision(definitions);
     return seeded;
   }
 
@@ -3720,6 +3806,7 @@ export class CraftingSystemManager {
     });
     this._assertUniqueComponentSources(system, item);
     system.components.push(item);
+    advanceDefinitionRevision(system.components);
     await this.save({ put: system });
     return item;
   }
@@ -3886,10 +3973,11 @@ export class CraftingSystemManager {
       ? system.recipeItemDefinitions
       : [];
 
-    const byMembership = definitions.filter((def) =>
-      (Array.isArray(def.recipeIds) ? def.recipeIds : []).some((id) => String(id) === rid)
-    );
-    if (byMembership.length > 0) return byMembership;
+    // Reverse membership is a retained `recipeId -> definitions` index (issue 1076), not a
+    // filter over every definition per access check. The buckets keep array order, so the
+    // returned list is identical to the filter's; it is copied because the bucket is shared.
+    const byMembership = findByRecipeId(getDefinitionIndex(definitions), rid);
+    if (byMembership.length > 0) return [...byMembership];
 
     // Only fall back while the system has not resolved by `recipeIds` (issue 1011). Read
     // the marker; never re-derive it from the arrays.
@@ -4770,6 +4858,9 @@ export class CraftingSystemManager {
       existing.registeredItemUuid = nextSnapshot.registeredItemUuid;
       existing.originItemUuid = nextSnapshot.originItemUuid;
       existing.aliasItemUuids = nextFallbacks;
+      // Indexed fields (`name`, the source-reference union) rewritten in place on an
+      // element (issue 1076).
+      advanceDefinitionRevision(system.components);
 
       if (options.persist !== false) await this.save({ put: system });
       return { item: existing, action: 'updated', sourceFallbacks: nextSnapshot.sourceFallbacks };
@@ -4786,6 +4877,7 @@ export class CraftingSystemManager {
 
     this._assertUniqueComponentSources(system, item);
     system.components.push(item);
+    advanceDefinitionRevision(system.components);
     const addedRoleKey = this._componentRoleFlagKey(system.id);
     if (addedRoleKey) await this._stampSourceIdentity(source, addedRoleKey, item.id);
     if (options.persist !== false) await this.save({ put: system });
@@ -4851,6 +4943,7 @@ export class CraftingSystemManager {
     );
 
     system.components[idx] = updatedItem;
+    advanceDefinitionRevision(system.components);
     // Re-point the transferable flag: clear the old source (if it still points here)
     // and stamp the new source, so copies match the current source, not the old one.
     const replaceRoleKey = this._componentRoleFlagKey(system.id);
@@ -5008,7 +5101,12 @@ export class CraftingSystemManager {
           component.description = nextDescription;
           changed = true;
         }
-        if (changed) updated++;
+        if (changed) {
+          updated++;
+          // A component's `name` is an indexed field of the name fallback, rewritten in
+          // place on an element of an otherwise unchanged array (issue 1076).
+          advanceDefinitionRevision(components);
+        }
       }
     }
 
@@ -5035,6 +5133,7 @@ export class CraftingSystemManager {
       this._assertUniqueComponentSources(system, updatedItem, itemId);
     }
     system.components[idx] = updatedItem;
+    advanceDefinitionRevision(system.components);
     await this.save({ put: system });
     return system.components[idx];
   }
@@ -5169,6 +5268,7 @@ export class CraftingSystemManager {
       );
       changedIds.push(String(component.id));
     }
+    if (changedIds.length > 0) advanceDefinitionRevision(system.components);
 
     if (changedIds.length > 0 && options.persist !== false) await this.save({ put: system });
     return { updated: changedIds.length, componentIds: changedIds };
@@ -5469,6 +5569,8 @@ export class CraftingSystemManager {
       if (remove) removals += current.length - next.length;
       else additions += next.length - current.length;
     }
+    // Membership rewritten in place on elements (issue 1076).
+    if (bookIds.length > 0) advanceDefinitionRevision(system.recipeItemDefinitions);
 
     return { changed: seeded || bookIds.length > 0, bookIds, additions, removals };
   }

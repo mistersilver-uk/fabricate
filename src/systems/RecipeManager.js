@@ -23,6 +23,7 @@ import { formatCurrencyRequirement, normalizeCurrencyUnit } from './currencyProf
 import { readStackQuantity } from './itemStackQuantity.js';
 import { RecipeActivationError } from './RecipeActivationError.js';
 import { RecipePersistenceError } from './RecipePersistenceError.js';
+import { corpusChanged, REVISION_SCOPES, RevisionRegistry } from './revisionTokens.js';
 import { SettingsCraftingDefinitionRepository } from './SettingsCraftingDefinitionRepository.js';
 import { SignatureValidator } from './SignatureValidator.js';
 import { computeSystemVisibility } from './systemValidation.js';
@@ -82,6 +83,13 @@ export class RecipeManager {
   } = {}) {
     this.recipes = new Map();
     this.initialized = false;
+    // The revision-token registry this manager mints from (issue 1076). Per manager, never
+    // a module singleton: two managers in one test process must not share counters.
+    this._revisions = new RevisionRegistry();
+    // The retained `craftingSystemId -> recipe id[]` cohort, rebuilt lazily. Holds IDS, not
+    // recipe objects, so replacing a stored recipe under the same id is transparently
+    // correct and only an add/remove/move can invalidate it.
+    this._cohortCache = null;
     this.getCraftingSystem = typeof getCraftingSystem === 'function' ? getCraftingSystem : null;
     this._getCraftingSystemManager =
       typeof getCraftingSystemManager === 'function' ? getCraftingSystemManager : null;
@@ -222,6 +230,7 @@ export class RecipeManager {
     for (const recipe of await this._repository.loadAll()) {
       this.recipes.set(recipe.id, recipe);
     }
+    this._advanceRecipeRevision();
 
     this.initialized = true;
     console.log(`Fabricate | Loaded ${this.recipes.size} recipes`);
@@ -255,13 +264,18 @@ export class RecipeManager {
    * catches up here. Does NOT persist, so it is safe to call from a settings hook
    * without a write loop.
    *
-   * @returns {boolean} `true` only when the serialized recipes actually changed, so
+   * Change detection is {@link corpusChanged}, NOT `JSON.stringify` of the whole corpus
+   * (issue 1076). The old comparison serialized every recipe twice per reload — 22.3 MB of
+   * string per pass at 10,000 recipes — on every connected client, purely to answer a
+   * boolean. The replacement compares record by record with a reference fast path and
+   * short-circuits at the first difference, and a reload that finds no change advances no
+   * revision token.
+   *
+   * @returns {boolean} `true` only when the recipes actually changed, so
    *   callers can skip re-emitting a change hook (and avoid a redundant refresh on
    *   the writing client, whose map already holds the saved data).
    */
   reload() {
-    const serialize = (map) => JSON.stringify([...map.values()].map((r) => r.toJSON()));
-    const before = serialize(this.recipes);
     // Optional repository capability: `null` means the backend has no synchronous
     // replicated snapshot to read, which is the honest answer for anything
     // document-backed (#1088 Q3). Reloading is then a no-op rather than a wrong
@@ -272,9 +286,20 @@ export class RecipeManager {
     for (const recipe of savedRecipes) {
       next.set(recipe.id, recipe);
     }
+    const changed = corpusChanged(this.recipes.values(), next.values(), (recipe) =>
+      typeof recipe?.toJSON === 'function' ? recipe.toJSON() : recipe
+    );
     this.recipes = next;
     this.initialized = true;
-    return before !== serialize(this.recipes);
+    // The cohort index is keyed on the map object, so a replaced map is already a miss;
+    // dropping it here keeps that explicit rather than incidental.
+    this._cohortCache = null;
+    if (changed) {
+      const touched = new Set();
+      for (const recipe of next.values()) touched.add(recipe?.craftingSystemId);
+      this._advanceRecipeRevision(...touched);
+    }
+    return changed;
   }
 
   _notifyRecipesChanged(action, details = {}) {
@@ -334,6 +359,7 @@ export class RecipeManager {
     }
 
     this.recipes.set(recipe.id, recipe);
+    this._advanceRecipeRevision(recipe.craftingSystemId);
     if (options.persist !== false) {
       await this.save({ put: recipe });
     }
@@ -399,6 +425,9 @@ export class RecipeManager {
     }
 
     this.recipes.set(recipeId, updatedRecipe);
+    // Both systems, because an edit that MOVES a recipe must also invalidate a consumer
+    // watching the system it left (issue 1076).
+    this._advanceRecipeRevision(recipe.craftingSystemId, updatedRecipe.craftingSystemId);
     if (options.persist !== false) {
       await this.save({ put: updatedRecipe });
     }
@@ -498,6 +527,7 @@ export class RecipeManager {
     }
 
     this.recipes.delete(recipeId);
+    this._advanceRecipeRevision(recipe.craftingSystemId);
     if (options.persist !== false) {
       await this.save({ delete: recipeId });
     }
@@ -604,21 +634,100 @@ export class RecipeManager {
   }
 
   /**
+   * The current revision token of one scope (issue 1076).
+   *
+   * The read half of the contract documented in {@link module:revisionTokens}. Consumers
+   * (#1074's signature report, #1077's snapshots, #1078's invalidation routing) hold a
+   * token and compare it with `===`; they never advance one.
+   *
+   * @param {string} [scope] A member of `REVISION_SCOPES`, defaulting to the whole recipe
+   *   domain.
+   * @returns {number}
+   */
+  revision(scope = REVISION_SCOPES.recipes) {
+    return this._revisions.read(scope);
+  }
+
+  /**
+   * Advance the recipe revision tokens after a mutation, and drop the cohort index.
+   *
+   * Always advances the DOMAIN scope plus the scope of every crafting system named — a
+   * move between systems names both, because a consumer watching the system the recipe
+   * LEFT must also stop trusting its cache.
+   *
+   * @param {...(string|null|undefined)} systemIds The crafting systems this mutation
+   *   touched.
+   * @returns {void}
+   * @private
+   */
+  _advanceRecipeRevision(...systemIds) {
+    this._cohortCache = null;
+    const scopes = systemIds
+      .filter((systemId) => systemId != null)
+      .map((systemId) => REVISION_SCOPES.recipesOfSystem(systemId));
+    this._revisions.advance(REVISION_SCOPES.recipes, ...scopes);
+  }
+
+  /**
+   * The retained `craftingSystemId -> recipe id[]` cohort index (issue 1076).
+   *
+   * `getRecipes({craftingSystemId})` is called from every listing, visibility and
+   * validation path, and each call used to copy EVERY recipe in EVERY system into a fresh
+   * array before discarding all but one system's. The index answers the same question from
+   * the smallest cohort instead.
+   *
+   * It stores IDS rather than recipe objects on purpose: replacing a stored recipe under
+   * the same id — which is what `updateRecipe` does — leaves the cohort correct without any
+   * bookkeeping, so only an add, a delete or a move between systems can invalidate it. Its
+   * validity is the map's identity plus its size plus the domain revision token, so a
+   * fixture that populates `manager.recipes` directly is still seen.
+   *
+   * @returns {Map<*, string[]>} Recipe ids per crafting system id, in map insertion order.
+   * @private
+   */
+  _recipeCohorts() {
+    const token = this._revisions.read(REVISION_SCOPES.recipes);
+    const cached = this._cohortCache;
+    const warm =
+      cached &&
+      cached.map === this.recipes &&
+      cached.size === this.recipes.size &&
+      cached.token === token;
+    if (warm) return cached.cohorts;
+    const cohorts = new Map();
+    for (const [recipeId, recipe] of this.recipes) {
+      const key = recipe?.craftingSystemId;
+      const bucket = cohorts.get(key);
+      if (bucket) bucket.push(recipeId);
+      else cohorts.set(key, [recipeId]);
+    }
+    this._cohortCache = { map: this.recipes, size: this.recipes.size, token, cohorts };
+    return cohorts;
+  }
+
+  /**
    * Get all recipes
    * @param {Object} filters - Optional filters
    * @returns {Recipe[]}
    */
   getRecipes(filters = {}) {
-    let recipes = [...this.recipes.values()];
+    let recipes;
+    // Start from the smallest indexed cohort available rather than copying the whole
+    // corpus and filtering it down (issue 1076). Order is the map's insertion order in
+    // both branches, so the returned list is identical to the pre-index one.
+    if (filters.craftingSystemId === undefined) {
+      recipes = [...this.recipes.values()];
+    } else {
+      recipes = [];
+      for (const recipeId of this._recipeCohorts().get(filters.craftingSystemId) ?? []) {
+        const recipe = this.recipes.get(recipeId);
+        if (recipe) recipes.push(recipe);
+      }
+    }
 
     // Filter by category
     if (filters.category) {
       recipes = recipes.filter((r) => r.category === filters.category);
-    }
-
-    // Filter by crafting system
-    if (filters.craftingSystemId !== undefined) {
-      recipes = recipes.filter((r) => r.craftingSystemId === filters.craftingSystemId);
     }
 
     // Filter by system
@@ -2491,6 +2600,7 @@ export class RecipeManager {
       }
 
       this.recipes.set(recipe.id, recipe);
+      this._advanceRecipeRevision(recipe.craftingSystemId);
       imported++;
     }
 
