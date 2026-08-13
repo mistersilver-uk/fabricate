@@ -566,5 +566,11 @@ Seven backends were built in order to select one, so six were throwaway from the
 They are preserved where they can still be read: in the commits of the pull request that introduced this ADR, titled `feat(#1079): prototype seven persistence backends behind the repository seam` and `feat(#1079): measure the persistence candidates inside a real Foundry`.
 GitHub retains a merged pull request's individual commits, so the harness, the storage host and the measurement suite remain inspectable there without living in the test corpus.
 
-Anyone re-deriving these numbers should expect to re-author the harness against the interface `CraftingDefinitionRepository` already presents, which is what the prototypes implemented.
-The method is recorded above in enough detail to do that: the fixture and its seed, the two-class measurement convention, the four accessors `RecipeManager` passes to its repository, and the kill criterion each candidate was measured against.
+The two commits are not equally disposable, and the argument above covers only the first of them.
+`feat(#1079): prototype seven persistence backends behind the repository seam` is genuinely throwaway — six of its seven arms were dead the moment a backend was chosen.
+`feat(#1079): measure the persistence candidates inside a real Foundry` is not: it is the measurement instrument that filled the `persistence-experiments` slot issue 1073 reserved, it holds no prototype, and the four live figures this ADR leans on hardest came from it — the six-field compendium index, 164.8 B/record, the 340-byte `Setting` envelope, and the 1,155-byte receiver diff.
+It was dropped with the other only because it has no subject to measure until issue 1080 implements the selected adapter.
+
+Re-deriving the headless figures means re-authoring a harness against the interface `CraftingDefinitionRepository` already presents, which is what the prototypes implemented.
+Re-deriving the four live figures means more than that: a Foundry scenario that creates and deletes real documents, plus a two-client probe to observe what a second client receives.
+The method is recorded above in enough detail to do either: the fixture and its seed, the two-class measurement convention, the four accessors `RecipeManager` passes to its repository, and the kill criterion each candidate was measured against.
