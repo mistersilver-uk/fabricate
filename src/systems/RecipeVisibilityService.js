@@ -1,13 +1,14 @@
-import {
-  FABRICATE_FLAG_NAMESPACE,
-  getFabricateFlag,
-  isSafeFlagKeySegment,
-  setFabricateFlag,
-} from '../config/flags.js';
+import { FABRICATE_FLAG_NAMESPACE, getFabricateFlag, setFabricateFlag } from '../config/flags.js';
 import { itemMatchesRecipeItemSource, matchRecipeItemDefinition } from '../utils/sourceUuid.js';
 
 import { evaluatePrerequisites } from './characterPrerequisites.js';
 import { createDefaultPartyLearnPool } from './recipeItemPartyLearnPool.js';
+import {
+  buildFlagMapFromEntries,
+  isDirectlyDeletableId,
+  readDiscoveryProgressEntries,
+  readLearnedRecipeEntries,
+} from './recipeKeyedFlagEntries.js';
 import { computeSystemVisibility } from './systemValidation.js';
 import { selectWritableActors } from './writableActors.js';
 
@@ -1872,11 +1873,21 @@ export class RecipeVisibilityService {
    * at `initialize()` and mutates actor flags directly (there is no GM relay), so an
    * un-filtered walk had a player attempting `Actor#update` on every other
    * character in the world.
+   *
+   * Stale ids come from the ENTRY-BOUNDARY reader, never from `Object.keys` (issue
+   * 1143). `Document#update` nests a dotted recipe id into a subtree, so the top level
+   * of the persisted map holds the id's FIRST SEGMENT (`imported`) rather than an id.
+   * That segment names no valid recipe, so it read as stale, and the `-=imported`
+   * deletion below removed the whole subtree — every sibling entry whose recipe still
+   * existed with it. See `recipeKeyedFlagEntries.js` for why the walk stops at the
+   * entry and why `flattenObject` is the wrong inverse.
    */
   async cleanupLearnedRecipes(validRecipeIds = new Set()) {
     for (const actor of selectWritableActors(game.actors)) {
       const learned = this._getLearnedMap(actor);
-      const staleIds = Object.keys(learned || {}).filter((id) => !validRecipeIds.has(id));
+      const staleIds = [...readLearnedRecipeEntries(learned).keys()].filter(
+        (id) => !validRecipeIds.has(id)
+      );
       if (staleIds.length === 0) continue;
       // Route through the shared deletion primitive so pruned keys are actually
       // removed with explicit `-=` deletions (the prior filtered-map `_setLearnedMap`
@@ -1898,11 +1909,18 @@ export class RecipeVisibilityService {
    * as the sole write — that merge never removes keys and the entry resurrects on
    * reload (the `deleteRemovedActiveRunFlags` doctrine).
    *
-   * Dotted (imported) recipe ids that `expandObject` would mis-split on `.` cannot be
-   * removed by a `-=<id>` key, so they route to a two-step delete-then-write fallback:
-   * the parent key is dropped (`flags.fabricate.fabricate.-=learnedRecipes`) and the
-   * retained map re-written — two SEQUENTIAL awaited operations, never a same-update
-   * mix (which `mergeObject` may process delete-after-insert and wipe the whole map).
+   * Both stores are read through the ENTRY-BOUNDARY reader in
+   * `recipeKeyedFlagEntries.js` (issue 1143), never by indexing the raw map: a dotted
+   * recipe id is persisted as a SUBTREE, so `hasOwnProperty(map, 'a.b')` is false and
+   * `map['a.b']` is undefined against the shape actually on the document.
+   *
+   * An id routes to a two-step delete-then-write fallback whenever a batched `-=<id>`
+   * key would destroy something else — because the id is not a safe segment, OR because
+   * another entry nests inside it (`a` and `a.b` share one node, so `-=a` removes both).
+   * The fallback drops the parent key (`flags.fabricate.fabricate.-=learnedRecipes`) and
+   * re-writes the retained map, rebuilt from the entry view rather than by filtering the
+   * raw top level — two SEQUENTIAL awaited operations, never a same-update mix (which
+   * `mergeObject` may process delete-after-insert and wipe the whole map).
    *
    * When `freeLearnBudget` (default true — reset/erase are respec/amnesia, so the
    * actor must be able to re-learn), each cleared entry frees one consumed learn slot
@@ -1934,14 +1952,20 @@ export class RecipeVisibilityService {
     const discoveryMap = clearDiscovery ? this._getDiscoveryProgressMap(actor) : {};
     const requested = [...new Set((recipeIds || []).map(String))];
 
+    // Both stores are read at the ENTRY BOUNDARY (issue 1143). A dotted id is nested by
+    // `Document#update`, so `hasOwnProperty(map, 'imported.recipe.id')` is false against
+    // the persisted shape and a direct `map[id]` index misses the entry object the
+    // budget refund needs. The two maps have DIFFERENT entry shapes, so each gets its
+    // own reader rather than one hard-coded field list.
+    const learnedEntries = readLearnedRecipeEntries(learnedMap);
+    const discoveryEntries = clearDiscovery
+      ? readDiscoveryProgressEntries(discoveryMap)
+      : new Map();
+
     // Split the request against what actually exists in each store, since a caller may
     // pass discovery-only ids (reset-all) or ids absent from both.
-    const learnedIds = requested.filter((id) =>
-      Object.prototype.hasOwnProperty.call(learnedMap, id)
-    );
-    const discoveryIds = clearDiscovery
-      ? requested.filter((id) => Object.prototype.hasOwnProperty.call(discoveryMap, id))
-      : [];
+    const learnedIds = requested.filter((id) => learnedEntries.has(id));
+    const discoveryIds = clearDiscovery ? requested.filter((id) => discoveryEntries.has(id)) : [];
     if (learnedIds.length === 0 && discoveryIds.length === 0) {
       return { success: true, count: 0 };
     }
@@ -1949,23 +1973,30 @@ export class RecipeVisibilityService {
     // Capture budget context BEFORE any deletion (the entry's `sourceItemUuid` is
     // needed to resolve the held copy) — budget only exists for LEARNED entries.
     const budgetEntries = freeLearnBudget
-      ? learnedIds.map((id) => ({ recipeId: id, entry: learnedMap[id] }))
+      ? learnedIds.map((id) => ({ recipeId: id, entry: learnedEntries.get(id) }))
       : [];
 
-    const learnedUnsafe = learnedIds.filter((id) => !isSafeFlagKeySegment(id));
-    const discoveryUnsafe = discoveryIds.filter((id) => !isSafeFlagKeySegment(id));
+    // An id may only take the batched `-=` path when that key destroys nothing else.
+    // Being a safe flag-key segment is NOT enough (issue 1143): with ids `a` and `a.b`
+    // persisted as one node, `-=a` is well-formed and removes recipe `a.b` with it.
+    const learnedNeedsRebuild = learnedIds.filter(
+      (id) => !isDirectlyDeletableId(learnedEntries, id)
+    );
+    const discoveryNeedsRebuild = discoveryIds.filter(
+      (id) => !isDirectlyDeletableId(discoveryEntries, id)
+    );
     const nested = `flags.${FABRICATE_FLAG_NAMESPACE}.${FABRICATE_FLAG_NAMESPACE}`;
 
     // Common (generated-id) case: batch per-key `-=` deletions for both stores into
-    // ONE update. A store with a dotted id is excluded here and handled by the
-    // two-step fallback below instead.
+    // ONE update. A store holding an id that cannot be deleted in place is excluded
+    // here and handled by the two-step fallback below instead.
     const updates = {};
-    if (learnedUnsafe.length === 0) {
+    if (learnedNeedsRebuild.length === 0) {
       for (const id of learnedIds) {
         updates[`${nested}.learnedRecipes.-=${id}`] = null;
       }
     }
-    if (clearDiscovery && discoveryUnsafe.length === 0) {
+    if (clearDiscovery && discoveryNeedsRebuild.length === 0) {
       for (const id of discoveryIds) {
         updates[`${nested}.discoveryProgress.-=${id}`] = null;
       }
@@ -1974,25 +2005,31 @@ export class RecipeVisibilityService {
       await actor.update(updates);
     }
 
-    // Two-step delete-then-write fallback for dotted learned ids: drop the parent key
-    // FIRST, then re-write the retained map so the merge lands on an absent key and is
+    // Two-step delete-then-write fallback for dotted ids: drop the parent key FIRST,
+    // then re-write the retained map so the merge lands on an absent key and is
     // reload-safe. Ordering is load-bearing — never fold both into one update.
-    if (learnedUnsafe.length > 0) {
+    //
+    // The retained map is rebuilt from the ENTRY VIEW, not from `Object.entries` of the
+    // raw store (issue 1143). Filtering the raw top level against a set of ids compares
+    // nested first segments on one side with ids on the other: nothing matches, so the
+    // very entry just deleted is retained and written straight back, and detection
+    // alone would not have fixed anything. A dotted id re-splits on this write exactly
+    // as the original learn write did — the documented fidelity limit — but no
+    // SURVIVING entry is destroyed, which is the invariant that matters.
+    if (learnedNeedsRebuild.length > 0) {
       await actor.update({ [`${nested}.-=learnedRecipes`]: null });
       const clearedLearned = new Set(learnedIds);
-      const retained = {};
-      for (const [id, value] of Object.entries(learnedMap)) {
-        if (!clearedLearned.has(id)) retained[id] = value;
-      }
+      const retained = buildFlagMapFromEntries(
+        [...learnedEntries].filter(([id]) => !clearedLearned.has(id))
+      );
       await this._setLearnedMap(actor, retained);
     }
-    if (clearDiscovery && discoveryUnsafe.length > 0) {
+    if (clearDiscovery && discoveryNeedsRebuild.length > 0) {
       await actor.update({ [`${nested}.-=discoveryProgress`]: null });
       const clearedDiscovery = new Set(discoveryIds);
-      const retainedDiscovery = {};
-      for (const [id, value] of Object.entries(discoveryMap)) {
-        if (!clearedDiscovery.has(id)) retainedDiscovery[id] = value;
-      }
+      const retainedDiscovery = buildFlagMapFromEntries(
+        [...discoveryEntries].filter(([id]) => !clearedDiscovery.has(id))
+      );
       await this._setDiscoveryMap(actor, retainedDiscovery);
     }
 
@@ -2041,8 +2078,10 @@ export class RecipeVisibilityService {
     if (!actor || typeof actor.update !== 'function') {
       return { success: false, count: 0 };
     }
-    const learnedMap = this._getLearnedMap(actor);
-    const ids = Object.keys(learnedMap).filter(
+    // Entry-boundary ids, not `Object.keys` (issue 1143): a dotted id's first segment
+    // resolves to no recipe, so it could never be attributed to a system and the reset
+    // silently skipped it.
+    const ids = [...readLearnedRecipeEntries(this._getLearnedMap(actor)).keys()].filter(
       (id) => this._getRecipeById(id)?.craftingSystemId === systemId
     );
     return this.forgetLearnedRecipes(actor, ids, { freeLearnBudget, clearDiscovery: true });
@@ -2061,9 +2100,15 @@ export class RecipeVisibilityService {
     if (!actor || typeof actor.update !== 'function') {
       return { success: false, count: 0 };
     }
-    const learnedMap = this._getLearnedMap(actor);
-    const discoveryMap = this._getDiscoveryProgressMap(actor);
-    const ids = [...new Set([...Object.keys(learnedMap), ...Object.keys(discoveryMap)])];
+    // Entry-boundary ids for BOTH stores (issue 1143). `Object.keys` yielded a dotted
+    // id's first segment, which `forgetLearnedRecipes` then found genuinely present and
+    // deleted as a whole subtree, taking every sibling with it.
+    const ids = [
+      ...new Set([
+        ...readLearnedRecipeEntries(this._getLearnedMap(actor)).keys(),
+        ...readDiscoveryProgressEntries(this._getDiscoveryProgressMap(actor)).keys(),
+      ]),
+    ];
     return this.forgetLearnedRecipes(actor, ids, { freeLearnBudget, clearDiscovery: true });
   }
 }

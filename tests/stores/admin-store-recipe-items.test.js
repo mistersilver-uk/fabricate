@@ -241,6 +241,38 @@ describe('adminStore Books & Scrolls recipe-item projection', () => {
     assert.equal(gone.resolvedName, 'Torn Page');
   });
 
+  it('counts a learner whose recipe id is DOTTED, agreeing with the deletion cascade (1143)', async () => {
+    // `Document#update` nests a dotted recipe id into a subtree, so the persisted map's
+    // top level holds `imported`, not the id. Reading `Object.keys` here reported ZERO
+    // learners while `forgetLearnedRecipes` — reading through the shared entry-boundary
+    // reader — acted on the real id: the GM panel and the mutation disagreed about the
+    // same actor. Seeded in the NESTED shape Foundry really persists.
+    const nested = (id) => ({
+      imported: { recipe: { [id]: { learnedAt: 1, sourceItemUuid: null } } }
+    });
+    globalThis.game.actors.contents = [
+      makeFlaggedActor({ id: 'a1', flags: { fabricate: { fabricate: { learnedRecipes: nested('one') } } } }),
+      makeFlaggedActor({ id: 'a2', flags: { fabricate: { fabricate: { learnedRecipes: nested('one') } } } }),
+      makeFlaggedActor({ id: 'a3', flags: { fabricate: { fabricate: { learnedRecipes: nested('two') } } } })
+    ];
+    const system = makeSystem({
+      recipeItemDefinitions: [
+        { id: 'primer', name: 'Primer', originItemUuid: 'Item.aaa', recipeIds: ['imported.recipe.one'], caps: {} },
+        { id: 'codex', name: 'Codex', originItemUuid: 'Item.bbb', recipeIds: ['imported.recipe.two'], caps: {} }
+      ]
+    });
+    const recipes = [
+      makeRecipe({ id: 'imported.recipe.one', name: 'Imported One' }),
+      makeRecipe({ id: 'imported.recipe.two', name: 'Imported Two' })
+    ];
+    const store = createAdminStore(createServices(system, recipes, []));
+    await store.refresh();
+    const vs = get(store.viewState);
+
+    assert.equal(recipeItemById(vs, 'primer').learnedByCount, 2, 'a1 and a2 both learned the dotted recipe');
+    assert.equal(recipeItemById(vs, 'codex').learnedByCount, 1);
+  });
+
   it('setRecipeItemEnabled persists only the enabled flag and refreshes', async () => {
     const capture = [];
     const store = buildStore(capture);
