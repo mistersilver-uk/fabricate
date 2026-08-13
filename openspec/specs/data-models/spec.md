@@ -1559,7 +1559,9 @@ Define the save/import invariant that guarantees deterministic ingredient-signat
 1. Applies only when `CraftingSystem.resolutionMode === "alchemy"`.
 2. Scope is the **enabled** recipes in the crafting system.
    `SignatureValidator.validateSystem` scans only enabled recipes — the exact complement of the runtime matcher's `if (!recipe.enabled) continue;` skip — so the scanned set equals the matchable set.
-   The invariant is _"the set of **enabled** recipes is collision-free"_: the `blocks:'system'` gate, the save-block, and the disable-reconciliation all funnel through `validateSystem`, and disabling all participants of a conflict genuinely clears it (re-enabling a disabled collider is re-caught at that mutation).
+   The invariant is _"the set of **enabled** recipes is collision-free"_: the `blocks:'system'` gate, the save-block, and the disable-reconciliation all funnel through one scan scope, and disabling all participants of a conflict genuinely clears it (re-enabling a disabled collider is re-caught at that mutation).
+   That scan may be served from a report compiled once per revision rather than re-run per question, provided the report is invalidated by every change that can alter a signature — the recipes of the system, the system's own component/tag/essence definitions, and any in-place rewrite of a stored recipe — and provided a candidate evaluated incrementally against it yields the conflicts, in the order, a full `validateSystem` scan of the same substituted corpus would have reported.
+   `validateSystem` remains the unpruned oracle the cached path is answerable to.
 3. Signature overlap is based on satisfiable ingredient assignments, not just textual equality.
 4. Matching expansion must include:
    - direct component matches (`match.type === "component"`)
