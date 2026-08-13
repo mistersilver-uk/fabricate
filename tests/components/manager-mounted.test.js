@@ -2005,7 +2005,18 @@ function createStore(calls = [], options = {}) {
       const ids = [...(essenceIds || [])];
       calls.push(['deleteEssences', ids]);
       if (options.deleteEssencesReject) return Promise.reject(new Error('delete failed'));
-      return options.deleteEssencesResult ?? { deleted: ids.length, blocked: [], recipesUpdated: 2 };
+      // `recipesDisabled` is in the default, not just the explicit results, because the real
+      // `adminStore.deleteEssences` always returns it (issue 1144). A double that omits it is
+      // looser than production, and every toast test that does NOT pass an explicit result would
+      // then be asserting against a shape the app never produces.
+      return (
+        options.deleteEssencesResult ?? {
+          deleted: ids.length,
+          blocked: [],
+          recipesUpdated: 2,
+          recipesDisabled: 1,
+        }
+      );
     },
     cancelEssenceDraft: () => {
       calls.push(['cancelEssenceDraft']);
