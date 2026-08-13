@@ -52,7 +52,9 @@ installFoundryEnv();
 
 const { CraftingListingBuilder } = await import('../src/systems/CraftingListingBuilder.js');
 const { ResolutionModeService } = await import('../src/systems/ResolutionModeService.js');
-const { SignatureValidator } = await import('../src/systems/SignatureValidator.js');
+const { SignatureValidator, readSignatureCounters, resetSignatureCounters } = await import(
+  '../src/systems/SignatureValidator.js'
+);
 const { RecipeManager } = await import('../src/systems/RecipeManager.js');
 const { Recipe } = await import('../src/models/Recipe.js');
 
@@ -249,13 +251,15 @@ describe('issue 1072 guard — the alchemy signature audit stays enabled-scoped'
   });
 
   it('performs at most one full-system audit when a single recipe is enabled', () => {
-    // Countable only because `CraftingSystemManager` now implements
-    // `getComponentsForSystem` and `RecipeManager._signatureSource` delegates to it
-    // (issue 1072): `validateSystem` reads the component library exactly once per audit, so
-    // this counter IS the audit count. #1074 may drive it to zero by caching, which this
-    // upper bound accommodates; the sibling assertion below is what proves the counter is
-    // capable of moving at all.
+    // Originally counted through a PROXY — `getComponentsForSystem` calls, on the premise
+    // that `validateSystem` reads the component library exactly once per audit. Issue 1074
+    // retired that premise (the revision guard reads the library too, which is an O(1)
+    // identity check and not an audit) and replaced it with a direct audit counter inside
+    // `SignatureValidator`, so the assertion now reads the real number instead of a stand-in
+    // for it. The delegation the proxy also demonstrated is kept below as a lower bound, and
+    // the sibling assertion still proves the proxy can move at all.
     const counters = createOperationCounters();
+    resetSignatureCounters();
     const system = makeCraftingSystem({ componentCount: 8, resolutionMode: 'alchemy' });
     const stored = [
       makeSignatureRecipe({ id: 'r-candidate', componentId: 'c-0', enabled: false }),
@@ -274,11 +278,16 @@ describe('issue 1072 guard — the alchemy signature audit stays enabled-scoped'
 
     manager.canActivateRecipe('r-candidate');
 
+    const audits = readSignatureCounters().reportBuilds;
     assert.ok(
-      counters.get('auditGetComponentsForSystem') <= 1,
-      `enabling one recipe in a 21-recipe alchemy system ran ` +
-        `${counters.get('auditGetComponentsForSystem')} full-system audits; the budget is one. ` +
-        `An audit per recipe is the multiplication #1074 exists to remove.`
+      audits <= 1,
+      `enabling one recipe in a 21-recipe alchemy system ran ${audits} full-system audits; ` +
+        `the budget is one. An audit per recipe is the multiplication #1074 exists to remove.`
+    );
+    assert.ok(
+      counters.get('auditGetComponentsForSystem') > 0,
+      'the manager must still reach the library through the collaborator (issue 1072), not ' +
+        'through a global shim'
     );
   });
 

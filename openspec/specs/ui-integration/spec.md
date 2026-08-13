@@ -191,6 +191,18 @@ A manager modal MUST NOT be assembled from a raw HTML string handed to a Foundry
 Such a dialog inherits Foundry's page-title headings, unstyled list markup, and full-width footer button, which is a second modal design standing beside the shared one; it also cannot use any shared primitive, since a string is not a component.
 The post-import reference report and the bulk-import folder-categorization step are both import-flow modals and MUST therefore be visually indistinguishable in chrome.
 
+#### Yes/no confirmations
+
+A destructive or irreversible action confirms through the shared confirm seam, which is Foundry's own two-button confirm rather than the manager's modal chrome.
+
+That confirmation states two things, and neither is left to a platform default.
+It renders a TITLE naming what is at stake, and its affirmative button names the ACTION — Delete, Reset, Move, Change mode — never the generic _Yes_.
+Both are localized keys at every call site but one — the gathering library record delete confirm still builds its title and body from hardcoded English, a deliberately deferred gap rather than the shipped norm.
+An untitled confirm, or one whose affirmative reads _Yes_, is not an acceptable rendering of a destructive action however accurate its body text, because the two controls a GM actually reads before committing say nothing about what is about to happen.
+
+The seam maps a caller's title onto the window title and accepts a callback-only button, so no call site can silently lose either.
+It cannot supply the affirmative label, which is why that stays a per-action string owned by the caller.
+
 #### Standing statements
 
 A permanent explanation of how a surface behaves and a conditional hazard warning are the same layout and render through one shared callout primitive: a leading semantic glyph plus one sentence in a tinted, rounded strip.

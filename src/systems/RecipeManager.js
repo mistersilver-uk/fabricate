@@ -59,6 +59,30 @@ function selectedIngredientItems(selection) {
 }
 
 /**
+ * Whether a retained alchemy signature report's guard still describes the world (issue
+ * 1074). Every field is compared by IDENTITY or by `===` on a number, so this is O(1) —
+ * the O(cohort) half of the guard is paid once while `members` is derived, and returns the
+ * previous array unchanged when nothing moved.
+ *
+ * See {@link RecipeManager#_alchemySignatureReport} for what each clause exists to catch.
+ *
+ * @param {object} previous
+ * @param {object} next
+ * @returns {boolean}
+ */
+function signatureGuardsMatch(previous, next) {
+  return (
+    previous.recipesToken === next.recipesToken &&
+    previous.systemToken === next.systemToken &&
+    previous.recipeMap === next.recipeMap &&
+    previous.recipeCount === next.recipeCount &&
+    previous.components === next.components &&
+    previous.componentCount === next.componentCount &&
+    previous.members === next.members
+  );
+}
+
+/**
  * Manages recipe storage, retrieval, and CRUD operations
  */
 export class RecipeManager {
@@ -90,6 +114,11 @@ export class RecipeManager {
     // recipe objects, so replacing a stored recipe under the same id is transparently
     // correct and only an add/remove/move can invalidate it.
     this._cohortCache = null;
+    // The retained per-system alchemy signature reports (issue 1074), each with the guard
+    // it was compiled under. Keyed by system id rather than held singly because the GM can
+    // switch systems and a single slot would thrash between two open browsers.
+    /** @type {Map<string, {guard: object, report: object}>} */
+    this._signatureReports = new Map();
     this.getCraftingSystem = typeof getCraftingSystem === 'function' ? getCraftingSystem : null;
     this._getCraftingSystemManager =
       typeof getCraftingSystemManager === 'function' ? getCraftingSystemManager : null;
@@ -703,6 +732,136 @@ export class RecipeManager {
     }
     this._cohortCache = { map: this.recipes, size: this.recipes.size, token, cohorts };
     return cohorts;
+  }
+
+  /**
+   * The retained alchemy signature report for one system (issue 1074).
+   *
+   * Compiled at most once per revision by `SignatureValidator.compileReport`, which costs
+   * exactly one full audit; every subsequent read reuses it, and the enable gate answers a
+   * candidate from its inverted component index instead of re-auditing the system.
+   *
+   * ## The invalidation rule
+   *
+   * A retained report is reusable only when ALL THREE clauses hold. Tokens alone are not
+   * enough, for the same reason {@link _recipeCohorts} needed more than a token: a manager
+   * that fails to advance one, or a fixture that writes the map directly, would otherwise
+   * pin a wrong answer — and a wrong signature answer blocks or permits a GM's save.
+   *
+   * 1. **Tokens** — the `recipes:<systemId>` scope minted here, and the `system:<systemId>`
+   *    scope minted by `CraftingSystemManager`. The second is what catches a component,
+   *    tag or essence edit changing how an ingredient expands. Note it advances at that
+   *    manager's `save()`, so a fixture that stubs `save` never advances it; clause 2 is
+   *    what keeps such a fixture honest.
+   * 2. **Containers** — the recipe map's identity and size, and the system's component array
+   *    and that array's length. Catches a whole-map swap (`reload`, the `deleteRecipes`
+   *    restore), a batch delete, a recipe written straight into the map, and a fixture
+   *    assigning `system.components` outright while stubbing the `save` that would have
+   *    advanced the token. The SYSTEM object's own identity is deliberately NOT a clause:
+   *    nothing it carries other than the component array can change a compiled signature, so
+   *    the clause could not be given a failing test and would have been untested code.
+   * 3. **Members** — the enabled cohort must be the SAME recipe objects in the same order.
+   *    This is the in-place clause: every `RecipeManager` write path replaces the stored
+   *    object, so a surviving object whose `enabled` flag flipped underneath us is exactly
+   *    the mutation the first two clauses cannot see. It walks the cached cohort index and
+   *    allocates nothing, so re-reading N rows stays free of corpus copies.
+   *
+   * @param {string} systemId
+   * @param {object} systemManager the resolved crafting-system manager collaborator.
+   * @returns {object|null} the report, or `null` when the system is unknown.
+   * @private
+   */
+  _alchemySignatureReport(systemId, systemManager) {
+    const cached = this._signatureReports.get(systemId);
+    const guard = this._captureSignatureReportGuard(systemId, systemManager, cached?.guard);
+    if (cached && signatureGuardsMatch(cached.guard, guard)) return cached.report;
+
+    const validator = new SignatureValidator(
+      this._signatureSource(systemManager, (id) => this.getRecipes({ craftingSystemId: id }))
+    );
+    const report = validator.compileReport(systemId);
+    if (!report) {
+      this._signatureReports.delete(systemId);
+      return null;
+    }
+    this._signatureReports.set(systemId, { guard, report });
+    return report;
+  }
+
+  /**
+   * Read the three-clause guard for a system's signature report.
+   *
+   * `previousGuard` is the retained report's own guard. When one is supplied, clause 3's
+   * walk compares against its member array in place and returns that SAME array on a match,
+   * so a warm read allocates nothing at all; on a miss (or a cold read) it materialises the
+   * cohort the fresh report will be stored under.
+   *
+   * @param {string} systemId
+   * @param {object} systemManager
+   * @param {object|null} [previousGuard]
+   * @returns {object} the guard tuple.
+   * @private
+   */
+  _captureSignatureReportGuard(systemId, systemManager, previousGuard = null) {
+    const system = systemManager.getSystem?.(systemId) ?? null;
+    const components =
+      typeof systemManager.getComponentsForSystem === 'function'
+        ? systemManager.getComponentsForSystem(systemId)
+        : system?.components;
+    return {
+      recipesToken: this._revisions.read(REVISION_SCOPES.recipesOfSystem(systemId)),
+      systemToken:
+        typeof systemManager.revision === 'function'
+          ? systemManager.revision(REVISION_SCOPES.system(systemId))
+          : null,
+      recipeMap: this.recipes,
+      recipeCount: this.recipes.size,
+      components,
+      componentCount: Array.isArray(components) ? components.length : -1,
+      members: this._enabledCohortMembers(systemId, previousGuard?.members),
+    };
+  }
+
+  /**
+   * The enabled recipes of a system, in cohort order — clause 3 of the signature guard.
+   *
+   * Returns `previous` UNCHANGED when the cohort still holds exactly those objects, so the
+   * warm path costs one pass over an already-cached id list and zero allocation. Any
+   * difference — a flipped `enabled` flag on a surviving object, a replaced object under
+   * the same id, a different length — yields a fresh array, which fails identity comparison
+   * against the retained guard and forces a recompile.
+   *
+   * @param {string} systemId
+   * @param {object[]} [previous]
+   * @returns {object[]}
+   * @private
+   */
+  _enabledCohortMembers(systemId, previous) {
+    const cohort = this._recipeCohorts().get(systemId) ?? [];
+    if (previous) {
+      let matched = 0;
+      let intact = true;
+      for (const recipeId of cohort) {
+        const recipe = this.recipes.get(recipeId);
+        // The truthy `enabled` test mirrors `SignatureValidator`'s own scan scope exactly
+        // (see issue 1134); the guard must track the set the audit actually compiles, not
+        // the set the model's `!== false` default would imply.
+        if (!recipe?.enabled) continue;
+        if (previous[matched] !== recipe) {
+          intact = false;
+          break;
+        }
+        matched += 1;
+      }
+      if (intact && matched === previous.length) return previous;
+    }
+
+    const members = [];
+    for (const recipeId of cohort) {
+      const recipe = this.recipes.get(recipeId);
+      if (recipe?.enabled) members.push(recipe);
+    }
+    return members;
   }
 
   /**
@@ -2760,23 +2919,22 @@ export class RecipeManager {
     const system = systemManager.getSystem(systemId);
     if (system?.resolutionMode !== 'alchemy') return { valid: true, errors: [] };
 
-    // The validator is now enabled-scoped (issue 649). This gate runs on an ENABLE
-    // transition, but the store copy of `recipe` is still disabled (it is persisted
-    // only after this passes). Substitute the candidate recipe (enabled = its target
-    // state) so the scan evaluates the collision the enable would create; without the
-    // swap the enabled-scoped validator would exclude the still-disabled store copy
-    // and miss the conflict. That substitution is the ONLY reason this path cannot
-    // hand the manager straight to the validator (issue 1072).
-    const csm = this._signatureSource(systemManager, (id) =>
-      this.getRecipes({ craftingSystemId: id }).map((existing) =>
-        existing.id === recipe.id ? recipe : existing
-      )
-    );
+    // The validator is enabled-scoped (issue 649). This gate runs on an ENABLE transition,
+    // but the store copy of `recipe` is still disabled (it is persisted only after this
+    // passes), so the scan has to evaluate the candidate in the store copy's place —
+    // otherwise the enabled-scoped audit excludes the still-disabled copy and misses the
+    // conflict. The retained report holds the compiled entries for every OTHER enabled
+    // recipe, and `candidateConflicts` performs exactly that substitution against them
+    // (issue 1074): the candidate's own stored entries are excluded, its sets are compared
+    // with each other, and the result is emitted in full-audit order. What it no longer
+    // does is re-audit the whole system and copy the recipe corpus once per call, which is
+    // what made preparing N GM browser rows O(N^3).
+    const report = this._alchemySignatureReport(systemId, systemManager);
+    if (!report) return { valid: true, errors: [] };
 
-    const validator = new SignatureValidator(csm);
-    const result = validator.validateRecipe(recipe, systemId);
-    const errors = result.conflicts.map((c) => c.message);
-    const issues = result.conflicts.map((c) => ({
+    const conflicts = report.candidateConflicts(recipe);
+    const errors = conflicts.map((c) => c.message);
+    const issues = conflicts.map((c) => ({
       code: c.code,
       params: c.params,
       message: c.message,
@@ -2803,20 +2961,13 @@ export class RecipeManager {
     if (system?.resolutionMode !== 'alchemy') return [];
 
     // No candidate substitution here — this runs AFTER the mutation is stored — so the
-    // recipe accessor is the plain store read (issue 1072).
-    const validator = new SignatureValidator(
-      this._signatureSource(systemManager, (id) => this.getRecipes({ craftingSystemId: id }))
-    );
-
-    const { conflicts } = validator.validateSystem(systemId);
-    const conflictIds = new Set();
-    for (const conflict of conflicts) {
-      conflictIds.add(conflict.recipeA.id);
-      conflictIds.add(conflict.recipeB.id);
-    }
+    // whole-system report answers it directly (issue 1072, issue 1074). `blockedRecipeIds`
+    // is precisely the set this pass has always derived by hand from the conflict list.
+    const report = this._alchemySignatureReport(systemId, systemManager);
+    if (!report) return [];
 
     const disabled = [];
-    for (const id of conflictIds) {
+    for (const id of report.blockedRecipeIds) {
       const recipe = this.recipes.get(id);
       if (recipe?.enabled === true) {
         recipe.enabled = false;
@@ -2825,6 +2976,14 @@ export class RecipeManager {
     }
 
     if (disabled.length > 0) {
+      // This is the ONE write path in this manager that mutates a STORED recipe in place
+      // rather than replacing it, so nothing else would advance the token and every
+      // revision-keyed consumer — the signature report above included — would keep serving
+      // an answer computed against recipes that are no longer enabled. The report's member
+      // clause would catch it too; advancing here is the correct fix rather than the
+      // backstop, because a token is only ever wrong when a manager failed to advance it
+      // (see `module:revisionTokens`).
+      this._advanceRecipeRevision(systemId);
       // The repository's bulk boundary, on a real multi-record mutation: each disabled
       // recipe announces itself, and the batch coalesces them into exactly one write —
       // the same single write the whole-corpus `save()` issued here before. Naming the
