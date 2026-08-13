@@ -2208,6 +2208,36 @@ export function createAdminStore(services) {
     return get(toolDraftDirty) && get(toolDraft) !== null;
   }
 
+  /**
+   * The `yes`/`no` pair of a DELETE confirm, in the shape `DialogV2.confirm` merges
+   * (issue 1154).
+   *
+   * Two things it exists to stop coming back. `DialogV2.confirm` merges each button over
+   * a default with `mergeObject`, which iterates `Object.keys(other)` — `[]` for a
+   * function — so the bare `yes: () => true` this replaced across the file configured
+   * NOTHING and left every destructive confirm here asking the generic *Yes*. And the
+   * affirmative is COPY: it is localized, never a literal, and never left to the core
+   * default (which is `"Yes"` on V13.351 and `"COMMON.Yes"` on V14.365).
+   *
+   * `no` carries only its callback on purpose — core's own default label is a correct
+   * answer to the question-form title these dialogs ask, and its default callback already
+   * returns false.
+   *
+   * One shared verb for every delete rather than a per-surface key: the button says what
+   * the action is, and the dialog's own title and body say what is being deleted.
+   *
+   * @private
+   */
+  function _deleteConfirmButtons() {
+    return {
+      yes: {
+        label: services.localize?.('FABRICATE.Admin.Manager.Delete') || 'Delete',
+        callback: () => true,
+      },
+      no: { callback: () => false },
+    };
+  }
+
   async function confirmDiscardDirtyToolsDraft() {
     if (!isToolsDraftDirty()) return true;
     if (dirtyToolsDraftDiscardConfirmation) return dirtyToolsDraftDiscardConfirmation;
@@ -2219,8 +2249,18 @@ export function createAdminStore(services) {
         content:
           services.localize?.('FABRICATE.Admin.Manager.Tools.DiscardDirty.Content') ||
           'The tools library has unsaved changes. Discard them and continue?',
-        yes: () => true,
-        no: () => false,
+        yes: {
+          label:
+            services.localize?.('FABRICATE.Admin.Manager.Tools.DiscardDirty.Confirm') ||
+            'Discard changes',
+          callback: () => true,
+        },
+        no: {
+          label:
+            services.localize?.('FABRICATE.Admin.Manager.Tools.DiscardDirty.Cancel') ||
+            'Keep editing',
+          callback: () => false,
+        },
       });
       return result === true;
     })();
@@ -2365,12 +2405,25 @@ export function createAdminStore(services) {
   // (delete step, revert multi→single, Complex→Simple trim). The editor stages the
   // result into its root-held draft after the user confirms; this helper only owns
   // the dialog wiring (the root has no direct services.confirmDialog seam).
-  async function confirmRecipeAction({ title, content } = {}) {
+  //
+  // `confirmLabel` is REQUIRED of every caller in practice (issue 1154): the actions
+  // routed here are not all the same verb — one deletes a step, another switches a
+  // recipe back to single-step — so the store cannot name the affirmative for them, and
+  // `DialogV2.confirm`'s default label is the generic *Yes*.
+  async function confirmRecipeAction({ title, content, confirmLabel } = {}) {
+    // `label` is OMITTED, never set to undefined, when a caller supplies none:
+    // `mergeObject` iterates the keys it is handed, so `label: undefined` OVERWRITES
+    // the default with nothing, and `_renderButtons` sets `span.innerText = _loc(label)`;
+    // `localize` returns its `stringId` argument unchanged when no translation is found, so
+    // the button renders the literal word "undefined" — strictly worse than the generic
+    // default it was meant to replace. (Executed against both builds' `mergeObject`.)
+    const yes = { callback: () => true };
+    if (confirmLabel) yes.label = confirmLabel;
     const confirmed = await services.confirmDialog?.({
       title,
       content,
-      yes: () => true,
-      no: () => false,
+      yes,
+      no: { callback: () => false },
     });
     return confirmed === true;
   }
@@ -2708,17 +2761,21 @@ export function createAdminStore(services) {
         const partyStore = getPartyStore();
         if (!partyStore) return false;
         const party = partyStore.get?.(partyId);
-        const name = _escapeHtml(party?.name || partyId);
+        // The name is raw in the TITLE (ApplicationV2 assigns it through `innerText`, so
+        // escaping there would surface a literal `&#39;`) and escaped in the CONTENT, which
+        // is HTML.
+        const name = String(party?.name || partyId);
+        const escapedName = _escapeHtml(name);
         const confirmed = await services.confirmDialog?.({
           title:
             services.localize?.('FABRICATE.Admin.Manager.Travel.DeletePartyTitle', { name }) ||
             `Delete ${name}?`,
           content: `<p>${
-            services.localize?.('FABRICATE.Admin.Manager.Travel.DeletePartyContent', { name }) ||
-            `Delete Fabricate party <strong>${name}</strong>?`
+            services.localize?.('FABRICATE.Admin.Manager.Travel.DeletePartyContent', {
+              name: escapedName,
+            }) || `Delete Fabricate party <strong>${escapedName}</strong>?`
           }</p>`,
-          yes: () => true,
-          no: () => false,
+          ..._deleteConfirmButtons(),
         });
         if (!confirmed) return false;
         return withSave(async (store) => {
@@ -2740,9 +2797,13 @@ export function createAdminStore(services) {
             party.memberActorUuids.includes(uuid)
         );
         if (source) {
-          const actorName = _escapeHtml(
+          // The actor name is raw in the TITLE (ApplicationV2 assigns it through `innerText`,
+          // so escaping there would surface a literal `&#39;`) and escaped in the CONTENT,
+          // which is HTML.
+          const actorName = String(
             getActorOptions().find((actor) => actor.uuid === uuid)?.name || uuid
           );
+          const escapedActorName = _escapeHtml(actorName);
           const sourceName = _escapeHtml(source.name || source.id);
           const targetName = _escapeHtml(partyStore.get?.(targetPartyId)?.name || targetPartyId);
           const confirmed = await services.confirmDialog?.({
@@ -2752,14 +2813,20 @@ export function createAdminStore(services) {
               }) || `Move ${actorName}?`,
             content: `<p>${
               services.localize?.('FABRICATE.Admin.Manager.Travel.MoveMemberContent', {
-                actor: actorName,
+                actor: escapedActorName,
                 from: sourceName,
                 to: targetName,
               }) ||
-              `Move <strong>${actorName}</strong> from <strong>${sourceName}</strong> to <strong>${targetName}</strong>?`
+              `Move <strong>${escapedActorName}</strong> from <strong>${sourceName}</strong> to <strong>${targetName}</strong>?`
             }</p>`,
-            yes: () => true,
-            no: () => false,
+            // Not a delete: moving a member is reversible, and the affirmative names the
+            // move rather than borrowing the destructive verb.
+            yes: {
+              label:
+                services.localize?.('FABRICATE.Admin.Manager.Travel.MoveMemberConfirm') || 'Move',
+              callback: () => true,
+            },
+            no: { callback: () => false },
           });
           if (!confirmed) return false;
           return withSave((store) => store.moveMember(source.id, targetPartyId, uuid), 'members');
@@ -2909,7 +2976,11 @@ export function createAdminStore(services) {
         const realmStore = getRealmStore();
         if (!realmStore || !systemId) return false;
         const realm = realmStore.get?.(systemId, realmId);
-        const name = _escapeHtml(realm?.name || realmId);
+        // The name is raw in the TITLE (ApplicationV2 assigns it through `innerText`, so
+        // escaping there would surface a literal `&#39;`) and escaped in the CONTENT, which
+        // is HTML.
+        const name = String(realm?.name || realmId);
+        const escapedName = _escapeHtml(name);
         // Collect referenced-by evidence WITHOUT deleting first: GatheringRealmStore.delete
         // returns it post-delete, but we surface it in the confirm copy beforehand by
         // probing the collaborators the store uses.
@@ -2929,11 +3000,11 @@ export function createAdminStore(services) {
             services.localize?.('FABRICATE.Admin.Manager.Travel.Realms.DeleteTitle', { name }) ||
             `Delete ${name}?`,
           content: `<p>${
-            services.localize?.('FABRICATE.Admin.Manager.Travel.Realms.DeleteContent', { name }) ||
-            `Delete realm <strong>${name}</strong>?`
+            services.localize?.('FABRICATE.Admin.Manager.Travel.Realms.DeleteContent', {
+              name: escapedName,
+            }) || `Delete realm <strong>${escapedName}</strong>?`
           }</p>${refLine}`,
-          yes: () => true,
-          no: () => false,
+          ..._deleteConfirmButtons(),
         });
         if (!confirmed) return false;
         clearErrors();
@@ -3780,8 +3851,7 @@ export function createAdminStore(services) {
       (await services.confirmDialog?.({
         title: `Delete ${label}?`,
         content,
-        yes: () => true,
-        no: () => false,
+        ..._deleteConfirmButtons(),
       })) === true
     );
   }
@@ -4736,8 +4806,7 @@ export function createAdminStore(services) {
           'This copy is a stack of {quantity}. Deleting removes every unit, because uses and learns are tracked per document.',
           { quantity }
         )}</p>`,
-        yes: () => true,
-        no: () => false,
+        ..._deleteConfirmButtons(),
       });
       if (!confirmed) return { success: false, cancelled: true };
     }
@@ -4763,8 +4832,13 @@ export function createAdminStore(services) {
     return services.confirmDialog?.({
       title: _knowledgeText(titleKey, titleFallback),
       content: `<p>${_knowledgeText(contentKey, contentFallback)}</p><p>${note}</p>`,
-      yes: () => true,
-      no: () => false,
+      // A reset erases learned knowledge but deletes no definition, so it names its own
+      // verb rather than reusing the delete pair.
+      yes: {
+        label: _knowledgeText('FABRICATE.Admin.Manager.Knowledge.ResetConfirm', 'Reset'),
+        callback: () => true,
+      },
+      no: { callback: () => false },
     });
   }
 
@@ -4881,11 +4955,25 @@ export function createAdminStore(services) {
     const system = systemManager.getSystem(systemId);
     if (!system) return;
 
+    // The single most destructive action in the app, and until issue 1154 it asked for
+    // that in an untitled window with a generic *Yes* and hardcoded English copy. The
+    // name is raw in the TITLE (ApplicationV2 assigns it through `innerText`, so escaping
+    // there would surface a literal `&amp;`) and escaped in the CONTENT, which is HTML.
+    const name = String(system.name || '');
+    const escapedName = _escapeHtml(name);
+    const consequences =
+      services.localize?.('FABRICATE.Admin.Manager.DeleteSystemConfirm.Consequences') ||
+      'Linked recipes, gathering environments, gathering tools and tasks, and any in-progress or historical crafting, salvage, and gathering runs for this system will be removed.';
     const confirmed = await services.confirmDialog({
-      title: `Delete ${system.name}?`,
-      content: `<p>Delete crafting system <strong>${system.name}</strong>?</p><p>Linked recipes, gathering environments, gathering tools and tasks, and any in-progress or historical crafting, salvage, and gathering runs for this system will be removed.</p>`,
-      yes: () => true,
-      no: () => false,
+      title:
+        services.localize?.('FABRICATE.Admin.Manager.DeleteSystemConfirm.Title', { name }) ||
+        `Delete ${name}?`,
+      content: `<p>${
+        services.localize?.('FABRICATE.Admin.Manager.DeleteSystemConfirm.Content', {
+          name: escapedName,
+        }) || `Delete crafting system <strong>${escapedName}</strong>?`
+      }</p><p>${consequences}</p>`,
+      ..._deleteConfirmButtons(),
     });
     if (!confirmed) return;
 
@@ -4972,8 +5060,13 @@ export function createAdminStore(services) {
         localizeFn?.('FABRICATE.Admin.SystemSettings.ResolutionModeChangeTitle') ||
         'Change Resolution Mode?',
       content: `<p>${content}</p>`,
-      yes: () => true,
-      no: () => false,
+      yes: {
+        label:
+          localizeFn?.('FABRICATE.Admin.SystemSettings.ResolutionModeChangeConfirm') ||
+          'Change mode',
+        callback: () => true,
+      },
+      no: { callback: () => false },
     });
     if (!confirmed) return false;
 
@@ -5022,8 +5115,13 @@ export function createAdminStore(services) {
         }) ||
         `Changing the salvage resolution mode for ${system.name}: components incompatible with the new salvage mode will have salvage disabled.`
       }</p>`,
-      yes: () => true,
-      no: () => false,
+      yes: {
+        label:
+          localizeFn?.('FABRICATE.Admin.SystemSettings.SalvageResolutionModeChangeConfirm') ||
+          'Change mode',
+        callback: () => true,
+      },
+      no: { callback: () => false },
     });
     if (!confirmed) return false;
 
@@ -5481,21 +5579,23 @@ export function createAdminStore(services) {
     const targetEnvironment =
       currentEnvironments.find((environment) => environment.id === targetId) ||
       get(environmentDraft);
-    const environmentName = targetEnvironment?.name || targetId;
+    // The name is raw in the TITLE (ApplicationV2 assigns it through `innerText`, so
+    // escaping there would surface a literal `&#39;`) and escaped in the CONTENT, which is
+    // HTML.
+    const environmentName = String(targetEnvironment?.name || targetId);
     const escapedEnvironmentName = _escapeHtml(environmentName);
     const confirmed = await services.confirmDialog?.({
       title:
         services.localize?.('FABRICATE.Admin.Environments.DeleteTitle', {
-          name: escapedEnvironmentName,
-        }) || `Delete ${escapedEnvironmentName}?`,
+          name: environmentName,
+        }) || `Delete ${environmentName}?`,
       content: `<p>${
         services.localize?.('FABRICATE.Admin.Environments.DeleteContent', {
           name: escapedEnvironmentName,
         }) ||
         `Delete gathering environment <strong>${escapedEnvironmentName}</strong>? This also cleans active and historical gathering runs that reference it.`
       }</p>`,
-      yes: () => true,
-      no: () => false,
+      ..._deleteConfirmButtons(),
     });
     if (!confirmed) return false;
 
@@ -5714,7 +5814,7 @@ export function createAdminStore(services) {
         label: services.localize?.('FABRICATE.Admin.Manager.DisableMultiStep.Confirm') || 'Disable',
         callback: () => true,
       },
-      no: () => false,
+      no: { callback: () => false },
     });
     return confirmed === true;
   }
@@ -6409,9 +6509,12 @@ export function createAdminStore(services) {
       title:
         services.localize?.('FABRICATE.Admin.Manager.Essence.DeleteConfirm.Title', { name }) ||
         `Delete ${name}?`,
+      // Content is issue 1156's builder, which omits consequences whose count is zero
+      // rather than stating "0 component(s)"; the buttons are issue 1154's, so the
+      // affirmative names the action instead of reading "Yes". The two are orthogonal —
+      // one is what the dialog says, the other is what its controls are called.
       content: `<p>${_essenceDeleteDialogContent(name, impact)}</p>`,
-      yes: () => true,
-      no: () => false,
+      ..._deleteConfirmButtons(),
     });
     if (!confirmed) return false;
 
@@ -8179,8 +8282,7 @@ export function createAdminStore(services) {
         services.localize?.('FABRICATE.Admin.Manager.RecipeItem.DeleteTitle') ||
         'Delete recipe item?',
       content: `<p>${services.localize?.('FABRICATE.Admin.Manager.RecipeItem.DeleteContent') || 'Delete this recipe item? Recipes linked to it will be unlinked.'}</p>`,
-      yes: () => true,
-      no: () => false,
+      ..._deleteConfirmButtons(),
     });
     if (!confirmed) return false;
     try {
@@ -8370,10 +8472,11 @@ export function createAdminStore(services) {
    * Two things about the options object below are not stylistic (issue 1132), and the
    * shape it replaced had both wrong:
    *
-   *  - the title lands at `window.title`, NOT top level. `services.confirmDialog` calls
-   *    `DialogV2.confirm` WITHOUT `normalizeDialogOptions` — only `renderDialog` uses that
-   *    — and `ApplicationV2` reads `this.options.window.title`, so a top-level `title` is
-   *    read by nothing and the dialog rendered with an empty title bar;
+   *  - the title lands at `window.title`, NOT top level. `ApplicationV2` reads
+   *    `this.options.window.title`, so an unmapped top-level `title` is read by nothing and
+   *    the dialog rendered with an empty title bar. This site states the canonical shape
+   *    directly; since issue 1154 `normalizeConfirmOptions` also maps the top-level form
+   *    for every other call site in this file, so both spellings arrive correct;
    *  - `yes` and `no` are OBJECTS carrying a label and a callback, not bare functions.
    *    `DialogV2.confirm` merges each over `{action, label: "COMMON.Yes"|"COMMON.No", icon,
    *    callback}`, and a function contributes no own enumerable keys — so the confirm button
@@ -8382,13 +8485,10 @@ export function createAdminStore(services) {
    *    and V14.365) but it is the identical shape, and leaving one of the pair in the form
    *    the paragraph above calls broken is how the pattern comes back.
    *
-   * **The same two defects remain on the other `services.confirmDialog` call sites in this
-   * file, and the unifying fix is NOT to route them through `normalizeDialogOptions`.** That
-   * normalizer injects `buttons: [{action: 'close', …}]` when `buttons` is absent, and
-   * `DialogV2.confirm` then does `config.buttons ??= []; config.buttons.unshift(yes, no)` —
-   * so reusing it wholesale renders a THREE-button confirm on every site. The fix is a
-   * narrow top-level-`title` → `window.title` mapping inside `confirmDialog` itself; see the
-   * note carried there.
+   * The affirmative LABEL is still the caller's, here and everywhere: no central mapping can
+   * name a destructive action for you. `_deleteConfirmButtons()` is the shared pair for the
+   * plain deletes; this one keeps its own key because the recipe delete's copy is authored
+   * as a set with its impact-stating body.
    *
    * It routes the write through `CraftingSystemManager.deleteRecipes`, not
    * `RecipeManager.deleteRecipe`, so the studio singular cascades the recipe-item
@@ -8941,9 +9041,10 @@ export function createAdminStore(services) {
       title:
         services.localize?.('FABRICATE.Admin.Manager.Component.DeleteConfirm.Title', { name }) ||
         `Delete ${name}?`,
+      // As above: issue 1156's zero-omitting content, issue 1154's named affirmative
+      // button.
       content: `<p>${_componentDeleteDialogContent(name, impact)}</p>`,
-      yes: () => true,
-      no: () => false,
+      ..._deleteConfirmButtons(),
     });
     if (!confirmed) return;
 
