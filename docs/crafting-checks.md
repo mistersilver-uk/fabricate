@@ -550,6 +550,112 @@ The dice groups in a trigger come from the formula.
 When the same shape appears twice (for example two separate d20 rolls), Fabricate numbers them so you can tell them apart.
 Editing the formula can renumber the groups, so check your dice-group triggers after you change a check formula.
 
+## Success-counting checks
+
+Not every game measures a check as one running total against a difficulty.
+Some systems roll a pool of dice and count how many of them individually clear a threshold, then compare that count against a target.
+Fabricate can run this style of check today, by adding a counting suffix such as `cs` or `cf` to a die term in the formula field you already use.
+This is an advanced topic that draws on nearly every earlier section of this page.
+
+### Counting dice instead of adding them
+
+A formula that carries a `cs` or `cf` suffix on one of its dice totals to the number of qualifying dice, rather than a sum of the dice's faces.
+The **Difficulty** card's meet-or-exceed comparison then compares that count against the **DC**, so the check passes once enough dice qualify.
+That is exactly the rule a dice-pool system uses.
+Meet-or-exceed is already the default comparison, so nothing about that setting needs to change.
+Set the **DC** to the number of qualifying dice the formula must produce.
+See [Relative and fixed tiers](#relative-and-fixed-tiers), because a fixed routed check has no DC at all, so this reading does not apply there.
+
+### Progressive checks award the count
+
+A progressive check awards the roll's raw total as its result.
+On a counting formula that total is the number of qualifying dice, not a face sum, so the award can never be larger than the size of the pool.
+Converting an existing progressive recipe from an additive formula to a counting one silently rescales every award.
+A recipe that used to award somewhere between 2 and 20 from a `2d10` formula can now only award somewhere between 0 and 2 from a two-die counting pool, and nothing warns you.
+Re-author your award thresholds whenever you move a progressive check onto a counting formula.
+
+### Setting the difficulty without a prompt
+
+Named difficulty tiers on the check, together with a per-recipe tier selection, give you per-recipe difficulty with no macro at all.
+Where a dynamic DC macro is also in play, the recipe's chosen tier resolves first, and the macro is handed that value as its starting point.
+If the macro is missing, throws, or returns something that is not a number, the tier's DC still stands.
+The two features compose rather than compete.
+
+The per-recipe **Check tier** control is only offered on a recipe's **Overview** tab while the check's **DC source** is **Static**.
+Switching a check to **Dynamic** removes that control from every recipe's **Overview** tab.
+Fabricate still honours a tier a recipe already had chosen, so the composition above is real, not only theoretical.
+Choose the recipe's difficulty tier while the **DC source** is **Static**.
+A tier you already chose keeps setting the starting point the macro adjusts, even after you switch that check to **Dynamic**.
+See [Dynamic DC macros](#dynamic-dc-macros).
+
+### Do not add bonuses to a counting check
+
+Tool bonuses, eligible check modifiers, and the roll prompt's **Situational bonus** field each add a separate additive term onto the end of the rolled formula.
+On an ordinary formula, that extra term improves the roll.
+On a counting formula it adds free qualifying dice to the count instead, which is almost never what you want.
+Do not combine bonuses with a counting formula.
+Switch off any contributing check modifier entries for that activity, and tell players to leave **Situational bonus** blank when they roll a counting check.
+This is a current limitation, not a permanent design choice.
+See [Check modifiers](#check-modifiers) and [Rolling a check from the UI](#rolling-a-check-from-the-ui).
+
+### Writing the qualifying threshold
+
+The qualifying threshold in a counting formula must resolve to a single whole number.
+Write either a literal number, or one character-data path on its own.
+A composed expression does not work here: two paths added together, anything in brackets, or anything containing a space cannot be written in this position.
+For example, a two-die pool that qualifies when each die rolls at or under a character's skill value could use a formula that reads that skill from one character-data path, such as `2d20cs<=@skills.survival.value`.
+Notice that this example qualifies by rolling low, so it is also the example that breaks the usual assumption that a higher roll is better.
+When your game system does not already expose the number you need as one path, write an Active Effect that computes the value and writes it onto the character.
+Your formula then reads that single path, which satisfies the one-path rule.
+
+### When the character is missing the value
+
+{: .note }
+> A character-data path the actor does not have is substituted as zero before the roll happens.
+> The check then rolls a threshold of zero, no die can qualify, and the attempt fails.
+> A failed check still consumes whatever the system's failure policy says it consumes.
+> The roll prompt shows the unresolved threshold as `NaN`, while the roll itself uses zero, so the prompt is your warning sign.
+> Nothing blocks the roll from happening.
+> Check the path against the character before you rely on it in a counting formula.
+> See [Rolling a check from the UI](#rolling-a-check-from-the-ui).
+
+### Triggers on a counting check
+
+The one-click high and low trigger presets assume the highest face is good and the lowest face is bad.
+On a pool that qualifies by rolling low, that assumption is inverted, so author those triggers by hand instead of using a preset.
+Be precise about what a preset actually does.
+On a routed check, the high and low presets step the outcome tier up or down.
+On a pass/fail or progressive check, they force a success or a failure instead.
+See [Tier stepping](#tier-stepping) and [Tool breakage triggers](#tool-breakage-triggers).
+
+A roll-total trigger, and a dice-group trigger using its group total measure, both read the count of qualifying dice, not a sum of faces.
+A value you wrote for a face sum will never match a counting formula's total.
+
+The per-die measures, any die, all dice, the lowest die, and the highest die, read the individual faces the dice showed.
+Whether a counting suffix leaves every rolled die active for those measures to see could not be confirmed for this page, so treat it as unverified rather than as a guarantee.
+Re-check every trigger on the check with a test roll after you move its formula to a counting pool.
+
+### What the previews will tell you
+
+The odds histogram on the check's panel deliberately abstains from drawing a chart for a counting formula, and it says so.
+That is correct behaviour: the panel refuses rather than showing a chart that would be wrong.
+The average reading, and any ranking built from it, are not trustworthy for a counting formula.
+Do not use them to compare one check against another.
+
+The roll prompt also does not offer advantage or disadvantage on a counting formula, and that omission is a reassurance rather than a gap.
+Advantage means rolling a second d20 and keeping the higher result, which has no meaning for a pool of dice.
+The prompt only offers advantage and disadvantage when the authored formula is a plain `1d20`.
+
+### What a counting check cannot do
+
+**The pool size is fixed by the formula you typed.**
+There is no per-roll choice of how many dice to roll, and a player cannot add dice at the roll prompt.
+In a system where spending a meta-currency to enlarge the pool is a core move, you edit the formula by hand between rolls and track that resource at the table yourself.
+
+**Two different weights on one pool cannot be expressed.**
+A counting suffix gives every qualifying die the same weight of one.
+A die that should count twice under some condition has no way to show that on a counting formula.
+
 ---
 
 ## See Also
