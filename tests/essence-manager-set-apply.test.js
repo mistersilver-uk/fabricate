@@ -395,6 +395,8 @@ test('1036/15: the same input through the SET form completes and persists too', 
     essenceIds: ['fire', 'water'],
     recipesUpdated: 2,
     // The set form multiplies the abort: one bad recipe took the whole selection with it.
+    // Only r1 loses its shape — r2 keeps a surviving component ingredient group.
+    recipesDisabled: 1,
   });
   assert.deepEqual(
     recipeManager.recipes.get('r1').toJSON().ingredientSets,
@@ -538,6 +540,8 @@ test('1036/16: a NON-ALCHEMY bulk delete of 3 essences across 2 shared recipes i
     deleted: 3,
     essenceIds: ['fire', 'water', 'air'],
     recipesUpdated: 2,
+    // Both recipes keep a surviving component ingredient group, so neither loses its shape.
+    recipesDisabled: 0,
   });
   assert.equal(countWrites('craftingSystems'), 1, 'ONE craftingSystems write');
   assert.equal(countWrites('recipes'), 1, 'ONE recipes write — not one per rewritten recipe');
@@ -579,6 +583,42 @@ test('1036/16 negative control: the un-batched per-essence shape exceeds that bo
   );
 });
 
+// Issue 1144 — `deleteEssences` mirrors `deleteComponents`'s `recipesDisabled` count: an
+// enabled->disabled TRANSITION, not the resulting disabled state. A recipe that was already
+// disabled before the delete is clamped along with the rest but must NOT inflate the count,
+// or a GM re-running a delete against an already-shaky library would be warned about recipes
+// it cannot possibly still be disabling.
+test('1036/1144: deleteEssences counts the enabled->disabled TRANSITION, not already-disabled recipes', async () => {
+  const { manager, recipeManager } = makeFixture({
+    essenceDefinitions: [makeEssence({ id: 'fire' })],
+    recipes: [
+      recipeRequiringOnlyEssence('r-already-disabled', 'fire', { enabled: false }),
+      recipeRequiringOnlyEssence('r-newly-disabled', 'fire', { enabled: true }),
+      recipeRequiring('r-survives', { fire: 1 }, { enabled: true }),
+    ],
+  });
+
+  const result = await manager.deleteEssences(SYSTEM_ID, ['fire']);
+
+  assert.equal(
+    result.recipesDisabled,
+    1,
+    'only the recipe actually taken from enabled to disabled is counted'
+  );
+  assert.equal(result.recipesUpdated, 3, 'all three referencing recipes were rewritten');
+  assert.equal(
+    recipeManager.recipes.get('r-already-disabled').enabled,
+    false,
+    'the already-disabled recipe is still clamped, just not counted'
+  );
+  assert.equal(recipeManager.recipes.get('r-newly-disabled').enabled, false);
+  assert.equal(
+    recipeManager.recipes.get('r-survives').enabled,
+    true,
+    'a recipe keeping a surviving component requirement is not disabled at all'
+  );
+});
+
 test('1036: deleteEssences strips every deleted essence from carrying components', async () => {
   const { manager } = makeFixture({
     essenceDefinitions: [makeEssence({ id: 'fire' }), makeEssence({ id: 'water' })],
@@ -603,11 +643,13 @@ test('1036: deleteEssences ignores unknown ids and is a no-op for an empty selec
     deleted: 0,
     essenceIds: [],
     recipesUpdated: 0,
+    recipesDisabled: 0,
   });
   assert.deepEqual(await manager.deleteEssences(SYSTEM_ID, []), {
     deleted: 0,
     essenceIds: [],
     recipesUpdated: 0,
+    recipesDisabled: 0,
   });
   assert.equal(settingWrites.length, 0, 'neither issued a world write');
 });

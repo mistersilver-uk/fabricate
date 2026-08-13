@@ -68,6 +68,25 @@ describe('1036/copy essence bulk-delete two-count strings', () => {
     const sentence = interpolate(bulkEdit.Deleted, { count: 3, recipes: 2 });
     assert.equal(sentence, 'Deleted 3 essence(s) and rewrote 2 recipe(s).');
   });
+
+  // Issue 1144 — the twin of the component toast's `DeletedWithDisabled` string. The toast
+  // is the ONLY feedback that survives the panel unmounting on a successful delete, and
+  // "recipes disabled" is the most consequential of the three outcomes reported: recipes the
+  // GM's players could craft this morning and cannot craft now.
+  it('DeletedWithDisabled reports the disable count as well as the other two', () => {
+    assert.equal(
+      interpolate(bulkEdit.DeletedWithDisabled, { count: 3, recipes: 2, disabled: 1 }),
+      'Deleted 3 essence(s) and rewrote 2 recipe(s), disabling 1 of them.'
+    );
+  });
+
+  it('the zero-disable case has its own shorter sentence, not a trailing "0 of them"', () => {
+    // Two whole sentences rather than one plus an appended clause: a locale that cannot
+    // append an English subordinate clause is the usual cost of building a sentence out of
+    // fragments.
+    assert.ok(!bulkEdit.Deleted.includes('{disabled}'), 'the short form names no disable count');
+    assert.notEqual(bulkEdit.Deleted, bulkEdit.DeletedWithDisabled);
+  });
 });
 
 // WCAG 2.5.3 Label in Name (issue 1132). A speech-input user activates a control by saying what

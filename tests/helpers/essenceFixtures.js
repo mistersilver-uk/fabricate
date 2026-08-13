@@ -284,7 +284,7 @@ export function makeEssenceStoreHarness(options = {}) {
       writes.push({ kind: 'deleteEssences', essenceIds: [...essenceIds] });
       const removed = new Set([...essenceIds].map(String));
       system.essenceDefinitions = definitions().filter((def) => !removed.has(String(def.id)));
-      return { deleted: removed.size, essenceIds: [...removed], recipesUpdated: 0 };
+      return { deleted: removed.size, essenceIds: [...removed], recipesUpdated: 0, recipesDisabled: 0 };
     },
   };
 
