@@ -605,7 +605,7 @@ describe('adminStore recipe-item projections + API', () => {
     // property read or an object key keeps the real guard — a row that carried the alias
     // would be seeded into the editor draft and posted back on save — without pinning
     // prose.
-    const legacyAliasAsField = /linkedRecipeItemUuid\s*:|[.?]\s*linkedRecipeItemUuid|\[\s*['"`]linkedRecipeItemUuid['"`]\s*\]/;
+    const legacyAliasAsField = /linkedRecipeItemUuid\s*:|[.?]\s*linkedRecipeItemUuid|\[\s*['"`]linkedRecipeItemUuid['"`]\s*\]|[{,]\s*linkedRecipeItemUuid/;
     assert.equal(legacyAliasAsField.test(storeSource), false, 'the store never projects the legacy alias');
     assert.equal(legacyAliasAsField.test(projectionSource), false, 'nor does either projection');
   });
