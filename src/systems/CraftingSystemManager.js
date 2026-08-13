@@ -5744,7 +5744,7 @@ export class CraftingSystemManager {
     const recipeItemsRewritten = plan.prunes.length;
     if (recipeItemsRewritten > 0) {
       try {
-        await this.save();
+        await this.save({ put: system });
       } catch (error) {
         // Put the live definitions back before rethrowing: this client must not go on
         // rendering a prune the world never received.
