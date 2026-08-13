@@ -25,6 +25,10 @@ import { setupDOM, teardownDOM } from '../helpers/svelte-dom.js';
 // than a copy of them that is free to drift from the case it claims to guard.
 import { VIEW_LAB_CASES } from '../../scripts/lib/viewLabCases.js';
 import { getModifierExpressionSuggestions } from '../../src/config/modifierExpressionSuggestions.js';
+// The one place the "move the keyboard, then announce" delay is declared (issue 1157). The
+// bulk-selection block below waits on it rather than restating the number, so a change to the
+// rule cannot leave these tests quietly asserting the un-delayed state.
+import { ANNOUNCE_AFTER_FOCUS_MS } from '../../src/ui/svelte/util/announceAfterFocus.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 const sharedComponentNames = [
@@ -494,6 +498,12 @@ function compileManagerRoot() {
     // temp tree with NO dependency validator, so omitting a raw module HANGS the whole
     // suite as `# cancelled` rather than naming the missing file.
     'managerColorTokens.js',
+    // The ONE "move the keyboard, then announce" ordering rule (issue 1157). The manager
+    // root imports it for the actions that empty a bulk selection and `BulkDeleteCard`
+    // imports it for a refused write, which is precisely why it is a module and not two
+    // copies. It is an import-free leaf, so this single entry closes the graph — and this
+    // suite has NO dependency validator, so omitting it HANGS the whole file (# cancelled).
+    'announceAfterFocus.js',
   ]) {
     const utilDestination = join(tempRoot, `src/ui/svelte/util/${utilPath}`);
     mkdirSync(dirname(utilDestination), { recursive: true });
@@ -786,6 +796,21 @@ function mountManager(calls = [], storeOptions = {}) {
   });
   flushSync();
   return target;
+}
+
+/**
+ * Wait for a sentence that is QUEUED BEHIND A FOCUS UTTERANCE (issue 1157).
+ *
+ * A `polite` region is queued speech and a focus change cancels queued speech, so every
+ * live region in the manager that is paired with a focus move writes its text AFTER the
+ * move — see `src/ui/svelte/util/announceAfterFocus.js`, which owns that order. The delay is
+ * IMPORTED rather than restated: a local copy of the number would silently start asserting
+ * the un-delayed state the moment the rule changed it.
+ */
+async function waitForQueuedAnnouncement() {
+  await new Promise((resolve) => setTimeout(resolve, ANNOUNCE_AFTER_FOCUS_MS + 40));
+  await tick();
+  flushSync();
 }
 
 // Mount the manager, route to Recipes, and open the recipe-edit route for r1.
@@ -7833,7 +7858,7 @@ describe('CraftingSystemManager mounted behavior', () => {
       deleteComponentsResult: { deleted: 0, recipesUpdated: 0, recipesDisabled: 0 },
     });
 
-    assert.deepEqual(messages, [], 'nothing was deleted, so nothing is announced');
+    assert.deepEqual(messages, [], 'nothing was deleted, so no COMPLETION message is toasted');
     assert.ok(
       Boolean(target.querySelector('[data-component-bulk-delete-card]')),
       'and the selection survives, so the GM can see what did not happen and retry'
@@ -7842,6 +7867,23 @@ describe('CraftingSystemManager mounted behavior', () => {
       componentDeleteButton().getAttribute('data-armed'),
       'false',
       'but the arm is spent — a still-armed button would delete on the next single click'
+    );
+
+    // …AND THE GM WHO CANNOT SEE THE TOAST IS TOLD (issue 1157, review round). Confirming
+    // disabled the control, which put focus on `<body>` and emptied the card's region, so
+    // this panel's refused delete was silent AND placeless — the recipe twin had shipped
+    // both halves and this one had shipped neither.
+    await waitForQueuedAnnouncement();
+    assert.equal(
+      target.querySelector('[data-component-bulk-delete-announce]').textContent.trim(),
+      'Nothing was deleted. The selection is unchanged.'
+    );
+    // `assert.ok` over a boolean, never `assert.equal` over two nodes: on failure
+    // `node:assert` serialises the actual value and walks a mounted happy-dom element's
+    // circular tree until the heap dies, which surfaces as `# cancelled` with no message.
+    assert.ok(
+      document.activeElement === componentDeleteButton(),
+      'and the keyboard is back on the control that was pressed'
     );
   });
 
@@ -8477,6 +8519,10 @@ describe('CraftingSystemManager mounted behavior', () => {
 
     const region = target.querySelector('[data-recipe-bulk-delete-announce]');
     assert.ok(Boolean(region), 'the card is still mounted, so the region is there to speak');
+    // The sentence is QUEUED BEHIND the focus restore (issue 1157): the card returns the
+    // keyboard to the re-enabled control first, because a focus change cancels pending polite
+    // speech, and only then writes the text.
+    await waitForQueuedAnnouncement();
     assert.match(region.textContent, /Nothing was deleted\. The selection is unchanged\./);
     assert.equal(recipeDeleteButton().getAttribute('data-armed'), 'false');
   });
@@ -10560,7 +10606,7 @@ describe('CraftingSystemManager mounted behavior', () => {
       deleteEssencesResult: { deleted: 0, blocked: [], recipesUpdated: 0 },
     });
 
-    assert.deepEqual(messages, [], 'nothing was deleted, so nothing is announced');
+    assert.deepEqual(messages, [], 'nothing was deleted, so no COMPLETION message is toasted');
     assert.ok(
       Boolean(target.querySelector('[data-essence-bulk-delete-card]')),
       'and the selection survives, so the GM can see what did not happen and retry'
@@ -10569,6 +10615,18 @@ describe('CraftingSystemManager mounted behavior', () => {
       button().getAttribute('data-armed'),
       'false',
       'but the arm is spent — a still-armed button would delete on the next single click'
+    );
+
+    // The twin of the component assertion (issue 1157, review round): the card survives this
+    // path, so it is the one surface that can say the delete reached nothing.
+    await waitForQueuedAnnouncement();
+    assert.equal(
+      target.querySelector('[data-essence-bulk-delete-announce]').textContent.trim(),
+      'Nothing was deleted. The selection is unchanged.'
+    );
+    assert.ok(
+      document.activeElement === button(),
+      'and the keyboard is back on the control that was pressed'
     );
   });
 
@@ -18649,5 +18707,402 @@ describe('CraftingSystemManager mounted behavior', () => {
     flushSync();
     const dirty = target.querySelector('[data-checks-nav-dirty="crafting"]');
     assert.equal(dirty.getAttribute('role'), 'img');
+  });
+
+  // ── Issue 1157: emptying a bulk selection ─────────────────────────────────────────
+  //
+  // Every action that empties a bulk selection unmounts the panel it was performed from, and
+  // with it the control that was pressed. Focus fell to `document.body` and nothing was said,
+  // on all three studios, for Clear as well as for delete.
+  //
+  // This is the ONLY suite that mounts `CraftingSystemManagerRoot`, so it is the only place
+  // the manager-level live region and the focus hop can be proved at all: both belong to the
+  // root precisely because every panel-level suite's component is gone by the time they act.
+  //
+  // ONE TABLE, NOT THREE COPIED BLOCKS. The defect was identical on the three studios, so a
+  // per-studio suite would be three chances to fix two of them — and three near-identical
+  // blocks are what the SonarCloud duplication gate fails on besides.
+  describe('emptying a bulk selection announces it and re-homes the keyboard', () => {
+    //
+    // `stage` is per-studio because the AXES are: the two studios with a category select
+    // stage through it, and the Essence Studio, which has none, stages its status radio.
+    // Everything else here is one hook name per studio.
+    const BULK_STUDIOS = [
+      {
+        name: 'Essence',
+        route: () => navButton('Essences'),
+        rows: ['water', 'earth'],
+        rowAttr: 'data-essence-select',
+        toolbar: 'data-essence-toolbar',
+        pageBox: 'data-essence-select-all-page',
+        toolbarClear: 'data-essence-clear-selection',
+        panelClear: 'data-essence-bulk-clear',
+        panel: 'data-essence-bulk-panel',
+        deleteCard: 'data-essence-bulk-delete-card',
+        apply: 'data-essence-bulk-apply',
+        stage: () => target.querySelector('[data-essence-bulk-status-option="disable"] input').click(),
+        applyResultOption: 'applyEssenceBulkEditResult',
+        applied: 'Updated 2 essences.',
+        appliedNone: 'No essences needed changing.',
+      },
+      {
+        name: 'Component',
+        route: () => navButton('Components'),
+        rows: ['c1', 'c2'],
+        rowAttr: 'data-component-select',
+        toolbar: 'data-component-toolbar',
+        pageBox: 'data-component-select-all-page',
+        toolbarClear: 'data-component-clear-selection',
+        panelClear: 'data-component-bulk-clear',
+        panel: 'data-component-bulk-panel',
+        deleteCard: 'data-component-bulk-delete-card',
+        apply: 'data-component-bulk-apply',
+        stage: () => stageFirstCategory('data-component-bulk-category'),
+        applyResultOption: 'applyComponentBulkEditResult',
+        applied: 'Applied bulk changes to 2 components.',
+        appliedNone: 'No components needed changing.',
+      },
+      {
+        name: 'Recipe',
+        route: () => craftingParent(),
+        rows: ['r1', 'r2'],
+        rowAttr: 'data-recipe-select',
+        toolbar: 'data-recipe-toolbar',
+        pageBox: 'data-recipe-select-all-page',
+        toolbarClear: 'data-recipe-clear-selection',
+        panelClear: 'data-recipe-bulk-clear',
+        panel: 'data-recipe-bulk-panel',
+        deleteCard: 'data-recipe-bulk-delete-card',
+        apply: 'data-recipe-bulk-apply',
+        stage: () => stageFirstCategory('data-recipe-bulk-category'),
+        applyResultOption: 'applyRecipeBulkEditResult',
+        applied: 'Applied bulk changes to 2 recipes.',
+        appliedNone: 'No recipes needed changing.',
+      },
+    ];
+
+    /** Stage the first real option of a bulk category select, so Apply becomes live. */
+    function stageFirstCategory(attribute) {
+      const select = target.querySelector(`[${attribute}]`);
+      const option = Array.from(select.options).find((candidate) => candidate.value);
+      assert.ok(
+        Boolean(option),
+        `[${attribute}] offers nothing but "leave unchanged", so nothing can be staged through it`
+      );
+      select.value = option.value;
+      select.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+
+    const REGION = '[data-manager-bulk-selection-announce]';
+
+    /**
+     * What holds focus, as a SHORT STRING.
+     *
+     * Never the node: `node:assert` serialises the actual value to build its diff, and
+     * walking a mounted happy-dom element's circular tree kills the heap — a failing
+     * assertion surfaces as a `# cancelled` suite with no message.
+     *
+     * `detached` is reported apart from `document.body` because the two engines disagree
+     * about which one a removed focused node produces, and BOTH are the failure this block
+     * exists to catch.
+     */
+    function focusHolder(studio) {
+      const active = document.activeElement;
+      if (!active || active === document.body) return 'document.body';
+      if (active.isConnected === false) return 'detached';
+      if (active.hasAttribute?.(studio.toolbar)) return 'studio toolbar';
+      if (active.hasAttribute?.(studio.pageBox)) return 'page-selection box';
+      if (active.classList?.contains?.('manager-nav-button')) return 'nav rail';
+      return 'somewhere else';
+    }
+
+    function regionNode() {
+      return target.querySelector(REGION);
+    }
+
+    function announcement() {
+      const region = regionNode();
+      return region ? region.textContent.trim() : null;
+    }
+
+    // The focus hop is deferred a microtask past Svelte's own flush — the same ordering
+    // `RecipeBulkEditPanel.focusAfterRerender` relies on — so an assertion made synchronously
+    // after the click would read the pre-hop `document.activeElement` and pass or fail for
+    // the wrong reason.
+    async function settle() {
+      await tick();
+      flushSync();
+      await Promise.resolve();
+      await Promise.resolve();
+    }
+
+    /**
+     * `settle()`, plus the wait for the sentence that is QUEUED BEHIND THE FOCUS UTTERANCE.
+     *
+     * A `polite` region is queued speech and a focus change cancels queued speech, so the
+     * announcement is deliberately written after the hop rather than before it — see
+     * `src/ui/svelte/util/announceAfterFocus.js`, which owns that order for the root and for
+     * `BulkDeleteCard` alike. The delay is IMPORTED rather than restated here: a local copy of
+     * the number would silently start asserting the un-delayed state the moment it changed.
+     */
+    async function settleAnnouncement() {
+      await settle();
+      await waitForQueuedAnnouncement();
+      await settle();
+    }
+
+    async function openStudio(studio, calls = [], options = {}) {
+      mountManager(calls, options);
+      studio.route().click();
+      await settle();
+    }
+
+    async function selectRows(studio) {
+      for (const id of studio.rows) {
+        target.querySelector(`[${studio.rowAttr}="${id}"]`).click();
+        await settle();
+      }
+      assert.ok(
+        Boolean(target.querySelector(`[${studio.panel}]`)),
+        `pre-condition: ${studio.name} Studio shows its bulk panel over the selection`
+      );
+    }
+
+    /** Press the studio's Apply, capturing the completion toast. */
+    async function applySelection(studio) {
+      const messages = [];
+      const previousUi = globalThis.ui;
+      globalThis.ui = { notifications: { info: (message) => messages.push(message) } };
+      try {
+        const apply = target.querySelector(`[${studio.apply}]`);
+        assert.equal(apply.disabled, false, 'pre-condition: something is staged, so Apply is live');
+        apply.click();
+        await settle();
+        await settle();
+        return messages;
+      } finally {
+        if (previousUi === undefined) delete globalThis.ui;
+        else globalThis.ui = previousUi;
+      }
+    }
+
+    /** Arm and confirm the studio's set delete, capturing the completion toast. */
+    async function deleteSelection(studio) {
+      const messages = [];
+      const previousUi = globalThis.ui;
+      globalThis.ui = { notifications: { info: (message) => messages.push(message) } };
+      try {
+        const button = () => target.querySelector(`[${studio.deleteCard}] .manager-button.is-danger`);
+        button().click();
+        await settle();
+        button().click();
+        await settle();
+        await settle();
+        return messages;
+      } finally {
+        if (previousUi === undefined) delete globalThis.ui;
+        else globalThis.ui = previousUi;
+      }
+    }
+
+    it('renders ONE live region for the whole manager, and renders it EMPTY', async () => {
+      mountManager();
+
+      const regions = target.querySelectorAll(REGION);
+      assert.equal(regions.length, 1, 'exactly one manager-level region');
+      assert.equal(regions[0].getAttribute('aria-live'), 'polite');
+      assert.equal(regions[0].getAttribute('aria-atomic'), 'true');
+      // A region inserted into the DOM together with its text is not announced by most
+      // screen readers, so it has to exist first and be empty until something is said.
+      assert.equal(announcement(), '', 'and it says nothing until an action does');
+    });
+
+    for (const studio of BULK_STUDIOS) {
+      it(`${studio.name} Studio: the toolbar Clear announces and lands on the studio toolbar`, async () => {
+        await openStudio(studio);
+        await selectRows(studio);
+
+        assert.notEqual(
+          focusHolder(studio),
+          'studio toolbar',
+          'anti-vacuity: focus is not already on the target this test claims it moves to'
+        );
+
+        target.querySelector(`[${studio.toolbarClear}]`).click();
+        await settle();
+
+        // ── THE ORDER, WHICH IS NOT THE OBVIOUS ONE (review round) ──────────────────
+        // The keyboard moves FIRST and the region is still EMPTY when it lands. A `polite`
+        // announcement is queued speech and NVDA and JAWS both cancel queued speech on a
+        // focus change, so writing the sentence first — which is what the first cut did —
+        // is an announcement the GM may never hear: the original silence, hidden behind a
+        // focus hop that works. No engine in this repo runs a screen reader, so the
+        // utterance is not observable here; the ORDER is, and this is it.
+        assert.equal(focusHolder(studio), 'studio toolbar');
+        assert.equal(announcement(), '', 'nothing is queued in front of the focus utterance');
+
+        await settleAnnouncement();
+        assert.equal(announcement(), 'Selection cleared.');
+        assert.ok(
+          !target.querySelector(`[${studio.panel}]`),
+          'and the panel really did unmount, which is what dropped the focus in the first place'
+        );
+      });
+
+      // ── THE TARGET IS INERT, AND THAT IS THE POINT (review round) ─────────────────
+      // The hop first went to the toolbar's page-selection box — a real
+      // `<input type="checkbox">` whose `onchange` selects every rendered row. A GM who
+      // clicked Clear with the mouse and then pressed the space bar to scroll would have
+      // silently re-selected the whole page, with no visible focus ring, because the box's
+      // only ring is `:focus-visible` and Chrome does not match it for programmatic focus
+      // after a pointer interaction.
+      //
+      // The space bar is asserted as what it IS on a focused control: a click. On the
+      // `<section>` it is nothing; on the checkbox it was the whole page back.
+      it(`${studio.name} Studio: the hop target cannot be operated by the space bar`, async () => {
+        await openStudio(studio);
+        await selectRows(studio);
+        target.querySelector(`[${studio.toolbarClear}]`).click();
+        await settleAnnouncement();
+        assert.equal(focusHolder(studio), 'studio toolbar');
+
+        const landed = document.activeElement;
+        assert.equal(landed.tagName, 'SECTION', 'a landmark, not a control');
+        assert.equal(landed.getAttribute('tabindex'), '-1', 'focusable, but never a tab stop');
+        assert.ok(
+          Boolean(landed.getAttribute('aria-label')),
+          'and it is NAMED, which is what the GM hears instead of a control they might operate'
+        );
+
+        landed.click();
+        await settle();
+        assert.ok(
+          !target.querySelector(`[${studio.panel}]`),
+          'pressing space where the GM was left does NOT re-select the page'
+        );
+      });
+
+      it(`${studio.name} Studio: the panel header Clear does exactly the same`, async () => {
+        // The panel header's `Clear selection` and the toolbar's `Clear` are ONE action by
+        // two routes. Fixing one and not the other is what leaves a third pattern behind.
+        await openStudio(studio);
+        await selectRows(studio);
+
+        target.querySelector(`[${studio.panelClear}]`).click();
+        await settleAnnouncement();
+
+        assert.equal(announcement(), 'Selection cleared.');
+        assert.equal(focusHolder(studio), 'studio toolbar');
+      });
+
+      // ── APPLY (review round) ─────────────────────────────────────────────────────
+      // Apply is the third action that empties the selection, and it shipped in the first
+      // cut with no coverage at all on any studio — while two of the three apply message
+      // expressions were being rewritten. It is asserted here on the same terms as the
+      // delete: the sentence the GM reads and the sentence the GM hears are the SAME one,
+      // so a studio that re-words its toast cannot leave the screen-reader user on a stale
+      // copy of the old one.
+      it(`${studio.name} Studio: a successful Apply announces its completion sentence`, async () => {
+        await openStudio(studio);
+        await selectRows(studio);
+        studio.stage();
+        await settle();
+
+        const messages = await applySelection(studio);
+
+        assert.deepEqual(messages, [studio.applied], 'the apply really did complete and report');
+        await settleAnnouncement();
+        assert.equal(announcement(), messages[0]);
+        assert.equal(focusHolder(studio), 'studio toolbar');
+        assert.ok(
+          !target.querySelector(`[${studio.panel}]`),
+          'the panel that held Apply is gone, which is what dropped the focus'
+        );
+      });
+
+      // A write that legitimately changed nothing — every selected row already matched the
+      // staged values — is not a failure, and "Updated 0 essences." was reachable and being
+      // SPOKEN as the sole outcome of a successful action. Each studio states the zero case
+      // in its own words.
+      it(`${studio.name} Studio: an Apply that changed nothing says so, rather than reporting 0`, async () => {
+        await openStudio(studio, [], { [studio.applyResultOption]: { updated: 0 } });
+        await selectRows(studio);
+        studio.stage();
+        await settle();
+
+        const messages = await applySelection(studio);
+
+        assert.deepEqual(messages, [studio.appliedNone]);
+        await settleAnnouncement();
+        assert.equal(announcement(), studio.appliedNone);
+        assert.equal(focusHolder(studio), 'studio toolbar');
+      });
+
+      it(`${studio.name} Studio: a successful set delete announces the completion sentence`, async () => {
+        await openStudio(studio);
+        await selectRows(studio);
+
+        const messages = await deleteSelection(studio);
+
+        assert.equal(messages.length, 1, 'the delete really did complete and report');
+        await settleAnnouncement();
+        // The two audiences are told the SAME thing, asserted as an identity rather than as
+        // three hardcoded sentences: a studio that re-words its toast cannot leave the
+        // screen-reader user on a stale copy of the old one.
+        assert.equal(announcement(), messages[0]);
+        assert.match(announcement(), /^Deleted /, 'and it is the completion sentence, not "Selection cleared."');
+        assert.equal(focusHolder(studio), 'studio toolbar');
+        assert.ok(
+          !target.querySelector(`[${studio.deleteCard}]`),
+          'the card that used to own the only region is gone, which is the whole problem'
+        );
+      });
+
+      it(`${studio.name} Studio: an identical second announcement REPLACES the region's node`, async () => {
+        // Re-inserting identical text announces nothing the second time, and clearing a
+        // selection twice running is an ordinary gesture. The child node is keyed on the
+        // announcement object so each one is a genuine insertion rather than a rewrite —
+        // asserted as node IDENTITY, because the text is identical by construction.
+        await openStudio(studio);
+        await selectRows(studio);
+        target.querySelector(`[${studio.toolbarClear}]`).click();
+        await settleAnnouncement();
+        const first = regionNode().firstElementChild;
+        assert.ok(Boolean(first), 'the announcement renders its own child node');
+
+        await selectRows(studio);
+        target.querySelector(`[${studio.toolbarClear}]`).click();
+        await settleAnnouncement();
+        const second = regionNode().firstElementChild;
+
+        assert.equal(announcement(), 'Selection cleared.', 'the same sentence, twice');
+        assert.ok(
+          Boolean(second) && second !== first,
+          'and a NEW node carries it, so the region is inserted into rather than rewritten'
+        );
+      });
+
+      it(`${studio.name} Studio: focus the GM moved themselves is left alone`, async () => {
+        // The folded-in half of the issue. A GM who tabs away while an awaited write is in
+        // flight must not be yanked back by its result. The nav rail is used as the place
+        // they went because every studio has one and it is real product markup.
+        await openStudio(studio);
+        await selectRows(studio);
+
+        const elsewhere = target.querySelector('.manager-nav-button');
+        elsewhere.focus();
+        assert.equal(focusHolder(studio), 'nav rail', 'pre-condition: the GM is elsewhere');
+
+        await deleteSelection(studio);
+        await settleAnnouncement();
+
+        assert.match(announcement(), /^Deleted /, 'the outcome is still announced');
+        assert.equal(
+          focusHolder(studio),
+          'nav rail',
+          'but the keyboard is left where the GM put it'
+        );
+      });
+    }
   });
 });

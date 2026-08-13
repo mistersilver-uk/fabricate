@@ -1911,7 +1911,8 @@
           "LeaveUnchanged": "Leave unchanged",
           "Deleting": "Deleting…",
           "DeleteCancelled": "Delete cancelled. Nothing was deleted.",
-          "DeleteNoneDeleted": "Nothing was deleted. The selection is unchanged."
+          "DeleteNoneDeleted": "Nothing was deleted. The selection is unchanged.",
+          "SelectionCleared": "Selection cleared."
         },
         "Recipe": {
           "Kicker": "Recipes View",
@@ -3115,6 +3116,7 @@
             "DeleteArmedAnnouncement": "Delete armed. Activate again to delete {count} essence definition(s) and rewrite {recipes} recipe(s).",
             "Applied": "Updated {count} essences.",
             "AppliedOne": "Updated 1 essence.",
+            "AppliedNone": "No essences needed changing.",
             "Deleted": "Deleted {count} essence(s) and rewrote {recipes} recipe(s).",
             "DeletedWithDisabled": "Deleted {count} essence(s) and rewrote {recipes} recipe(s), disabling {disabled} of them."
           }

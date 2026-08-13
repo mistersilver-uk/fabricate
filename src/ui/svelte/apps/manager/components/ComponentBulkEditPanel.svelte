@@ -93,6 +93,11 @@
    - deleteImpact: `describeComponentDeleteImpact(...)` output, supplied by the owner rather
      than derived here. See the note beside `impact` for why this one number cannot come from
      the rows.
+   - deleteOutcome: an OPTIONAL sentence announcing what a finished delete did when it left
+     this panel mounted — a refused or no-op write (issue 1157). The card's own live region is
+     the only place that outcome can be spoken, because on the success path the card is gone;
+     without it a refused delete leaves the GM on `<body>` with nothing said but a Foundry
+     toast, which is not a live region. The owner clears it as it arms.
    - onArmDelete() / onDisarmDelete() / onDelete(ids).
 -->
 <script>
@@ -135,6 +140,7 @@
     deleting = false,
     deleteArmed = false,
     deleteImpact = null,
+    deleteOutcome = '',
     onDraftChange = () => {},
     onClearSelection = () => {},
     onApply = () => {},
@@ -695,6 +701,7 @@
     'FABRICATE.Admin.Manager.BulkEdit.DeleteCancelled',
     'Delete cancelled. Nothing was deleted.'
   )}
+  outcomeAnnouncement={deleteOutcome}
   armed={deleteArmed === true}
   busy={deleting === true}
   disabled={impact.deletable === 0 || applying === true}

@@ -40,6 +40,8 @@ const panel = createMountedComponentHarness({
     // layout util come with it. A missing entry here HANGS the suite (`# cancelled`)
     // rather than failing it, which is why the list is hoisted and shared.
     ...SEARCHABLE_POPOVER_RAW_MODULES,
+    // `BulkDeleteCard`'s shared focus/announce ordering rule (issue 1157).
+    'src/ui/svelte/util/announceAfterFocus.js',
     'src/utils/recipeCategories.js',
     // The pure staging model and its shared selection leaf. Both are STATIC imports of the
     // component under test, and the shared harness's closure validator throws loudly on an

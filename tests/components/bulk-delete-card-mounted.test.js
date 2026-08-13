@@ -26,6 +26,7 @@ import { resolve } from 'node:path';
 
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
+import { ANNOUNCE_AFTER_FOCUS_MS } from '../../src/ui/svelte/util/announceAfterFocus.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 const CARD_PATH = 'src/ui/svelte/apps/manager/BulkDeleteCard.svelte';
@@ -33,6 +34,9 @@ const CARD_PATH = 'src/ui/svelte/apps/manager/BulkDeleteCard.svelte';
 const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-bulk-delete-card-',
+  // The card's ONE shared leaf (issue 1157): the "move the keyboard, then announce" ordering
+  // rule it shares with the manager root, which is why it is a module rather than two copies.
+  rawModules: ['src/ui/svelte/util/announceAfterFocus.js'],
   compiledModules: ['src/ui/svelte/apps/manager/ArmedDangerButton.svelte', CARD_PATH],
   componentPath: CARD_PATH,
 });
@@ -63,6 +67,18 @@ function props(overrides = {}) {
     announceAttr: 'data-recipe-bulk-delete-announce',
     ...overrides,
   };
+}
+
+/**
+ * Wait past the delay the outcome sentence spends queued behind the focus utterance
+ * (issue 1157), then flush the render that state write schedules.
+ *
+ * The delay is IMPORTED rather than restated: a local copy of the number would silently
+ * start asserting the un-delayed state the moment the rule changed its mind about it.
+ */
+async function settleAnnouncement() {
+  await new Promise((resolve) => setTimeout(resolve, ANNOUNCE_AFTER_FOCUS_MS + 40));
+  flushSync();
 }
 
 const card = (root) => root.querySelector('[data-recipe-bulk-delete-card]');
@@ -274,8 +290,14 @@ describe('1132 BulkDeleteCard — the accessibility wiring', () => {
     await harness.setProps(
       props({ armed: false, busy: false, outcomeAnnouncement: 'Failed to delete the selected recipes.' })
     );
-    assert.equal(live(root).textContent.trim(), 'Failed to delete the selected recipes.');
 
+    // ── AND IN THAT ORDER (issue 1157, review round) ────────────────────────────────
+    // The focus move comes FIRST and the sentence is queued BEHIND it. A `polite` region is
+    // queued speech and NVDA and JAWS both cancel queued speech on a focus change, so the
+    // original order — write the sentence, then move focus — is an announcement the GM may
+    // never hear. That is not observable here (no engine in this repo runs a screen reader),
+    // but the ORDER is, and it is what the shared rule in `util/announceAfterFocus.js` fixes.
+    //
     // Deferred a microtask past the flush, because the control is re-enabled in the same one
     // and `focus()` on a still-disabled button does nothing.
     await Promise.resolve();
@@ -284,18 +306,94 @@ describe('1132 BulkDeleteCard — the accessibility wiring', () => {
       button(root),
       'and the GM is put back on the control they were using, not left on <body>'
     );
+    assert.equal(
+      live(root).textContent.trim(),
+      '',
+      'the region is still EMPTY at the moment focus lands, so nothing is queued in front of the focus utterance'
+    );
+
+    await settleAnnouncement();
+    assert.equal(live(root).textContent.trim(), 'Failed to delete the selected recipes.');
+    harness.remount();
+  });
+
+  // ── …BUT ONLY FROM `<body>` (issue 1157) ─────────────────────────────────────────
+  //
+  // The restore above used to be unconditional, so a GM who tabbed into the browser's search
+  // field while the write was running was yanked back out of it the moment the write refused.
+  // `<body>` is where the confirm's own `disabled` leaves the keyboard — that premise is
+  // measured in Chromium by `bulk-delete-busy-focus.test.js` — and it is the only state worth
+  // rescuing; anywhere else is a place the GM chose to be.
+  it('leaves focus alone when the GM moved it somewhere else during the write', async () => {
+    const root = await harness.mount(props({ armed: true }));
+    button(root).focus();
+
+    await harness.setProps(props({ armed: true, busy: true }));
+    // The GM tabs away mid-write. A REAL, connected node outside the card, standing for the
+    // browser's search field; `document.body.focus()` is the case the sibling test covers.
+    const elsewhere = document.createElement('input');
+    document.body.appendChild(elsewhere);
+    elsewhere.focus();
+    assert.ok(document.activeElement === elsewhere, 'pre-condition: the GM is in the field');
+
+    await harness.setProps(
+      props({ armed: false, busy: false, outcomeAnnouncement: 'Failed to delete the selected recipes.' })
+    );
+    assert.equal(
+      live(root).textContent.trim(),
+      'Failed to delete the selected recipes.',
+      'the outcome is still announced — the guard is about focus, not about speech — and it is '
+        + 'announced IMMEDIATELY, because a sentence with no focus utterance to queue behind has '
+        + 'nothing to wait for'
+    );
+
+    await Promise.resolve();
+    assert.ok(
+      document.activeElement === elsewhere,
+      'and the GM keeps the control they moved to, rather than being yanked back'
+    );
+    elsewhere.remove();
     harness.remount();
   });
 
   it('lets the next arm announce again after an outcome', async () => {
     const failed = props({ outcomeAnnouncement: 'Failed to delete the selected recipes.' });
     const root = await harness.mount(failed);
+    // The outcome takes focus from `<body>` here too, so it is queued behind that hop.
+    await settleAnnouncement();
     assert.equal(live(root).textContent.trim(), 'Failed to delete the selected recipes.');
 
     // The owner clears the outcome as it arms, which is what stops a stale sentence
     // out-ranking the armed one.
     await harness.setProps(props({ armed: true, outcomeAnnouncement: '' }));
     assert.match(live(root).textContent, /Activate again/);
+    harness.remount();
+  });
+
+  // THE RACE THE DELAY OPENS, closed here rather than left to be discovered. The outcome is
+  // spoken on a timer, so a GM who re-arms inside that window would otherwise hear the
+  // refusal land on top of the arm — a stale sentence out-ranking the current state, which is
+  // the same defect the `announcedOutcome` bookkeeping exists to prevent on the synchronous
+  // paths.
+  it('drops a queued outcome that a re-arm has already overtaken', async () => {
+    const root = await harness.mount(props({ armed: true }));
+    button(root).focus();
+    await harness.setProps(props({ armed: true, busy: true }));
+    document.body.focus();
+
+    await harness.setProps(
+      props({ armed: false, busy: false, outcomeAnnouncement: 'Failed to delete the selected recipes.' })
+    );
+    // Inside the delay, before the sentence has been written: the GM arms again.
+    await harness.setProps(props({ armed: true, outcomeAnnouncement: '' }));
+    assert.match(live(root).textContent, /Activate again/, 'the arm is announced');
+
+    await settleAnnouncement();
+    assert.match(
+      live(root).textContent,
+      /Activate again/,
+      'and the overtaken outcome never lands on top of it'
+    );
     harness.remount();
   });
 

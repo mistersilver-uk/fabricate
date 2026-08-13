@@ -12,6 +12,7 @@
     DEFAULT_GATHERING_TASK_IMG,
   } from '../../../../gatheringImageDefaults.js';
   import { localize, notifyInfo, notifyWarn } from '../../util/foundryBridge.js';
+  import { announceAfterFocusMove } from '../../util/announceAfterFocus.js';
   import { resolveDropUuid } from '../../util/dropUtils.js';
   import { permitsFailureResults } from '../../../../utils/failureResultPolicy.js';
   import {
@@ -218,6 +219,12 @@
   // live region this module controls. The card announces this and takes focus back; it is
   // cleared on the next arm so a second refusal speaks again.
   let recipeBulkDeleteOutcome = $state('');
+  // Its two twins (issue 1157, review round). The Component and Essence panels rendered the
+  // same card and never passed it a sentence, so their refused deletes landed on `<body>`
+  // and said nothing at all — the half of the paragraph above that had only ever been
+  // implemented once.
+  let componentBulkDeleteOutcome = $state('');
+  let essenceBulkDeleteOutcome = $state('');
   // The essence library's lifted view-state (issue 1036) — the third and last studio to get
   // one, and the fix for criterion 12. Search, status, source, sort, view mode, page and
   // the bulk selection all lived inside `EssenceBrowserView`, so opening an essence
@@ -4267,6 +4274,126 @@
     store.deleteComponent?.(itemId);
   }
 
+  // ── EMPTYING A BULK SELECTION (issue 1157) ───────────────────────────────────────
+  //
+  // Every action that empties a bulk selection unmounts the panel it was performed FROM.
+  // The three that do it are Clear (the toolbar's and the panel header's, which are one
+  // action reached two ways), a successful set delete, and a successful Apply — and all
+  // three left the GM with focus on `document.body` and nothing announced.
+  //
+  // Both halves are owned HERE rather than by a panel or a browser, and for the same
+  // reason the bulk drafts are: the panel is destroyed by the very transition that has to
+  // be reported. `BulkDeleteCard`'s own region closed the FAILURE half only, because on
+  // that path the card survives; on the success path there was nowhere left to speak
+  // from. This root outlives every one of them.
+  //
+  // ── THE REGION ───────────────────────────────────────────────────────────────────
+  // ONE polite region for the whole manager, rendered at the end of `.fabricate-manager`
+  // (see the markup) and mounted for the manager's whole life. Two live-region facts
+  // shape it, and both are already recorded on `BulkDeleteCard`:
+  //
+  //  - a region inserted into the DOM together with its text is not announced by most
+  //    screen readers, so this one exists from mount and is EMPTY until something is
+  //    said;
+  //  - re-inserting identical text announces nothing the second time, and "Selection
+  //    cleared." twice running is an ordinary GM gesture. The card solves this by having
+  //    its owner clear the outcome on the next arm; there is no equivalent moment here,
+  //    so the announcement is a NEW OBJECT every time and the markup keys its child node
+  //    on it. The node is destroyed and recreated rather than having its text rewritten,
+  //    which is a genuine insertion into the region on every announcement — the same
+  //    device a per-message node gives a live announcer.
+  //
+  // It is deliberately NOT a component. A new `.svelte` under `apps/manager/` is claimed
+  // by four hand-maintained mirrors (the view-lab case registry, the screenshot evidence
+  // map and its pinning test, and this suite's compile list), and one region rendered at
+  // one site is not the repeated control the shared-primitive rule exists for.
+  let bulkSelectionAnnouncement = $state(null);
+  // Orders the deferred announcements below against each other; see
+  // `announceBulkSelectionEmptied`. Plain, not `$state`: nothing renders it.
+  let bulkAnnouncementTicket = 0;
+
+  // The focus target: the studio's TOOLBAR — the `<section>` holding the filter rows and,
+  // as its last row, the selection register. It is a landmark with a per-studio accessible
+  // name ("Essence filters"), it is rendered whether or not anything is selected, and it
+  // survives every transition below, where the panel, the delete card and the toolbar's own
+  // Clear are all gone by the time focus needs somewhere to land.
+  //
+  // IT IS AN INERT TARGET, AND THAT IS THE POINT (review round, issue 1157). The hop first
+  // went to the toolbar's page-selection box, which is a real `<input type="checkbox">`
+  // whose `onchange` selects every rendered row: a GM who clicked Clear with the mouse and
+  // then pressed Space to scroll would have silently re-selected the whole page, with no
+  // visible focus indicator, because the box's only ring is `:focus-visible` and Chrome does
+  // not match that for programmatic focus after a pointer interaction. Landing on a
+  // `tabindex="-1"` section instead announces where the GM now is, leaves Space as scroll,
+  // and leaves every control of the register one Tab away.
+  //
+  // `tabindex="-1"` is also why the browser's results count was wrongly ruled out earlier as
+  // "a `<span>` nothing can focus": that attribute is the standard device for making a
+  // non-actionable element a focus target. The toolbar wins on the accessible name, not on
+  // focusability.
+  //
+  // These three are a hand-maintained mirror of the hooks the browser views put on their own
+  // toolbars; `manager-mounted.test.js` fails if one drifts.
+  const BULK_SELECTION_TOOLBAR = {
+    components: 'data-component-toolbar',
+    essences: 'data-essence-toolbar',
+    recipes: 'data-recipe-toolbar',
+  };
+
+  function selectionClearedAnnouncement() {
+    return text('FABRICATE.Admin.Manager.BulkEdit.SelectionCleared', 'Selection cleared.');
+  }
+
+  /**
+   * Put the keyboard back on `studio`'s toolbar, and report whether it actually moved.
+   *
+   * ONLY RESCUE FOCUS THE RE-RENDER ACTUALLY DROPPED. A GM who tabbed into the search field
+   * while an awaited write was in flight keeps their place; a control the re-render has
+   * detached is not somewhere they can still be, whatever the engine left `activeElement`
+   * pointing at (Chromium moves it to `<body>`, happy-dom can strand it on the removed node
+   * — `recipe-bulk-edit-panel-mounted.test.js` reports both shapes for exactly this reason).
+   *
+   * @returns {boolean} true only when focus was moved, which is what decides whether the
+   *   announcement has a focus utterance to queue behind.
+   */
+  function focusBulkSelectionToolbar(studio) {
+    if (typeof document === 'undefined') return false;
+    const attribute = BULK_SELECTION_TOOLBAR[studio];
+    if (!attribute) return false;
+    const active = document.activeElement;
+    if (active && active !== document.body && active.isConnected !== false) return false;
+    const node = document.querySelector(`.fabricate-manager [${attribute}]`);
+    if (!node || node.isConnected === false) return false;
+    node.focus?.();
+    return document.activeElement === node;
+  }
+
+  /**
+   * Report an emptied bulk selection: put the keyboard back on `studio`'s toolbar and
+   * announce `message` through the manager's region, IN THAT ORDER.
+   *
+   * The order is the whole point and it is not the obvious one — see
+   * `util/announceAfterFocus.js`, which owns it for this and for `BulkDeleteCard`. Assigning
+   * the announcement here, synchronously, is what the first cut did, and it puts a queued
+   * `polite` utterance in front of a focus change that cancels it.
+   */
+  function announceBulkSelectionEmptied(studio, message) {
+    const spoken = String(message || '');
+    // The ticket is what the delay costs: a sentence still waiting must never land on top of
+    // one asked for after it, or two actions inside the delay would leave the region holding
+    // the OLDER of the two — with a new node under it, so the GM would hear the wrong
+    // sentence rather than nothing. `BulkDeleteCard` carries the same guard.
+    bulkAnnouncementTicket += 1;
+    const ticket = bulkAnnouncementTicket;
+    announceAfterFocusMove(
+      () => focusBulkSelectionToolbar(studio),
+      () => {
+        if (ticket !== bulkAnnouncementTicket) return;
+        bulkSelectionAnnouncement = { text: spoken };
+      }
+    );
+  }
+
   // ── Bulk edit (issue 772) ────────────────────────────────────────────────────────
   // The panel stages into a draft this root owns; NOTHING is written until Apply. The
   // model's helpers are immutable, so the panel hands back a NEW draft rather than
@@ -4278,8 +4405,14 @@
   // Clearing the selection is the documented escape from a mode that hides unlink, delete
   // and copy-source-UUID; the count reaching zero also discards the draft (see the effect
   // above) and returns the rail to the single-component inspector.
-  function clearComponentBulkSelection() {
+  //
+  // Every caller that empties the selection routes through here, so the announcement and
+  // the focus hop cannot be had by one exit and missed by another. `message` defaults to
+  // the noun-free clear sentence and is overridden by the delete and apply paths with the
+  // sentence they are already toasting, so the two audiences are told the same thing.
+  function clearComponentBulkSelection(message = selectionClearedAnnouncement()) {
     componentBrowserState.bulkSelectedComponentIds = new Set();
+    announceBulkSelectionEmptied('components', message);
   }
 
   async function applyComponentBulkEdit() {
@@ -4304,36 +4437,45 @@
       // tag three of five already carry updates two. Naming the selection size instead
       // would report work that did not happen.
       const count = result.updated;
+      const message = componentBulkAppliedMessage(count);
       // One `save()` and one `refresh()` happened inside the store action, so the rows are
       // already re-rendering; clearing the selection returns the rail to the inspector and
-      // the count-to-zero effect discards the draft.
-      clearComponentBulkSelection();
-      // Singular, on the same terms as the panel's own heading and Apply label: the
-      // threshold is `> 0`, so ONE ticked row is the advertised case, and this toast is
-      // the ONLY feedback that survives the panel unmounting on a successful apply.
-      // Zero is its own message rather than "applied to 0 components", which reads as a
-      // failure for what is a legitimate outcome — every selected component already
-      // matched the staged values.
-      notifyInfo(
-        count === 0
-          ? text(
-              'FABRICATE.Admin.Manager.Component.BulkEdit.AppliedNone',
-              'No components needed changing.'
-            )
-          : count === 1
-            ? text(
-                'FABRICATE.Admin.Manager.Component.BulkEdit.AppliedOne',
-                'Applied bulk changes to 1 component.'
-              )
-            : text(
-                'FABRICATE.Admin.Manager.Component.BulkEdit.Applied',
-                'Applied bulk changes to {count} components.'
-              ).replace('{count}', count)
-      );
+      // the count-to-zero effect discards the draft. It also announces and re-homes focus,
+      // because the apply is one of the three actions that empties the selection.
+      clearComponentBulkSelection(message);
+      notifyInfo(message);
       return true;
     } finally {
       componentBulkApplying = false;
     }
+  }
+
+  // Singular, on the same terms as the panel's own heading and Apply label: the threshold is
+  // `> 0`, so ONE ticked row is the advertised case, and this sentence is the only feedback
+  // that survives the panel unmounting on a successful apply — as a toast for the GM reading
+  // the screen and through the manager's live region for the one who is not.
+  //
+  // Zero is its own message rather than "applied to 0 components", which reads as a failure
+  // for what is a legitimate outcome — every selected component already matched the staged
+  // values. A guard chain rather than a nested ternary, which the SonarCloud gate reports as
+  // a new code smell.
+  function componentBulkAppliedMessage(count) {
+    if (count === 0) {
+      return text(
+        'FABRICATE.Admin.Manager.Component.BulkEdit.AppliedNone',
+        'No components needed changing.'
+      );
+    }
+    if (count === 1) {
+      return text(
+        'FABRICATE.Admin.Manager.Component.BulkEdit.AppliedOne',
+        'Applied bulk changes to 1 component.'
+      );
+    }
+    return text(
+      'FABRICATE.Admin.Manager.Component.BulkEdit.Applied',
+      'Applied bulk changes to {count} components.'
+    ).replace('{count}', count);
   }
 
   // The ARMED bulk delete's confirm step (issue 1129). The impact statement is rendered by
@@ -4354,9 +4496,22 @@
       // selection stays put; the arm is dropped either way, because the GM's confirmation has
       // been spent and a still-armed button would delete on the next single click.
       const deleted = Number(result?.deleted) || 0;
-      if (deleted === 0) return false;
-      clearComponentBulkSelection();
-      notifyInfo(componentBulkDeletedMessage(result));
+      if (deleted === 0) {
+        // The card SURVIVES this path, so it is the one place the outcome can be spoken and
+        // the one control focus can be returned to. The sentence is the neutral one the
+        // recipe twin uses, because the two outcomes folded into this branch — a refused
+        // write, already toasted, and a concurrent client having deleted the same components
+        // — are indistinguishable from here, and "Failed" is false on the more reachable of
+        // the two.
+        componentBulkDeleteOutcome = text(
+          'FABRICATE.Admin.Manager.BulkEdit.DeleteNoneDeleted',
+          'Nothing was deleted. The selection is unchanged.'
+        );
+        return false;
+      }
+      const message = componentBulkDeletedMessage(result);
+      clearComponentBulkSelection(message);
+      notifyInfo(message);
       return true;
     } catch (err) {
       // The store catches its own write failures, so reaching here means the failure was
@@ -4409,8 +4564,13 @@
   // Clearing the selection is the documented escape from a mode that hides Edit, Duplicate
   // and Delete; the count reaching zero also discards the draft (see the effect above) and
   // returns the rail to the single-recipe inspector.
-  function clearRecipeBulkSelection() {
+  //
+  // The twin of `clearComponentBulkSelection` above, including its announcement and focus
+  // hop: see that function for why every exit that empties the selection routes through one
+  // place per studio.
+  function clearRecipeBulkSelection(message = selectionClearedAnnouncement()) {
     recipeBrowserState.bulkSelectedRecipeIds = new Set();
+    announceBulkSelectionEmptied('recipes', message);
   }
 
   // Singular / plural over one count, so the three post-apply sentences below do not each
@@ -4550,6 +4710,18 @@
     recipeBulkDeleteArmed = true;
   }
 
+  // The two twins. Arming clears the previous outcome for the reason above: a live region
+  // that is handed identical text a second time says nothing the second time.
+  function armComponentBulkDelete() {
+    componentBulkDeleteOutcome = '';
+    componentBulkDeleteArmed = true;
+  }
+
+  function armEssenceBulkDelete() {
+    essenceBulkDeleteOutcome = '';
+    essenceBulkDeleteArmed = true;
+  }
+
   async function deleteSelectedRecipes(ids) {
     if (recipeBulkDeleting) return false;
     const targets = Array.isArray(ids) ? ids : [];
@@ -4580,8 +4752,9 @@
         );
         return false;
       }
-      clearRecipeBulkSelection();
-      notifyInfo(recipeBulkDeletedMessage(result));
+      const message = recipeBulkDeletedMessage(result);
+      clearRecipeBulkSelection(message);
+      notifyInfo(message);
       return true;
     } catch (err) {
       // The store catches its own write failures, so reaching here means the failure was
@@ -4666,10 +4839,12 @@
       if (!result) return false;
       // One save and one refresh happened inside the store action, so the rows are already
       // re-rendering; clearing the selection returns the rail to the single-recipe
-      // inspector and the count-to-zero effect discards the draft. The toast below is the
-      // only feedback that survives the panel unmounting on a successful apply.
-      clearRecipeBulkSelection();
-      notifyInfo(recipeBulkAppliedMessage(result));
+      // inspector and the count-to-zero effect discards the draft. The sentence below is the
+      // only feedback that survives the panel unmounting on a successful apply, so it is both
+      // toasted and announced through the manager's live region.
+      const message = recipeBulkAppliedMessage(result);
+      clearRecipeBulkSelection(message);
+      notifyInfo(message);
       return true;
     } finally {
       recipeBulkApplying = false;
@@ -4830,8 +5005,10 @@
     essenceBulkDraft = next || createEssenceBulkDraft();
   }
 
-  function clearEssenceBulkSelection() {
+  // The third twin of `clearComponentBulkSelection`, announcement and focus hop included.
+  function clearEssenceBulkSelection(message = selectionClearedAnnouncement()) {
     essenceBrowserState.bulkSelectedEssenceIds = new Set();
+    announceBulkSelectionEmptied('essences', message);
   }
 
   async function applyEssenceBulkEdit() {
@@ -4848,19 +5025,37 @@
     try {
       const result = await store.applyEssenceBulkEdit?.(ids, edit);
       if (!result) return false;
-      clearEssenceBulkSelection();
-      notifyInfo(
-        result.updated === 1
-          ? text('FABRICATE.Admin.Manager.Essence.BulkEdit.AppliedOne', 'Updated 1 essence.')
-          : text(
-              'FABRICATE.Admin.Manager.Essence.BulkEdit.Applied',
-              'Updated {count} essences.'
-            ).replace('{count}', result.updated)
-      );
+      const message = essenceBulkAppliedMessage(Number(result.updated) || 0);
+      clearEssenceBulkSelection(message);
+      notifyInfo(message);
       return true;
     } finally {
       essenceBulkApplying = false;
     }
+  }
+
+  // The third of the three apply reports, on the same terms as its two siblings.
+  //
+  // ZERO IS ITS OWN SENTENCE (review round, issue 1157). `updated: 0` is reachable — every
+  // selected essence already matched the staged values — and it used to fall through to the
+  // plural branch and say "Updated 0 essences.", which reads as a failure for a legitimate
+  // outcome. That was survivable while the sentence was only a toast; this change makes it
+  // the SOLE SPOKEN OUTCOME of a successful action, so the branch both siblings already had
+  // is no longer optional here.
+  function essenceBulkAppliedMessage(count) {
+    if (count === 0) {
+      return text(
+        'FABRICATE.Admin.Manager.Essence.BulkEdit.AppliedNone',
+        'No essences needed changing.'
+      );
+    }
+    if (count === 1) {
+      return text('FABRICATE.Admin.Manager.Essence.BulkEdit.AppliedOne', 'Updated 1 essence.');
+    }
+    return text(
+      'FABRICATE.Admin.Manager.Essence.BulkEdit.Applied',
+      'Updated {count} essences.'
+    ).replace('{count}', count);
   }
 
   // The ARMED bulk delete's confirm step. The impact statement is rendered by the panel
@@ -4880,9 +5075,18 @@
       // identical guard; nothing was deleted, so nothing is announced and the selection
       // stays put.
       const deleted = Number(result?.deleted) || 0;
-      if (deleted === 0) return false;
-      clearEssenceBulkSelection();
-      notifyInfo(essenceBulkDeletedMessage(result));
+      if (deleted === 0) {
+        // The twin of the component branch above, and for the same reason: the card survives
+        // a delete that reached nothing, so this is the only surface that can say so.
+        essenceBulkDeleteOutcome = text(
+          'FABRICATE.Admin.Manager.BulkEdit.DeleteNoneDeleted',
+          'Nothing was deleted. The selection is unchanged.'
+        );
+        return false;
+      }
+      const message = essenceBulkDeletedMessage(result);
+      clearEssenceBulkSelection(message);
+      notifyInfo(message);
       return true;
     } catch (err) {
       // The store catches its own write failures, so reaching here means the failure was
@@ -8023,6 +8227,8 @@
         onSelectEssence={selectEssence}
         onEditEssence={editEssence}
         onToggleEssenceEnabled={toggleEssenceEnabled}
+        onSelectionCleared={() =>
+          announceBulkSelectionEmptied('essences', selectionClearedAnnouncement())}
         bind:browserState={essenceBrowserState}
       />
     {:else if currentView === 'essence-edit' && selectedSystem}
@@ -8125,6 +8331,8 @@
         onSelectComponent={(id) => selectComponent(id)}
         onDropComponent={(data) => dropComponent(data)}
         onEditComponent={(id) => editComponent(id)}
+        onSelectionCleared={() =>
+          announceBulkSelectionEmptied('components', selectionClearedAnnouncement())}
       />
     {:else if currentView === 'recipe-edit' && selectedSystem}
       <RecipeEditView
@@ -8255,6 +8463,8 @@
         onEditRecipe={(id) => editRecipe(id)}
         onToggleEnabled={(id, enabled, options) => toggleRecipeEnabled(id, enabled, options)}
         onToggleLocked={(id, locked) => store.toggleRecipeLocked?.(id, locked)}
+        onSelectionCleared={() =>
+          announceBulkSelectionEmptied('recipes', selectionClearedAnnouncement())}
       />
     {:else if currentView === 'system-edit' && selectedSystem}
       <main
@@ -10796,10 +11006,11 @@
               applying={essenceBulkApplying}
               deleting={essenceBulkDeleting}
               deleteArmed={essenceBulkDeleteArmed}
+              deleteOutcome={essenceBulkDeleteOutcome}
               onDraftChange={(next) => stageEssenceBulkDraft(next)}
               onClearSelection={() => clearEssenceBulkSelection()}
               onApply={() => applyEssenceBulkEdit()}
-              onArmDelete={() => (essenceBulkDeleteArmed = true)}
+              onArmDelete={() => armEssenceBulkDelete()}
               onDisarmDelete={() => (essenceBulkDeleteArmed = false)}
               onDelete={(ids) => deleteSelectedEssences(ids)}
             />
@@ -10945,10 +11156,11 @@
               deleting={componentBulkDeleting}
               deleteArmed={componentBulkDeleteArmed}
               deleteImpact={componentBulkDeleteImpact}
+              deleteOutcome={componentBulkDeleteOutcome}
               onDraftChange={(next) => stageComponentBulkDraft(next)}
               onClearSelection={() => clearComponentBulkSelection()}
               onApply={() => applyComponentBulkEdit()}
-              onArmDelete={() => (componentBulkDeleteArmed = true)}
+              onArmDelete={() => armComponentBulkDelete()}
               onDisarmDelete={() => (componentBulkDeleteArmed = false)}
               onDelete={(ids) => deleteSelectedComponents(ids)}
             />
@@ -11380,4 +11592,34 @@
     content={importReportContent}
     onClose={() => (importReportContent = null)}
   />
+
+  <!--
+    THE MANAGER'S ONE PERSISTENT LIVE REGION (issue 1157). It is the LAST child of
+    `.fabricate-manager` and is never conditionally rendered, so it outlives every view, every
+    browser and every bulk panel — which is the whole point: the actions it reports are the
+    ones that destroy the surface they were performed from.
+
+    It is EMPTY on mount. A region inserted into the DOM together with its text is not
+    announced by most screen readers, so the region has to be there first and the text has to
+    arrive later.
+
+    The child is KEYED ON THE ANNOUNCEMENT OBJECT, which `announceBulkSelectionEmptied`
+    replaces on every call. That is what makes "Selection cleared." speak the SECOND time:
+    re-inserting identical text announces nothing, so the node is destroyed and recreated
+    rather than having its text rewritten, and each announcement is a genuine insertion.
+    `aria-atomic` then has the region read as one sentence rather than as a diff.
+
+    `.visually-hidden` is declared under `.fabricate-manager` in `styles/fabricate.css`, which
+    this element is inside; do not lift this region out of that root.
+  -->
+  <p
+    class="visually-hidden"
+    aria-live="polite"
+    aria-atomic="true"
+    data-manager-bulk-selection-announce
+  >
+    {#key bulkSelectionAnnouncement}{#if bulkSelectionAnnouncement?.text}<span
+          >{bulkSelectionAnnouncement.text}</span
+        >{/if}{/key}
+  </p>
 </div>

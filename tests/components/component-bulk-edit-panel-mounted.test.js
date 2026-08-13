@@ -31,6 +31,8 @@ const panel = createMountedComponentHarness({
   tmpPrefix: 'fabricate-component-bulk-panel-',
   rawModules: [
     'src/ui/svelte/util/foundryBridge.js',
+    // `BulkDeleteCard`'s shared focus/announce ordering rule (issue 1157).
+    'src/ui/svelte/util/announceAfterFocus.js',
     'src/utils/componentCategories.js',
     // The pure selection + staging model. Omitting it throws loudly in this shared
     // harness — the hand-rolled suites are the ones that hang instead.

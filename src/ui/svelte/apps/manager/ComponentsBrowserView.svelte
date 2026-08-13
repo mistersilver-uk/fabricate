@@ -56,6 +56,12 @@
     onSelectComponent = () => {},
     onDropComponent = () => {},
     onEditComponent = () => {},
+    // Told AFTER the toolbar's Clear has emptied the selection (issue 1157). The clear stays
+    // this browser's — the selection is its state — but the FEEDBACK cannot be: emptying the
+    // selection unmounts the bulk panel and the Clear button that was pressed, so the
+    // announcement and the focus hop belong to something that outlives both. Optional, so a
+    // standalone mount clears exactly as it did.
+    onSelectionCleared = null,
     // The filter / sort / group / paginate view-state (issue 676). The manager root
     // LIFTS this up and binds it here so it survives the editor round-trip: opening a
     // component unmounts this browser, and remounting it with the controls reset to
@@ -193,8 +199,11 @@
     ui.bulkSelectedComponentIds = setComponentSelection(bulkSelectedIds, filteredIds, true);
   }
 
+  // The write is FIRST, so the owner's callback runs with Svelte's flush already ahead of the
+  // focus hop it schedules.
   function clearBulkSelection() {
     ui.bulkSelectedComponentIds = new Set();
+    onSelectionCleared?.();
   }
 
   // The active-filter chips, derived by the pure model so the run and the "is anything
@@ -501,8 +510,14 @@
     no visual pressed state, and the direction button sat at the boxy base
     `.manager-button` scale the Recipe Studio already documented fixing.
   -->
+  <!-- `tabindex="-1"` makes this landmark a FOCUS TARGET without making it a tab stop
+       (issue 1157) — see the twin note in `EssenceBrowserView`. The manager root lands the
+       keyboard here when an action empties the bulk selection and unmounts the panel that
+       was acted on, addressing it through `data-component-toolbar`. -->
   <section
     class="manager-toolbar manager-component-toolbar"
+    tabindex="-1"
+    data-component-toolbar
     aria-label={text('FABRICATE.Admin.Manager.Component.Filters', 'Component filters')}
   >
     <div class="manager-component-filter-row">
