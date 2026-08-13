@@ -40,6 +40,27 @@
  * it, or making its listing note unreachable all leave this file 11/11 green — measured, which is
  * why those tests exist.
  */
+
+/**
+ * Issue 1168: this file's runtime is governed by the `--test-timeout` on the `test` script in
+ * `package.json`, and CANNOT be narrowed to just this file with a `describe`/`it` `{ timeout }`
+ * option — that was tried and measured to not work, not assumed. `node:test` wraps every file
+ * passed to the CLI in an implicit test whose own deadline is inherited from `--test-timeout`;
+ * inheritance only flows DOWNWARD (a child adopts its parent's timeout as its own default), never
+ * upward as an override. A `{ timeout: 300000 }` on the describe below, on the slow `it` inside
+ * it, or on a describe wrapping this whole file's content, all still got cancelled at the CLI's
+ * shorter value in testing, reported as `not ok 1 - <filepath>` rather than by the name of
+ * whichever inner node supposedly owned the longer budget — the same shape the original bug
+ * report showed. So the 300000 lives on the `test` script itself, applying to all files, not just
+ * this one.
+ *
+ * The corpus-wide `format:check` invocation below (`inspects the real component corpus, not a
+ * reconstruction of it`) is the reason: measured at ~7.5s run alone on an idle machine, ~17.8s as
+ * part of a full idle `npm test`, and up to 128.1s under the kind of concurrent load this repo's
+ * lane gates actually produce (2-3 other full `npm test` runs in flight at once) — well past the
+ * previous 60000ms cap, which is exactly what turned a slow-but-healthy run into a `# cancelled 1`
+ * that read as a flake. Narrowing this back down "to tidy it" reintroduces that.
+ */
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
