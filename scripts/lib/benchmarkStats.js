@@ -18,23 +18,31 @@
  */
 
 /**
+ * A sorted copy of a NON-EMPTY sample set.
+ *
+ * Refuses an empty set rather than returning `NaN` downstream. A statistics function handed no
+ * samples has nothing to report, and a `NaN` here flows into the run record and the human report
+ * as `NaN ms`, which reads like a measurement rather than like the absence of one.
+ *
  * @param {number[]} samples
  * @returns {number[]} A sorted copy; the caller's array is never mutated.
  */
 function sorted(samples) {
+  if (!Array.isArray(samples) || samples.length === 0) {
+    throw new Error('benchmark statistics need at least one sample; got none');
+  }
   return [...samples].sort((left, right) => left - right);
 }
 
 /**
  * The linear-interpolated quantile of a sample set.
  *
- * @param {number[]} samples
+ * @param {number[]} samples Must be non-empty.
  * @param {number} q In `[0, 1]`.
  * @returns {number}
  */
 export function quantile(samples, q) {
   const values = sorted(samples);
-  if (values.length === 0) return NaN;
   if (values.length === 1) return values[0];
   const position = (values.length - 1) * q;
   const lower = Math.floor(position);
@@ -54,18 +62,18 @@ export function median(samples) {
 /**
  * Summarise one case's samples.
  *
- * @param {number[]} samples
+ * @param {number[]} samples Must be non-empty.
  * @returns {{reps: number, min: number, p25: number, median: number, p75: number, max: number}}
  */
 export function summarise(samples) {
   const values = sorted(samples);
   return {
     reps: values.length,
-    min: values[0] ?? NaN,
+    min: values[0],
     p25: quantile(values, 0.25),
     median: quantile(values, 0.5),
     p75: quantile(values, 0.75),
-    max: values.at(-1) ?? NaN,
+    max: values.at(-1),
   };
 }
 

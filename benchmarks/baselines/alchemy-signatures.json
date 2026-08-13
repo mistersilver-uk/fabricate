@@ -1,6 +1,6 @@
 {
   "profile": "alchemy-signatures",
-  "harnessVersion": 1,
+  "harnessVersion": 2,
   "seed": 1071,
   "description": "2,000 enabled alchemy signatures with a controlled 10% collision pool over 500 components.",
   "construction": "literal payloads",
@@ -23,9 +23,9 @@
     }
   ],
   "checksums": {
-    "corpus": "fbf28c252f37008f",
-    "components": "34b5ec99c5dd38f1",
-    "inventory": "68bbbc57179b7fd1"
+    "corpus": "7f96e44bd6958778",
+    "components": "9b8f1efaee4d5fdf",
+    "inventory": "37fd544e256af8b9"
   },
   "cases": {
     "signatureValidator.validateSystem": {

@@ -1,6 +1,6 @@
 {
   "profile": "recipe-graph",
-  "harnessVersion": 1,
+  "harnessVersion": 2,
   "seed": 1071,
   "description": "Sparse (1,000 recipes, fan-out 1) and dense (500 recipes, fan-out 8) dependency graphs.",
   "construction": "literal payloads",
@@ -26,9 +26,9 @@
     }
   ],
   "checksums": {
-    "corpus": "2f536cfc04bbcdd5",
-    "components": "b63d504416cc9541",
-    "inventory": "5e217420bb6e023b"
+    "corpus": "1affbba596f58db0",
+    "components": "408956ae4990b4c3",
+    "inventory": "b3dbb11f762887fb"
   },
   "cases": {
     "graph.buildRecipeGraph.sparse": {

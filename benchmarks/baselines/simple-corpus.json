@@ -1,6 +1,6 @@
 {
   "profile": "simple-corpus",
-  "harnessVersion": 1,
+  "harnessVersion": 2,
   "seed": 1071,
   "description": "10,000 simple recipes over a 5,000-component library; token 20-stack inventory.",
   "construction": "literal payloads; the serialization cases hydrate them through Recipe.fromJSON",
@@ -24,9 +24,9 @@
     }
   ],
   "checksums": {
-    "corpus": "9f5e1c44b3e5bbad",
-    "components": "32b44781d2425cde",
-    "inventory": "c404b4a6a230b89b"
+    "corpus": "4c7625a4c4ebe5f7",
+    "components": "809d88ddd68a3ff3",
+    "inventory": "7bbca01052f4a18b"
   },
   "cases": {
     "recipeManager.getRecipes.unfiltered": {
@@ -54,7 +54,7 @@
       "description": "The pure GM component browser projection over a 5,000-component library.",
       "counts": {
         "pagedRows": 25,
-        "totalRows": 838,
+        "totalRows": 812,
         "categoryGroups": 5
       }
     },
@@ -76,14 +76,14 @@
       "description": "SERIALIZATION: RecipeManager.save() replaces the whole `recipes` world setting. Real Recipe#toJSON output; the byte count is the replicated payload every client re-parses.",
       "counts": {
         "serializedRecipes": 10000,
-        "serializedBytes": 19809637
+        "serializedBytes": 19809681
       }
     },
     "craftingSystemManager.save": {
       "description": "SERIALIZATION: CraftingSystemManager.save() replaces the whole `craftingSystems` setting, so a single component edit replicates the entire 5,000-component library.",
       "counts": {
         "serializedSystems": 1,
-        "serializedBytes": 1973455
+        "serializedBytes": 1973024
       }
     },
     "craftingSystemManager.normalizeImport": {

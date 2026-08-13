@@ -58,14 +58,13 @@ export function writeBaseline(profile, payload) {
 }
 
 /**
- * Diff a freshly measured class-1 payload against its committed baseline.
+ * Drift in the fixture IDENTITY: the harness version, the seed, or a corpus checksum.
  *
- * @param {object|null} baseline
+ * @param {object} baseline
  * @param {object} measured
- * @returns {string[]} Human-readable drift lines; empty means clean.
+ * @returns {string[]}
  */
-export function diffAgainstBaseline(baseline, measured) {
-  if (!baseline) return ['no committed baseline (run with --update-baselines)'];
+function diffFixtureIdentity(baseline, measured) {
   const drift = [];
   if (baseline.harnessVersion !== measured.harnessVersion) {
     drift.push(`harnessVersion ${baseline.harnessVersion} -> ${measured.harnessVersion}`);
@@ -78,25 +77,64 @@ export function diffAgainstBaseline(baseline, measured) {
       drift.push(`fixture checksum ${key}: ${baseline.checksums?.[key]} -> ${value}`);
     }
   }
-  const baselineIds = new Set(Object.keys(baseline.cases ?? {}));
-  const measuredIds = new Set(Object.keys(measured.cases));
+  return drift;
+}
+
+/**
+ * Drift in one case's COUNTS — the regression guard firing.
+ *
+ * @param {string} id
+ * @param {object} before
+ * @param {object} after
+ * @returns {string[]}
+ */
+function diffCounts(id, before, after) {
+  const drift = [];
+  for (const key of new Set([...Object.keys(before), ...Object.keys(after)])) {
+    if (before[key] !== after[key]) {
+      drift.push(`${id}.${key}: ${before[key]} -> ${after[key]}`);
+    }
+  }
+  return drift;
+}
+
+/**
+ * Drift in the case REGISTRY and in each shared case's counts.
+ *
+ * @param {object} baselineCases
+ * @param {object} measuredCases
+ * @returns {string[]}
+ */
+function diffCases(baselineCases, measuredCases) {
+  const drift = [];
+  const baselineIds = new Set(Object.keys(baselineCases));
+  const measuredIds = new Set(Object.keys(measuredCases));
   for (const id of baselineIds) {
     if (!measuredIds.has(id)) drift.push(`case removed: ${id}`);
   }
   for (const id of measuredIds) {
-    if (!baselineIds.has(id)) {
+    if (baselineIds.has(id)) {
+      drift.push(...diffCounts(id, baselineCases[id].counts ?? {}, measuredCases[id].counts ?? {}));
+    } else {
       drift.push(`case added: ${id}`);
-      continue;
-    }
-    const before = baseline.cases[id].counts ?? {};
-    const after = measured.cases[id].counts ?? {};
-    for (const countKey of new Set([...Object.keys(before), ...Object.keys(after)])) {
-      if (before[countKey] !== after[countKey]) {
-        drift.push(`${id}.${countKey}: ${before[countKey]} -> ${after[countKey]}`);
-      }
     }
   }
   return drift;
+}
+
+/**
+ * Diff a freshly measured class-1 payload against its committed baseline.
+ *
+ * @param {object|null} baseline
+ * @param {object} measured
+ * @returns {string[]} Human-readable drift lines; empty means clean.
+ */
+export function diffAgainstBaseline(baseline, measured) {
+  if (!baseline) return ['no committed baseline (run with --update-baselines)'];
+  return [
+    ...diffFixtureIdentity(baseline, measured),
+    ...diffCases(baseline.cases ?? {}, measured.cases),
+  ];
 }
 
 /**

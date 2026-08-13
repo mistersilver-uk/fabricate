@@ -55,8 +55,12 @@ export const DEFAULT_SEED = 1071;
 /**
  * The harness version. Bump it when a generator changes shape in a way that legitimately moves
  * every committed count, so a baseline diff carries the reason with it.
+ *
+ * 2 — `pickDistinct` became a partial Fisher-Yates instead of bounded rejection sampling. Same
+ *     contract, different draw sequence, so every component's essence and tag picks moved and
+ *     with them every fixture checksum and every downstream count.
  */
-export const HARNESS_VERSION = 1;
+export const HARNESS_VERSION = 2;
 
 /** A token inventory for the corpus-axis profiles: present, but never the thing being varied. */
 const CORPUS_AXIS_STACKS = 20;

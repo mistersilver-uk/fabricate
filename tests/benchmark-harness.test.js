@@ -42,7 +42,7 @@ import {
   SCALE_PROFILE_NAMES,
   buildScaleFixture,
 } from './helpers/scale/scaleProfiles.js';
-import { createSeededRandom } from './helpers/scale/scaleRandom.js';
+import { createSeededRandom, pickDistinct } from './helpers/scale/scaleRandom.js';
 
 const SYSTEM_ID = 'benchsys';
 
@@ -103,6 +103,61 @@ describe('scale fixtures are reproducible from {profile, seed} alone', () => {
       () => buildScaleFixture({ profile: 'no-such-profile' }),
       /Unknown scale profile "no-such-profile"/
     );
+  });
+});
+
+describe('pickDistinct returns exactly the requested scale', () => {
+  // The sampler is the one place a fixture generator can silently produce the WRONG SCALE, which
+  // is the defect class the whole harness exists to catch. SonarCloud's S1994 flagged its old
+  // fill loop for testing `chosen.size` while incrementing `index`; that loop terminated
+  // correctly, but nothing here proved it did, and nothing bounded it if the clamp above it ever
+  // moved. These assertions bind the contract instead of the implementation.
+  const pool = ['a', 'b', 'c', 'd', 'e', 'f'];
+
+  for (const count of [0, 1, 3, 6]) {
+    it(`returns exactly ${count} distinct elements`, () => {
+      const picked = pickDistinct(createSeededRandom(11), pool, count);
+      assert.equal(picked.length, count);
+      assert.equal(new Set(picked).size, count, 'every element must be distinct');
+      for (const entry of picked) assert.ok(pool.includes(entry), 'and drawn from the pool');
+    });
+  }
+
+  it('clamps a count larger than the pool instead of padding with undefined', () => {
+    const picked = pickDistinct(createSeededRandom(11), pool, 99);
+    assert.equal(picked.length, pool.length);
+    assert.ok(
+      picked.every((entry) => entry !== undefined),
+      'an out-of-range index would surface as an undefined element, not as an error'
+    );
+  });
+
+  it('returns elements in ascending POOL order, not draw order', () => {
+    // Draw order would make the fixture checksum depend on the draw sequence, so two runs that
+    // picked the same set differently would report generator drift that is not there.
+    const picked = pickDistinct(createSeededRandom(3), pool, 4);
+    const positions = picked.map((entry) => pool.indexOf(entry));
+    assert.deepEqual(positions, [...positions].sort((left, right) => left - right));
+  });
+
+  it('terminates and still returns the full count for a degenerate generator', () => {
+    // A generator pinned at 0 is the pathological input the old rejection-sampling guard existed
+    // for. Selection sampling has no guard and no fallback: it cannot spin, because it runs
+    // exactly `count` iterations.
+    const picked = pickDistinct(() => 0, pool, 4);
+    assert.equal(picked.length, 4);
+    assert.equal(new Set(picked).size, 4);
+  });
+
+  it('is reproducible from its seed', () => {
+    assert.deepEqual(
+      pickDistinct(createSeededRandom(42), pool, 3),
+      pickDistinct(createSeededRandom(42), pool, 3)
+    );
+  });
+
+  it('tolerates a non-array pool rather than throwing mid-generation', () => {
+    assert.deepEqual(pickDistinct(createSeededRandom(1), null, 3), []);
   });
 });
 
@@ -271,11 +326,91 @@ describe('the fixture checksum detects generator drift and nothing else', () => 
   it('does not silently drop a function-valued field', () => {
     // A held stack carries a `getFlag` closure. Dropping functions would make a flagged and an
     // unflagged item checksum identically — exactly the distinction the profiles exist to make.
-    assert.equal(stableStringify({ getFlag: () => null }), '{"getFlag":<function>}');
+    assert.equal(stableStringify({ getFlag: () => null }), '{"getFlag":<function:getFlag>}');
   });
 
   it('is sensitive to array ORDER', () => {
     assert.notEqual(fixtureChecksum([1, 2]), fixtureChecksum([2, 1]));
+  });
+
+  // A checksum's only job is to notice difference, so a value that serialises to the same text as
+  // a DIFFERENT value is the function silently failing. These are the collapses that existed.
+  it('does not collapse two distinct symbols', () => {
+    assert.notEqual(fixtureChecksum(Symbol('a')), fixtureChecksum(Symbol('b')));
+  });
+
+  it('does not collapse two distinct dates', () => {
+    assert.notEqual(fixtureChecksum(new Date(0)), fixtureChecksum(new Date(1)));
+    assert.notEqual(fixtureChecksum(new Date(0)), fixtureChecksum({}));
+  });
+
+  it('does not collapse distinct non-finite numbers', () => {
+    assert.notEqual(fixtureChecksum(Number.NaN), fixtureChecksum(Number.POSITIVE_INFINITY));
+    assert.notEqual(fixtureChecksum(Number.POSITIVE_INFINITY), fixtureChecksum('Infinity'));
+  });
+
+  it('distinguishes a durable held stack from an unmatched one', () => {
+    // The concrete version of the concern: these two stacks are the whole point of the inventory
+    // mix, they carry an identical `getFlag` closure, and if the checksum collapsed them a
+    // 70/30 fixture and a 0/100 fixture could hash the same.
+    const inventory = inventoryOf({ stacks: 100, components: libraryOf(50) });
+    assert.notEqual(
+      fixtureChecksum(inventory.byKind.durable[0]),
+      fixtureChecksum(inventory.byKind.unmatched[0])
+    );
+  });
+
+  it('distinguishes two FIXTURES differing only in a previously-collapsing field', () => {
+    // The collapse that mattered is not at the scalar level, it is at the fixture level: two
+    // otherwise-identical fixture objects that hash the same are two fixtures the drift guard can
+    // no longer tell apart. Both fields below rendered identically before — a Date fell through
+    // to the plain-object branch where `Object.keys` yields `[]` (so every date was `{}`), and a
+    // symbol hit `JSON.stringify`, which returns the VALUE `undefined` rather than a string.
+    const withDateA = { id: 'c-1', stamped: new Date(0) };
+    const withDateB = { id: 'c-1', stamped: new Date(86_400_000) };
+    assert.notEqual(fixtureChecksum(withDateA), fixtureChecksum(withDateB));
+
+    const withSymbolA = { id: 'c-1', kind: Symbol('durable') };
+    const withSymbolB = { id: 'c-1', kind: Symbol('unmatched') };
+    assert.notEqual(fixtureChecksum(withSymbolA), fixtureChecksum(withSymbolB));
+
+    // And neither renders as the token the old implementation produced.
+    assert.ok(!stableStringify(withDateA).includes('"stamped":{}'), 'a date is no longer `{}`');
+    assert.ok(
+      !stableStringify(withSymbolA).includes('undefined'),
+      'a symbol is no longer the literal `undefined`'
+    );
+  });
+
+  it('orders keys by code unit, which is what makes the digest machine-independent', () => {
+    // Pins the comparator, and pins it AGAINST `localeCompare` specifically. A locale-aware
+    // compare orders "a" before "B" in en-GB but code-unit order puts "B" first, so swapping the
+    // comparator for the obvious-looking one would make the same fixture hash differently on two
+    // machines with different ICU data — the exact non-determinism this module exists to remove.
+    assert.equal(stableStringify({ a: 1, B: 2 }), '{"B":2,"a":1}');
+    assert.equal(stableStringify({ B: 2, a: 1 }), '{"B":2,"a":1}');
+    assert.equal(fixtureChecksum({ a: 1, B: 2 }), fixtureChecksum({ B: 2, a: 1 }));
+  });
+
+  it('orders keys at every depth, not just the top level', () => {
+    const left = { outer: { z: 1, a: { y: 2, b: 3 } } };
+    const right = { outer: { a: { b: 3, y: 2 }, z: 1 } };
+    assert.equal(stableStringify(left), stableStringify(right));
+    assert.equal(stableStringify(left), '{"outer":{"a":{"b":3,"y":2},"z":1}}');
+  });
+
+  it('emits no [object Object] for any registered profile fixture', () => {
+    // The direct answer to "is a value stringifying as [object Object]?". Asserted against every
+    // profile rather than reasoned about, because the fixtures are what actually matter.
+    for (const profile of SCALE_PROFILE_NAMES) {
+      const fixture = buildScaleFixture({ profile, seed: DEFAULT_SEED });
+      for (const part of [fixture.components, fixture.recipes, fixture.inventory.actors]) {
+        assert.ok(
+          !stableStringify(part).includes('[object Object]'),
+          `${profile} serialises a value as [object Object], which collapses distinct fixtures`
+        );
+      }
+    }
   });
 });
 
@@ -351,6 +486,13 @@ describe('class-2 statistics report ratios with a band', () => {
     assert.deepEqual(samples, [5, 1, 3]);
     assert.equal(stats.median, 3);
     assert.equal(quantile([1, 2, 3, 4], 0.5), 2.5);
+  });
+
+  it('refuses an empty sample set rather than reporting NaN', () => {
+    // A NaN would flow into the run record and the human report as "NaN ms", which reads like a
+    // measurement rather than like the absence of one.
+    assert.throws(() => summarise([]), /at least one sample/);
+    assert.throws(() => quantile([], 0.5), /at least one sample/);
   });
 });
 

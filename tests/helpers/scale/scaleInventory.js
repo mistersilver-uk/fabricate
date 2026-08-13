@@ -44,7 +44,6 @@
  */
 import { roleItem } from '../componentIdentityFixtures.js';
 
-import { componentSourceUuid } from './scaleComponents.js';
 import { intBetween } from './scaleRandom.js';
 
 /**
@@ -136,6 +135,97 @@ function heldStack({ kind, index, systemId, component, quantity }) {
 }
 
 /**
+ * Order the three stack kinds so every PREFIX of the sequence holds the declared mix.
+ *
+ * Interleaved proportionally rather than shuffled. A seeded shuffle would be reproducible too,
+ * but it can deal ONE actor a run of cheap durable stacks purely by luck of the seed, which makes
+ * per-actor cost depend on the seed instead of on the declared mix. The rule is the standard
+ * proportional interleave: repeatedly emit from whichever kind has made the least fractional
+ * progress. Because every prefix holds the mix, so does every actor's round-robin share.
+ *
+ * @param {{unmatched: number, durable: number, sourceRef: number}} weights
+ * @param {number} total
+ * @returns {Array<'unmatched'|'durable'|'sourceRef'>}
+ */
+function interleaveKinds(weights, total) {
+  const kinds = Object.keys(weights);
+  const cursors = Object.fromEntries(kinds.map((kind) => [kind, 0]));
+  const ordered = [];
+  for (let placed = 0; placed < total; placed++) {
+    let best = null;
+    let bestProgress = Infinity;
+    for (const kind of kinds) {
+      if (cursors[kind] >= weights[kind]) continue;
+      const progress = (cursors[kind] + 0.5) / weights[kind];
+      if (progress < bestProgress) {
+        bestProgress = progress;
+        best = kind;
+      }
+    }
+    if (best === null) break;
+    ordered.push(best);
+    cursors[best] += 1;
+  }
+  return ordered;
+}
+
+/**
+ * Turn an ordered kind sequence into per-actor item lists, plus the indexes the benchmark cases
+ * select branches with.
+ *
+ * `byKind` exists because the identity benchmarks MUST measure the miss case separately from the
+ * durable-flag hit case — averaging them hides a two-orders-of-magnitude difference — and this is
+ * how a case selects one branch WITHOUT stamping a marker field onto the item, which would put a
+ * field on an item object that no real item carries.
+ *
+ * Matched stacks cover a CONTIGUOUS PREFIX of the library rather than a strided sample, for two
+ * reasons that both come down to the fixture meaning something: a player holds a subset of the
+ * library, not every seventh entry; and the recipe corpora consume components from the front of
+ * the library, so a strided inventory would leave every recipe uncraftable and send every
+ * craftability evaluation down the same "missing" branch.
+ *
+ * @param {object} options
+ * @param {string[]} options.ordered
+ * @param {object[]} options.components
+ * @param {string} options.systemId
+ * @param {() => number} options.random
+ * @param {number} options.actorCount
+ * @returns {{perActor: object[][], byKind: object, matchedComponentIds: string[],
+ *   craftingActorComponentIds: string[]}}
+ */
+function dealStacks({ ordered, components, systemId, random, actorCount }) {
+  const perActor = Array.from({ length: actorCount }, () => []);
+  const byKind = { unmatched: [], durable: [], sourceRef: [] };
+  const matchedComponentIds = [];
+  const craftingActorComponentIds = [];
+  let matchedOrdinal = 0;
+
+  for (const [index, kind] of ordered.entries()) {
+    let component = null;
+    if (kind !== 'unmatched') {
+      component = components[matchedOrdinal % components.length];
+      matchedComponentIds.push(component.id);
+      // `CraftingEngine.findComponentItems` searches ONE actor, so a case probing a component
+      // held only by a SOURCE actor would report zero matches and quietly measure the
+      // never-matched path while claiming to measure the matcher.
+      if (index % actorCount === 0) craftingActorComponentIds.push(component.id);
+      matchedOrdinal += 1;
+    }
+    const stack = heldStack({
+      kind,
+      index,
+      systemId,
+      component,
+      quantity: intBetween(random, 1, 5),
+    });
+    byKind[kind].push(stack);
+    perActor[index % actorCount].push(stack);
+  }
+
+  return { perActor, byKind, matchedComponentIds, craftingActorComponentIds };
+}
+
+/**
  * Build the held-inventory axis: `stacks` stacks spread over one crafting actor and
  * `sourceActorCount` additional component-source actors, resolved against `components`.
  *
@@ -174,69 +264,19 @@ export function buildHeldInventory({
   const durableCount = Math.round(matchedCount * durableShare);
   const sourceRefCount = matchedCount - durableCount;
 
-  // Interleave the three kinds proportionally rather than shuffling them. A seeded shuffle
-  // would be reproducible too, but it can deal ONE actor a run of cheap durable stacks purely
-  // by luck of the seed, which makes per-actor cost depend on the seed instead of on the
-  // declared mix. The rule below is the standard proportional interleave — repeatedly emit
-  // from whichever kind has made the least fractional progress — so every prefix of the
-  // sequence, and therefore every actor's round-robin share, holds the declared mix.
-  const kinds = ['unmatched', 'durable', 'sourceRef'];
-  const weights = [unmatchedCount, durableCount, sourceRefCount];
-  const cursors = [0, 0, 0];
-  const ordered = [];
-  for (let placed = 0; placed < stacks; placed++) {
-    let best = -1;
-    let bestProgress = Infinity;
-    for (let bucket = 0; bucket < kinds.length; bucket++) {
-      if (cursors[bucket] >= weights[bucket]) continue;
-      const progress = (cursors[bucket] + 0.5) / weights[bucket];
-      if (progress < bestProgress) {
-        bestProgress = progress;
-        best = bucket;
-      }
-    }
-    if (best === -1) break;
-    ordered.push(kinds[best]);
-    cursors[best] += 1;
-  }
+  const ordered = interleaveKinds(
+    { unmatched: unmatchedCount, durable: durableCount, sourceRef: sourceRefCount },
+    stacks
+  );
 
   const actorCount = sourceActorCount + 1;
-  const perActor = Array.from({ length: actorCount }, () => []);
-  // An index of which stacks are which kind. The identity benchmarks MUST measure the miss
-  // case separately from the durable-flag hit case — averaging them hides a 66x difference —
-  // and this index is how a case selects one branch without stamping a marker field onto the
-  // item, which would both change the fixture checksum's meaning and put a field on an item
-  // object that no real item carries.
-  const byKind = { unmatched: [], durable: [], sourceRef: [] };
-  // Matched stacks cover a CONTIGUOUS PREFIX of the library rather than a strided sample.
-  // Two reasons, both about the fixture meaning something: a player holds a subset of the
-  // library, not every seventh entry; and the recipe corpora consume components from the front
-  // of the library, so a strided inventory would leave every recipe uncraftable and every
-  // craftability evaluation would exit down the same "missing" branch.
-  let matchedOrdinal = 0;
-  const matchedComponentIds = [];
-  const craftingActorComponentIds = [];
-  for (const [index, kind] of ordered.entries()) {
-    let component = null;
-    if (kind !== 'unmatched') {
-      component = components[matchedOrdinal % components.length];
-      matchedComponentIds.push(component.id);
-      // `CraftingEngine.findComponentItems` searches ONE actor, so a case probing a component
-      // held only by a SOURCE actor would report zero matches and quietly measure the
-      // never-matched path while claiming to measure the matcher.
-      if (index % actorCount === 0) craftingActorComponentIds.push(component.id);
-      matchedOrdinal += 1;
-    }
-    const stack = heldStack({
-      kind,
-      index,
-      systemId,
-      component,
-      quantity: intBetween(random, 1, 5),
-    });
-    byKind[kind].push(stack);
-    perActor[index % actorCount].push(stack);
-  }
+  const { perActor, byKind, matchedComponentIds, craftingActorComponentIds } = dealStacks({
+    ordered,
+    components,
+    systemId,
+    random,
+    actorCount,
+  });
 
   // Books land on the crafting actor: the knowledge gate reads the acting character first.
   for (const [bookIndex, uuid] of bookUuids.entries()) {
