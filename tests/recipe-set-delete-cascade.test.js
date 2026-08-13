@@ -163,7 +163,15 @@ function makeFixture({
   const manager = new CraftingSystemManager(recipeManager);
   manager.systems.set(SYSTEM_ID, manager._normalizeSystem(system));
   manager.initialized = true;
-  env.settings.set(SETTING_KEYS.CRAFTING_SYSTEMS, [...manager.systems.values()]);
+  // Round-tripped through JSON the way the recipes seed above already is via `toJSON()` —
+  // `env.settings` is a bare `Map`, so seeding the LIVE system objects directly would let a
+  // reader that walks the "persisted" array see `_deleteRecipeSet`'s in-memory mutations
+  // whether or not `save()` had actually run, which is exactly the hole this fixture exists
+  // to close (issue 1132, review round 2).
+  env.settings.set(
+    SETTING_KEYS.CRAFTING_SYSTEMS,
+    JSON.parse(JSON.stringify([...manager.systems.values()]))
+  );
 
   const visibility = new RecipeVisibilityService(recipeManager, manager);
   let flagPasses = 0;
@@ -485,7 +493,7 @@ describe('the resolution-mode migration calls the SET form once', () => {
 
     assert.deepEqual(fixture.persistedRecipeIds(), [], 'both un-migratable recipes went');
     assert.equal(fixture.writesOf(SETTING_KEYS.RECIPES), 1, 'one `recipes` write for the whole set');
-    assert.equal(fixture.flagPasses(), 1, 'one actor-flag pass for the whole set');
+    assert.equal(fixture.flagPasses(), 1, 'one learned-recipes flag pass for the whole set');
 
     // `updateSystem` persists the merged system BEFORE the migration runs, so the claim is
     // about the writes the DELETE adds: exactly one, after the recipes write.
