@@ -1,0 +1,48 @@
+{
+  "profile": "rich-corpus",
+  "harnessVersion": 2,
+  "seed": 1071,
+  "description": "5,000 alternative/tag/tool/essence-heavy recipes over 5,000 components and 200 tools.",
+  "construction": "literal payloads; the ingredient-solver cases hydrate a bounded subset",
+  "requiresNodeModules": false,
+  "ceiling": null,
+  "scale": {
+    "components": 5000,
+    "recipes": 5000,
+    "tools": 200,
+    "heldStacks": 20
+  },
+  "inventoryMix": [
+    {
+      "stacks": 20,
+      "unmatched": 14,
+      "durable": 4,
+      "sourceRef": 2,
+      "books": 0,
+      "unmatchedRatio": 0.7,
+      "sourceActorCount": 1
+    }
+  ],
+  "checksums": {
+    "corpus": "f505eacf7b5ef6d1",
+    "components": "809d88ddd68a3ff3",
+    "inventory": "b3fadd9c07c1d700"
+  },
+  "cases": {
+    "ingredientSet.resolveIngredientSelection": {
+      "description": "The bounded backtracking ingredient solver over 12 adversarial multi-option recipes (3 sets x 3 groups x 3 options each). Hydrated, because the solver is a model method; the matcher-invocation count is the per-node work term #1083 targets, and the candidate-examination count is what each node actually costs.",
+      "counts": {
+        "componentCandidatesExamined": 56246901,
+        "ingredientMatcherInvocations": 10020,
+        "selectionsResolved": 36,
+        "selectionsSatisfied": 12
+      }
+    },
+    "recipeVisibility.getVisibleRecipes.global": {
+      "description": "The corpus-wide visibility pass in global mode over 5,000 rich recipes.",
+      "counts": {
+        "visibleRecipes": 5000
+      }
+    }
+  }
+}

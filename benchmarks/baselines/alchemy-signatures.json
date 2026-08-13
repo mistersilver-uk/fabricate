@@ -1,0 +1,52 @@
+{
+  "profile": "alchemy-signatures",
+  "harnessVersion": 2,
+  "seed": 1071,
+  "description": "2,000 enabled alchemy signatures with a controlled 10% collision pool over 500 components.",
+  "construction": "literal payloads",
+  "requiresNodeModules": false,
+  "ceiling": "Capped at 2,000, not the 5,000 target: validateSystem is quadratic (~6.1 s per audit at 5,000), and the pre-fix N-audits-per-N-rows behaviour extrapolates to ~8.5 hours for one GM manager open. Prove #1074 with the comparison counter, never with wall clock.",
+  "scale": {
+    "components": 500,
+    "recipes": 2000,
+    "collidingRecipes": 200
+  },
+  "inventoryMix": [
+    {
+      "stacks": 20,
+      "unmatched": 14,
+      "durable": 4,
+      "sourceRef": 2,
+      "books": 0,
+      "unmatchedRatio": 0.7,
+      "sourceActorCount": 1
+    }
+  ],
+  "checksums": {
+    "corpus": "7f96e44bd6958778",
+    "components": "9b8f1efaee4d5fdf",
+    "inventory": "37fd544e256af8b9"
+  },
+  "cases": {
+    "signatureValidator.validateSystem": {
+      "description": "The pairwise enabled-signature audit over 2,000 signatures. The comparison counter is the number #1074 must move; the wall clock at full 5,000 scale is unobtainable.",
+      "counts": {
+        "componentCandidatesExamined": 4400000,
+        "signatureComparisons": 1999000,
+        "conflicts": 8800
+      }
+    },
+    "alchemyListing.buildListing": {
+      "description": "The alchemy workbench open, bounded to 100 rows of the signature corpus.",
+      "counts": {
+        "componentCandidatesExamined": 14021,
+        "craftingActorItemsReads": 2,
+        "craftingActorItemsScanned": 20,
+        "sourceActor0ItemsReads": 2,
+        "sourceActor0ItemsScanned": 20,
+        "knownRecipes": 0,
+        "chooserSystems": 1
+      }
+    }
+  }
+}
