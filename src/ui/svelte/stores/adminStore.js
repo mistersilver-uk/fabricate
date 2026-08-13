@@ -6252,7 +6252,7 @@ export function createAdminStore(services) {
       if (recipes === 1) {
         return [
           'FABRICATE.Admin.Manager.Essence.DeleteConfirm.ContentOne',
-          `Delete essence ${name}? It will be removed from ${components} component(s), and 1 recipe(s) that requires it will be rewritten. ${permanence}.`,
+          `Delete essence ${name}? It will be removed from ${components} component(s), and 1 recipe that requires it will be rewritten. ${permanence}.`,
         ];
       }
       return [
@@ -6270,7 +6270,7 @@ export function createAdminStore(services) {
       if (recipes === 1) {
         return [
           'FABRICATE.Admin.Manager.Essence.DeleteConfirm.ContentRecipesOne',
-          `Delete essence ${name}? 1 recipe(s) that requires it will be rewritten. ${permanence}.`,
+          `Delete essence ${name}? 1 recipe that requires it will be rewritten. ${permanence}.`,
         ];
       }
       return [

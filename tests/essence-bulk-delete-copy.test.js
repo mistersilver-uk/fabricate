@@ -195,7 +195,7 @@ describe('1156/copy the essence delete dialog uses correct verb agreement at rec
     const sentence = interpolate(deleteConfirm.ContentRecipesOne, { name: 'Fire' });
     assert.match(
       sentence,
-      /1 recipe\(s\) that requires it/,
+      /1 recipe that requires it/,
       'singular verb "requires" at recipes: 1'
     );
     assert.ok(!sentence.includes('that require it'), 'not plural "require"');
@@ -206,7 +206,7 @@ describe('1156/copy the essence delete dialog uses correct verb agreement at rec
     const sentence = interpolate(deleteConfirm.ContentRecipesOne, { name: 'Fire' });
     assert.equal(
       sentence,
-      'Delete essence Fire? 1 recipe(s) that requires it will be rewritten. Deleting is permanent — an essence you recreate is a new essence.'
+      'Delete essence Fire? 1 recipe that requires it will be rewritten. Deleting is permanent — an essence you recreate is a new essence.'
     );
   });
 
@@ -214,7 +214,7 @@ describe('1156/copy the essence delete dialog uses correct verb agreement at rec
     const sentence = interpolate(deleteConfirm.ContentOne, { name: 'Fire', components: 2 });
     assert.match(
       sentence,
-      /1 recipe\(s\) that requires it/,
+      /1 recipe that requires it/,
       'singular verb "requires" at recipes: 1'
     );
     assert.ok(!sentence.includes('that require it'), 'not plural "require"');
@@ -226,7 +226,7 @@ describe('1156/copy the essence delete dialog uses correct verb agreement at rec
     const sentence = interpolate(deleteConfirm.ContentOne, { name: 'Fire', components: 2 });
     assert.equal(
       sentence,
-      'Delete essence Fire? It will be removed from 2 component(s), and 1 recipe(s) that requires it will be rewritten. Deleting is permanent — an essence you recreate is a new essence.'
+      'Delete essence Fire? It will be removed from 2 component(s), and 1 recipe that requires it will be rewritten. Deleting is permanent — an essence you recreate is a new essence.'
     );
   });
 });
