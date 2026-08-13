@@ -4936,6 +4936,11 @@ export class CraftingSystemManager {
    * @param {Iterable<string>} componentIds ids of the components to mutate.
    * @param {{category?: string, addTags?: string[], removeTags?: string[],
    *   essences?: Record<string, number>, difficulty?: number|null|string}} [edit]
+   * @param {{persist?: boolean}} [options] - Set `persist=false` for a batch caller that
+   *   issues several set-applies (e.g. the folder-import commit, one per mapped folder) and
+   *   then a SINGLE `save()` for the whole run. Only the `craftingSystems` write is gated;
+   *   the cohort resolution, mutation, re-normalization and returned counts are identical.
+   *   Default `true` keeps the GM browser's one-shot bulk edit writing immediately.
    * @returns {Promise<{updated: number, componentIds: string[]}>} the ids the edit was
    *   APPLIED TO — the resolved cohort, not a diff. `changedIds` is pushed for every id in
    *   the target set that resolves to a component, whether or not any value differs, so a
@@ -4944,7 +4949,7 @@ export class CraftingSystemManager {
    *   diff here would have to reproduce the normalization `_normalizeComponent` performs.
    *   Matches {@link CraftingSystemManager#applyBulkEditToEssences}'s contract exactly.
    */
-  async applyBulkEditToComponents(systemId, componentIds, edit = {}) {
+  async applyBulkEditToComponents(systemId, componentIds, edit = {}, options = {}) {
     this._assertGM('apply a bulk edit to components');
     const system = this.getSystem(systemId);
     if (!system) throw new Error(`Crafting system not found: ${systemId}`);
@@ -5000,7 +5005,7 @@ export class CraftingSystemManager {
       changedIds.push(String(component.id));
     }
 
-    if (changedIds.length > 0) await this.save();
+    if (changedIds.length > 0 && options.persist !== false) await this.save();
     return { updated: changedIds.length, componentIds: changedIds };
   }
 
