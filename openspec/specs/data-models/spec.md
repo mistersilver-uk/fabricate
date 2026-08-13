@@ -2630,6 +2630,49 @@ Tests MUST cover a same-primary-value call that repairs an unsatisfied ancillary
 This requirement applies only when the application composes separate sequential API calls into one invariant.
 A single Foundry atomic or batched document operation does not require application-level compensation merely because its one API call writes several documents or fields.
 
+## Runtime Read Indexes and Revision Tokens
+
+Runtime read indexes and revision tokens are **derived, in-memory, per-client state**.
+They change no persisted shape, are never serialized, never cross the wire, and are rebuildable in full from the authoritative persisted definitions.
+A client that discarded every one of them would answer every question identically, only slower.
+
+### Runtime Read Indexes
+
+The runtime managers MAY retain `Map`-backed read indexes over a crafting system's definition arrays — components, first-class tools, essence definitions and recipe-item definitions — so that identity resolution, name-fallback matching and reverse book-membership lookups are constant-time rather than a linear scan per owned item.
+
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
+
+| Requirement | Rule |
+| --- | --- |
+| **System-scoped** | An index is derived from ONE system's candidate array and MUST NOT be keyed globally. Component, tool and recipe-item ids are unique only within a system — a copy-imported system deliberately preserves its origin's ids — so a globally-keyed index would resolve an item to a definition in a system it does not belong to. |
+| **Precedence-preserving** | An indexed lookup MUST return exactly the definition the equivalent `Array.find()` returned. Id, exact-name and folded-name facets are therefore first-insert-wins in array order, source-reference lookups take the EARLIEST matching candidate in array order (not the first matching reference), and membership buckets keep array order. |
+| **Case semantics are held apart** | The exact-name and case-folded name facets are separate. The read/craft sites match case-INSENSITIVELY and the salvage/destroy site matches case-SENSITIVELY, deliberately; one folded facet cannot serve both, and collapsing them would let bulk destroy delete items belonging to a differently-cased component. |
+| **Telemetry-preserving** | A name-only match MUST still emit the deprecation telemetry defined for the name fallback — once per `(system, definition, item name)`, for the matched definition only. An index that resolves faster but stops emitting it removes the signal that tells a GM their items are unstamped. |
+| **Explicitly invalidated** | An index derived from array `A` is valid while `A` is the same object, has the same length, and carries the same index revision. Any in-place mutation of `A` — replacing or reordering an element, or rewriting an INDEXED FIELD of an element (`id`, `name`, `registeredItemUuid`, `originItemUuid`, `aliasItemUuids`, `recipeIds`) — MUST advance that array's index revision. Rebuilding the array is itself sufficient. |
+
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
+
+An index is a cache, so a stale index is a correctness defect that presents as a data defect.
+Tests MUST cover invalidation directly: a definition added, renamed, deleted and reordered through the manager's own API must each be visible to the very next resolution, including the constant-length element replacement that neither array identity nor length can detect.
+
+### Revision Tokens
+
+A **revision token** is an opaque non-negative integer, monotonically increasing within one scope of one manager, starting at `0`.
+Its value carries no meaning; the only supported operation is `===` against a token the same consumer read earlier from the same scope.
+It is per-client and per-process: it is never persisted, never replicated, and carries no meaning on another client.
+
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
+
+| Requirement | Rule |
+| --- | --- |
+| **Managers mint, consumers read** | Only the recipe and crafting-system managers advance a token. A consumer holds a token and compares it; it never advances one. |
+| **Two granularities, both published** | Every mutation advances the DOMAIN scope and the affected crafting system's scope. A consumer that can attribute its cache to one system watches the narrow scope and is untouched by an edit elsewhere; a consumer that cannot watches the domain scope. |
+| **A move advances both systems** | A recipe moved between crafting systems advances the scopes of the system it left AND the system it joined, because a consumer watching the former must also stop trusting its cache. |
+| **Comparable without serializing the corpus** | Change detection MUST NOT serialize the whole collection. A reload that finds no change MUST advance no token, and MUST answer that question by short-circuiting record-wise comparison rather than by hashing or stringifying the corpus. |
+| **Remote edits arrive as local reloads** | A remote edit reaches a client as a replicated setting change; the client's `reload()` detects it and advances the LOCAL token, which is what a local consumer needs. |
+
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
+
 ## Behavioural Ownership
 
 - Resolution mode semantics and mode validation: `resolution-modes/spec.md`
