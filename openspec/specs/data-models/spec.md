@@ -2541,26 +2541,34 @@ They are unrelated mechanisms.
 
 ### Dynamic DC Macro Contract
 
-A configured dynamic DC macro receives one payload object containing:
+Before any check resolves its DC, Fabricate computes an **anchor DC** via `CraftingEngine._resolveCheckAnchorDc`.
+The anchor is the record's selected difficulty tier — the recipe's `checkTierId` matched against the check config's `tiers[].id` — when it names a tier that still exists, and the check config's static `dc` otherwise.
+
+A `SimpleCheck` or `RoutedCheck` normalizes its `dc` to a finite integer, defaulting to 15, on every save (`CraftingSystemManager._normalizeSimpleCraftingCheck` / `_normalizeRoutedCraftingCheck`), so a normalized record's static `dc` is never absent or non-finite.
+`_resolveCheckAnchorDc`'s own fallback to a literal `15` therefore guards only a config object that skipped that normalization and is not reachable through normal play.
+
+When `dcMode` is anything other than `dynamic`, the anchor IS the resolved DC and no macro runs.
+When `dcMode` is `dynamic` and a macro is configured, `CraftingEngine._resolveSimpleCheckDc` runs it and hands it one payload object containing:
 
 - `recipe`
 - `craftingSystem`
 - `craftingActor`
 - `candidateIngredientSet`
+- `anchorDc` — the anchor DC resolved above, before the macro runs
 
 Fabricate exposes that exact object with identity as `scope`, `context`, and `args`.
 The `scope` identifier provides Foundry-facing familiarity while `context` and `args` remain backward-compatible aliases.
 This is not full native `Macro#execute` behavior: Foundry's native `scope` is a rest copy, and Fabricate does not add Foundry's native `speaker`, `actor`, `token`, or `character` locals.
 
 Fabricate applies `Number(result)` to the macro's return value.
-When the coerced value is finite, Fabricate truncates it to an integer and uses it as the dynamic DC.
-An absent configured macro, a thrown error, or a result whose numeric coercion is non-finite falls back to the configured static DC.
+When the coerced value is finite, Fabricate truncates it to an integer and uses it as the DC.
+An absent configured macro, a thrown error, or a result whose numeric coercion is non-finite all leave the anchor DC in force, so a per-record difficulty tier and a dynamic DC macro compose rather than acting as alternatives: the tier sets the number the macro is asked to adjust.
 
 The shared executor deliberately evaluates the selected script Macro command instead of calling `Macro#execute`.
 This keeps player-initiated workflows from being blocked by Foundry's current-user Macro permission gate.
 The direct evaluation bypasses only the client-side Macro document check and grants no additional server or document authority; the script still runs as the current player.
 Foundry runtime globals `game`, `foundry`, `ui`, and `fromUuid` remain directly available and are not injected as payload parameters.
-Errors thrown by a configured macro propagate unchanged to the owning Fabricate workflow, which decides whether to abort or apply a documented fallback such as the dynamic DC fallback above.
+Errors thrown by a configured macro propagate unchanged to the owning Fabricate workflow, which decides whether to abort or apply a documented fallback such as the anchor-DC fallback above.
 
 ### Crafting Check Macro Contract (Removed in 1.8.0)
 
