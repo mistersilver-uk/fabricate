@@ -28,6 +28,15 @@
   arms. Do not substitute a `confirmDialog`, and do not remove the impact list and leave the
   arm — the carve-out is the pair, not the button.
 
+  The pairing is also wired for assistive tech rather than left to proximity: the impact list
+  carries an id and is the button's `aria-describedby`, and arming — which changes the
+  button's label and name UNDER FOCUS, where a name change is not reliably announced — is
+  announced through its own polite live region.
+
+  A count of ZERO is omitted rather than rendered. The components row always renders; the
+  recipe rows appear only when they have something to say, so the commonest selection of all
+  (components no recipe names) states one fact instead of one fact and two noughts.
+
   ── NOTHING IS WRITTEN UNTIL APPLY ────────────────────────────────────────────────
   Every control stages into a draft the CALLER owns; the browser rows do not change while
   staging. The draft helpers in `componentBulkEditModel.js` are IMMUTABLE — each returns a
@@ -242,15 +251,21 @@
           { count: impact.recipesRewritten }
         )
   );
+  // Names the TRANSITION, not a state. `recipesDisabled` counts only recipes that are
+  // enabled TODAY and will become disabled — an already-disabled recipe is excluded by
+  // design, because the number warns about craftability the GM is about to lose rather than
+  // restating what was already off. "N of those recipes will be left uncraftable and
+  // disabled" read as a statement about the resulting state, under which an already-disabled
+  // recipe belongs in the count and its absence looks like an undercount.
   const impactDisabledLabel = $derived(
     impact.recipesDisabled === 1
       ? text(
           'FABRICATE.Admin.Manager.Component.BulkEdit.ImpactDisabledOne',
-          '1 of those recipes will be left uncraftable and disabled.'
+          '1 of those recipes is enabled today and will be disabled.'
         )
       : format(
           'FABRICATE.Admin.Manager.Component.BulkEdit.ImpactDisabled',
-          '{count} of those recipes will be left uncraftable and disabled.',
+          '{count} of those recipes are enabled today and will be disabled.',
           { count: impact.recipesDisabled }
         )
   );
@@ -264,6 +279,32 @@
             count: impact.deletable,
           }
         )
+  );
+  // WCAG 2.5.3 Label in Name: the accessible name must CONTAIN the visible label, so a
+  // speech-input user can activate the control by saying what they can read. The armed
+  // button reads `Confirm delete`, so the name opens with that exact string and the counts
+  // follow it — "Confirm deleting 3 component(s)…" does not contain "Confirm delete" and
+  // was therefore unactivatable by voice. The idle pair needs no such reordering: its
+  // `…DeleteAria*` sibling is the visible label verbatim.
+  const deleteArmedAriaLabel = $derived(
+    format(
+      'FABRICATE.Admin.Manager.Component.BulkEdit.DeleteConfirmAria',
+      'Confirm delete — {count} component(s), {recipes} recipe(s)',
+      { count: impact.deletable, recipes: impact.recipesRewritten }
+    )
+  );
+  // Arming changes the button's LABEL and its accessible name while it holds focus, and a
+  // name change under focus is not reliably announced. So the state change is announced in
+  // its own polite region instead. It empties on disarm, which is also what makes a
+  // RE-arm announce: the region's text has to change to be spoken.
+  const deleteArmedAnnouncement = $derived(
+    deleteArmed === true
+      ? format(
+          'FABRICATE.Admin.Manager.Component.BulkEdit.DeleteArmedAnnouncement',
+          'Delete armed. Activate again to delete {count} component(s) and rewrite {recipes} recipe(s).',
+          { count: impact.deletable, recipes: impact.recipesRewritten }
+        )
+      : ''
   );
   // `Unchanged`, NOT "Leave unchanged". This label sits on a `<button>` whose activation
   // ARMS the axis, so an imperative reading ("leave unchanged") names the opposite of what
@@ -623,18 +664,38 @@
     `describeComponentDeleteImpact` owns that arithmetic and counts through the very functions
     the delete executes through; this component only renders it.
   -->
-  <ul class="manager-component-bulk-impact" data-component-bulk-impact>
+  <ul
+    id="component-bulk-delete-impact"
+    class="manager-component-bulk-impact"
+    data-component-bulk-impact
+  >
     <li data-component-bulk-impact-row="components">
       {impactComponentsLabel}
     </li>
-    <li data-component-bulk-impact-row="recipes">
-      {impactRecipesLabel}
-    </li>
-    <li data-component-bulk-impact-row="disabled">
-      {impactDisabledLabel}
-    </li>
+    <!--
+      A ZERO row is omitted rather than stated. "0 recipes will be rewritten." is noise on the
+      commonest selection there is — components no recipe names — and it pushes the one number
+      that always matters, the component count, into a list of mostly nothing. The components
+      row is unconditional: it is the statement of what the button does, and a delete card that
+      states nothing has lost the pairing the arm depends on.
+    -->
+    {#if impact.recipesRewritten > 0}
+      <li data-component-bulk-impact-row="recipes">
+        {impactRecipesLabel}
+      </li>
+    {/if}
+    {#if impact.recipesDisabled > 0}
+      <li data-component-bulk-impact-row="disabled">
+        {impactDisabledLabel}
+      </li>
+    {/if}
   </ul>
 
+  <!--
+    The impact list is the button's DESCRIPTION, not merely adjacent to it: `aria-describedby`
+    is what makes a screen-reader user hear the consequence when they arrive at the control,
+    rather than only if they happen to have read the list on the way past.
+  -->
   <ArmedDangerButton
     token="delete-components"
     armed={deleteArmed === true}
@@ -642,15 +703,16 @@
     idleLabel={deleteLabel}
     armedLabel={text('FABRICATE.Admin.Manager.Component.BulkEdit.DeleteConfirm', 'Confirm delete')}
     idleAriaLabel={deleteAriaLabel}
-    armedAriaLabel={format(
-      'FABRICATE.Admin.Manager.Component.BulkEdit.DeleteConfirmAria',
-      'Confirm deleting {count} component(s) and rewriting {recipes} recipe(s)',
-      { count: impact.deletable, recipes: impact.recipesRewritten }
-    )}
+    armedAriaLabel={deleteArmedAriaLabel}
+    describedBy="component-bulk-delete-impact"
     onArm={onArmDelete}
     onDisarm={onDisarmDelete}
     onConfirm={() => onDelete(impact.deletableIds)}
   />
+
+  <p class="visually-hidden" aria-live="polite" data-component-bulk-delete-announce>
+    {deleteArmedAnnouncement}
+  </p>
 </section>
 
 <style>
@@ -712,7 +774,22 @@
      size — visibly chunkier than every other right-rail control. Scoped to this card only, so
      the row-level `ArmedDangerButton` uses elsewhere in the manager are untouched, and only
      the type scale changes — the danger/armed colour treatment from `styles/fabricate.css`
-     is untouched. */
+     is untouched.
+
+     THIS RULE AND THE `-impact` RULE BELOW ARE DELIBERATE SECOND COPIES of the Essence
+     Studio's identical blocks, and were reviewed for extraction and kept (issue 1129). The
+     two candidate destinations both cost more than the duplication saves:
+
+      - `styles/fabricate.css` re-routes any future edit to the broad `theme-or-global-ui`
+        recipe in `scripts/ui-pr-screenshot-evidence.mjs`, which is the exact outcome the
+        block comment at the top of this `<style>` exists to prevent;
+      - `ArmedDangerButton` itself would need a size variant prop, which changes the Essence
+        Studio's markup and its own capture routing for a change that is not about essences.
+
+     A shared `BulkDeleteCard` component is the honest extraction, but it reshapes two
+     shipped studios and belongs to its own change rather than to this one. The duplication
+     is two short rules in scoped Svelte `<style>` blocks, which SonarCloud does not analyse,
+     so nothing but the reader pays for it. */
   .manager-component-bulk-delete :global(.manager-button) {
     min-height: 34px;
     padding: 0 var(--fab-space-3);

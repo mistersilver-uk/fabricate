@@ -4242,23 +4242,50 @@
     componentBulkDeleting = true;
     try {
       const result = await store.deleteComponents?.(targets);
-      if (!result) return false;
+      // A FAILED write returns the store's zero result, which is an OBJECT and therefore
+      // truthy — `if (!result)` alone caught only the absent-action case and let a failed
+      // delete clear the selection and report "Deleted 0 component(s)" on top of the error
+      // toast the store already raised. Nothing was deleted, so nothing is announced and the
+      // selection stays put; the arm is dropped either way, because the GM's confirmation has
+      // been spent and a still-armed button would delete on the next single click.
+      const deleted = Number(result?.deleted) || 0;
       componentBulkDeleteArmed = false;
+      if (deleted === 0) return false;
       clearComponentBulkSelection();
       notifyInfo(componentBulkDeletedMessage(result));
       return true;
+    } catch (err) {
+      // The store catches its own write failures, so reaching here means the failure was
+      // elsewhere. Swallowing it at the boundary keeps an unhandled rejection out of a click
+      // handler that has no caller to receive it.
+      console.error('Fabricate | Failed to delete the selected components:', err);
+      return false;
     } finally {
       componentBulkDeleting = false;
     }
   }
 
+  // `recipesDisabled` is the most consequential outcome of the three — recipes the GM's
+  // players could craft this morning and cannot craft now — and the toast is the ONLY
+  // feedback that survives the panel unmounting on a successful delete. It is reported when
+  // non-zero, and the zero case takes the shorter sentence rather than trailing ", disabling
+  // 0 of them", which reads as a warning about nothing.
   function componentBulkDeletedMessage(result) {
-    return text(
-      'FABRICATE.Admin.Manager.Component.BulkEdit.Deleted',
-      'Deleted {count} component(s) and rewrote {recipes} recipe(s).'
-    )
+    const disabled = Number(result?.recipesDisabled) || 0;
+    const template =
+      disabled > 0
+        ? text(
+            'FABRICATE.Admin.Manager.Component.BulkEdit.DeletedWithDisabled',
+            'Deleted {count} component(s) and rewrote {recipes} recipe(s), disabling {disabled} of them.'
+          )
+        : text(
+            'FABRICATE.Admin.Manager.Component.BulkEdit.Deleted',
+            'Deleted {count} component(s) and rewrote {recipes} recipe(s).'
+          );
+    return template
       .replace('{count}', Number(result?.deleted) || 0)
-      .replace('{recipes}', Number(result?.recipesUpdated) || 0);
+      .replace('{recipes}', Number(result?.recipesUpdated) || 0)
+      .replace('{disabled}', disabled);
   }
 
   // ── Recipe bulk edit (issue 1010) ────────────────────────────────────────────────
