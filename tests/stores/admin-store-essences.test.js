@@ -399,6 +399,65 @@ test('1036: deleteEssence hands the cascade impact counts to the confirm dialog'
 });
 
 // ---------------------------------------------------------------------------
+// Issue 1156 — the singular delete dialog omits a stated-zero consequence, per
+// consequence, the essence sibling of the recipe dialog's #1152 fix.
+// ---------------------------------------------------------------------------
+
+test('1156: deleteEssence selects the plain branch when neither consequence is non-zero', async () => {
+  const harness = makeEssenceStoreHarness({
+    essences: [makeEssence({ id: 'fire', name: 'Fire' })],
+  });
+  const store = await openStore(harness);
+
+  await store.deleteEssence('fire');
+
+  const plain = harness.localizations.find(
+    (call) => call.key === 'FABRICATE.Admin.Manager.Essence.DeleteConfirm.ContentPlain'
+  );
+  assert.ok(plain, 'the plain branch is localized when there is nothing to state');
+  assert.deepEqual(plain.data, { name: 'Fire', components: 0, recipes: 0 });
+  assert.equal(
+    harness.localizations.some(
+      (call) => call.key === 'FABRICATE.Admin.Manager.Essence.DeleteConfirm.Content'
+    ),
+    false,
+    'the combined branch is never reached at (0, 0)'
+  );
+});
+
+test('1156: deleteEssence selects the components-only branch when only components carry it', async () => {
+  const harness = makeEssenceStoreHarness({
+    essences: [makeEssence({ id: 'fire', name: 'Fire' })],
+    components: [{ id: 'c1', name: 'Ember', essences: { fire: 2 } }],
+  });
+  const store = await openStore(harness);
+
+  await store.deleteEssence('fire');
+
+  const call = harness.localizations.find(
+    (entry) => entry.key === 'FABRICATE.Admin.Manager.Essence.DeleteConfirm.ContentComponents'
+  );
+  assert.ok(call, 'the components-only branch is localized');
+  assert.deepEqual(call.data, { name: 'Fire', components: 1, recipes: 0 });
+});
+
+test('1156: deleteEssence selects the recipes-only branch when only a recipe requires it', async () => {
+  const harness = makeEssenceStoreHarness({
+    essences: [makeEssence({ id: 'fire', name: 'Fire' })],
+    recipes: [recipeWithSetEssence('r1', 'fire')],
+  });
+  const store = await openStore(harness);
+
+  await store.deleteEssence('fire');
+
+  const call = harness.localizations.find(
+    (entry) => entry.key === 'FABRICATE.Admin.Manager.Essence.DeleteConfirm.ContentRecipes'
+  );
+  assert.ok(call, 'the recipes-only branch is localized');
+  assert.deepEqual(call.data, { name: 'Fire', components: 0, recipes: 1 });
+});
+
+// ---------------------------------------------------------------------------
 // deleteEssences — the set delete deletes every member; usage never blocks it
 // ---------------------------------------------------------------------------
 
