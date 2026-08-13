@@ -15,7 +15,6 @@ import {
 import { getSetting, setSetting, SETTING_KEYS } from '../config/settings.js';
 import { migrateRecipeForModeChange } from '../migration/migrateRecipeForModeChange.js';
 import { deriveToolSourceFromComponents } from '../migration/migrateToolsToFirstClass.js';
-import { getIngredientComponentId } from '../models/match/matchTypes.js';
 import { Tool, TOOL_BREAKAGE_MODES as TOOL_BREAKAGE_MODE_LIST } from '../models/Tool.js';
 import { normalizeSelectionIds } from '../utils/bulkSelectionModel.js';
 import { normalizeCategoryIconMap } from '../utils/categoryIcons.js';
@@ -31,6 +30,12 @@ import {
   normalizeCustomRecipeCategories,
   normalizeRecipeCategory,
 } from '../utils/recipeCategories.js';
+import {
+  recipeLostItsShape,
+  recipeReferencesAnyComponent,
+  recipeReferencesComponent,
+  stripComponentsFromRecipeJson,
+} from '../utils/recipeComponentReferences.js';
 import { recipeReferencesEssence } from '../utils/recipeEssenceReferences.js';
 import { resolveRecipeCheckTierOptions } from '../utils/routedOutcomeKeywords.js';
 import {
@@ -5438,99 +5443,218 @@ export class CraftingSystemManager {
 
   async deleteItem(systemId, itemId) {
     this._assertGM('delete component');
+    const outcome = await this._deleteComponentSet(systemId, [itemId]);
+    if (outcome.deleted === 0) return false;
+
+    if (outcome.recipesUpdated > 0) {
+      ui?.notifications?.info?.(
+        `Removed "${outcome.removedNames[0] || 'component'}" and updated ${outcome.recipesUpdated} recipe(s).`
+      );
+    }
+
+    await this._reconcileAlchemySignaturesAfterDeletion(outcome.system);
+
+    return true;
+  }
+
+  /**
+   * Delete a SET of components in ONE `craftingSystems` write and ONE `recipes` write
+   * (issue 1129).
+   *
+   * **The batched recipe cascade is the point of this method existing**, exactly as it is for
+   * {@link CraftingSystemManager#deleteEssences}. Looping {@link CraftingSystemManager#deleteItem}
+   * would issue one `craftingSystems` write per component AND — because
+   * {@link RecipeManager#updateRecipe} ends in its own `save()`, a full replace of the `recipes`
+   * world setting — one `recipes` write per rewritten recipe per component, each triggering a
+   * serialization diff plus `Hooks.callAll` on EVERY connected client. A recipe referencing
+   * two deleted components would be written twice and COUNTED twice. Instead the union rewrite
+   * is computed per recipe ONCE and exactly one `recipes` save, one `this.save()`, one
+   * `_notifySystemsChanged()`, one summary notification and one
+   * `_reconcileAlchemySignaturesAfterDeletion` follow.
+   *
+   * Because both settings are REPLACED rather than merged, neither needs a `-=` deletion key.
+   *
+   * In-use components are NOT refused. Deletion is warned, not blocked: the caller states the
+   * recipe impact before arming, and the cascade rewrites every referencing recipe.
+   *
+   * `recipesDisabled` counts recipes this call took from enabled to disabled — a recipe that
+   * was already disabled is not counted, because the number exists to warn about craftability
+   * the GM is about to lose, not to restate what was already off.
+   *
+   * @param {string} systemId
+   * @param {Iterable<string>} componentIds
+   * @returns {Promise<{deleted: number, componentIds: string[], recipesUpdated: number,
+   *   recipesDisabled: number}>}
+   */
+  async deleteComponents(systemId, componentIds) {
+    this._assertGM('delete components');
+    const outcome = await this._deleteComponentSet(systemId, componentIds);
+    if (outcome.deleted === 0) {
+      return { deleted: 0, componentIds: [], recipesUpdated: 0, recipesDisabled: 0 };
+    }
+
+    this._notifySystemsChanged();
+
+    if (outcome.recipesUpdated > 0) {
+      ui?.notifications?.info?.(
+        `Removed ${outcome.deleted} component(s) and updated ${outcome.recipesUpdated} recipe(s).`
+      );
+    }
+
+    await this._reconcileAlchemySignaturesAfterDeletion(outcome.system);
+
+    return {
+      deleted: outcome.deleted,
+      componentIds: outcome.componentIds,
+      recipesUpdated: outcome.recipesUpdated,
+      recipesDisabled: outcome.recipesDisabled,
+    };
+  }
+
+  /**
+   * The shared body of {@link CraftingSystemManager#deleteItem} and
+   * {@link CraftingSystemManager#deleteComponents}: remove the components, repair every
+   * reference to them, and persist once.
+   *
+   * Both public deletes route through here so they cannot disagree about what deleting a
+   * component reaches. It deliberately does NOT assert GM, notify, or reconcile alchemy
+   * signatures — each caller owns its own message and the singular form keeps its historical
+   * silence on `_notifySystemsChanged`.
+   *
+   * The recipe rewrites run BEFORE `await this.save()`, as both essence deletes already do.
+   * That ordering is only safe because the activation blocker lives in
+   * `_validateRecipeForActivation` and NOT in `_validateRecipeForPersistence`: a
+   * persistence-level blocker would throw partway through the loop with `components` and
+   * `essenceDefinitions` already mutated in memory, some recipes written, and nothing persisted.
+   *
+   * ── ONE REFERENCE CLASS IS DELIBERATELY LEFT DANGLING ─────────────────────────────
+   * A SURVIVING component's `salvage.resultGroups[].results` may name a deleted component,
+   * and nothing here repairs it — the shipped `deleteItem` did not either, and this method
+   * preserves that behaviour rather than widening the blast radius of a bug fix.
+   * `_cleanupSalvageRunsForComponent` covers actor RUN HISTORY only, which is a different
+   * store. The consequence is bounded and visible: the impact statement the bulk panel shows
+   * claims no salvage coverage, so it does not promise a repair that does not happen. Closing
+   * it changes what a delete does to stored components and warrants its own issue.
+   *
+   * @param {string} systemId
+   * @param {Iterable<string>} componentIds
+   * @returns {Promise<{deleted: number, componentIds: string[], removedNames: string[],
+   *   recipesUpdated: number, recipesDisabled: number, system: object}>}
+   * @private
+   */
+  async _deleteComponentSet(systemId, componentIds) {
     const system = this.getSystem(systemId);
     if (!system) throw new Error(`Crafting system not found: ${systemId}`);
-    const removed = system.components.find((i) => i.id === itemId);
-    const before = system.components.length;
-    const filteredItems = system.components.filter((i) => i.id !== itemId);
-    if (filteredItems.length === before) return false;
-    system.components = filteredItems;
 
-    // Clear essence source-item links that pointed to the deleted component.
+    const components = Array.isArray(system.components) ? system.components : [];
+    const requested = new Set(normalizeSelectionIds(componentIds));
+    const removed = components.filter((component) => requested.has(String(component?.id ?? '')));
+    if (removed.length === 0) {
+      return {
+        deleted: 0,
+        componentIds: [],
+        removedNames: [],
+        recipesUpdated: 0,
+        recipesDisabled: 0,
+        system,
+      };
+    }
+
+    const removedIds = removed.map((component) => String(component.id));
+    const removedIdSet = new Set(removedIds);
+    system.components = components.filter(
+      (component) => !removedIdSet.has(String(component?.id ?? ''))
+    );
+
+    // Clear essence source-item links that pointed to any deleted component.
     const essenceDefinitions = (system.essenceDefinitions || []).map((def) => ({
       ...def,
-      originItemUuid: def.originItemUuid === itemId ? null : def.originItemUuid,
-      associatedSystemItemId:
-        def.associatedSystemItemId === itemId ? null : def.associatedSystemItemId,
+      originItemUuid: removedIdSet.has(def.originItemUuid) ? null : def.originItemUuid,
+      associatedSystemItemId: removedIdSet.has(def.associatedSystemItemId)
+        ? null
+        : def.associatedSystemItemId,
     }));
     system.essenceDefinitions = essenceDefinitions;
     system.essences = essenceDefinitions.map((def) => def.id);
 
-    // Remove item references from recipes in this system and clean up empty groups.
-    // Only recipes that actually reference the deleted component are touched, so unrelated
-    // recipes are not re-saved (and do not trigger notifications).
-    const recipes = this.recipeManager
-      .getRecipes({})
-      .filter((r) => r.craftingSystemId === systemId && this._recipeReferencesComponent(r, itemId));
-    let updatedRecipeCount = 0;
-    for (const recipe of recipes) {
-      const updated = recipe.toJSON();
-      updated.ingredientSets = (updated.ingredientSets || [])
-        .map((set) => ({
-          ...set,
-          ingredientGroups: (set.ingredientGroups || [])
-            .map((group) => ({
-              ...group,
-              options: (group.options || []).filter(
-                (ing) => getIngredientComponentId(ing) !== itemId
-              ),
-            }))
-            .filter((group) => (group.options || []).length > 0),
-          ingredients: (set.ingredients || []).filter(
-            (ing) => (ing.componentId || ing.systemItemId) !== itemId
-          ),
-        }))
-        .map((set) => ({
-          ...set,
-          ingredients: (set.ingredientGroups || [])
-            .map((group) => group.options?.[0] || null)
-            .filter(Boolean),
-        }))
-        .filter(
-          (set) =>
-            (set.ingredientGroups?.length || set.ingredients?.length || 0) > 0 ||
-            Object.keys(set.essences || {}).length > 0
-        );
+    const { recipesUpdated, recipesDisabled } = await this._stripComponentsFromRecipes(
+      systemId,
+      removedIdSet
+    );
 
-      updated.resultGroups = (updated.resultGroups || [])
-        .map((group) => ({
-          ...group,
-          results: (group.results || []).filter(
-            (res) => (res.componentId || res.systemItemId) !== itemId
-          ),
-        }))
-        .filter((group) => (group.results || []).length > 0);
-      updated.results = (updated.results || []).filter(
-        (res) => (res.componentId || res.systemItemId) !== itemId
-      );
-
-      const hasResults =
-        (updated.resultGroups?.length || 0) > 0 || (updated.results?.length || 0) > 0;
-      if (updated.ingredientSets.length === 0 || !hasResults) {
-        updated.enabled = false;
-      }
-
-      await this.recipeManager.updateRecipe(recipe.id, updated, {
-        notify: false,
-        allowIncomplete: true,
-      });
-      updatedRecipeCount += 1;
+    // Clean up salvage runs referencing each deleted component.
+    for (const componentId of removedIds) {
+      await this._cleanupSalvageRunsForComponent(componentId, systemId);
     }
-
-    // Clean up salvage runs referencing the deleted component
-    await this._cleanupSalvageRunsForComponent(itemId, systemId);
 
     await this.save();
 
-    if (updatedRecipeCount > 0) {
-      ui?.notifications?.info?.(
-        `Removed "${removed?.name ?? 'component'}" and updated ${updatedRecipeCount} recipe(s).`
+    return {
+      deleted: removedIds.length,
+      componentIds: removedIds,
+      removedNames: removed.map((component) => String(component?.name ?? '')),
+      recipesUpdated,
+      recipesDisabled,
+      system,
+    };
+  }
+
+  /**
+   * Strip every deleted component from every referencing recipe in ONE `recipes` write.
+   *
+   * Each recipe is rewritten ONCE for the whole set — a recipe referencing two deleted
+   * components must not be written twice, nor counted twice — and the trailing `save()` is the
+   * only persist. Only recipes that actually reference a deleted component are touched, so
+   * unrelated recipes are not re-saved.
+   *
+   * The rewrite and the "no longer craftable" decision both live in
+   * `src/utils/recipeComponentReferences.js`, which is also what the bulk panel's impact
+   * statement counts through, so the stated numbers and the executed write cannot drift.
+   *
+   * @param {string} systemId
+   * @param {Set<string>} removedIdSet
+   * @returns {Promise<{recipesUpdated: number, recipesDisabled: number}>}
+   * @private
+   */
+  async _stripComponentsFromRecipes(systemId, removedIdSet) {
+    const recipes = this.recipeManager
+      .getRecipes({})
+      .filter(
+        (recipe) =>
+          recipe.craftingSystemId === systemId && recipeReferencesAnyComponent(recipe, removedIdSet)
       );
+
+    let recipesDisabled = 0;
+    for (const recipe of recipes) {
+      const { json } = stripComponentsFromRecipeJson(recipe, removedIdSet);
+      if (recipeLostItsShape(json)) {
+        if (json.enabled !== false) recipesDisabled += 1;
+        json.enabled = false;
+      }
+
+      await this.recipeManager.updateRecipe(recipe.id, json, {
+        persist: false,
+        notify: false,
+        emitChange: false,
+        allowIncomplete: true,
+      });
     }
 
-    await this._reconcileAlchemySignaturesAfterDeletion(system);
-
-    return true;
+    if (recipes.length > 0) {
+      await this.recipeManager.save();
+      // ONE change signal for the whole batch, restoring what `emitChange: false` suppressed.
+      //
+      // This is load-bearing rather than tidy. Before the batching, each rewrite left
+      // `emitChange` at its default and `updateRecipe` fired `recipesChanged` per recipe on
+      // the acting client. `settingChangeBridge` does NOT backfill it: it re-emits only when
+      // `recipeManager.reload()` returns truthy, and on the WRITING client the in-memory map
+      // already equals the saved setting, so `reload()` returns false. Without this line a
+      // GM's own crafting window keeps offering pre-rewrite recipes until an unrelated write.
+      // `deleteItem` deliberately does not call `_notifySystemsChanged()`, so it has no other
+      // signal at all.
+      this.recipeManager.notifyRecipesChanged({ action: 'update' });
+    }
+    return { recipesUpdated: recipes.length, recipesDisabled };
   }
 
   /**
@@ -5812,37 +5936,22 @@ export class CraftingSystemManager {
    * @private
    */
   _recipeLostItsShape(updated) {
-    const hasResults =
-      (updated.resultGroups?.length || 0) > 0 ||
-      (updated.results?.length || 0) > 0 ||
-      (updated.steps || []).some((step) => (step.resultGroups?.length || 0) > 0);
-    const hasIngredientSets =
-      (updated.ingredientSets?.length || 0) > 0 ||
-      (updated.steps || []).some((step) => (step.ingredientSets?.length || 0) > 0);
-    return !hasIngredientSets || !hasResults;
+    return recipeLostItsShape(updated);
   }
 
   /**
    * Whether a recipe references the given component in any ingredient set or result.
-   * Uses the same field matching as the strip logic in {@link deleteItem}.
+   * Uses the same field matching as the strip logic the component deletes execute.
+   *
+   * Delegates to the shared leaf (issue 1129) so this predicate, the strip, and the admin
+   * store's recipe-usage projection are one implementation rather than three.
+   *
    * @param {object} recipe
    * @param {string} itemId
    * @returns {boolean}
    */
   _recipeReferencesComponent(recipe, itemId) {
-    const data = typeof recipe.toJSON === 'function' ? recipe.toJSON() : recipe;
-    const matchesId = (ref) => getIngredientComponentId(ref) === itemId;
-
-    for (const set of data.ingredientSets || []) {
-      for (const group of set.ingredientGroups || []) {
-        if ((group.options || []).some(matchesId)) return true;
-      }
-      if ((set.ingredients || []).some(matchesId)) return true;
-    }
-    for (const group of data.resultGroups || []) {
-      if ((group.results || []).some(matchesId)) return true;
-    }
-    return (data.results || []).some(matchesId);
+    return recipeReferencesComponent(recipe, itemId);
   }
 
   /**

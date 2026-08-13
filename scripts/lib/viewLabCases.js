@@ -1688,6 +1688,85 @@ export const VIEW_LAB_CASES = Object.freeze([
     ],
   }),
   managerCase({
+    id: 'manager-components-bulk-delete-idle',
+    label: 'Manager — Components bulk delete idle',
+    reaches: 'beyond',
+    smokeLabels: [],
+    // The UNARMED face of the set delete (issue 1129), and the frame that actually
+    // photographs the impact statement.
+    //
+    // The bulk-edit cases above do NOT photograph it "for free". The delete card sits below
+    // the panel shell and below the sticky Apply dock, which puts it under the rail's fold at
+    // the registry's 1280x820 position — measured on the published
+    // `manager-components-bulk-edit-unstaged` frame, where the rail ends at the essence grid
+    // and the card is simply absent. The armed case only shows it because CLICKING the button
+    // scrolls it into view, and that frame shows the armed state by definition.
+    //
+    // Hence the explicit `scroll` step: `frame.screenshot()` does not scroll nested overflow
+    // containers, so without it the card is out of frame while every assertion still passes.
+    //
+    // `sm-iron-ingot` is selected on PURPOSE, and the choice is load-bearing. Through the real
+    // describer the lab fixture yields 7 recipes rewritten and 3 of them disabled, so this is
+    // the only frame in the registry that photographs the DISABLED row at all — the armed twin
+    // below selects iron+copper ore, which computes 2 / 1 / 0 and therefore photographs the
+    // zero-gating instead. Between the two, every branch of the impact list has a frame.
+    // Selecting an ore here as well would leave the card's most consequential sentence, and the
+    // one this round rewrote, with no visual evidence anywhere.
+    query: {},
+    steps: [
+      'Components',
+      { selector: 'label:has(input[data-component-select="sm-iron-ingot"])' },
+      { selector: '[data-component-bulk-delete-card]', scroll: true },
+    ],
+    expectView: 'components',
+    // UNARMED is the state under test, and `data-armed="false"` is what separates this frame
+    // from its armed twin below — an `expectSelector` naming only the card would pass on
+    // either.
+    expectSelector: '.fabricate-manager [data-arm-token="delete-components"][data-armed="false"]',
+    kinds: ['manager', 'components'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/Component/,
+      /^src\/ui\/svelte\/apps\/manager\/components?\//,
+      /^src\/utils\/recipeComponentReferences\.js$/,
+      BULK_EDIT_CHROME_PATTERN,
+    ],
+  }),
+  managerCase({
+    id: 'manager-components-bulk-delete-armed',
+    label: 'Manager — Components bulk delete armed',
+    reaches: 'beyond',
+    smokeLabels: [],
+    // The ARMED half of the set delete (issue 1129), the twin of
+    // `manager-essences-bulk-delete-armed`. The first click only ARMS, so this frame shows
+    // `Confirm delete` beside the impact statement it is a confirmation OF, with nothing
+    // written.
+    //
+    // Two frames rather than one because the two states are the point: the idle sibling
+    // directly above shows the impact statement rendered BEFORE arming, and this one shows
+    // that the arm is a second, separate act. Either frame alone would leave half of the
+    // pairing — statement plus arm — unphotographed.
+    query: {},
+    steps: [
+      'Components',
+      { selector: 'label:has(input[data-component-select="sm-iron-ore"])' },
+      { selector: 'label:has(input[data-component-select="sm-copper-ore"])' },
+      // The BUTTON, not the card: `ArmedDangerButton` stamps `data-arm-token` on the control
+      // it arms, so this cannot drift onto a wrapper the way a class selector could.
+      { selector: '[data-arm-token="delete-components"]' },
+    ],
+    expectView: 'components',
+    // Armed is a STATE, and a frame that merely re-photographed the idle button would be
+    // indistinguishable from the bulk-edit case above.
+    expectSelector: '.fabricate-manager [data-arm-token="delete-components"][data-armed="true"]',
+    kinds: ['manager', 'components'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/Component/,
+      /^src\/ui\/svelte\/apps\/manager\/components?\//,
+      /^src\/utils\/recipeComponentReferences\.js$/,
+      BULK_EDIT_CHROME_PATTERN,
+    ],
+  }),
+  managerCase({
     id: 'manager-components-bulk-edit-unstaged',
     label: 'Manager — Components bulk edit unstaged',
     smokeLabels: ['manager-components-bulk-edit-unstaged'],
