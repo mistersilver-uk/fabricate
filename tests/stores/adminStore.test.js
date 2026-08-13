@@ -3368,6 +3368,48 @@ describe('createAdminStore', () => {
       assert.equal(store.describeComponentDelete([]).deletable, 0);
     });
 
+    it('describeComponentDelete returns the zero impact rather than throwing', async () => {
+      // It is called from a `$derived` in the manager root on EVERY selection change, so it
+      // runs on the render path. A throw here does not surface as a failed action — it takes
+      // the whole component browser down. The four inputs that can be absent are pinned
+      // together because each is guarded by a different line.
+      const services = createMockServices();
+      const zero = { deletable: 0, deletableIds: [], recipesRewritten: 0, recipesDisabled: 0 };
+
+      // 1. No system selected at all.
+      const unselected = createAdminStore(services);
+      assert.deepEqual(unselected.describeComponentDelete(['comp-1']), zero);
+
+      // 2. A selected id naming no system.
+      const origManager = services.getCraftingSystemManager();
+      services.getCraftingSystemManager = () => ({ ...origManager, getSystem: () => null });
+      const missingSystem = createAdminStore(services);
+      await missingSystem.selectSystem('sys1');
+      assert.deepEqual(missingSystem.describeComponentDelete(['comp-1']), zero);
+
+      // 3 and 4. A recipe manager that is absent, and one whose recipe list is missing. Both
+      // reach `describeComponentDeleteImpact`, which is where an unguarded `recipes.length`
+      // would throw. Swapped in AFTER `selectSystem`, because the store's own refresh needs a
+      // working recipe manager to get this far and this test is about the describer, not
+      // about a store that never loaded.
+      const recipeless = createMockServices();
+      const recipelessSystem = recipeless.getCraftingSystemManager().getSystem('sys1');
+      recipelessSystem.components = [makeItem({ id: 'comp-1', name: 'Herb' })];
+      delete recipelessSystem.items;
+      const degrading = createAdminStore(recipeless);
+      await degrading.selectSystem('sys1');
+
+      recipeless.getRecipeManager = null;
+      assert.deepEqual(
+        degrading.describeComponentDelete(['comp-1']),
+        { ...zero, deletable: 1, deletableIds: ['comp-1'] },
+        'no recipe manager still yields a countable component impact'
+      );
+
+      recipeless.getRecipeManager = () => ({ getRecipes: () => undefined });
+      assert.equal(degrading.describeComponentDelete(['comp-1']).recipesRewritten, 0);
+    });
+
     it('updateComponent forwards updates to systemManager.updateItem and refreshes', async () => {
       let updateArgs = null;
       const services = createMockServices();

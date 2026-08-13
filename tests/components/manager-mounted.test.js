@@ -7723,6 +7723,70 @@ describe('CraftingSystemManager mounted behavior', () => {
     );
   });
 
+  // The post-delete toast is the ONLY feedback that survives the panel unmounting, on the
+  // same terms as the apply toast above. Both cases below install `ui.notifications` per
+  // test and remove it again, matching `applyBulkEditOverRows`.
+  async function deleteSelectedRows(ids, options = {}) {
+    const messages = [];
+    const calls = [];
+    const previousUi = globalThis.ui;
+    globalThis.ui = { notifications: { info: (message) => messages.push(message) } };
+    try {
+      await openComponentsBrowser(calls, options);
+      for (const id of ids) tickComponentRow(id);
+      componentDeleteButton().click();
+      flushSync();
+      componentDeleteButton().click();
+      await tick();
+      flushSync();
+      return { messages, calls };
+    } finally {
+      if (previousUi === undefined) delete globalThis.ui;
+      else globalThis.ui = previousUi;
+    }
+  }
+
+  it('reports the DISABLED recipes in the toast, the most consequential outcome', async () => {
+    // Components deleted and recipes rewritten are administrative; recipes disabled is the
+    // one the GM's players feel. It was the number the toast did not carry.
+    const { messages } = await deleteSelectedRows(['c1', 'c2'], {
+      deleteComponentsResult: { deleted: 2, recipesUpdated: 3, recipesDisabled: 1 },
+    });
+
+    assert.deepEqual(messages, [
+      'Deleted 2 component(s) and rewrote 3 recipe(s), disabling 1 of them.',
+    ]);
+  });
+
+  it('drops the disable clause entirely when nothing was disabled', async () => {
+    const { messages } = await deleteSelectedRows(['c1'], {
+      deleteComponentsResult: { deleted: 1, recipesUpdated: 2, recipesDisabled: 0 },
+    });
+
+    assert.deepEqual(messages, ['Deleted 1 component(s) and rewrote 2 recipe(s).']);
+  });
+
+  it('reports NO success and keeps the selection when the write deleted nothing', async () => {
+    // The store returns its zero result — an OBJECT, and therefore truthy — on a failed
+    // write, after raising its own error toast. A bare `if (!result)` guard let that through
+    // as success: the selection cleared and the GM read "Deleted 0 component(s)" underneath
+    // the error, with the rows still in the library.
+    const { messages } = await deleteSelectedRows(['c1'], {
+      deleteComponentsResult: { deleted: 0, recipesUpdated: 0, recipesDisabled: 0 },
+    });
+
+    assert.deepEqual(messages, [], 'nothing was deleted, so nothing is announced');
+    assert.ok(
+      Boolean(target.querySelector('[data-component-bulk-delete-card]')),
+      'and the selection survives, so the GM can see what did not happen and retry'
+    );
+    assert.equal(
+      componentDeleteButton().getAttribute('data-armed'),
+      'false',
+      'but the arm is spent — a still-armed button would delete on the next single click'
+    );
+  });
+
   it('applies every staged axis in ONE set-apply write, then resets the selection and the draft', async () => {
     const calls = [];
     await openComponentsBrowser(calls);

@@ -473,10 +473,12 @@ function deleteButton(root) {
   return deleteCard(root).querySelector('.manager-button.is-danger');
 }
 
+function impactRow(root, row) {
+  return deleteCard(root).querySelector(`[data-component-bulk-impact-row="${row}"]`);
+}
+
 function impactText(root, row) {
-  return deleteCard(root)
-    .querySelector(`[data-component-bulk-impact-row="${row}"]`)
-    .textContent.trim();
+  return impactRow(root, row).textContent.trim();
 }
 
 function impactOf(overrides = {}) {
@@ -512,9 +514,98 @@ describe('ComponentBulkEditPanel set delete (issue 1129)', () => {
       'false',
       'the control starts unarmed'
     );
-    assert.match(impactText(root, 'components'), /3 components will be deleted/);
-    assert.match(impactText(root, 'recipes'), /2 recipes will be rewritten/);
-    assert.match(impactText(root, 'disabled'), /1 of those recipes/);
+    // LITERAL, whole-row equality rather than "contains a number". A row asserted with
+    // `/2 recipes/` keeps passing after the sentence around the number changes meaning — and
+    // this card's whole job is the sentence, not the digit.
+    assert.equal(impactText(root, 'components'), '3 components will be deleted.');
+    assert.equal(impactText(root, 'recipes'), '2 recipes will be rewritten.');
+    assert.equal(
+      impactText(root, 'disabled'),
+      '1 of those recipes is enabled today and will be disabled.'
+    );
+  });
+
+  it('omits a ZERO row rather than stating "0 recipes will be rewritten"', async () => {
+    // The commonest selection there is: components no recipe names. Two noughts under one
+    // real fact is noise, and it buries the number the button acts on.
+    const { root } = await mountWithDelete({
+      deleteImpact: impactOf({ recipesRewritten: 0, recipesDisabled: 0 })
+    });
+
+    assert.equal(
+      impactText(root, 'components'),
+      '3 components will be deleted.',
+      'the components row is unconditional — the card must still state what the button does'
+    );
+    assert.ok(!impactRow(root, 'recipes'), 'no zero rewrite row');
+    assert.ok(!impactRow(root, 'disabled'), 'no zero disable row');
+    assert.ok(
+      !deleteCard(root).textContent.includes('0 '),
+      'and no stray zero anywhere in the card'
+    );
+  });
+
+  it('keeps the rewrite row when only the DISABLE count is zero', async () => {
+    // The two rows are gated independently: rewriting recipes without disabling any is the
+    // ordinary outcome, and gating them together would hide it.
+    const { root } = await mountWithDelete({
+      deleteImpact: impactOf({ recipesRewritten: 2, recipesDisabled: 0 })
+    });
+
+    assert.equal(impactText(root, 'recipes'), '2 recipes will be rewritten.');
+    assert.ok(!impactRow(root, 'disabled'), 'but nothing is disabled, so nothing says so');
+  });
+
+  it('associates the impact list with the button, and announces the arm', async () => {
+    // Proximity is not association: without `aria-describedby` a screen-reader user arriving
+    // at the control hears its name and nothing about the consequence, unless they happened
+    // to read the list on the way past.
+    const { root } = await mountWithDelete();
+    const described = deleteButton(root).getAttribute('aria-describedby');
+
+    assert.ok(described, 'the button names a description');
+    const list = deleteCard(root).querySelector(`#${described}`);
+    assert.ok(Boolean(list), 'and it resolves to an element inside the card');
+    assert.equal(list.getAttribute('data-component-bulk-impact'), '');
+
+    const live = deleteCard(root).querySelector('[data-component-bulk-delete-announce]');
+    assert.ok(Boolean(live), 'the armed state has a live region');
+    assert.equal(live.getAttribute('aria-live'), 'polite');
+    assert.equal(live.textContent.trim(), '', 'which says nothing while the control is idle');
+  });
+
+  it('announces the consequence when the owner arms it, and falls silent on disarm', async () => {
+    const { root } = await mountWithDelete();
+    const live = () => deleteCard(root).querySelector('[data-component-bulk-delete-announce]');
+
+    await panel.setProps({ deleteArmed: true });
+    flushSync();
+    assert.match(live().textContent, /3 component\(s\)/, 'it names what confirming would do');
+    assert.match(live().textContent, /again/i, 'and that a SECOND activation is the delete');
+
+    await panel.setProps({ deleteArmed: false });
+    flushSync();
+    assert.equal(
+      live().textContent.trim(),
+      '',
+      'emptying on disarm is also what makes a RE-arm announce'
+    );
+  });
+
+  it('gives the ARMED control a name containing its visible label (WCAG 2.5.3)', async () => {
+    // A speech-input user says what they can read. "Confirm deleting 3 component(s)…" does
+    // not contain "Confirm delete", so the armed half of a destructive two-step control could
+    // not be activated by voice.
+    const { root } = await mountWithDelete({ deleteArmed: true });
+    const button = deleteButton(root);
+    const visible = button.querySelector('span').textContent.trim();
+
+    assert.equal(visible, 'Confirm delete');
+    assert.ok(
+      button.getAttribute('aria-label').startsWith(visible),
+      `"${button.getAttribute('aria-label')}" must open with "${visible}"`
+    );
+    assert.match(button.getAttribute('aria-label'), /3 component\(s\), 2 recipe\(s\)/);
   });
 
   it('reports three numbers that are three different questions', async () => {

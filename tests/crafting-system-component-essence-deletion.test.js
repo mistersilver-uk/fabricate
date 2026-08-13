@@ -2,6 +2,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { installFoundryEnv } from './helpers/foundryEnv.js';
+// The panel's side of the contract. Imported HERE, in the manager's own suite, because the
+// change's central claim is that the stated impact and the executed write agree — and that is
+// a claim about two modules, so only a test that runs both can falsify it.
+import { describeComponentDeleteImpact } from '../src/utils/recipeComponentReferences.js';
 
 const { notifications } = installFoundryEnv();
 
@@ -162,9 +166,16 @@ function makeRecipeManager() {
     // `{ persist: false }` and ONE trailing `save()` is the only persist. A double without
     // `save` is LOOSER than the thing it stands for, which is how a suite proves a batching
     // claim it never exercised. Recording the calls is what lets the batching be asserted.
+    //
+    // It also SNAPSHOTS what the in-memory map held at that instant. A call count alone
+    // proves the write happened once; it cannot see a rewrite applied AFTER the persist, or
+    // one applied to a copy the persist never reached — both of which leave the count at 1
+    // and the world setting holding the pre-delete bodies.
     saveCalls: 0,
+    savedRecipes: [],
     async save() {
       this.saveCalls += 1;
+      this.savedRecipes.push(recipes.map((recipe) => recipe.toJSON()));
     },
     // The real `RecipeManager` exposes this, and the batched cascade now calls it ONCE to
     // restore the change signal that `emitChange: false` suppresses on every rewrite. A
@@ -188,7 +199,18 @@ function makeRecipeManager() {
 function makeManager(recipeManager) {
   const manager = new CraftingSystemManager(recipeManager);
   manager.initialized = true;
-  manager.save = async () => {};
+  // `save()` IS the `craftingSystems` world-setting write, so counting it is how "one
+  // crafting-system write regardless of set size" becomes falsifiable rather than asserted in
+  // a doc block. The snapshot is the same argument the recipe double's `save` records: a
+  // count cannot see components removed after the persist.
+  manager.saveCalls = 0;
+  manager.savedComponentIds = [];
+  manager.save = async () => {
+    manager.saveCalls += 1;
+    manager.savedComponentIds.push(
+      (manager.getSystem('sys')?.components || []).map((component) => component.id)
+    );
+  };
   manager.systems.set('sys', manager._normalizeSystem({
     id: 'sys',
     name: 'Alchemy',
@@ -710,4 +732,235 @@ test('1129: a delete that rewrites NOTHING emits no signal and saves nothing', a
   assert.equal(recipeManager.updateCalls.length, 0);
   assert.equal(recipeManager.saveCalls, 0, 'no recipes write for a component no recipe names');
   assert.equal(recipeManager.notifyCalls, 0, 'and no spurious signal');
+});
+
+// ── The stated/executed contract, the write budget, and the GM gate (issue 1129) ──────
+//
+// The central claim of this change is that the numbers the bulk panel STATES are exactly what
+// the write PERFORMS. `describeComponentDeleteImpact` counts through the same three leaf
+// functions `deleteComponents` executes through, which makes drift structurally hard — but
+// "hard" is not "checked", and nothing outside the leaf's own unit tests had ever run the two
+// halves against one fixture and compared them.
+
+test('1129: the STATED impact equals what the delete PERFORMS, on one fixture', async () => {
+  notifications.length = 0;
+  const recipeManager = makeRecipeManager();
+  const manager = makeManager(recipeManager);
+
+  // Deliberately a case where no two numbers agree by accident, and where each rewritten
+  // recipe names BOTH deleted components: `iron` is the only INGREDIENT of four recipes and
+  // `bar` is the only RESULT of the same four, so each is rewritten once and left with
+  // nothing at either end.
+  const ids = ['iron', 'bar'];
+  const stated = describeComponentDeleteImpact(ids, recipeManager.getRecipes({}));
+
+  const performed = await manager.deleteComponents('sys', ids);
+
+  assert.equal(
+    performed.recipesUpdated,
+    stated.recipesRewritten,
+    'the panel promised a rewrite count the write did not match'
+  );
+  assert.equal(
+    performed.recipesDisabled,
+    stated.recipesDisabled,
+    'the panel promised a disable count the write did not match'
+  );
+  assert.equal(performed.deleted, stated.deletable);
+
+  // Negative controls, because three numbers that are all equal make the comparison vacuous.
+  assert.ok(stated.recipesRewritten > 1, 'more than one recipe is rewritten');
+  assert.ok(
+    stated.deletable !== stated.recipesRewritten,
+    'the component count and the rewrite count are genuinely different numbers'
+  );
+
+  // And the executed numbers are what the write DID, not a third count computed beside it.
+  assert.equal(
+    new Set(recipeManager.updateCalls.map((call) => call.recipeId)).size,
+    stated.recipesRewritten
+  );
+  assert.equal(
+    recipeManager.updateCalls.filter((call) => call.updates.enabled === false).length,
+    stated.recipesDisabled
+  );
+});
+
+test('1129: one craftingSystems write and one recipes write, regardless of set size', async () => {
+  notifications.length = 0;
+  const oneRecipes = makeRecipeManager();
+  const one = makeManager(oneRecipes);
+  await one.deleteComponents('sys', ['iron']);
+
+  notifications.length = 0;
+  const manyRecipes = makeRecipeManager();
+  const many = makeManager(manyRecipes);
+  await many.deleteComponents('sys', ['iron', 'wood', 'bar', 'potion', 'unused']);
+
+  assert.equal(one.saveCalls, 1, 'a one-component delete issues one crafting-system write');
+  assert.equal(many.saveCalls, 1, 'and so does a five-component delete — the budget is per CALL');
+  assert.equal(oneRecipes.saveCalls, 1);
+  assert.equal(
+    manyRecipes.saveCalls,
+    1,
+    'one recipes write for five components across six recipes'
+  );
+
+  // The control that makes the equal counts mean batching rather than a delete that simply
+  // did less: the larger set genuinely rewrote strictly more recipes.
+  assert.ok(
+    manyRecipes.updateCalls.length > oneRecipes.updateCalls.length,
+    'the larger set genuinely rewrote more recipes'
+  );
+});
+
+test('1129: the CONTENTS the write persists are the rewritten ones, not the pre-delete bodies', async () => {
+  notifications.length = 0;
+  const recipeManager = makeRecipeManager();
+  const manager = makeManager(recipeManager);
+
+  await manager.deleteComponents('sys', ['iron', 'wood']);
+
+  // Read at `save()` time, not at the end of the test. A rewrite applied AFTER the persist, or
+  // applied to a copy the persist never reached, leaves the call count at 1 and the world
+  // setting holding the pre-delete bodies — invisible to a count-only assertion.
+  const persistedRecipes = recipeManager.savedRecipes.at(-1);
+  assert.ok(persistedRecipes, 'the recipes save happened');
+  assert.equal(
+    JSON.stringify(persistedRecipes).includes('"iron"'),
+    false,
+    'no persisted recipe still names the deleted component'
+  );
+  assert.equal(JSON.stringify(persistedRecipes).includes('"wood"'), false);
+  // Negative control: an unrelated reference survives in the same snapshot, so the two
+  // assertions above are not passing against an empty or truncated payload.
+  assert.equal(
+    JSON.stringify(persistedRecipes).includes('"potion"'),
+    true,
+    'an unrelated reference survives — the snapshot is real'
+  );
+
+  assert.deepEqual(
+    manager.savedComponentIds.at(-1),
+    ['unused', 'potion', 'bar', 'plank'],
+    'the crafting-system write persists exactly the surviving components'
+  );
+});
+
+test('1129: a NON-GM caller writes nothing through either delete', async () => {
+  notifications.length = 0;
+  const recipeManager = makeRecipeManager();
+  const manager = makeManager(recipeManager);
+
+  // Every test double here is omnipotent — none of them refuses a write — so a missing GM
+  // gate is invisible to every other assertion in this file, and the smoke harness runs as a
+  // GM. Flipping the flag is the only way the omission can fail a test.
+  game.user.isGM = false;
+  try {
+    await assert.rejects(
+      () => manager.deleteComponents('sys', ['iron']),
+      /GM permissions required/,
+      'the set delete is GM-gated'
+    );
+    await assert.rejects(
+      () => manager.deleteItem('sys', 'iron'),
+      /GM permissions required/,
+      'and so is the singular delete it shares a body with'
+    );
+  } finally {
+    game.user.isGM = true;
+  }
+
+  assert.equal(recipeManager.updateCalls.length, 0, 'no recipe was rewritten');
+  assert.equal(recipeManager.saveCalls, 0, 'no recipes write');
+  assert.equal(manager.saveCalls, 0, 'no crafting-system write');
+  assert.ok(
+    manager.getSystem('sys').components.some((component) => component.id === 'iron'),
+    'and the component is still there'
+  );
+});
+
+test('1129: the batch-level cascade helpers run once per CALL, not once per component', async () => {
+  notifications.length = 0;
+  const recipeManager = makeRecipeManager();
+  const manager = makeManager(recipeManager);
+  // The alchemy reconcile is gated on the system's resolution mode, so the fixture opts in
+  // before the helper can run at all.
+  manager.getSystem('sys').resolutionMode = 'alchemy';
+
+  const hooksBefore = globalThis.Hooks;
+  const hookNames = [];
+  globalThis.Hooks = { callAll: (name) => hookNames.push(name) };
+  try {
+    await manager.deleteComponents('sys', ['iron', 'wood', 'bar']);
+  } finally {
+    globalThis.Hooks = hooksBefore;
+  }
+
+  assert.equal(recipeManager.disableCalls.length, 1, 'one alchemy signature reconcile per call');
+  assert.equal(recipeManager.notifyCalls, 1, 'one recipes-changed signal per call');
+  assert.equal(recipeManager.saveCalls, 1, 'one recipes persist per call');
+  assert.equal(manager.saveCalls, 1, 'one crafting-system persist per call');
+  assert.equal(
+    hookNames.filter((name) => name === 'fabricate.craftingSystemsChanged').length,
+    1,
+    'one systems-changed hook per call'
+  );
+  assert.equal(notifications.length, 1, 'one summary notification, not one per component');
+});
+
+test('1129: salvage RUN cleanup is the one per-component pass, and is pinned as such', async () => {
+  notifications.length = 0;
+  const recipeManager = makeRecipeManager();
+  const manager = makeManager(recipeManager);
+
+  const removed = [];
+  const fabricateBefore = game.fabricate;
+  game.fabricate = {
+    ...fabricateBefore,
+    getSalvageRunManager: () => ({
+      async removeRunsForComponent(componentId) {
+        removed.push(componentId);
+      },
+    }),
+  };
+  try {
+    await manager.deleteComponents('sys', ['iron', 'wood', 'bar']);
+  } finally {
+    game.fabricate = fabricateBefore;
+  }
+
+  // Asserted rather than quietly tolerated. `SalvageRunManager` offers no set-wise form, so
+  // this one cascade still fans out over the selection — a pass over every actor's run history
+  // per deleted component. Pinning it makes the cost visible, and gives a future batched
+  // `removeRunsForComponents` a test that notices when it lands.
+  assert.deepEqual(removed, ['iron', 'wood', 'bar'], 'one pass per deleted component');
+});
+
+test('1129: deleteComponents returns the exact field names its callers read by name', async () => {
+  notifications.length = 0;
+  const recipeManager = makeRecipeManager();
+  const manager = makeManager(recipeManager);
+
+  const result = await manager.deleteComponents('sys', ['iron']);
+
+  // A SEAM, not a redundant shape check. `adminStore.deleteComponents` reads `deleted`,
+  // `recipesUpdated` and `recipesDisabled` off this object BY NAME and republishes the same
+  // three names to the manager root, which interpolates them into the post-delete toast.
+  // Renaming one is silent at every step: `Number(undefined) || 0` is 0, so a successful
+  // delete would report "Deleted 0 component(s)" with every other test still green.
+  assert.deepEqual(
+    Object.keys(result).sort(),
+    ['componentIds', 'deleted', 'recipesDisabled', 'recipesUpdated'],
+    'the returned field names are a published contract, not an implementation detail'
+  );
+  assert.equal(typeof result.deleted, 'number');
+  assert.equal(typeof result.recipesUpdated, 'number');
+  assert.equal(typeof result.recipesDisabled, 'number');
+  assert.ok(Array.isArray(result.componentIds));
+
+  // The no-op return travels a different code path and must carry the same names, or a delete
+  // that matched nothing reports through a differently-shaped object.
+  const noop = await manager.deleteComponents('sys', ['nothing-named-this']);
+  assert.deepEqual(Object.keys(noop).sort(), Object.keys(result).sort());
 });
