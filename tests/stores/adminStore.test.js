@@ -1349,6 +1349,47 @@ describe('createAdminStore', () => {
       assert.ok(!remaining.some((s) => s.id === 'sys1'), 'sys1 should be deleted');
     });
 
+    it('deleteSystem asks in a titled window with a Delete button, all localized', async () => {
+      // The most destructive action in the app, and until issue 1154 it asked for that
+      // with hardcoded English in an untitled window whose confirm button read the
+      // generic *Yes* — `DialogV2.confirm` merges `yes` over a default with `mergeObject`,
+      // which iterates `Object.keys(other)`, and a function has none.
+      //
+      // The mock's `localize` is `(key) => key`, so asserting the KEY asserts that the
+      // string is localized at all — a literal would come back as the literal. Only a
+      // SUPPLIED label is asserted: the core default is "Yes" on V13.351 and "COMMON.Yes"
+      // on V14.365, so pinning a default would pin a build.
+      let options = null;
+      const services = createMockServices({
+        confirmDialog: async (bag) => {
+          options = bag;
+          return true;
+        },
+      });
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      await store.deleteSystem('sys1');
+
+      assert.equal(options.title, 'FABRICATE.Admin.Manager.DeleteSystemConfirm.Title');
+      assert.ok(
+        options.content.includes('FABRICATE.Admin.Manager.DeleteSystemConfirm.Content'),
+        'the body names the system through a key, not a hardcoded English sentence'
+      );
+      assert.ok(
+        options.content.includes('FABRICATE.Admin.Manager.DeleteSystemConfirm.Consequences'),
+        'and so does the cascade warning'
+      );
+      assert.equal(options.yes.label, 'FABRICATE.Admin.Manager.Delete');
+      assert.equal(typeof options.yes.callback, 'function');
+      assert.equal(typeof options.no, 'object', 'no is an object, never a bare function');
+      assert.equal(options.no.callback(), false);
+      assert.equal(
+        Object.hasOwn(options, 'buttons'),
+        false,
+        'a confirm never carries a buttons array — DialogV2.confirm unshifts into it'
+      );
+    });
+
     it('deleteSystem does nothing when confirm is declined', async () => {
       const services = createMockServices({
         confirmDialog: async () => false,

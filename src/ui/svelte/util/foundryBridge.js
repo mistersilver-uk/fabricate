@@ -100,10 +100,50 @@ export function formatList(items) {
   return i18n.getListFormatter(LIST_FORMAT_OPTIONS).format(values);
 }
 
+/**
+ * Put a confirm's option bag into the shape `DialogV2.confirm` and `ApplicationV2`
+ * actually READ. Shared with `src/ui/foundryCompat.js`, which imports it, so the manager
+ * app's confirm seam and the player app's cannot drift apart (issue 1154).
+ *
+ * Two mappings, both narrow, both load-bearing:
+ *
+ *  - `title` → `window.title`, because `ApplicationV2#title` is
+ *    `_loc(this.options.window.title)` and `DEFAULT_OPTIONS.window.title` is `""`. A
+ *    top-level `title` is read by nothing, so before this every manager confirm — the
+ *    crafting-system delete included — rendered with an EMPTY title bar. An explicit
+ *    `window.title` always wins; the top-level form is accepted sugar, not a second
+ *    contract.
+ *  - a function `yes`/`no` → `{ callback }`, because `DialogV2.confirm` merges each over
+ *    a default button with `mergeObject`, which iterates `Object.keys(other)` — `[]` for
+ *    a function. A bare `yes: () => 'x'` therefore configures NOTHING, silently keeping
+ *    the default label AND the default `() => true` callback. Wrapping it makes the
+ *    callback real; the LABEL is still the caller's job, and on a destructive confirm it
+ *    is not optional.
+ *
+ * It deliberately does NOT go through `normalizeDialogOptions`. That one injects
+ * `buttons: [{ action: 'close', … }]` when `buttons` is absent, and `DialogV2.confirm`
+ * then does `config.buttons ??= []; config.buttons.unshift(yes, no)` — i.e. reusing it
+ * here would render a THREE-button confirm on every site.
+ *
+ * Returns a fresh bag; the caller's object is never mutated.
+ *
+ * @param {object} [options]
+ * @returns {object}
+ */
+export function normalizeConfirmOptions(options) {
+  const normalized = { ...(options || {}) };
+  if (normalized.title && !normalized.window?.title) {
+    normalized.window = { ...(normalized.window || {}), title: normalized.title };
+  }
+  if (typeof normalized.yes === 'function') normalized.yes = { callback: normalized.yes };
+  if (typeof normalized.no === 'function') normalized.no = { callback: normalized.no };
+  return normalized;
+}
+
 export async function confirmDialog(options) {
   const DialogV2 = globalThis.foundry?.applications?.api?.DialogV2;
   if (!DialogV2?.confirm) return false;
-  return DialogV2.confirm(options);
+  return DialogV2.confirm(normalizeConfirmOptions(options));
 }
 
 export function renderDialog(options) {
