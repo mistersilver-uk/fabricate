@@ -726,7 +726,8 @@ If `recipeItemDefinition.originItemUuid` no longer resolves to a template:
 
 ### Recipe Deletion
 
-- Remove corresponding learned entries from all actors.
+- Remove corresponding learned entries from the actors the deleting client may write.
+This is the same scope `destructive-changes-and-migrations/spec.md`'s Delete Recipe cascade states, and the same scope the GM surface counts characters over, so one cascade is never described by two capabilities as reaching two different sets.
 - The removal uses the explicit `-=` deletion primitive (`forgetLearnedRecipes`) called with `freeLearnBudget: false` — recipe deletion is content management, not an in-fiction un-learn, so it must not refund any consumed learn budget.
 `cleanupLearnedRecipes` is rerouted onto that primitive, fixing the prior filtered-map `setFlag` rebuild that MERGED and therefore never actually deleted the stale keys (they resurrected on reload).
 - The stale set is derived through the entry-boundary reader (see Reading A Recipe-Id-Keyed Flag Map), so deleting one recipe removes **only** that recipe's entry.

@@ -31,9 +31,36 @@
   `removeBookIds`, and the write primitive's books-not-recipes iteration are all unchanged.
   One book on screen is a property of the CONTROL, never of the staged set.
 
-  Consequence, accepted and recorded: Edit, Duplicate and Delete live ONLY in
+  Consequence, accepted and recorded: Edit and Duplicate live ONLY in
   `RecipeBrowserInspector`, so ticking one box hides them until the selection clears.
-  `Clear selection` is the documented escape and is the first control in the header.
+  `Clear selection` is the documented escape and is the first control in the header. DELETE
+  is no longer in that list — issue 1132 gave the panel its own set delete, because the swap
+  was making the one DESTRUCTIVE affordance harder to reach at exactly the moment a GM had
+  selected the rows they wanted rid of. Edit and Duplicate stay out: neither is destructive,
+  and neither has an impact worth stating, which is what the arm below is paired with.
+
+  ── THE BULK DELETE IS ARMED, AND IT IS PAIRED WITH AN IMPACT STATEMENT ───────────
+  `AGENTS.md` reserves `confirmDialog` for bulk actions EXCEPT where the panel states the
+  impact of the pending action in view before the control is armed. This card does, so it
+  arms. Do not substitute a `confirmDialog`, and do not remove the impact list and leave the
+  arm — the carve-out is the pair, not the button. Measured at the shipped 1280x940 the whole
+  card is in the first visible state with rail to spare, and on a short rail the impact list
+  is the immediately preceding sibling of the control INSIDE the same card, so no scroll
+  position exists in which the arm is reachable and the statement is not on screen.
+
+  The card is the shared `BulkDeleteCard` primitive, which is where the pairing, the
+  description association, the live region, the zero-row gate, the busy face and the scoped
+  CSS live. The `data-recipe-bulk-*` hook names follow this panel's existing convention as
+  `*Attr` overrides. What is left here is what is about RECIPES: the four sentences, the
+  standing hint, and the impact prop.
+
+  THE STANDING HINT IS NOT A COUNT, and that is why it is always rendered. Deleting a recipe
+  is irreversible in a way deleting a component is not: `cleanupLearnedRecipes` forgets with
+  `freeLearnBudget: false`, and an orphan entry frees nothing regardless, because a `total`
+  pool key is unreconstructable once the recipe is gone. A character who learned from a
+  scroll loses the knowledge AND the spent slot, and a recreated recipe has a new id that the
+  spent scroll can no longer teach. A GM reading "will forget" has every reason to read it as
+  re-teachable.
 
   ── NOTHING IS WRITTEN UNTIL APPLY ────────────────────────────────────────────────
   Every control stages into a draft the CALLER owns — the manager root, because this panel
@@ -81,8 +108,18 @@
    - draft / onDraftChange(next): the staged edit, owned by the caller.
    - applying: an in-flight apply; the panel goes inert rather than double-writing.
    - onClearSelection() / onApply().
+   - deleting: an in-flight delete; the card renders its busy face. It is the CALLER's own
+     flag and never derived from `deleteArmed` — see `BulkDeleteCard` for the blur race.
+   - deleteArmed: whether the set delete holds its armed token. The OWNER clears it on any
+     change to the selection — an arm is a statement about a SPECIFIC set.
+   - deleteImpact: `adminStore.describeRecipeDelete(...)` output, supplied by the owner
+     rather than derived here. None of its three numbers is available from the projected
+     rows: the learner count needs actor flags and the recipe-item count needs the system's
+     definitions with its membership basis.
+   - onArmDelete() / onDisarmDelete() / onDelete(ids).
 -->
 <script>
+  import BulkDeleteCard from '../BulkDeleteCard.svelte';
   import Callout from '../Callout.svelte';
   import SearchablePopover from '../SearchablePopover.svelte';
   import SegmentedControl from '../SegmentedControl.svelte';
@@ -117,9 +154,15 @@
     blockedCount = 0,
     draft = createRecipeBulkDraft(),
     applying = false,
+    deleting = false,
+    deleteArmed = false,
+    deleteImpact = null,
     onDraftChange = () => {},
     onClearSelection = () => {},
     onApply = () => {},
+    onArmDelete = () => {},
+    onDisarmDelete = () => {},
+    onDelete = () => {},
   } = $props();
 
   // Which book the pick card is composing. PANEL-LOCAL VIEW STATE, not a staged edit: it
@@ -166,6 +209,128 @@
           count,
         })
   );
+
+  // ── The set delete (issue 1132) ──────────────────────────────────────────────────
+  // Normalized once so every label below reads numbers rather than optional chains, and so
+  // an absent prop renders the disabled zero card instead of `NaN recipes`.
+  //
+  // `deletable` is NOT `count`. A selected id that no longer resolves in the recipe map is
+  // pruned from the browser's selection only when the projection republishes — a different
+  // moment from the click — and `RecipeManager.deleteRecipe` throws for such an id, so the
+  // card states, and the button deletes, the ids that resolve.
+  const impact = $derived({
+    deletable: Number(deleteImpact?.deletable) || 0,
+    deletableIds: Array.isArray(deleteImpact?.deletableIds) ? deleteImpact.deletableIds : [],
+    recipeItemsAffected: Number(deleteImpact?.recipeItemsAffected) || 0,
+    learnersAffected: Number(deleteImpact?.learnersAffected) || 0,
+  });
+
+  // The `…One` sibling-key ternary this panel already uses everywhere else, so the impact
+  // statement never says "1 recipes will be deleted".
+  const deleteLabel = $derived(
+    impact.deletable === 1
+      ? text('FABRICATE.Admin.Manager.Recipe.BulkEdit.DeleteOne', 'Delete 1 recipe')
+      : format('FABRICATE.Admin.Manager.Recipe.BulkEdit.Delete', 'Delete {count} recipes', {
+          count: impact.deletable,
+        })
+  );
+  const deleteAriaLabel = $derived(
+    impact.deletable === 1
+      ? text('FABRICATE.Admin.Manager.Recipe.BulkEdit.DeleteAriaOne', 'Delete 1 recipe')
+      : format('FABRICATE.Admin.Manager.Recipe.BulkEdit.DeleteAria', 'Delete {count} recipes', {
+          count: impact.deletable,
+        })
+  );
+  // The SUBJECT row, which carries no `count` and therefore always renders: it is the
+  // statement of what the button does, and a card that states nothing has lost the pairing
+  // the arm depends on.
+  const impactRecipesLabel = $derived(
+    impact.deletable === 1
+      ? text(
+          'FABRICATE.Admin.Manager.Recipe.BulkEdit.ImpactRecipesOne',
+          '1 recipe will be deleted.'
+        )
+      : format(
+          'FABRICATE.Admin.Manager.Recipe.BulkEdit.ImpactRecipes',
+          '{count} recipes will be deleted.',
+          { count: impact.deletable }
+        )
+  );
+  // `recipe item` is the canonical spec noun; `books & scrolls` is the display name the
+  // manager's own navigation already uses for the same vocabulary, so the GM reads it as
+  // they find it. The figure is a DISTINCT union — two selected recipes in one book is one
+  // book — and it is basis-aware, so on a legacy-basis system it counts the recipe items
+  // that will no longer contain them even though no definition is rewritten.
+  //
+  // THE TWO CONSEQUENCE ROWS CARRY NO PRONOUN FOR THE RECIPES, and that is a correction to
+  // issue 1132's authored copy rather than a style preference. The delta authored
+  // "1 book or scroll will lose it." / "{count} books & scrolls will lose them.", branching
+  // on the ITEM count while the pronoun agrees with the RECIPE count — so a perfectly
+  // ordinary selection of three recipes that share one book rendered "3 recipes will be
+  // deleted. 1 book or scroll will lose it." Branching on both counts would need a 2x2 key
+  // matrix per row, which is exactly what the `(s)` idiom exists here to avoid. Naming the
+  // consequence without a pronoun ("Removed from 1 book or scroll.") is correct in every
+  // combination, keeps one `…One` sibling per row, and reads as the parallel consequence
+  // list the card is.
+  const impactItemsLabel = $derived(
+    impact.recipeItemsAffected === 1
+      ? text(
+          'FABRICATE.Admin.Manager.Recipe.BulkEdit.ImpactItemsOne',
+          'Removed from 1 book or scroll.'
+        )
+      : format(
+          'FABRICATE.Admin.Manager.Recipe.BulkEdit.ImpactItems',
+          'Removed from {count} books & scrolls.',
+          { count: impact.recipeItemsAffected }
+        )
+  );
+  // The qualifier is the loudest thing on the card and is deliberately part of the ROW
+  // rather than a separate sentence: the learn slot is spent by the same act the number
+  // counts, so a GM who reads the number has read the consequence.
+  const impactLearnersLabel = $derived(
+    impact.learnersAffected === 1
+      ? text(
+          'FABRICATE.Admin.Manager.Recipe.BulkEdit.ImpactLearnersOne',
+          'Forgotten by 1 character — they do not get their learn slot back, so a spent book or scroll cannot teach it again.'
+        )
+      : format(
+          'FABRICATE.Admin.Manager.Recipe.BulkEdit.ImpactLearners',
+          'Forgotten by {count} characters — they do not get their learn slots back, so a spent book or scroll cannot teach it again.',
+          { count: impact.learnersAffected }
+        )
+  );
+  // WCAG 2.5.3 Label in Name: the accessible name must CONTAIN the visible label, so a
+  // speech-input user can activate the control by saying what they can read. The armed
+  // button reads `Confirm delete`, so the name OPENS with that exact string and the counts
+  // follow it. The idle pair needs no reordering: its `…DeleteAria*` sibling is the visible
+  // label verbatim.
+  const deleteArmedAriaLabel = $derived(
+    format(
+      'FABRICATE.Admin.Manager.Recipe.BulkEdit.DeleteConfirmAria',
+      'Confirm delete — {count} recipe(s), {items} recipe item(s) and {learners} character(s) affected. This cannot be undone.',
+      {
+        count: impact.deletable,
+        items: impact.recipeItemsAffected,
+        learners: impact.learnersAffected,
+      }
+    )
+  );
+  const deleteArmedAnnouncement = $derived(
+    format(
+      'FABRICATE.Admin.Manager.Recipe.BulkEdit.DeleteArmedAnnouncement',
+      'Delete armed. Activate again to delete {count} recipe(s). This cannot be undone.',
+      { count: impact.deletable }
+    )
+  );
+  // Three sentences, three different questions, and the last two are gated on their own
+  // count by the card. Zero is omitted rather than stated as zero: "0 books & scrolls will
+  // lose them." is noise on the commonest selection there is and it buries the one number
+  // that always matters.
+  const deleteImpactRows = $derived([
+    { key: 'recipes', text: impactRecipesLabel },
+    { key: 'items', text: impactItemsLabel, count: impact.recipeItemsAffected },
+    { key: 'learners', text: impactLearnersLabel, count: impact.learnersAffected },
+  ]);
 
   // `Leave unchanged`, shared with the Component Studio's category sentinel: it is
   // noun-free, both panels render it, and the recipe panel alone renders it TWICE. Its
@@ -937,6 +1102,44 @@
     {/if}
   {/if}
 </BulkEditPanelShell>
+
+<!--
+  The DELETE block sits below the shell rather than inside it: the shell's Apply is the
+  panel's primary action, and a destructive action inside the same card would read as a
+  second way of applying the staged edit. The Essence and Component Studios' cards are the
+  twins. The accepted consequence is that Apply's sticky dock now clamps to the panel's own
+  box rather than the rail's bottom edge — see the enumeration in `BulkEditPanelShell`'s
+  dock comment and its gate in `tests/components/bulk-edit-dock-pinning.test.js`.
+
+  `busy` is the caller's own `deleting` flag and is NOT folded into `disabled` here: the card
+  needs to tell an in-flight write apart from an inert one to render its third face at all.
+  `applying` still inerts the control, because a staged apply and a delete must not race.
+-->
+<BulkDeleteCard
+  token="delete-recipes"
+  heading={text('FABRICATE.Admin.Manager.Recipe.BulkEdit.DeleteHeading', 'Delete selected recipes')}
+  rows={deleteImpactRows}
+  standingHint={text(
+    'FABRICATE.Admin.Manager.Recipe.BulkEdit.DeleteStandingHint',
+    'Deleting is permanent. A recipe you recreate is a new recipe.'
+  )}
+  idleLabel={deleteLabel}
+  armedLabel={text('FABRICATE.Admin.Manager.Recipe.BulkEdit.DeleteConfirm', 'Confirm delete')}
+  busyLabel={text('FABRICATE.Admin.Manager.BulkEdit.Deleting', 'Deleting…')}
+  idleAriaLabel={deleteAriaLabel}
+  armedAriaLabel={deleteArmedAriaLabel}
+  armedAnnouncement={deleteArmedAnnouncement}
+  armed={deleteArmed === true}
+  busy={deleting === true}
+  disabled={impact.deletable === 0 || applying === true}
+  cardAttr="data-recipe-bulk-delete-card"
+  impactAttr="data-recipe-bulk-impact"
+  rowAttr="data-recipe-bulk-impact-row"
+  announceAttr="data-recipe-bulk-delete-announce"
+  onArm={onArmDelete}
+  onDisarm={onDisarmDelete}
+  onConfirm={() => onDelete(impact.deletableIds)}
+/>
 
 <style>
   /* Manager-scoped by PLACEMENT — this component lives under `apps/manager/`, so

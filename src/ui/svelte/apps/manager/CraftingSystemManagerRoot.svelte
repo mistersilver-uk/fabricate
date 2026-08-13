@@ -203,6 +203,14 @@
   // selection itself lives on the lifted `recipeBrowserState`.
   let recipeBulkDraft = $state(createRecipeBulkDraft());
   let recipeBulkApplying = $state(false);
+  // The recipe library's armed bulk delete (issue 1132), the third and last studio to get
+  // one. `…Deleting` is the caller's OWN in-flight flag and is what the card's busy face
+  // derives from — never `…Armed`. Disabling a focused button fires blur in Chromium and
+  // Firefox and `ArmedDangerButton` disarms on blur, so a busy face keyed off the arm flips
+  // back to idle for the whole duration of the write; happy-dom does not fire that blur, so
+  // a mounted assertion would pass on behaviour that does not hold in Foundry.
+  let recipeBulkDeleting = $state(false);
+  let recipeBulkDeleteArmed = $state(false);
   // The essence library's lifted view-state (issue 1036) — the third and last studio to get
   // one, and the fix for criterion 12. Search, status, source, sort, view mode, page and
   // the bulk selection all lived inside `EssenceBrowserView`, so opening an essence
@@ -1889,11 +1897,58 @@
   const recipeBulkCategoryOptions = $derived(
     getEffectiveRecipeCategories(selectedSystem?.categories || [])
   );
+  // What deleting the current selection would do (issue 1132). Derived from the STORE, not
+  // from the projected rows: the learner count needs actor flags and the recipe-item count
+  // needs the system's definitions with its membership basis, neither of which is in the
+  // row projection — and the store counts through the SAME leaf the write executes
+  // through, so the stated numbers cannot drift from the performed ones.
+  const recipeBulkDeleteImpact = $derived(
+    store.describeRecipeDelete?.(recipeBulkSelectedIds) ?? {
+      deletable: 0,
+      deletableIds: [],
+      recipeItemsAffected: 0,
+      recipeItemIds: [],
+      learnersAffected: 0,
+      learnerIds: [],
+    }
+  );
   // Discard the staged draft whenever the selection empties — a clear, a system switch, a
   // prune that removed the last id, or a successful apply. The panel is unmounted at that
   // point, so this is the only place the discard can honestly happen.
+  //
+  // It reads the COUNT, and that is deliberate rather than an oversight: retargeting it to
+  // the Set identity — as the Component Studio's single combined effect is keyed — would
+  // discard a staged draft on every selection change, which is a regression of issue 1010's
+  // whole staging model. The arm needs the other dependency, so it gets its own effect
+  // below rather than folding into this one.
   $effect(() => {
     if (recipeBulkSelectionCount === 0) recipeBulkDraft = createRecipeBulkDraft();
+  });
+  // DISARM the delete whenever the selection changes at all. An arm is a statement about a
+  // SPECIFIC set: once the set moves, the impact sentence the GM read before arming is no
+  // longer the impact of confirming, so the second click must not still be a confirmation.
+  //
+  // It reads the SET, not its size, and the honest reason is narrower than the one issue
+  // 1132's delta gives. The delta motivates it as "a size dependency cannot see a same-size
+  // swap"; MEASURED AGAINST THE SHIPPED BROWSER, no such swap is reachable. Every mutation
+  // `RecipesBrowserView` performs changes the count — untick then tick is two flushes, the
+  // phantom-id prune assigns only `if (pruned.size !== current.size)`, and
+  // `Select all N results` is hidden once every filtered row is selected. So a
+  // count-keyed disarm would behave identically today, and the mutation proof for that
+  // claim comes back GREEN. What the Set dependency actually buys is that this effect is
+  // keyed on the reactive unit the state IS — `bulkSelectedRecipeIds` is reassigned, never
+  // mutated — so it stays correct if a future republish does produce an equal-sized set,
+  // and it matches the Component Studio's shipped effect rather than inventing a second
+  // convention. It is robustness and consistency, not a live defect fix; the test below
+  // says the same rather than dressing an unreachable case up as coverage.
+  //
+  // It is a SECOND effect rather than a clause added to the one above, and that part is
+  // load-bearing: folding the disarm in would either leave the draft discard keyed on the
+  // count (fine) or retarget the draft discard to the Set (a regression of issue 1010,
+  // discarding a staged draft on every selection change).
+  $effect(() => {
+    void recipeBulkSelectedIds;
+    recipeBulkDeleteArmed = false;
   });
   const environmentList = $derived($viewState.environments || []);
   const environmentValidationCount = $derived(
@@ -4449,6 +4504,87 @@
     return sentences.join(' ');
   }
 
+  // The ARMED bulk delete's confirm step (issue 1132). The impact statement is rendered by
+  // the panel from `recipeBulkDeleteImpact`; this only performs the write and reports what
+  // happened. The delete is warned, not blocked, so every resolvable selected recipe is
+  // deleted and nothing is skipped.
+  //
+  // FAILURE IS NOT SILENT, and this path is genuinely reachable: a GM whose
+  // `SETTINGS_MODIFY` has been explicitly revoked passes the client-side `_assertGM` gate
+  // and is then refused by the server. The store raises the error toast; this returns the
+  // card to IDLE — disarmed, not busy — with the selection intact, so the GM can see what
+  // they were about to delete and try again. A stuck spinner over a live selection would be
+  // worse than the failure.
+  async function deleteSelectedRecipes(ids) {
+    if (recipeBulkDeleting) return false;
+    const targets = Array.isArray(ids) ? ids : [];
+    if (targets.length === 0) return false;
+    recipeBulkDeleting = true;
+    try {
+      const result = await store.deleteRecipes?.(targets);
+      // A FAILED write returns the store's zero result, which is an OBJECT and therefore
+      // truthy — `if (!result)` would catch only the absent-action case and let a failed
+      // delete clear the selection and report "Deleted 0 recipe(s)" on top of the error
+      // toast the store already raised.
+      const deleted = Number(result?.deleted) || 0;
+      if (deleted === 0) return false;
+      clearRecipeBulkSelection();
+      notifyInfo(recipeBulkDeletedMessage(result));
+      return true;
+    } catch (err) {
+      // The store catches its own write failures, so reaching here means the failure was
+      // elsewhere. Swallowing it at the boundary keeps an unhandled rejection out of a
+      // click handler that has no caller to receive it.
+      console.error('Fabricate | Failed to delete the selected recipes:', err);
+      return false;
+    } finally {
+      // Both live here so the paragraph above stays true on EVERY exit. A disarm sitting in
+      // the `try` after the await would be skipped by a rejection, leaving an armed button
+      // that deletes on the next single click.
+      recipeBulkDeleteArmed = false;
+      recipeBulkDeleting = false;
+    }
+  }
+
+  // The post-delete report, and the only feedback that survives the panel unmounting on a
+  // successful delete. Every NON-ZERO outcome is named: `recipeItemsPruned` is the number of
+  // recipe items actually rewritten and `learnersAffected` the characters who lost the
+  // knowledge, and each is omitted when zero rather than stated as ", removing them from 0
+  // recipe items", which reads as a warning about nothing. The four-way table is explicit
+  // rather than assembled from a localized join word, which is the part of a sentence a
+  // translator is least able to place.
+  function recipeBulkDeletedMessage(result) {
+    const count = Number(result?.deleted) || 0;
+    const items = Number(result?.recipeItemsPruned) || 0;
+    const learners = Number(result?.learnersAffected) || 0;
+    let template;
+    if (items > 0 && learners > 0) {
+      template = text(
+        'FABRICATE.Admin.Manager.Recipe.BulkEdit.DeletedWithItemsAndLearners',
+        'Deleted {count} recipe(s), removed them from {items} recipe item(s), and {learners} character(s) forgot them.'
+      );
+    } else if (items > 0) {
+      template = text(
+        'FABRICATE.Admin.Manager.Recipe.BulkEdit.DeletedWithItems',
+        'Deleted {count} recipe(s) and removed them from {items} recipe item(s).'
+      );
+    } else if (learners > 0) {
+      template = text(
+        'FABRICATE.Admin.Manager.Recipe.BulkEdit.DeletedWithLearners',
+        'Deleted {count} recipe(s); {learners} character(s) forgot them.'
+      );
+    } else {
+      template = text(
+        'FABRICATE.Admin.Manager.Recipe.BulkEdit.Deleted',
+        'Deleted {count} recipe(s).'
+      );
+    }
+    return template
+      .replace('{count}', count)
+      .replace('{items}', items)
+      .replace('{learners}', learners);
+  }
+
   async function applyRecipeBulkEdit() {
     if (recipeBulkApplying) return false;
     const ids = recipeBulkSelectedIds;
@@ -4675,12 +4811,27 @@
     essenceBulkDeleting = true;
     try {
       const result = await store.deleteEssences?.(targets);
-      if (!result) return false;
-      essenceBulkDeleteArmed = false;
+      // A FAILED write returns the store's zero result, which is an OBJECT and therefore
+      // truthy — `if (!result)` caught only the absent-action case and let a failed delete
+      // clear the selection and report "Deleted 0 essence(s)" on top of the error toast the
+      // store already raised. The component and recipe twins in this file carry the
+      // identical guard; nothing was deleted, so nothing is announced and the selection
+      // stays put.
+      const deleted = Number(result?.deleted) || 0;
+      if (deleted === 0) return false;
       clearEssenceBulkSelection();
       notifyInfo(essenceBulkDeletedMessage(result));
       return true;
+    } catch (err) {
+      // The store catches its own write failures, so reaching here means the failure was
+      // elsewhere. Swallowing it at the boundary keeps an unhandled rejection out of a
+      // click handler that has no caller to receive it.
+      console.error('Fabricate | Failed to delete the selected essences:', err);
+      return false;
     } finally {
+      // The disarm lives HERE rather than in the `try` after the await: a rejection would
+      // otherwise skip it and leave an armed button that deletes on the next single click.
+      essenceBulkDeleteArmed = false;
       essenceBulkDeleting = false;
     }
   }
@@ -10851,9 +11002,15 @@
               blockedCount={recipeBulkBlockedCount}
               draft={recipeBulkDraft}
               applying={recipeBulkApplying}
+              deleting={recipeBulkDeleting}
+              deleteArmed={recipeBulkDeleteArmed}
+              deleteImpact={recipeBulkDeleteImpact}
               onDraftChange={(next) => stageRecipeBulkDraft(next)}
               onClearSelection={() => clearRecipeBulkSelection()}
               onApply={() => applyRecipeBulkEdit()}
+              onArmDelete={() => (recipeBulkDeleteArmed = true)}
+              onDisarmDelete={() => (recipeBulkDeleteArmed = false)}
+              onDelete={(ids) => deleteSelectedRecipes(ids)}
             />
           {:else}
             <RecipeBrowserInspector

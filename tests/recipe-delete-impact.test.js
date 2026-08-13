@@ -147,6 +147,34 @@ describe('buildLearnedRecipeActorIndex', () => {
     assert.deepEqual([...(index.get('r1') ?? [])], ['a1'], 'and so does the learner index');
   });
 
+  it('derives ids at the ENTRY BOUNDARY, so a dotted id agrees with the cascade', () => {
+    // `Document#update` dot-expands a recipe id containing a `.` into a SUBTREE, so the
+    // persisted map's top level holds the id's first segment (`imported`) and never the id.
+    // `cleanupLearnedRecipes` reads through `readLearnedRecipeEntries` and acts on the real
+    // id, so an index derived from `Object.keys` here would state ZERO learners for a recipe
+    // the very same delete then forgets off two characters — the GM surface and the mutation
+    // disagreeing about one actor (issue 1143). This is the ONE derivation.
+    const nested = { imported: { recipe: { one: { learnedAt: 1, sourceItemUuid: null } } } };
+    const dottedLearner = (id) => ({
+      id,
+      isOwner: true,
+      getFlag: (scope, key) =>
+        scope === 'fabricate' && key === 'fabricate.learnedRecipes' ? nested : undefined,
+    });
+
+    const index = buildLearnedRecipeActorIndex([dottedLearner('a1'), dottedLearner('a2')]);
+    assert.deepEqual(
+      [...index.keys()],
+      ['imported.recipe.one'],
+      'the real id, not the `imported` top-level segment'
+    );
+    assert.deepEqual(
+      selectLearnerActorIds(index, ['imported.recipe.one']).sort(),
+      ['a1', 'a2'],
+      'and both learners are counted'
+    );
+  });
+
   it('reads a Foundry collection through its `contents`', () => {
     const index = buildLearnedRecipeActorIndex({ contents: [learner('a1', ['r1', 'r2'])] });
     assert.deepEqual([...index.keys()].sort(), ['r1', 'r2']);

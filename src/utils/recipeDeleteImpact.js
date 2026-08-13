@@ -24,12 +24,14 @@
  * skip work. Do not add such a branch and call it basis awareness.
  *
  * **This module is a leaf on purpose.** It is imported by a store the mounted Svelte
- * suites pull in, so its own imports are held to two zero-import modules (`config/flags.js`
- * and `systems/writableActors.js`); anything heavier would land in every mounted
- * component's dependency closure. It reads no Foundry global and mutates nothing it is
- * handed — the caller applies the plan.
+ * suites pull in, so its own imports are held to `config/flags.js`,
+ * `systems/writableActors.js` (zero imports) and `systems/recipeKeyedFlagEntries.js`
+ * (whose sole import is `config/flags.js`, already here); anything heavier would land in
+ * every mounted component's dependency closure. It reads no Foundry global and mutates
+ * nothing it is handed — the caller applies the plan.
  */
 import { getFabricateFlag } from '../config/flags.js';
+import { readLearnedRecipeEntries } from '../systems/recipeKeyedFlagEntries.js';
 import { selectWritableActors } from '../systems/writableActors.js';
 
 const ZERO_IMPACT = Object.freeze({
@@ -155,6 +157,13 @@ export function planRecipeItemMembershipPrune(definitions, recipes, membershipRe
  * persists it at the doubly-nested `flags.fabricate.fabricate.learnedRecipes` path, so a
  * hand-written single-nested read resolves to `undefined` in a real world.
  *
+ * The ids come from the shared ENTRY-BOUNDARY reader and never from `Object.keys` (issue
+ * 1143), for the same reason `cleanupLearnedRecipes` does: `Document#update` nests a
+ * dotted recipe id into a subtree, so the top level of the persisted map yields the id's
+ * FIRST SEGMENT. A count derived from the top level would under-report a learner the
+ * cascade — reading through this same function — then goes on to clear. This is the one
+ * derivation, so the number stated and the number reached cannot disagree.
+ *
  * @param {Iterable<object>|{contents?: object[]}|null|undefined} actors Typically `game.actors`.
  * @returns {Map<string, Set<string>>} Never null; empty in a headless context.
  */
@@ -168,7 +177,7 @@ export function buildLearnedRecipeActorIndex(actors) {
     const learned = getFabricateFlag(actor, 'learnedRecipes', null);
     if (!learned || typeof learned !== 'object') continue;
     const actorId = trimmed(actor.id || actor._id);
-    for (const recipeId of Object.keys(learned)) {
+    for (const recipeId of readLearnedRecipeEntries(learned).keys()) {
       if (!index.has(recipeId)) index.set(recipeId, new Set());
       index.get(recipeId).add(actorId);
     }

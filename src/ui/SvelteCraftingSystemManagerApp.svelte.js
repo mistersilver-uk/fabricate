@@ -322,6 +322,13 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
           .map((actor) => this._describeAccessActor(actor))
           .filter((actor) => actor.id && actor.name)
           .sort((a, b) => a.name.localeCompare(b.name)),
+      // The raw actor DOCUMENTS, not a projection (issue 1132). `adminStore` builds the
+      // learned-knowledge index through the shared `buildLearnedRecipeActorIndex`, which
+      // reads each actor's flags through `getFabricateFlag` and filters by `isOwner` —
+      // neither survives `_describeAccessActor`'s projection, and the store must not reach
+      // `game.*` itself. Unsorted and unfiltered on purpose: the shared selector owns the
+      // scope, so a second filter here could only make the two disagree.
+      getWorldActors: () => Array.from(game.actors?.contents || game.actors || []),
       // Game-world Items ({ uuid, name, img, type }), name-sorted, for resolving
       // linked Item previews after drag-and-drop.
       getWorldItemOptions: () =>

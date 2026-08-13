@@ -142,6 +142,16 @@ function createMockServices(overrides = {}) {
       sys.essences = sys.essenceDefinitions.map((d) => d.id);
       return true;
     },
+    // The cascading recipe delete every GM-initiated delete routes through (issue 1132) —
+    // the studio singular included, which is why this double reaches the recipe manager's
+    // leaf rather than deleting from `recipes` itself.
+    deleteRecipes: async (systemId, recipeIds) => {
+      const ids = Array.from(recipeIds || [], String).filter((id) =>
+        recipes.some((r) => r.id === id)
+      );
+      for (const id of ids) await mockRecipeManager.deleteRecipe(id);
+      return { deleted: ids.length, recipeIds: ids, recipeItemsPruned: 0, learnersAffected: 0 };
+    },
   };
 
   const mockRecipeManager = {
@@ -2447,45 +2457,97 @@ describe('createAdminStore', () => {
   // -------------------------------------------------------------------------
 
   describe('recipe list operations', () => {
-    it('deleteRecipe shows confirm and calls recipeManager.deleteRecipe', async () => {
+    // The studio singular routes through `CraftingSystemManager.deleteRecipes`, not
+    // `RecipeManager.deleteRecipe` (issue 1132): the leaf does not cascade the recipe-item
+    // membership prune, so a singular delete that called it directly would leave the very
+    // dangling ids the set delete exists to stop leaving. Asserting the SET form is the
+    // whole point of this test — an assertion on the leaf passes either way, since the
+    // cascading body calls it too.
+    it('deleteRecipe shows confirm and routes through the cascading set delete', async () => {
       let confirmCalled = false;
-      let deletedId = null;
+      let setCall = null;
       const services = createMockServices({
         confirmDialog: async () => {
           confirmCalled = true;
           return true;
         },
       });
-      const origManager = services.getRecipeManager();
-      services.getRecipeManager = () => ({
-        ...origManager,
-        deleteRecipe: async (id) => {
-          deletedId = id;
-          await origManager.deleteRecipe(id);
+      const origSystemManager = services.getCraftingSystemManager();
+      services.getCraftingSystemManager = () => ({
+        ...origSystemManager,
+        deleteRecipes: async (systemId, recipeIds, options) => {
+          setCall = { systemId, recipeIds: [...recipeIds], options };
+          return await origSystemManager.deleteRecipes(systemId, recipeIds, options);
         },
       });
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
       await store.deleteRecipe('r1');
       assert.ok(confirmCalled, 'should call confirmDialog');
-      assert.equal(deletedId, 'r1');
+      assert.deepEqual(setCall?.recipeIds, ['r1']);
+      assert.equal(setCall?.systemId, 'sys1');
+      assert.equal(
+        services.getRecipeManager().getRecipe('r1'),
+        null,
+        'the recipe is gone from the map'
+      );
+    });
+
+    // Both defects were SHIPPED, and neither is visible without reading the options object:
+    // `services.confirmDialog` calls `DialogV2.confirm` WITHOUT `normalizeDialogOptions`, so
+    // nothing maps a top-level `title` onto `window.title` and `ApplicationV2` rendered an
+    // empty title bar; and `DialogV2.confirm` merges `yes` over a default carrying
+    // `label: "COMMON.Yes"`, so a bare `yes: () => true` contributes no own enumerable keys
+    // and the confirm button on a DESTRUCTIVE dialog read the generic *Yes*.
+    it('deleteRecipe passes the title at window.title and a labelled confirm button', async () => {
+      let options = null;
+      const services = createMockServices({
+        confirmDialog: async (opts) => {
+          options = opts;
+          return false;
+        },
+        localize: (key, data) =>
+          key === 'FABRICATE.Admin.Manager.Recipe.DeleteConfirm.Title'
+            ? `Delete ${data?.name}?`
+            : key === 'FABRICATE.Admin.Manager.Recipe.DeleteConfirm.Confirm'
+              ? 'Delete'
+              : key,
+      });
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      await store.deleteRecipe('r1');
+
+      assert.equal(options?.window?.title, 'Delete Recipe One?', 'the title lands at window.title');
+      assert.equal(
+        Object.prototype.hasOwnProperty.call(options, 'title'),
+        false,
+        'no top-level title, which nothing reads'
+      );
+      assert.equal(options?.yes?.label, 'Delete', 'the confirm button carries its own label');
+      assert.equal(typeof options?.yes?.callback, 'function', 'and keeps its callback');
+      assert.equal(
+        typeof options?.yes,
+        'object',
+        'a bare function would contribute no own enumerable keys to the merge'
+      );
     });
 
     it('deleteRecipe does nothing when confirm declined', async () => {
-      let deletedId = null;
+      let setCall = null;
       const services = createMockServices({
         confirmDialog: async () => false,
       });
-      const origManager = services.getRecipeManager();
-      services.getRecipeManager = () => ({
-        ...origManager,
-        deleteRecipe: async (id) => {
-          deletedId = id;
+      const origSystemManager = services.getCraftingSystemManager();
+      services.getCraftingSystemManager = () => ({
+        ...origSystemManager,
+        deleteRecipes: async (systemId, recipeIds) => {
+          setCall = { systemId, recipeIds };
+          return { deleted: 0, recipeIds: [], recipeItemsPruned: 0, learnersAffected: 0 };
         },
       });
       const store = createAdminStore(services);
       await store.deleteRecipe('r1');
-      assert.equal(deletedId, null, 'should not delete when declined');
+      assert.equal(setCall, null, 'should not delete when declined');
     });
 
     it('duplicateRecipe clones recipe with (Copy) suffix', async () => {

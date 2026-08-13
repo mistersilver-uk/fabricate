@@ -41,6 +41,10 @@ import { recipeReferencesEssence } from '../../../utils/recipeEssenceReferences.
 import { describeEssenceDeleteImpact } from '../../../utils/essenceBulkEditModel.js';
 import { describeComponentDeleteImpact } from '../../../utils/recipeComponentReferences.js';
 import {
+  buildLearnedRecipeActorIndex,
+  describeRecipeDeleteImpact,
+} from '../../../utils/recipeDeleteImpact.js';
+import {
   isGeneralRecipeCategory,
   normalizeCustomRecipeCategories,
 } from '../../../utils/recipeCategories.js';
@@ -4161,6 +4165,21 @@ export function createAdminStore(services) {
    */
   let refreshTicket = 0;
 
+  /**
+   * The learned-knowledge index, built ONCE per refresh (issue 1132).
+   *
+   * `describeRecipeDelete` runs on a render path — the bulk panel re-derives its impact
+   * statement on every selection change — so it must perform no actor iteration of its
+   * own. The world walk happens here instead, at the same cadence as every other
+   * projection, and both readers (this describer and the Books & Scrolls `learnedByCount`)
+   * consume the one build.
+   *
+   * It is deliberately NOT invalidated by a delete: `deleteRecipes` calls `refresh()`
+   * afterwards, which rebuilds it, and a stale index between the two would only be read by
+   * a describer whose selection has just been cleared.
+   */
+  let learnedRecipeActorIndex = new Map();
+
   async function refresh() {
     const ticket = ++refreshTicket;
     const isCurrent = () => ticket === refreshTicket;
@@ -4171,6 +4190,10 @@ export function createAdminStore(services) {
       _scheduleReadyRefresh();
       return;
     }
+
+    // ONE world walk per refresh (issue 1132), before the phase-1 publish so the delete
+    // describer has it on the very first render rather than after the async phase.
+    learnedRecipeActorIndex = buildLearnedRecipeActorIndex(services.getWorldActors?.() || []);
 
     const allSystems = systemManager.getSystems();
     const currentSystemId = get(selectedSystemId);
@@ -4349,7 +4372,10 @@ export function createAdminStore(services) {
         recipeItemDefinitions: await _enrichRecipeItemLibrary(
           selectedSystemData.recipeItemDefinitions,
           recipeListData.recipes,
-          selectedSystem?.membershipResolvesByRecipeIds
+          selectedSystem?.membershipResolvesByRecipeIds,
+          // The SAME index the delete describer reads, so "Learned by 4" on a book and
+          // "4 characters will forget them" on the delete card are one derivation.
+          learnedRecipeActorIndex
         ),
       };
     }
@@ -8015,22 +8041,182 @@ export function createAdminStore(services) {
     }
   }
 
+  /**
+   * What deleting this set of recipes would do (issue 1132) — the impact statement the
+   * bulk panel renders BEFORE the GM arms the control, and the same arithmetic the
+   * singular dialog reports.
+   *
+   * It counts through `describeRecipeDeleteImpact`, which is the same leaf
+   * `CraftingSystemManager.deleteRecipes` executes the write through, so the stated
+   * numbers cannot drift from the performed ones. See `utils/recipeDeleteImpact.js` for
+   * the one place they legitimately differ (a legacy-basis system's recipe-item figure)
+   * and why that is a definition rather than a drift.
+   *
+   * It returns the zero impact rather than throwing for an absent or stale system: this
+   * runs on a render path, on every selection change, before any click.
+   *
+   * @param {Iterable<string>} recipeIds The SELECTED recipe ids.
+   * @returns {{deletable: number, deletableIds: string[], recipeItemsAffected: number,
+   *   recipeItemIds: string[], learnersAffected: number, learnerIds: string[]}}
+   */
+  function describeRecipeDelete(recipeIds) {
+    const empty = {
+      deletable: 0,
+      deletableIds: [],
+      recipeItemsAffected: 0,
+      recipeItemIds: [],
+      learnersAffected: 0,
+      learnerIds: [],
+    };
+    const sysId = get(selectedSystemId);
+    if (!sysId) return empty;
+
+    const system = services.getCraftingSystemManager?.()?.getSystem?.(sysId);
+    if (!system) return empty;
+
+    return describeRecipeDeleteImpact(recipeIds, {
+      recipes: _selectedSystemRecipes(sysId),
+      recipeItemDefinitions: system.recipeItemDefinitions,
+      membershipResolvesByRecipeIds: system.membershipResolvesByRecipeIds,
+      // The CACHED index — never a fresh build. The panel re-derives on every tick of a
+      // checkbox, and a world walk per tick is the thing this cache exists to prevent.
+      learnerIndex: learnedRecipeActorIndex,
+    });
+  }
+
+  /**
+   * The localized copy the singular delete dialog reads, from the SAME describer the bulk
+   * card reads (issue 1132). Before it, the dialog was hardcoded English naming no
+   * consequence at all — it said "Delete recipe X?" while silently forgetting the recipe
+   * off every character who had learned it.
+   *
+   * @param {string} name
+   * @param {object} impact `describeRecipeDelete` output.
+   * @returns {string}
+   * @private
+   */
+  function _recipeDeleteDialogContent(name, impact) {
+    const data = {
+      name,
+      items: impact.recipeItemsAffected,
+      learners: impact.learnersAffected,
+    };
+    const key =
+      impact.recipeItemsAffected > 0 || impact.learnersAffected > 0
+        ? 'FABRICATE.Admin.Manager.Recipe.DeleteConfirm.Content'
+        : 'FABRICATE.Admin.Manager.Recipe.DeleteConfirm.ContentPlain';
+    const localized = services.localize?.(key, data);
+    if (localized && localized !== key) return localized;
+    return impact.recipeItemsAffected > 0 || impact.learnersAffected > 0
+      ? `Delete recipe ${name}? It is removed from ${impact.recipeItemsAffected} recipe item(s) and forgotten by ${impact.learnersAffected} character(s). Deleting is permanent.`
+      : `Delete recipe ${name}? Deleting is permanent.`;
+  }
+
+  /**
+   * The studio's SINGULAR recipe delete.
+   *
+   * Two things about the options object below are not stylistic (issue 1132), and the
+   * shape it replaced had both wrong:
+   *
+   *  - the title lands at `window.title`, NOT top level. `services.confirmDialog` calls
+   *    `DialogV2.confirm` WITHOUT `normalizeDialogOptions` — only `renderDialog` uses that
+   *    — and `ApplicationV2` reads `this.options.window.title`, so a top-level `title` is
+   *    read by nothing and the dialog rendered with an empty title bar;
+   *  - `yes` is an OBJECT carrying a label, not a bare function. `DialogV2.confirm` merges
+   *    `yes` over `{action, label: "COMMON.Yes", icon, callback}`, and a function
+   *    contributes no own enumerable keys — so the confirm button on a destructive dialog
+   *    read the generic *Yes*.
+   *
+   * It routes the write through `CraftingSystemManager.deleteRecipes`, not
+   * `RecipeManager.deleteRecipe`, so the studio singular cascades the recipe-item
+   * membership prune exactly as the set form does. `RecipeManager.deleteRecipe` is the
+   * leaf and deliberately does not cascade; its docblock names the entry points that do.
+   *
+   * @param {string} recipeId
+   * @returns {Promise<boolean>}
+   */
   async function deleteRecipe(recipeId) {
     const recipeManager = services.getRecipeManager();
     const recipe = recipeManager.getRecipe(recipeId);
     if (!recipe) return false;
 
+    const name = String(recipe.name || '');
+    const impact = describeRecipeDelete([recipeId]);
     const confirmed = await services.confirmDialog({
-      title: `Delete ${recipe.name}?`,
-      content: `<p>Delete recipe <strong>${recipe.name}</strong>?</p>`,
-      yes: () => true,
+      window: {
+        title:
+          services.localize?.('FABRICATE.Admin.Manager.Recipe.DeleteConfirm.Title', { name }) ||
+          `Delete ${name}?`,
+      },
+      content: `<p>${_recipeDeleteDialogContent(name, impact)}</p>`,
+      yes: {
+        label:
+          services.localize?.('FABRICATE.Admin.Manager.Recipe.DeleteConfirm.Confirm') || 'Delete',
+        callback: () => true,
+      },
       no: () => false,
     });
     if (!confirmed) return false;
 
-    await recipeManager.deleteRecipe(recipeId);
+    const sysId = get(selectedSystemId) || recipe.craftingSystemId || '';
+    await services.getCraftingSystemManager().deleteRecipes(sysId, [recipeId]);
     await refresh();
     return true;
+  }
+
+  /**
+   * Delete a SET of recipes (issue 1132) through the manager's batched primitive: ONE
+   * `recipes` write, ONE `craftingSystems` write and ONE actor-flag pass for the whole set.
+   *
+   * `notify: false` is load-bearing rather than defensive. `RecipeManager.deleteRecipe`
+   * raises its own singular info notification by default, so leaving it on would give the
+   * GM N toasts AND the root's own summary for one action; the summary is the one that
+   * names what the delete reached.
+   *
+   * Confirmation is the CALLER's, not this function's: the bulk delete is armed in the
+   * panel beside an impact statement naming the counts, which is strictly more information
+   * than a modal can carry.
+   *
+   * @param {Iterable<string>} recipeIds
+   * @returns {Promise<{deleted: number, recipeIds: string[], recipeItemsPruned: number,
+   *   learnersAffected: number}>} The zero result on every no-write path, INCLUDING a
+   *   failed write — the caller distinguishes them by `deleted`, never by truthiness.
+   */
+  async function deleteRecipes(recipeIds) {
+    const empty = { deleted: 0, recipeIds: [], recipeItemsPruned: 0, learnersAffected: 0 };
+    const systemManager = services.getCraftingSystemManager();
+    const sysId = get(selectedSystemId);
+    if (!sysId) return empty;
+
+    // Resolved against the recipe map first, exactly as the describer resolves them, so a
+    // stale selected id cannot reach the write and cannot inflate what is reported.
+    const impact = describeRecipeDelete(recipeIds);
+    if (impact.deletable === 0) return empty;
+
+    try {
+      const result = await systemManager.deleteRecipes(sysId, impact.deletableIds, {
+        notify: false,
+      });
+      await refresh();
+      return {
+        deleted: Number(result?.deleted) || 0,
+        recipeIds: Array.isArray(result?.recipeIds) ? result.recipeIds : [],
+        recipeItemsPruned: Number(result?.recipeItemsPruned) || 0,
+        learnersAffected: Number(result?.learnersAffected) || 0,
+      };
+    } catch (err) {
+      // The write genuinely throws for a caller whose `SETTINGS_MODIFY` has been revoked —
+      // the server refuses and the socket dispatch rejects — so this path is reachable and
+      // must not be silent. The GM sees the error; the caller returns the card to idle
+      // with the selection intact.
+      console.error('Fabricate | Failed to delete recipes:', err);
+      services.notify?.error?.(
+        services.localize?.('FABRICATE.Admin.Manager.Recipe.BulkEdit.DeleteFailed') ||
+          err?.message ||
+          'Failed to delete recipes'
+      );
+      return empty;
+    }
   }
 
   async function duplicateRecipe(recipeId) {
@@ -8799,6 +8985,8 @@ export function createAdminStore(services) {
     saveTeaserConfig,
     createRecipe,
     deleteRecipe,
+    deleteRecipes,
+    describeRecipeDelete,
     duplicateRecipe,
     toggleRecipeEnabled,
     toggleRecipeLocked,

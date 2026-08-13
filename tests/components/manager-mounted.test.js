@@ -1934,6 +1934,36 @@ function createStore(calls = [], options = {}) {
       }
       return { updated: ids.length, recipeIds: ids };
     },
+    // The recipe set delete (issue 1132). `describeRecipeDelete` is a SYNCHRONOUS selector
+    // the root `$derived`s the panel's impact from, exactly as its component twin above is —
+    // an async double here would render an unresolved impact and the card would silently
+    // show zeroes and disable itself.
+    describeRecipeDelete: (recipeIds) => {
+      const ids = [...(recipeIds || [])];
+      return (
+        options.recipeDeleteImpact ?? {
+          deletable: ids.length,
+          deletableIds: ids,
+          recipeItemsAffected: ids.length > 0 ? 2 : 0,
+          recipeItemIds: ids.length > 0 ? ['ri1', 'ri2'] : [],
+          learnersAffected: ids.length > 0 ? 4 : 0,
+          learnerIds: ids.length > 0 ? ['a1', 'a2', 'a3', 'a4'] : [],
+        }
+      );
+    },
+    deleteRecipes: (recipeIds) => {
+      const ids = [...(recipeIds || [])];
+      calls.push(['deleteRecipes', ids]);
+      if (options.deleteRecipesReject) return Promise.reject(new Error('delete failed'));
+      return (
+        options.deleteRecipesResult ?? {
+          deleted: ids.length,
+          recipeIds: ids,
+          recipeItemsPruned: 1,
+          learnersAffected: 4,
+        }
+      );
+    },
     // FIVE positional arguments. `colorToken` (issue 917) is the last of them, and a
     // four-parameter stub records a call that looks identical whether the argument is
     // threaded or silently dropped — which is exactly how the value went missing once
@@ -8085,6 +8115,257 @@ describe('CraftingSystemManager mounted behavior', () => {
     });
 
     assert.deepEqual(messages, ['Applied bulk changes to 1 recipe.']);
+  });
+
+  // ── Issue 1132: the recipe set delete, end to end ─────────────────────────────────
+  //
+  // The panel suite proves the card is WIRED and the card suite proves it BEHAVES; this is
+  // the only place the ROOT's three additions can be proved at all — the second effect, the
+  // failure path and the busy flag. Each of the three is invisible to every other suite.
+
+  async function openRecipesBrowser(calls = [], options = {}) {
+    mountManager(calls, options);
+    craftingParent().click();
+    await tick();
+    flushSync();
+  }
+
+  function tickRecipeRow(id) {
+    target.querySelector(`[data-recipe-select="${id}"]`).click();
+    flushSync();
+  }
+
+  function recipeDeleteButton() {
+    return target.querySelector('[data-recipe-bulk-delete-card] .manager-button.is-danger');
+  }
+
+  it('offers the set delete the moment the bulk panel replaces the inspector', async () => {
+    // The gap this issue closes, stated as the sequence a GM performs: Delete lived ONLY on
+    // the single-recipe inspector, so ticking the rows you wanted rid of hid it.
+    await openRecipesBrowser();
+    assert.ok(
+      Boolean(target.querySelector('[data-recipe-action="delete"]')),
+      'the single-recipe inspector offers Delete'
+    );
+
+    tickRecipeRow('r1');
+
+    assert.ok(
+      !target.querySelector('[data-recipe-action="delete"]'),
+      'the inspector — and its Delete — is replaced'
+    );
+    assert.ok(recipeDeleteButton(), 'but the panel now carries its own set delete');
+    assert.match(
+      target.querySelector('[data-recipe-bulk-impact-row="items"]').textContent,
+      /Removed from 2 books & scrolls/,
+      'the impact the store computed reaches the panel'
+    );
+    assert.match(
+      target.querySelector('[data-recipe-bulk-impact-row="learners"]').textContent,
+      /Forgotten by 4 characters/
+    );
+  });
+
+  it('takes TWO clicks, and the first writes nothing', async () => {
+    const calls = [];
+    await openRecipesBrowser(calls);
+    tickRecipeRow('r1');
+    tickRecipeRow('r2');
+
+    recipeDeleteButton().click();
+    flushSync();
+    assert.equal(
+      calls.some((call) => call[0] === 'deleteRecipes'),
+      false,
+      'the FIRST click only arms — nothing is written'
+    );
+    assert.equal(recipeDeleteButton().getAttribute('data-armed'), 'true');
+
+    recipeDeleteButton().click();
+    await tick();
+    flushSync();
+    const write = calls.find((call) => call[0] === 'deleteRecipes');
+    assert.deepEqual(write?.[1], ['r1', 'r2'], 'the second click deletes the selection');
+  });
+
+  it('DISARMS when the selection changes underneath the armed control', async () => {
+    // The second effect. An arm is a statement about a SPECIFIC set: once the set moves, the
+    // impact sentence the GM read before arming is no longer the impact of confirming.
+    //
+    // WHAT THIS DOES NOT PROVE, said plainly so nobody reads more into it. It does not
+    // distinguish the effect's `Set` dependency from a `count` one: keying the effect on
+    // `recipeBulkSelectionCount` instead leaves this test GREEN, verified by mutation. That
+    // is not a hole in the test — no reachable control produces an equal-sized new set
+    // (untick-then-tick is two flushes, the browser's phantom prune assigns only when the
+    // size differs, and `Select all N results` is hidden once everything is selected), so
+    // there is no such case to write. The Set dependency is keyed on the reactive unit the
+    // state is; see the effect's own comment.
+    const calls = [];
+    await openRecipesBrowser(calls);
+    tickRecipeRow('r1');
+
+    recipeDeleteButton().click();
+    flushSync();
+    assert.equal(recipeDeleteButton().getAttribute('data-armed'), 'true');
+
+    tickRecipeRow('r1');
+    tickRecipeRow('r2');
+
+    assert.equal(
+      recipeDeleteButton().getAttribute('data-armed'),
+      'false',
+      'swapping the selection disarms the pending delete'
+    );
+    recipeDeleteButton().click();
+    flushSync();
+    assert.equal(
+      calls.some((call) => call[0] === 'deleteRecipes'),
+      false,
+      'the next click re-arms rather than writing'
+    );
+  });
+
+  it('keeps a staged bulk-edit draft across a NON-EMPTY selection change', async () => {
+    // THE REGRESSION THE SECOND EFFECT EXISTS TO AVOID. The shipped effect discards the
+    // staged draft when the selection EMPTIES, deliberately — the panel is unmounted at that
+    // point, so it is the only place the discard can honestly happen. Retargeting THAT
+    // effect to the Set identity, rather than adding a second one, would discard a staged
+    // draft on every selection change and undo issue 1010's whole staging model.
+    await openRecipesBrowser();
+    tickRecipeRow('r1');
+
+    const stageDisable = () =>
+      target
+        .querySelector('[data-recipe-bulk-status-option="disable"] input')
+        .dispatchEvent(new window.Event('change', { bubbles: true }));
+    const applyEnabled = () => !target.querySelector('[data-recipe-bulk-apply]').disabled;
+
+    stageDisable();
+    flushSync();
+    assert.equal(applyEnabled(), true, 'pre-condition: the draft really is staged');
+
+    tickRecipeRow('r2');
+
+    assert.equal(
+      applyEnabled(),
+      true,
+      'growing the selection must not throw away what the GM staged'
+    );
+    assert.equal(
+      recipeDeleteButton().getAttribute('data-armed'),
+      'false',
+      'while the arm — which IS a statement about a specific set — is still dropped'
+    );
+  });
+
+  async function deleteSelectedRecipeRows(ids, options = {}) {
+    const messages = [];
+    const calls = [];
+    const previousUi = globalThis.ui;
+    globalThis.ui = { notifications: { info: (message) => messages.push(message) } };
+    try {
+      await openRecipesBrowser(calls, options);
+      for (const id of ids) tickRecipeRow(id);
+      recipeDeleteButton().click();
+      flushSync();
+      recipeDeleteButton().click();
+      await tick();
+      flushSync();
+      return { messages, calls };
+    } finally {
+      if (previousUi === undefined) delete globalThis.ui;
+      else globalThis.ui = previousUi;
+    }
+  }
+
+  it('clears the selection after a successful delete and reports every non-zero outcome', async () => {
+    const { messages } = await deleteSelectedRecipeRows(['r1', 'r2'], {
+      deleteRecipesResult: {
+        deleted: 2,
+        recipeIds: ['r1', 'r2'],
+        recipeItemsPruned: 1,
+        learnersAffected: 4,
+      },
+    });
+
+    assert.deepEqual(messages, [
+      'Deleted 2 recipe(s), removed them from 1 recipe item(s), and 4 character(s) forgot them.',
+    ]);
+    assert.ok(
+      !target.querySelector('[data-recipe-bulk-delete-card]'),
+      'the rail returns to the single-recipe inspector'
+    );
+  });
+
+  it('drops the clauses whose outcome was zero rather than reporting a nought', async () => {
+    const { messages } = await deleteSelectedRecipeRows(['r1'], {
+      deleteRecipesResult: {
+        deleted: 1,
+        recipeIds: ['r1'],
+        recipeItemsPruned: 0,
+        learnersAffected: 0,
+      },
+    });
+
+    assert.deepEqual(messages, ['Deleted 1 recipe(s).']);
+  });
+
+  it('names the learners alone when the prune rewrote nothing', async () => {
+    // The legacy-basis shape: membership lives on the recipe and dies with it, so
+    // `recipeItemsPruned` is 0 while characters really did forget the recipes.
+    const { messages } = await deleteSelectedRecipeRows(['r1', 'r2'], {
+      deleteRecipesResult: {
+        deleted: 2,
+        recipeIds: ['r1', 'r2'],
+        recipeItemsPruned: 0,
+        learnersAffected: 3,
+      },
+    });
+
+    assert.deepEqual(messages, ['Deleted 2 recipe(s); 3 character(s) forgot them.']);
+  });
+
+  it('returns the card to IDLE and keeps the selection when the write is refused', async () => {
+    // FAILURE IS NOT SILENT, and this path is reachable rather than theoretical: a GM whose
+    // `SETTINGS_MODIFY` has been revoked passes the client-side `_assertGM` gate and is then
+    // refused by the server. The store raises the error toast; the root must not announce a
+    // success on top of it, must not throw the selection away, and must not leave a spinner.
+    const { messages } = await deleteSelectedRecipeRows(['r1'], {
+      deleteRecipesResult: {
+        deleted: 0,
+        recipeIds: [],
+        recipeItemsPruned: 0,
+        learnersAffected: 0,
+      },
+    });
+
+    assert.deepEqual(messages, [], 'nothing was deleted, so nothing is announced');
+    assert.ok(
+      Boolean(target.querySelector('[data-recipe-bulk-delete-card]')),
+      'and the selection survives, so the GM can see what did not happen and retry'
+    );
+    assert.equal(
+      recipeDeleteButton().getAttribute('data-armed'),
+      'false',
+      'the arm is spent — a still-armed button would delete on the next single click'
+    );
+    assert.equal(
+      recipeDeleteButton().getAttribute('data-busy'),
+      'false',
+      'and the busy face is cleared, not left as a stuck spinner over a live selection'
+    );
+  });
+
+  it('clears the busy flag even when the action REJECTS, so the card cannot stick', async () => {
+    // The store catches its own write failures, so a rejection reaching the root means the
+    // failure was elsewhere — and a `finally`-less handler would leave `recipeBulkDeleting`
+    // true forever, disabling the control the GM needs in order to try again.
+    const { messages } = await deleteSelectedRecipeRows(['r1'], { deleteRecipesReject: true });
+
+    assert.deepEqual(messages, []);
+    assert.equal(recipeDeleteButton().getAttribute('data-busy'), 'false');
+    assert.equal(recipeDeleteButton().getAttribute('data-armed'), 'false');
+    assert.equal(recipeDeleteButton().disabled, false, 'and the control is live again');
   });
 
   // Creating a crafting system already SELECTED it in the store, but the GM was left on

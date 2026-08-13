@@ -96,6 +96,13 @@ export function createServices(system, recipes = [], capture = [], overrides = {
     getScriptMacros: () => [],
     getSceneOptions: () => [],
     getWorldUsers: () => [],
+    // The raw actor DOCUMENTS the store builds its learned-knowledge index from (issue
+    // 1132). It reads `globalThis.game` because that is where these fixtures already seed
+    // their actors; the real seam in `SvelteCraftingSystemManagerApp` does the same read.
+    getWorldActors: () => {
+      const raw = globalThis.game?.actors;
+      return Array.isArray(raw?.contents) ? raw.contents : Array.isArray(raw) ? raw : [];
+    },
     localize: (key) => key,
     notify: { info: () => {}, warn: () => {}, error: () => {} },
     ...serviceOverrides,
@@ -108,8 +115,23 @@ export function createServices(system, recipes = [], capture = [], overrides = {
  * real doubly-nested `flags.fabricate.fabricate.learnedRecipes` path — and a
  * single-nested-only fixture correctly resolves to nothing.
  */
-export function makeFlaggedActor({ id, name = '', img = '', flags = {}, items = [] } = {}) {
-  const actor = { id, name: name || id, img, flags, items };
+/**
+ * `isOwner` defaults to TRUE because these fixtures model a GM session, which is the only
+ * session the manager runs in. `Actor#isOwner` short-circuits to OWNER for any `isGM`, so a
+ * GM client genuinely sees every world actor as writable — and the learned-knowledge index
+ * is scoped to `selectWritableActors` (issue 970/1132), so an actor without the field is
+ * filtered out and contributes nothing. Pass `isOwner: false` to model the non-owned actor
+ * both the count and the cascade must exclude.
+ */
+export function makeFlaggedActor({
+  id,
+  name = '',
+  img = '',
+  flags = {},
+  items = [],
+  isOwner = true,
+} = {}) {
+  const actor = { id, name: name || id, img, flags, items, isOwner };
   actor.getFlag = (scope, key) =>
     String(key || '')
       .split('.')

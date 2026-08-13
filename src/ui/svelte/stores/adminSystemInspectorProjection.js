@@ -23,9 +23,8 @@
  * Deliberately a LEAF under `stores/`: no `.svelte` imports from `src/ui/svelte/stores/`,
  * so this module cannot reach a mounted-component test's dependency closure.
  */
-import { getFabricateFlag } from '../../../config/flags.js';
-import { readLearnedRecipeEntries } from '../../../systems/recipeKeyedFlagEntries.js';
 import { activityFailureResultPolicy } from '../../../utils/failureResultPolicy.js';
+import { buildLearnedRecipeActorIndex } from '../../../utils/recipeDeleteImpact.js';
 import { normalizeCharacterPrerequisiteList } from '../../../systems/characterPrerequisites.js';
 import {
   normalizeModifierPolicy,
@@ -94,43 +93,23 @@ async function _resolveRecipeItemSource(uuid) {
   }
 }
 
-// Build a `recipeId -> Set(actorId)` index of learned recipes across every world
-// actor (best-effort; `game.*` may be unavailable in headless contexts → empty).
+// The `recipeId -> Set(actorId)` index of learned recipes is no longer built here. It is
+// `buildLearnedRecipeActorIndex` in `utils/recipeDeleteImpact.js` (issue 1132), which the
+// bulk-delete describer and `CraftingSystemManager.deleteRecipes` also count through, so
+// "Learned by 4" on a book and "4 characters will forget them" on the delete card are one
+// derivation rather than three that agree by convention.
 //
-// The learned map MUST be read through `getFabricateFlag` (issue 785). Every
-// writer persists it at the doubly-nested `flags.fabricate.fabricate.learnedRecipes`
-// path (`normalizeFlagKey` prefixes `fabricate.`, then the flattened update path
-// nests it under the `fabricate` scope), so the old hand-written single-nested
-// `actor.flags.fabricate.learnedRecipes` read resolved to `undefined` in a real
-// world and "Learned by" was permanently 0. `getFabricateFlag` also try/catches
-// `getFlag`'s inactive-scope throw.
+// Two properties came with the move and both are load-bearing:
 //
-// The ids come from the shared ENTRY-BOUNDARY reader, not `Object.keys` (issue 1143).
-// `Document#update` nests a dotted recipe id into a subtree, so the top level yields the
-// id's first segment and this panel under-reported learners for such a recipe while the
-// deletion cascade — reading through the same reader — acted on the real id. Both must
-// answer with the same ids or the GM surface and the mutation disagree.
-function _buildLearnedRecipeActorIndex() {
-  const index = new Map();
-  const raw = globalThis.game?.actors;
-  const actors = Array.isArray(raw?.contents)
-    ? raw.contents
-    : Array.isArray(raw)
-      ? raw
-      : typeof raw?.[Symbol.iterator] === 'function'
-        ? [...raw]
-        : [];
-  for (const actor of actors) {
-    const learned = getFabricateFlag(actor, 'learnedRecipes', null);
-    if (!learned || typeof learned !== 'object') continue;
-    const actorId = actor.id || actor._id || '';
-    for (const recipeId of readLearnedRecipeEntries(learned).keys()) {
-      if (!index.has(recipeId)) index.set(recipeId, new Set());
-      index.get(recipeId).add(actorId);
-    }
-  }
-  return index;
-}
+//  - the walk is SCOPED to `selectWritableActors` (issue 970), the cascade's own set. It
+//    is a no-op in any GM session, because `isOwner` is unconditionally true for a GM and
+//    the Studio is GM-only, so `learnedByCount` states no different figure than it did;
+//  - the ids still come from the shared ENTRY-BOUNDARY reader rather than `Object.keys`
+//    (issue 1143), so a dotted recipe id — persisted as a SUBTREE by `Document#update` —
+//    is counted here exactly as the deletion cascade counts it.
+//
+// Best-effort: `game.*` may be unavailable in a headless context, which yields an empty
+// index rather than a throw.
 
 // The legacy reverse-ref index: `recipeItemId -> rows`. Built ONLY while the system's
 // membership-basis marker is unset, so it costs nothing on a system that has switched
@@ -167,10 +146,18 @@ function _legacyRecipeItemIndex(recipeList) {
 // parameter buys is that this function does not have a SECOND, differently-shaped opinion
 // about the basis for a future caller to hand a rawer list to
 // (`ui-integration/spec.md`, the membership-basis paragraph).
+//
+// `learnerIndex` is the caller's ONE per-refresh build of the learned-knowledge index
+// (issue 1132). The store now needs the same index on a render path — the bulk-delete
+// describer recomputes on every selection change and must iterate no actors — so building
+// it once per refresh and threading it here is what stops the same world walk happening
+// twice per refresh. Omitting it builds one, so the two existing test call sites and any
+// caller that has no cache still work.
 export async function enrichRecipeItemLibrary(
   projectedItems,
   recipes,
-  membershipResolvesByRecipeIds
+  membershipResolvesByRecipeIds,
+  learnerIndex = null
 ) {
   const items = Array.isArray(projectedItems) ? projectedItems : [];
   if (items.length === 0) return [];
@@ -189,7 +176,10 @@ export async function enrichRecipeItemLibrary(
     category: recipe.category || '',
   });
 
-  const actorIndex = _buildLearnedRecipeActorIndex();
+  const actorIndex =
+    learnerIndex instanceof Map
+      ? learnerIndex
+      : buildLearnedRecipeActorIndex(globalThis.game?.actors);
   const resolved = await Promise.all(
     items.map((item) => _resolveRecipeItemSource(item.originItemUuid))
   );

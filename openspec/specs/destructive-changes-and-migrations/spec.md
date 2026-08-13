@@ -48,10 +48,25 @@ When `CraftingSystem.resolutionMode` changes:
 
 ### Delete Recipe
 
+Deleting a recipe is a confirmed destructive record rewrite across recipe items and characters, not a silent orphaning.
+It has both a single-recipe and a SET form, and the two perform the same cascade.
+
 1. Remove recipe from persisted recipes.
 2. Remove run records referencing the recipe.
-3. Remove learned flags for that recipe from all actors.
+3. Remove learned flags for that recipe from the actors the deleting client may write.
 4. Remove recipe-specific UI preference data.
+5. Remove the deleted recipe's id from every recipe item definition whose `recipeIds[]` contained it, so no membership entry points at a recipe that no longer exists.
+   The basis is explicit rather than inferred: on a system whose `membershipResolvesByRecipeIds` marker is unset, membership resolves through the recipe's own legacy scalar and therefore dies with the recipe, so no definition is rewritten and none is left dangling.
+   The prune neither sets nor reads that monotone marker — an unauthored, irreversible basis flip is not an acceptable side effect of a deletion the GM authored for another reason.
+6. Both forms state their impact before the GM commits, and both report the same arithmetic: how many recipes will be deleted, how many recipe items will no longer contain them, and how many characters will lose the learned knowledge.
+   The recipe-item figure counts DISTINCT recipe items — two selected recipes in one recipe item is one recipe item — and it is basis-aware, so it may exceed the number of definitions the write actually rewrites.
+   The character figure counts DISTINCT actors resolved through the same writable-actor scope clause 3 cascades over.
+7. Deletion is WARNED, not BLOCKED: no recipe is refused or skipped on account of the recipe items containing it or the characters who have learned it.
+8. Every GM-initiated recipe deletion routes through one shared body, so the entry points cannot disagree about what deleting a recipe reaches.
+   The compendium importer's orphan-prune phase is exempt: the pack owns the whole definition set it has just written and the phase deliberately batches to a single recipes write.
+   An overwrite import that changes a system's resolution mode still cascades, transitively through the resolution-mode migration.
+9. A recipe item's `caps.learn.prerequisiteIds` and a teaser's `fragments[].recipeIds` are deliberately NOT pruned: both are authored content an unrelated delete must not silently rewrite, and the Required Knowledge gate fails open on a dangling prerequisite.
+   The accepted consequence is recorded rather than discovered later — because that gate SKIPS a dangling prerequisite rather than clearing it, a retained id re-arms if a keep-mode pack reinstall re-mints a recipe under the same id.
 
 ### Delete a Referenced Category or Tag
 
@@ -170,9 +185,9 @@ For systems in `alchemy` mode:
 
 ### Learned Recipes Clean-up
 
-- Remove learned entries for missing recipe IDs.
+- Remove learned entries for missing recipe IDs, from the actors the running client may write.
 - Keep valid learned entries even if the visibility mode changes.
-- During a Delete Crafting System operation this clean-up runs as one bulk pass across all actors, not once per deleted recipe; this batches how the clean-up executes without changing its scope.
+- During a Delete Crafting System operation this clean-up runs as one bulk pass across those actors, not once per deleted recipe; this batches how the clean-up executes without changing its scope.
 
 ### Preferences Clean-up
 
