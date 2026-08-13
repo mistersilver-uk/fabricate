@@ -13,9 +13,15 @@ test('Fabricate exposes deleteRecipe on the main Foundry API object', () => {
     mainSource.includes('async deleteRecipe(recipeId)'),
     'Fabricate should expose a deleteRecipe method on the main game.fabricate API object'
   );
+  // Issue 1132: it routes through the CASCADING set primitive rather than the
+  // `RecipeManager` leaf, so the public API and the GM studio cannot disagree about what
+  // deleting a recipe reaches. Its return value changed from `undefined` to the result
+  // object at the same time.
   assert.ok(
-    mainSource.includes('return await this.recipeManager.deleteRecipe(recipeId);'),
-    'Fabricate.deleteRecipe should delegate to RecipeManager.deleteRecipe'
+    mainSource.includes(
+      'return await this.craftingSystemManager.deleteRecipes(recipe.craftingSystemId, [recipeId]);'
+    ),
+    'Fabricate.deleteRecipe should route through CraftingSystemManager.deleteRecipes'
   );
 });
 
