@@ -36,6 +36,11 @@ import {
   recipeReferencesComponent,
   stripComponentsFromRecipeJson,
 } from '../utils/recipeComponentReferences.js';
+import {
+  buildLearnedRecipeActorIndex,
+  planRecipeItemMembershipPrune,
+  selectLearnerActorIds,
+} from '../utils/recipeDeleteImpact.js';
 import { recipeReferencesEssence } from '../utils/recipeEssenceReferences.js';
 import { resolveRecipeCheckTierOptions } from '../utils/routedOutcomeKeywords.js';
 import {
@@ -3440,16 +3445,31 @@ export class CraftingSystemManager {
    * deleted. Emits one aggregated info notification for migrated recipes, one warn
    * notification listing deleted recipes (only when any were deleted), and a single
    * `recipesChanged` emission.
+   *
+   * **The deletions are COLLECTED and the set form is called ONCE** (issue 1132). This
+   * runs INSIDE {@link CraftingSystemManager#updateSystem}, after that method's own
+   * `save()` and before its terminal `_notifySystemsChanged()`, so routing the loop
+   * through a cascading singular would give each un-migratable recipe its own
+   * `craftingSystems` write, its own O(actors) flag pass and its own systems-changed
+   * emission — publishing a half-migrated system N times, which is exactly the fault the
+   * batched primitive exists to avoid. Per-recipe notification and emission stay
+   * suppressed so this method keeps emitting its one aggregate, and `notifySystems: false`
+   * leaves the systems-changed signal to `updateSystem`'s terminal one.
+   *
+   * It passes the LIVE `merged` system rather than a snapshot: `updateSystem` saves again
+   * after this returns, so a prune written against a copy would be clobbered.
+   *
    * @param {string} systemId
    * @param {string} fromMode
    * @param {string} toMode
-   * @param {object} system The merged (post-change) system.
+   * @param {object} system The merged (post-change) system, live in `this.systems`.
    * @private
    */
   async _migrateRecipesForModeChange(systemId, fromMode, toMode, system) {
     const affectedRecipes = this.recipeManager.getRecipes({ craftingSystemId: systemId });
     let migratedCount = 0;
     const deletedNames = [];
+    const deletedIds = [];
 
     for (const recipe of affectedRecipes) {
       const recipeJSON = typeof recipe?.toJSON === 'function' ? recipe.toJSON() : recipe;
@@ -3462,7 +3482,7 @@ export class CraftingSystemManager {
 
       if (outcome === 'delete') {
         deletedNames.push(recipe.name || recipe.id);
-        await this.recipeManager.deleteRecipe(recipe.id, { notify: false, emitChange: false });
+        deletedIds.push(recipe.id);
         continue;
       }
 
@@ -3472,6 +3492,14 @@ export class CraftingSystemManager {
         emitChange: false,
       });
       migratedCount += 1;
+    }
+
+    if (deletedIds.length > 0) {
+      await this._deleteRecipeSet(system, deletedIds, {
+        notify: false,
+        emitChange: false,
+        notifySystems: false,
+      });
     }
 
     if (migratedCount > 0) {
@@ -5562,6 +5590,159 @@ export class CraftingSystemManager {
       await this.recipeManager.updateRecipe(recipeId, updates, options);
       return { updated: true, blocked: true, rejected: false };
     }
+  }
+
+  /**
+   * Delete a SET of recipes and everything that deletion reaches, in ONE `recipes` write,
+   * ONE `craftingSystems` write and ONE actor-flag pass (issue 1132).
+   *
+   * **It lives here and not on `RecipeManager` because `RecipeManager` READS systems and
+   * never WRITES them.** Write ownership of the `craftingSystems` setting, and `save()` on
+   * it, exist only here. (`RecipeManager` does hold a `getCraftingSystem` seam and reaches
+   * the system manager in roughly fifteen places, so "it has no reference" would be false.)
+   *
+   * **Every GM-initiated delete routes through the shared body**, exactly as
+   * {@link CraftingSystemManager#deleteItem} and
+   * {@link CraftingSystemManager#deleteComponents} both route through
+   * `_deleteComponentSet`, so the entry points cannot disagree about what deleting a
+   * recipe reaches: the studio singular, the studio set, `game.fabricate.deleteRecipe` and
+   * {@link CraftingSystemManager#_migrateRecipesForModeChange}. Two paths are deliberately
+   * exempt and both are recorded on {@link RecipeManager#deleteRecipe}.
+   *
+   * @param {string} systemId The system whose recipe items the prune rewrites. An
+   *   unresolvable id deletes the recipes and prunes nothing rather than throwing — unlike
+   *   components and essences, which LIVE on the system, a recipe lives in its own world
+   *   setting, so a recipe whose `craftingSystemId` dangles is a real and deletable object
+   *   and is precisely the orphan `game.fabricate.deleteRecipe` most needs to reach.
+   * @param {Iterable<string>} recipeIds A stale id is skipped, not thrown.
+   * @param {{notify?: boolean, emitChange?: boolean, notifySystems?: boolean}} [options]
+   * @returns {Promise<{deleted: number, recipeIds: string[], recipeItemsPruned: number,
+   *   learnersAffected: number}>} `recipeItemsPruned` counts the definitions actually
+   *   REWRITTEN, which is zero on a legacy-basis system; the figure the GM is shown is the
+   *   basis-aware count of recipe items that will no longer contain them, from
+   *   `describeRecipeDeleteImpact`. See `utils/recipeDeleteImpact.js` for why those two are
+   *   different questions rather than a drift.
+   */
+  async deleteRecipes(systemId, recipeIds, options = {}) {
+    this._assertGM('delete recipes');
+    return await this._deleteRecipeSet(this.getSystem(systemId), recipeIds, options);
+  }
+
+  /**
+   * The shared body of every cascading recipe delete.
+   *
+   * **Write order: `recipes` setting → `craftingSystems` setting → actor flags.** Two
+   * reasons carry it, and `applyBulkEditToRecipes`' docblock already states the permission
+   * argument both rest on — `_assertGM` is `game.user.isGM` (`hasRole(ASSISTANT)`) while
+   * `SETTINGS_MODIFY` is revocable from assistants, so in a world that has revoked it the
+   * client-side gate passes, the server refuses and `SocketInterface.dispatch` rejects.
+   *
+   *  - **Recipes before books.** If the book write fails after the recipe write, the world
+   *    holds dangling book ids — exactly today's steady state, invisible at render and
+   *    repaired by the next successful delete. Books first, with the recipe write then
+   *    failing, would lose authored membership for recipes that still exist, with nothing
+   *    able to reconstruct it. Note that {@link CraftingSystemManager#applyBulkEditToRecipes}
+   *    orders the two the OTHER way, for a reason that does not apply here: its book write
+   *    SETS the basis marker, so recipes-first would leave a window in which recipes are
+   *    persisted against an unmarked system. A delete sets no marker, so that reason is
+   *    absent and the dangling-membership one governs.
+   *  - **Both settings before actors**, for a caller whose `SETTINGS_MODIFY` has been
+   *    explicitly revoked. There is no client-side preflight on the update path, the write
+   *    genuinely throws, and it is not swallowed — such a caller must mutate no actor flags.
+   *
+   * **The `craftingSystems` write must not touch the membership-basis marker.**
+   * {@link CraftingSystemManager#updateRecipeItemDefinition} is the single choke point for
+   * it (issue 1011) and looping that would be N `craftingSystems` writes AND would flip a
+   * legacy system's basis irreversibly and system-wide as a side effect of a delete the GM
+   * authored for another reason. So this writes the array directly, reusing
+   * {@link CraftingSystemManager#_normalizeMembershipRecipeIds} because the six membership
+   * readers match by exact string equality — and it neither sets nor reads the marker.
+   * That deliberately departs from `applyBulkEditToRecipes`, which also bypasses the choke
+   * point but DOES maintain the marker: correct for an edit, wrong for a delete, because
+   * `_seedMembershipFromLegacyScalars` PUSHES onto existing arrays rather than replacing,
+   * so seeding on the way to removing an id would materialise legacy membership as
+   * authored membership.
+   *
+   * **Both change hooks, not one.** The batch writes both settings, so it emits both
+   * signals, gated per-axis exactly as `applyBulkEditToRecipes` does: on the writing client
+   * `reload()` returns `false`, so the `updateSetting` socket bridge re-emits nothing
+   * locally and a book change announced only as `recipesChanged` would be invisible to the
+   * GM's own other windows. `deleteComponents` and `deleteEssences` both rewrite recipes
+   * and emit only `_notifySystemsChanged()` — they are the trap here, not the pattern.
+   *
+   * @param {object|null} system The LIVE normalized system from `this.systems`, never a
+   *   snapshot: the mode-change caller runs inside `updateSystem`, which saves again
+   *   afterwards, and a prune written against a copy would be clobbered by those saves.
+   * @param {Iterable<string>} recipeIds
+   * @param {{notify?: boolean, emitChange?: boolean, notifySystems?: boolean}} [options]
+   * @returns {Promise<{deleted: number, recipeIds: string[], recipeItemsPruned: number,
+   *   learnersAffected: number}>}
+   * @private
+   */
+  async _deleteRecipeSet(system, recipeIds, options = {}) {
+    const requested = normalizeSelectionIds(recipeIds);
+    const recipes = requested
+      .map((recipeId) => this.recipeManager?.getRecipe?.(recipeId))
+      .filter(Boolean);
+    if (recipes.length === 0) {
+      return { deleted: 0, recipeIds: [], recipeItemsPruned: 0, learnersAffected: 0 };
+    }
+    const doomedIds = recipes.map((recipe) => String(recipe.id));
+
+    // Counted BEFORE the flag pass below clears the very entries it counts, and through the
+    // same writable-actor selector the cascade walks.
+    const learnerIds = selectLearnerActorIds(
+      buildLearnedRecipeActorIndex(globalThis.game?.actors),
+      doomedIds
+    );
+
+    // Planned BEFORE the recipes leave the map: under the legacy basis membership resolves
+    // through the RECIPE's own scalar, which is unreadable once the recipe is gone.
+    const plan = planRecipeItemMembershipPrune(
+      system?.recipeItemDefinitions,
+      recipes,
+      system?.membershipResolvesByRecipeIds === true
+    );
+
+    // ---- 1. the `recipes` setting -----------------------------------------------------
+    const outcome = await this.recipeManager.deleteRecipes(doomedIds, {
+      notify: options.notify,
+      emitChange: false,
+      cleanupFlags: false,
+    });
+
+    // ---- 2. the `craftingSystems` setting ---------------------------------------------
+    // Skipped outright when this half changed nothing, as `applyBulkEditToRecipes` skips
+    // each of its two writes: the guarantee is at most ONE write of each, not one write
+    // unconditionally. On a legacy-basis system that is every time, and it is a theorem
+    // rather than a basis check — see `planRecipeItemMembershipPrune`.
+    for (const entry of plan.prunes) {
+      entry.definition.recipeIds = this._normalizeMembershipRecipeIds(entry.recipeIds);
+    }
+    const recipeItemsPruned = plan.prunes.length;
+    if (recipeItemsPruned > 0) await this.save();
+
+    // ---- 3. actor flags ---------------------------------------------------------------
+    await this.recipeManager.cleanupOrphanedRecipeFlags?.();
+
+    // ---- 4. both change hooks ---------------------------------------------------------
+    if (recipeItemsPruned > 0 && options.notifySystems !== false) this._notifySystemsChanged();
+    if (options.emitChange !== false) {
+      // The payload shape is the singular `{recipeId}` widened to the id SET. Confirmed
+      // safe: `_notifyRecipesChanged` spreads `details`, a plural `recipeIds` payload
+      // already exists on the bulk edit above, and every listener is arity-0.
+      this.recipeManager.notifyRecipesChanged?.({
+        action: 'delete',
+        recipeIds: outcome.recipeIds,
+      });
+    }
+
+    return {
+      deleted: outcome.deleted,
+      recipeIds: outcome.recipeIds,
+      recipeItemsPruned,
+      learnersAffected: learnerIds.length,
+    };
   }
 
   async deleteItem(systemId, itemId) {

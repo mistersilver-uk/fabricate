@@ -477,6 +477,17 @@ export class RecipeManager {
    *   per recipe and then issues a SINGLE `save()` after the whole batch; only the
    *   per-recipe `save()` (one whole-array `recipes` world write) is skipped. Default
    *   `true` keeps every single-recipe caller issuing its one write.
+   *
+   * **This is the LEAF, and it does NOT cascade the recipe-item membership prune**
+   * (issue 1132). A recipe deleted through here stays named by every
+   * `recipeItemDefinitions[].recipeIds` array that contained it, because write ownership
+   * of the `craftingSystems` setting lives on `CraftingSystemManager` and not here.
+   * {@link CraftingSystemManager#deleteRecipes} is the entry point that DOES cascade, and
+   * every GM-initiated delete — the studio singular and set, `game.fabricate.deleteRecipe`
+   * and the resolution-mode migration — routes through it. The exemptions are
+   * {@link CraftingSystemManager#deleteSystem} (the books go with the system) and the
+   * compendium importer's orphan-prune phase (the pack owns the definition set it just
+   * wrote, and the phase deliberately batches to a single `recipes` write).
    */
   async deleteRecipe(recipeId, options = {}) {
     this._assertGM('delete recipe');
@@ -499,6 +510,76 @@ export class RecipeManager {
     if (options.emitChange !== false) {
       this._notifyRecipesChanged('delete', { recipeId });
     }
+  }
+
+  /**
+   * Delete a SET of recipes in ONE `recipes` world write, guarding the in-memory map
+   * against a refused write (issue 1132).
+   *
+   * **The map guard is the point of this method existing, and it belongs here.**
+   * {@link RecipeManager#deleteRecipe} deletes from `this.recipes` BEFORE it persists, so
+   * a rejected `save()` leaves the map missing recipes the world setting still holds — and
+   * the next unrelated successful `save()` then persists a deletion that failed. A batch
+   * makes that worse by the size of the batch. The guard sits inside `RecipeManager`
+   * because the map is `RecipeManager`'s: a batch caller driving a `{persist: false}` loop
+   * from outside would have to reach into another manager's state to snapshot and restore
+   * it, which is a layer boundary the fix does not need to cross.
+   *
+   * The restore is a whole-map swap back to the pre-delete snapshot. That is exactly the
+   * state the `recipes` setting still holds when OUR write is the one that failed. A peer
+   * write landing through `reload()` inside the failed `save()`'s await window would be
+   * discarded by the restore — an accepted, bounded exposure, and the same absence of any
+   * compare-and-set that `_applyBulkRecipePatches` documents for the settings path.
+   *
+   * A requested id that resolves to no recipe is SKIPPED rather than thrown, unlike the
+   * singular form: a bulk selection is assembled from a projection that republishes at a
+   * different moment from the click, so a stale id is expected rather than exceptional.
+   *
+   * @param {Iterable<string>} recipeIds
+   * @param {{notify?: boolean, emitChange?: boolean, cleanupFlags?: boolean}} [options]
+   *   Same three gates as {@link RecipeManager#deleteRecipe}; there is no `persist` gate,
+   *   because owning its single `save()` is what this method is for.
+   * @returns {Promise<{deleted: number, recipeIds: string[], recipes: object[]}>} The
+   *   recipes actually removed, in requested order.
+   * @throws {Error} Rethrows a refused `recipes` write AFTER restoring the map, so the
+   *   caller must not have mutated anything else first (see the write ordering in
+   *   {@link CraftingSystemManager#deleteRecipes}).
+   */
+  async deleteRecipes(recipeIds, options = {}) {
+    this._assertGM('delete recipes');
+
+    const requested = [
+      ...new Set([...(recipeIds || [])].map((id) => String(id ?? '').trim()).filter(Boolean)),
+    ];
+    const removed = requested.map((id) => this.recipes.get(id)).filter(Boolean);
+    if (removed.length === 0) return { deleted: 0, recipeIds: [], recipes: [] };
+
+    const removedIds = removed.map((recipe) => String(recipe.id));
+    const restorePoint = new Map(this.recipes);
+    for (const id of removedIds) this.recipes.delete(id);
+
+    try {
+      await this.save();
+    } catch (error) {
+      this.recipes = restorePoint;
+      throw error;
+    }
+
+    if (options.cleanupFlags !== false) {
+      await this._cleanupFlagsAfterRecipeMutation();
+    }
+    if (options.notify !== false) {
+      ui.notifications.info(
+        removed.length === 1
+          ? `Recipe "${removed[0].name}" deleted`
+          : `Deleted ${removed.length} recipes`
+      );
+    }
+    if (options.emitChange !== false) {
+      this._notifyRecipesChanged('delete', { recipeIds: removedIds });
+    }
+
+    return { deleted: removed.length, recipeIds: removedIds, recipes: removed };
   }
 
   /**

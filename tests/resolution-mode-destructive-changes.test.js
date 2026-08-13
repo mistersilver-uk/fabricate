@@ -27,12 +27,19 @@ const { CraftingSystemManager } = await import('../src/systems/CraftingSystemMan
 
 // A recipe-manager mock that records migration calls. Recipes are plain JSON; the
 // `updateRecipe` path records the migrated `resultSelection` so tests can assert
-// the matrix outcome, and `deleteRecipe` records deletions.
+// the matrix outcome, and the delete paths record deletions.
+//
+// `deleteRecipes` is the batch primitive the mode migration routes through since issue
+// 1132, and this double is deliberately NOT looser than the real one: it skips an id that
+// resolves to no recipe (rather than deleting a phantom), returns the same
+// `{deleted, recipeIds, recipes}` shape, and counts its own single flag pass so a
+// per-recipe fan-out regression is visible here.
 function makeRecipeManager(recipes = []) {
   let mutableRecipes = recipes.map((r) => ({ ...r }));
   const deleted = [];
   const updated = [];
   let signatureChecks = 0;
+  let flagPasses = 0;
 
   return {
     getRecipes(filters = {}) {
@@ -40,6 +47,9 @@ function makeRecipeManager(recipes = []) {
         return mutableRecipes.filter((recipe) => recipe.craftingSystemId === filters.craftingSystemId);
       }
       return mutableRecipes;
+    },
+    getRecipe(recipeId) {
+      return mutableRecipes.find((recipe) => recipe.id === recipeId) || null;
     },
     async updateRecipe(recipeId, updates) {
       updated.push({ recipeId, updates });
@@ -51,11 +61,27 @@ function makeRecipeManager(recipes = []) {
       deleted.push(recipeId);
       mutableRecipes = mutableRecipes.filter((recipe) => recipe.id !== recipeId);
     },
+    async deleteRecipes(recipeIds) {
+      const resolved = [...recipeIds].filter((id) =>
+        mutableRecipes.some((recipe) => recipe.id === id)
+      );
+      const removed = mutableRecipes.filter((recipe) => resolved.includes(recipe.id));
+      deleted.push(...resolved);
+      mutableRecipes = mutableRecipes.filter((recipe) => !resolved.includes(recipe.id));
+      return { deleted: resolved.length, recipeIds: resolved, recipes: removed };
+    },
+    async cleanupOrphanedRecipeFlags() {
+      flagPasses += 1;
+    },
     async disableSignatureConflicts() {
       signatureChecks += 1;
       return [];
     },
     _notifyRecipesChanged() {},
+    notifyRecipesChanged() {},
+    getFlagCleanupPassCount() {
+      return flagPasses;
+    },
     getDeletedRecipeIds() {
       return [...deleted];
     },
