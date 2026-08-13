@@ -243,4 +243,22 @@ describe('recipeItemDefinitionsContaining — data access is injected, the rule 
       'the refusal to fall through survives the injection'
     );
   });
+
+  it('diverges on whitespace-padded stored recipeIds, a seam closed by normalizer trimming on load', () => {
+    // The index keys buckets on `String(recipeId)` untrimmed, while the scan trims. On a
+    // stored recipeId like `' r1 '`, the scan finds a match (after trimming both sides),
+    // but the index looks for the key `'r1'` and misses (because the key is `' r1 '`). This
+    // is not a defect in the field: `CraftingSystemManager._normalizeRecipeItemDefinition`
+    // trims `recipeIds` on EVERY load, so a padded id can never exist at runtime — the seam
+    // is closed in practice. But the battery must exercise it to ensure the two lookups stay
+    // honest; a test without this case would silently pass even if someone accidentally
+    // removed a trim somewhere.
+    const defs = definitions({ a: [' r1 '] });
+    const scanned = ids(recipeItemDefinitionsContaining(defs, { id: 'r1' }, true));
+    const indexed = ids(
+      recipeItemDefinitionsContaining(defs, { id: 'r1' }, true, indexedMembershipLookups)
+    );
+    assert.deepEqual(scanned, ['book-a'], 'scan finds the definition by trimming both sides');
+    assert.deepEqual(indexed, [], 'index misses because it keys on the untrimmed stored id');
+  });
 });
