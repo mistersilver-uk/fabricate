@@ -76,7 +76,7 @@
       "description": "SERIALIZATION: RecipeManager.save() replaces the whole `recipes` world setting. Real Recipe#toJSON output; the byte count is the replicated payload every client re-parses.",
       "counts": {
         "serializedRecipes": 10000,
-        "serializedBytes": 19809681
+        "serializedBytes": 12224183
       }
     },
     "craftingSystemManager.save": {
