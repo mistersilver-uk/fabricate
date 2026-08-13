@@ -4249,7 +4249,6 @@
       // selection stays put; the arm is dropped either way, because the GM's confirmation has
       // been spent and a still-armed button would delete on the next single click.
       const deleted = Number(result?.deleted) || 0;
-      componentBulkDeleteArmed = false;
       if (deleted === 0) return false;
       clearComponentBulkSelection();
       notifyInfo(componentBulkDeletedMessage(result));
@@ -4261,6 +4260,12 @@
       console.error('Fabricate | Failed to delete the selected components:', err);
       return false;
     } finally {
+      // Both live here so the comment above stays true on EVERY exit. `store.deleteComponents`
+      // catches its own write failures, but it resolves the system and its managed items
+      // OUTSIDE that try, so a rejection can reach this function — and a disarm sitting in the
+      // `try` after the await would be skipped, leaving an armed button that deletes on the
+      // next single click.
+      componentBulkDeleteArmed = false;
       componentBulkDeleting = false;
     }
   }

@@ -1704,11 +1704,18 @@ export const VIEW_LAB_CASES = Object.freeze([
     //
     // Hence the explicit `scroll` step: `frame.screenshot()` does not scroll nested overflow
     // containers, so without it the card is out of frame while every assertion still passes.
+    //
+    // `sm-iron-ingot` is selected on PURPOSE, and the choice is load-bearing. Through the real
+    // describer the lab fixture yields 7 recipes rewritten and 3 of them disabled, so this is
+    // the only frame in the registry that photographs the DISABLED row at all — the armed twin
+    // below selects iron+copper ore, which computes 2 / 1 / 0 and therefore photographs the
+    // zero-gating instead. Between the two, every branch of the impact list has a frame.
+    // Selecting an ore here as well would leave the card's most consequential sentence, and the
+    // one this round rewrote, with no visual evidence anywhere.
     query: {},
     steps: [
       'Components',
-      { selector: 'label:has(input[data-component-select="sm-iron-ore"])' },
-      { selector: 'label:has(input[data-component-select="sm-copper-ore"])' },
+      { selector: 'label:has(input[data-component-select="sm-iron-ingot"])' },
       { selector: '[data-component-bulk-delete-card]', scroll: true },
     ],
     expectView: 'components',
