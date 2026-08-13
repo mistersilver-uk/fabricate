@@ -6249,6 +6249,12 @@ export function createAdminStore(services) {
   function _essenceDeleteDialogBranch(name, components, recipes) {
     const permanence = 'Deleting is permanent — an essence you recreate is a new essence';
     if (components > 0 && recipes > 0) {
+      if (recipes === 1) {
+        return [
+          'FABRICATE.Admin.Manager.Essence.DeleteConfirm.ContentOne',
+          `Delete essence ${name}? It will be removed from ${components} component(s), and 1 recipe(s) that requires it will be rewritten. ${permanence}.`,
+        ];
+      }
       return [
         'FABRICATE.Admin.Manager.Essence.DeleteConfirm.Content',
         `Delete essence ${name}? It will be removed from ${components} component(s), and ${recipes} recipe(s) that require it will be rewritten. ${permanence}.`,
@@ -6261,6 +6267,12 @@ export function createAdminStore(services) {
       ];
     }
     if (recipes > 0) {
+      if (recipes === 1) {
+        return [
+          'FABRICATE.Admin.Manager.Essence.DeleteConfirm.ContentRecipesOne',
+          `Delete essence ${name}? 1 recipe(s) that requires it will be rewritten. ${permanence}.`,
+        ];
+      }
       return [
         'FABRICATE.Admin.Manager.Essence.DeleteConfirm.ContentRecipes',
         `Delete essence ${name}? ${recipes} recipe(s) that require it will be rewritten. ${permanence}.`,
@@ -8802,6 +8814,12 @@ export function createAdminStore(services) {
   function _componentDeleteDialogBranch(name, recipes, disabled) {
     const permanence = 'Deleting is permanent — a component you recreate is a new component';
     if (recipes > 0 && disabled > 0) {
+      if (disabled === 1) {
+        return [
+          'FABRICATE.Admin.Manager.Component.DeleteConfirm.ContentDisabledOne',
+          `Delete component ${name}? ${recipes} recipe(s) will be rewritten, and 1 of those recipes is enabled today and will be disabled. ${permanence}.`,
+        ];
+      }
       return [
         'FABRICATE.Admin.Manager.Component.DeleteConfirm.Content',
         `Delete component ${name}? ${recipes} recipe(s) will be rewritten, and ${disabled} of those recipes are enabled today and will be disabled. ${permanence}.`,

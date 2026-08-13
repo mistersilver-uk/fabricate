@@ -2615,6 +2615,7 @@
           "DeleteConfirm": {
             "Title": "Delete {name}?",
             "Content": "Delete component {name}? {recipes} recipe(s) will be rewritten, and {disabled} of those recipes are enabled today and will be disabled. Deleting is permanent — a component you recreate is a new component.",
+            "ContentDisabledOne": "Delete component {name}? {recipes} recipe(s) will be rewritten, and 1 of those recipes is enabled today and will be disabled. Deleting is permanent — a component you recreate is a new component.",
             "ContentRecipes": "Delete component {name}? {recipes} recipe(s) will be rewritten. Deleting is permanent — a component you recreate is a new component.",
             "ContentPlain": "Delete component {name}? Deleting is permanent — a component you recreate is a new component."
           },
@@ -2931,8 +2932,10 @@
           "DeleteConfirm": {
             "Title": "Delete {name}?",
             "Content": "Delete essence {name}? It will be removed from {components} component(s), and {recipes} recipe(s) that require it will be rewritten. Deleting is permanent — an essence you recreate is a new essence.",
+            "ContentOne": "Delete essence {name}? It will be removed from {components} component(s), and 1 recipe(s) that requires it will be rewritten. Deleting is permanent — an essence you recreate is a new essence.",
             "ContentComponents": "Delete essence {name}? It will be removed from {components} component(s). Deleting is permanent — an essence you recreate is a new essence.",
             "ContentRecipes": "Delete essence {name}? {recipes} recipe(s) that require it will be rewritten. Deleting is permanent — an essence you recreate is a new essence.",
+            "ContentRecipesOne": "Delete essence {name}? 1 recipe(s) that requires it will be rewritten. Deleting is permanent — an essence you recreate is a new essence.",
             "ContentPlain": "Delete essence {name}? Deleting is permanent — an essence you recreate is a new essence."
           },
           "DuplicateName": "{name} (copy)",
