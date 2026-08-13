@@ -1,4 +1,4 @@
-import { getFabricateFlag } from '../config/flags.js';
+import { getFabricateFlag, isSafeFlagKeySegment } from '../config/flags.js';
 import { getSetting, setSetting, SETTING_KEYS } from '../config/settings.js';
 import { matchGatheringTools, classifyGatheringToolStates } from '../gatheringToolRuntime.js';
 import { getIngredientComponentId, getMatchHandler } from '../models/match/matchTypes.js';
@@ -73,6 +73,40 @@ export class RecipeManager {
   _assertGM(action) {
     if (!game.user?.isGM) {
       throw new Error(`GM permissions required: ${action}`);
+    }
+  }
+
+  /**
+   * Reject a recipe id that cannot serve as a durable-flag MAP KEY (issue 1143), the
+   * exact sibling of `CraftingSystemManager._assertValidSystemId` and the same
+   * `isSafeFlagKeySegment` doctrine.
+   *
+   * A recipe id is interpolated into two per-actor flag maps, `learnedRecipes` and
+   * `discoveryProgress`. Those are written through a flattened `Document#update` path,
+   * and `Document#update` dot-expands the whole nested VALUE TREE of an `ObjectField`
+   * (V14 in `ObjectField#_cleanType`, V13 one level up in `DataModel#updateSource`), so
+   * an id containing a `.` is not stored under the key it was written with — it becomes
+   * a SUBTREE. Every reader indexing the map by id then misses it, and worse, the
+   * id→storage mapping stops being injective: learning `a.b` and then `a` silently
+   * destroys `a.b` before any reader runs. Reader-side repair
+   * (`recipeKeyedFlagEntries.js`) is best-effort for worlds that already carry such an
+   * id; refusing it here is the complete fix.
+   *
+   * Fail LOUDLY at the entry point rather than accepting a booby-trapped id. The id is
+   * NEVER rewritten — recipe books, Required Knowledge, and learned entries all
+   * reference the recipe by id. `foundry.utils.randomID()` always satisfies the pattern,
+   * so this can only fire for an imported or hand-authored id; the compendium importer
+   * already isolates a per-recipe failure into its import report. Loading an existing
+   * world does NOT route through here, so a world that already holds such an id keeps
+   * working under reader-side repair instead of being bricked.
+   *
+   * @private
+   */
+  _assertValidRecipeId(id) {
+    if (!isSafeFlagKeySegment(id)) {
+      throw new Error(
+        `Invalid recipe id "${id}": a recipe id must match /^[A-Za-z0-9_-]+$/ (no dots or spaces), because it is used as a durable-flag map key in learnedRecipes and discoveryProgress.`
+      );
     }
   }
 
@@ -157,6 +191,7 @@ export class RecipeManager {
     this._assertGM('create recipe');
 
     const recipe = new Recipe(recipeData);
+    this._assertValidRecipeId(recipe.id);
     const validation = this._validateRecipeForPersistence(recipe, {
       requireComplete: !options.allowIncomplete,
     });

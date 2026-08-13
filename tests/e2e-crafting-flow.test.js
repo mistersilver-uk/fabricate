@@ -1078,3 +1078,438 @@ test('check-failure breakTools: a macro data.breakTools does NOT force-break the
     'a macro data.breakTools passthrough must not force-break the tool'
   );
 });
+
+// ===========================================================================
+// Group N (issue 1098): the CRAFTING failure award
+//
+// Until this issue `craft()` returned inside `if (!checkResult.success)` before any
+// resolution ran, so a failed craft produced nothing whatever a recipe authored — the
+// reserved `role: 'failure'` result set was reachable only through the alchemy-Simple
+// path, and a routed recipe could not bind a result set to a failure tier at all.
+//
+// EVERY TEST HERE DRIVES `craft()`, never the producer alone. The producer could select
+// the right group and the branch still report an empty award on three separate seams —
+// the return value, the run record and the chat card — and a producer-level test cannot
+// see any of them.
+// ===========================================================================
+
+/** The markup root only a CRAFTING/SALVAGE card carries — never a dice post. */
+const CRAFT_CARD_MARKUP = 'fabricate-craft-chat';
+
+/** Capture every `ChatMessage.create` payload for the duration of one test. */
+function captureCraftChat(t) {
+  const previous = globalThis.ChatMessage;
+  const created = [];
+  globalThis.ChatMessage = {
+    create: async (payload) => {
+      created.push(payload);
+      return { id: `msg-${created.length}` };
+    },
+    getSpeaker: () => ({ alias: 'Crafter' }),
+  };
+  t.after(() => {
+    if (previous === undefined) delete globalThis.ChatMessage;
+    else globalThis.ChatMessage = previous;
+  });
+  return created;
+}
+
+/**
+ * A run manager that RETAINS the `completeStepFailure` payload.
+ *
+ * `makeRunManager` above deliberately drops it — every earlier test asserts on the run's
+ * status alone — and the whole point of this group is that the award reaches the record
+ * that lands in the actor's Fabricate run-container flag.
+ */
+function makeFailureRecordingRunManager() {
+  const base = makeRunManager(1);
+  const payloads = [];
+  return {
+    ...base,
+    get failurePayloads() {
+      return payloads;
+    },
+    async completeStepFailure(actor, run, stepIndex, reason, payload) {
+      payloads.push(payload);
+      return base.completeStepFailure(actor, run, stepIndex, reason, payload);
+    },
+    // A single-step recipe with no time gate finishes inside , which discards a
+    // phantom run on some abort paths; the base fake predates that seam and lacks it.
+    async discardRun() {},
+  };
+}
+
+/** The two result sets CF1's crafting analogue needs: a success one and a reserved one. */
+function failureAwardResultGroups({ withFailureGroup = true } = {}) {
+  const groups = [
+    {
+      id: 'rg-success',
+      name: 'Potion',
+      results: [{ id: 'r-success', componentId: 'comp-potion', quantity: 1 }],
+    },
+  ];
+  if (withFailureGroup) {
+    groups.push({
+      id: 'rg-failure',
+      role: 'failure',
+      name: 'Sludge',
+      results: [{ id: 'r-failure', componentId: 'comp-sludge', quantity: 1 }],
+    });
+  }
+  return groups;
+}
+
+/**
+ * A wired SIMPLE-mode craft whose check FAILS, with chat output on and the failure
+ * consumption policy set so nothing is consumed and no tool breaks — so the only thing
+ * these tests can be observing is the award itself.
+ */
+function makeCraftingFailureSetup(failureResultPolicy, { withFailureGroup = true } = {}) {
+  const system = makeSystem({
+    id: 'sys-fail-award',
+    resolutionMode: 'simple',
+    features: { craftingChecks: true, chatOutput: true },
+    craftingCheck: {
+      enabled: true,
+      failureResultPolicy,
+      outcomes: [],
+      progressive: null,
+      consumption: { consumeIngredientsOnFail: false, breakToolsOnFail: false },
+    },
+    managedItems: [
+      { id: 'comp-potion', registeredItemUuid: 'uuid:potion', difficulty: 1 },
+      { id: 'comp-sludge', registeredItemUuid: 'uuid:sludge', difficulty: 1 },
+    ],
+  });
+  setupGame(system);
+
+  const potionSource = makeSourceItem('Potion');
+  const sludgeSource = makeSourceItem('Sludge');
+  globalThis.fromUuid = async (uuid) => {
+    if (uuid === 'uuid:potion') return potionSource;
+    if (uuid === 'uuid:sludge') return sludgeSource;
+    return null;
+  };
+
+  const herb = makeItem({ id: 'herb-fail', name: 'Herb', quantity: 2 });
+  const ingredientSet = makeIngredientSet({ id: 'set-fail', ingredientItem: herb, quantity: 1 });
+  const recipe = makeRecipe({
+    craftingSystemId: system.id,
+    resultGroups: failureAwardResultGroups({ withFailureGroup }),
+    steps: [
+      {
+        id: 'step-1',
+        name: 'Step 1',
+        ingredientSets: [ingredientSet],
+        resultGroups: failureAwardResultGroups({ withFailureGroup }),
+        timeRequirement: null,
+      },
+    ],
+  });
+
+  const sourceActor = makeActor({ id: 'a-fail', items: [herb] });
+  const craftingActor = makeActor({ id: 'a-fail' });
+  const runManager = makeFailureRecordingRunManager();
+  const engine = new CraftingEngine(
+    makeRecipeManager({ ingredientItem: herb, ingredientSet }),
+    runManager,
+    makeResolutionService(system)
+  );
+  engine._runCraftingCheck = async () => ({
+    success: false,
+    message: 'Roll too low',
+    outcome: null,
+    value: 3,
+    data: {},
+  });
+
+  return { engine, craftingActor, sourceActor, recipe, system, runManager, herb };
+}
+
+test('craft(): a failed check under always produces the reserved failure result set', async (t) => {
+  captureCraftChat(t);
+  const { engine, craftingActor, sourceActor, recipe } = makeCraftingFailureSetup('always');
+
+  const result = await engine.craft(craftingActor, [sourceActor], recipe, null, {});
+
+  assert.equal(result.success, false, 'it is still a FAILED craft');
+  assert.equal(craftingActor.createdItems.length, 1, 'exactly one item was produced');
+  assert.equal(
+    craftingActor.createdItems[0].name,
+    'Sludge',
+    'the reserved FAILURE set was produced, never the success one'
+  );
+});
+
+test('craft(): the failure award is reported on the return value, the run record AND the chat card', async (t) => {
+  const created = captureCraftChat(t);
+  const { engine, craftingActor, sourceActor, recipe, runManager } =
+    makeCraftingFailureSetup('always');
+
+  const result = await engine.craft(craftingActor, [sourceActor], recipe, null, {});
+
+  // 1. THE RETURN VALUE — what every caller of `craft()` reads. `null` here would report
+  //    "produced nothing" while items sat on the actor.
+  assert.ok(Array.isArray(result.results), 'results is an array, not null');
+  assert.equal(result.results.length, 1);
+  assert.equal(
+    result.disposition,
+    'produced-on-failure',
+    'and the discriminator says a failure produced something'
+  );
+
+  // 2. THE RUN RECORD — it persists into the actor's Fabricate run-container flag, so an
+  //    empty `createdResults` beside real items is a DURABLE contradiction.
+  assert.equal(runManager.failurePayloads.length, 1, 'the failure was recorded');
+  const recorded = runManager.failurePayloads[0].createdResults;
+  assert.equal(recorded.length, 1, 'the award is in the run record');
+  assert.equal(recorded[0].name, 'Sludge', 'in the SUCCESS branch shape, name captured at award time');
+  assert.ok(recorded[0].actorUuid && recorded[0].itemUuid);
+
+  // 3. THE RENDERED CHAT CARD, read as HTML rather than as the arguments passed to the
+  //    poster. `buildResultCard`'s failure branch built its sections from `model.consumed`
+  //    and `model.tools` ONLY and never read `model.results`, so a threaded award rendered
+  //    as nothing — an argument-level assertion passes on a card that shows nothing.
+  const card = created.find((payload) => String(payload.content).includes(CRAFT_CARD_MARKUP));
+  assert.ok(card, 'the crafting card was posted');
+  assert.match(String(card.content), /Sludge/, 'the failure card renders the produced item');
+});
+
+test('craft(): a failed check under never produces nothing, byte-for-byte as before', async (t) => {
+  const created = captureCraftChat(t);
+  const { engine, craftingActor, sourceActor, recipe, runManager } =
+    makeCraftingFailureSetup('never');
+
+  const result = await engine.craft(craftingActor, [sourceActor], recipe, null, {});
+
+  assert.equal(result.results, null, 'the return value is the pre-1098 one');
+  assert.equal(
+    Object.hasOwn(result, 'disposition'),
+    false,
+    'and carries no discriminator, so nothing about the old shape changed'
+  );
+  assert.equal(craftingActor.createdItems.length, 0, 'nothing was created on the actor');
+  assert.deepEqual(runManager.failurePayloads[0].createdResults, []);
+  const card = created.find((payload) => String(payload.content).includes(CRAFT_CARD_MARKUP));
+  assert.ok(!String(card.content).includes('Sludge'), 'and the card shows no award');
+});
+
+test('craft(): under never, resolution is never ASKED — the short-circuit is before selection', async (t) => {
+  captureCraftChat(t);
+  // "`never` short-circuits BEFORE any group is selected" is a statement about WHEN, and
+  // the item count cannot see it: the resolver's own failure branch is policy-gated too,
+  // so removing the engine's gate leaves both the award and the count at zero while the
+  // recipe's whole result model has been walked on every failed craft.
+  //
+  // This is the assertion that makes the engine gate load-bearing rather than defence in
+  // depth, and it is why the gate is the FIRST statement of `_produceCraftingFailureResults`.
+  const setup = makeCraftingFailureSetup('never');
+  // Shadow the ONE method on the instance rather than spreading the service: it is a class
+  // instance, so a spread copy loses every prototype method the engine also calls.
+  const countCalls = (service) => {
+    const counter = { calls: 0 };
+    const original = service.resolveResultGroups.bind(service);
+    service.resolveResultGroups = (...args) => {
+      counter.calls += 1;
+      return original(...args);
+    };
+    return counter;
+  };
+  const counted = countCalls(setup.engine.resolutionModeService);
+
+  await setup.engine.craft(setup.craftingActor, [setup.sourceActor], setup.recipe, null, {});
+
+  assert.equal(counted.calls, 0, 'a failed craft under never resolves nothing at all');
+
+  // …and the same spy DOES count under a permitting policy, so the assertion above is
+  // discriminating rather than vacuously true of a spy that was never wired up.
+  const permitting = makeCraftingFailureSetup('always');
+  const permittingCounted = countCalls(permitting.engine.resolutionModeService);
+  await permitting.engine.craft(
+    permitting.craftingActor,
+    [permitting.sourceActor],
+    permitting.recipe,
+    null,
+    {}
+  );
+  assert.ok(permittingCounted.calls > 0, 'a permitting policy does ask');
+});
+
+test('craft(): always on a recipe authoring NO failure result set produces nothing', async (t) => {
+  captureCraftChat(t);
+  const { engine, craftingActor, sourceActor, recipe } = makeCraftingFailureSetup('always', {
+    withFailureGroup: false,
+  });
+
+  const result = await engine.craft(craftingActor, [sourceActor], recipe, null, {});
+
+  // The policy SELECTS an authored failure output; it never fabricates one.
+  assert.equal(result.results, null);
+  assert.equal(craftingActor.createdItems.length, 0, 'and emphatically not the success set');
+});
+
+test('craft(): the failure award does not change what a failed craft COSTS', async (t) => {
+  captureCraftChat(t);
+  // A failure AWARD and a failure COST are separate decisions, and the consumption
+  // toggles alone own the second. This recipe awards on failure AND keeps its
+  // ingredients, which is only expressible if the two are genuinely independent.
+  const { engine, craftingActor, sourceActor, recipe, herb } = makeCraftingFailureSetup('always');
+
+  await engine.craft(craftingActor, [sourceActor], recipe, null, {});
+
+  assert.equal(herb.deleteCalled, false, 'consumeIngredientsOnFail: false still returns the herb');
+  assert.equal(craftingActor.createdItems.length, 1, 'while the award still happened');
+});
+
+// ── routedByCheck: the single-result-group exemption is a TRAP on the failure path ────
+
+/**
+ * A routed-by-check system whose relative tiers carry ONE failure-marked tier.
+ * `resultGroupCount: 1` reproduces the single-group exemption; `2` gives the failure tier
+ * a group of its own to route to.
+ */
+function makeRoutedFailureSetup(failureResultPolicy, { resultGroupCount = 1 } = {}) {
+  const system = makeSystem({
+    id: 'sys-routed-fail',
+    resolutionMode: 'routedByCheck',
+    features: { craftingChecks: true, chatOutput: true },
+    craftingCheck: {
+      enabled: true,
+      failureResultPolicy,
+      outcomes: [],
+      progressive: null,
+      consumption: { consumeIngredientsOnFail: false, breakToolsOnFail: false },
+      routed: {
+        type: 'relative',
+        rollFormula: '1d20',
+        relativeOutcomes: [
+          { id: 't-fine', name: 'Fine', success: true, dc: 0 },
+          { id: 't-ruined', name: 'Ruined', success: false, dc: -5 },
+        ],
+        fixedOutcomes: [],
+      },
+    },
+    managedItems: [
+      { id: 'comp-potion', registeredItemUuid: 'uuid:potion', difficulty: 1 },
+      { id: 'comp-sludge', registeredItemUuid: 'uuid:sludge', difficulty: 1 },
+    ],
+  });
+  setupGame(system);
+
+  const potionSource = makeSourceItem('Potion');
+  const sludgeSource = makeSourceItem('Sludge');
+  globalThis.fromUuid = async (uuid) => {
+    if (uuid === 'uuid:potion') return potionSource;
+    if (uuid === 'uuid:sludge') return sludgeSource;
+    return null;
+  };
+
+  // The single-group case declares NO `checkOutcomeIds` at all, which is what makes it a
+  // purely NAME-routed recipe and lets the single-group exemption actually fire. Declaring
+  // one would resolve the failure tier and then report `unrouted-tier` instead — a
+  // misconfiguration, which no policy awards — so the trap would never be reached and the
+  // test would pass against an engine that still had it.
+  const groups = [
+    {
+      id: 'rg-fine',
+      name: 'Fine',
+      ...(resultGroupCount > 1 ? { checkOutcomeIds: ['t-fine'] } : {}),
+      results: [{ id: 'r-fine', componentId: 'comp-potion', quantity: 1 }],
+    },
+  ];
+  if (resultGroupCount > 1) {
+    groups.push({
+      id: 'rg-ruined',
+      name: 'Ruined',
+      checkOutcomeIds: ['t-ruined'],
+      results: [{ id: 'r-ruined', componentId: 'comp-sludge', quantity: 1 }],
+    });
+  }
+
+  const herb = makeItem({ id: 'herb-routed-fail', name: 'Herb', quantity: 2 });
+  const ingredientSet = makeIngredientSet({
+    id: 'set-routed-fail',
+    ingredientItem: herb,
+    quantity: 1,
+  });
+  const recipe = makeRecipe({
+    craftingSystemId: system.id,
+    resultGroups: groups,
+    steps: [
+      {
+        id: 'step-1',
+        name: 'Step 1',
+        ingredientSets: [ingredientSet],
+        resultGroups: groups,
+        timeRequirement: null,
+      },
+    ],
+  });
+
+  const sourceActor = makeActor({ id: 'a-routed-fail', items: [herb] });
+  const craftingActor = makeActor({ id: 'a-routed-fail' });
+  const engine = new CraftingEngine(
+    makeRecipeManager({ ingredientItem: herb, ingredientSet }),
+    makeFailureRecordingRunManager(),
+    makeResolutionService(system)
+  );
+  engine._runCraftingCheck = async () => ({
+    success: false,
+    message: 'Ruined',
+    outcome: 'Ruined',
+    value: 2,
+    data: {},
+  });
+
+  return { engine, craftingActor, sourceActor, recipe };
+}
+
+test('craft(): a routed failed check NEVER takes the single-group exemption and awards the success set', async (t) => {
+  captureCraftChat(t);
+  // THE CRAFTING ANALOGUE OF CF1. Under `routedByCheck` a step with exactly one result
+  // group takes the single-group exemption, which was written for the success path and
+  // returns that group with `disposition: 'success'` for any non-keyword outcome. Awarding
+  // on anything but an explicit failure disposition therefore hands a failed craft its
+  // full SUCCESS output — silent, exploitable, and invisible to a length-only assertion.
+  const { engine, craftingActor, sourceActor, recipe } = makeRoutedFailureSetup('always', {
+    resultGroupCount: 1,
+  });
+
+  const result = await engine.craft(craftingActor, [sourceActor], recipe, null, {});
+
+  assert.equal(result.success, false);
+  assert.equal(craftingActor.createdItems.length, 0, 'the success set was NOT awarded');
+  assert.equal(result.results, null);
+});
+
+test('craft(): a routed failed check awards the set bound to its FAILURE-marked tier', async (t) => {
+  const created = captureCraftChat(t);
+  const { engine, craftingActor, sourceActor, recipe } = makeRoutedFailureSetup('always', {
+    resultGroupCount: 2,
+  });
+
+  const result = await engine.craft(craftingActor, [sourceActor], recipe, null, {});
+
+  assert.equal(result.success, false, 'still a failed craft');
+  assert.equal(craftingActor.createdItems.length, 1);
+  assert.equal(
+    craftingActor.createdItems[0].name,
+    'Sludge',
+    'the set bound to the Ruined tier, never the one bound to Fine'
+  );
+  assert.equal(result.results.length, 1);
+  const card = created.find((payload) => String(payload.content).includes(CRAFT_CARD_MARKUP));
+  assert.match(String(card.content), /Sludge/);
+});
+
+test('craft(): under never a routed failure-marked tier routes nothing at all', async (t) => {
+  captureCraftChat(t);
+  const { engine, craftingActor, sourceActor, recipe } = makeRoutedFailureSetup('never', {
+    resultGroupCount: 2,
+  });
+
+  const result = await engine.craft(craftingActor, [sourceActor], recipe, null, {});
+
+  assert.equal(craftingActor.createdItems.length, 0);
+  assert.equal(result.results, null);
+});

@@ -198,6 +198,44 @@ A presence-only match is spared from usage/breakage and recorded as skipped, and
    until the gate matures), so the same misconfiguration detected at FINISH records a step
    FAILURE with no refund and still reports failure — never a false success with zero items.
 
+3. **A FAILED check resolves an authored FAILURE result group when the policy permits it**
+   (`craftingCheck.failureResultPolicy`, `data-models` requirement 35).
+   Both crafting failure branches do this — the immediate one in `craft()` and the timed
+   recorder in `_finishTimedStep` — through ONE producer, because a delay is a scheduling
+   property and not a different set of outcomes.
+   Under `never` the branch short-circuits BEFORE resolution is asked at all, so a failed
+   craft walks no result model and nothing can observe a selection that was never made.
+
+   **The award is an ALLOWLIST over the resolution disposition, never a fall-through.**
+   Only `fail` (the reserved `role: 'failure'` group of `simple` / alchemy-`simple`,
+   selected BY ROLE) and `failure` (the group a `routedByCheck` recipe assigned to a
+   failure-marked outcome tier) may be produced on a failed check.
+   This is not a formality: under `routedByCheck` a step with exactly ONE result group takes
+   the single-group exemption, which was written for the success path and returns that group
+   with `disposition: 'success'` for any non-keyword outcome — including the `null` outcome a
+   failed check carries — so producing on anything else hands a failed craft its full SUCCESS
+   output. `routedByIngredients` is excluded on the same grounds: it routes by the chosen
+   ingredient set and reports no disposition, so a failed craft would award the set's normal
+   result.
+   A routed failing tier that no result group lists resolves to `unrouted-tier`, which is not
+   on the allowlist: it produces nothing, and it does NOT convert the craft into a
+   misconfiguration abort, because the failure consumption policy has already been applied
+   and there is nothing left to abort cleanly.
+
+   **The award is REPORTED on every seam the success award is**: the created records are
+   threaded into the run record's `createdResults` through the SAME mapper the success path
+   uses (that record persists into the actor's run-container flag, so an empty list beside
+   real items is a durable contradiction), passed to the crafting chat card — whose failure
+   branch gained a results section shared with salvage — and returned as `results` rather
+   than `null`, with the additive `disposition: 'produced-on-failure'` discriminator attached
+   only when something was produced, so a failure awarding nothing is unchanged in every
+   observable way.
+
+   **It decides nothing about COST.** Consumption and tool breakage are governed by
+   `craftingCheck.consumption` and are applied BEFORE the award; a failure AWARD and a
+   failure COST are separate decisions, and a recipe may award on failure while returning
+   its ingredients.
+
 ### Apply Effects
 
 1. Consume ingredients and apply tool usage/breakage (destroying or flagging-broken exhausted tools) according to success/failure policy.
@@ -405,7 +443,13 @@ If it is present, the run must resume automatically when world time reaches the 
 - **Simple**: Exactly one success result group, plus a tolerated but inert reserved `role: 'failure'` group when a Simple salvage check formula (`salvageCraftingCheck.simple.rollFormula`) exists.
 Additional groups are invalid and are dropped by normalization (see `data-models/spec.md` Component Requirement 5).
 Optional pass/fail check.
-The engine awards `slice(0, 1)` — the first success result group — and does not route to a failure group; salvage does not adopt the recipe/alchemy failure-award semantics.
+On SUCCESS the engine awards `slice(0, 1)` — the first success result group, by index and with no role filter.
+**The claim that salvage does not route to a failure group is RETRACTED (issue 1098).**
+`_resolveSalvageResultGroups` now takes an explicit `disposition` argument.
+Under `disposition: 'failure'` — reached only when `salvageCraftingCheck.failureResultPolicy` permits results on failure — `simple` selects the single reserved `role: 'failure'` group **BY ROLE, never by index** (the retain-one clamp guarantees index 0 is the SUCCESS group, so an index-based selection would award the full success salvage output on a failed check) and returns nothing when none is authored; `routed` selects by `component.salvage.outcomeRouting[outcome]` for the failing tier's name; `progressive` returns nothing, having one success group against a budget and no tier to mark.
+Under `disposition: 'success'` — the default — every branch is unchanged.
+**The failure award is REPORTED on every seam the success award is**: the created records are threaded into `completeRun`'s `createdResults` in the success branch's shape (that record persists into the actor's run-container flag, so an empty list beside real items leaves a durable contradiction), passed to the salvage chat card — whose failure branch gained a results section of its own, having previously read neither `model.results` nor rendered one — and returned as `results` rather than `null`, which is what the bulk-salvage surfaces read.
+The failure branch builds the salvage recipe view the success branch builds.
 - **Routed**: Check is mandatory and requires an authored `salvageCraftingCheck.routed.rollFormula`.
   The engine-evaluated routed salvage check rolls the configured formula and maps the total onto
   an outcome tier whose NAME is the `outcome`; with no authored formula the salvage fails loudly
@@ -427,7 +471,17 @@ The engine awards `slice(0, 1)` — the first success result group — and does 
   `Component.salvage.allowPlayerResultReorder` (cross-reference `ui-integration` §Player Salvage Surface).
   The GM toggle is authored policy, exported and honoured.
 
-### Failure Consumption Policy
+### Failure Consumption and Failure-Result Policy
+
+Two ORTHOGONAL axes, and a system may author any combination of them: what a failed attempt COSTS, and what it PRODUCES.
+
+**The produce axis** is `salvageCraftingCheck.failureResultPolicy` (`'never' | 'perRecord' | 'always'`, see `data-models` requirement 35 and `resolution-modes` §Check Source).
+
+**The consume axis** is the pair below, both GM-authorable on the Salvage route's On-failure section since issue 1098 — persisted since 1.7.0 and reachable from no editor before it.
+**Both defaults are traps, and BOTH must be mirrored by any projection of them.**
+`consumeComponentOnFail` defaults **TRUE** via `!== false`, so a projection that drops it INVERTS a system authored `false` rather than merely losing it.
+`breakToolsOnFail` is read as `(consumption?.breakToolsOnFail ?? consumption?.consumeCatalystsOnFail) === true` — a **legacy alias**, default FALSE — so a projection reading the new key alone silently flips a pre-1.7.0 system's break-tools setting from ON to OFF the first time a GM opens the section and saves.
+The store projection mirrors the normalizer's new-then-legacy read exactly, as the crafting projection already does.
 
 - `salvageCraftingCheck.consumption.consumeComponentOnFail`: if true (default), the component is consumed even on failure.
 - `salvageCraftingCheck.consumption.breakToolsOnFail`: if false (default), Tools are not broken on failure.

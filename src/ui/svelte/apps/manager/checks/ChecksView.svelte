@@ -43,6 +43,7 @@
   import EmptyState from '../EmptyState.svelte';
   import RadioCardGroup from '../RadioCardGroup.svelte';
   import ToggleCard from '../ToggleCard.svelte';
+  import CheckFailurePolicy from './CheckFailurePolicy.svelte';
   import ChecksEditorTabs from './ChecksEditorTabs.svelte';
   import ChecksRightMenu from './ChecksRightMenu.svelte';
   import CraftingCheckEditor from './CraftingCheckEditor.svelte';
@@ -112,6 +113,32 @@
     // crafting check (and mirrors it for salvage); alchemy resolves consumption through its
     // own `consumeOnFail` flag instead, so these toggles are hidden in alchemy mode.
     craftingConsumption = null,
+    // Salvage's OWN failure consumption ({ consumeComponentOnFail, breakToolsOnFail }),
+    // persisted since 1.7.0 and reachable from NO editor until issue 1098. The Salvage
+    // On-failure section is its first authoring surface. Both defaults are traps —
+    // `consumeComponentOnFail` defaults ON, `breakToolsOnFail` defaults OFF — so the
+    // store projects them explicitly rather than letting this component re-derive them.
+    salvageConsumption = null,
+    // The FAILURE-RESULT POLICY per activity (issue 1098): 'never' | 'perRecord' |
+    // 'always'. The orthogonal produce axis to the consumption toggles beside it. Read
+    // from the PERSISTED system rather than a draft, because it live-persists on select
+    // exactly as the consumption toggles do.
+    craftingFailureResultPolicy = 'perRecord',
+    salvageFailureResultPolicy = 'perRecord',
+    gatheringFailureResultPolicy = 'perRecord',
+    // The gathering row the rail's `PREVIEW AS` record selector has chosen (issue 1098,
+    // DN10), or `null` when none is. The On-failure section cross-references THAT row's
+    // `task.failureOutcome` read-only, because this screen is system-level and a system
+    // carries many gathering rows — a cross-reference with no subject would have to pick
+    // one arbitrarily.
+    //
+    // IT IS `null` ON EVERY CALL SITE TODAY. The `PREVIEW AS` panel on `main` is a
+    // pre-roll card with no control; the selector arrives with the outcome-preview
+    // simulator (issue 1097). The cross-reference therefore renders its stated no-record
+    // state — which is the state DN10 specifies for exactly this case — and becomes live
+    // by threading one prop once that selector exists.
+    previewedGatheringTask = null,
+    onOpenGatheringTask = () => {},
     // The ONE system-level modifier library (issue 770, reshaped by 1055, moved up by 1095,
     // unified with the gathering character-modifier library by 1117). This screen renders it
     // READ-ONLY for every activity, crafting included, and links to the one surface that
@@ -172,6 +199,10 @@
     onUpdateGatheringCheckRouted = () => {},
     onSetAlchemyCheckMode = () => {},
     onUpdateCraftingConsumption = () => {},
+    onUpdateSalvageConsumption = () => {},
+    onUpdateCraftingFailureResultPolicy = () => {},
+    onUpdateSalvageFailureResultPolicy = () => {},
+    onUpdateGatheringFailureResultPolicy = () => {},
     onUpdateCraftingCheckModifiers = () => {},
     onUpdateSalvageCheckModifiers = () => {},
     onUpdateGatheringCheckModifiers = () => {},
@@ -255,6 +286,13 @@
     craftingConsumption?.consumeIngredientsOnFail !== false
   );
   const breakToolsOnFail = $derived(craftingConsumption?.breakToolsOnFail === true);
+
+  // Salvage's own pair (issue 1098), read with the SALVAGE normalizer's defaults, which
+  // are not crafting's key names: `consumeComponentOnFail` defaults ON (`!== false`) and
+  // `breakToolsOnFail` defaults OFF (`=== true`). Getting the first one wrong inverts an
+  // authored OFF rather than merely losing it.
+  const consumeComponentOnFail = $derived(salvageConsumption?.consumeComponentOnFail !== false);
+  const salvageBreakToolsOnFail = $derived(salvageConsumption?.breakToolsOnFail === true);
 
   // Only `routedByCheck` uses the tier-routing CraftingCheckEditor. `routedByIngredients`
   // authors its optional pass/fail check via the shared SimpleCraftingCheckEditor
@@ -858,6 +896,52 @@
     return text(entry[0], entry[1]);
   });
 
+  // The PLURAL of the same noun, sentence-initial (issue 1098). The failure-result
+  // policy's `always` card ends "…{records} without one produce nothing", which begins a
+  // sentence, so a lower-case singular cannot be reused with an `s` bolted on — and the
+  // three activities do not pluralize alike ("salvageable items", "gathering tasks").
+  const RECORD_NOUNS_PLURAL = {
+    crafting: ['FABRICATE.Admin.Manager.Checks.RecordNoun.CraftingPlural', 'Recipes'],
+    salvage: ['FABRICATE.Admin.Manager.Checks.RecordNoun.SalvagePlural', 'Salvageable items'],
+    gathering: ['FABRICATE.Admin.Manager.Checks.RecordNoun.GatheringPlural', 'Gathering tasks'],
+  };
+  const recordNounPlural = $derived.by(() => {
+    const entry = RECORD_NOUNS_PLURAL[activity] || RECORD_NOUNS_PLURAL.crafting;
+    return text(entry[0], entry[1]);
+  });
+
+  // WHERE THE POLICY HAS NO REACH, and why (issue 1098, DN11). The prototype's card ends
+  // "Applies to every resolution mode", which is not true of this data model: neither
+  // `routedByIngredients` nor `progressive` has an outcome tier or a reserved failure
+  // group to mark, and gathering's whole routed path is dormant pending issue 683. The
+  // clause is therefore NOT adopted, and a stated reason is rendered in its place — a
+  // control that silently does nothing is the outcome this note exists to avoid.
+  const failurePolicyInertNote = $derived.by(() => {
+    if (activity === 'gathering') {
+      return gatheringD100
+        ? text(
+            'FABRICATE.Admin.Manager.Checks.FailureResults.InertGatheringD100',
+            'The d100 gathering roll has no failure outcome to produce — and routed and progressive gathering are not available yet. This setting is kept and takes effect when they are.'
+          )
+        : '';
+    }
+    if (activity === 'crafting' && resolutionMode === 'routedByIngredients') {
+      return text(
+        'FABRICATE.Admin.Manager.Checks.FailureResults.InertRoutedByIngredients',
+        'In routed-by-ingredients mode the check has no outcome tiers to mark as failures, so nothing here can be produced on a failed check. This setting is kept, and applies again if you switch to a mode that has them.'
+      );
+    }
+    const progressive =
+      (activity === 'crafting' && craftingProgressive) ||
+      (activity === 'salvage' && salvageProgressive);
+    return progressive
+      ? text(
+          'FABRICATE.Admin.Manager.Checks.FailureResults.InertProgressive',
+          'A progressive check spends its rolled value down one ordered list of results, so it has no failure outcome to produce. This setting is kept, and applies again if you switch to a mode that has one.'
+        )
+      : '';
+  });
+
   // ── The roll section's mode callout (issue 1096) ────────────────────────────────────
   //
   // The AUTHORED mode for whichever activity is open, in that activity's own vocabulary —
@@ -1344,6 +1428,97 @@
   />
 {/snippet}
 
+<!-- The failure-RESULT policy card, rendered by all three activity routes AND by the
+     alchemy branch, from ONE definition (issue 1098). A snippet rather than four call
+     sites: the prop list is the contract, four copies of it drift, and near-identical
+     blocks are what the new-code duplication gate fails on. Which activity's policy and
+     which saver it reaches are resolved here from `activity`, so no call site can pair
+     crafting's value with salvage's saver. -->
+{#snippet failurePolicyCard()}
+  <CheckFailurePolicy
+    {activity}
+    {recordNoun}
+    {recordNounPlural}
+    inertNote={failurePolicyInertNote}
+    value={activity === 'salvage'
+      ? salvageFailureResultPolicy
+      : activity === 'gathering'
+        ? gatheringFailureResultPolicy
+        : craftingFailureResultPolicy}
+    onChange={(next) => {
+      if (activity === 'salvage') return onUpdateSalvageFailureResultPolicy(next);
+      if (activity === 'gathering') return onUpdateGatheringFailureResultPolicy(next);
+      return onUpdateCraftingFailureResultPolicy(next);
+    }}
+  />
+{/snippet}
+
+<!-- GATHERING'S On-failure SECTION, rendered from ONE definition by both gathering
+     branches — `d100` and the two formula-rolled modes — because the section's content is
+     the same in all three and only the inert note inside the policy card differs.
+
+     IT RENDERS NO CONSUMPTION TOGGLES, and that is a data fact rather than an omission:
+     gathering has no `consumption` block at all, on the check or on the task. What it has
+     instead is `task.failureOutcome`, the text/macro feedback a failed attempt dispatches,
+     which is authored on the task and is cross-referenced here read-only. -->
+{#snippet gatheringOnFailureSection()}
+  {@render failurePolicyCard()}
+  <Callout
+    tone="info"
+    text={text(
+      'FABRICATE.Admin.Manager.Checks.FailureResults.GatheringDormant',
+      'Routed and progressive gathering are still being built, so nothing on this screen changes what a failed gathering attempt does yet. What you set here is kept and takes effect when they arrive.'
+    )}
+    dataAttr="data-gathering-failure-dormant"
+  />
+  <section class="manager-inspector-card" data-gathering-failure-outcome>
+    <h3 class="manager-checks-card-title">
+      {text(
+        'FABRICATE.Admin.Manager.Checks.FailureResults.FailureOutcomeTitle',
+        'Failure feedback'
+      )}
+    </h3>
+    <p class="manager-muted">
+      {text(
+        'FABRICATE.Admin.Manager.Checks.FailureResults.FailureOutcomeLead',
+        'A gathering task can say what happens when an attempt turns up nothing — a line of text, or a macro. It is authored on the task itself.'
+      )}
+    </p>
+    {#if previewedGatheringTask}
+      <p class="manager-muted" data-gathering-failure-outcome-value>
+        <strong>{previewedGatheringTask.name}</strong> ·
+        {previewedGatheringTask.failureOutcome?.mode === 'macro'
+          ? text('FABRICATE.Admin.Manager.Checks.FailureResults.FailureOutcomeMacro', 'Macro')
+          : previewedGatheringTask.failureOutcome?.mode === 'text'
+            ? text('FABRICATE.Admin.Manager.Checks.FailureResults.FailureOutcomeText', 'Text')
+            : text('FABRICATE.Admin.Manager.Checks.FailureResults.FailureOutcomeNone', 'Not set')}
+      </p>
+    {:else}
+      <p class="manager-muted" data-gathering-failure-outcome-empty>
+        {text(
+          'FABRICATE.Admin.Manager.Checks.FailureResults.FailureOutcomeNoRecord',
+          'Choose a gathering task under Preview as to open its failure feedback.'
+        )}
+      </p>
+    {/if}
+    <button
+      type="button"
+      class="manager-button"
+      data-gathering-failure-outcome-link
+      disabled={!previewedGatheringTask}
+      onclick={() => onOpenGatheringTask(previewedGatheringTask?.id || '')}
+    >
+      <i class="fas fa-arrow-up-right-from-square" aria-hidden="true"></i>
+      <span
+        >{text(
+          'FABRICATE.Admin.Manager.Checks.FailureResults.FailureOutcomeOpen',
+          'Open this task'
+        )}</span
+      >
+    </button>
+  </section>
+{/snippet}
+
 <!-- The one place a section that cannot apply is answered, so the copy names the MODE
      rather than saying "nothing here" five times over. -->
 {#snippet inapplicableSection(sectionLabel)}
@@ -1475,6 +1650,13 @@
           {/if}
 
           {#if activeSection === 'on-failure'}
+            <!-- ALCHEMY RENDERS IT TOO (issue 1098). `alchemy simple` is one of the two
+                 crafting modes where the reserved `role: 'failure'` group is a LIVE award,
+                 so omitting the policy here would hide the control from a mode it actually
+                 governs. Alchemy's own consumption flag (`consumeOnFail`) stays below,
+                 where it already lived — it is alchemy's substitute for the generic
+                 consumption pair, not for this. -->
+            {@render failurePolicyCard()}
             <section class="manager-inspector-card" data-alchemy-behaviour>
               <h3 class="manager-checks-card-title">
                 {text(
@@ -1645,6 +1827,7 @@
           {/if}
 
           {#if activeSection === 'on-failure'}
+            {@render failurePolicyCard()}
             <!-- TWO TOP-LEVEL CARDS, as the prototype draws them, plus the note it ends the
                  screen with. The `Failure consumption policy` card that used to wrap them was
                  invented here: it named a policy the design does not name, and the pane head
@@ -1756,9 +1939,52 @@
             {@render salvageModifierCard()}
           {/if}
           {#if activeSection === 'on-failure'}
-            {@render inapplicableSection(
-              text('FABRICATE.Admin.Manager.Checks.Sections.OnFailure', 'On failure')
-            )}
+            <!-- SALVAGE'S FIRST On-failure SECTION (issue 1098). It rendered the
+                 "nothing to set here" empty state, which was true of the screen and false
+                 of the data: `consumeComponentOnFail` and `breakToolsOnFail` have been
+                 persisted since 1.7.0 and were reachable from no editor, and the
+                 failure-result policy is new. -->
+            {@render failurePolicyCard()}
+            <div class="manager-checks-flag-list" data-salvage-failure-consumption>
+              <ToggleCard
+                icon="fas fa-fire"
+                section="salvage-failure-consume-component"
+                field="consumeComponentOnFail"
+                title={text(
+                  'FABRICATE.Admin.Manager.Checks.SalvageFailure.ConsumeComponentOnFail',
+                  'Consume the item on a failed check'
+                )}
+                sub={text(
+                  'FABRICATE.Admin.Manager.Checks.SalvageFailure.ConsumeComponentOnFailDesc',
+                  'The item being salvaged is used up even when the salvage check fails. On by default.'
+                )}
+                toggleLabel={text(
+                  'FABRICATE.Admin.Manager.Checks.SalvageFailure.ConsumeComponentOnFail',
+                  'Consume the item on a failed check'
+                )}
+                on={consumeComponentOnFail}
+                onToggle={(next) => onUpdateSalvageConsumption({ consumeComponentOnFail: next })}
+              />
+              <ToggleCard
+                icon="fas fa-hammer"
+                section="salvage-failure-break-tools"
+                field="breakToolsOnFail"
+                title={text(
+                  'FABRICATE.Admin.Manager.Checks.SalvageFailure.BreakToolsOnFail',
+                  'Break tools on a failed check'
+                )}
+                sub={text(
+                  'FABRICATE.Admin.Manager.Checks.SalvageFailure.BreakToolsOnFailDesc',
+                  'Required tools break when the salvage check fails. Off by default.'
+                )}
+                toggleLabel={text(
+                  'FABRICATE.Admin.Manager.Checks.SalvageFailure.BreakToolsOnFail',
+                  'Break tools on a failed check'
+                )}
+                on={salvageBreakToolsOnFail}
+                onToggle={(next) => onUpdateSalvageConsumption({ breakToolsOnFail: next })}
+              />
+            </div>
           {/if}
         </div>
       {:else if activity === 'gathering' && gatheringD100}
@@ -1791,6 +2017,11 @@
                  carries the dormancy notice; hiding it would take the report away from the
                  state that needs it most. -->
             {@render gatheringModifierCard()}
+          {:else if activeSection === 'on-failure'}
+            <!-- On-failure renders under d100 too, for the same reason Modifiers does: the
+                 policy is persisted per ACTIVITY, not per mode, so hiding it under the one
+                 mode a GM can currently select would hide it always. -->
+            {@render gatheringOnFailureSection()}
           {:else}
             {@render inapplicableSection(
               text(
@@ -1831,9 +2062,7 @@
             {@render gatheringModifierCard()}
           {/if}
           {#if activeSection === 'on-failure'}
-            {@render inapplicableSection(
-              text('FABRICATE.Admin.Manager.Checks.Sections.OnFailure', 'On failure')
-            )}
+            {@render gatheringOnFailureSection()}
           {/if}
         </div>
       {:else}

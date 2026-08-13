@@ -248,10 +248,11 @@ test('the runner applies 1.23.0, reports the collisions and never persists the t
 
   const summary = await runner.run();
 
-  // TWO, not one: issue 1096's 1.24.0 entry is a deliberate no-op that exists to mark the
-  // routed DC-source downgrade boundary, and the runner counts every entry it applies.
-  assert.equal(summary.ran, 2);
-  assert.equal(store.get('migrationVersion'), '1.24.0');
+  // THREE, not one: issue 1096's 1.24.0 entry is a deliberate no-op that exists to mark
+  // the routed DC-source downgrade boundary, and issue 1098's 1.25.0 seeds the
+  // failure-result policy; the runner counts every entry it applies.
+  assert.equal(summary.ran, 3);
+  assert.equal(store.get('migrationVersion'), '1.25.0');
   assert.deepEqual(summary.unifiedModifierCollisions, [{ system: 'Herbalism', collisions: 1 }]);
   for (const key of ['craftingSystems', 'gatheringConfig']) {
     assert.ok(

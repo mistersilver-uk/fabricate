@@ -127,14 +127,25 @@ export function hasRealFolderGroups(groups) {
 
 /**
  * Import each non-skipped folder decision's items, then apply that folder's category and
- * tags to the freshly imported component set via the manager's set-apply primitive (one
- * `save()` per folder). The shared commit loop behind the import mapping modal (issue
- * 771); Foundry-global-free — the caller injects the `systemManager` so it is unit
- * testable against a real `CraftingSystemManager`.
+ * tags to the freshly imported component set via the manager's set-apply primitive. The
+ * shared commit loop behind the import mapping modal (issue 771); Foundry-global-free —
+ * the caller injects the `systemManager` so it is unit testable against a real
+ * `CraftingSystemManager`.
+ *
+ * The WHOLE run — every folder's items and every folder's set-apply — is persisted by ONE
+ * `save()` at the end (issue 1086). Each `save()` replaces the entire `craftingSystems`
+ * world setting and replicates it to every connected client, so the per-item write this
+ * used to issue made a folder import quadratic in corpus size. Both collaborator calls
+ * therefore run with `persist: false` and this function owns the single terminal write.
+ *
+ * `save` is optional-chained so a synchronous-storing mock manager (which needs no
+ * settings flush) stays a valid injection; a real `CraftingSystemManager` always defines
+ * it, so production always issues its one write.
  *
  * @param {{
- *   addItemFromUuid: (systemId: string, uuid: string) => Promise<{item?: {id?: string}, action: string, sourceFallbacks?: Array}>,
- *   applyBulkEditToComponents: (systemId: string, ids: string[], edit: object) => Promise<object>
+ *   addItemFromUuid: (systemId: string, uuid: string, options?: {persist?: boolean}) => Promise<{item?: {id?: string}, action: string, sourceFallbacks?: Array}>,
+ *   applyBulkEditToComponents: (systemId: string, ids: string[], edit: object, options?: {persist?: boolean}) => Promise<object>,
+ *   save?: () => Promise<void>
  * }} systemManager
  * @param {string} systemId
  * @param {Array<{itemUuids?: string[], category?: string, addTags?: string[]}>} decisions
@@ -146,31 +157,48 @@ export async function applyFolderImportDecisions(systemManager, systemId, decisi
   let skipped = 0;
   let total = 0;
   const sourceFallbacks = [];
-  for (const decision of decisions || []) {
-    const itemUuids = Array.isArray(decision.itemUuids) ? decision.itemUuids : [];
-    const importedIds = [];
-    for (const itemUuid of itemUuids) {
-      total += 1;
-      const result = await systemManager.addItemFromUuid(systemId, itemUuid);
-      if (result.action === 'added') added += 1;
-      else if (result.action === 'updated') updated += 1;
-      else skipped += 1;
-      if (result.item?.id) importedIds.push(result.item.id);
-      if (Array.isArray(result.sourceFallbacks)) sourceFallbacks.push(...result.sourceFallbacks);
+  // Whether anything actually changed the corpus. A run whose every item is already
+  // present AND whose folders carry no category/tags mutates nothing, so it writes
+  // nothing — the same no-op an unbatched all-skipped re-drop was.
+  let dirty = false;
+  try {
+    for (const decision of decisions || []) {
+      const itemUuids = Array.isArray(decision.itemUuids) ? decision.itemUuids : [];
+      const importedIds = [];
+      for (const itemUuid of itemUuids) {
+        total += 1;
+        const result = await systemManager.addItemFromUuid(systemId, itemUuid, {
+          persist: false,
+        });
+        if (result.action === 'added') added += 1;
+        else if (result.action === 'updated') updated += 1;
+        else skipped += 1;
+        if (result.action !== 'skipped') dirty = true;
+        if (result.item?.id) importedIds.push(result.item.id);
+        if (Array.isArray(result.sourceFallbacks)) sourceFallbacks.push(...result.sourceFallbacks);
+      }
+      const addTags = Array.isArray(decision.addTags) ? decision.addTags : [];
+      if (importedIds.length > 0 && (decision.category || addTags.length > 0)) {
+        // Applied to EVERY imported id, INCLUDING a 'skipped' (re-dropped, already-existing)
+        // component: re-dropping a folder deliberately re-categorizes its items, so the
+        // overwrite-on-redrop here is intended, not a leak.
+        // Import stages only the two axes it owns: it supplies NEITHER `essences` nor
+        // `difficulty`, so the primitive's presence-based guard is false for both and an
+        // import never clears a component's essences or DC (issue 772).
+        const applied = await systemManager.applyBulkEditToComponents(
+          systemId,
+          importedIds,
+          { category: decision.category || '', addTags },
+          { persist: false }
+        );
+        if (applied?.updated > 0) dirty = true;
+      }
     }
-    const addTags = Array.isArray(decision.addTags) ? decision.addTags : [];
-    if (importedIds.length > 0 && (decision.category || addTags.length > 0)) {
-      // Applied to EVERY imported id, INCLUDING a 'skipped' (re-dropped, already-existing)
-      // component: re-dropping a folder deliberately re-categorizes its items, so the
-      // overwrite-on-redrop here is intended, not a leak.
-      // Import stages only the two axes it owns: it supplies NEITHER `essences` nor
-      // `difficulty`, so the primitive's presence-based guard is false for both and an
-      // import never clears a component's essences or DC (issue 772).
-      await systemManager.applyBulkEditToComponents(systemId, importedIds, {
-        category: decision.category || '',
-        addTags,
-      });
-    }
+  } finally {
+    // `finally`, not a trailing statement: an item that throws part-way through must still
+    // persist the folders and items already committed, which the per-item writes used to
+    // give for free. The error still propagates — this flushes, it does not swallow.
+    if (dirty) await systemManager.save?.();
   }
   return { added, updated, skipped, total, sourceFallbacks };
 }

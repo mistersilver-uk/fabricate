@@ -64,10 +64,17 @@ test('Recipe.toJSON round-trips allowPlayerResultReorder: FALSE', () => {
   assert.equal(restored.allowPlayerResultReorder, false, 'the false survives the round-trip');
 });
 
-test('Recipe.toJSON round-trips allowPlayerResultReorder: true', () => {
+test('Recipe.toJSON OMITS allowPlayerResultReorder: true, and absence still reads true', () => {
+  // Issue 1087 stopped emitting the default. That is a WRITE-side change only, and the
+  // rest of this file is what makes it safe to make: `false` is still emitted (the test
+  // above), and absence has always meant `true` on disk anyway — issue 651 deliberately
+  // seeded no migration, so every reader already had to handle a missing key.
   const json = new Recipe({ id: 'r1', name: 'Potion', allowPlayerResultReorder: true }).toJSON();
-  assert.equal(json.allowPlayerResultReorder, true);
-  assert.equal(new Recipe(json).allowPlayerResultReorder, true);
+  assert.ok(
+    !('allowPlayerResultReorder' in json),
+    'the default is not written into every persisted recipe'
+  );
+  assert.equal(new Recipe(json).allowPlayerResultReorder, true, 'and absence rebuilds as true');
 });
 
 test('Recipe.toJSON survives a JSON string round-trip (export/import shape)', () => {

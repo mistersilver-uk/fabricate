@@ -36,22 +36,20 @@ import {
   prepareForImport,
   makeExportFilename,
 } from '../../../systems/CraftingSystemExporter.js';
+import { readLearnedRecipeEntries } from '../../../systems/recipeKeyedFlagEntries.js';
 import { recipeReferencesEssence } from '../../../utils/recipeEssenceReferences.js';
 import { describeEssenceDeleteImpact } from '../../../utils/essenceBulkEditModel.js';
+import { describeComponentDeleteImpact } from '../../../utils/recipeComponentReferences.js';
 import {
   isGeneralRecipeCategory,
   normalizeCustomRecipeCategories,
-  normalizeRecipeCategory,
 } from '../../../utils/recipeCategories.js';
 import {
   isGeneralComponentCategory,
   normalizeCustomComponentCategories,
 } from '../../../utils/componentCategories.js';
 import { withCategoryIcon } from '../../../utils/categoryIcons.js';
-import {
-  plainTextDescription,
-  descriptionTextCandidate,
-} from '../../../utils/plainTextDescription.js';
+import { plainTextDescription } from '../../../utils/plainTextDescription.js';
 import {
   planRecipeCategoryReassignments,
   planComponentCategoryReassignments,
@@ -87,10 +85,6 @@ import {
 import {
   authoredCheckModifierIds,
   isRollExpression,
-  normalizeModifierPolicy,
-  resolveActiveCraftingCheckFormula,
-  resolveActiveGatheringCheckFormula,
-  resolveActiveSalvageCheckFormula,
   resolveModifierBounds,
 } from '../../../systems/checkModifierResolver.js';
 import { validateDropRows } from '../../../systems/GatheringEnvironmentStore.js';
@@ -102,20 +96,46 @@ import { DEFAULT_GATHERING_EVENT_IMG } from '../../../gatheringImageDefaults.js'
 import { DEFAULT_GATHERING_TASK_IMG } from '../../gatheringTaskDefaults.js';
 import { evaluateSystemValidation } from '../../../systems/systemValidation.js';
 import { SignatureValidator } from '../../../systems/SignatureValidator.js';
-import { ingredientSetToolsAreActive } from '../../../systems/toolCheckBonus.js';
 import {
   localizeRecipeActivationError,
   localizeRecipePersistenceError,
 } from '../../../utils/recipeActivationMessages.js';
-import { craftingEffect } from '../apps/manager/crafting/craftingVisibility.js';
 import { resolveRecipeAccessRoster } from '../../../utils/recipeAccessRoster.js';
+import { authoredFailureOutcome } from '../../../utils/gatheringFailureOutcome.js';
+import {
+  activityFailureResultPolicy,
+  normalizeFailureResultPolicy,
+} from '../../../utils/failureResultPolicy.js';
 import { getFabricateFlag } from '../../../config/flags.js';
 import {
   defaultKnowledgeTab,
   projectKnowledgeSnapshot,
-  recipeItemLabelFromUuid as _recipeItemLabelFromUuid,
-  recipeItemTypeFromRecipeCount as _recipeItemTypeFromRecipeCount,
 } from '../apps/manager/knowledge/knowledgeStudio.js';
+// The GM browser projection (issue 1090). Row, card and inspector projection are pure
+// modules now; this store is the reactive wiring and service orchestration around them.
+// Each is imported back under the module-private name it had while it lived here, so the
+// call sites below are unchanged — the same shape the knowledge projection uses above
+// after issue 785 extracted it.
+import {
+  clonePlain as _clonePlain,
+  fallbackRandomID as _fallbackRandomID,
+  normalizeGatheringLibraryTool as _normalizeGatheringLibraryTool,
+} from './adminStoreInternals.js';
+import {
+  buildRecipeList as _buildRecipeList,
+  DERIVED_RECIPE_PROJECTION_FIELDS,
+  withoutDerivedRecipeProjectionFields,
+} from './adminRecipeRowProjection.js';
+import { buildItemCards as _buildItemCards } from './adminComponentRowProjection.js';
+import {
+  buildSelectedSystemViewData as _buildSelectedSystemViewData,
+  enrichRecipeItemLibrary as _enrichRecipeItemLibrary,
+} from './adminSystemInspectorProjection.js';
+
+// `DERIVED_RECIPE_PROJECTION_FIELDS` and `withoutDerivedRecipeProjectionFields` moved to
+// the row projection alongside the derivation they describe, and are re-exported here so
+// this module's public surface is unchanged for any importer of the old path.
+export { DERIVED_RECIPE_PROJECTION_FIELDS, withoutDerivedRecipeProjectionFields };
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -321,267 +341,6 @@ function _nextSystemName(systemManager) {
   return `${base} ${i}`;
 }
 
-/**
- * Build a human-readable visibility summary for a recipe row.
- */
-function _visibilitySummary(recipe) {
-  const visibility = recipe.visibility || {};
-  if (visibility.restricted !== true) return 'All players';
-  const allowed = Array.isArray(visibility.allowedUserIds) ? visibility.allowedUserIds : [];
-  if (allowed.length === 0) return 'Restricted (none selected)';
-  return `Restricted (${allowed.length})`;
-}
-
-function _ingredientCountForSet(ingredientSet) {
-  const groups =
-    Array.isArray(ingredientSet?.ingredientGroups) && ingredientSet.ingredientGroups.length > 0
-      ? ingredientSet.ingredientGroups
-      : (ingredientSet?.ingredients || []).map((ingredient) => ({ options: [ingredient] }));
-  return groups.reduce((sum, group) => sum + ((group.options || []).length || 0), 0);
-}
-
-function _getRecipeExecutionSteps(recipe) {
-  const methodSteps =
-    typeof recipe?.getExecutionSteps === 'function' ? recipe.getExecutionSteps() : null;
-  if (Array.isArray(methodSteps) && methodSteps.length > 0) return methodSteps;
-  if (Array.isArray(recipe?.steps) && recipe.steps.length > 0) return recipe.steps;
-
-  return [
-    {
-      id: 'implicit-step',
-      name: 'Step 1',
-      ingredientSets: Array.isArray(recipe?.ingredientSets) ? recipe.ingredientSets : [],
-      resultGroups: Array.isArray(recipe?.resultGroups) ? recipe.resultGroups : [],
-      toolIds: Array.isArray(recipe?.toolIds) ? recipe.toolIds : [],
-    },
-  ];
-}
-
-function _usesExplicitRecipeSteps(recipe, executionSteps) {
-  return (Array.isArray(recipe?.steps) && recipe.steps.length > 0) || executionSteps.length > 1;
-}
-
-function _buildRequirementPreviewStep(
-  step,
-  index,
-  sharedRecipeToolIds = [],
-  craftingSystem = null
-) {
-  const ingredientSets = Array.isArray(step?.ingredientSets) ? step.ingredientSets : [];
-  const ingredientSetSummaries = ingredientSets.map((set, setIndex) => ({
-    id: set?.id || `set-${setIndex + 1}`,
-    name: set?.name || `Set ${setIndex + 1}`,
-    ingredientCount: _ingredientCountForSet(set),
-    toolCount:
-      ingredientSetToolsAreActive(craftingSystem, set) && Array.isArray(set?.toolIds)
-        ? set.toolIds.length
-        : 0,
-  }));
-  const stepToolCount = Array.isArray(step?.toolIds) ? step.toolIds.length : 0;
-  const previewIngredientCount =
-    ingredientSetSummaries.length > 0
-      ? Math.max(...ingredientSetSummaries.map((set) => set.ingredientCount))
-      : 0;
-  const previewSetToolCount =
-    ingredientSetSummaries.length > 0
-      ? Math.max(...ingredientSetSummaries.map((set) => set.toolCount))
-      : 0;
-
-  const resultGroups = Array.isArray(step?.resultGroups) ? step.resultGroups : [];
-
-  return {
-    id: step?.id || `step-${index + 1}`,
-    name: step?.name || `Step ${index + 1}`,
-    ingredientSetCount: ingredientSets.length,
-    ingredientCount: previewIngredientCount,
-    toolCount: sharedRecipeToolIds.length + stepToolCount + previewSetToolCount,
-    resultGroupCount: resultGroups.length,
-    // The number of result ITEMS across the step's groups. Distinct from
-    // `resultGroupCount`: the browser row's "N out" half is only meaningful in
-    // `simple` / `progressive` (issue 643 §9); tier- and set-keyed modes render
-    // the GROUP count instead, so both numbers have to be projected.
-    resultItemCount: resultGroups.reduce(
-      (sum, group) => sum + (Array.isArray(group?.results) ? group.results.length : 0),
-      0
-    ),
-    hasAlternatives: ingredientSetSummaries.length > 1,
-    ingredientSetSummaries,
-  };
-}
-
-function _recipeStructure(isSimple, stepCount) {
-  if (stepCount > 1) {
-    return { structureKey: 'multiStep', structureLabel: 'Multi-step' };
-  }
-  if (isSimple) {
-    return { structureKey: 'simple', structureLabel: 'Simple' };
-  }
-  return { structureKey: 'singleStep', structureLabel: 'Single step' };
-}
-
-/**
- * Coarse fallback for {@link _isRecipeIncomplete} when a recipe model instance
- * (with `validate()` / `validateStructure()`) is unavailable. Detects the common
- * shell shapes — missing ingredient sets / result groups — but not the deeper
- * completeness cases the validators reject.
- * @param {object} recipe
- * @returns {boolean}
- */
-function _isRecipeIncompleteByCounts(recipe) {
-  const steps = Array.isArray(recipe?.steps) ? recipe.steps : [];
-  if (steps.length > 0) {
-    return steps.some(
-      (step) =>
-        !Array.isArray(step?.ingredientSets) ||
-        step.ingredientSets.length === 0 ||
-        !Array.isArray(step?.resultGroups) ||
-        step.resultGroups.length === 0
-    );
-  }
-  const ingredientSets = Array.isArray(recipe?.ingredientSets) ? recipe.ingredientSets : [];
-  const resultGroups = Array.isArray(recipe?.resultGroups) ? recipe.resultGroups : [];
-  return ingredientSets.length === 0 || resultGroups.length === 0;
-}
-
-/**
- * Derive whether a recipe is an incomplete authoring shell — persistable but not craftable.
- * Source of truth: a recipe is incomplete iff it is structurally sound but fails the
- * full completeness contract, i.e. `validateStructure().valid === true` while
- * `validate().valid === false`. This exactly matches the craftability/completeness
- * notion (the engine gates craft on `Recipe.validate()`), so the chip never falsely
- * reads "complete" for a recipe whose ingredient set has no groups/essences, whose
- * result group is empty, whose resolution-mode cardinality is unmet, or — for explicit
- * multi-step recipes — whose step is missing either side. The two validators are pure.
- * Falls back to a coarse count-only check when a model instance is unavailable.
- * @param {Recipe} recipe
- * @returns {boolean}
- */
-function _isRecipeIncomplete(recipe) {
-  if (typeof recipe?.validate === 'function' && typeof recipe?.validateStructure === 'function') {
-    return recipe.validate().valid === false && recipe.validateStructure().valid === true;
-  }
-  return _isRecipeIncompleteByCounts(recipe);
-}
-
-/**
- * Derive whether ACTIVATION would refuse this recipe (issue 1010) — the ONE predicate
- * behind the row's `Can't enable` pill, the bulk panel's pre-flight count and the bulk
- * write's `blockedEnables`. `RecipeManager.canActivateRecipe` runs the same
- * `_validateRecipeForActivation` the write runs, against a clone with `enabled: true`.
- *
- * It CANNOT be derived from {@link _isRecipeIncomplete}, which is
- * `validate().valid === false && validateStructure().valid === true`. A STRUCTURALLY
- * BROKEN recipe therefore reads `incomplete: false` while still being un-enableable, and
- * none of the essence-reference, tag-placeholder, resolution-mode or alchemy-signature
- * blockers move it either. Reading `incomplete` here would let the panel warn that three
- * selected recipes will stay off while zero rows wear the pill — two contradicting
- * statements about one fact, on one screen.
- *
- * The guard covers only a recipe manager that does not implement the predicate (an
- * injected test seam); an invalid RESULT is never swallowed.
- *
- * @param {object} recipeManager
- * @param {Recipe} recipe
- * @returns {boolean}
- */
-function _isRecipeEnableBlocked(recipeManager, recipe) {
-  if (typeof recipeManager?.canActivateRecipe !== 'function') return false;
-  return !recipeManager.canActivateRecipe(recipe).valid;
-}
-
-function _buildRecipeBrowserDisplay(recipe, craftingSystem = null) {
-  const executionSteps = _getRecipeExecutionSteps(recipe);
-  const isSimple =
-    typeof recipe.isSimpleRecipe === 'function' ? recipe.isSimpleRecipe(craftingSystem) : true;
-  const sharedRecipeToolIds =
-    _usesExplicitRecipeSteps(recipe, executionSteps) && Array.isArray(recipe?.toolIds)
-      ? recipe.toolIds
-      : [];
-  const requirementsPreview = executionSteps.map((step, index) =>
-    _buildRequirementPreviewStep(step, index, sharedRecipeToolIds, craftingSystem)
-  );
-  const structure = _recipeStructure(isSimple, requirementsPreview.length);
-
-  return {
-    description: String(recipe.description || '').trim(),
-    stepCount: requirementsPreview.length,
-    resultGroupCount: requirementsPreview.reduce((sum, step) => sum + step.resultGroupCount, 0),
-    resultItemCount: requirementsPreview.reduce((sum, step) => sum + step.resultItemCount, 0),
-    ingredientCount: requirementsPreview.reduce((sum, step) => sum + step.ingredientCount, 0),
-    toolCount: requirementsPreview.reduce((sum, step) => sum + step.toolCount, 0),
-    ...structure,
-    requirementsPreview,
-    isSimple,
-  };
-}
-
-/**
- * The crafting check a recipe row's check pill resolves against, keyed off the
- * SYSTEM's resolution mode. `routedByCheck` authors its check on the `routed`
- * slot; `simple`, `alchemy` and `routedByIngredients` share the `simple`
- * pass/fail slot; `progressive` has its own.
- * @private
- */
-function _recipeCheckConfig(system) {
-  const mode = system?.resolutionMode || 'simple';
-  if (mode === 'routedByCheck') return system?.craftingCheck?.routed || null;
-  if (mode === 'progressive') return system?.craftingCheck?.progressive || null;
-  return system?.craftingCheck?.simple || null;
-}
-
-/**
- * The check pill the recipe row renders (issue 643 §9). The row cannot derive
- * this — the DC lives on the SYSTEM's check, keyed by the recipe's `checkTierId`
- * — so it is projected here.
- *
- * A check is USABLE only when it has an authored `rollFormula`; "checks enabled"
- * is not the same thing. The DC resolution mirrors
- * `CraftingEngine._resolveSimpleCheckDc`: the recipe's selected tier wins, then
- * the check's static default.
- *
- * The two check-less kinds are NOT the same fact, and the row must not tell the GM
- * they are:
- *
- *  - `ingredients` — a `routedByIngredients` system with no usable check. Results
- *    route off the ingredient set that was used, so the recipe resolves perfectly
- *    well with no roll. This is a working configuration, reported neutrally.
- *  - `none` — every other mode with no usable check. The system cannot roll for this
- *    recipe, which is a state the GM should be able to SCAN a library for, so it
- *    carries a warning rather than an em dash that says nothing.
- *
- * @param {object} system the selected crafting system (raw, not projected).
- * @param {object} recipe the Recipe model.
- * @returns {{kind: 'none' | 'ingredients' | 'progressive' | 'dynamic' | 'dc', dc: number | null}}
- * @private
- */
-function _buildRecipeCheckSummary(system, recipe) {
-  const mode = system?.resolutionMode || 'simple';
-  // Alchemy's own check mode is system-level and independent of the crafting
-  // check; `none` means the recipe resolves with no check at all.
-  if (mode === 'alchemy' && (system?.alchemy?.checkMode || 'none') === 'none') {
-    return { kind: 'none', dc: null };
-  }
-
-  const config = _recipeCheckConfig(system);
-  const hasRollFormula = Boolean(String(config?.rollFormula ?? '').trim());
-  if (!config || !hasRollFormula) {
-    return mode === 'routedByIngredients'
-      ? { kind: 'ingredients', dc: null }
-      : { kind: 'none', dc: null };
-  }
-  if (mode === 'progressive') return { kind: 'progressive', dc: null };
-  // A dynamic DC is macro-resolved at craft time; there is no static number to show.
-  if (config.dcMode === 'dynamic') return { kind: 'dynamic', dc: null };
-
-  const tiers = Array.isArray(config.tiers) ? config.tiers : [];
-  const tier = recipe?.checkTierId ? tiers.find((entry) => entry?.id === recipe.checkTierId) : null;
-  const tierDc = Number(tier?.dc);
-  if (tier && Number.isFinite(tierDc)) return { kind: 'dc', dc: Math.trunc(tierDc) };
-
-  const defaultDc = Number(config.dc);
-  return { kind: 'dc', dc: Number.isFinite(defaultDc) ? Math.trunc(defaultDc) : 15 };
-}
-
 function _getManagedItems(system) {
   if (Array.isArray(system?.components)) return system.components;
   if (Array.isArray(system?.items)) return system.items;
@@ -657,30 +416,6 @@ function _normalizeComponentEssences(essences) {
 function _resolutionModeLabel(mode, localizeFn) {
   const key = RESOLUTION_MODE_LABEL_KEYS[mode];
   return key ? localizeFn?.(key) || mode : mode;
-}
-
-function _buildSalvageSummary(item, salvageEnabled) {
-  if (!salvageEnabled || item?.salvage?.enabled !== true) return null;
-
-  const salvage = item.salvage || {};
-  const outcomeRouting =
-    salvage.outcomeRouting && typeof salvage.outcomeRouting === 'object'
-      ? Object.keys(salvage.outcomeRouting).length
-      : 0;
-
-  return {
-    quantityRequired: Number(salvage.ingredientQuantity) || 1,
-    toolCount: Array.isArray(salvage.toolIds) ? salvage.toolIds.length : 0,
-    resultGroupCount: Array.isArray(salvage.resultGroups) ? salvage.resultGroups.length : 0,
-    hasTimeRequirement: !!salvage.timeRequirement,
-    hasCurrencyRequirement: !!salvage.currencyRequirement,
-    outcomeCount: outcomeRouting,
-  };
-}
-
-function _clonePlain(value) {
-  if (value === null || value === undefined) return value;
-  return JSON.parse(JSON.stringify(value));
 }
 
 function _normalizeGatheringTag(value) {
@@ -867,22 +602,6 @@ function _seedGatheringConditionOptions(kind, raw, defaults) {
   return _normalizeGatheringConditionOptions(kind, defaults);
 }
 
-// Module-scope id fallback for the normalizer helpers (which run before the store
-// closure's services-aware _randomID exists). Prefers Foundry's randomID, then the
-// Web Crypto UUID; the last resort is a time + counter id (no PRNG) so we never
-// rely on Math.random for identity.
-let _fallbackIdCounter = 0;
-function _fallbackRandomID() {
-  if (typeof globalThis.foundry?.utils?.randomID === 'function') {
-    return globalThis.foundry.utils.randomID();
-  }
-  if (typeof globalThis.crypto?.randomUUID === 'function') {
-    return globalThis.crypto.randomUUID().replace(/-/g, '').slice(0, 16);
-  }
-  _fallbackIdCounter += 1;
-  return `id-${Date.now().toString(36)}-${_fallbackIdCounter.toString(36)}`;
-}
-
 function _normalizeGatheringDropRow(row = {}, randomID = _fallbackRandomID) {
   return {
     id: row.id ? String(row.id) : randomID(),
@@ -1049,33 +768,6 @@ function _normalizeToolOnBreak(input) {
   return { mode };
 }
 
-function _normalizeGatheringLibraryTool(tool = {}, randomID = _fallbackRandomID) {
-  const originItemUuid =
-    tool.originItemUuid ||
-    tool.registeredItemUuid ||
-    tool.sourceItemUuid ||
-    tool.sourceUuid ||
-    null;
-  const registeredItemUuid =
-    tool.registeredItemUuid ||
-    tool.originItemUuid ||
-    tool.sourceUuid ||
-    tool.sourceItemUuid ||
-    null;
-  const rawAliasItemUuids = Array.isArray(tool.aliasItemUuids)
-    ? tool.aliasItemUuids
-    : Array.isArray(tool.fallbackItemIds)
-      ? tool.fallbackItemIds
-      : [];
-  return Tool.fromJSON({
-    ...tool,
-    id: String(tool.id || randomID()),
-    registeredItemUuid,
-    originItemUuid,
-    aliasItemUuids: rawAliasItemUuids,
-  }).toJSON();
-}
-
 function _normalizeGatheringTask(task = {}, randomID = _fallbackRandomID) {
   const id = String(task.id || randomID());
   return {
@@ -1134,6 +826,10 @@ function _normalizeGatheringTask(task = {}, randomID = _fallbackRandomID) {
     // dropped the moment a task is saved through THIS draft path. The shared
     // `authoredCheckModifierIds` attach is the same call on both sides.
     ...authoredCheckModifierIds(task.checkModifierIds),
+    // The task's text/macro failure feedback (issue 1098, CF8), through the same shared
+    // attach its mirror uses. Emitted by NEITHER library rebuild before that issue, so a
+    // value authored anywhere was dropped the moment a task was saved through this path.
+    ...authoredFailureOutcome(task.failureOutcome),
     // Optional per-task gathering DC override: when set it replaces the
     // system-level gathering check default DC at gather time. null = use default.
     // Guard null/''/undefined explicitly so re-normalizing a null stays null
@@ -1673,309 +1369,6 @@ function _normalizeNullablePositiveInteger(value) {
 }
 
 /**
- * Build the recipe list for the recipes tab.
- * Mirrors RecipeManagerApp._prepareRecipeContext().
- */
-function _buildRecipeList(systemManager, recipeManager, selectedSystem, recipeSearchTerm) {
-  if (!selectedSystem) return { recipes: [], recipeCategories: [], showVisibilitySummary: false };
-
-  const listMode = selectedSystem.recipeVisibility?.listMode || 'global';
-  const showVisibilitySummary = listMode === 'player';
-
-  let recipes = recipeManager.getRecipes({ craftingSystemId: selectedSystem.id });
-
-  if (recipeSearchTerm) {
-    const lower = recipeSearchTerm.toLowerCase();
-    recipes = recipes.filter(
-      (r) =>
-        r.name.toLowerCase().includes(lower) || (r.description || '').toLowerCase().includes(lower)
-    );
-  }
-
-  const categoriesMap = new Map();
-  for (const recipe of recipeManager.getRecipes({ craftingSystemId: selectedSystem.id })) {
-    const key = normalizeRecipeCategory(recipe.category);
-    categoriesMap.set(key, (categoriesMap.get(key) || 0) + 1);
-  }
-  const recipeCategories = Array.from(categoriesMap.entries())
-    .map(([name, count]) => ({ name, count }))
-    .sort((a, b) => a.name.localeCompare(b.name));
-
-  const prepared = recipes.map((recipe) => {
-    const display = _buildRecipeBrowserDisplay(recipe, selectedSystem);
-    // Book membership (many-to-many): the books that contain this recipe. The
-    // legacy scalars `recipeItemId`/name/source reflect the FIRST containing book —
-    // an accident of definition order, which is exactly why NO image is derived from
-    // them (issue 884): a recipe's icon is its own `img` and nothing else.
-    // `selectedSystem` here is the RAW manager system (`getSystems()`), not the
-    // hand-built viewState projection, so the membership-basis marker is reachable
-    // without adding it to that allowlist (issue 1011).
-    const containingDefinitions = _recipeItemDefinitionsContaining(
-      selectedSystem.recipeItemDefinitions,
-      recipe,
-      selectedSystem.membershipResolvesByRecipeIds
-    );
-    const recipeItemIds = containingDefinitions.map((def) => String(def.id));
-    const recipeItemDefinition = containingDefinitions[0] || null;
-    const recipeItemId = recipeItemDefinition ? String(recipeItemDefinition.id) : '';
-    // Plain authoring data for the recipe editor's step-mode UI. Sourced from
-    // toJSON() so step / top-level shapes match Recipe._normalizeStep exactly.
-    // The multi-step editor reads `steps` (and migrates the top-level fields into
-    // the seeded first step); without these the editor cannot detect or author steps.
-    const raw = recipe.toJSON();
-    return {
-      id: recipe.id,
-      name: recipe.name,
-      img: recipe.img,
-      description: display.description,
-      category: normalizeRecipeCategory(recipe.category),
-      steps: Array.isArray(raw.steps) ? raw.steps : [],
-      ingredientSets: Array.isArray(raw.ingredientSets) ? raw.ingredientSets : [],
-      resultGroups: Array.isArray(raw.resultGroups) ? raw.resultGroups : [],
-      // Result routing: the per-recipe routing mode (provider) and check-tier
-      // reference live at the top level and MUST be projected, or the editor
-      // seeds them empty and they revert on reload (the routing-mode persistence
-      // bug). The resultGroups/ingredientSets arrays above already carry their
-      // own routing fields (checkOutcomeIds / resultGroupId).
-      resultSelection: raw.resultSelection || null,
-      outcomeRouting: raw.outcomeRouting || null,
-      checkTierId: raw.checkTierId ?? null,
-      minSuccessOutcomeId: raw.minSuccessOutcomeId ?? null,
-      // Per-recipe crafting-check modifier override (issue 770). This projection is a
-      // hand-built ALLOWLIST: omitting it makes the Overview override control seed from
-      // `undefined`, render "Inherit system default", and silently write the override
-      // back to null on the next save (data loss). `raw` is `recipe.toJSON()`, which
-      // carries `craftingModifier` per the model.
-      craftingModifier: raw.craftingModifier ?? null,
-      // Single-step recipe duration (issue 845). This projection is a hand-built
-      // ALLOWLIST: omitting it makes the Overview Duration steppers seed from
-      // `undefined` and render "Instant" on every editor open — the persisted value
-      // is NOT lost (RecipeManager.updateRecipe shallow-merges it back from the stored
-      // record when the draft omits the key), so craft time still applies, but the GM
-      // sees their authored duration reset to zero. Multi-step recipes carry their
-      // per-step duration inside the `steps` array projected wholesale below.
-      timeRequirement: raw.timeRequirement ?? null,
-      complex: raw.complex === true,
-      toolIds: Array.isArray(raw.toolIds) ? raw.toolIds : [],
-      visibilitySummary: _visibilitySummary(recipe),
-      // The raw `{ restricted, allowedUserIds }` object (display string aside) so
-      // the per-recipe restriction editor can seed, stage, and save an edit. Without
-      // it `recipeDraft.visibility` is undefined and edits cannot be persisted.
-      visibility: raw.visibility || null,
-      // Per-recipe access grants (restricted visibility mode): the normalized
-      // `{ characterIds, playerIds }` snapshot the Access tab seeds and saves, plus
-      // a `{ characterCount, playerCount }` summary the recipe rows render as the
-      // "N char · N player" grant chip (or "No access" when both are 0).
-      access: {
-        characterIds: Array.isArray(raw.access?.characterIds) ? raw.access.characterIds : [],
-        playerIds: Array.isArray(raw.access?.playerIds) ? raw.access.playerIds : [],
-      },
-      accessSummary: {
-        characterCount: Array.isArray(raw.access?.characterIds)
-          ? raw.access.characterIds.length
-          : 0,
-        playerCount: Array.isArray(raw.access?.playerIds) ? raw.access.playerIds.length : 0,
-      },
-      locked: recipe.locked === true,
-      enabled: recipe.enabled !== false,
-      // GM policy: may a player reorder this recipe's progressive result stages
-      // (issue 651)? This projection is a hand-built ALLOWLIST — an omitted field is
-      // invisible to the editor, so the Results tab's toggle card would seed from
-      // `undefined`, read default-true, and silently render ON for a recipe the GM had
-      // authored OFF. Default-true here mirrors the model's constructor.
-      allowPlayerResultReorder: recipe.allowPlayerResultReorder !== false,
-      // Derived (no stored flag): a shell missing ingredient sets / result groups is
-      // persistable but not craftable. Surfaced as an "Incomplete" chip in the browser.
-      incomplete: _isRecipeIncomplete(recipe),
-      // Derived (no stored flag): would ACTIVATION refuse this recipe? See
-      // `_isRecipeEnableBlocked` for why `incomplete` above could NOT have served — a
-      // structurally broken recipe reads `incomplete: false` and still cannot be enabled.
-      // This projection is a hand-built ALLOWLIST, so omitting the field would leave it
-      // invisible to the row pill and every downstream blocked-enable count silently zero.
-      enableBlocked: _isRecipeEnableBlocked(recipeManager, recipe),
-      // Book membership: all books containing this recipe (many-to-many), plus the
-      // first book's id/name/source for legacy single-link consumers. Deliberately no
-      // book IMAGE among them (issue 884): the GM readers resolve `recipe.img` through
-      // the shared `resolveRecipeImage` helper, never a containing book's artwork.
-      recipeItemIds,
-      recipeItemId,
-      recipeItemName: recipeItemDefinition?.name || '',
-      recipeItemSourceUuid: recipeItemDefinition?.originItemUuid || '',
-      // The row's check pill: the system check's DC resolved through this recipe's
-      // `checkTierId`, or `{ kind: 'none' }` when the system has no USABLE check
-      // (usable iff an authored rollFormula exists — "checks enabled" is not the
-      // same thing). The row cannot derive this (issue 643 §9).
-      checkSummary: _buildRecipeCheckSummary(selectedSystem, recipe),
-      isSimple: display.isSimple,
-      stepCount: display.stepCount,
-      resultGroupCount: display.resultGroupCount,
-      resultItemCount: display.resultItemCount,
-      ingredientCount: display.ingredientCount,
-      toolCount: display.toolCount,
-      structureKey: display.structureKey,
-      structureLabel: display.structureLabel,
-      requirementsPreview: display.requirementsPreview,
-      ingredients: new Array(display.ingredientCount),
-      tools: new Array(display.toolCount),
-    };
-  });
-
-  return { recipes: prepared, recipeCategories, showVisibilitySummary };
-}
-
-/**
- * Build the item cards list for the items tab.
- * Mirrors _prepareContext item logic from RecipeManagerApp.
- */
-function _sourceUuidForItemCard(item) {
-  return item?.originItemUuid || item?.registeredItemUuid || '';
-}
-
-function _sourceOriginForUuid(uuid, sourceMissing = false) {
-  if (sourceMissing) {
-    return {
-      sourceOrigin: 'missing',
-      sourceOriginLabel: 'Missing',
-    };
-  }
-  if (!uuid) {
-    return {
-      sourceOrigin: 'unknown',
-      sourceOriginLabel: 'Unknown',
-    };
-  }
-  if (uuid.startsWith('Compendium.')) {
-    return {
-      sourceOrigin: 'compendium',
-      sourceOriginLabel: 'Compendium',
-    };
-  }
-  if (uuid.startsWith('Item.')) {
-    return {
-      sourceOrigin: 'world',
-      sourceOriginLabel: 'Items Directory',
-    };
-  }
-  return {
-    sourceOrigin: 'unknown',
-    sourceOriginLabel: 'Unknown',
-  };
-}
-
-/**
- * Resolve a component's linked source document ONCE, returning both the document and
- * the `missing` verdict derived from the same lookup.
- *
- * The `missing` contract is preserved EXACTLY as `_sourceMissingForUuid` defined it,
- * and the two clauses are load-bearing in opposite directions:
- *  - no uuid, or no `fromUuid` (every non-Foundry test env): `missing: false`. Deriving
- *    it as `Boolean(uuid) && !doc` instead would report EVERY component's source as
- *    unresolved the moment `fromUuid` is absent.
- *  - a throw: `missing: true`.
- *
- * Returning the doc as well is what lets the component card follow the LINKED ITEM for
- * description (issue 676) without resolving the same uuid twice per component — which,
- * for a compendium-linked library, is real async I/O per row.
- *
- * @param {string} uuid
- * @returns {Promise<{doc: object|null, missing: boolean}>}
- */
-async function _resolveSourceDocumentState(uuid) {
-  if (!uuid || typeof globalThis.fromUuid !== 'function') return { doc: null, missing: false };
-  try {
-    const doc = await globalThis.fromUuid(uuid);
-    return { doc: doc || null, missing: !doc };
-  } catch (_) {
-    return { doc: null, missing: true };
-  }
-}
-
-/**
- * The linked document's description, in a SYSTEM-AGNOSTIC way.
- *
- * dnd5e keeps it at `system.description.value` as HTML; others use a bare
- * `description`. Both are handed to `_plainTextDescription`, which recurses objects
- * (`_descriptionTextCandidate`) and strips markup — so the `{value, chat}` shape and a
- * plain string both resolve. `doc.system` is NEVER passed whole: the recursion would
- * happily flatten every unrelated field on the sheet into the "description".
- *
- * @param {object|null} doc
- * @returns {string}
- */
-async function _documentDescriptionCandidate(doc, enrichToHtml) {
-  if (!doc) return '';
-  const raw = _descriptionTextCandidate(doc.system?.description ?? doc.description ?? '');
-  if (!raw) return '';
-  // The live fallback RESOLVES too (issue 800). It has to: the population this
-  // fallback exists for — a compendium-linked component whose stored description is
-  // empty (issue 676) — is precisely the population whose live description carries
-  // the raw directives the reporter saw. A non-enriching fallback would leave the
-  // reported bug visible for exactly those components until a GM ran Repair.
-  // `relativeTo` is passed here as well as at ingestion, or the same description can
-  // resolve at registration and go broken on this path.
-  const enriched =
-    typeof enrichToHtml === 'function' ? await enrichToHtml(raw, { relativeTo: doc }) : raw;
-  return _plainTextDescription(enriched);
-}
-
-// ---------------------------------------------------------------------------
-// Books & Scrolls recipe-item projection (issue 511)
-//
-// The library surface reads each recipe item enriched with its resolved
-// game-world item (name/img/type), its linked recipes (reverse ref via
-// `recipe.recipeItemId`), and how many world actors have learned any of those
-// recipes. Resolution touches `fromUuid`, so it is done ONCE per refresh and
-// batched with `Promise.all` (never inside a Svelte `$derived`/`$effect`).
-// ---------------------------------------------------------------------------
-
-// `_recipeItemLabelFromUuid` and `_recipeItemTypeFromRecipeCount` now live in the
-// pure `knowledge/knowledgeStudio.js` projection and are imported back at the top
-// of this module (issue 785). The Books & Scrolls Type pill and the Knowledge
-// surface's Type column read the SAME derivation, so the two cannot drift.
-
-/**
- * Fields `_buildRecipeList` DERIVES onto a projected recipe row that are not authored
- * recipe state (issue 978).
- *
- * They exist for display — the browser's book column, the editor's Books & Scrolls tab,
- * and `handleRemoveRecipeItem`'s post-unlink refresh all read them — but the editor
- * seeds its draft from a whole projected row and Save posts the whole draft, so without
- * a strip at the write boundary `recipeItemId` (the only one of the four that is also a
- * real `Recipe` field) is persisted onto the model. Its value is
- * `containingDefinitions[0]`, i.e. definition order — an authoring accident.
- *
- * The other three are dropped today by `Recipe.fromJSON`, which reconstructs from named
- * fields. That is a property of the model's current field list rather than a guarantee,
- * so the whole derived set is stripped and named once here.
- */
-export const DERIVED_RECIPE_PROJECTION_FIELDS = Object.freeze([
-  'recipeItemId',
-  'recipeItemIds',
-  'recipeItemName',
-  'recipeItemSourceUuid',
-]);
-
-/**
- * Drop the derived projection fields from a recipe update payload.
- *
- * OMITS the keys rather than nulling them. `RecipeManager.updateRecipe` merges
- * `{ ...recipe.toJSON(), ...updates }`, so an absent key preserves the persisted value
- * while an explicit `null` would DESTROY the scalar that `_migrateLegacyRecipeItems`
- * maintains for the standalone alchemy formula-item cohort the 1.13.0 migration
- * deliberately preserved.
- *
- * @param {object} updates A recipe update payload, possibly a whole projected row.
- * @returns {object} The payload without any derived projection field.
- */
-export function withoutDerivedRecipeProjectionFields(updates) {
-  if (!updates || typeof updates !== 'object') return updates;
-  if (!DERIVED_RECIPE_PROJECTION_FIELDS.some((field) => field in updates)) return updates;
-  const stripped = { ...updates };
-  for (const field of DERIVED_RECIPE_PROJECTION_FIELDS) delete stripped[field];
-  return stripped;
-}
-
-/**
  * The result shape of `CraftingSystemManager.applyBulkEditToRecipes` (issue 1010), split
  * by kind so {@link _normalizeBulkRecipeEditResult} stays a two-line loop rather than an
  * eight-way object literal of near-identical coercions.
@@ -2017,307 +1410,6 @@ function _normalizeBulkRecipeEditResult(result) {
     normalized[key] = Array.isArray(result?.[key]) ? result[key] : [];
   }
   return normalized;
-}
-
-// The recipe-item definitions of a system that CONTAIN a recipe (issue 511
-// many-to-many). Canonical read is each definition's `recipeIds[]`; only while the
-// system's membership-basis marker is unset does it fall back to the recipe's book-only
-// `recipeItemId`.
-//
-// The basis is a PARAMETER, not re-derived here (issue 1011). This is a module-scope
-// pure helper with no system in scope, and the "any definition has a non-empty
-// recipeIds" inference it used to run flipped in both directions — so the caller threads
-// `system.membershipResolvesByRecipeIds` down from the raw manager system.
-function _recipeItemDefinitionsContaining(definitions, recipe, membershipResolvesByRecipeIds) {
-  const defs = Array.isArray(definitions) ? definitions : [];
-  const rid = String(recipe?.id || '');
-  const byMembership = defs.filter((def) =>
-    (Array.isArray(def.recipeIds) ? def.recipeIds : []).some((id) => String(id) === rid)
-  );
-  if (byMembership.length > 0) return byMembership;
-  if (membershipResolvesByRecipeIds === true) return [];
-  const recipeItemId = String(recipe?.recipeItemId || '').trim();
-  return recipeItemId ? defs.filter((def) => String(def.id) === recipeItemId) : [];
-}
-
-// Synchronous fallback projection painted immediately in refresh phase 1. The
-// resolved name/img/type, linked `recipes[]`, and `learnedByCount` are filled in
-// asynchronously by `_enrichRecipeItemLibrary` before the phase-2 publish.
-function _projectRecipeItemDefinitionSync(def) {
-  const originItemUuid = def?.originItemUuid || '';
-  return {
-    id: def?.id || '',
-    originItemUuid,
-    img: def?.img || '',
-    description: def?.description || '',
-    enabled: def?.enabled !== false,
-    // Book membership (issue 511 many-to-many) — the recipe ids this book contains.
-    recipeIds: Array.isArray(def?.recipeIds) ? def.recipeIds.map((id) => String(id)) : [],
-    caps: _clonePlain(def?.caps || {}),
-    resolvedName: def?.name || _recipeItemLabelFromUuid(originItemUuid) || 'Recipe item',
-    resolvedImg: def?.img || 'icons/svg/item-bag.svg',
-    derivedType: _recipeItemTypeFromRecipeCount(0),
-    linkMissing: false,
-    recipes: [],
-    learnedByCount: 0,
-  };
-}
-
-// Resolve one linked game-world item. Returns `{ doc, missing }`; `missing` is
-// true only when a uuid is present but cannot be resolved (deleted/broken link).
-async function _resolveRecipeItemSource(uuid) {
-  if (!uuid || typeof globalThis.fromUuid !== 'function') return { doc: null, missing: false };
-  try {
-    const doc = await globalThis.fromUuid(uuid);
-    return { doc: doc || null, missing: !doc };
-  } catch (_) {
-    return { doc: null, missing: true };
-  }
-}
-
-// Build a `recipeId -> Set(actorId)` index of learned recipes across every world
-// actor (best-effort; `game.*` may be unavailable in headless contexts → empty).
-//
-// The learned map MUST be read through `getFabricateFlag` (issue 785). Every
-// writer persists it at the doubly-nested `flags.fabricate.fabricate.learnedRecipes`
-// path (`normalizeFlagKey` prefixes `fabricate.`, then the flattened update path
-// nests it under the `fabricate` scope), so the old hand-written single-nested
-// `actor.flags.fabricate.learnedRecipes` read resolved to `undefined` in a real
-// world and "Learned by" was permanently 0. `getFabricateFlag` also try/catches
-// `getFlag`'s inactive-scope throw.
-function _buildLearnedRecipeActorIndex() {
-  const index = new Map();
-  const raw = globalThis.game?.actors;
-  const actors = Array.isArray(raw?.contents)
-    ? raw.contents
-    : Array.isArray(raw)
-      ? raw
-      : typeof raw?.[Symbol.iterator] === 'function'
-        ? [...raw]
-        : [];
-  for (const actor of actors) {
-    const learned = getFabricateFlag(actor, 'learnedRecipes', null);
-    if (!learned || typeof learned !== 'object') continue;
-    const actorId = actor.id || actor._id || '';
-    for (const recipeId of Object.keys(learned)) {
-      if (!index.has(recipeId)) index.set(recipeId, new Set());
-      index.get(recipeId).add(actorId);
-    }
-  }
-  return index;
-}
-
-// The legacy reverse-ref index: `recipeItemId -> rows`. Built ONLY while the system's
-// membership-basis marker is unset, so it costs nothing on a system that has switched
-// basis and cannot be consulted there by accident.
-function _legacyRecipeItemIndex(recipeList) {
-  const index = new Map();
-  for (const recipe of recipeList) {
-    const key = String(recipe?.recipeItemId || '');
-    if (!key) continue;
-    if (!index.has(key)) index.set(key, []);
-    index.get(key).push(recipe);
-  }
-  return index;
-}
-
-// Enrich the synchronously-projected recipe items with async-resolved
-// name/img/type plus their derived `recipes[]` and `learnedByCount`. Called once
-// per refresh from the async phase; `fromUuid` resolution is batched.
-//
-// This is the SIXTH recipe-book membership reader, and the second in this file: it
-// answers the same many-to-many from the BOOK's side. Like
-// `_recipeItemDefinitionsContaining`, it takes the basis as a PARAMETER threaded from
-// the raw manager system rather than inferring it — the inference available here would
-// have been per DEFINITION ("this book's `recipeIds` is empty, so it must be
-// un-migrated"), which is the retired system-wide predicate at definition scope.
-//
-// The parameter is BELT AND BRACES at this call site, and saying so is more useful than
-// overstating it: `recipes` is the PROJECTED recipe list, whose `recipeItemId`
-// `_buildRecipeList` derives from `_recipeItemDefinitionsContaining` rather than copying
-// the raw legacy scalar. So on a marked system an emptied book's former members already
-// carry `recipeItemId: ''`, and `_legacyRecipeItemIndex` could not resurrect them even if
-// this guard were dropped — the basis decision has already been taken upstream. What the
-// parameter buys is that this function does not have a SECOND, differently-shaped opinion
-// about the basis for a future caller to hand a rawer list to
-// (`ui-integration/spec.md`, the membership-basis paragraph).
-async function _enrichRecipeItemLibrary(projectedItems, recipes, membershipResolvesByRecipeIds) {
-  const items = Array.isArray(projectedItems) ? projectedItems : [];
-  if (items.length === 0) return [];
-
-  const recipeList = Array.isArray(recipes) ? recipes : [];
-  const recipeById = new Map();
-  for (const recipe of recipeList) recipeById.set(String(recipe?.id), recipe);
-  // `=== true` exactly as `_recipeItemDefinitionsContaining` tests it: a missing boolean
-  // fails to LEGACY, which is the safe direction, and `null` is what the index being
-  // absent means downstream.
-  const legacyIndex =
-    membershipResolvesByRecipeIds === true ? null : _legacyRecipeItemIndex(recipeList);
-  const toRecipeRef = (recipe) => ({
-    id: recipe.id,
-    name: recipe.name,
-    category: recipe.category || '',
-  });
-
-  const actorIndex = _buildLearnedRecipeActorIndex();
-  const resolved = await Promise.all(
-    items.map((item) => _resolveRecipeItemSource(item.originItemUuid))
-  );
-
-  return items.map((item, index) => {
-    const { doc, missing } = resolved[index];
-    // Canonical membership: the book's `recipeIds`. `legacyIndex` is null once the
-    // system resolves by `recipeIds`, so an empty array then means "this book has no
-    // members" — full stop — rather than "this book has not migrated".
-    const memberIds = Array.isArray(item.recipeIds) ? item.recipeIds : [];
-    const linkedRecipes =
-      memberIds.length > 0
-        ? memberIds
-            .map((id) => recipeById.get(String(id)))
-            .filter(Boolean)
-            .map(toRecipeRef)
-        : (legacyIndex?.get(String(item.id)) || []).map(toRecipeRef);
-    const learnedActors = new Set();
-    for (const recipe of linkedRecipes) {
-      const actorsForRecipe = actorIndex.get(recipe.id);
-      if (actorsForRecipe) for (const actorId of actorsForRecipe) learnedActors.add(actorId);
-    }
-    return {
-      ...item,
-      resolvedName: doc?.name || item.resolvedName,
-      resolvedImg: doc?.img || item.resolvedImg,
-      derivedType: _recipeItemTypeFromRecipeCount(linkedRecipes.length),
-      linkMissing: missing,
-      recipes: linkedRecipes,
-      learnedByCount: learnedActors.size,
-    };
-  });
-}
-
-// Deterministic structural serialization with recursively sorted object keys.
-// JSON.stringify alone follows insertion order, so two structurally-identical
-// items built by different code paths could serialize differently; sorting keys
-// makes the signature depend on structure/values only.
-function _stableStringify(value) {
-  if (value === null || typeof value !== 'object') return JSON.stringify(value);
-  if (Array.isArray(value)) return `[${value.map(_stableStringify).join(',')}]`;
-  const keys = Object.keys(value).sort((a, b) => a.localeCompare(b));
-  const entries = keys.map((k) => `${JSON.stringify(k)}:${_stableStringify(value[k])}`);
-  return `{${entries.join(',')}}`;
-}
-
-// Per-item memo signature. The card is `{ ...item, ...overrides }`, so it ships
-// EVERY stored `item` field — the signature therefore serializes the WHOLE item
-// (not a hand-enumerated subset, which would miss e.g. `category`/`difficulty`
-// and serve a stale card). It is combined with the EXTERNAL inputs the card also
-// reads: the `showTags`/`showEssences`/`showSalvage` flags (a `features.salvage`
-// toggle is a system-level change that is neither an item field nor a system-id
-// change, so it MUST live in the signature to invalidate) and the resolved
-// essence name/icon per essence id (an essence-catalog edit is system-level).
-function _itemCardSignature(item, showTags, showEssences, showSalvage, essenceDefinitionById) {
-  const essenceResolution = Object.keys(item?.essences || {})
-    .sort((a, b) => a.localeCompare(b))
-    .map((id) => [
-      id,
-      essenceDefinitionById.get(id)?.name || id,
-      essenceDefinitionById.get(id)?.icon,
-    ]);
-  return _stableStringify({
-    item,
-    showTags,
-    showEssences,
-    showSalvage,
-    essenceResolution,
-  });
-}
-
-// The per-store item-card memo (a Map keyed `${systemId}:${itemId}` → `{signature, card}`)
-// lets an unchanged component skip its per-item `fromUuid` (`_resolveSourceDocumentState`)
-// and conditional `enrichHTML` on refresh, so a single-component edit no longer pays
-// O(all-components) resolution cost.
-//
-// FRESHNESS TRADE (disclosed, NOT "unchanged"): on a cache hit the memo reuses the
-// last-resolved source-document state, so `sourceMissing`/`sourceOrigin` (the "Missing"
-// badge) reflects an EXTERNAL source-document delete/restore only on system re-select
-// (the whole cache clears on a system-id change) or on Repair Item Data / item-sync of
-// that component (its stored fields change → signature miss) — NOT on an unrelated
-// same-system refresh. This matches the existing best-effort, opportunistic behavior:
-// there is no world-item-delete refresh hook (foundryBridge ignores non-actor items), so
-// today such a change is already reflected only on the next unrelated refresh. No
-// USER-edited field goes stale — a user edit mutates the stored item → signature miss.
-async function _buildItemCards(
-  systemManager,
-  selectedSystem,
-  itemSearchTerm,
-  { showTags, showEssences, essenceDefinitionById, enrichToHtml, cache }
-) {
-  if (!selectedSystem) return [];
-  const showSalvage = selectedSystem.features?.salvage === true;
-  const items = systemManager.getItems(selectedSystem.id, itemSearchTerm);
-  return Promise.all(
-    items.map(async (item) => {
-      const cacheKey = `${selectedSystem.id}:${item.id}`;
-      const signature = _itemCardSignature(
-        item,
-        showTags,
-        showEssences,
-        showSalvage,
-        essenceDefinitionById
-      );
-      const cached = cache?.get(cacheKey);
-      // Hit: reuse the prior card verbatim, skipping `fromUuid` + `enrichHTML`.
-      if (cached && cached.signature === signature) return cached.card;
-      const registeredItemUuidDisplay = _sourceUuidForItemCard(item);
-      // Precedence: STORED FIRST, enriched live document as the fallback (issue 800,
-      // flipping the live-first order issue 676 introduced).
-      //
-      // Issue 676 preferred the live document because the stored description was
-      // routinely empty for a compendium-linked component, so the identity strip's
-      // promise that "name, image & description follow the linked item" rendered a bare
-      // "—". Since descriptions are now RESOLVED and stored at ingestion and by the GM
-      // repair, the stored value is the authoritative one and reading the live document
-      // on every render is pure cost.
-      //
-      // The trade is honest and is read FRESHNESS: a pack-content change (a game system
-      // or module shipping new prose) now reaches the component when a GM runs Repair
-      // Item Data, where previously it landed on the next render. Item-sync covers
-      // in-world edits only.
-      //
-      // Statement form, deliberately: `(await enrichedLive) || stored` would re-introduce
-      // the per-component `enrichHTML` call this flip exists to avoid.
-      const { doc: sourceDoc, missing: sourceMissing } =
-        await _resolveSourceDocumentState(registeredItemUuidDisplay);
-      let description = _plainTextDescription(item.description);
-      if (!description) {
-        description = await _documentDescriptionCandidate(sourceDoc, enrichToHtml);
-      }
-      const sourceOrigin = _sourceOriginForUuid(registeredItemUuidDisplay, sourceMissing);
-      const card = {
-        ...item,
-        img: item.img || 'icons/svg/item-bag.svg',
-        description,
-        hasDescription: description.length > 0,
-        tags: showTags ? item.tags || [] : [],
-        essences: showEssences
-          ? Object.entries(item.essences || {}).map(([id, quantity]) => ({
-              id,
-              name: essenceDefinitionById.get(id)?.name || id,
-              icon: essenceDefinitionById.get(id)?.icon || 'fas fa-mortar-pestle',
-              quantity,
-            }))
-          : [],
-        registeredItemUuidDisplay,
-        hasRegisteredItemUuid: Boolean(registeredItemUuidDisplay),
-        sourceMissing,
-        ...sourceOrigin,
-        salvageSummary: _buildSalvageSummary(item, showSalvage),
-        showTags,
-        showEssences,
-      };
-      cache?.set(cacheKey, { signature, card });
-      return card;
-    })
-  );
 }
 
 function _sourceComponentIdForEssence(def, managedItemById) {
@@ -2482,379 +1574,17 @@ function _buildEssenceCards(essenceDefinitions, managedItems, managedItemOptions
   });
 }
 
-// Thin delegators to the shared Foundry-free plain-texter (src/utils/
-// plainTextDescription.js). Kept as named module functions because
-// `_documentDescriptionCandidate`, `_buildManagedItemOptions`, and the Books &
-// Scrolls projection call them, and source-contract tests may pin the names.
+// Thin delegator to the shared Foundry-free plain-texter (src/utils/
+// plainTextDescription.js). Kept as a named module function because
+// `_buildManagedItemOptions` calls it and source-contract tests may pin the name.
 // The shared helper flattens Foundry enricher directives (issue 800) before the
 // HTML strip, so every description surface renders human-readable labels.
+//
+// Its `_descriptionTextCandidate` twin left with the component-card projection
+// (issue 1090), which was its only caller; that module imports the shared helper
+// directly rather than carrying a second copy of the delegator.
 function _plainTextDescription(value) {
   return plainTextDescription(value);
-}
-
-function _descriptionTextCandidate(value, seen = new Set()) {
-  return descriptionTextCandidate(value, seen);
-}
-
-/**
- * Which of the two FORMULA-DERIVED reasons a check-modifier catalogue is INERT applies, or
- * `null` when it is live. Discriminated rather than collapsed to one boolean because each cause needs
- * different GM-facing copy — "this mode rolls no check" is a different fix from "this
- * check has no formula yet". The order matters: a mode with no check slot has no formula
- * to inspect.
- *
- * There were THREE causes until issue 1094. The third — "a formula is authored but never
- * spends the placeholder" — retired with the placeholder itself: the resolved scalar is
- * appended to whatever the GM authored, so an authored formula always carries it and the
- * state is no longer reachable.
- *
- * PER-ACTIVITY SINCE ISSUE 1095. This used to be crafting-only, keyed directly on
- * `resolveActiveCraftingCheckFormula`; salvage and gathering now select over the same
- * catalogue, so they need the same answer and it must come from ONE derivation. The
- * argument is whichever of the three `resolveActive*CheckFormula` siblings owns the
- * activity — all three return the same shape for exactly this reason.
- *
- * A THIRD cause exists that this function cannot return, and the boundary is deliberate:
- * gathering `d100` is `noModifierSupport`, not `noCheck`. The d100 rolled against each
- * drop's chance IS that mode's check, so the mode does roll and only the seam to add a
- * modifier to that roll is missing. Deciding that needs the gathering resolution mode,
- * which is not derivable from this argument, so `ChecksView.svelte` applies the override
- * where the mode is in scope. This function answers the two questions a `{slot,
- * checkUsable}` pair can answer, and nothing here may be read as a claim that d100 rolls
- * no check.
- * @param {{ slot: string|null, checkUsable: boolean }} formula
- * @returns {'noCheck'|'noFormula'|null}
- */
-function _checkModifierInertCause(formula) {
-  if (formula.slot === null) return 'noCheck';
-  if (!formula.checkUsable) return 'noFormula';
-  return null;
-}
-
-/**
- * The check-modifier facts the Checks card and the recipe editor need beyond the raw
- * `craftingCheck` fields (issue 1055), projected as an extension of the allowlist below.
- *
- * `maxModifierPicks` is passed through RAW and is deliberately NOT defaulted — no `|| 1`,
- * no `?? 0`. Absence is a real value ("unlimited"), distinct from every authored bound,
- * and both authoring surfaces render it as such. A default here would forge a GM decision
- * that was never made and would silently truncate recipe picks already on disk. The key is
- * always emitted so the shape is fixed; its value is `undefined` when unbounded. What
- * absence MEANS at resolution time is `resolveMaxModifierPicks`'s answer (`Infinity`), and
- * this projection deliberately does not pre-empt it.
- *
- * "Does this rule defer the selection?" is deliberately NOT projected alongside it. Both
- * surfaces already receive the normalized rule, and `policyDefersSelection` exists on the
- * resolver so an authoring surface can ask it directly — which is what the Checks card
- * does, live against the radio group the GM is clicking. A projected copy would answer
- * from the last persisted rule and would be the one derivation on this axis capable of
- * disagreeing with the card that reads it.
- *
- * PER-ACTIVITY SINCE ISSUE 1095. One builder, three call sites, so the salvage and
- * gathering Modifiers sections can report `noCheck` / `noFormula` at all — before this
- * they had no inert-cause projection and no way to say that their selection reaches no
- * roll. The activity picks which `resolveActive*CheckFormula` sibling answers and which
- * check block the cap is read from.
- *
- * GATHERING IS ANSWERED AGAINST `d100` (issue 1095, decision 8), because the gathering
- * resolution mode lives on the gathering ECONOMY config, which this projection cannot
- * see, and both formula-rolled modes are rendered `disabled` pending issue 683 — so
- * `d100` is the only mode a GM can select today.
- *
- * ITS `modifierFormulaInertCause` IS THEREFORE `noCheck`, AND THAT IS NOT THE GM-FACING
- * ANSWER. Gathering `d100` is `noModifierSupport`: the d100 rolled against each drop's
- * chance IS that mode's check, and only the seam to add a modifier to it is missing.
- * `ChecksView.svelte` overrides the cause where the mode is in scope, and no surface reads
- * this projection's gathering cause today — the one consumer
- * (`CraftingSystemManagerRoot.svelte`, for the recipe Overview banner) reads the CRAFTING
- * projection only. Any future consumer must apply the same override rather than render
- * `noCheck`'s copy, which tells a GM the mode rolls nothing and to switch to one that
- * rolls. When 683 ships, the real mode is threaded in here and this stops being a
- * constant.
- *
- * @param {object} system The selected crafting system.
- * @param {'crafting'|'salvage'|'gathering'} activity
- */
-function _buildCheckModifierRuleView(system, activity) {
-  const formula =
-    activity === 'salvage'
-      ? resolveActiveSalvageCheckFormula(system)
-      : activity === 'gathering'
-        ? resolveActiveGatheringCheckFormula(system)
-        : resolveActiveCraftingCheckFormula(system);
-  const check =
-    activity === 'salvage'
-      ? system?.salvageCraftingCheck
-      : activity === 'gathering'
-        ? system?.gatheringCraftingCheck
-        : system?.craftingCheck;
-  return {
-    modifierFormulaInertCause: _checkModifierInertCause(formula),
-    maxModifierPicks: check?.maxModifierPicks,
-  };
-}
-
-/**
- * The selection triple every activity check carries over the system catalogue (issue
- * 1095), projected through ONE derivation so the three cannot drift.
- *
- * `defaultModifierPolicy` is normalized through the resolver's own vocabulary rather than
- * a local copy of it, for the reason the crafting projection already records: a
- * hand-maintained allowlist here silently rewrote a stored `playerPicks` to `addAll` and
- * made the rule unselectable (issue 855). It also means a world still carrying the
- * pre-1095 `byRecipe` projects as `bySubject`, so the radio group selects correctly
- * before the migration has run.
- *
- * @param {object|null|undefined} check The persisted activity check block.
- * @param {object} system The selected crafting system.
- * @param {'crafting'|'salvage'|'gathering'} activity
- */
-function _buildCheckModifierSelectionView(check, system, activity) {
-  return {
-    defaultModifierPolicy: normalizeModifierPolicy(check?.defaultModifierPolicy) ?? 'addAll',
-    defaultModifierIds: Array.isArray(check?.defaultModifierIds)
-      ? [...check.defaultModifierIds]
-      : [],
-    ..._buildCheckModifierRuleView(system, activity),
-  };
-}
-
-/**
- * Build the full selectedSystem view data object.
- * Mirrors RecipeManagerApp._prepareContext() selectedSystem section.
- */
-function _buildSelectedSystemViewData(
-  selectedSystem,
-  managedItemOptions,
-  componentTagOptions,
-  essenceDefinitions,
-  availableScriptMacros,
-  sceneOptions
-) {
-  if (!selectedSystem) return null;
-
-  const showTags = true;
-  const showEssences = selectedSystem.features?.essences === true;
-
-  const listMode = selectedSystem.recipeVisibility?.listMode || 'global';
-  const showRecipeVisibilityKnowledgeOptions = listMode === 'knowledge';
-  const showRecipeVisibilityPlayerNote = listMode === 'player';
-
-  // Flat system-level visibility strategy (issue 511, PR-B). `visibilityMode`
-  // gates the whole Crafting surface; `craftingEffect` is the matrix contract
-  // consumed by the Settings effect panel and nav gating alike.
-  const visibilityMode = selectedSystem.visibilityMode || 'knowledge';
-
-  return {
-    id: selectedSystem.id,
-    name: selectedSystem.name,
-    description: selectedSystem.description,
-    enabled: selectedSystem.enabled !== false,
-    resolutionMode: selectedSystem.resolutionMode || 'simple',
-    visibilityMode,
-    craftingEffect: craftingEffect(visibilityMode),
-
-    features: {
-      recipeCategories: true,
-      itemTags: true,
-      essences: selectedSystem.features?.essences === true,
-      multiStepRecipes: selectedSystem.features?.multiStepRecipes === true,
-      propertyMacros: selectedSystem.features?.propertyMacros === true,
-      craftingChecks: selectedSystem.features?.craftingChecks === true,
-      outcomeRouting: selectedSystem.features?.outcomeRouting === true,
-      effectTransfer: selectedSystem.features?.effectTransfer === true,
-      gathering: selectedSystem.features?.gathering === true,
-      salvage: selectedSystem.features?.salvage === true,
-      // Default-ON policy flag (issue 848): an explicit false forfeits inputs on a
-      // player cancel; anything else (incl. a legacy system missing the key) refunds.
-      refundOnPlayerCancel: selectedSystem.features?.refundOnPlayerCancel !== false,
-    },
-
-    categories: selectedSystem.categories || [],
-    // The system-level COMPONENT category vocabulary (issue 676). This hand-built
-    // projection is an allowlist: without this line the Tags & Categories screen's
-    // component-categories section is permanently EMPTY, however correctly the
-    // normalizer and the write path behave. Distinct from `_buildManagedItemOptions`,
-    // which projects the per-component `category` field.
-    componentCategories: selectedSystem.componentCategories || [],
-    // Per-category icon maps (issue 689), parallel to the string vocabularies
-    // above. Like `componentCategories`, these are invisible to the Tags &
-    // Categories screen unless surfaced through this hand-built allowlist, however
-    // correctly the normalizer and write path behave.
-    categoryIcons: selectedSystem.categoryIcons || {},
-    componentCategoryIcons: selectedSystem.componentCategoryIcons || {},
-    itemTags: selectedSystem.itemTags || selectedSystem.tags || [],
-    essenceDefinitions,
-    managedItemOptions,
-    // `{ id, tags }` projection consumed only by the recipe Validation tab's
-    // overlapping-requirement detection. Empty when no component carries tags →
-    // the overlap check no-ops.
-    componentTagOptions,
-    // System-owned library Tools (canonical source). Surfaced here so the Tools
-    // browser and the gathering task editor's tool picker read the system's
-    // tools rather than the gathering-config copy.
-    tools: Array.isArray(selectedSystem.tools)
-      ? selectedSystem.tools.map((tool) => _normalizeGatheringLibraryTool(tool))
-      : [],
-
-    // System-owned character prerequisite library (issue 544). Surfaced through
-    // the allowlist projection (like `tools`) so the System Settings accordion
-    // and the recipe-item learning-gate picker read them.
-    characterPrerequisites: normalizeCharacterPrerequisiteList(
-      selectedSystem.characterPrerequisites
-    ),
-
-    requirements: selectedSystem.requirements || {
-      time: { enabled: true },
-      currency: { enabled: false, units: [] },
-    },
-
-    craftingCheck: {
-      enabled: selectedSystem.craftingCheck?.enabled === true,
-      mode: selectedSystem.craftingCheck?.mode || 'passFail',
-      outcomesText: Array.isArray(selectedSystem.craftingCheck?.outcomes)
-        ? selectedSystem.craftingCheck.outcomes.join(', ')
-        : '',
-      // The structured routed config edited in the Checks editor must be surfaced
-      // so the editor can read back what was persisted (otherwise it always seeds
-      // empty and edits look like they never saved).
-      routed: selectedSystem.craftingCheck?.routed
-        ? _clonePlain(selectedSystem.craftingCheck.routed)
-        : null,
-      // Same rationale as `routed`: surface the simple pass/fail config so the
-      // simple-mode editor (and the recipe tier dropdown) can read it back.
-      simple: selectedSystem.craftingCheck?.simple
-        ? _clonePlain(selectedSystem.craftingCheck.simple)
-        : null,
-      // Surface the progressive config too (issue 419) so the progressive editor
-      // reads back its persisted checkBreakage (the deep _clonePlain preserves the
-      // nested block). Previously unsurfaced, so a progressive edit seeded empty.
-      progressive: selectedSystem.craftingCheck?.progressive
-        ? _clonePlain(selectedSystem.craftingCheck.progressive)
-        : null,
-      // Failure consumption policy (issue 712). Unprojected before, so the checks
-      // editor could not read it back. Mirror the manager normalizer's defaults so
-      // a system authored with `consumeIngredientsOnFail: false` seeds OFF, not the
-      // default ON — a dropped default-true field is inverted, not merely absent.
-      consumption: {
-        consumeIngredientsOnFail:
-          selectedSystem.craftingCheck?.consumption?.consumeIngredientsOnFail !== false,
-        breakToolsOnFail:
-          (selectedSystem.craftingCheck?.consumption?.breakToolsOnFail ??
-            selectedSystem.craftingCheck?.consumption?.consumeCatalystsOnFail) === true,
-      },
-      // Crafting's SELECTION over the system catalogue plus the pick cap and the two
-      // derivations both authoring surfaces read (issues 770, 1055, 1095). Spread from a
-      // named builder so this allowlist keeps stating what it carries while the giant
-      // literal gains no new branches — see `_buildCheckModifierRuleView` for why
-      // `maxModifierPicks` is passed through undefaulted. The CATALOGUE itself is no
-      // longer here: it moved to the system level and is projected below.
-      ..._buildCheckModifierSelectionView(selectedSystem.craftingCheck, selectedSystem, 'crafting'),
-    },
-    // The ONE system-level modifier library (issue 1117). This hand-built projection is an
-    // ALLOWLIST: a field omitted here is INVISIBLE to the UI, however correctly the
-    // normalizer and the write path behave — so without this line the library editor, all
-    // three eligibility pickers, the recipe override control AND every gathering drop-row,
-    // event and stamina-cost modifier picker all read empty. It absorbed both the
-    // check-modifier catalogue (`system.checkModifiers`) and the gathering character-
-    // modifier library (`gatheringConfig.systems[id].characterModifiers`).
-    modifiers: Array.isArray(selectedSystem.modifiers)
-      ? selectedSystem.modifiers.map((modifier) => _clonePlain(modifier))
-      : [],
-    // Tool-breakage authority (issue 419): surfaced so the Tools page and the
-    // check editors can read it back (NOT projected before → invisible to the UI).
-    // The engine normalizer defaults unknown/missing to "toolSpecific".
-    toolBreakage: {
-      authority:
-        selectedSystem.toolBreakage?.authority === 'checkDriven' ? 'checkDriven' : 'toolSpecific',
-    },
-    salvageResolutionMode: selectedSystem.salvageResolutionMode || 'simple',
-    salvageCraftingCheck: {
-      enabled: selectedSystem.salvageCraftingCheck?.enabled === true,
-      // Surface the structured per-mode configs so the salvage Checks editors and
-      // the per-component outcome-routing names can read back what was persisted
-      // (otherwise they seed empty and edits look like they never saved).
-      simple: selectedSystem.salvageCraftingCheck?.simple
-        ? _clonePlain(selectedSystem.salvageCraftingCheck.simple)
-        : null,
-      routed: selectedSystem.salvageCraftingCheck?.routed
-        ? _clonePlain(selectedSystem.salvageCraftingCheck.routed)
-        : null,
-      progressive: selectedSystem.salvageCraftingCheck?.progressive
-        ? _clonePlain(selectedSystem.salvageCraftingCheck.progressive)
-        : null,
-      // Salvage's OWN selection over the system catalogue (issue 1095). New: salvage had
-      // no modifier seam at all before this, so none of these three keys existed and the
-      // salvage Modifiers section had nothing to read.
-      ..._buildCheckModifierSelectionView(
-        selectedSystem.salvageCraftingCheck,
-        selectedSystem,
-        'salvage'
-      ),
-    },
-    // System-level gathering check. The gathering editor reads these back per
-    // resolution mode (d100 has no editable config, so only progressive/routed
-    // are surfaced alongside the active flag).
-    gatheringCraftingCheck: {
-      enabled: selectedSystem.gatheringCraftingCheck?.enabled === true,
-      progressive: selectedSystem.gatheringCraftingCheck?.progressive
-        ? _clonePlain(selectedSystem.gatheringCraftingCheck.progressive)
-        : null,
-      routed: selectedSystem.gatheringCraftingCheck?.routed
-        ? _clonePlain(selectedSystem.gatheringCraftingCheck.routed)
-        : null,
-      // Gathering's OWN selection over the system library (issue 1095). Its
-      // `modifierFormulaInertCause` reads `noCheck` for every system today, because `d100`
-      // is the only gathering mode a GM can select (decision 8) and no sub-config is
-      // authored for it.
-      //
-      // THE SECTION DOES NOT SAY `noCheck`; it OVERRIDES it. `ChecksView` answers gathering
-      // `d100` with `noModifierSupport` and renders `ModifierInertNoModifierSupport`,
-      // because the d100 rolled against each drop's chance IS that mode's check — only the
-      // seam to add a modifier to it is missing. `noCheck`'s copy would deny the mode rolls
-      // at all and send the GM to the two modes nobody can select yet. The dormancy notice
-      // naming issue 683 renders alongside it, not instead of it.
-      ..._buildCheckModifierSelectionView(
-        selectedSystem.gatheringCraftingCheck,
-        selectedSystem,
-        'gathering'
-      ),
-    },
-
-    alchemy:
-      selectedSystem.resolutionMode === 'alchemy'
-        ? {
-            checkMode: ['none', 'simple', 'tiered'].includes(selectedSystem.alchemy?.checkMode)
-              ? selectedSystem.alchemy.checkMode
-              : 'none',
-            learnOnCraft: selectedSystem.alchemy?.learnOnCraft === true,
-            consumeOnFail: selectedSystem.alchemy?.consumeOnFail !== false,
-            showAttemptHistoryToPlayers:
-              selectedSystem.alchemy?.showAttemptHistoryToPlayers !== false,
-          }
-        : null,
-
-    recipeVisibility: selectedSystem.recipeVisibility || {},
-    // Books & Scrolls library projection (issue 511). Painted synchronously with
-    // stored name/img fallbacks; refresh() overwrites this with the async-enriched
-    // shape (resolved name/img/type, derived recipes[], learnedByCount) before the
-    // phase-2 publish. Never resolve `fromUuid` here — this runs synchronously.
-    recipeItemDefinitions: Array.isArray(selectedSystem.recipeItemDefinitions)
-      ? selectedSystem.recipeItemDefinitions.map(_projectRecipeItemDefinitionSync)
-      : [],
-    teaserConfig: selectedSystem.teaserConfig || {
-      enabled: false,
-      discoveryMode: 'threshold',
-      fragments: [],
-    },
-    showRecipeVisibilityKnowledgeOptions,
-    showRecipeVisibilityPlayerNote,
-
-    showTags,
-    showEssences,
-    availableScriptMacros,
-    sceneOptions,
-  };
 }
 
 // ---------------------------------------------------------------------------
@@ -2928,9 +1658,10 @@ export function createAdminStore(services) {
   let knowledgeDefaultTabResolved = false;
 
   // Per-store item-card memo (store-instance scope, NEVER module-global — avoids
-  // cross-app/test bleed). See `_buildItemCards` for the signature shape and the
-  // disclosed source-document freshness trade. Cleared in `refresh()` on a
-  // resolved-system-id change (the single invalidation chokepoint); item-search
+  // cross-app/test bleed). The cache is OWNED here and INJECTED into the projection
+  // for exactly that reason; see `adminComponentRowProjection.js` for the signature
+  // shape and the disclosed source-document freshness trade. Cleared in `refresh()`
+  // on a resolved-system-id change (the single invalidation chokepoint); item-search
   // changes deliberately do NOT invalidate.
   const itemCardCache = new Map();
   let itemCardCacheSystemId = '';
@@ -5507,8 +4238,9 @@ export function createAdminStore(services) {
         return {
           ...def,
           // The two persisted fields added in issue 1036, stated EXPLICITLY rather than
-          // left to the spread. This object and `_buildSelectedSystemViewData`'s
-          // `selectedSystem` are hand-built projections, and this repo has repeatedly
+          // left to the spread. This object and `buildSelectedSystemViewData`'s
+          // `selectedSystem` (`adminSystemInspectorProjection.js`) are hand-built
+          // projections, and this repo has repeatedly
           // shipped a correct normalizer and write path whose field was invisible to the
           // UI because a projection like this one did not name it (see the
           // `componentCategories` and `categoryIcons` notes there). Naming them makes the
@@ -8707,13 +7439,81 @@ export function createAdminStore(services) {
     await refresh();
   }
 
-  // Which system key each activity's check-modifier SELECTION is persisted under. The
-  // library is not in here: it is top-level and shared (issues 1095, 1117).
-  const CHECK_MODIFIER_ACTIVITY_KEYS = {
+  // Live-persist salvage's failure-consumption policy (issue 1098) — the twin of
+  // `saveCraftingCheckConsumption` above, for the two keys that have been persisted since
+  // 1.7.0 and reachable from no editor until the Salvage On-failure section shipped. It
+  // spreads BOTH the existing salvageCraftingCheck block AND its nested `consumption`
+  // sub-object for the reason its crafting twin states: `updateSystem` shallow-merges the
+  // top level only, so a naive patch would drop every sibling AND the untouched flag, which
+  // the normalizer then re-defaults — and one of those defaults is TRUE, so the loss would
+  // present as a silent inversion rather than an obvious blank.
+  async function saveSalvageCheckConsumption(patch = {}) {
+    const systemManager = services.getCraftingSystemManager();
+    const sysId = get(selectedSystemId);
+    if (!sysId) return;
+    const system = systemManager.getSystem(sysId);
+    if (!system) return;
+    const existing = system.salvageCraftingCheck || {};
+    await systemManager.updateSystem(sysId, {
+      salvageCraftingCheck: {
+        ...existing,
+        // No `|| {}` fallback: spreading `undefined` in an object literal is already a
+        // no-op, and the lint rule that flags the redundant form is one this file is
+        // slowly working out of rather than into.
+        consumption: { ...existing.consumption, ...patch },
+      },
+    });
+    await refresh();
+  }
+
+  // Which system key each activity's check block is persisted under. The modifier LIBRARY
+  // is not in here: it is top-level and shared (issues 1095, 1117). Named for the block
+  // rather than for one of its fields because two savers now key on it — the
+  // check-modifier selection and the failure-result policy (issue 1098).
+  const CHECK_ACTIVITY_SYSTEM_KEYS = {
     crafting: 'craftingCheck',
     salvage: 'salvageCraftingCheck',
     gathering: 'gatheringCraftingCheck',
   };
+
+  /**
+   * Live-persist ONE activity's failure-result policy (issue 1098).
+   *
+   * A SIBLING of `consumption`, not a member of it, so `saveCraftingCheckConsumption`
+   * structurally cannot carry it — and gathering has no consumption block at all, so there
+   * was no saver to extend. One parameterised writer rather than three near-identical ones:
+   * the three differ only in which key they write, and three copies is how one activity
+   * comes to forget to spread `existing`.
+   *
+   * It spreads `existing` under `updateSystem`'s shallow top-level merge, so every sibling
+   * of the policy — the per-mode sub-objects, the modifier selection, the consumption block
+   * — survives rather than being re-defaulted by the normalizer on the next read. The value
+   * goes through the shared normalizer so a junk argument writes the default rather than
+   * persisting something the engine would have to re-interpret.
+   */
+  async function saveCheckFailureResultPolicy(activity, policy) {
+    const activityKey = CHECK_ACTIVITY_SYSTEM_KEYS[activity];
+    if (!activityKey) return;
+    const systemManager = services.getCraftingSystemManager();
+    const sysId = get(selectedSystemId);
+    if (!sysId) return;
+    const system = systemManager.getSystem(sysId);
+    if (!system) return;
+    await systemManager.updateSystem(sysId, {
+      [activityKey]: {
+        ...system[activityKey],
+        failureResultPolicy: normalizeFailureResultPolicy(policy),
+      },
+    });
+    await refresh();
+  }
+
+  const saveCraftingCheckFailureResultPolicy = (policy) =>
+    saveCheckFailureResultPolicy('crafting', policy);
+  const saveSalvageCheckFailureResultPolicy = (policy) =>
+    saveCheckFailureResultPolicy('salvage', policy);
+  const saveGatheringCheckFailureResultPolicy = (policy) =>
+    saveCheckFailureResultPolicy('gathering', policy);
 
   // Persist one activity's check-modifier SELECTION (issues 770, 1055, 1095, 1117).
   //
@@ -8741,7 +7541,7 @@ export function createAdminStore(services) {
     if (!sysId) return;
     const system = systemManager.getSystem(sysId);
     if (!system) return;
-    const activityKey = CHECK_MODIFIER_ACTIVITY_KEYS[activity];
+    const activityKey = CHECK_ACTIVITY_SYSTEM_KEYS[activity];
     if (!activityKey || Object.keys(patch).length === 0) return;
     await systemManager.updateSystem(sysId, {
       [activityKey]: { ...(system[activityKey] || {}), ...patch },
@@ -9512,6 +8312,53 @@ export function createAdminStore(services) {
 
   // --- Item/Component management ---
 
+  /**
+   * The selected system's recipes, for the component delete-impact arithmetic (issue 1129).
+   *
+   * Both delete forms read this so the singular dialog and the bulk panel cannot report
+   * different numbers for the same component.
+   *
+   * @param {string} sysId
+   * @returns {object[]}
+   * @private
+   */
+  function _selectedSystemRecipes(sysId) {
+    return services.getRecipeManager?.()?.getRecipes?.({ craftingSystemId: sysId }) || [];
+  }
+
+  /**
+   * What deleting this set of components would do, over the selected system's recipes
+   * (issue 1129).
+   *
+   * Exposed as a store function rather than projected onto `itemCards`, deliberately. The
+   * "recipes disabled" number cannot be computed per row — whether a recipe survives depends
+   * on the WHOLE selection, since two selected components may be the only two options of one
+   * ingredient group — so it needs recipe bodies. Computing it here keeps recipe JSON out of
+   * Svelte props entirely and keeps `_itemCardSignature` free of a recipes input it would
+   * otherwise need in order not to serve a stale count.
+   *
+   * Ids are resolved against the system first, so an id naming no component cannot inflate
+   * the count the GM is shown.
+   *
+   * @param {Iterable<string>} componentIds
+   * @returns {{deletable: number, deletableIds: string[], recipesRewritten: number,
+   *   recipesDisabled: number}}
+   */
+  function describeComponentDelete(componentIds) {
+    const sysId = get(selectedSystemId);
+    const empty = { deletable: 0, deletableIds: [], recipesRewritten: 0, recipesDisabled: 0 };
+    if (!sysId) return empty;
+
+    const system = services.getCraftingSystemManager().getSystem(sysId);
+    if (!system) return empty;
+
+    const known = new Set(_getManagedItems(system).map((item) => String(item?.id ?? '')));
+    const resolved = Array.from(componentIds || [], String).filter((id) => known.has(id));
+    if (resolved.length === 0) return empty;
+
+    return describeComponentDeleteImpact(resolved, _selectedSystemRecipes(sysId));
+  }
+
   async function deleteComponent(itemId) {
     const systemManager = services.getCraftingSystemManager();
     const sysId = get(selectedSystemId);
@@ -9520,9 +8367,20 @@ export function createAdminStore(services) {
     const item = _getManagedItems(system).find((i) => i.id === itemId);
     if (!item) return;
 
+    // The singular dialog states the same arithmetic the bulk panel states, from the same
+    // describer — before issue 1129 it was hardcoded English that named no numbers at all
+    // and simply said "and remove it from recipes".
+    const name = String(item.name || '');
+    const impact = describeComponentDelete([itemId]);
+    const data = { name, recipes: impact.recipesRewritten, disabled: impact.recipesDisabled };
     const confirmed = await services.confirmDialog({
-      title: `Delete ${item.name}?`,
-      content: `<p>Delete component <strong>${item.name}</strong> and remove it from recipes in this system?</p>`,
+      title:
+        services.localize?.('FABRICATE.Admin.Manager.Component.DeleteConfirm.Title', { name }) ||
+        `Delete ${name}?`,
+      content: `<p>${
+        services.localize?.('FABRICATE.Admin.Manager.Component.DeleteConfirm.Content', data) ||
+        `Delete component ${name}? This rewrites ${impact.recipesRewritten} recipe(s) and disables ${impact.recipesDisabled} of them.`
+      }</p>`,
       yes: () => true,
       no: () => false,
     });
@@ -9530,6 +8388,53 @@ export function createAdminStore(services) {
 
     await systemManager.deleteItem(sysId, itemId);
     await refresh();
+  }
+
+  /**
+   * Delete a SET of components (issue 1129) through the manager's batched primitive: ONE
+   * `craftingSystems` write and ONE `recipes` write for the whole set.
+   *
+   * The delete is WARNED, not BLOCKED: every requested component is deleted regardless of
+   * recipe usage, because the cascade rewrites every referencing recipe. There is no blocked
+   * partition to compute or report.
+   *
+   * Confirmation is the CALLER's, not this function's: the bulk delete is armed in the panel
+   * (`ArmedDangerButton`) beside an impact statement naming the counts, which is strictly
+   * more information than a modal can carry.
+   *
+   * @param {Iterable<string>} componentIds
+   * @returns {Promise<{deleted: number, recipesUpdated: number, recipesDisabled: number}>}
+   */
+  async function deleteComponents(componentIds) {
+    const empty = { deleted: 0, recipesUpdated: 0, recipesDisabled: 0 };
+    const systemManager = services.getCraftingSystemManager();
+    const sysId = get(selectedSystemId);
+    if (!sysId) return empty;
+
+    const system = systemManager.getSystem(sysId);
+    if (!system) return empty;
+
+    const requested = new Set(Array.from(componentIds || [], String).filter(Boolean));
+    if (requested.size === 0) return empty;
+
+    const resolved = _getManagedItems(system)
+      .map((item) => String(item?.id ?? ''))
+      .filter((id) => requested.has(id));
+    if (resolved.length === 0) return empty;
+
+    try {
+      const result = await systemManager.deleteComponents(sysId, resolved);
+      await refresh();
+      return {
+        deleted: Number(result?.deleted) || 0,
+        recipesUpdated: Number(result?.recipesUpdated) || 0,
+        recipesDisabled: Number(result?.recipesDisabled) || 0,
+      };
+    } catch (err) {
+      console.error('Fabricate | Failed to delete components:', err);
+      services.notify?.error?.(err?.message || 'Failed to delete components');
+      return empty;
+    }
   }
 
   async function updateComponent(itemId, updates = {}) {
@@ -9863,6 +8768,10 @@ export function createAdminStore(services) {
     saveCraftingCheckProgressive,
     saveCraftingCheckActive,
     saveCraftingCheckConsumption,
+    saveSalvageCheckConsumption,
+    saveCraftingCheckFailureResultPolicy,
+    saveSalvageCheckFailureResultPolicy,
+    saveGatheringCheckFailureResultPolicy,
     saveCraftingCheckModifiers,
     saveSalvageCheckModifiers,
     saveGatheringCheckModifiers,
@@ -9909,6 +8818,8 @@ export function createAdminStore(services) {
     exportSystem,
     importSystem,
     deleteComponent,
+    deleteComponents,
+    describeComponentDelete,
     updateComponent,
     applyComponentBulkEdit,
     applyRecipeBulkEdit,

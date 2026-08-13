@@ -26,6 +26,7 @@ import {
   findMatchingComponent,
   resolveItemEssences,
 } from '../utils/essenceResolver.js';
+import { activityPermitsFailureResults } from '../utils/failureResultPolicy.js';
 import { MacroExecutor } from '../utils/MacroExecutor.js';
 import { resolveProgressiveAward } from '../utils/progressiveAward.js';
 import { applyPlayerResultOrder } from '../utils/progressiveResultOrder.js';
@@ -174,6 +175,56 @@ function mapConsumedIngredientRef({ item, quantity }) {
     actorUuid: item.parent?.uuid || null,
     itemUuid: item.uuid,
     quantity,
+    name: item.name ?? null,
+    img: item.img ?? null,
+  };
+}
+
+/**
+ * Map one CRAFTED result document to the persisted run-record `createdResults` shape.
+ *
+ * ONE shape, THREE writers (issue 1098): the success path, the immediate failure branch
+ * and the timed failure recorder. The success path has always written this literal; the
+ * two failure writers are new and write THE SAME SHAPE through this mapper rather than a
+ * lookalike, because the record lands in the actor's Fabricate run-container flag and a
+ * failure run whose `createdResults` disagreed with the items on the actor would be a
+ * durable contradiction — the Journal history reporting an empty award beside real loot.
+ *
+ * @param {object} item the created Item document
+ * @param {object} craftingActor the actor it was created on
+ * @returns {{actorUuid: string, itemUuid: string, quantity: number, name: string|null, img: string|null}}
+ */
+function craftedResultRecord(item, craftingActor) {
+  return {
+    actorUuid: craftingActor.uuid,
+    itemUuid: item.uuid,
+    quantity: awardedQuantityOf(item),
+    name: item.name ?? null,
+    img: item.img ?? null,
+  };
+}
+
+/**
+ * Map one salvage award record to the persisted run-record `createdResults` shape.
+ *
+ * ONE shape, TWO branches (issue 1098). The success branch has always written this; the
+ * new failure branch writes THE SAME SHAPE rather than a lookalike, because the record
+ * lands in the actor's Fabricate run-container flag and a failure run whose
+ * `createdResults` disagreed with the items actually on the actor would be a durable
+ * contradiction — the Journal history would report an empty award beside real loot.
+ *
+ * Name/img are captured at award time (mirroring the crafting award record) so a salvage
+ * record is self-describing in the Journal even if the item is later deleted. Older
+ * records without them fall back to the componentId resolver.
+ *
+ * @param {{item: object, componentId: string|null}} record
+ * @returns {{itemUuid: string, componentId: string|null, quantity: number, name: string|null, img: string|null}}
+ */
+function salvageCreatedResultRecord({ item, componentId }) {
+  return {
+    itemUuid: item.uuid,
+    componentId,
+    quantity: awardedQuantityOf(item),
     name: item.name ?? null,
     img: item.img ?? null,
   };
@@ -352,6 +403,37 @@ export class CraftingEngine {
    */
   _isMisconfigurationDisposition(disposition) {
     return ['misconfiguration', 'unrouted-tier', 'error'].includes(disposition);
+  }
+
+  /**
+   * Does this resolution `meta.disposition` identify an authored FAILURE output?
+   *
+   * THE FAILURE AWARD IS AN ALLOWLIST, NEVER A FALL-THROUGH (issue 1098), and this is the
+   * crafting analogue of the by-ROLE-never-by-index rule the salvage failure branch
+   * follows. Resolution reports what it selected and WHY; only the two dispositions that
+   * mean "this is the failure output" may be produced on a failed check.
+   *
+   * The trap this closes is live rather than theoretical. Under `routedByCheck` a step
+   * with exactly ONE result group takes the single-group exemption, which was written for
+   * the success path and returns that group with `disposition: 'success'` for any
+   * non-keyword outcome — including the `null` outcome a failed check carries. Producing
+   * on anything but this allowlist therefore hands a failed craft its full SUCCESS output.
+   * `routedByIngredients` is excluded for the same reason: it routes by the chosen
+   * ingredient set and reports no disposition at all, so a failed craft would award the
+   * set's normal result.
+   *
+   *  - `'fail'` — the reserved `role: 'failure'` group of `simple` / alchemy-`simple`,
+   *    selected BY ROLE by `_resolveSimpleResultGroups` (which never indexes), and the
+   *    empty-groups reading a recipe authoring no failure output produces.
+   *  - `'failure'` — the group a `routedByCheck` recipe assigned to a failure-marked
+   *    outcome tier, returned by `_routeByTierAssignment` only where the policy permits.
+   *
+   * @param {string|null|undefined} disposition
+   * @returns {boolean}
+   * @private
+   */
+  _isFailureAwardDisposition(disposition) {
+    return ['fail', 'failure'].includes(disposition);
   }
 
   /**
@@ -844,6 +926,20 @@ export class CraftingEngine {
         } catch (consumptionError) {
           console.error('Fabricate | Error during failure-path consumption:', consumptionError);
         }
+        // THE FAILURE AWARD (issue 1098). It runs AFTER consumption and breakage, so the
+        // essence snapshot the reserved output transfers from is the one the attempt
+        // actually spent — and so a failure that awards nothing is unchanged in every
+        // observable way.
+        const failureResults = await this._produceCraftingFailureResults({
+          craftingActor,
+          executionRecipe,
+          step,
+          ingredientSet,
+          consumedItems: consumedOnFail,
+          toolItems: toolValidation.tools,
+          checkResult,
+          resultGroupId: options?.resultGroupId || null,
+        });
         if (runManager && run) {
           await runManager.completeStepFailure(
             craftingActor,
@@ -861,6 +957,12 @@ export class CraftingEngine {
               },
               consumedIngredients: consumedOnFail.map(mapConsumedIngredientRef),
               usedTools: usedToolsOnFail,
+              // In the SUCCESS branch's shape, through the same mapper: the record lands
+              // in the actor's run-container flag, so an empty list beside real items is a
+              // durable contradiction rather than a cosmetic gap.
+              createdResults: failureResults.map((item) =>
+                craftedResultRecord(item, craftingActor)
+              ),
             }
           );
         }
@@ -870,15 +972,21 @@ export class CraftingEngine {
           recipe,
           consumedIngredients: consumedOnFail,
           tools: usedToolPairs,
-          createdResults: [],
+          // The card's failure branch renders these under its own results section; an
+          // empty list leaves every existing failure card byte-for-byte unchanged.
+          createdResults: failureResults,
           failureReason: checkResult.message || 'Crafting check failed',
           rollValue: rollTotalForCard(checkResult),
           tierStep: tierStepForCard(checkResult),
         });
         return {
           success: false,
-          results: null,
+          // `null` when nothing was awarded — what every existing caller reads as "a
+          // failed craft produced nothing". The discriminator is attached only when
+          // something WAS produced, so today's failure return is unchanged.
+          results: failureResults.length > 0 ? failureResults : null,
           message: checkResult.message || 'Crafting check failed',
+          ...(failureResults.length > 0 && { disposition: 'produced-on-failure' }),
         };
       }
       if (
@@ -1069,13 +1177,9 @@ export class CraftingEngine {
           },
           consumedIngredients: consumedItems.map(mapConsumedIngredientRef),
           usedTools,
-          createdResults: (resultItems || []).map((item) => ({
-            actorUuid: craftingActor.uuid,
-            itemUuid: item.uuid,
-            quantity: awardedQuantityOf(item),
-            name: item.name ?? null,
-            img: item.img ?? null,
-          })),
+          createdResults: (resultItems || []).map((item) =>
+            craftedResultRecord(item, craftingActor)
+          ),
         });
       }
       // Step resolved: a multi-step recipe keeps an active run for the next step; a
@@ -1508,6 +1612,21 @@ export class CraftingEngine {
       } catch (breakageError) {
         console.error('Fabricate | Error during timed-step failure tool breakage:', breakageError);
       }
+      // THE FAILURE AWARD, timed twin (issue 1098). A timed craft that fails must produce
+      // what an immediate one would: the delay is a scheduling property, not a different
+      // set of outcomes. The START snapshot (`resolvedEssences`) is threaded because the
+      // source items are already gone by the time this runs — the same reason the alchemy
+      // timed twin takes it.
+      const failureResults = await this._produceCraftingFailureResults({
+        craftingActor,
+        executionRecipe,
+        step,
+        ingredientSet,
+        consumedItems,
+        toolItems,
+        checkResult,
+        precomputedEssences: resolvedEssences,
+      });
       await runManager.completeStepFailure(craftingActor, run, stepIndex, message, {
         selectedIngredientSetId: ingredientSet?.id,
         lastCheckResult: {
@@ -1519,6 +1638,7 @@ export class CraftingEngine {
         },
         consumedIngredients: consumedRunRefs,
         usedTools,
+        createdResults: failureResults.map((item) => craftedResultRecord(item, craftingActor)),
       });
       await this._postCraftChatMessage({
         success: false,
@@ -1526,12 +1646,20 @@ export class CraftingEngine {
         recipe,
         consumedIngredients: consumedItems,
         tools: usedToolPairs,
-        createdResults: [],
+        createdResults: failureResults,
         failureReason: message,
         rollValue: rollTotalForCard(checkResult),
         tierStep: tierStepForCard(checkResult),
       });
-      return { resolved: true, result: { success: false, results: null, message } };
+      return {
+        resolved: true,
+        result: {
+          success: false,
+          results: failureResults.length > 0 ? failureResults : null,
+          message,
+          ...(failureResults.length > 0 && { disposition: 'produced-on-failure' }),
+        },
+      };
     };
 
     if (!checkResult.success) {
@@ -1657,13 +1785,7 @@ export class CraftingEngine {
       },
       consumedIngredients: consumedRunRefs,
       usedTools,
-      createdResults: (resultItems || []).map((item) => ({
-        actorUuid: craftingActor.uuid,
-        itemUuid: item.uuid,
-        quantity: awardedQuantityOf(item),
-        name: item.name ?? null,
-        img: item.img ?? null,
-      })),
+      createdResults: (resultItems || []).map((item) => craftedResultRecord(item, craftingActor)),
     });
 
     const visibilityService = game.fabricate?.getRecipeVisibilityService?.();
@@ -1706,6 +1828,106 @@ export class CraftingEngine {
             : `Completed ${stepLabel} for ${recipe.name}`,
       },
     };
+  }
+
+  /**
+   * Produce the authored FAILURE result for a failed crafting check (issue 1098), or
+   * nothing — the crafting twin of the salvage failure award, and the seam both crafting
+   * failure paths (the immediate `craft()` branch and the timed `_finishTimedStep` one)
+   * call so the two cannot diverge.
+   *
+   * ## `never` short-circuits BEFORE any group is selected
+   *
+   * The policy gate is here, not inside the resolver, and it is the FIRST thing this
+   * method does. Under `never` no resolution runs at all, so a failed craft is
+   * byte-for-byte what it was: no group is chosen and then discarded, and nothing can
+   * observe a selection that was never made.
+   *
+   * `perRecord` and `always` are ONE predicate — {@link activityPermitsFailureResults} —
+   * and deliberately not two branches: the policy SELECTS an authored failure output and
+   * never fabricates one, so a second branch could only differ by inventing an output the
+   * recipe never authored. A recipe authoring none produces nothing under either.
+   *
+   * ## Which authored output, per mode
+   *
+   * Resolution is the SAME `_createResultItems` the success path uses, so there is no
+   * second routing derivation to drift: `simple` and alchemy-`simple` resolve the
+   * reserved `role: 'failure'` group (by ROLE — those branches never index), and
+   * `routedByCheck` resolves the group assigned to the failure-marked outcome tier, which
+   * `ResolutionModeService` returns with `disposition: 'failure'`.
+   * `routedByIngredients` and `progressive` have no tier to mark and resolve nothing.
+   *
+   * ## Only a FAILURE disposition is produced, and nothing else becomes one
+   *
+   * The award is gated on {@link _isFailureAwardDisposition} BEFORE any item is created —
+   * see that method for the single-group exemption this closes, which would otherwise
+   * hand a failed routed craft its full SUCCESS output.
+   *
+   * A routed failing tier that no result group lists resolves to `unrouted-tier`, which is
+   * not on the allowlist: it produces nothing, and it does NOT convert the craft into a
+   * misconfiguration abort either, because the caller has already applied the failure
+   * consumption policy and there is nothing left to abort cleanly. The craft records the
+   * failure it already had.
+   *
+   * IT DECIDES NOTHING ABOUT COST. Consumption and tool breakage are governed by
+   * `craftingCheck.consumption` and are applied by the caller BEFORE this runs; a failure
+   * AWARD and a failure COST are separate decisions and this method reads neither toggle.
+   *
+   * @returns {Promise<Array>} the created result documents, or `[]`
+   * @private
+   */
+  async _produceCraftingFailureResults({
+    craftingActor,
+    executionRecipe,
+    step,
+    ingredientSet,
+    consumedItems,
+    toolItems,
+    checkResult,
+    resultGroupId = null,
+    precomputedEssences = null,
+    essenceEnabled = null,
+  }) {
+    if (!activityPermitsFailureResults(this._getRecipeSystem(executionRecipe), 'crafting')) {
+      return [];
+    }
+    try {
+      // PREFLIGHT THE DISPOSITION BEFORE CREATING ANYTHING. Resolution is a pure,
+      // deterministic read of the recipe/step/ingredient set/check result, so asking it
+      // twice agrees with itself — the same argument the pre-consumption misconfiguration
+      // gate in `craft()` already makes for resolving ahead of mutation. Asking after
+      // creation would be too late: the items would already be on the actor.
+      const resolutionService =
+        this.resolutionModeService || game.fabricate?.getResolutionModeService?.();
+      if (typeof resolutionService?.resolveResultGroups !== 'function') return [];
+      const preflight = resolutionService.resolveResultGroups({
+        recipe: executionRecipe,
+        step,
+        ingredientSet,
+        checkResult,
+        selectedResultGroupId: resultGroupId,
+      });
+      if (!this._isFailureAwardDisposition(preflight?.meta?.disposition)) return [];
+
+      const { items } = await this._createResultItems(
+        craftingActor,
+        executionRecipe,
+        step,
+        ingredientSet,
+        consumedItems,
+        toolItems,
+        checkResult,
+        resultGroupId,
+        { precomputedEssences, essenceEnabled }
+      );
+      return Array.isArray(items) ? items : [];
+    } catch (error) {
+      // A failed craft that cannot build its failure output still has to RECORD the
+      // failure the caller is in the middle of writing. Throwing here would abandon the
+      // run mid-write, after consumption, which is strictly worse than awarding nothing.
+      console.error('Fabricate | Error producing crafting failure results:', error);
+      return [];
+    }
   }
 
   /**
@@ -5525,6 +5747,34 @@ export class CraftingEngine {
         console.error('Fabricate | Error during salvage failure-path consumption:', error);
       }
 
+      // THE FAILURE AWARD (issue 1098, decision 5). Until this issue `salvage()` returned
+      // here unconditionally, so a failed salvage produced nothing whatever a component
+      // authored — which is why `salvageCraftingCheck.failureResultPolicy: 'never'` is
+      // what the 1.25.0 migration seeds onto every existing world.
+      //
+      // The disposition is EXPLICIT. `_resolveSalvageResultGroups` selects the reserved
+      // group BY ROLE under `'failure'`; the default `'success'` would hand back
+      // `resultGroups[0]`, which the retain-one clamp guarantees is the SUCCESS group —
+      // i.e. the full success salvage output, awarded for failing.
+      const failureResultGroups = activityPermitsFailureResults(system, 'salvage')
+        ? this._resolveSalvageResultGroups(component, system, checkResult, salvageRun, 'failure')
+        : [];
+      // The success branch builds this view before `_createSingleResult`; the failure
+      // branch had none, because it never created anything.
+      const failureSalvageRecipeView =
+        failureResultGroups.length > 0 ? this._buildSalvageRecipeView(component, system) : null;
+      const { resultItems: failureResultItems, createdRecords: failureCreatedRecords } =
+        failureSalvageRecipeView
+          ? await this._awardSalvageResultGroups({
+              actor,
+              resultGroups: failureResultGroups,
+              consumedItems: consumedOnFail,
+              tools: toolValidation.tools,
+              salvageRecipeView: failureSalvageRecipeView,
+              checkResult,
+            })
+          : { resultItems: [], createdRecords: [] };
+
       if (salvageRunManager && salvageRun) {
         salvageRun = await salvageRunManager.completeRun(actor, salvageRun, 'failed', {
           consumedComponents: consumedOnFail.map(({ item, quantity }) => ({
@@ -5532,7 +5782,9 @@ export class CraftingEngine {
             quantity,
           })),
           usedTools,
-          createdResults: [],
+          // In the SUCCESS BRANCH'S SHAPE, through the same mapper. An empty list beside
+          // real items on the actor is a durable contradiction, not a cosmetic gap.
+          createdResults: failureCreatedRecords.map(salvageCreatedResultRecord),
           checkResult: {
             success: false,
             outcome: checkResult.outcome,
@@ -5556,7 +5808,9 @@ export class CraftingEngine {
         system,
         component,
         consumedQuantity: forfeitedQuantity,
-        results: [],
+        // The card renders these under its own failure-award section (issue 1098);
+        // an empty list leaves every existing failure card byte-for-byte unchanged.
+        results: failureResultItems,
         usedTools,
         failureReason: checkResult.message || 'Salvage check failed',
         rollValue: rollTotalForCard(checkResult),
@@ -5566,7 +5820,10 @@ export class CraftingEngine {
 
       return {
         success: false,
-        results: null,
+        // `null` when nothing was awarded — that is what every existing caller reads as
+        // "a failed salvage produced nothing", and the bulk-salvage surfaces read THIS
+        // value rather than the run record or the card (issue 1098, AF5/CF9).
+        results: failureResultItems.length > 0 ? failureResultItems : null,
         message: checkResult.message || 'Salvage check failed',
         salvageRun,
       };
@@ -5594,33 +5851,14 @@ export class CraftingEngine {
     });
 
     const salvageRecipeView = this._buildSalvageRecipeView(component, system);
-    const resultItems = [];
-    // Track the awarding component id alongside each created item without
-    // reshaping `resultItems` (it is returned as `results` below). Each `result`
-    // carries its component id as `result.componentId` (legacy `result.systemItemId`),
-    // the same accessor used by `_createSingleResult` and progressive award.
-    const createdRecords = [];
-    for (const group of resultGroups) {
-      for (const result of group.results || []) {
-        const created = await this._createSingleResult(
-          actor,
-          result,
-          consumedItems,
-          toolValidation.tools,
-          salvageRecipeView,
-          checkResult
-        );
-        // De-dup a stacked-twice component (same object returned): the award tag
-        // accumulates, so one record carries the summed quantity (issue 858 review).
-        if (created && !resultItems.includes(created)) {
-          resultItems.push(created);
-          createdRecords.push({
-            item: created,
-            componentId: result.componentId || result.systemItemId || null,
-          });
-        }
-      }
-    }
+    const { resultItems, createdRecords } = await this._awardSalvageResultGroups({
+      actor,
+      resultGroups,
+      consumedItems,
+      tools: toolValidation.tools,
+      salvageRecipeView,
+      checkResult,
+    });
 
     if (salvageRunManager && salvageRun) {
       salvageRun = await salvageRunManager.completeRun(actor, salvageRun, 'succeeded', {
@@ -5629,16 +5867,7 @@ export class CraftingEngine {
           quantity,
         })),
         usedTools,
-        createdResults: createdRecords.map(({ item, componentId }) => ({
-          itemUuid: item.uuid,
-          componentId,
-          quantity: awardedQuantityOf(item),
-          // Capture name/img at award time (mirroring the crafting award record) so a
-          // salvage record is self-describing in the Journal even if the item is later
-          // deleted. Older records without these fall back to the componentId resolver.
-          name: item.name ?? null,
-          img: item.img ?? null,
-        })),
+        createdResults: createdRecords.map(salvageCreatedResultRecord),
         checkResult: {
           success: true,
           outcome: checkResult.outcome,
@@ -5777,6 +6006,67 @@ export class CraftingEngine {
   }
 
   /**
+   * Create every result in the resolved salvage groups and return both the created
+   * documents (the `results` a caller returns) and the award records the run container
+   * needs, keyed to the component each item was awarded FOR.
+   *
+   * ONE implementation, TWO callers (issue 1098): the success branch and the new
+   * failure branch. A second copy of this loop would be a second place for the
+   * stacked-twice de-dup and the `componentId` fallback chain to drift — and the failure
+   * branch's whole purpose is that its award is recorded exactly as the success
+   * branch's is.
+   *
+   * @param {object} args
+   * @param {object} args.actor the salvaging actor (the engine is owner-scoped, so
+   *   creation is `actor.createEmbeddedDocuments` and adds no permission surface)
+   * @param {Array} args.resultGroups groups already resolved for the disposition
+   * @param {Array} args.consumedItems `{item, quantity}` pairs consumed for this attempt
+   * @param {Array} args.tools resolved tool items
+   * @param {object} args.salvageRecipeView the synthetic recipe view results are made against
+   * @param {object|null} args.checkResult
+   * @returns {Promise<{resultItems: Array, createdRecords: Array<{item: object, componentId: string|null}>}>}
+   * @private
+   */
+  async _awardSalvageResultGroups({
+    actor,
+    resultGroups,
+    consumedItems,
+    tools,
+    salvageRecipeView,
+    checkResult,
+  }) {
+    const resultItems = [];
+    // Track the awarding component id alongside each created item without
+    // reshaping `resultItems` (it is returned as `results` by both callers). Each
+    // `result` carries its component id as `result.componentId` (legacy
+    // `result.systemItemId`), the same accessor `_createSingleResult` and progressive
+    // award use.
+    const createdRecords = [];
+    for (const group of resultGroups) {
+      for (const result of group.results || []) {
+        const created = await this._createSingleResult(
+          actor,
+          result,
+          consumedItems,
+          tools,
+          salvageRecipeView,
+          checkResult
+        );
+        // De-dup a stacked-twice component (same object returned): the award tag
+        // accumulates, so one record carries the summed quantity (issue 858 review).
+        if (created && !resultItems.includes(created)) {
+          resultItems.push(created);
+          createdRecords.push({
+            item: created,
+            componentId: result.componentId || result.systemItemId || null,
+          });
+        }
+      }
+    }
+    return { resultItems, createdRecords };
+  }
+
+  /**
    * Get the salvage failure consumption policy from the system.
    * Defaults: consumeComponentOnFail=true, breakToolsOnFail=false.
    * @private
@@ -5794,14 +6084,44 @@ export class CraftingEngine {
   /**
    * Resolve which salvage result groups to use based on mode and check result.
    *
+   * ## The `disposition` argument (issue 1098, CF1)
+   *
+   * `'success'` — the DEFAULT — is byte-for-byte the behaviour every caller had before:
+   * `simple` awards `resultGroups[0]` BY INDEX (the `_normalizeSalvage` retain-one clamp
+   * guarantees the SUCCESS group sits there), `routed` routes by
+   * `outcomeRouting[outcome]`, `progressive` spends the budget down `allGroups[0]`.
+   *
+   * `'failure'` is the new capability, and it selects DIFFERENTLY on purpose:
+   *  - `simple` selects the single reserved `role: 'failure'` group **BY ROLE, NEVER BY
+   *    INDEX**, returning `[]` when none is authored. This is the whole point of the
+   *    argument: index 0 is the SUCCESS group by clamp, so `slice(0, 1)` on a failed
+   *    check would award the full success salvage output — silent, exploitable, and
+   *    invisible to any test asserting only that a failure produced something.
+   *  - `routed` routes by `outcomeRouting[outcome]` for the FAILING tier's name. That
+   *    branch never filtered on success, so it needs no change beyond being reached;
+   *    `routedOutcomeTierNames` already offers failure tier names to the authoring select.
+   *  - `progressive` returns `[]`: it has one success group against a budget and no tier
+   *    to mark, so there is nothing a failure could select.
+   *
+   * The CALLER decides the disposition and the CALLER owns the policy gate; this
+   * function never reads `failureResultPolicy`, so `disposition: 'failure'` always means
+   * "the caller established that a failure may produce".
+   *
    * @param {object} component
    * @param {object} system
    * @param {object|null} checkResult
    * @param {object|null} [salvageRun] The active run, carrying the result order captured
    *   at start (issue 651 D2). The order is read from HERE and never from settings.
+   * @param {'success'|'failure'} [disposition] Which award to resolve.
    * @private
    */
-  _resolveSalvageResultGroups(component, system, checkResult, salvageRun = null) {
+  _resolveSalvageResultGroups(
+    component,
+    system,
+    checkResult,
+    salvageRun = null,
+    disposition = 'success'
+  ) {
     // The mode comes from the shared derivation (issue 859), which also flags a token
     // outside `simple|routed|progressive`. Legacy tokens are rewritten to canonical
     // values by the manager (salvage token normalizer) and the 1.4.0 migration, so an
@@ -5817,10 +6137,23 @@ export class CraftingEngine {
     const allGroups = Array.isArray(component.salvage?.resultGroups)
       ? component.salvage.resultGroups
       : [];
+    const failureAward = disposition === 'failure';
 
     if (mode === 'simple') {
+      // BY ROLE on failure, BY INDEX on success. See the header: the retain-one clamp
+      // puts the SUCCESS group at index 0, so an index-based failure selection would
+      // award the full success salvage output on a failed check.
+      if (failureAward) {
+        const failureGroup = allGroups.find((group) => group?.role === 'failure');
+        return failureGroup ? [failureGroup] : [];
+      }
       return allGroups.slice(0, 1);
     }
+
+    // One success group against a budget, and no tier to mark: a failing check has
+    // nothing to select here, so `progressive` awards nothing on failure whatever the
+    // policy says (issue 1098).
+    if (mode === 'progressive' && failureAward) return [];
 
     if (mode === 'routed') {
       const outcome = checkResult?.outcome == null ? null : String(checkResult.outcome);

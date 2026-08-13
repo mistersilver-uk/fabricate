@@ -3230,6 +3230,207 @@ describe('createAdminStore', () => {
       assert.deepEqual(deletedArgs, { sysId: 'sys1', itemId: 'comp-1' });
     });
 
+    // ── The set delete (issue 1129) ──────────────────────────────────────────────
+    //
+    // The store half is a passthrough with NO confirmDialog: the panel arms beside an impact
+    // statement, which carries strictly more information than a modal. A dialog here would
+    // make the arm a second gate rather than the gate.
+
+    it('deleteComponents routes the whole set through the BATCHED manager primitive', async () => {
+      let batchArgs = null;
+      const services = createMockServices();
+      const origManager = services.getCraftingSystemManager();
+      const sys = origManager.getSystem('sys1');
+      if (sys) {
+        sys.components = [
+          makeItem({ id: 'comp-1', name: 'Herb' }),
+          makeItem({ id: 'comp-2', name: 'Root' }),
+        ];
+        delete sys.items;
+      }
+      services.getCraftingSystemManager = () => ({
+        ...origManager,
+        deleteComponents: async (sysId, ids) => {
+          batchArgs = { sysId, ids };
+          return { deleted: ids.length, recipesUpdated: 3, recipesDisabled: 1 };
+        },
+      });
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      const result = await store.deleteComponents(['comp-1', 'comp-2']);
+
+      assert.deepEqual(batchArgs, { sysId: 'sys1', ids: ['comp-1', 'comp-2'] });
+      assert.deepEqual(result, { deleted: 2, recipesUpdated: 3, recipesDisabled: 1 });
+    });
+
+    it('deleteComponents raises NO confirm dialog — the panel already armed', async () => {
+      let confirmCalled = false;
+      const services = createMockServices({
+        confirmDialog: async () => {
+          confirmCalled = true;
+          return true;
+        },
+      });
+      const origManager = services.getCraftingSystemManager();
+      const sys = origManager.getSystem('sys1');
+      if (sys) {
+        sys.components = [makeItem({ id: 'comp-1', name: 'Herb' })];
+        delete sys.items;
+      }
+      services.getCraftingSystemManager = () => ({
+        ...origManager,
+        deleteComponents: async () => ({ deleted: 1, recipesUpdated: 0, recipesDisabled: 0 }),
+      });
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      await store.deleteComponents(['comp-1']);
+
+      assert.equal(confirmCalled, false, 'confirmation is the caller-side arm, not a modal');
+    });
+
+    it('deleteComponents drops ids that name no component in the system', async () => {
+      let batchArgs = null;
+      const services = createMockServices();
+      const origManager = services.getCraftingSystemManager();
+      const sys = origManager.getSystem('sys1');
+      if (sys) {
+        sys.components = [makeItem({ id: 'comp-1', name: 'Herb' })];
+        delete sys.items;
+      }
+      services.getCraftingSystemManager = () => ({
+        ...origManager,
+        deleteComponents: async (sysId, ids) => {
+          batchArgs = { sysId, ids };
+          return { deleted: ids.length, recipesUpdated: 0, recipesDisabled: 0 };
+        },
+      });
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      await store.deleteComponents(['comp-1', 'ghost']);
+
+      assert.deepEqual(batchArgs.ids, ['comp-1'], 'an unresolved id never reaches the write');
+    });
+
+    it('deleteComponents is a no-op for an empty selection', async () => {
+      let called = false;
+      const services = createMockServices();
+      const origManager = services.getCraftingSystemManager();
+      services.getCraftingSystemManager = () => ({
+        ...origManager,
+        deleteComponents: async () => {
+          called = true;
+          return { deleted: 0, recipesUpdated: 0, recipesDisabled: 0 };
+        },
+      });
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      const result = await store.deleteComponents([]);
+
+      assert.equal(called, false);
+      assert.deepEqual(result, { deleted: 0, recipesUpdated: 0, recipesDisabled: 0 });
+    });
+
+    it('deleteComponents reports a failed write rather than throwing at the panel', async () => {
+      const services = createMockServices();
+      const origManager = services.getCraftingSystemManager();
+      const sys = origManager.getSystem('sys1');
+      if (sys) {
+        sys.components = [makeItem({ id: 'comp-1', name: 'Herb' })];
+        delete sys.items;
+      }
+      services.getCraftingSystemManager = () => ({
+        ...origManager,
+        deleteComponents: async () => {
+          throw new Error('nope');
+        },
+      });
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      const result = await store.deleteComponents(['comp-1']);
+
+      assert.deepEqual(result, { deleted: 0, recipesUpdated: 0, recipesDisabled: 0 });
+    });
+
+    it('describeComponentDelete resolves ids against the system before counting', async () => {
+      const services = createMockServices();
+      const origManager = services.getCraftingSystemManager();
+      const sys = origManager.getSystem('sys1');
+      if (sys) {
+        sys.components = [makeItem({ id: 'comp-1', name: 'Herb' })];
+        delete sys.items;
+      }
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+
+      // A ghost id must not inflate the number the GM is shown.
+      assert.equal(store.describeComponentDelete(['comp-1', 'ghost']).deletable, 1);
+      assert.equal(store.describeComponentDelete(['ghost']).deletable, 0);
+      assert.equal(store.describeComponentDelete([]).deletable, 0);
+    });
+
+    it('describeComponentDelete returns the zero impact rather than throwing', async () => {
+      // It is called from a `$derived` in the manager root on EVERY selection change, so it
+      // runs on the render path. A throw here does not surface as a failed action — it takes
+      // the whole component browser down. So all four inputs that can be absent are pinned by
+      // OUTCOME here: whatever is missing, the caller gets the zero impact and not an
+      // exception.
+      //
+      // They are NOT four separate lines of coverage, and saying they were would overstate
+      // them. Only case 3 is load-bearing on the line it names: drop the optional call on
+      // `getRecipeManager` and this test fails. The other three are BACKSTOPPED, and deleting
+      // the guard each one names changes nothing, because `_getManagedItems` answers `[]` for
+      // an absent system and `describeComponentDeleteImpact` coerces a non-array:
+      //
+      //  - cases 1 and 2 both fall through to the later `resolved.length === 0` return
+      //    instead of stopping at `if (!sysId)` / `if (!system)`;
+      //  - case 4 survives the loss of `_selectedSystemRecipes`'s `|| []`, because
+      //    `Array.isArray(recipes) ? recipes : []` inside the describer already covers it.
+      //
+      // They are kept anyway, as render-path OUTCOME pins rather than as proof that any
+      // individual guard is necessary: the contract is that the caller gets the zero impact,
+      // whichever line delivers it, so a change that removes a backstop is caught here even
+      // though removing a redundant guard is not.
+      const services = createMockServices();
+      const zero = { deletable: 0, deletableIds: [], recipesRewritten: 0, recipesDisabled: 0 };
+
+      // 1. No system selected at all.
+      const unselected = createAdminStore(services);
+      assert.deepEqual(unselected.describeComponentDelete(['comp-1']), zero);
+
+      // 2. A selected id naming no system.
+      const origManager = services.getCraftingSystemManager();
+      services.getCraftingSystemManager = () => ({ ...origManager, getSystem: () => null });
+      const missingSystem = createAdminStore(services);
+      await missingSystem.selectSystem('sys1');
+      assert.deepEqual(missingSystem.describeComponentDelete(['comp-1']), zero);
+
+      // 3 and 4. A recipe manager that is absent, and one whose recipe list is missing. Both
+      // reach `describeComponentDeleteImpact`, which is where an unguarded `recipes.length`
+      // would throw. Swapped in AFTER `selectSystem`, because the store's own refresh needs a
+      // working recipe manager to get this far and this test is about the describer, not
+      // about a store that never loaded.
+      const recipeless = createMockServices();
+      const recipelessSystem = recipeless.getCraftingSystemManager().getSystem('sys1');
+      recipelessSystem.components = [makeItem({ id: 'comp-1', name: 'Herb' })];
+      delete recipelessSystem.items;
+      const degrading = createAdminStore(recipeless);
+      await degrading.selectSystem('sys1');
+
+      recipeless.getRecipeManager = null;
+      assert.deepEqual(
+        degrading.describeComponentDelete(['comp-1']),
+        { ...zero, deletable: 1, deletableIds: ['comp-1'] },
+        'no recipe manager still yields a countable component impact'
+      );
+
+      recipeless.getRecipeManager = () => ({ getRecipes: () => undefined });
+      assert.deepEqual(
+        degrading.describeComponentDelete(['comp-1']),
+        { ...zero, deletable: 1, deletableIds: ['comp-1'] },
+        'a recipe manager returning no list yields the same countable impact, not a throw'
+      );
+    });
+
     it('updateComponent forwards updates to systemManager.updateItem and refreshes', async () => {
       let updateArgs = null;
       const services = createMockServices();
@@ -4215,6 +4416,8 @@ describe('createAdminStore', () => {
         'exportSystem',
         'importSystem',
         'deleteComponent',
+        'deleteComponents',
+        'describeComponentDelete',
         'updateComponent',
         'setRecipeSearch',
         'setItemSearch',
@@ -8101,5 +8304,169 @@ describe('createAdminStore — gathering economy', () => {
     };
     store.refreshGatheringConfig();
     assert.equal(get(store.viewState).gatheringConfig.systems.sys1.economy.stamina.enabled, false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The FAILURE-RESULT POLICY and salvage's failure CONSUMPTION (issue 1098)
+//
+// `_buildSelectedSystemViewData` is a hand-built ALLOWLIST: a field omitted there is
+// INVISIBLE to the UI however correctly the normalizer and the write path behave. These
+// tests drive the REAL projection and the REAL savers, because that is the only place the
+// omission shows up.
+// ---------------------------------------------------------------------------
+
+describe('createAdminStore — failure-result policy (issue 1098)', () => {
+  /** Project a raw system through the real store and read one activity's check back. */
+  async function projectChecks(mutate) {
+    const services = createMockServices();
+    const sys = services._getSystemsMutable().find((s) => s.id === 'sys1');
+    mutate(sys);
+    const store = createAdminStore(services);
+    await store.refresh();
+    return get(store.viewState).selectedSystem;
+  }
+
+  it('projects failureResultPolicy on ALL THREE activity checks, at non-default values', async () => {
+    const selected = await projectChecks((sys) => {
+      sys.craftingCheck = { mode: 'passFail', failureResultPolicy: 'always' };
+      sys.salvageCraftingCheck = { failureResultPolicy: 'never' };
+      sys.gatheringCraftingCheck = { failureResultPolicy: 'always' };
+    });
+
+    // Each is a DIFFERENT value from its neighbour, so a projection reading one activity's
+    // policy onto another is visible rather than accidentally correct.
+    assert.equal(selected.craftingCheck.failureResultPolicy, 'always');
+    assert.equal(selected.salvageCraftingCheck.failureResultPolicy, 'never');
+    assert.equal(selected.gatheringCraftingCheck.failureResultPolicy, 'always');
+  });
+
+  it('projects an absent or unrecognized policy as the read-time default', async () => {
+    const selected = await projectChecks((sys) => {
+      sys.craftingCheck = { mode: 'passFail' };
+      sys.salvageCraftingCheck = { failureResultPolicy: 'sometimes' };
+      sys.gatheringCraftingCheck = {};
+    });
+
+    for (const key of ['craftingCheck', 'salvageCraftingCheck', 'gatheringCraftingCheck']) {
+      assert.equal(selected[key].failureResultPolicy, 'perRecord', key);
+    }
+  });
+
+  // Salvage's consumption block was persisted since 1.7.0 and projected NOWHERE, which is
+  // why the Salvage On-failure section could not exist. Both of its defaults are traps.
+  it('projects salvage consumption, mirroring BOTH of the normalizer trap defaults', async () => {
+    // `consumeComponentOnFail` defaults TRUE via `!== false`, so dropping it INVERTS an
+    // authored `false` rather than merely losing it — a default-valued fixture is no oracle.
+    const authored = await projectChecks((sys) => {
+      sys.salvageCraftingCheck = {
+        consumption: { consumeComponentOnFail: false, breakToolsOnFail: true },
+      };
+    });
+    assert.equal(authored.salvageCraftingCheck.consumption.consumeComponentOnFail, false);
+    assert.equal(authored.salvageCraftingCheck.consumption.breakToolsOnFail, true);
+
+    // Absence reads as the default-ON, which is the state most systems are in.
+    const absent = await projectChecks((sys) => {
+      sys.salvageCraftingCheck = { consumption: {} };
+    });
+    assert.equal(absent.salvageCraftingCheck.consumption.consumeComponentOnFail, true);
+    assert.equal(absent.salvageCraftingCheck.consumption.breakToolsOnFail, false);
+  });
+
+  it('reads breakToolsOnFail NEW-THEN-LEGACY, so a pre-1.7.0 system is not flipped ON→OFF', async () => {
+    // A system authored before the 1.7.0 rename carries ONLY `consumeCatalystsOnFail`. A
+    // projection reading the new key alone would render the toggle OFF, and the first save
+    // from that screen would persist the GM's setting as OFF — silently, and for a setting
+    // they never touched.
+    const legacyOnly = await projectChecks((sys) => {
+      sys.salvageCraftingCheck = { consumption: { consumeCatalystsOnFail: true } };
+    });
+    assert.equal(
+      legacyOnly.salvageCraftingCheck.consumption.breakToolsOnFail,
+      true,
+      'the legacy alias is honoured by the projection exactly as by the normalizer'
+    );
+
+    // …and an explicit NEW-key value wins over the legacy one, in both directions.
+    const bothKeys = await projectChecks((sys) => {
+      sys.salvageCraftingCheck = {
+        consumption: { breakToolsOnFail: false, consumeCatalystsOnFail: true },
+      };
+    });
+    assert.equal(bothKeys.salvageCraftingCheck.consumption.breakToolsOnFail, false);
+  });
+
+  /** Capture the `updateSystem` payload a saver writes. */
+  async function captureSave(run) {
+    let updateArgs = null;
+    const services = createMockServices();
+    // Seed a sibling on every check block. The saver has to carry it through
+    // `updateSystem`'s shallow top-level merge, and a fixture with nothing beside the
+    // policy could not tell a spread saver from one that replaced the whole block.
+    const raw = services._getSystemsMutable().find((s2) => s2.id === 'sys1');
+    raw.craftingCheck = { ...(raw.craftingCheck || {}), enabled: true };
+    raw.salvageCraftingCheck = {
+      enabled: true,
+      consumption: { consumeComponentOnFail: false },
+    };
+    raw.gatheringCraftingCheck = { enabled: true };
+    const origManager = services.getCraftingSystemManager();
+    services.getCraftingSystemManager = () => ({
+      ...origManager,
+      updateSystem: async (id, updates) => {
+        updateArgs = { id, updates };
+        await origManager.updateSystem(id, updates);
+      },
+    });
+    const store = createAdminStore(services);
+    await store.selectSystem('sys1');
+    await run(store);
+    return updateArgs;
+  }
+
+  it('each activity saver writes its OWN check block and preserves every sibling', async () => {
+    // `updateSystem` shallow-merges the TOP level only, so a saver that did not spread
+    // `existing` would drop every sibling of the policy and the normalizer would then
+    // re-default them — silent data loss, and the reason this is asserted on a SIBLING
+    // rather than by reading the saver.
+    const cases = [
+      ['craftingCheck', (store) => store.saveCraftingCheckFailureResultPolicy('always')],
+      ['salvageCraftingCheck', (store) => store.saveSalvageCheckFailureResultPolicy('always')],
+      ['gatheringCraftingCheck', (store) => store.saveGatheringCheckFailureResultPolicy('never')],
+    ];
+    for (const [key, run] of cases) {
+      const args = await captureSave(run);
+      assert.ok(args, `${key}: the saver wrote`);
+      assert.ok(args.updates[key], `${key}: it wrote its own block`);
+      assert.ok(
+        Object.hasOwn(args.updates[key], 'failureResultPolicy'),
+        `${key}: carrying the policy`
+      );
+      // The sibling every check block has. Its survival is what proves `existing` was spread.
+      assert.ok(
+        Object.hasOwn(args.updates[key], 'enabled'),
+        `${key}: and every sibling of the policy survives the shallow merge`
+      );
+    }
+  });
+
+  it('an unrecognized policy is normalized by the saver rather than persisted', async () => {
+    const args = await captureSave((store) => store.saveCraftingCheckFailureResultPolicy('bogus'));
+    assert.equal(args.updates.craftingCheck.failureResultPolicy, 'perRecord');
+  });
+
+  it('the salvage consumption saver spreads the block AND its nested sub-object', async () => {
+    const args = await captureSave((store) =>
+      store.saveSalvageCheckConsumption({ breakToolsOnFail: true })
+    );
+    assert.equal(args.updates.salvageCraftingCheck.consumption.breakToolsOnFail, true);
+    // The UNTOUCHED flag has to survive too: it defaults TRUE, so losing it would present
+    // as an inversion the next time the normalizer read the block.
+    assert.ok(
+      Object.hasOwn(args.updates.salvageCraftingCheck.consumption, 'consumeComponentOnFail'),
+      'the sibling consumption flag is carried, not re-defaulted'
+    );
+    assert.ok(Object.hasOwn(args.updates.salvageCraftingCheck, 'enabled'));
   });
 });

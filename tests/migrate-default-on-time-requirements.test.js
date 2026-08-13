@@ -102,7 +102,7 @@ test('the runner applies 1.19.0 and bumps the migration version', async () => {
   const result = await runner.run();
 
   assert.equal(result.aborted, false);
-  assert.equal(store.get('migrationVersion'), '1.24.0');
+  assert.equal(store.get('migrationVersion'), '1.25.0');
   assert.ok(!('enabled' in store.get('craftingSystems')[0].requirements.time));
 });
 
@@ -113,7 +113,7 @@ test('1.19.0 is version-gated — a later deliberate opt-out is NOT flipped back
   // leave a later migration unapplied, so `result.ran` would be 1 and the assertion below
   // would be measuring "the later migration ran", not "the 1.19.0 gate held".
   const store = new Map([
-    ['migrationVersion', '1.24.0'],
+    ['migrationVersion', '1.25.0'],
     ['craftingSystems', [{ id: 'sys', requirements: { time: { enabled: false } } }]],
   ]);
   const runner = new MigrationRunner({
