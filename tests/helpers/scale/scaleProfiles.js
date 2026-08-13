@@ -44,7 +44,12 @@
 import { buildComponentLibrary, buildToolLibrary } from './scaleComponents.js';
 import { INVENTORY_SERIES, buildHeldInventory } from './scaleInventory.js';
 import { createSeededRandom } from './scaleRandom.js';
-import { buildGraphCorpus, buildRecipeCorpus, recipeItemSourceUuid } from './scaleRecipes.js';
+import {
+  buildGraphChainCorpus,
+  buildGraphCorpus,
+  buildRecipeCorpus,
+  recipeItemSourceUuid,
+} from './scaleRecipes.js';
 
 /** The system id every profile builds under. Flag-key safe (no dots). */
 export const BENCH_SYSTEM_ID = 'benchsys';
@@ -276,13 +281,16 @@ export const SCALE_PROFILES = Object.freeze({
 
   'recipe-graph': {
     description:
-      'Sparse (1,000 recipes, fan-out 1) and dense (500 recipes, fan-out 8) dependency graphs.',
+      'Sparse (1,000 recipes, fan-out 1), dense (500 recipes, fan-out 8) and deep ' +
+      '(20,000-recipe linear chain) dependency graphs.',
     construction: 'literal payloads',
     requiresNodeModules: false,
     ceiling:
-      'Depth and fan-out are both bounded. Edge count is producer x consumer, so an unbounded ' +
-      'dense corpus makes the benchmark the pathology it measures; and layoutGraph cycle ' +
-      'detection is a recursive unguarded DFS, so an unbounded chain stack-overflows first.',
+      'Fan-out is bounded because edge count is producer x consumer, so an unbounded dense ' +
+      'corpus makes the benchmark the pathology it measures. DEPTH is deliberately NOT ' +
+      'bounded: the deep shape exists to sit past the depth at which the pre-fix recursive ' +
+      'cycle-detection DFS threw RangeError (measured 8,193 on this checkout, issue 1082). A ' +
+      'shallower chain would pass against the broken implementation and prove nothing.',
     scale: {
       components: 2000,
       sparseRecipes: 1000,
@@ -290,6 +298,8 @@ export const SCALE_PROFILES = Object.freeze({
       denseRecipes: 500,
       denseFanOut: 8,
       layerCount: 12,
+      deepRecipes: 20_000,
+      deepChainDepth: 20_000,
     },
     build(random) {
       const components = buildComponentLibrary({
@@ -313,19 +323,28 @@ export const SCALE_PROFILES = Object.freeze({
         layerCount: 12,
         fanOut: 8,
       });
+      const inventory = buildHeldInventory({
+        stacks: CORPUS_AXIS_STACKS,
+        components,
+        systemId: BENCH_SYSTEM_ID,
+        random,
+        sourceActorCount: 1,
+      });
+      // Drawn LAST, after every pre-existing generator. Each of these builders consumes the
+      // shared seeded stream, so inserting the depth axis anywhere earlier would shift every
+      // later draw and move committed checksums that nothing about this axis should touch.
+      const deep = buildGraphChainCorpus({
+        count: 20_000,
+        systemId: `${BENCH_SYSTEM_ID}c`,
+        random,
+      });
       return {
         system: baseSystem({ systemId: BENCH_SYSTEM_ID, components, tools: [] }),
         components,
         tools: [],
         recipes: sparse,
-        graphs: { sparse, dense },
-        inventory: buildHeldInventory({
-          stacks: CORPUS_AXIS_STACKS,
-          components,
-          systemId: BENCH_SYSTEM_ID,
-          random,
-          sourceActorCount: 1,
-        }),
+        graphs: { sparse, dense, deep },
+        inventory,
       };
     },
   },

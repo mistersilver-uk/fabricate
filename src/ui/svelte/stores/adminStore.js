@@ -23,7 +23,12 @@
  * concurrent callers share the same in-flight confirmation promise.
  */
 import { writable, get } from 'svelte/store';
-import { buildRecipeGraph, layoutGraph, filterGraph } from '../util/recipeGraphBuilder.js';
+import {
+  createRecipeGraphIndex,
+  buildBoundedRecipeGraph,
+  layoutGraph,
+} from '../util/recipeGraphBuilder.js';
+import { REVISION_SCOPES } from '../../../systems/revisionTokens.js';
 import { DEFAULT_ESSENCE_ICON, normalizeEssenceIcon } from '../util/essenceIcons.js';
 import {
   TIME_OF_DAY_ICONS,
@@ -1087,6 +1092,36 @@ function _resolveVisibleTab(tabName, selectedSystem) {
   return 'systems';
 }
 
+/**
+ * The graph projection before anything has been queried (issue 1082).
+ *
+ * `bound` is `null` rather than absent so a consumer's disclosure check is one shape in every
+ * state: `null` means "no graph was asked for", and a descriptor with `complete: false` means
+ * "this is a fragment of the system, say so".
+ */
+function _emptyGraphData() {
+  return { nodes: [], edges: [], width: 0, height: 0, bound: null };
+}
+
+/**
+ * The recipe ids whose name matches a graph search term.
+ *
+ * Reads the retained index's node seeds rather than a built graph, so the search cohort can
+ * be resolved BEFORE the bounded query decides what to materialise. Filtering after the fact
+ * would let the bound discard the very recipes the GM searched for.
+ *
+ * @param {object} index
+ * @param {string} lowerSearchTerm Already lower-cased and trimmed.
+ * @returns {string[]}
+ */
+function _graphSearchMatches(index, lowerSearchTerm) {
+  const matches = [];
+  for (const seed of index.nodeSeedById.values()) {
+    if ((seed.name || '').toLowerCase().includes(lowerSearchTerm)) matches.push(seed.id);
+  }
+  return matches;
+}
+
 function _emptyEnvironmentState(canShowEnvironmentsTab = false, error = null) {
   return {
     canShowEnvironmentsTab,
@@ -1641,6 +1676,61 @@ export function createAdminStore(services) {
   let externalRefreshScheduled = false;
   let destroyed = false;
 
+  // --- Recipe dependency graph state (issue 1082) ---
+  //
+  // The retained producer/consumer index, keyed on the recipe revision token `RecipeManager`
+  // mints (issue 1076). Every graph interaction that is not a definition change — a search
+  // keystroke, a re-render, a `refresh()` triggered by something unrelated — re-queries this
+  // index instead of rebuilding it, which is the difference between one pass over the corpus
+  // per edit and one per keystroke. It holds exactly one system: switching systems replaces
+  // it rather than accumulating, because a GM works in one system at a time and the graph is
+  // the largest projection in the store.
+  let graphIndexCache = null;
+
+  /**
+   * The producer/consumer index for one system, built at most once per recipe revision.
+   *
+   * A manager with no `revision()` (an older injected double) yields a `null` token, which
+   * never compares equal and therefore always rebuilds. Failing that way round is deliberate:
+   * a rebuilt index is slow, a wrongly-reused one is wrong.
+   */
+  function _graphIndexFor(selectedSystem, recipeManager) {
+    const revision =
+      recipeManager?.revision?.(REVISION_SCOPES.recipesOfSystem(selectedSystem.id)) ?? null;
+    if (
+      graphIndexCache &&
+      graphIndexCache.systemId === selectedSystem.id &&
+      revision !== null &&
+      graphIndexCache.revision === revision
+    ) {
+      return graphIndexCache.index;
+    }
+    const index = createRecipeGraphIndex(
+      recipeManager.getRecipes({ craftingSystemId: selectedSystem.id })
+    );
+    graphIndexCache = { systemId: selectedSystem.id, revision, index };
+    return index;
+  }
+
+  /**
+   * The laid-out, BOUNDED graph projection for the selected system (issue 1082).
+   *
+   * A search term becomes the query's `cohort` scope rather than a post-hoc filter, so the
+   * node budget is spent on what the GM asked for. With no search term the query is `all`,
+   * which over the bound returns no nodes and `bound.requiresScope`: there is no honest
+   * 500-recipe answer to "show me a 10,000-recipe system", and a rendered slice of one would
+   * read as the whole thing. The published `graphData.bound` is what a consuming view must
+   * disclose.
+   */
+  function _buildGraphData(selectedSystem, recipeManager) {
+    const index = _graphIndexFor(selectedSystem, recipeManager);
+    const searchTerm = (get(graphSearch) || '').toLowerCase().trim();
+    const scope = searchTerm
+      ? { type: 'cohort', recipeIds: _graphSearchMatches(index, searchTerm) }
+      : { type: 'all' };
+    return layoutGraph(buildBoundedRecipeGraph(index, { scope }));
+  }
+
   // --- GM Knowledge surface state (issue 785) ---
   //
   // `refresh()` is invoked by ~40 mutation paths and a whole-world `actors × items`
@@ -1698,7 +1788,7 @@ export function createAdminStore(services) {
     },
     recipeSearchTerm: '',
     itemSearchTerm: '',
-    graphData: { nodes: [], edges: [], width: 0, height: 0 },
+    graphData: _emptyGraphData(),
     graphSearchTerm: '',
     experimentalFeaturesEnabled: services.getSetting?.('experimentalFeatures') === true,
     gatheringConfig: _normalizeGatheringConfig(
@@ -4423,13 +4513,9 @@ export function createAdminStore(services) {
     );
 
     // --- Graph data (lazy, computed only when graph tab is active) ---
-    let graphData = { nodes: [], edges: [], width: 0, height: 0 };
+    let graphData = _emptyGraphData();
     if (get(activeTab) === 'graph' && selectedSystem) {
-      const allRecipes = recipeManager.getRecipes({ craftingSystemId: selectedSystem.id });
-      const components = _getManagedItems(selectedSystem);
-      const rawGraph = buildRecipeGraph(allRecipes, components);
-      const layoutResult = layoutGraph(rawGraph);
-      graphData = filterGraph(layoutResult, { searchTerm: get(graphSearch) });
+      graphData = _buildGraphData(selectedSystem, recipeManager);
     }
 
     // A newer refresh has already taken over; publishing here would put its work back.
@@ -8932,6 +9018,9 @@ export function createAdminStore(services) {
     knowledgeRefreshScheduled = false;
     knowledgeActive = false;
     _clearKnowledgeCache();
+    // The graph index retains the whole recipe corpus's component sets (issue 1082); a closed
+    // manager must not keep them alive alongside the knowledge snapshot.
+    graphIndexCache = null;
   }
 
   unsubscribeFabricateDataChanged = _subscribeExternalDataChanges();

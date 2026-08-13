@@ -2,17 +2,19 @@
   "profile": "recipe-graph",
   "harnessVersion": 2,
   "seed": 1071,
-  "description": "Sparse (1,000 recipes, fan-out 1) and dense (500 recipes, fan-out 8) dependency graphs.",
+  "description": "Sparse (1,000 recipes, fan-out 1), dense (500 recipes, fan-out 8) and deep (20,000-recipe linear chain) dependency graphs.",
   "construction": "literal payloads",
   "requiresNodeModules": false,
-  "ceiling": "Depth and fan-out are both bounded. Edge count is producer x consumer, so an unbounded dense corpus makes the benchmark the pathology it measures; and layoutGraph cycle detection is a recursive unguarded DFS, so an unbounded chain stack-overflows first.",
+  "ceiling": "Fan-out is bounded because edge count is producer x consumer, so an unbounded dense corpus makes the benchmark the pathology it measures. DEPTH is deliberately NOT bounded: the deep shape exists to sit past the depth at which the pre-fix recursive cycle-detection DFS threw RangeError (measured 8,193 on this checkout, issue 1082). A shallower chain would pass against the broken implementation and prove nothing.",
   "scale": {
     "components": 2000,
     "sparseRecipes": 1000,
     "sparseFanOut": 1,
     "denseRecipes": 500,
     "denseFanOut": 8,
-    "layerCount": 12
+    "layerCount": 12,
+    "deepRecipes": 20000,
+    "deepChainDepth": 20000
   },
   "inventoryMix": [
     {
@@ -43,11 +45,14 @@
     "graph.layoutGraph.sparse": {
       "description": "Layered layout + edge paths over the bounded sparse graph.",
       "counts": {
+        "graphAdjacencyLookups": 967,
+        "graphIncomingEdgesExamined": 967,
         "identityCandidatesExamined": 0,
         "identityIndexBuilds": 0,
         "nodes": 1000,
         "edges": 968,
-        "cycleEdges": 1
+        "cycleEdges": 1,
+        "deepestLayer": 37
       }
     },
     "graph.buildRecipeGraph.dense": {
@@ -62,11 +67,36 @@
     "graph.layoutGraph.dense": {
       "description": "Layered layout + edge paths over the bounded dense graph.",
       "counts": {
+        "graphAdjacencyLookups": 461,
+        "graphIncomingEdgesExamined": 3568,
         "identityCandidatesExamined": 0,
         "identityIndexBuilds": 0,
         "nodes": 500,
         "edges": 3568,
-        "cycleEdges": 0
+        "cycleEdges": 0,
+        "deepestLayer": 22
+      }
+    },
+    "graph.buildRecipeGraph.deep": {
+      "description": "Producer/consumer edge derivation over the bounded deep corpus.",
+      "counts": {
+        "identityCandidatesExamined": 0,
+        "identityIndexBuilds": 0,
+        "nodes": 20000,
+        "edges": 19999
+      }
+    },
+    "graph.layoutGraph.deep": {
+      "description": "Layered layout + edge paths over the bounded deep graph.",
+      "counts": {
+        "graphAdjacencyLookups": 19999,
+        "graphIncomingEdgesExamined": 19999,
+        "identityCandidatesExamined": 0,
+        "identityIndexBuilds": 0,
+        "nodes": 20000,
+        "edges": 19999,
+        "cycleEdges": 0,
+        "deepestLayer": 19999
       }
     }
   }
