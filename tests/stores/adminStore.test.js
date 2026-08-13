@@ -3371,8 +3371,25 @@ describe('createAdminStore', () => {
     it('describeComponentDelete returns the zero impact rather than throwing', async () => {
       // It is called from a `$derived` in the manager root on EVERY selection change, so it
       // runs on the render path. A throw here does not surface as a failed action — it takes
-      // the whole component browser down. The four inputs that can be absent are pinned
-      // together because each is guarded by a different line.
+      // the whole component browser down. So all four inputs that can be absent are pinned by
+      // OUTCOME here: whatever is missing, the caller gets the zero impact and not an
+      // exception.
+      //
+      // They are NOT four separate lines of coverage, and saying they were would overstate
+      // them. Only case 3 is load-bearing on the line it names: drop the optional call on
+      // `getRecipeManager` and this test fails. The other three are BACKSTOPPED, and deleting
+      // the guard each one names changes nothing, because `_getManagedItems` answers `[]` for
+      // an absent system and `describeComponentDeleteImpact` coerces a non-array:
+      //
+      //  - cases 1 and 2 both fall through to the later `resolved.length === 0` return
+      //    instead of stopping at `if (!sysId)` / `if (!system)`;
+      //  - case 4 survives the loss of `_selectedSystemRecipes`'s `|| []`, because
+      //    `Array.isArray(recipes) ? recipes : []` inside the describer already covers it.
+      //
+      // They are kept anyway, as render-path OUTCOME pins rather than as proof that any
+      // individual guard is necessary: the contract is that the caller gets the zero impact,
+      // whichever line delivers it, so a change that removes a backstop is caught here even
+      // though removing a redundant guard is not.
       const services = createMockServices();
       const zero = { deletable: 0, deletableIds: [], recipesRewritten: 0, recipesDisabled: 0 };
 
@@ -3407,7 +3424,11 @@ describe('createAdminStore', () => {
       );
 
       recipeless.getRecipeManager = () => ({ getRecipes: () => undefined });
-      assert.equal(degrading.describeComponentDelete(['comp-1']).recipesRewritten, 0);
+      assert.deepEqual(
+        degrading.describeComponentDelete(['comp-1']),
+        { ...zero, deletable: 1, deletableIds: ['comp-1'] },
+        'a recipe manager returning no list yields the same countable impact, not a throw'
+      );
     });
 
     it('updateComponent forwards updates to systemManager.updateItem and refreshes', async () => {
