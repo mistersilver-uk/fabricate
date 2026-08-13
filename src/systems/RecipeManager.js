@@ -1,5 +1,5 @@
 import { getFabricateFlag, isSafeFlagKeySegment } from '../config/flags.js';
-import { getSetting, setSetting, SETTING_KEYS } from '../config/settings.js';
+import { SETTING_KEYS } from '../config/settings.js';
 import { matchGatheringTools, classifyGatheringToolStates } from '../gatheringToolRuntime.js';
 import { getIngredientComponentId, getMatchHandler } from '../models/match/matchTypes.js';
 import { DEFAULT_RECIPE_IMAGE, Recipe } from '../models/Recipe.js';
@@ -17,11 +17,13 @@ import {
 } from '../utils/sourceUuid.js';
 
 import { evaluatePrerequisite } from './characterPrerequisites.js';
+import { applyDefinitionChange } from './CraftingDefinitionRepository.js';
 import { buildCurrencyAffordProbe, getCurrencyRequirementConfig } from './currencyAffordance.js';
 import { formatCurrencyRequirement, normalizeCurrencyUnit } from './currencyProfile.js';
 import { readStackQuantity } from './itemStackQuantity.js';
 import { RecipeActivationError } from './RecipeActivationError.js';
 import { RecipePersistenceError } from './RecipePersistenceError.js';
+import { SettingsCraftingDefinitionRepository } from './SettingsCraftingDefinitionRepository.js';
 import { SignatureValidator } from './SignatureValidator.js';
 import { computeSystemVisibility } from './systemValidation.js';
 import { ingredientSetToolsAreActive, resolveToolPrerequisites } from './toolCheckBonus.js';
@@ -67,13 +69,36 @@ export class RecipeManager {
    *   The manager itself, for the paths that need more than one system or need the
    *   recipe/component accessors (issue 1072). Both default to the `game.fabricate`
    *   globals, so every existing `new RecipeManager({})` construction is unaffected.
+   * @param {import('./CraftingDefinitionRepository.js').CraftingDefinitionRepository}
+   *   [deps.repository] - the persistence seam (issue 1089). Defaults to the
+   *   settings-backed adapter, so the ~100 single-argument construction sites in
+   *   production and tests keep working unchanged; inject a fake to count reads and
+   *   writes without patching `game.settings`.
    */
-  constructor({ getCraftingSystem = null, getCraftingSystemManager = null } = {}) {
+  constructor({
+    getCraftingSystem = null,
+    getCraftingSystemManager = null,
+    repository = null,
+  } = {}) {
     this.recipes = new Map();
     this.initialized = false;
     this.getCraftingSystem = typeof getCraftingSystem === 'function' ? getCraftingSystem : null;
     this._getCraftingSystemManager =
       typeof getCraftingSystemManager === 'function' ? getCraftingSystemManager : null;
+    // The adapter shares THIS map rather than mirroring it — see
+    // `SettingsCraftingDefinitionRepository` for why a second ordered map would be a
+    // silent corruption of the persisted array's order. The manager still owns every
+    // in-memory `set`/`delete` on it: the repository is the persistence seam, not the
+    // domain state, and a document-backed adapter (#1080) will not maintain this map.
+    this._repository =
+      repository ??
+      new SettingsCraftingDefinitionRepository({
+        settingKey: SETTING_KEYS.RECIPES,
+        corpus: () => this.recipes,
+        hydrate: (raw) => Recipe.fromJSON(raw),
+        serialize: (recipe) => recipe.toJSON(),
+        scopeOf: (recipe) => recipe?.craftingSystemId ?? null,
+      });
   }
 
   /**
@@ -193,10 +218,8 @@ export class RecipeManager {
   async initialize() {
     if (this.initialized) return;
 
-    // Load recipes from game settings
-    const savedRecipes = getSetting(SETTING_KEYS.RECIPES) || [];
-    for (const recipeData of savedRecipes) {
-      const recipe = Recipe.fromJSON(recipeData);
+    // Load recipes through the definition repository (issue 1089)
+    for (const recipe of await this._repository.loadAll()) {
       this.recipes.set(recipe.id, recipe);
     }
 
@@ -205,11 +228,23 @@ export class RecipeManager {
   }
 
   /**
-   * Save all recipes to game settings
+   * Persist a recipe mutation through the definition repository (issue 1089).
+   *
+   * `save()` with no argument is the whole-corpus write it has always been, and it is
+   * still the batch callers' flush point: the compendium importer and the
+   * essence-deletion cascade mutate the in-memory map per recipe with
+   * `{ persist: false }` and then issue exactly one of these.
+   *
+   * `save({ put })` / `save({ delete })` / `save({ batch })` name the records a
+   * mutation actually touched. Under the settings adapter all four write the same
+   * bytes, because `game.settings.set` cannot address one element — but the
+   * information is now carried to the seam instead of being discarded at the call
+   * site, which is the whole point of landing this before the persistence ADR.
+   *
+   * @param {import('./CraftingDefinitionRepository.js').DefinitionChange} [change]
    */
-  async save() {
-    const recipesArray = [...this.recipes.values()].map((r) => r.toJSON());
-    await setSetting(SETTING_KEYS.RECIPES, recipesArray);
+  async save(change = null) {
+    await applyDefinitionChange(this._repository, change, this.recipes.values());
   }
 
   /**
@@ -227,10 +262,14 @@ export class RecipeManager {
   reload() {
     const serialize = (map) => JSON.stringify([...map.values()].map((r) => r.toJSON()));
     const before = serialize(this.recipes);
-    const savedRecipes = getSetting(SETTING_KEYS.RECIPES) || [];
+    // Optional repository capability: `null` means the backend has no synchronous
+    // replicated snapshot to read, which is the honest answer for anything
+    // document-backed (#1088 Q3). Reloading is then a no-op rather than a wrong
+    // answer, and #1092 owns the replacement transport.
+    const savedRecipes = this._repository.readReplicatedSnapshot();
+    if (!savedRecipes) return false;
     const next = new Map();
-    for (const recipeData of savedRecipes) {
-      const recipe = Recipe.fromJSON(recipeData);
+    for (const recipe of savedRecipes) {
       next.set(recipe.id, recipe);
     }
     this.recipes = next;
@@ -296,7 +335,7 @@ export class RecipeManager {
 
     this.recipes.set(recipe.id, recipe);
     if (options.persist !== false) {
-      await this.save();
+      await this.save({ put: recipe });
     }
     console.debug(`Fabricate | Created recipe "${recipe.name}" (${recipe.id})`);
 
@@ -361,7 +400,7 @@ export class RecipeManager {
 
     this.recipes.set(recipeId, updatedRecipe);
     if (options.persist !== false) {
-      await this.save();
+      await this.save({ put: updatedRecipe });
     }
     console.debug(`Fabricate | Updated recipe "${updatedRecipe.name}" (${updatedRecipe.id})`);
     if (options.notify !== false) {
@@ -449,7 +488,7 @@ export class RecipeManager {
 
     this.recipes.delete(recipeId);
     if (options.persist !== false) {
-      await this.save();
+      await this.save({ delete: recipeId });
     }
     if (options.cleanupFlags !== false) {
       await this._cleanupFlagsAfterRecipeMutation();
@@ -2595,7 +2634,12 @@ export class RecipeManager {
     }
 
     if (disabled.length > 0) {
-      await this.save();
+      // The repository's bulk boundary, on a real multi-record mutation: each disabled
+      // recipe announces itself, and the batch coalesces them into exactly one write —
+      // the same single write the whole-corpus `save()` issued here before. Naming the
+      // records is what lets a granular backend (#1080) write only these N without any
+      // caller changing.
+      await this.save({ batch: disabled.map(({ id }) => this.recipes.get(id)) });
       this._notifyRecipesChanged('update', {
         disabledForSignatureConflict: disabled.map((d) => d.id),
       });
