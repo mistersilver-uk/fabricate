@@ -143,6 +143,52 @@ function makeRecipeManager() {
         }
       ],
       resultGroups: [{ id: 'rg5', results: [{ componentId: 'bar' }] }]
+    }),
+    // Rewritten but NOT disabled. It names `bar` among ALTERNATIVES at both ends — an
+    // ingredient group of two options and a result group of two results — so a delete that
+    // takes `bar` (or `wood`) still leaves it with something to consume and something to
+    // produce. Without a recipe of this shape the fixture's rewrite and disable counts are
+    // the same number, and every assertion comparing them is vacuous.
+    makeRecipe({
+      id: 'recipe-assortment',
+      name: 'Smith Assortment',
+      craftingSystemId: 'sys',
+      enabled: true,
+      ingredientSets: [
+        {
+          id: 's6',
+          essences: {},
+          ingredientGroups: [
+            { id: 'g6', options: [{ componentId: 'wood' }, { componentId: 'plank' }] }
+          ],
+          ingredients: [{ componentId: 'wood' }]
+        }
+      ],
+      resultGroups: [
+        { id: 'rg6', results: [{ componentId: 'bar' }, { componentId: 'plank' }] }
+      ]
+    }),
+    // ALREADY disabled, and it names `bar` as its only result. Deleting `bar` rewrites it
+    // and leaves it with nothing to produce, so the rewrite clamps `enabled` to false again
+    // — but no enabled→disabled TRANSITION happens, so `recipesDisabled` must not count it.
+    // That is the whole content of the `json.enabled !== false` guard in
+    // `_stripComponentsFromRecipes`, and of the identical `before?.enabled !== false` guard
+    // in `describeComponentDeleteImpact`. It names neither `iron` nor `wood`, so it does not
+    // disturb the single-component fixtures above it.
+    makeRecipe({
+      id: 'recipe-shelved-bar',
+      name: 'Shelved Bar Mould',
+      craftingSystemId: 'sys',
+      enabled: false,
+      ingredientSets: [
+        {
+          id: 's7',
+          essences: {},
+          ingredientGroups: [{ id: 'g7', options: [{ componentId: 'plank' }] }],
+          ingredients: [{ componentId: 'plank' }]
+        }
+      ],
+      resultGroups: [{ id: 'rg7', results: [{ componentId: 'bar' }] }]
     })
   ];
 
@@ -529,7 +575,14 @@ test('deleteComponents rewrites each referencing recipe ONCE for the whole set',
   assert.deepEqual(result.componentIds, ['iron', 'wood']);
   assert.deepEqual(
     recipeManager.updateCalls.map((call) => call.recipeId),
-    ['recipe-iron', 'recipe-none', 'recipe-match-iron', 'recipe-multistep-iron', 'recipe-alias-iron'],
+    [
+      'recipe-iron',
+      'recipe-none',
+      'recipe-match-iron',
+      'recipe-multistep-iron',
+      'recipe-alias-iron',
+      'recipe-assortment'
+    ],
     'every referencing recipe is rewritten exactly once, in one pass over the recipe list'
   );
 });
@@ -578,15 +631,31 @@ test('deleteComponents reports the recipes it leaves uncraftable, and disables t
 
   // `bar` is the ONLY result of recipe-iron, recipe-match-iron and recipe-alias-iron, so
   // deleting it leaves each with nothing to produce.
+  //
+  // The count is of enabled→disabled TRANSITIONS, not of recipes left clamped, so the
+  // re-derivation has to know which recipes were enabled beforehand. `recipe-shelved-bar`
+  // is rewritten and clamped to disabled like the rest and must NOT appear in the number,
+  // and `recipe-assortment` keeps an alternative result and is not clamped at all.
+  const enabledBefore = new Set(
+    recipeManager
+      .getRecipes({})
+      .filter((recipe) => recipe.enabled !== false)
+      .map((recipe) => recipe.id)
+  );
   const result = await manager.deleteComponents('sys', ['bar']);
 
-  const disabled = recipeManager.updateCalls.filter((call) => call.updates.enabled === false);
+  const clamped = recipeManager.updateCalls.filter((call) => call.updates.enabled === false);
+  const transitioned = clamped.filter((call) => enabledBefore.has(call.recipeId));
   assert.equal(
     result.recipesDisabled,
-    disabled.length,
-    'the reported disable count equals the number actually clamped'
+    transitioned.length,
+    'the reported disable count equals the number actually taken from enabled to disabled'
   );
   assert.ok(result.recipesDisabled > 0, 'losing the only result disables the recipe');
+  assert.ok(
+    clamped.length > transitioned.length,
+    'and an already-disabled recipe was clamped without being counted — otherwise the guard is unexercised'
+  );
 });
 
 test('deleteComponents ignores unknown ids and is a no-op for an empty selection', async () => {
@@ -747,11 +816,24 @@ test('1129: the STATED impact equals what the delete PERFORMS, on one fixture', 
   const recipeManager = makeRecipeManager();
   const manager = makeManager(recipeManager);
 
-  // Deliberately a case where no two numbers agree by accident, and where each rewritten
-  // recipe names BOTH deleted components: `iron` is the only INGREDIENT of four recipes and
-  // `bar` is the only RESULT of the same four, so each is rewritten once and left with
-  // nothing at either end.
+  // The fixture is chosen so the three stated numbers are three DIFFERENT numbers, and in
+  // particular so `recipesRewritten > recipesDisabled > 0`. Equal counts are what make a
+  // comparison like this vacuous: while rewrite and disable were both 4, TRANSPOSING the two
+  // fields in the object `deleteComponents` returns passed every assertion here.
+  //
+  // `iron` is the only INGREDIENT of four recipes and `bar` is the only RESULT of the same
+  // four, so each is rewritten once and left with nothing at either end. `recipe-assortment`
+  // names `bar` among alternatives and is rewritten while staying craftable, which separates
+  // rewrite from disable. `recipe-shelved-bar` names `bar` too but was ALREADY disabled, so
+  // it is rewritten and clamped without being a transition — which is what makes the
+  // `enabled !== false` guard on both sides of the comparison load-bearing.
   const ids = ['iron', 'bar'];
+  const enabledBefore = new Set(
+    recipeManager
+      .getRecipes({})
+      .filter((recipe) => recipe.enabled !== false)
+      .map((recipe) => recipe.id)
+  );
   const stated = describeComponentDeleteImpact(ids, recipeManager.getRecipes({}));
 
   const performed = await manager.deleteComponents('sys', ids);
@@ -768,11 +850,24 @@ test('1129: the STATED impact equals what the delete PERFORMS, on one fixture', 
   );
   assert.equal(performed.deleted, stated.deletable);
 
-  // Negative controls, because three numbers that are all equal make the comparison vacuous.
+  // Negative controls. Any two of these three numbers being equal makes the comparison
+  // above satisfiable by an implementation that returns the wrong one, so each pair is
+  // separated explicitly rather than left to the fixture's good behaviour.
   assert.ok(stated.recipesRewritten > 1, 'more than one recipe is rewritten');
+  assert.ok(stated.recipesDisabled > 0, 'and some of them are left uncraftable');
   assert.ok(
-    stated.deletable !== stated.recipesRewritten,
-    'the component count and the rewrite count are genuinely different numbers'
+    stated.recipesRewritten > stated.recipesDisabled,
+    'the rewrite count and the disable count are genuinely different numbers'
+  );
+  assert.ok(
+    stated.deletable !== stated.recipesRewritten && stated.deletable !== stated.recipesDisabled,
+    'and neither of them is the component count'
+  );
+  // The guard that makes `recipesDisabled` a transition count is only exercised while an
+  // already-disabled recipe is actually part of the rewritten set.
+  assert.ok(
+    recipeManager.updateCalls.some((call) => call.recipeId === 'recipe-shelved-bar'),
+    'the already-disabled recipe really is rewritten by this selection'
   );
 
   // And the executed numbers are what the write DID, not a third count computed beside it.
@@ -781,8 +876,11 @@ test('1129: the STATED impact equals what the delete PERFORMS, on one fixture', 
     stated.recipesRewritten
   );
   assert.equal(
-    recipeManager.updateCalls.filter((call) => call.updates.enabled === false).length,
-    stated.recipesDisabled
+    recipeManager.updateCalls.filter(
+      (call) => call.updates.enabled === false && enabledBefore.has(call.recipeId)
+    ).length,
+    stated.recipesDisabled,
+    'the disable count is the enabled→disabled transitions, not every recipe left clamped'
   );
 });
 
@@ -934,7 +1032,73 @@ test('1129: salvage RUN cleanup is the one per-component pass, and is pinned as 
   // this one cascade still fans out over the selection — a pass over every actor's run history
   // per deleted component. Pinning it makes the cost visible, and gives a future batched
   // `removeRunsForComponents` a test that notices when it lands.
+  //
+  // This case installs `game.fabricate.getSalvageRunManager`, so it pins the DELEGATING branch
+  // of `_cleanupSalvageRunsForComponent` only. The in-manager fallback that runs when no
+  // salvage run manager is registered — the `for (const actor of game.actors)` walk — is where
+  // the per-component cost is actually paid, and it has its own case below.
   assert.deepEqual(removed, ['iron', 'wood', 'bar'], 'one pass per deleted component');
+});
+
+test('1129: with no SalvageRunManager the cleanup walks every actor once per component', async () => {
+  notifications.length = 0;
+  const recipeManager = makeRecipeManager();
+  const manager = makeManager(recipeManager);
+
+  // The branch the case above does NOT reach. `_getSalvageRunManager()` returns null whenever
+  // nothing registered one on `game.fabricate`, and the fallback then re-reads every actor's
+  // salvage-run flag once per deleted component. `game.actors` is empty in every other test
+  // here, so that loop body has never executed — the fan-out was asserted of the delegating
+  // branch and merely assumed of the branch that pays for it.
+  const reads = [];
+  const writes = [];
+  const makeActor = (id, history) => {
+    const container = { history };
+    return {
+      id,
+      getFlag(_scope, key) {
+        reads.push(`${id}|${key}`);
+        return key === 'fabricate.salvageRuns' ? container : null;
+      },
+      async setFlag(_scope, key, value) {
+        writes.push({ actorId: id, key, componentIds: value.history.map((run) => run.componentId) });
+        container.history = value.history;
+      },
+    };
+  };
+
+  const actorsBefore = game.actors;
+  game.actors = [
+    makeActor('actor-a', [
+      { componentId: 'iron', craftingSystemId: 'sys' },
+      { componentId: 'wood', craftingSystemId: 'sys' },
+      // Another system's run for the same component: the filter is scoped by system, so this
+      // must survive both passes.
+      { componentId: 'iron', craftingSystemId: 'other-sys' },
+    ]),
+    makeActor('actor-b', [{ componentId: 'plank', craftingSystemId: 'sys' }]),
+  ];
+  try {
+    await manager.deleteComponents('sys', ['iron', 'wood']);
+  } finally {
+    game.actors = actorsBefore;
+  }
+
+  assert.equal(
+    reads.length,
+    4,
+    'every actor is re-read once per deleted component — actors x components, the cost a set-wise form would remove'
+  );
+  assert.deepEqual(
+    writes.map((write) => write.actorId),
+    ['actor-a', 'actor-a'],
+    'only the actor whose history actually changed is written, once per matching component'
+  );
+  assert.deepEqual(
+    writes.at(-1).componentIds,
+    ['iron'],
+    "the surviving entry is the OTHER system's run for the same component, not a leftover of this one"
+  );
 });
 
 test('1129: deleteComponents returns the exact field names its callers read by name', async () => {
