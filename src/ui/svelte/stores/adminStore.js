@@ -6348,10 +6348,10 @@ export function createAdminStore(services) {
    * strictly more information than a modal can carry.
    *
    * @param {Iterable<string>} essenceIds
-   * @returns {Promise<{deleted: number, recipesUpdated: number}>}
+   * @returns {Promise<{deleted: number, recipesUpdated: number, recipesDisabled: number}>}
    */
   async function deleteEssences(essenceIds) {
-    const empty = { deleted: 0, recipesUpdated: 0 };
+    const empty = { deleted: 0, recipesUpdated: 0, recipesDisabled: 0 };
     const context = _selectedSystemEssences();
     if (!context) return empty;
     const { systemManager, sysId, existing } = context;
@@ -6371,6 +6371,7 @@ export function createAdminStore(services) {
       return {
         deleted: Number(result?.deleted) || 0,
         recipesUpdated: Number(result?.recipesUpdated) || 0,
+        recipesDisabled: Number(result?.recipesDisabled) || 0,
       };
     } catch (err) {
       console.error('Fabricate | Failed to delete essences:', err);

@@ -531,6 +531,29 @@ test('1036: deleteEssences issues ONE batched manager write for the whole set', 
   assert.deepEqual(deleteWrites[0].essenceIds, ['fire', 'water']);
 });
 
+// Issue 1144 — the toast's disable count does not exist unless the store passes it through
+// BY NAME. `deleteComponents` already proves this passthrough for its twin; this is the
+// essence half of the same seam.
+test('1144: deleteEssences passes recipesDisabled through from the manager by name', async () => {
+  const harness = makeEssenceStoreHarness({
+    essences: [
+      makeEssence({ id: 'fire', name: 'Fire' }),
+      makeEssence({ id: 'water', name: 'Water' }),
+    ],
+  });
+  harness.systemManager.deleteEssences = async (id, essenceIds) => ({
+    deleted: [...essenceIds].length,
+    essenceIds: [...essenceIds],
+    recipesUpdated: 3,
+    recipesDisabled: 1,
+  });
+  const store = await openStore(harness);
+
+  const result = await store.deleteEssences(['fire', 'water']);
+
+  assert.deepEqual(result, { deleted: 2, recipesUpdated: 3, recipesDisabled: 1 });
+});
+
 // ---------------------------------------------------------------------------
 // setEssenceEnabled — one manager write, and the invalidated-recipe report
 // ---------------------------------------------------------------------------

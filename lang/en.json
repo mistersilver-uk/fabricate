@@ -3109,7 +3109,8 @@
             "DeleteArmedAnnouncement": "Delete armed. Activate again to delete {count} essence definition(s) and rewrite {recipes} recipe(s).",
             "Applied": "Updated {count} essences.",
             "AppliedOne": "Updated 1 essence.",
-            "Deleted": "Deleted {count} essence(s) and rewrote {recipes} recipe(s)."
+            "Deleted": "Deleted {count} essence(s) and rewrote {recipes} recipe(s).",
+            "DeletedWithDisabled": "Deleted {count} essence(s) and rewrote {recipes} recipe(s), disabling {disabled} of them."
           }
         },
         "Environment": {
