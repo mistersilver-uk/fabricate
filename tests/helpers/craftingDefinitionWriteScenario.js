@@ -1,31 +1,62 @@
 /**
- * A scripted, non-trivial corpus mutation run over the two crafting managers, with
- * every `game.settings` write recorded in order.
+ * A scripted, non-trivial corpus mutation run over the two crafting managers, which
+ * observes three independent things about every `game.settings` write it provokes.
  *
- * This exists to prove ONE thing about issue 1089: routing `RecipeManager` and
- * `CraftingSystemManager` through a `CraftingDefinitionRepository` changed neither
- * the number of persistence writes, nor their order, nor a single byte of what was
- * written. The seam is only worth landing before the persistence ADR if it is
- * provably invisible, and "the suites still pass" does not prove that — most of them
- * assert on the in-memory managers, not on the serialized corpus.
+ * This exists to prove ONE claim about issue 1089: routing `RecipeManager` and
+ * `CraftingSystemManager` through a `CraftingDefinitionRepository` changed nothing.
+ * The existing manager suites cannot show that — they assert on the in-memory
+ * managers, not on the bytes that reach storage.
+ *
+ * ## Why this is not one big recorded snapshot any more
+ *
+ * It was, and the snapshot had to be re-recorded three times in a fortnight for
+ * changes that had nothing to do with the seam: #1131 added `failureResultPolicy` to
+ * three check normalizers, and #1136 retired the flat `results` alias and every
+ * rebuildable default from the recipe payload. Both legitimately moved the bytes.
+ *
+ * That is not a tolerable cost, and the reason is not the re-recording effort. A
+ * fixture that cries wolf repeatedly teaches its reviewer to regenerate it on sight,
+ * and the failure after that is the real one. So the snapshot was split along the line
+ * that actually separates the seam's concerns from everyone else's:
+ *
+ * | Part | Mechanism | Moves when |
+ * |---|---|---|
+ * | Write SHAPE — count, order, target key | checked-in golden | write counts change (rare, and always deliberate) |
+ * | Write PAYLOAD — the bytes | live differential, recomputed each run | never; both legs move together |
+ * | Round-TRIP — hydrate/re-serialize | assertion | never |
+ *
+ * The seam owns write shape. It does NOT own payload content — it never constructs a
+ * payload, it delegates entirely to `Recipe.toJSON()` and the system normalizers. Only
+ * that second dimension was generating the noise, so only that one stopped being a
+ * snapshot.
  *
  * The scenario drives PUBLIC manager APIs only, so the same driver runs unchanged
- * against the pre-seam tree and the post-seam tree. Its recorded output is checked in
- * as a golden (`tests/fixtures/craftingDefinitionWriteLog.golden.json`), generated
- * from the base commit BEFORE the seam existed.
+ * against a pre-seam tree — which is how the write-shape golden is recorded, and the
+ * only way that fixture can honestly claim the seam did not change the write count.
+ * On a pre-seam tree the differential compares an expression against itself and is
+ * trivially true; that is correct, because there is no seam there to test.
  *
  * This file is deliberately NOT named `*.test.js`: `tests/helpers/` sits outside the
  * `npm test` glob, so nothing here is collected as a suite. It is exercised from
- * inside the glob by `tests/crafting-definition-repository.test.js`.
+ * inside the glob by `tests/crafting-definition-persistence-equivalence.test.js`.
  */
 
-import { createHash } from 'node:crypto';
+/** Setting keys, inlined so the helper runs against a bare `src` export of any tree. */
+const RECIPES_KEY = 'recipes';
+const CRAFTING_SYSTEMS_KEY = 'craftingSystems';
+
+/**
+ * The frozen wall clock for the run. `Recipe.toJSON()` stamps `metadata.created` and
+ * `metadata.modified` from `Date.now()`; an unfrozen clock makes two runs differ at an
+ * identical byte length, which reads exactly like a real regression and is not one.
+ */
+const FROZEN_NOW = 1_760_000_000_000;
 
 /**
  * Deterministic id generator. The managers call `foundry.utils.randomID()` for
- * generated ids, and a random one would make the golden unreproducible.
+ * generated ids, and a random one would make the run unreproducible.
  *
- * @returns {{ next: () => string, reset: () => void }}
+ * @returns {{ next: () => string }}
  */
 function makeIdSequence() {
   let seq = 0;
@@ -34,40 +65,52 @@ function makeIdSequence() {
       seq += 1;
       return `gen${String(seq).padStart(4, '0')}`;
     },
-    reset: () => {
-      seq = 0;
-    },
   };
 }
 
 /**
- * The frozen wall clock for the run. `Recipe.toJSON()` stamps `metadata.created` and
- * `metadata.modified` from `Date.now()`, so an unfrozen clock makes every recipe
- * write differ from the last run at the same byte length — which reads exactly like a
- * real regression and is not one.
- */
-const FROZEN_NOW = 1_760_000_000_000;
-
-/**
  * Install the Foundry globals the two managers read, with a settings store that
- * records every write in order.
+ * records the shape of every write and checks its payload against the pre-seam
+ * expression as it happens.
  *
  * Deliberately a GM client: every scenario step is a GM-only mutation, and the point
- * of the run is the write log, not the permission gate (which
+ * of the run is the write behaviour, not the permission gate (which
  * `tests/helpers/settings.js` covers).
- *
- * @returns {{
- *   settings: Map<string, unknown>,
- *   writes: Array<{ key: string, value: unknown }>,
- *   restore: () => void,
- * }}
  */
 function installRecordingFoundryEnv() {
   const settings = new Map();
   const writes = [];
+  const differentialFailures = [];
   const ids = makeIdSequence();
   const realNow = Date.now;
   Date.now = () => FROZEN_NOW;
+
+  /** Bound after the managers exist; until then no payload check is possible. */
+  let managers = null;
+
+  /**
+   * The expression the PRE-SEAM managers used to build their payload, verbatim:
+   * `RecipeManager.save()` was `[...this.recipes.values()].map((r) => r.toJSON())` and
+   * `CraftingSystemManager.save()` was `[...this.systems.values()]`.
+   *
+   * Recomputed from the LIVE maps at the moment of each write, which is what makes
+   * this a differential rather than a snapshot: a payload change in the model layer
+   * moves this leg and the adapter's leg identically, while any divergence introduced
+   * by the seam moves only one.
+   *
+   * @param {string} key
+   * @returns {string|null} serialized expected payload, or `null` when uncheckable.
+   */
+  function expectedPayload(key) {
+    if (!managers) return null;
+    if (key === RECIPES_KEY) {
+      return JSON.stringify([...managers.recipeManager.recipes.values()].map((r) => r.toJSON()));
+    }
+    if (key === CRAFTING_SYSTEMS_KEY) {
+      return JSON.stringify([...managers.systemManager.systems.values()]);
+    }
+    return null;
+  }
 
   globalThis.foundry = {
     utils: {
@@ -81,7 +124,7 @@ function installRecordingFoundryEnv() {
   };
 
   globalThis.game = {
-    user: { isGM: true, name: 'Golden GM' },
+    user: { isGM: true, name: 'Scenario GM' },
     users: { activeGM: { id: 'gm-1' } },
     actors: [],
     packs: [],
@@ -89,11 +132,14 @@ function installRecordingFoundryEnv() {
     settings: {
       get: (_namespace, key) => settings.get(key),
       set: async (_namespace, key, value) => {
+        const index = writes.length;
+        const expected = expectedPayload(key);
+        const written = JSON.stringify(value);
+        writes.push({ index, key, checked: expected !== null });
+        if (expected !== null && expected !== written) {
+          differentialFailures.push({ index, key, expected, written });
+        }
         settings.set(key, value);
-        // Snapshot at write time. The managers hand `setSetting` live object
-        // references, so a later in-place mutation would otherwise rewrite history
-        // and make an unequal run look equal.
-        writes.push({ key, value: JSON.parse(JSON.stringify(value)) });
         return value;
       },
     },
@@ -106,6 +152,10 @@ function installRecordingFoundryEnv() {
   return {
     settings,
     writes,
+    differentialFailures,
+    bindManagers: (bound) => {
+      managers = bound;
+    },
     restore: () => {
       Date.now = realNow;
     },
@@ -145,22 +195,12 @@ function ingredientAndResults(suffix, componentUuid) {
 }
 
 /**
- * Run the scenario and return the ordered write log.
- *
- * The step list is deliberately varied: single-record creates, single-record updates,
- * a single-record delete, in-place library edits that persist through the owning
- * system record, a batched multi-recipe rewrite, and a cascading system delete. Those
- * are exactly the five shapes the seam had to preserve, and each of them reaches
- * `save()` by a different route in the pre-seam code.
+ * Run the scenario.
  *
  * @param {object} modules
  * @param {new (...args: any[]) => any} modules.RecipeManager
  * @param {new (...args: any[]) => any} modules.CraftingSystemManager
- * @returns {Promise<{
- *   writes: Array<{ key: string, value: unknown }>,
- *   steps: string[],
- *   finalCorpus: Record<string, unknown>,
- * }>}
+ * @returns {Promise<object>} the run's observations; see {@link executeScenario}.
  */
 export async function runCraftingDefinitionWriteScenario({ RecipeManager, CraftingSystemManager }) {
   const env = installRecordingFoundryEnv();
@@ -174,14 +214,17 @@ export async function runCraftingDefinitionWriteScenario({ RecipeManager, Crafti
 /**
  * The scripted mutation run itself, separated so the frozen clock is always restored.
  *
- * @param {{ settings: Map<string, unknown>, writes: Array<{ key: string, value: unknown }> }} env
- * @param {{ RecipeManager: any, CraftingSystemManager: any }} modules
- * @returns {Promise<{ writes: any[], steps: string[], finalCorpus: Record<string, unknown> }>}
+ * The step list is deliberately varied: single-record creates, single-record updates,
+ * a single-record delete, in-place library edits that persist through the owning
+ * system record, a batched multi-recipe rewrite, and a cascading system delete. Those
+ * are exactly the shapes the seam had to preserve, and each reaches persistence by a
+ * different route.
  */
 async function executeScenario(env, { RecipeManager, CraftingSystemManager }) {
   const steps = [];
   const recipeManager = new RecipeManager();
   const systemManager = new CraftingSystemManager(recipeManager);
+  env.bindManagers({ recipeManager, systemManager });
 
   await recipeManager.initialize();
   await systemManager.initialize();
@@ -291,47 +334,97 @@ async function executeScenario(env, { RecipeManager, CraftingSystemManager }) {
   await systemManager.deleteSystem('beta');
   steps.push('deleteSystem:beta');
 
-  // Reload proves the read path round-trips what the write path produced.
-  const reloadedSystems = systemManager.reload();
-  const reloadedRecipes = recipeManager.reload();
-  steps.push(`reload:${reloadedSystems}:${reloadedRecipes}`);
+  const roundTrip = captureRoundTrip(env, { recipeManager, systemManager });
+  steps.push('roundTrip');
 
-  const finalCorpus = Object.fromEntries(
-    [...env.settings.entries()].sort(([a], [b]) => a.localeCompare(b))
-  );
-
-  return { writes: env.writes, steps, finalCorpus };
+  return {
+    steps,
+    writes: env.writes.map(({ index, key }) => ({ index, key })),
+    writeCount: env.writes.length,
+    differential: {
+      checked: env.writes.filter((write) => write.checked).length,
+      total: env.writes.length,
+      failures: env.differentialFailures,
+    },
+    roundTrip,
+  };
 }
 
 /**
- * Reduce a scenario run to the comparable golden shape.
+ * Re-hydrate the persisted corpus and re-serialize it, so a key that storage carries
+ * but a round trip cannot reproduce is visible.
  *
- * The per-write digest is what makes this a BYTE identity check rather than a shape
- * check: any change to a normalizer's emitted key set, to map ordering, or to a
- * serialized default moves a digest even when the corpus still "looks right".
- * `finalCorpus` is carried in full alongside it purely so a failure is diagnosable —
- * a bare digest mismatch tells you nothing about which field moved.
+ * This is the check that actually defends against a whitelist rebuild: every
+ * normalizer in `CraftingSystemManager` emits an explicit key set, so a key it stops
+ * emitting is dropped from storage on the next save. Unlike a byte snapshot it is
+ * invariant to any legitimate payload change — #1136 could retire two thirds of the
+ * recipe payload and this still holds, because it compares the corpus against itself
+ * through a hydrate/serialize cycle rather than against remembered bytes.
  *
- * @param {{ writes: Array<{ key: string, value: unknown }>, steps: string[], finalCorpus: object }} run
- * @returns {object}
+ * `reload()` is used as the hydrator because it is the managers' own read path, so
+ * this exercises production code rather than a re-implementation of it. Its boolean
+ * return is a second, independent signal: `false` means the persisted bytes rehydrate
+ * to the identical in-memory corpus.
  */
-export function summarizeScenarioRun(run) {
+function captureRoundTrip(env, { recipeManager, systemManager }) {
+  const persistedRecipes = env.settings.get(RECIPES_KEY) ?? [];
+  const persistedSystems = env.settings.get(CRAFTING_SYSTEMS_KEY) ?? [];
+
+  const recipesReportedChange = recipeManager.reload();
+  const systemsReportedChange = systemManager.reload();
+
+  return {
+    recipes: {
+      reportedChange: recipesReportedChange,
+      persisted: asPersistedForm(persistedRecipes),
+      reserialized: asPersistedForm(
+        [...recipeManager.recipes.values()].map((recipe) => recipe.toJSON())
+      ),
+    },
+    craftingSystems: {
+      reportedChange: systemsReportedChange,
+      persisted: asPersistedForm(persistedSystems),
+      // Systems are persisted as-is (the repository's serializer is identity), so the
+      // re-serialized form is the hydrated map itself.
+      reserialized: asPersistedForm([...systemManager.systems.values()]),
+    },
+  };
+}
+
+/**
+ * Project a corpus to the form that actually reaches storage.
+ *
+ * `setSetting` is handed live object references and Foundry persists them as JSON, so
+ * a key whose value is literally `undefined` exists in memory and does NOT exist in
+ * storage — `_normalizeSystem` emits `originItemUuid: undefined` on an essence with no
+ * source, for one. Comparing the in-memory shapes would report that as a round-trip
+ * failure on every run.
+ *
+ * This does not soften the check. JSON only elides keys that are `undefined`, so a key
+ * carrying any real value survives on both sides and a genuine drop still fails.
+ *
+ * @param {unknown} corpus
+ * @returns {unknown}
+ */
+function asPersistedForm(corpus) {
+  return JSON.parse(JSON.stringify(corpus));
+}
+
+/**
+ * Reduce a run to the checked-in write-SHAPE golden: how many writes, in what order,
+ * against which setting key. Deliberately excludes every byte of payload.
+ *
+ * This fixture is meant to be brittle. A PR that changes write counts SHOULD turn it
+ * red and update it deliberately — that is the write-amplification guarantee #1080
+ * must improve on and #1139 already moved once.
+ *
+ * @param {object} run
+ * @returns {{ steps: string[], writeCount: number, writes: Array<{index: number, key: string}> }}
+ */
+export function summarizeWriteShape(run) {
   return {
     steps: run.steps,
-    writeCount: run.writes.length,
-    writes: run.writes.map((write, index) => {
-      const json = JSON.stringify(write.value);
-      return {
-        index,
-        key: write.key,
-        bytes: json.length,
-        sha256: createHash('sha256').update(json).digest('hex'),
-      };
-    }),
-    // Round-tripped through JSON on purpose. `setSetting` is handed live object
-    // references, and Foundry persists them as JSON — so a key whose value is
-    // literally `undefined` is present in memory and absent in storage. Comparing the
-    // in-memory shape would report that difference as a corpus change on every run.
-    finalCorpus: JSON.parse(JSON.stringify(run.finalCorpus)),
+    writeCount: run.writeCount,
+    writes: run.writes,
   };
 }

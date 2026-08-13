@@ -1,0 +1,98 @@
+{
+  "steps": [
+    "initialize",
+    "createSystem:alpha",
+    "createSystem:beta",
+    "updateSystem:alpha:essences",
+    "createItem:alpha:0",
+    "createItem:alpha:1",
+    "createItem:alpha:2",
+    "createItem:beta:0",
+    "updateItem:alpha:1",
+    "createRecipe:blade",
+    "createRecipe:nail",
+    "createRecipe:tonic",
+    "updateRecipe:nail",
+    "batch:create+update+save",
+    "deleteRecipe:nail",
+    "deleteItem:alpha:2",
+    "deleteEssence:alpha:earth",
+    "deleteSystem:beta",
+    "roundTrip"
+  ],
+  "writeCount": 18,
+  "writes": [
+    {
+      "index": 0,
+      "key": "craftingSystems"
+    },
+    {
+      "index": 1,
+      "key": "craftingSystems"
+    },
+    {
+      "index": 2,
+      "key": "craftingSystems"
+    },
+    {
+      "index": 3,
+      "key": "craftingSystems"
+    },
+    {
+      "index": 4,
+      "key": "craftingSystems"
+    },
+    {
+      "index": 5,
+      "key": "craftingSystems"
+    },
+    {
+      "index": 6,
+      "key": "craftingSystems"
+    },
+    {
+      "index": 7,
+      "key": "craftingSystems"
+    },
+    {
+      "index": 8,
+      "key": "recipes"
+    },
+    {
+      "index": 9,
+      "key": "recipes"
+    },
+    {
+      "index": 10,
+      "key": "recipes"
+    },
+    {
+      "index": 11,
+      "key": "recipes"
+    },
+    {
+      "index": 12,
+      "key": "recipes"
+    },
+    {
+      "index": 13,
+      "key": "recipes"
+    },
+    {
+      "index": 14,
+      "key": "craftingSystems"
+    },
+    {
+      "index": 15,
+      "key": "craftingSystems"
+    },
+    {
+      "index": 16,
+      "key": "recipes"
+    },
+    {
+      "index": 17,
+      "key": "craftingSystems"
+    }
+  ]
+}
