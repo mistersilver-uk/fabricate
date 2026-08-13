@@ -38,7 +38,7 @@ When `CraftingSystem.resolutionMode` changes:
 1. Delete all recipes in the system.
 2. Apply the same clean-up as mode change.
    This clean-up covers all three actor- and user-scoped stores keyed by the deleted system: crafting runs (both active and history) via the runs clean-up; learned-recipe flags via the learned-recipes clean-up; and per-user progressive-ordering and stale-reference preferences via the preferences clean-up.
-   For performance and reliability, once all recipes have been deleted this clean-up is performed as a single bulk pass across all actors per store, not a per-recipe sequential clean-up that fans out to one flag write per recipe per actor.
+   For performance and reliability, once all recipes have been deleted this clean-up is performed as a single bulk pass per store across the actors the deleting client may write, not a per-recipe sequential clean-up that fans out to one flag write per recipe per actor.
    Batching how the clean-up runs does not narrow which categories it covers.
    The deliberately-orphaned per-actor `discoveryProgress` flag remains out of scope.
 3. Remove the system from persisted settings.
@@ -57,13 +57,14 @@ It has both a single-recipe and a SET form, and the two perform the same cascade
 4. Remove recipe-specific UI preference data.
 5. Remove the deleted recipe's id from every recipe item definition whose `recipeIds[]` contained it, so no membership entry points at a recipe that no longer exists.
    The basis is explicit rather than inferred: on a system whose `membershipResolvesByRecipeIds` marker is unset, membership resolves through the recipe's own legacy scalar and therefore dies with the recipe, so no definition is rewritten and none is left dangling.
-   The prune neither sets nor reads that monotone marker — an unauthored, irreversible basis flip is not an acceptable side effect of a deletion the GM authored for another reason.
+   The prune's WRITE neither sets that monotone marker nor consults it to decide what to rewrite — an unauthored, irreversible basis flip is not an acceptable side effect of a deletion the GM authored for another reason — while the basis-aware figure in clause 6 does read it, which is why clause 5 is a statement about the write and not about the capability.
 6. Both forms state their impact before the GM commits, and both report the same arithmetic: how many recipes will be deleted, how many recipe items will no longer contain them, and how many characters will lose the learned knowledge.
    The recipe-item figure counts DISTINCT recipe items — two selected recipes in one recipe item is one recipe item — and it is basis-aware, so it may exceed the number of definitions the write actually rewrites.
    The character figure counts DISTINCT actors resolved through the same writable-actor scope clause 3 cascades over.
+   It counts the actors THIS deletion makes forget something; clause 3's clean-up removes every learned entry naming a recipe that no longer exists, so on a world carrying pre-existing orphans it touches a superset of them.
 7. Deletion is WARNED, not BLOCKED: no recipe is refused or skipped on account of the recipe items containing it or the characters who have learned it.
 8. Every GM-initiated recipe deletion routes through one shared body, so the entry points cannot disagree about what deleting a recipe reaches.
-   The compendium importer's orphan-prune phase is exempt: the pack owns the whole definition set it has just written and the phase deliberately batches to a single recipes write.
+   Two paths are exempt and both are recorded on the leaf delete itself: deleting a whole crafting system, where the recipe items go with the system that holds them, and the compendium importer's orphan-prune phase, where the pack owns the whole definition set it has just written and the phase deliberately batches to a single recipes write.
    An overwrite import that changes a system's resolution mode still cascades, transitively through the resolution-mode migration.
 9. A recipe item's `caps.learn.prerequisiteIds` and a teaser's `fragments[].recipeIds` are deliberately NOT pruned: both are authored content an unrelated delete must not silently rewrite, and the Required Knowledge gate fails open on a dangling prerequisite.
    The accepted consequence is recorded rather than discovered later — because that gate SKIPS a dangling prerequisite rather than clearing it, a retained id re-arms if a keep-mode pack reinstall re-mints a recipe under the same id.
@@ -181,7 +182,7 @@ For systems in `alchemy` mode:
 - Remove run entries that reference missing recipe IDs.
 - Remove run entries for recipes in deleted systems.
 - Runs cleanup should be executed after every destructive operation and during startup migration.
-- During a Delete Crafting System operation this clean-up runs as one bulk pass per store across all actors, not once per deleted recipe; this batches how the clean-up executes without changing its scope.
+- During a Delete Crafting System operation this clean-up runs as one bulk pass across the actors the deleting client may write, not once per deleted recipe; this batches how the clean-up executes without changing its scope.
 
 ### Learned Recipes Clean-up
 
