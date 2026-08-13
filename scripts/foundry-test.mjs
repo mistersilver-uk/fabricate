@@ -46,8 +46,25 @@ const ROOT = join(__dirname, '..');
  * hang rather than a long run.
  */
 const CHECKS = Object.freeze({
-  full: Object.freeze({ script: 'foundry-test-run.mjs', timeoutMs: null }),
-  version: Object.freeze({ script: 'foundry-version-assert.mjs', timeoutMs: 360_000 })
+  full: Object.freeze({ script: 'foundry-test-run.mjs', timeoutMs: null, preflightArgs: null }),
+  version: Object.freeze({
+    script: 'foundry-version-assert.mjs',
+    timeoutMs: 360_000,
+    preflightArgs: null
+  }),
+  // The performance profile (issue #1073). It takes NO budget of its own, so the `perf` entry in
+  // foundryRunBudget.js decides how long it gets — that is the profile axis doing what it is for,
+  // rather than a second constant here that would have to be kept in step with it.
+  //
+  // It is the ONLY check with a preflight, and that is its acceptance criterion rather than a
+  // nicety: the felddy image activates a licence and downloads a Foundry build at container boot,
+  // so "start it and see" is an expensive way to discover a missing password. `--preflight` runs
+  // BEFORE build and up, starts nothing, downloads nothing, and exits 2 with instructions.
+  perf: Object.freeze({
+    script: 'foundry-perf-run.mjs',
+    timeoutMs: null,
+    preflightArgs: ['--preflight']
+  })
 });
 
 /**
@@ -220,6 +237,17 @@ async function main() {
   const up = join(__dirname, 'foundry-test-up.mjs');
   const run = join(__dirname, selectedCheck.script);
   const down = join(__dirname, 'foundry-test-down.mjs');
+
+  // Step -1: preconditions, for a check that declares them. Deliberately BEFORE the build as well
+  // as before `up`: a run that cannot possibly succeed should not first spend a Vite build.
+  if (selectedCheck.preflightArgs) {
+    process.stdout.write('=== foundry-test: PREFLIGHT ===\n');
+    const preflightCode = runScript(run, selectedCheck.preflightArgs);
+    if (preflightCode !== 0) {
+      process.stderr.write('Preconditions not met. Nothing was started or downloaded.\n');
+      process.exit(2);
+    }
+  }
 
   // Step 0: Build the module so the smoke always exercises CURRENT source.
   // foundry-setup-data.mjs copies dist/ into the Foundry data dir as the module, so a

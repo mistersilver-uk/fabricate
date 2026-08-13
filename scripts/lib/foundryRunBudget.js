@@ -60,6 +60,18 @@ export const EXPECTED_WALK_MS_BY_PROFILE = {
   full: 32 * 60_000,
   screenshots: 32 * 60_000,
   rc: 24 * 60_000,
+  // `perf` (issue #1073) is UNMEASURED and deliberately the most generous entry in the table. It is
+  // not a walk of the smoke's phases at all: it seeds a synthetic corpus of up to 10,000 recipes
+  // into a live world, RELOADS to measure startup against it, then drives the GM manager, the player
+  // app and a second joined client. The corpus sizes it exists to characterise are the ones the
+  // whole performance programme calls slow, so the budget cannot be derived from any measured walk —
+  // and unlike `rc`, a `perf` overrun costs an opt-in manual run rather than a required check.
+  //
+  // Two facts bound the guess from below. Issue #1070 measured 10,000 synthetic recipes serializing
+  // to 22.3 MB, and its alchemy note records that the PRE-FIX behaviour at N=5,000 extrapolates to
+  // hours — which is why `alchemy-signatures` is capped at 2,000 and proved with counters. Anything
+  // beyond this budget is a hang or a pathology worth interrupting, not a long run.
+  perf: 60 * 60_000,
 };
 
 /**

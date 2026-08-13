@@ -688,3 +688,45 @@ Comparison between two runs MUST be refused when the runs came from environments
 - **THEN** each quantity is a separate fixture dimension that varies while the other is pinned, so a regression is attributable to one of them
 - **AND** the dimension is reported as a series of at least three points rather than as a single number
 - **AND** each fixture declares the composition that decides which branch of the measured path it exercises
+
+### Requirement: Opt-in live-Foundry performance measurement
+
+Measurement that requires a licensed Foundry installation MUST be an opt-in profile of the existing Foundry harness, MUST run in no required check, and MUST NOT start or download anything before its preconditions are met.
+Its measurements MUST NOT become assertions.
+
+#### Scenario: adding a live-Foundry measurement profile
+
+- **WHEN** performance behaviour can only be observed inside a running Foundry
+- **THEN** the profile is added to the existing harness's check and profile mechanisms and reuses its container identity, world lifecycle and teardown, rather than introducing a second harness, compose file or world script
+- **AND** the profile is declared in no GitHub Actions workflow, and a test fails when one references it
+- **AND** the profile carries its own wall-clock budget entry rather than inheriting a smoke walk's
+
+#### Scenario: preconditions for a licensed measurement run
+
+- **WHEN** a live-Foundry profile is invoked
+- **THEN** it checks for the container runtime, the credentials, the already-cached Foundry image and the fixtures it seeds, before any build, container start or download
+- **AND** an unmet precondition exits non-zero naming the precondition and the command that satisfies it
+- **AND** no image, Foundry build or licence material is fetched by the check itself
+
+#### Scenario: seeding a large corpus for measurement
+
+- **WHEN** a measurement profile needs a corpus at the scale being characterised
+- **THEN** the corpus is written as a bounded number of persistence writes that does not vary with corpus size, rather than through a per-record authoring API
+- **AND** the fixtures are the ones the Foundry-free harness uses, so the two layers measure the same corpus
+- **AND** the world is reloaded after seeding, so a startup measurement is taken against the seeded corpus rather than an empty world
+- **AND** the composition the store actually retained is counted against the composition requested, and any drift is reported
+
+#### Scenario: attributing startup cost to the module
+
+- **WHEN** a measurement reports startup time attributable to the module
+- **THEN** the module opens explicit performance mark boundaries around its own initialization and around each nested phase whose cost scales with the corpus
+- **AND** the instrumentation degrades to a no-op rather than failing a boot when the timing API is absent, partial or throwing
+- **AND** a phase that reported no measurement is recorded as missing rather than as zero
+
+#### Scenario: recording a live-Foundry measurement
+
+- **WHEN** a live-Foundry profile completes
+- **THEN** every duration and heap value is written to a gitignored run record, is never asserted, and carries a statement in the artifact itself that it must not be quoted as an absolute
+- **AND** counts are recorded against the Foundry build, game system and fixture that produced them, and no live-Foundry measurement is committed as a baseline
+- **AND** a comparison between two run records is refused, naming the differing fields, when their host, Foundry build, arm, game system, browser build, fixture profile or fixture seed differ
+- **AND** every measurement the profile declares but does not implement records what blocks it, and every declared measurement that produced no result is reported by name
