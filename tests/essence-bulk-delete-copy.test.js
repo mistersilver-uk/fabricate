@@ -112,3 +112,78 @@ describe('1132/copy essence bulk-delete names contain their visible labels', () 
     assert.match(announcement, /again/i, 'and says a SECOND activation is what deletes');
   });
 });
+
+// Issue 1156: the singular delete dialog stated both consequence figures unconditionally, so
+// the commonest single delete of all — an essence carried by nothing and required by no
+// recipe — read "This removes it from 0 component(s) and rewrites 0 recipe(s) that require
+// it." The recipe dialog fixed this for its own consequences in #1152 and added the
+// `ui-integration` clause making zero-omission the rule for every studio's singular dialog;
+// this is the essence sibling of that fix.
+describe('1156/copy the essence delete dialog omits zero consequences', () => {
+  const deleteConfirm = lang.FABRICATE.Admin.Manager.Essence.DeleteConfirm;
+
+  it('names both counts when both are non-zero', () => {
+    const content = interpolate(deleteConfirm.Content, { name: 'Fire', components: 2, recipes: 3 });
+    assert.match(content, /Fire/);
+    assert.match(content, /2 component\(s\)/);
+    assert.match(content, /3 recipe\(s\)/);
+  });
+
+  // FOUR BRANCHES, BECAUSE THE TWO CONSEQUENCES ARE INDEPENDENT (`describeEssenceDeleteImpact`):
+  // an essence can carry no component yet be required by recipes, or the reverse.
+  it('has a branch per consequence, so neither is ever stated as a nought', () => {
+    const componentsOnly = interpolate(deleteConfirm.ContentComponents, {
+      name: 'Fire',
+      components: 2,
+    });
+    assert.match(componentsOnly, /2 component\(s\)/);
+    assert.equal(/recipe/i.test(componentsOnly), false, 'and says nothing about recipes');
+
+    const recipesOnly = interpolate(deleteConfirm.ContentRecipes, { name: 'Fire', recipes: 3 });
+    assert.match(recipesOnly, /3 recipe\(s\)/);
+    assert.equal(/component/i.test(recipesOnly), false, 'and says nothing about components');
+  });
+
+  it('has a numberless branch, so an essence reaching nothing says so plainly', () => {
+    const plain = interpolate(deleteConfirm.ContentPlain, { name: 'Fire' });
+    assert.match(plain, /Fire/);
+    assert.match(plain, /permanent/i);
+    assert.equal(/\d/.test(plain.replace('Fire', '')), false, 'and names no count');
+  });
+
+  it('states every branch in the FUTURE, not as accomplished fact', () => {
+    for (const [key, data] of [
+      ['Content', { name: 'X', components: 2, recipes: 3 }],
+      ['ContentComponents', { name: 'X', components: 2 }],
+      ['ContentRecipes', { name: 'X', recipes: 3 }],
+    ]) {
+      const value = interpolate(deleteConfirm[key], data);
+      assert.match(value, /will be (removed|rewritten)/, `${key} describes what deleting WILL do`);
+    }
+  });
+
+  it('reads correctly at a count of one in the combined branch', () => {
+    const content = interpolate(deleteConfirm.Content, { name: 'X', components: 1, recipes: 1 });
+    assert.match(content, /1 component\(s\)/);
+    assert.match(content, /1 recipe\(s\)/);
+  });
+
+  it('every branch states that deleting is permanent', () => {
+    for (const [key, data] of [
+      ['Content', { name: 'X', components: 2, recipes: 3 }],
+      ['ContentComponents', { name: 'X', components: 2 }],
+      ['ContentRecipes', { name: 'X', recipes: 3 }],
+      ['ContentPlain', { name: 'X' }],
+    ]) {
+      assert.match(
+        interpolate(deleteConfirm[key], data),
+        /permanent/i,
+        `${key} states permanence`
+      );
+    }
+  });
+
+  it('titles the dialog with the essence name', () => {
+    assert.equal(interpolate(deleteConfirm.Title, { name: 'Fire' }), 'Delete Fire?');
+  });
+});
