@@ -61,6 +61,7 @@ import {
 import { resolveAlchemySubmissions } from './utils/alchemySubmissions.js';
 import { progressiveOrderKey } from './utils/progressiveResultOrder.js';
 import { findStackableMatch } from './utils/sourceUuid.js';
+import { STARTUP_PHASES, createStartupMarks } from './utils/startupMarks.js';
 import {
   callGatheringRuntimeWithCurrentViewer,
   createGatheringSceneAccess,
@@ -568,6 +569,14 @@ class Fabricate {
   async initialize() {
     console.log('Fabricate | Initializing...');
 
+    // Explicit performance boundaries around startup (issue 1073). The Foundry perf profile
+    // reports "ready time attributable to Fabricate"; without marks that attribution is a guess,
+    // because a stopwatch around the `ready` hook also times Foundry, the game system and every
+    // other active module. `createStartupMarks` is total — an absent or partial `performance`
+    // degrades to a no-op — so this can never fail a boot.
+    this._startupMarks = createStartupMarks();
+    this._startupMarks.begin(STARTUP_PHASES.INITIALIZE);
+
     // Register settings
     this.registerSettings();
     applyCurrentFabricateTheme(getSetting, SETTING_KEYS.THEME);
@@ -578,7 +587,9 @@ class Fabricate {
     // key: it is brand new, so no prior stored value exists to migrate.
     applyItemStackQuantityPathSetting();
     // Run data migrations before managers load persisted data
+    this._startupMarks.begin(STARTUP_PHASES.MIGRATIONS);
     await this._runMigrations();
+    this._startupMarks.end(STARTUP_PHASES.MIGRATIONS);
     // Create managers
     // Both seams are lazy closures because `craftingSystemManager` is constructed on the
     // next statement — it needs `recipeManager` in ITS constructor, so one of the two has
@@ -655,9 +666,12 @@ class Fabricate {
       }
     );
 
-    // Initialize recipe manager
+    // Initialize recipe manager. Both `initialize()` calls deserialize a whole world-setting
+    // payload, so this span is the corpus-proportional half of startup.
+    this._startupMarks.begin(STARTUP_PHASES.DATA_LOAD);
     await this.recipeManager.initialize();
     await this.craftingSystemManager.initialize();
+    this._startupMarks.end(STARTUP_PHASES.DATA_LOAD);
     this.gatheringEnvironmentStore = new GatheringEnvironmentStore({
       systemManager: this.craftingSystemManager,
       runCleanup: {
@@ -876,6 +890,7 @@ class Fabricate {
     // Each pass is also scoped to the actors this client owns (see
     // `selectWritableActors`), so a refusal should no longer be reachable at all;
     // this guard is the belt to that braces.
+    this._startupMarks.begin(STARTUP_PHASES.STARTUP_MAINTENANCE);
     await runStartupMaintenance([
       ['crafting runs', () =>
         this.craftingRunManager.cleanupInvalidRuns(validRecipes, validSystems)],
@@ -897,10 +912,17 @@ class Fabricate {
           validComponentIds
         })]
     ]);
+    this._startupMarks.end(STARTUP_PHASES.STARTUP_MAINTENANCE);
 
     registerFragmentDiscoveryHook(this.craftingSystemManager, this.recipeVisibilityService);
     registerRecipeItemLearningHook(this.recipeVisibilityService);
 
+    // Close the outer span BEFORE readiness is announced, so anything waiting on
+    // `whenReady()` observes a complete `fabricate:initialize` measure. It sits ABOVE
+    // `this.ready = true` deliberately: `tests/components/manager-launch-readiness.test.js`
+    // pins `this.ready = true;` and `this._resolveReady?.();` as adjacent lines, and that
+    // adjacency is the guard against readiness drifting away from the flag it announces.
+    this._startupMarks.end(STARTUP_PHASES.INITIALIZE);
     this.ready = true;
     this._resolveReady?.();
     console.log('Fabricate | Ready');
