@@ -13,12 +13,13 @@
   } from '../../../../gatheringImageDefaults.js';
   import { localize, notifyInfo, notifyWarn } from '../../util/foundryBridge.js';
   import { resolveDropUuid } from '../../util/dropUtils.js';
+  import { permitsFailureResults } from '../../../../utils/failureResultPolicy.js';
   import {
-    routedSuccessTierOptions,
     routedOutcomeTierOptions,
+    routedTierOptionsForPolicy,
+    routedOutcomeTierNamesForPolicy,
     routedHasOutcomeTiers,
     routedOutcomeTierCount,
-    routedOutcomeTierNames,
     resolveRecipeCheckTierOptions,
     resolveRecipeFixedOutcomeTierOptions,
   } from '../../../../utils/routedOutcomeKeywords.js';
@@ -191,6 +192,11 @@
   // lives on the lifted `componentBrowserState`, beside the browser's other view-state.
   let componentBulkDraft = $state(createComponentBulkDraft());
   let componentBulkApplying = $state(false);
+  // The armed bulk delete (issue 1129). `…Armed` is the single armed token for the whole
+  // selection — the target is the set, not a row — and it is cleared by the selection effect
+  // below on ANY change to the set.
+  let componentBulkDeleting = $state(false);
+  let componentBulkDeleteArmed = $state(false);
   // The recipe library's twin (issue 1010), owned here for the identical reason: the
   // recipe bulk panel is unmounted the moment the selection empties, so a panel-owned
   // draft would be destroyed by the very transition that is supposed to DISCARD it. The
@@ -685,8 +691,17 @@
   // Routed-check outcome tiers (active type) offered to the recipe editor's
   // check-mode result-set assignment control as {id, name}. Failure tiers are
   // excluded — a failed check produces no result set to route to.
+  // POLICY-CONDITIONAL since issue 1098 (decision 7): success-filtered when the crafting
+  // failure-result policy forbids failure results, unfiltered when it permits them, so a
+  // GM can bind a result group to a failure-marked tier exactly where the engine will
+  // route one. It is a SWAP between two functions the codebase already had, and
+  // `systemValidation` feeds `recipeReadiness` from the same swap — the picker and the
+  // readiness warnings can never disagree about which tiers are assignable.
   const recipeRoutedOutcomeTierOptions = $derived.by(() =>
-    routedSuccessTierOptions(selectedSystem?.craftingCheck?.routed)
+    routedTierOptionsForPolicy(
+      selectedSystem?.craftingCheck?.routed,
+      selectedSystem?.craftingCheck?.failureResultPolicy
+    )
   );
   // ALL routed outcome tiers ({id, name}, success + failure) — the library inspector
   // resolves a routed-by-check result group's checkOutcomeIds to these tier NAMES.
@@ -699,13 +714,26 @@
   const recipeRoutedHasOutcomeTiers = $derived.by(() =>
     routedHasOutcomeTiers(selectedSystem?.craftingCheck?.routed)
   );
+  // Whether this system's crafting failure-result policy permits results on a failed check
+  // (issue 1098). Read through the shared predicate rather than compared to a literal, so
+  // the editor's third empty hint and the engine's routing decision cannot disagree about
+  // what an absent or unrecognized value means.
+  const recipeFailureResultsAllowed = $derived(
+    permitsFailureResults(selectedSystem?.craftingCheck?.failureResultPolicy)
+  );
 
   // Salvage feature gate + the inputs the per-component salvage editor needs.
   const componentSalvageEnabled = $derived(selectedSystem?.features?.salvage === true);
   // Routed-salvage outcome tier NAMES (active type), used by the per-component
   // outcome-routing selects. Names map to result-group ids in component.salvage.
+  // Policy-conditional on the same terms (issue 1098). Unfiltered until that issue, so it
+  // offered failure tier names as DEAD OPTIONS: `salvage()` returned before
+  // `_resolveSalvageResultGroups` on a failed check, and nothing ever routed through them.
   const salvageOutcomeNames = $derived(
-    routedOutcomeTierNames(selectedSystem?.salvageCraftingCheck?.routed)
+    routedOutcomeTierNamesForPolicy(
+      selectedSystem?.salvageCraftingCheck?.routed,
+      selectedSystem?.salvageCraftingCheck?.failureResultPolicy
+    )
   );
   // The second axis of the per-component salvage panel's derived presentation
   // (issue 676, decision 2): salvageResolutionMode × salvage-check enablement.
@@ -1790,11 +1818,31 @@
   const componentBulkCategoryOptions = $derived(
     componentCategoryOptions(itemCards, selectedSystem?.componentCategories || [])
   );
-  // Discard the staged draft whenever the selection empties — a clear, a system switch, a
-  // prune that removed the last id, or a successful apply. The panel is unmounted at that
-  // point, so this is the only place the discard can honestly happen.
+  // What deleting the current selection would do (issue 1129). Derived from the STORE rather
+  // than from the selected cards, because the "recipes disabled" number depends on the whole
+  // selection against real recipe bodies — see `adminStore.describeComponentDelete`.
+  const componentBulkDeleteImpact = $derived(
+    store.describeComponentDelete?.(componentBulkSelectedIds) ?? {
+      deletable: 0,
+      deletableIds: [],
+      recipesRewritten: 0,
+      recipesDisabled: 0,
+    }
+  );
+  // Discard the staged draft when the selection empties — a clear, a system switch, a prune
+  // that removed the last id, or a successful apply — and DISARM the delete whenever the
+  // selection changes at all. An arm is a statement about a SPECIFIC set: once the set moves,
+  // the impact sentence the GM read before arming is no longer the impact of confirming, so
+  // the second click must not still be a confirmation. The Essence Studio's twin above is
+  // where this rule is stated at length.
+  //
+  // It reads the SET, not its size, for the reason recorded there: the browser assigns a NEW
+  // `Set` on every mutation, so set identity is what "changes at all" means, and a size
+  // dependency cannot see a same-size swap.
   $effect(() => {
-    if (componentBulkSelectionCount === 0) componentBulkDraft = createComponentBulkDraft();
+    const selectedIds = componentBulkSelectedIds;
+    if (selectedIds.size === 0) componentBulkDraft = createComponentBulkDraft();
+    componentBulkDeleteArmed = false;
   });
   // ── The recipe bulk selection (issue 1010) ───────────────────────────────────────
   // Read straight off the LIFTED browser state, which `RecipesBrowserView` binds: the
@@ -4204,6 +4252,68 @@
     } finally {
       componentBulkApplying = false;
     }
+  }
+
+  // The ARMED bulk delete's confirm step (issue 1129). The impact statement is rendered by
+  // the panel from `componentBulkDeleteImpact`; this only performs the write and reports what
+  // happened. The delete is warned, not blocked, so every selected component is deleted and
+  // nothing is skipped.
+  async function deleteSelectedComponents(ids) {
+    if (componentBulkDeleting) return false;
+    const targets = Array.isArray(ids) ? ids : [];
+    if (targets.length === 0) return false;
+    componentBulkDeleting = true;
+    try {
+      const result = await store.deleteComponents?.(targets);
+      // A FAILED write returns the store's zero result, which is an OBJECT and therefore
+      // truthy — `if (!result)` alone caught only the absent-action case and let a failed
+      // delete clear the selection and report "Deleted 0 component(s)" on top of the error
+      // toast the store already raised. Nothing was deleted, so nothing is announced and the
+      // selection stays put; the arm is dropped either way, because the GM's confirmation has
+      // been spent and a still-armed button would delete on the next single click.
+      const deleted = Number(result?.deleted) || 0;
+      if (deleted === 0) return false;
+      clearComponentBulkSelection();
+      notifyInfo(componentBulkDeletedMessage(result));
+      return true;
+    } catch (err) {
+      // The store catches its own write failures, so reaching here means the failure was
+      // elsewhere. Swallowing it at the boundary keeps an unhandled rejection out of a click
+      // handler that has no caller to receive it.
+      console.error('Fabricate | Failed to delete the selected components:', err);
+      return false;
+    } finally {
+      // Both live here so the comment above stays true on EVERY exit. `store.deleteComponents`
+      // catches its own write failures, but it resolves the system and its managed items
+      // OUTSIDE that try, so a rejection can reach this function — and a disarm sitting in the
+      // `try` after the await would be skipped, leaving an armed button that deletes on the
+      // next single click.
+      componentBulkDeleteArmed = false;
+      componentBulkDeleting = false;
+    }
+  }
+
+  // `recipesDisabled` is the most consequential outcome of the three — recipes the GM's
+  // players could craft this morning and cannot craft now — and the toast is the ONLY
+  // feedback that survives the panel unmounting on a successful delete. It is reported when
+  // non-zero, and the zero case takes the shorter sentence rather than trailing ", disabling
+  // 0 of them", which reads as a warning about nothing.
+  function componentBulkDeletedMessage(result) {
+    const disabled = Number(result?.recipesDisabled) || 0;
+    const template =
+      disabled > 0
+        ? text(
+            'FABRICATE.Admin.Manager.Component.BulkEdit.DeletedWithDisabled',
+            'Deleted {count} component(s) and rewrote {recipes} recipe(s), disabling {disabled} of them.'
+          )
+        : text(
+            'FABRICATE.Admin.Manager.Component.BulkEdit.Deleted',
+            'Deleted {count} component(s) and rewrote {recipes} recipe(s).'
+          );
+    return template
+      .replace('{count}', Number(result?.deleted) || 0)
+      .replace('{recipes}', Number(result?.recipesUpdated) || 0)
+      .replace('{disabled}', disabled);
   }
 
   // ── Recipe bulk edit (issue 1010) ────────────────────────────────────────────────
@@ -7508,6 +7618,13 @@
             craftingCheckSimple={checkSimpleDraft}
             craftingCheckProgressive={checkProgressiveDraft}
             craftingConsumption={selectedSystem?.craftingCheck?.consumption || null}
+            salvageConsumption={selectedSystem?.salvageCraftingCheck?.consumption || null}
+            craftingFailureResultPolicy={selectedSystem?.craftingCheck?.failureResultPolicy ||
+              'perRecord'}
+            salvageFailureResultPolicy={selectedSystem?.salvageCraftingCheck?.failureResultPolicy ||
+              'perRecord'}
+            gatheringFailureResultPolicy={selectedSystem?.gatheringCraftingCheck
+              ?.failureResultPolicy || 'perRecord'}
             modifiers={selectedSystem?.modifiers || []}
             craftingDefaultModifierPolicy={selectedSystem?.craftingCheck?.defaultModifierPolicy ||
               'addAll'}
@@ -7553,6 +7670,13 @@
             {onUpdateGatheringCheckRouted}
             onSetAlchemyCheckMode={(m) => store.setAlchemyCheckMode?.(m)}
             onUpdateCraftingConsumption={(patch) => store.saveCraftingCheckConsumption?.(patch)}
+            onUpdateSalvageConsumption={(patch) => store.saveSalvageCheckConsumption?.(patch)}
+            onUpdateCraftingFailureResultPolicy={(policy) =>
+              store.saveCraftingCheckFailureResultPolicy?.(policy)}
+            onUpdateSalvageFailureResultPolicy={(policy) =>
+              store.saveSalvageCheckFailureResultPolicy?.(policy)}
+            onUpdateGatheringFailureResultPolicy={(policy) =>
+              store.saveGatheringCheckFailureResultPolicy?.(policy)}
             onUpdateCraftingCheckModifiers={(patch) => store.saveCraftingCheckModifiers?.(patch)}
             onUpdateSalvageCheckModifiers={(patch) => store.saveSalvageCheckModifiers?.(patch)}
             onUpdateGatheringCheckModifiers={(patch) => store.saveGatheringCheckModifiers?.(patch)}
@@ -7808,6 +7932,7 @@
         routingProvider={recipeRoutingProvider}
         routedOutcomeTierOptions={recipeRoutedOutcomeTierOptions}
         routedOutcomeTiersDefined={recipeRoutedHasOutcomeTiers}
+        routedFailureResultsAllowed={recipeFailureResultsAllowed}
         alchemy={recipeAlchemy}
         signatureConflicts={recipeSignatureConflicts}
         onOpenComponent={(componentId) => editComponent(componentId)}
@@ -10590,9 +10715,15 @@
               selectedCards={componentBulkSelectedCards}
               draft={componentBulkDraft}
               applying={componentBulkApplying}
+              deleting={componentBulkDeleting}
+              deleteArmed={componentBulkDeleteArmed}
+              deleteImpact={componentBulkDeleteImpact}
               onDraftChange={(next) => stageComponentBulkDraft(next)}
               onClearSelection={() => clearComponentBulkSelection()}
               onApply={() => applyComponentBulkEdit()}
+              onArmDelete={() => (componentBulkDeleteArmed = true)}
+              onDisarmDelete={() => (componentBulkDeleteArmed = false)}
+              onDelete={(ids) => deleteSelectedComponents(ids)}
             />
           {:else if selectedComponent}
             <ComponentBrowserInspector

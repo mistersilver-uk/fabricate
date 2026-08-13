@@ -131,6 +131,8 @@ function compileManagerRoot() {
   // The roll section's mode callout (issue 1096). `ChecksView` imports it STATICALLY, so
   // omitting it does not skip a branch — it fails module resolution for the whole suite.
   writeCompiledSvelte('src/ui/svelte/apps/manager/checks/CheckModeCallout.svelte');
+  // Issue 1098: the On-failure section's failure-result policy card.
+  writeCompiledSvelte('src/ui/svelte/apps/manager/checks/CheckFailurePolicy.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/checks/ChecksEditorTabs.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/checks/ChecksRightMenu.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/checks/CheckDcMacroCard.svelte');
@@ -581,6 +583,12 @@ function compileManagerRoot() {
     // omitting it: the suite HANGS as `# cancelled` rather than naming the missing file.
     'src/utils/browserPagination.js',
     'src/utils/routedOutcomeKeywords.js',
+    // Issue 1098: `routedOutcomeKeywords.js` reads the failure-result policy to decide
+    // which outcome tiers a result-authoring control may offer.
+    'src/utils/failureResultPolicy.js',
+    // Issue 1098: adminStore's gathering-task normalizer emits `task.failureOutcome`
+    // through this shared absence-preserving attach.
+    'src/utils/gatheringFailureOutcome.js',
     'src/utils/craftingCheckExpression.js',
     // foundryBridge imports the shared rich-text-to-plain-text normalizer when it
     // resolves dropped source documents for the Tool Studio.
@@ -1865,6 +1873,32 @@ function createStore(calls = [], options = {}) {
     },
     setItemSearch: (term) => calls.push(['setItemSearch', term]),
     deleteComponent: (id) => calls.push(['deleteComponent', id]),
+    // The set delete (issue 1129). `describeComponentDelete` is a SYNCHRONOUS selector the
+    // root `$derived`s the panel's impact from, so the double returns a literal rather than a
+    // promise — an async double here would render an unresolved impact and the panel would
+    // silently show zeroes.
+    describeComponentDelete: (componentIds) => {
+      const ids = [...(componentIds || [])];
+      return (
+        options.componentDeleteImpact ?? {
+          deletable: ids.length,
+          deletableIds: ids,
+          recipesRewritten: ids.length > 0 ? 2 : 0,
+          recipesDisabled: ids.length > 0 ? 1 : 0,
+        }
+      );
+    },
+    deleteComponents: (componentIds) => {
+      const ids = [...(componentIds || [])];
+      calls.push(['deleteComponents', ids]);
+      return (
+        options.deleteComponentsResult ?? {
+          deleted: ids.length,
+          recipesUpdated: 2,
+          recipesDisabled: 1,
+        }
+      );
+    },
     updateComponent: (id, updates) => {
       calls.push(['updateComponent', id, updates]);
       if (options.updateComponentReject) return Promise.reject(new Error('update failed'));
@@ -7590,6 +7624,174 @@ describe('CraftingSystemManager mounted behavior', () => {
       target.querySelector('[data-component-bulk-apply]').disabled,
       true,
       'so a re-opened panel cannot apply a stale edit'
+    );
+  });
+
+  // ── The armed set delete, end to end (issue 1129) ──────────────────────────────────
+  //
+  // The panel-level suite proves the CARD behaves; this proves the ROOT wires it — that the
+  // impact reaches the panel, that the two clicks reach the store, and above all that the
+  // armed token does not survive a change to the set it was armed for.
+
+  function componentDeleteButton() {
+    return target.querySelector('[data-component-bulk-delete-card] .manager-button.is-danger');
+  }
+
+  it('offers the set delete the moment the bulk panel replaces the inspector', async () => {
+    await openComponentsBrowser();
+
+    // The gap this issue closes: before it, ticking a row hid the ONLY delete affordance.
+    assert.ok(
+      Boolean(target.querySelector('[data-component-action="delete"]')),
+      'the single-component inspector offers Delete'
+    );
+
+    tickComponentRow('c1');
+
+    assert.ok(
+      !target.querySelector('[data-component-action="delete"]'),
+      'the inspector — and its Delete — is replaced'
+    );
+    assert.ok(componentDeleteButton(), 'but the panel now carries its own set delete');
+    assert.match(
+      target.querySelector('[data-component-bulk-impact-row="recipes"]').textContent,
+      /2 recipes will be rewritten/,
+      'the impact the store computed reaches the panel'
+    );
+  });
+
+  it('takes TWO clicks, and the first writes nothing', async () => {
+    const calls = [];
+    await openComponentsBrowser(calls);
+    tickComponentRow('c1');
+    tickComponentRow('c2');
+
+    componentDeleteButton().click();
+    flushSync();
+    assert.equal(
+      calls.some((call) => call[0] === 'deleteComponents'),
+      false,
+      'the FIRST click only arms — nothing is written'
+    );
+    assert.equal(componentDeleteButton().getAttribute('data-armed'), 'true');
+
+    componentDeleteButton().click();
+    await tick();
+    flushSync();
+    const write = calls.find((call) => call[0] === 'deleteComponents');
+    assert.deepEqual(write?.[1], ['c1', 'c2'], 'the second click deletes the selection');
+  });
+
+  it('DISARMS when the selection changes underneath the armed control', async () => {
+    // An arm is a statement about a SPECIFIC set. If the set moves, the impact sentence the
+    // GM read before arming is no longer the impact of confirming, so the second click must
+    // not still be a confirmation.
+    const calls = [];
+    await openComponentsBrowser(calls);
+    tickComponentRow('c1');
+
+    componentDeleteButton().click();
+    flushSync();
+    assert.equal(componentDeleteButton().getAttribute('data-armed'), 'true');
+
+    tickComponentRow('c2');
+
+    assert.equal(
+      componentDeleteButton().getAttribute('data-armed'),
+      'false',
+      'growing the selection disarms the pending delete'
+    );
+    componentDeleteButton().click();
+    flushSync();
+    assert.equal(
+      calls.some((call) => call[0] === 'deleteComponents'),
+      false,
+      'the next click re-arms rather than writing'
+    );
+  });
+
+  it('clears the selection after a successful delete, returning the rail to the inspector', async () => {
+    const calls = [];
+    await openComponentsBrowser(calls);
+    tickComponentRow('c1');
+
+    componentDeleteButton().click();
+    flushSync();
+    componentDeleteButton().click();
+    await tick();
+    flushSync();
+
+    assert.ok(
+      calls.some((call) => call[0] === 'deleteComponents'),
+      'the write happened'
+    );
+    assert.ok(
+      Boolean(target.querySelector('[data-component-inspector]')),
+      'the rail returns to the single-component inspector'
+    );
+  });
+
+  // The post-delete toast is the ONLY feedback that survives the panel unmounting, on the
+  // same terms as the apply toast above. Both cases below install `ui.notifications` per
+  // test and remove it again, matching `applyBulkEditOverRows`.
+  async function deleteSelectedRows(ids, options = {}) {
+    const messages = [];
+    const calls = [];
+    const previousUi = globalThis.ui;
+    globalThis.ui = { notifications: { info: (message) => messages.push(message) } };
+    try {
+      await openComponentsBrowser(calls, options);
+      for (const id of ids) tickComponentRow(id);
+      componentDeleteButton().click();
+      flushSync();
+      componentDeleteButton().click();
+      await tick();
+      flushSync();
+      return { messages, calls };
+    } finally {
+      if (previousUi === undefined) delete globalThis.ui;
+      else globalThis.ui = previousUi;
+    }
+  }
+
+  it('reports the DISABLED recipes in the toast, the most consequential outcome', async () => {
+    // Components deleted and recipes rewritten are administrative; recipes disabled is the
+    // one the GM's players feel. It was the number the toast did not carry.
+    const { messages } = await deleteSelectedRows(['c1', 'c2'], {
+      deleteComponentsResult: { deleted: 2, recipesUpdated: 3, recipesDisabled: 1 },
+    });
+
+    assert.deepEqual(messages, [
+      'Deleted 2 component(s) and rewrote 3 recipe(s), disabling 1 of them.',
+    ]);
+  });
+
+  it('drops the disable clause entirely when nothing was disabled', async () => {
+    const { messages } = await deleteSelectedRows(['c1'], {
+      deleteComponentsResult: { deleted: 1, recipesUpdated: 2, recipesDisabled: 0 },
+    });
+
+    assert.deepEqual(messages, ['Deleted 1 component(s) and rewrote 2 recipe(s).']);
+  });
+
+  it('reports NO success and keeps the selection when the write deleted nothing', async () => {
+    // The store returns its zero result — an OBJECT, and therefore truthy — on a failed
+    // write, after raising its own error toast. A bare `if (!result)` guard let that through
+    // as success: the selection cleared and the GM read "Deleted 0 component(s)" underneath
+    // the error, with the rows still in the library.
+    const { messages } = await deleteSelectedRows(['c1'], {
+      deleteComponentsResult: { deleted: 0, recipesUpdated: 0, recipesDisabled: 0 },
+    });
+
+    assert.deepEqual(messages, [], 'nothing was deleted, so nothing is announced');
+    assert.ok(
+      Boolean(target.querySelector('[data-component-bulk-delete-card]')),
+      'and the selection survives, so the GM can see what did not happen and retry'
+    );
+    assert.equal(
+      componentDeleteButton().getAttribute('data-armed'),
+      'false',
+      'but the arm is spent — a still-armed button would delete on the next single click'
     );
   });
 

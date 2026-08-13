@@ -588,6 +588,27 @@ The `1.23.0` settings-data migration (`src/migration/migrateUnifyModifierLibrari
     That is strictly more loss than `1.22.0`'s own lossy downgrade, which is why it is declared and named again rather than inherited.
 12. **The pre-save window is the same ACCEPTED gap `1.22.0` records**, with the same properties: a player loading the world before the primary GM's pass reads a system whose libraries still sit at their old keys, resolves a check-modifier scalar of `0`, and reports a gathering drop-row reference as missing; the state cannot be persisted by a player, self-heals when the GM's pass lands, and carries no runtime read alias for exactly the reasons `1.22.0` states.
 
+### Failure-Result Policy Seed Migration (`1.25.0`, `downgradeTo: '1.24.0'`, pure, clone-first, idempotent)
+
+Issue 1098 gives every activity check a `failureResultPolicy` whose normalize-on-read default is `perRecord` — a value that PERMITS a failed check to produce an authored failure result.
+The `1.25.0` settings-data migration (`src/migration/migrateSeedFailureResultPolicy.js`) writes `failureResultPolicy: 'never'` onto every `craftingCheck`, `salvageCraftingCheck` and `gatheringCraftingCheck` block that already exists on disk.
+
+1. **Its entire purpose is that NO UPGRADED WORLD CHANGES BEHAVIOUR**, and the hazard is concrete rather than theoretical.
+   A salvage component may legally persist a reserved `role: 'failure'` result group carrying results — `_normalizeSalvage` tolerates one whenever the Simple salvage check has an authored roll formula — and until this issue it awarded **nothing**, in every world, always.
+   Without the seed, the upgrade would silently turn it on and every failed salvage would start handing out loot the GM authored for a capability that did not exist.
+   Only NEWLY-CREATED systems get the `perRecord` default; the GM opts in deliberately, per activity, per system.
+2. **It seeds NOTHING onto a check block that does not exist**, matching the no-storage-churn decisions `migrateMaxModifierPicks`, `migrateRetireProgressiveAllowPlayerReorder` and the `1.22.0` catalogue migration already record.
+   An absent block has no authored failure output to award and no surface to observe the policy on; it picks up the read-time default the first time the GM authors that check, which is a system they are creating rather than one they are upgrading.
+3. **An already-present value always wins**, and the guard is key PRESENCE rather than validity: deciding the absent case is this migration's only job, so a value this build would normalize away is still not overwritten.
+   That is what makes it idempotent without relying on the version gate, and the View Lab depends on it directly — it boots the real runner over its fixtures with no `migrationVersion`, so every migration runs on every lab build.
+4. **The per-system transform is SHARED with the export-payload upcast** (`applySeededFailureResultPolicy`), applied branch-independently, so an imported bundle lands exactly where a migrated world does — and a bundle written by a post-1098 build already carries an authored policy, which the guard above is what stops a round trip from resetting.
+5. **It reports nothing and therefore adds no key to the runner's three return literals.** Unlike `1.21.0` it needs no GM notice, because its entire observable effect is that nothing observable changes.
+6. **Mutated setting key:** `craftingSystems`, and only it.
+7. **The runner's before-any-load ordering is load-bearing**, as it is for `1.22.0` and `1.23.0`: all three check normalizers are ALLOWLIST REBUILDS, so a save running first would emit the `perRecord` default onto every check — and this migration would then correctly decline to overwrite it, permanently locking in the very behaviour change it exists to prevent.
+8. **The downgrade is CLEAN, and is deliberately NOT declared `downgradeLosesData`.**
+   `1.24.0`'s normalizers do not emit `failureResultPolicy`, so the key is dropped on the next save — and since that release has no failure-result capability at all, nothing changes behaviourally.
+   It is the first entry since `1.21.0` of which that is true, and the rule `1.22.0` established is about naming a REAL loss in the label rather than about every entry claiming one.
+
 ### Catalyst → Tool Migration (`0.6.0`)
 
 The `0.6.0` migration (`src/migration/migrateCatalystsToTools.js`) retires the Catalyst concept by converting recipe-side catalysts into shared library **Tools** referenced by `toolIds`.

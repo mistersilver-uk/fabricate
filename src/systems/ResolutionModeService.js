@@ -1,3 +1,4 @@
+import { activityPermitsFailureResults } from '../utils/failureResultPolicy.js';
 import { resolveProgressiveAward } from '../utils/progressiveAward.js';
 import { applyPlayerResultOrder } from '../utils/progressiveResultOrder.js';
 import { buildRecipeActivationIssue } from '../utils/recipeActivationMessages.js';
@@ -475,12 +476,24 @@ export class ResolutionModeService {
    * no routed config or no name match. Used to route by explicit tier→result-set
    * assignments (`ResultGroup.checkOutcomeIds`).
    *
-   * Only `success === true` tiers route via the assignment: a `success: false`
-   * tier must never produce a `disposition: 'success'` result, so it returns
-   * null here and falls through to the fail/keyword/name handling below.
+   * THE `success === true` REQUIREMENT IS POLICY-AWARE (issue 1098, decision 7).
+   *
+   * The original constraint — a `success: false` tier must never produce a
+   * `disposition: 'success'` result — is PRESERVED, not discarded. What changed is how
+   * it is honoured. When `craftingCheck.failureResultPolicy` permits results on failure,
+   * a failure-marked tier DOES resolve here, and {@link _routeByTierAssignment} returns
+   * its assigned group with a `disposition: 'failure'` meta instead of `'success'`.
+   * When the policy does NOT permit, behaviour is byte-for-byte what it was: `null`,
+   * falling through to the existing fail/keyword/name handling, so nothing ever looks up
+   * a group for a failing tier.
+   *
+   * The returned pair says WHICH it resolved, because the caller cannot re-derive it
+   * from an id alone and a caller that guessed `'success'` would reintroduce exactly the
+   * defect the constraint exists to prevent.
+   *
    * @param {object} system
    * @param {string|null} outcome
-   * @returns {string|null}
+   * @returns {{tierId: string, success: boolean}|null}
    */
   _resolveRoutedTierId(system, outcome) {
     const routed = system?.craftingCheck?.routed;
@@ -488,10 +501,14 @@ export class ResolutionModeService {
     const tiers = routed.type === 'fixed' ? routed.fixedOutcomes : routed.relativeOutcomes;
     if (!Array.isArray(tiers)) return null;
     const normalized = this._normalizeName(outcome);
+    const permitsFailure = activityPermitsFailureResults(system, 'crafting');
     const tier = tiers.find(
-      (entry) => entry?.success === true && this._normalizeName(entry?.name) === normalized
+      (entry) =>
+        (entry?.success === true || permitsFailure) &&
+        this._normalizeName(entry?.name) === normalized
     );
-    return tier?.id || null;
+    if (!tier?.id) return null;
+    return { tierId: tier.id, success: tier.success === true };
   }
 
   /**
@@ -511,7 +528,7 @@ export class ResolutionModeService {
           : [];
 
     if (mode === 'simple') {
-      return this._resolveSimpleResultGroups({ checkResult, allGroups });
+      return this._resolveSimpleResultGroups({ checkResult, allGroups, system });
     }
     if (mode === 'routedByIngredients') {
       return this._routeByIngredientSet(ingredientSet, allGroups, selectedResultGroupId);
@@ -630,21 +647,28 @@ export class ResolutionModeService {
    *    NO `checkOutcomeIds` on any group (it is name-routed, not tier-routed). The
    *    caller falls back to outcome-name matching (the legitimate no-assignment path).
    *  - `disposition:'unrouted-tier'` (empty groups) — the outcome DID resolve to an
-   *    authored success tier AND the recipe opted into tier routing (at least one
+   *    authored tier AND the recipe opted into tier routing (at least one
    *    group declares `checkOutcomeIds`), but no group lists THIS tier's id. This is a
    *    distinct misconfiguration (tier resolved but unassigned); the caller surfaces
    *    it rather than masking it with name matching.
-   *  - `disposition:'success'` — routed to the assigned group.
+   *  - `disposition:'success'` — routed to the assigned group of a SUCCESS tier.
+   *  - `disposition:'failure'` — routed to the assigned group of a FAILURE-MARKED tier
+   *    (issue 1098, decision 7). Only reachable when `craftingCheck.failureResultPolicy`
+   *    permits results on failure; a failing tier never carries `'success'`.
    * @returns {{groups: Array, meta: object}|null}
    */
   _routeByTierAssignment(system, outcome, allGroups) {
-    const tierId = this._resolveRoutedTierId(system, outcome);
-    if (!tierId) return null;
+    const resolved = this._resolveRoutedTierId(system, outcome);
+    if (!resolved) return null;
+    const { tierId, success } = resolved;
     const assigned = allGroups.filter(
       (group) => Array.isArray(group.checkOutcomeIds) && group.checkOutcomeIds.includes(tierId)
     );
     if (assigned.length > 0) {
-      return { groups: assigned.slice(0, 1), meta: { outcome, disposition: 'success' } };
+      return {
+        groups: assigned.slice(0, 1),
+        meta: { outcome, disposition: success ? 'success' : 'failure' },
+      };
     }
     // The tier resolved but no group lists it. Distinguish a tier-routed recipe (some
     // group declares `checkOutcomeIds`) — a genuine unrouted-tier misconfiguration —
@@ -686,10 +710,21 @@ export class ResolutionModeService {
    * output, produces nothing on a fail rather than the success item). No check, or a
    * passed check (`checkResult` null / `success` true), produces the single SUCCESS group
    * (the first group not flagged `role: 'failure'`).
+   *
+   * THE FAILURE BRANCH IS POLICY-GATED (issue 1098). Under
+   * `craftingCheck.failureResultPolicy: 'never'` the reserved group is never selected —
+   * the short-circuit is BEFORE the lookup, so no group is chosen and then discarded —
+   * and the disposition is still `'fail'`, which is what every caller already keys on.
+   * `perRecord` and `always` both permit, and both still SELECT rather than fabricate:
+   * a recipe authoring no reserved group produces nothing under either.
+   * @param {?object} system the recipe's owning system, for the policy read
    * @returns {{groups: Array, meta: object}}
    */
-  _resolveSimpleResultGroups({ checkResult, allGroups }) {
+  _resolveSimpleResultGroups({ checkResult, allGroups, system }) {
     if (checkResult?.success === false) {
+      if (!activityPermitsFailureResults(system, 'crafting')) {
+        return { groups: [], meta: { disposition: 'fail' } };
+      }
       const failureGroup = allGroups.find((group) => group?.role === 'failure');
       return { groups: failureGroup ? [failureGroup] : [], meta: { disposition: 'fail' } };
     }
@@ -704,6 +739,13 @@ export class ResolutionModeService {
       return this._resolveRoutedByCheckResultGroups({ checkResult, system, allGroups });
     }
     if (checkMode === 'simple' && checkResult?.success === false) {
+      // Policy-gated exactly as `_resolveSimpleResultGroups` is (issue 1098): under
+      // `never` the reserved group is never looked up, so `_produceAlchemyFailureResults`
+      // — which routes through here via `_createResultItems` — creates nothing and the
+      // brew's failure banner reports an empty award.
+      if (!activityPermitsFailureResults(system, 'crafting')) {
+        return { groups: [], meta: { disposition: 'fail' } };
+      }
       const failureGroup = allGroups.find((group) => group?.role === 'failure');
       return {
         groups: failureGroup ? [failureGroup] : [],

@@ -1491,7 +1491,9 @@ export class InventoryListingBuilder {
     const { mode, config, checkUsable } = resolveSalvageCheck(system);
     // Simple mode admits exactly one SUCCESS group (issue 764). A stored-but-not-yet-
     // re-normalized legacy config with more than one success group is misconfigured: the
-    // engine awards `slice(0, 1)`, so the surplus is silently ignored. The GM sees this
+    // engine's SUCCESS award is `slice(0, 1)`, so the surplus is silently ignored. (The
+    // failure award added by issue 1098 selects the reserved `role: 'failure'` group BY
+    // ROLE, so it is not counted here and cannot be the surplus.) The GM sees this
     // cue on the GM inventory path (the non-GM path hard-hides via `hiddenEntityIds`),
     // and the config self-heals on the next system save.
     const salvageGroups = Array.isArray(salvage?.resultGroups) ? salvage.resultGroups : [];
@@ -1669,7 +1671,11 @@ export class InventoryListingBuilder {
   /**
    * Project a salvage result group's results for display. Mirrors
    * `CraftingEngine._resolveSalvageResultGroups`'s `allGroups.slice(0, 1)` for simple
-   * mode, so the list shown is the list the engine awards.
+   * mode UNDER `disposition: 'success'`, so the list shown is the list the engine awards
+   * on a passed check. This projection is deliberately the SUCCESS award only: issue
+   * 1098 gave the failure branch its own role-keyed selection of the reserved
+   * `role: 'failure'` group, and what a player is shown before salvaging is what
+   * salvaging successfully yields.
    * @private
    */
   _salvageResultItems(group, componentById) {

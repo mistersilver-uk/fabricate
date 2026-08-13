@@ -30,11 +30,22 @@
     routingProvider = null,
     ingredientSetOptions = [],
     assignedIngredientSetIds = [],
+    // POLICY-CONDITIONAL since issue 1098 (decision 7): success-filtered when the system's
+    // `craftingCheck.failureResultPolicy` forbids failure results, unfiltered when it
+    // permits them, so a result set can be bound to a failure-marked tier exactly where the
+    // engine will route one. Resolved by the manager root, and read by `recipeReadiness`
+    // from the SAME swap, so the picker and the readiness warnings cannot disagree.
     outcomeTierOptions = [],
-    // Whether the routed check has ANY outcome tier (even failure-only). When the
-    // success-filtered `outcomeTierOptions` is empty this disambiguates "no tiers
-    // authored yet" from "tiers exist but none is a Success" for the empty hint.
+    // Whether the routed check has ANY outcome tier (even failure-only). When
+    // `outcomeTierOptions` is empty this disambiguates "no tiers authored yet" from
+    // "tiers exist but none is offerable" for the empty hint.
     outcomeTiersDefined = false,
+    // Whether the failure-result policy permits results on a failed check (issue 1098).
+    // Its ONLY use here is the third empty hint: with tiers defined and the list still
+    // empty, "none is marked as a Success" is only half the story under a forbidding
+    // policy, because marking one Success is not the only remedy — allowing failure
+    // results is the other, and it is the one a GM authoring a ruined-output recipe wants.
+    failureResultsAllowed = false,
     // Alchemy Simple two-slot editor (issue 554). `staticLabel` replaces the free-text
     // name input with a fixed header label (used by both the "On success" and the
     // reserved "On a failed check" slots). `reserved` marks the failure slot: it adds
@@ -199,6 +210,29 @@
     }
     onChange({ ...group, results: [...results, { id: newId(), componentId: id, quantity: 1 }] });
   }
+
+  // THE THREE-WAY EMPTY HINT (issue 1098, decision 7). Written as a guard chain rather
+  // than nested ternaries: the SonarCloud gate fails those, and the ORDER is the point —
+  // "there are no tiers" has to be answered before "none of them can be offered", or a
+  // recipe on a system with no outcome tiers at all would be told to change a policy.
+  const outcomeTierEmptyHint = $derived.by(() => {
+    if (!outcomeTiersDefined) {
+      return text(
+        'FABRICATE.Admin.Manager.Recipe.RoutingNoOutcomeTiers',
+        'Define outcome tiers in the routed crafting check first.'
+      );
+    }
+    if (!failureResultsAllowed) {
+      return text(
+        'FABRICATE.Admin.Manager.Recipe.RoutingNoSuccessOutcomeTiersPolicy',
+        'Every outcome tier on this check is a failure, and this system produces nothing on a failed check. Mark a tier as a Success, or let failed checks produce a result on the crafting check’s On failure section.'
+      );
+    }
+    return text(
+      'FABRICATE.Admin.Manager.Recipe.RoutingNoSuccessOutcomeTiers',
+      'No outcome tier is marked as a Success. Mark one as Success in the crafting check to route a result set to it.'
+    );
+  });
 </script>
 
 <div
@@ -248,15 +282,7 @@
             'FABRICATE.Admin.Manager.Recipe.RoutingSearchOutcomeTiers',
             'Search outcomes...'
           )}
-          emptyHint={outcomeTiersDefined
-            ? text(
-                'FABRICATE.Admin.Manager.Recipe.RoutingNoSuccessOutcomeTiers',
-                'No outcome tier is marked as a Success. Mark one as Success in the crafting check to route a result set to it.'
-              )
-            : text(
-                'FABRICATE.Admin.Manager.Recipe.RoutingNoOutcomeTiers',
-                'Define outcome tiers in the routed crafting check first.'
-              )}
+          emptyHint={outcomeTierEmptyHint}
           onAdd={(id) => addOutcomeTier(id)}
           onRemove={(id) => removeOutcomeTier(id)}
         />

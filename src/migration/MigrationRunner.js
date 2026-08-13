@@ -34,6 +34,7 @@ import { migrateRenameGatheringRegionsToRealms } from './migrateRenameGatheringR
 import { migrateRenameSourceUuidFields } from './migrateRenameSourceUuidFields.js';
 import { migrateRetireCraftingModToken } from './migrateRetireCraftingModToken.js';
 import { migrateRetireProgressiveAllowPlayerReorder } from './migrateRetireProgressiveAllowPlayerReorder.js';
+import { migrateSeedFailureResultPolicy } from './migrateSeedFailureResultPolicy.js';
 import { migrateSplitRoutedResolutionModes } from './migrateSplitRoutedResolutionModes.js';
 import { migrateStaminaRegenPolicy } from './migrateStaminaRegenPolicy.js';
 import { migrateSystemCheckModifierCatalogue } from './migrateSystemCheckModifierCatalogue.js';
@@ -476,6 +477,29 @@ const MIGRATIONS = [
     // every stored routed slot would touch every system in the world to change nothing.
     // What this entry buys is the boundary the recovery prompt warns at.
     migrate: (data) => data,
+  },
+  {
+    version: '1.25.0',
+    // NO LOSSY-DOWNGRADE CLAUSE, and that is the fact worth stating. Unlike 1.22.0,
+    // 1.23.0 and 1.24.0 this migration's downgrade IS clean, so it is deliberately not
+    // marked `downgradeLosesData` — the rule those three established is about naming a
+    // real loss in the label, not about every entry claiming one.
+    label:
+      'Seed the new per-activity failure-result policy to "never" on every crafting, ' +
+      'salvage and gathering check that already exists, so NO EXISTING WORLD CHANGES ' +
+      'BEHAVIOUR. A failed check can now produce an authored failure result, and a ' +
+      'newly-created system decides that per record — but a system you authored before ' +
+      'this release was authored against an engine that could not produce on failure at ' +
+      'all. A salvage component may already carry a reserved failure result group that ' +
+      'has always awarded nothing; without this seed the upgrade would start awarding it ' +
+      'on every failed salvage. Turn the policy on yourself, per activity, per system. ' +
+      'Checks that do not exist yet are left alone, and DOWNGRADING IS LOSSLESS: 1.24.0 ' +
+      'does not emit this key, drops it on the first save, and has no failure-result ' +
+      'capability for it to govern',
+    downgradeTo: '1.24.0',
+    // Reports nothing, so it adds no key to the runner's three return literals below:
+    // its entire observable effect is that nothing observable changes.
+    migrate: (data) => migrateSeedFailureResultPolicy(data),
   },
   // Future migrations added here in version order
 ];

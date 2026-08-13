@@ -486,6 +486,17 @@ describe('KnowledgeView mounted behaviour', () => {
     const deleteButton = target.querySelector('[data-arm-token="delete:i1"]');
     assert.equal(deleteButton.getAttribute('data-armed'), 'false');
     assert.match(deleteButton.getAttribute('aria-label'), /Delete Alchemist Cook Book/);
+    // `describedBy` is OPTIONAL (issue 1129 added it for the bulk panels' impact list), and a
+    // row call site passes none. It must therefore render NO `aria-describedby` at all: the
+    // bare `aria-describedby=""` that a raw pass-through emits points at nothing, and a
+    // screen reader resolving an empty idref list is a worse name than no description. This
+    // is the assertion that makes `describedBy || undefined` in `ArmedDangerButton` a
+    // contract rather than a comment.
+    assert.equal(
+      deleteButton.hasAttribute('aria-describedby'),
+      false,
+      'a call site that passes no description renders exactly the markup it did before the prop existed'
+    );
 
     deleteButton.click();
     await harness.setProps({});

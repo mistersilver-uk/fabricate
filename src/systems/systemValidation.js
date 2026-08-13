@@ -24,7 +24,9 @@
  *    `{ systemComponents, routingProvider, routedOutcomeTierOptions }`, where
  *    `routingProvider` is derived from the system MODE (`'check'` for
  *    `routedByCheck`, the alchemy recipe provider for alchemy, else null) and
- *    `routedOutcomeTierOptions = routedSuccessTierOptions(system.craftingCheck?.routed)`,
+ *    `routedOutcomeTierOptions = routedTierOptionsForPolicy(system.craftingCheck?.routed,
+ *    system.craftingCheck?.failureResultPolicy)` — the SAME policy-conditional set the
+ *    recipe editor's picker offers (issue 1098),
  *    so #431's `unroutedResultGroup` / `unproducedOutcomeTier` warnings surface;
  *  - environments → {@link evaluateEnvironmentReadiness} with the per-environment
  *    composition view-model the caller precomputed (carried as
@@ -67,7 +69,7 @@
 import { evaluateEnvironmentReadiness } from '../ui/svelte/apps/manager/environment/environmentReadiness.js';
 import { evaluateRecipeReadiness } from '../ui/svelte/apps/manager/recipe/recipeReadiness.js';
 import {
-  routedSuccessTierOptions,
+  routedTierOptionsForPolicy,
   routedOutcomeTierNames,
 } from '../utils/routedOutcomeKeywords.js';
 
@@ -268,7 +270,15 @@ function tagEnvironmentIssue(issue, environment) {
  * @returns {SystemValidationIssue[]}
  */
 function collectRecipeIssues(system, recipes, systemComponents) {
-  const routedOutcomeTierOptions = routedSuccessTierOptions(system?.craftingCheck?.routed);
+  // POLICY-CONDITIONAL, and it must read the SAME set the recipe editor's picker offers
+  // (issue 1098, decision 7): the picker swaps to the unfiltered tier list when the
+  // crafting failure-result policy permits results on failure, so a validator still
+  // reading the success-filtered list would report every authored failure-tier assignment
+  // as an unrouted group the moment a GM turned the policy on.
+  const routedOutcomeTierOptions = routedTierOptionsForPolicy(
+    system?.craftingCheck?.routed,
+    system?.craftingCheck?.failureResultPolicy
+  );
   // The routing basis is the system MODE (not a per-recipe provider): a
   // `routedByCheck` system routes every recipe by the routed-check outcome, so the
   // #431 check-routing warnings apply to all its recipes. Alchemy keeps its

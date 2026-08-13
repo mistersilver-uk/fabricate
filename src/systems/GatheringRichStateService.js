@@ -1,4 +1,5 @@
 import { authoredCheckModifierIds } from '../utils/checkModifierPicks.js';
+import { authoredFailureOutcome } from '../utils/gatheringFailureOutcome.js';
 
 import { evaluateEnvironmentMatch } from './gatheringMatch.js';
 import { depleteNodeOnce, normalizeNodeConfig } from './gatheringNodeConfig.js';
@@ -1532,6 +1533,12 @@ export class GatheringRichStateService {
       // Same absence-preserving attach as the two normalizers, for the same reason: an
       // authored EMPTY array is a real pick of zero and must not collapse back to inherit.
       ...authoredCheckModifierIds(normalized.checkModifierIds),
+      // THE FAILURE OUTCOME MUST REACH THE ENGINE, not merely disk (issue 1098, CF8).
+      // `GatheringEngine._applyFailureFeedback` reads `task.failureOutcome ?? null` off
+      // THIS object, so emitting it from the two library normalizers alone would leave the
+      // field correct on disk and dead at roll time — the exact third-mirror failure
+      // `checkModifierIds` above records.
+      ...authoredFailureOutcome(normalized.failureOutcome),
       // Per-task routed-check DC override (issue 904). resolutionMode stays hardcoded
       // to 'd100' above — routed gathering is disabled ("Coming soon") pending #683 —
       // so this plumbing is deliberately dormant until routed resolution ships.
@@ -2049,6 +2056,10 @@ function normalizeLibraryTask(task = {}) {
     // what keeps the two from drifting on the subtle half (authoredness is decided by
     // `Array.isArray` at entry, never by the filtered length).
     ...authoredCheckModifierIds(task.checkModifierIds),
+    // The task's text/macro failure feedback (issue 1098, CF8). Emitted by NO gathering-task
+    // rebuild before that issue, so a GM-authored value was dropped on the next save — and
+    // `_libraryTaskToRuntimeTask` above must emit it too, or it never reaches the engine.
+    ...authoredFailureOutcome(task.failureOutcome),
     // Per-task routed-check DC override (issue 904): replaces the routed check's
     // own dc at gather time when set. Guard null/''/undefined explicitly before
     // `Number()` so re-normalizing a null stays null (Number(null) is 0, which

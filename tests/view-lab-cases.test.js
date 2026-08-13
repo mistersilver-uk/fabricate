@@ -2540,3 +2540,46 @@ test('the expectView pin FAILS against the pre-split value, and against a nav id
   assert.equal(accepts('crafting-settings'), true, 'the VIEW that nav id maps to is accepted');
   assert.equal(accepts('recipe-edit'), true);
 });
+
+// ── the recipe-readiness string-path probe (issue 1098, BH4) ─────────────────────────────
+//
+// `recipeReadiness.js` decides the readiness BADGES on the recipe editor's tabs, and issue
+// 1098 makes its routed-check validation policy-conditional. A change confined to it must
+// therefore select the recipe-editor frames — and it must NOT fall through to
+// `FALLBACK_CASE_ID`, which is what `mapChangedFilesToCases` returns when nothing matched
+// and is the silent failure this whole file exists to catch: the capture job would publish
+// the app shell and `check-screenshots` would go green on a frame showing nothing.
+//
+// PROVEN CAPABLE OF FAILING: pointing it at a path no `sourceMatches` covers (asserted
+// below against a deliberately unmatched file) returns exactly the fallback, so a
+// regression that stopped `recipeReadiness.js` matching would red the first assertion
+// rather than quietly widening the second.
+test('a change confined to recipeReadiness.js selects the recipe-editor cases, never the fallback', () => {
+  const selected = mapChangedFilesToCases([
+    'src/ui/svelte/apps/manager/recipe/recipeReadiness.js',
+  ]).map((viewCase) => viewCase.id);
+
+  assert.ok(selected.length > 0, 'it selects something');
+  assert.ok(
+    !selected.includes(FALLBACK_CASE_ID),
+    'it never falls through to the app-shell fallback, which would publish a frame showing nothing'
+  );
+  // Every selected case is a recipe one: the badges this module determines are drawn
+  // nowhere else, so a selection reaching the Checks studio would be over-broad.
+  const strays = selected.filter((id) => !getCaseById(id)?.kinds?.includes('recipes'));
+  assert.deepEqual(strays, [], `only recipe cases are selected; got ${strays.join(', ')}`);
+  // …and the canonical recipe-editor frames ARE among them.
+  for (const expected of ['manager-recipe-edit-results', 'manager-recipe-edit-validation']) {
+    assert.ok(selected.includes(expected), `${expected} is selected`);
+  }
+
+  // The negative control: an unmatched path DOES return the fallback, so the assertion
+  // above is discriminating rather than vacuously true.
+  assert.deepEqual(
+    mapChangedFilesToCases(['src/ui/svelte/apps/manager/no-such-module-for-this-probe.js']).map(
+      (viewCase) => viewCase.id
+    ),
+    [FALLBACK_CASE_ID],
+    'an unmatched UI path falls through to the fallback, which is what the probe rules out'
+  );
+});

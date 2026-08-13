@@ -477,18 +477,24 @@ describe('1093 must-not-regress — persisted state with no surface', () => {
     assert.match(adminStoreSource, /dcOverride: \(\(\) => \{/, '_normalizeGatheringTask emits it');
   });
 
-  // ── task.failureOutcome, pinned at its REAL state (CF8) ─────────────────────
+  // ── task.failureOutcome, THE PIN MOVED BY ISSUE 1098 (CF8) ──────────────────
   //
-  // The row in issue 1093's table was CORRECTED: `failureOutcome` is validated
-  // (`GatheringEngine.validateFailureOutcome`) and carries a diagnostic path builder in
-  // `adminStore`, but it is emitted by NEITHER gathering-task normalizer and is editable
-  // NOWHERE. Pinning the state it is claimed to have would be pinning a fiction; this pins
-  // what is actually true until issue 1098 task 52 changes it.
+  // THIS IS THE ONE DELIBERATE PIN MOVE THIS FILE ANTICIPATED, and the note it replaces
+  // named it in advance: "adding `failureOutcome` to either normalizer's return literal
+  // reds the first assertion, which is exactly the change issue 1098 will make — and it
+  // will move this pin deliberately rather than discovering the drift later."
   //
-  // PROVEN CAPABLE OF FAILING: adding `failureOutcome` to either normalizer's return
-  // literal reds the first assertion, which is exactly the change issue 1098 will make —
-  // and it will move this pin deliberately rather than discovering the drift later.
-  it('task.failureOutcome is validated and diagnosed but emitted by NEITHER normalizer', () => {
+  // The row in issue 1093's table was CORRECTED before that: `failureOutcome` was
+  // validated (`GatheringEngine.validateFailureOutcome`) and carried a diagnostic path
+  // builder in `adminStore`, but was emitted by NEITHER gathering-task normalizer and
+  // editable NOWHERE, so what shipped was pinned rather than what was claimed. Issue 1098
+  // gives it the emission it lacked, and the pin now states the STRONGER fact — THREE
+  // rebuilds, not two, because `_libraryTaskToRuntimeTask` is the one the engine reads and
+  // two mirrors alone would leave the field correct on disk and dead at roll time.
+  //
+  // PROVEN CAPABLE OF FAILING: deleting the attach from any ONE of the three reds that
+  // rebuild's assertion and leaves the other two green.
+  it('task.failureOutcome is emitted by ALL THREE gathering-task rebuilds', () => {
     const normalizeLibraryTask = richStateSource.slice(
       richStateSource.indexOf('function normalizeLibraryTask'),
       richStateSource.indexOf('function normalizeItemDrop')
@@ -497,14 +503,26 @@ describe('1093 must-not-regress — persisted state with no surface', () => {
       adminStoreSource.indexOf('function _normalizeGatheringTask'),
       adminStoreSource.indexOf('function _normalizeGatheringEvent')
     );
-    assert.ok(normalizeLibraryTask.length > 0 && normalizeGatheringTask.length > 0);
-    assert.ok(
-      !normalizeLibraryTask.includes('failureOutcome'),
-      'normalizeLibraryTask does not emit it — so a GM-authored value would be dropped'
+    const libraryTaskToRuntimeTask = richStateSource.slice(
+      richStateSource.indexOf('_libraryTaskToRuntimeTask(task, environment = null)'),
+      richStateSource.indexOf('function normalizeLibraryTask')
     );
     assert.ok(
-      !normalizeGatheringTask.includes('failureOutcome'),
-      '_normalizeGatheringTask does not emit it either'
+      normalizeLibraryTask.length > 0 &&
+        normalizeGatheringTask.length > 0 &&
+        libraryTaskToRuntimeTask.length > 0
+    );
+    assert.ok(
+      normalizeLibraryTask.includes('authoredFailureOutcome'),
+      'normalizeLibraryTask emits it — otherwise a GM-authored value is dropped on save'
+    );
+    assert.ok(
+      normalizeGatheringTask.includes('authoredFailureOutcome'),
+      '_normalizeGatheringTask, its mirror, emits it too'
+    );
+    assert.ok(
+      libraryTaskToRuntimeTask.includes('authoredFailureOutcome'),
+      'the engine-facing runtime-task builder emits it — the half two mirrors leave dead'
     );
     // …and it IS still validated and diagnosed, so the field is live rather than dead.
     const engineSource = readFileSync(resolve(repoRoot, 'src/systems/GatheringEngine.js'), 'utf8');

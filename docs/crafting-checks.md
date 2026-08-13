@@ -453,10 +453,37 @@ Gathering checks step their tier the same way, but do not report the step in cha
 The next time the system is loaded, that check gains two triggers: one watching the first d20 group for a 20 that steps up one, and one watching it for a 1 that steps down one.
 Nothing is lost, you do not need to do anything, and you can now edit, delete, or extend those triggers like any others.
 
-## Failure consumption policy
+## On failure
 
-When a crafting check fails, you decide what happens to the recipe's ingredients and its required Tools.
-Two toggles on the **On failure** section of **Checks › Crafting** set this policy for the whole system.
+A failed check has two separate questions, and the **On failure** section of each check route asks both.
+What does the failure PRODUCE, and what does it COST?
+They are independent, so you can author any combination of them.
+
+### Produce a result on a failed check
+
+The **Produce a result on a failed check** card decides whether a failed check can still hand the crafter something — a ruined ingot, a torn hide, scraps.
+It has three settings.
+
+- **Never.** A failed check produces nothing at all.
+- **Decided per recipe.** Each recipe chooses for itself, so most fail with nothing while a few still yield a failure result.
+This is what a system you create now starts on.
+- **Always.** Every failed check produces its failure result.
+
+The setting **selects** a failure output you have already authored; it never invents one.
+A recipe with no failure result produces nothing on a failure even under **Always**, so switching to **Always** cannot make an existing recipe start handing out items you did not write.
+
+Where you author that output depends on the resolution mode.
+In **simple** mode and in Alchemy's **Simple check** mode it is the recipe's reserved failure result set, which the Results tab draws with a danger border.
+In **Routed by check** mode it is an outcome tier you have marked as a failure: while this setting permits failure results, those tiers appear in the result set's **Produced on outcome** picker and you bind a result set to them exactly as you would to a success tier.
+Turn the setting back to **Never** and they stop being offered and stop routing — but nothing you authored is deleted, and it all comes back when you permit failure results again.
+
+**Routed by ingredients** and **Progressive** have no failure outcome to mark, so the setting is inert in those modes and the section says so rather than showing a control that does nothing.
+Salvage and gathering each have their own copy of this setting on their own check route.
+Gathering's is inert for now: routed and progressive gathering are still being built.
+
+### What a failure costs
+
+Two toggles on the **On failure** section of **Checks › Crafting** set the consumption half of the policy for the whole system.
 
 - **Consume ingredients on a failed check** is on by default.
 The recipe's ingredients are used up even when the crafting check fails.
@@ -464,10 +491,20 @@ Turn it off to return the ingredients on a failed check, so a failed attempt cos
 - **Break tools on a failed check** is off by default.
 Turn it on to allow normal Tool breakage evaluation after the crafting check fails.
 
-This policy applies to every failed crafting check in the system, across the simple, Routed by ingredients, Routed by check, and Progressive modes.
+This consumption policy applies to every failed crafting check in the system, across the simple, Routed by ingredients, Routed by check, and Progressive modes.
 It does not appear in Alchemy mode, where a failed brew follows the system's own [Consume on Fail]({% link recipes/alchemy.md %}#consume-on-fail) setting instead.
 Salvage failures follow their own separate policy, so this control does not change what a failed salvage consumes.
+The **Checks › Salvage** route's own **On failure** section is where you set it — **Consume the item on a failed check** (on by default) and **Break tools on a failed check** (off by default).
+Those two settings have always been part of a salvage system; before this release there was simply no screen that showed them.
 See [Salvage]({% link salvage.md %}).
+
+### Upgrading from a version before 1.25.0
+
+A system you already have keeps behaving exactly as it did: the upgrade sets **Produce a result on a failed check** to **Never** on every check it finds, on every system.
+That is deliberate rather than cautious.
+A salvageable item may already carry a failure result set that has never been awarded, because no version of Fabricate before this one could award one — and turning the setting on for you would start handing that loot out on every failed salvage with no warning.
+Only systems you create after upgrading start on **Decided per recipe**.
+Turn it on yourself, per activity, per system, when you want it.
 
 The **Break tools on a failed check** toggle permits breakage on the failure path.
 The system's breakage source still decides whether Tool-specific mechanics or matching check triggers determine the break.
