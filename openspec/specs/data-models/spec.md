@@ -1141,8 +1141,10 @@ Recipe = {
   // Identifies the source pack (the payload's system.id when present, else the created
   // system id) so a later reinstall can prune recipes the pack dropped without touching
   // GM-authored recipes. Normalized to object-or-null by the Recipe constructor (a
-  // malformed value normalizes to null), emitted by toJSON(), null for hand-authored
-  // recipes, re-stamped on every import, and retained across GM edits.
+  // malformed value normalizes to null), null for hand-authored recipes, re-stamped on
+  // every import, and retained across GM edits. OMITTED from toJSON() when null
+  // (requirement 18) — the never-prune guard is the RECONSTRUCTED null, which absence
+  // rebuilds, not the presence of the key on the wire.
   importSource: { systemId: string, importedAt: number } | null,
 }
 ```
@@ -1222,6 +1224,16 @@ Recipe = {
     A recipe that is a book member through `RecipeItemDefinition.recipeIds[]` and carries no `linkedRecipeItemUuid` has its leaked scalar cleared by that same un-gated pass, which is idempotent because a cleared recipe is not a re-stamp candidate.
     The repair is deliberately unreachable while the system's `membershipResolvesByRecipeIds` marker is unset, because no recipe is then a member by `recipeIds` and the scalar is still the membership source for `getRecipeItemDefinitionsContaining` and `_getRecipeObjectsReferencingRecipeItemDefinition`.
     Those two membership reads, and their `adminStore` mirrors `_recipeItemDefinitionsContaining` and `_enrichRecipeItemLibrary`, are each gated on that marker rather than on any per-read inference over the arrays, so a leaked scalar never resurrects phantom book membership — its only live consequence was the image borrow in requirement 16.
+18. `Recipe.toJSON()` OMITS a field whose value is the one the constructor rebuilds from absence, and omits the flat top-level `results` alias unconditionally (issue 1087).
+    A recipe is rewritten whole on every mutation, replicated to every client, and stringified twice more by `RecipeManager.reload()`'s change comparison, so an always-emitted default is paid once per recipe on every one of those.
+    Absence and the written default already mean the same thing on read, which is what makes the omission a pure write-side reduction: it needs no migration, loses nothing on downgrade, and does not change what any stored recipe means.
+    On a 10,000-recipe corpus the alias accounts for ~10% of the serialized bytes and the defaults for ~26%, together ~36% (23.75 MB to 15.23 MB).
+    Three fields are deliberately NOT omitted, and the reasons are the rule rather than exceptions to it.
+    `complex` is DERIVED from the authored shape when absent (`_deriveComplex`), not defaulted, so omitting a stored `false` can reconstruct as `true`.
+    `metadata` is rebuilt from `Date.now()` and the current user's name when absent, which is not the value that was omitted.
+    `enabled: true` is omittable by the model and NOT by its readers: `SignatureValidator.validateSystem` scopes the alchemy signature-collision scan with a truthy `recipe?.enabled` over payloads handed to it straight from `toJSON()` by `CraftingSystemManager._assertNoAlchemySignatureCollisions` and `collectAlchemySignatureBlockers`, so omitting the default would empty that scan and silently retire the save-block.
+    `allowPlayerResultReorder: true` IS omitted, and the difference is instructive: absence has been a live on-disk state for it since issue 651 declined to seed it by migration, so every reader already asks `!== false`.
+    Whether a default may be omitted is therefore a property of the field's READERS, audited per field, and the omission set is a hand-maintained mirror of the constructor guarded mechanically by `tests/recipe-serialization-payload.test.js`.
 
 ### Validation Guidance
 
@@ -2626,6 +2638,12 @@ A single Foundry atomic or batched document operation does not require applicati
 - Legacy aliases in write output (`toJSON`) are transitional and scheduled for removal once migration coverage is confirmed.
 - Runtime writers MAY temporarily dual-emit documented transitional aliases during compatibility windows.
 - No new legacy aliases may be introduced unless explicitly added to this policy section with a removal plan.
+- **Retiring an alias from the WRITE path is a separate decision from retiring it from the READ path**, and the two are recorded in different tables below.
+  An alias may stop being emitted the moment no production path reads it off a serialized payload; it may stop being ACCEPTED only when no data in the wild can still carry it, which for anything a world, an exported system file or third-party content may hold is never.
+  A write-retired alias therefore keeps a permanent inbound shim and belongs in § Write-Retired Aliases (Read Permanently), not in § Retired Aliases (Fully Removed) — the latter's "strip on import/export" rule would delete exactly the data the shim exists to recover.
+- A serialized payload MAY omit a field whose absence its own constructor rebuilds to the identical value, and absence then carries the same meaning the written default carried.
+  This is a write-side reduction, not a schema change: no migration is required and no downgrade loses data, because every reader that already handled the default keeps reading the same value.
+  It is legitimate only where NO reader distinguishes the two, which is a property of the readers and must be audited per field rather than assumed from the constructor (see Recipe requirement 18).
 
 ### Canonical Fields
 
@@ -2691,13 +2709,24 @@ These are transitional and will be removed in a future version once all dependen
 - `essences` (emitted by `IngredientSet.toJSON` as `essences: this.essences`, `{}` post-migration; superseded by essence ingredient options — one-release window)
 - `essences` (CraftingSystem: derived id-string array equal to `essenceDefinitions.map(def => def.id)`, emitted alongside canonical `essenceDefinitions`; stripped on export by `stripTransitionalAliases` and re-derived after component deletion — not a Record, never feature-gated)
 - `ingredients` (emitted alongside `ingredientGroups` in IngredientSet)
-- `results` (emitted alongside `resultGroups` in Recipe)
 - `associatedSystemItemId` (emitted alongside `sourceComponentId` in EssenceDefinition and alongside `originItemUuid` in Component)
 - `tags` (emitted alongside `itemTags` in CraftingSystem normalization)
 - UI convenience aliases (`enableTags`, `enableEssences`, `enableCategories`, `enableMultiStepRecipes`, `advancedOptionsEnabled`)
 
 These transitional aliases exist solely for UI code paths that have not yet been updated.
 They do not represent the canonical data contract and must not be relied upon by new code.
+
+### Write-Retired Aliases (Read Permanently)
+
+The following aliases are **no longer emitted** by `toJSON()` / normalization output and **must never be re-introduced on the write path**, while their read fallbacks are PERMANENT and must not be removed by a later alias cleanup.
+
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
+
+| Alias                        | Write Retired By | Read Fallback                            | Why the read stays                                                                                                                                                                                                                                                                                                                                                              |
+| ---------------------------- | ---------------- | ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `results` (flat array, Recipe) | #1087 | `Recipe._normalizeResultGroups`, which wraps each flat result into a single-result group when `resultGroups` is absent or empty | It duplicated `resultGroups[].results` wholesale and was ~10% of a representative recipe payload, paid on every write and every socket replication. Worlds, exported system files and third-party content authored before the retirement carry it as their only result data and cannot all be reached by a migration, so accepting it is not a window that closes. Import reference remapping and `migrateComponentId` keep traversing it for the same reason. |
+
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
 
 ### Retired Aliases (Fully Removed)
 
@@ -2713,6 +2742,6 @@ The following aliases **must not be emitted by new code** and must be stripped o
 Tests must include:
 
 - Backward-compatible read tests: constructing models from legacy-only data (e.g., `systemItemId` without `componentId`) must produce correct canonical state.
-- Canonical-write assertions: `toJSON()` output must include all canonical fields with correct values.
+- Canonical-write assertions: `toJSON()` output must include all canonical fields with correct values, except where a model documents an omitted-when-default set (Recipe requirement 18), which is instead asserted as "omitted for a defaulted model, emitted for a non-default value, and reconstructed identically from absence".
 - Migration idempotency: running the `migrateComponentId` migration on already-migrated data must produce identical output.
 - Round-trip integrity: `Model.fromJSON(model.toJSON())` must preserve all canonical fields.
