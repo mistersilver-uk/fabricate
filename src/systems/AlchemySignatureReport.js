@@ -141,10 +141,17 @@ export class AlchemySignatureReport {
    * The conflicts a candidate recipe would participate in, as the equivalent full audit
    * would have reported them.
    *
-   * Substitution semantics match the pre-cache path exactly: the candidate REPLACES its
-   * stored copy in the scan, so the stored copy's compiled entries are excluded and the
-   * candidate's own sets are compared with each other as well as with the rest of the
-   * system.
+   * The candidate is evaluated as though its activation had already landed, and it reaches
+   * this method at two different moments (issue 1167):
+   *
+   * - **Stored** — an enable transition (`updateRecipe`, `canActivateRecipe`). The candidate
+   *   REPLACES its stored copy in the scan, so that copy's compiled entries are excluded and
+   *   the candidate's own sets are compared with each other as well as with the rest of the
+   *   system.
+   * - **Not stored** — a create or import (`createRecipe`, `importRecipes`), which both gate
+   *   BEFORE `this.recipes.set`. The candidate is APPENDED, taking the cohort position
+   *   persisting it will literally give it, and is otherwise scanned identically. Nothing is
+   *   excluded, because no stored entry carries its id.
    *
    * @param {object} candidate A recipe (usually a clone with `enabled: true`).
    * @returns {object[]} Conflicts in full-audit order; empty when the candidate cannot
@@ -158,13 +165,21 @@ export class AlchemySignatureReport {
     // changing which recipes the collision gate scans is not this cache's business.
     if (!candidate?.enabled) return [];
 
-    // A candidate absent from the stored cohort is absent from the substituted scan too:
-    // `_validateSignatures` substitutes by id over the STORED list, so a not-yet-created
-    // recipe never enters it and the audit reports nothing about it. Preserved rather than
-    // repaired — `createRecipe` and `importRecipes` both gate on this path, and widening
-    // it would newly refuse recipes the current build accepts.
-    const cohortIndex = this.cohortIndexByRecipeId.get(candidate.id);
-    if (cohortIndex === undefined) return [];
+    // A candidate the stored cohort has never seen is the CREATE/IMPORT case, and it is
+    // scanned at the position persisting it would give it: appended after every stored
+    // recipe (issue 1167). Returning `[]` here — which is what a substitute-only scan
+    // amounts to for a recipe that has no stored copy to substitute for — made the gate
+    // unconditionally vacuous on exactly the two paths that introduce a first-time
+    // collision, because no conflict the audit reports can name a recipe the audit never
+    // scanned.
+    //
+    // `cohortIndexByRecipeId` holds one entry per cohort member, enabled or not, so its
+    // SIZE is the index one past the last — the append slot, and strictly greater than
+    // every stored entry's `cohortIndex`. That keeps `(cohortIndex, setIndex)` a total
+    // order over the scan and puts the newcomer last in every conflict it participates in,
+    // which is the side an audit of the post-create cohort would have put it on.
+    const storedIndex = this.cohortIndexByRecipeId.get(candidate.id);
+    const cohortIndex = storedIndex === undefined ? this.cohortIndexByRecipeId.size : storedIndex;
 
     const candidateEntries = this._validator.compileRecipeEntries(
       candidate,
@@ -212,7 +227,8 @@ export class AlchemySignatureReport {
    * Sound by the argument in this module's header: every group of the candidate must be
    * covered by a collider's components, so the collider must share an id with the
    * candidate's SMALLEST group. The candidate's own stored entries are excluded because
-   * the substitution removed them from the scan.
+   * the substitution removed them from the scan; for an APPENDED candidate (issue 1167)
+   * that exclusion matches nothing, which is correct — there is no stored copy to remove.
    *
    * @param {object} entry
    * @param {*} candidateRecipeId

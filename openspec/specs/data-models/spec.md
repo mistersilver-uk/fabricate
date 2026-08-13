@@ -1570,10 +1570,20 @@ Define the save/import invariant that guarantees deterministic ingredient-signat
 5. Ingredient groups may resolve to the same component ID when inventory quantity is sufficient to satisfy the aggregate quantity across those groups.
 6. Any overlapping satisfiable signatures between ingredient sets in the same system are invalid.
 7. Save is blocked for any collision among enabled recipes in the system, including when editing an unrelated recipe.
-8. Import behavior is partial:
-   - non-conflicting recipes are imported,
-   - conflicting recipes are rejected,
-   - one aggregated conflict report is returned at completion.
+8. The scan MUST evaluate the candidate recipe as though its activation had already landed — the enabled cohort it is scanned against is the stored one with the candidate SUBSTITUTED for its stored copy, or APPENDED when no stored recipe carries its id.
+   Both arrangements are required, because a candidate reaches the gate at two different moments: an enable transition (`updateRecipe`, `canActivateRecipe`) validates a candidate whose stored copy is still disabled or still carries the pre-edit ingredient sets, while a create or import (`createRecipe`, `importRecipes`) validates a candidate that is not stored at all and is persisted only after the gate passes.
+   A conflict is reported as a pair of recipe ids and then filtered to the ones naming the candidate, so a candidate missing from the scanned cohort can never be named and the gate answers "no collision" for every candidate whatever its signature.
+   Which recipes a new recipe may collide with is therefore identical on all four paths, and a first-time collision is refused at the moment it is introduced rather than only at the next reconciliation.
+   An appended candidate takes the cohort position persisting it would give it — after every stored recipe — so the conflicts it reports carry the order and the pair orientation an audit of the post-create cohort would have produced.
+9. A recipe refused by the gate is never persisted enabled, and each entry path refuses it in its own idiom:
+   - a strict `createRecipe` REJECTS, so the caller fixes the collision before the recipe exists;
+   - a drafting `createRecipe` (`allowIncomplete`) is BORN DISABLED, the same outcome any other activation failure already produces for a draft;
+   - `importRecipes` SKIPS AND REPORTS the recipe rather than throwing, so one ambiguous recipe never aborts the recipes around it.
+10. Import behavior is partial:
+    - non-conflicting recipes are imported,
+    - conflicting recipes are rejected,
+    - one aggregated conflict report is returned at completion.
+    A recipe rejected SOLELY for a signature collision is reported under its own reason, distinct from the malformed-recipe reason, because it is authored correctly and is refused only for the company it keeps; a recipe that is both malformed and colliding is reported as malformed, the fault to fix first.
 
 ## Tool
 
