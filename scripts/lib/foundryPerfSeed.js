@@ -240,6 +240,7 @@ export function censusRequestedMix(actorPayloads, systemId) {
  * @param {string} [options.itemType]
  * @param {string} [options.actorType]
  * @param {string} [options.quantityPath] The game system's stack-quantity field.
+ * @param {number} [options.inventoryPoint] Which point of a multi-point inventory series to seed.
  * @returns {{
  *   settings: Array<{namespace: string, key: string, value: unknown}>,
  *   actors: object[],
@@ -254,7 +255,17 @@ export function buildFoundrySeed(fixture, options = {}) {
 
   const systems = [fixture.system];
   const recipes = [...(fixture.recipes ?? [])];
-  const fixtureActors = fixture.inventory?.actors ?? [];
+
+  // THE INVENTORY AXIS IS A SERIES, AND A DEFAULT THAT SEEDS ONLY ITS FIRST POINT IS A TRAP.
+  // `held-inventory` carries `inventorySeries` — 100 / 500 / 1,000 held stacks against the SAME
+  // 5,000-component library — while `inventory` is just its first entry. Seeding `inventory`
+  // unconditionally would have run the whole Foundry profile at 100 stacks while its report said
+  // `held-inventory`, i.e. measured the cheapest point of the axis and named it after the axis. The
+  // chosen point is recorded on the seed so a reader never has to infer which one produced a number.
+  const series = fixture.inventorySeries ?? null;
+  const inventoryPoint = Number.isInteger(options.inventoryPoint) ? options.inventoryPoint : 0;
+  const inventory = series ? (series[inventoryPoint] ?? series.at(-1)) : fixture.inventory;
+  const fixtureActors = inventory?.actors ?? [];
   const actors = fixtureActors.map((actor) =>
     toActorCreateData(actor, { itemType, quantityPath, actorType })
   );
@@ -291,7 +302,9 @@ export function buildFoundrySeed(fixture, options = {}) {
       actorType,
       quantityPath,
       requestedMix: censusRequestedMix(actors, fixture.system?.id ?? ''),
-      declaredMix: fixture.inventory?.mix ?? null,
+      declaredMix: inventory?.mix ?? null,
+      inventorySeriesLength: series?.length ?? 1,
+      inventoryPoint: series ? inventoryPoint : null,
       // The setting payloads at rest. This is the write-amplification number the whole programme
       // argues from, and it needs no clock to be believed.
       payloadBytes: {

@@ -32,6 +32,7 @@
  * Environment:
  *   FOUNDRY_PERF_FIXTURE       issue 1071 scale profile to seed (default `simple-corpus`)
  *   FOUNDRY_PERF_SEED          fixture seed (default: issue 1071's own default)
+ *   FOUNDRY_PERF_INVENTORY     which point of a held-inventory series to seed (default 0)
  *   FOUNDRY_PERF_IMPORT_LIMIT  recipes the import scenario imports (default 200)
  *   FOUNDRY_PERF_TRACE=1       also export a Chrome DevTools trace
  *   FOUNDRY_PERF_SECOND_CLIENT=0  skip the cross-client propagation scenario
@@ -436,7 +437,16 @@ async function main() {
   const fixtureSeed = Number(process.env.FOUNDRY_PERF_SEED ?? scale.DEFAULT_SEED);
   log(`Building fixture "${fixtureProfile}" (seed ${fixtureSeed})...\n`);
   const fixture = scale.buildScaleFixture({ profile: fixtureProfile, seed: fixtureSeed });
-  const seed = buildFoundrySeed(fixture);
+  const seed = buildFoundrySeed(fixture, {
+    inventoryPoint: Number(process.env.FOUNDRY_PERF_INVENTORY ?? 0),
+  });
+  if (seed.invariant.inventoryPoint !== null) {
+    log(
+      `Held-inventory series point ${seed.invariant.inventoryPoint} of ` +
+        `${seed.invariant.inventorySeriesLength}: ${seed.invariant.requestedMix.stacks} stacks.
+`
+    );
+  }
 
   const browser = await chromium.launch({ headless: true });
   const context = await browser.newContext({ viewport: { width: 1600, height: 900 } });

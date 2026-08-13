@@ -186,6 +186,33 @@ test('seeding writes a bounded number of times whatever the corpus size', () => 
   );
 });
 
+test('a multi-point inventory series seeds the point that was asked for', () => {
+  // Found by running the seeder against issue 1071's REAL fixtures: `held-inventory` carries a
+  // 100 / 500 / 1,000 series and a bare `fixture.inventory` is only its FIRST point, so an
+  // unparameterised seeder would have run the whole profile at the cheapest point of the axis while
+  // reporting it under the axis's name.
+  const base = fakeFixture({ recipes: 2, components: 4, stacks: 6 });
+  const series = [6, 12, 24].map((stacks) => fakeFixture({ recipes: 2, components: 4, stacks }));
+  const fixture = {
+    ...base,
+    inventorySeries: series.map((entry) => entry.inventory),
+  };
+
+  const first = buildFoundrySeed(fixture);
+  const last = buildFoundrySeed(fixture, { inventoryPoint: 2 });
+
+  assert.equal(first.invariant.inventoryPoint, 0);
+  assert.equal(first.invariant.inventorySeriesLength, 3);
+  assert.equal(first.invariant.requestedMix.stacks, 6);
+  assert.equal(last.invariant.inventoryPoint, 2);
+  assert.equal(last.invariant.requestedMix.stacks, 24, 'the third point holds four times the first');
+  assert.deepEqual(last.writes, first.writes, 'a bigger series point is still three writes');
+
+  // A corpus-axis fixture has no series, and must say so rather than claim to be at point 0.
+  assert.equal(buildFoundrySeed(base).invariant.inventoryPoint, null);
+  assert.equal(buildFoundrySeed(base).invariant.inventorySeriesLength, 1);
+});
+
 test('the seed carries the two corpus settings, in the shape the managers read', () => {
   const seed = buildFoundrySeed(fakeFixture({ recipes: 4, components: 2, stacks: 3 }));
   assert.deepEqual(
