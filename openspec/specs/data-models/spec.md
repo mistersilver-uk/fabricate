@@ -606,6 +606,13 @@ CraftingSystem = {
     The third is the ENGINE-FACING rebuild `_libraryTaskToRuntimeTask` (`GatheringRichStateService.js`), which projects a library task into the runtime task `GatheringEngine` resolves against, and its failure mode is DIFFERENT and strictly harder to see: the pick persists correctly, both library normalizers are correct, and the pick is simply never read at roll time, so `bySubject` silently resolves the activity's default set for every task.
     A world satisfying the two-rebuild reading exactly can therefore still have `bySubject` wholly broken on gathering.
 
+35. **Failure-result policy.** `failureResultPolicy` (`'never' | 'perRecord' | 'always'`) is present on ALL THREE activity checks — `craftingCheck`, `salvageCraftingCheck` and `gatheringCraftingCheck` — and answers exactly one question: may a FAILED check produce a result at all.
+    It is the ORTHOGONAL axis to failure CONSUMPTION (`recipes-and-steps` §Failure Consumption Policy), which answers what a failed attempt costs; gathering carries the produce axis and no consume axis.
+    It **SELECTS an authored failure output and never fabricates one**, so `always` on a record authoring none produces nothing — which is why `perRecord` and `always` share ONE runtime predicate and differ as declarations of intent rather than as a second branch.
+    All three normalizers emit it through ONE shared derivation (`_normalizeFailureResultPolicy`); because each is a whitelist rebuild, omitting it from any one drops it from that activity on the next save.
+    A newly-created system defaults to `perRecord`, and an absent or unrecognized value normalizes to `perRecord` on read (the `toolBreakage.authority` precedent, requirement 21).
+    An UPGRADED world never reaches that default: the `1.25.0` migration seeds `never` onto every check block already on disk (`destructive-changes-and-migrations`), so no existing world changes behaviour.
+
 **Disambiguation:** `checkBreakage` (per-check, decides WHEN tools break under `checkDriven`) is distinct from the gathering realm rule `toolBreakagePolicy` (`failureOnBreak | successDespiteBreak`, defined in `gathering-and-harvesting`, which governs what a broken tool does to the gather outcome).
 The two are unrelated and independently applied.
 
@@ -967,8 +974,12 @@ Represent one curated item entry available to recipes and salvage operations.
    In `simple` salvage mode a component's salvage has exactly one success result group (`role !== 'failure'`) plus at most one reserved `role: 'failure'` group, the failure group tolerated only when `salvageCraftingCheck.simple.rollFormula` is authored; no additional groups are permitted.
    `salvage.enabled` is clamped to `false` in `simple` mode when there is no success group (a failure-only config cannot be enabled).
    Routed mode keeps "one or more"; progressive keeps "exactly one".
-   This bound is enforced at the `_normalizeSalvage` normalizer — the single chokepoint every writer passes (GM save, import, copy-mode, migration) — not by any UI control, via a success-first retain-one clamp whose post-clamp `resultGroups[0]` is the first success group (the group the engine awards via `slice(0, 1)`, with no role filter).
-   The reserved-failure tolerance is a data-model / validation allowance only: salvage Simple awards `slice(0, 1)` and never routes to a failure group.
+   This bound is enforced at the `_normalizeSalvage` normalizer — the single chokepoint every writer passes (GM save, import, copy-mode, migration) — not by any UI control, via a success-first retain-one clamp whose post-clamp `resultGroups[0]` is the first success group (the group the engine awards ON SUCCESS via `slice(0, 1)`, with no role filter).
+   **The reserved-failure tolerance is a LIVE CAPABILITY, governed by `salvageCraftingCheck.failureResultPolicy` (issue 1098).**
+   Its previous reading — a data-model / validation allowance only, with salvage Simple never awarding or routing to a failure group — is RETRACTED.
+   When the policy permits results on failure, the salvage failure branch resolves the reserved group and awards it.
+   **Both clamps are unchanged, and the ordering guarantee becomes MORE load-bearing, not less:** the SUCCESS branch still selects `resultGroups[0]` by INDEX, so the FAILURE branch selects the reserved group **by ROLE and never by index**, returning nothing when none is authored — an index-based failure selection would award the full success salvage output on a failed check.
+   The `enabled` clamp — a Simple config with no success group cannot be enabled — is unchanged.
 6. Runtime essence matching, craftability checks, discovered-recipe craftability, crafting-check contexts, and effect-transfer contexts must count `Component.essences` for actor items that match the component by source reference or name.
    Explicit `fabricate.essences` item flags remain a compatibility override for that item.
    The source-reference half of that match is governed by the shared **Component Item Matching** resolver defined below (its identity tier, then the raw-reference fall-through).

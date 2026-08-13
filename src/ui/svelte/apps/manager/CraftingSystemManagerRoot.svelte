@@ -13,12 +13,13 @@
   } from '../../../../gatheringImageDefaults.js';
   import { localize, notifyInfo, notifyWarn } from '../../util/foundryBridge.js';
   import { resolveDropUuid } from '../../util/dropUtils.js';
+  import { permitsFailureResults } from '../../../../utils/failureResultPolicy.js';
   import {
-    routedSuccessTierOptions,
     routedOutcomeTierOptions,
+    routedTierOptionsForPolicy,
+    routedOutcomeTierNamesForPolicy,
     routedHasOutcomeTiers,
     routedOutcomeTierCount,
-    routedOutcomeTierNames,
     resolveRecipeCheckTierOptions,
     resolveRecipeFixedOutcomeTierOptions,
   } from '../../../../utils/routedOutcomeKeywords.js';
@@ -685,8 +686,17 @@
   // Routed-check outcome tiers (active type) offered to the recipe editor's
   // check-mode result-set assignment control as {id, name}. Failure tiers are
   // excluded — a failed check produces no result set to route to.
+  // POLICY-CONDITIONAL since issue 1098 (decision 7): success-filtered when the crafting
+  // failure-result policy forbids failure results, unfiltered when it permits them, so a
+  // GM can bind a result group to a failure-marked tier exactly where the engine will
+  // route one. It is a SWAP between two functions the codebase already had, and
+  // `systemValidation` feeds `recipeReadiness` from the same swap — the picker and the
+  // readiness warnings can never disagree about which tiers are assignable.
   const recipeRoutedOutcomeTierOptions = $derived.by(() =>
-    routedSuccessTierOptions(selectedSystem?.craftingCheck?.routed)
+    routedTierOptionsForPolicy(
+      selectedSystem?.craftingCheck?.routed,
+      selectedSystem?.craftingCheck?.failureResultPolicy
+    )
   );
   // ALL routed outcome tiers ({id, name}, success + failure) — the library inspector
   // resolves a routed-by-check result group's checkOutcomeIds to these tier NAMES.
@@ -699,13 +709,26 @@
   const recipeRoutedHasOutcomeTiers = $derived.by(() =>
     routedHasOutcomeTiers(selectedSystem?.craftingCheck?.routed)
   );
+  // Whether this system's crafting failure-result policy permits results on a failed check
+  // (issue 1098). Read through the shared predicate rather than compared to a literal, so
+  // the editor's third empty hint and the engine's routing decision cannot disagree about
+  // what an absent or unrecognized value means.
+  const recipeFailureResultsAllowed = $derived(
+    permitsFailureResults(selectedSystem?.craftingCheck?.failureResultPolicy)
+  );
 
   // Salvage feature gate + the inputs the per-component salvage editor needs.
   const componentSalvageEnabled = $derived(selectedSystem?.features?.salvage === true);
   // Routed-salvage outcome tier NAMES (active type), used by the per-component
   // outcome-routing selects. Names map to result-group ids in component.salvage.
+  // Policy-conditional on the same terms (issue 1098). Unfiltered until that issue, so it
+  // offered failure tier names as DEAD OPTIONS: `salvage()` returned before
+  // `_resolveSalvageResultGroups` on a failed check, and nothing ever routed through them.
   const salvageOutcomeNames = $derived(
-    routedOutcomeTierNames(selectedSystem?.salvageCraftingCheck?.routed)
+    routedOutcomeTierNamesForPolicy(
+      selectedSystem?.salvageCraftingCheck?.routed,
+      selectedSystem?.salvageCraftingCheck?.failureResultPolicy
+    )
   );
   // The second axis of the per-component salvage panel's derived presentation
   // (issue 676, decision 2): salvageResolutionMode × salvage-check enablement.
@@ -7508,6 +7531,13 @@
             craftingCheckSimple={checkSimpleDraft}
             craftingCheckProgressive={checkProgressiveDraft}
             craftingConsumption={selectedSystem?.craftingCheck?.consumption || null}
+            salvageConsumption={selectedSystem?.salvageCraftingCheck?.consumption || null}
+            craftingFailureResultPolicy={selectedSystem?.craftingCheck?.failureResultPolicy ||
+              'perRecord'}
+            salvageFailureResultPolicy={selectedSystem?.salvageCraftingCheck?.failureResultPolicy ||
+              'perRecord'}
+            gatheringFailureResultPolicy={selectedSystem?.gatheringCraftingCheck
+              ?.failureResultPolicy || 'perRecord'}
             modifiers={selectedSystem?.modifiers || []}
             craftingDefaultModifierPolicy={selectedSystem?.craftingCheck?.defaultModifierPolicy ||
               'addAll'}
@@ -7553,6 +7583,13 @@
             {onUpdateGatheringCheckRouted}
             onSetAlchemyCheckMode={(m) => store.setAlchemyCheckMode?.(m)}
             onUpdateCraftingConsumption={(patch) => store.saveCraftingCheckConsumption?.(patch)}
+            onUpdateSalvageConsumption={(patch) => store.saveSalvageCheckConsumption?.(patch)}
+            onUpdateCraftingFailureResultPolicy={(policy) =>
+              store.saveCraftingCheckFailureResultPolicy?.(policy)}
+            onUpdateSalvageFailureResultPolicy={(policy) =>
+              store.saveSalvageCheckFailureResultPolicy?.(policy)}
+            onUpdateGatheringFailureResultPolicy={(policy) =>
+              store.saveGatheringCheckFailureResultPolicy?.(policy)}
             onUpdateCraftingCheckModifiers={(patch) => store.saveCraftingCheckModifiers?.(patch)}
             onUpdateSalvageCheckModifiers={(patch) => store.saveSalvageCheckModifiers?.(patch)}
             onUpdateGatheringCheckModifiers={(patch) => store.saveGatheringCheckModifiers?.(patch)}
@@ -7808,6 +7845,7 @@
         routingProvider={recipeRoutingProvider}
         routedOutcomeTierOptions={recipeRoutedOutcomeTierOptions}
         routedOutcomeTiersDefined={recipeRoutedHasOutcomeTiers}
+        routedFailureResultsAllowed={recipeFailureResultsAllowed}
         alchemy={recipeAlchemy}
         signatureConflicts={recipeSignatureConflicts}
         onOpenComponent={(componentId) => editComponent(componentId)}

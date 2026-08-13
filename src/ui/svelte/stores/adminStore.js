@@ -109,6 +109,11 @@ import {
 } from '../../../utils/recipeActivationMessages.js';
 import { craftingEffect } from '../apps/manager/crafting/craftingVisibility.js';
 import { resolveRecipeAccessRoster } from '../../../utils/recipeAccessRoster.js';
+import { authoredFailureOutcome } from '../../../utils/gatheringFailureOutcome.js';
+import {
+  activityFailureResultPolicy,
+  normalizeFailureResultPolicy,
+} from '../../../utils/failureResultPolicy.js';
 import { getFabricateFlag } from '../../../config/flags.js';
 import {
   defaultKnowledgeTab,
@@ -1134,6 +1139,10 @@ function _normalizeGatheringTask(task = {}, randomID = _fallbackRandomID) {
     // dropped the moment a task is saved through THIS draft path. The shared
     // `authoredCheckModifierIds` attach is the same call on both sides.
     ...authoredCheckModifierIds(task.checkModifierIds),
+    // The task's text/macro failure feedback (issue 1098, CF8), through the same shared
+    // attach its mirror uses. Emitted by NEITHER library rebuild before that issue, so a
+    // value authored anywhere was dropped the moment a task was saved through this path.
+    ...authoredFailureOutcome(task.failureOutcome),
     // Optional per-task gathering DC override: when set it replaces the
     // system-level gathering check default DC at gather time. null = use default.
     // Guard null/''/undefined explicitly so re-normalizing a null stays null
@@ -2743,6 +2752,12 @@ function _buildSelectedSystemViewData(
           (selectedSystem.craftingCheck?.consumption?.breakToolsOnFail ??
             selectedSystem.craftingCheck?.consumption?.consumeCatalystsOnFail) === true,
       },
+      // The failure-RESULT policy (issue 1098): the orthogonal produce axis, a SIBLING of
+      // `consumption` rather than a member of it — which is why `saveCraftingCheckConsumption`
+      // cannot carry it and each activity gets its own saver. Read through the shared
+      // normalizer so the projection and the manager normalizer cannot disagree about what
+      // an absent or unrecognized value means.
+      failureResultPolicy: activityFailureResultPolicy(selectedSystem, 'crafting'),
       // Crafting's SELECTION over the system catalogue plus the pick cap and the two
       // derivations both authoring surfaces read (issues 770, 1055, 1095). Spread from a
       // named builder so this allowlist keeps stating what it carries while the giant
@@ -2771,6 +2786,24 @@ function _buildSelectedSystemViewData(
     salvageResolutionMode: selectedSystem.salvageResolutionMode || 'simple',
     salvageCraftingCheck: {
       enabled: selectedSystem.salvageCraftingCheck?.enabled === true,
+      failureResultPolicy: activityFailureResultPolicy(selectedSystem, 'salvage'),
+      // SALVAGE'S FAILURE CONSUMPTION, projected for the first time (issue 1098). It has
+      // been persisted since 1.7.0 and surfaced NOWHERE, so the Salvage On-failure section
+      // is its first authoring surface — and both defaults are traps that this projection
+      // has to mirror EXACTLY, the way the crafting projection above already does:
+      //
+      //  - `consumeComponentOnFail` defaults TRUE via `!== false`, so a projection that
+      //    dropped it would INVERT a system authored `false`, not merely lose it.
+      //  - `breakToolsOnFail` is read NEW-THEN-LEGACY against `consumeCatalystsOnFail` (the
+      //    1.7.0 rename). Reading the new key alone silently flips a pre-1.7.0 system from
+      //    ON to OFF the first time a GM opens this section and saves.
+      consumption: {
+        consumeComponentOnFail:
+          selectedSystem.salvageCraftingCheck?.consumption?.consumeComponentOnFail !== false,
+        breakToolsOnFail:
+          (selectedSystem.salvageCraftingCheck?.consumption?.breakToolsOnFail ??
+            selectedSystem.salvageCraftingCheck?.consumption?.consumeCatalystsOnFail) === true,
+      },
       // Surface the structured per-mode configs so the salvage Checks editors and
       // the per-component outcome-routing names can read back what was persisted
       // (otherwise they seed empty and edits look like they never saved).
@@ -2797,6 +2830,10 @@ function _buildSelectedSystemViewData(
     // are surfaced alongside the active flag).
     gatheringCraftingCheck: {
       enabled: selectedSystem.gatheringCraftingCheck?.enabled === true,
+      // Gathering carries the produce axis and NO consume axis (issue 1098) — it has no
+      // consumption block at all, so the On-failure section renders this control and no
+      // toggles beside it, plus the dormancy notice naming issue 683.
+      failureResultPolicy: activityFailureResultPolicy(selectedSystem, 'gathering'),
       progressive: selectedSystem.gatheringCraftingCheck?.progressive
         ? _clonePlain(selectedSystem.gatheringCraftingCheck.progressive)
         : null,
@@ -8707,13 +8744,81 @@ export function createAdminStore(services) {
     await refresh();
   }
 
-  // Which system key each activity's check-modifier SELECTION is persisted under. The
-  // library is not in here: it is top-level and shared (issues 1095, 1117).
-  const CHECK_MODIFIER_ACTIVITY_KEYS = {
+  // Live-persist salvage's failure-consumption policy (issue 1098) — the twin of
+  // `saveCraftingCheckConsumption` above, for the two keys that have been persisted since
+  // 1.7.0 and reachable from no editor until the Salvage On-failure section shipped. It
+  // spreads BOTH the existing salvageCraftingCheck block AND its nested `consumption`
+  // sub-object for the reason its crafting twin states: `updateSystem` shallow-merges the
+  // top level only, so a naive patch would drop every sibling AND the untouched flag, which
+  // the normalizer then re-defaults — and one of those defaults is TRUE, so the loss would
+  // present as a silent inversion rather than an obvious blank.
+  async function saveSalvageCheckConsumption(patch = {}) {
+    const systemManager = services.getCraftingSystemManager();
+    const sysId = get(selectedSystemId);
+    if (!sysId) return;
+    const system = systemManager.getSystem(sysId);
+    if (!system) return;
+    const existing = system.salvageCraftingCheck || {};
+    await systemManager.updateSystem(sysId, {
+      salvageCraftingCheck: {
+        ...existing,
+        // No `|| {}` fallback: spreading `undefined` in an object literal is already a
+        // no-op, and the lint rule that flags the redundant form is one this file is
+        // slowly working out of rather than into.
+        consumption: { ...existing.consumption, ...patch },
+      },
+    });
+    await refresh();
+  }
+
+  // Which system key each activity's check block is persisted under. The modifier LIBRARY
+  // is not in here: it is top-level and shared (issues 1095, 1117). Named for the block
+  // rather than for one of its fields because two savers now key on it — the
+  // check-modifier selection and the failure-result policy (issue 1098).
+  const CHECK_ACTIVITY_SYSTEM_KEYS = {
     crafting: 'craftingCheck',
     salvage: 'salvageCraftingCheck',
     gathering: 'gatheringCraftingCheck',
   };
+
+  /**
+   * Live-persist ONE activity's failure-result policy (issue 1098).
+   *
+   * A SIBLING of `consumption`, not a member of it, so `saveCraftingCheckConsumption`
+   * structurally cannot carry it — and gathering has no consumption block at all, so there
+   * was no saver to extend. One parameterised writer rather than three near-identical ones:
+   * the three differ only in which key they write, and three copies is how one activity
+   * comes to forget to spread `existing`.
+   *
+   * It spreads `existing` under `updateSystem`'s shallow top-level merge, so every sibling
+   * of the policy — the per-mode sub-objects, the modifier selection, the consumption block
+   * — survives rather than being re-defaulted by the normalizer on the next read. The value
+   * goes through the shared normalizer so a junk argument writes the default rather than
+   * persisting something the engine would have to re-interpret.
+   */
+  async function saveCheckFailureResultPolicy(activity, policy) {
+    const activityKey = CHECK_ACTIVITY_SYSTEM_KEYS[activity];
+    if (!activityKey) return;
+    const systemManager = services.getCraftingSystemManager();
+    const sysId = get(selectedSystemId);
+    if (!sysId) return;
+    const system = systemManager.getSystem(sysId);
+    if (!system) return;
+    await systemManager.updateSystem(sysId, {
+      [activityKey]: {
+        ...system[activityKey],
+        failureResultPolicy: normalizeFailureResultPolicy(policy),
+      },
+    });
+    await refresh();
+  }
+
+  const saveCraftingCheckFailureResultPolicy = (policy) =>
+    saveCheckFailureResultPolicy('crafting', policy);
+  const saveSalvageCheckFailureResultPolicy = (policy) =>
+    saveCheckFailureResultPolicy('salvage', policy);
+  const saveGatheringCheckFailureResultPolicy = (policy) =>
+    saveCheckFailureResultPolicy('gathering', policy);
 
   // Persist one activity's check-modifier SELECTION (issues 770, 1055, 1095, 1117).
   //
@@ -8741,7 +8846,7 @@ export function createAdminStore(services) {
     if (!sysId) return;
     const system = systemManager.getSystem(sysId);
     if (!system) return;
-    const activityKey = CHECK_MODIFIER_ACTIVITY_KEYS[activity];
+    const activityKey = CHECK_ACTIVITY_SYSTEM_KEYS[activity];
     if (!activityKey || Object.keys(patch).length === 0) return;
     await systemManager.updateSystem(sysId, {
       [activityKey]: { ...(system[activityKey] || {}), ...patch },
@@ -9863,6 +9968,10 @@ export function createAdminStore(services) {
     saveCraftingCheckProgressive,
     saveCraftingCheckActive,
     saveCraftingCheckConsumption,
+    saveSalvageCheckConsumption,
+    saveCraftingCheckFailureResultPolicy,
+    saveSalvageCheckFailureResultPolicy,
+    saveGatheringCheckFailureResultPolicy,
     saveCraftingCheckModifiers,
     saveSalvageCheckModifiers,
     saveGatheringCheckModifiers,

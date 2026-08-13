@@ -267,7 +267,7 @@ test('the runner applies 1.20.0 to craftingSystems and bumps the migration versi
   const result = await runner.run();
 
   assert.equal(result.aborted, false);
-  assert.equal(store.get('migrationVersion'), '1.24.0');
+  assert.equal(store.get('migrationVersion'), '1.25.0');
   assert.equal(store.get('craftingSystems')[0].craftingCheck[MAX_PICKS], 1);
   assert.deepEqual(
     store.get('recipes')[0].craftingModifier,
@@ -278,7 +278,7 @@ test('the runner applies 1.20.0 to craftingSystems and bumps the migration versi
 
 test('the runner does not re-run 1.20.0 once the world is at that version', async () => {
   const store = new Map([
-    ['migrationVersion', '1.24.0'],
+    ['migrationVersion', '1.25.0'],
     ['craftingSystems', [system({ defaultModifierPolicy: 'playerPicks' })]],
     ['recipes', []],
   ]);

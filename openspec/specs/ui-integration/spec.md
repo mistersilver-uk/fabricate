@@ -1092,7 +1092,27 @@ The flavour text is shown whole, in the one surface with room for it.
 
 The **Produces** list shows every produced group, **toned by role**.
 The result-group pill carries the GM-authored group name (Fabricate's outcome tiers are authored, so the name is the recipe's — never a crit/success/fail vocabulary the model does not have); its tone is the role the group plays, success-soft or danger-soft.
-The reserved `role: 'failure'` group — the failure output for plain `simple` resolution mode and alchemy-Simple checkMode alike — is **rendered** (danger-bordered), not filtered out, so a simple or alchemy recipe's failure output is visible; no failure row is invented in a routed mode, where a failed craft produces nothing.
+The reserved `role: 'failure'` group — the failure output for plain `simple` resolution mode and alchemy-Simple checkMode alike — is **rendered** (danger-bordered), not filtered out, so a simple or alchemy recipe's failure output is visible.
+**The routed clause is CONDITIONAL, not absolute (issue 1098).**
+In a routed mode the list renders a failure-toned row for a result group assigned to a failure-marked outcome tier **when the system's `craftingCheck.failureResultPolicy` permits results on failure**, and renders none when it does not — matching what the engine will actually do.
+The successful-craft-makes-nothing warning still keys on the SUCCESS rows only: a recipe whose only group is a failure output still makes nothing when the craft succeeds, and says so.
+
+### The On-failure section
+
+Each activity route's fifth section renders the `failureResultPolicy` `RadioCardGroup`, whose `perRecord` card copy is **per activity** — "Decided per recipe" / "Decided per salvageable item" / "Decided per gathering task", from the same record-noun vocabulary the Difficulty card reads.
+Crafting adds `consumeIngredientsOnFail` and `breakToolsOnFail`; the alchemy branch renders the policy beside its own behaviour flags, because alchemy `simple` is one of the two crafting modes where the reserved failure group is a live award.
+Salvage renders `consumeComponentOnFail` and `breakToolsOnFail`, persisted since 1.7.0 and reachable from no editor before this; **gathering renders NEITHER**, because it has no consumption block, renders the **dormancy notice naming issue 683**, and cross-references `task.failureOutcome` read-only.
+Where the policy is inert — `routedByIngredients`, `progressive`, gathering `d100` — the section renders a **stated inert note naming the reason** rather than a control that does nothing, and the control itself stays selectable, because the policy is persisted per ACTIVITY rather than per mode and switching modes must not reset it.
+The prototype's sentence "Applies to every resolution mode" is therefore **recorded as NON-ADOPTED** and is not rendered: the requirement above makes the policy inert on three of the modes.
+
+### Routed result-group authoring is policy-conditional
+
+The recipe result-authoring control's outcome-tier options are drawn from the system's routed tier list **filtered to `success === true` when the failure-result policy forbids failure results, and unfiltered when it permits them** — a swap between two functions the codebase already has, not a new derivation.
+`recipeReadiness`'s routed-check validation reads the SAME set, so the picker and the readiness warnings can never disagree about which tiers are assignable.
+The companion "are any tiers defined at all" signal keeps its meaning and gains a third empty hint for "tiers exist, some are failure tiers, but the policy does not permit failure results", which names allowing failure results as a remedy alongside marking a tier as a Success.
+The per-component salvage `outcomeRouting` select is policy-conditional on the same terms — it was unfiltered and therefore offered dead options.
+**`minSuccessOutcomeId` is unaffected**: it names a minimum SUCCESS tier and its picker keeps reading the success-filtered set under every policy value.
+**An authored `ResultGroup.checkOutcomeIds` entry naming a failure-marked tier is NEVER stripped on a policy change or a tier `success` flip** — the strip keys on tier-id existence, so the assignment persists on disk, stops being offered and stops routing, and routes again when the policy permits.
 The successful-craft-makes-nothing warning still keys on the success rows: a recipe whose only group is the failure group still makes nothing when the craft succeeds, and says so.
 
 The inspector's primary action is **`Edit recipe`** — the accent-filled, full-width, loudest control on the panel, and the point of the inspector.

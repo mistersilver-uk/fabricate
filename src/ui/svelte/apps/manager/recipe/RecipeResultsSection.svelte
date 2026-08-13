@@ -40,6 +40,9 @@
     ingredientSets = [],
     outcomeTierOptions = [],
     outcomeTiersDefined = false,
+    // Issue 1098: forwarded to each group card's third empty hint. A tab prop that is not
+    // ALSO forwarded here silently defaults, which is why the whole chain is spelled out.
+    failureResultsAllowed = false,
     // Progressive systems award this group's results in order; forwarded to the
     // group card so it renders drag-reorder handles on the result rows.
     progressive = false,
@@ -246,6 +249,7 @@
             assignedIngredientSetIds={assignedSetIdsFor(group)}
             outcomeTierOptions={tierOptionsFor(index)}
             {outcomeTiersDefined}
+            {failureResultsAllowed}
             onAssignIngredientSet={(setId, assigned) =>
               onAssignIngredientSet(group?.id || null, setId, assigned)}
             onChange={(nextGroup) => updateGroup(index, nextGroup)}

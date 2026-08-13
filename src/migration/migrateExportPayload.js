@@ -14,6 +14,7 @@ import { FABRICATE_EXPORT_SCHEMA_VERSION } from '../systems/authoringExport.js';
 
 import { applyMaxModifierPicks } from './migrateMaxModifierPicks.js';
 import { applyRetireCraftingModToken } from './migrateRetireCraftingModToken.js';
+import { applySeededFailureResultPolicy } from './migrateSeedFailureResultPolicy.js';
 import { applySystemCheckModifierCatalogue } from './migrateSystemCheckModifierCatalogue.js';
 import { deriveToolSourceFromComponents } from './migrateToolsToFirstClass.js';
 import { applyUnifiedModifierLibrary } from './migrateUnifyModifierLibraries.js';
@@ -152,6 +153,30 @@ function unifyModifierLibraries(migrated) {
 }
 
 /**
+ * Seed `failureResultPolicy: 'never'` onto an imported bundle's existing check blocks
+ * (issue 1098), mirroring the world-side 1.25.0 migration so an imported system behaves
+ * exactly like a migrated one rather than silently arriving on the permitting `perRecord`
+ * default. An export bundle carries exactly one system, so the shared per-system transform
+ * is applied directly with no grouping.
+ *
+ * BRANCH-INDEPENDENT for the reason all five siblings above are: `migrateExportPayload`
+ * returns early once `payload.schemaVersion` is already current, and every bundle written
+ * by the shipping build carries the current schema, so a derivation reachable only from
+ * the legacy branch would never run on a real bundle. The policy is a NEW field on an OLD
+ * schema version, so its absence is orthogonal to the envelope version.
+ *
+ * A bundle written by a post-1098 build already carries an authored policy on each check,
+ * and the transform never overwrites a present key — which is exactly what stops an
+ * export/import round trip from resetting a GM's `always` back to `never`.
+ * @private
+ */
+function seedFailureResultPolicy(migrated) {
+  const system = migrated?.system;
+  if (!system || typeof system !== 'object' || Array.isArray(system)) return;
+  applySeededFailureResultPolicy(system);
+}
+
+/**
  * @param {*} payload - Parsed export JSON of any prior schema
  * @returns {object} Upcast payload at the current schema version
  */
@@ -170,6 +195,7 @@ export function migrateExportPayload(payload) {
     retireCraftingModToken(current);
     liftCheckModifierCatalogue(current);
     unifyModifierLibraries(current);
+    seedFailureResultPolicy(current);
     return current;
   }
 
@@ -204,6 +230,7 @@ export function migrateExportPayload(payload) {
   retireCraftingModToken(migrated);
   liftCheckModifierCatalogue(migrated);
   unifyModifierLibraries(migrated);
+  seedFailureResultPolicy(migrated);
 
   return migrated;
 }
