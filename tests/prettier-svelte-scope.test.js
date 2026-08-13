@@ -125,6 +125,9 @@ const GATE_TARGETS = [
   // The deterministic performance harness (issue 1071). The three libraries carry all the
   // reusable behaviour — the two `.mjs` entry points export nothing, because
   // `unicorn/no-exports-in-scripts` forbids a CLI from also being a module.
+  // The PATH-walking executable resolver, extracted out of compare-svelte-render.mjs so the
+  // benchmark envelope can share it instead of copying a security-sensitive helper.
+  'scripts/lib/resolveExecutable.js',
   'scripts/lib/benchmarkBaselines.js',
   'scripts/lib/benchmarkEnvelope.js',
   'scripts/lib/benchmarkStats.js',

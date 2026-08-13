@@ -21,12 +21,33 @@ import { execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { arch, cpus, platform, release, totalmem } from 'node:os';
 
+import { resolveExecutable } from './resolveExecutable.js';
+
 /** The envelope fields a comparison must agree on, or refuse. */
 export const COMPARABILITY_FIELDS = Object.freeze(['nodeVersion', 'cpuModel', 'arch']);
 
+/**
+ * The git executable, resolved ONCE to an absolute path in an absolute `PATH` directory.
+ *
+ * Spawning a bare `'git'` leaves resolution to the OS at spawn time, which is SonarCloud's
+ * `javascript:S4036`: a writable or relative `PATH` entry earlier in the list would win and run
+ * with this process's privileges. `resolveExecutable` skips relative entries outright and pins
+ * the result, and is shared with `compare-svelte-render.mjs` rather than copied.
+ *
+ * `null` when git is not installed, which is not an error here: a run record without commit
+ * metadata is still a perfectly valid set of timings, and refusing to benchmark because a VCS is
+ * missing would be a strange thing for a benchmark harness to do.
+ */
+const GIT_EXECUTABLE = resolveExecutable('git');
+
 function git(args, cwd) {
+  if (!GIT_EXECUTABLE) return null;
   try {
-    return execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] })
+    return execFileSync(GIT_EXECUTABLE, args, {
+      cwd,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    })
       .toString()
       .trim();
   } catch {
@@ -59,12 +80,15 @@ function detectContainerized() {
  */
 export function captureEnvelope({ repoRoot, fixtureProfile, fixtureSeed, harnessVersion }) {
   const cpuList = cpus();
+  const status = git(['status', '--porcelain'], repoRoot);
   return {
     commit: git(['rev-parse', 'HEAD'], repoRoot),
     branch: git(['rev-parse', '--abbrev-ref', 'HEAD'], repoRoot),
-    // A dirty tree is the single most common reason two runs of "the same commit" disagree,
-    // so it is captured rather than inferred.
-    dirty: (git(['status', '--porcelain'], repoRoot) ?? '') !== '',
+    // A dirty tree is the single most common reason two runs of "the same commit" disagree, so it
+    // is captured rather than inferred. `null` — not `false` — when git could not be consulted:
+    // reporting a tree as clean because nothing looked is the misleading answer, and it is the one
+    // that would let someone compare two runs of the same SHA and never suspect the diff.
+    dirty: status === null ? null : status !== '',
     nodeVersion: process.versions.node,
     v8Version: process.versions.v8,
     os: `${platform()} ${release()}`,
