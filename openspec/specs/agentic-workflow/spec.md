@@ -688,6 +688,7 @@ Comparison between two runs MUST be refused when the runs came from environments
 - **THEN** each quantity is a separate fixture dimension that varies while the other is pinned, so a regression is attributable to one of them
 - **AND** the dimension is reported as a series of at least three points rather than as a single number
 - **AND** each fixture declares the composition that decides which branch of the measured path it exercises
+
 ### Requirement: Opt-in live-Foundry performance measurement
 
 Measurement that requires a licensed Foundry installation MUST be an opt-in profile of the existing Foundry harness, MUST run in no required check, and MUST NOT start or download anything before its preconditions are met.
