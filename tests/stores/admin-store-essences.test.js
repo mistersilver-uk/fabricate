@@ -269,7 +269,11 @@ test('1036: a recipe reference is reported through its OWN key, never as a block
   const store = await openStore(harness);
 
   const card = cardFor(store, 'fire');
-  assert.equal(card.deleteRewritesRecipes, true, 'a recipe reference is reported through its own key');
+  assert.equal(
+    card.deleteRewritesRecipes,
+    true,
+    'a recipe reference is reported through its own key'
+  );
   assert.equal(card.componentUsageCount, 0);
   assert.equal(
     Object.hasOwn(card, 'deleteBlocked'),
@@ -283,7 +287,9 @@ test('1036: a recipe reference is reported through its OWN key, never as a block
 // ---------------------------------------------------------------------------
 
 test('1036/9: a duplicate takes a name updateEssence will still accept', async () => {
-  const harness = makeEssenceStoreHarness({ essences: [makeEssence({ id: 'fire', name: 'Fire' })] });
+  const harness = makeEssenceStoreHarness({
+    essences: [makeEssence({ id: 'fire', name: 'Fire' })],
+  });
   const store = await openStore(harness);
 
   const copyId = await store.duplicateEssence('fire');
@@ -297,7 +303,9 @@ test('1036/9: a duplicate takes a name updateEssence will still accept', async (
 });
 
 test('1036/9: duplicating twice yields THREE distinct names', async () => {
-  const harness = makeEssenceStoreHarness({ essences: [makeEssence({ id: 'fire', name: 'Fire' })] });
+  const harness = makeEssenceStoreHarness({
+    essences: [makeEssence({ id: 'fire', name: 'Fire' })],
+  });
   const store = await openStore(harness);
 
   await store.duplicateEssence('fire');
@@ -387,7 +395,7 @@ test('1036: deleteEssence hands the cascade impact counts to the confirm dialog'
   await store.deleteEssence('fire');
 
   const content = harness.localizations.find(
-    (call) => call.key === 'FABRICATE.Admin.Manager.Essence.DeleteConfirm.Content'
+    (call) => call.key === 'FABRICATE.Admin.Manager.Essence.DeleteConfirm.ContentOne'
   );
   assert.ok(content, 'the confirm content is localized, not hardcoded');
   assert.deepEqual(
@@ -395,7 +403,11 @@ test('1036: deleteEssence hands the cascade impact counts to the confirm dialog'
     { name: 'Fire', components: 2, recipes: 1 },
     'the GM is told, before confirming, how far the cascade reaches: two carriers, one recipe'
   );
-  assert.equal(harness.confirmations.length, 1, 'exactly one confirm is asked, not one per carrier');
+  assert.equal(
+    harness.confirmations.length,
+    1,
+    'exactly one confirm is asked, not one per carrier'
+  );
 });
 
 // ---------------------------------------------------------------------------
@@ -441,10 +453,10 @@ test('1156: deleteEssence selects the components-only branch when only component
   assert.deepEqual(call.data, { name: 'Fire', components: 1, recipes: 0 });
 });
 
-test('1156: deleteEssence selects the recipes-only branch when only a recipe requires it', async () => {
+test('1156: deleteEssence selects the recipes-only branch when recipes require it', async () => {
   const harness = makeEssenceStoreHarness({
     essences: [makeEssence({ id: 'fire', name: 'Fire' })],
-    recipes: [recipeWithSetEssence('r1', 'fire')],
+    recipes: [recipeWithSetEssence('r1', 'fire'), recipeWithSetEssence('r2', 'fire')],
   });
   const store = await openStore(harness);
 
@@ -454,6 +466,25 @@ test('1156: deleteEssence selects the recipes-only branch when only a recipe req
     (entry) => entry.key === 'FABRICATE.Admin.Manager.Essence.DeleteConfirm.ContentRecipes'
   );
   assert.ok(call, 'the recipes-only branch is localized');
+  assert.deepEqual(call.data, { name: 'Fire', components: 0, recipes: 2 });
+});
+
+// TWO recipes above and ONE here, deliberately: the plural key and its `...One` sibling are
+// different strings, so a fixture that only ever holds one would leave the plural branch
+// asserted by nothing at this level.
+test('1156: deleteEssence selects the singular recipes-only branch at exactly one', async () => {
+  const harness = makeEssenceStoreHarness({
+    essences: [makeEssence({ id: 'fire', name: 'Fire' })],
+    recipes: [recipeWithSetEssence('r1', 'fire')],
+  });
+  const store = await openStore(harness);
+
+  await store.deleteEssence('fire');
+
+  const call = harness.localizations.find(
+    (entry) => entry.key === 'FABRICATE.Admin.Manager.Essence.DeleteConfirm.ContentRecipesOne'
+  );
+  assert.ok(call, 'the singular recipes-only branch is localized');
   assert.deepEqual(call.data, { name: 'Fire', components: 0, recipes: 1 });
 });
 
