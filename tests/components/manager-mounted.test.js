@@ -2005,7 +2005,18 @@ function createStore(calls = [], options = {}) {
       const ids = [...(essenceIds || [])];
       calls.push(['deleteEssences', ids]);
       if (options.deleteEssencesReject) return Promise.reject(new Error('delete failed'));
-      return options.deleteEssencesResult ?? { deleted: ids.length, blocked: [], recipesUpdated: 2 };
+      // `recipesDisabled` is in the default, not just the explicit results, because the real
+      // `adminStore.deleteEssences` always returns it (issue 1144). A double that omits it is
+      // looser than production, and every toast test that does NOT pass an explicit result would
+      // then be asserting against a shape the app never produces.
+      return (
+        options.deleteEssencesResult ?? {
+          deleted: ids.length,
+          blocked: [],
+          recipesUpdated: 2,
+          recipesDisabled: 1,
+        }
+      );
     },
     cancelEssenceDraft: () => {
       calls.push(['cancelEssenceDraft']);
@@ -10518,6 +10529,27 @@ describe('CraftingSystemManager mounted behavior', () => {
       else globalThis.ui = previousUi;
     }
   }
+
+  // Issue 1144 — the essence toast did not carry `recipesDisabled` at all before this fix.
+  // Mirrors 'reports the DISABLED recipes in the toast, the most consequential outcome' and
+  // 'drops the disable clause entirely when nothing was disabled' from the component suite.
+  it('reports the DISABLED recipes in the essence toast, the most consequential outcome', async () => {
+    const { messages } = await deleteSelectedEssenceRows(['water'], {
+      deleteEssencesResult: { deleted: 1, recipesUpdated: 3, recipesDisabled: 1 },
+    });
+
+    assert.deepEqual(messages, [
+      'Deleted 1 essence(s) and rewrote 3 recipe(s), disabling 1 of them.',
+    ]);
+  });
+
+  it('drops the disable clause entirely from the essence toast when nothing was disabled', async () => {
+    const { messages } = await deleteSelectedEssenceRows(['water'], {
+      deleteEssencesResult: { deleted: 1, recipesUpdated: 2, recipesDisabled: 0 },
+    });
+
+    assert.deepEqual(messages, ['Deleted 1 essence(s) and rewrote 2 recipe(s).']);
+  });
 
   it('reports NO essence success and keeps the selection when the write deleted nothing', async () => {
     // The store returns its zero result — an OBJECT, and therefore truthy — on a failed

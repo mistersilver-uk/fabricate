@@ -6293,6 +6293,84 @@ export function createAdminStore(services) {
   }
 
   /**
+   * The localized copy the singular essence delete dialog reads (issue 1156, the essence
+   * sibling of `_recipeDeleteDialogContent`). Before it, the dialog stated both consequence
+   * counts unconditionally, so the commonest single delete of all — an essence carried by
+   * nothing and required by no recipe — read "This removes it from 0 component(s) and
+   * rewrites 0 recipe(s) that require it." The `ui-integration` clause issue 1152 added says
+   * a zero consequence is omitted, not stated; this obeys it.
+   *
+   * FOUR KEYS, because `componentsAffected` and `recipeRewrites` are independent
+   * (`describeEssenceDeleteImpact`): an essence can carry no component yet be required by
+   * recipes, or the reverse. The plain branch is the one where BOTH are zero.
+   *
+   * The count-carrying branches are FUTURE ("It will be removed…", "…will be rewritten"):
+   * the essence still exists while the GM reads the sentence.
+   *
+   * @param {string} name
+   * @param {{componentsAffected: number, recipeRewrites: number}} impact
+   *   `describeEssenceDeleteImpact` output.
+   * @returns {string}
+   * @private
+   */
+  function _essenceDeleteDialogContent(name, impact) {
+    const components = Number(impact?.componentsAffected) || 0;
+    const recipes = Number(impact?.recipeRewrites) || 0;
+    const data = { name, components, recipes };
+    const [key, fallback] = _essenceDeleteDialogBranch(name, components, recipes);
+    const localized = services.localize?.(key, data);
+    if (localized && localized !== key) return localized;
+    return fallback;
+  }
+
+  /**
+   * The `[key, englishFallback]` pair for one of the four essence dialog branches.
+   *
+   * @param {string} name
+   * @param {number} components
+   * @param {number} recipes
+   * @returns {[string, string]}
+   * @private
+   */
+  function _essenceDeleteDialogBranch(name, components, recipes) {
+    const permanence = 'Deleting is permanent — an essence you recreate is a new essence';
+    if (components > 0 && recipes > 0) {
+      if (recipes === 1) {
+        return [
+          'FABRICATE.Admin.Manager.Essence.DeleteConfirm.ContentOne',
+          `Delete essence ${name}? It will be removed from ${components} component(s), and 1 recipe that requires it will be rewritten. ${permanence}.`,
+        ];
+      }
+      return [
+        'FABRICATE.Admin.Manager.Essence.DeleteConfirm.Content',
+        `Delete essence ${name}? It will be removed from ${components} component(s), and ${recipes} recipe(s) that require it will be rewritten. ${permanence}.`,
+      ];
+    }
+    if (components > 0) {
+      return [
+        'FABRICATE.Admin.Manager.Essence.DeleteConfirm.ContentComponents',
+        `Delete essence ${name}? It will be removed from ${components} component(s). ${permanence}.`,
+      ];
+    }
+    if (recipes > 0) {
+      if (recipes === 1) {
+        return [
+          'FABRICATE.Admin.Manager.Essence.DeleteConfirm.ContentRecipesOne',
+          `Delete essence ${name}? 1 recipe that requires it will be rewritten. ${permanence}.`,
+        ];
+      }
+      return [
+        'FABRICATE.Admin.Manager.Essence.DeleteConfirm.ContentRecipes',
+        `Delete essence ${name}? ${recipes} recipe(s) that require it will be rewritten. ${permanence}.`,
+      ];
+    }
+    return [
+      'FABRICATE.Admin.Manager.Essence.DeleteConfirm.ContentPlain',
+      `Delete essence ${name}? ${permanence}.`,
+    ];
+  }
+
+  /**
    * Delete ONE essence definition, after asking (issue 1036).
    *
    * Renamed from `removeEssence` so the singular and the plural share one verb, localized,
@@ -6327,15 +6405,11 @@ export function createAdminStore(services) {
     ]);
 
     const name = String(essence.name || '');
-    const data = { name, components: impact.componentsAffected, recipes: impact.recipeRewrites };
     const confirmed = await services.confirmDialog({
       title:
         services.localize?.('FABRICATE.Admin.Manager.Essence.DeleteConfirm.Title', { name }) ||
         `Delete ${name}?`,
-      content: `<p>${
-        services.localize?.('FABRICATE.Admin.Manager.Essence.DeleteConfirm.Content', data) ||
-        `Delete essence ${name}? This removes it from ${impact.componentsAffected} component(s) and rewrites ${impact.recipeRewrites} recipe(s) that require it.`
-      }</p>`,
+      content: `<p>${_essenceDeleteDialogContent(name, impact)}</p>`,
       yes: () => true,
       no: () => false,
     });
@@ -6360,10 +6434,10 @@ export function createAdminStore(services) {
    * strictly more information than a modal can carry.
    *
    * @param {Iterable<string>} essenceIds
-   * @returns {Promise<{deleted: number, recipesUpdated: number}>}
+   * @returns {Promise<{deleted: number, recipesUpdated: number, recipesDisabled: number}>}
    */
   async function deleteEssences(essenceIds) {
-    const empty = { deleted: 0, recipesUpdated: 0 };
+    const empty = { deleted: 0, recipesUpdated: 0, recipesDisabled: 0 };
     const context = _selectedSystemEssences();
     if (!context) return empty;
     const { systemManager, sysId, existing } = context;
@@ -6383,6 +6457,7 @@ export function createAdminStore(services) {
       return {
         deleted: Number(result?.deleted) || 0,
         recipesUpdated: Number(result?.recipesUpdated) || 0,
+        recipesDisabled: Number(result?.recipesDisabled) || 0,
       };
     } catch (err) {
       console.error('Fabricate | Failed to delete essences:', err);
@@ -8778,6 +8853,77 @@ export function createAdminStore(services) {
     return describeComponentDeleteImpact(resolved, _selectedSystemRecipes(sysId));
   }
 
+  /**
+   * The localized copy the singular component delete dialog reads (issue 1156, the
+   * component sibling of `_recipeDeleteDialogContent`). Before it, the dialog stated the
+   * rewrite count unconditionally, so the commonest single delete of all — a component that
+   * no recipe references — read "This rewrites 0 recipe(s) and disables 0 of them." The
+   * `ui-integration` clause issue 1152 added says a zero consequence is omitted, not stated;
+   * this obeys it.
+   *
+   * THREE KEYS, not four: `describeComponentDeleteImpact` only ever increments
+   * `recipesDisabled` for a recipe already counted in `recipesRewritten` (a recipe cannot be
+   * disabled by a delete without also being rewritten by it), so `disabled > 0` implies
+   * `recipes > 0` — there is no independent fourth branch to reach.
+   *
+   * The count-carrying branches are FUTURE ("…will be rewritten…", "…will be disabled"): the
+   * component still exists while the GM reads the sentence. The disable clause names the
+   * TRANSITION rather than the resulting state ("enabled today and will be disabled"), the
+   * same phrasing the bulk panel's `ImpactDisabled` row already settled on — the state
+   * phrasing ("left uncraftable and disabled") this dialog used to carry reads an
+   * already-disabled recipe as part of the count, which it is not.
+   *
+   * @param {string} name
+   * @param {{recipesRewritten: number, recipesDisabled: number}} impact
+   *   `describeComponentDeleteImpact` output.
+   * @returns {string}
+   * @private
+   */
+  function _componentDeleteDialogContent(name, impact) {
+    const recipes = Number(impact?.recipesRewritten) || 0;
+    const disabled = Number(impact?.recipesDisabled) || 0;
+    const data = { name, recipes, disabled };
+    const [key, fallback] = _componentDeleteDialogBranch(name, recipes, disabled);
+    const localized = services.localize?.(key, data);
+    if (localized && localized !== key) return localized;
+    return fallback;
+  }
+
+  /**
+   * The `[key, englishFallback]` pair for one of the three component dialog branches.
+   *
+   * @param {string} name
+   * @param {number} recipes
+   * @param {number} disabled
+   * @returns {[string, string]}
+   * @private
+   */
+  function _componentDeleteDialogBranch(name, recipes, disabled) {
+    const permanence = 'Deleting is permanent — a component you recreate is a new component';
+    if (recipes > 0 && disabled > 0) {
+      if (disabled === 1) {
+        return [
+          'FABRICATE.Admin.Manager.Component.DeleteConfirm.ContentDisabledOne',
+          `Delete component ${name}? ${recipes} recipe(s) will be rewritten, and 1 of those recipes is enabled today and will be disabled. ${permanence}.`,
+        ];
+      }
+      return [
+        'FABRICATE.Admin.Manager.Component.DeleteConfirm.Content',
+        `Delete component ${name}? ${recipes} recipe(s) will be rewritten, and ${disabled} of those recipes are enabled today and will be disabled. ${permanence}.`,
+      ];
+    }
+    if (recipes > 0) {
+      return [
+        'FABRICATE.Admin.Manager.Component.DeleteConfirm.ContentRecipes',
+        `Delete component ${name}? ${recipes} recipe(s) will be rewritten. ${permanence}.`,
+      ];
+    }
+    return [
+      'FABRICATE.Admin.Manager.Component.DeleteConfirm.ContentPlain',
+      `Delete component ${name}? ${permanence}.`,
+    ];
+  }
+
   async function deleteComponent(itemId) {
     const systemManager = services.getCraftingSystemManager();
     const sysId = get(selectedSystemId);
@@ -8791,15 +8937,11 @@ export function createAdminStore(services) {
     // and simply said "and remove it from recipes".
     const name = String(item.name || '');
     const impact = describeComponentDelete([itemId]);
-    const data = { name, recipes: impact.recipesRewritten, disabled: impact.recipesDisabled };
     const confirmed = await services.confirmDialog({
       title:
         services.localize?.('FABRICATE.Admin.Manager.Component.DeleteConfirm.Title', { name }) ||
         `Delete ${name}?`,
-      content: `<p>${
-        services.localize?.('FABRICATE.Admin.Manager.Component.DeleteConfirm.Content', data) ||
-        `Delete component ${name}? This rewrites ${impact.recipesRewritten} recipe(s) and disables ${impact.recipesDisabled} of them.`
-      }</p>`,
+      content: `<p>${_componentDeleteDialogContent(name, impact)}</p>`,
       yes: () => true,
       no: () => false,
     });

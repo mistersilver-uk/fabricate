@@ -128,11 +128,14 @@ const LEGACY_MEMBERSHIPS = {
   'r-none': [],
 };
 
-// The adminStore helper never implemented the `linkedRecipeItemUuid` leg of the legacy
-// fallback, so under the LEGACY basis it resolves a strict subset. Pinned rather than
-// "fixed": widening it would be an unrelated behaviour change, and the point of the
-// marker is that once the basis switches, this divergence disappears by construction.
-const LEGACY_MEMBERSHIPS_WITHOUT_UUID_LEG = { ...LEGACY_MEMBERSHIPS, 'r-uuid-a': [] };
+// There is no longer a per-reader expectation map. Until issue 1155 the two `adminStore`
+// readers needed one — the store's own membership helper had no `linkedRecipeItemUuid`
+// leg, so under the LEGACY basis it resolved a strict SUBSET (`r-uuid-a` came back
+// empty), and that subset was pinned here as current behaviour. It was a pin of a defect:
+// on an un-migrated world the GM browser's book column and the delete card's impact
+// statement could name different books for one recipe. Every reader now asks the one
+// implementation in `utils/recipeItemMembership.js`, so one map covers all six and a
+// reader that grew its own copy of the rule again would fail here.
 
 const NO_MEMBERSHIPS = { 'r-scalar-a': [], 'r-scalar-b': [], 'r-uuid-a': [], 'r-none': [] };
 
@@ -268,7 +271,6 @@ const READERS = [
   },
   {
     name: 'adminStore recipe projection (recipeItemIds)',
-    legacyMemberships: LEGACY_MEMBERSHIPS_WITHOUT_UUID_LEG,
     async resolve(fixture, recipeId) {
       await fixture.store.refresh();
       const row = get(fixture.store.viewState).recipes.find((entry) => entry.id === recipeId);
@@ -286,9 +288,10 @@ const READERS = [
     // guard to a per-definition "this book's `recipeIds` is empty, so fall back" leaves
     // all five scenarios below green. That is not a gap in the scenarios: the enrichment
     // is handed the PROJECTED recipe rows, and `_buildRecipeList` derives their
-    // `recipeItemId` from `_recipeItemDefinitionsContaining` rather than copying the raw
-    // legacy scalar, so on a marked system an emptied book's former members already carry
-    // `recipeItemId: ''` and the legacy reverse index has nothing to resurrect.
+    // `recipeItemId` from the shared `recipeItemDefinitionsContaining` rather than copying
+    // the raw legacy scalar, so on a marked system an emptied book's former members
+    // already carry `recipeItemId: ''` and the legacy reverse index has nothing to
+    // resurrect.
     //
     // What it DOES hold is that the book-side answer and the recipe-side answer agree
     // across every scenario while both are read off that one upstream projection. So it
@@ -298,7 +301,6 @@ const READERS = [
     // tab and both player-facing readers say it does not have. It is not vacuous either:
     // three of the five scenarios expect a non-empty result from it.
     name: 'adminStore Books & Scrolls library (recipeItemDefinitions[].recipes)',
-    legacyMemberships: LEGACY_MEMBERSHIPS_WITHOUT_UUID_LEG,
     async resolve(fixture, recipeId) {
       await fixture.store.refresh();
       const definitions = get(fixture.store.viewState).selectedSystem?.recipeItemDefinitions ?? [];
@@ -356,12 +358,7 @@ describe('recipe-book membership basis — a legacy-basis system', () => {
   forEachReader('resolves membership through the legacy scalars', async (reader) => {
     const fixture = await makeFixture();
     assert.equal(marker(fixture), false, 'no array is populated, so the marker backfills false');
-    return assertMemberships(
-      fixture,
-      reader,
-      reader.legacyMemberships ?? LEGACY_MEMBERSHIPS,
-      'legacy basis'
-    );
+    return assertMemberships(fixture, reader, LEGACY_MEMBERSHIPS, 'legacy basis');
   });
 });
 
@@ -380,8 +377,9 @@ describe('recipe-book membership basis — the first membership write', () => {
     await writeBookA(fixture);
 
     assert.equal(marker(fixture), true, 'the write set the marker');
-    // Every reader now agrees, INCLUDING the adminStore helper that has no uuid leg:
-    // once the basis is `recipeIds`, the seed has carried that membership across.
+    // Every reader agrees here for a second, independent reason: once the basis is
+    // `recipeIds`, the seed has carried that membership across, so no legacy leg is
+    // consulted at all.
     return assertMemberships(fixture, reader, LEGACY_MEMBERSHIPS, 'after the first write');
   });
 
@@ -433,8 +431,9 @@ describe('recipe-book membership basis — the first membership write', () => {
 });
 
 describe('recipe-book membership basis — the dangling-id resolution order (issue 1010)', () => {
-  // `_resolveLegacyMembershipDefinition` (extracted from `_seedMembershipFromLegacyScalars`,
-  // issue 1010) deliberately does NOT fall through to the `linkedRecipeItemUuid` leg when
+  // `resolveLegacyMembershipDefinition` (`utils/recipeItemMembership.js`, which the seed
+  // in `_seedMembershipFromLegacyScalars` now asks rather than restating — issue 1155)
+  // deliberately does NOT fall through to the `linkedRecipeItemUuid` leg when
   // `recipeItemId` is PRESENT but names no definition: only an ABSENT `recipeItemId` falls
   // through. Pin BOTH directions through the real seeding write (`updateRecipeItemDefinition`,
   // not the extracted helper in isolation, so a caller that stops consulting it is also
@@ -596,8 +595,10 @@ describe('recipe-book membership basis — the write choke point', () => {
   });
 
   it('normalizes the written membership ids (trimmed, deduped, non-empty)', async () => {
-    // The five readers compare with `String(id) === rid`, so a whitespace-padded id
-    // written by a second path would simply stop matching.
+    // Membership matches by exact string equality, and the index-backed lookup the
+    // player-facing readers use keys the retained `recipeId -> definitions` buckets on the
+    // STORED id verbatim, so a whitespace-padded id written by a second path would simply
+    // stop matching. Normalizing at the write is what makes that unreachable.
     const fixture = await makeFixture();
     await fixture.manager.updateRecipeItemDefinition(SYSTEM_ID, 'book-a', {
       recipeIds: ['  r-scalar-a  ', 'r-scalar-a', '', null, 'r-uuid-a'],

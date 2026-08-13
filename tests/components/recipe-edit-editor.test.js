@@ -597,8 +597,17 @@ describe('adminStore recipe-item projections + API', () => {
   it('projects recipeItemId on recipes and recipeItemDefinitions on the selected system', () => {
     assert.ok(recipeRowProjectionSource.includes('recipeItemId,'), 'recipeItemId projected onto recipe rows');
     assert.ok(/recipeItemDefinitions:\s*Array\.isArray\(selectedSystem\.recipeItemDefinitions\)/.test(systemInspectorProjectionSource), 'recipeItemDefinitions projected');
-    assert.equal(storeSource.includes('linkedRecipeItemUuid'), false, 'the store never projects the legacy alias');
-    assert.equal(projectionSource.includes('linkedRecipeItemUuid'), false, 'nor does the projection');
+    // What this pins is that the legacy uuid alias is never a FIELD the store or the
+    // projections read or emit. It was a bare substring match until issue 1155, which is
+    // no longer the same claim: the row's book membership now resolves through the shared
+    // `utils/recipeItemMembership.js`, whose legacy leg reads that alias, and the
+    // projection names it in the comment explaining why. Matching the identifier as a
+    // property read or an object key keeps the real guard — a row that carried the alias
+    // would be seeded into the editor draft and posted back on save — without pinning
+    // prose.
+    const legacyAliasAsField = /linkedRecipeItemUuid\s*:|[.?]\s*linkedRecipeItemUuid|\[\s*['"`]linkedRecipeItemUuid['"`]\s*\]|[{,]\s*linkedRecipeItemUuid/;
+    assert.equal(legacyAliasAsField.test(storeSource), false, 'the store never projects the legacy alias');
+    assert.equal(legacyAliasAsField.test(projectionSource), false, 'nor does either projection');
   });
 });
 

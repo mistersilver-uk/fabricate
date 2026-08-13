@@ -1,5 +1,6 @@
 import { FABRICATE_FLAG_NAMESPACE, getFabricateFlag, setFabricateFlag } from '../config/flags.js';
-import { findByRecipeId, getDefinitionIndex } from '../utils/definitionIndex.js';
+import { indexedMembershipLookups } from '../utils/definitionIndex.js';
+import { recipeItemDefinitionsContaining } from '../utils/recipeItemMembership.js';
 import { itemMatchesRecipeItemSource, matchRecipeItemDefinition } from '../utils/sourceUuid.js';
 
 import { evaluatePrerequisites } from './characterPrerequisites.js';
@@ -135,42 +136,30 @@ export class RecipeVisibilityService {
     return actor?.testUserPermission?.(viewer, 'OWNER') === true;
   }
 
-  // The book/scroll definitions a recipe belongs to (issue 511 many-to-many). Canonical
-  // read is each definition's `recipeIds[]`; while the system's
-  // `membershipResolvesByRecipeIds` marker is unset it falls back to the recipe's legacy
-  // single reverse ref. Returns a SET — a recipe may live in several books, each with
-  // its own caps.
+  // The book/scroll definitions a recipe belongs to (issue 511 many-to-many). Returns a
+  // SET — a recipe may live in several books, each with its own caps.
+  //
+  // The rule is `utils/recipeItemMembership.js` (issue 1155), the ONE implementation every
+  // membership reader asks: canonical `recipeIds[]`, falling back to the recipe's legacy
+  // reverse ref only while the system's `membershipResolvesByRecipeIds` marker is unset.
+  // This is the most player-facing caller — per-book learn caps and character
+  // prerequisites are enforced off it — which is precisely why it must not carry its own
+  // copy of the rule, and why the basis is READ from the system rather than re-derived
+  // from the arrays (issue 1011): the retired inference flipped in both directions, so
+  // emptying the last array resurrected phantom memberships for every player at once.
+  //
+  // `indexedMembershipLookups` keeps the `recipeIds[]` leg on the retained
+  // `recipeId -> definitions` index (issue 1076), because this runs on EVERY access check
+  // and a linear scan of the system's definitions here was a measurable per-check cost.
   _getRecipeItemDefinitions(recipe) {
     const system = this._getCraftingSystem(recipe);
     if (!system) return [];
-    const definitions = system.recipeItemDefinitions || [];
-    const rid = String(recipe?.id || '');
-
-    // The reverse `recipeId -> definitions` index (issue 1076). This runs on EVERY access
-    // check, so filtering the system's whole `recipeItemDefinitions` array here was a
-    // per-check linear scan on a player-facing path; the buckets preserve array order, so
-    // the answer is unchanged. Copied because the bucket is shared with the index.
-    const byMembership = findByRecipeId(getDefinitionIndex(definitions), rid);
-    if (byMembership.length > 0) return [...byMembership];
-
-    // Only fall back while the system has not resolved by `recipeIds` (issue 1011). This
-    // is player-facing — per-book learn caps and character prerequisites are enforced
-    // off it — so the basis is READ from the system, never re-derived from the arrays:
-    // the retired inference flipped in both directions, so emptying the last array
-    // resurrected phantom memberships for every player at once.
-    if (system.membershipResolvesByRecipeIds === true) return [];
-
-    const recipeItemId = String(recipe?.recipeItemId || '').trim();
-    if (recipeItemId) {
-      const def = definitions.find((d) => String(d.id) === recipeItemId);
-      return def ? [def] : [];
-    }
-    const legacyUuid = String(recipe?.linkedRecipeItemUuid || '').trim();
-    if (legacyUuid) {
-      const def = definitions.find((d) => String(d.originItemUuid || '') === legacyUuid);
-      return def ? [def] : [];
-    }
-    return [];
+    return recipeItemDefinitionsContaining(
+      system.recipeItemDefinitions || [],
+      recipe,
+      system.membershipResolvesByRecipeIds,
+      indexedMembershipLookups
+    );
   }
 
   // A single representative definition (the recipe's first member book) — used for

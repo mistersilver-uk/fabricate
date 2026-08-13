@@ -393,3 +393,22 @@ export function findByRecipeId(index, recipeId) {
   _counters.candidatesExamined += bucket.length;
   return bucket;
 }
+
+/**
+ * The membership lookups `utils/recipeItemMembership.js` accepts, backed by the retained
+ * index (issue 1155).
+ *
+ * Only the `recipeIds[]` leg is index-backed, and deliberately so: it is the leg that runs
+ * on EVERY player access check, and it is the one issue 1076's index exists for. The two
+ * legacy legs run only on an un-migrated system and only after that leg misses, and they
+ * were array scans at every call site before the membership rule was unified — so leaving
+ * them as the leaf's default scan keeps this change free of any new index plumbing and any
+ * new invalidation obligation.
+ *
+ * Lives here rather than in the membership leaf because the leaf imports nothing: it is
+ * reached from the store projections the mounted Svelte suites pull in, and this module's
+ * retained caches have no business in that closure.
+ */
+export const indexedMembershipLookups = Object.freeze({
+  byRecipeId: (definitions, recipeId) => findByRecipeId(getDefinitionIndex(definitions), recipeId),
+});

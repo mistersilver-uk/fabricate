@@ -938,7 +938,8 @@ Capabilities:
 - Manager allows essence deletion regardless of component usage: deletion is WARNED, not BLOCKED, because the cascade strips the essence from every carrying component and rewrites every referencing recipe.
   No delete is refused, and no set member is skipped, on account of the components carrying the essence, and the browser row shows the component count plainly with no delete-blocked marker.
   Both delete forms state their impact before the GM commits.
-  The single delete's confirmation states how many components the essence is removed from and how many recipes are rewritten.
+  The single delete's confirmation states how many components the essence is removed from and how many recipes are rewritten, worded in the FUTURE because the essence still exists as the GM reads it.
+  Each consequence figure is gated on its own count, so the commonest single delete of all — carried by no component and required by no recipe — states neither nought.
 - A set delete states its impact before it is armed, and recomputes it when the selection changes.
   The statement reports how many essence definitions will be deleted, how many components carry one or more of the SELECTED essences, and how many recipes will be rewritten.
   The component number is counted over the whole selection as a DISTINCT-carrier union: a component carrying two selected essences counts once, because the cascade strips it in one pass, so the copy says "one or more of the selected essences" rather than a per-essence sum.
@@ -1223,7 +1224,8 @@ The surface lists every recipe item in the selected system (from `selectedSystem
 Which basis resolves membership is recorded on the system, not inferred per read.
 A system carries a monotonic `membershipResolvesByRecipeIds` marker: it is set by the first write to any definition's `recipeIds` and is never cleared, and on load it is set for any system that does not already carry it and has at least one definition with a non-empty `recipeIds`, so an existing marker is preserved rather than recomputed.
 The write that first sets it seeds every definition in the system from the legacy scalars in the same write, so switching basis carries existing membership across rather than discarding it.
-While the marker is unset, membership resolves through the legacy `recipe.recipeItemId` scalar; once set, only `recipeIds` resolves it, so an empty `recipeIds` array means "this book has no members" rather than "this system has not migrated".
+While the marker is unset, membership resolves through the recipe's legacy reverse ref — `recipe.recipeItemId` against a definition id, or, only when that scalar is ABSENT, `recipe.linkedRecipeItemUuid` against a definition `originItemUuid`; once set, only `recipeIds` resolves it, so an empty `recipeIds` array means "this book has no members" rather than "this system has not migrated".
+Every GM surface resolves membership through the same implementation as the player-facing runtime and the delete impact statement, so the recipe browser's book column, the Books & Scrolls contents, and "n books & scrolls will lose them" cannot name different books for one recipe.
 Re-deriving the basis per read — "any definition has a non-empty `recipeIds`" — is forbidden: it flips in both directions, so the first membership write to a legacy system would orphan every scalar-only member, and emptying the last array would revert the whole system and resurrect phantom memberships on player-facing reads.
 
 Membership is authored on the item's **Contents** tab (writing the definition's `recipeIds`) or, for a multi-row selection, on the recipe browser's bulk edit panel — never on the recipe editor.
@@ -1899,7 +1901,7 @@ The GM component surfaces: the component browser and the component editor.
     The set delete uses the two-step armed confirmation rather than a modal dialog, paired with the impact statement above; the armed token is dropped whenever the selection changes at all, because an arm is a statement about a specific set.
     The set write persists through a single crafting-system write and a single recipes write regardless of set size, then clears the selection and returns the rail to the single-component inspector.
     Because that exit unmounts the panel, the completion message is the only surviving feedback and reports what happened — components deleted, recipes rewritten, and, when non-zero, recipes disabled — while a write that deleted nothing reports no success and leaves the selection intact.
-    The single-component delete states the same arithmetic in its confirmation, from the same computation, so the two forms cannot report different numbers for the same component.
+    The single-component delete states the same arithmetic in its confirmation, from the same computation, so the two forms cannot report different numbers for the same component, worded in the FUTURE and gated on its own count so the commonest single delete of all — referenced by no recipe — states neither nought.
 
 ## Step Editor
 
