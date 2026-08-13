@@ -287,6 +287,43 @@ describe('1132 BulkDeleteCard — the accessibility wiring', () => {
     harness.remount();
   });
 
+  // ── …BUT ONLY FROM `<body>` (issue 1157) ─────────────────────────────────────────
+  //
+  // The restore above used to be unconditional, so a GM who tabbed into the browser's search
+  // field while the write was running was yanked back out of it the moment the write refused.
+  // `<body>` is where the confirm's own `disabled` leaves the keyboard — that premise is
+  // measured in Chromium by `bulk-delete-busy-focus.test.js` — and it is the only state worth
+  // rescuing; anywhere else is a place the GM chose to be.
+  it('leaves focus alone when the GM moved it somewhere else during the write', async () => {
+    const root = await harness.mount(props({ armed: true }));
+    button(root).focus();
+
+    await harness.setProps(props({ armed: true, busy: true }));
+    // The GM tabs away mid-write. A REAL, connected node outside the card, standing for the
+    // browser's search field; `document.body.focus()` is the case the sibling test covers.
+    const elsewhere = document.createElement('input');
+    document.body.appendChild(elsewhere);
+    elsewhere.focus();
+    assert.ok(document.activeElement === elsewhere, 'pre-condition: the GM is in the field');
+
+    await harness.setProps(
+      props({ armed: false, busy: false, outcomeAnnouncement: 'Failed to delete the selected recipes.' })
+    );
+    assert.equal(
+      live(root).textContent.trim(),
+      'Failed to delete the selected recipes.',
+      'the outcome is still announced — the guard is about focus, not about speech'
+    );
+
+    await Promise.resolve();
+    assert.ok(
+      document.activeElement === elsewhere,
+      'and the GM keeps the control they moved to, rather than being yanked back'
+    );
+    elsewhere.remove();
+    harness.remount();
+  });
+
   it('lets the next arm announce again after an outcome', async () => {
     const failed = props({ outcomeAnnouncement: 'Failed to delete the selected recipes.' });
     const root = await harness.mount(failed);

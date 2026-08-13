@@ -231,6 +231,22 @@ The subject row — the count of what is being deleted — always renders, while
 The accessible name of each face contains its visible label, so a speech-input user can activate the control by saying what they can read; the impact statement is programmatically associated with the armed control rather than merely adjacent to it; arming is announced through a live region that exists in the document before it has any text, and disarming without confirming is announced through that same region rather than the region simply falling silent, because clearing a live region announces nothing and the control's accessible name changes under focus at the exact moment the GM stops hearing about it; and the control shows a distinct in-progress face for the duration of the write, driven by the caller's own in-flight state and never derived from the armed state.
 A studio that hand-rolls a fourth delete card is a second design for the same affordance and is not an acceptable rendering.
 
+#### Emptying a bulk selection
+
+Every action that empties a bulk selection unmounts the panel it was performed from and, with it, the control that was pressed.
+That is true of Clear — reachable both from the selection toolbar and from the panel header, one action by two routes — of a successful set delete, and of a successful Apply, on every studio that offers a bulk selection.
+So each of them REPORTS the outcome and RE-HOMES the keyboard, and neither obligation is discharged by a notification: a toast is not a live region, and it moves focus nowhere.
+
+The report is made through ONE polite live region owned by the manager rather than by any panel or card.
+A card's own region can only close the half where the card survives — a refused or no-op write — because on the success path the region is destroyed by the very transition it would have to announce.
+The manager's region exists in the document before it has any text, for the reason every live region in this specification does, and each announcement REPLACES the region's content node rather than rewriting its text, because re-inserting identical text announces nothing and clearing a selection twice running is an ordinary gesture.
+A delete or an apply announces the same sentence it reports as a completion message, so the two audiences are told the same thing; a bare Clear announces a noun-free sentence stating that the selection was cleared.
+
+Focus moves to the studio's SELECTION TOOLBAR — addressed through the page-selection control it renders, which is the first control of the selection register and is present whether or not anything is selected.
+It is the only candidate that survives the transition: the panel, the delete card and the toolbar's own Clear are all gone by the time focus needs somewhere to land, and a browser's results count is not focusable.
+Focus is moved only when the re-render actually dropped it — when it rests on the document body, or on a node the re-render has detached.
+A GM who moved focus elsewhere while an awaited write was in flight keeps their place, and the same rule governs the delete card's own restore after a refused write.
+
 A bulk edit panel may render a sibling card after the shell.
 Apply's dock then clamps to the panel's own box rather than to the rail's bottom edge, and that is accepted.
 What is required is that Apply's border box stays wholly within the scrollport at every scroll offset; the guarantee holds while the sibling is shorter than the scrollport, and a sibling taller than it is a reachability failure rather than an accepted configuration.
@@ -1220,7 +1236,8 @@ The set delete uses the two-step armed confirmation rather than a modal dialog, 
 The set write persists through AT MOST one recipes write and AT MOST one crafting-system write regardless of set size, in that order, followed by one actor-flag clean-up for the whole set rather than one per recipe.
 The crafting-system write and the crafting-systems change signal are both skipped when the prune rewrote no definition, which on a legacy-basis system is every time; the recipes change signal is emitted for the delete itself.
 The actor-flag clean-up is one clean-up, not one write pass: it clears the run store and the learned-recipe store, each over the actors the deleting client may write.
-On success it clears the selection and returns the rail to the single-recipe inspector; because that exit unmounts the panel, the completion message is the only surviving feedback and reports every non-zero outcome — recipes deleted, recipe items that no longer contain them, and characters who forgot them.
+On success it clears the selection and returns the rail to the single-recipe inspector; because that exit unmounts the panel, the completion message is the surviving feedback and reports every non-zero outcome — recipes deleted, recipe items that no longer contain them, and characters who forgot them.
+That same sentence is announced through the manager's live region and the keyboard is returned to the selection toolbar, per Emptying a bulk selection above.
 The recipe-item figure it reports is the one the impact statement promised, not the number of definitions the write rewrote, so a legacy-basis delete does not report having done less than it stated.
 A write that deleted nothing reports no success, leaves the selection intact and returns the control to its idle face rather than leaving it in progress, and tells the GM that nothing was deleted — whether the write failed or simply reached nothing, which a concurrent client deleting the same recipes between the statement and the click produces without any failure at all.
 That outcome is announced through the card's own live region and focus is returned to the re-enabled control, because confirming disables the control and so moves focus to the document body; disarming without confirming is announced through the same region, since it changes the control's accessible name while it holds focus.
@@ -1912,7 +1929,8 @@ The GM component surfaces: the component browser and the component editor.
     Deletion is WARNED, not BLOCKED: no component is refused and no set member is skipped on account of the recipes referencing it, matching the essence rule under Essences Tab.
     The set delete uses the two-step armed confirmation rather than a modal dialog, paired with the impact statement above; the armed token is dropped whenever the selection changes at all, because an arm is a statement about a specific set.
     The set write persists through a single crafting-system write and a single recipes write regardless of set size, then clears the selection and returns the rail to the single-component inspector.
-    Because that exit unmounts the panel, the completion message is the only surviving feedback and reports what happened — components deleted, recipes rewritten, and, when non-zero, recipes disabled — while a write that deleted nothing reports no success and leaves the selection intact.
+    Because that exit unmounts the panel, the completion message is the surviving on-screen feedback and reports what happened — components deleted, recipes rewritten, and, when non-zero, recipes disabled — while a write that deleted nothing reports no success and leaves the selection intact.
+    That same sentence is announced through the manager's live region and the keyboard is returned to the studio's toolbar, per Emptying a bulk selection above.
     The single-component delete states the same arithmetic in its confirmation, from the same computation, so the two forms cannot report different numbers for the same component, worded in the FUTURE and gated on its own count so the commonest single delete of all — referenced by no recipe — states neither nought.
 
 ## Step Editor

@@ -18650,4 +18650,245 @@ describe('CraftingSystemManager mounted behavior', () => {
     const dirty = target.querySelector('[data-checks-nav-dirty="crafting"]');
     assert.equal(dirty.getAttribute('role'), 'img');
   });
+
+  // ── Issue 1157: emptying a bulk selection ─────────────────────────────────────────
+  //
+  // Every action that empties a bulk selection unmounts the panel it was performed from, and
+  // with it the control that was pressed. Focus fell to `document.body` and nothing was said,
+  // on all three studios, for Clear as well as for delete.
+  //
+  // This is the ONLY suite that mounts `CraftingSystemManagerRoot`, so it is the only place
+  // the manager-level live region and the focus hop can be proved at all: both belong to the
+  // root precisely because every panel-level suite's component is gone by the time they act.
+  //
+  // ONE TABLE, NOT THREE COPIED BLOCKS. The defect was identical on the three studios, so a
+  // per-studio suite would be three chances to fix two of them — and three near-identical
+  // blocks are what the SonarCloud duplication gate fails on besides.
+  describe('emptying a bulk selection announces it and re-homes the keyboard', () => {
+    const BULK_STUDIOS = [
+      {
+        name: 'Essence',
+        route: () => navButton('Essences'),
+        rows: ['water', 'earth'],
+        rowAttr: 'data-essence-select',
+        pageBox: 'data-essence-select-all-page',
+        toolbarClear: 'data-essence-clear-selection',
+        panelClear: 'data-essence-bulk-clear',
+        panel: 'data-essence-bulk-panel',
+        deleteCard: 'data-essence-bulk-delete-card',
+      },
+      {
+        name: 'Component',
+        route: () => navButton('Components'),
+        rows: ['c1', 'c2'],
+        rowAttr: 'data-component-select',
+        pageBox: 'data-component-select-all-page',
+        toolbarClear: 'data-component-clear-selection',
+        panelClear: 'data-component-bulk-clear',
+        panel: 'data-component-bulk-panel',
+        deleteCard: 'data-component-bulk-delete-card',
+      },
+      {
+        name: 'Recipe',
+        route: () => craftingParent(),
+        rows: ['r1', 'r2'],
+        rowAttr: 'data-recipe-select',
+        pageBox: 'data-recipe-select-all-page',
+        toolbarClear: 'data-recipe-clear-selection',
+        panelClear: 'data-recipe-bulk-clear',
+        panel: 'data-recipe-bulk-panel',
+        deleteCard: 'data-recipe-bulk-delete-card',
+      },
+    ];
+
+    const REGION = '[data-manager-bulk-selection-announce]';
+
+    /**
+     * What holds focus, as a SHORT STRING.
+     *
+     * Never the node: `node:assert` serialises the actual value to build its diff, and
+     * walking a mounted happy-dom element's circular tree kills the heap — a failing
+     * assertion surfaces as a `# cancelled` suite with no message.
+     *
+     * `detached` is reported apart from `document.body` because the two engines disagree
+     * about which one a removed focused node produces, and BOTH are the failure this block
+     * exists to catch.
+     */
+    function focusHolder(studio) {
+      const active = document.activeElement;
+      if (!active || active === document.body) return 'document.body';
+      if (active.isConnected === false) return 'detached';
+      if (active.hasAttribute?.(studio.pageBox)) return 'selection toolbar';
+      if (active.classList?.contains?.('manager-nav-button')) return 'nav rail';
+      return 'somewhere else';
+    }
+
+    function regionNode() {
+      return target.querySelector(REGION);
+    }
+
+    function announcement() {
+      const region = regionNode();
+      return region ? region.textContent.trim() : null;
+    }
+
+    // The focus hop is deferred a microtask past Svelte's own flush — the same ordering
+    // `RecipeBulkEditPanel.focusAfterRerender` relies on — so an assertion made synchronously
+    // after the click would read the pre-hop `document.activeElement` and pass or fail for
+    // the wrong reason.
+    async function settle() {
+      await tick();
+      flushSync();
+      await Promise.resolve();
+      await Promise.resolve();
+    }
+
+    async function openStudio(studio, calls = [], options = {}) {
+      mountManager(calls, options);
+      studio.route().click();
+      await settle();
+    }
+
+    async function selectRows(studio) {
+      for (const id of studio.rows) {
+        target.querySelector(`[${studio.rowAttr}="${id}"]`).click();
+        await settle();
+      }
+      assert.ok(
+        Boolean(target.querySelector(`[${studio.panel}]`)),
+        `pre-condition: ${studio.name} Studio shows its bulk panel over the selection`
+      );
+    }
+
+    /** Arm and confirm the studio's set delete, capturing the completion toast. */
+    async function deleteSelection(studio) {
+      const messages = [];
+      const previousUi = globalThis.ui;
+      globalThis.ui = { notifications: { info: (message) => messages.push(message) } };
+      try {
+        const button = () => target.querySelector(`[${studio.deleteCard}] .manager-button.is-danger`);
+        button().click();
+        await settle();
+        button().click();
+        await settle();
+        await settle();
+        return messages;
+      } finally {
+        if (previousUi === undefined) delete globalThis.ui;
+        else globalThis.ui = previousUi;
+      }
+    }
+
+    it('renders ONE live region for the whole manager, and renders it EMPTY', async () => {
+      mountManager();
+
+      const regions = target.querySelectorAll(REGION);
+      assert.equal(regions.length, 1, 'exactly one manager-level region');
+      assert.equal(regions[0].getAttribute('aria-live'), 'polite');
+      assert.equal(regions[0].getAttribute('aria-atomic'), 'true');
+      // A region inserted into the DOM together with its text is not announced by most
+      // screen readers, so it has to exist first and be empty until something is said.
+      assert.equal(announcement(), '', 'and it says nothing until an action does');
+    });
+
+    for (const studio of BULK_STUDIOS) {
+      it(`${studio.name} Studio: the toolbar Clear announces and lands on the selection toolbar`, async () => {
+        await openStudio(studio);
+        await selectRows(studio);
+
+        assert.notEqual(
+          focusHolder(studio),
+          'selection toolbar',
+          'anti-vacuity: focus is not already on the target this test claims it moves to'
+        );
+
+        target.querySelector(`[${studio.toolbarClear}]`).click();
+        await settle();
+
+        assert.equal(announcement(), 'Selection cleared.');
+        assert.equal(focusHolder(studio), 'selection toolbar');
+        assert.ok(
+          !target.querySelector(`[${studio.panel}]`),
+          'and the panel really did unmount, which is what dropped the focus in the first place'
+        );
+      });
+
+      it(`${studio.name} Studio: the panel header Clear does exactly the same`, async () => {
+        // The panel header's `Clear selection` and the toolbar's `Clear` are ONE action by
+        // two routes. Fixing one and not the other is what leaves a third pattern behind.
+        await openStudio(studio);
+        await selectRows(studio);
+
+        target.querySelector(`[${studio.panelClear}]`).click();
+        await settle();
+
+        assert.equal(announcement(), 'Selection cleared.');
+        assert.equal(focusHolder(studio), 'selection toolbar');
+      });
+
+      it(`${studio.name} Studio: a successful set delete announces the completion sentence`, async () => {
+        await openStudio(studio);
+        await selectRows(studio);
+
+        const messages = await deleteSelection(studio);
+
+        assert.equal(messages.length, 1, 'the delete really did complete and report');
+        // The two audiences are told the SAME thing, asserted as an identity rather than as
+        // three hardcoded sentences: a studio that re-words its toast cannot leave the
+        // screen-reader user on a stale copy of the old one.
+        assert.equal(announcement(), messages[0]);
+        assert.match(announcement(), /^Deleted /, 'and it is the completion sentence, not "Selection cleared."');
+        assert.equal(focusHolder(studio), 'selection toolbar');
+        assert.ok(
+          !target.querySelector(`[${studio.deleteCard}]`),
+          'the card that used to own the only region is gone, which is the whole problem'
+        );
+      });
+
+      it(`${studio.name} Studio: an identical second announcement REPLACES the region's node`, async () => {
+        // Re-inserting identical text announces nothing the second time, and clearing a
+        // selection twice running is an ordinary gesture. The child node is keyed on the
+        // announcement object so each one is a genuine insertion rather than a rewrite —
+        // asserted as node IDENTITY, because the text is identical by construction.
+        await openStudio(studio);
+        await selectRows(studio);
+        target.querySelector(`[${studio.toolbarClear}]`).click();
+        await settle();
+        const first = regionNode().firstElementChild;
+        assert.ok(Boolean(first), 'the announcement renders its own child node');
+
+        await selectRows(studio);
+        target.querySelector(`[${studio.toolbarClear}]`).click();
+        await settle();
+        const second = regionNode().firstElementChild;
+
+        assert.equal(announcement(), 'Selection cleared.', 'the same sentence, twice');
+        assert.ok(
+          Boolean(second) && second !== first,
+          'and a NEW node carries it, so the region is inserted into rather than rewritten'
+        );
+      });
+
+      it(`${studio.name} Studio: focus the GM moved themselves is left alone`, async () => {
+        // The folded-in half of the issue. A GM who tabs away while an awaited write is in
+        // flight must not be yanked back by its result. The nav rail is used as the place
+        // they went because every studio has one and it is real product markup.
+        await openStudio(studio);
+        await selectRows(studio);
+
+        const elsewhere = target.querySelector('.manager-nav-button');
+        elsewhere.focus();
+        assert.equal(focusHolder(studio), 'nav rail', 'pre-condition: the GM is elsewhere');
+
+        await deleteSelection(studio);
+
+        assert.match(announcement(), /^Deleted /, 'the outcome is still announced');
+        assert.equal(
+          focusHolder(studio),
+          'nav rail',
+          'but the keyboard is left where the GM put it'
+        );
+      });
+    }
+  });
 });

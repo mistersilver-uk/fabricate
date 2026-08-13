@@ -56,6 +56,12 @@
     onEditRecipe = () => {},
     onToggleEnabled = () => {},
     onToggleLocked = () => {},
+    // Told AFTER the toolbar's Clear has emptied the selection (issue 1157). The clear stays
+    // this browser's — the selection is its state — but the FEEDBACK cannot be: emptying the
+    // selection unmounts the bulk panel and the Clear button that was pressed, so the
+    // announcement and the focus hop belong to something that outlives both. Optional, so a
+    // standalone mount clears exactly as it did.
+    onSelectionCleared = null,
     // The filter / sort / group / paginate view-state (issue 643). The manager root
     // LIFTS this up (a single `$state` object) and binds it here so it survives the
     // editor round-trip: opening a recipe unmounts this browser, and remounting it
@@ -191,8 +197,11 @@
     ui.bulkSelectedRecipeIds = setRecipeSelection(bulkSelectedIds, filteredIds, true);
   }
 
+  // The write is FIRST, so the owner's callback runs with Svelte's flush already ahead of the
+  // focus hop it schedules.
   function clearBulkSelection() {
     ui.bulkSelectedRecipeIds = new Set();
+    onSelectionCleared?.();
   }
 
   function text(key, fallback) {

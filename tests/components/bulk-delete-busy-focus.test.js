@@ -123,6 +123,23 @@ describe('1132 disabling the focused delete control fires blur in a real browser
     assert.ok(measured.focusedBefore, 'the control did not take focus, so the disable below cannot blur it');
   });
 
+  // THE SECOND PREMISE, and the one issue 1157's guard rests on. `BulkDeleteCard` no longer
+  // restores focus unconditionally after a refused write: it restores only when focus is
+  // still on `document.body`, so a GM who tabbed into the browser's search field while the
+  // write was running keeps their place. That guard is only the RIGHT guard if `<body>` is
+  // genuinely where the disable leaves the keyboard — if Chromium parked focus somewhere else
+  // the condition would never hold, the restore would never run, and the mounted suite (which
+  // enters that state by hand with an explicit `document.body.focus()`) would agree it was
+  // fine.
+  it('leaves the keyboard on document.body, which is what the restore guard tests for', () => {
+    assert.equal(
+      measured.activeAfter,
+      'BODY',
+      'Chromium no longer parks focus on <body> when the focused control is disabled — re-derive '
+        + "BulkDeleteCard's outcome focus guard, which only restores from that exact state"
+    );
+  });
+
   it('fires blur the moment the control is disabled, which happy-dom never does', () => {
     // THE PREMISE. Without it, `busy` would be an unnecessary prop and an `armed`-derived
     // busy face would be correct — and the mounted suite, running on an engine that raises no

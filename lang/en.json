@@ -1911,7 +1911,8 @@
           "LeaveUnchanged": "Leave unchanged",
           "Deleting": "Deleting…",
           "DeleteCancelled": "Delete cancelled. Nothing was deleted.",
-          "DeleteNoneDeleted": "Nothing was deleted. The selection is unchanged."
+          "DeleteNoneDeleted": "Nothing was deleted. The selection is unchanged.",
+          "SelectionCleared": "Selection cleared."
         },
         "Recipe": {
           "Kicker": "Recipes View",

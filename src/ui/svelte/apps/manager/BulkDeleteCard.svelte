@@ -77,9 +77,11 @@
      disables the control, which moves focus to `document.body` and empties this region, so
      on the failure path nothing distinguishes "deleted" from "refused" except a Foundry
      toast, which is not a live region this module controls. Setting it also returns focus
-     to the re-enabled control, because the GM is now on `<body>` with the selection still
-     live. A SUCCESSFUL delete unmounts this card, so its outcome cannot be announced from
-     here and the caller's toast remains the surviving feedback for it.
+     to the re-enabled control WHEN FOCUS IS STILL ON `<body>`, where the confirm's own
+     `disabled` left it — a GM who tabbed into the browser's search field while the write was
+     running keeps their place (issue 1157). A SUCCESSFUL delete unmounts this card, so its
+     outcome cannot be announced from here: the caller's toast and the manager-level live
+     region `CraftingSystemManagerRoot` renders are the surviving feedback for it.
    - token: the arm token, and the STEM OF BOTH GENERATED IDS. One component now renders in
      three panels and a manager view can hold more than one at a time, so hardcoding
      `id="bulk-delete-impact"` would collide the moment it does.
@@ -185,7 +187,18 @@
       // it does not bring focus back, so the GM who is being told the delete was refused is
       // told it from nowhere in particular. Deferred past this flush because the control is
       // re-enabled in the same one and `focus()` on a still-disabled button does nothing.
-      queueMicrotask(() => control?.focus?.());
+      //
+      // ONLY WHEN FOCUS IS ACTUALLY NOWHERE (issue 1157). The restore was unconditional, so
+      // a GM who tabbed into the browser's search field while the write was in flight was
+      // yanked back out of it by its result. `<body>` is where the disable left them and is
+      // the only state worth rescuing; anything else is a place they chose.
+      queueMicrotask(() => {
+        if (typeof document !== 'undefined') {
+          const active = document.activeElement;
+          if (active && active !== document.body && active.isConnected !== false) return;
+        }
+        control?.focus?.();
+      });
       return;
     }
     if (outcome) return;
