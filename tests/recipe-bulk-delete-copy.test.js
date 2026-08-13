@@ -45,8 +45,79 @@ describe('1132/copy the recipe delete card states three independent consequences
     // `recipe item` is the canonical spec noun and `books & scrolls` is the display name the
     // manager's own navigation already uses for the same vocabulary. UI copy may say "book";
     // canonical spec text may not.
-    assert.equal(interpolate(bulkEdit.ImpactItems, { count: 2 }), 'Removed from 2 books & scrolls.');
-    assert.equal(bulkEdit.ImpactItemsOne, 'Removed from 1 book or scroll.');
+    assert.equal(
+      interpolate(bulkEdit.ImpactItems, { count: 2 }),
+      'Will be removed from 2 books & scrolls.'
+    );
+    assert.equal(bulkEdit.ImpactItemsOne, 'Will be removed from 1 book or scroll.');
+  });
+
+  // ONE COUNTABLE NOUN FOR ONE COUNT, ACROSS ALL FOUR SURFACES. The recipe-item figure is
+  // named on the card, in the armed accessible name, in the completion toast and in the
+  // singular dialog, and it was named two ways: `books & scrolls` on the card and
+  // `recipe item(s)` on the other three. The aria/visible pair was the worst of it, because
+  // `aria-describedby` points AT the card's list — a screen-reader user heard "2 recipe
+  // item(s)" as the name of a control described by a row reading "2 books & scrolls".
+  //
+  // The DISPLAY NAME won, and the corpus is the reason: every other item-referring string in
+  // this namespace already says it (`BookPick`, `BookSearch`/`BookSearchOne`, `BookNoMatch`,
+  // `BookClearPick`, `AppliedBooks*`), so naming it `recipe item` here would have traded a
+  // four-surface split for a one-against-ten split inside the studio's own copy.
+  it('names the recipe-item figure with ONE noun across card, dialog, toast and aria', () => {
+    const surfaces = [
+      ['card plural', interpolate(bulkEdit.ImpactItems, { count: 2 })],
+      ['card singular', bulkEdit.ImpactItemsOne],
+      ['armed aria', interpolate(bulkEdit.DeleteConfirmAria, { count: 3, items: 2, learners: 4 })],
+      ['toast (items)', interpolate(bulkEdit.DeletedWithItems, { count: 3, items: 2 })],
+      [
+        'toast (both)',
+        interpolate(bulkEdit.DeletedWithItemsAndLearners, { count: 3, items: 2, learners: 4 }),
+      ],
+      [
+        'dialog (both)',
+        interpolate(deleteConfirm.Content, { name: 'Sunfire Draught', items: 2, learners: 4 }),
+      ],
+      ['dialog (items)', interpolate(deleteConfirm.ContentItems, { name: 'X', items: 2 })],
+    ];
+    for (const [where, sentence] of surfaces) {
+      assert.match(sentence, /books? (?:&|or) scrolls?/i, `${where} names the display name`);
+      assert.equal(
+        /recipe items?\b/i.test(sentence),
+        false,
+        `${where} must not name the same count a second way ("${sentence}")`
+      );
+    }
+  });
+
+  // The display name has no count-neutral singular, so the strings carrying two or three
+  // counts say "{items} of your books & scrolls" rather than "book(s) or scroll(s)". The
+  // whole point is that it reads correctly at ONE.
+  it('reads correctly at a count of one in every multi-count string', () => {
+    const one = /1 of your books & scrolls/;
+    assert.match(interpolate(bulkEdit.DeleteConfirmAria, { count: 1, items: 1, learners: 1 }), one);
+    assert.match(interpolate(bulkEdit.DeletedWithItems, { count: 1, items: 1 }), one);
+    assert.match(
+      interpolate(bulkEdit.DeletedWithItemsAndLearners, { count: 1, items: 1, learners: 1 }),
+      one
+    );
+    assert.match(interpolate(deleteConfirm.Content, { name: 'X', items: 1, learners: 1 }), one);
+  });
+
+  // Every consequence row is a FORECAST, and it sits one line under a subject row that says
+  // "will be deleted". "Removed from 1 book or scroll." above a button that has not been
+  // pressed reads as current state, and the mood split between the two made the card look
+  // like a description of what had already happened.
+  it('states each consequence in the future, not as accomplished fact', () => {
+    for (const [key, value] of [
+      ['ImpactItems', interpolate(bulkEdit.ImpactItems, { count: 2 })],
+      ['ImpactItemsOne', bulkEdit.ImpactItemsOne],
+      ['ImpactLearners', interpolate(bulkEdit.ImpactLearners, { count: 4 })],
+      ['ImpactLearnersOne', bulkEdit.ImpactLearnersOne],
+    ]) {
+      assert.match(value, /^Will be /, `${key} states a forecast, not a completed state`);
+    }
+    assert.match(bulkEdit.ImpactRecipes, /will be deleted/);
+    assert.match(bulkEdit.ImpactRecipesOne, /will be deleted/);
   });
 
   // THE ROW COUNTS ARE INDEPENDENT, AND THE COPY MUST NOT ASSUME THEY AGREE. This is the
@@ -71,18 +142,38 @@ describe('1132/copy the recipe delete card states three independent consequences
         `${key} pronominalizes the recipes ("${value}"), so it reads wrong whenever the recipe count and the item count disagree`
       );
     }
-    // The learners row keeps "it" — but only inside the spent-slot qualifier, where it refers
-    // to the BOOK OR SCROLL that can no longer teach, not to the recipes. That is why the
-    // sentence is checked up to the dash rather than banned outright.
+    // THE LEARNERS ROW IS SCANNED WHOLE, AND THAT IS THE CORRECTION. It used to be checked
+    // only up to the dash, on the argument that the "it" in "a spent book or scroll cannot
+    // teach it again" named the book. It did not: the book is the SUBJECT of "cannot teach",
+    // so its object is the recipe — and with three recipes selected, "cannot teach it again"
+    // names one of three. The exemption made this gate green ON the defect it exists to
+    // catch, which is worse than not having it, so the whole string is banned now.
     for (const [key, value] of [
       ['ImpactLearners', interpolate(bulkEdit.ImpactLearners, { count: 4 })],
       ['ImpactLearnersOne', bulkEdit.ImpactLearnersOne],
     ]) {
-      const clause = value.split('—')[0];
       assert.equal(
-        PRONOUN.test(clause),
+        PRONOUN.test(value),
         false,
-        `${key}'s leading clause ("${clause.trim()}") pronominalizes the recipes`
+        `${key} pronominalizes the recipes somewhere in "${value}" — including inside the qualifier, where "cannot teach it again" names the recipe and not the book`
+      );
+    }
+  });
+
+  // The OTHER half of the same class, and the one the qualifier still carried after the
+  // pronoun went: the row branches on the LEARNER count, and "their learn slot" agrees with
+  // the number of slots each character spent — which is how many of the SELECTED recipes
+  // they had learned. One character who learned three of them loses three slots and still
+  // read the singular branch. A general statement of the rule is true at every combination.
+  it('states the spent-slot rule without agreeing with a count the row does not branch on', () => {
+    for (const [key, value] of [
+      ['ImpactLearners', interpolate(bulkEdit.ImpactLearners, { count: 4 })],
+      ['ImpactLearnersOne', bulkEdit.ImpactLearnersOne],
+    ]) {
+      assert.equal(
+        /their learn slots?\b/i.test(value),
+        false,
+        `${key} makes the slot count agree with the character count ("${value}")`
       );
     }
   });
@@ -98,10 +189,29 @@ describe('1132/copy the recipe delete card states three independent consequences
         items === 1 ? bulkEdit.ImpactItemsOne : interpolate(bulkEdit.ImpactItems, { count: items }),
       ].join(' ');
 
-    assert.equal(render(1, 1), '1 recipe will be deleted. Removed from 1 book or scroll.');
-    assert.equal(render(3, 1), '3 recipes will be deleted. Removed from 1 book or scroll.');
-    assert.equal(render(1, 2), '1 recipe will be deleted. Removed from 2 books & scrolls.');
-    assert.equal(render(3, 2), '3 recipes will be deleted. Removed from 2 books & scrolls.');
+    assert.equal(render(1, 1), '1 recipe will be deleted. Will be removed from 1 book or scroll.');
+    assert.equal(render(3, 1), '3 recipes will be deleted. Will be removed from 1 book or scroll.');
+    assert.equal(render(1, 2), '1 recipe will be deleted. Will be removed from 2 books & scrolls.');
+    assert.equal(
+      render(3, 2),
+      '3 recipes will be deleted. Will be removed from 2 books & scrolls.'
+    );
+  });
+
+  // THE CARD AS PUBLISHED, at the counts the View Lab fixtures produce (3 recipes, 1 recipe
+  // item, 2 characters). This is the sentence in the frame this change ships as its
+  // evidence, and it is the exact combination the pronoun defect read wrong in.
+  it('reads correctly at 3 recipes / 1 recipe item / 2 characters, the published frame', () => {
+    const card = [
+      interpolate(bulkEdit.ImpactRecipes, { count: 3 }),
+      bulkEdit.ImpactItemsOne,
+      interpolate(bulkEdit.ImpactLearners, { count: 2 }),
+    ].join(' ');
+
+    assert.equal(
+      card,
+      '3 recipes will be deleted. Will be removed from 1 book or scroll. Will be forgotten by 2 characters — spent learn slots are not given back, and a spent book or scroll cannot teach a deleted recipe again.'
+    );
   });
 
   it('the learners row carries the spent-slot qualifier at BOTH counts', () => {
@@ -115,8 +225,8 @@ describe('1132/copy the recipe delete card states three independent consequences
       bulkEdit.ImpactLearnersOne,
     ]) {
       assert.match(sentence, /forgotten/i);
-      assert.match(sentence, /do not get their learn slots? back/i);
-      assert.match(sentence, /cannot teach it again/i);
+      assert.match(sentence, /learn slots are not given back/i);
+      assert.match(sentence, /cannot teach a deleted recipe again/i);
     }
   });
 
@@ -148,7 +258,7 @@ describe('1132/copy the recipe accessible names contain their visible labels', (
     // screen-reader user hears what confirming reaches.
     const name = interpolate(bulkEdit.DeleteConfirmAria, { count: 3, items: 2, learners: 4 });
     assert.match(name, /3 recipe\(s\)/);
-    assert.match(name, /2 recipe item\(s\)/);
+    assert.match(name, /2 of your books & scrolls/);
     assert.match(name, /4 character\(s\)/);
     assert.match(name, /cannot be undone/i);
   });
@@ -181,10 +291,10 @@ describe('1132/copy the post-delete toast reports every non-zero outcome', () =>
     assert.equal(interpolate(bulkEdit.Deleted, { count: 3 }), 'Deleted 3 recipe(s).');
   });
 
-  it('names the recipe items when the prune rewrote any', () => {
+  it('names the recipe items that no longer contain them', () => {
     const sentence = interpolate(bulkEdit.DeletedWithItems, { count: 3, items: 2 });
     assert.match(sentence, /3 recipe\(s\)/);
-    assert.match(sentence, /2 recipe item\(s\)/);
+    assert.match(sentence, /2 of your books & scrolls/);
   });
 
   it('names the learners when any character lost the knowledge', () => {
@@ -200,14 +310,14 @@ describe('1132/copy the post-delete toast reports every non-zero outcome', () =>
       learners: 4,
     });
     assert.match(sentence, /3 recipe\(s\)/);
-    assert.match(sentence, /2 recipe item\(s\)/);
+    assert.match(sentence, /2 of your books & scrolls/);
     assert.match(sentence, /4 character\(s\)/);
   });
 
   it('reads correctly with every count at 1, which is what the "(s)" idiom buys', () => {
     assert.equal(
       interpolate(bulkEdit.DeletedWithItemsAndLearners, { count: 1, items: 1, learners: 1 }),
-      'Deleted 1 recipe(s), removed them from 1 recipe item(s), and 1 character(s) forgot them.'
+      'Deleted 1 recipe(s), removed them from 1 of your books & scrolls, and 1 character(s) forgot them.'
     );
   });
 });
@@ -216,7 +326,7 @@ describe('1132/copy the singular dialog reports the same arithmetic', () => {
   it('carries both counts, and its own confirm-button label', () => {
     const content = interpolate(deleteConfirm.Content, { name: 'Sunfire Draught', items: 2, learners: 4 });
     assert.match(content, /Sunfire Draught/);
-    assert.match(content, /2 recipe item\(s\)/);
+    assert.match(content, /2 of your books & scrolls/);
     assert.match(content, /4 character\(s\)/);
     // `DialogV2.confirm` merges `yes` over a default carrying `label: "COMMON.Yes"`, so a
     // destructive confirm needs its OWN label or it reads as the generic *Yes*.
@@ -231,6 +341,49 @@ describe('1132/copy the singular dialog reports the same arithmetic', () => {
     assert.match(plain, /Sunfire Draught/);
     assert.match(plain, /permanent/i);
     assert.equal(/\d/.test(plain.replace('Sunfire Draught', '')), false, 'and names no count');
+  });
+
+  // FOUR BRANCHES, BECAUSE THE TWO CONSEQUENCES ARE INDEPENDENT. Gating them as a pair made
+  // the commonest single delete of all — in one book, learned by nobody — render
+  // "… and forgotten by 0 character(s)", and its mirror render "removed from 0 recipe
+  // item(s)". The card omits a zero consequence rather than stating it; the dialog for the
+  // same action has to obey the same rule, and each single-consequence branch must carry
+  // only the number it is for.
+  it('has a branch per consequence, so neither is ever stated as a nought', () => {
+    const itemsOnly = interpolate(deleteConfirm.ContentItems, { name: 'Sunfire Draught', items: 2 });
+    assert.match(itemsOnly, /2 of your books & scrolls/);
+    assert.equal(/character/i.test(itemsOnly), false, 'and says nothing about characters');
+
+    const learnersOnly = interpolate(deleteConfirm.ContentLearners, {
+      name: 'Sunfire Draught',
+      learners: 4,
+    });
+    assert.match(learnersOnly, /4 character\(s\)/);
+    assert.equal(
+      /books? (?:&|or) scrolls?/i.test(learnersOnly),
+      false,
+      'and the learner-only branch says nothing about books'
+    );
+  });
+
+  it('states the consequence in the FUTURE — the recipe still exists as the GM reads it', () => {
+    for (const [key, value] of [
+      ['Content', interpolate(deleteConfirm.Content, { name: 'X', items: 2, learners: 4 })],
+      ['ContentItems', interpolate(deleteConfirm.ContentItems, { name: 'X', items: 2 })],
+      ['ContentLearners', interpolate(deleteConfirm.ContentLearners, { name: 'X', learners: 4 })],
+    ]) {
+      assert.match(value, /It will be /, `${key} describes what deleting WILL do`);
+    }
+  });
+
+  it('names the learn slot only where a character is actually named', () => {
+    // The trailing "a character does not get their learn slot back" is a consequence OF the
+    // learner clause. On the items-only branch there is no learner, so the sentence would be
+    // a warning about nobody.
+    assert.match(deleteConfirm.Content, /learn slot back/);
+    assert.match(deleteConfirm.ContentLearners, /learn slot back/);
+    assert.equal(/learn slot/.test(deleteConfirm.ContentItems), false);
+    assert.equal(/learn slot/.test(deleteConfirm.ContentPlain), false);
   });
 });
 

@@ -38,6 +38,14 @@
    - disabled: disables both arming and confirming.
    - busy / busyLabel / busyIcon: an OPTIONAL third face for a caller whose confirm starts a
      write it can await. See the note below — this is not a variant of `armed`.
+   - showTitle: whether the accessible name is ALSO exposed as a hover `title`. Default true,
+     which is right for the ROW call sites: those render a two-word label ("Delete",
+     "Confirm?") while the accessible name names the target document, so the tooltip is the
+     only place a sighted mouse user reads what the button reaches. `BulkDeleteCard` passes
+     `false`, because there the consequence is already on screen as the impact list the
+     control is `aria-describedby`-associated with — and the armed names it renders carry the
+     "(s)" idiom, which is defensible for an AT-only string and reads as an un-interpolated
+     template ("1 recipe(s)") the moment it becomes visible text.
    - onArm(token) / onDisarm(token) / onConfirm(token).
 
   ── THE BUSY FACE IS NOT DERIVED FROM `armed`, AND THAT IS THE WHOLE POINT ────────
@@ -55,6 +63,11 @@
   Hence `busy` is the caller's own flag, `faceOf` reads it FIRST so it wins over `armed`
   whichever way the disarm race lands, and blur is a no-op while busy so an in-flight write
   cannot clear the owner's arm token underneath itself.
+
+  The busy face carries `data-busy` and `aria-busy` and NO state class. It briefly carried
+  `class:is-busy`, which was the only occurrence of that name under `src/` or `styles/` — a
+  class implying a treatment that does not exist. `data-busy` is the test hook; if the busy
+  face ever needs an appearance of its own, add the rule and the class together.
 -->
 <script>
   let {
@@ -71,10 +84,13 @@
     busy = false,
     busyLabel = '',
     busyIcon = 'fas fa-spinner fa-spin',
+    showTitle = true,
     onArm = () => {},
     onDisarm = () => {},
     onConfirm = () => {},
   } = $props();
+
+  let element = $state(null);
 
   const inFlight = $derived(busy === true);
   // A guard chain rather than a nested ternary: three faces read as three `if`s, and the
@@ -114,20 +130,29 @@
     if (inFlight) return;
     if (armed) onDisarm(token);
   }
+
+  /**
+   * Put focus back on this control. Exported so a caller can return the keyboard to the
+   * button after a write it awaited REFUSED: confirming disables the control, which moves
+   * focus to `document.body`, and re-enabling it does not bring focus back.
+   */
+  export function focus() {
+    element?.focus?.();
+  }
 </script>
 
 <button
+  bind:this={element}
   type="button"
   class="manager-button is-danger"
   class:is-armed={armed}
-  class:is-busy={inFlight}
   data-armed={armed ? 'true' : 'false'}
   data-busy={inFlight ? 'true' : 'false'}
   data-arm-token={token}
   aria-label={consequence}
   aria-describedby={describedBy || undefined}
   aria-busy={inFlight ? 'true' : undefined}
-  title={consequence}
+  title={showTitle ? consequence : undefined}
   disabled={isInert}
   onclick={handleClick}
   onkeydown={handleKeydown}

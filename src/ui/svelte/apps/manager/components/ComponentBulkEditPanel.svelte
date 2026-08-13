@@ -293,10 +293,16 @@
   // follow it — "Confirm deleting 3 component(s)…" does not contain "Confirm delete" and
   // was therefore unactivatable by voice. The idle pair needs no such reordering: its
   // `…DeleteAria*` sibling is the visible label verbatim.
+  //
+  // It ENDS with the irreversibility, and that is not decoration (issue 1132, review round).
+  // The name a screen-reader user hears on the armed face is the only place the permanence
+  // of a component delete is stated at all — this panel carries no standing hint — and the
+  // string was a bare count fragment with no full stop while both essence and recipe pairs
+  // ended "This cannot be undone." Deleting components is no less permanent than either.
   const deleteArmedAriaLabel = $derived(
     format(
       'FABRICATE.Admin.Manager.Component.BulkEdit.DeleteConfirmAria',
-      'Confirm delete — {count} component(s), {recipes} recipe(s)',
+      'Confirm delete — {count} component(s) and {recipes} recipe(s) affected. This cannot be undone.',
       { count: impact.deletable, recipes: impact.recipesRewritten }
     )
   );
@@ -683,6 +689,10 @@
   idleAriaLabel={deleteAriaLabel}
   armedAriaLabel={deleteArmedAriaLabel}
   armedAnnouncement={deleteArmedAnnouncement}
+  disarmedAnnouncement={text(
+    'FABRICATE.Admin.Manager.BulkEdit.DeleteCancelled',
+    'Delete cancelled. Nothing was deleted.'
+  )}
   armed={deleteArmed === true}
   busy={deleting === true}
   disabled={impact.deletable === 0 || applying === true}

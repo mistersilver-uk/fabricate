@@ -949,11 +949,17 @@ describe('RecipeBulkEditPanel set delete (issue 1132)', () => {
     const { root } = await mountPanel({ deleteImpact: FULL_IMPACT });
 
     assert.match(impactRow(root, 'recipes').textContent, /3 recipes will be deleted\./);
-    assert.match(impactRow(root, 'items').textContent, /Removed from 2 books & scrolls\./);
-    assert.match(impactRow(root, 'learners').textContent, /Forgotten by 4 characters/);
+    assert.match(
+      impactRow(root, 'items').textContent,
+      /Will be removed from 2 books & scrolls\./
+    );
+    assert.match(impactRow(root, 'learners').textContent, /Will be forgotten by 4 characters/);
     // The qualifier is the load-bearing half of the learners sentence: the learn slot is
     // spent by the same act the number counts.
-    assert.match(impactRow(root, 'learners').textContent, /do not get their learn slots back/);
+    assert.match(
+      impactRow(root, 'learners').textContent,
+      /spent learn slots are not given back/
+    );
   });
 
   it('always states the permanence, which is a PROPERTY and has no count to gate it on', async () => {
@@ -990,8 +996,11 @@ describe('RecipeBulkEditPanel set delete (issue 1132)', () => {
     });
 
     assert.match(impactRow(root, 'recipes').textContent, /1 recipe will be deleted\./);
-    assert.match(impactRow(root, 'items').textContent, /Removed from 1 book or scroll\./);
-    assert.match(impactRow(root, 'learners').textContent, /Forgotten by 1 character/);
+    assert.match(
+      impactRow(root, 'items').textContent,
+      /Will be removed from 1 book or scroll\./
+    );
+    assert.match(impactRow(root, 'learners').textContent, /Will be forgotten by 1 character/);
     assert.match(deleteButton(root).textContent, /Delete 1 recipe/);
   });
 

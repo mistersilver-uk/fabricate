@@ -67,6 +67,19 @@
      "Confirm deleting 3 …" is unactivatable beside a button reading "Confirm delete". The busy
      face needs no third string: its accessible name IS its visible label.
    - armedAnnouncement: what the live region says once armed.
+   - disarmedAnnouncement: OPTIONAL, what it says when an ARMED control is disarmed without
+     confirming. Escape and click-away both change the control's accessible name while it
+     still holds focus, which is exactly what this region exists for, and emptying a region
+     announces nothing — so without this the one keyboard gesture that CANCELS a destructive
+     action is the only one that is silent. Omitted by a caller that wants the old silence.
+   - outcomeAnnouncement: OPTIONAL, what it says once a write the caller awaited has come
+     back and left the control live — a REFUSED or no-op delete, in practice. Confirming
+     disables the control, which moves focus to `document.body` and empties this region, so
+     on the failure path nothing distinguishes "deleted" from "refused" except a Foundry
+     toast, which is not a live region this module controls. Setting it also returns focus
+     to the re-enabled control, because the GM is now on `<body>` with the selection still
+     live. A SUCCESSFUL delete unmounts this card, so its outcome cannot be announced from
+     here and the caller's toast remains the surviving feedback for it.
    - token: the arm token, and the STEM OF BOTH GENERATED IDS. One component now renders in
      three panels and a manager view can hold more than one at a time, so hardcoding
      `id="bulk-delete-impact"` would collide the moment it does.
@@ -92,6 +105,8 @@
     idleAriaLabel = '',
     armedAriaLabel = '',
     armedAnnouncement = '',
+    disarmedAnnouncement = '',
+    outcomeAnnouncement = '',
     token = '',
     armed = false,
     busy = false,
@@ -125,10 +140,60 @@
     )
   );
 
-  // Cleared while busy as well as while idle. The armed sentence says "activate again to
-  // delete", which is no longer true once the write has started; emptying is also what makes a
-  // RE-arm announce at all, since a live region re-inserting identical text says nothing.
-  const announcement = $derived(busy === true || armed !== true ? '' : armedAnnouncement);
+  // ── WHAT THE LIVE REGION SAYS, AND WHEN ──────────────────────────────────────────
+  // Three transitions, not one, and the last two cannot be derived from the props alone
+  // because both are states in which the control is simply IDLE — "never armed" and
+  // "armed and then cancelled" are the same `armed: false, busy: false` pair. So this is
+  // `$state` driven by an effect that watches the transition rather than a `$derived`.
+  //
+  //  - ARMED: the consequence sentence. Cleared while BUSY as well, because "activate again
+  //    to delete" stops being true the moment the write starts.
+  //  - DISARMED WITHOUT CONFIRMING: `disarmedAnnouncement`, if the caller supplies one.
+  //  - AN AWAITED WRITE CAME BACK AND LEFT THE CARD MOUNTED: `outcomeAnnouncement`.
+  //
+  // `wasArmed` is cleared on the BUSY edge, and that is what stops a successful confirm
+  // reading as a cancellation: confirm takes the control armed → busy → idle, and without
+  // the clear the trailing idle edge would announce "Delete cancelled." over a delete that
+  // actually happened.
+  //
+  // Every path assigns, including the empty string. A region whose text does not change
+  // says nothing, so re-arming after a cancellation, or cancelling twice, still speaks.
+  let announcement = $state('');
+  let wasArmed = false;
+  let announcedOutcome = '';
+  let control = $state(null);
+
+  $effect(() => {
+    const outcome = String(outcomeAnnouncement || '');
+    if (busy === true) {
+      wasArmed = false;
+      announcedOutcome = '';
+      announcement = '';
+      return;
+    }
+    if (armed === true) {
+      wasArmed = true;
+      announcedOutcome = '';
+      announcement = armedAnnouncement;
+      return;
+    }
+    if (outcome && outcome !== announcedOutcome) {
+      announcedOutcome = outcome;
+      wasArmed = false;
+      announcement = outcome;
+      // The confirm disabled the control, which moved focus to `document.body`; re-enabling
+      // it does not bring focus back, so the GM who is being told the delete was refused is
+      // told it from nowhere in particular. Deferred past this flush because the control is
+      // re-enabled in the same one and `focus()` on a still-disabled button does nothing.
+      queueMicrotask(() => control?.focus?.());
+      return;
+    }
+    if (outcome) return;
+    announcedOutcome = '';
+    const cancelled = wasArmed === true;
+    wasArmed = false;
+    announcement = cancelled ? disarmedAnnouncement : '';
+  });
 
   // Spread, following `BulkEditPanelShell`'s hook idiom: the attribute NAME is a parameter, so
   // it cannot be written literally in the markup. The value is `''`, not `true` — Svelte
@@ -162,7 +227,15 @@
   <!-- The impact list is the button's DESCRIPTION, not merely adjacent to it: `aria-describedby`
        is what makes a screen-reader user hear the consequence when they arrive at the control,
        rather than only if they happened to read the list on the way past. -->
+  <!-- `showTitle={false}`: the accessible name is NOT also a hover tooltip here. The armed
+       names the three studios pass carry the count-agreement-neutral "(s)" idiom, which is
+       defensible for an AT-only string and reads as an un-interpolated template — "1 recipe(s)"
+       — the moment it becomes visible text. Nothing is lost: every count in those names is in
+       the impact list two lines above, which this control is `aria-describedby`-associated
+       with. The ROW call sites keep the tooltip, where the accessible name is the only place
+       a sighted user reads which document a two-word "Delete" reaches. -->
   <ArmedDangerButton
+    bind:this={control}
     {token}
     {armed}
     {busy}
@@ -173,6 +246,7 @@
     {idleAriaLabel}
     {armedAriaLabel}
     describedBy={impactId}
+    showTitle={false}
     {onArm}
     {onDisarm}
     {onConfirm}

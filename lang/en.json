@@ -1904,7 +1904,8 @@
           "Lock": "Lock",
           "Unlock": "Unlock",
           "LeaveUnchanged": "Leave unchanged",
-          "Deleting": "Deleting…"
+          "Deleting": "Deleting…",
+          "DeleteCancelled": "Delete cancelled. Nothing was deleted."
         },
         "Recipe": {
           "Kicker": "Recipes View",
@@ -2341,24 +2342,27 @@
             "DeleteAria": "Delete {count} recipes",
             "DeleteAriaOne": "Delete 1 recipe",
             "DeleteConfirm": "Confirm delete",
-            "DeleteConfirmAria": "Confirm delete — {count} recipe(s), {items} recipe item(s) and {learners} character(s) affected. This cannot be undone.",
+            "DeleteConfirmAria": "Confirm delete — {count} recipe(s), {items} of your books & scrolls and {learners} character(s) affected. This cannot be undone.",
             "DeleteArmedAnnouncement": "Delete armed. Activate again to delete {count} recipe(s). This cannot be undone.",
             "DeleteStandingHint": "Deleting is permanent. A recipe you recreate is a new recipe.",
             "DeleteFailed": "Failed to delete the selected recipes.",
+            "DeleteNothing": "Nothing was deleted — the selected recipes are no longer in this system.",
             "ImpactRecipes": "{count} recipes will be deleted.",
             "ImpactRecipesOne": "1 recipe will be deleted.",
-            "ImpactItems": "Removed from {count} books & scrolls.",
-            "ImpactItemsOne": "Removed from 1 book or scroll.",
-            "ImpactLearners": "Forgotten by {count} characters — they do not get their learn slots back, so a spent book or scroll cannot teach it again.",
-            "ImpactLearnersOne": "Forgotten by 1 character — they do not get their learn slot back, so a spent book or scroll cannot teach it again.",
+            "ImpactItems": "Will be removed from {count} books & scrolls.",
+            "ImpactItemsOne": "Will be removed from 1 book or scroll.",
+            "ImpactLearners": "Will be forgotten by {count} characters — spent learn slots are not given back, and a spent book or scroll cannot teach a deleted recipe again.",
+            "ImpactLearnersOne": "Will be forgotten by 1 character — spent learn slots are not given back, and a spent book or scroll cannot teach a deleted recipe again.",
             "Deleted": "Deleted {count} recipe(s).",
-            "DeletedWithItems": "Deleted {count} recipe(s) and removed them from {items} recipe item(s).",
+            "DeletedWithItems": "Deleted {count} recipe(s) and removed them from {items} of your books & scrolls.",
             "DeletedWithLearners": "Deleted {count} recipe(s); {learners} character(s) forgot them.",
-            "DeletedWithItemsAndLearners": "Deleted {count} recipe(s), removed them from {items} recipe item(s), and {learners} character(s) forgot them."
+            "DeletedWithItemsAndLearners": "Deleted {count} recipe(s), removed them from {items} of your books & scrolls, and {learners} character(s) forgot them."
           },
           "DeleteConfirm": {
             "Title": "Delete {name}?",
-            "Content": "Delete recipe {name}? It is removed from {items} recipe item(s) and forgotten by {learners} character(s). Deleting is permanent — a recipe you recreate is a new recipe, and a character does not get their learn slot back.",
+            "Content": "Delete recipe {name}? It will be removed from {items} of your books & scrolls and forgotten by {learners} character(s). Deleting is permanent — a recipe you recreate is a new recipe, and a character does not get their learn slot back.",
+            "ContentItems": "Delete recipe {name}? It will be removed from {items} of your books & scrolls. Deleting is permanent — a recipe you recreate is a new recipe.",
+            "ContentLearners": "Delete recipe {name}? It will be forgotten by {learners} character(s). Deleting is permanent — a recipe you recreate is a new recipe, and a character does not get their learn slot back.",
             "ContentPlain": "Delete recipe {name}? Deleting is permanent — a recipe you recreate is a new recipe.",
             "Confirm": "Delete"
           },
@@ -2700,7 +2704,7 @@
             "DeleteAria": "Delete {count} components",
             "DeleteAriaOne": "Delete 1 component",
             "DeleteConfirm": "Confirm delete",
-            "DeleteConfirmAria": "Confirm delete — {count} component(s), {recipes} recipe(s)",
+            "DeleteConfirmAria": "Confirm delete — {count} component(s) and {recipes} recipe(s) affected. This cannot be undone.",
             "DeleteArmedAnnouncement": "Delete armed. Activate again to delete {count} component(s) and rewrite {recipes} recipe(s).",
             "Deleted": "Deleted {count} component(s) and rewrote {recipes} recipe(s).",
             "DeletedWithDisabled": "Deleted {count} component(s) and rewrote {recipes} recipe(s), disabling {disabled} of them."

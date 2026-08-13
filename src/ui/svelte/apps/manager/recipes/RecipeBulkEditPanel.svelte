@@ -116,6 +116,10 @@
      rather than derived here. None of its three numbers is available from the projected
      rows: the learner count needs actor flags and the recipe-item count needs the system's
      definitions with its membership basis.
+   - deleteOutcome: an OPTIONAL sentence announcing what a finished delete did when it left
+     this card mounted — a refused or no-op write, in practice. The owner sets it and clears
+     it on the next arm; the card announces it through its live region and puts focus back on
+     the control the confirm's own `disabled` moved to `document.body`.
    - onArmDelete() / onDisarmDelete() / onDelete(ids).
 -->
 <script>
@@ -157,6 +161,7 @@
     deleting = false,
     deleteArmed = false,
     deleteImpact = null,
+    deleteOutcome = '',
     onDraftChange = () => {},
     onClearSelection = () => {},
     onApply = () => {},
@@ -256,11 +261,25 @@
           { count: impact.deletable }
         )
   );
-  // `recipe item` is the canonical spec noun; `books & scrolls` is the display name the
-  // manager's own navigation already uses for the same vocabulary, so the GM reads it as
-  // they find it. The figure is a DISTINCT union — two selected recipes in one book is one
-  // book — and it is basis-aware, so on a legacy-basis system it counts the recipe items
-  // that will no longer contain them even though no definition is rewritten.
+  // ── ONE COUNTABLE NOUN FOR ONE COUNT, ACROSS ALL FOUR SURFACES ───────────────────
+  // The recipe-item figure is named `books & scrolls` / `book or scroll` on the card, in
+  // the armed accessible name, in the completion toast and in the singular delete dialog.
+  // It had been split — the card said one thing and the other three said "recipe item(s)"
+  // — and the aria/visible pair was the worst of it: `aria-describedby` points AT this
+  // list, so a screen-reader user heard "2 recipe item(s)" as the name of a control
+  // described by a row reading "2 books & scrolls", which is a WCAG 2.5.3 smell.
+  //
+  // The display name won rather than the canonical noun, and the corpus is why. Every
+  // other item-referring string under the Recipe lang namespace already says it —
+  // `BookPick`, `BookSearch`/`BookSearchOne`, `BookNoMatch`, `BookClearPick`,
+  // `AppliedBooks*`, the editor's `Not in any book or scroll` — so naming it `recipe item`
+  // here would have swapped a four-surface split for a one-against-ten split inside the
+  // studio's own namespace. `recipe item` remains the canonical noun in `openspec/` and in
+  // every identifier, exactly as `ui-integration`'s Books & Scrolls section requires.
+  //
+  // The multi-count strings say "{items} of your books & scrolls" rather than an "(s)"
+  // form: "1 of your books & scrolls" is grammatical, so the display name survives into
+  // the strings that carry two or three counts without needing "book(s) or scroll(s)".
   //
   // THE TWO CONSEQUENCE ROWS CARRY NO PRONOUN FOR THE RECIPES, and that is a correction to
   // issue 1132's authored copy rather than a style preference. The delta authored
@@ -269,33 +288,47 @@
   // ordinary selection of three recipes that share one book rendered "3 recipes will be
   // deleted. 1 book or scroll will lose it." Branching on both counts would need a 2x2 key
   // matrix per row, which is exactly what the `(s)` idiom exists here to avoid. Naming the
-  // consequence without a pronoun ("Removed from 1 book or scroll.") is correct in every
-  // combination, keeps one `…One` sibling per row, and reads as the parallel consequence
-  // list the card is.
+  // consequence without a pronoun is correct in every combination, keeps one `…One` sibling
+  // per row, and reads as the parallel consequence list the card is.
+  //
+  // Both rows are FUTURE and subject-less. "Removed from 1 book or scroll." above a button
+  // that has not been pressed reads as current state, one line under a subject row that
+  // correctly says "will be deleted"; "Will be removed from…" cannot. The elided subject is
+  // the device that keeps them count-neutral — "The recipes will be removed from…" re-opens
+  // the same 2x2 matrix on the subject.
   const impactItemsLabel = $derived(
     impact.recipeItemsAffected === 1
       ? text(
           'FABRICATE.Admin.Manager.Recipe.BulkEdit.ImpactItemsOne',
-          'Removed from 1 book or scroll.'
+          'Will be removed from 1 book or scroll.'
         )
       : format(
           'FABRICATE.Admin.Manager.Recipe.BulkEdit.ImpactItems',
-          'Removed from {count} books & scrolls.',
+          'Will be removed from {count} books & scrolls.',
           { count: impact.recipeItemsAffected }
         )
   );
   // The qualifier is the loudest thing on the card and is deliberately part of the ROW
   // rather than a separate sentence: the learn slot is spent by the same act the number
   // counts, so a GM who reads the number has read the consequence.
+  //
+  // NEITHER HALF OF THE QUALIFIER MAY AGREE WITH A COUNT THIS ROW DOES NOT BRANCH ON. The
+  // row branches on the LEARNER count, and the authored copy carried two words that agree
+  // with other counts: "cannot teach it again" pronominalized the RECIPES (three selected
+  // recipes, one book, and "it" names one of three), and "their learn slot(s)" agrees with
+  // the number of slots each character spent, which is the number of selected recipes they
+  // had learned — one character who learned three of them loses three slots and still read
+  // the singular branch. "a deleted recipe" and the generic-plural rule statement are both
+  // true at every combination of the three counts.
   const impactLearnersLabel = $derived(
     impact.learnersAffected === 1
       ? text(
           'FABRICATE.Admin.Manager.Recipe.BulkEdit.ImpactLearnersOne',
-          'Forgotten by 1 character — they do not get their learn slot back, so a spent book or scroll cannot teach it again.'
+          'Will be forgotten by 1 character — spent learn slots are not given back, and a spent book or scroll cannot teach a deleted recipe again.'
         )
       : format(
           'FABRICATE.Admin.Manager.Recipe.BulkEdit.ImpactLearners',
-          'Forgotten by {count} characters — they do not get their learn slots back, so a spent book or scroll cannot teach it again.',
+          'Will be forgotten by {count} characters — spent learn slots are not given back, and a spent book or scroll cannot teach a deleted recipe again.',
           { count: impact.learnersAffected }
         )
   );
@@ -307,7 +340,7 @@
   const deleteArmedAriaLabel = $derived(
     format(
       'FABRICATE.Admin.Manager.Recipe.BulkEdit.DeleteConfirmAria',
-      'Confirm delete — {count} recipe(s), {items} recipe item(s) and {learners} character(s) affected. This cannot be undone.',
+      'Confirm delete — {count} recipe(s), {items} of your books & scrolls and {learners} character(s) affected. This cannot be undone.',
       {
         count: impact.deletable,
         items: impact.recipeItemsAffected,
@@ -1129,6 +1162,11 @@
   idleAriaLabel={deleteAriaLabel}
   armedAriaLabel={deleteArmedAriaLabel}
   armedAnnouncement={deleteArmedAnnouncement}
+  disarmedAnnouncement={text(
+    'FABRICATE.Admin.Manager.BulkEdit.DeleteCancelled',
+    'Delete cancelled. Nothing was deleted.'
+  )}
+  outcomeAnnouncement={deleteOutcome}
   armed={deleteArmed === true}
   busy={deleting === true}
   disabled={impact.deletable === 0 || applying === true}

@@ -208,8 +208,120 @@ describe('1132 BulkDeleteCard — the accessibility wiring', () => {
     assert.equal(
       live(root).textContent.trim(),
       '',
-      'emptying on disarm is also what makes a RE-arm announce, since identical text is not respoken'
+      'a caller that supplies no disarm sentence keeps the old silence, so the two converted studios are unchanged unless they opt in'
     );
+    harness.remount();
+  });
+
+  // ESCAPE AND CLICK-AWAY BOTH DISARM WHILE THE BUTTON HOLDS FOCUS, changing its accessible
+  // name under it — which is the exact condition this region exists for. Emptying a region
+  // announces nothing, so the one gesture that CANCELS a destructive action was the only one
+  // that said nothing at all (issue 1132, review round).
+  it('announces the CANCELLATION on disarm when the caller supplies the sentence', async () => {
+    const cancelled = props({ disarmedAnnouncement: 'Delete cancelled. Nothing was deleted.' });
+    const root = await harness.mount(cancelled);
+
+    assert.equal(live(root).textContent.trim(), '', 'and says nothing on mount, never armed');
+
+    await harness.setProps({ ...cancelled, armed: true });
+    assert.match(live(root).textContent, /Activate again/);
+
+    await harness.setProps({ ...cancelled, armed: false });
+    assert.equal(live(root).textContent.trim(), 'Delete cancelled. Nothing was deleted.');
+
+    await harness.setProps({ ...cancelled, armed: true });
+    assert.match(live(root).textContent, /Activate again/, 'and a RE-arm still announces');
+    harness.remount();
+  });
+
+  it('does NOT read a confirmed delete as a cancellation', async () => {
+    // The trap in tracking "was armed": confirming takes the control armed → busy → idle, so
+    // a naive trailing-idle rule announces "Delete cancelled." over a delete that happened.
+    const cancelled = props({ disarmedAnnouncement: 'Delete cancelled. Nothing was deleted.' });
+    const root = await harness.mount({ ...cancelled, armed: true });
+    assert.match(live(root).textContent, /Activate again/);
+
+    await harness.setProps({ ...cancelled, armed: true, busy: true });
+    assert.equal(live(root).textContent.trim(), '', 'the region is emptied while the write runs');
+
+    await harness.setProps({ ...cancelled, armed: false, busy: false });
+    assert.equal(
+      live(root).textContent.trim(),
+      '',
+      'and the write finishing is not a cancellation'
+    );
+    harness.remount();
+  });
+
+  // CONFIRMING DISABLES THE CONTROL, WHICH MOVES FOCUS TO `document.body`. Re-enabling it
+  // does not bring focus back, so on a refused or no-op delete the GM's keyboard is nowhere
+  // and the region — emptied while busy — has said nothing about the outcome. The Foundry
+  // error toast is not a live region this module controls.
+  it('announces the OUTCOME of a finished write and takes focus back', async () => {
+    const root = await harness.mount(props({ armed: true }));
+    button(root).focus();
+
+    await harness.setProps(props({ armed: true, busy: true }));
+    // The disable is what moves focus away in a real browser; happy-dom does not fire that
+    // blur, so the post-write state is entered deliberately here, exactly as the busy-face
+    // suite below does. `bulk-delete-busy-focus.test.js` is where the browser fact itself is
+    // measured.
+    document.body.focus();
+    // ANTI-VACUITY, asserted before the claim it bounds: if focus were still on the control
+    // here, "focus came back" would pass on a card that did nothing at all.
+    assert.notEqual(document.activeElement, button(root), 'the write really did drop focus');
+
+    await harness.setProps(
+      props({ armed: false, busy: false, outcomeAnnouncement: 'Failed to delete the selected recipes.' })
+    );
+    assert.equal(live(root).textContent.trim(), 'Failed to delete the selected recipes.');
+
+    // Deferred a microtask past the flush, because the control is re-enabled in the same one
+    // and `focus()` on a still-disabled button does nothing.
+    await Promise.resolve();
+    assert.equal(
+      document.activeElement,
+      button(root),
+      'and the GM is put back on the control they were using, not left on <body>'
+    );
+    harness.remount();
+  });
+
+  it('lets the next arm announce again after an outcome', async () => {
+    const failed = props({ outcomeAnnouncement: 'Failed to delete the selected recipes.' });
+    const root = await harness.mount(failed);
+    assert.equal(live(root).textContent.trim(), 'Failed to delete the selected recipes.');
+
+    // The owner clears the outcome as it arms, which is what stops a stale sentence
+    // out-ranking the armed one.
+    await harness.setProps(props({ armed: true, outcomeAnnouncement: '' }));
+    assert.match(live(root).textContent, /Activate again/);
+    harness.remount();
+  });
+
+  it('does not expose the accessible name as a hover tooltip', async () => {
+    // The armed names the three studios pass carry the count-agreement-neutral "(s)" idiom,
+    // which is defensible for an AT-only string and reads as an un-interpolated template —
+    // "1 recipe(s)" — the moment it becomes visible text. Nothing is lost: every count in
+    // those names is in the impact list this control is `aria-describedby`-associated with.
+    // The ROW call sites of `ArmedDangerButton` keep their tooltip, where the accessible name
+    // is the only place a sighted user reads which document a two-word "Delete" reaches.
+    const root = await harness.mount(props({ armed: true }));
+    assert.equal(button(root).getAttribute('title'), null);
+    assert.match(
+      button(root).getAttribute('aria-label'),
+      /Confirm delete/,
+      'while the accessible name is untouched'
+    );
+    harness.remount();
+  });
+
+  it('carries no state class the stylesheet does not define', async () => {
+    // `is-busy` was the only occurrence of that name under `src/` or `styles/`: a class
+    // implying a treatment that does not exist. `data-busy` is the hook.
+    const root = await harness.mount(props({ busy: true }));
+    assert.equal(button(root).classList.contains('is-busy'), false);
+    assert.equal(button(root).getAttribute('data-busy'), 'true');
     harness.remount();
   });
 });

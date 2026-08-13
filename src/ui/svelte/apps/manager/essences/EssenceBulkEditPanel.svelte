@@ -404,6 +404,10 @@
   idleAriaLabel={deleteAriaLabel}
   armedAriaLabel={deleteArmedAriaLabel}
   armedAnnouncement={deleteArmedAnnouncement}
+  disarmedAnnouncement={text(
+    'FABRICATE.Admin.Manager.BulkEdit.DeleteCancelled',
+    'Delete cancelled. Nothing was deleted.'
+  )}
   armed={deleteArmed === true}
   busy={deleting === true}
   disabled={impact.deletable === 0 || applying === true}
