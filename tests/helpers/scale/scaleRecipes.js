@@ -337,6 +337,80 @@ export function buildGraphCorpus({ count, systemId, components, random, layerCou
 }
 
 /**
+ * THE DEPTH AXIS: a strictly linear dependency chain of exactly `count` recipes (issue 1082).
+ *
+ * {@link buildGraphCorpus} varies WIDTH — fan-out at a bounded depth — and cannot produce this
+ * shape. Its hub component ids are drawn modulo the shared component library, so asking it for
+ * a 20,000-layer chain over a 2,000-component library wraps every 2,000 layers and yields a
+ * broad, cyclic graph rather than a deep one. Depth needs its own generator with its own
+ * component id space, and it needs one because depth is where the layout used to CRASH: the
+ * cycle-detection DFS was recursive and unguarded, and it threw
+ * `RangeError: Maximum call stack size exceeded` at a measured depth of 8,193 — inside the
+ * 10,000-recipe corpus this programme supports.
+ *
+ * Recipe `i` consumes chain component `i - 1` and produces chain component `i`, so the graph
+ * has exactly `count` nodes, `count - 1` edges, no cycles, and a deepest layer of `count - 1`.
+ * Those four figures are all machine-invariant, which is what lets a baseline assert the depth
+ * rather than trust the generator.
+ *
+ * @param {object} options
+ * @param {number} options.count Chain depth, in recipes.
+ * @param {string} options.systemId
+ * @param {() => number} options.random
+ * @returns {object[]}
+ */
+export function buildGraphChainCorpus({ count, systemId, random }) {
+  const recipes = [];
+  for (let index = 0; index < count; index++) {
+    const id = `${systemId}-chain-${index}`;
+    recipes.push({
+      id,
+      name: `Bench Chain Link ${index}`,
+      img: 'icons/sundries/documents/blueprint-recipe-alchemical.webp',
+      category: SCALE_CATEGORIES[index % SCALE_CATEGORIES.length],
+      craftingSystemId: systemId,
+      enabled: true,
+      metadata: { created: 0, modified: 0, author: 'benchmark', version: '1.0.0' },
+      ingredientSets:
+        index === 0
+          ? []
+          : [
+              {
+                id: `${id}-s0`,
+                ingredientGroups: [
+                  {
+                    id: `${id}-s0-g0`,
+                    options: [
+                      {
+                        quantity: 1,
+                        match: {
+                          type: 'component',
+                          componentId: `${systemId}-chain-c-${index - 1}`,
+                        },
+                      },
+                    ],
+                  },
+                ],
+              },
+            ],
+      resultGroups: [
+        {
+          id: `${id}-rg0`,
+          checkOutcomeIds: [],
+          results: [
+            {
+              componentId: `${systemId}-chain-c-${index}`,
+              quantity: intBetween(random, 1, 2),
+            },
+          ],
+        },
+      ],
+    });
+  }
+  return recipes;
+}
+
+/**
  * A corpus of `count` recipes of one shape.
  *
  * @param {object} options

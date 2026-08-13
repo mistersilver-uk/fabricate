@@ -437,9 +437,18 @@ function alchemyCases() {
   ];
 }
 
-/** The dependency-graph cases. */
+/**
+ * The dependency-graph cases.
+ *
+ * `deep` is the DEPTH axis (issue 1082) and it is not a bigger version of the other two. A
+ * 20,000-link linear chain is the shape that made the pre-fix layout throw
+ * `RangeError: Maximum call stack size exceeded` — its cycle-detection DFS was recursive and
+ * unguarded, and it failed at a measured depth of 8,193. That case therefore does not merely
+ * get slower without the fix; it does not complete at all, which is why its committed counts
+ * are a crash regression guard rather than a performance one.
+ */
 function graphCases() {
-  const shapes = ['sparse', 'dense'];
+  const shapes = ['sparse', 'dense', 'deep'];
   return shapes.flatMap((shape) => [
     {
       id: `graph.buildRecipeGraph.${shape}`,
@@ -460,18 +469,28 @@ function graphCases() {
       setup: (context) => ({
         world: worldFor(context),
         recipes: context.fixture.graphs[shape],
+        // The adjacency-lookup seam (issue 1082). `graphIncomingEdgesExamined` is what makes
+        // "layout performs no repeated whole-edge filtering per node" a committed number: the
+        // pre-fix ordering pass filtered ALL edges once per node per layer and examined
+        // 1,068,168 edge entries on the 3,568-edge dense fixture, so a reintroduced rescan
+        // moves this count by orders of magnitude rather than subtly.
+        counters: context.counters,
       }),
       // The graph is rebuilt inside the timed region on purpose: `layoutGraph` MUTATES the
       // nodes it is given (x/y/layer), so timing repeated calls over one graph would measure
       // an increasingly pre-solved layout rather than the layout.
-      run: ({ world, recipes }) =>
+      run: ({ world, recipes, counters }) =>
         world.modules.graph.layoutGraph(
-          world.modules.graph.buildRecipeGraph(recipes, world.fixture.components)
+          world.modules.graph.buildRecipeGraph(recipes, world.fixture.components),
+          { instrumentation: counters }
         ),
       counts: (_state, laid) => ({
         nodes: laid.nodes.length,
         edges: laid.edges.length,
         cycleEdges: laid.edges.filter((edge) => edge.isCycleEdge).length,
+        // The depth the layout actually resolved. A chain that silently stopped part-way
+        // would still report the right node and edge counts; only this one moves.
+        deepestLayer: laid.nodes.reduce((deepest, node) => Math.max(deepest, node.layer), 0),
       }),
     },
   ]);

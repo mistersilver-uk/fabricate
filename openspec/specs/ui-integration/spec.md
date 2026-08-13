@@ -1344,6 +1344,40 @@ It is computed by a separate refresh gated on a `knowledgeActive` flag, so it is
 Each store action awaits its seam call and then re-runs the knowledge refresh, never the shared `refresh()`.
 The result is published as a top-level `viewState.knowledge` and is **always a new object**; it MUST NOT hang off `selectedSystem`, which would force a `selectedSystem` reference rebuild on every knowledge publish and let a late second-phase publish clobber freshly projected rows.
 
+### Recipe Dependency Graph
+
+The graph route itself is still planned (#442) — the rail item remains a disabled `Soon` placeholder behind `fabricate.experimentalFeatures`, per the Manager Shell navigation contract above.
+What is specified here is the DATA contract the store already publishes and any implementation of that route MUST honour, because the bound below is a product decision about what a GM is shown, not an implementation detail of whichever view eventually renders it.
+
+**The graph is bounded by default.** The default bound is **500 nodes and 2,000 edges**.
+The recipe dependency relation is producer x consumer through shared components, so one component produced by P recipes and consumed by C recipes contributes P x C edges; an unscoped graph over a system with thousands of recipes is therefore quadratic in recipes and cannot be laid out or drawn on the main thread.
+The bound is enforced during construction, not by discarding a completed graph: node selection precedes edge derivation and edge derivation stops at the budget, so the bound bounds work rather than only output.
+
+**Supported query scopes.**
+
+- `all` — the whole system, complete when the system fits inside the bound.
+- `recipe` — a selected recipe plus a hop radius over the dependency relation (default 2 hops).
+- `component` — a selected component's producers and consumers, interleaved so that a neighbourhood truncated at the node bound still shows dependencies rather than one side of them.
+- `cohort` — an explicit recipe id set, which is how a search or category filter is applied, resolved BEFORE the bound is spent so the bound never discards the recipes the GM searched for.
+
+**An unscoped system over the bound returns no graph and says so.**
+It MUST NOT return an arbitrary 500-recipe slice.
+There is no comprehensible 500-recipe subset of an unscoped 10,000-recipe corpus, and a rendered slice would be read as the system.
+The query instead reports that a scope is required, together with the true recipe count, so the GM can scope the question or ask for the full graph explicitly.
+
+**Disclosure is mandatory and is carried in the data.**
+Every graph result carries a bound descriptor stating the scope, the budgets in force, the system's total recipe count, the candidate node count where it is exactly knowable, whether the result is complete, and which budget stopped it.
+A view rendering a result whose bound is not complete MUST state plainly that it is showing a bounded neighbourhood rather than the whole system.
+Filtering or laying out a graph carries the descriptor through unchanged: neither operation can make an incomplete graph complete.
+
+**The full graph stays available on explicit request only.**
+An explicit unbounded request lifts both budgets; it is never the default, and it does not make the result complete by assertion — the descriptor still reports what was produced.
+
+**Indexes are retained, not rebuilt per interaction.**
+The producer/consumer relation is indexed once per recipe revision, keyed on the revision token `RecipeManager` mints for the selected system, and re-queried for every filter or search interaction.
+A definition change advances the token and rebuilds; nothing else does.
+The index stores the relation THROUGH components and expands neighbours on demand rather than materialising recipe-to-recipe adjacency, because that materialisation is the same producer x consumer product the bound exists to prevent.
+
 ### Environments Tab
 
 Only shown when `features.gathering === true` for the selected crafting system.
