@@ -59,10 +59,87 @@ function selectedIngredientItems(selection) {
  * Manages recipe storage, retrieval, and CRUD operations
  */
 export class RecipeManager {
-  constructor({ getCraftingSystem = null } = {}) {
+  /**
+   * @param {object} [deps]
+   * @param {Function|null} [deps.getCraftingSystem] - `(systemId) => system`. The
+   *   pre-existing narrow seam; still honoured by {@link _resolveCraftingSystem}.
+   * @param {Function|null} [deps.getCraftingSystemManager] - `() => CraftingSystemManager`.
+   *   The manager itself, for the paths that need more than one system or need the
+   *   recipe/component accessors (issue 1072). Both default to the `game.fabricate`
+   *   globals, so every existing `new RecipeManager({})` construction is unaffected.
+   */
+  constructor({ getCraftingSystem = null, getCraftingSystemManager = null } = {}) {
     this.recipes = new Map();
     this.initialized = false;
     this.getCraftingSystem = typeof getCraftingSystem === 'function' ? getCraftingSystem : null;
+    this._getCraftingSystemManager =
+      typeof getCraftingSystemManager === 'function' ? getCraftingSystemManager : null;
+  }
+
+  /**
+   * The crafting-system manager collaborator.
+   *
+   * Every path that needs the manager routes through here (issue 1072). Twelve sites
+   * previously read `game.fabricate?.getCraftingSystemManager?.()` inline — including
+   * {@link _validateSignatures}, the one path the alchemy signature-audit work has to
+   * instrument — which meant the manager was reachable only by installing a global
+   * shim. A counting or caching collaborator can now be injected through the
+   * constructor, and the global stays as the default so no existing caller changes.
+   *
+   * Resolved per call, never cached: `game.fabricate` is assembled during Foundry's
+   * `ready` hook, after the managers are constructed, so a value captured in the
+   * constructor would be `undefined` forever.
+   *
+   * @returns {object|null}
+   * @private
+   */
+  _systemManager() {
+    if (this._getCraftingSystemManager) return this._getCraftingSystemManager() ?? null;
+    return game.fabricate?.getCraftingSystemManager?.() ?? null;
+  }
+
+  /**
+   * The seam bag handed to the currency affordance layer.
+   *
+   * `evaluateCraftability` builds a currency probe per recipe, and that probe resolves the
+   * system's currency config — so without this the player listing path would still reach
+   * the `game.fabricate` global once per recipe even though the manager holds an injected
+   * collaborator (issue 1072). Mirrors `CraftingEngine._currencySeams()`, which supplies
+   * the coin spenders on the same bag.
+   *
+   * @returns {{getCraftingSystemManager: () => object|null}}
+   * @private
+   */
+  _currencySeams() {
+    return { getCraftingSystemManager: () => this._systemManager() };
+  }
+
+  /**
+   * A {@link SignatureValidator} source built from the manager collaborator.
+   *
+   * One definition shared by the enable-time gate ({@link _validateSignatures}) and the
+   * post-mutation reconciliation ({@link disableSignatureConflicts}), which previously
+   * carried near-identical adapter closures that could drift apart (issue 1072).
+   * `getComponentsForSystem` prefers the manager's own accessor so a counting or indexed
+   * manager is actually consulted, and falls back to reading `system.components` for the
+   * many fixtures whose system manager is a bare `{getSystem}` object.
+   *
+   * @param {object} systemManager
+   * @param {(systemId: string) => object[]} getRecipesForSystem - Supplied by the caller
+   *   because the two callers genuinely differ: the enable-time gate substitutes the
+   *   candidate recipe for its still-disabled stored copy.
+   * @returns {{getSystem: Function, getRecipesForSystem: Function, getComponentsForSystem: Function}}
+   * @private
+   */
+  _signatureSource(systemManager, getRecipesForSystem) {
+    return {
+      getSystem: (id) => systemManager.getSystem(id),
+      getRecipesForSystem,
+      getComponentsForSystem: (id) =>
+        typeof systemManager.getComponentsForSystem === 'function'
+          ? systemManager.getComponentsForSystem(id)
+          : systemManager.getSystem(id)?.components || [],
+    };
   }
 
   /**
@@ -504,7 +581,7 @@ export class RecipeManager {
     if (!systemId) return false;
     if (cache.has(systemId)) return cache.get(systemId);
 
-    const systemManager = game.fabricate?.getCraftingSystemManager?.();
+    const systemManager = this._systemManager();
     const system = systemManager?.getSystem?.(systemId);
     if (!system) {
       cache.set(systemId, false);
@@ -612,7 +689,7 @@ export class RecipeManager {
     // Bind the currency affordability probe to the crafting actor so a currency
     // alternative is selectable in the display exactly when the engine could spend
     // it. A null actor yields a probe that is always false (currency shows missing).
-    const affordCurrency = buildCurrencyAffordProbe(craftingActor, recipe);
+    const affordCurrency = buildCurrencyAffordProbe(craftingActor, recipe, this._currencySeams());
 
     // Resolve the recipe's currency units once so a currency option's cost row can
     // render a human label (abbreviation, else label) instead of the raw unit id.
@@ -854,7 +931,7 @@ export class RecipeManager {
 
     const availableItems = sourceActors.flatMap((actor) => [...actor.items]);
     const features = this._getSystemFeatures(recipe);
-    const affordCurrency = buildCurrencyAffordProbe(craftingActor, recipe);
+    const affordCurrency = buildCurrencyAffordProbe(craftingActor, recipe, this._currencySeams());
     const resolveItemEssencesForSet = this._buildEssenceOptionResolver(recipe);
 
     const ingredientByKey = new Map();
@@ -1032,7 +1109,7 @@ export class RecipeManager {
   _resolveCraftingSystem(systemId) {
     if (!systemId) return null;
     if (this.getCraftingSystem) return this.getCraftingSystem(systemId) ?? null;
-    return game.fabricate?.getCraftingSystemManager?.()?.getSystem?.(systemId) ?? null;
+    return this._systemManager()?.getSystem?.(systemId) ?? null;
   }
 
   _resolveToolItemActor(item, sourceActors) {
@@ -1280,7 +1357,7 @@ export class RecipeManager {
    * @returns {object[]}
    */
   _resolveNormalizedCurrencyUnits(recipe) {
-    const units = getCurrencyRequirementConfig(recipe)?.units || [];
+    const units = getCurrencyRequirementConfig(recipe, this._currencySeams())?.units || [];
     return units.map((unit) => normalizeCurrencyUnit(unit)).filter(Boolean);
   }
 
@@ -1677,9 +1754,7 @@ export class RecipeManager {
    */
   _resolveEssenceDefinition(recipe, type) {
     const systemId = recipe?.craftingSystemId;
-    const system = systemId
-      ? game.fabricate?.getCraftingSystemManager?.()?.getSystem(systemId)
-      : null;
+    const system = systemId ? this._systemManager()?.getSystem(systemId) : null;
     const definitions = Array.isArray(system?.essenceDefinitions) ? system.essenceDefinitions : [];
     return definitions.find((def) => def?.id === type) ?? null;
   }
@@ -2031,7 +2106,7 @@ export class RecipeManager {
     if (!systemId) {
       return { enableTags: false, enableEssences: false };
     }
-    const systemManager = game.fabricate?.getCraftingSystemManager?.();
+    const systemManager = this._systemManager();
     const system = systemManager?.getSystem(systemId);
     const features = system?.features || {};
     return {
@@ -2047,7 +2122,7 @@ export class RecipeManager {
   _getComponent(recipe, componentId) {
     const systemId = recipe?.craftingSystemId;
     if (!systemId || !componentId) return null;
-    const systemManager = game.fabricate?.getCraftingSystemManager?.();
+    const systemManager = this._systemManager();
     const system = systemManager?.getSystem(systemId);
     if (!system) return null;
     return (system.components || []).find((item) => item.id === componentId) || null;
@@ -2224,7 +2299,7 @@ export class RecipeManager {
   _getSystemComponents(recipe) {
     const systemId = recipe?.craftingSystemId;
     if (!systemId) return [];
-    const systemManager = game.fabricate?.getCraftingSystemManager?.();
+    const systemManager = this._systemManager();
     const system = systemManager?.getSystem(systemId);
     return Array.isArray(system?.components) ? system.components : [];
   }
@@ -2238,7 +2313,7 @@ export class RecipeManager {
   _getSystemTools(recipe) {
     const systemId = recipe?.craftingSystemId;
     if (!systemId) return [];
-    const systemManager = game.fabricate?.getCraftingSystemManager?.();
+    const systemManager = this._systemManager();
     const system = systemManager?.getSystem(systemId);
     return Array.isArray(system?.tools) ? system.tools : [];
   }
@@ -2442,7 +2517,7 @@ export class RecipeManager {
     const systemId = recipe?.craftingSystemId;
     if (!systemId) return { valid: true, errors: [] };
 
-    const systemManager = game.fabricate?.getCraftingSystemManager?.();
+    const systemManager = this._systemManager();
     if (!systemManager) return { valid: true, errors: [] };
 
     // Signature uniqueness only matters when the engine *infers* which recipe
@@ -2455,24 +2530,18 @@ export class RecipeManager {
     const system = systemManager.getSystem(systemId);
     if (system?.resolutionMode !== 'alchemy') return { valid: true, errors: [] };
 
-    const csm = {
-      getSystem: (id) => systemManager.getSystem(id),
-      // The validator is now enabled-scoped (issue 649). This gate runs on an ENABLE
-      // transition, but the store copy of `recipe` is still disabled (it is persisted
-      // only after this passes). Substitute the candidate recipe (enabled = its target
-      // state) so the scan evaluates the collision the enable would create; without the
-      // swap the enabled-scoped validator would exclude the still-disabled store copy
-      // and miss the conflict.
-      getRecipesForSystem: (id) =>
-        this.getRecipes({ craftingSystemId: id }).map((existing) =>
-          existing.id === recipe.id ? recipe : existing
-        ),
-      getComponentsForSystem: (id) => {
-        const system = systemManager.getSystem(id);
-        if (!system) return [];
-        return system.components || [];
-      },
-    };
+    // The validator is now enabled-scoped (issue 649). This gate runs on an ENABLE
+    // transition, but the store copy of `recipe` is still disabled (it is persisted
+    // only after this passes). Substitute the candidate recipe (enabled = its target
+    // state) so the scan evaluates the collision the enable would create; without the
+    // swap the enabled-scoped validator would exclude the still-disabled store copy
+    // and miss the conflict. That substitution is the ONLY reason this path cannot
+    // hand the manager straight to the validator (issue 1072).
+    const csm = this._signatureSource(systemManager, (id) =>
+      this.getRecipes({ craftingSystemId: id }).map((existing) =>
+        existing.id === recipe.id ? recipe : existing
+      )
+    );
 
     const validator = new SignatureValidator(csm);
     const result = validator.validateRecipe(recipe, systemId);
@@ -2499,15 +2568,15 @@ export class RecipeManager {
    * @returns {Promise<Array<{id: string, name: string}>>} the recipes that were disabled
    */
   async disableSignatureConflicts(systemId) {
-    const systemManager = game.fabricate?.getCraftingSystemManager?.();
+    const systemManager = this._systemManager();
     const system = systemManager?.getSystem(systemId);
     if (system?.resolutionMode !== 'alchemy') return [];
 
-    const validator = new SignatureValidator({
-      getSystem: (id) => systemManager.getSystem(id),
-      getRecipesForSystem: (id) => this.getRecipes({ craftingSystemId: id }),
-      getComponentsForSystem: (id) => systemManager.getSystem(id)?.components || [],
-    });
+    // No candidate substitution here — this runs AFTER the mutation is stored — so the
+    // recipe accessor is the plain store read (issue 1072).
+    const validator = new SignatureValidator(
+      this._signatureSource(systemManager, (id) => this.getRecipes({ craftingSystemId: id }))
+    );
 
     const { conflicts } = validator.validateSystem(systemId);
     const conflictIds = new Set();
@@ -2558,7 +2627,7 @@ export class RecipeManager {
     const systemId = recipe?.craftingSystemId;
     if (!systemId) return null;
 
-    const systemManager = game.fabricate?.getCraftingSystemManager?.();
+    const systemManager = this._systemManager();
     const system = systemManager?.getSystem(systemId);
     if (!system) return null;
 
@@ -2747,7 +2816,7 @@ export class RecipeManager {
       return { valid: true, errors: [], issues: [] };
     }
 
-    const systemManager = game.fabricate?.getCraftingSystemManager?.();
+    const systemManager = this._systemManager();
     const system = systemManager?.getSystem(systemId);
     if (!system) {
       return { valid: true, errors: [], issues: [] };
@@ -2809,7 +2878,7 @@ export class RecipeManager {
   async _cleanupFlagsAfterRecipeMutation() {
     const runManager = game.fabricate?.getCraftingRunManager?.();
     const visibilityService = game.fabricate?.getRecipeVisibilityService?.();
-    const systemManager = game.fabricate?.getCraftingSystemManager?.();
+    const systemManager = this._systemManager();
     if (!runManager && !visibilityService) return;
 
     const validRecipes = new Set(this.getRecipes({}).map((r) => r.id));
