@@ -26,6 +26,11 @@ stats.html
 # Machine-DEPENDENT and never asserted, so they must not be committed — the committed,
 # machine-invariant half lives in benchmarks/baselines/ and is tracked.
 /.benchmarks/
+# Class-2 Foundry perf run records and Chrome traces (issue 1073). Wall clock and heap measured
+# inside a live Foundry: machine-, build- and browser-dependent, never asserted, never committed.
+# Kept apart from issue 1071's /.benchmarks/ on purpose — these two sets of numbers have DIFFERENT
+# comparability rules, and one directory would invite comparing across them.
+/.foundry-perf/
 # Assembled data directory for Docker mount (contains symlinks)
 .foundry-e2e/data/
 test-results/

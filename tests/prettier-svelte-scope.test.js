@@ -134,6 +134,16 @@ const GATE_TARGETS = [
   'scripts/lib/benchmarkRunner.js',
   'scripts/benchmark-performance.mjs',
   'scripts/benchmark-compare.mjs',
+  // The Foundry performance profile (issue 1073): the pure derivations it depends on — the
+  // measurement registry, the seeding transform, the preconditions, the run record and the
+  // browser-side capture summarizers — plus the scenarios and the runner itself.
+  'scripts/lib/foundryPerfMeasurements.js',
+  'scripts/lib/foundryPerfSeed.js',
+  'scripts/lib/foundryPerfPreflight.js',
+  'scripts/lib/foundryPerfRecord.js',
+  'scripts/lib/foundryPerfCapture.js',
+  'scripts/lib/foundryPerfScenarios.js',
+  'scripts/foundry-perf-run.mjs',
   'scripts/visual-parity/lib/view-lab.js',
   'eslint.config.js',
 ];

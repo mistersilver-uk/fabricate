@@ -282,6 +282,10 @@ export default [
       // The Checks Studio parity extractor (issue 1096): its whole measurement pass is one
       // `page.evaluate` body reading `getComputedStyle` inside the prototype's page.
       'scripts/checks-studio-parity-extract.mjs',
+      // The Foundry perf profile (issue 1073): its scenarios and its seeding are almost entirely
+      // `page.evaluate` bodies driving `game`, `Actor` and the rendered DOM.
+      'scripts/lib/foundryPerfScenarios.js',
+      'scripts/foundry-perf-run.mjs',
     ],
     languageOptions: {
       globals: { ...globals.browser, ...foundryGlobals },
