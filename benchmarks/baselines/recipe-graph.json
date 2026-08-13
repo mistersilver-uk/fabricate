@@ -34,6 +34,8 @@
     "graph.buildRecipeGraph.sparse": {
       "description": "Producer/consumer edge derivation over the bounded sparse corpus.",
       "counts": {
+        "identityCandidatesExamined": 0,
+        "identityIndexBuilds": 0,
         "nodes": 1000,
         "edges": 968
       }
@@ -41,6 +43,8 @@
     "graph.layoutGraph.sparse": {
       "description": "Layered layout + edge paths over the bounded sparse graph.",
       "counts": {
+        "identityCandidatesExamined": 0,
+        "identityIndexBuilds": 0,
         "nodes": 1000,
         "edges": 968,
         "cycleEdges": 1
@@ -49,6 +53,8 @@
     "graph.buildRecipeGraph.dense": {
       "description": "Producer/consumer edge derivation over the bounded dense corpus.",
       "counts": {
+        "identityCandidatesExamined": 0,
+        "identityIndexBuilds": 0,
         "nodes": 500,
         "edges": 3568
       }
@@ -56,6 +62,8 @@
     "graph.layoutGraph.dense": {
       "description": "Layered layout + edge paths over the bounded dense graph.",
       "counts": {
+        "identityCandidatesExamined": 0,
+        "identityIndexBuilds": 0,
         "nodes": 500,
         "edges": 3568,
         "cycleEdges": 0

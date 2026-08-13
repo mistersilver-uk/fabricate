@@ -32,7 +32,9 @@
     "ingredientSet.resolveIngredientSelection": {
       "description": "The bounded backtracking ingredient solver over 12 adversarial multi-option recipes (3 sets x 3 groups x 3 options each). Hydrated, because the solver is a model method; the matcher-invocation count is the per-node work term #1083 targets, and the candidate-examination count is what each node actually costs.",
       "counts": {
-        "componentCandidatesExamined": 56246901,
+        "componentCandidatesExamined": 96380,
+        "identityCandidatesExamined": 8006,
+        "identityIndexBuilds": 1,
         "ingredientMatcherInvocations": 10020,
         "selectionsResolved": 36,
         "selectionsSatisfied": 12
@@ -41,6 +43,8 @@
     "recipeVisibility.getVisibleRecipes.global": {
       "description": "The corpus-wide visibility pass in global mode over 5,000 rich recipes.",
       "counts": {
+        "identityCandidatesExamined": 0,
+        "identityIndexBuilds": 0,
         "visibleRecipes": 5000
       }
     }

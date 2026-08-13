@@ -1,4 +1,5 @@
 import { FABRICATE_FLAG_NAMESPACE, getFabricateFlag, setFabricateFlag } from '../config/flags.js';
+import { findByRecipeId, getDefinitionIndex } from '../utils/definitionIndex.js';
 import { itemMatchesRecipeItemSource, matchRecipeItemDefinition } from '../utils/sourceUuid.js';
 
 import { evaluatePrerequisites } from './characterPrerequisites.js';
@@ -145,10 +146,12 @@ export class RecipeVisibilityService {
     const definitions = system.recipeItemDefinitions || [];
     const rid = String(recipe?.id || '');
 
-    const byMembership = definitions.filter((def) =>
-      (Array.isArray(def.recipeIds) ? def.recipeIds : []).some((id) => String(id) === rid)
-    );
-    if (byMembership.length > 0) return byMembership;
+    // The reverse `recipeId -> definitions` index (issue 1076). This runs on EVERY access
+    // check, so filtering the system's whole `recipeItemDefinitions` array here was a
+    // per-check linear scan on a player-facing path; the buckets preserve array order, so
+    // the answer is unchanged. Copied because the bucket is shared with the index.
+    const byMembership = findByRecipeId(getDefinitionIndex(definitions), rid);
+    if (byMembership.length > 0) return [...byMembership];
 
     // Only fall back while the system has not resolved by `recipeIds` (issue 1011). This
     // is player-facing — per-book learn caps and character prerequisites are enforced

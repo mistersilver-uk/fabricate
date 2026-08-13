@@ -20,7 +20,21 @@
  * {@link reportNameOnlyMatch}, which emits a warn-once, deduped console notice. A match
  * that reaches this module has, by construction, already failed durable + source-ref
  * resolution at the call site, so a hit here is precisely a name-ONLY match.
+ *
+ * ## The list-aware form is index-backed (issue 1076)
+ *
+ * {@link findComponentByNameSilently} used to be a `candidates.find()` over the ENTIRE
+ * component library that scanned it in full and returned `null` — and that is the branch a
+ * real player inventory spends most of its time in, because mundane gear, ammo and loot
+ * match nothing. It now reads {@link module:definitionIndex}, which holds the exact-name and
+ * case-folded maps SEPARATELY: one folded map cannot serve both semantics, and collapsing
+ * them would let bulk destroy delete items belonging to a differently-cased component. Both
+ * maps are built first-insert-wins in array order, so two components sharing a name still
+ * resolve to the one `.find()` resolved to. Telemetry is unchanged — it fires on the matched
+ * definition only, warn-once, exactly as before.
  */
+
+import { findByName, getDefinitionIndex } from './definitionIndex.js';
 
 /**
  * The raw name comparison, parameterized on case-sensitivity. Both names must be
@@ -120,10 +134,7 @@ export function matchComponentByName(item, component, { caseSensitive = false, s
  * @returns {object|null} The first name-matching component, or null.
  */
 export function findComponentByNameSilently(item, components, { caseSensitive = false } = {}) {
-  const candidates = Array.isArray(components) ? components : [];
-  return (
-    candidates.find((component) => namesMatch(item?.name, component?.name, caseSensitive)) || null
-  );
+  return findByName(getDefinitionIndex(components), item?.name, caseSensitive);
 }
 
 /**
