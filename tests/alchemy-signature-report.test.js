@@ -94,10 +94,13 @@ function makeManager({ recipes, resolutionMode = 'alchemy', components } = {}) {
 }
 
 /**
- * The PRE-CACHE answer, reproduced exactly: a full unpruned audit over the live cohort with
- * the candidate substituted for its stored copy, filtered to the conflicts naming it.
+ * The full-audit answer, reproduced exactly: an unpruned audit over the live cohort with the
+ * candidate IN it — substituted for its stored copy, or appended when it has none (issue
+ * 1167) — filtered to the conflicts naming it.
  *
- * This is the oracle every cached answer below is compared against.
+ * This is the oracle every cached answer below is compared against. The append leg matters
+ * as much as the substitution leg: an oracle that only substituted would answer `[]` for a
+ * not-yet-stored candidate, and would then agree with the vacuous gate rather than judge it.
  *
  * @param {object} manager
  * @param {object} systemManager
@@ -107,10 +110,14 @@ function makeManager({ recipes, resolutionMode = 'alchemy', components } = {}) {
 function oracleConflicts(manager, systemManager, candidate) {
   const validator = new SignatureValidator({
     getSystem: (id) => systemManager.getSystem(id),
-    getRecipesForSystem: (id) =>
-      manager
-        .getRecipes({ craftingSystemId: id })
-        .map((existing) => (existing.id === candidate.id ? candidate : existing)),
+    getRecipesForSystem: (id) => {
+      const cohort = manager.getRecipes({ craftingSystemId: id });
+      const substituted = cohort.map((existing) =>
+        existing.id === candidate.id ? candidate : existing
+      );
+      const stored = cohort.some((existing) => existing.id === candidate.id);
+      return stored ? substituted : [...substituted, candidate];
+    },
     getComponentsForSystem: (id) => systemManager.getComponentsForSystem(id),
   });
   return validator.validateRecipe(candidate, SYSTEM_ID).conflicts;
@@ -198,6 +205,24 @@ describe('the cached alchemy signature gate agrees with the full-audit oracle', 
     const expected = oracleConflicts(manager, systemManager, candidate).map((c) => c.message);
     assert.equal(expected.length, 4, 'the ordering assertion needs several conflicts');
     assert.deepEqual(manager._validateSignatures(candidate).errors, expected);
+  });
+
+  it('answers a NOT-YET-STORED candidate as an audit of the post-create cohort would', () => {
+    // Issue 1167: `createRecipe` and `importRecipes` gate before the recipe reaches the map,
+    // so the candidate has no stored copy to substitute for. It is appended instead, and the
+    // answer must match the unpruned audit pair for pair AND in audit order — including
+    // which side of each conflict the newcomer lands on, which the append position decides.
+    const { manager, systemManager } = makeManager({ recipes: COLLIDING_CORPUS });
+    const candidate = new Recipe(recipePayload('r-new', [['c1']]));
+
+    const expected = oracleConflicts(manager, systemManager, candidate).map((c) => c.message);
+    assert.equal(expected.length, 3, 'r-new collides with r-a, r-b and r-d’s second set');
+    assert.deepEqual(manager._validateSignatures(candidate).errors, expected);
+    assert.ok(
+      expected.every((message) => /and "Recipe r-new"/.test(message)),
+      `an appended candidate is the SECOND side of every pair: ${expected.join(' | ')}`
+    );
+    assert.ok(!manager.recipes.has('r-new'), 'the gate stores nothing');
   });
 
   it('answers an EDITED candidate from the indexed cohort, not from the filed conflicts', () => {
@@ -355,9 +380,7 @@ describe('the signature report invalidates when the world moves under it', () =>
     // The one mutation none of the other clauses can see, and the reason the recipe token is
     // consumed rather than inferred from the object graph: the map is the same object at the
     // same size, the system and its components are untouched, and the newcomer is disabled so
-    // the enabled cohort does not move either. Only `recipes:<systemId>` advanced — and
-    // without it the report's cohort map has no slot for the newcomer, so the gate would
-    // report NO conflict and let a colliding recipe be enabled.
+    // the enabled cohort does not move either. Only `recipes:<systemId>` advanced.
     const outsider = { ...recipePayload('r-x', [['c1']], { enabled: false }), craftingSystemId: 'other' };
     const { manager } = makeManager({ recipes: [...COLLIDING_CORPUS, outsider] });
     assert.equal(gateMessages(manager, 'r-e').length, 3, 'warm the report BEFORE the move');
@@ -369,7 +392,24 @@ describe('the signature report invalidates when the world moves under it', () =>
     assert.equal(
       gateMessages(manager, 'r-x').length,
       3,
-      'a stale cohort map would answer "no conflict" for a recipe it has never seen'
+      'the newcomer is scanned against the system it moved into'
+    );
+
+    // The assertion above no longer BINDS on its own: since issue 1167 a candidate the
+    // report has no slot for is appended to the scan rather than answered "no conflict", so
+    // it reads correctly from a stale report too. What a stale report cannot get right is
+    // what it tells a recipe it ALREADY holds, so the newcomer is enabled and an incumbent
+    // is asked — an answer that can only come from the report's own compiled entries.
+    manager.recipes.set(
+      'r-x',
+      new Recipe({ ...outsider, craftingSystemId: SYSTEM_ID, enabled: true })
+    );
+    manager._advanceRecipeRevision(SYSTEM_ID);
+
+    assert.equal(
+      gateMessages(manager, 'r-e').length,
+      4,
+      'a stale report would still report r-e colliding with three recipes, not four'
     );
   });
 
@@ -446,6 +486,23 @@ describe('the signature report invalidates when the world moves under it', () =>
     assert.equal(manager.revision(REVISION_SCOPES.recipesOfSystem(SYSTEM_ID)), before);
 
     assert.equal(gateMessages(manager, 'r-f').length, 3, 'r-f collides with r-a, r-b and r-d');
+
+    // As in the moved-in case above, that assertion stopped binding at issue 1167: a
+    // candidate absent from the report is appended to the scan, so it reads correctly from
+    // a stale one. An ENABLED direct write is the leg that still binds, because it changes
+    // what the report must tell every OTHER recipe.
+    manager.recipes.set('r-g', new Recipe(recipePayload('r-g', [['c1']])));
+    assert.equal(
+      manager.revision(REVISION_SCOPES.recipesOfSystem(SYSTEM_ID)),
+      before,
+      'the premise is still that NO token moved'
+    );
+
+    assert.equal(
+      gateMessages(manager, 'r-e').length,
+      4,
+      'a report that never saw the direct write would still report three colliders for r-e'
+    );
   });
 
   it('recompiles when the map is swapped for one of the SAME size', () => {
