@@ -402,6 +402,25 @@ When a single matched instance must be mutated (increment or consume), choose:
 2. Stable actor order tie-break.
 3. Stable item order tie-break.
 
+### One Candidate Collection Per Evaluation
+
+A corpus-wide visibility pass evaluates every enabled recipe against the SAME crafting actor and component-source actors.
+The candidate collection in step 3 of the Knowledge Access Algorithm MUST therefore be derivable from one walk of those actors' inventories per pass, not one walk per recipe.
+
+Two consequences are normative:
+
+- **The candidate walk MAY be narrowed by a prefilter, and that prefilter MUST be a superset.**
+An implementation may restrict the documents offered to the per-recipe matcher to those matching **any** of the crafting system's recipe-item definitions **union every legacy `linkedRecipeItemUuid` carried by a recipe in the pass**.
+That union is a superset of every individual recipe's match set, so the per-recipe matcher — which still decides each candidate — returns the identical set.
+Omitting the legacy leg makes the union a *subset* for un-migrated recipes and silently hides their books; the legacy leg is therefore part of the requirement, not an optimisation detail.
+- **Exhaustion MUST NOT re-collect a candidate set an access evaluation already produced.**
+A recipe's item-knowledge is exhausted when at least one matching copy is owned and every such copy has reached its own book's cap.
+Both numbers are already established by the Knowledge Access Algorithm, so a caller holding that result derives exhaustion from it.
+A result that owns no evidence — the GM bypass, which scans no inventory, or a mode that never evaluated knowledge — MUST be distinguishable from a genuine count of zero, and only the latter answers "not exhausted"; the former falls back to collecting candidates.
+
+These are read-path requirements only.
+Exact craft submission continues to revalidate against current documents before consumption, and no snapshot or prefilter is authoritative at consumption time.
+
 ## Learning Recipes
 
 ### Preconditions

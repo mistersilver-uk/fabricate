@@ -1,9 +1,10 @@
 import { FABRICATE_FLAG_NAMESPACE, getFabricateFlag, setFabricateFlag } from '../config/flags.js';
-import { indexedMembershipLookups } from '../utils/definitionIndex.js';
+import { indexedMembershipLookups, readDefinitionRevision } from '../utils/definitionIndex.js';
 import { recipeItemDefinitionsContaining } from '../utils/recipeItemMembership.js';
 import { itemMatchesRecipeItemSource, matchRecipeItemDefinition } from '../utils/sourceUuid.js';
 
 import { evaluatePrerequisites } from './characterPrerequisites.js';
+import { buildInventorySnapshot } from './inventorySnapshot.js';
 import { createDefaultPartyLearnPool } from './recipeItemPartyLearnPool.js';
 import {
   buildFlagMapFromEntries,
@@ -62,6 +63,11 @@ export class RecipeVisibilityService {
     this.recipeManager = recipeManager;
     this.craftingSystemManager = craftingSystemManager;
     this._partyLearnPool = partyLearnPool;
+    // Retained recipe -> member-book lookups (issue 1077). Null until first use; validity is
+    // the source array's identity + length + `definitionIndex` revision, so nothing here has
+    // to be cleared by a mutator. See `_memoRecipeItemDefinitions`.
+    this._recipeItemDefinitionMemo = null;
+    this._legacyMatchMemo = null;
   }
 
   _getCraftingSystem(recipe) {
@@ -136,6 +142,52 @@ export class RecipeVisibilityService {
     return actor?.testUserPermission?.(viewer, 'OWNER') === true;
   }
 
+  /**
+   * The book/scroll definitions a recipe belongs to, RETAINED per recipe so the array is
+   * stable across calls (issue 1077).
+   *
+   * Stability is not cosmetic here. `definitionIndex` keys its retained index on the
+   * candidate ARRAY OBJECT, and `recipeItemDefinitionsContaining` deliberately returns a
+   * FRESH array every time (it must — an index-backed `byRecipeId` hands back the shared
+   * bucket, which a caller must not be able to mutate). Handing that throwaway straight to
+   * the index meant the index was rebuilt once per (recipe x held item) pair: 122,501 index
+   * builds for one 5,000-recipe visibility pass on the committed `knowledge-corpus` profile.
+   * #1076's index was correct and simply never got the chance to hit. Memoising the RESULT
+   * here is what makes the array stable without giving the rule a second implementation.
+   *
+   * Validity follows `RecipeManager._recipeCohorts`' rule exactly — the source array's
+   * IDENTITY, its LENGTH, and `definitionIndex`'s own revision counter. That third clause is
+   * the one that matters: `CraftingSystemManager` rewrites indexed FIELDS of live definition
+   * elements (the `recipeIds` membership writers), which the first two clauses cannot see,
+   * and `tests/recipe-book-membership-basis.test.js` is what catches a memo that ignores it.
+   * @private
+   */
+  _memoRecipeItemDefinitions(system, recipe, compute) {
+    const definitions = system.recipeItemDefinitions || [];
+    const revision = readDefinitionRevision(definitions);
+    const cached = this._recipeItemDefinitionMemo;
+    const warm =
+      cached &&
+      cached.definitions === definitions &&
+      cached.length === definitions.length &&
+      cached.revision === revision;
+    const byRecipeId = warm ? cached.byRecipeId : new Map();
+    if (!warm) {
+      this._recipeItemDefinitionMemo = {
+        definitions,
+        length: definitions.length,
+        revision,
+        byRecipeId,
+      };
+    }
+    const key = String(recipe?.id || '');
+    const hit = byRecipeId.get(key);
+    if (hit) return hit;
+    const computed = compute(definitions, key);
+    byRecipeId.set(key, computed);
+    return computed;
+  }
+
   // The book/scroll definitions a recipe belongs to (issue 511 many-to-many). Returns a
   // SET — a recipe may live in several books, each with its own caps.
   //
@@ -151,14 +203,18 @@ export class RecipeVisibilityService {
   // `indexedMembershipLookups` keeps the `recipeIds[]` leg on the retained
   // `recipeId -> definitions` index (issue 1076), because this runs on EVERY access check
   // and a linear scan of the system's definitions here was a measurable per-check cost.
+  // The memo (issue 1077) retains the RESULT so the array handed on is stable; see
+  // `_memoRecipeItemDefinitions` for why that identity matters to the index.
   _getRecipeItemDefinitions(recipe) {
     const system = this._getCraftingSystem(recipe);
     if (!system) return [];
-    return recipeItemDefinitionsContaining(
-      system.recipeItemDefinitions || [],
-      recipe,
-      system.membershipResolvesByRecipeIds,
-      indexedMembershipLookups
+    return this._memoRecipeItemDefinitions(system, recipe, (definitions) =>
+      recipeItemDefinitionsContaining(
+        definitions,
+        recipe,
+        system.membershipResolvesByRecipeIds,
+        indexedMembershipLookups
+      )
     );
   }
 
@@ -205,7 +261,46 @@ export class RecipeVisibilityService {
     const legacyUuid = String(recipe?.linkedRecipeItemUuid || '').trim();
     if (!legacyUuid) return defs;
     if (defs.some((def) => String(def?.originItemUuid || '').trim() === legacyUuid)) return defs;
-    return [...defs, { id: null, originItemUuid: legacyUuid }];
+    // Retained beside the member list for the same reason it is: this array is handed
+    // straight to `matchRecipeItemDefinition`, which indexes it by object identity, so
+    // rebuilding it per matched item rebuilt the index per matched item (issue 1077).
+    const system = this._getCraftingSystem(recipe);
+    if (!system) return [...defs, { id: null, originItemUuid: legacyUuid }];
+    return this._memoLegacyMatchDefinitions(system, recipe, defs, legacyUuid);
+  }
+
+  /**
+   * The retained `[...memberBooks, syntheticLegacyEntry]` array for one legacy recipe.
+   * Shares {@link _memoRecipeItemDefinitions}' validity rule; keyed separately because the
+   * synthetic entry makes it a different array from the member list.
+   * @private
+   */
+  _memoLegacyMatchDefinitions(system, recipe, defs, legacyUuid) {
+    const definitions = system.recipeItemDefinitions || [];
+    const revision = readDefinitionRevision(definitions);
+    const cached = this._legacyMatchMemo;
+    const warm =
+      cached &&
+      cached.definitions === definitions &&
+      cached.length === definitions.length &&
+      cached.revision === revision;
+    const byRecipeId = warm ? cached.byRecipeId : new Map();
+    if (!warm) {
+      this._legacyMatchMemo = {
+        definitions,
+        length: definitions.length,
+        revision,
+        byRecipeId,
+      };
+    }
+    const key = String(recipe?.id || '');
+    const hit = byRecipeId.get(key);
+    // `defs` is itself memo-stable, so an identity check is enough to notice the member list
+    // being recomputed under us rather than trusting the revision alone.
+    if (hit && hit.defs === defs) return hit.matchDefinitions;
+    const matchDefinitions = [...defs, { id: null, originItemUuid: legacyUuid }];
+    byRecipeId.set(key, { defs, matchDefinitions });
+    return matchDefinitions;
   }
 
   // Resolve which member book an item IS, AND by which tier, through the one shared,
@@ -529,7 +624,60 @@ export class RecipeVisibilityService {
     return this._getRecipeItemCaps(null, definition || null);
   }
 
-  _collectCandidateItems(recipe, craftingActor, componentSourceActors = []) {
+  /**
+   * The owned documents that ARE one of `recipe`'s member books, in the deterministic
+   * (actor, item) order the learn/use paths select on.
+   *
+   * `snapshot` is an optional read optimisation and never a semantic one (issue 1077). Given
+   * one, this walks the snapshot's per-system book candidates — a SUPERSET of what any single
+   * recipe's matcher can accept, proven sound in `inventorySnapshot`'s header — instead of
+   * re-enumerating every source actor's whole inventory. The per-recipe matcher below is
+   * unchanged and still decides every entry, so the two paths return the identical array;
+   * only the number of items the matcher is offered differs. Without a snapshot the walk is
+   * exactly what it always was, which is what every direct caller (`learnRecipe`,
+   * `guardCraftStart`, the GM knowledge surfaces) still gets.
+   *
+   * @param {object} recipe
+   * @param {object|null} craftingActor
+   * @param {object[]} [componentSourceActors]
+   * @param {object|null} [snapshot] A snapshot built from THESE actors, or null.
+   * @returns {Array<{actor: object, item: object, actorOrder: number, itemOrder: number,
+   *   timesUsed: number}>}
+   * @private
+   */
+  _collectCandidateItems(recipe, craftingActor, componentSourceActors = [], snapshot = null) {
+    // A recipe belonging to no book — no `recipeIds` membership, no legacy `recipeItemId`
+    // and no `linkedRecipeItemUuid` — has an EMPTY match-definition set, and
+    // `matchRecipeItemDefinition` returns nothing for an empty set, so the walk below can
+    // only ever return `[]`. Answering that without touching inventory removes a full
+    // per-recipe inventory scan from every recipe of a system that does not gate on books
+    // at all, which is the common configuration (issue 1077).
+    if (!this._hasRecipeItemReference(recipe)) return [];
+
+    const matched = [];
+    for (const entry of this._candidateItemEntries(
+      craftingActor,
+      componentSourceActors,
+      snapshot,
+      recipe
+    )) {
+      if (!this._isMatchingRecipeItem(recipe, entry.item)) continue;
+      matched.push({ ...entry, timesUsed: this._getRecipeItemUsage(entry.item) });
+    }
+    return matched;
+  }
+
+  /**
+   * The `{actor, item, actorOrder, itemOrder}` records the candidate walk considers — the
+   * snapshot's prefiltered set when one is supplied, otherwise every held document.
+   * @private
+   */
+  _candidateItemEntries(craftingActor, componentSourceActors, snapshot, recipe) {
+    if (snapshot) {
+      const system = this._getCraftingSystem(recipe);
+      if (system) return snapshot.recipeItemCandidates(system);
+    }
+
     const actors = [];
     if (craftingActor) actors.push(craftingActor);
     for (const actor of componentSourceActors || []) {
@@ -538,21 +686,14 @@ export class RecipeVisibilityService {
       actors.push(actor);
     }
 
-    const matched = [];
-    for (const [actorIdx, actor] of actors.entries()) {
+    const entries = [];
+    for (const [actorOrder, actor] of actors.entries()) {
       const items = [...(actor.items || [])];
-      for (const [itemIdx, item] of items.entries()) {
-        if (!this._isMatchingRecipeItem(recipe, item)) continue;
-        matched.push({
-          actor,
-          item,
-          actorOrder: actorIdx,
-          itemOrder: itemIdx,
-          timesUsed: this._getRecipeItemUsage(item),
-        });
+      for (const [itemOrder, item] of items.entries()) {
+        entries.push({ actor, item, actorOrder, itemOrder });
       }
     }
-    return matched;
+    return entries;
   }
 
   // Drop candidate items that have reached their OWN book's use cap (issue 511
@@ -606,6 +747,7 @@ export class RecipeVisibilityService {
     craftingActor,
     componentSourceActors = [],
     knowledgeMode = null,
+    snapshot = null,
   }) {
     const system = this._getCraftingSystem(recipe);
     const knowledge = this._getKnowledgeConfig(system);
@@ -616,12 +758,21 @@ export class RecipeVisibilityService {
         hasLearned: true,
         hasMatchedItem: true,
         matchedItems: [],
+        // A GM collects no real items on this path, so it owns no evidence about
+        // exhaustion either. `null` (never `0`) keeps that distinguishable from a
+        // genuine "owns nothing" — see `isKnowledgeItemExhausted`.
+        candidateItemCount: null,
       };
     }
 
     const learnedMap = this._getLearnedMap(craftingActor);
     const hasLearned = !!learnedMap?.[recipe.id];
-    const allMatches = this._collectCandidateItems(recipe, craftingActor, componentSourceActors);
+    const allMatches = this._collectCandidateItems(
+      recipe,
+      craftingActor,
+      componentSourceActors,
+      snapshot
+    );
     // Each candidate is judged against its OWN book's use caps (per-book, issue 511).
     const matchedItems = this._filterNonExhausted(recipe, allMatches);
     const hasMatchedItem = matchedItems.length > 0;
@@ -640,6 +791,12 @@ export class RecipeVisibilityService {
       hasLearned,
       hasMatchedItem,
       matchedItems,
+      // How many matching copies were owned BEFORE per-book cap filtering. Carried so a
+      // caller that already has this result can answer "is this recipe's book knowledge
+      // exhausted?" without collecting the candidate set a second time (issue 1077): the
+      // answer is `candidateItemCount > 0 && matchedItems.length === 0`, which is exactly
+      // what `isKnowledgeItemExhausted` computes from its own rescan.
+      candidateItemCount: allMatches.length,
     };
   }
 
@@ -658,9 +815,25 @@ export class RecipeVisibilityService {
    * @param {object} args.recipe
    * @param {object|null} args.craftingActor
    * @param {object[]} [args.componentSourceActors]
+   * @param {object|null} [args.knowledge] A result of {@link evaluateKnowledgeAccess} for
+   *   this same recipe and actor set. When it carries evidence (`candidateItemCount`), the
+   *   answer is read from it and NO inventory is rescanned — the visibility pass already
+   *   collected exactly this candidate set and filtered it by the same per-book caps
+   *   (issue 1077). A caller with nothing to offer omits it and gets the original rescan.
    * @returns {boolean}
    */
-  isKnowledgeItemExhausted({ recipe, craftingActor, componentSourceActors = [] }) {
+  isKnowledgeItemExhausted({
+    recipe,
+    craftingActor,
+    componentSourceActors = [],
+    knowledge = null,
+  }) {
+    const owned = knowledge?.candidateItemCount;
+    if (typeof owned === 'number') {
+      // Owning nothing is an "unknown"/teaser state, not an exhausted one — the same
+      // reading the rescan below applies.
+      return owned > 0 && (knowledge.matchedItems?.length ?? 0) === 0;
+    }
     const allMatches = this._collectCandidateItems(recipe, craftingActor, componentSourceActors);
     if (allMatches.length === 0) return false;
     const nonExhausted = this._filterNonExhausted(recipe, allMatches);
@@ -840,9 +1013,18 @@ export class RecipeVisibilityService {
    * @param {object} params.viewer - The viewing user (`isGM` short-circuits to full access).
    * @param {object} [params.craftingActor]
    * @param {object[]} [params.componentSourceActors]
+   * @param {object|null} [params.snapshot] An {@link buildInventorySnapshot} result built from
+   *   THESE actors. A pure read optimisation for the knowledge branches — see
+   *   `_collectCandidateItems`. Omit it and the evaluation is byte-for-byte what it was.
    * @returns {{ visible: boolean, craftable: boolean, reason: string, knowledge?: object }}
    */
-  evaluateRecipeAccess({ recipe, viewer, craftingActor, componentSourceActors = [] }) {
+  evaluateRecipeAccess({
+    recipe,
+    viewer,
+    craftingActor,
+    componentSourceActors = [],
+    snapshot = null,
+  }) {
     const system = this._getCraftingSystem(recipe);
     if (!system) {
       return { visible: false, craftable: false, reason: 'missing-system' };
@@ -887,6 +1069,7 @@ export class RecipeVisibilityService {
               craftingActor,
               componentSourceActors,
               knowledgeMode: 'item',
+              snapshot,
             });
             revealedByMode = knowledge.hasMatchedItem;
           }
@@ -945,6 +1128,7 @@ export class RecipeVisibilityService {
             craftingActor,
             componentSourceActors,
             knowledgeMode,
+            snapshot,
           });
           visible = knowledge.granted || knowledge.hasMatchedItem;
           break;
@@ -976,18 +1160,85 @@ export class RecipeVisibilityService {
     return { visible: true, craftable: true, reason: 'ok', knowledge };
   }
 
+  /**
+   * The corpus-wide visibility pass: every enabled recipe a viewer may see, with its access.
+   *
+   * The knowledge branches of this pass used to re-enumerate every source actor's whole
+   * inventory PER RECIPE, so opening a crafting app against 5,000 book-gated recipes and a
+   * four-actor party performed 20,000 `actor.items` reads and 120,000 recipe-item match
+   * attempts (issue 1077). One snapshot is built here instead — one read of each actor, one
+   * book-candidate resolution per held document per system — and threaded down, which makes
+   * the per-recipe term proportional to the books actually held rather than to the whole
+   * inventory.
+   *
+   * The snapshot is a per-pass VALUE and is discarded when this returns; it is never a cache
+   * and cannot go stale. See `inventorySnapshot`'s header for why the item half is not
+   * keyed on #1076's revision tokens.
+   *
+   * @param {object} params
+   * @param {object} params.viewer
+   * @param {string} [params.craftingSystemId] Restrict to one system.
+   * @param {object|null} [params.craftingActor]
+   * @param {object[]} [params.componentSourceActors]
+   * @returns {Array<{recipe: object, access: object}>}
+   */
   getVisibleRecipes({ viewer, craftingSystemId, craftingActor, componentSourceActors = [] }) {
     const recipes = this.recipeManager.getRecipes({
       enabled: true,
       craftingSystemId,
     });
 
+    const snapshot = this._passSnapshot(recipes, craftingActor, componentSourceActors);
+
     return recipes
       .map((recipe) => ({
         recipe,
-        access: this.evaluateRecipeAccess({ recipe, viewer, craftingActor, componentSourceActors }),
+        access: this.evaluateRecipeAccess({
+          recipe,
+          viewer,
+          craftingActor,
+          componentSourceActors,
+          snapshot,
+        }),
       }))
       .filter((entry) => entry.access.visible);
+  }
+
+  /**
+   * The per-pass inventory snapshot a corpus-wide walk shares.
+   *
+   * Every legacy `linkedRecipeItemUuid` in the pass is collected up front and handed to the
+   * snapshot, because `_recipeItemMatchDefinitions` adds a synthetic definition for one and
+   * the snapshot's candidate superset must contain every definition any recipe's matcher
+   * could see. Miss those and an un-migrated recipe's book would be filtered out — the one
+   * way this optimisation could change an answer, so it is done here rather than assumed.
+   *
+   * @param {object[]} recipes
+   * @param {object|null} craftingActor
+   * @param {object[]} componentSourceActors
+   * @returns {object}
+   * @private
+   */
+  _passSnapshot(recipes, craftingActor, componentSourceActors) {
+    const legacyBySystem = new Map();
+    for (const recipe of recipes) {
+      const legacyUuid = String(recipe?.linkedRecipeItemUuid || '').trim();
+      if (!legacyUuid) continue;
+      const systemId = recipe?.craftingSystemId;
+      const bucket = legacyBySystem.get(systemId);
+      if (bucket) bucket.add(legacyUuid);
+      else legacyBySystem.set(systemId, new Set([legacyUuid]));
+    }
+
+    const snapshot = buildInventorySnapshot({
+      craftingActor,
+      componentSourceActors,
+      matchesRecipeItem: itemMatchesRecipeItemSource,
+    });
+    return {
+      recipeItemCandidates: (system) =>
+        snapshot.recipeItemCandidates(system, legacyBySystem.get(system?.id) ?? []),
+    };
   }
 
   // The System-Validity Gate's two facts for one system (spec §System-Validity
