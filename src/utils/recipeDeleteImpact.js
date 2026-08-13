@@ -58,6 +58,21 @@ function toArray(value) {
  * a non-empty `recipeIds`" predicate this replaced flipped in both directions, so the
  * caller threads the system's own marker down.
  *
+ * ── THE MEMBERSHIP RULE IS MAINTAINED IN FOUR PLACES, AND THIS IS ONE OF THEM ─────
+ * Do not read "mirrors X exactly" below as a statement about two functions. As of issue
+ * 1132 the same rule is implemented at four sites, and they are ALREADY unmirrored:
+ *
+ *   1. this function;
+ *   2. `CraftingSystemManager.getRecipeItemDefinitionsContaining`;
+ *   3. `CraftingSystemManager._resolveLegacyMembershipDefinition`;
+ *   4. `adminRecipeRowProjection._recipeItemDefinitionsContaining` — which has NO
+ *      `linkedRecipeItemUuid` → `originItemUuid` leg, while the other three do.
+ *
+ * Any change to what "this recipe item contains this recipe" means is a change to all four.
+ * Routing 2 and 4 through this leaf is the right end state and is a real refactor with its
+ * own regression surface, so it is deliberately NOT attempted here; it is recorded as the
+ * maintenance obligation it is rather than discovered from a defect later.
+ *
  * The legacy leg mirrors `CraftingSystemManager._resolveLegacyMembershipDefinition`
  * exactly, including its deliberate refusal to fall through: a PRESENT `recipeItemId`
  * resolves by definition id and the `linkedRecipeItemUuid` branch is not consulted even

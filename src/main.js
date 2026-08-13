@@ -3068,8 +3068,8 @@ class Fabricate {
    * **API change:** this used to return `undefined`.
    *
    * @param {string} recipeId - The recipe ID to delete
-   * @returns {Promise<{deleted: number, recipeIds: string[], recipeItemsPruned: number,
-   *   learnersAffected: number}>}
+   * @returns {Promise<{deleted: number, recipeIds: string[], recipeItemsAffected: number,
+   *   recipeItemsRewritten: number, learnersAffected: number}>}
    * @throws {Error} When Fabricate is not initialized, or `recipeId` names no recipe.
    */
   async deleteRecipe(recipeId) {

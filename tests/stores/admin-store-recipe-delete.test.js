@@ -79,7 +79,8 @@ function withDeleteRecorder(services, calls, result = null, thrown = null) {
         result || {
           deleted: recipeIds.length,
           recipeIds: [...recipeIds],
-          recipeItemsPruned: 0,
+          recipeItemsAffected: 0,
+          recipeItemsRewritten: 0,
           learnersAffected: 0,
         }
       );
@@ -108,7 +109,8 @@ describe('1132 adminStore.describeRecipeDelete', () => {
     // ONE book, not two: `primer` holds both selected recipes.
     assert.equal(impact.recipeItemsAffected, 1);
     assert.deepEqual(impact.recipeItemIds, ['primer']);
-    // ONE learner, not three: a1 learned both (counted once) and a3 is not writable.
+    // TWO learners, not three: a1 learned both (counted once), a2 learned r2, and a3 is
+    // not writable by this client.
     assert.equal(impact.learnersAffected, 2);
     assert.deepEqual([...impact.learnerIds].sort(), ['a1', 'a2']);
   });
@@ -192,7 +194,7 @@ describe('1132 adminStore.describeRecipeDelete — the divergence matrix', () =>
   it('AXIS 1 — membership basis: the stated recipe-item count is basis-aware', async () => {
     // On a LEGACY-basis system membership lives on the recipe's own `recipeItemId` scalar
     // and every `recipeIds` array is empty by construction. The write rewrites nothing —
-    // `recipeItemsPruned` is 0 — but the sentence "1 book or scroll will lose it" is still
+    // `recipeItemsRewritten` is 0 — but the sentence "1 book or scroll" is still
     // TRUE, because the book really does stop containing the recipe. Revision 2 of this
     // delta would have stated the number and pruned nothing while claiming they matched.
     const legacy = makeSystem({
@@ -297,15 +299,46 @@ describe('1132 adminStore.deleteRecipes', () => {
     assert.equal(result.deleted, 2);
   });
 
-  it('writes nothing when no selected id resolves', async () => {
+  // A DELETE THAT REACHED NOTHING REPORTS, and it is reachable with no failure at all: a
+  // concurrent client deleting the same recipes between the describe and the click empties
+  // the resolvable set. The store used to return the zero result in silence and the caller
+  // then returned `false`, so a GM who clicked delete and saw nothing happen was told
+  // nothing; only the `catch` surfaced anything at all (issue 1132, review round).
+  it('writes nothing, and SAYS so, when no selected id resolves', async () => {
     const calls = [];
-    const services = withDeleteRecorder(createServices(modernSystem(), threeRecipes()), calls);
+    const warnings = [];
+    const services = withDeleteRecorder(
+      createServices(modernSystem(), threeRecipes(), [], {
+        notify: { info: () => {}, warn: (message) => warnings.push(message), error: () => {} },
+      }),
+      calls
+    );
     const store = createAdminStore(services);
     await store.refresh();
 
     const result = await store.deleteRecipes(['ghost']);
     assert.equal(calls.length, 0);
     assert.equal(result.deleted, 0);
+    assert.equal(warnings.length, 1, 'the GM is told the delete reached nothing');
+    assert.ok(warnings[0], 'with a message, not an empty string');
+  });
+
+  it('reports a write that succeeded but deleted nothing, which is the same silence', async () => {
+    const calls = [];
+    const warnings = [];
+    const services = withDeleteRecorder(
+      createServices(modernSystem(), threeRecipes(), [], {
+        notify: { info: () => {}, warn: (message) => warnings.push(message), error: () => {} },
+      }),
+      calls,
+      { deleted: 0, recipeIds: [], recipeItemsAffected: 0, recipeItemsRewritten: 0, learnersAffected: 0 }
+    );
+    const store = createAdminStore(services);
+    await store.refresh();
+
+    const result = await store.deleteRecipes(['r1']);
+    assert.equal(result.deleted, 0);
+    assert.equal(warnings.length, 1);
   });
 
   it('reports what the WRITE returned, not what the statement predicted', async () => {
@@ -315,7 +348,8 @@ describe('1132 adminStore.deleteRecipes', () => {
     const services = withDeleteRecorder(createServices(modernSystem(), threeRecipes()), calls, {
       deleted: 2,
       recipeIds: ['r1', 'r2'],
-      recipeItemsPruned: 1,
+      recipeItemsAffected: 1,
+      recipeItemsRewritten: 1,
       learnersAffected: 2,
     });
     const store = createAdminStore(services);
@@ -325,9 +359,31 @@ describe('1132 adminStore.deleteRecipes', () => {
     assert.deepEqual(result, {
       deleted: 2,
       recipeIds: ['r1', 'r2'],
-      recipeItemsPruned: 1,
+      recipeItemsAffected: 1,
+      recipeItemsRewritten: 1,
       learnersAffected: 2,
     });
+  });
+
+  // BOTH recipe-item numbers reach the caller, and the LEGACY-BASIS shape is where it
+  // matters: the write rewrites nothing while the books genuinely stop containing the
+  // recipes, so a store that forwarded only the rewritten figure would leave the toast
+  // announcing no recipe-item consequence at all after a card that promised one.
+  it('forwards the number the CARD promised beside the number the write rewrote', async () => {
+    const calls = [];
+    const services = withDeleteRecorder(createServices(modernSystem(), threeRecipes()), calls, {
+      deleted: 2,
+      recipeIds: ['r1', 'r2'],
+      recipeItemsAffected: 1,
+      recipeItemsRewritten: 0,
+      learnersAffected: 2,
+    });
+    const store = createAdminStore(services);
+    await store.refresh();
+
+    const result = await store.deleteRecipes(['r1', 'r2']);
+    assert.equal(result.recipeItemsAffected, 1, 'the stated figure survives the store');
+    assert.equal(result.recipeItemsRewritten, 0, 'and the performed one is not conflated with it');
   });
 
   it('surfaces a refused write to the GM and returns the ZERO result, not a throw', async () => {
@@ -352,5 +408,166 @@ describe('1132 adminStore.deleteRecipes', () => {
     assert.equal(result.deleted, 0);
     assert.equal(errors.length, 1, 'the GM is told');
     assert.ok(errors[0], 'with a message, not an empty string');
+  });
+});
+
+describe('1132 adminStore.deleteRecipe — the studio SINGULAR', () => {
+  // A recipe lives in its OWN world setting and carries its own `craftingSystemId`, while
+  // the prune runs over `getSystem(systemId).recipeItemDefinitions`. The selection was being
+  // preferred over the recipe, so for a recipe whose system is not the selected one the
+  // recipe deleted, the prune ran over the WRONG system's definitions, found no containing
+  // definition, and the recipe's real book kept the dangling id — precisely the invariant
+  // this change exists to restore. The describer had the same skew, so the dialog stated
+  // zero impact while the delete proceeded. `game.fabricate.deleteRecipe` has always read
+  // the id off the recipe; the fallback order was simply inverted here.
+  function twoSystemServices(calls, dialogs) {
+    const other = makeSystem({
+      id: 'sys2',
+      name: 'System Two',
+      membershipResolvesByRecipeIds: true,
+      recipeItemDefinitions: [
+        { id: 'tome', name: 'Tome', originItemUuid: 'Item.ccc', recipeIds: ['x1'], caps: {} },
+      ],
+    });
+    const selected = modernSystem();
+    const systems = [selected, other];
+    const recipes = [...threeRecipes(), makeRecipe({ id: 'x1', name: 'Elsewhere', craftingSystemId: 'sys2' })];
+    const services = createServices(selected, recipes, [], {
+      confirmDialog: async (options) => {
+        dialogs.push(options);
+        return true;
+      },
+    });
+    const systemManager = services.getCraftingSystemManager();
+    services.getCraftingSystemManager = () => ({
+      ...systemManager,
+      getSystems: () => systems,
+      getSystem: (id) => systems.find((system) => system.id === id) || null,
+      deleteRecipes: async (systemId, recipeIds, options) => {
+        calls.push({ systemId, recipeIds: [...recipeIds], options });
+        return {
+          deleted: recipeIds.length,
+          recipeIds: [...recipeIds],
+          recipeItemsAffected: 0,
+          recipeItemsRewritten: 0,
+          learnersAffected: 0,
+        };
+      },
+    });
+    return services;
+  }
+
+  it("prunes against the RECIPE's system, not the selected one", async () => {
+    const calls = [];
+    const store = createAdminStore(twoSystemServices(calls, []));
+    await store.refresh();
+
+    await store.deleteRecipe('x1');
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].systemId, 'sys2', 'the recipe is the authority on its own system');
+    assert.deepEqual(calls[0].recipeIds, ['x1']);
+  });
+
+  it('states the impact against that same system, so the dialog cannot report a nought', async () => {
+    // The other half of the skew: describing against the SELECTED system finds `x1` in none
+    // of its definitions, so the dialog took the numberless branch for a delete that really
+    // does empty a book.
+    const dialogs = [];
+    const store = createAdminStore(twoSystemServices([], dialogs));
+    await store.refresh();
+
+    await store.deleteRecipe('x1');
+    assert.equal(dialogs.length, 1);
+    assert.match(
+      dialogs[0].content,
+      /removed from 1 of your books & scrolls/,
+      'the counted branch, computed against sys2, not the numberless one'
+    );
+  });
+
+  it("falls back to the selection only when the recipe names no system", async () => {
+    const calls = [];
+    const dialogs = [];
+    const services = twoSystemServices(calls, dialogs);
+    const orphan = makeRecipe({ id: 'orphan', name: 'Orphan', craftingSystemId: '' });
+    const recipeManager = services.getRecipeManager();
+    services.getRecipeManager = () => ({
+      ...recipeManager,
+      getRecipe: (id) => (id === 'orphan' ? orphan : recipeManager.getRecipe(id)),
+    });
+    const store = createAdminStore(services);
+    await store.refresh();
+
+    await store.deleteRecipe('orphan');
+    assert.equal(calls[0].systemId, 'sys1', 'the selection is the FALLBACK, not the authority');
+  });
+
+  it('passes the confirm shape DialogV2 actually reads, on both buttons', async () => {
+    // `services.confirmDialog` calls `DialogV2.confirm` WITHOUT `normalizeDialogOptions`, so
+    // a top-level `title` is read by nothing; and `DialogV2.confirm` merges `yes` and `no`
+    // over defaults carrying their own labels and callbacks, so a bare function contributes
+    // no own enumerable keys. `no: () => false` was harmless — the default `no.callback`
+    // already returns false — but it is the identical shape, and one of the pair left in the
+    // broken form is how the pattern comes back.
+    //
+    // VERSION NOTE for anyone extending this: the DEFAULT labels are the literals "Yes"/"No"
+    // on V13.351 and the i18n keys "COMMON.Yes"/"COMMON.No" on V14.365. Asserting a supplied
+    // label is version-independent; asserting a default one is not.
+    const dialogs = [];
+    const store = createAdminStore(twoSystemServices([], dialogs));
+    await store.refresh();
+
+    await store.deleteRecipe('r1');
+    const [options] = dialogs;
+    assert.equal(Object.hasOwn(options, 'title'), false, 'no top-level title, which nothing reads');
+    assert.ok(options.window?.title, 'the title lands at window.title');
+    assert.equal(typeof options.yes, 'object', 'yes is an object, so its label survives the merge');
+    assert.equal(typeof options.yes.callback, 'function');
+    assert.equal(typeof options.no, 'object', 'and so is no');
+    assert.equal(typeof options.no.callback, 'function');
+  });
+});
+
+describe('1132 adminStore learner-index freshness', () => {
+  // `updateActor` routes a `flags` diff to `scheduleKnowledgeRefresh`, which is a TOTAL
+  // no-op unless the Knowledge surface is open — so with the Recipe Studio open, a player
+  // learning from a scroll left the card understating "Will be forgotten by N characters"
+  // until an unrelated `refresh()`. Rebuilding at the hook would be a world walk per foreign
+  // module's flag write, so the hook MARKS and the next read that needs the index rebuilds.
+  it('rebuilds the index on the next read after an actor write marks it stale', async () => {
+    let actorReads = 0;
+    const services = createServices(modernSystem(), threeRecipes(), [], {
+      getWorldActors: () => {
+        actorReads += 1;
+        return globalThis.game.actors.contents;
+      },
+    });
+    const store = createAdminStore(services);
+    await store.refresh();
+
+    assert.equal(store.describeRecipeDelete(['r3']).learnersAffected, 0, 'nobody knows r3 yet');
+    const afterRefresh = actorReads;
+
+    // A player learns r3 from a scroll. Nothing in the manager has refreshed.
+    globalThis.game.actors.contents[1].flags.fabricate.fabricate.learnedRecipes.r3 = 1;
+    assert.equal(
+      store.describeRecipeDelete(['r3']).learnersAffected,
+      0,
+      'and without the mark the cached index cannot see it — which is what the mark is for'
+    );
+    assert.equal(actorReads, afterRefresh, 'and no walk happened, so the cache still holds');
+
+    store.markLearnedRecipeIndexStale();
+    assert.equal(actorReads, afterRefresh, 'marking itself walks nothing');
+    assert.equal(
+      store.describeRecipeDelete(['r3']).learnersAffected,
+      1,
+      'the next read that needs the index rebuilds it'
+    );
+    assert.equal(actorReads, afterRefresh + 1, 'exactly ONE walk, on the read');
+
+    store.describeRecipeDelete(['r3']);
+    store.describeRecipeDelete(['r1']);
+    assert.equal(actorReads, afterRefresh + 1, 'and the rebuild is not repeated per tick');
   });
 });

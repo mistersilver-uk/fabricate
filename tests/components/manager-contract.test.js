@@ -2959,7 +2959,7 @@ describe('CraftingSystemManager source contract', () => {
     // target document id — never a row index, which the asynchronous re-projection
     // would turn into a destructive misfire.
     assert.ok(
-      armedDangerButtonSource.includes('<button\n  type="button"'),
+      armedDangerButtonSource.includes('<button\n  bind:this={element}\n  type="button"'),
       'the armed confirmation should be a real button element'
     );
     assert.equal(
@@ -3035,8 +3035,23 @@ describe('CraftingSystemManager source contract', () => {
     // `updateActor` is key-filtered because it is noisy (every HP tick fires it);
     // learned recipes, usage counts and learn counts all live under `flags`.
     assert.ok(
-      appSource.includes("if ('flags' in diff) reprojectKnowledge();"),
+      appSource.includes("if ('flags' in diff) {"),
       "updateActor re-projects knowledge only on a 'flags' diff"
+    );
+    // `scheduleKnowledgeRefresh` is a TOTAL no-op unless the Knowledge surface is open, so
+    // the same diff must ALSO mark the Recipe Studio's learned-recipe index stale — that
+    // index is what the delete card's "Will be forgotten by N characters" counts through
+    // (issue 1132, review round). Marking is all it does: `updateActor` fires for every
+    // module's flag writes, so rebuilding here would be a world walk per foreign write.
+    assert.ok(
+      appSource.includes(
+        'const markLearnerIndexStale = () => this._adminStore?.markLearnedRecipeIndexStale?.();'
+      ),
+      'the actor hooks mark the learned-recipe index stale rather than rebuilding it'
+    );
+    assert.ok(
+      appSource.includes('markLearnerIndexStale();\n        reprojectKnowledge();'),
+      'and the flags branch does both'
     );
     // Parent CRUD is load-bearing, not belt-and-braces: an `Actor.create` carrying
     // `items[]` fires createActor and ZERO createItem.

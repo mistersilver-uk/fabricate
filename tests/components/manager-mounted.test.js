@@ -1959,7 +1959,8 @@ function createStore(calls = [], options = {}) {
         options.deleteRecipesResult ?? {
           deleted: ids.length,
           recipeIds: ids,
-          recipeItemsPruned: 1,
+          recipeItemsAffected: 1,
+          recipeItemsRewritten: 1,
           learnersAffected: 4,
         }
       );
@@ -1997,9 +1998,13 @@ function createStore(calls = [], options = {}) {
       }
       return { updated: ids.length, essenceIds: ids };
     },
+    // `deleteEssencesReject` is the twin of `deleteRecipesReject` above, and it is what makes
+    // the essence root's `finally` disarm detectable at all: with only a result option, the
+    // rejection branch has no way in and moving the disarm back into the `try` stays green.
     deleteEssences: (essenceIds) => {
       const ids = [...(essenceIds || [])];
       calls.push(['deleteEssences', ids]);
+      if (options.deleteEssencesReject) return Promise.reject(new Error('delete failed'));
       return options.deleteEssencesResult ?? { deleted: ids.length, blocked: [], recipesUpdated: 2 };
     },
     cancelEssenceDraft: () => {
@@ -8157,12 +8162,12 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(recipeDeleteButton(), 'but the panel now carries its own set delete');
     assert.match(
       target.querySelector('[data-recipe-bulk-impact-row="items"]').textContent,
-      /Removed from 2 books & scrolls/,
+      /Will be removed from 2 books & scrolls/,
       'the impact the store computed reaches the panel'
     );
     assert.match(
       target.querySelector('[data-recipe-bulk-impact-row="learners"]').textContent,
-      /Forgotten by 4 characters/
+      /Will be forgotten by 4 characters/
     );
   });
 
@@ -8283,13 +8288,14 @@ describe('CraftingSystemManager mounted behavior', () => {
       deleteRecipesResult: {
         deleted: 2,
         recipeIds: ['r1', 'r2'],
-        recipeItemsPruned: 1,
+        recipeItemsAffected: 1,
+        recipeItemsRewritten: 1,
         learnersAffected: 4,
       },
     });
 
     assert.deepEqual(messages, [
-      'Deleted 2 recipe(s), removed them from 1 recipe item(s), and 4 character(s) forgot them.',
+      'Deleted 2 recipe(s), removed them from 1 of your books & scrolls, and 4 character(s) forgot them.',
     ]);
     assert.ok(
       !target.querySelector('[data-recipe-bulk-delete-card]'),
@@ -8302,7 +8308,8 @@ describe('CraftingSystemManager mounted behavior', () => {
       deleteRecipesResult: {
         deleted: 1,
         recipeIds: ['r1'],
-        recipeItemsPruned: 0,
+        recipeItemsAffected: 0,
+        recipeItemsRewritten: 0,
         learnersAffected: 0,
       },
     });
@@ -8310,19 +8317,40 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.deepEqual(messages, ['Deleted 1 recipe(s).']);
   });
 
-  it('names the learners alone when the prune rewrote nothing', async () => {
-    // The legacy-basis shape: membership lives on the recipe and dies with it, so
-    // `recipeItemsPruned` is 0 while characters really did forget the recipes.
+  it('names the learners alone when NO book contained them', async () => {
     const { messages } = await deleteSelectedRecipeRows(['r1', 'r2'], {
       deleteRecipesResult: {
         deleted: 2,
         recipeIds: ['r1', 'r2'],
-        recipeItemsPruned: 0,
+        recipeItemsAffected: 0,
+        recipeItemsRewritten: 0,
         learnersAffected: 3,
       },
     });
 
     assert.deepEqual(messages, ['Deleted 2 recipe(s); 3 character(s) forgot them.']);
+  });
+
+  // THE LEGACY-BASIS SHAPE, AND THE NUMBER THE TOAST MUST READ. Under the legacy basis
+  // membership lives on the recipe and dies with it, so the write rewrites NO definition —
+  // `recipeItemsRewritten: 0` — while the books genuinely stop containing the recipes. The
+  // toast used to read the rewritten figure, so the card said "Will be removed from 1 book
+  // or scroll" and the toast then dropped the clause entirely, making the operation look as
+  // though it had done less than it promised (issue 1132, review round).
+  it('reports the recipe items the CARD promised, not the definitions the write rewrote', async () => {
+    const { messages } = await deleteSelectedRecipeRows(['r1', 'r2'], {
+      deleteRecipesResult: {
+        deleted: 2,
+        recipeIds: ['r1', 'r2'],
+        recipeItemsAffected: 1,
+        recipeItemsRewritten: 0,
+        learnersAffected: 0,
+      },
+    });
+
+    assert.deepEqual(messages, [
+      'Deleted 2 recipe(s) and removed them from 1 of your books & scrolls.',
+    ]);
   });
 
   it('returns the card to IDLE and keeps the selection when the write is refused', async () => {
@@ -8334,7 +8362,8 @@ describe('CraftingSystemManager mounted behavior', () => {
       deleteRecipesResult: {
         deleted: 0,
         recipeIds: [],
-        recipeItemsPruned: 0,
+        recipeItemsAffected: 0,
+        recipeItemsRewritten: 0,
         learnersAffected: 0,
       },
     });
@@ -8354,6 +8383,87 @@ describe('CraftingSystemManager mounted behavior', () => {
       'false',
       'and the busy face is cleared, not left as a stuck spinner over a live selection'
     );
+  });
+
+  // ── The impact is re-derived on a REPUBLISH, not only on a selection change ───────
+  //
+  // Everything `describeRecipeDelete` consults is invisible to the rune graph: the selected
+  // system id is a `svelte/store` read, the system comes out of a plain Map and the learner
+  // index is a plain `let`. So the selection was the derivation's only trigger, and the
+  // concrete drift was reachable inside this very panel — select three recipes, stage "add to
+  // Book X", Apply (the selection survives), and the card still stated the pre-apply book
+  // count while the confirm pruned the post-apply one (issue 1132, review round).
+  it('re-derives the impact when the store republishes underneath a live selection', async () => {
+    const calls = [];
+    const storeOptions = {
+      recipeDeleteImpact: {
+        deletable: 1,
+        deletableIds: ['r1'],
+        recipeItemsAffected: 2,
+        recipeItemIds: ['ri1', 'ri2'],
+        learnersAffected: 0,
+        learnerIds: [],
+      },
+    };
+    const store = createStore(calls, storeOptions);
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: { store, services: { openCurrentAdmin: () => {} } },
+    });
+    flushSync();
+    craftingParent().click();
+    await tick();
+    flushSync();
+    tickRecipeRow('r1');
+
+    const itemsRow = () => target.querySelector('[data-recipe-bulk-impact-row="items"]');
+    assert.match(itemsRow().textContent, /2 books & scrolls/, 'pre-condition');
+
+    // The world moves under the card and the store republishes, exactly as `refresh()` does.
+    // The SELECTION is untouched, which is the whole point.
+    storeOptions.recipeDeleteImpact = {
+      deletable: 1,
+      deletableIds: ['r1'],
+      recipeItemsAffected: 1,
+      recipeItemIds: ['ri1'],
+      learnersAffected: 0,
+      learnerIds: [],
+    };
+    store.viewState.update((state) => ({ ...state }));
+    await tick();
+    flushSync();
+
+    assert.match(
+      itemsRow().textContent,
+      /1 book or scroll/,
+      'the card states what the write would do NOW, not what it would have done when the row was ticked'
+    );
+  });
+
+  // ── The refused delete is ANNOUNCED, not just toasted (issue 1132, review round) ──
+  //
+  // Confirming disables the control, which moves focus to `document.body` and empties the
+  // card's live region. On the refused or no-op path the card is still mounted with the
+  // selection intact, so an assistive-technology user was left on `<body>` beside a
+  // re-enabled button with nothing said: the store's Foundry toast is not a live region this
+  // module controls, and nothing distinguished "deleted" from "refused".
+  it('announces the refusal through the card live region and re-arms nothing', async () => {
+    await deleteSelectedRecipeRows(['r1'], {
+      deleteRecipesResult: {
+        deleted: 0,
+        recipeIds: [],
+        recipeItemsAffected: 0,
+        recipeItemsRewritten: 0,
+        learnersAffected: 0,
+      },
+    });
+
+    const region = target.querySelector('[data-recipe-bulk-delete-announce]');
+    assert.ok(Boolean(region), 'the card is still mounted, so the region is there to speak');
+    assert.match(region.textContent, /Failed to delete the selected recipes/);
+    assert.equal(recipeDeleteButton().getAttribute('data-armed'), 'false');
   });
 
   it('clears the busy flag even when the action REJECTS, so the card cannot stick', async () => {
@@ -10357,6 +10467,86 @@ describe('CraftingSystemManager mounted behavior', () => {
       ['earth', 'water'],
       'and it deletes EVERY selected member, carried or not'
     );
+  });
+
+  // ── The essence root's two no-write exits (issue 1132, review round) ──────────────
+  //
+  // Both guards were CORRECTED for the essence path by this change and both shipped with
+  // ZERO coverage: the component twin is gated by its own zero-result case and the recipe
+  // twin by a zero result and a rejection, while `deleteEssencesResult` was exposed by the
+  // store double and supplied by nothing in the suite. Reverting
+  // `Number(result?.deleted) || 0; if (deleted === 0)` to `if (!result)`, and moving
+  // `essenceBulkDeleteArmed = false` out of the `finally` and back into the `try`, were both
+  // green mutations. A fix the suite cannot see is not closed.
+  async function deleteSelectedEssenceRows(ids, options = {}) {
+    const messages = [];
+    const calls = [];
+    const previousUi = globalThis.ui;
+    globalThis.ui = { notifications: { info: (message) => messages.push(message) } };
+    try {
+      target = document.createElement('div');
+      document.body.appendChild(target);
+      mounted = mount(Component, {
+        target,
+        props: { store: createStore(calls, options), services: { openCurrentAdmin: () => {} } },
+      });
+      flushSync();
+      navButton('Essences').click();
+      await tick();
+      flushSync();
+      for (const id of ids) {
+        target.querySelector(`[data-essence-select="${id}"]`).click();
+        await tick();
+        flushSync();
+      }
+      const button = () =>
+        target.querySelector('[data-essence-bulk-delete-card] .manager-button.is-danger');
+      button().click();
+      await tick();
+      flushSync();
+      button().click();
+      await tick();
+      await tick();
+      flushSync();
+      return { messages, calls, button };
+    } finally {
+      if (previousUi === undefined) delete globalThis.ui;
+      else globalThis.ui = previousUi;
+    }
+  }
+
+  it('reports NO essence success and keeps the selection when the write deleted nothing', async () => {
+    // The store returns its zero result — an OBJECT, and therefore truthy — on a failed
+    // write, after raising its own error toast. A bare `if (!result)` guard lets that through
+    // as success: the selection clears and the GM reads "Deleted 0 essence(s)" underneath the
+    // error, with the rows still in the library.
+    const { messages, button } = await deleteSelectedEssenceRows(['water'], {
+      deleteEssencesResult: { deleted: 0, blocked: [], recipesUpdated: 0 },
+    });
+
+    assert.deepEqual(messages, [], 'nothing was deleted, so nothing is announced');
+    assert.ok(
+      Boolean(target.querySelector('[data-essence-bulk-delete-card]')),
+      'and the selection survives, so the GM can see what did not happen and retry'
+    );
+    assert.equal(
+      button().getAttribute('data-armed'),
+      'false',
+      'but the arm is spent — a still-armed button would delete on the next single click'
+    );
+  });
+
+  it('clears the essence arm even when the action REJECTS, so the card cannot stick', async () => {
+    // The disarm has to live in the `finally`: in the `try`, after the await, a rejection
+    // skips it and leaves an ARMED button that deletes on the next single click.
+    const { messages, button } = await deleteSelectedEssenceRows(['water'], {
+      deleteEssencesReject: true,
+    });
+
+    assert.deepEqual(messages, []);
+    assert.equal(button().getAttribute('data-armed'), 'false');
+    assert.equal(button().getAttribute('data-busy'), 'false');
+    assert.equal(button().disabled, false, 'and the control is live again');
   });
 
   it('applies a staged essence bulk edit with falsy-but-real axes', async () => {

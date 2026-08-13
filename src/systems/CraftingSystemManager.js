@@ -5593,8 +5593,8 @@ export class CraftingSystemManager {
   }
 
   /**
-   * Delete a SET of recipes and everything that deletion reaches, in ONE `recipes` write,
-   * ONE `craftingSystems` write and ONE actor-flag pass (issue 1132).
+   * Delete a SET of recipes and everything that deletion reaches, in at most ONE `recipes`
+   * write, at most ONE `craftingSystems` write and ONE actor-flag CLEAN-UP (issue 1132).
    *
    * **It lives here and not on `RecipeManager` because `RecipeManager` READS systems and
    * never WRITES them.** Write ownership of the `craftingSystems` setting, and `save()` on
@@ -5616,12 +5616,14 @@ export class CraftingSystemManager {
    *   and is precisely the orphan `game.fabricate.deleteRecipe` most needs to reach.
    * @param {Iterable<string>} recipeIds A stale id is skipped, not thrown.
    * @param {{notify?: boolean, emitChange?: boolean, notifySystems?: boolean}} [options]
-   * @returns {Promise<{deleted: number, recipeIds: string[], recipeItemsPruned: number,
-   *   learnersAffected: number}>} `recipeItemsPruned` counts the definitions actually
-   *   REWRITTEN, which is zero on a legacy-basis system; the figure the GM is shown is the
-   *   basis-aware count of recipe items that will no longer contain them, from
-   *   `describeRecipeDeleteImpact`. See `utils/recipeDeleteImpact.js` for why those two are
-   *   different questions rather than a drift.
+   * @returns {Promise<{deleted: number, recipeIds: string[], recipeItemsAffected: number,
+   *   recipeItemsRewritten: number, learnersAffected: number}>} BOTH recipe-item numbers,
+   *   because they answer different questions and the GM was promised the first one:
+   *   `recipeItemsAffected` is the basis-aware count of recipe items that will no longer
+   *   contain these recipes — the figure the card states — and `recipeItemsRewritten` counts
+   *   the definitions the write actually rewrote, which is zero on a legacy-basis system.
+   *   See `utils/recipeDeleteImpact.js` for why those two are different questions rather
+   *   than a drift.
    */
   async deleteRecipes(systemId, recipeIds, options = {}) {
     this._assertGM('delete recipes');
@@ -5650,6 +5652,16 @@ export class CraftingSystemManager {
    *    explicitly revoked. There is no client-side preflight on the update path, the write
    *    genuinely throws, and it is not swallowed — such a caller must mutate no actor flags.
    *
+   * **The `craftingSystems` half takes a restore point, exactly as the `recipes` half does.**
+   * The prune mutates the LIVE `entry.definition.recipeIds` in `this.systems` and then
+   * saves; a refused second write would otherwise leave this client showing pruned state
+   * while every peer still reads the dangling ids, until an unrelated later save happened to
+   * persist it. `RecipeManager.deleteRecipes` snapshots and restores its map for the same
+   * reason. The exposure is narrow — the ordering above means a revoked `SETTINGS_MODIFY`
+   * throws at step 1, before any system is touched — so this covers a transient failure of
+   * the second write alone. The snapshot is per-pruned-definition and shallow, which is
+   * enough: the mutation is a whole-array replacement of one field.
+   *
    * **The `craftingSystems` write must not touch the membership-basis marker.**
    * {@link CraftingSystemManager#updateRecipeItemDefinition} is the single choke point for
    * it (issue 1011) and looping that would be N `craftingSystems` writes AND would flip a
@@ -5675,8 +5687,8 @@ export class CraftingSystemManager {
    *   afterwards, and a prune written against a copy would be clobbered by those saves.
    * @param {Iterable<string>} recipeIds
    * @param {{notify?: boolean, emitChange?: boolean, notifySystems?: boolean}} [options]
-   * @returns {Promise<{deleted: number, recipeIds: string[], recipeItemsPruned: number,
-   *   learnersAffected: number}>}
+   * @returns {Promise<{deleted: number, recipeIds: string[], recipeItemsAffected: number,
+   *   recipeItemsRewritten: number, learnersAffected: number}>}
    * @private
    */
   async _deleteRecipeSet(system, recipeIds, options = {}) {
@@ -5685,7 +5697,13 @@ export class CraftingSystemManager {
       .map((recipeId) => this.recipeManager?.getRecipe?.(recipeId))
       .filter(Boolean);
     if (recipes.length === 0) {
-      return { deleted: 0, recipeIds: [], recipeItemsPruned: 0, learnersAffected: 0 };
+      return {
+        deleted: 0,
+        recipeIds: [],
+        recipeItemsAffected: 0,
+        recipeItemsRewritten: 0,
+        learnersAffected: 0,
+      };
     }
     const doomedIds = recipes.map((recipe) => String(recipe.id));
 
@@ -5716,31 +5734,58 @@ export class CraftingSystemManager {
     // each of its two writes: the guarantee is at most ONE write of each, not one write
     // unconditionally. On a legacy-basis system that is every time, and it is a theorem
     // rather than a basis check — see `planRecipeItemMembershipPrune`.
+    const membershipRestore = plan.prunes.map((entry) => [
+      entry.definition,
+      entry.definition.recipeIds,
+    ]);
     for (const entry of plan.prunes) {
       entry.definition.recipeIds = this._normalizeMembershipRecipeIds(entry.recipeIds);
     }
-    const recipeItemsPruned = plan.prunes.length;
-    if (recipeItemsPruned > 0) await this.save();
+    const recipeItemsRewritten = plan.prunes.length;
+    if (recipeItemsRewritten > 0) {
+      try {
+        await this.save();
+      } catch (error) {
+        // Put the live definitions back before rethrowing: this client must not go on
+        // rendering a prune the world never received.
+        for (const [definition, recipeIds] of membershipRestore) definition.recipeIds = recipeIds;
+        throw error;
+      }
+    }
 
     // ---- 3. actor flags ---------------------------------------------------------------
+    // ONE clean-up, which is TWO writable-actor walks: `CraftingRunManager.cleanupInvalidRuns`
+    // and then `RecipeVisibilityService.cleanupLearnedRecipes`. Pre-existing and correct —
+    // they clear different stores — but it is one clean-up per SET rather than per recipe,
+    // which is the batching claim, and "a single actor-flag pass" was never true of it.
     await this.recipeManager.cleanupOrphanedRecipeFlags?.();
 
     // ---- 4. both change hooks ---------------------------------------------------------
-    if (recipeItemsPruned > 0 && options.notifySystems !== false) this._notifySystemsChanged();
+    if (recipeItemsRewritten > 0 && options.notifySystems !== false) this._notifySystemsChanged();
     if (options.emitChange !== false) {
       // The payload shape is the singular `{recipeId}` widened to the id SET. Confirmed
       // safe: `_notifyRecipesChanged` spreads `details`, a plural `recipeIds` payload
-      // already exists on the bulk edit above, and every listener is arity-0.
-      this.recipeManager.notifyRecipesChanged?.({
-        action: 'delete',
-        recipeIds: outcome.recipeIds,
-      });
+      // already exists on the bulk edit above, and every in-repo listener is arity-0.
+      //
+      // The SINGULAR key is emitted too when the set holds exactly one id, so the payload
+      // does not become path-dependent: `RecipeManager.deleteRecipe` is still live for
+      // `deleteSystem` and the importer and emits `{…, recipeId}`, and "every listener is
+      // arity-0" is a fact about THIS repo, not about a third-party module reading the hook.
+      const details = { action: 'delete', recipeIds: outcome.recipeIds };
+      if (outcome.recipeIds.length === 1) details.recipeId = outcome.recipeIds[0];
+      this.recipeManager.notifyRecipesChanged?.(details);
     }
 
     return {
       deleted: outcome.deleted,
       recipeIds: outcome.recipeIds,
-      recipeItemsPruned,
+      // BOTH numbers. `plan.affectedIds` is what the card promised the GM and was being
+      // computed and discarded, so the toast reported the implementation figure instead:
+      // on a legacy-basis system the card read "Will be removed from 1 book or scroll" and
+      // the toast then omitted the clause entirely, making the operation look as though it
+      // had done less than it said it would.
+      recipeItemsAffected: plan.affectedIds.length,
+      recipeItemsRewritten,
       learnersAffected: learnerIds.length,
     };
   }

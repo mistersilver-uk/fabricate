@@ -1358,15 +1358,31 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
     if (this._userHooks) return;
     const reproject = () => this._adminStore?.refreshAccessRosters?.();
     const reprojectKnowledge = () => this._adminStore?.scheduleKnowledgeRefresh?.();
+    // `scheduleKnowledgeRefresh` is a TOTAL no-op unless the Knowledge surface is open, so
+    // before this the learned-recipe index the Recipe Studio's delete card counts through
+    // was rebuilt only by a full `refresh()`. With the studio open, a player learning from
+    // a scroll left the card understating "Will be forgotten by N characters" (issue 1132,
+    // review round). Marking is deliberately all this does: `updateActor` fires for EVERY
+    // module's flag writes, so rebuilding the index here would be a world walk per foreign
+    // write, and republishing to make it visible would re-derive the whole manager on the
+    // same cadence. The store rebuilds on the next read that needs it.
+    const markLearnerIndexStale = () => this._adminStore?.markLearnedRecipeIndexStale?.();
     const reprojectOnActorCrud = () => {
       reproject();
+      markLearnerIndexStale();
       reprojectKnowledge();
     };
     const reprojectOnRelevantActorChange = (_actor, changed) => {
       const diff = changed || {};
+      // `ownership` also moves the WRITABLE-actor set the index is built over, so it marks
+      // the index stale as well as re-projecting the access rosters.
+      if ('ownership' in diff) markLearnerIndexStale();
       if ('ownership' in diff || 'name' in diff || 'img' in diff) reproject();
       // Learned recipes, usage counts and learn counts all live under `flags`.
-      if ('flags' in diff) reprojectKnowledge();
+      if ('flags' in diff) {
+        markLearnerIndexStale();
+        reprojectKnowledge();
+      }
     };
     // An Item embedded in a COMPENDIUM Actor also has an Actor parent and could
     // never change the projection. `Document#pack` falls back to `this.parent?.pack`,

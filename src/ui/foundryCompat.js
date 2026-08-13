@@ -16,6 +16,32 @@ export function getDragEventData(event) {
   return null;
 }
 
+/**
+ * A yes/no confirmation, straight through to `DialogV2.confirm`.
+ *
+ * TWO SHAPE TRAPS, and both have shipped (issue 1132). `DialogV2.confirm` is NOT routed
+ * through `normalizeDialogOptions` below, so:
+ *
+ *  - the title must be passed at `window.title`. `ApplicationV2` reads
+ *    `this.options.window.title`, and nothing here maps a top-level `title` onto it, so a
+ *    caller passing `{ title }` renders an EMPTY title bar;
+ *  - `yes` and `no` must be OBJECTS. `DialogV2.confirm` merges each over a default carrying
+ *    `label: "COMMON.Yes"` / `"COMMON.No"`, and a function contributes no own enumerable
+ *    keys — so a bare `yes: () => true` leaves a destructive confirm reading the generic
+ *    *Yes*. (The default labels are the literals `"Yes"`/`"No"` on V13.351 and the i18n keys
+ *    `"COMMON.Yes"`/`"COMMON.No"` on V14.365; a caller supplying its own label is unaffected
+ *    by that difference, and a TEST asserting a default label is version-sensitive.)
+ *
+ * **When these are swept across the remaining call sites, do NOT reuse
+ * `normalizeDialogOptions` for it.** That function injects
+ * `buttons: [{ action: 'close', … }]` when `buttons` is absent, and `DialogV2.confirm` then
+ * does `config.buttons ??= []; config.buttons.unshift(yes, no)` — so routing confirms
+ * through it renders a THREE-button confirm on every site. The unifying fix is a narrow
+ * top-level-`title` → `window.title` mapping here.
+ *
+ * @param {object} options
+ * @returns {Promise<boolean>}
+ */
 export async function confirmDialog(options) {
   const DialogV2 = foundry.applications?.api?.DialogV2;
   if (!DialogV2?.confirm) return false;

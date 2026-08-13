@@ -211,6 +211,13 @@
   // a mounted assertion would pass on behaviour that does not hold in Foundry.
   let recipeBulkDeleting = $state(false);
   let recipeBulkDeleteArmed = $state(false);
+  // What a FINISHED delete that left the card mounted has to say for itself. Confirming
+  // disables the control, which moves focus to `document.body` and empties the card's live
+  // region, so on the refused or no-op path an assistive-technology user is left on `<body>`
+  // beside a re-enabled button with nothing announced — the Foundry error toast is not a
+  // live region this module controls. The card announces this and takes focus back; it is
+  // cleared on the next arm so a second refusal speaks again.
+  let recipeBulkDeleteOutcome = $state('');
   // The essence library's lifted view-state (issue 1036) — the third and last studio to get
   // one, and the fix for criterion 12. Search, status, source, sort, view mode, page and
   // the bulk selection all lived inside `EssenceBrowserView`, so opening an essence
@@ -1902,16 +1909,34 @@
   // needs the system's definitions with its membership basis, neither of which is in the
   // row projection — and the store counts through the SAME leaf the write executes
   // through, so the stated numbers cannot drift from the performed ones.
-  const recipeBulkDeleteImpact = $derived(
-    store.describeRecipeDelete?.(recipeBulkSelectedIds) ?? {
-      deletable: 0,
-      deletableIds: [],
-      recipeItemsAffected: 0,
-      recipeItemIds: [],
-      learnersAffected: 0,
-      learnerIds: [],
-    }
-  );
+  //
+  // THE `$viewState` READ IS A DEPENDENCY, NOT A LEFTOVER (review round). Everything
+  // `describeRecipeDelete` consults is invisible to the rune graph — `get(selectedSystemId)`
+  // is a `svelte/store` read, `getSystem()` walks a plain Map, and the learner index is a
+  // plain `let` — so the selection was the derivation's ONLY trigger. Concretely: select
+  // three recipes, stage "add to Book X" in this same panel, Apply (the selection survives;
+  // only a count reaching zero discards state) and the card still read "Will be removed
+  // from 1 book or scroll" while the confirm pruned two. Taking the projection the store
+  // republishes on every `refresh()` makes the card recompute whenever the world it counts
+  // over has been re-read. It does NOT make the card recompute on an external actor-flag
+  // write with no refresh behind it — the store's stale-index marker is the other half of
+  // that, see `adminStore.markLearnedRecipeIndexStale`.
+  //
+  // Deliberately NOT applied to `componentBulkDeleteImpact` above: that path ships as it is,
+  // and widening its dependency is a change to a shipped studio this change does not owe.
+  const recipeBulkDeleteImpact = $derived.by(() => {
+    void $viewState;
+    return (
+      store.describeRecipeDelete?.(recipeBulkSelectedIds) ?? {
+        deletable: 0,
+        deletableIds: [],
+        recipeItemsAffected: 0,
+        recipeItemIds: [],
+        learnersAffected: 0,
+        learnerIds: [],
+      }
+    );
+  });
   // Discard the staged draft whenever the selection empties — a clear, a system switch, a
   // prune that removed the last id, or a successful apply. The panel is unmounted at that
   // point, so this is the only place the discard can honestly happen.
@@ -4515,6 +4540,14 @@
   // card to IDLE — disarmed, not busy — with the selection intact, so the GM can see what
   // they were about to delete and try again. A stuck spinner over a live selection would be
   // worse than the failure.
+  // Arming CLEARS the previous outcome, so the card's live region is free to announce the
+  // next one. Without it a second refusal would re-insert identical text, which a live
+  // region does not speak.
+  function armRecipeBulkDelete() {
+    recipeBulkDeleteOutcome = '';
+    recipeBulkDeleteArmed = true;
+  }
+
   async function deleteSelectedRecipes(ids) {
     if (recipeBulkDeleting) return false;
     const targets = Array.isArray(ids) ? ids : [];
@@ -4527,7 +4560,17 @@
       // delete clear the selection and report "Deleted 0 recipe(s)" on top of the error
       // toast the store already raised.
       const deleted = Number(result?.deleted) || 0;
-      if (deleted === 0) return false;
+      if (deleted === 0) {
+        // The card survives this path, so the outcome is announced through the card's own
+        // live region and focus goes back to the control. The store has already raised the
+        // Foundry toast; a toast is not a live region, so without this the GM's keyboard is
+        // on `<body>` and nothing at all has been said.
+        recipeBulkDeleteOutcome = text(
+          'FABRICATE.Admin.Manager.Recipe.BulkEdit.DeleteFailed',
+          'Failed to delete the selected recipes.'
+        );
+        return false;
+      }
       clearRecipeBulkSelection();
       notifyInfo(recipeBulkDeletedMessage(result));
       return true;
@@ -4536,6 +4579,10 @@
       // elsewhere. Swallowing it at the boundary keeps an unhandled rejection out of a
       // click handler that has no caller to receive it.
       console.error('Fabricate | Failed to delete the selected recipes:', err);
+      recipeBulkDeleteOutcome = text(
+        'FABRICATE.Admin.Manager.Recipe.BulkEdit.DeleteFailed',
+        'Failed to delete the selected recipes.'
+      );
       return false;
     } finally {
       // Both live here so the paragraph above stays true on EVERY exit. A disarm sitting in
@@ -4547,26 +4594,32 @@
   }
 
   // The post-delete report, and the only feedback that survives the panel unmounting on a
-  // successful delete. Every NON-ZERO outcome is named: `recipeItemsPruned` is the number of
-  // recipe items actually rewritten and `learnersAffected` the characters who lost the
-  // knowledge, and each is omitted when zero rather than stated as ", removing them from 0
-  // recipe items", which reads as a warning about nothing. The four-way table is explicit
-  // rather than assembled from a localized join word, which is the part of a sentence a
-  // translator is least able to place.
+  // successful delete. Every NON-ZERO outcome is named, and each is omitted when zero rather
+  // than stated as ", removing them from 0 books & scrolls", which reads as a warning about
+  // nothing. The four-way table is explicit rather than assembled from a localized join
+  // word, which is the part of a sentence a translator is least able to place.
+  //
+  // IT REPORTS `recipeItemsAffected`, THE NUMBER THE CARD PROMISED — not
+  // `recipeItemsRewritten`, the definitions the write actually rewrote (review round). The
+  // two-number design is right and both names are right; surfacing the IMPLEMENTATION figure
+  // to the GM was the defect. On a legacy-basis system membership lives on the recipe and
+  // dies with it, so nothing is rewritten while the books really do stop containing the
+  // recipes: the card read "Will be removed from 1 book or scroll" and the toast then
+  // dropped the clause, making the operation look as though it had done less than it said.
   function recipeBulkDeletedMessage(result) {
     const count = Number(result?.deleted) || 0;
-    const items = Number(result?.recipeItemsPruned) || 0;
+    const items = Number(result?.recipeItemsAffected) || 0;
     const learners = Number(result?.learnersAffected) || 0;
     let template;
     if (items > 0 && learners > 0) {
       template = text(
         'FABRICATE.Admin.Manager.Recipe.BulkEdit.DeletedWithItemsAndLearners',
-        'Deleted {count} recipe(s), removed them from {items} recipe item(s), and {learners} character(s) forgot them.'
+        'Deleted {count} recipe(s), removed them from {items} of your books & scrolls, and {learners} character(s) forgot them.'
       );
     } else if (items > 0) {
       template = text(
         'FABRICATE.Admin.Manager.Recipe.BulkEdit.DeletedWithItems',
-        'Deleted {count} recipe(s) and removed them from {items} recipe item(s).'
+        'Deleted {count} recipe(s) and removed them from {items} of your books & scrolls.'
       );
     } else if (learners > 0) {
       template = text(
@@ -11005,10 +11058,11 @@
               deleting={recipeBulkDeleting}
               deleteArmed={recipeBulkDeleteArmed}
               deleteImpact={recipeBulkDeleteImpact}
+              deleteOutcome={recipeBulkDeleteOutcome}
               onDraftChange={(next) => stageRecipeBulkDraft(next)}
               onClearSelection={() => clearRecipeBulkSelection()}
               onApply={() => applyRecipeBulkEdit()}
-              onArmDelete={() => (recipeBulkDeleteArmed = true)}
+              onArmDelete={() => armRecipeBulkDelete()}
               onDisarmDelete={() => (recipeBulkDeleteArmed = false)}
               onDelete={(ids) => deleteSelectedRecipes(ids)}
             />
