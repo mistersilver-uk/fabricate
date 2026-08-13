@@ -194,11 +194,93 @@ describe('1129/copy the singular delete dialog states the same arithmetic', () =
       disabled: 1,
     });
     assert.match(sentence, /2 recipe\(s\)/);
-    assert.match(sentence, /1 of them/);
+    assert.match(sentence, /1 of those recipes/);
     assert.match(sentence, /Iron/);
   });
 
   it('titles the dialog with the component name', () => {
     assert.equal(interpolate(deleteConfirm.Title, { name: 'Iron' }), 'Delete Iron?');
+  });
+});
+
+describe('1156/copy the component delete dialog uses correct verb agreement at disabled: 1', () => {
+  it('uses singular "is" when disabled count is 1', () => {
+    const sentence = interpolate(deleteConfirm.ContentDisabledOne, {
+      name: 'Iron',
+      recipes: 2,
+    });
+    assert.match(
+      sentence,
+      /1 of those recipes is enabled today/,
+      'singular verb "is" at disabled: 1'
+    );
+    assert.ok(!sentence.includes('are enabled today'), 'not plural "are"');
+    assert.match(sentence, /2 recipe\(s\)/);
+    assert.match(sentence, /Iron/);
+  });
+
+  it('reads the ContentDisabledOne string in full at disabled: 1', () => {
+    const sentence = interpolate(deleteConfirm.ContentDisabledOne, {
+      name: 'Iron',
+      recipes: 2,
+    });
+    assert.equal(
+      sentence,
+      'Delete component Iron? 2 recipe(s) will be rewritten, and 1 of those recipes is enabled today and will be disabled. Deleting is permanent — a component you recreate is a new component.'
+    );
+  });
+});
+
+// Issue 1156: the singular delete dialog stated both consequence figures unconditionally, so
+// the commonest single delete of all — a component no recipe references — read "This rewrites
+// 0 recipe(s) and disables 0 of them." The recipe dialog fixed this for its own three
+// consequences in #1152 and added the `ui-integration` clause making zero-omission the rule
+// for every studio's singular dialog; this is the component sibling of that fix.
+describe('1156/copy the component delete dialog omits zero consequences', () => {
+  // THREE BRANCHES, NOT FOUR: `describeComponentDeleteImpact` only ever counts a recipe as
+  // disabled when it is also counted as rewritten (a recipe cannot be disabled by a delete
+  // without also being rewritten by it), so `disabled > 0` implies `recipes > 0` — there is
+  // no reachable branch where only the disable count is non-zero.
+  it('has a numberless branch, so a component reaching no recipe says so plainly', () => {
+    const plain = interpolate(deleteConfirm.ContentPlain, { name: 'Iron' });
+    assert.match(plain, /Iron/);
+    assert.match(plain, /permanent/i);
+    assert.equal(/\d/.test(plain.replace('Iron', '')), false, 'and names no count');
+  });
+
+  it('has a rewrite-only branch that names no disable count', () => {
+    const rewriteOnly = interpolate(deleteConfirm.ContentRecipes, { name: 'Iron', recipes: 2 });
+    assert.match(rewriteOnly, /2 recipe\(s\)/);
+    assert.equal(/disabl/i.test(rewriteOnly), false, 'and says nothing about disabling');
+  });
+
+  it('states every branch in the FUTURE, not as accomplished fact', () => {
+    for (const [key, data] of [
+      ['Content', { name: 'X', recipes: 2, disabled: 1 }],
+      ['ContentRecipes', { name: 'X', recipes: 2 }],
+    ]) {
+      const value = interpolate(deleteConfirm[key], data);
+      assert.match(value, /will be (rewritten|disabled)/, `${key} describes what deleting WILL do`);
+    }
+  });
+
+  // The disable clause names the TRANSITION, matching the bulk panel's `ImpactDisabled` row
+  // (asserted above), rather than the resulting STATE ("left uncraftable and disabled") the
+  // dialog used to carry — which read an already-disabled recipe as part of the count.
+  it('the disable clause names the transition rather than the resulting state', () => {
+    const sentence = interpolate(deleteConfirm.Content, { name: 'Iron', recipes: 2, disabled: 1 });
+    assert.match(sentence, /enabled today/);
+    assert.match(sentence, /will be disabled/);
+    assert.ok(!/uncraftable/.test(sentence), 'the state phrasing this fix replaces');
+  });
+
+  it('every branch states that deleting is permanent', () => {
+    for (const [key, data] of [
+      ['Content', { name: 'X', recipes: 2, disabled: 1 }],
+      ['ContentRecipes', { name: 'X', recipes: 2 }],
+      ['ContentPlain', { name: 'X' }],
+    ]) {
+      assert.match(interpolate(deleteConfirm[key], data), /permanent/i, `${key} states permanence`);
+    }
   });
 });
