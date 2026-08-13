@@ -69,7 +69,7 @@ The 22.3 MB figure predates issue 1136 (which retired the flat `results` alias a
 **Every byte in this ADR is the `Recipe#toJSON` shape**, because that is the shape storage holds.
 Measuring the raw payloads would have compared every candidate against a baseline 41% smaller than the one production pays, flattering the baseline and understating every alternative.
 
-Reproduce with `npm run persistence:spike` — `simple-corpus`, seed 1071, in a fresh process.
+Reproduced against `simple-corpus`, seed 1071, in a fresh process — see **Provenance of these numbers** below for where the harness lives.
 
 {: .note }
 > **Run it in a fresh process if you intend to quote the bytes.**
@@ -131,10 +131,10 @@ Issue 1079 requires these to be explicit, on the grounds that a "preferred hypot
 
 ## What was measured, and how
 
-**Headless matrix** — `npm run persistence:spike`.
+**Headless matrix** — the spike harness (see **Provenance of these numbers**).
 Issue 1071's `simple-corpus` fixture (10,000 recipes over a 5,000-component library, seed 1071), hydrated through the real `Recipe.fromJSON` and serialized through the real `Recipe#toJSON` — the exact four accessors `RecipeManager` passes to its repository in production.
 Every number is **class 1** under issue 1071's convention: machine-invariant, reproducible from `{profile, seed}` alone, and therefore assertable.
-The relations they support are guarded inside `npm test` by `tests/persistence-prototypes.test.js`.
+The relations they support were guarded inside `npm test` by the spike's own suite while the prototypes existed.
 
 Bytes are `JSON.stringify(value).length` throughout — UTF-16 code units of the serialized form, exactly as issue 1071's `settingBytes` counts them.
 Not a measure of what a socket compresses it to; a consistent size that makes two backends comparable.
@@ -249,7 +249,7 @@ It is worth noting what is *gained* alongside it: a pack write carries the chang
 ### Concurrent GM writes
 
 No Foundry API offers compare-and-swap on a setting or on a document, so the only question is what a second writer destroys.
-Measured in `tests/persistence-prototypes.test.js`: two repositories over one storage host, each editing a **different** record.
+Measured in the spike's own suite: two repositories over one storage host, each editing a **different** record.
 
 - **Baseline and B(2):** the first writer's edit is **silently lost**.
   The second `setSetting` replaces the array with a snapshot taken before it.
@@ -283,7 +283,7 @@ But the four surviving index fields are `_id`, **`name`**, `sort` and **`folder`
 Measured: a `systemId`-scoped summary listing costs **10,000 document fetches** under plain candidate A and **zero** under A+, for **60,000 extra index bytes** — 7.9% of the modelled index, 6 bytes per record.
 Both arms return identical record sets; only the cost differs.
 On real Foundry the cost is smaller still in relative terms, because `folder` is already in the index carrying `null`; foldering replaces that null with a folder id, so the added bytes are the id string rather than a whole new field.
-This is asserted in `tests/persistence-prototypes.test.js` rather than claimed.
+This was asserted in the spike's own suite rather than claimed.
 
 It is not free of risk, and both halves belong in the decision:
 
@@ -448,7 +448,7 @@ What remains is a decision about which surfaces are acceptable, taken explicitly
 Stated because a comparison matrix with no gaps is a comparison matrix that is hiding some.
 
 - **Wall clock as a decision input.**
-  Timings are recorded (`npm run persistence:spike` prints them, labelled class 2) and are never asserted or compared across machines.
+  Timings were recorded by the spike harness, labelled class 2, and are never asserted or compared across machines.
   An architecture decision that turned on a millisecond measured on one laptop is one nobody else can check.
 - **Per-client heap.**
   `performance.memory.usedJSHeapSize` depends on whatever the garbage collector last did and is a hint about allocation pressure, never evidence.
@@ -544,9 +544,7 @@ It removes the whole-corpus write and the concurrent-write clobber, which are th
 > The prototypes, measurements, comparison matrix and recommendation above are the agent scope;
 > the selection is not.
 >
-> Once written, issue 1080 is rewritten to the chosen backend and the other branch is deleted, and
-> the throwaway prototypes under `tests/helpers/persistence/`, `scripts/persistence-spike.mjs` and
-> `tests/persistence-prototypes.test.js` are removed with it.
+> Once written, issue 1080 is rewritten to the chosen backend and the other branch is deleted.
 
 ---
 
@@ -556,4 +554,17 @@ It removes the whole-corpus write and the concurrent-write clobber, which are th
 - Issue 1092 builds the cross-client transport, mandatory for any document-backed choice and sized against V14's un-hydrated-receiver gap.
 - Issue 1091 defines the canonical summary projection, which decides whether A+'s index suffices or a replicated summary setting is also needed.
 - Issue 1073's `propagation-unhydrated` measurement gains a real subject and can be implemented.
-- The prototypes are deleted.
+- The prototypes are already deleted — see **Provenance of these numbers**.
+
+---
+
+## Provenance of these numbers
+
+The prototypes that produced every figure above are **deliberately not versioned on `main`**.
+Seven backends were built in order to select one, so six were throwaway from the moment the spike started, and carrying them in the module's test fixtures would have run 2,681 lines of disposable code in CI on every push for the rest of the project.
+
+They are preserved where they can still be read: in the commits of the pull request that introduced this ADR, titled `feat(#1079): prototype seven persistence backends behind the repository seam` and `feat(#1079): measure the persistence candidates inside a real Foundry`.
+GitHub retains a merged pull request's individual commits, so the harness, the storage host and the measurement suite remain inspectable there without living in the test corpus.
+
+Anyone re-deriving these numbers should expect to re-author the harness against the interface `CraftingDefinitionRepository` already presents, which is what the prototypes implemented.
+The method is recorded above in enough detail to do that: the fixture and its seed, the two-class measurement convention, the four accessors `RecipeManager` passes to its repository, and the kill criterion each candidate was measured against.
