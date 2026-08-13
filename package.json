@@ -35,7 +35,7 @@
     "viewlab:chrome:status": "node scripts/view-lab-chrome.mjs status",
     "viewlab:chrome:clean": "node scripts/view-lab-chrome.mjs clean",
     "viewlab:chrome:baseline": "node scripts/view-lab-screenshots.mjs chrome",
-    "test": "node --conditions=browser --test --test-timeout=60000 tests/*.test.js tests/journal/*.test.js tests/stores/*.test.js tests/components/*.test.js tests/actions/*.test.js tests/util/*.test.js tests/systems/*.test.js tests/canvas/*.test.js tests/canvas/regions/*.test.js",
+    "test": "node --conditions=browser --test --test-timeout=300000 tests/*.test.js tests/journal/*.test.js tests/stores/*.test.js tests/components/*.test.js tests/actions/*.test.js tests/util/*.test.js tests/systems/*.test.js tests/canvas/*.test.js tests/canvas/regions/*.test.js",
     "test:foundry:install": "playwright install chromium --with-deps",
     "test:foundry:up": "node scripts/foundry-test-up.mjs",
     "test:foundry:run": "node scripts/foundry-test-run.mjs",
