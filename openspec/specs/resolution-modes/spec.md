@@ -636,6 +636,7 @@ Simple additionally tolerates the reserved `role: 'failure'` group, whose ABSENC
 - A Simple- or Tiered-check-mode system requires an authored crafting-check roll formula (`craftingCheck.simple` for Simple, `craftingCheck.routed` for Tiered): a missing formula is an unconditional system-level blocker (`alchemyCheckNoFormula`) surfaced by `systemValidation`, not a per-recipe error.
 The retired provider required/enum rules no longer apply (issue 554).
 - All recipes must satisfy alchemy-wide signature separability invariants; a signature collision — now narrowed to an INSEPARABLE (symmetric-transversal) pair, no longer a mere subset/superset — blocks save/import operations system-wide until resolved.
+The gate evaluates a candidate as though its activation had already landed, whether or not the recipe is stored yet, so a create or an import that would introduce a collision is refused at that moment rather than at the next reconciliation (see `data-models/spec.md` §Alchemy Signature Uniqueness).
 
 ## Testing Requirements
 

@@ -83,6 +83,27 @@ function signatureGuardsMatch(previous, next) {
 }
 
 /**
+ * The machine-readable reason an import skipped a recipe the activation gate refused.
+ *
+ * A refused recipe is `invalid` unless EVERY issue it carries is an alchemy signature
+ * collision, in which case it is `signature-conflict` (issue 1167). The distinction is the
+ * GM's, not the code's: a colliding recipe is authored correctly and is refused only
+ * because another ENABLED recipe in the system claims an inseparable ingredient signature,
+ * so reporting it as "invalid" in the conflict report sends the GM looking for a fault in
+ * a recipe that has none. A recipe that is BOTH malformed and colliding stays `invalid`,
+ * because the structural fault is the one to fix first.
+ *
+ * @param {{code: string|null}[]} [issues]
+ * @returns {'invalid'|'signature-conflict'}
+ */
+function importConflictReason(issues) {
+  const list = Array.isArray(issues) ? issues : [];
+  const collisionOnly =
+    list.length > 0 && list.every((issue) => issue?.code === 'signatureCollision');
+  return collisionOnly ? 'signature-conflict' : 'invalid';
+}
+
+/**
  * Manages recipe storage, retrieval, and CRUD operations
  */
 export class RecipeManager {
@@ -2711,11 +2732,17 @@ export class RecipeManager {
    *
    * Each recipe that cannot be imported is skipped and recorded as a conflict:
    * `reason: 'invalid'` when activation validation fails (carrying the validation
-   * `errors`), or `reason: 'duplicate-id'` when a recipe with the same id already
-   * exists and `overwrite` is false. On completion the skipped recipes are surfaced
-   * in ONE aggregated conflict-report notification (spec item 3), kept distinct from
-   * the terminal counts notification (spec item 4). Duplicate-id skips are no longer
+   * `errors`), `reason: 'signature-conflict'` when the ONLY thing it fails is alchemy
+   * signature uniqueness against the enabled recipes already in the system (issue 1167 —
+   * see {@link importConflictReason}), or `reason: 'duplicate-id'` when a recipe with the
+   * same id already exists and `overwrite` is false. On completion the skipped recipes are
+   * surfaced in ONE aggregated conflict-report notification (spec item 3), kept distinct
+   * from the terminal counts notification (spec item 4). Duplicate-id skips are no longer
    * silent.
+   *
+   * A colliding recipe is SKIPPED AND REPORTED, never thrown: that is how import already
+   * treats every other recipe it refuses, and one ambiguous recipe in a pack must not
+   * abort the recipes around it.
    *
    * @param {Object[]} recipesData - Array of recipe data
    * @param {boolean} overwrite - Whether to overwrite existing recipes
@@ -2741,7 +2768,7 @@ export class RecipeManager {
         conflicts.push({
           recipeId: recipe.id,
           recipeName: recipe.name,
-          reason: 'invalid',
+          reason: importConflictReason(validation.issues),
           errors: validation.errors,
         });
         skipped++;
@@ -2790,7 +2817,11 @@ export class RecipeManager {
    * @private
    */
   _formatImportConflictReport(conflicts) {
-    const reasonLabels = { 'duplicate-id': 'duplicate id', invalid: 'invalid' };
+    const reasonLabels = {
+      'duplicate-id': 'duplicate id',
+      invalid: 'invalid',
+      'signature-conflict': 'signature conflict',
+    };
     const details = conflicts
       .map((c) => `"${c.recipeName || c.recipeId}" (${reasonLabels[c.reason] || c.reason})`)
       .join(', ');
@@ -2898,6 +2929,10 @@ export class RecipeManager {
   /**
    * Validate that this recipe's ingredient signatures do not overlap with other recipes
    * in the same crafting system. Warns GMs of ambiguous crafting scenarios.
+   *
+   * Evaluates the candidate as though it were already stored and enabled — see
+   * {@link AlchemySignatureReport#candidateConflicts} — so a recipe that has not been
+   * persisted yet is gated exactly like one that has (issue 1167).
    * @param {Recipe} recipe
    * @returns {{valid: boolean, errors: string[]}}
    * @private

@@ -160,6 +160,8 @@ On recipe import:
    - non-conflicting recipes are imported,
    - conflicting recipes are rejected.
 2. If target system mode is `alchemy`, signature uniqueness collisions are treated as conflicts.
+   A recipe not yet held by the manager is evaluated as though it were already stored and enabled, so a collision an import would INTRODUCE is caught at import rather than only by the next reconciliation (see `data-models/spec.md` §Alchemy Signature Uniqueness).
+   Such a recipe is skipped and reported under its own conflict reason rather than throwing, and the recipes around it still import.
 3. The import operation must emit one aggregated conflict report at completion.
 4. The import operation must emit one terminal notification summary and must not emit per-recipe create or update notifications.
 

@@ -300,7 +300,10 @@ GM only.
 **Returns:** `Promise<{ imported: number, skipped: number, total: number, conflicts: object[] }>`
 
 Each recipe that cannot be imported is skipped and recorded in `conflicts`.
-A conflict has `recipeId`, `recipeName`, and a `reason` of either `"invalid"` (activation validation failed, and the entry also carries the validation `errors`) or `"duplicate-id"` (a recipe with the same ID already exists and `overwrite` is `false`).
+A conflict has `recipeId`, `recipeName`, and one of three `reason` values.
+`"invalid"` means activation validation failed, and the entry also carries the validation `errors`.
+`"signature-conflict"` means the recipe is well formed but its ingredient signature is inseparable from an already-enabled recipe in the same alchemy system; it also carries the validation `errors`.
+`"duplicate-id"` means a recipe with the same ID already exists and `overwrite` is `false`.
 
 The import emits one aggregate success notification with the imported and skipped counts.
 It does not emit per-recipe create/update notifications.
