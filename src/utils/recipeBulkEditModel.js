@@ -333,8 +333,8 @@ export function bulkRecipeBookOp(draft, bookId) {
  * for a book that holds every selected recipe. Counting from the definition would report
  * "holds none selected" and DISABLE Remove on exactly the legacy worlds that most need
  * this axis. Each projected row's `recipeItemIds` is derived by
- * `_recipeItemDefinitionsContaining` (`adminStore.js`), which takes the basis as a
- * parameter and is pinned against a real legacy-basis world by
+ * `recipeItemDefinitionsContaining` (`utils/recipeItemMembership.js`), which takes the
+ * basis as a parameter and is pinned against a real legacy-basis world by
  * `tests/recipe-book-membership-basis.test.js` — so reading it is basis-aware for free.
  *
  * A `Map` rather than a plain object because a recipe-item definition id is unvalidated
