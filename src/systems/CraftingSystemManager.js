@@ -56,11 +56,13 @@ import {
   resolveMaxModifierPicks,
   resolveModifierBounds,
 } from './checkModifierResolver.js';
+import { applyDefinitionChange } from './CraftingDefinitionRepository.js';
 import { normalizeCurrencyConfig } from './currencyProfile.js';
 import { normalizeGatheringRealmList, normalizeGatheringRealmSettings } from './gatheringRealms.js';
 import { normalizePreviewSandbox } from './progressiveCheckSandbox.js';
 import { RecipeActivationError } from './RecipeActivationError.js';
 import { RecipePersistenceError } from './RecipePersistenceError.js';
+import { SettingsCraftingDefinitionRepository } from './SettingsCraftingDefinitionRepository.js';
 import { SignatureValidator } from './SignatureValidator.js';
 
 // Membership sets derived from the canonical Tool model vocabularies, so the
@@ -84,11 +86,28 @@ export class CraftingSystemManager {
    *   the pass-through is what keeps the headless suites honest rather than mocked.
    * @param {(rawTexts: Iterable<string>) => Promise<void>} [seams.primeEnricherCache]
    *   - warm the compendium cache once per bulk run.
+   * @param {import('./CraftingDefinitionRepository.js').CraftingDefinitionRepository}
+   *   [seams.repository] - the persistence seam (issue 1089). Defaults to the
+   *   settings-backed adapter, so every existing construction site keeps working;
+   *   inject a fake to count reads and writes without patching `game.settings`.
    */
   constructor(recipeManager, seams = {}) {
     this.recipeManager = recipeManager;
     this.systems = new Map();
     this.initialized = false;
+    // Shares THIS map rather than mirroring it, and hydrates through the manager's own
+    // `_normalizeSystem`. That normalizer is a WHITELIST REBUILD — a key it does not
+    // emit is dropped from storage on the next save — so the repository must call it
+    // rather than carry any approximation of the persisted shape.
+    this._repository =
+      seams.repository ??
+      new SettingsCraftingDefinitionRepository({
+        settingKey: SETTING_KEYS.CRAFTING_SYSTEMS,
+        corpus: () => this.systems,
+        hydrate: (raw) => this._normalizeSystem(raw),
+        serialize: (system) => system,
+        scopeOf: (system) => system?.id ?? null,
+      });
     this._enrichToHtml = seams.enrichToHtml ?? ((text) => text);
     this._primeEnricherCache = seams.primeEnricherCache ?? (async () => {});
     // Active-GM gate for the un-versioned legacy recipe-item backfill run from
@@ -104,9 +123,9 @@ export class CraftingSystemManager {
 
   async initialize() {
     if (this.initialized) return;
-    const saved = getSetting(SETTING_KEYS.CRAFTING_SYSTEMS) || [];
-    for (const system of saved) {
-      const normalized = this._normalizeSystem(system);
+    // Hydration runs inside the repository (issue 1089), so `loadAll()` returns
+    // already-normalized systems.
+    for (const normalized of await this._repository.loadAll()) {
       this.systems.set(normalized.id, normalized);
     }
     await this._migrateLegacyRecipeItems();
@@ -2324,9 +2343,24 @@ export class CraftingSystemManager {
     return output;
   }
 
-  async save() {
-    const payload = [...this.systems.values()];
-    await setSetting(SETTING_KEYS.CRAFTING_SYSTEMS, payload);
+  /**
+   * Persist a crafting-system mutation through the definition repository (issue 1089).
+   *
+   * `save()` with no argument stays the whole-corpus write, and three callers still
+   * need it because they are genuinely multi-system: the legacy recipe-item
+   * migration, the definition-description refresh, and the item-sync metadata refresh
+   * each iterate every system.
+   *
+   * Every other mutation site — 21 of them — names the one system it touched with
+   * `save({ put: system })`, or the one it removed with `save({ delete: systemId })`.
+   * Under the settings adapter all of these write the same bytes, because
+   * `game.settings.set` replaces the whole value; the difference is that the record is
+   * now carried to the seam instead of being thrown away at the call site.
+   *
+   * @param {import('./CraftingDefinitionRepository.js').DefinitionChange} [change]
+   */
+  async save(change = null) {
+    await applyDefinitionChange(this._repository, change, this.systems.values());
   }
 
   /**
@@ -2343,10 +2377,13 @@ export class CraftingSystemManager {
    */
   reload() {
     const before = JSON.stringify([...this.systems.values()]);
-    const saved = getSetting(SETTING_KEYS.CRAFTING_SYSTEMS) || [];
+    // Optional repository capability: `null` means the backend has no synchronous
+    // replicated snapshot to read (see `CraftingDefinitionRepository`), so reloading
+    // is a no-op rather than a wrong answer.
+    const saved = this._repository.readReplicatedSnapshot();
+    if (!saved) return false;
     const next = new Map();
-    for (const system of saved) {
-      const normalized = this._normalizeSystem(system);
+    for (const normalized of saved) {
       next.set(normalized.id, normalized);
     }
     this.systems = next;
@@ -2360,6 +2397,47 @@ export class CraftingSystemManager {
 
   getSystem(systemId) {
     return this.systems.get(systemId) || null;
+  }
+
+  /**
+   * The ENABLED-and-disabled recipe set belonging to a system.
+   *
+   * Half of the `{getSystem, getRecipesForSystem, getComponentsForSystem}` contract
+   * {@link SignatureValidator} has always documented but which no runtime object
+   * implemented — seven call sites hand-rolled an ad-hoc adapter closure instead, so
+   * there was no runtime method a counter could attach to and no single definition of
+   * "the recipes of a system" (issue 1072). Several of those adapters are NOT
+   * equivalent to this one and deliberately stay: the enable-time gate substitutes the
+   * candidate recipe, and the migration/validation paths pass a JSON snapshot rather
+   * than the live store. They now differ from a named baseline instead of from each other.
+   *
+   * Filtering (`enabled`) is the validator's own job — it scopes its scan to enabled
+   * recipes itself — so this accessor stays unfiltered and callers do not each re-decide.
+   *
+   * @param {string} systemId
+   * @returns {object[]}
+   */
+  getRecipesForSystem(systemId) {
+    if (!systemId) return [];
+    return this.recipeManager?.getRecipes?.({ craftingSystemId: systemId }) ?? [];
+  }
+
+  /**
+   * The managed component library of a system — the other half of the
+   * {@link SignatureValidator} contract (issue 1072).
+   *
+   * Returns the LIVE array rather than a copy, matching every adapter closure this
+   * replaces (`system.components || []`). {@link getEssenceDefinitions} above copies,
+   * but changing that here would be a silent behaviour change on the signature path
+   * and a per-call O(components) allocation on the exact scan this issue exists to
+   * bound. Callers must not mutate it.
+   *
+   * @param {string} systemId
+   * @returns {object[]}
+   */
+  getComponentsForSystem(systemId) {
+    const system = this.getSystem(systemId);
+    return Array.isArray(system?.components) ? system.components : [];
   }
 
   getEssenceDefinitions(systemId) {
@@ -2554,7 +2632,7 @@ export class CraftingSystemManager {
     this._assertValidSystemId(system.id);
     this._assertUniqueComponentSourcesForSystem(system);
     this.systems.set(system.id, system);
-    await this.save();
+    await this.save({ put: system });
     this._notifySystemsChanged();
     return system;
   }
@@ -2606,7 +2684,7 @@ export class CraftingSystemManager {
       existing.description = snapshot.description;
       existing.originItemUuid = snapshot.originItemUuid;
 
-      await this.save();
+      await this.save({ put: system });
       // A source-uuid change is a re-point: clear ONLY the durable per-system leaf off the old
       // source document so it no longer claims this definition — never the whole `roles` flag
       // nor the whole `roles[systemId]` object (that would destroy sibling componentId/toolId).
@@ -2627,7 +2705,7 @@ export class CraftingSystemManager {
     system.recipeItemDefinitions = recipeItemDefinitions;
 
     if (roleFlagKey) await this._stampSourceIdentity(source, roleFlagKey, item.id);
-    await this.save();
+    await this.save({ put: system });
     return { item, action: 'added' };
   }
 
@@ -2747,7 +2825,7 @@ export class CraftingSystemManager {
       }
     }
     try {
-      await this.save();
+      await this.save({ put: system });
     } catch (error) {
       errors.push(error);
     }
@@ -2827,7 +2905,7 @@ export class CraftingSystemManager {
     const previousTools = system.tools;
     system.tools = nextTools;
     try {
-      await this.save();
+      await this.save({ put: system });
     } catch (error) {
       system.tools = previousTools;
       throw error;
@@ -2867,7 +2945,7 @@ export class CraftingSystemManager {
     const previousTools = system.tools;
     system.tools = tools.filter((entry) => String(entry?.id) !== String(toolId));
     try {
-      await this.save();
+      await this.save({ put: system });
     } catch (error) {
       system.tools = previousTools;
       throw error;
@@ -2921,7 +2999,7 @@ export class CraftingSystemManager {
       recipe.linkedRecipeItemUuid = null;
     }
 
-    await this.save();
+    await this.save({ put: system });
     if (affectedRecipeObjects.length > 0 && this.recipeManager?.save) {
       await this.recipeManager.save();
     }
@@ -2981,7 +3059,7 @@ export class CraftingSystemManager {
       ]),
     });
 
-    await this.save();
+    await this.save({ put: system });
     return { item: { ...definition } };
   }
 
@@ -3214,7 +3292,7 @@ export class CraftingSystemManager {
     // mode through the in-memory `systems` map (e.g. `RecipeManager` activation and
     // routed-provider validation consult the current system).
     this.systems.set(systemId, merged);
-    await this.save();
+    await this.save({ put: merged });
 
     // Migration-first mode change: migrate recipes to fit the new mode wherever
     // possible and delete ONLY those a per-recipe structural constraint of the new
@@ -3234,7 +3312,7 @@ export class CraftingSystemManager {
     const oldMode = current.salvageResolutionMode || 'simple';
     const disabledComponents = this._disableInvalidSalvageConfigs(merged, oldMode);
     if (disabledComponents.length > 0) {
-      await this.save();
+      await this.save({ put: merged });
       const names = disabledComponents.join(', ');
       ui?.notifications?.warn?.(
         `Fabricate | Salvage disabled for ${disabledComponents.length} component(s) incompatible with new mode: ${names}`
@@ -3487,7 +3565,7 @@ export class CraftingSystemManager {
     }
 
     this.systems.delete(systemId);
-    await this.save();
+    await this.save({ delete: systemId });
 
     await this._cleanupSystemScopedState(systemId);
 
@@ -3614,7 +3692,7 @@ export class CraftingSystemManager {
     });
     this._assertUniqueComponentSources(system, item);
     system.components.push(item);
-    await this.save();
+    await this.save({ put: system });
     return item;
   }
 
@@ -4665,7 +4743,7 @@ export class CraftingSystemManager {
       existing.originItemUuid = nextSnapshot.originItemUuid;
       existing.aliasItemUuids = nextFallbacks;
 
-      if (options.persist !== false) await this.save();
+      if (options.persist !== false) await this.save({ put: system });
       return { item: existing, action: 'updated', sourceFallbacks: nextSnapshot.sourceFallbacks };
     }
 
@@ -4682,7 +4760,7 @@ export class CraftingSystemManager {
     system.components.push(item);
     const addedRoleKey = this._componentRoleFlagKey(system.id);
     if (addedRoleKey) await this._stampSourceIdentity(source, addedRoleKey, item.id);
-    if (options.persist !== false) await this.save();
+    if (options.persist !== false) await this.save({ put: system });
     return { item, action: 'added', sourceFallbacks: nextSnapshot.sourceFallbacks };
   }
 
@@ -4754,7 +4832,7 @@ export class CraftingSystemManager {
       }
       await this._stampSourceIdentity(source, replaceRoleKey, itemId);
     }
-    await this.save();
+    await this.save({ put: system });
     return { item: updatedItem, sourceFallbacks: nextSnapshot.sourceFallbacks };
   }
 
@@ -4929,7 +5007,7 @@ export class CraftingSystemManager {
       this._assertUniqueComponentSources(system, updatedItem, itemId);
     }
     system.components[idx] = updatedItem;
-    await this.save();
+    await this.save({ put: system });
     return system.components[idx];
   }
 
@@ -5064,7 +5142,7 @@ export class CraftingSystemManager {
       changedIds.push(String(component.id));
     }
 
-    if (changedIds.length > 0 && options.persist !== false) await this.save();
+    if (changedIds.length > 0 && options.persist !== false) await this.save({ put: system });
     return { updated: changedIds.length, componentIds: changedIds };
   }
 
@@ -5182,7 +5260,7 @@ export class CraftingSystemManager {
     result.bookRemovals = books.removals;
     if (books.changed) {
       system.membershipResolvesByRecipeIds = true;
-      await this.save();
+      await this.save({ put: system });
     }
 
     // ---- Then recipes ------------------------------------------------------
@@ -5632,7 +5710,7 @@ export class CraftingSystemManager {
       await this._cleanupSalvageRunsForComponent(componentId, systemId);
     }
 
-    await this.save();
+    await this.save({ put: system });
 
     return {
       deleted: removedIds.length,
@@ -5772,7 +5850,7 @@ export class CraftingSystemManager {
       updatedRecipeCount += 1;
     }
 
-    await this.save();
+    await this.save({ put: system });
     this._notifySystemsChanged();
 
     if (updatedRecipeCount > 0) {
@@ -5915,7 +5993,7 @@ export class CraftingSystemManager {
 
     const recipesUpdated = await this._stripEssencesFromRecipes(systemId, removedIds);
 
-    await this.save();
+    await this.save({ put: system });
     this._notifySystemsChanged();
 
     if (recipesUpdated > 0) {

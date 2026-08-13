@@ -591,8 +591,14 @@ class Fabricate {
     await this._runMigrations();
     this._startupMarks.end(STARTUP_PHASES.MIGRATIONS);
     // Create managers
+    // Both seams are lazy closures because `craftingSystemManager` is constructed on the
+    // next statement — it needs `recipeManager` in ITS constructor, so one of the two has
+    // to be resolved late. `getCraftingSystemManager` (issue 1072) is what the twelve
+    // paths inside RecipeManager that used to read `game.fabricate` directly now go
+    // through, which is why they no longer depend on the `ready`-hook global at all.
     this.recipeManager = new RecipeManager({
       getCraftingSystem: (systemId) => this.craftingSystemManager?.getSystem?.(systemId) ?? null,
+      getCraftingSystemManager: () => this.craftingSystemManager ?? null,
     });
     // Issue 800: the manager RESOLVES source descriptions through Foundry's own
     // enricher at its async ingestion boundaries, so a content link is stored as the
