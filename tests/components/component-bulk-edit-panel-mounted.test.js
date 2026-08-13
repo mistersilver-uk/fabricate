@@ -53,8 +53,11 @@ const panel = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/BulkEditPanelShell.svelte',
     'src/ui/svelte/apps/manager/BulkEditSection.svelte',
     'src/ui/svelte/apps/manager/BulkEditSelect.svelte',
-    // The set delete's two-state arm/confirm control (issue 1129).
+    // The set delete's arm/confirm control (issue 1129) and the shared card that now renders
+    // it (issue 1132). Both are STATIC imports of the component under test; omitting either
+    // HANGS this suite as `# cancelled` rather than failing it.
     'src/ui/svelte/apps/manager/ArmedDangerButton.svelte',
+    'src/ui/svelte/apps/manager/BulkDeleteCard.svelte',
     'src/ui/svelte/apps/manager/components/EssenceQuantityCard.svelte',
     'src/ui/svelte/apps/manager/components/ComponentBulkEditPanel.svelte'
   ],

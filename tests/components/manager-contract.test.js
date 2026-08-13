@@ -2043,8 +2043,11 @@ describe('CraftingSystemManager source contract', () => {
     // The armed BULK delete is a deliberate deviation from the `AGENTS.md` carve-out, under
     // the maintainer's binding decision for this action. The SINGLE delete keeps the
     // store-owned `confirmDialog`, so the two idioms do not collide on one screen.
+    // The arm is now reached through the shared `BulkDeleteCard` (issue 1132), which renders
+    // `ArmedDangerButton` itself. Retargeted rather than dropped: the assertion is about the
+    // IDIOM — this delete arms instead of opening a dialog — and the card is what carries it.
     assert.ok(
-      essenceStudioSource.includes('<ArmedDangerButton'),
+      essenceStudioSource.includes('<BulkDeleteCard'),
       'the bulk delete arms rather than opening a dialog'
     );
     assert.ok(

@@ -239,6 +239,10 @@ function compileManagerRoot() {
   // mounted manager test as `# cancelled`, it does not fail one.
   writeCompiledSvelte('src/ui/svelte/apps/manager/KnowledgeView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/ArmedDangerButton.svelte');
+  // The shared bulk-delete card (issue 1132). All three bulk-edit panels render it, and all
+  // three are in the root's static graph, so the same rule applies: omitting it HANGS every
+  // mounted manager test as `# cancelled`, it does not fail one.
+  writeCompiledSvelte('src/ui/svelte/apps/manager/BulkDeleteCard.svelte');
   // The shared no-state primitive. The Knowledge roster and both tab bodies render it,
   // so it is in the root's static graph too. `Callout` is the shared standing-statement
   // strip both Knowledge tabs render (issue 785); same rule, same consequence.
@@ -10012,16 +10016,15 @@ describe('CraftingSystemManager mounted behavior', () => {
       'and the single-essence inspector is gone while a selection exists'
     );
 
-    const impactText = (row) =>
-      target.querySelector(`[data-essence-bulk-impact-row="${row}"]`).textContent.trim();
+    const impactRow = (row) => target.querySelector(`[data-essence-bulk-impact-row="${row}"]`);
+    const impactText = (row) => impactRow(row).textContent.trim();
     assert.ok(impactText('essences').startsWith('1'), '1 deletable essence');
-    assert.ok(impactText('components').startsWith('0'), 'carried by no components');
+    // Carried by no components, so the shared card omits the row entirely rather than stating a
+    // nought (issue 1132). Asserted as ABSENCE: the old `startsWith('0')` form would now THROW
+    // on a null dereference rather than fail, and a throwing control is the one whose cheapest
+    // repair is deletion.
+    assert.ok(!impactRow('components'), 'carried by no components, so nothing is said about them');
     assert.ok(impactText('recipes').startsWith('1'), 'and rewriting 1 recipe');
-    assert.match(
-      impactText('components'),
-      /selected essences/,
-      'and the line says WHICH set it counts, since it counts the whole selection'
-    );
     assert.ok(
       !target.querySelector('[data-essence-bulk-blocked]'),
       'no member is ever blocked — deletion is warned, not blocked'
@@ -10034,9 +10037,16 @@ describe('CraftingSystemManager mounted behavior', () => {
     flushSync();
     assert.ok(impactText('essences').startsWith('2'), 'the carried member is deletable too');
     assert.ok(impactText('recipes').startsWith('2'), 'r1 and r2, unioned rather than summed');
+    // And the row RETURNS the moment the count is non-zero, which is what stops the absence
+    // assertion above passing for a row that was simply removed.
     assert.ok(
       impactText('components').startsWith('1'),
       'and its CARRIER is reported as impact, unioned over the whole selection'
+    );
+    assert.match(
+      impactText('components'),
+      /selected essences/,
+      'and the line says WHICH set it counts, since it counts the whole selection'
     );
     assert.ok(
       !target.querySelector('[data-essence-bulk-blocked]'),

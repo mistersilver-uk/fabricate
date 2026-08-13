@@ -1903,7 +1903,8 @@
           "StatusDisable": "Disable",
           "Lock": "Lock",
           "Unlock": "Unlock",
-          "LeaveUnchanged": "Leave unchanged"
+          "LeaveUnchanged": "Leave unchanged",
+          "Deleting": "Deleting…"
         },
         "Recipe": {
           "Kicker": "Recipes View",
@@ -3063,9 +3064,10 @@
             "Delete": "Delete {count} essences",
             "DeleteOne": "Delete 1 essence",
             "DeleteConfirm": "Confirm delete",
-            "DeleteAria": "Delete {count} essence definitions",
+            "DeleteAria": "Delete {count} essences",
             "DeleteAriaOne": "Delete 1 essence definition",
-            "DeleteConfirmAria": "Confirm deleting {count} essence definition(s) and rewriting {recipes} recipe(s)",
+            "DeleteConfirmAria": "Confirm delete — {count} essence definition(s) will be deleted and {recipes} recipe(s) rewritten",
+            "DeleteArmedAnnouncement": "Delete armed. Activate again to delete {count} essence definition(s) and rewrite {recipes} recipe(s).",
             "Applied": "Updated {count} essences.",
             "AppliedOne": "Updated 1 essence.",
             "Deleted": "Deleted {count} essence(s) and rewrote {recipes} recipe(s)."

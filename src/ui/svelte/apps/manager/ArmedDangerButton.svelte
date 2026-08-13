@@ -36,7 +36,25 @@
      render exactly the markup they did before it existed; a bare `aria-describedby=""`
      would point at nothing and is what the `|| undefined` below avoids.
    - disabled: disables both arming and confirming.
+   - busy / busyLabel / busyIcon: an OPTIONAL third face for a caller whose confirm starts a
+     write it can await. See the note below — this is not a variant of `armed`.
    - onArm(token) / onDisarm(token) / onConfirm(token).
+
+  ── THE BUSY FACE IS NOT DERIVED FROM `armed`, AND THAT IS THE WHOLE POINT ────────
+  Without it a caller that awaits its write leaves the GM looking at a disabled, danger-filled
+  `Confirm delete` — a control still asking for the click it has already had. The obvious repair,
+  reading "armed AND disabled" as "in flight", does not work and fails INVISIBLY:
+
+   - `handleBlur` below disarms on blur, and DISABLING A FOCUSED BUTTON FIRES BLUR in Chromium
+     and Firefox. So the moment the caller sets its in-flight flag the control disarms, and an
+     `armed`-derived busy face drops straight back to the IDLE label for the whole write —
+     "Delete 3 recipes", beside a spinnerless disabled button, while the delete is running;
+   - happy-dom does NOT fire that blur, so a mounted assertion passes on behaviour that does
+     not hold in a browser.
+
+  Hence `busy` is the caller's own flag, `faceOf` reads it FIRST so it wins over `armed`
+  whichever way the disarm race lands, and blur is a no-op while busy so an in-flight write
+  cannot clear the owner's arm token underneath itself.
 -->
 <script>
   let {
@@ -50,17 +68,32 @@
     armedAriaLabel = '',
     describedBy = '',
     disabled = false,
+    busy = false,
+    busyLabel = '',
+    busyIcon = 'fas fa-spinner fa-spin',
     onArm = () => {},
     onDisarm = () => {},
     onConfirm = () => {},
   } = $props();
 
-  const label = $derived(armed ? armedLabel : idleLabel);
-  const icon = $derived(armed ? armedIcon : idleIcon);
-  const consequence = $derived(armed ? armedAriaLabel : idleAriaLabel);
+  const inFlight = $derived(busy === true);
+  // A guard chain rather than a nested ternary: three faces read as three `if`s, and the
+  // SonarCloud quality gate reports a nested conditional as a new code smell.
+  function faceOf(busyFace, armedFace, idleFace) {
+    if (busy === true) return busyFace;
+    if (armed) return armedFace;
+    return idleFace;
+  }
+
+  const label = $derived(faceOf(busyLabel, armedLabel, idleLabel));
+  const icon = $derived(faceOf(busyIcon, armedIcon, idleIcon));
+  // The busy face's accessible name is its VISIBLE label, so WCAG 2.5.3 Label in Name holds
+  // for it by construction rather than by a fourth string nobody would keep in step.
+  const consequence = $derived(faceOf(busyLabel, armedAriaLabel, idleAriaLabel));
+  const isInert = $derived(disabled === true || inFlight);
 
   function handleClick() {
-    if (disabled) return;
+    if (isInert) return;
     if (armed) {
       onConfirm(token);
       return;
@@ -71,13 +104,14 @@
   // Escape disarms without leaving the control, and is stopped here so it does not
   // also close an ancestor surface the GM did not mean to leave.
   function handleKeydown(event) {
-    if (event.key !== 'Escape' || !armed) return;
+    if (event.key !== 'Escape' || !armed || inFlight) return;
     event.preventDefault();
     event.stopPropagation();
     onDisarm(token);
   }
 
   function handleBlur() {
+    if (inFlight) return;
     if (armed) onDisarm(token);
   }
 </script>
@@ -86,12 +120,15 @@
   type="button"
   class="manager-button is-danger"
   class:is-armed={armed}
+  class:is-busy={inFlight}
   data-armed={armed ? 'true' : 'false'}
+  data-busy={inFlight ? 'true' : 'false'}
   data-arm-token={token}
   aria-label={consequence}
   aria-describedby={describedBy || undefined}
+  aria-busy={inFlight ? 'true' : undefined}
   title={consequence}
-  {disabled}
+  disabled={isInert}
   onclick={handleClick}
   onkeydown={handleKeydown}
   onblur={handleBlur}

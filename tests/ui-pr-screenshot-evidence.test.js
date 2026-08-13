@@ -462,6 +462,29 @@ describe('UI PR screenshot evidence', () => {
     );
   });
 
+  it('routes the shared bulk-DELETE card at all three studios, not the theme fallback (issue 1132)', () => {
+    // `BulkDeleteCard.svelte` sits directly under `apps/manager/`, so it matches neither
+    // studio's directory glob. Unnamed it would map to NO recipe, fall to the generic
+    // `theme-or-global-ui` set, and publish six frames of unrelated screens as the evidence for
+    // a change to the one card the three delete affordances share — while
+    // `scripts/lib/viewLabCases.js` claimed it on the delete frames. The two registries
+    // disagreeing about one file's evidence is the exact failure the enumeration exists to stop.
+    const views = mapChangedFilesToViews([
+      'src/ui/svelte/apps/manager/BulkDeleteCard.svelte',
+    ]).map(view => view.id);
+
+    assert.equal(
+      views.includes('theme-or-global-ui'),
+      false,
+      'the card must map to real frames rather than falling through to the global fallback',
+    );
+    // One studio each, because a delete card that renders in three studios and republishes only
+    // two leaves the third's frame stale on exactly the change that altered it.
+    for (const id of ['manager-components-bulk-edit', 'manager-recipes-bulk-edit', 'manager-essences']) {
+      assert.ok(views.includes(id), `${id} must republish when the shared delete card changes`);
+    }
+  });
+
   it('gives the recipe bulk panel its own three frames and its own trigger set (issue 1010)', () => {
     const byId = Object.fromEntries(VIEW_RECIPES.map(view => [view.id, view]));
     // Each is its own view with exactly one same-named label, for the `candidates[0]` reason

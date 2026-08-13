@@ -89,13 +89,19 @@ const TOOL_STUDIO_MATCHES = [
 const COMPONENTS_BROWSER_MATCHES = [
   /^src\/ui\/svelte\/apps\/manager\/ComponentsBrowserView\.svelte$/,
   /^src\/ui\/svelte\/apps\/manager\/components\/.+\.svelte$/,
-  // The shared bulk-edit primitives (issue 1010). They sit directly under `apps/manager/`,
-  // beside `Chip` and `Callout`, so they fall through BOTH the `components/` glob above and
-  // the `recipes/` one — a change to any of them would otherwise map to no view at all and
-  // publish nothing. Enumerated by name rather than widened to a directory glob, because
-  // `apps/manager/*.svelte` is the whole manager and would conscript these frames as the
-  // evidence for every screen in it.
-  /^src\/ui\/svelte\/apps\/manager\/(?:BulkSelectionToolbar|BulkEditPanelShell|BulkEditSection|BulkEditSelect)\.svelte$/,
+  // The shared bulk-edit primitives (issue 1010) and the shared bulk-DELETE card (issue
+  // 1132). They sit directly under `apps/manager/`, beside `Chip` and `Callout`, so they fall
+  // through BOTH the `components/` glob above and the `recipes/` one — a change to any of them
+  // would otherwise map to no view at all and fall to the broad `theme-or-global-ui` recipe,
+  // publishing frames that cannot show the change. Enumerated by name rather than widened to a
+  // directory glob, because `apps/manager/*.svelte` is the whole manager and would conscript
+  // these frames as the evidence for every screen in it.
+  //
+  // `BulkDeleteCard` is named in the ESSENCES recipe too. That is not over-claiming: unlike the
+  // four chrome primitives, the delete card renders in all three studios, and
+  // `scripts/lib/viewLabCases.js` claims it on all three studios' delete frames. The two
+  // registries must not disagree about what evidence a change to one file requires.
+  /^src\/ui\/svelte\/apps\/manager\/(?:BulkSelectionToolbar|BulkEditPanelShell|BulkEditSection|BulkEditSelect|BulkDeleteCard)\.svelte$/,
 ];
 
 // A single-frame components-browser view: one same-named smoke label over the shared
@@ -134,7 +140,7 @@ const BULK_EDIT_MODEL_MATCHES = [
 const RECIPES_BROWSER_MATCHES = [
   /^src\/ui\/svelte\/apps\/manager\/RecipesBrowserView\.svelte$/,
   /^src\/ui\/svelte\/apps\/manager\/recipes\/.*\.svelte$/,
-  /^src\/ui\/svelte\/apps\/manager\/(?:BulkSelectionToolbar|BulkEditPanelShell|BulkEditSection|BulkEditSelect)\.svelte$/,
+  /^src\/ui\/svelte\/apps\/manager\/(?:BulkSelectionToolbar|BulkEditPanelShell|BulkEditSection|BulkEditSelect|BulkDeleteCard)\.svelte$/,
 ];
 
 // A single-frame recipes-browser view: one same-named smoke label over the shared browser match
@@ -526,6 +532,11 @@ export const VIEW_RECIPES = Object.freeze([
       // published frames that cannot show the change.
       /^src\/ui\/svelte\/util\/(?:essenceIcons|essencePreviewRow|managerColorTokens)\.js$/,
       /^src\/utils\/essence(?:BrowserModel|BulkEditModel|Validation)\.js$/,
+      // The shared bulk-delete card (issue 1132). It sits directly under `apps/manager/`, so it
+      // falls through the `essences/` glob above exactly as the bulk-edit chrome falls through
+      // the two browser globs, and the Essence Studio's own bulk-selection frame is where a
+      // change to it is visible here.
+      /^src\/ui\/svelte\/apps\/manager\/BulkDeleteCard\.svelte$/,
     ],
   },
   {

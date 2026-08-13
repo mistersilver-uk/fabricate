@@ -31,6 +31,13 @@ const rowSource = read('src/ui/svelte/apps/manager/essences/EssenceRow.svelte');
 // assertions about the LIST row still read `rowSource`.
 const cardSource = read('src/ui/svelte/apps/manager/library/LibraryCard.svelte');
 const bulkPanelSource = read('src/ui/svelte/apps/manager/essences/EssenceBulkEditPanel.svelte');
+// The delete CARD's anatomy and look now live in the shared bulk-delete primitive (issue
+// 1132); the essence panel supplies the sentences and renders it. Assertions about the CARD
+// read here, assertions about the panel's own axes still read `bulkPanelSource`. Same retarget
+// as `LibraryCard` above, and for the same reason: Svelte scoping is per component, so the
+// rule moved with the markup it styles and a pin left on the panel would assert on a selector
+// that matches nothing.
+const bulkDeleteCardSource = read('src/ui/svelte/apps/manager/BulkDeleteCard.svelte');
 const identityTabSource = read('src/ui/svelte/apps/manager/essences/EssenceIdentityTab.svelte');
 const inspectorSource = read('src/ui/svelte/apps/manager/essences/EssenceBrowserInspector.svelte');
 const previewSource = read('src/ui/svelte/apps/manager/essences/EssenceBehaviorPreview.svelte');
@@ -300,11 +307,15 @@ describe('essence studio prototype fidelity (issue 1036)', () => {
     // other right-rail button, `InspectorActionButton`'s `.fab-inspector-action` (0.72rem)
     // included. happy-dom cannot compute the cascade, so this is a source assertion; the
     // rendered proof is the re-captured frame.
-    const styles = styleBlock(bulkPanelSource);
+    //
+    // RETARGETED at the primitive (issue 1132). The card extracted to `BulkDeleteCard.svelte`,
+    // and Svelte scoping is per component: this rule HAD to move with the markup or it would
+    // have stopped matching, which is exactly the regression this assertion exists to catch —
+    // in all three studios at once, and invisibly to any source review. Asserting it here is
+    // what makes the move safe rather than what makes it pass.
+    const styles = styleBlock(bulkDeleteCardSource);
     assert.ok(
-      /\.manager-essence-bulk-delete :global\(\.manager-button\) \{[^}]*font-size: 0\.72rem;/s.test(
-        styles
-      ),
+      /\.fab-bulk-delete-card :global\(\.manager-button\) \{[^}]*font-size: 0\.72rem;/s.test(styles),
       'the delete card scopes its button to the shared inspector-action label size'
     );
     // Scoped to the delete card only — the danger/armed colour treatment stays in the
@@ -313,6 +324,26 @@ describe('essence studio prototype fidelity (issue 1036)', () => {
       styles.includes('.manager-button.is-danger'),
       false,
       'the colour treatment is not re-declared here, only the type scale'
+    );
+    // The impact list's treatment moved with it, and it is the other half of the same frame:
+    // dropped rather than moved, the sentence the GM acts on loses its indent, its colour and
+    // its weight everywhere the card renders.
+    assert.ok(
+      /\.fab-bulk-delete-impact \{[^}]*padding-left: var\(--fab-space-4\);/s.test(styles),
+      'and the impact list keeps its indent'
+    );
+    assert.ok(
+      /\.fab-bulk-delete-impact \{[^}]*color: var\(--fab-text-secondary\);[^}]*font-weight: 600;/s.test(
+        styles
+      ),
+      'its secondary colour and its heavier face'
+    );
+    // The panel must NOT still be declaring them: a stale copy left behind is a rule that
+    // matches nothing, and it would make this retarget look load-bearing when it was not.
+    assert.equal(
+      /manager-essence-bulk-(?:delete|impact)/.test(styleBlock(bulkPanelSource)),
+      false,
+      'and the panel no longer declares a rule for markup it no longer renders'
     );
   });
 

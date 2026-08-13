@@ -25,8 +25,20 @@
   contradiction. Do not substitute a `confirmDialog` here.
 
   ── THE IMPACT STATEMENT ──────────────────────────────────────────────────────────
+  The card itself is the shared `BulkDeleteCard` primitive (issue 1132), which owns the
+  heading, the impact list, the armed control, the description association, the live region,
+  the busy face, the zero-row gate and the scoped CSS that keeps the danger button at the
+  right-rail label size. What is here is only what is about ESSENCES: the three sentences and
+  the arithmetic behind them. `data-essence-bulk-*` hook names survive the move as `*Attr`
+  overrides, so the mounted suites, the smoke selectors and the View Lab cases are untouched.
+
   It is shown BEFORE the action is armed, and it recomputes when the selection changes,
   because it is `$derived` from the selected ROWS rather than latched at arm time.
+
+  Two of the three rows are now GATED on a non-zero count, which they were not before: the
+  primitive omits a consequence row that says nothing and always renders the subject row, so
+  a selection carried by nothing states one fact instead of one fact and a nought. That rule
+  was already shipped on the Component Studio; the conversion is what makes the two agree.
 
   Its three numbers are three different questions and none is derived from another: how many
   essences will be deleted, how many COMPONENTS carry any of them, and how many RECIPES will
@@ -41,7 +53,7 @@
   skipped — the impact statement is the whole warning.
 -->
 <script>
-  import ArmedDangerButton from '../ArmedDangerButton.svelte';
+  import BulkDeleteCard from '../BulkDeleteCard.svelte';
   import BulkEditPanelShell from '../BulkEditPanelShell.svelte';
   import BulkEditSection from '../BulkEditSection.svelte';
   import Callout from '../Callout.svelte';
@@ -201,18 +213,49 @@
           { count: impact.recipeRewrites }
         )
   );
+  // WCAG 2.5.3 Label in Name: the accessible name must CONTAIN the visible label, so a
+  // speech-input user can activate the control by saying what they can read. The plural pair
+  // shipped as "Delete 3 essences" / "Delete 3 essence definitions", which does NOT contain the
+  // visible string, so the idle face of a destructive control was unactivatable by voice; the
+  // `…One` branch passed only by luck, since "Delete 1 essence definition" happens to contain
+  // "Delete 1 essence". The word "definitions" moved into the impact list, where the count it
+  // qualifies already lives.
   const deleteAriaLabel = $derived(
     impact.deletable === 1
       ? text(
           'FABRICATE.Admin.Manager.Essence.BulkEdit.DeleteAriaOne',
           'Delete 1 essence definition'
         )
-      : format(
-          'FABRICATE.Admin.Manager.Essence.BulkEdit.DeleteAria',
-          'Delete {count} essence definitions',
-          { count: impact.deletable }
-        )
+      : format('FABRICATE.Admin.Manager.Essence.BulkEdit.DeleteAria', 'Delete {count} essences', {
+          count: impact.deletable,
+        })
   );
+  // The armed name opens with the armed visible label for the same rule. "Confirm deleting 3
+  // essence definition(s)…" does not contain "Confirm delete".
+  const deleteArmedAriaLabel = $derived(
+    format(
+      'FABRICATE.Admin.Manager.Essence.BulkEdit.DeleteConfirmAria',
+      'Confirm delete — {count} essence definition(s) will be deleted and {recipes} recipe(s) rewritten',
+      { count: impact.deletable, recipes: impact.recipeRewrites }
+    )
+  );
+  // Arming changes the button's label and name UNDER FOCUS, where a name change is not
+  // reliably announced, so the state change is announced in the card's own polite region.
+  const deleteArmedAnnouncement = $derived(
+    format(
+      'FABRICATE.Admin.Manager.Essence.BulkEdit.DeleteArmedAnnouncement',
+      'Delete armed. Activate again to delete {count} essence definition(s) and rewrite {recipes} recipe(s).',
+      { count: impact.deletable, recipes: impact.recipeRewrites }
+    )
+  );
+
+  // Three sentences, three different questions, and the two carrier rows are gated on their
+  // own count by the card. The subject row carries no `count`, so it always renders.
+  const deleteImpactRows = $derived([
+    { key: 'essences', text: impactEssencesLabel },
+    { key: 'components', text: impactComponentsLabel, count: impact.componentsAffected },
+    { key: 'recipes', text: impactRecipesLabel, count: impact.recipeRewrites },
+  ]);
 </script>
 
 <BulkEditPanelShell
@@ -336,51 +379,42 @@
 <!--
   The DELETE block sits below the shell rather than inside it: the shell's Apply is the
   panel's primary action, and a destructive action inside the same card would read as a
-  second way of applying the staged edit.
+  second way of applying the staged edit. It un-pins the shell's sticky Apply dock, which is
+  accepted and gated — see `BulkEditPanelShell`'s dock comment for what survives the un-pin.
+
+  The `components` row is a DISTINCT-carrier union over the selection: a component carrying two
+  selected essences is one carrier, not two, because the cascade strips it in one pass. The copy
+  says "one or more of the selected essences" for exactly that reason. See
+  `describeEssenceDeleteImpact`.
+
+  `busy` is the caller's own `deleting` flag and is NOT folded into `disabled` here: the card
+  needs to tell an in-flight write apart from an inert one to render the third face at all.
+  `applying` still inerts the control, because a staged apply and a delete must not race.
 -->
-<section class="manager-inspector-card manager-essence-bulk-delete" data-essence-bulk-delete-card>
-  <div class="manager-edit-card-heading">
-    <h3 class="manager-card-title">
-      {text('FABRICATE.Admin.Manager.Essence.BulkEdit.DeleteHeading', 'Delete selected essences')}
-    </h3>
-  </div>
-
-  <!-- Stated BEFORE the action is armed, and recomputed from the selection. -->
-  <ul class="manager-essence-bulk-impact" data-essence-bulk-impact>
-    <li data-essence-bulk-impact-row="essences">
-      {impactEssencesLabel}
-    </li>
-    <!--
-      A DISTINCT-carrier union over the selection: a component carrying two selected essences
-      is one carrier, not two, because the cascade strips it in one pass. The copy says "one
-      or more of the selected essences" for exactly that reason. See
-      `describeEssenceDeleteImpact`.
-    -->
-    <li data-essence-bulk-impact-row="components">
-      {impactComponentsLabel}
-    </li>
-    <li data-essence-bulk-impact-row="recipes">
-      {impactRecipesLabel}
-    </li>
-  </ul>
-
-  <ArmedDangerButton
-    token="delete-essences"
-    armed={deleteArmed === true}
-    disabled={impact.deletable === 0 || inert}
-    idleLabel={deleteLabel}
-    armedLabel={text('FABRICATE.Admin.Manager.Essence.BulkEdit.DeleteConfirm', 'Confirm delete')}
-    idleAriaLabel={deleteAriaLabel}
-    armedAriaLabel={format(
-      'FABRICATE.Admin.Manager.Essence.BulkEdit.DeleteConfirmAria',
-      'Confirm deleting {count} essence definition(s) and rewriting {recipes} recipe(s)',
-      { count: impact.deletable, recipes: impact.recipeRewrites }
-    )}
-    onArm={onArmDelete}
-    onDisarm={onDisarmDelete}
-    onConfirm={() => onDelete(impact.deletableIds)}
-  />
-</section>
+<BulkDeleteCard
+  token="delete-essences"
+  heading={text(
+    'FABRICATE.Admin.Manager.Essence.BulkEdit.DeleteHeading',
+    'Delete selected essences'
+  )}
+  rows={deleteImpactRows}
+  idleLabel={deleteLabel}
+  armedLabel={text('FABRICATE.Admin.Manager.Essence.BulkEdit.DeleteConfirm', 'Confirm delete')}
+  busyLabel={text('FABRICATE.Admin.Manager.BulkEdit.Deleting', 'Deleting…')}
+  idleAriaLabel={deleteAriaLabel}
+  armedAriaLabel={deleteArmedAriaLabel}
+  armedAnnouncement={deleteArmedAnnouncement}
+  armed={deleteArmed === true}
+  busy={deleting === true}
+  disabled={impact.deletable === 0 || applying === true}
+  cardAttr="data-essence-bulk-delete-card"
+  impactAttr="data-essence-bulk-impact"
+  rowAttr="data-essence-bulk-impact-row"
+  announceAttr="data-essence-bulk-delete-announce"
+  onArm={onArmDelete}
+  onDisarm={onDisarmDelete}
+  onConfirm={() => onDelete(impact.deletableIds)}
+/>
 
 <style>
   /* ONE control each, now that both axis resets live on their section's label row. The
@@ -395,39 +429,9 @@
     min-width: 0;
   }
 
-  .manager-essence-bulk-delete {
-    display: flex;
-    flex-direction: column;
-    gap: var(--fab-space-2);
-  }
-
-  /* The armed danger button reads at the shared inspector-action label size (issue 1036,
-     maintainer round). `ArmedDangerButton` renders a bare `.manager-button`, which carries
-     no font-size of its own and so inherited the app's body size — visibly chunkier than
-     every other right-rail control, `InspectorActionButton`'s `.fab-inspector-action`
-     included (`0.72rem`). Scoped to this card only: the row-level `ArmedDangerButton` uses
-     elsewhere in the manager are untouched, and the danger/armed colour treatment from
-     `styles/fabricate.css` is untouched too — only the type scale changes. */
-  .manager-essence-bulk-delete :global(.manager-button) {
-    min-height: 34px;
-    padding: 0 var(--fab-space-3);
-    font-size: 0.72rem;
-    font-weight: 700;
-  }
-
-  /* WEIGHT, not size. This is the sentence the GM is asked to act on and it sits under a
-     louder warning `Callout`; at the muted tone it was the quietest thing on a destructive
-     card. It keeps the small type — the card is a rail, not a dialog — and gains the
-     secondary text colour and a heavier face so it reads as a statement rather than a
-     footnote. */
-  .manager-essence-bulk-impact {
-    display: flex;
-    flex-direction: column;
-    gap: var(--fab-space-2xs);
-    margin: 0;
-    padding-left: var(--fab-space-4);
-    color: var(--fab-text-secondary);
-    font-size: 0.72rem;
-    font-weight: 600;
-  }
+  /* The delete card's three rules — the card box, the 34px/0.72rem/700 danger button and the
+     impact list's indent, colour and weight — moved to `BulkDeleteCard.svelte` with the markup
+     they style (issue 1132). They could not stay: Svelte scoping is per component, so the
+     moment that `<section>` rendered from there these selectors matched nothing, and the
+     rendered result would have been the issue 1036 defect back in every studio at once. */
 </style>

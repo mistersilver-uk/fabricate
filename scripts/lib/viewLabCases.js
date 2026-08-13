@@ -94,6 +94,22 @@ const BULK_EDIT_CHROME_PATTERN =
   /^src\/ui\/svelte\/apps\/manager\/Bulk(?:SelectionToolbar|EditPanelShell|EditSection|EditSelect)\.svelte$/;
 
 /**
+ * The shared bulk-DELETE card (issue 1132): the heading, impact statement, standing hint and
+ * armed control every studio's set delete renders.
+ *
+ * Separate from `BULK_EDIT_CHROME_PATTERN` because the two select DIFFERENT frames. The chrome
+ * appears in every bulk-edit frame; this card is below the sticky Apply dock and under the rail's
+ * fold, so the only frames that photograph it at all are the four `*-bulk-delete-*` cases, each of
+ * which scrolls or clicks it into view. Attributing it to the bulk-EDIT frames would publish a
+ * frame in which the changed component is not visible.
+ *
+ * Not in `MANAGER_PRIMITIVES` either, for the reason stated above: a broad signal is claim-exempt
+ * and routes to the representative set, and this component has exactly the delete frames as its
+ * consumers, so targeting is both possible and honest.
+ */
+const BULK_DELETE_CARD_PATTERN = /^src\/ui\/svelte\/apps\/manager\/BulkDeleteCard\.svelte$/;
+
+/**
  * The trigger set the three `manager-recipes-bulk-edit*` frames share (issue 1010).
  *
  * The first two patterns are the recipe browser's own pair, exactly as every other recipe case
@@ -1729,6 +1745,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/components?\//,
       /^src\/utils\/recipeComponentReferences\.js$/,
       BULK_EDIT_CHROME_PATTERN,
+      BULK_DELETE_CARD_PATTERN,
     ],
   }),
   managerCase({
@@ -1764,6 +1781,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/components?\//,
       /^src\/utils\/recipeComponentReferences\.js$/,
       BULK_EDIT_CHROME_PATTERN,
+      BULK_DELETE_CARD_PATTERN,
     ],
   }),
   managerCase({
@@ -2856,6 +2874,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/essences\//,
       /^src\/ui\/svelte\/util\/(?:essenceIcons|managerColorTokens)\.js$/,
       /^src\/utils\/essence(?:BrowserModel|BulkEditModel|Validation)\.js$/,
+      BULK_DELETE_CARD_PATTERN,
     ],
   }),
   managerCase({
