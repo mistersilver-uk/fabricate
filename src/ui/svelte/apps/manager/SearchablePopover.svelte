@@ -8,7 +8,8 @@
   within it does not dismiss).
 
   Props:
-    options      — [{ id, label, icon?, img?, meta?, trailing?, addMarker?, dataId?,
+    options      — [{ id, label, icon?, img?, meta?, trailing?, trailingIcon?,
+                   addMarker?, dataId?,
                    group? }] (consumer builds the full list, including any leading
                    "special" option such as Auto).
                    `addMarker` stamps `data-recipe-add` on that OPTION (the recipe
@@ -27,6 +28,9 @@
                    Capture walks and mounted tests address an option by identity through
                    it; without one the only handle is the display label, which is
                    localized and therefore not a selector.
+                   `trailingIcon` marks an option that IS the current value with a
+                   glyph rather than a word — the travel-actor picker checks the
+                   linked actor, and `trailing` renders a Chip, which is a label.
     optionGroups — OPTIONAL [{ id, label }]. When non-empty the options are bucketed
                    by `option.group` and each bucket renders under its own heading as
                    an ARIA `role="group"` with that label. This exists because a menu
@@ -71,10 +75,31 @@
                    handful of fixed options (the recipe row-level "or…" menu) drops
                    it: `search` stays '' so `filteredOptions` and the autofocus
                    `$effect` degrade gracefully to the full, unfiltered list.
+    inlineSearchTrigger — the trigger REPLACES ITSELF with the search field while open
+                   (default false, so all 19 shipped consumers render unchanged). The
+                   World > Parties travel-actor control is a 210px column whose
+                   "Link an actor" / "Change actor" button becomes the search box on
+                   activation rather than stacking a second field inside the popover;
+                   the popover's own search row is suppressed in this mode, because
+                   there is exactly one query and it must live in exactly one field.
+    header / footer — OPTIONAL snippets rendered inside the popover, above the option
+                   list and below it. They exist for a picker whose panel states
+                   something the option rows cannot: the travel-actor picker heads its
+                   list with an `ACTORS` eyebrow and a matched-of-total count, and foots
+                   it with a danger "Unlink {name}" affordance that is not one of the
+                   choices. Authored in the CALLING component, so their scoped styles
+                   belong to the caller even though this component renders them.
+    maxHeight    — OPTIONAL px cap clamped against the computed layout height (0 = the
+                   layout's own value). A picker anchored in a narrow column wants a
+                   shorter panel than the viewport would allow.
     popoverClass — optional extra class on the portaled popover element (the
                    pickerClass lands on the trigger's root, which the portaled
                    popover escapes, so a popover-scoped style needs its own hook)
     *AriaLabel / searchPlaceholder / emptyHint — localized strings
+    open         — OPTIONAL `$bindable` open state (default false). Bind it when a
+                   surface must open the picker from something OTHER than the trigger,
+                   or must force it shut from outside — the World > Parties card does
+                   both. Unbound consumers are unaffected.
     onChoose(id) — called with the chosen option id
 -->
 <script>
@@ -97,6 +122,11 @@
     valueClass = '',
     showChevron = true,
     showSearch = true,
+    inlineSearchTrigger = false,
+    inlineCloseLabel = '',
+    header = undefined,
+    footer = undefined,
+    maxHeight = 0,
     popoverClass = '',
     triggerAddMarker = '',
     triggerData = {},
@@ -109,10 +139,15 @@
     pickerClass = '',
     minWidth = 240,
     maxWidth = 340,
+    // OPTIONAL two-way handle on the open state (default false, so every consumer that
+    // does not `bind:` it behaves exactly as before). The World > Parties travel-actor
+    // panel needs it in both directions: its TILE opens the picker without being the
+    // trigger, and a page or page-size change must force every open picker shut so no
+    // popover outlives the card that anchored it.
+    open = $bindable(false),
     onChoose = () => {},
   } = $props();
 
-  let open = $state(false);
   let search = $state('');
   let pickerRoot = $state(null);
   let popoverRoot = $state(null);
@@ -185,7 +220,11 @@
 
   function getHorizontalBounds(hostRect) {
     if (!pickerRoot) return {};
-    const selector = '.admin-main, .manager-main, .manager-table-scroll';
+    // `.manager-travel-parties` is the World > Parties pane's OWN scroller (issue 1182):
+    // that pane scrolls itself rather than sitting inside `.manager-table-scroll`, so
+    // without it here a card's travel-actor picker is bounded by the manager shell and
+    // can be laid out past the pane's right edge.
+    const selector = '.admin-main, .manager-main, .manager-table-scroll, .manager-travel-parties';
     let candidate = pickerRoot.parentElement;
     while (candidate) {
       if (candidate.matches?.(selector)) {
@@ -207,7 +246,12 @@
   }
 
   function updatePosition() {
-    if (!open || !triggerButton || typeof window === 'undefined') return;
+    // In `inlineSearchTrigger` mode the trigger button is UNMOUNTED while open (the
+    // search field takes its place), so the anchor falls back to the picker root —
+    // which is the element the inline field occupies. Without the fallback the panel
+    // would keep its last style and drift on scroll.
+    const anchor = triggerButton ?? pickerRoot;
+    if (!open || !anchor || typeof window === 'undefined') return;
     const host = getPopoverHost();
     const hostRect = host?.getBoundingClientRect?.() ?? {
       left: 0,
@@ -215,7 +259,7 @@
       width: window.innerWidth,
       height: window.innerHeight,
     };
-    const triggerRect = triggerButton.getBoundingClientRect();
+    const triggerRect = anchor.getBoundingClientRect();
     const bounds = getHorizontalBounds(hostRect);
     const layout = computeIconPickerPopoverLayout(
       {
@@ -243,11 +287,12 @@
       layout.placement === 'top'
         ? `top: auto; bottom: ${layout.bottom}px;`
         : `top: ${layout.top}px; bottom: auto;`;
+    const cappedHeight = maxHeight > 0 ? Math.min(layout.maxHeight, maxHeight) : layout.maxHeight;
     popoverStyle = [
       `left: ${layout.left}px;`,
       'right: auto;',
       `width: ${layout.width}px;`,
-      `max-height: ${layout.maxHeight}px;`,
+      `max-height: ${cappedHeight}px;`,
       vertical,
     ].join(' ');
   }
@@ -310,7 +355,27 @@
       ></i>{/if}
   {/snippet}
 
-  {#if triggerChip}
+  {#if inlineSearchTrigger && open}
+    <div class="manager-travel-picker-inline">
+      <i class="fas fa-magnifying-glass" aria-hidden="true"></i>
+      <input
+        bind:this={searchInput}
+        bind:value={search}
+        type="text"
+        placeholder={searchPlaceholder}
+        aria-label={searchAriaLabel || undefined}
+      />
+      <button
+        type="button"
+        class="manager-travel-picker-inline-close"
+        aria-label={inlineCloseLabel || undefined}
+        title={inlineCloseLabel || undefined}
+        onclick={() => close()}
+      >
+        <i class="fas fa-xmark" aria-hidden="true"></i>
+      </button>
+    </div>
+  {:else if triggerChip}
     <Chip tag="button" bind:element={triggerButton} class={triggerClass} {...triggerAttributes}
       >{@render triggerBody()}</Chip
     >
@@ -337,7 +402,7 @@
         }
       }}
     >
-      {#if showSearch}
+      {#if showSearch && !inlineSearchTrigger}
         <div class="manager-travel-popover-search">
           <input
             bind:this={searchInput}
@@ -378,8 +443,14 @@
             <span class="manager-travel-option-name">{option.label}</span>
           {/if}
           {#if option.trailing}<Chip tone="disabled">{option.trailing}</Chip>{/if}
+          {#if option.trailingIcon}<i
+              class={`manager-travel-option-marker ${option.trailingIcon}`}
+              aria-hidden="true"
+            ></i>{/if}
         </button>
       {/snippet}
+
+      {#if header}{@render header()}{/if}
 
       <div
         class="manager-travel-popover-options"
@@ -410,6 +481,8 @@
           {/each}
         {/if}
       </div>
+
+      {#if footer}{@render footer()}{/if}
     </div>
   {/if}
 </div>
