@@ -1,282 +1,463 @@
-import { describe, it, before, after } from 'node:test';
+import { describe, it, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, rmSync, symlinkSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
-import { pathToFileURL } from 'node:url';
-import { flushSync, mount, tick, unmount } from '../../node_modules/svelte/src/index-client.js';
-import { setupDOM, teardownDOM } from '../helpers/svelte-dom.js';
-import { createSvelteCompiler, installComponentTestGlobals } from '../helpers/svelte-component-harness.js';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { flushSync } from '../../node_modules/svelte/src/index-client.js';
+import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
-let tempRoot;
-let GatheringPartiesTab;
-let mounted;
-let target;
-
-const { writeCompiledSvelte, writeRawModule } = createSvelteCompiler(repoRoot, () => tempRoot);
+// Migrated off the hand-rolled compiler (issue 1182). `createMountedComponentHarness`
+// validates the full static dependency closure BEFORE mounting, so a `.svelte` this
+// tree renders that the list omits fails with a named error instead of hanging the
+// suite at the 300s timeout with `# cancelled N` and `# fail 0`.
+const harness = createMountedComponentHarness({
+  repoRoot,
+  tmpPrefix: 'fabricate-parties-tab-',
+  rawModules: [
+    'src/ui/svelte/util/foundryBridge.js',
+    'src/ui/svelte/util/iconPickerPopover.js',
+    'src/ui/svelte/util/dropUtils.js',
+    'src/ui/svelte/actions/dismissOnOutsideClick.js',
+    'src/ui/svelte/actions/portal.js',
+    'src/ui/svelte/actions/dragDrop.js',
+    // The card's selection seam: capture-phase pointerdown/focusin, so a card can be
+    // the inspector's selection target without being a control.
+    'src/ui/svelte/actions/selectsParty.js',
+  ],
+  compiledModules: [
+    // The manager's ONE chip (issue 883) and ONE no-state primitive (issue 785).
+    'src/ui/svelte/apps/manager/Chip.svelte',
+    'src/ui/svelte/apps/manager/EmptyState.svelte',
+    'src/ui/svelte/components/Pagination.svelte',
+    'src/ui/svelte/apps/manager/SearchablePopover.svelte',
+    'src/ui/svelte/apps/manager/RealmOverridePicker.svelte',
+    'src/ui/svelte/apps/manager/PartyNameField.svelte',
+    'src/ui/svelte/apps/manager/PartyMemberRow.svelte',
+    'src/ui/svelte/apps/manager/PartyAddMemberPanel.svelte',
+    'src/ui/svelte/apps/manager/PartyTravelActorPanel.svelte',
+    'src/ui/svelte/apps/manager/PartyExpandedBody.svelte',
+    'src/ui/svelte/apps/manager/GatheringPartiesTab.svelte',
+  ],
+  componentPath: 'src/ui/svelte/apps/manager/GatheringPartiesTab.svelte',
+});
 
 function makeParty(overrides = {}) {
   return {
     id: 'p1',
     name: 'Vanguard',
     enabled: false,
+    memberCards: [],
+    memberActorUuids: [],
+    memberCount: 0,
     travelActor: null,
+    travelActorUuid: '',
+    staleTravelActor: null,
     overrideMode: 'none',
     overrideRealmIds: [],
     currentRealmEvidence: { source: 'unresolved', resolved: false, realms: [], staleRealmIds: [] },
-    ...overrides
+    ...overrides,
   };
 }
 
 function makeParties(count) {
-  return Array.from({ length: count }, (_, i) => makeParty({ id: `p${i + 1}`, name: `Party ${i + 1}` }));
+  return Array.from({ length: count }, (_, index) =>
+    makeParty({ id: `p${index + 1}`, name: `Party ${index + 1}` })
+  );
 }
 
-async function mountTab(props) {
-  target = document.createElement('div');
-  document.body.appendChild(target);
-  mounted = mount(GatheringPartiesTab, {
-    target,
-    props: { parties: [], systemId: 'sys-1', systemRealms: [], onSetRealmOverride: () => {}, onClearRealmOverride: () => {}, ...props }
-  });
+function mountTab(props = {}) {
+  return harness.mount({ parties: [], systemId: 'sys-1', systemRealms: [], ...props });
+}
+
+function cards(root) {
+  return root.querySelectorAll('.manager-travel-parties-row');
+}
+
+function press(node) {
+  node.dispatchEvent(new window.Event('pointerdown', { bubbles: true }));
+  node.click();
   flushSync();
-  await tick();
+}
+
+function typeSearch(root, value) {
+  const input = root.querySelector('.manager-travel-parties-query');
+  input.value = value;
+  input.dispatchEvent(new window.Event('input', { bubbles: true }));
   flushSync();
+  return input;
 }
 
-function remount() {
-  if (mounted) { unmount(mounted); mounted = null; }
-  target?.remove();
-}
+before(() => harness.setup());
+after(() => harness.teardown());
+afterEach(() => harness.remount());
 
-function rows() {
-  return target.querySelectorAll('.manager-travel-parties-row');
-}
-
-describe('GatheringPartiesTab mounted behavior', () => {
-  before(async () => {
-    setupDOM();
-    installComponentTestGlobals();
-
-    tempRoot = mkdtempSync(join(tmpdir(), 'fabricate-parties-tab-'));
-    symlinkSync(resolve(repoRoot, 'node_modules'), join(tempRoot, 'node_modules'), 'junction');
-
-    writeRawModule('src/ui/svelte/util/foundryBridge.js');
-    writeRawModule('src/ui/svelte/util/iconPickerPopover.js');
-    writeRawModule('src/ui/svelte/util/dropUtils.js');
-    writeRawModule('src/ui/svelte/actions/dismissOnOutsideClick.js');
-    writeRawModule('src/ui/svelte/actions/portal.js');
-    writeRawModule('src/ui/svelte/actions/dragDrop.js');
-    // The shared no-state primitive (issue 785) and the manager's ONE chip (issue 883).
-    // A `.svelte` the tree renders but the harness omits HANGS the suite (# cancelled)
-    // rather than failing it.
-    writeCompiledSvelte('src/ui/svelte/apps/manager/Chip.svelte');
-    writeCompiledSvelte('src/ui/svelte/apps/manager/EmptyState.svelte');
-    writeCompiledSvelte('src/ui/svelte/components/Pagination.svelte');
-    writeCompiledSvelte('src/ui/svelte/apps/manager/SearchablePopover.svelte');
-    writeCompiledSvelte('src/ui/svelte/apps/manager/RealmOverridePicker.svelte');
-    writeCompiledSvelte('src/ui/svelte/apps/manager/PartyNameField.svelte');
-    writeCompiledSvelte('src/ui/svelte/apps/manager/PartyExpandedBody.svelte');
-    writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringPartiesTab.svelte');
-    const mod = await import(pathToFileURL(join(tempRoot, 'src/ui/svelte/apps/manager/GatheringPartiesTab.svelte.js')).href);
-    GatheringPartiesTab = mod.default;
+describe('GatheringPartiesTab (mounted)', () => {
+  it('renders the shared empty state with a create action when there are no parties', async () => {
+    const created = [];
+    const root = await mountTab({ parties: [], onCreateParty: () => created.push(true) });
+    assert.equal(cards(root).length, 0);
+    assert.ok(root.querySelector('[data-travel-parties-none]'), 'no-parties panel renders');
+    root.querySelector('[data-manager-party-create]').click();
+    flushSync();
+    assert.deepEqual(created, [true]);
   });
 
-  after(() => {
-    if (mounted) unmount(mounted);
-    target?.remove();
-    teardownDOM();
-    if (tempRoot) rmSync(tempRoot, { recursive: true, force: true });
+  it('suppresses the search bar at one party and shows it at two', async () => {
+    let root = await mountTab({ parties: makeParties(1) });
+    assert.ok(!root.querySelector('.manager-travel-parties-query'), 'no search bar at one party');
+    harness.remount();
+
+    root = await mountTab({ parties: makeParties(2) });
+    assert.ok(Boolean(root.querySelector('.manager-travel-parties-query')), 'search bar at two');
   });
 
-  it('renders an empty state when there are no parties', async () => {
-    await mountTab({ parties: [] });
-    assert.equal(rows().length, 0);
-    assert.ok(target.querySelector('[data-travel-parties-empty]'));
-    remount();
+  it('reports MATCHED of TOTAL, not page of total', async () => {
+    const root = await mountTab({ parties: makeParties(5) });
+    // Page size is 4, so a page-of-total counter would read "4 of 5".
+    assert.equal(root.querySelector('[data-manager-party-match-count]').textContent.trim(), '5 of 5');
+    typeSearch(root, 'Party 3');
+    assert.equal(root.querySelector('[data-manager-party-match-count]').textContent.trim(), '1 of 5');
   });
 
-  it('renders a row per party with status and member-count chips, and a fallback icon when no travel actor', async () => {
-    await mountTab({
+  it('matches a member name as well as a party name', async () => {
+    const root = await mountTab({
       parties: [
-        makeParty({ id: 'p1', name: 'Wardens', enabled: true, memberCount: 3 }),
-        makeParty({ id: 'p2', name: 'Scouts', enabled: false, memberCount: 1 })
-      ]
+        makeParty({ id: 'p1', name: 'Wardens' }),
+        makeParty({
+          id: 'p2',
+          name: 'Scouts',
+          memberCards: [{ uuid: 'Actor.a', name: 'Alara', img: '', stale: false }],
+          memberActorUuids: ['Actor.a'],
+          memberCount: 1,
+        }),
+      ],
     });
-    assert.equal(rows().length, 2);
-    const first = rows()[0];
-    assert.match(first.querySelector('.manager-travel-parties-name').textContent, /Wardens/);
-    // No travel actor image => fallback icon span
-    assert.ok(first.querySelector('.manager-travel-parties-thumb-fallback'));
-    // Enabled chip + member-count chip (the mode chip was replaced)
-    assert.ok(first.querySelector('.manager-chip.is-active'));
-    assert.equal(first.querySelector('.manager-travel-parties-mode-chip'), null);
-    assert.match(first.querySelector('.manager-travel-parties-members-chip').textContent, /3/);
-    assert.match(first.querySelector('.manager-travel-parties-members-chip').getAttribute('aria-label'), /3 members/);
-    // Disabled + singular member label on second
-    const second = rows()[1];
-    assert.ok(second.querySelector('.manager-chip.is-disabled'));
-    assert.match(second.querySelector('.manager-travel-parties-members-chip').getAttribute('aria-label'), /1 member/);
-    remount();
+    typeSearch(root, 'alara');
+    assert.equal(cards(root).length, 1);
+    assert.equal(cards(root)[0].getAttribute('data-manager-travel-party-id'), 'p2');
   });
 
-  it('shows the travel actor image when set', async () => {
-    await mountTab({
-      parties: [makeParty({ travelActor: { uuid: 'Actor.a', name: 'Alara', img: 'icons/alara.webp' } })]
+  it('matches a travel-actor name', async () => {
+    const root = await mountTab({
+      parties: [
+        makeParty({ id: 'p1', name: 'Wardens' }),
+        makeParty({
+          id: 'p2',
+          name: 'Scouts',
+          travelActorUuid: 'Actor.v',
+          travelActor: { uuid: 'Actor.v', name: 'Vosk', img: '' },
+        }),
+      ],
     });
-    const img = target.querySelector('img.manager-travel-parties-thumb');
-    assert.ok(img);
-    assert.equal(img.getAttribute('src'), 'icons/alara.webp');
-    remount();
+    typeSearch(root, 'vosk');
+    assert.equal(cards(root).length, 1);
+    assert.equal(cards(root)[0].getAttribute('data-manager-travel-party-id'), 'p2');
   });
 
-  it('does not duplicate the current realm in the row header (it lives in the inspector)', async () => {
-    await mountTab({
-      parties: [makeParty({ id: 'p1', name: 'A', currentRealmEvidence: { source: 'manualOverride', resolved: true, realms: [{ id: 'r1', name: 'Northreach', enabled: true }], staleRealmIds: [] } })]
-    });
-    assert.equal(target.querySelector('.manager-travel-parties-current-realm'), null);
-    remount();
+  it('renders the shared filtered panel and NO card list when nothing matches', async () => {
+    const root = await mountTab({ parties: makeParties(3) });
+    typeSearch(root, 'zzz');
+    assert.ok(Boolean(root.querySelector('[data-travel-parties-no-match]')), 'filtered panel');
+    assert.ok(!root.querySelector('.manager-travel-parties-list'), 'no card list');
+    assert.equal(cards(root).length, 0);
   });
 
-  it('paginates over a page size of 6', async () => {
-    await mountTab({ parties: makeParties(7) });
-    assert.equal(rows().length, 6);
-    remount();
-  });
-
-  it('filters the list by search term', async () => {
-    await mountTab({ parties: [makeParty({ id: 'p1', name: 'Wardens' }), makeParty({ id: 'p2', name: 'Scouts' })] });
-    const search = target.querySelector('input[type="search"]');
-    search.value = 'scout';
-    search.dispatchEvent(new window.Event('input', { bubbles: true }));
+  it('returns to page 1 on a search keystroke', async () => {
+    const root = await mountTab({ parties: makeParties(9) });
+    root.querySelector('[data-pagination-next]').click();
     flushSync();
-    await tick();
-    flushSync();
-    assert.equal(rows().length, 1);
-    assert.match(rows()[0].querySelector('.manager-travel-parties-name').textContent, /Scouts/);
-    remount();
+    assert.match(root.querySelector('[data-pagination-page]').textContent, /Page 2 of 3/);
+    typeSearch(root, 'Party');
+    assert.match(root.querySelector('[data-pagination-page]').textContent, /Page 1 of 3/);
   });
 
-  it('selects a party on header activation and reflects the selection as the expanded row', async () => {
+  it('clears the query when the search gate closes, so a delete cannot strand the pane', async () => {
+    const root = await mountTab({ parties: makeParties(2) });
+    typeSearch(root, 'Party 2');
+    assert.equal(cards(root).length, 1);
+
+    // The second party is deleted upstream: the search bar unmounts with it, so the
+    // query must go too or nothing left on screen can clear the no-match state.
+    await harness.setProps({ parties: makeParties(1) });
+    assert.ok(!root.querySelector('.manager-travel-parties-query'), 'search bar is gone');
+    assert.ok(!root.querySelector('[data-travel-parties-no-match]'), 'not stranded in no-match');
+    assert.equal(cards(root).length, 1);
+  });
+
+  it('offers exactly 2/4/6/10 per page and defaults to 4', async () => {
+    const root = await mountTab({ parties: makeParties(9) });
+    const select = root.querySelector('[data-pagination-size]');
+    // Counted, not merely present: the select renders unconditionally, so a presence
+    // assertion cannot fail.
+    assert.deepEqual(
+      Array.from(select.querySelectorAll('option')).map((option) => option.value),
+      ['2', '4', '6', '10']
+    );
+    assert.equal(cards(root).length, 4);
+  });
+
+  it('force-closes an open move drawer and travel-actor picker on a page-SIZE change', async () => {
+    const root = await mountTab({
+      parties: [
+        makeParty({
+          id: 'p1',
+          name: 'Wardens',
+          memberCards: [{ uuid: 'Actor.a', name: 'Alara', img: '', stale: false }],
+          memberActorUuids: ['Actor.a'],
+          memberCount: 1,
+        }),
+        ...makeParties(4).map((party, index) => makeParty({ id: `q${index}`, name: `Q${index}` })),
+      ],
+      actorOptions: [{ uuid: 'Actor.a', id: 'a', name: 'Alara', img: '', isPlayerCharacter: true }],
+    });
+
+    root.querySelector('.manager-party-member-move').click();
+    flushSync();
+    root.querySelector('[data-manager-party-actor-trigger="p1"]').click();
+    flushSync();
+    assert.ok(Boolean(root.querySelector('[data-manager-party-move-drawer]')), 'drawer opened');
+    assert.ok(Boolean(root.querySelector('.manager-travel-popover')), 'picker opened');
+
+    // A page CHANGE would unmount the keyed cards and close both incidentally; a page
+    // SIZE change keeps them mounted, so it is the only case that proves the close.
+    const select = root.querySelector('[data-pagination-size]');
+    select.value = '6';
+    select.dispatchEvent(new window.Event('change', { bubbles: true }));
+    flushSync();
+
+    assert.ok(!root.querySelector('[data-manager-party-move-drawer]'), 'drawer closed');
+    assert.ok(!root.querySelector('.manager-travel-popover'), 'picker closed');
+  });
+
+  it('selects a card on pointer and on focus, adds no tab stop, and marks it aria-current', async () => {
     const selections = [];
-    // Collapsed: clicking the header requests selection of the row's party.
-    await mountTab({
-      parties: [makeParty({ id: 'p1', name: 'Wardens' })],
+    const root = await mountTab({
+      parties: makeParties(2),
       selectedPartyId: '',
-      onSelectParty: (id) => selections.push(id)
+      onSelectParty: (id) => selections.push(id),
     });
-    let header = target.querySelector('.manager-travel-parties-header');
-    assert.equal(header.getAttribute('aria-expanded'), 'false');
-    assert.equal(target.querySelector('[data-manager-travel-party-editor]'), null);
-    header.click();
+
+    const first = cards(root)[0];
+    assert.ok(!first.hasAttribute('tabindex'), 'the card itself is not a tab stop');
+    assert.ok(!first.hasAttribute('role') || first.getAttribute('role') === 'listitem');
+
+    first.querySelector('.manager-party-name-input').dispatchEvent(
+      new window.Event('pointerdown', { bubbles: true })
+    );
     flushSync();
     assert.deepEqual(selections, ['p1']);
-    remount();
 
-    // Selected: the matching row renders expanded with its (empty) editor body.
-    await mountTab({ parties: [makeParty({ id: 'p1', name: 'Wardens' })], selectedPartyId: 'p1' });
-    header = target.querySelector('.manager-travel-parties-header');
-    assert.equal(header.getAttribute('aria-expanded'), 'true');
-    assert.ok(target.querySelector('.manager-travel-parties-row.is-selected'));
-    assert.ok(target.querySelector('[data-manager-travel-party-editor]'));
-    remount();
-
-    // Clicking the already-selected row toggles selection off.
-    const toggles = [];
-    await mountTab({
-      parties: [makeParty({ id: 'p1', name: 'Wardens' })],
-      selectedPartyId: 'p1',
-      onSelectParty: (id) => toggles.push(id)
-    });
-    target.querySelector('.manager-travel-parties-header').click();
+    cards(root)[1]
+      .querySelector('.manager-party-name-input')
+      .dispatchEvent(new window.Event('focusin', { bubbles: true }));
     flushSync();
-    assert.deepEqual(toggles, ['']);
-    remount();
+    assert.deepEqual(selections, ['p1', 'p2']);
+
+    await harness.setProps({ selectedPartyId: 'p2' });
+    assert.equal(cards(root)[1].getAttribute('aria-current'), 'true');
+    assert.ok(!cards(root)[0].hasAttribute('aria-current'));
   });
 
-  it('sets and clears the realm override from a searchable popover without selecting the row', async () => {
-    const calls = [];
+  it('lets an inner control select its own card AND still run its own handler exactly once', async () => {
     const selections = [];
-    await mountTab({
-      parties: [makeParty({ id: 'p1', name: 'Wardens', overrideMode: 'manual', overrideRealmIds: ['r1'] })],
+    const deleted = [];
+    const root = await mountTab({
+      parties: makeParties(2),
       selectedPartyId: '',
-      systemRealms: [{ id: 'r1', name: 'Northreach', enabled: true }, { id: 'r2', name: 'Ashen March', enabled: true }],
       onSelectParty: (id) => selections.push(id),
-      onSetRealmOverride: (partyId, systemId, ids) => calls.push(['set', partyId, systemId, ids]),
-      onClearRealmOverride: (partyId, systemId) => calls.push(['clear', partyId, systemId])
+      onDeleteParty: (id) => deleted.push(id),
     });
 
-    // No native select; the override is a popover trigger.
-    assert.equal(target.querySelector('select.manager-travel-parties-override'), null);
-    const trigger = target.querySelector('.manager-travel-parties-override-trigger');
-    assert.match(trigger.textContent, /Northreach/);
+    press(root.querySelector('[data-manager-party-delete="p2"]'));
+    assert.deepEqual(deleted, ['p2'], 'the control ran its own handler once');
+    assert.deepEqual(selections, ['p2'], 'and selected its own card, not another');
+  });
 
-    // Opening the popover does not select the row.
+  it('does not re-select the already-selected card, so a live validation error survives a press', async () => {
+    const selections = [];
+    const root = await mountTab({
+      parties: makeParties(2),
+      selectedPartyId: 'p1',
+      onSelectParty: (id) => selections.push(id),
+    });
+    press(cards(root)[0].querySelector('[data-manager-party-delete="p1"]'));
+    assert.deepEqual(selections, [], 'selectParty clears store errors, so it must not re-fire');
+  });
+
+  it('keeps an uncommitted name draft across a selection change', async () => {
+    const root = await mountTab({ parties: makeParties(2), selectedPartyId: '' });
+    const input = cards(root)[0].querySelector('.manager-party-name-input');
+    input.value = 'Half-typed';
+    input.dispatchEvent(new window.Event('input', { bubbles: true }));
+    flushSync();
+
+    await harness.setProps({ selectedPartyId: 'p2' });
+    // The `{#each}` key is what guarantees this: an unkeyed list would re-create the
+    // input and silently discard the edit in progress.
+    assert.equal(cards(root)[0].querySelector('.manager-party-name-input').value, 'Half-typed');
+  });
+
+  it('keeps the inspector selection when the selected party is filtered off the page', async () => {
+    const selections = [];
+    const root = await mountTab({
+      parties: [makeParty({ id: 'p1', name: 'Wardens' }), makeParty({ id: 'p2', name: 'Scouts' })],
+      selectedPartyId: 'p1',
+      onSelectParty: (id) => selections.push(id),
+    });
+    typeSearch(root, 'scouts');
+    assert.equal(cards(root).length, 1);
+    assert.deepEqual(selections, [], 'a search must not silently retarget the inspector');
+  });
+
+  it('routes a rejected member add to the card that issued it, and to no other', async () => {
+    const root = await mountTab({
+      parties: makeParties(2),
+      actorOptions: [{ uuid: 'Actor.a', id: 'a', name: 'Alara', img: '', isPlayerCharacter: true }],
+    });
+    root.querySelector('[data-manager-party-add-open="p2"]').click();
+    flushSync();
+    root.querySelector('[data-manager-party-candidate="Actor.a"]').click();
+    flushSync();
+
+    await harness.setProps({
+      travelError: 'This actor already belongs to another enabled party.',
+      travelFieldErrors: { members: 'This actor already belongs to another enabled party.' },
+    });
+
+    const second = cards(root)[1];
+    assert.ok(Boolean(second.querySelector('#party-member-error-p2')), 'error on the issuing card');
+    assert.ok(!cards(root)[0].querySelector('.manager-party-field-error'), 'and on no other card');
+    assert.ok(
+      !root.querySelector('[data-manager-party-summary-error]'),
+      'a field error does not also render the pane summary'
+    );
+  });
+
+  it('routes a rejected travel-actor assignment beneath that card travel-actor panel', async () => {
+    const root = await mountTab({ parties: makeParties(2) });
+    const tile = root.querySelector('[data-manager-party-travel-actor="p2"]');
+    const drop = new window.Event('drop', { bubbles: true });
+    drop.preventDefault = () => {};
+    drop.dataTransfer = { getData: () => JSON.stringify({ type: 'Actor', uuid: 'Actor.x' }) };
+    tile.dispatchEvent(drop);
+    flushSync();
+
+    await harness.setProps({
+      travelError: 'This travel actor is already used by another enabled party.',
+      travelFieldErrors: {
+        travelActor: 'This travel actor is already used by another enabled party.',
+      },
+    });
+
+    assert.ok(Boolean(root.querySelector('#party-travel-actor-error-p2')));
+    assert.equal(
+      root.querySelector('[data-manager-party-travel-actor="p2"]').getAttribute('aria-describedby'),
+      'party-travel-actor-error-p2'
+    );
+    assert.ok(!root.querySelector('#party-travel-actor-error-p1'));
+  });
+
+  it('renders a rejected ENABLE as the pane-level summary above the list', async () => {
+    // `setPartyEnabled` passes no field context, and req 5 can reject an enable the
+    // travel-actor gate allows, so the enable control is never the only feedback surface.
+    const root = await mountTab({
+      parties: [
+        makeParty({ id: 'p1', name: 'Wardens', enabled: true, travelActorUuid: 'Actor.v' }),
+        makeParty({ id: 'p2', name: 'Scouts' }),
+      ],
+    });
+    root.querySelector('[data-manager-party-enable="p1"]').click();
+    flushSync();
+
+    await harness.setProps({ travelError: 'Only one enabled party may hold this actor.' });
+    const summary = root.querySelector('[data-manager-party-summary-error]');
+    assert.ok(Boolean(summary), 'a context-free error renders once above the card list');
+    assert.match(summary.textContent, /Only one enabled party/);
+  });
+
+  it('falls back to the pane summary when the issuing card is filtered off the page', async () => {
+    const root = await mountTab({
+      parties: [makeParty({ id: 'p1', name: 'Wardens' }), makeParty({ id: 'p2', name: 'Scouts' })],
+      actorOptions: [{ uuid: 'Actor.a', id: 'a', name: 'Alara', img: '', isPlayerCharacter: true }],
+    });
+    root.querySelector('[data-manager-party-add-open="p2"]').click();
+    flushSync();
+    root.querySelector('[data-manager-party-candidate="Actor.a"]').click();
+    flushSync();
+    await harness.setProps({
+      travelError: 'This actor already belongs to another enabled party.',
+      travelFieldErrors: { members: 'This actor already belongs to another enabled party.' },
+    });
+    typeSearch(root, 'wardens');
+
+    assert.ok(!root.querySelector('#party-member-error-p2'), 'the issuing card is gone');
+    assert.ok(
+      Boolean(root.querySelector('[data-manager-party-summary-error]')),
+      'so the error falls back to the summary rather than disappearing'
+    );
+  });
+
+  it('keeps the realm-override gate lock inside [data-travel-panel="parties"]', async () => {
+    const hint = 'Enable Travel & Realms to set a current-realm override.';
+    const root = await mountTab({
+      parties: makeParties(1),
+      realmOverridesAvailable: false,
+      realmOverridesUnavailableHint: hint,
+    });
+    const lock = root.querySelector(
+      '[data-travel-panel="parties"] [data-party-realm-override-unavailable]'
+    );
+    assert.ok(Boolean(lock), 'viewLabCases.js:3269 matches on exactly this pair');
+    assert.match(lock.textContent, /Enable Travel & Realms/);
+    assert.ok(!root.querySelector('.manager-travel-parties-override-trigger'));
+  });
+
+  it('renders the realm-override picker through the SHIPPED default trigger mode', async () => {
+    // Characterization for `SearchablePopover`'s untouched path: the World > Parties
+    // travel-actor control opts into a new inline-search trigger, and 19 other consumers
+    // must keep rendering a plain trigger button with a chevron and an in-popover search.
+    const chosen = [];
+    const root = await mountTab({
+      parties: [makeParty({ id: 'p1', name: 'Wardens' })],
+      systemRealms: [
+        { id: 'r1', name: 'Northreach', enabled: true },
+        { id: 'r2', name: 'Ashen March', enabled: true },
+      ],
+      onSetRealmOverride: (partyId, systemId, ids) => chosen.push([partyId, systemId, ids]),
+    });
+
+    const trigger = root.querySelector('.manager-travel-parties-override-trigger');
+    assert.equal(trigger.getAttribute('aria-haspopup'), 'dialog');
     trigger.click();
     flushSync();
-    await tick();
-    flushSync();
-    assert.ok(target.querySelector('.manager-travel-popover'));
-    assert.deepEqual(selections, []);
 
-    // The popover offers a search field plus an Auto option and one option per realm.
-    assert.ok(target.querySelector('.manager-travel-popover-search input'));
-    const optionFor = (label) => Array.from(target.querySelectorAll('.manager-travel-option'))
-      .find(button => button.textContent.includes(label));
-
-    optionFor('Ashen March').click();
+    assert.ok(Boolean(root.querySelector('.manager-travel-popover-search input')), 'in-popover search');
+    assert.ok(
+      Boolean(root.querySelector('.manager-travel-parties-override-trigger')),
+      'the trigger button stays mounted in the default mode'
+    );
+    Array.from(root.querySelectorAll('.manager-travel-option'))
+      .find((option) => option.textContent.includes('Ashen March'))
+      .click();
     flushSync();
-    assert.deepEqual(calls.at(-1), ['set', 'p1', 'sys-1', ['r2']]);
-    assert.equal(target.querySelector('.manager-travel-popover'), null); // closed after choosing
-
-    // Reopen and choose Auto to clear the override.
-    target.querySelector('.manager-travel-parties-override-trigger').click();
-    flushSync();
-    await tick();
-    flushSync();
-    optionFor('Auto').click();
-    flushSync();
-    assert.deepEqual(calls.at(-1), ['clear', 'p1', 'sys-1']);
-    assert.deepEqual(selections, []); // never selected the row through the popover
-    remount();
+    assert.deepEqual(chosen, [['p1', 'sys-1', ['r2']]]);
   });
 
-  it('replaces the realm picker with an explanation when overrides are explicitly unavailable', async () => {
-    const hint = 'Enable Travel & Realms to set a current-realm override.';
-    await mountTab({
-      parties: [makeParty({ id: 'p1', name: 'Wardens' })],
-      realmOverridesAvailable: false,
-      realmOverridesUnavailableHint: hint
-    });
-
-    assert.ok(!target.querySelector('.manager-travel-parties-override-trigger'));
-    const unavailable = target.querySelector('[data-party-realm-override-unavailable]');
-    assert.ok(unavailable);
-    assert.equal(unavailable.getAttribute('aria-label'), hint);
-    assert.equal(unavailable.getAttribute('title'), hint);
-    remount();
-  });
-
-  it('filters the override options by realm search', async () => {
-    await mountTab({
-      parties: [makeParty({ id: 'p1', name: 'Wardens' })],
-      systemRealms: [{ id: 'r1', name: 'Northreach', enabled: true }, { id: 'r2', name: 'Ashen March', enabled: true }]
-    });
-    target.querySelector('.manager-travel-parties-override-trigger').click();
-    flushSync();
-    await tick();
-    flushSync();
-    const realmSearch = target.querySelector('.manager-travel-popover-search input');
-    realmSearch.value = 'ashen';
-    realmSearch.dispatchEvent(new window.Event('input', { bubbles: true }));
-    flushSync();
-    await tick();
-    flushSync();
-    const optionNames = Array.from(target.querySelectorAll('.manager-travel-option-name')).map(node => node.textContent.trim());
-    assert.ok(optionNames.includes('Ashen March'));
-    assert.ok(!optionNames.includes('Northreach'));
-    remount();
+  it('teaches SearchablePopover the pane scroller so a card picker is bounded by the pane', () => {
+    // happy-dom returns a zero-valued `getBoundingClientRect`, so the horizontal clamp
+    // cannot be proven by mounting. This pins the ancestor list itself, which is the
+    // thing that changed: without the pane class the walk falls through to the manager
+    // shell and a card's picker can be laid out past the pane's right edge.
+    const source = readFileSync(
+      resolve(repoRoot, 'src/ui/svelte/apps/manager/SearchablePopover.svelte'),
+      'utf8'
+    );
+    const ancestorList = source
+      .split('\n')
+      .find((line) => line.includes("'.admin-main"));
+    assert.ok(Boolean(ancestorList), 'getHorizontalBounds still walks a named ancestor list');
+    assert.match(ancestorList, /\.manager-table-scroll/);
+    assert.match(ancestorList, /\.manager-travel-parties/);
   });
 });
