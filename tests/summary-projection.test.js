@@ -48,9 +48,8 @@ globalThis.game = { user: { name: 'Fixture GM' } };
 
 const { Recipe } = await import('../src/models/Recipe.js');
 const { buildInventorySnapshot } = await import('../src/systems/inventorySnapshot.js');
-const { CRAFTING_BROWSE_STATUS, deriveBrowseStatus } = await import(
-  '../src/systems/craftingBrowseStatus.js'
-);
+const { CRAFTING_BROWSE_STATUS, deriveBrowseStatus } =
+  await import('../src/systems/craftingBrowseStatus.js');
 const {
   COMPONENT_SUMMARY_FIELDS,
   RECIPE_SUMMARY_FIELDS,
@@ -438,6 +437,20 @@ describe('summary purity — zero exact-evaluation calls', () => {
     // pointing at an import statement that does not exist. (`[^:]` spares `://` in a URL.)
     const code = source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/[^\n]*/g, '$1');
 
+    // The stripper is regex-based, so a stray `/*` inside a string literal or a line
+    // comment could open a phantom block running to the next real `*/` and swallow the code
+    // between. That would fail OPEN — the exhaustiveness count below reads the same
+    // stripped text, so both sides would shrink together and stay balanced while an import
+    // vanished. Counting statement-anchored imports on BOTH texts catches the desync; a
+    // JSDoc line reads ` * import …`, and `[ \t]*` does not match `*`, so prose still
+    // cannot trip it.
+    const anchoredImports = (text) => (text.match(/^[ \t]*import\b/gm) ?? []).length;
+    assert.equal(
+      anchoredImports(code),
+      anchoredImports(source),
+      'comment stripping must not swallow an import statement'
+    );
+
     // Matches the multi-line form Prettier produces past the print width, and either quote
     // style. A line-anchored single-quote regex misses both, and would report green while
     // the module held exactly the collaborator this forbids.
@@ -561,11 +574,14 @@ describe('the cheap-availability rule, defined once', () => {
     assert.equal(met.availability.available, true);
   });
 
-  it('narrows a Recipe INSTANCE through getExecutionSteps, and a plain object through steps', () => {
-    // A caller may hold either: a `Recipe` answers `getExecutionSteps()`, a deserialized
-    // row does not. Reading only the method would leave every plain-object caller on the
-    // silently-vacuous path above. The instance arm uses the REAL model class rather than a
-    // duck type, so the test exercises the same normalization a caller actually gets.
+  it('tolerates both recipe shapes a caller may hold', () => {
+    // A `Recipe` answers `getExecutionSteps()`; a deserialized row carries a bare `steps[]`.
+    // Reading only the latter would leave every instance caller on the silently-vacuous
+    // path above. The title deliberately does NOT claim the two arms take different code
+    // paths: for availability they cannot, because a Recipe's `getExecutionSteps()` returns
+    // `this.steps` verbatim when non-empty and otherwise synthesizes a step carrying the
+    // same top-level `ingredientSets` — so the method arm is defensive, not distinct. The
+    // instance arm still uses the REAL model class, so it exercises real normalization.
     const plain = makeSteppedRecipe(4);
     for (const [label, recipe] of [
       ['plain object', plain],
@@ -598,6 +614,27 @@ describe('the cheap-availability rule, defined once', () => {
         `${label}: step 1 needs 2 against 3 held — step 2's 99 must not decide the row`
       );
     }
+  });
+
+  it('answers "not asked" for an absent recipe even WITH a snapshot in view', () => {
+    // The `!recipe` guard, pinned directly. Without it the empty-requirements early return
+    // fires and a phantom row comes back `available: true` — the same silent-wrong the
+    // not-asked/unavailable distinction exists to prevent, and exactly what an index miss
+    // would produce. The sibling tests both miss it: one passes no snapshot, so the first
+    // clause already short-circuits, and the other passes a real recipe.
+    assert.equal(
+      projectSummaryAvailability({ snapshot: snapshotHolding(9), system: SYSTEM, recipe: null }),
+      null
+    );
+    assert.equal(
+      projectRecipeSummary({
+        system: SYSTEM,
+        audience: SUMMARY_AUDIENCE.PLAYER,
+        access: VISIBLE_ACCESS,
+        snapshot: snapshotHolding(9),
+      }).availability,
+      null
+    );
   });
 
   it('distinguishes "not asked" from "unavailable" when no snapshot is in view', () => {
