@@ -461,6 +461,32 @@ test('Phase C seeds system modifiers canonically before the settings-list action
   assert.match(beforeFirstAction, /modifierRowCount !== 2/);
 });
 
+test('manager stability counts populated system Travel realm and map rows', () => {
+  const guardStart = HARNESS.indexOf('async function assertManagerLayoutStable(page, label)');
+  const rowCountStart = HARNESS.indexOf('const rowCount = metrics.filter', guardStart);
+  const editFormCountStart = HARNESS.indexOf(
+    'const editFormCount = metrics.filter',
+    rowCountStart
+  );
+  assert.ok(
+    guardStart >= 0 && guardStart < rowCountStart && rowCountStart < editFormCountStart,
+    'the Manager layout measurement and row-count guard must remain bounded'
+  );
+
+  const measurementBlock = HARNESS.slice(guardStart, rowCountStart);
+  const rowCountBlock = HARNESS.slice(rowCountStart, editFormCountStart);
+  for (const selector of ['.manager-travel-realms-row', '.manager-map-link-row']) {
+    assert.ok(
+      measurementBlock.includes(`'${selector}'`),
+      `${selector} must participate in overflow measurement`
+    );
+    assert.ok(
+      rowCountBlock.includes(`metric.selector === '${selector}'`),
+      `${selector} must satisfy the populated-row backstop`
+    );
+  }
+});
+
 test('phase assignment matches the manager/player prefix split', () => {
   for (const label of SCREENSHOT_CAPTURE_ORDER) {
     const phase = phaseForCaptureLabel(label);

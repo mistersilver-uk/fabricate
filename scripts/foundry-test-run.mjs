@@ -1540,6 +1540,8 @@ async function assertManagerLayoutStable(page, label) {
       '.environment-task-layout',
       '.manager-travel-view',
       '.manager-travel-parties-row',
+      '.manager-travel-realms-row',
+      '.manager-map-link-row',
       '.manager-party-member-row',
       '.manager-fact'
     ];
@@ -1582,6 +1584,8 @@ async function assertManagerLayoutStable(page, label) {
       || metric.selector === '.manager-knowledge-copy-row'
       || metric.selector === '.manager-knowledge-learned-row'
       || metric.selector === '.manager-travel-parties-row'
+      || metric.selector === '.manager-travel-realms-row'
+      || metric.selector === '.manager-map-link-row'
   ).length;
   const editFormCount = metrics.filter(metric =>
     metric.selector === '.manager-system-edit-form'
