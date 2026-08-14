@@ -1965,7 +1965,7 @@ function readPatchMap(path) {
   for (const line of readLines(path)) {
     try {
       const entry = JSON.parse(line);
-      if (entry && entry.filename) map[entry.filename] = entry.patch ?? '';
+      if (entry?.filename) map[entry.filename] = entry.patch ?? '';
     } catch {
       // A malformed line costs frames, never evidence: an unattributable patch widens the
       // producer's selection rather than narrowing it, so dropping it here is the safe direction.

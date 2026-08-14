@@ -33,6 +33,31 @@ function resolveFixture(source, state) {
 }
 
 /**
+ * Resolve a fixture that stands in for `gh` STDOUT, and refuse anything that is not text.
+ *
+ * `gh` answers bytes, so every one of these fixtures is a string; `String(resolved)` would instead
+ * render a stray object as `'[object Object]'` and hand the gate a body that parses to no evidence
+ * at all. The suite would then read a green `no-screenshots-section` verdict as the product's
+ * answer when it is really the fixture's — so this refuses rather than coerces. `null` and
+ * `undefined` still mean "the field is empty", which is what `gh --jq` prints for an absent field.
+ *
+ * @param {unknown} source The value or factory.
+ * @param {object} state The fake's call counters.
+ * @param {string} field The fixture's name, for the diagnostic.
+ * @returns {string} The resolved text.
+ * @throws {TypeError} when the fixture resolves to anything but a string.
+ */
+function resolveTextFixture(source, state, field) {
+  const resolved = resolveFixture(source, state) ?? '';
+  if (typeof resolved !== 'string') {
+    throw new TypeError(
+      `makeGhFake: the '${field}' fixture must resolve to a string, not ${typeof resolved}.`
+    );
+  }
+  return resolved;
+}
+
+/**
  * A fake `gh` runner covering the three calls the gate makes: the workflow-runs list, the live body
  * read, and the live head read.
  *
@@ -59,11 +84,11 @@ export function makeGhFake({ runs = [], body = '', headOid = '' } = {}) {
       state.runListCalls += 1;
       return ok(JSON.stringify({ total_count: workflowRuns.length, workflow_runs: workflowRuns }));
     }
-    if (args.includes('headRefOid')) return ok(String(resolveFixture(headOid, state) ?? ''));
+    if (args.includes('headRefOid')) return ok(resolveTextFixture(headOid, state, 'headOid'));
     if (args.includes('body')) {
-      const value = resolveFixture(body, state) ?? '';
+      const value = resolveTextFixture(body, state, 'body');
       state.bodyReads += 1;
-      return ok(String(value));
+      return ok(value);
     }
     return { status: 1, stdout: '', stderr: `unexpected gh call: ${args.join(' ')}` };
   };

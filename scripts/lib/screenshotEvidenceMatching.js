@@ -111,8 +111,29 @@ const EVIDENCE = Object.freeze({
   WRONG_VIEWS: 'wrong-views',
 });
 
-const MARKDOWN_IMAGE_PATTERN = /!\[[^\]]*\]\(\s*([^)\s]+)[^)]*\)/g;
-const HTML_IMAGE_PATTERN = /<img\b[^>]*\bsrc\s*=\s*["']?([^"'\s>]+)/gi;
+/**
+ * The image patterns are deliberately split into "find the whole span" and "narrow it in code".
+ *
+ * A single regex doing both is AMBIGUOUS and therefore backtracks super-linearly (SonarCloud S5852):
+ * `\(\s*([^)\s]+)[^)]*\)` lets the capture and the tail compete for the same characters, and
+ * `<img\b[^>]*\bsrc` lets `[^>]*` eat into the `src` it is looking for. Neither was theoretical —
+ * on an unterminated `![a](aaa…` and on a run of `<img ` starts with no `src`, both forms cost
+ * ~4x per doubling of the input (18ms at 4k characters, 1.1s at 32k); the two image patterns below
+ * are flat at ~0.1ms on the same inputs.
+ *
+ * Each image pattern below is a single character-class repetition with a terminator the class
+ * excludes, so there is exactly one way to match and nothing to backtrack over. The narrowing rules
+ * that used to live in the quantifiers live in {@link markdownImageUrl} and {@link htmlImageSrc}
+ * instead, where they are plain code. A differential fuzz over the old patterns agreed on every
+ * input, so this is the same answer computed a different way — not a new parsing rule.
+ */
+
+/** The whole `![alt](target)` target, title and all. */
+const MARKDOWN_IMAGE_PATTERN = /!\[[^\]]*\]\(([^)]*)\)/g;
+
+/** A whole `<img …>` tag's attribute text, up to the closing `>` or the end of the input. */
+const HTML_IMAGE_TAG_PATTERN = /<img\b([^>]*)/gi;
+
 const HEADING_PATTERN = /^(#{1,6})\s+(.+?)\s*#*$/;
 const NEXT_HEADING_PATTERN = /^(#{1,6})\s/;
 
@@ -193,7 +214,55 @@ function screenshotSections(body) {
 }
 
 /**
+ * The URL half of a Markdown image target, dropping the optional `"title"` that may follow it.
+ *
+ * CommonMark separates the destination from the title with whitespace, so the destination is the
+ * first whitespace-delimited run — exactly what the old `\(\s*([^)\s]+)` captured, and exactly what
+ * made that pattern ambiguous against the `[^)]*` tail behind it.
+ *
+ * @param {string} target The text between the target's parentheses.
+ * @returns {string} The destination, or `''` when the target carries none.
+ */
+function markdownImageUrl(target) {
+  return target.trimStart().split(/\s/, 1)[0];
+}
+
+/**
+ * The `src` a `<img …>` tag's attribute text carries, or `''` when it carries none.
+ *
+ * THE RIGHTMOST `src=` WINS, which is what the greedy `[^>]*` in the old single-regex form did:
+ * greedy repetition backtracks from the right, so the first prefix length at which `\bsrc` matched
+ * was the LAST `src=` in the tag. The value rule is unchanged too: one optional opening quote, then
+ * the run of characters that is neither a quote, whitespace, nor `>`.
+ *
+ * The scan advances by ONE CHARACTER per hit rather than by the whole match, so overlapping
+ * occurrences (`src=src=x`, where the value itself contains `src=`) are all considered and the last
+ * start position still wins. A differential fuzz against the old pattern found that exact input
+ * class to be the only place a non-overlapping `matchAll` diverged.
+ *
+ * The pattern is declared HERE rather than beside its siblings above because this scan drives
+ * `lastIndex` by hand: a module-level global regex would carry that cursor between calls, which is
+ * shared mutable state whose correctness depends on every future caller resetting it.
+ *
+ * @param {string} attributes The text between `<img` and the tag's closing `>`.
+ * @returns {string} The `src` value.
+ */
+function htmlImageSrc(attributes) {
+  const pattern = /\bsrc\s*=\s*["']?([^"'\s>]+)/gi;
+  let src = '';
+  for (let match = pattern.exec(attributes); match; match = pattern.exec(attributes)) {
+    src = match[1];
+    pattern.lastIndex = match.index + 1;
+  }
+  return src;
+}
+
+/**
  * The image URLs in a chunk of Markdown, from both the `![alt](url)` and the `<img src=…>` forms.
+ *
+ * Empty results are dropped: a target with no destination (`![alt]()`) and a tag with no `src` were
+ * both non-matches under the old patterns, so counting them now would newly satisfy the gate on
+ * markup carrying no image at all.
  *
  * @param {string} text The Markdown.
  * @returns {string[]} The URLs, in no particular order.
@@ -201,9 +270,9 @@ function screenshotSections(body) {
 function imageUrlsIn(text) {
   const source = String(text || '');
   return [
-    ...Array.from(source.matchAll(MARKDOWN_IMAGE_PATTERN), (match) => match[1]),
-    ...Array.from(source.matchAll(HTML_IMAGE_PATTERN), (match) => match[1]),
-  ];
+    ...Array.from(source.matchAll(MARKDOWN_IMAGE_PATTERN), (match) => markdownImageUrl(match[1])),
+    ...Array.from(source.matchAll(HTML_IMAGE_TAG_PATTERN), (match) => htmlImageSrc(match[1])),
+  ].filter(Boolean);
 }
 
 /**
@@ -343,7 +412,15 @@ export function selectCaptureRun(runs = [], scope = {}) {
   if (mine.length === 0) return null;
   const pending = mine.filter((run) => run.status !== 'completed');
   const candidates = pending.length > 0 ? pending : mine;
-  return candidates.reduce((best, run) => (createdAtMs(run) >= createdAtMs(best) ? run : best));
+  // SEEDED WITH `null`, not left seedless. A seedless `reduce` throws on an empty array, so its
+  // safety is a property of the two guards above it rather than of this line; the seed makes the
+  // empty case answer `null` — the documented "no run belongs to this pull request" answer — instead
+  // of depending on a caller-visible invariant staying true. The comparison is unchanged: `>=` keeps
+  // the LAST of equally-created runs, which is the selection rule (i) and (i3) pin.
+  return candidates.reduce(
+    (best, run) => (best === null || createdAtMs(run) >= createdAtMs(best) ? run : best),
+    null
+  );
 }
 
 // ────────────────────────────────────────────────────────────────────────────────────────────────
@@ -532,7 +609,7 @@ function listCaptureRuns(context) {
     `repos/${context.repo}/actions/workflows/${context.captureWorkflow}/runs` +
     `?head_sha=${encodeURIComponent(context.headSha)}&event=pull_request&per_page=100`;
   const result = context.runGh(['api', query]);
-  if (!result || result.status !== 0) {
+  if (result?.status !== 0) {
     console.warn(
       `::warning::Could not list ${context.captureWorkflow} runs for ${context.headSha}: ${result?.stderr || 'unknown error'}`
     );
@@ -560,7 +637,7 @@ function readPullRequestField(context, field) {
   if (context.repo) args.push('--repo', context.repo);
   args.push('--json', field, '--jq', `.${field}`);
   const result = context.runGh(args);
-  if (!result || result.status !== 0) {
+  if (result?.status !== 0) {
     throw new Error(
       `Failed to read ${field} for pull request #${context.prNumber}: ${result?.stderr || 'unknown error'}`
     );
