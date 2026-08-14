@@ -424,18 +424,35 @@ test('Phase C seeds system modifiers canonically before the settings-list action
   const listStart = HARNESS.indexOf('// --- Settings-list ergonomics (issue 768) ---');
   const firstAction = HARNESS.indexOf("locator('[data-toggle-modifier]')", listStart);
   assert.ok(
-    gatheringStart >= 0 && systemPatchStart > gatheringStart && systemPatchEnd > systemPatchStart,
-    'the Phase-C gathering and canonical system patches must remain bounded'
-  );
-  assert.ok(
-    listStart >= 0 && firstAction > listStart,
-    'the settings-list action must remain bounded'
+    phaseCStart >= 0 &&
+      phaseCStart < gatheringStart &&
+      gatheringStart < systemPatchStart &&
+      systemPatchStart < systemPatchEnd &&
+      systemPatchEnd < listStart &&
+      listStart < firstAction,
+    'the Phase-C gathering patch, canonical system patch, and list action must remain strictly ordered'
   );
 
   const gatheringPatch = HARNESS.slice(gatheringStart, systemPatchStart);
   const systemPatch = HARNESS.slice(systemPatchStart, systemPatchEnd);
   const beforeFirstAction = HARNESS.slice(listStart, firstAction);
-  assert.doesNotMatch(gatheringPatch, /\bcharacterModifiers\s*:/);
+  const systemObjectMatch = gatheringPatch.match(/^(\s*)\[systemId\]: \{/m);
+  assert.ok(systemObjectMatch, 'the Phase-C gathering fixture must retain its system object');
+  const topLevelCharacterModifiers = new RegExp(
+    `^${systemObjectMatch[1]}  characterModifiers\\s*:`,
+    'm'
+  );
+  assert.match(
+    `${systemObjectMatch[1]}  characterModifiers: []`,
+    topLevelCharacterModifiers,
+    'the retired-key guard must detect a top-level system fixture library'
+  );
+  assert.doesNotMatch(
+    `${systemObjectMatch[1]}    characterModifiers: []`,
+    topLevelCharacterModifiers,
+    'the retired-key guard must permit nested task, drop-row, and event references'
+  );
+  assert.doesNotMatch(gatheringPatch, topLevelCharacterModifiers);
   assert.match(systemPatch, /await csm\.updateSystem\(systemId, \{[\s\S]*?modifiers:\s*\[/);
   assert.match(systemPatch, /smoke-mod-herbalism/);
   assert.match(systemPatch, /smoke-mod-survival/);
