@@ -263,7 +263,8 @@ export class CraftingListingBuilder {
       // `## Recipe` requirement 16. This previously borrowed the containing book's
       // artwork ahead of an authored image, keyed on the legacy `recipe.recipeItemId`
       // scalar; book membership is many-to-many, so "the containing book" tracked
-      // definition order rather than anything the GM authored (issue 887).
+      // definition order rather than anything the GM authored (issue 884, the rule; issue
+      // 887 shipped the removal of the last borrows).
       //
       // `resolveRecipeImage` rather than `recipe.img` directly: Foundry's generic
       // item-bag is the "no image" sentinel, and collapsing without it would render the

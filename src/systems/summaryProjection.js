@@ -33,6 +33,25 @@
  * favourite, so there is nothing for the two surfaces to disagree about. Recording it as
  * one shape is what stops a later surface inventing an audience axis it does not need.
  *
+ * ## What the projection does not decide: WHO gets a summary
+ *
+ * This module answers "given this recipe and this caller-supplied access result, what is
+ * its summary?", once per recipe. It never asks "which recipes may this viewer see?" — that
+ * is `RecipeVisibilityService`'s one candidate collection, and duplicating it here would
+ * give recipe-visibility/spec.md's gate a second, independently-driftable copy instead of a
+ * single owner.
+ *
+ * The consequence of skipping that upstream gate is not a crash, which is why it is written
+ * down rather than left to be discovered: {@link projectRecipeSummary} called with no
+ * `access` for a recipe the viewer cannot actually see produces an UNREDACTED summary
+ * reporting the `available` browse status — correct for a recipe the caller already knows
+ * is visible, and a disclosure of an undiscovered recipe's identity and category for one
+ * that is not. Nothing downstream of this module can catch that, because an omitted access
+ * result and "nothing to redact" are the same input here. A surface building player-audience
+ * summaries must therefore project only recipes the visibility evaluation already made
+ * visible, and must pass each one's own access result — see
+ * `recipe-visibility/spec.md` § Summary Projection Disclosure.
+ *
  * ## What a summary MUST NOT contain
  *
  * - **No exact craftability.** No `evaluateCraftability()` result, no ingredient
@@ -65,6 +84,14 @@
  * {@link projectSummaryAvailability} IS the rule. Both surfaces call it rather than
  * wiring snapshot → tallies → projection themselves, so neither can drift into a second
  * interpretation of "does this actor plausibly have the materials?".
+ *
+ * "Cheap availability" here and #1077's "indexed availability projection" are the SAME
+ * rule with the SAME implementation, `projectRecipeAvailability` in `inventorySnapshot.js`,
+ * reached only through {@link projectSummaryAvailability} below and never re-derived. The
+ * two phrasings exist because #1077 named the rule at the tallies and #1091 named it again
+ * at the summary that consumes it — a second name picked up along the way, not a second
+ * rule authored twice. Treating them as two things is exactly the drift this module exists
+ * to foreclose.
  *
  * It carries forward #1077's documented OPTIMISM verbatim: the answer is an upper bound.
  * A `true` means "nothing rules this out" and must be presented as "looks makeable", never
@@ -242,8 +269,9 @@ function tagList(value) {
  * @param {object|null} input.system The owning crafting system, for the per-system tallies.
  * @param {object|null} input.recipe
  * @returns {{available: boolean, optimistic: true, missingEssenceIds: string[],
- *   unsatisfiedGroupCount: number}|null} `null` when no snapshot was supplied — which is
- *   "not asked", NOT "unavailable". {@link deriveBrowseStatus} reads the distinction.
+ *   unsatisfiedGroupCount: number}|null} `null` when no usable snapshot or no recipe was
+ *   supplied — which is "not asked", NOT "unavailable", in every case. {@link
+ *   deriveBrowseStatus} reads the distinction.
  */
 export function projectSummaryAvailability({ snapshot = null, system = null, recipe = null } = {}) {
   if (!snapshot || typeof snapshot.componentTallies !== 'function' || !recipe) return null;
@@ -384,11 +412,15 @@ export function projectRecipeSummary({
       // `null` rather than `false` when nothing was asked, so a surface holding no
       // snapshot does not paint every row `missingMaterials`.
       materialsAvailable: availability === null ? null : availability.available,
-      // Gated on audience exactly as `CraftingListingBuilder` gates it (`!isGM && …`).
-      // A GM bypasses the knowledge gate entirely, so a GM row can never be `exhausted` —
-      // the builder's suite pins that as "a GM never sees an exhausted status". Since
-      // `browseStatus` is a SHARED field, honouring a caller's `exhausted` for a GM would
-      // be an audience-dependent derivation of a shared field, which this contract forbids.
+      // `!isGM &&` here narrows the INPUT, not the shared rule: `deriveBrowseStatus`
+      // itself takes no audience and never branches on one, matching
+      // `CraftingListingBuilder`'s own gate (`!isGM && …`). A GM row is never `exhausted`
+      // because the knowledge gate that PRODUCES exhaustion is bypassed for a GM entirely —
+      // that is a property of the gate, and this line is a defensive narrowing against a
+      // caller passing a stale `exhausted=true` computed before the audience was settled,
+      // not a second, audience-dependent derivation of a field this contract requires to
+      // have exactly one. The builder's suite pins the outcome as "a GM never sees an
+      // exhausted status".
       exhausted: !isGM && exhausted === true,
     }),
     category: normalizeRecipeCategory(recipe?.category),
@@ -396,7 +428,8 @@ export function projectRecipeSummary({
     // The recipe's OWN image, through the shared resolver that treats Foundry's generic
     // item-bag as the "no image" sentinel. Never the containing book's artwork: book
     // membership is many-to-many, so "the containing book" names definition order rather
-    // than anything the GM authored (issue 887).
+    // than anything the GM authored (issue 884, the rule; issue 887 shipped the removal of
+    // the last borrows).
     img: idOrNull(resolveRecipeImage(recipe ?? {})),
     name: text(recipe?.name),
     redaction,

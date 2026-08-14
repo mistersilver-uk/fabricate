@@ -56,7 +56,9 @@ export const CRAFTING_BROWSE_STATUS = Object.freeze({
  * @param {boolean|null} [input.materialsAvailable] Whether a material check passed, or
  *   `null` when none ran.
  * @param {boolean} [input.exhausted] Whether every owned copy of the recipe's book has
- *   reached its cap.
+ *   reached its cap. This rule takes no audience and never branches on one: a GM row reads
+ *   `exhausted` as `false` because the knowledge gate that produces exhaustion is bypassed
+ *   for a GM upstream, not because this function treats a GM caller differently.
  * @returns {string} A {@link CRAFTING_BROWSE_STATUS} value.
  */
 export function deriveBrowseStatus({
