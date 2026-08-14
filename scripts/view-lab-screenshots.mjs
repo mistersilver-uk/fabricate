@@ -134,6 +134,7 @@ async function startLabServer() {
  * 155-frame capture costs a whole run.
  */
 const CLICK_MODIFIERS = ['Alt', 'Control', 'ControlOrMeta', 'Meta', 'Shift'];
+const PRESS_KEYS = ['Enter', 'Space'];
 
 /**
  * The verbs a `modifiers` step may NOT carry. `selectOption`, `fill`, `setInputFiles` and
@@ -142,7 +143,7 @@ const CLICK_MODIFIERS = ['Alt', 'Control', 'ControlOrMeta', 'Meta', 'Shift'];
  * name. That is the failure class every other guard in this runner exists to prevent, so the
  * pairing is rejected rather than dropped.
  */
-const MODIFIER_INCOMPATIBLE_VERBS = ['select', 'fill', 'upload', 'scroll'];
+const MODIFIER_INCOMPATIBLE_VERBS = ['select', 'fill', 'upload', 'scroll', 'press'];
 
 /**
  * Drive a case to its named view state.
@@ -164,6 +165,7 @@ const MODIFIER_INCOMPATIBLE_VERBS = ['select', 'fill', 'upload', 'scroll'];
  *   { selector, fill: 'text' }         type into it, which is the only way to reach a dirty form
  *   { selector, scroll: true }         scroll it into view inside its own overflow container
  *   { selector, upload: json }         choose a file on a native file input
+ *   { selector, press: 'Enter' }       activate it with Enter or Space
  *
  * @param {import('playwright').Page} page The lab page.
  * @param {Array<string|object>} steps Ordered steps.
@@ -211,7 +213,7 @@ async function runSteps(page, steps, label, scratch) {
         }
       }
 
-      // Five verbs, because a click alone cannot reach every state the smoke photographs. The smoke
+      // Six verbs, because a click alone cannot reach every state the smoke photographs. The smoke
       // itself drives these surfaces with `selectOption` and `fill`; a click-only runner leaves those
       // states permanently out of reach no matter how many stable hooks exist, which is not a
       // fixture problem and cannot be solved by fixture work.
@@ -244,6 +246,14 @@ async function runSteps(page, steps, label, scratch) {
         // `.application` does NOT scroll nested overflow containers, so a card that never scrolled
         // into view is simply absent from the frame while every assertion still passes.
         await target.scrollIntoViewIfNeeded();
+      } else if ('press' in step) {
+        if (!PRESS_KEYS.includes(step.press)) {
+          throw new Error(
+            `${label}: step for "${step.selector}" names unknown key ${JSON.stringify(step.press)} — ` +
+              `press accepts ${PRESS_KEYS.join(', ')}`
+          );
+        }
+        await target.press(step.press);
       } else {
         await target.click(modifiers ? { modifiers } : {});
       }

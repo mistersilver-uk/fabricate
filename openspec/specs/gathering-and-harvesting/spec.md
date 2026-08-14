@@ -220,7 +220,7 @@ There are no other strategies and no per-environment configuration of the select
 GM authoring UI for blind environments shows each included task's calculated selection share as `weight / sum(included task weights) * 100`; the displayed percentage is informational and does not change the persisted weight shape.
 17. Reveal behaviour is set at the system level only — the system Gathering Rules `revealPolicy` / `revealScope` apply to every environment.
 Environments do not override them.
-18. `includedRealmIds`, `includedBiomeIds`, `excludedRealmIds`, and `excludedBiomeIds` are optional, opt-in location availability rules evaluated against the party's resolved current realms (see *Location-Aware Gathering*). `includedRealmIds` is the realm membership (multiple `GatheringRealm` ids) authored from the Travel tab / environment editor.
+18. `includedRealmIds`, `includedBiomeIds`, `excludedRealmIds`, and `excludedBiomeIds` are optional, opt-in location availability rules evaluated against the party's resolved current realms (see *Location-Aware Gathering*). `includedRealmIds` is the realm membership (multiple `GatheringRealm` ids) authored from World > Travel > Realms / the environment editor.
 They are distinct from the inert legacy `region` string: `region` is a free-text tag string, is NOT a `GatheringRealm` id, no longer participates in composition matching, and is not editor-surfaced.
 The legacy `biomes` tag list remains a composition match dimension.
 An environment with none of the location fields (or only empty-after-normalization arrays) is not location-gated and preserves existing behavior.
@@ -235,11 +235,17 @@ Realm authoring stays lightweight geography — a Realm owns no tasks, events, o
 A **Gathering Realm** is the Fabricate geography concept; it is distinct from a Foundry **Scene Region** (`RegionDocument` / Region Behaviour), the canvas object that a realm maps to many-to-one through `sceneMappings[].sceneRegionUuid`.
 This distinction is the reason the Fabricate concept was renamed from **Region** to **Realm**.
 
-This section specifies the **shipped Phase 1** behavior (manual current-realm MVP).
-Scene Region automation, realm modifier application, and the full player travel/discovery UI are later-phase follow-ups; the reserved fields and source tokens below leave room for them without changing the contract.
+This section specifies the shipped manual override and live token-derived Scene Region behavior.
+Realm modifier application and the full player travel/discovery UI remain later-phase follow-ups; the reserved fields below leave room for them without changing the contract.
 
 The entire realm/travel/availability subsystem is gated by a per-system `gatheringRealmSettings.enabled` toggle that defaults to `false` (see *Gathering Realm Settings*).
-When disabled, every gate point — the engine location-block choke point, the current-realm resolver, the location-aware public API, and the Manager Travel tab and environment realm selectors — behaves as if no environment is location-gated and no travel surfaces exist.
+When disabled, every gate point — the engine location-block choke point, the current-realm resolver, the location-aware public API, the Manager World Parties/Travel navigation, and environment realm selectors — behaves as if no environment is location-gated and no travel surfaces exist.
+In Manager, parties are reached through the world-level `Parties` destination and selected-system
+realm/map authoring through `World > Travel > Realms` and `World > Travel > Map Region Links`.
+This presentation does not change ownership: the party list and count are world-global, while
+current-realm overrides remain keyed by selected `systemId`, realms remain owned by that crafting
+system, and Map Region Links writes the active-scene Region choice only into those realms'
+`sceneMappings`.
 Realm is geography only and is NOT a composition axis (composition uses biome + danger); the legacy region vocabulary that previously conflated geography with composition tagging has been removed.
 
 ### Gathering Realm
@@ -255,7 +261,7 @@ GatheringRealm = {
   secret: boolean,    // default false
   biomes: string[],   // terrain/ecology traits from the system biome vocabulary
   sort?: number,
-  sceneMappings?: GatheringRealmSceneMapping[], // bridge to Foundry Scene Regions; member field names NOT renamed; authored via the Travel route's Map Region Links tab, applied at runtime by live sensing
+  sceneMappings?: GatheringRealmSceneMapping[], // bridge to Foundry Scene Regions; member field names NOT renamed; authored via World > Travel > Map Region Links, applied at runtime by live sensing
   modifiers?: GatheringRealmModifier[],         // reserved for Phase 4 realm modifiers
 }
 ```
@@ -269,7 +275,7 @@ GatheringRealm = {
 5. Secret realms may affect runtime availability, but their identity must not be disclosed to a non-GM viewer until the selected actor has discovered the realm or `GatheringRealmSettings.revealMode === "alwaysVisible"`.
 6. Disabled realms must not satisfy environment availability for non-GM users, except when a GM manual override explicitly includes a disabled realm for diagnostic/preview purposes.
 7. Stale realm ids in environments, party overrides, or discovery flags are ignored at runtime and surfaced to GMs as repair evidence.
-8. `sceneMappings` normalize, validate (unique ids, known enums, finite values), and round-trip; they are authored via the Travel route's Map Region Links tab (single-valued per scene region, `adminStore.setMapRegionLink`) and are **applied at runtime** by live token-derived sensing (Phase 3, shipped).
+8. `sceneMappings` normalize, validate (unique ids, known enums, finite values), and round-trip; they are authored via World > Travel > Map Region Links (single-valued per scene region, `adminStore.setMapRegionLink`) and are **applied at runtime** by live token-derived sensing (Phase 3, shipped).
 `modifiers` normalize, validate, and round-trip but are **not yet applied at runtime** — realm modifier application (Phase 4) is not shipped.
 The `sceneMappings[].sceneRegionUuid`/`sceneUuid` fields name Foundry `RegionDocument` objects and are **not** renamed.
 
@@ -289,7 +295,7 @@ GatheringRealmSettings = {
 2. Missing settings normalize to `enabled: false`, `revealMode: "manual"`, and `modifierVisibility: "visible"`.
 3. Unknown values are rejected at save/import boundaries and coerced to defaults when read from existing data. `enabled` must be a real boolean when present; only an explicit `true` enables the subsystem, and any non-boolean coerces to `false` on read.
 4. `enabled` gates the entire realm/travel/availability subsystem.
-When `false` (the default, including for all migrated systems), every environment behaves as ungated (no location blocking), the current-realm resolver fast-exits to the unresolved-empty shape, the location-aware public API returns null/false, and the Manager hides the Travel tab and the environment realm selectors.
+When `false` (the default, including for all migrated systems), every environment behaves as ungated (no location blocking), the current-realm resolver fast-exits to the unresolved-empty shape, the location-aware public API returns null/false, and the Manager hides World Parties/Travel and the environment realm selectors.
 A shared `isGatheringRealmsEnabled(system)` helper is the single source of truth every gate reads.
 5. `manual` reveal mode means only GM/API reveal actions add actor discovery for secret realms. `alwaysVisible` discloses realm identities to players (while still allowing discovery history). `onPartyTokenEntry` is reserved for Phase 3 token automation and is not yet active.
 
@@ -407,7 +413,7 @@ GatheringRealmModifier = {
 } // Phase 4
 ```
 
-These records normalize, validate (unique ids, known enums, finite values, stale uuids stay readable for repair), and round-trip through realm persistence and import/export, but Fabricate does not yet resolve Scene Region mappings (Phase 3) or apply realm modifiers to listing/attempt calculations (Phase 4).
+These records normalize, validate (unique ids, known enums, finite values, stale uuids stay readable for repair), and round-trip through realm persistence and import/export. Fabricate resolves Scene Region mappings through live token sensing (Phase 3 shipped), but does not yet apply realm modifiers to listing/attempt calculations (Phase 4).
 When implemented, modifiers must adjust gathering behavior only and must not rewrite source environment, task, event, drop, or component records.
 
 ## System Gathering Rules

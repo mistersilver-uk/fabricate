@@ -116,8 +116,8 @@
 <div
   class="manager-gathering-panel manager-travel-parties"
   id="travel-panel-parties"
-  role="tabpanel"
-  aria-labelledby="travel-tab-parties"
+  role="region"
+  aria-labelledby="manager-world-nav-parties"
   data-travel-panel="parties"
 >
   <section

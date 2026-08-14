@@ -38,8 +38,8 @@
 <div
   class="manager-gathering-panel manager-travel-map-links"
   id="travel-panel-map"
-  role="tabpanel"
-  aria-labelledby="travel-tab-map"
+  role="region"
+  aria-labelledby="manager-world-nav-map"
   data-travel-panel="map"
 >
   {#if !sceneUuid}

@@ -3213,45 +3213,71 @@ export const VIEW_LAB_CASES = Object.freeze([
     ],
   }),
   managerCase({
-    id: 'manager-gathering-travel-normal',
-    label: 'Manager — Gathering travel normal',
-    smokeLabels: ['manager-gathering-travel-normal'],
-    // Lands on the real Travel and parties surface — the parties/realms/map-region tabs, an
-    // ENABLED party with its three members, and the selected-party inspector — rather than the
-    // environments browser this used to capture. The seed that blocked it is fixed: it authored
-    // `memberActorIds` where `GatheringPartyStore._normalizeParty` reads `memberActorUuids`, so
-    // every field normalised away and the card read "Disabled, 0 members".
+    id: 'manager-world-parties-normal',
+    label: 'Manager — World Parties normal',
+    smokeLabels: ['manager-world-parties-normal'],
     reaches: 'exact',
-    // SMITHING, not herbalism. The Travel subitem exists only while the owning system's
-    // `gatheringRealmSettings.enabled` is true, and switching that on for herbalism would
-    // realm-lock all three of its environments (every one names an included realm) and take the
-    // already-captured environments, blind and stacked frames with it. Smithing already runs the
-    // Travel/Realms subsystem for the realm-locked environment teaser.
     query: { system: 'lab-smithing' },
-    steps: ['Gathering', { selector: '#manager-gathering-nav-travel' }],
+    steps: [{ selector: '#manager-world-nav-parties', press: 'Enter' }],
     expectView: 'environments',
-    kinds: ['manager', 'environments'],
+    expectSelector: '[data-travel-panel="parties"]',
+    position: { width: 1330, height: 900 },
+    kinds: ['manager', 'environments', 'world'],
     sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/CraftingSystemManagerRoot\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/Environment/,
-      /^src\/ui\/svelte\/apps\/manager\/Gathering(Economy|EventEditView|EventsBrowserView|MapLinksTab|PartiesTab|RealmsTab|TaskEditView|TasksBrowserView|TravelTabs)/,
+      /^src\/ui\/svelte\/apps\/manager\/Gathering(MapLinksTab|PartiesTab|RealmsTab)/,
       /^src\/ui\/svelte\/apps\/manager\/(Party|Realm|RosterRow|MapRegionLinkPicker)/,
     ],
   }),
   managerCase({
-    id: 'manager-gathering-travel-stacked',
-    label: 'Manager — Gathering travel stacked',
-    smokeLabels: ['manager-gathering-travel-stacked'],
-    // Reaches Travel for the same reason as its normal-width twin above, at the stacked breakpoint.
+    id: 'manager-world-realms-normal',
+    label: 'Manager — World Travel Realms expanded',
+    smokeLabels: ['manager-world-realms-normal'],
     reaches: 'exact',
     query: { system: 'lab-smithing' },
-    steps: ['Gathering', { selector: '#manager-gathering-nav-travel' }],
-    expectView: 'environments',
-    position: { width: 1000, height: 720 },
-    kinds: ['manager', 'environments', 'responsive'],
-    sourceMatches: [
-      /^src\/ui\/svelte\/apps\/manager\/Environment/,
-      /^src\/ui\/svelte\/apps\/manager\/Gathering(Economy|EventEditView|EventsBrowserView|MapLinksTab|PartiesTab|RealmsTab|TaskEditView|TasksBrowserView|TravelTabs)/,
+    steps: [
+      { selector: '#manager-world-travel-toggle', press: 'Space' },
+      { selector: '#manager-world-nav-realms', press: 'Enter' },
     ],
+    expectView: 'environments',
+    expectSelector: '[data-travel-panel="realms"]',
+    position: { width: 1330, height: 900 },
+    kinds: ['manager', 'environments', 'world'],
+    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|EnvironmentsBrowserView|GatheringRealmsTab)\.svelte$/],
+  }),
+  managerCase({
+    id: 'manager-world-realms-stacked',
+    label: 'Manager — World Travel Realms stacked',
+    smokeLabels: ['manager-world-realms-stacked'],
+    reaches: 'exact',
+    query: { system: 'lab-smithing' },
+    steps: [
+      { selector: '#manager-world-travel-toggle', press: 'Space' },
+      { selector: '#manager-world-nav-realms', press: 'Enter' },
+    ],
+    expectView: 'environments',
+    expectSelector: '[data-travel-panel="realms"]',
+    position: { width: 1000, height: 720 },
+    kinds: ['manager', 'environments', 'world', 'responsive'],
+    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|EnvironmentsBrowserView|GatheringRealmsTab)\.svelte$/],
+  }),
+  managerCase({
+    id: 'manager-world-map-collapsed',
+    label: 'Manager — World Travel Map Region Links collapsed rail',
+    smokeLabels: ['manager-world-map-collapsed'],
+    reaches: 'exact',
+    query: { system: 'lab-smithing' },
+    steps: [
+      { selector: '#manager-world-travel-toggle', press: 'Space' },
+      { selector: '#manager-world-nav-map', press: 'Enter' },
+      { selector: '[data-manager-rail-toggle]', press: 'Enter' },
+    ],
+    expectView: 'environments',
+    expectSelector: '.manager-body.is-rail-collapsed #manager-world-nav-travel.is-active',
+    position: { width: 1330, height: 900 },
+    kinds: ['manager', 'environments', 'world', 'responsive'],
+    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|EnvironmentsBrowserView|GatheringMapLinksTab)\.svelte$/],
   }),
   managerCase({
     id: 'manager-gathering-economy-actors',

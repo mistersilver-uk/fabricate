@@ -145,7 +145,8 @@ function navDeclarationScope(sources, template) {
  * The step keys `runSteps` dispatches on. Hoisted out of the step test so the drift check below can
  * compare them against the runner's own lists.
  */
-const VERBS = ['select', 'fill', 'scroll', 'upload'];
+const VERBS = ['select', 'fill', 'scroll', 'upload', 'press'];
+const PRESS_KEYS = ['Enter', 'Space'];
 
 /**
  * `modifiers` is a MODIFIER, not a verb: it does not choose which action runs, it changes how the
@@ -455,6 +456,12 @@ test('every interaction step names text that exists in the manager UI', () => {
       if (VERBS.filter((verb) => verb in step).length > 1) {
         missing.push(`${viewCase.id}: step for "${step.selector}" names more than one verb`);
       }
+      if ('press' in step && !PRESS_KEYS.includes(step.press)) {
+        missing.push(
+          `${viewCase.id}: step for "${step.selector}" names unknown key ` +
+            `${JSON.stringify(step.press)} — press accepts ${PRESS_KEYS.join(', ')}`
+        );
+      }
       // The runner rejects both of these too, but that throw only fires during a capture run, which
       // is not an `npm test` gate — so a bad step would sit green in the registry until somebody
       // spent twenty minutes discovering it. Both rules are therefore enforced HERE as well.
@@ -737,6 +744,11 @@ test('the modifier vocabulary this file enforces is the one the capture driver e
     declaredArray('MODIFIER_INCOMPATIBLE_VERBS'),
     [...VERBS].sort(),
     'the driver refuses to pair `modifiers` with a different set of verbs than this file knows'
+  );
+  assert.deepEqual(
+    declaredArray('PRESS_KEYS'),
+    [...PRESS_KEYS].sort(),
+    'the driver accepts a different press-key vocabulary than this file admits'
   );
 });
 

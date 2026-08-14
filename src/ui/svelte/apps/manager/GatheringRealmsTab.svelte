@@ -109,8 +109,8 @@
 <div
   class="manager-gathering-panel manager-travel-realms"
   id="travel-panel-realms"
-  role="tabpanel"
-  aria-labelledby="travel-tab-realms"
+  role="region"
+  aria-labelledby="manager-world-nav-realms"
   data-travel-panel="realms"
 >
   <section

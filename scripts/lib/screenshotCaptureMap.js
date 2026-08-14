@@ -167,8 +167,10 @@ export const SCREENSHOT_CAPTURE_ORDER = Object.freeze([
   'manager-environment-edit-placeholder',
   'manager-gathering-events-normal',
   'manager-gathering-event-editor-normal',
-  'manager-gathering-travel-normal',
-  'manager-gathering-travel-stacked',
+  'manager-world-parties-normal',
+  'manager-world-realms-normal',
+  'manager-world-realms-stacked',
+  'manager-world-map-collapsed',
   'manager-tool-parity-01-library-1280x720',
   'manager-tool-zero-state-empty-library-1280x720',
   'manager-tool-parity-02-overview-1280x720',
@@ -413,7 +415,7 @@ const D0_SECTION_SPANS = [
   {
     name: 'gathering',
     from: 'manager-environments-browse-normal',
-    to: 'manager-gathering-travel-stacked',
+    to: 'manager-world-map-collapsed',
   },
   {
     name: 'tools',

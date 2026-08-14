@@ -215,7 +215,6 @@ function compileManagerRoot() {
   writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringTasksBrowserView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringEventsBrowserView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringEventEditView.svelte');
-  writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringTravelTabs.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringPartiesTab.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringRealmsTab.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringMapLinksTab.svelte');
@@ -766,6 +765,10 @@ function gatheringToggle() {
   // Target the Gathering group's toggle specifically: the Crafting group (unconditional
   // as of issue 745) also renders a `.manager-nav-toggle`, ahead of Gathering in the rail.
   return target.querySelector('#manager-nav-gathering + .manager-nav-toggle');
+}
+
+function worldNavItem(id) {
+  return target.querySelector(`#manager-world-nav-${id}`);
 }
 
 // The gated Crafting nav group (issue 511) nests Recipes as a sub-route. Clicking
@@ -1716,6 +1719,23 @@ function createStore(calls = [], options = {}) {
         },
       },
     },
+    gatheringRealmSettings: { enabled: options.gatheringRealmsEnabled === true },
+    travelParties: options.travelParties || [
+      { id: 'party-one', name: 'Wayfarers', enabled: true, memberCount: 2 },
+      { id: 'party-two', name: 'Night Watch', enabled: false, memberCount: 1 },
+    ],
+    selectedPartyId: 'party-one',
+    selectedSystemRealms: options.selectedSystemRealms || [
+      {
+        id: 'realm-forest',
+        name: 'Green March',
+        enabled: true,
+        environmentCount: 1,
+        partyCount: 1,
+      },
+    ],
+    currentSceneRegions: options.currentSceneRegions || [],
+    currentSceneUuid: options.currentSceneUuid || '',
     foundrySystemId: options.foundrySystemId || '',
     // The `evaluateSystemValidation` report drives the System Overview page's
     // Validation tab, its nav badge, and the system-blocker banner.
@@ -13154,7 +13174,72 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(target.textContent.includes('Quiet Cavern'));
   });
 
-  it('flips the Travel & Realms toggle (aria-pressed) and reveals the Travel nav item', async () => {
+  it('renders the gated World hierarchy after selected-system navigation and routes its destinations', async () => {
+    const calls = [];
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore(calls, { gatheringRealmsEnabled: true }),
+        services: { openCurrentAdmin: () => {} },
+      },
+    });
+    flushSync();
+
+    const world = target.querySelector('[data-world-nav-section]');
+    assert.ok(world, 'World renders when Gathering and Travel & Realms are enabled');
+    assert.equal(world.querySelector('#manager-world-heading').textContent.trim(), 'WORLD');
+    assert.equal(world.querySelector('#manager-world-scope').textContent.trim(), 'every system');
+    assert.ok(
+      Array.from(target.querySelector('.manager-nav').children).indexOf(world) >
+        Array.from(target.querySelector('.manager-nav').children).indexOf(
+          target.querySelector('#manager-nav-gathering').closest('.manager-nav-group')
+        ),
+      'World follows all selected-system navigation'
+    );
+    assert.deepEqual(
+      Array.from(world.querySelectorAll('[data-world-nav-item]')).map((item) => item.id),
+      ['manager-world-nav-parties', 'manager-world-nav-travel']
+    );
+    assert.ok(worldNavItem('parties').querySelector('.fa-users'));
+    assert.ok(worldNavItem('travel').querySelector('.fa-route'));
+    assert.equal(worldNavItem('parties').querySelector('.manager-nav-count').textContent.trim(), '2');
+    assert.ok(!gatheringSubitem('Travel'), 'Gathering no longer owns a Travel child');
+
+    worldNavItem('travel').click();
+    await tick();
+    flushSync();
+    assert.equal(worldNavItem('travel').getAttribute('aria-expanded'), 'true');
+    assert.equal(
+      target.querySelector('#manager-world-travel-toggle').getAttribute('aria-controls'),
+      'manager-world-travel-submenu'
+    );
+    assert.ok(target.querySelector('[data-world-travel-submenu]'));
+    assert.ok(worldNavItem('realms').querySelector('.fa-mountain-sun'));
+    assert.ok(worldNavItem('map').querySelector('.fa-map-location-dot'));
+    assert.equal(worldNavItem('parties').getAttribute('aria-current'), 'page');
+    assert.equal(target.querySelector('[data-travel-panel="parties"]').getAttribute('role'), 'region');
+    assert.equal(
+      target.querySelector('[data-travel-panel="parties"]').getAttribute('aria-labelledby'),
+      'manager-world-nav-parties'
+    );
+
+    worldNavItem('realms').click();
+    await tick();
+    flushSync();
+    assert.equal(worldNavItem('realms').getAttribute('aria-current'), 'page');
+    assert.equal(
+      target.querySelectorAll('[data-world-nav-section] [aria-current="page"]').length,
+      1,
+      'only the concrete destination is current'
+    );
+    assert.ok(worldNavItem('travel').classList.contains('is-active'));
+    assert.ok(target.querySelector('[data-manager-travel-realm-id="realm-forest"]'));
+    assert.ok(!target.querySelector('[id^="travel-tab-"]'), 'the retired horizontal tabs are absent');
+  });
+
+  it('flips Travel & Realms and reveals World without restoring Gathering Travel', async () => {
     const calls = [];
     target = document.createElement('div');
     document.body.appendChild(target);
@@ -13193,11 +13278,8 @@ describe('CraftingSystemManager mounted behavior', () => {
       'true',
       'toggle reflects the new pressed state'
     );
-    // Enabling the flag reveals the Travel nav item.
-    assert.ok(
-      gatheringSubitem('Travel'),
-      'Travel nav item appears once Travel & Realms is enabled'
-    );
+    assert.ok(target.querySelector('[data-world-nav-section]'), 'the World section is now available');
+    assert.ok(!gatheringSubitem('Travel'), 'Travel does not return to Gathering');
   });
 
   it('falls back from a stale Travel tab to Environments when Travel & Realms is disabled', async () => {
@@ -13214,20 +13296,17 @@ describe('CraftingSystemManager mounted behavior', () => {
     await tick();
     flushSync();
 
-    // Enable the subsystem, then route to the Travel tab.
+    // Enable the subsystem, then route to World Parties.
     gatheringSubitem('Settings').click();
     await tick();
     flushSync();
     target.querySelector('[data-gathering-realm-toggle]').click();
     await tick();
     flushSync();
-    gatheringSubitem('Travel').click();
+    worldNavItem('parties').click();
     await tick();
     flushSync();
-    assert.ok(
-      gatheringSubitem('Travel')?.getAttribute('aria-current') === 'page',
-      'Travel tab is active'
-    );
+    assert.equal(worldNavItem('parties').getAttribute('aria-current'), 'page');
 
     // Disabling the flag must drop the stale Travel tab back to Environments, not
     // leave the manager stranded on a hidden tab. Re-enter Settings to flip it off
@@ -13239,15 +13318,15 @@ describe('CraftingSystemManager mounted behavior', () => {
     await tick();
     flushSync();
 
-    assert.equal(Boolean(gatheringSubitem('Travel')), false, 'Travel nav item hidden again');
-    // The active tab is no longer Travel; Settings remains the current selection.
+    assert.ok(!target.querySelector('[data-world-nav-section]'), 'World is hidden again');
+    // The active tab is no longer World; Settings remains the current selection.
     const activeSubitem = Array.from(target.querySelectorAll('.manager-nav-subitem')).find(
       (item) => item.getAttribute('aria-current') === 'page'
     );
     assert.notEqual(
       activeSubitem?.textContent.trim(),
-      'Travel',
-      'stale Travel tab is not the active tab'
+      'Parties',
+      'stale World destination is not the active tab'
     );
   });
 

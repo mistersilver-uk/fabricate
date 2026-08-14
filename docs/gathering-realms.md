@@ -7,8 +7,8 @@ nav_order: 8.3
 # Gathering Realms & Travel
 
 Location-aware gathering lets a GM describe campaign geography as first-class **realms**, group actors into Fabricate-managed **parties**, and make gathering environments available or unavailable based on where the party currently is.
-This page covers realms, parties, the GM **Travel** route, manual current-realm overrides, actor-scoped realm discovery, and location-gated environment availability.
-Token-driven realm sensing from the travel actor's placed token, and realm modifiers applied to gathering calculations, are planned, not yet available.
+This page covers realms, parties, the GM **World** navigation, manual current-realm overrides, actor-scoped realm discovery, and location-gated environment availability.
+Token-driven realm sensing from the travel actor's placed token is available; realm modifiers applied to gathering calculations remain planned.
 
 {: .gm }
 > The whole realm and travel subsystem is **off by default** and is enabled per crafting system with the **Enable Travel & Realms** toggle in gathering Settings (see [Enabling Travel & Realms](#enabling-travel--realms)).
@@ -47,24 +47,25 @@ Enable it per system with the **Enable Travel & Realms** toggle on the Gathering
 
 While the toggle is **off**, the system behaves as a non-location-aware system:
 
-- The **Travel** nav item is hidden, and if Travel was the open tab it falls back to **Environments**.
+- **World → Parties** and **World → Travel** are hidden, and an open World destination falls back to Gathering **Environments**.
 - The environment editor shows no realm selectors.
 - No current-realm, availability, party, or discovery surfaces appear.
 - Every environment is available.
   Composition (biome and danger) is unaffected.
 
 The **Settings** tab itself stays visible while disabled, since it hosts the toggle.
-Turning the toggle on reveals the **Travel** tab (where realms are authored), the environment editor's multi-realm selector, and the rest of the location-aware surfaces described below.
+Turning the toggle on reveals **World → Parties**, **World → Travel → Realms**, and **World → Travel → Map Region Links**, plus the environment editor's multi-realm selector and the rest of the location-aware surfaces described below.
 
-## The Travel Route
+## World Parties and Travel
 
-With **Enable Travel & Realms** turned on, open the Crafting System Manager, select the crafting system, and choose the **Travel** tab in the Gathering section.
-The center column shows the party list, the selected party's editor (name, enabled state, members, travel actor, and current-realm override), and the **Realms** authoring surface (a realm list and detail editor).
+With **Enable Travel & Realms** turned on, open the Crafting System Manager and select the crafting system.
+Choose **World → Parties** for the world party list and selected party editor (name, enabled state, members, travel actor, and selected-system current-realm override), or expand **World → Travel** for **Realms** and **Map Region Links**.
 The right-hand inspector echoes the selected party's read-only current-realm evidence.
 When no parties exist yet, the panel shows a setup checklist: create a realm, create a party, add members, assign a travel actor, then set the party's current realm.
 
-The Travel tab is hidden whenever the toggle is off.
-Create realms here before assigning environments to them.
+All four World entries are hidden whenever the toggle is off.
+The `WORLD / every system` heading is presentation only: parties and their count are world-level, while overrides, realms, and authored map links re-project for the selected crafting system.
+Create realms under **World → Travel → Realms** before assigning environments to them.
 
 ## Realms
 
@@ -80,7 +81,7 @@ Each realm belongs to one crafting system and stores:
 | **Enabled** | Disabled realms are flagged in the UI. A manual override that includes a disabled realm still resolves it (marked **Disabled**) so GMs can preview or diagnose |
 | **Secret** | A secret realm is never disclosed to players (not even its name) until the actor discovers it (see [Secret realms and discovery](#secret-realms-and-discovery)) |
 | **Biomes** | Biome tags (from the system's biome list) used by environment biome availability rules |
-| **Scene mappings** | Links from the realm to one or more Foundry scene regions, reserved for the scene-automation phase |
+| **Scene mappings** | Links from the realm to one or more Foundry scene regions, authored from **World → Travel → Map Region Links** and used by live token sensing |
 | **Modifiers** | Adjustments to event chance, drop rate, yield, difficulty, stamina cost, and attempt limit (plus custom adjustments) are stored and checked now, and applied to gathering calculations in a later phase |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
@@ -93,11 +94,11 @@ The two are bridged but not the same:
 
 - A realm's **scene mappings** point a realm at one or more Foundry scene regions.
   Several scene regions can map onto one realm, so a single realm can span multiple drawn map areas.
-- Scene region automation (sensing which realm a travel marker is in from the scene regions it occupies) is planned, not yet available.
+- Scene region automation senses which realm a travel actor occupies from its placed token's Region membership, with a position hit-test fallback.
 
-### Authoring realms (Travel tab)
+### Authoring realms (World → Travel → Realms)
 
-Realm create, edit, and delete all live in the **Travel** tab, as a realm list with a detail editor:
+Realm create, edit, and delete live under **World → Travel → Realms**, as a realm list with a detail editor:
 
 - Create a realm, then edit its **name, description, image, enabled** state, **secret** flag, and **biomes** (chosen from the system biome vocabulary).
 - **Delete realm** goes through the standard confirmation dialog.
@@ -105,7 +106,8 @@ Realm create, edit, and delete all live in the **Travel** tab, as a realm list w
   Deletion never blocks.
   Dangling references become stale repair evidence instead.
 
-Scene mappings and modifiers are planned, not yet available: they normalize, validate, and round-trip, but are not yet authored in the UI or applied at runtime, and existing values on a realm are preserved untouched.
+Scene mappings are authored under **World → Travel → Map Region Links**, normalize and round-trip, and drive live token sensing.
+Realm modifiers normalize, validate, and round-trip but are not yet authored in the UI or applied at runtime; existing modifier values are preserved untouched.
 
 ### Realm settings (per system)
 
@@ -118,7 +120,7 @@ The remaining settings are set through the API (see [API](#api)):
 | Setting | Values | Effect |
 |:--------|:-------|:-------|
 | Travel & Realms | off (default), on | Gates the whole realm, travel, and availability subsystem for the system. Set from the Settings tab **Enable Travel & Realms** toggle (see [Enabling Travel & Realms](#enabling-travel--realms)) |
-| Reveal mode | manual (default), on party token entry, always visible | "Always visible" discloses realm names to players even when secret and undiscovered. "On party token entry" is reserved for the scene-automation phase |
+| Reveal mode | manual (default), on party token entry, always visible | "Always visible" discloses realm names to players even when secret and undiscovered. Automatic discovery on party-token entry remains a follow-up; live realm sensing itself is already shipped |
 | Modifier visibility | visible (default), GM only | Default disclosure for realm modifiers once modifiers apply during play |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
@@ -132,9 +134,8 @@ A party stores a name, an enabled flag, member actor UUIDs, one optional travel 
 - **Members** can be added through the searchable picker, removed, or moved to another party.
   A move is a single persisted update, so a member never momentarily belongs to two parties mid-move.
 - **Travel actor** is the actor that represents the party on a campaign map (for example, a banner or caravan actor whose token sits on an overworld or hexcrawl scene).
-  In this slice it is an identity slot and an enablement requirement.
-  A later phase senses the party's realm presence from its placed token.
-  Set or clear it from the Travel route.
+  Fabricate senses the party's realm presence from that actor's placed token and the selected system's map links.
+  Set or clear it from **World → Parties**.
 - **Enabling a party** is only possible once it has a travel actor assigned.
   The toggle stays disabled (with a hint) until one is set.
 - **One enabled party per actor** means an actor may be associated with at most one *enabled* party in total, whether as a member, as the travel actor, or both (and when both, the same party).
@@ -151,9 +152,8 @@ The party row shows a **Needs repair** badge and the panel lists each stale refe
 
 A party's current realm is resolved **per crafting system**, in this order:
 
-1. **GM manual override** is set from the Travel route.
-2. **Travel actor token sensing** is planned, not yet available.
-   The inspector already reserves the *Travel actor* source label with an "Automation not yet available" note.
+1. **GM manual override** is set from **World → Parties**.
+2. **Travel actor token sensing** checks the travel actor's placed tokens against realm Scene Region mappings and reports the *Travel actor* source label when it resolves.
 3. **Unresolved** means no current realm.
 
 To set the override, select one or more realm chips in the **Current realm override** section and click **Set current realm** (a party can be in several realms at once, e.g. overlapping geography).
@@ -167,7 +167,7 @@ The inspector echoes the resulting evidence: the resolution source (**GM overrid
 
 An environment declares which realms it belongs to, and it can belong to **multiple** realms.
 When **Enable Travel & Realms** is on, the environment editor shows a multi-select chip control (like the biome selector) listing the system's realms.
-When the toggle is on but no realms exist yet, the selector shows an empty state pointing you to the **Travel** tab to create realms first.
+When the toggle is on but no realms exist yet, the selector shows an empty state pointing you to **World → Travel → Realms** to create realms first.
 The selector is hidden while the toggle is off.
 
 ## Environment Location Rules

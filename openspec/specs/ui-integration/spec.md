@@ -443,12 +443,27 @@ Selected-system navigation:
   Activating the parent item opens the Environments browser by default and expands the submenu **only when the active route is outside Gathering**; when a Gathering child page or Gathering edit subroute is already active, activating the parent item must not navigate away from the current Gathering page.
   Activating only the expand/collapse control toggles the submenu without navigation.
   While a Gathering child page or Gathering edit subroute is active, the expand/collapse control is locked: it only toggles (no navigation) and the submenu remains expanded and cannot be collapsed.
-  The expanded submenu contains Environments, Tasks, Events, Travel, and Settings inside a soft grouped container that does not shift the parent Gathering row, icon, label, or expand/collapse control.
-  The `Travel` submenu item shows the total party count as its badge.
+  The expanded submenu contains Environments, Tasks, Events, and Settings inside a soft grouped container that does not shift the parent Gathering row, icon, label, or expand/collapse control.
   The Gathering parent row remains visually neutral, and only the selected subsection uses the selected menu-item treatment.
   Gathering section navigation must not be duplicated as an in-page horizontal tab strip.
 - The selected-system `Tools` rail item is a top-level entry rendered between `Essences` and `Gathering`.
   It is always visible when a crafting system is selected and is not gated by the gathering or essences feature flags, because tools are a cross-cutting crafting concept that will be referenced by recipes, salvage, and gathering tasks alike.
+- After selected-system navigation, the rail exposes a localized `WORLD` / `every system`
+  presentation group when and only when a selected system enables Gathering and Travel & Realms.
+  The heading changes no aggregate ownership and omits every Downtime control.
+  World contains a direct `Parties` destination with the total world-party count and an expandable,
+  otherwise neutral `Travel` group whose children are `Realms` and `Map Region Links`.
+  Activating Travel from outside a World destination expands it and opens Parties; while either
+  child is current Travel remains expanded and may carry group-active styling, but only the concrete
+  Parties, Realms, or Map Region Links destination carries `aria-current="page"`.
+  The stable ids are `manager-world-heading`, `manager-world-scope`,
+  `manager-world-nav-parties`, `manager-world-nav-travel`, `manager-world-travel-toggle`,
+  `manager-world-travel-submenu`, `manager-world-nav-realms`, and `manager-world-nav-map`, paired
+  with `data-world-nav-section`, `data-world-nav-item`, `data-world-travel-toggle`, and
+  `data-world-travel-submenu` hooks.
+  Native buttons keep Enter/Space activation and normal tab order; closed children leave the tab
+  order. In the 56px rail Parties and Travel keep localized accessible names, an active child is
+  represented by the Travel parent icon, and a GM reaches children by expanding the persistent rail.
 - The root `Crafting Systems` breadcrumb returns to the systems browser.
   The selected-system breadcrumb opens that system's in-manager System Overview route on its Settings tab.
 - The selected-system rail scope uses the shared selector card described above.
@@ -456,7 +471,7 @@ Selected-system navigation:
 
 Rail and count layout:
 
-- The manager left rail can be collapsed to an icon-only strip to reclaim horizontal width for the middle content column; section navigation (System Overview, Recipes, Components, Essences, Tools, the Gathering submenu parent, etc.) remains reachable when collapsed via its section icons, and a localized, keyboard-reachable toggle control switches between expanded and collapsed.
+- The manager left rail can be collapsed to an icon-only strip to reclaim horizontal width for the middle content column; section navigation (System Overview, Recipes, Components, Essences, Tools, the Gathering submenu parent, World Parties and World Travel, etc.) remains reachable when collapsed via its section icons, and a localized, keyboard-reachable toggle control switches between expanded and collapsed.
   The per-client preference persists in `fabricate.managerRailCollapsed` (default expanded).
 - The selected-system rail scope has stable geometry.
   Long system names are visually prominent but are capped or truncated before they can overflow the rail or move nav buttons below it.
@@ -1455,7 +1470,7 @@ Current GM editor behavior:
   Geography is no longer a composition tag and the legacy single-`region` selector has been removed; geography is authored as realm membership (see the realm multi-select below).
 - When `gatheringRealmSettings.enabled` is `true`, the environment editor surfaces a multi-select **realm** chip control (`includedRealmIds`) mirroring the biome selector, sourced from the system's `GatheringRealm` records.
   When the toggle is off the realm control is hidden entirely.
-  When the toggle is on but the system has no realms yet, the control shows a muted empty line pointing the GM to create realms in the Travel tab first.
+  When the toggle is on but the system has no realms yet, the control shows a muted empty line pointing the GM to create realms under World > Travel > Realms first.
 - The selected draft can edit risk display/evidence and risk-to-danger matching evidence where supported.
 - The selected system's Gathering Settings tab configures d100 reward selection, event selection, limits, and event outcome through `gatheringConfig.systems[systemId].rules`.
 - The selected system's Gathering Settings tab configures per-system `Times of day` and `Weather conditions` matching settings with enable toggles, current value selectors, add controls, label/icon-editable value pills, and selected-system cleanup on deletion.
@@ -1479,7 +1494,7 @@ Current GM editor behavior:
 - The selected-system inspector exposes a per-system character modifier library for gathering, with add/edit/delete controls, opt-in preset seeding when supported by the active Foundry system, and stale-reference evidence for rows that still point at deleted modifiers.
 - D100 drop row and event editors expose character modifier references with modifier selection, `+`/`-` operator, optional min/max bounds, per-row override fields, and clear GM-facing evidence without leaking expression or macro internals to non-GM blind history.
 - The settings/tag area can edit gathering vocabularies for biomes and danger.
-  The legacy `regions` vocabulary dimension has been removed (geography is not a composition tag); geography is authored as `GatheringRealm` records in the Travel tab.
+  The legacy `regions` vocabulary dimension has been removed (geography is not a composition tag); geography is authored as `GatheringRealm` records under World > Travel > Realms.
   Weather and time-of-day vocabulary editing lives in the Gathering Settings tab condition panels.
 - The editor keeps core environment identity separate from task/node authoring.
 - The editor allows environments to exist without a linked scene.
@@ -1548,24 +1563,26 @@ The environments editor must block save when:
 
 ### GM Travel Route
 
-When `features.gathering === true` AND the selected system's `gatheringRealmSettings.enabled` is `true`, the selected-system Gathering submenu exposes a `Travel` route for managing Fabricate-managed gathering parties, the selected system's current-realm overrides, and the system's realms.
+When `features.gathering === true` AND the selected system's `gatheringRealmSettings.enabled` is `true`, the World section exposes `Parties` plus the `Travel` children `Realms` and `Map Region Links` for managing Fabricate-managed gathering parties, the selected system's current-realm overrides, and the system's realms.
 It must not be duplicated in a separate detached settings UI.
 
 The Travel/Realms subsystem is opt-in per system:
 
 - A `Travel & Realms` toggle (default off) lives in the gathering Settings surface (it is the one surface that stays visible when the subsystem is disabled, since it hosts the toggle).
   Enabling it writes `gatheringRealmSettings.enabled = true`.
-  The toggle card carries hint copy naming where Travel lives (e.g. "Enabling this reveals the Travel tab…") so a GM can connect the toggle to the outcome.
-- When the toggle is off, the `Travel` nav item is hidden AND removed from the gathering tab-resolution/fallback lists, so a stale `activeGatheringTab === 'travel'` falls back to `Environments` (filtering the render alone is insufficient).
+  The toggle card names the exact World paths so a GM can connect the toggle to the outcome.
+- When the toggle is off, all four World entries are hidden and a stale World destination falls back to Gathering `Environments`.
   The environment editor also hides its realm selector while the toggle is off.
   Disabling the subsystem treats every environment as ungated at runtime.
+- When Gathering becomes unavailable or the selected system is cleared, the existing route-availability normalization returns to the systems browser.
 
 Shipped capabilities:
 
-- `Travel` is reachable only while a gathering-enabled crafting system is selected.
+- World Parties and Travel are reachable only while a gathering-enabled crafting system with Travel & Realms enabled is selected.
   Party create/rename/enable/disable, member management, and travel-actor assignment are **world-global** (parties are shared across systems); only the current-realm override block is **per selected system**.
   The view states this explicitly.
-- The `Travel` submenu badge shows the total party count.
+- The `Parties` World entry shows the total party count, unchanged as selected systems change.
+  Current-realm overrides, Realms, and Map Region Links re-project for the selected system; active-scene Region inventory is world/scene data, while authored links persist only through that selected system's realms and `sceneMappings`.
 - Create, rename, enable/disable, and delete Fabricate parties.
 - Assign actor members to a party and assign exactly one **travel actor** (the actor that represents the party on a campaign map).
   Assigning a travel actor already used by another enabled party, or an actor already associated with another enabled party, is rejected with an inline error associated with the relevant control (the duplicate-travel-actor error routes to the travel-actor control).
@@ -1575,7 +1592,7 @@ Shipped capabilities:
   Override editing exists in exactly one place (center).
 - The current-realm evidence component renders all three source states using the canonical labels `GM override`, `Travel actor`, and `No current realm`.
   The GM evidence panel renders the live `Travel actor` source label when a party's realm resolves from token-derived sensing (Phase 3, shipped).
-- The Travel route presents a third **Map Region Links** tab (`GatheringTravelTabs.svelte`) that lists the Scene Regions on the active scene (`GatheringMapLinksTab.svelte`) with a per-region realm picker (`MapRegionLinkPicker.svelte`) linking each scene region to at most one realm (single-valued per scene region, written by `adminStore.setMapRegionLink`).
+- The World Travel group presents **Map Region Links** as a rail destination (`GatheringMapLinksTab.svelte`) that lists the Scene Regions on the active scene with a per-region realm picker (`MapRegionLinkPicker.svelte`) linking each scene region to at most one realm (single-valued per scene region, written by `adminStore.setMapRegionLink`).
 - Each stale member / travel-actor / override-realm reference gets a remove/clear action; "repair" means removing the stale reference and re-assigning through the normal pickers.
 - The route embeds the canonical **realm authoring surface** using a realm list + detail layout: the list creates/selects/deletes realms; the detail pane edits the selected realm's name, description, image, enabled, secret, and biomes (chosen from the system biome vocabulary).
   Edits merge-patch over the existing record so unedited fields (sort, sceneMappings, modifiers) round-trip untouched.
@@ -1584,8 +1601,11 @@ Shipped capabilities:
   The legacy environments-browser "Region" filter has been removed.
 - Validation lives in the party store; the view surfaces store validation errors inline next to the relevant control using the Manager's `aria-invalid`/`aria-describedby` pattern.
   Actor pickers follow the accessible semantics established by `ActorSelectTopBar`.
+- The retained Parties, Realms, and Map Region Links content renders as labelled regions connected
+  to the corresponding World destination. The former `GatheringTravelTabs` horizontal strip and
+  every `tabpanel` / `travel-tab-*` relationship are absent.
 
-Not yet shipped (later-phase follow-ups, kept out of canonical capability claims): realm discovery controls, and the player-facing travel/current-realm view. (Realm authoring — name/description/img/secret/biomes — and the environment realm-membership control now ship inside the Travel route and environment editor; `sceneMappings` authoring now ships via the Map Region Links tab; only the legacy realm ordering and Phase 4 `modifiers` authoring remain reserved.)
+Not yet shipped (later-phase follow-ups, kept out of canonical capability claims): realm discovery controls, and the player-facing travel/current-realm view. (Realm authoring — name/description/img/secret/biomes — and the environment realm-membership control now ship under World Travel and the environment editor; `sceneMappings` authoring ships via World > Travel > Map Region Links; only the legacy realm ordering and Phase 4 `modifiers` authoring remain reserved.)
 
 ### Gathering Event Library
 

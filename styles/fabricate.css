@@ -2113,6 +2113,15 @@
   box-shadow: none;
 }
 
+.fabricate-manager .manager-body.is-rail-collapsed .manager-world-nav {
+  margin-top: var(--fab-space-1);
+  padding-top: var(--fab-space-2);
+}
+
+.fabricate-manager .manager-body.is-rail-collapsed .manager-world-heading-row {
+  display: none;
+}
+
 .fabricate-manager .manager-main {
   display: grid;
   grid-template-rows: auto auto 1fr;
@@ -12082,6 +12091,67 @@
   flex: 1 1 auto;
   min-height: 96px;
   overflow: hidden auto;
+}
+
+/* World is a presentation group after the selected-system navigation, not another
+   persistence scope. Its divider and two-line micro-heading follow the Downtime Studio
+   reference while every interactive row continues to use the shipped manager-nav contract. */
+.fabricate-manager .manager-world-nav {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-1);
+  margin-top: calc(var(--fab-space-3) + var(--fab-space-2xs));
+  padding-top: var(--fab-space-3);
+  border-top: 1px solid var(--fab-mv2-border);
+}
+
+.fabricate-manager .manager-world-heading-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: flex-start;
+  gap: var(--fab-space-chip);
+  padding: 0 var(--fab-space-1) var(--fab-space-2);
+}
+
+.fabricate-manager .manager-world-heading-row h2,
+.fabricate-manager .manager-world-heading-row span {
+  margin: 0;
+  font-family: var(--fab-font-sans);
+  font-size: 0.58rem;
+  line-height: 1.2;
+}
+
+.fabricate-manager .manager-world-heading-row h2 {
+  color: var(--fab-text-subtle);
+  font-weight: 700;
+  letter-spacing: 0.14em;
+}
+
+.fabricate-manager .manager-world-heading-row span {
+  color: var(--fab-mv2-text-muted);
+  font-weight: 500;
+}
+
+.fabricate-manager .manager-world-travel-submenu {
+  padding-left: calc(var(--fab-space-4) * 2);
+}
+
+.fabricate-manager .manager-world-travel-submenu .manager-nav-subitem {
+  min-height: 28px;
+  padding-block: 7px;
+  color: var(--fab-text-subtle);
+  font-size: 0.75rem;
+}
+
+.fabricate-manager .manager-world-travel-group.is-expanded {
+  background: transparent;
+  box-shadow: none;
+}
+
+.fabricate-manager .manager-world-travel-group.is-expanded .manager-nav-parent.is-active {
+  color: var(--fab-mv2-accent);
+  background: var(--fab-accent-soft);
+  box-shadow: inset 3px 0 0 var(--fab-mv2-accent);
 }
 
 /* The two blocks above the nav are not the scroller, so they must not absorb its shrink —

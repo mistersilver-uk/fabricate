@@ -3148,7 +3148,7 @@
             "Title": "Travel & Realms",
             "Enable": "Enable Travel & Realms",
             "Disable": "Disable Travel & Realms",
-            "Hint": "Enabling this reveals the Travel tab, where you build realms and place parties, and lets environments be assigned to realms. Leave it off if your game does not use travel or location-gated gathering."
+            "Hint": "Enabling this reveals World → Parties and World → Travel → Realms / Map Region Links, and lets environments be assigned to realms. Leave it off if your game does not use travel or location-gated gathering."
           },
           "GatheringTabs": {
             "Label": "Gathering sections",
@@ -4297,6 +4297,13 @@
             "SecretChip": "Secret",
             "RevealedChip": "Revealed"
           }
+        },
+        "World": {
+          "Heading": "WORLD",
+          "Scope": "every system",
+          "ExpandTravel": "Expand Travel",
+          "CollapseTravel": "Collapse Travel",
+          "TravelDestinations": "Travel destinations"
         },
         "Tools": {
           "Title": "Tools",
