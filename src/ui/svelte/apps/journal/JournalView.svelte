@@ -172,8 +172,18 @@
       overflow-y: auto;
     }
 
-    .journal-view-column {
+    /* The desktop rules below share their selectors. Keep the narrow declarations
+       more specific so the 220px minimum and left-header visibility survive the
+       normal `min-height: 0` / `overflow: hidden` flex defaults. */
+    .journal-view-grid .journal-view-column {
       min-height: 220px;
+    }
+
+    /* The stacked grid owns vertical scrolling. The desktop left pane clips its
+       two equal-height list bodies, but retaining that clip here can hide the
+       first list header beneath the player bar before either body scrolls. */
+    .journal-view-grid .journal-view-column-left {
+      overflow: visible;
     }
   }
 

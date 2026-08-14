@@ -67,6 +67,16 @@ describe('JournalView layout + effects', () => {
       viewSource.slice(viewSource.indexOf(narrowBreakpoint)).includes('grid-template-columns: 1fr;'),
       'reflows to a single column at the narrow breakpoint'
     );
+    assert.match(
+      viewSource.slice(viewSource.indexOf(narrowBreakpoint)),
+      /\.journal-view-grid\s+\.journal-view-column-left\s*\{\s*overflow:\s*visible;/,
+      'the stacked grid does not clip the first list header beneath the player bar'
+    );
+    assert.match(
+      viewSource.slice(viewSource.indexOf(narrowBreakpoint)),
+      /\.journal-view-grid\s+\.journal-view-column\s*\{\s*min-height:\s*220px;/,
+      'the stacked grid retains the 220px minimum despite desktop flex defaults'
+    );
   });
 
   it('reads the shared store', () => {
