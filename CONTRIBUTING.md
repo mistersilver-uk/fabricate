@@ -1038,7 +1038,10 @@ An image the View Lab capture job published automatically only counts when it si
 Its case id and head SHA, read back from its published S3 URL (`<prefix>/<pr>/<head-sha>/<caseId>.png`), must match this PR's current head and one of the changed views.
 An image in a Screenshots section that is NOT inside that managed block satisfies the check outright, with no matching applied — that is what keeps the maintainer-pasted path and the fork path working, since a drag-and-dropped GitHub attachment carries no case id and no head SHA.
 
-A failing check names which problem it is, via a distinct `::error::<code>` prefix: `no-screenshots-section`, `capture-run-not-found`, `capture-run-failed`, `capture-published-nothing`, `no-frames-for-this-head`, `no-frames-for-changed-views`, `capture-cancelled`, or `capture-did-not-conclude`.
+A failing check names which problem it is, via a distinct `::error::<code>` prefix: `no-screenshots-section`, `capture-run-not-found`, `capture-run-failed`, `capture-published-nothing`, `no-frames-for-this-head`, `no-frames-for-changed-views`, `capture-cancelled`, `capture-did-not-conclude`, or `pull-request-read-failed`.
+The last of these fires when the check cannot re-read the live PR body after the producer concludes, for example on a rate limit or a transient error from the API.
+It is deliberately distinct from `capture-published-nothing`, because an unread body is not evidence that the producer published nothing.
+Reporting it under that code would send the reader to debug the producer, when the actual problem is the check's own re-read failing.
 
 The only way to skip the check is the **`screenshots-exempt` label**, which only a maintainer can apply.
 An agent must never apply it.
