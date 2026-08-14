@@ -1085,6 +1085,13 @@ export const VIEW_LAB_CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/BooksScrollsView\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/recipe-item\//,
+      // The manager router and the Crafting entry model (issue 1151). Both decide which
+      // mode-conditional entries this frame's submenu shows and which route survives a
+      // system change, and neither is reachable from the view components above — so
+      // without these two a router change published nine frames that never render the
+      // Crafting submenu at all.
+      /^src\/ui\/svelte\/apps\/manager\/CraftingSystemManagerRoot\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/crafting\/craftingNav\.js$/,
     ],
   }),
   managerCase({
@@ -1741,6 +1748,13 @@ export const VIEW_LAB_CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/AccessTabView\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/GrantAccessInspector\.svelte$/,
+      // The manager router and the Crafting entry model (issue 1151), for the reason
+      // recorded on `manager-books-scrolls-normal`. This case runs on `lab-alchemy`,
+      // which is restricted AND alchemy, so its submenu is the two-conditional-entry
+      // shape — `Recipes / Access / Knowledge / Settings` — that the wider Knowledge
+      // gate produces.
+      /^src\/ui\/svelte\/apps\/manager\/CraftingSystemManagerRoot\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/crafting\/craftingNav\.js$/,
     ],
   }),
   managerCase({
