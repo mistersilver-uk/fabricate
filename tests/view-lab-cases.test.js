@@ -807,14 +807,18 @@ test('system Travel Map evidence is populated and long-label focus cannot duplic
   const stacked = getCaseById('manager-system-travel-map-stacked');
   const longLabel = getCaseById('manager-system-travel-long-label-focus');
   const mountSource = readFileSync(resolve(ROOT, 'tests/view-lab/mount.js'), 'utf8');
+  const contentSource = readFileSync(resolve(ROOT, 'tests/view-lab/world/labContent.js'), 'utf8');
   const worldSource = readFileSync(resolve(ROOT, 'tests/view-lab/world/labWorld.js'), 'utf8');
   const runnerSource = readFileSync(resolve(ROOT, 'scripts/view-lab-screenshots.mjs'), 'utf8');
 
   for (const viewCase of [normal, stacked]) {
     assert.match(viewCase.expectSelector, /Scene\.lab-map\.Region\.deep-gate/);
-    assert.match(viewCase.expectSelector, /Deep Gate Approach/);
-    assert.match(viewCase.expectSelector, /The Underdeep/);
+    assert.match(viewCase.expectSelector, /manager-map-link-name/);
+    assert.match(viewCase.expectSelector, /manager-travel-region-item-name/);
   }
+  assert.match(contentSource, /name: 'The Underdeep'/);
+  assert.match(contentSource, /sceneRegionUuid: 'Scene\.lab-map\.Region\.deep-gate'/);
+  assert.match(worldSource, /name: 'Deep Gate Approach'/);
   assert.equal(longLabel.query?.longTravelLabels, '1');
   assert.deepEqual(longLabel.smokeLabels, []);
   assert.equal(longLabel.distinctEvidenceGroup, stacked.distinctEvidenceGroup);

@@ -3369,9 +3369,9 @@ export const VIEW_LAB_CASES = Object.freeze([
     ],
     expectView: 'environments',
     expectSelector:
-      '.fabricate-manager:has([data-manager-map-region-uuid="Scene.lab-map.Region.deep-gate"]' +
-      ':has-text("Deep Gate Approach")):has(.manager-travel-inspector' +
-      '[aria-label="Selected map region link"]:has-text("The Underdeep"))',
+      '.fabricate-manager:has([data-manager-map-region-uuid="Scene.lab-map.Region.deep-gate"] ' +
+      '.manager-map-link-name):has(.manager-travel-inspector' +
+      '[aria-label="Selected map region link"] .manager-travel-region-item-name)',
     position: { width: 1330, height: 900 },
     kinds: ['manager', 'environments', 'world'],
     sourceMatches: [
@@ -3391,9 +3391,9 @@ export const VIEW_LAB_CASES = Object.freeze([
     ],
     expectView: 'environments',
     expectSelector:
-      '.fabricate-manager:has([data-manager-map-region-uuid="Scene.lab-map.Region.deep-gate"]' +
-      ':has-text("Deep Gate Approach")):has(.manager-travel-inspector' +
-      '[aria-label="Selected map region link"]:has-text("The Underdeep"))',
+      '.fabricate-manager:has([data-manager-map-region-uuid="Scene.lab-map.Region.deep-gate"] ' +
+      '.manager-map-link-name):has(.manager-travel-inspector' +
+      '[aria-label="Selected map region link"] .manager-travel-region-item-name)',
     position: { width: 1000, height: 720 },
     kinds: ['manager', 'environments', 'world', 'responsive'],
     sourceMatches: [
