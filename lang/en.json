@@ -3163,9 +3163,6 @@
             "EncountersTitle": "Gathering events",
             "EncountersHint": "Browse reusable events before attaching them to environments.",
             "Travel": "Travel",
-            "TravelTitle": "Travel and parties",
-            "TravelActions": "Travel and party actions",
-            "TravelInspector": "Selected party inspector",
             "SettingsPlaceholderTitle": "Gathering settings",
             "SettingsPlaceholderHint": "Set system-level drop resolution and event rules for gathering.",
             "OpenTasks": "Review tasks",
@@ -4092,7 +4089,6 @@
         },
         "Travel": {
           "Title": "Travel",
-          "Subtitle": "Manage Fabricate parties and set the current realm for the selected crafting system.",
           "RealmsTitle": "Realms",
           "RealmsHint": "Manage the realms available to the selected crafting system.",
           "RealmsActions": "Realm actions",
