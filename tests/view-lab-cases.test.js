@@ -592,6 +592,11 @@ test('layout expectation selectors name UI that still exists', () => {
 });
 
 test('a layout assertion helper change selects every case whose layout it validates', () => {
+  assert.equal(
+    hasUiChanges([LAYOUT_ASSERTION_PATH]),
+    true,
+    'a helper-only change must require screenshot evidence'
+  );
   assert.deepEqual(selectedIds([LAYOUT_ASSERTION_PATH]), RESPONSIVE_LAYOUT_CASE_IDS);
 });
 

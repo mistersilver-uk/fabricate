@@ -5826,7 +5826,9 @@ export function isUiFile(filePath) {
  */
 export function hasUiChanges(files = []) {
   const normalized = files.map((file) => normalizePath(file));
-  if (normalized.some((file) => isUiFile(file))) return true;
+  if (normalized.some((file) => isUiFile(file) || LAB_INFRASTRUCTURE_PATTERN.test(file))) {
+    return true;
+  }
   return false;
 }
 
