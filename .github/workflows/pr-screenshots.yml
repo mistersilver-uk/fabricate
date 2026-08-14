@@ -31,10 +31,24 @@ on:
     # checkout of untrusted head code — with Foundry credentials and AWS keys in scope here, it is
     # a straightforward arbitrary-code-execution vector on a public repository.
     # `edited` is deliberately absent. Publishing rewrites the PR body, which itself fires `edited`
-    # — listening for it would make this job retrigger its own output indefinitely. The trade is
-    # that `check-screenshots` in `ci.yml` may read the body before this job has written it and go
-    # red once; the body edit then fires the `edited` event `ci.yml` DOES listen for, and the
-    # re-run sees the published block. Red-then-green, not stuck-red.
+    # — listening for it would make this job retrigger its own output indefinitely.
+    #
+    # This used to record a self-healing story that does not hold: that a first-push red in
+    # `check-screenshots` cleared itself because the publish step's body edit fired the `edited`
+    # event `ci.yml` DOES listen for. It cannot. The publish step edits the body with a `GH_TOKEN`
+    # set from `github.token` — the default `GITHUB_TOKEN` — and GitHub does not create workflow
+    # runs from events raised by that token, so the compensating `edited` run is never dispatched.
+    # Confirmed against PR #1131's real history: its head has exactly ONE `ci.yml` run,
+    # and that run is `run_attempt: 2`, a human clicking re-run. No `edited`-event run exists for
+    # that head at all. That was the issue's "passes on a manual re-run, with no change to the
+    # branch".
+    #
+    # The actual contract now (issue 1133): `check-screenshots` AWAITS this job's conclusion for the
+    # same head SHA before it decides, and then re-reads the body this job wrote rather than a copy
+    # fetched before it. It also matches what was published — each frame's head SHA and View Lab
+    # case id come from its published S3 key — so waiting cannot be satisfied by a frame left over
+    # from the previous head. Nothing in THIS job changed: it neither knows nor cares that it is
+    # being waited on.
     types: [opened, synchronize, reopened]
 
 concurrency:
