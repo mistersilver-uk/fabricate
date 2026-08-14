@@ -791,6 +791,15 @@ test('no two cases claiming exact reach produce the same frame', () => {
   );
 });
 
+test('the no-selection World Parties case clears selection through the real Manager store', () => {
+  const noSelection = getCaseById('manager-world-parties-no-selection');
+  const mountSource = readFileSync(resolve(ROOT, 'tests/view-lab/mount.js'), 'utf8');
+
+  assert.equal(noSelection.query?.clearSystem, '1');
+  assert.match(mountSource, /clearSystem: params\.get\('clearSystem'\) === '1'/);
+  assert.match(mountSource, /if \(params\.clearSystem\) await props\.store\.selectSystem\(''\)/);
+});
+
 test('every crafting case claims exactly the resolution-mode body it renders', () => {
   // The crafting cases carry a per-MODE `sourceMatches` pattern so that editing
   // `detail/ProgressiveBody.svelte` selects the four progressive frames rather than all 27. That

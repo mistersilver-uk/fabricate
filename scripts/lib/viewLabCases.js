@@ -3269,7 +3269,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Manager — World Parties with no crafting system selected',
     smokeLabels: ['manager-world-parties-no-selection'],
     reaches: 'exact',
-    query: { system: '' },
+    query: { clearSystem: '1' },
     steps: [{ selector: '#manager-world-nav-parties', press: 'Enter' }],
     expectView: 'world',
     expectSelector: '[data-travel-panel="parties"] [data-party-realm-override-unavailable]',
