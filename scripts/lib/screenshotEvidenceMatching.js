@@ -86,6 +86,15 @@ export const DEFAULT_CAPTURE_WORKFLOW = 'pr-screenshots.yml';
  * supplied nothing"), `capture-run-failed` (the run failed on the change's own content) and
  * `capture-published-nothing` (the infrastructure the producer depends on was unavailable, which
  * the producer itself treats as outside the pull request's control).
+ *
+ * `pull-request-read-failed` exists for the same reason one level down. The body read is the most
+ * exercised `gh` call in this module — it runs on every awaited run, and twice on a cancelled one —
+ * and it used to THROW past the adapter, so a rate-limited `gh pr view` printed a bare
+ * `Failed to read body for pull request #<n>: HTTP 403: API rate limit exceeded` with no
+ * `::error::<code>` at all. An uncoded red is the failure this whole issue exists to remove, and the
+ * runs-list call one function above already treats the SAME API under the SAME rate limit as a
+ * warned, coded failure; the asymmetry was accidental. Both now fail closed, and both say which of
+ * "the answer was no" and "there was no answer" happened.
  */
 export const GATE_CODES = Object.freeze({
   NO_SCREENSHOTS_SECTION: 'no-screenshots-section',
@@ -97,6 +106,7 @@ export const GATE_CODES = Object.freeze({
   CAPTURE_CANCELLED: 'capture-cancelled',
   CAPTURE_DID_NOT_CONCLUDE: 'capture-did-not-conclude',
   SUPERSEDED: 'superseded',
+  PULL_REQUEST_READ_FAILED: 'pull-request-read-failed',
 });
 
 /** The managed screenshot block's delimiters, as `upsertScreenshotsBlock` writes them. */
@@ -144,13 +154,27 @@ const NEXT_HEADING_PATTERN = /^(#{1,6})\s/;
 /**
  * The managed block's text, or `''` when the body carries no complete block.
  *
+ * THE END DELIMITER IS SOUGHT FROM THE START DELIMITER, not from the beginning of the body. This
+ * read `indexOf(END)` with an `end < start` ordering guard behind it, and that pair had a hole: on a
+ * hand-edited body carrying a STRAY end delimiter above the real block, the first `end` precedes
+ * `start`, the guard answered "no block", and the block's own auto-published frames were then
+ * counted as images OUTSIDE the block — which satisfies the gate outright through the human-pasted
+ * precedence rule, with no head or view matching applied. A stray delimiter must not launder
+ * published frames into maintainer-supplied evidence.
+ *
+ * The ordering guard is gone with it rather than kept, because it was unfalsifiable: two
+ * non-overlapping delimiters with the end one FIRST always satisfy `end + END.length <= start`, so
+ * `slice(start, end + END.length)` already answered `''` and no input could tell the guard from its
+ * absence. A scoped search states the same intent as code that runs.
+ *
  * @param {string} text The normalized body.
  * @returns {string} The block, delimiters included.
  */
 function managedBlockText(text) {
   const start = text.indexOf(SCREENSHOTS_BLOCK_START);
-  const end = text.indexOf(SCREENSHOTS_BLOCK_END);
-  if (start === -1 || end === -1 || end < start) return '';
+  if (start === -1) return '';
+  const end = text.indexOf(SCREENSHOTS_BLOCK_END, start);
+  if (end === -1) return '';
   return text.slice(start, end + SCREENSHOTS_BLOCK_END.length);
 }
 
@@ -685,6 +709,22 @@ function runNotFoundMessage(context, tracker) {
 }
 
 /**
+ * The `pull-request-read-failed` diagnostic.
+ *
+ * It says WHICH question went unanswered, for the same reason `capture-run-not-found` has two forms:
+ * an unread body is not evidence that the body is empty, and reporting it as
+ * `capture-published-nothing` would tell the reader to go and look at an IAM trust policy for what
+ * is really a rate limit on this gate's own call.
+ *
+ * @param {object} context The normalized gate context.
+ * @param {string} error What the failed call reported.
+ * @returns {string} The diagnostic.
+ */
+function bodyUnreadableMessage(context, error) {
+  return `This gate could not read pull request #${context.prNumber}'s body after the ${context.captureWorkflow} run for ${headPhrase(context)} concluded: ${error}. It therefore does not know whether that run published evidence, and a gate that cannot read the body must not guess at it — so this fails rather than passing. A GitHub API outage or a rate limit on this gate's own call reads exactly this way, so this is NOT missing author evidence and NOT a fault in the capture: re-run this check.`;
+}
+
+/**
  * @param {object} run The concluded producer run.
  * @param {object} context The normalized gate context.
  * @returns {string} The diagnostic.
@@ -740,10 +780,21 @@ function listCaptureRuns(context, tracker) {
 /**
  * Read a `gh pr view --json <field>` scalar.
  *
+ * IT ANSWERS AN OUTCOME RATHER THAN THROWING. A throw here left the process to the adapter's
+ * top-level handler, which prints `error.message` bare — no `::error::<code>`, on the most exercised
+ * `gh` call in this module, under exactly the rate limit `listCaptureRuns` already handles as a
+ * warned, coded failure. The caller decides what an unread field means: a body it cannot read is
+ * `pull-request-read-failed` and fails closed, while a live head it cannot read simply declines to
+ * take the `superseded` escape hatch — which can only ever turn a failure into a pass, so failing to
+ * perform it is fail-closed by construction.
+ *
+ * `--repo` SCOPING is not decoration: `gh pr view <n>` without it resolves the number against
+ * whatever remote the runner's checkout points at, which on a fork's checkout is a different pull
+ * request with the same number.
+ *
  * @param {object} context The normalized gate context.
  * @param {string} field The JSON field.
- * @returns {string} The value, trimmed.
- * @throws {Error} when the call fails — a gate that cannot read the body must not guess at it.
+ * @returns {{ok: boolean, value: string, error: string}} The read's outcome.
  */
 function readPullRequestField(context, field) {
   const args = ['pr', 'view', String(context.prNumber)];
@@ -751,11 +802,13 @@ function readPullRequestField(context, field) {
   args.push('--json', field, '--jq', `.${field}`);
   const result = context.runGh(args);
   if (result?.status !== 0) {
-    throw new Error(
-      `Failed to read ${field} for pull request #${context.prNumber}: ${result?.stderr || 'unknown error'}`
+    const error = result?.stderr || 'unknown error';
+    console.warn(
+      `::warning::Could not read ${field} for pull request #${context.prNumber}: ${error}`
     );
+    return { ok: false, value: '', error };
   }
-  return String(result.stdout || '').trim();
+  return { ok: true, value: String(result.stdout || '').trim(), error: '' };
 }
 
 // ────────────────────────────────────────────────────────────────────────────────────────────────
@@ -1017,8 +1070,13 @@ function failFromAssessment(assessment, fallback, tracker, run) {
  * @returns {object} The verdict.
  */
 function decideFromConcludedRun(context, tracker, run) {
+  // SCOPED TO `cancelled`, deliberately. A newer push cancels its predecessor's capture through
+  // workflow concurrency, so a cancelled run has no output through no fault of the head it was drawn
+  // for. Any other conclusion means the run RAN for this head, and a head that has since moved is
+  // then irrelevant: widening this pass to any conclusion would let every pull request whose head
+  // moved during the check pass with no evidence at all.
   if (run?.conclusion === 'cancelled') {
-    const liveHead = readPullRequestField(context, 'headRefOid');
+    const liveHead = readPullRequestField(context, 'headRefOid').value;
     if (liveHead && liveHead !== context.headSha) {
       return verdict({
         exitCode: 0,
@@ -1030,7 +1088,18 @@ function decideFromConcludedRun(context, tracker, run) {
     }
   }
 
-  const assessment = assessBody(readPullRequestField(context, 'body'), context);
+  const liveBody = readPullRequestField(context, 'body');
+  if (!liveBody.ok) {
+    return verdict({
+      exitCode: 1,
+      code: GATE_CODES.PULL_REQUEST_READ_FAILED,
+      message: bodyUnreadableMessage(context, liveBody.error),
+      tracker,
+      run,
+    });
+  }
+
+  const assessment = assessBody(liveBody.value, context);
   if (assessment.state === EVIDENCE.SATISFIED) {
     return verdict({ exitCode: 0, message: assessment.message, tracker, run });
   }
