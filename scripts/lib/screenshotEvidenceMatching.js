@@ -335,23 +335,31 @@ export function classifyPublishedFrameUrl(url, prNumber) {
  * Split a body's screenshot images into the automatically published frames and the ones a person
  * put there.
  *
+ * `hasManagedBlock` is reported SEPARATELY from `inBlock.length`, because the two are not the same
+ * question and a diagnostic that conflates them names a block the reader cannot find. `containsImage`
+ * in `scripts/ui-pr-screenshot-evidence.mjs` accepts `<img src="">` and `![a](   )`, whose URL halves
+ * {@link imageUrlsIn} correctly drops — so a body with neither a block nor a usable image URL reaches
+ * the matcher with an empty `inBlock`, and "the managed screenshot block carries no frame" would then
+ * be said of a block that is not there.
+ *
  * @param {string} body The pull request body.
  * @param {object} [options] Parsing inputs.
  * @param {string|number} [options.prNumber] The pull request number, the key-shape anchor.
- * @returns {{inBlock: {caseId: string|null, headSha: string|null, url: string}[], outsideBlock: string[]}}
- *   The managed block's frames with their identities, and the URLs of the Screenshots-section
- *   images that are not in the block.
+ * @returns {{inBlock: {caseId: string|null, headSha: string|null, url: string}[], outsideBlock: string[], hasManagedBlock: boolean}}
+ *   The managed block's frames with their identities, the URLs of the Screenshots-section images that
+ *   are not in the block, and whether the body carries a complete managed block at all.
  */
 export function parseScreenshotEvidenceImages(body = '', { prNumber } = {}) {
   const text = String(body || '').replaceAll('\r\n', '\n');
-  const inBlock = imageUrlsIn(managedBlockText(text)).map((url) => ({
+  const block = managedBlockText(text);
+  const inBlock = imageUrlsIn(block).map((url) => ({
     url,
     ...(classifyPublishedFrameUrl(url, prNumber) ?? { caseId: null, headSha: null }),
   }));
   const outsideBlock = screenshotSections(maskManagedBlock(text)).flatMap((section) =>
     imageUrlsIn(section)
   );
-  return { inBlock, outsideBlock };
+  return { inBlock, outsideBlock, hasManagedBlock: block !== '' };
 }
 
 // ────────────────────────────────────────────────────────────────────────────────────────────────
@@ -428,6 +436,31 @@ export function selectCaptureRun(runs = [], scope = {}) {
 // ────────────────────────────────────────────────────────────────────────────────────────────────
 
 /**
+ * The identified frames this gate is entitled to treat as drawn for the pull request's current head.
+ *
+ * AN ABSENT `headSha` MEANS "CANNOT JUDGE HEAD", NOT "EVERY FRAME IS STALE". `headSha` is optional
+ * and defaults to `''`, while a published key's SHA segment is never empty (it is `.filter(Boolean)`-ed
+ * out of the path), so a plain equality test classes EVERY identified frame stale the moment the
+ * caller supplies no head — which is exactly what `npm run screenshots:ui:check` and any other
+ * non-`--await-capture` invocation do. That turned a body carrying a perfectly good published block
+ * into `no-frames-for-this-head` (with an empty SHA interpolated into the prose), contradicting the
+ * gate's own contract that the default path behaves as it did before this change.
+ *
+ * The degradation granted here is the one the code ALREADY grants a legacy key that carries no SHA
+ * segment: unmatched-for-head falls back to the case-id rule rather than hard-failing. The staleness
+ * rule stays strict wherever a head SHA IS available — which is every path that can actually judge
+ * staleness, including every CI invocation, since `ci.yml` always passes `--head-sha`.
+ *
+ * @param {{caseId: string, headSha: string|null}[]} identified The block's identified frames.
+ * @param {object} context The normalized gate context.
+ * @returns {{caseId: string, headSha: string|null}[]} The frames not known to belong to another head.
+ */
+function framesForThisHead(identified, context) {
+  if (!context.headSha) return identified;
+  return identified.filter((frame) => frame.headSha === null || frame.headSha === context.headSha);
+}
+
+/**
  * Whether the automatically published frames in the block are evidence for THIS head and THESE
  * views.
  *
@@ -437,19 +470,21 @@ export function selectCaptureRun(runs = [], scope = {}) {
  * remove. Non-empty intersection is enough for the "genuinely frame-less PR still fails" criterion,
  * because a producer that published nothing has an empty intersection.
  *
- * @param {{caseId: string|null, headSha: string|null}[]} inBlock The block's frames.
+ * @param {{inBlock: {caseId: string|null, headSha: string|null}[], hasManagedBlock: boolean}} images
+ *   The body's parsed managed-block images.
  * @param {object} context The normalized gate context.
  * @returns {{state: string, message: string}} The assessment.
  */
-function matchPublishedFrames(inBlock, context) {
+function matchPublishedFrames({ inBlock, hasManagedBlock }, context) {
   const identified = inBlock.filter((frame) => frame.caseId);
   if (identified.length === 0) {
-    return { state: EVIDENCE.NONE, message: publishedNothingIdentifiable(context) };
+    return {
+      state: EVIDENCE.NONE,
+      message: publishedNothingIdentifiable(context, hasManagedBlock),
+    };
   }
 
-  const forThisHead = identified.filter(
-    (frame) => frame.headSha === null || frame.headSha === context.headSha
-  );
+  const forThisHead = framesForThisHead(identified, context);
   if (forThisHead.length === 0) {
     return { state: EVIDENCE.STALE_HEAD, message: staleHeadMessage(identified, context) };
   }
@@ -490,13 +525,11 @@ function matchPublishedFrames(inBlock, context) {
  * @returns {{state: string, message: string}} The assessment.
  */
 function assessBody(body, context) {
-  const { inBlock, outsideBlock } = parseScreenshotEvidenceImages(body, {
-    prNumber: context.prNumber,
-  });
-  if (outsideBlock.length > 0) {
+  const images = parseScreenshotEvidenceImages(body, { prNumber: context.prNumber });
+  if (images.outsideBlock.length > 0) {
     return {
       state: EVIDENCE.SATISFIED,
-      message: `Screenshot evidence found in the pull request body (${outsideBlock.length} image(s) supplied outside the managed block; no matching applied).`,
+      message: `Screenshot evidence found in the pull request body (${images.outsideBlock.length} image(s) supplied outside the managed block; no matching applied).`,
     };
   }
 
@@ -506,7 +539,7 @@ function assessBody(body, context) {
   });
   if (missing) return { state: EVIDENCE.NONE, message: missing };
 
-  return matchPublishedFrames(inBlock, context);
+  return matchPublishedFrames(images, context);
 }
 
 // ────────────────────────────────────────────────────────────────────────────────────────────────
@@ -523,10 +556,46 @@ function matchedMessage(frames) {
 }
 
 /**
+ * The head SHA as a noun phrase, NEVER an empty interpolation.
+ *
+ * `headSha` is optional, so `run for ${context.headSha}` renders as `run for ` on any call that
+ * supplies none — a sentence with a hole in it, which reads as a bug in the gate rather than as a
+ * diagnosis of the pull request.
+ *
  * @param {object} context The normalized gate context.
+ * @returns {string} The SHA, or a phrase naming the head without one.
+ */
+function headPhrase(context) {
+  return context.headSha || "this pull request's head";
+}
+
+/**
+ * The head SHA as a trailing qualifier, or nothing at all when the gate was given none.
+ *
+ * @param {object} context The normalized gate context.
+ * @returns {string} A leading-space-prefixed SHA, or `''`.
+ */
+function headSuffix(context) {
+  return context.headSha ? ` ${context.headSha}` : '';
+}
+
+/**
+ * The diagnostic for a body whose Screenshots section produced no identifiable published frame.
+ *
+ * It has TWO forms because there are two conditions, and the block-less one is reachable: the
+ * evidence predicate in `scripts/ui-pr-screenshot-evidence.mjs` accepts `<img src="">` and `![a](  )`
+ * as images while {@link imageUrlsIn} correctly reads no URL out of either, so a body carrying that
+ * markup under a Screenshots heading and NO managed block lands here. Naming a managed block in that
+ * case sends the reader looking for something the body does not contain.
+ *
+ * @param {object} context The normalized gate context.
+ * @param {boolean} hasManagedBlock Whether the body carries a complete managed block at all.
  * @returns {string} The diagnostic.
  */
-function publishedNothingIdentifiable(context) {
+function publishedNothingIdentifiable(context, hasManagedBlock) {
+  if (!hasManagedBlock) {
+    return `This pull request's body carries no managed screenshot block, and the image markup under its Screenshots heading supplies no image URL — an \`<img>\` with an empty \`src\`, or an \`![alt]()\` with an empty target, is markup without an image. Embed an image with a real URL, or let the ${context.captureWorkflow} capture publish the block.`;
+  }
   return `The managed screenshot block carries no frame this gate can identify as belonging to pull request #${context.prNumber}. Auto-published frames are identified by their published location (\`<prefix>/<pr>/<head-sha>/<case-id>.png\`), not by their caption.`;
 }
 
@@ -537,7 +606,7 @@ function publishedNothingIdentifiable(context) {
  */
 function staleHeadMessage(frames, context) {
   const heads = [...new Set(frames.map((frame) => frame.headSha).filter(Boolean))].join(', ');
-  return `The managed screenshot block's frames were drawn for ${heads || 'another head'}, not for this pull request's head ${context.headSha}. A stale frame depicts a state this pull request no longer proposes, so it is not evidence for it. Push again, or re-run the ${context.captureWorkflow} capture, so the block is republished for this head.`;
+  return `The managed screenshot block's frames were drawn for ${heads || 'another head'}, not for this pull request's head${headSuffix(context)}. A stale frame depicts a state this pull request no longer proposes, so it is not evidence for it. Push again, or re-run the ${context.captureWorkflow} capture, so the block is republished for this head.`;
 }
 
 /**
@@ -556,7 +625,7 @@ function wrongViewsMessage(frames, expected) {
  * @returns {string} A sentence naming the run's conclusion and URL.
  */
 function runSummary(run, context) {
-  return `The ${context.captureWorkflow} run for ${context.headSha} concluded ${run?.conclusion ?? 'with no conclusion'} (${run?.html_url ?? 'no run URL reported'}).`;
+  return `The ${context.captureWorkflow} run for ${headPhrase(context)} concluded ${run?.conclusion ?? 'with no conclusion'} (${run?.html_url ?? 'no run URL reported'}).`;
 }
 
 /**
@@ -582,6 +651,28 @@ function publishedNothingMessage(run, context) {
 }
 
 /**
+ * The `capture-run-not-found` diagnostic.
+ *
+ * It has TWO forms because "no run appeared" has two causes that the run list cannot tell apart from
+ * its result alone. When at least one poll READ the list, the absence is a real observation and the
+ * reader should check whether the producer dispatches for this pull request. When every poll's list
+ * call failed, nothing was observed at all: a GitHub API outage or a rate-limit 403 answers `[]` just
+ * as an absent producer does, and asserting the producer never dispatched is then a claim the gate
+ * has no evidence for. Both forms still FAIL — only the prose differs.
+ *
+ * @param {object} context The normalized gate context.
+ * @param {object} tracker The loop's mutable state.
+ * @returns {string} The diagnostic.
+ */
+function runNotFoundMessage(context, tracker) {
+  const grace = `${Math.round(context.graceMs / 1000)}s`;
+  if (tracker.listReads === 0) {
+    return `The ${context.captureWorkflow} runs for ${headPhrase(context)} could not be read within ${grace}: all ${tracker.listFailures} attempt(s) to list them failed, so this gate never saw the run list. A GitHub API outage or a rate limit answers exactly as an absent producer does, so this is NOT evidence that ${context.captureWorkflow} failed to dispatch, and it is not missing author evidence either. Re-run this check; if it keeps failing, the run-list call is what to investigate, not this pull request.`;
+  }
+  return `No ${context.captureWorkflow} run for ${headPhrase(context)} appeared within ${grace}. A producer WAS expected for this head, so this is not missing author evidence — check whether ${context.captureWorkflow} is dispatching for this pull request at all.`;
+}
+
+/**
  * @param {object} run The concluded producer run.
  * @param {object} context The normalized gate context.
  * @returns {string} The diagnostic.
@@ -601,24 +692,34 @@ function runFailedMessage(run, context) {
  * retries by construction, and if none ever succeeds the gate ends at `capture-run-not-found`, which
  * is fail-closed.
  *
+ * IT ALSO RECORDS WHETHER THE LIST WAS EVER READ. `[]` from a sustained API outage or a rate-limit
+ * 403 is byte-identical to `[]` from a producer that never dispatched, and only this function knows
+ * which it was. Without the count, `capture-run-not-found` tells the reader to check whether the
+ * producer workflow is dispatching at all — the wrong place to look, and this whole issue exists
+ * because a red that names the wrong problem trains maintainers to ignore the gate.
+ *
  * @param {object} context The normalized gate context.
+ * @param {object} tracker The loop's mutable state, which counts read outcomes.
  * @returns {object[]} The runs.
  */
-function listCaptureRuns(context) {
+function listCaptureRuns(context, tracker) {
   const query =
     `repos/${context.repo}/actions/workflows/${context.captureWorkflow}/runs` +
     `?head_sha=${encodeURIComponent(context.headSha)}&event=pull_request&per_page=100`;
   const result = context.runGh(['api', query]);
   if (result?.status !== 0) {
+    tracker.listFailures += 1;
     console.warn(
-      `::warning::Could not list ${context.captureWorkflow} runs for ${context.headSha}: ${result?.stderr || 'unknown error'}`
+      `::warning::Could not list ${context.captureWorkflow} runs for ${headPhrase(context)}: ${result?.stderr || 'unknown error'}`
     );
     return [];
   }
   try {
     const parsed = JSON.parse(String(result.stdout || '{}'));
+    tracker.listReads += 1;
     return Array.isArray(parsed.workflow_runs) ? parsed.workflow_runs : [];
   } catch {
+    tracker.listFailures += 1;
     console.warn(`::warning::Could not parse the ${context.captureWorkflow} runs response.`);
     return [];
   }
@@ -801,7 +902,7 @@ function effectiveDeadline(context, tracker) {
 async function locateCaptureRun(context, tracker) {
   for (;;) {
     tracker.polls += 1;
-    const run = selectCaptureRun(listCaptureRuns(context), context);
+    const run = selectCaptureRun(listCaptureRuns(context, tracker), context);
     if (run) return run;
     if (context.now() - tracker.gateStart >= context.graceMs) return null;
     if (tracker.polls >= context.maxPolls) return null;
@@ -832,7 +933,7 @@ async function awaitConclusion(context, tracker, initial) {
     // concludes it is no longer non-terminal, so re-selecting would hand the verdict to whichever
     // sibling was created last, and the gate would report a conclusion and a URL belonging to a run
     // it never waited on. The `?? run` fallback keeps the last known state if the list drops it.
-    const runs = listCaptureRuns(context);
+    const runs = listCaptureRuns(context, tracker);
     run = runs.find((candidate) => candidate?.id === initial?.id) ?? run;
   }
 }
@@ -910,7 +1011,7 @@ function decideFromConcludedRun(context, tracker, run) {
       return verdict({
         exitCode: 0,
         code: GATE_CODES.SUPERSEDED,
-        message: `This head (${context.headSha}) was superseded by ${liveHead} before its capture finished, so its capture was cancelled. Required checks are evaluated on the latest head, whose own run is the authoritative one — not this gate.`,
+        message: `This head${headSuffix(context)} was superseded by ${liveHead} before its capture finished, so its capture was cancelled. Required checks are evaluated on the latest head, whose own run is the authoritative one — not this gate.`,
         tracker,
         run,
       });
@@ -938,6 +1039,10 @@ async function awaitProducerAndDecide(context, preflight) {
     gateStart: context.now(),
     anchorMs: null,
     sawQueued: false,
+    // Read outcomes of the runs-list call, so `capture-run-not-found` can tell "the list said there
+    // is no run" from "the list was never successfully read". Both fail; they point elsewhere.
+    listReads: 0,
+    listFailures: 0,
   };
 
   const located = await locateCaptureRun(context, tracker);
@@ -946,7 +1051,7 @@ async function awaitProducerAndDecide(context, preflight) {
       preflight,
       {
         code: GATE_CODES.CAPTURE_RUN_NOT_FOUND,
-        message: `No ${context.captureWorkflow} run for ${context.headSha} appeared within ${Math.round(context.graceMs / 1000)}s. A producer WAS expected for this head, so this is not missing author evidence — check whether ${context.captureWorkflow} is dispatching for this pull request at all.`,
+        message: runNotFoundMessage(context, tracker),
       },
       tracker,
       null
@@ -959,7 +1064,7 @@ async function awaitProducerAndDecide(context, preflight) {
       preflight,
       {
         code: GATE_CODES.CAPTURE_DID_NOT_CONCLUDE,
-        message: `The ${context.captureWorkflow} run for ${context.headSha} did not conclude within this gate's bounds (${run?.html_url ?? 'no run URL reported'}, last status ${run?.status ?? 'unknown'}, ${tracker.polls} poll(s)). A gate that passed on a timeout could be waited out, so this fails.`,
+        message: `The ${context.captureWorkflow} run for ${headPhrase(context)} did not conclude within this gate's bounds (${run?.html_url ?? 'no run URL reported'}, last status ${run?.status ?? 'unknown'}, ${tracker.polls} poll(s)). A gate that passed on a timeout could be waited out, so this fails.`,
       },
       tracker,
       run

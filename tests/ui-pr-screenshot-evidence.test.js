@@ -2487,6 +2487,41 @@ describe('UI PR screenshot evidence', () => {
     }
   });
 
+  it('check without --await-capture keeps today behaviour exactly on a published managed block', async () => {
+    // The two cases above are the only "unchanged default" coverage there was, and NEITHER body
+    // carries a managed block — one has no evidence at all and the other a human-pasted image, which
+    // short-circuits on the outside-the-block precedence rule. So the path that actually matches
+    // published frames was asserted-but-uncovered on this invocation, and it had regressed: with no
+    // `--head-sha` the gate has no head to judge staleness against, and comparing frames against the
+    // empty default classed every one of them stale. A body a maintainer can see the screenshots in
+    // failed `no-frames-for-this-head`, quoting an empty SHA.
+    const paths = writeCheckInputs({
+      body: managedScreenshotBlock({
+        prNumber: 1133,
+        caseIds: ['manager-tool-parity-01-library-1280x720'],
+        headSha: 'e'.repeat(40),
+      }),
+    });
+    const gh = makeGhFake({});
+    const clock = makeGateClock({});
+    try {
+      let exitCode;
+      const captured = await captureConsole(async () => {
+        exitCode = await runPreservingExitCode(() => main(
+          checkArgs(paths),
+          { runGh: gh.runGh, sleep: clock.sleep, now: clock.now },
+        ));
+      });
+
+      assert.equal(exitCode, 0, captured.error.join('\n'));
+      assert.equal(captured.error.length, 0);
+      assert.equal(gh.calls.length, 0, 'the default path must make no API call at all');
+      assert.equal(clock.sleepCalls, 0);
+    } finally {
+      rmSync(paths.root, { recursive: true, force: true });
+    }
+  });
+
   it('check honours the exempt label without --await-capture, exactly as before', async () => {
     const paths = writeCheckInputs({ labels: ['screenshots-exempt'] });
     const gh = makeGhFake({});

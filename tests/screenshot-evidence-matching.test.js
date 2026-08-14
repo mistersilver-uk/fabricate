@@ -18,8 +18,10 @@
  *
  * THE MUTATION MAP IS THE ACCEPTANCE BAR
  * --------------------------------------
- * Each of the 24 mutations below must flip the named test to FAIL. A test that passes under its
- * mutation is not evidence of the behaviour it claims to cover.
+ * Each of the 28 mutations below must flip the named test to FAIL. A test that passes under its
+ * mutation is not evidence of the behaviour it claims to cover. The delta's map named 24; the last
+ * four are decision points post-implementation review found unpinned, and are listed here so a later
+ * revision that removes one without removing its test is visible.
  *
  *   delete the await                                        -> (a)
  *   invert the failure branch                               -> (a), (c), (d)
@@ -45,6 +47,10 @@
  *   adapter: map the base SHA into headSha                  -> (p)
  *   adapter: never forward --await-capture                  -> (p)
  *   maxPolls * pollIntervalMs < maxWaitMs                   -> tests/ci-workflow-semantics.test.js
+ *   judge staleness with no head SHA to judge against       -> (v)
+ *   skip the staleness rule when a head SHA IS available    -> (v2)
+ *   name a managed block the body does not contain          -> (w)
+ *   blame the producer for a run list never read            -> (k3)
  *
  * WHY `# cancelled` IS THE RISK HERE AND `# fail` IS NOT ALWAYS ENOUGH
  * --------------------------------------------------------------------
@@ -567,6 +573,108 @@ describe('decideScreenshotGate', () => {
 
     assertFailedWith(decision, GATE_CODES.NO_SCREENSHOTS_SECTION);
     assert.equal(gh.calls.length, 0);
+  });
+
+  it('(v) does not call a published block stale when no head SHA was supplied to judge it against', async () => {
+    // THE PRE-CHANGE DEFAULT INVOCATION, exactly: no `awaitCapture` and no `headSha`, which is how
+    // `npm run screenshots:ui:check` and every other non-CI caller reach the gate. `headSha` defaults
+    // to `''`, and a published key's SHA segment is never `''`, so a plain equality test classes
+    // EVERY identified frame stale here — turning a body carrying a perfectly good block into
+    // `no-frames-for-this-head`, with an empty SHA interpolated into the prose. Cases (n) and (n2)
+    // cannot see that: one carries a no-evidence body and the other a human-pasted image, and neither
+    // reaches the matcher's head rule at all.
+    const gh = makeGhFake({});
+    const clock = makeGateClock({});
+
+    const decision = await decide({
+      gh,
+      clock,
+      body: bodyWithBlock({ headSha: PREVIOUS_HEAD }),
+      headSha: '',
+      awaitCapture: false,
+      captureEligible: false,
+    });
+
+    assert.equal(decision.exitCode, 0, decision.message);
+    assert.equal(decision.code, null);
+    assert.match(decision.message, new RegExp(EXPECTED_CASE_IDS[0]));
+    assert.equal(gh.calls.length, 0, 'the default path must make no API call at all');
+    assert.equal(clock.sleepCalls, 0);
+  });
+
+  it('(v2) still reds on the previous head’s frames the moment a head SHA IS available', async () => {
+    // The control for (v). The degradation above is scoped to "cannot judge head" and must not have
+    // relaxed the staleness rule anywhere a head SHA exists — including on the same default,
+    // non-await path (v) exercises, which is where (c) and (m) do not reach.
+    const gh = makeGhFake({});
+    const clock = makeGateClock({});
+
+    const decision = await decide({
+      gh,
+      clock,
+      body: bodyWithBlock({ headSha: PREVIOUS_HEAD }),
+      awaitCapture: false,
+      captureEligible: false,
+    });
+
+    assertFailedWith(decision, GATE_CODES.NO_FRAMES_FOR_THIS_HEAD);
+    assert.match(decision.message, new RegExp(`head ${HEAD}\\b`), 'the head must be named, not empty');
+    assert.equal(gh.calls.length, 0);
+  });
+
+  it('(w) does not name a managed screenshot block the body does not contain', async () => {
+    // `containsImage` in the evaluation bundle accepts an `<img>` with an empty `src`, while
+    // `imageUrlsIn` reads no URL out of it — so the gate arrives at the matcher with no missing-
+    // evidence explanation AND no frames, having never seen a managed block. Sending the reader to
+    // look inside a block that is not there is the wrong-problem red this whole issue is about.
+    const gh = makeGhFake({});
+    const clock = makeGateClock({});
+
+    const decision = await decide({
+      gh,
+      clock,
+      body: '## Screenshots\n\n<img src="">\n',
+      awaitCapture: false,
+      captureEligible: false,
+    });
+
+    assert.equal(decision.exitCode, 1);
+    assert.doesNotMatch(
+      decision.message,
+      /The managed screenshot block carries/,
+      'no managed block exists in this body, so the message must not describe one'
+    );
+    assert.match(decision.message, /no managed screenshot block/);
+    assert.equal(gh.calls.length, 0);
+  });
+
+  it('(k3) does not blame the producer for a run list it never managed to read', async () => {
+    // A sustained API outage or a rate-limit 403 makes `listCaptureRuns` answer `[]`, which is
+    // byte-identical to "the producer never dispatched". Telling the reader to check whether
+    // pr-screenshots.yml dispatches at all is then the wrong place to look. Still fails closed.
+    const gh = makeGhFake({ runs: [], body: '' });
+    const runGh = (args) => {
+      if (args[0] !== 'api') return gh.runGh(args);
+      gh.calls.push([...args]);
+      return { status: 1, stdout: '', stderr: 'HTTP 403: API rate limit exceeded' };
+    };
+    const clock = makeGateClock({ start: 0, step: 4_000 });
+
+    let decision;
+    const captured = await captureConsole(async () => {
+      decision = await decide({ gh: { runGh, calls: gh.calls }, clock });
+    });
+
+    assertFailedWith(decision, GATE_CODES.CAPTURE_RUN_NOT_FOUND);
+    assert.ok(gh.calls.length > 1, 'the grace window must have been polled more than once');
+    assert.match(decision.message, /could not be read/);
+    assert.match(decision.message, new RegExp(`all ${gh.calls.length} attempt`));
+    assert.doesNotMatch(
+      decision.message,
+      /is dispatching for this pull request at all/,
+      'an unread run list is no evidence about whether the producer dispatched'
+    );
+    assert.ok(captured.warn.length > 0, 'each failed list call is still warned about');
   });
 });
 
