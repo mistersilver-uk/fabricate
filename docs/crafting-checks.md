@@ -606,7 +606,7 @@ The qualifying threshold in a counting formula must resolve to a single whole nu
 Write either a literal number, or one character-data path on its own.
 Fabricate's own formula reader recognises only those two shapes in that position.
 A composed expression, such as two paths added together, anything in brackets, or anything containing a space, is not supported there.
-Even where the dice engine might otherwise accept it, a composed threshold leaves the odds panel and the average reading unable to describe the check.
+Fabricate's reader stops at the first operator or bracket, so the remainder of a composed threshold is silently read as a separate term added to the roll rather than as part of the threshold.
 For example, a two-die pool that qualifies when each die rolls at or under a character's skill value could use a formula that reads that skill from one character-data path, such as `2d20cs<=@skills.survival.value`.
 Notice that this example qualifies by rolling low, so it is also the example that breaks the usual assumption that a higher roll is better.
 When your game system does not already expose the number you need as one path, write an Active Effect that computes the value and writes it onto the character.
@@ -618,7 +618,7 @@ Your formula then reads that single path, which satisfies the one-path rule.
 > A character-data path the actor does not have is substituted as zero before the roll happens.
 > What that zero threshold does to the check depends on which way the comparison reads.
 > On a roll-under formula such as the `cs<=` example above, a zero threshold means no die can qualify, so the check fails, and a failed check still consumes whatever the system's failure policy says it consumes.
-> On the more common roll-over formula, such as `2d20cs>=@skills.survival.value` becoming `2d20cs>=0`, every die qualifies instead, so the count reaches the full pool size and the check passes automatically, with no consuming failure to make that visible.
+> On the more common roll-over formula, such as `2d20cs>=@skills.survival.value` becoming `2d20cs>=0`, every die qualifies instead, so the count reaches the full pool size, and the check passes automatically when that pool size meets the authored DC, with no consuming failure to make that visible.
 > Nothing blocks the roll from happening either way.
 > The roll prompt shows the unresolved threshold as `NaN`, while the roll itself uses zero, so in both directions the prompt is your only warning sign.
 > Check the path against the character before you rely on it in a counting formula.
@@ -653,7 +653,7 @@ Advantage means rolling a second d20 and keeping the higher result, which has no
 Fabricate offers advantage and disadvantage whenever the authored formula contains a plain, unmodified `1d20` term, and rewrites only that term when you pick one.
 A pure counting pool, such as `2d20cs>=15`, has no plain `1d20` term, so the option is withheld.
 A formula that mixes a plain `1d20` with a counting pool, such as `1d20 + 2d6cs>=5`, still offers advantage and disadvantage, and the transform touches only the `1d20`.
-A bulk salvage batch prompts once and applies that single advantage choice to every roll in it, so a single counting-formula entry anywhere in a mixed batch withholds advantage and disadvantage for the whole batch, not only for that entry.
+A bulk salvage batch prompts once and applies that single advantage choice to every roll in it, so a single pure counting-formula entry anywhere in a mixed batch withholds advantage and disadvantage for the whole batch, not only for that entry.
 See [Rolling a check from the UI](#rolling-a-check-from-the-ui) for how that batch prompt works.
 
 ### What a counting check cannot do

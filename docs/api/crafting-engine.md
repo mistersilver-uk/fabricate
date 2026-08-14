@@ -106,7 +106,11 @@ When an optional check has no roll formula to run, the engine treats it as a no-
 The simple pass/fail check can compute its DC from a macro instead of a static value.
 Before the macro runs, Fabricate resolves an anchor DC: the recipe's selected difficulty tier's DC when `recipe.checkTierId` names a tier that still exists, and the check's configured static `dc` otherwise.
 When `simple.dcMode` is `"dynamic"`, the engine runs the macro at `system.craftingCheck.simple.macroUuid`, passes it that anchor DC, and uses the macro's returned number as the DC.
-If the macro is absent or throws, the engine falls back to the anchor DC instead of running it.
+If the macro is absent or throws, the engine falls back to the anchor DC.
+
+The routed check's `system.craftingCheck.routed` slot carries the same DC source chooser and DC macro, at `system.craftingCheck.routed.macroUuid`, resolved by the same `_resolveSimpleCheckDc` path parameterized over the routed config instead of the simple one.
+`_runRoutedCheck` resolves its base DC through that same method, so a routed relative check's tier thresholds (`dc + outcome.dc`) shift with the resolved DC exactly as the simple check's DC does.
+A routed fixed check has no DC and does not offer the DC source chooser.
 This dynamic-DC macro is the only macro the crafting check still uses, and it only computes the DC.
 It never resolves the check outcome itself.
 
