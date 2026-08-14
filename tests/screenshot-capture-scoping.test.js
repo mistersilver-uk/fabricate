@@ -407,6 +407,20 @@ test('World Parties and system Travel capture-map order mirrors the live Foundry
   assert.ok(!harnessLabels.includes('manager-system-travel-long-label-focus'));
 });
 
+test('the system Travel Map capture directs its keyboard action to the destination', () => {
+  const blockStart = HARNESS.indexOf('// World Parties plus system Travel (#1179)');
+  const mapDestinationStart = HARNESS.indexOf('const mapDestination = page.locator', blockStart);
+  const mapPanelWait = HARNESS.indexOf('[data-travel-panel="map"]', mapDestinationStart);
+  assert.ok(
+    blockStart >= 0 && blockStart < mapDestinationStart && mapDestinationStart < mapPanelWait,
+    'the #1179 Map keyboard action must remain bounded before its panel wait'
+  );
+
+  const mapInteraction = HARNESS.slice(mapDestinationStart, mapPanelWait);
+  assert.match(mapInteraction, /await mapDestination\.press\('Space'\)/);
+  assert.doesNotMatch(mapInteraction, /page\.keyboard\.press\('Space'\)/);
+});
+
 test('Phase C seeds system modifiers canonically before the settings-list action', () => {
   const phaseCStart = HARNESS.indexOf("startPhase('phase-C')");
   const gatheringStart = HARNESS.indexOf(
