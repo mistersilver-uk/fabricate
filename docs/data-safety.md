@@ -108,7 +108,7 @@ A few more everyday safeguards are worth calling out.
 
 **You are asked before anything destructive happens.**
 When an action in the Crafting System Manager would discard unsaved edits or delete something, Fabricate asks you to confirm first through a standard Foundry confirmation dialog.
-The one known exception is a book or scroll you have open for editing in Books & Scrolls.
+The one known exception is a recipe item you have open for editing in Books & Scrolls — despite the name, that surface manages every recipe item regardless of its Foundry item type, not just books and scrolls.
 If another connected GM changes this system's visibility mode away from Item or Knowledge mode while you have unsaved edits open there, Fabricate can navigate you away and discard those edits without asking first.
 Changing the visibility mode yourself does not trigger this, because that setting lives on the Crafting Settings screen, and leaving unsaved changes there always asks first.
 Save your changes promptly to avoid losing them this way.
