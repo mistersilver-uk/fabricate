@@ -54,12 +54,18 @@ describe('JournalView layout + effects', () => {
     // Pin the reflow contract (container seam + narrow-width single-column
     // breakpoint), not the exact fr/minmax track literal — the column ratios are
     // tunable design details that should not break this wiring guard.
+    const narrowBreakpoint = '@container fabricate-journal (max-width: 960px)';
+
     assert.ok(viewSource.includes('grid-template-columns:'), 'declares an explicit column track');
     assert.ok(viewSource.includes('container-type: inline-size;'), 'establishes a size container');
     assert.ok(viewSource.includes('container-name: fabricate-journal;'), 'names the journal container');
     assert.ok(
-      viewSource.includes('@container fabricate-journal (max-width: 900px)'),
-      'reflows to a single column below the narrow breakpoint'
+      viewSource.includes(narrowBreakpoint),
+      'uses the shared reachable 960px narrow breakpoint'
+    );
+    assert.ok(
+      viewSource.slice(viewSource.indexOf(narrowBreakpoint)).includes('grid-template-columns: 1fr;'),
+      'reflows to a single column at the narrow breakpoint'
     );
   });
 
