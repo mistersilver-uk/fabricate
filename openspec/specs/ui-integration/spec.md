@@ -470,31 +470,24 @@ Selected-system navigation:
   order.
   In the 56px rail Parties and Travel keep localized accessible names, an active child is
   represented by the Travel parent icon, and a GM reaches children by expanding the persistent rail.
-- Fresh Manager state leaves Crafting, Checks, Gathering, and selected-system Travel disclosures
-  collapsed. The Travel toggle changes disclosure only; its native Enter and Space activation
-  exposes the child buttons without consuming a dirty-route guard. Activating Realms or Map Region
-  Links is the guarded navigation. Activating the Travel parent from outside Travel is equivalent to
-  choosing Realms, while activating it from an active Realms or Map route preserves that child and
-  restores the expanded disclosure.
-- Selected-system Travel transitions use the complete Manager route-exit contract. Cancel, a save
-  callback returning `false`, and a rejected save keep the current dirty Gathering task/event and
-  its selected system. A successful save or explicit discard permits the requested Realms or Map
-  destination. Disabling Travel & Realms from an active child runs that same guard and, when allowed,
-  returns to Gathering Environments. Switching from enabled system A to enabled system B preserves
-  the active child while re-projecting B's realms, map links, and Party override evidence. Switching
-  to a Gathering system whose card is off returns to Gathering Environments; losing Gathering or
-  clearing the selected system returns to the systems browser. A current World Parties route survives
-  every one of these capability, card, and selection transitions.
-- World Parties has dedicated `WORLD / every system`, title, hint, action-region, and inspector names
-  rather than inheriting Gathering Environments presentation. It remains fully operable without a
-  selected system. Realms and Map Region Links likewise expose destination-specific visible titles,
-  hints, action-region names, and inspector names; Party copy is not reused for either child.
-- The World-derived navigation appearance is a shared Manager contract rather than a World-only
-  exception. Every selected-system direct leaf, expandable parent, and submenu child receives the
-  corresponding type scale, icon/count geometry, row sizing, neutral/hover/focus-visible/active/
-  disabled treatment. Travel uses one child level with the same full-width row geometry and content
-  inset as Gathering; its expanded group uses Gathering's border, background, radius, and gap. The
-  shared styling changes no route, disclosure, or ARIA semantics.
+- Fresh Manager state leaves Crafting, Checks, Gathering, and selected-system Travel disclosures collapsed.
+  The Travel toggle changes disclosure only; its native Enter and Space activation exposes the child buttons without consuming a dirty-route guard.
+  Activating Realms or Map Region Links is the guarded navigation.
+  Activating the Travel parent from outside Travel is equivalent to choosing Realms, while activating it from an active Realms or Map route preserves that child and restores the expanded disclosure.
+- Selected-system Travel transitions use the complete Manager route-exit contract.
+  Cancel, a save callback returning `false`, and a rejected save keep the current dirty Gathering task/event and its selected system.
+  A successful save or explicit discard permits the requested Realms or Map destination.
+  Disabling Travel & Realms from an active child runs that same guard and, when allowed, returns to Gathering Environments.
+  Switching from enabled system A to enabled system B preserves the active child while re-projecting B's realms, map links, and Party override evidence.
+  Switching to a Gathering system whose card is off returns to Gathering Environments; losing Gathering or clearing the selected system returns to the systems browser.
+  A current World Parties route survives every one of these capability, card, and selection transitions.
+- World Parties has dedicated `WORLD / every system`, title, hint, action-region, and inspector names rather than inheriting Gathering Environments presentation.
+  It remains fully operable without a selected system.
+  Realms and Map Region Links likewise expose destination-specific visible titles, hints, action-region names, and inspector names; Party copy is not reused for either child.
+- The World-derived navigation appearance is a shared Manager contract rather than a World-only exception.
+  Every selected-system direct leaf, expandable parent, and submenu child receives the corresponding type scale, icon/count geometry, row sizing, neutral/hover/focus-visible/active/disabled treatment.
+  Travel uses one child level with the same full-width row geometry and content inset as Gathering; its expanded group uses Gathering's border, background, radius, and gap.
+  The shared styling changes no route, disclosure, or ARIA semantics.
 - The root `Crafting Systems` breadcrumb returns to the systems browser.
   The selected-system breadcrumb opens that system's in-manager System Overview route on its Settings tab.
 - The selected-system rail scope uses the shared selector card described above.
