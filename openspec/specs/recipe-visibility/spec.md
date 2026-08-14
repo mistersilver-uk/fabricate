@@ -348,6 +348,11 @@ A player-audience summary carries no GM-only field, which today means the recipe
 - **Exhaustion is a player-only status.**
 A GM bypasses the knowledge gate, so a GM-audience summary MUST NOT report a recipe exhausted even when the caller supplies an exhaustion result.
 Because the browse status is a field both audiences share, honouring it for a GM would make a shared field's derivation depend on the audience, which this contract forbids.
+- **The summary does not gate visibility; the calling surface does.**
+The projection answers what a summary of THIS recipe for THIS audience is, given an access result the visibility evaluation already produced.
+It performs no cohort selection and no visibility filtering of its own, so a surface building player-audience summaries MUST build them only for recipes that evaluation made visible, and MUST pass each recipe's own access result.
+Omitting the access result yields an unredacted summary reporting the available browse status — correct for a visible recipe, and a disclosure for one that is not.
+The gate is upstream and stays there; this contract does not move it and MUST NOT be read as duplicating it.
 
 Tests MUST cover the redacted player summary directly — that it withholds availability, that the snapshot is never consulted to build it, that it reports the discovery browse status, and that the same recipe is unredacted for a GM.
 
