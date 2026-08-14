@@ -31,7 +31,9 @@
     selectedPartyId = '',
     actorOptions = [],
     saving = false,
-    realmOverridesAvailable = false,
+    // Root always supplies the real selected-system gate. Defaulting to available preserves
+    // this component's established direct-mount/API behaviour for isolated consumers.
+    realmOverridesAvailable = true,
     realmOverridesUnavailableHint = '',
     onSelectParty = () => {},
     onSetRealmOverride = () => {},

@@ -243,6 +243,22 @@ describe('GatheringPartiesTab mounted behavior', () => {
     remount();
   });
 
+  it('replaces the realm picker with an explanation when overrides are explicitly unavailable', async () => {
+    const hint = 'Enable Travel & Realms to set a current-realm override.';
+    await mountTab({
+      parties: [makeParty({ id: 'p1', name: 'Wardens' })],
+      realmOverridesAvailable: false,
+      realmOverridesUnavailableHint: hint
+    });
+
+    assert.ok(!target.querySelector('.manager-travel-parties-override-trigger'));
+    const unavailable = target.querySelector('[data-party-realm-override-unavailable]');
+    assert.ok(unavailable);
+    assert.equal(unavailable.getAttribute('aria-label'), hint);
+    assert.equal(unavailable.getAttribute('title'), hint);
+    remount();
+  });
+
   it('filters the override options by realm search', async () => {
     await mountTab({
       parties: [makeParty({ id: 'p1', name: 'Wardens' })],
