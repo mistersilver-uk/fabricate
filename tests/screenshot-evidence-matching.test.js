@@ -18,7 +18,7 @@
  *
  * THE MUTATION MAP IS THE ACCEPTANCE BAR
  * --------------------------------------
- * Each of the 45 mutations below must flip the named test to FAIL. A test that passes under its
+ * Each of the 62 mutations below must flip the named test to FAIL. A test that passes under its
  * mutation is not evidence of the behaviour it claims to cover. The delta's map named 24; the rest
  * are decision points post-implementation review found unpinned, and are listed here so a later
  * revision that removes one without removing its test is visible.
@@ -32,6 +32,9 @@
  *   intersection -> equality                                -> (o)
  *   delete the deadline                                     -> (g1)
  *   delete maxPolls                                         -> (g2)
+ *   drop locateCaptureRun's grace give-up                   -> (g3)
+ *   drop effectiveDeadline's maxWaitMs ceiling              -> (g4)
+ *   drop observeAnchor's once-only guard                    -> (g5)
  *   most-recent-only run selection                          -> (i3)
  *   oldest-run selection                                    -> (i)
  *   drop the pull_requests[].number filter                  -> (i2)
@@ -58,11 +61,25 @@
  *   adapter: forward headRepository empty                   -> (p3)
  *   adapter: forward patches as undefined                   -> (p4)
  *   parseArgs: treat an empty flag value as missing         -> (p5)
+ *   adapter: changedFilesRequired always false              -> (p6)
+ *   adapter: drop `|| undefined` on --capture-workflow      -> (p7)
+ *   parseCaptureTimeoutMs('') -> 0                          -> (p7)
+ *   parseCaptureEligible('') -> true                        -> (p8)
+ *   parseArgs: drop `next === undefined`                    -> (p9)
+ *   parseArgs: drop `next.startsWith('--')`                 -> (p9)
+ *   adapter: read an empty --head-sha as a real head        -> (p10)
  *   maxPolls * pollIntervalMs < maxWaitMs                   -> tests/ci-workflow-semantics.test.js
+ *   the gate step stops passing --head-sha                  -> tests/ci-workflow-semantics.test.js
  *   judge staleness with no head SHA to judge against       -> (v)
  *   skip the staleness rule when a head SHA IS available    -> (v2)
+ *   refuse a legacy key's absent head SHA                   -> (v3)
  *   name a managed block the body does not contain          -> (w)
+ *   seek the end delimiter from the body's start            -> (w2)
+ *   headPhrase interpolating an empty head SHA              -> (w3)
  *   blame the producer for a run list never read            -> (k3)
+ *   widen the superseded pass past `cancelled`              -> (f3)
+ *   swallow a failed pull request body read                 -> (z1)
+ *   readPullRequestField without its --repo scoping         -> (a)
  *   htmlImageSrc returns ''                                 -> the image-parser test
  *   htmlImageSrc takes the LEFTMOST src                     -> the image-parser test
  *   markdownImageUrl keeps the CommonMark title             -> the image-parser test
@@ -75,6 +92,18 @@
  * cap were deleted, that loop would spin under a `sleep` that resolves immediately until node:test's
  * `--test-timeout` fires — which reports the file's remaining tests as `# cancelled`, never as
  * `# fail`. Read both counts.
+ *
+ * WHY (g3), (g4) AND (g5) ASSERT ON THE CLOCK RATHER THAN ON A CODE
+ * -----------------------------------------------------------------
+ * Three separate bounds stop this gate — the grace give-up, the wall-clock ceiling and the once-only
+ * deadline anchor — and each ALONE keeps the job inside the 75-minute `timeout-minutes` that
+ * `tests/ci-workflow-semantics.test.js` ties `MAX_WAIT_MS` to. Dropping any one of them still ends
+ * at `capture-did-not-conclude` or `capture-run-not-found`, just 15 to 77 minutes later, and past 75
+ * GitHub kills the job with NO `::error::<code>` at all — an uncoded red, which is the failure this
+ * issue exists to remove. A code assertion cannot see that; elapsed time on the injected clock can,
+ * so these three read `clock.now()`. Two of them also mutually mask (drop the ceiling and the anchor
+ * guard together and the anchored deadline slides forever), which is why each has its own fixture
+ * rather than one shared "it terminates" case.
  */
 
 import assert from 'node:assert/strict';
@@ -109,6 +138,7 @@ import {
   validateChangedFilesForCheck,
 } from '../scripts/ui-pr-screenshot-evidence.mjs';
 import {
+  BLOCK_END,
   DEFAULT_HEAD_BRANCH,
   atClock,
   captureConsole,
@@ -244,6 +274,29 @@ function bodyWithBlock({ headSha = HEAD, caseIds = EXPECTED_CASE_IDS } = {}) {
   return `Some description.\n\n${managedScreenshotBlock({ prNumber: PR, caseIds, headSha })}\n`;
 }
 
+/**
+ * A `gh` fake whose producer run stays `queued` for the first N polls and then runs forever.
+ *
+ * Shared by (g4) and (g5) rather than spelled out twice: `tests/**` duplication counts against the
+ * SonarCloud new-code gate, and the two cases differ only in how long the queue is — which is
+ * exactly the variable that decides WHICH bound ends the wait.
+ *
+ * @param {number} queuedPolls How many polls report the run as `queued`.
+ * @returns {object} The fake.
+ */
+function neverConcludingRun(queuedPolls) {
+  return makeGhFake({
+    runs: (state) => [
+      workflowRun({
+        status: state.runListCalls < queuedPolls ? 'queued' : 'in_progress',
+        conclusion: null,
+        runStartedAt: atClock(0),
+      }),
+    ],
+    body: '',
+  });
+}
+
 /** A body whose Screenshots section holds a drag-and-dropped GitHub attachment. */
 const HUMAN_PASTED_BODY = '## Screenshots\n\n![a screenshot](https://github.test/attachments/9f3a)\n';
 
@@ -275,6 +328,13 @@ describe('decideScreenshotGate', () => {
     assert.equal(decision.waited, true, 'the gate must have actually waited');
     assert.equal(decision.runConclusion, 'success');
     assert.ok(clock.sleepCalls > 0, 'the gate must have slept at least once');
+    // The post-conclusion re-read is SCOPED to this repository. `gh pr view 1133` without `--repo`
+    // resolves the number against whatever remote the runner's checkout points at, which is a
+    // different pull request with the same number — and its body would then decide this gate.
+    assert.deepEqual(
+      gh.calls.find((args) => args.includes('body')),
+      ['pr', 'view', String(PR), '--repo', REPO, '--json', 'body', '--jq', '.body']
+    );
   });
 
   it('(b) passes within one run once the capture concludes and republishes the body', async () => {
@@ -368,6 +428,29 @@ describe('decideScreenshotGate', () => {
     assertFailedWith(decision, GATE_CODES.CAPTURE_CANCELLED);
   });
 
+  it('(f3) does not pass a FAILED capture as superseded, however far the head has since moved', async () => {
+    // The superseded pass is scoped to `cancelled` because a newer push cancels its predecessor's
+    // capture through workflow concurrency — the run produced nothing through no fault of the head it
+    // was drawn for. Any other conclusion means the run RAN for this head, and "the head moved since"
+    // is then not an excuse: widening the pass to any conclusion turns every push that lands during
+    // the check into a green gate with no evidence at all, which is a false green on the busiest
+    // path there is. (f1) cannot see that — its run IS cancelled — so nothing pinned the scoping.
+    const gh = makeGhFake({
+      runs: [workflowRun({ conclusion: 'failure' })],
+      headOid: NEXT_HEAD,
+      body: '',
+    });
+    const clock = makeGateClock({ start: 0, step: 1_000 });
+
+    const decision = await decide({ gh, clock });
+
+    assertFailedWith(decision, GATE_CODES.CAPTURE_RUN_FAILED);
+    assert.ok(
+      !gh.calls.some((args) => args.includes('headRefOid')),
+      'only a cancelled run raises the question of whether a newer head superseded this one'
+    );
+  });
+
   it('(g1) fails on the deadline when the capture never concludes and the clock advances', async () => {
     const gh = makeGhFake({ runs: [workflowRun({ status: 'in_progress', conclusion: null })] });
     const clock = makeGateClock({ start: 0, step: 10_000 });
@@ -391,6 +474,78 @@ describe('decideScreenshotGate', () => {
 
     assertFailedWith(decision, GATE_CODES.CAPTURE_DID_NOT_CONCLUDE);
     assert.equal(decision.polls, 5, 'the cap, not the clock, is what ended this loop');
+  });
+
+  it('(g3) gives up on a producer that never appears within the grace window, at production bounds', async () => {
+    // AT PRODUCTION BOUNDS, on a clock advancing one real poll interval per sleep, so the assertion
+    // is wall-clock minutes rather than fixture units. `locateCaptureRun` carries no wall-clock
+    // ceiling of its own — only this give-up and the iteration cap — so without it a pull request
+    // whose producer never dispatches polls for MAX_POLLS * POLL_INTERVAL_MS (80 minutes), and the
+    // 75-minute job ceiling kills the job before the script can name the problem.
+    const gh = makeGhFake({ runs: [], body: '' });
+    const clock = makeGateClock({ start: 0, step: POLL_INTERVAL_MS });
+
+    const decision = await decide({ gh, clock, bounds: PRODUCTION_BOUNDS });
+
+    assertFailedWith(decision, GATE_CODES.CAPTURE_RUN_NOT_FOUND);
+    assert.ok(
+      clock.now() <= GRACE_MS,
+      `the search for a producer run must end at the ${GRACE_MS / MS_PER_MINUTE}-minute grace window, but the clock read ${clock.now() / MS_PER_MINUTE} minute(s)`
+    );
+    assert.ok(
+      decision.polls < MAX_POLLS,
+      `the grace window, not the ${MAX_POLLS}-poll cap, must be what ended this — the cap alone runs ${(MAX_POLLS * POLL_INTERVAL_MS) / MS_PER_MINUTE} minutes, past the job's own ceiling`
+    );
+  });
+
+  it('(g4) stops at its own wall-clock ceiling on a capture that queues for most of it, at production bounds', async () => {
+    // The ceiling is the ONLY bound that can end this: the run is queued for 50 minutes, so its
+    // anchored deadline (job start + capture timeout + slack) lands at 95 minutes, well past both the
+    // ceiling and the 75-minute job timeout. Queued time does not consume the capture's budget, but
+    // it does consume this gate's.
+    const gh = neverConcludingRun((50 * MS_PER_MINUTE) / POLL_INTERVAL_MS);
+    const clock = makeGateClock({ start: 0, step: POLL_INTERVAL_MS });
+
+    const decision = await decide({ gh, clock, bounds: PRODUCTION_BOUNDS });
+
+    assertFailedWith(decision, GATE_CODES.CAPTURE_DID_NOT_CONCLUDE);
+    assert.ok(
+      clock.now() <= MAX_WAIT_MS,
+      `the whole gate must end by its ${MAX_WAIT_MS / MS_PER_MINUTE}-minute ceiling — which tests/ci-workflow-semantics.test.js pins below the job's timeout-minutes — but the clock read ${clock.now() / MS_PER_MINUTE} minute(s)`
+    );
+    assert.ok(
+      decision.polls < MAX_POLLS,
+      `the ceiling, not the ${MAX_POLLS}-poll cap, must be what ended this`
+    );
+  });
+
+  it('(g5) anchors the capture deadline ONCE, so a run observed repeatedly cannot push it forward', async () => {
+    // The anchor is recorded at the FIRST non-queued observation. Recording it again on every later
+    // observation would move the deadline forward by one poll interval each time — a deadline that
+    // can never be reached — leaving the wall-clock ceiling as the only bound, 10 minutes later here
+    // and unbounded if the ceiling is dropped too. That mutual masking is why this case queues for
+    // only 10 minutes: the anchored deadline then lands at 55 minutes, strictly inside the ceiling,
+    // so the ceiling cannot stand in for the anchor.
+    const queuedPolls = (10 * MS_PER_MINUTE) / POLL_INTERVAL_MS;
+    const deadline = queuedPolls * POLL_INTERVAL_MS + CAPTURE_TIMEOUT_MS + SLACK_MS;
+    assert.ok(
+      deadline < MAX_WAIT_MS,
+      `this fixture only discriminates while the anchored deadline (${deadline}) is inside the ceiling (${MAX_WAIT_MS})`
+    );
+    const gh = neverConcludingRun(queuedPolls);
+    const clock = makeGateClock({ start: 0, step: POLL_INTERVAL_MS });
+
+    const decision = await decide({ gh, clock, bounds: PRODUCTION_BOUNDS });
+
+    assertFailedWith(decision, GATE_CODES.CAPTURE_DID_NOT_CONCLUDE);
+    assert.ok(
+      clock.now() >= deadline && clock.now() < deadline + POLL_INTERVAL_MS,
+      `expected the wait to end at the anchored deadline (${deadline / MS_PER_MINUTE} minutes), but the clock read ${clock.now() / MS_PER_MINUTE} minute(s)`
+    );
+    assert.ok(
+      clock.now() < MAX_WAIT_MS,
+      'the anchored deadline, not the wall-clock ceiling, must be what ended this'
+    );
   });
 
   it('(h) passes on a human-pasted attachment even beside a stale managed block', async () => {
@@ -758,6 +913,30 @@ describe('decideScreenshotGate', () => {
     assert.equal(gh.calls.length, 0);
   });
 
+  it('(v3) accepts a legacy published key, whose location carries no head SHA to judge', async () => {
+    // The third member of the family, and the one the module's own docstring PROMISES: a key with no
+    // SHA segment answers `headSha: null`, which the matcher must read as "cannot judge THIS FRAME's
+    // head" and fall back to the case-id rule. That is what makes a publish-flag regression degrade
+    // to today's behaviour instead of reddening every UI PR — a false red on every pull request at
+    // once, from a producer-side change no author can see. `classifyPublishedFrameUrl`'s legacy
+    // branch is unit-tested below, but nothing tested that the MATCHER consumes the `null` it emits,
+    // and (v) cannot: (v) supplies no head SHA at all, so it never reaches the per-frame rule.
+    const gh = makeGhFake({});
+    const clock = makeGateClock({});
+
+    const decision = await decide({
+      gh,
+      clock,
+      body: bodyWithBlock({ headSha: null }),
+      awaitCapture: false,
+      captureEligible: false,
+    });
+
+    assert.equal(decision.exitCode, 0, decision.message);
+    assert.match(decision.message, new RegExp(EXPECTED_CASE_IDS[0]));
+    assert.equal(gh.calls.length, 0);
+  });
+
   it('(w) does not name a managed screenshot block the body does not contain', async () => {
     // `containsImage` in the evaluation bundle accepts an `<img>` with an empty `src`, while
     // `imageUrlsIn` reads no URL out of it — so the gate arrives at the matcher with no missing-
@@ -782,6 +961,53 @@ describe('decideScreenshotGate', () => {
     );
     assert.match(decision.message, /no managed screenshot block/);
     assert.equal(gh.calls.length, 0);
+  });
+
+  it('(w2) finds the managed block below a stray end delimiter, rather than reading its frames as hand-supplied', async () => {
+    // A hand-edited body can carry an end delimiter ABOVE the real block. Seeking the end delimiter
+    // from the body's start then finds that stray one, the block "does not parse", and its
+    // auto-published frames — still sitting under the block's own `## Screenshots` heading — count as
+    // images OUTSIDE the block, which satisfies the gate OUTRIGHT through the human-pasted precedence
+    // rule with no head or view matching applied. One stray delimiter would launder the previous
+    // head's frames into maintainer-supplied evidence, which is the staleness hole this issue closes,
+    // re-opened by punctuation. The end delimiter is therefore sought from the start delimiter.
+    const gh = makeGhFake({});
+    const clock = makeGateClock({});
+    const stale = managedScreenshotBlock({
+      prNumber: PR,
+      caseIds: EXPECTED_CASE_IDS,
+      headSha: PREVIOUS_HEAD,
+    });
+
+    const decision = await decide({
+      gh,
+      clock,
+      body: `Some description.\n\n${BLOCK_END}\n\n${stale}\n`,
+      awaitCapture: false,
+      captureEligible: false,
+    });
+
+    assertFailedWith(decision, GATE_CODES.NO_FRAMES_FOR_THIS_HEAD);
+    assert.match(decision.message, new RegExp(PREVIOUS_HEAD));
+  });
+
+  it('(w3) names the head in its prose, or says it has none, but never renders a hole in the sentence', async () => {
+    // `headSha` is optional, so every message that quotes it can render `run for ` with nothing after
+    // it — a sentence with a hole in it, which reads as a bug in the gate rather than as a diagnosis
+    // of the pull request. The guard has a docstring promising it never happens and, until this case,
+    // no test: every other fixture here supplies a head SHA.
+    const gh = makeGhFake({ runs: [], body: '' });
+    const clock = makeGateClock({ start: 0, step: 4_000 });
+
+    const decision = await decide({ gh, clock, headSha: '' });
+
+    assertFailedWith(decision, GATE_CODES.CAPTURE_RUN_NOT_FOUND);
+    assert.match(
+      decision.message,
+      new RegExp(`No ${CAPTURE_WORKFLOW} run for this pull request's head appeared`),
+      'with no SHA to quote, the head is named as a noun phrase'
+    );
+    assert.doesNotMatch(decision.message, /run for {2}/, 'never an empty interpolation');
   });
 
   it('(k3) does not blame the producer for a run list it never managed to read', async () => {
@@ -811,6 +1037,39 @@ describe('decideScreenshotGate', () => {
       'an unread run list is no evidence about whether the producer dispatched'
     );
     assert.ok(captured.warn.length > 0, 'each failed list call is still warned about');
+  });
+
+  it('(z1) codes a body it could not read, instead of dying with a bare message', async () => {
+    // The body read runs on EVERY awaited run — twice on a cancelled one — so it is the most
+    // exercised `gh` call in the module, and it used to throw past the adapter: on a rate-limited
+    // `gh pr view` the required check printed `Failed to read body for pull request #1133: HTTP 403…`
+    // with no `::error::<code>` at all. That is the same uncoded red case (p5) removed one layer up,
+    // reproduced on the hot path — and the runs-list call already treats the SAME API under the SAME
+    // rate limit as a warned, coded failure. It must also NOT be reported as
+    // `capture-published-nothing`: the run may well have published, and that message sends the reader
+    // to an IAM trust policy for what is a rate limit on this gate's own call.
+    const gh = makeGhFake({ runs: [workflowRun({})], body: '' });
+    const runGh = (args) => {
+      if (args[0] !== 'pr') return gh.runGh(args);
+      gh.calls.push([...args]);
+      return { status: 1, stdout: '', stderr: 'HTTP 403: API rate limit exceeded' };
+    };
+    const clock = makeGateClock({ start: 0, step: 1_000 });
+
+    let decision;
+    const captured = await captureConsole(async () => {
+      decision = await decide({ gh: { runGh, calls: gh.calls }, clock });
+    });
+
+    assertFailedWith(decision, GATE_CODES.PULL_REQUEST_READ_FAILED);
+    assert.match(decision.message, new RegExp(`could not read pull request #${PR}'s body`));
+    assert.match(decision.message, /HTTP 403/);
+    assert.doesNotMatch(
+      decision.message,
+      /It published no screenshot block/,
+      'an unread body is no evidence that the producer published nothing'
+    );
+    assert.ok(captured.warn.length > 0, 'the failed read is warned about, as the list call is');
   });
 });
 
@@ -1086,6 +1345,165 @@ describe('the check command adapter', () => {
       exempted.captured.log.some((line) => line.includes('screenshots-exempt')),
       'the maintainer label must still be readable on this path'
     );
+  });
+
+  it('(p6) fails closed on an EMPTY changed-file input, the condition that guard exists for', async (t) => {
+    // `--changed-files` is the sixth adapter-forwarded input, and the only one whose failure
+    // direction is a silent pass on EVERY pull request: `changedFilesRequired: false` makes the
+    // relocated step-2 guard return nothing, an empty file list then arms nothing, and the gate
+    // reports "No UI files changed - screenshot check skipped." for a pull request whose changed-file
+    // set it simply failed to fetch — which is exactly what an empty `gh api …/files` result looks
+    // like. Case (s) pins the guard at module level; nothing pinned that the adapter ASKS for it.
+    const paths = cliInputs(t, { changedFiles: [] });
+    const gh = makeGhFake({ runs: [workflowRun({})], body: bodyWithBlock() });
+    const clock = makeGateClock({ start: 0, step: 1_000 });
+
+    const { exitCode, captured } = await runCheck(
+      gateCheckArgv(paths, { prNumber: PR, extra: [...AWAIT_FLAGS] }),
+      { gh, clock }
+    );
+
+    assert.equal(exitCode, 1);
+    // Verbatim, and deliberately code-less: this relocated guard keeps the line CI has always
+    // emitted for this condition.
+    assert.ok(
+      captured.error.includes(
+        '::error::Changed-files input is empty; cannot determine whether this PR changes UI files.'
+      ),
+      `expected today's changed-files diagnostic, got ${JSON.stringify(captured.error)}`
+    );
+    assert.equal(gh.calls.length, 0, 'a guard that fails closed must not wait out the producer');
+    assert.equal(clock.sleepCalls, 0);
+  });
+
+  it('(p7) reads an EMPTY --capture-workflow and --capture-timeout-minutes as absent, so the module’s defaults apply', async (t) => {
+    // Both branches became REACHABLE when an empty flag value stopped being parsed as a missing one
+    // (case (p5)), and neither was tested. Dropping `|| undefined` sends `''` into the runs query as
+    // `workflows//runs`, which matches no workflow and waits out the whole budget; making
+    // `parseCaptureTimeoutMs('')` answer `0` collapses the deadline to the slack alone, so every UI
+    // pull request reds `capture-did-not-conclude` five minutes in — this issue's own symptom under
+    // the new code.
+    const paths = cliInputs(t);
+    const gh = makeGhFake({
+      runs: [workflowRun({ status: 'in_progress', conclusion: null })],
+      body: '',
+    });
+    const clock = makeGateClock({ start: 0, step: POLL_INTERVAL_MS });
+
+    const { exitCode, captured } = await runCheck(
+      gateCheckArgv(paths, {
+        prNumber: PR,
+        extra: [
+          '--repo',
+          REPO,
+          '--head-sha',
+          HEAD,
+          '--await-capture',
+          '--capture-eligible',
+          'true',
+          '--capture-workflow',
+          '',
+          '--capture-timeout-minutes',
+          '',
+        ],
+      }),
+      { gh, clock }
+    );
+
+    assert.equal(exitCode, 1);
+    assertAnnotated(captured, GATE_CODES.CAPTURE_DID_NOT_CONCLUDE);
+    assert.ok(
+      runsQueries(gh).every((query) =>
+        query.startsWith(`repos/${REPO}/actions/workflows/${CAPTURE_WORKFLOW}/runs`)
+      ),
+      `an empty --capture-workflow must fall back to the module's own default, got ${JSON.stringify([...new Set(runsQueries(gh))])}`
+    );
+    const deadline = CAPTURE_TIMEOUT_MS + SLACK_MS;
+    assert.ok(
+      clock.now() >= deadline && clock.now() < deadline + POLL_INTERVAL_MS,
+      `an empty --capture-timeout-minutes must fall back to the module's ${CAPTURE_TIMEOUT_MS}ms default, but the wait ended at ${clock.now()}ms`
+    );
+  });
+
+  it('(p8) reads an EMPTY --capture-eligible as NOT eligible, so no such invocation enters the wait loop', async (t) => {
+    const paths = cliInputs(t, { body: 'No evidence here.' });
+    // A body the producer's run would satisfy, so entering the wait loop is observable as a PASS as
+    // well as as an API call — the mutation's real-world shape, not just an extra request.
+    const gh = makeGhFake({ runs: [workflowRun({})], body: bodyWithBlock() });
+    const clock = makeGateClock({ start: 0, step: 1_000 });
+
+    const { exitCode, captured } = await runCheck(
+      gateCheckArgv(paths, {
+        prNumber: PR,
+        extra: ['--repo', REPO, '--head-sha', HEAD, '--await-capture', '--capture-eligible', ''],
+      }),
+      { gh, clock }
+    );
+
+    assert.equal(exitCode, 1);
+    assertAnnotated(captured, GATE_CODES.NO_SCREENSHOTS_SECTION);
+    assert.equal(gh.calls.length, 0, "an empty flag is not the literal 'true'");
+    assert.equal(clock.sleepCalls, 0);
+  });
+
+  it('(p9) still refuses a genuinely missing flag value, in both of the shapes that produce one', async (t) => {
+    // The other half of (p5). An empty value is a VALUE, but a flag at the end of the vector and a
+    // flag followed by another flag still carry none — and a parser that accepted those would read
+    // `--head-sha --await-capture` as a head SHA of `--await-capture` while silently consuming the
+    // flag behind it. `grep "Missing value for" tests/` returned nothing repo-wide before this case.
+    const paths = cliInputs(t);
+    const gh = makeGhFake({});
+    const clock = makeGateClock({});
+
+    await assert.rejects(
+      () =>
+        runCheck(gateCheckArgv(paths, { prNumber: PR, extra: ['--repo', REPO, '--head-sha'] }), {
+          gh,
+          clock,
+        }),
+      /Missing value for --head-sha/,
+      'a flag at the END of the argument vector carries no value at all'
+    );
+    await assert.rejects(
+      () =>
+        runCheck(gateCheckArgv(paths, { prNumber: PR, extra: ['--head-sha', '--await-capture'] }), {
+          gh,
+          clock,
+        }),
+      /Missing value for --head-sha/,
+      'a following flag is an omitted value, not the string "--await-capture"'
+    );
+    assert.equal(gh.calls.length, 0);
+  });
+
+  it('(p10) reads an EMPTY --head-sha as “cannot judge head”, and reds the same body once one is supplied', async (t) => {
+    // The two r5 fixes INTERACT here: `--head-sha ''` now parses as a value, and `framesForThisHead`
+    // reads an empty head as "cannot judge", so the staleness rule switches itself off and a body
+    // carrying the PREVIOUS head's block passes. `ci.yml` always populates `$HEAD_SHA` — pinned in
+    // tests/ci-workflow-semantics.test.js, which is the other half of this composition — so the live
+    // gate always takes the judging path.
+    //
+    // Making an explicitly-empty `--head-sha` an ERROR instead was considered and rejected: parsing
+    // precedes step 1, so a throw there is an unskippable red that not even a maintainer-applied
+    // `screenshots-exempt` label can clear, which is precisely the failure class (p5) removed. The
+    // degradation is documented, deliberate, and pinned in BOTH directions here.
+    const paths = cliInputs(t, { body: bodyWithBlock({ headSha: PREVIOUS_HEAD }) });
+    const gh = makeGhFake({});
+    const clock = makeGateClock({});
+
+    const degraded = await runCheck(
+      gateCheckArgv(paths, { prNumber: PR, extra: ['--repo', REPO, '--head-sha', ''] }),
+      { gh, clock }
+    );
+    assert.equal(degraded.exitCode, 0, degraded.captured.error.join('\n'));
+
+    const judged = await runCheck(
+      gateCheckArgv(paths, { prNumber: PR, extra: ['--repo', REPO, '--head-sha', HEAD] }),
+      { gh, clock }
+    );
+    assert.equal(judged.exitCode, 1);
+    assertAnnotated(judged.captured, GATE_CODES.NO_FRAMES_FOR_THIS_HEAD, PREVIOUS_HEAD);
+    assert.equal(gh.calls.length, 0, 'neither decision needs a producer run');
   });
 
   it('(q) parses --capture-eligible as a literal string, so a fork never enters the wait loop', async (t) => {

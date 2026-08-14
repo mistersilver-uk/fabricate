@@ -201,6 +201,16 @@ test('the screenshot gate awaits the capture run for its own head, within pinned
   assert.match(gateStep.run, /--await-capture/);
   assert.match(gateStep.run, /--patches-file/);
 
+  // The GATE's own `--head-sha`, which nothing pinned: the assertion below covers the producer's
+  // publish step only, and the two are separate flags on separate jobs. It stopped being loud when
+  // the matcher learned to read an absent head as "cannot judge head" rather than as "every frame is
+  // stale" — the right degradation for `npm run screenshots:ui:check`, but it means deleting this
+  // flag now disables the staleness rule SILENTLY and passes the previous head's frames on every UI
+  // pull request. Case (p10) in tests/screenshot-evidence-matching.test.js pins the CLI half of that
+  // composition; this is the half that says CI always supplies a head to judge against.
+  assert.match(gateStep.run, /--head-sha "\$HEAD_SHA"/);
+  assert.equal(gateStep.env.HEAD_SHA, '${{ github.event.pull_request.head.sha }}');
+
   // The capture deadline is READ from the producer, never restated.
   const declaredCaptureMinutes = Number(flagValue(gateStep.run, '--capture-timeout-minutes'));
   assert.equal(
