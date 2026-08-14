@@ -96,8 +96,13 @@ export async function buildLabWorld({
   seed = 20_260_601,
   managedSystemId = null,
   experimentalFeatures = true,
+  clearSystem = false,
 } = {}) {
   const content = buildLabContent();
+  // A real Manager refresh resolves an empty selection to the first available crafting system.
+  // The dedicated World Parties no-selection case therefore needs the truthful world state that
+  // makes an empty selection stable: no crafting systems, while global Parties and actors remain.
+  if (clearSystem) content.systems = [];
   const actors = buildLabActors(content);
   const documents = buildDocumentIndex(content, actors);
   const localize = await createLocalizer();

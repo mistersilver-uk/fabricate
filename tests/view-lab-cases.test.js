@@ -797,6 +797,7 @@ test('the no-selection World Parties case clears selection through the real Mana
 
   assert.equal(noSelection.query?.clearSystem, '1');
   assert.match(mountSource, /clearSystem: params\.get\('clearSystem'\) === '1'/);
+  assert.match(mountSource, /clearSystem: params\.clearSystem/);
   assert.match(mountSource, /if \(params\.clearSystem\) await props\.store\.selectSystem\(''\)/);
 });
 

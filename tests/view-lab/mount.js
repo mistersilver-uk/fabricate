@@ -427,6 +427,7 @@ async function boot() {
     : await buildLabWorld({
         managedSystemId: params.system,
         experimentalFeatures: params.experimental,
+        clearSystem: params.clearSystem,
       });
   const localize = world ? world.localize : (key) => key;
   configureLabPage({ colorScheme: params.colorScheme });
