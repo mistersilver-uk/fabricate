@@ -312,7 +312,7 @@ describe('UI PR screenshot evidence', () => {
     assert.ok(views[0].smokeLabels.includes('manager-environment-edit-placeholder'));
   });
 
-  it('pins World navigation sources and the Foundry walk to the six World captures', () => {
+  it('pins World Parties and system Travel sources to the six navigation captures', () => {
     const worldLabels = [
       'manager-world-default-collapsed',
       'manager-world-travel-expanded-neutral',
@@ -353,11 +353,11 @@ describe('UI PR screenshot evidence', () => {
     assert.equal(harness.includes('manager-gathering-travel-stacked'), false);
     for (const selector of [
       '#manager-world-nav-parties',
-      '#manager-world-travel-toggle',
-      '#manager-world-nav-realms',
-      '#manager-world-nav-map',
+      '#manager-travel-toggle',
+      '#manager-travel-nav-realms',
+      '#manager-travel-nav-map',
     ]) {
-      assert.ok(harness.includes(selector), `the World walk must use ${selector}`);
+      assert.ok(harness.includes(selector), `the navigation walk must use ${selector}`);
     }
     for (const label of worldLabels) {
       assert.ok(harness.includes(label), `the Foundry walk must capture ${label}`);

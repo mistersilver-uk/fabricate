@@ -3148,7 +3148,7 @@
             "Title": "Travel & Realms",
             "Enable": "Enable Travel & Realms",
             "Disable": "Disable Travel & Realms",
-            "Hint": "Enabling this reveals World → Parties and World → Travel → Realms / Map Region Links, and lets environments be assigned to realms. Leave it off if your game does not use travel or location-gated gathering."
+            "Hint": "World Parties are always available. Enabling this reveals Gathering → Travel → Realms / Map Region Links for this crafting system, enables party realm overrides, and lets environments be assigned to realms."
           },
           "GatheringTabs": {
             "Label": "Gathering sections",
@@ -4302,7 +4302,10 @@
           "Scope": "every system",
           "ExpandTravel": "Expand Travel",
           "CollapseTravel": "Collapse Travel",
-          "TravelDestinations": "Travel destinations"
+          "TravelDestinations": "Travel destinations",
+          "PartiesSubtitle": "Manage Fabricate parties shared across every crafting system.",
+          "PartyOverrideGatheringRequired": "Select a crafting system with Gathering enabled to set a current-realm override.",
+          "PartyOverrideTravelRequired": "Enable Travel & Realms in Gathering settings to set a current-realm override."
         },
         "Tools": {
           "Title": "Tools",

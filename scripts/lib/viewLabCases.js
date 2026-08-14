@@ -3214,14 +3214,13 @@ export const VIEW_LAB_CASES = Object.freeze([
   }),
   managerCase({
     id: 'manager-world-default-collapsed',
-    label: 'Manager — World Travel collapsed by default',
+    label: 'Manager — system Travel collapsed by default',
     smokeLabels: ['manager-world-default-collapsed'],
     reaches: 'exact',
     query: { system: 'lab-smithing' },
     steps: [],
     expectView: 'systems',
-    expectSelector:
-      '[data-world-nav-section] #manager-world-nav-travel[aria-expanded="false"]:not(.is-active)',
+    expectSelector: '#manager-nav-travel[aria-expanded="false"]:not(.is-active)',
     position: { width: 1330, height: 900 },
     kinds: ['manager', 'world'],
     sourceMatches: [
@@ -3231,14 +3230,14 @@ export const VIEW_LAB_CASES = Object.freeze([
   }),
   managerCase({
     id: 'manager-world-travel-expanded-neutral',
-    label: 'Manager — World Travel expanded neutral',
+    label: 'Manager — system Travel expanded neutral',
     smokeLabels: ['manager-world-travel-expanded-neutral'],
     reaches: 'exact',
     query: { system: 'lab-smithing' },
-    steps: [{ selector: '#manager-world-travel-toggle', press: 'Space' }],
+    steps: [{ selector: '#manager-travel-toggle', press: 'Space' }],
     expectView: 'systems',
     expectSelector:
-      '[data-world-nav-section]:has(#manager-world-nav-travel[aria-expanded="true"])' +
+      '.manager-system-travel-group:has(#manager-nav-travel[aria-expanded="true"])' +
       ':not(:has([aria-current="page"]))',
     position: { width: 1330, height: 900 },
     kinds: ['manager', 'world'],
@@ -3254,7 +3253,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     reaches: 'exact',
     query: { system: 'lab-smithing' },
     steps: [{ selector: '#manager-world-nav-parties', press: 'Enter' }],
-    expectView: 'environments',
+    expectView: 'world',
     expectSelector: '[data-travel-panel="parties"]',
     position: { width: 1330, height: 900 },
     kinds: ['manager', 'environments', 'world'],
@@ -3267,13 +3266,13 @@ export const VIEW_LAB_CASES = Object.freeze([
   }),
   managerCase({
     id: 'manager-world-realms-normal',
-    label: 'Manager — World Travel Realms expanded',
+    label: 'Manager — system Travel Realms expanded',
     smokeLabels: ['manager-world-realms-normal'],
     reaches: 'exact',
     query: { system: 'lab-smithing' },
     steps: [
-      { selector: '#manager-world-travel-toggle', press: 'Space' },
-      { selector: '#manager-world-nav-realms', press: 'Enter' },
+      { selector: '#manager-travel-toggle', press: 'Space' },
+      { selector: '#manager-travel-nav-realms', press: 'Enter' },
     ],
     expectView: 'environments',
     expectSelector: '[data-travel-panel="realms"]',
@@ -3285,13 +3284,13 @@ export const VIEW_LAB_CASES = Object.freeze([
   }),
   managerCase({
     id: 'manager-world-realms-stacked',
-    label: 'Manager — World Travel Realms stacked',
+    label: 'Manager — system Travel Realms stacked',
     smokeLabels: ['manager-world-realms-stacked'],
     reaches: 'exact',
     query: { system: 'lab-smithing' },
     steps: [
-      { selector: '#manager-world-travel-toggle', press: 'Space' },
-      { selector: '#manager-world-nav-realms', press: 'Enter' },
+      { selector: '#manager-travel-toggle', press: 'Space' },
+      { selector: '#manager-travel-nav-realms', press: 'Enter' },
     ],
     expectView: 'environments',
     expectSelector: '[data-travel-panel="realms"]',
@@ -3303,17 +3302,17 @@ export const VIEW_LAB_CASES = Object.freeze([
   }),
   managerCase({
     id: 'manager-world-map-collapsed',
-    label: 'Manager — World Travel Map Region Links collapsed rail',
+    label: 'Manager — system Travel Map Region Links collapsed rail',
     smokeLabels: ['manager-world-map-collapsed'],
     reaches: 'exact',
     query: { system: 'lab-smithing' },
     steps: [
-      { selector: '#manager-world-travel-toggle', press: 'Space' },
-      { selector: '#manager-world-nav-map', press: 'Enter' },
+      { selector: '#manager-travel-toggle', press: 'Space' },
+      { selector: '#manager-travel-nav-map', press: 'Enter' },
       { selector: '[data-manager-rail-toggle]', press: 'Enter' },
     ],
     expectView: 'environments',
-    expectSelector: '.manager-body.is-rail-collapsed #manager-world-nav-travel.is-active',
+    expectSelector: '.manager-body.is-rail-collapsed #manager-nav-travel.is-active',
     position: { width: 1330, height: 900 },
     kinds: ['manager', 'environments', 'world', 'responsive'],
     sourceMatches: [

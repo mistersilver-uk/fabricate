@@ -110,7 +110,7 @@
   class="manager-gathering-panel manager-travel-realms"
   id="travel-panel-realms"
   role="region"
-  aria-labelledby="manager-world-nav-realms"
+  aria-labelledby="manager-travel-nav-realms"
   data-travel-panel="realms"
 >
   <section

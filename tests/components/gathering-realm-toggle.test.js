@@ -30,11 +30,11 @@ describe('Travel & Realms settings toggle', () => {
     assert.ok(environmentsBrowserSource.includes('onSetGatheringRealmsEnabled?.(selectedSystemId, !realmsEnabled)'), 'toggle flips the flag through the store action');
   });
 
-  it('toggle hint names the World destinations revealed by the setting', () => {
+  it('toggle hint distinguishes permanent World Parties from gated system Travel', () => {
     const hint = lang.FABRICATE.Admin.Manager.Environment.RealmToggle.Hint;
     assert.equal(typeof hint, 'string');
-    assert.ok(hint.includes('World → Parties'), 'hint copy names the global Parties path');
-    assert.ok(hint.includes('World → Travel'), 'hint copy names the selected-system Travel path');
+    assert.ok(hint.includes('World Parties are always available'), 'hint names the global surface');
+    assert.ok(hint.includes('Gathering → Travel'), 'hint names the gated system path');
   });
 
   it('wires the setGatheringRealmsEnabled store action to GatheringRealmStore.updateRealmSettings', () => {
@@ -51,16 +51,17 @@ describe('Travel & Realms settings toggle', () => {
   });
 });
 
-describe('World navigation gating', () => {
-  it('gates the World section on Gathering plus Travel & Realms without restoring Gathering Travel', () => {
+describe('World and Travel navigation gating', () => {
+  it('keeps World Parties permanent and gates top-level Travel', () => {
     assert.ok(managerRootSource.includes('const gatheringRealmsEnabled = $derived($viewState.gatheringRealmSettings?.enabled === true)'), 'root derives the gate flag');
     assert.ok(
-      managerRootSource.includes('const canShowWorldTravel = $derived(canShowEnvironments && gatheringRealmsEnabled)'),
-      'World requires both the selected-system Gathering gate and Travel & Realms'
+      managerRootSource.includes('const canShowSystemTravel = $derived(canShowEnvironments && gatheringRealmsEnabled)'),
+      'system Travel requires Gathering plus Travel & Realms'
     );
-    assert.ok(managerRootSource.includes('{#if canShowWorldTravel} <section class="manager-world-nav"'), 'the derived gate controls the World section');
     assert.ok(managerRootSource.includes('id="manager-world-nav-parties"'), 'World exposes Parties');
-    assert.ok(managerRootSource.includes('id="manager-world-nav-travel"'), 'World exposes Travel');
+    assert.ok(managerRootSource.includes('{#if canShowSystemTravel} <div class={`manager-nav-group manager-system-travel-group'), 'the gate controls top-level Travel');
+    assert.ok(managerRootSource.includes('id="manager-nav-travel"'), 'system navigation exposes Travel');
+    assert.equal(managerRootSource.includes('id="manager-world-nav-travel"'), false);
     assert.equal(
       managerRootSource.includes("id: 'travel', icon: 'fas fa-route'"),
       false,
@@ -68,10 +69,10 @@ describe('World navigation gating', () => {
     );
   });
 
-  it('falls back to Gathering Environments when the World gate closes', () => {
+  it('falls back to Gathering Environments when the system Travel gate closes', () => {
     assert.ok(
-      managerRootSource.includes("activeGatheringTab === 'travel' && !canShowWorldTravel ? 'environments' : activeGatheringTab"),
-      'a hidden World route projects to Gathering Environments immediately'
+      managerRootSource.includes("activeGatheringTab === 'travel' && !canShowSystemTravel ? 'environments' : activeGatheringTab"),
+      'a hidden Travel route projects to Gathering Environments immediately'
     );
     assert.ok(
       managerRootSource.includes("if (!visibleGatheringNavItems.some((tab) => tab.id === activeGatheringTab)) { activeGatheringTab = 'environments'; }"),

@@ -31,6 +31,8 @@
     selectedPartyId = '',
     actorOptions = [],
     saving = false,
+    realmOverridesAvailable = false,
+    realmOverridesUnavailableHint = '',
     onSelectParty = () => {},
     onSetRealmOverride = () => {},
     onClearRealmOverride = () => {},
@@ -194,11 +196,22 @@
             </div>
 
             <div class="manager-travel-parties-right">
-              <RealmOverridePicker
-                value={overrideValue(party)}
-                realms={systemRealms}
-                onChoose={(realmId) => chooseOverride(party, realmId)}
-              />
+              {#if realmOverridesAvailable}
+                <RealmOverridePicker
+                  value={overrideValue(party)}
+                  realms={systemRealms}
+                  onChoose={(realmId) => chooseOverride(party, realmId)}
+                />
+              {:else}
+                <span
+                  class="manager-travel-parties-override-unavailable"
+                  data-party-realm-override-unavailable
+                  title={realmOverridesUnavailableHint}
+                  aria-label={realmOverridesUnavailableHint}
+                >
+                  <i class="fas fa-lock" aria-hidden="true"></i>
+                </span>
+              {/if}
 
               <span class="manager-travel-parties-chevron" aria-hidden="true">
                 <i class={isExpanded ? 'fas fa-chevron-up' : 'fas fa-chevron-down'}></i>

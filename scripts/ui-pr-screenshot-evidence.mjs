@@ -591,15 +591,15 @@ export const VIEW_RECIPES = Object.freeze([
   toolStudioFrame('stress-immune', 'Tool Studio stress — check-driven Immune', 'manager-tool-stress-immune', TOOL_STUDIO_MATCHES),
   toolStudioFrame('stress-invalid-validation', 'Tool Studio stress — failing Validation', 'manager-tool-stress-invalid-validation', TOOL_STUDIO_MATCHES),
   toolStudioFrame('stress-wrapping-680', 'Tool Studio stress — 680px wrapping', 'manager-tool-stress-wrapping-680', TOOL_STUDIO_MATCHES),
-  worldNavigationFrame('manager-world-default-collapsed', 'Manager World — default collapsed'),
+  worldNavigationFrame('manager-world-default-collapsed', 'Manager Travel — default collapsed'),
   worldNavigationFrame(
     'manager-world-travel-expanded-neutral',
-    'Manager World — Travel expanded neutral'
+    'Manager Travel — expanded neutral'
   ),
   worldNavigationFrame('manager-world-parties-normal', 'Manager World — Parties'),
-  worldNavigationFrame('manager-world-realms-normal', 'Manager World — Realms'),
-  worldNavigationFrame('manager-world-realms-stacked', 'Manager World — Realms stacked'),
-  worldNavigationFrame('manager-world-map-collapsed', 'Manager World — Map collapsed rail'),
+  worldNavigationFrame('manager-world-realms-normal', 'Manager Travel — Realms'),
+  worldNavigationFrame('manager-world-realms-stacked', 'Manager Travel — Realms stacked'),
+  worldNavigationFrame('manager-world-map-collapsed', 'Manager Travel — Map collapsed rail'),
   {
     id: 'manager-recipes',
     label: 'Manager recipes',

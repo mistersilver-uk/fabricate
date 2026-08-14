@@ -2484,6 +2484,14 @@ export function createAdminStore(services) {
       return Array.isArray(options) ? _clonePlain(options) : [];
     }
 
+    function canUsePartyRealmOverrides(systemId = get(selectedSystemId)) {
+      const id = String(systemId || '');
+      if (!id || id !== String(get(selectedSystemId) || '')) return false;
+      const system = services.getCraftingSystemManager?.()?.getSystem?.(id) || null;
+      const settings = getRealmStore()?.getRealmSettings?.(id) || null;
+      return system?.features?.gathering === true && settings?.enabled === true;
+    }
+
     function clearErrors() {
       travelError.set(null);
       travelFieldErrors.set({});
@@ -2518,6 +2526,7 @@ export function createAdminStore(services) {
           : [];
       const realmById = new Map(realms.map((realm) => [realm.id, realm]));
       const locationService = getLocationService();
+      const partyRealmOverridesAvailable = canUsePartyRealmOverrides(systemId);
 
       // Resolve each party's current realms ONCE (manual override OR live travel-
       // marker sensing) and bucket by realm id, so every realm-to-party list below
@@ -2526,7 +2535,7 @@ export function createAdminStore(services) {
       const partyResolvedRealmIds = new Map();
       for (const party of parties) {
         const evidence =
-          systemId && locationService?.resolveCurrentRealms
+          partyRealmOverridesAvailable && locationService?.resolveCurrentRealms
             ? locationService.resolveCurrentRealms({ partyId: party.id, systemId })
             : {
                 resolved: false,
@@ -2555,10 +2564,11 @@ export function createAdminStore(services) {
           realmIds: [],
           staleRealmIds: [],
         };
-        const override =
-          party.currentRealmOverrides?.[systemId] ??
-          party.currentRegionOverrides?.[systemId] ??
-          null;
+        const override = partyRealmOverridesAvailable
+          ? (party.currentRealmOverrides?.[systemId] ??
+            party.currentRegionOverrides?.[systemId] ??
+            null)
+          : null;
         const overrideRealmIds =
           override?.mode === 'manual' ? (override.realmIds ?? override.regionIds ?? []) : [];
         const memberCards = party.memberActorUuids.map((uuid) => ({
@@ -2703,6 +2713,7 @@ export function createAdminStore(services) {
           systemId && realmStore?.getRealmSettings
             ? realmStore.getRealmSettings(systemId)
             : { enabled: false, revealMode: 'manual', modifierVisibility: 'visible' },
+        partyRealmOverridesAvailable,
         actorOptions,
       };
     }
@@ -2852,11 +2863,13 @@ export function createAdminStore(services) {
         return withSave((partyStore) => partyStore.setTravelActor(partyId, null));
       },
       async setPartyRealmOverride(partyId, systemId, realmIds) {
+        if (!canUsePartyRealmOverrides(systemId)) return false;
         return withSave((partyStore) =>
           partyStore.setCurrentRealmOverride(partyId, systemId, realmIds || [])
         );
       },
       async clearPartyRealmOverride(partyId, systemId) {
+        if (!canUsePartyRealmOverrides(systemId)) return false;
         return withSave((partyStore) => partyStore.clearCurrentRealmOverride(partyId, systemId));
       },
       async removeStaleMember(partyId, actorUuid) {
@@ -2866,6 +2879,7 @@ export function createAdminStore(services) {
         return withSave((partyStore) => partyStore.setTravelActor(partyId, null));
       },
       async dropStaleOverrideRealm(partyId, systemId, realmId) {
+        if (!canUsePartyRealmOverrides(systemId)) return false;
         const partyStore = getPartyStore();
         if (!partyStore) return false;
         const party = partyStore.get?.(partyId);

@@ -84,6 +84,8 @@
     travelFieldErrors = {},
     travelActorOptions = [],
     travelSystemRealms = [],
+    partyRealmOverridesAvailable = false,
+    partyRealmOverridesUnavailableHint = '',
     travelSelectedRealmId = '',
     onSelectRealm = () => {},
     onAddEnvironmentToRealm = () => {},
@@ -1172,6 +1174,8 @@
           selectedPartyId={travelSelectedPartyId}
           actorOptions={travelActorOptions}
           saving={travelSaving}
+          realmOverridesAvailable={partyRealmOverridesAvailable}
+          realmOverridesUnavailableHint={partyRealmOverridesUnavailableHint}
           {onSelectParty}
           onSetRealmOverride={onSetPartyRealmOverride}
           onClearRealmOverride={onClearPartyRealmOverride}
@@ -1260,7 +1264,7 @@
         <p class="manager-condition-panel-hint">
           {text(
             'FABRICATE.Admin.Manager.Environment.RealmToggle.Hint',
-            'Enabling this reveals World → Parties and World → Travel → Realms / Map Region Links, and lets environments be assigned to realms. Leave it off if your game does not use travel or location-gated gathering.'
+            'World Parties are always available. Enabling this reveals Gathering → Travel → Realms / Map Region Links for this crafting system, enables party realm overrides, and lets environments be assigned to realms.'
           )}
         </p>
       </section>

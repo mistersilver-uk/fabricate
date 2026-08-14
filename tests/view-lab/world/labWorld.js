@@ -21,11 +21,7 @@
  *   5. flip the viewer for player frames.
  */
 import { buildLabActors, buildDocumentIndex } from './labActors.js';
-import {
-  buildLabBlindRunSecret,
-  buildLabRunStates,
-  installLabRunStates,
-} from './labRunStates.js';
+import { buildLabBlindRunSecret, buildLabRunStates, installLabRunStates } from './labRunStates.js';
 import { buildLabContent, LAB_SYSTEM_IDS } from './labContent.js';
 import { installFoundryShim, settingsKey } from '../foundry/installFoundryShim.js';
 import { createLocalizer, toI18nStub } from '../labI18n.js';
@@ -54,7 +50,7 @@ function seedSettings(content, actors, managedSystemId, experimentalFeatures) {
       // (`GatheringPartyStore`), and `_normalizeParty` returns a fixed six-field record that has no
       // such key — so authoring one asserts a scoping that does not exist and is dropped on read.
       // It also read as a CONTRADICTION of the frame it feeds: `manager-world-parties-normal`
-      // photographs this herbalism-named party on SMITHING's World → Parties path, which is
+      // photographs this herbalism-named party on the system-independent World → Parties path,
       // correct precisely because the scoping is not real.
       // `GatheringPartyStore._normalizeParty` reads `memberActorUuids` and `enabled`, and it takes
       // UUIDs rather than ids. This was authored as `memberActorIds` with bare ids and

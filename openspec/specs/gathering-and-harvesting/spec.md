@@ -220,7 +220,7 @@ There are no other strategies and no per-environment configuration of the select
 GM authoring UI for blind environments shows each included task's calculated selection share as `weight / sum(included task weights) * 100`; the displayed percentage is informational and does not change the persisted weight shape.
 17. Reveal behaviour is set at the system level only — the system Gathering Rules `revealPolicy` / `revealScope` apply to every environment.
 Environments do not override them.
-18. `includedRealmIds`, `includedBiomeIds`, `excludedRealmIds`, and `excludedBiomeIds` are optional, opt-in location availability rules evaluated against the party's resolved current realms (see *Location-Aware Gathering*). `includedRealmIds` is the realm membership (multiple `GatheringRealm` ids) authored from World > Travel > Realms / the environment editor.
+18. `includedRealmIds`, `includedBiomeIds`, `excludedRealmIds`, and `excludedBiomeIds` are optional, opt-in location availability rules evaluated against the party's resolved current realms (see *Location-Aware Gathering*). `includedRealmIds` is the realm membership (multiple `GatheringRealm` ids) authored from Gathering > Travel > Realms / the environment editor.
 They are distinct from the inert legacy `region` string: `region` is a free-text tag string, is NOT a `GatheringRealm` id, no longer participates in composition matching, and is not editor-surfaced.
 The legacy `biomes` tag list remains a composition match dimension.
 An environment with none of the location fields (or only empty-after-normalization arrays) is not location-gated and preserves existing behavior.
@@ -239,11 +239,12 @@ This section specifies the shipped manual override and live token-derived Scene 
 Realm modifier application and the full player travel/discovery UI remain later-phase follow-ups; the reserved fields below leave room for them without changing the contract.
 
 The entire realm/travel/availability subsystem is gated by a per-system `gatheringRealmSettings.enabled` toggle that defaults to `false` (see *Gathering Realm Settings*).
-When disabled, every gate point — the engine location-block choke point, the current-realm resolver, the location-aware public API, the Manager World Parties/Travel navigation, and environment realm selectors — behaves as if no environment is location-gated and no travel surfaces exist.
-In Manager, parties are reached through the world-level `Parties` destination and selected-system
-realm/map authoring through `World > Travel > Realms` and `World > Travel > Map Region Links`.
-Travel is collapsed when Manager opens; its parent opens Parties unless Realms or Map Region Links
-is already current, in which case the parent preserves that child and keeps the group expanded.
+When disabled, every runtime gate point — the engine location-block choke point, current-realm resolver, location-aware public API, selected-system Travel navigation, and environment realm selectors — behaves as if no environment is location-gated.
+World Party CRUD remains available.
+In Manager, parties are always reached through world-level `World > Parties`; selected-system
+realm/map authoring is reached through `Gathering > Travel > Realms` and `Gathering > Travel > Map Region Links` only while the card gate is on.
+Travel is collapsed when Manager opens; its parent opens Realms unless a child is already current,
+in which case the parent preserves that child and keeps the group expanded.
 This presentation does not change ownership: the party list and count are world-global, while
 current-realm overrides remain keyed by selected `systemId`, realms remain owned by that crafting
 system, and Map Region Links writes the active-scene Region choice only into those realms'
@@ -263,7 +264,7 @@ GatheringRealm = {
   secret: boolean,    // default false
   biomes: string[],   // terrain/ecology traits from the system biome vocabulary
   sort?: number,
-  sceneMappings?: GatheringRealmSceneMapping[], // bridge to Foundry Scene Regions; member field names NOT renamed; authored via World > Travel > Map Region Links, applied at runtime by live sensing
+  sceneMappings?: GatheringRealmSceneMapping[], // bridge to Foundry Scene Regions; member field names NOT renamed; authored via Gathering > Travel > Map Region Links, applied at runtime by live sensing
   modifiers?: GatheringRealmModifier[],         // reserved for Phase 4 realm modifiers
 }
 ```
@@ -277,7 +278,7 @@ GatheringRealm = {
 5. Secret realms may affect runtime availability, but their identity must not be disclosed to a non-GM viewer until the selected actor has discovered the realm or `GatheringRealmSettings.revealMode === "alwaysVisible"`.
 6. Disabled realms must not satisfy environment availability for non-GM users, except when a GM manual override explicitly includes a disabled realm for diagnostic/preview purposes.
 7. Stale realm ids in environments, party overrides, or discovery flags are ignored at runtime and surfaced to GMs as repair evidence.
-8. `sceneMappings` normalize, validate (unique ids, known enums, finite values), and round-trip; they are authored via World > Travel > Map Region Links (single-valued per scene region, `adminStore.setMapRegionLink`) and are **applied at runtime** by shipped live token-derived sensing.
+8. `sceneMappings` normalize, validate (unique ids, known enums, finite values), and round-trip; they are authored via Gathering > Travel > Map Region Links (single-valued per scene region, `adminStore.setMapRegionLink`) and are **applied at runtime** by shipped live token-derived sensing.
 `modifiers` normalize, validate, and round-trip but are **not yet applied at runtime** — realm modifier application (Phase 4) is not shipped.
 The `sceneMappings[].sceneRegionUuid`/`sceneUuid` fields name Foundry `RegionDocument` objects and are **not** renamed.
 
@@ -297,7 +298,8 @@ GatheringRealmSettings = {
 2. Missing settings normalize to `enabled: false`, `revealMode: "manual"`, and `modifierVisibility: "visible"`.
 3. Unknown values are rejected at save/import boundaries and coerced to defaults when read from existing data. `enabled` must be a real boolean when present; only an explicit `true` enables the subsystem, and any non-boolean coerces to `false` on read.
 4. `enabled` gates the entire realm/travel/availability subsystem.
-When `false` (the default, including for all migrated systems), every environment behaves as ungated (no location blocking), the current-realm resolver fast-exits to the unresolved-empty shape, the location-aware public API returns null/false, and the Manager hides World Parties/Travel and the environment realm selectors.
+When `false` (the default, including for all migrated systems), every environment behaves as ungated (no location blocking), the current-realm resolver fast-exits to the unresolved-empty shape, the location-aware public API returns null/false, and the Manager hides selected-system Travel and environment realm selectors.
+World Parties and unrelated Party CRUD remain available, while current-realm override evidence and writes are unavailable.
 A shared `isGatheringRealmsEnabled(system)` helper is the single source of truth every gate reads.
 5. `manual` reveal mode means only GM/API reveal actions add actor discovery for secret realms. `alwaysVisible` discloses realm identities to players (while still allowing discovery history). `onPartyTokenEntry` automatic discovery is not yet active; that follow-up is distinct from the shipped live token-derived realm sensing used for current-realm resolution.
 
@@ -336,6 +338,8 @@ This keeps a selected actor's current-realm resolution unambiguous.
 6. A selected actor resolves to the unique enabled party that references the actor's UUID in `memberActorUuids` or as `travelActorUuid`; if the actor is in no enabled party, realm-aware gathering falls back to no current realm.
 7. Party membership is actor-based, not user-based, and must not depend on a game-system-supplied party/group actor type.
 8. Existing blind-task `revealScope: "party"` is not redefined by this change.
+9. Party create, select, rename, enable/disable, delete, membership, and travel-actor operations are available without a selected crafting system.
+Reading or writing `currentRealmOverrides[systemId]` through Manager requires that exact system to be selected, Gathering-enabled, and opted into Travel & Realms; otherwise Manager explains the prerequisite and the store performs no override write.
 
 ### Current Realm Resolution
 

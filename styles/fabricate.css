@@ -12183,16 +12183,14 @@
   background: var(--fab-overlay-light-04);
 }
 
-/*
-  The active nav row is ACCENT, not success: the rail's selected state is an identity
-  cue ("you are here"), never a status. Success/amber stay reserved for enabled and
-  warning states on the rows the manager screens list.
-*/
+/* World established the manager rail's quiet selected language. The same link styling is
+   shared by every system-specific direct, parent, and child route so changing scope does
+   not change the meaning of an active navigation row. */
 .fabricate-manager .manager-nav-button.is-active {
-  color: var(--fab-mv2-accent);
-  border-color: var(--fab-accent-border);
-  background: var(--fab-accent-soft);
-  box-shadow: inset 3px 0 0 var(--fab-mv2-accent);
+  color: var(--fab-mv2-text);
+  border-color: var(--fab-mv2-border-strong);
+  background: var(--fab-surface-active);
+  box-shadow: none;
   font-weight: 600;
 }
 
@@ -12202,7 +12200,7 @@
 }
 
 .fabricate-manager .manager-nav-button.is-active:focus {
-  box-shadow: inset 3px 0 0 var(--fab-mv2-accent);
+  box-shadow: none;
 }
 
 .fabricate-manager .manager-nav-group {
@@ -12229,6 +12227,11 @@
   border-color: transparent;
   background: transparent;
   box-shadow: none;
+}
+
+.fabricate-manager .manager-nav-group.is-expanded .manager-nav-parent.is-active {
+  color: var(--fab-mv2-text);
+  background: var(--fab-surface-active);
 }
 
 .fabricate-manager .manager-nav-group.is-expanded .manager-nav-parent:hover {
@@ -12308,10 +12311,10 @@
 }
 
 .fabricate-manager .manager-nav-subitem.is-active {
-  color: var(--fab-mv2-accent);
-  border-color: var(--fab-accent-border);
-  background: var(--fab-accent-soft);
-  box-shadow: inset 3px 0 0 var(--fab-mv2-accent);
+  color: var(--fab-mv2-text);
+  border-color: transparent;
+  background: var(--fab-surface-active);
+  box-shadow: none;
   font-weight: 600;
 }
 
@@ -12321,7 +12324,7 @@
 }
 
 .fabricate-manager .manager-nav-subitem.is-active:focus {
-  box-shadow: inset 3px 0 0 var(--fab-mv2-accent);
+  box-shadow: none;
 }
 
 .fabricate-manager .manager-nav-subitem:focus-visible {
@@ -12376,64 +12379,19 @@
 
 .fabricate-manager .manager-nav-button.is-active .manager-nav-count,
 .fabricate-manager .manager-nav-subitem.is-active .manager-nav-count {
-  color: var(--fab-mv2-accent);
-  font-weight: 700;
-}
-
-/* The downtime prototype's selected rows are neutral, and that visual language belongs
-   only to World: selected-system navigation keeps the manager's established accent state.
-   Children span the complete group width; their CONTENT starts at 32px rather than moving
-   the selected surface inward. The expanded parent is the prototype's sole accent analogue. */
-.fabricate-manager .manager-world-travel-submenu {
-  padding-right: 0;
-  padding-left: 0;
-}
-
-.fabricate-manager .manager-world-travel-child {
-  min-height: 28px;
-  padding: 7px var(--fab-space-2) 7px 32px;
   color: var(--fab-text-subtle);
-  font-size: 0.75rem;
-}
-
-.fabricate-manager #manager-world-nav-parties.is-active,
-.fabricate-manager .manager-world-travel-child.is-active {
-  color: var(--fab-mv2-text);
-  background: var(--fab-surface-active);
-  box-shadow: none;
-}
-
-.fabricate-manager #manager-world-nav-parties.is-active {
-  border-color: var(--fab-mv2-border-strong);
-}
-
-.fabricate-manager .manager-world-travel-child.is-active {
-  border-color: transparent;
-}
-
-.fabricate-manager #manager-world-nav-parties.is-active:focus,
-.fabricate-manager .manager-world-travel-child.is-active:focus {
-  box-shadow: none;
-}
-
-.fabricate-manager #manager-world-nav-parties.is-active .manager-nav-count {
-  color: var(--fab-text-subtle);
-  font-family: var(--fab-font-mono);
-  font-size: 0.625rem;
   font-weight: 600;
 }
 
-.fabricate-manager .manager-world-travel-group.is-expanded {
-  background: transparent;
-  box-shadow: none;
-}
-
-.fabricate-manager .manager-world-travel-group.is-expanded .manager-nav-parent.is-active,
-.fabricate-manager .manager-world-travel-group.is-expanded .manager-nav-parent.is-active:focus {
-  color: var(--fab-mv2-accent);
-  border-color: var(--fab-accent-border);
-  background: var(--fab-accent-soft);
-  box-shadow: none;
+/* A Party row explains why its system-specific realm override is unavailable without
+   disabling the global party editor around it. */
+.fabricate-manager .manager-travel-parties-override-unavailable {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  color: var(--fab-text-subtle);
 }
 
 /*

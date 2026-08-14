@@ -39,7 +39,7 @@
   class="manager-gathering-panel manager-travel-map-links"
   id="travel-panel-map"
   role="region"
-  aria-labelledby="manager-world-nav-map"
+  aria-labelledby="manager-travel-nav-map"
   data-travel-panel="map"
 >
   {#if !sceneUuid}

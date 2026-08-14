@@ -12,7 +12,8 @@ Token-driven realm sensing from the travel actor's placed token is available.
 Realm modifiers applied to gathering calculations remain planned.
 
 {: .gm }
-> The whole realm and travel subsystem is **off by default** and is enabled per crafting system with the **Enable Travel & Realms** toggle in gathering Settings (see [Enabling Travel & Realms](#enabling-travel--realms)).
+> Realm-aware travel is **off by default** per crafting system and is enabled with the **Enable Travel & Realms** toggle in gathering Settings (see [Enabling Travel & Realms](#enabling-travel--realms)).
+> World Party management is always available.
 > Only GMs can manage realms and parties and set current-realm overrides.
 > Players experience locations through the gathering app's blocked reasons and the redaction-safe location API.
 
@@ -48,27 +49,28 @@ Enable it per system with the **Enable Travel & Realms** toggle on the Gathering
 
 While the toggle is **off**, the system behaves as a non-location-aware system:
 
-- **World > Parties** and **World > Travel** are hidden, and an open World destination falls back to Gathering **Environments**.
+- **World > Parties** remains available for global Party management; current-realm overrides are unavailable.
+- Selected-system **Travel** is hidden, and an open Travel destination falls back to Gathering **Environments**.
 - The environment editor shows no realm selectors.
-- No current-realm, availability, party, or discovery surfaces appear.
+- No current-realm, availability, or discovery surfaces appear for that system.
 - Every environment is available.
   Composition (biome and danger) is unaffected.
 
 The **Settings** tab itself stays visible while disabled, since it hosts the toggle.
-Turning the toggle on reveals **World > Parties**, **World > Travel > Realms**, and **World > Travel > Map Region Links**, plus the environment editor's multi-realm selector and the rest of the location-aware surfaces described below.
+Turning the toggle on reveals **Gathering > Travel > Realms** and **Gathering > Travel > Map Region Links**, enables the selected system's current-realm override on **World > Parties**, and reveals the environment editor's multi-realm selector.
 
-## World Parties and Travel
+## World Parties and system Travel
 
-With **Enable Travel & Realms** turned on, open the Crafting System Manager and select the crafting system.
-Choose **World > Parties** for the world party list and selected party editor (name, enabled state, members, travel actor, and selected-system current-realm override), or expand **World > Travel** for **Realms** and **Map Region Links**.
+Choose **World > Parties** at any time for the world party list and editor (name, enabled state, members, and travel actor), including when no crafting system is selected.
+Select a Gathering-enabled crafting system and turn on **Enable Travel & Realms** to use its current-realm override or expand top-level **Travel** for **Realms** and **Map Region Links**.
 **Travel** is initially collapsed when the Crafting System Manager opens.
 The right-hand inspector echoes the selected party's read-only current-realm evidence.
 When no parties exist yet, the panel shows a simple **No parties yet** empty state.
 It does not render a setup checklist.
 
-All four World entries are hidden whenever the toggle is off.
-The `WORLD / every system` heading is presentation only: parties and their count are world-level, while overrides, realms, and authored map links re-project for the selected crafting system.
-Create realms under **World > Travel > Realms** before assigning environments to them.
+The `WORLD / every system` heading and Parties remain visible when the toggle is off and when no system is selected.
+Parties and their count are world-level, while overrides, realms, and authored map links re-project for the selected crafting system.
+Create realms under **Gathering > Travel > Realms** before assigning environments to them.
 
 ## Realms
 
@@ -84,7 +86,7 @@ Each realm belongs to one crafting system and stores:
 | **Enabled** | Disabled realms are flagged in the UI. A manual override that includes a disabled realm still resolves it (marked **Disabled**) so GMs can preview or diagnose |
 | **Secret** | A secret realm is never disclosed to players (not even its name) until the actor discovers it (see [Secret realms and discovery](#secret-realms-and-discovery)) |
 | **Biomes** | Biome tags (from the system's biome list) used by environment biome availability rules |
-| **Scene mappings** | Links from the realm to one or more Foundry Scene Regions, authored from **World > Travel > Map Region Links** and used by live token sensing |
+| **Scene mappings** | Links from the realm to one or more Foundry Scene Regions, authored from **Gathering > Travel > Map Region Links** and used by live token sensing |
 | **Modifiers** | Adjustments to event chance, drop rate, yield, difficulty, stamina cost, and attempt limit (plus custom adjustments) are stored and checked now, and applied to gathering calculations in a later phase |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
@@ -99,9 +101,9 @@ The two are bridged but not the same:
   Several Foundry Scene Regions can map onto one realm, so a single realm can span multiple drawn map areas.
 - Scene region automation senses which realm a travel actor occupies from its placed token's Region membership, with a position hit-test fallback.
 
-### Authoring realms (World > Travel > Realms)
+### Authoring realms (Gathering > Travel > Realms)
 
-Realm create, edit, and delete live under **World > Travel > Realms**, as a realm list with a detail editor:
+Realm create, edit, and delete live under **Gathering > Travel > Realms**, as a realm list with a detail editor:
 
 - Create a realm, then edit its **name, description, image, enabled** state, **secret** flag, and **biomes** (chosen from the system biome vocabulary).
 - **Delete realm** goes through the standard confirmation dialog.
@@ -109,7 +111,7 @@ Realm create, edit, and delete live under **World > Travel > Realms**, as a real
   Deletion never blocks.
   Dangling references become stale repair evidence instead.
 
-Scene mappings are authored under **World > Travel > Map Region Links**, normalize and round-trip, and drive live token sensing.
+Scene mappings are authored under **Gathering > Travel > Map Region Links**, normalize and round-trip, and drive live token sensing.
 Realm modifiers normalize, validate, and round-trip but are not yet authored in the UI or applied at runtime.
 Existing modifier values are preserved untouched.
 
@@ -161,6 +163,7 @@ A party's current realm is resolved **per crafting system**, in this order:
 3. **Unresolved** means no current realm.
 
 To set the override, select one or more realm chips in the **Current realm override** section and click **Set current realm** (a party can be in several realms at once, e.g. overlapping geography).
+This control is available only while its Gathering-enabled crafting system is selected and **Enable Travel & Realms** is on; otherwise the Party editor explains the missing prerequisite and does not write an override.
 **Clear current realm** records an explicit "no override".
 Both writes are stamped with the updating user and time.
 Including a disabled realm still resolves it (the UI marks it **Disabled**), and override ids referencing deleted realms surface as stale repair evidence and do not resolve.
@@ -171,7 +174,7 @@ The inspector echoes the resulting evidence: the resolution source (**GM overrid
 
 An environment declares which realms it belongs to, and it can belong to **multiple** realms.
 When **Enable Travel & Realms** is on, the environment editor shows a multi-select chip control (like the biome selector) listing the system's realms.
-When the toggle is on but no realms exist yet, the selector shows an empty state pointing you to **World > Travel > Realms** to create realms first.
+When the toggle is on but no realms exist yet, the selector shows an empty state pointing you to **Gathering > Travel > Realms** to create realms first.
 The selector is hidden while the toggle is off.
 
 ## Environment Location Rules
