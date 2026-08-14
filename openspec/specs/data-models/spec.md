@@ -88,10 +88,19 @@ CraftingSystem = {
     // Salvage reuses the crafting check sub-object shapes (so the GM Checks-tab
     // editors are shared); the active one is selected by salvageResolutionMode. The
     // simple/routed default DC is the sub-object's `dc`; a per-component override
-    // lives on Component.salvage.dcOverride. Salvage has no recipes, so the simple
-    // `tiers`/`dcMode`/`macroUuid` and routed `tiers` are persisted but not authored.
+    // lives on Component.salvage.dcOverride. Salvage has no recipes, so salvage DC
+    // RESOLUTION reads no `tiers`, `dcMode` or `macroUuid` on either slot (the routed
+    // slot gained its own `dcMode`/`macroUuid` in issue 1096): `_resolveSalvageDc` is
+    // arithmetic over the per-component override and the slot's own `dc`. That is a
+    // statement about DC resolution ALONE and not a licence to drop the fields:
+    // `simple.tiers` is the preset source for the per-component salvage DC control and
+    // `simple.dcMode` selects that control's system-default label, in EVERY resolution
+    // mode including routed — see the Dynamic DC Macro Contract. No salvage editor
+    // renders a tier table (the Checks tab mounts the simple editor with its DC-source
+    // half hidden and the routed editor with tiers hidden), so neither slot's `tiers`
+    // is authored there.
     simple: SimpleCheck,               // { rollFormula, dc, thresholdMode, dcMode, tiers, macroUuid, checkBreakage }
-    routed: RoutedCheck,               // { type, rollFormula, dc, thresholdMode, tiers, relativeOutcomes, fixedOutcomes, checkBreakage }
+    routed: RoutedCheck,               // { type, rollFormula, dc, thresholdMode, dcMode, macroUuid, tiers, relativeOutcomes, fixedOutcomes, checkBreakage }
     progressive: {
       awardMode: "partial" | "equal" | "exceed",
       rollFormula: string,             // default ""; total drives progressive awarding
@@ -276,6 +285,8 @@ CraftingSystem = {
   //   RoutedCheck = {
   //     type: "relative" | "fixed",                // default "relative"
   //     rollFormula: string, dc: number, thresholdMode: "meet" | "exceed",
+  //     dcMode: "static" | "dynamic",              // default "static" (crafting only)
+  //     macroUuid: string | null,                  // dynamic-DC macro (crafting only)
   //     tiers: { id, name, dc }[],                 // recipe-DC overrides (crafting only)
   //     relativeOutcomes: { id, name, success, breakTools, dc }[],
   //     fixedOutcomes: { id, name, success, breakTools, start, end }[],
@@ -2541,26 +2552,45 @@ They are unrelated mechanisms.
 
 ### Dynamic DC Macro Contract
 
-A configured dynamic DC macro receives one payload object containing:
+The dynamic DC macro is a **crafting-check** mechanism, and within crafting it reaches exactly the two DC-bearing check slots.
+Those are `craftingCheck.simple` — the shared pass/fail slot backing the `simple` and `routedByIngredients` modes and the alchemy `simple` check mode — and `craftingCheck.routed`, backing `routedByCheck` and the alchemy `tiered` check mode.
+Both resolve their DC through `CraftingEngine._resolveSimpleCheckDc`, which is the sole caller of `CraftingEngine._resolveCheckAnchorDc` and the sole dynamic-DC caller of the shared macro executor.
+No other check reaches either symbol.
+The crafting `progressive` check has no DC at all, and salvage and gathering resolve theirs arithmetically through `CraftingEngine._resolveSalvageDc` and `GatheringEngine._resolveGatheringRoutedDc` — a per-record `dcOverride` when finite, else the slot's static `dc`, else a literal `15` — consulting no `checkTierId`, no `tiers`, and no macro.
+Salvage and gathering nonetheless persist `dcMode`, `macroUuid`, and `tiers`, because they reuse the `SimpleCheck` and `RoutedCheck` shapes so the Checks-tab editors can be shared.
+No DC-resolution path outside the crafting check reads any of the three.
+They are not inert for that reason.
+Outside the shared Checks-tab editors, which round-trip whatever their slot holds, salvage's `simple.tiers` and `simple.dcMode` have one reader: the per-component salvage DC control (`src/ui/svelte/apps/manager/component/salvageDcPresets.js`) builds its preset options from `salvageCraftingCheck.simple.tiers` in EVERY salvage resolution mode, routed included — there is no `.routed.tiers` sibling for presets — and renders its system-default option without a DC number when `salvageCraftingCheck.simple.dcMode` is `dynamic`, because a macro-computed DC has no number to show.
+Dropping salvage's `simple.tiers` would therefore silently empty that preset list, and dropping its `simple.dcMode` would mislabel the default option, so arithmetic DC resolution licenses removing neither.
+`macroUuid` is the one of the three with no reader at all on salvage or gathering, and gathering has no manager-side reader of any of them.
+
+Before the configured macro runs, `_resolveCheckAnchorDc` computes an **anchor DC** for the crafting check slot being resolved.
+The anchor is the recipe's selected difficulty tier — `Recipe.checkTierId` matched against that slot's `tiers[].id` — when it names a tier that still exists, and the slot's static `dc` otherwise.
+`CraftingSystemManager._normalizeSimpleCraftingCheck` and `_normalizeRoutedCraftingCheck` normalize that `dc` to a finite integer, defaulting to 15, on every save, so a normalized crafting check slot's static `dc` is never absent or non-finite.
+`_resolveCheckAnchorDc`'s own fallback to a literal `15` therefore guards only a check config that reached it without that normalization, and is not reachable through normal play.
+
+When a crafting slot's `dcMode` is anything other than `dynamic`, or no `macroUuid` is configured, the anchor IS that check's resolved DC and no macro runs.
+When `dcMode` is `dynamic` and a `macroUuid` is configured, `_resolveSimpleCheckDc` runs that macro and hands it one payload object containing:
 
 - `recipe`
 - `craftingSystem`
 - `craftingActor`
 - `candidateIngredientSet`
+- `anchorDc` — the anchor DC resolved above, before the macro runs
 
 Fabricate exposes that exact object with identity as `scope`, `context`, and `args`.
 The `scope` identifier provides Foundry-facing familiarity while `context` and `args` remain backward-compatible aliases.
 This is not full native `Macro#execute` behavior: Foundry's native `scope` is a rest copy, and Fabricate does not add Foundry's native `speaker`, `actor`, `token`, or `character` locals.
 
 Fabricate applies `Number(result)` to the macro's return value.
-When the coerced value is finite, Fabricate truncates it to an integer and uses it as the dynamic DC.
-An absent configured macro, a thrown error, or a result whose numeric coercion is non-finite falls back to the configured static DC.
+When the coerced value is finite, Fabricate truncates it to an integer and uses it as that crafting check's DC.
+An absent configured macro, a `dcMode` other than `dynamic`, a thrown error, or a result whose numeric coercion is non-finite all leave the anchor DC in force, so a recipe's difficulty tier and a dynamic DC macro compose rather than acting as alternatives: the tier sets the number the macro is asked to adjust.
 
 The shared executor deliberately evaluates the selected script Macro command instead of calling `Macro#execute`.
 This keeps player-initiated workflows from being blocked by Foundry's current-user Macro permission gate.
 The direct evaluation bypasses only the client-side Macro document check and grants no additional server or document authority; the script still runs as the current player.
 Foundry runtime globals `game`, `foundry`, `ui`, and `fromUuid` remain directly available and are not injected as payload parameters.
-Errors thrown by a configured macro propagate unchanged to the owning Fabricate workflow, which decides whether to abort or apply a documented fallback such as the dynamic DC fallback above.
+Errors thrown by a configured macro propagate unchanged to the owning Fabricate workflow, which decides whether to abort or apply a documented fallback such as the anchor-DC fallback above, as does the executor's own `Macro not found or invalid` error when the configured uuid resolves to no document or to one carrying no string `command`.
 
 ### Crafting Check Macro Contract (Removed in 1.8.0)
 

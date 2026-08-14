@@ -200,6 +200,7 @@ See [Rolling a check from the UI]({% link crafting-checks.md %}#rolling-a-check-
 
 If your system uses Routed by check mode, or Progressive mode, you must configure a crafting check to gate outcomes on a player roll.
 See [Crafting Checks]({% link crafting-checks.md %}) for the settings, consumption-on-failure policies, and worked examples.
+If your game counts qualifying dice across a pool rather than adding one die to a modifier, see [Success-counting checks]({% link crafting-checks.md %}#success-counting-checks).
 
 ### Effect Transfer
 

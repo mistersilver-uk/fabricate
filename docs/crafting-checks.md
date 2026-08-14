@@ -75,7 +75,7 @@ On **Checks › Crafting**, open **The roll** section, find the **Difficulty** c
 Then drag the Script Macro you want to use into the **DC macro** area below it.
 The macro calculates only the DC.
 It does not roll the check or choose the crafting result.
-If no Macro is linked, the Macro fails, or it cannot provide a usable number, Fabricate uses the configured static DC instead.
+If no Macro is linked, the Macro fails, or it cannot provide a usable number, Fabricate falls back to the recipe's chosen difficulty tier when it has one, and to the configured static DC when it does not.
 See the [Dynamic DC Macro API example]({% link api/crafting-engine.md %}#dynamic-dc-macro) for the supported inputs and a working Script Macro.
 
 ## Rolling a check from the UI
@@ -549,6 +549,121 @@ Set a Tool to **Immune** in its **Breakage** tab to exclude it while keeping its
 The dice groups in a trigger come from the formula.
 When the same shape appears twice (for example two separate d20 rolls), Fabricate numbers them so you can tell them apart.
 Editing the formula can renumber the groups, so check your dice-group triggers after you change a check formula.
+
+## Success-counting checks
+
+Not every game measures a check as one running total against a difficulty.
+Some systems roll a pool of dice and count how many of them individually clear a threshold, then compare that count against a target.
+Fabricate can run this style of check today, by adding a counting suffix such as `cs` or `cf` to a die term in the formula field you already use.
+This is an advanced topic that draws on nearly every earlier section of this page.
+
+### Counting dice instead of adding them
+
+A formula that carries a `cs` or `cf` suffix on one of its dice totals to the number of qualifying dice, rather than a sum of the dice's faces.
+The **Difficulty** card's meet-or-exceed comparison then compares that count against the **DC**, so the check passes once enough dice qualify.
+That is exactly the rule a dice-pool system uses.
+Meet-or-exceed is already the default comparison, so nothing about that setting needs to change.
+Set the **DC** to the number of qualifying dice the formula must produce.
+See [Relative and fixed tiers](#relative-and-fixed-tiers), because a fixed routed check has no DC at all, so this reading does not apply there.
+
+### Progressive checks award the count
+
+A progressive check spends the roll's raw total as a budget against the ordered result thresholds you authored, rather than granting that many results outright.
+On a counting formula that total is the number of qualifying dice, not a face sum, so it can never exceed the size of the pool.
+Converting an existing progressive recipe from an additive formula to a counting one silently rescales it.
+A recipe that used to spend somewhere between 2 and 20 from a `2d10` formula can now only spend somewhere between 0 and 2 from a two-die counting pool, and nothing warns you.
+Re-author your award thresholds whenever you move a progressive check onto a counting formula.
+
+### Setting the difficulty without a prompt
+
+Named difficulty tiers on the check, together with a per-recipe tier selection, give you per-recipe difficulty with no macro at all.
+Where a dynamic DC macro is also in play, the recipe's chosen tier resolves first, and the macro is handed that value as its starting point.
+If the macro is missing, throws, or returns something that is not a number, the tier's DC still stands.
+The two features compose rather than compete.
+
+On a simple pass/fail check, the per-recipe **Check tier** control is only offered on a recipe's **Overview** tab while that check's **DC source** is **Static**.
+Switching a simple check to **Dynamic** removes that control from every recipe's **Overview** tab.
+Fabricate still honours a tier a recipe already had chosen, so the composition above is real, not only theoretical.
+On a simple check, choose the recipe's difficulty tier while the **DC source** is **Static**.
+A tier you already chose keeps setting the starting point the macro adjusts, even after you switch that check to **Dynamic**.
+See [Dynamic DC macros](#dynamic-dc-macros).
+
+### Do not add bonuses to a counting check
+
+Tool bonuses, eligible check modifiers, and the roll prompt's **Situational bonus** field each add a separate additive term onto the end of the rolled formula.
+On an ordinary formula, that extra term improves the roll.
+On a counting formula it adds free qualifying dice to the count instead, which is almost never what you want.
+Do not combine bonuses with a counting formula.
+Switch off any contributing check modifier entries for that activity, and tell players to leave **Situational bonus** blank when they roll a counting check.
+This is a current limitation, not a permanent design choice.
+A bulk salvage batch complicates that last piece of advice, because it prompts once and applies that single **Situational bonus** to every roll in the batch, counting formulas included.
+Telling players to leave the field blank is not something they can act on there, because the player cannot see which entries in a batch are counting checks and which are not.
+See [Check modifiers](#check-modifiers) and [Rolling a check from the UI](#rolling-a-check-from-the-ui).
+
+### Writing the qualifying threshold
+
+The qualifying threshold in a counting formula must resolve to a single whole number.
+Write either a literal number, or one character-data path on its own.
+Fabricate's own formula reader recognises only those two shapes in that position.
+A composed expression, such as two paths added together, anything in brackets, or anything containing a space, is not supported there.
+For example, a two-die pool that qualifies when each die rolls at or under a character's skill value could use a formula that reads that skill from one character-data path, such as `2d20cs<=@skills.survival.value`.
+Notice that this example qualifies by rolling low, so it is also the example that breaks the usual assumption that a higher roll is better.
+When your game system does not already expose the number you need as one path, write an Active Effect that computes the value and writes it onto the character.
+Your formula then reads that single path, which satisfies the one-path rule.
+
+### When the character is missing the value
+
+{: .note }
+> A character-data path the actor does not have is substituted as zero before the roll happens.
+> What that zero threshold does to the check depends on which way the comparison reads.
+> On a roll-under formula such as the `cs<=` example above, a zero threshold means no die can qualify, so the check fails, and a failed check still consumes whatever the system's failure policy says it consumes.
+> On the more common roll-over formula, such as `2d20cs>=@skills.survival.value` becoming `2d20cs>=0`, every die qualifies instead, so the count reaches the full pool size, and the check passes automatically when that pool size meets the authored DC, with no consuming failure to make that visible.
+> Nothing blocks the roll from happening either way.
+> The roll prompt shows the unresolved threshold as `NaN`, while the roll itself uses zero, so in both directions the prompt is your only warning sign.
+> Check the path against the character before you rely on it in a counting formula.
+> See [Rolling a check from the UI](#rolling-a-check-from-the-ui).
+
+### Triggers on a counting check
+
+The one-click high and low trigger presets assume the highest face is good and the lowest face is bad.
+On a pool that qualifies by rolling low, that assumption is inverted, so author those triggers by hand instead of using a preset.
+Be precise about what a preset actually does.
+On a routed check, the high and low presets step the outcome tier up or down.
+On a pass/fail or progressive check, they force a success or a failure instead.
+A legacy check that had **Natural tier stepping** converted to triggers when you upgraded carries a natural-20-steps-up trigger, and that trigger is inverted on a roll-low counting pool for the same reason the presets are.
+See [Tier stepping](#tier-stepping) and [Tool breakage triggers](#tool-breakage-triggers).
+
+A roll-total trigger, and a dice-group trigger using its group total measure, both read the count of qualifying dice, not a sum of faces.
+A value you wrote for a face sum will never match a counting formula's total.
+
+The per-die measures, any die, all dice, the lowest die, and the highest die, read the individual faces the dice showed.
+Fabricate does not promise that a counting suffix leaves every rolled die visible to those measures.
+Treat a per-die trigger as unverified on a counting pool, and confirm it with a test roll after you move the check's formula to a counting pool.
+
+### What the previews will tell you
+
+The odds histogram on the check's panel deliberately abstains from drawing a chart for a counting formula, and it says so.
+That is correct behaviour: the panel refuses rather than showing a chart that would be wrong.
+The average reading, and any ranking built from it, are not trustworthy for a counting formula.
+Do not use them to compare one check against another.
+
+The roll prompt also withholds advantage and disadvantage on a pure counting formula, and that omission is a reassurance rather than a gap.
+Advantage means rolling a second d20 and keeping the higher result, which has no meaning for a pool of dice.
+Fabricate offers advantage and disadvantage whenever the authored formula contains a plain, unmodified `1d20` term, and rewrites only that term when you pick one.
+A pure counting pool, such as `2d20cs>=15`, has no plain `1d20` term, so the option is withheld.
+A formula that mixes a plain `1d20` with a counting pool, such as `1d20 + 2d6cs>=5`, still offers advantage and disadvantage, and the transform touches only the `1d20`.
+A bulk salvage batch prompts once and applies that single advantage choice to every roll in it, so a single pure counting-formula entry anywhere in a mixed batch withholds advantage and disadvantage for the whole batch, not only for that entry.
+See [Rolling a check from the UI](#rolling-a-check-from-the-ui) for how that batch prompt works.
+
+### What a counting check cannot do
+
+**The pool size is fixed by the formula you typed.**
+There is no per-roll choice of how many dice to roll, and a player cannot add dice at the roll prompt.
+In a system where spending a meta-currency to enlarge the pool is a core move, you edit the formula by hand between rolls and track that resource at the table yourself.
+
+**Two different weights on one pool cannot be expressed.**
+A counting suffix gives every qualifying die the same weight of one.
+A die that should count twice under some condition has no way to show that on a counting formula.
 
 ---
 
