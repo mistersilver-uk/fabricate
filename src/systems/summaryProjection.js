@@ -272,6 +272,13 @@ export function projectSummaryAvailability({ snapshot = null, system = null, rec
  * re-pointing a summary at a mid-run step would make the row disagree with the inspector
  * the player opens from it — the exact divergence this contract exists to prevent.
  *
+ * That equivalence with `_firstStep` holds exactly for `Recipe` INSTANCES, which is all the
+ * builder is ever handed: it resolves steps through `ResolutionModeService`, which answers
+ * `[]` for anything lacking a `getExecutionSteps` method, so a plain object carrying
+ * `steps[]` would fall back to its empty top level there while narrowing correctly here.
+ * The difference favours this projection and no shipped surface hits it, but the two are
+ * not literally the same read.
+ *
  * Tolerates both shapes a caller may hold: a `Recipe` instance, which answers
  * `getExecutionSteps()`, and a plain deserialized object, which does not. Narrowing runs
  * through the SAME `buildStepRecipeView` the engine and the listing builder use, so the

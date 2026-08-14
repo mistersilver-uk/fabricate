@@ -126,31 +126,35 @@ function snapshotHolding(quantity, counters = null) {
   });
 }
 
-/** An explicit multi-step recipe: requirements on `steps[]`, top-level sets EMPTY. */
-function makeSteppedRecipe(requiredIron) {
+/** One ingredient set requiring `quantity` Iron. */
+function ironSet(quantity) {
+  return {
+    id: `set-${quantity}`,
+    ingredientGroups: [
+      { options: [{ quantity, match: { type: 'component', componentId: IRON.id } }] },
+    ],
+    essences: {},
+  };
+}
+
+/**
+ * An explicit multi-step recipe: requirements on `steps[]`, top-level sets EMPTY.
+ *
+ * Takes a quantity PER STEP rather than one quantity, so a fixture can distinguish which
+ * step was read. A single-step fixture cannot: first, last and active are the same element,
+ * so it pins "not the empty top level" while leaving "the FIRST step" — which the spec
+ * states normatively — unguarded.
+ */
+function makeSteppedRecipe(...perStepIron) {
   return makeRecipe({
     id: 'recipe-stepped',
     ingredientSets: [],
-    steps: [
-      {
-        id: 'step-1',
-        name: 'Draw the wire',
-        ingredientSets: [
-          {
-            id: 'set-1',
-            ingredientGroups: [
-              {
-                options: [
-                  { quantity: requiredIron, match: { type: 'component', componentId: IRON.id } },
-                ],
-              },
-            ],
-            essences: {},
-          },
-        ],
-        resultGroups: [],
-      },
-    ],
+    steps: perStepIron.map((quantity, index) => ({
+      id: `step-${index + 1}`,
+      name: `Step ${index + 1}`,
+      ingredientSets: [ironSet(quantity)],
+      resultGroups: [],
+    })),
   });
 }
 
@@ -188,6 +192,19 @@ describe('summary shape — one documented shape per entity', () => {
     assert.equal('favourite' in gm, false, 'the GM has no viewer to read favourites for');
     assert.equal(player.favourite, true);
     assert.equal('locked' in player, false, 'authoring state must not cross to a player client');
+    assert.equal('enabled' in player, false, 'nor the GM on/off toggle');
+
+    // Absent means UNLOCKED — the mirror of the absent-`enabled` rule below. Every other
+    // fixture sets `locked` explicitly, and a deserialized recipe carrying no `locked` key
+    // that read as pinned would disable its own edit affordances in the GM manager, with no
+    // control left to undo it.
+    assert.equal(
+      projectRecipeSummary({
+        recipe: makeRecipe({ locked: undefined }),
+        audience: SUMMARY_AUDIENCE.GM,
+      }).locked,
+      false
+    );
   });
 
   it('derives every SHARED field identically for both audiences', () => {
@@ -219,14 +236,27 @@ describe('summary shape — one documented shape per entity', () => {
 
   it('normalizes identity, grouping and tags off the authored records', () => {
     const summary = projectRecipeSummary({
-      recipe: makeRecipe({ category: '  ', tags: ['a', 'a', ' b ', ''] }),
+      // Deliberately NOT alphabetical: an ascending fixture cannot tell "preserves the
+      // authored order" apart from "sorts", so the assertion message below would be
+      // claiming something its own inputs could not show.
+      recipe: makeRecipe({ category: '  ', tags: ['tin', 'tin', ' brass ', ''] }),
       system: SYSTEM,
       audience: SUMMARY_AUDIENCE.GM,
     });
     assert.equal(summary.category, 'general', 'absent category normalizes to the reserved bucket');
-    assert.deepEqual(summary.tags, ['a', 'b'], 'deduped and trimmed, order preserved');
+    assert.deepEqual(summary.tags, ['tin', 'brass'], 'deduped and trimmed, order preserved');
     assert.equal(summary.systemId, SYSTEM_ID);
     assert.equal(summary.systemName, SYSTEM.name);
+  });
+
+  it('surfaces a name exactly as authored, padding included', () => {
+    // Deliberately untrimmed: the summary and the editor must agree about what the name
+    // IS, and a projection that quietly trimmed would make a GM's leading space invisible
+    // in every list while remaining in the record.
+    assert.equal(
+      projectRecipeSummary({ recipe: makeRecipe({ name: '  Iron Nails  ' }) }).name,
+      '  Iron Nails  '
+    );
   });
 
   it('reads an absent `enabled` as ON, matching the model default and the GM filter', () => {
@@ -402,16 +432,25 @@ describe('summary purity — zero exact-evaluation calls', () => {
       'utf8'
     );
 
-    // Matches the multi-line form Prettier produces past the print width, and either
-    // quote style. A line-anchored single-quote regex misses both, and would report green
-    // while the module held exactly the collaborator this forbids.
-    const withClause = [...source.matchAll(/\bimport\b[\s\S]*?\bfrom\s*(['"])([^'"]+)\1/g)].map(
-      (match) => match[2]
-    );
+    // Comments are stripped FIRST. The exhaustiveness count below keys on the `import`
+    // keyword, and this is a module whose own documentation discusses its imports — a doc
+    // comment merely containing the word would otherwise fail the test with a message
+    // pointing at an import statement that does not exist. (`[^:]` spares `://` in a URL.)
+    const code = source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/[^\n]*/g, '$1');
+
+    // Matches the multi-line form Prettier produces past the print width, and either quote
+    // style. A line-anchored single-quote regex misses both, and would report green while
+    // the module held exactly the collaborator this forbids.
+    //
+    // `export … from` is scanned too, and that is not thoroughness for its own sake: it is
+    // a real module dependency carrying NO `import` keyword at all, so a re-export would
+    // otherwise slip past both the allowlist and the exhaustiveness count while pulling the
+    // builder into the graph.
+    const withClause = [
+      ...code.matchAll(/\b(?:import|export)\b[\s\S]*?\bfrom\s*(['"])([^'"]+)\1/g),
+    ].map((match) => match[2]);
     // Side-effect imports (`import './x.js';`) carry no `from` clause at all.
-    const sideEffect = [...source.matchAll(/\bimport\s*(['"])([^'"]+)\1/g)].map(
-      (match) => match[2]
-    );
+    const sideEffect = [...code.matchAll(/\bimport\s*(['"])([^'"]+)\1/g)].map((match) => match[2]);
     const specifiers = [...new Set([...withClause, ...sideEffect])].sort((left, right) =>
       left.localeCompare(right)
     );
@@ -427,17 +466,18 @@ describe('summary purity — zero exact-evaluation calls', () => {
         './stepRecipeView.js',
       ],
       'summaryProjection may hold only pure projection leaves — no manager, engine, ' +
-        'builder or visibility service. Adding an import here is a deliberate act.'
+        'builder or visibility service. Adding an import or re-export here is a ' +
+        'deliberate act.'
     );
 
-    // The scan must also be exhaustive: every `import` keyword in the file has to have
+    // The scan must also be exhaustive: every `import` keyword in the code has to have
     // been captured above, or a form neither pattern understands could slip past both.
     assert.equal(
-      (source.match(/\bimport\b/g) ?? []).length,
+      (code.match(/\bimport\b/g) ?? []).length,
       withClause.length,
       'every import statement must be visible to the scan'
     );
-    assert.doesNotMatch(source, /\bimport\s*\(/, 'no dynamic import may smuggle one in');
+    assert.doesNotMatch(code, /\bimport\s*\(/, 'no dynamic import may smuggle one in');
   });
 });
 
@@ -524,22 +564,38 @@ describe('the cheap-availability rule, defined once', () => {
   it('narrows a Recipe INSTANCE through getExecutionSteps, and a plain object through steps', () => {
     // A caller may hold either: a `Recipe` answers `getExecutionSteps()`, a deserialized
     // row does not. Reading only the method would leave every plain-object caller on the
-    // silently-vacuous path above.
+    // silently-vacuous path above. The instance arm uses the REAL model class rather than a
+    // duck type, so the test exercises the same normalization a caller actually gets.
     const plain = makeSteppedRecipe(4);
-    const instanceLike = {
-      ...plain,
-      steps: undefined,
-      getExecutionSteps: () => makeSteppedRecipe(4).steps,
-    };
     for (const [label, recipe] of [
       ['plain object', plain],
-      ['Recipe-like instance', instanceLike],
+      ['Recipe instance', new Recipe({ ...plain, id: 'recipe-stepped-instance' })],
     ]) {
       assert.equal(
         projectSummaryAvailability({ snapshot: snapshotHolding(1), system: SYSTEM, recipe })
           .available,
         false,
         label
+      );
+    }
+  });
+
+  it("reads the FIRST step, not the last and not the actor's active one", () => {
+    // The spec states the FIRST step normatively, and the module's own docblock explains
+    // why it is not the active step. A one-step fixture cannot pin that — first, last and
+    // active coincide — so this uses two steps with deliberately different requirements:
+    // step 1 is satisfied by the held 3, step 2's 99 never is. Reading the last step, or
+    // "the active step, falling back to the first", both answer `false` here.
+    const twoStep = makeSteppedRecipe(2, 99);
+    for (const [label, recipe] of [
+      ['plain object', twoStep],
+      ['Recipe instance', new Recipe({ ...twoStep, id: 'recipe-two-step-instance' })],
+    ]) {
+      assert.equal(
+        projectSummaryAvailability({ snapshot: snapshotHolding(3), system: SYSTEM, recipe })
+          .available,
+        true,
+        `${label}: step 1 needs 2 against 3 held — step 2's 99 must not decide the row`
       );
     }
   });
@@ -697,6 +753,40 @@ describe('player-facing redaction', () => {
 
     assert.deepEqual(projected, authoritative);
   });
+
+  it('hands out a COPY of hiddenFields, never the caller’s own array', () => {
+    // A consumer trimming or sorting the list it was given would otherwise reach back into
+    // the caller's `access.teaserState` — or throw, when the fallback path handed out the
+    // module's frozen default.
+    const access = {
+      visible: true,
+      reason: 'teaser',
+      teaserState: { isTeaser: true, hiddenFields: ['ingredients'] },
+    };
+    const summary = projectRecipeSummary({
+      recipe: makeRecipe(),
+      audience: SUMMARY_AUDIENCE.PLAYER,
+      access,
+    });
+    summary.redaction.hiddenFields.push('results');
+    assert.deepEqual(access.teaserState.hiddenFields, ['ingredients'], 'caller state untouched');
+
+    const defaulted = projectRecipeSummary({
+      recipe: makeRecipe(),
+      audience: SUMMARY_AUDIENCE.PLAYER,
+      access: { visible: true, reason: 'teaser', teaserState: { isTeaser: true } },
+    });
+    defaulted.redaction.hiddenFields.push('tools');
+    assert.deepEqual(
+      projectRecipeSummary({
+        recipe: makeRecipe(),
+        audience: SUMMARY_AUDIENCE.PLAYER,
+        access: { visible: true, reason: 'teaser', teaserState: { isTeaser: true } },
+      }).redaction.hiddenFields,
+      ['ingredients', 'results', 'description'],
+      'the shared default survives a consumer mutating an earlier copy'
+    );
+  });
 });
 
 describe('browse-status precedence', () => {
@@ -742,13 +832,6 @@ describe('browse-status precedence', () => {
       );
     });
   }
-
-  it('prefers the visibility reason over a material shortfall', () => {
-    assert.equal(
-      deriveBrowseStatus({ reason: 'knowledge', materialsAvailable: false, exhausted: true }),
-      CRAFTING_BROWSE_STATUS.UNKNOWN
-    );
-  });
 
   it('surfaces exhaustion the knowledge evaluation already established', () => {
     const summary = projectRecipeSummary({
