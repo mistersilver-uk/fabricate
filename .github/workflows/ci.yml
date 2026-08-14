@@ -149,7 +149,20 @@ jobs:
   check-screenshots:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    # 75, raised from 5 (issue 1133). This job now AWAITS the `capture` job in
+    # `pr-screenshots.yml` for the same head SHA before deciding, and that job's own ceiling is 40
+    # minutes. The script's `maxWaitMs` (65 minutes) fires first by construction — the bounds
+    # inequality in `tests/ci-workflow-semantics.test.js` pins that ordering against this number —
+    # so a wait that runs long reports `capture-did-not-conclude` with a diagnosis rather than
+    # being killed here with none.
+    timeout-minutes: 75
+    # Declared at JOB level as well as workflow level (SonarCloud S8264). Job-level permissions
+    # REPLACE the workflow-level block rather than merging with it, so all three are restated;
+    # `actions: read` is the new one, needed to list the producer's workflow runs.
+    permissions:
+      contents: read
+      pull-requests: read
+      actions: read
     steps:
       - uses: actions/checkout@v6
 
@@ -159,13 +172,38 @@ jobs:
           node-version: 22
 
       - name: Check for screenshots in UI/UX PRs
+        # Every value reaches the shell through `env:` and is referenced as `$VAR` (SonarCloud
+        # S7630): a `${{ }}` inside `run:` is substituted before the shell parses the line, so a
+        # value carrying shell metacharacters would be executed rather than passed.
         env:
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
           PR_REPO: ${{ github.repository }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_HEAD_BRANCH: ${{ github.event.pull_request.head.ref }}
+          # RENDERS EMPTY when a contributor deletes their fork while the PR is open: `head.repo`
+          # is then null, and a property read on null renders as the empty string. Deliberately NOT
+          # given a `|| '<sentinel>'` default — the empty string is the honest answer ("this run
+          # cannot be narrowed by head repository"), the CLI accepts it as a value (see `parseArgs`)
+          # and `runBelongsToPullRequest` degrades to the `pull_requests[].number` and head-branch
+          # rules, whereas a sentinel would have to be recognised and unwrapped in a second place.
+          # The quoting of "$PR_HEAD_REPO" below is load-bearing for the same reason and is pinned
+          # by tests/ci-workflow-semantics.test.js: unquoted, an empty value would VANISH from the
+          # argument list and `--head-repository` would swallow the next flag.
+          PR_HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          # The SAME expression `capture`'s `if:` uses in pr-screenshots.yml, so the two cannot
+          # drift into disagreeing about whether a producer run can exist for this head. A fork PR
+          # has no producer to wait for, so the gate decides immediately on the body — which is
+          # also the only path a fork's author can satisfy.
+          # `tests/ci-workflow-semantics.test.js` compares the two SEMANTICALLY, over a
+          # same-repo/fork truth table, rather than by string equality.
+          CAPTURE_ELIGIBLE: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
         run: |
           # Read the live body (not the event payload) so a re-run or `edited`
-          # event sees screenshots added after the PR was opened.
+          # event sees screenshots added after the PR was opened. The script
+          # RE-READS the body itself after the capture run concludes; this copy
+          # only feeds the fast path, which passes without waiting when the body
+          # already satisfies the gate for this head.
           PR_BODY=$(gh pr view "$PR_NUMBER" --repo "$PR_REPO" --json body --jq .body)
           printf '%s\n' "$PR_BODY" > pr-body.md
 
@@ -178,9 +216,25 @@ jobs:
           # unskippable. The files endpoint returns metadata rather than a diff
           # body, so no line cap applies; `--paginate` walks its 100-per-page
           # pages. It does cap out at 3000 files (a limit no PR should reach).
+          #
+          # Each entry's `patch` comes along for the ride, exactly as
+          # pr-screenshots.yml already requests it, because the frame matcher
+          # selects expected cases with the SAME `mapChangedFilesToCases` the
+          # producer selects with — and that function narrows its selection from
+          # the patch. ONE paginated call, split locally into the filename list
+          # and the patch map: two calls would double the API cost and take two
+          # snapshots that can disagree if a push lands between them.
           gh api "repos/$PR_REPO/pulls/$PR_NUMBER/files" \
             --paginate \
-            --jq '.[].filename' > changed-files.txt
+            --jq '.[] | {filename: .filename, patch: (.patch // "")} | @json' > changed-files.jsonl
+          node -e '
+            const { readFileSync, writeFileSync } = require("node:fs");
+            const entries = readFileSync("changed-files.jsonl", "utf8")
+              .split("\n")
+              .filter(Boolean)
+              .map((line) => JSON.parse(line));
+            writeFileSync("changed-files.txt", entries.map((entry) => entry.filename).join("\n"));
+          '
 
           # Read the live label list. Only a maintainer-applied
           # `screenshots-exempt` label can skip this check; agents cannot
@@ -190,7 +244,16 @@ jobs:
 
           node scripts/ui-pr-screenshot-evidence.mjs check \
             --changed-files changed-files.txt \
+            --patches-file changed-files.jsonl \
             --body-file pr-body.md \
             --labels labels.txt \
             --exempt-label screenshots-exempt \
-            --pr "$PR_NUMBER"
+            --pr "$PR_NUMBER" \
+            --repo "$PR_REPO" \
+            --head-sha "$HEAD_SHA" \
+            --head-branch "$PR_HEAD_BRANCH" \
+            --head-repository "$PR_HEAD_REPO" \
+            --await-capture \
+            --capture-eligible "$CAPTURE_ELIGIBLE" \
+            --capture-workflow pr-screenshots.yml \
+            --capture-timeout-minutes 40

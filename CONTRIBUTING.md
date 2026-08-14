@@ -929,7 +929,8 @@ If you remove a screenshot from a page, delete the `.webp` too (and vice versa).
 
 UI changes must include screenshot evidence in the PR body.
 The CI `check-screenshots` job enforces this with `scripts/ui-pr-screenshot-evidence.mjs`: the body must contain a **Screenshots** heading (any ATX level, normally `##`) with at least one image beneath it.
-The smoke-harness/S3 workflow below is the recommended way to produce real screenshots, but any image under a Screenshots heading — including a drag-and-dropped GitHub attachment — satisfies the check.
+A frame the View Lab capture job published automatically must additionally match this PR's own head commit and one of the changed views, and the check now waits for that job to conclude before deciding — see "CI behavior" below.
+The smoke-harness/S3 workflow below is the recommended way to produce real screenshots, but any image under a Screenshots heading that a person put there directly — including a drag-and-dropped GitHub attachment — still satisfies the check outright, with no matching applied.
 
 ### When it applies
 
@@ -1021,7 +1022,10 @@ Smoke fixture data should use Foundry core or dnd5e non-SVG raster icon paths di
 ### CI behavior
 
 CI runs only the lightweight `check` (no smoke run on the runner).
-It reads the live PR body, changed files, and labels, then passes when the body has a **Screenshots** heading whose section contains at least one image.
+For a same-repository PR, it first awaits the `capture` job in `pr-screenshots.yml` for this PR's own head SHA, because that job is the automatic producer of screenshot evidence and used to publish its frames only after this check had already decided, reddening a PR's first push through no fault of the change.
+A fork PR has no such producer to wait for — `pr-screenshots.yml` never runs on untrusted head code — so the check decides immediately on whatever the body already carries, which is also the only path open to a fork's author.
+It likewise decides immediately, without waiting, whenever the body already carries evidence sufficient to satisfy the gate for this head.
+Once it has waited (or decided it need not), it re-reads the live PR body, the changed files, and the labels, then passes when the body has a **Screenshots** heading whose section contains at least one image that satisfies the rules below.
 
 - The heading match is case-insensitive, accepts any ATX level (`#`–`######`) and the singular form (`## Screenshot`).
 - The section runs from the heading to the next heading of the same or higher level, so an image under a *different* later heading does not count.
@@ -1029,6 +1033,15 @@ It reads the live PR body, changed files, and labels, then passes when the body 
 GitHub drag-and-drop attachment URLs have no file extension, so the image syntax — not the URL shape — is what matters.
 - An image with no Screenshots heading, or a Screenshots heading with no image, does not pass.
 There is **no `SCREENSHOTS_NEEDED:` text bypass**.
+
+An image the View Lab capture job published automatically only counts when it sits inside that job's own managed block in the PR body (`<!-- fabricate:screenshots:start -->` … `<!-- fabricate:screenshots:end -->`).
+Its case id and head SHA, read back from its published S3 URL (`<prefix>/<pr>/<head-sha>/<caseId>.png`), must match this PR's current head and one of the changed views.
+An image in a Screenshots section that is NOT inside that managed block satisfies the check outright, with no matching applied — that is what keeps the maintainer-pasted path and the fork path working, since a drag-and-dropped GitHub attachment carries no case id and no head SHA.
+
+A failing check names which problem it is, via a distinct `::error::<code>` prefix: `no-screenshots-section`, `capture-run-not-found`, `capture-run-failed`, `capture-published-nothing`, `no-frames-for-this-head`, `no-frames-for-changed-views`, `capture-cancelled`, `capture-did-not-conclude`, or `pull-request-read-failed`.
+The last of these fires when the check cannot re-read the live PR body after the producer concludes, for example on a rate limit or a transient error from the API.
+It is deliberately distinct from `capture-published-nothing`, because an unread body is not evidence that the producer published nothing.
+Reporting it under that code would send the reader to debug the producer, when the actual problem is the check's own re-read failing.
 
 The only way to skip the check is the **`screenshots-exempt` label**, which only a maintainer can apply.
 An agent must never apply it.
@@ -1308,7 +1321,7 @@ A bucket **lifecycle rule** expiring the `pr-screenshots/` prefix after N days i
 (Set N comfortably above how long PRs stay open, or the images break while a PR is still under review.)
 
 These objects are public-read by URL (the accepted tradeoff for inline GitHub rendering of a private repo's screenshots).
-The required `check-screenshots` gate fails closed until a maintainer publishes the screenshots manually or applies the `screenshots-exempt` label.
+The required `check-screenshots` gate fails closed until a maintainer publishes the screenshots manually or applies the `screenshots-exempt` label, and it now also fails closed when the automatically published frames belong to a stale head or match none of the PR's changed views.
 
 ## Release pipeline
 

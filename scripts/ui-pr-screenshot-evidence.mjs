@@ -10,6 +10,13 @@ import { spawnSync } from 'node:child_process';
 // does; and this file is in `KNOWN_UNGATED_SCRIPTS`, outside both the `lint` and the
 // `format:check` globs, while `scripts/lib/foundrySmokeSignal.js` is inside both.
 import { explainSmokeSummaryRefusal } from './lib/foundrySmokeSignal.js';
+// The `check` gate's composed decision — await the capture run for this head, then match what it
+// published — lives in the lib for the same two reasons, plus a third: it is a LEAF that imports
+// nothing from this file. The evaluation it needs (the four predicates below) is injected as the
+// `evaluate` collaborator bundle, because importing them there would make a `lib -> script -> lib`
+// cycle and `VIEW_RECIPES` above is a top-level `Object.freeze([...])` a cyclic partial-evaluation
+// order can observe as `undefined`.
+import { decideScreenshotGate } from './lib/screenshotEvidenceMatching.js';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const IMAGE_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.webp', '.gif']);
@@ -1884,7 +1891,7 @@ function parseArgs(argv) {
     }
     const [rawKey, inlineValue] = arg.slice(2).split(/=(.*)/s, 2);
     const key = toCamelCase(rawKey);
-    if (key === 'allowMissing' || key === 's3') {
+    if (key === 'allowMissing' || key === 's3' || key === 'awaitCapture') {
       args[key] = inlineValue === undefined ? true : inlineValue !== 'false';
       continue;
     }
@@ -1893,7 +1900,16 @@ function parseArgs(argv) {
       continue;
     }
     const next = argv[i + 1];
-    if (!next || next.startsWith('--')) {
+    // AN EMPTY STRING IS A VALUE, not a missing one. This read `!next`, which conflated the two —
+    // and CI hands this script empty values on a path nobody chooses: when a contributor deletes
+    // their fork while the PR is open, `github.event.pull_request.head.repo` is null, so
+    // `--head-repository "$PR_HEAD_REPO"` renders as `--head-repository ''`. Parsing threw before
+    // step 1 of the gate ran, so the required `check-screenshots` job died with a bare message and
+    // no `::error::<code>` — and, because the throw preceded the exempt-label check, not even a
+    // maintainer-applied `screenshots-exempt` label could clear it. An unskippable red for a
+    // reason outside the author's control is the exact failure class this gate exists to remove.
+    // `undefined` (the flag is last) and a following `--flag` are still missing values.
+    if (next === undefined || next.startsWith('--')) {
       throw new Error(`Missing value for --${rawKey}`);
     }
     args[key] = next;
@@ -1927,6 +1943,63 @@ export function loadChangedFiles(args, { resolveBase = resolveDefaultBase, readC
   return readChangedFiles(base);
 }
 
+// The `--capture-eligible` flag carries a GitHub expression's result, and a GitHub expression
+// renders as the literal STRING `true` / `false`. `Boolean('false')` is `true`, and that bug would
+// silently push every fork PR into the wait loop — so this parses the two literals and refuses
+// anything else rather than coercing.
+function parseCaptureEligible(value) {
+  if (value === undefined || value === '') return false;
+  if (value === 'true') return true;
+  if (value === 'false') return false;
+  throw new Error(`--capture-eligible must be the literal 'true' or 'false', not '${value}'`);
+}
+
+// `--capture-timeout-minutes` pins the gate's capture deadline to `capture`'s real `timeout-minutes`
+// in `pr-screenshots.yml`. Undefined leaves the module's own exported default in force; the adapter
+// restates no bound of its own.
+function parseCaptureTimeoutMs(value) {
+  if (value === undefined || value === '') return undefined;
+  const minutes = Number(value);
+  if (!Number.isFinite(minutes) || minutes <= 0) {
+    throw new Error(`--capture-timeout-minutes must be a positive number of minutes, not '${value}'`);
+  }
+  return minutes * 60_000;
+}
+
+// The JSONL `{filename, patch}` stream `gh api …/pulls/{n}/files --jq '… | @json'` emits, read into
+// the patch map `mapChangedFilesToCases` narrows its case selection with. One paginated call feeds
+// both this and the filename list, so the two can never snapshot different heads.
+function readPatchMap(path) {
+  const map = {};
+  for (const line of readLines(path)) {
+    try {
+      const entry = JSON.parse(line);
+      if (entry?.filename) map[entry.filename] = entry.patch ?? '';
+    } catch {
+      // A malformed line costs frames, never evidence: an unattributable patch widens the
+      // producer's selection rather than narrowing it, so dropping it here is the safe direction.
+    }
+  }
+  return map;
+}
+
+function defaultSleep(ms) {
+  return new Promise(resolve => { setTimeout(resolve, ms); });
+}
+
+// Apply the module's verdict. No pass/fail decision lives here — only its application, which is
+// what makes "drop the exit-code application" (a mutation that would make the gate a total no-op in
+// production) visible to a test that drives `main`.
+function reportScreenshotGateDecision(decision) {
+  const prefix = decision.code ? `${decision.code}: ` : '';
+  if (decision.exitCode !== 0) {
+    console.error(`::error::${prefix}${decision.message}`);
+    process.exitCode = decision.exitCode;
+    return;
+  }
+  console.log(decision.code ? `::notice::${prefix}${decision.message}` : decision.message);
+}
+
 export async function main(argv = process.argv.slice(2), deps = {}) {
   const args = parseArgs(argv);
   const command = args._[0] || 'plan';
@@ -1935,6 +2008,8 @@ export async function main(argv = process.argv.slice(2), deps = {}) {
     resolveHeadSha = resolveScreenshotHeadSha,
     readChangedFiles,
     runGh,
+    sleep,
+    now,
     putObject,
     config,
   } = deps;
@@ -1967,36 +2042,42 @@ export async function main(argv = process.argv.slice(2), deps = {}) {
   }
 
   if (command === 'check') {
-    const changedFiles = loadChanged();
-    const body = args.bodyFile ? readFileSync(args.bodyFile, 'utf8') : '';
-    const exemptLabel = args.exemptLabel || DEFAULT_EXEMPT_LABEL;
-    const labels = readLabelList(args.labels);
-
-    // A maintainer-applied label is the only exemption and wins unconditionally.
-    if (isExemptByLabel(labels, exemptLabel)) {
-      console.log(`Screenshot check skipped: '${exemptLabel}' label present.`);
-      return;
-    }
-
-    const changedFilesFailure = validateChangedFilesForCheck(changedFiles, { required: Boolean(args.changedFiles) });
-    if (changedFilesFailure) {
-      console.error(`::error::${changedFilesFailure}`);
-      process.exitCode = 1;
-      return;
-    }
-
-    if (!hasUiChanges(changedFiles)) {
-      console.log('No UI files changed - screenshot check skipped.');
-      return;
-    }
-
-    const failure = explainScreenshotEvidenceFailure(changedFiles, body, { prNumber: args.pr, exemptLabel });
-    if (failure) {
-      console.error(`::error::${failure}`);
-      process.exitCode = 1;
-    } else {
-      console.log('UI smoke screenshot evidence found.');
-    }
+    // A THIN ADAPTER, deliberately. No ordering, no re-read, no pass/fail decision and no restated
+    // bound literal may live here: all of that is `decideScreenshotGate`, where a test can see it.
+    // This supplies the collaborators from this module's own scope, maps the CLI flags onto the
+    // call, and applies the returned exit code.
+    const decision = await decideScreenshotGate({
+      runGh: runGh || defaultGhRunner,
+      sleep: sleep || defaultSleep,
+      now: now || Date.now,
+      // The cycle-avoidance seam: the REAL predicates, passed by reference.
+      evaluate: {
+        isExempt: isExemptByLabel,
+        validateChangedFiles: validateChangedFilesForCheck,
+        isArmed: hasUiChanges,
+        explainMissingEvidence: explainScreenshotEvidenceFailure,
+      },
+      changedFiles: loadChanged(),
+      changedFilesRequired: Boolean(args.changedFiles),
+      patches: args.patchesFile ? readPatchMap(args.patchesFile) : undefined,
+      body: args.bodyFile ? readFileSync(args.bodyFile, 'utf8') : '',
+      headSha: args.headSha,
+      prNumber: args.pr,
+      repo: args.repo,
+      headBranch: args.headBranch,
+      headRepository: args.headRepository,
+      // `|| undefined` so an EMPTY flag means "absent" and the module's own exported default
+      // applies, rather than `''` reaching the runs query as `workflows//runs`. Now that an empty
+      // string parses as a value (see `parseArgs`), every string flag has to say which of the two
+      // it means; the head-* three below mean "cannot narrow on this" and degrade in the module.
+      captureWorkflow: args.captureWorkflow || undefined,
+      awaitCapture: args.awaitCapture === true,
+      captureEligible: parseCaptureEligible(args.captureEligible),
+      captureTimeoutMs: parseCaptureTimeoutMs(args.captureTimeoutMinutes),
+      exemptLabel: args.exemptLabel || DEFAULT_EXEMPT_LABEL,
+      labels: readLabelList(args.labels),
+    });
+    reportScreenshotGateDecision(decision);
     return;
   }
 

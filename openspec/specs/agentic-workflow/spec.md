@@ -547,6 +547,8 @@ It MUST draw the same Foundry build that the live smoke boots, because the smoke
 Pull requests that change UI files MUST include screenshot evidence for the relevant changed views before the PR is opened or updated.
 Evidence MUST depict the changed view as a full application window.
 Every collected automated view MUST prove successful, non-degraded, exact-run provenance.
+Automatically published evidence MUST be identifiable as belonging to the pull request's current head.
+The evidence gate MUST NOT decide before the automated producer for that same head has concluded, UNLESS the pull request body already carries evidence sufficient to satisfy the gate for that head.
 
 #### Scenario: UI files changed
 
@@ -592,6 +594,32 @@ Every collected automated view MUST prove successful, non-degraded, exact-run pr
 - **AND** the automated producer is an accelerator, not an additional gate: a change that cannot run it (for want of the credentials or the write access the producer needs) falls back to the existing evidence path and is not failed for producing nothing
 - **AND** a selection that resolves to no case announces that outcome explicitly, and is never reported the same way as a run that rendered frames
 - **AND** a producer that selected cases but rendered none fails, because a run that publishes nothing is indistinguishable from success to every downstream check
+
+#### Scenario: the gate and the automated producer run concurrently
+
+- **WHEN** a pull request changes render files and the automated producer is able to run for that head
+- **THEN** the evidence gate does not decide until that pull request's producer run for that exact head has reached a conclusion, except where it already holds evidence sufficient to decide without that run's output
+- **AND** it re-reads the pull request body after that conclusion rather than deciding on a copy fetched before the producer wrote it
+- **AND** where several producer runs exist for one head, an unfinished one is awaited rather than an older finished one being read in its place
+- **AND** a producer run that is cancelled because a newer head superseded it does not fail the superseded head's gate, since the new head's own run is the authoritative one
+- **AND** a producer that never concludes fails the gate, because a gate that passes on a timeout can be waited out
+- **AND** the gate does not wait where no producer run can exist for that head, so a pull request the producer cannot serve is decided immediately on the evidence in its body rather than reported as skipped
+- **AND** that exception is exactly this: a gate that already holds satisfying evidence for the current head decides immediately, without waiting on a producer whose output it does not need
+
+#### Scenario: naming which evidence problem a failure is
+
+- **WHEN** the gate fails a pull request that changes render files
+- **THEN** the failure names which of these it is: no screenshot section where none was ever going to be produced automatically, a producer that was expected and never appeared, a producer whose run was cancelled without a newer head having superseded it, a producer that failed, a producer that concluded while publishing nothing, frames published for a different head, frames that depict none of the views this change selects, a producer that did not conclude, or the gate itself being unable to read the pull request's body when it goes to check what the producer published
+- **AND** a producer that was expected for this head and has not appeared is never reported as evidence the author failed to supply, because that is the same red this requirement exists to remove
+- **AND** a cancelled run is excused only when a newer head superseded it before its capture finished, since that newer head's own run is then the authoritative one; a cancelled run whose head has not moved is this failure instead, since the same cancellation means the opposite thing depending on whether the head moved
+- **AND** a producer that concludes successfully while publishing nothing — because the infrastructure it depends on was unavailable, which it treats as outside the pull request's control — is reported as that, and never as a fault in the change
+- **AND** a producer that fails is reported as a failure of that run, distinctly from an infrastructure gap, because the two point the reader at different things to fix
+- **AND** the gate being unable to read the pull request's body is reported as that, and never as the producer having published nothing, because an unread body carries no evidence of what the producer did and conflating the two sends the reader to debug the wrong system
+- **AND** a body the gate cannot read fails the gate rather than passing it, because a check that passes when it cannot read its own evidence can be satisfied by breaking that read
+- **AND** automatically published frames are identified by the case they depict and the head they were drawn for, carried in their published location rather than in their caption
+- **AND** evidence supplied by a person, which carries no such identity, satisfies the gate without that identification, so the maintainer-supplied path is unchanged
+- **AND** identification requires the automatically published frames to overlap the selected views rather than to equal them, because a run that renders only some of its selection has still produced evidence
+- **AND** automatically published frames left over from an earlier head do not satisfy the gate, since a stale frame depicts a state the pull request no longer proposes
 
 #### Scenario: a changed render file claims no case
 
