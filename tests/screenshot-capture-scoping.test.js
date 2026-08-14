@@ -407,18 +407,36 @@ test('World Parties and system Travel capture-map order mirrors the live Foundry
   assert.ok(!harnessLabels.includes('manager-system-travel-long-label-focus'));
 });
 
-test('the system Travel Map capture directs its keyboard action to the destination', () => {
+test('the Foundry Map capture uses a deterministic click while View Lab retains keyboard evidence', () => {
   const blockStart = HARNESS.indexOf('// World Parties plus system Travel (#1179)');
   const mapDestinationStart = HARNESS.indexOf('const mapDestination = page.locator', blockStart);
   const mapPanelWait = HARNESS.indexOf('[data-travel-panel="map"]', mapDestinationStart);
   assert.ok(
     blockStart >= 0 && blockStart < mapDestinationStart && mapDestinationStart < mapPanelWait,
-    'the #1179 Map keyboard action must remain bounded before its panel wait'
+    'the #1179 Map interaction must remain bounded before its panel wait'
   );
 
   const mapInteraction = HARNESS.slice(mapDestinationStart, mapPanelWait);
-  assert.match(mapInteraction, /await mapDestination\.press\('Space'\)/);
-  assert.doesNotMatch(mapInteraction, /page\.keyboard\.press\('Space'\)/);
+  assert.match(mapInteraction, /await mapDestination\.click\(\)/);
+  assert.doesNotMatch(mapInteraction, /\.press\('(?:Enter|Space)'\)/);
+
+  const viewLabCases = CAPTURE_PRODUCERS.find(
+    ({ path }) => path === 'scripts/lib/viewLabCases.js'
+  ).source;
+  const keyboardCaseStart = viewLabCases.indexOf(
+    "id: 'manager-system-travel-long-label-focus'"
+  );
+  const keyboardCaseEnd = viewLabCases.indexOf('\n  managerCase({', keyboardCaseStart);
+  assert.ok(
+    keyboardCaseStart >= 0 && keyboardCaseEnd > keyboardCaseStart,
+    'the View Lab Map keyboard evidence case must remain bounded'
+  );
+  const keyboardCase = viewLabCases.slice(keyboardCaseStart, keyboardCaseEnd);
+  assert.match(
+    keyboardCase,
+    /selector: '#manager-travel-nav-map', press: 'Space'/
+  );
+  assert.match(keyboardCase, /#manager-travel-nav-map\[aria-current="page"\]:focus-visible/);
 });
 
 test('Phase C seeds system modifiers canonically before the settings-list action', () => {

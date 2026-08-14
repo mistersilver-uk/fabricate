@@ -10239,7 +10239,10 @@ async function main() {
 
         await setManagerWindowSize(page, { width: 1280, height: 820 });
         const mapDestination = page.locator('.fabricate-manager #manager-travel-nav-map').first();
-        await mapDestination.press('Space');
+        // The View Lab long-label-focus case owns native Space activation and focus-visible
+        // evidence for this exact control. Use a targeted pointer transition here so the live
+        // Foundry capture isolates populated Map content from keyboard-focus timing.
+        await mapDestination.click();
         await page.locator('.fabricate-manager [data-travel-panel="map"]')
           .first().waitFor({ state: 'visible', timeout: 10_000 });
         await page.locator(
