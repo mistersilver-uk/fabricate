@@ -12132,28 +12132,6 @@
   font-weight: 500;
 }
 
-.fabricate-manager .manager-world-travel-submenu {
-  padding-left: calc(var(--fab-space-4) * 2);
-}
-
-.fabricate-manager .manager-world-travel-submenu .manager-nav-subitem {
-  min-height: 28px;
-  padding-block: 7px;
-  color: var(--fab-text-subtle);
-  font-size: 0.75rem;
-}
-
-.fabricate-manager .manager-world-travel-group.is-expanded {
-  background: transparent;
-  box-shadow: none;
-}
-
-.fabricate-manager .manager-world-travel-group.is-expanded .manager-nav-parent.is-active {
-  color: var(--fab-mv2-accent);
-  background: var(--fab-accent-soft);
-  box-shadow: inset 3px 0 0 var(--fab-mv2-accent);
-}
-
 /* The two blocks above the nav are not the scroller, so they must not absorb its shrink —
    a flex item defaults to `flex-shrink: 1` and would otherwise compress instead. */
 .fabricate-manager .manager-rail > .manager-rail-title,
@@ -12401,6 +12379,52 @@
 .fabricate-manager .manager-nav-subitem.is-active .manager-nav-count {
   color: var(--fab-mv2-accent);
   font-weight: 700;
+}
+
+/* The downtime prototype's selected rows are neutral, and that visual language belongs
+   only to World: selected-system navigation keeps the manager's established accent state.
+   Children span the complete group width; their CONTENT starts at 32px rather than moving
+   the selected surface inward. The expanded parent is the prototype's sole accent analogue. */
+.fabricate-manager .manager-world-travel-submenu {
+  padding-right: 0;
+  padding-left: 0;
+}
+
+.fabricate-manager .manager-world-travel-child {
+  min-height: 28px;
+  padding: 7px var(--fab-space-2) 7px 32px;
+  color: var(--fab-text-subtle);
+  font-size: 0.75rem;
+}
+
+.fabricate-manager #manager-world-nav-parties.is-active,
+.fabricate-manager .manager-world-travel-child.is-active {
+  color: var(--fab-mv2-text);
+  border-color: var(--fab-mv2-border-strong);
+  background: var(--fab-surface-active);
+  box-shadow: none;
+}
+
+.fabricate-manager #manager-world-nav-parties.is-active:focus,
+.fabricate-manager .manager-world-travel-child.is-active:focus {
+  box-shadow: none;
+}
+
+.fabricate-manager #manager-world-nav-parties.is-active .manager-nav-count {
+  color: var(--fab-mv2-text);
+}
+
+.fabricate-manager .manager-world-travel-group.is-expanded {
+  background: transparent;
+  box-shadow: none;
+}
+
+.fabricate-manager .manager-world-travel-group.is-expanded .manager-nav-parent.is-active,
+.fabricate-manager .manager-world-travel-group.is-expanded .manager-nav-parent.is-active:focus {
+  color: var(--fab-mv2-accent);
+  border-color: var(--fab-accent-border);
+  background: var(--fab-accent-soft);
+  box-shadow: inset 3px 0 0 var(--fab-mv2-accent);
 }
 
 /*

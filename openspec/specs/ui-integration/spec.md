@@ -448,12 +448,17 @@ Selected-system navigation:
   Gathering section navigation must not be duplicated as an in-page horizontal tab strip.
 - The selected-system `Tools` rail item is a top-level entry rendered between `Essences` and `Gathering`.
   It is always visible when a crafting system is selected and is not gated by the gathering or essences feature flags, because tools are a cross-cutting crafting concept that will be referenced by recipes, salvage, and gathering tasks alike.
-- After selected-system navigation, the rail exposes a localized `WORLD` / `every system`
+- After every selected-system navigation entry, including available disabled placeholders such as
+  Graph, the rail exposes a localized `WORLD` / `every system`
   presentation group when and only when a selected system enables Gathering and Travel & Realms.
   The heading changes no aggregate ownership and omits every Downtime control.
   World contains a direct `Parties` destination with the total world-party count and an expandable,
   otherwise neutral `Travel` group whose children are `Realms` and `Map Region Links`.
-  Activating Travel from outside a World destination expands it and opens Parties; while either
+  Travel starts collapsed whenever the Manager opens.
+  Activating Travel while neither Realms nor
+  Map Region Links is current expands it and opens Parties; activating it from either active child
+  preserves that child and ensures the group remains expanded.
+  While either
   child is current Travel remains expanded and may carry group-active styling, but only the concrete
   Parties, Realms, or Map Region Links destination carries `aria-current="page"`.
   The stable ids are `manager-world-heading`, `manager-world-scope`,
@@ -461,8 +466,11 @@ Selected-system navigation:
   `manager-world-travel-submenu`, `manager-world-nav-realms`, and `manager-world-nav-map`, paired
   with `data-world-nav-section`, `data-world-nav-item`, `data-world-travel-toggle`, and
   `data-world-travel-submenu` hooks.
+  Both the Travel parent and its separate disclosure control reference
+  `manager-world-travel-submenu` with `aria-controls`.
   Native buttons keep Enter/Space activation and normal tab order; closed children leave the tab
-  order. In the 56px rail Parties and Travel keep localized accessible names, an active child is
+  order.
+  In the 56px rail Parties and Travel keep localized accessible names, an active child is
   represented by the Travel parent icon, and a GM reaches children by expanding the persistent rail.
 - The root `Crafting Systems` breadcrumb returns to the systems browser.
   The selected-system breadcrumb opens that system's in-manager System Overview route on its Settings tab.
@@ -1591,7 +1599,7 @@ Shipped capabilities:
 - Layout split: the party list and all editing controls (rename, enable, members, travel actor, override Set/Clear) live in the center column; the right inspector is a read-only evidence echo for the selected party (current-realm evidence per source state, member/travel-actor summary, stale references).
   Override editing exists in exactly one place (center).
 - The current-realm evidence component renders all three source states using the canonical labels `GM override`, `Travel actor`, and `No current realm`.
-  The GM evidence panel renders the live `Travel actor` source label when a party's realm resolves from token-derived sensing (Phase 3, shipped).
+  The GM evidence panel renders the live `Travel actor` source label when a party's realm resolves from shipped token-derived sensing.
 - The World Travel group presents **Map Region Links** as a rail destination (`GatheringMapLinksTab.svelte`) that lists the Scene Regions on the active scene with a per-region realm picker (`MapRegionLinkPicker.svelte`) linking each scene region to at most one realm (single-valued per scene region, written by `adminStore.setMapRegionLink`).
 - Each stale member / travel-actor / override-realm reference gets a remove/clear action; "repair" means removing the stale reference and re-assigning through the normal pickers.
 - The route embeds the canonical **realm authoring surface** using a realm list + detail layout: the list creates/selects/deletes realms; the detail pane edits the selected realm's name, description, image, enabled, secret, and biomes (chosen from the system biome vocabulary).
@@ -1602,10 +1610,12 @@ Shipped capabilities:
 - Validation lives in the party store; the view surfaces store validation errors inline next to the relevant control using the Manager's `aria-invalid`/`aria-describedby` pattern.
   Actor pickers follow the accessible semantics established by `ActorSelectTopBar`.
 - The retained Parties, Realms, and Map Region Links content renders as labelled regions connected
-  to the corresponding World destination. The former `GatheringTravelTabs` horizontal strip and
+  to the corresponding World destination.
+  The former `GatheringTravelTabs` horizontal strip and
   every `tabpanel` / `travel-tab-*` relationship are absent.
 
-Not yet shipped (later-phase follow-ups, kept out of canonical capability claims): realm discovery controls, and the player-facing travel/current-realm view. (Realm authoring — name/description/img/secret/biomes — and the environment realm-membership control now ship under World Travel and the environment editor; `sceneMappings` authoring ships via World > Travel > Map Region Links; only the legacy realm ordering and Phase 4 `modifiers` authoring remain reserved.)
+Not yet shipped (later-phase follow-ups, kept out of canonical capability claims): realm discovery controls, and the player-facing travel/current-realm view.
+(Realm authoring — name/description/img/secret/biomes — and the environment realm-membership control now ship under World Travel and the environment editor; `sceneMappings` authoring ships via World > Travel > Map Region Links; only the legacy realm ordering and Phase 4 `modifiers` authoring remain reserved.)
 
 ### Gathering Event Library
 
@@ -2985,7 +2995,7 @@ When location-aware gathering is enabled, the player Gathering app shows current
 - Show the current realm name(s) when the selected actor is allowed to know them.
   Show "Undiscovered realm" style placeholders for secret current realms the selected actor has not discovered.
 - Show the current-realm evidence source using the canonical labels `GM override`, `Travel actor`, and `No current realm`.
-  A player's current realm may resolve live from travel-actor sensing (`source: 'travelActor'`, Phase 3, shipped) as well as from a manual override.
+  A player's current realm may resolve through shipped live travel-actor sensing (`source: 'travelActor'`) as well as from a manual override.
 - If the actor is not in a party, show a concise no-party location state that still does not block non-location-gated environments.
 - Current-realm display must fit narrow Foundry ApplicationV2 layouts without overlapping actor/stamina controls, and current-realm chips must wrap within the app container without forcing horizontal scrolling.
 

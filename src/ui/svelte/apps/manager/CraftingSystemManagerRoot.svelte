@@ -2051,6 +2051,11 @@
   ];
   const gatheringRealmsEnabled = $derived($viewState.gatheringRealmSettings?.enabled === true);
   const canShowWorldTravel = $derived(canShowEnvironments && gatheringRealmsEnabled);
+  const displayedGatheringTab = $derived(
+    activeGatheringTab === 'travel' && !canShowWorldTravel
+      ? 'environments'
+      : activeGatheringTab
+  );
   const visibleGatheringNavItems = gatheringNavItems;
   const gatheringInspectorTabs = $derived(
     visibleGatheringNavItems.filter((tab) => tab.id !== 'environments')
@@ -2069,10 +2074,10 @@
         currentView === 'gathering-event-edit')
   );
   const isActiveGatheringChildRoute = $derived(
-    isGatheringRoute && visibleGatheringNavItems.some((tab) => tab.id === activeGatheringTab)
+    isGatheringRoute && visibleGatheringNavItems.some((tab) => tab.id === displayedGatheringTab)
   );
   const activeGatheringInspectorTab = $derived(
-    gatheringInspectorTabs.find((tab) => tab.id === activeGatheringTab) || null
+    gatheringInspectorTabs.find((tab) => tab.id === displayedGatheringTab) || null
   );
   // World reuses the environments route as its content seam. Closing Travel & Realms
   // returns that stale World surface to Gathering Environments; the existing route
@@ -2910,12 +2915,12 @@
       return isCreatingEssenceDraft
         ? text('FABRICATE.Admin.Manager.Essence.CreateTitle', 'Create essence')
         : text('FABRICATE.Admin.Manager.Essence.EditTitle', 'Edit essence');
-    if (currentView === 'environments' && activeGatheringTab === 'tasks')
+    if (currentView === 'environments' && displayedGatheringTab === 'tasks')
       return text(
         'FABRICATE.Admin.Manager.Environment.GatheringTabs.TasksTitle',
         'Gathering Tasks'
       );
-    if (currentView === 'environments' && activeGatheringTab === 'travel')
+    if (currentView === 'environments' && displayedGatheringTab === 'travel')
       return text(
         'FABRICATE.Admin.Manager.Environment.GatheringTabs.TravelTitle',
         'Travel and parties'
@@ -3016,12 +3021,12 @@
         'FABRICATE.Admin.Manager.Essence.EditNoSourceSubtitle',
         'Update identity and icon for this essence.'
       );
-    if (currentView === 'environments' && activeGatheringTab === 'tasks')
+    if (currentView === 'environments' && displayedGatheringTab === 'tasks')
       return text(
         'FABRICATE.Admin.Manager.Environment.GatheringTabs.TasksHint',
         'Browse gathering tasks before attaching them to environments.'
       );
-    if (currentView === 'environments' && activeGatheringTab === 'travel')
+    if (currentView === 'environments' && displayedGatheringTab === 'travel')
       return text(
         'FABRICATE.Admin.Manager.Travel.Subtitle',
         'Manage Fabricate parties and set the current realm for the selected crafting system.'
@@ -3103,9 +3108,9 @@
       return text('FABRICATE.Admin.Manager.TagsCategories.Actions', 'Tags and categories actions');
     if (currentView === 'essences' || currentView === 'essence-edit')
       return text('FABRICATE.Admin.Manager.Essence.Actions', 'Essence actions');
-    if (currentView === 'environments' && activeGatheringTab === 'tasks')
+    if (currentView === 'environments' && displayedGatheringTab === 'tasks')
       return text('FABRICATE.Admin.Manager.Environment.Tasks.Actions', 'Gathering task actions');
-    if (currentView === 'environments' && activeGatheringTab === 'travel')
+    if (currentView === 'environments' && displayedGatheringTab === 'travel')
       return text(
         'FABRICATE.Admin.Manager.Environment.GatheringTabs.TravelActions',
         'Travel and party actions'
@@ -3150,12 +3155,12 @@
       );
     if (currentView === 'essences' || currentView === 'essence-edit')
       return text('FABRICATE.Admin.Manager.Essence.Inspector', 'Selected essence inspector');
-    if (currentView === 'environments' && activeGatheringTab === 'tasks')
+    if (currentView === 'environments' && displayedGatheringTab === 'tasks')
       return text(
         'FABRICATE.Admin.Manager.Environment.Tasks.Inspector',
         'Selected gathering task inspector'
       );
-    if (currentView === 'environments' && activeGatheringTab === 'travel')
+    if (currentView === 'environments' && displayedGatheringTab === 'travel')
       return text(
         'FABRICATE.Admin.Manager.Environment.GatheringTabs.TravelInspector',
         'Selected party inspector'
@@ -3265,32 +3270,35 @@
     return true;
   }
 
-  async function finishGatheringTaskRouteExit(action) {
+  async function finishGatheringTaskRouteExit(action, nextView) {
     if (action === 'cancel' || action === false) return false;
     if (action === 'save') {
       const saved = await saveGatheringTaskDraft();
       if (saved === false) return false;
     }
     clearGatheringTaskDraft();
+    if (nextView) activeView = nextView;
     return true;
   }
 
-  async function finishGatheringEventRouteExit(action) {
+  async function finishGatheringEventRouteExit(action, nextView) {
     if (action === 'cancel' || action === false) return false;
     if (action === 'save') {
       const saved = await saveGatheringEventDraft();
       if (saved === false) return false;
     }
     clearGatheringEventDraft();
+    if (nextView) activeView = nextView;
     return true;
   }
 
-  function confirmGatheringEventRouteExit(_nextView) {
+  function confirmGatheringEventRouteExit(nextView) {
     if (activeView !== 'gathering-event-edit') return true;
-    if (!gatheringEventDraftDirty) return finishGatheringEventRouteExit(true);
+    if (!gatheringEventDraftDirty) return finishGatheringEventRouteExit(true, nextView);
     const confirmed = store.confirmDiscardDirtyGatheringEventDraft?.() ?? false;
-    if (isPromise(confirmed)) return confirmed.then(finishGatheringEventRouteExit);
-    return finishGatheringEventRouteExit(confirmed);
+    if (isPromise(confirmed))
+      return confirmed.then((action) => finishGatheringEventRouteExit(action, nextView));
+    return finishGatheringEventRouteExit(confirmed, nextView);
   }
 
   function confirmComponentRouteExit(_nextView) {
@@ -3380,12 +3388,13 @@
     return finishRecipeItemRouteExit(confirmed);
   }
 
-  function confirmGatheringTaskRouteExit(_nextView) {
+  function confirmGatheringTaskRouteExit(nextView) {
     if (activeView !== 'gathering-task-edit') return true;
-    if (!gatheringTaskDraftDirty) return finishGatheringTaskRouteExit(true);
+    if (!gatheringTaskDraftDirty) return finishGatheringTaskRouteExit(true, nextView);
     const confirmed = store.confirmDiscardDirtyGatheringTaskDraft?.() ?? false;
-    if (isPromise(confirmed)) return confirmed.then(finishGatheringTaskRouteExit);
-    return finishGatheringTaskRouteExit(confirmed);
+    if (isPromise(confirmed))
+      return confirmed.then((action) => finishGatheringTaskRouteExit(action, nextView));
+    return finishGatheringTaskRouteExit(confirmed, nextView);
   }
 
   // `nextRouteId` is the identity of the SUBJECT the caller is navigating to, for the
@@ -5775,7 +5784,7 @@
 
   function openWorldDestination(destination = 'parties') {
     if (!canShowWorldTravel || !['parties', 'realms', 'map'].includes(destination)) return;
-    afterTruthyResult(confirmRouteExit('environments'), () => {
+    return afterTruthyResult(confirmRouteExit('environments'), () => {
       activeGatheringTab = 'travel';
       activeTravelTab = destination;
       if (destination !== 'parties') worldTravelExpanded = true;
@@ -5785,6 +5794,7 @@
 
   function activateWorldTravelParent() {
     worldTravelExpanded = true;
+    if (isWorldTravelChildRoute) return;
     openWorldDestination('parties');
   }
 
@@ -7228,7 +7238,7 @@
               saveLabel={essenceEditSaveLabel()}
               onBack={cancelEssenceEdit}
             />
-          {:else if currentView === 'environments' && activeGatheringTab === 'tasks'}
+          {:else if currentView === 'environments' && displayedGatheringTab === 'tasks'}
             <button
               type="button"
               class="manager-button is-primary"
@@ -7243,7 +7253,7 @@
                 )}</span
               >
             </button>
-          {:else if currentView === 'environments' && activeGatheringTab === 'encounters'}
+          {:else if currentView === 'environments' && displayedGatheringTab === 'encounters'}
             <button
               type="button"
               class="manager-button is-primary"
@@ -7258,7 +7268,7 @@
                 )}</span
               >
             </button>
-          {:else if currentView === 'environments' && activeGatheringTab === 'travel' && activeTravelTab === 'parties'}
+          {:else if currentView === 'environments' && displayedGatheringTab === 'travel' && activeTravelTab === 'parties'}
             <button
               type="button"
               class="manager-button is-primary"
@@ -7268,7 +7278,7 @@
               <i class="fas fa-plus" aria-hidden="true"></i>
               <span>{text('FABRICATE.Admin.Manager.Travel.CreateParty', 'Create party')}</span>
             </button>
-          {:else if currentView === 'environments' && activeGatheringTab === 'travel' && activeTravelTab === 'realms'}
+          {:else if currentView === 'environments' && displayedGatheringTab === 'travel' && activeTravelTab === 'realms'}
             <button
               type="button"
               class="manager-button is-primary"
@@ -7284,7 +7294,7 @@
               <i class="fas fa-plus" aria-hidden="true"></i>
               <span>{text('FABRICATE.Admin.Manager.Travel.CreateRealm', 'Create realm')}</span>
             </button>
-          {:else if currentView === 'environments' && activeGatheringTab === 'travel'}
+          {:else if currentView === 'environments' && displayedGatheringTab === 'travel'}
             <!-- Map Region Links tab has no create action. -->
           {:else if currentView === 'environments'}
             <button
@@ -7922,9 +7932,9 @@
                   {#each visibleGatheringNavItems as gatheringItem (gatheringItem.id)}
                     <button
                       type="button"
-                      class={`manager-nav-subitem ${isGatheringRoute && activeGatheringTab === gatheringItem.id ? 'is-active' : ''}`}
+                      class={`manager-nav-subitem ${isGatheringRoute && displayedGatheringTab === gatheringItem.id ? 'is-active' : ''}`}
                       id={`manager-gathering-nav-${gatheringItem.id}`}
-                      aria-current={isGatheringRoute && activeGatheringTab === gatheringItem.id
+                      aria-current={isGatheringRoute && displayedGatheringTab === gatheringItem.id
                         ? 'page'
                         : undefined}
                       onclick={() => openGatheringSection(gatheringItem.id)}
@@ -7943,107 +7953,6 @@
               {/if}
             </div>
           {/if}
-          {#if canShowWorldTravel}
-            <section
-              class="manager-world-nav"
-              data-world-nav-section
-              aria-labelledby="manager-world-heading"
-            >
-              <div class="manager-world-heading-row">
-                <h2 id="manager-world-heading">
-                  {text('FABRICATE.Admin.Manager.World.Heading', 'WORLD')}
-                </h2>
-                <span id="manager-world-scope">
-                  {text('FABRICATE.Admin.Manager.World.Scope', 'every system')}
-                </span>
-              </div>
-              <button
-                type="button"
-                class={`manager-nav-button manager-world-nav-item ${isWorldRoute && activeTravelTab === 'parties' ? 'is-active' : ''}`}
-                id="manager-world-nav-parties"
-                data-world-nav-item="parties"
-                aria-current={isWorldRoute && activeTravelTab === 'parties' ? 'page' : undefined}
-                onclick={() => openWorldDestination('parties')}
-              >
-                <i class="fas fa-users" aria-hidden="true"></i>
-                <span class="manager-nav-label">
-                  {text('FABRICATE.Admin.Manager.Travel.Tabs.Parties', 'Parties')}
-                </span>
-                <span class="manager-nav-count">{travelParties.length}</span>
-              </button>
-              <div
-                class={`manager-nav-group manager-world-travel-group ${worldTravelExpanded ? 'is-expanded' : ''}`}
-              >
-                <button
-                  type="button"
-                  class={`manager-nav-button manager-nav-parent manager-world-nav-item ${isWorldTravelChildRoute ? 'is-active' : ''}`}
-                  id="manager-world-nav-travel"
-                  data-world-nav-item="travel"
-                  aria-expanded={worldTravelExpanded}
-                  onclick={activateWorldTravelParent}
-                >
-                  <i class="fas fa-route" aria-hidden="true"></i>
-                  <span class="manager-nav-label">
-                    {text('FABRICATE.Admin.Manager.Environment.GatheringTabs.Travel', 'Travel')}
-                  </span>
-                </button>
-                <button
-                  type="button"
-                  class="manager-nav-toggle"
-                  id="manager-world-travel-toggle"
-                  data-world-travel-toggle
-                  aria-label={worldTravelExpanded
-                    ? text('FABRICATE.Admin.Manager.World.CollapseTravel', 'Collapse Travel')
-                    : text('FABRICATE.Admin.Manager.World.ExpandTravel', 'Expand Travel')}
-                  aria-controls="manager-world-travel-submenu"
-                  aria-expanded={worldTravelExpanded}
-                  onclick={toggleWorldTravel}
-                >
-                  <i
-                    class={worldTravelExpanded ? 'fas fa-chevron-up' : 'fas fa-chevron-down'}
-                    aria-hidden="true"
-                  ></i>
-                </button>
-                {#if worldTravelExpanded}
-                  <div
-                    class="manager-nav-submenu manager-world-travel-submenu"
-                    id="manager-world-travel-submenu"
-                    data-world-travel-submenu
-                    aria-label={text('FABRICATE.Admin.Manager.World.TravelDestinations', 'Travel destinations')}
-                  >
-                    <button
-                      type="button"
-                      class={`manager-nav-subitem ${isWorldRoute && activeTravelTab === 'realms' ? 'is-active' : ''}`}
-                      id="manager-world-nav-realms"
-                      data-world-nav-item="realms"
-                      aria-current={isWorldRoute && activeTravelTab === 'realms'
-                        ? 'page'
-                        : undefined}
-                      onclick={() => openWorldDestination('realms')}
-                    >
-                      <i class="fas fa-mountain-sun" aria-hidden="true"></i>
-                      <span class="manager-nav-label">
-                        {text('FABRICATE.Admin.Manager.Travel.Tabs.Realms', 'Realms')}
-                      </span>
-                    </button>
-                    <button
-                      type="button"
-                      class={`manager-nav-subitem ${isWorldRoute && activeTravelTab === 'map' ? 'is-active' : ''}`}
-                      id="manager-world-nav-map"
-                      data-world-nav-item="map"
-                      aria-current={isWorldRoute && activeTravelTab === 'map' ? 'page' : undefined}
-                      onclick={() => openWorldDestination('map')}
-                    >
-                      <i class="fas fa-map-location-dot" aria-hidden="true"></i>
-                      <span class="manager-nav-label">
-                        {text('FABRICATE.Admin.Manager.Travel.Tabs.MapLinks', 'Map Region Links')}
-                      </span>
-                    </button>
-                  </div>
-                {/if}
-              </div>
-            </section>
-          {/if}
         {/if}
         {#each visiblePlaceholderViews as view (view.labelKey)}
           <button
@@ -8060,6 +7969,110 @@
             <span class="manager-nav-count">{text('FABRICATE.Admin.Manager.Soon', 'Soon')}</span>
           </button>
         {/each}
+        {#if canShowWorldTravel}
+          <section
+            class="manager-world-nav"
+            data-world-nav-section
+            aria-labelledby="manager-world-heading"
+          >
+            <div class="manager-world-heading-row">
+              <h2 id="manager-world-heading">
+                {text('FABRICATE.Admin.Manager.World.Heading', 'WORLD')}
+              </h2>
+              <span id="manager-world-scope">
+                {text('FABRICATE.Admin.Manager.World.Scope', 'every system')}
+              </span>
+            </div>
+            <button
+              type="button"
+              class={`manager-nav-button manager-world-nav-item ${isWorldRoute && activeTravelTab === 'parties' ? 'is-active' : ''}`}
+              id="manager-world-nav-parties"
+              data-world-nav-item="parties"
+              aria-label={text('FABRICATE.Admin.Manager.Travel.Tabs.Parties', 'Parties')}
+              aria-current={isWorldRoute && activeTravelTab === 'parties' ? 'page' : undefined}
+              onclick={() => openWorldDestination('parties')}
+            >
+              <i class="fas fa-users" aria-hidden="true"></i>
+              <span class="manager-nav-label">
+                {text('FABRICATE.Admin.Manager.Travel.Tabs.Parties', 'Parties')}
+              </span>
+              <span class="manager-nav-count">{travelParties.length}</span>
+            </button>
+            <div
+              class={`manager-nav-group manager-world-travel-group ${worldTravelExpanded ? 'is-expanded' : ''}`}
+            >
+              <button
+                type="button"
+                class={`manager-nav-button manager-nav-parent manager-world-nav-item ${isWorldTravelChildRoute ? 'is-active' : ''}`}
+                id="manager-world-nav-travel"
+                data-world-nav-item="travel"
+                aria-label={text('FABRICATE.Admin.Manager.Environment.GatheringTabs.Travel', 'Travel')}
+                aria-controls="manager-world-travel-submenu"
+                aria-expanded={worldTravelExpanded}
+                onclick={activateWorldTravelParent}
+              >
+                <i class="fas fa-route" aria-hidden="true"></i>
+                <span class="manager-nav-label">
+                  {text('FABRICATE.Admin.Manager.Environment.GatheringTabs.Travel', 'Travel')}
+                </span>
+              </button>
+              <button
+                type="button"
+                class="manager-nav-toggle"
+                id="manager-world-travel-toggle"
+                data-world-travel-toggle
+                aria-label={worldTravelExpanded
+                  ? text('FABRICATE.Admin.Manager.World.CollapseTravel', 'Collapse Travel')
+                  : text('FABRICATE.Admin.Manager.World.ExpandTravel', 'Expand Travel')}
+                aria-controls="manager-world-travel-submenu"
+                aria-expanded={worldTravelExpanded}
+                onclick={toggleWorldTravel}
+              >
+                <i
+                  class={worldTravelExpanded ? 'fas fa-chevron-up' : 'fas fa-chevron-down'}
+                  aria-hidden="true"
+                ></i>
+              </button>
+              {#if worldTravelExpanded}
+                <div
+                  class="manager-nav-submenu manager-world-travel-submenu"
+                  id="manager-world-travel-submenu"
+                  data-world-travel-submenu
+                  aria-label={text('FABRICATE.Admin.Manager.World.TravelDestinations', 'Travel destinations')}
+                >
+                  <button
+                    type="button"
+                    class={`manager-nav-subitem manager-world-travel-child ${isWorldRoute && activeTravelTab === 'realms' ? 'is-active' : ''}`}
+                    id="manager-world-nav-realms"
+                    data-world-nav-item="realms"
+                    aria-current={isWorldRoute && activeTravelTab === 'realms'
+                      ? 'page'
+                      : undefined}
+                    onclick={() => openWorldDestination('realms')}
+                  >
+                    <i class="fas fa-mountain-sun" aria-hidden="true"></i>
+                    <span class="manager-nav-label">
+                      {text('FABRICATE.Admin.Manager.Travel.Tabs.Realms', 'Realms')}
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    class={`manager-nav-subitem manager-world-travel-child ${isWorldRoute && activeTravelTab === 'map' ? 'is-active' : ''}`}
+                    id="manager-world-nav-map"
+                    data-world-nav-item="map"
+                    aria-current={isWorldRoute && activeTravelTab === 'map' ? 'page' : undefined}
+                    onclick={() => openWorldDestination('map')}
+                  >
+                    <i class="fas fa-map-location-dot" aria-hidden="true"></i>
+                    <span class="manager-nav-label">
+                      {text('FABRICATE.Admin.Manager.Travel.Tabs.MapLinks', 'Map Region Links')}
+                    </span>
+                  </button>
+                </div>
+              {/if}
+            </div>
+          </section>
+        {/if}
       </nav>
     </aside>
 
@@ -8078,7 +8091,7 @@
         sceneOptions={selectedSystem?.sceneOptions || []}
         environmentTaskCounts={$viewState.environmentTaskCounts || {}}
         {shouldUseEnvironmentDraftForDisplay}
-        {activeGatheringTab}
+        activeGatheringTab={displayedGatheringTab}
         {activeTravelTab}
         selectedTaskId={selectedGatheringTask?.id || selectedGatheringTaskId}
         selectedEventId={selectedGatheringEvent?.id || selectedGatheringEventId}
@@ -8789,7 +8802,7 @@
             dataValue="reference-safe"
           />
         {:else if currentView === 'environments' || currentView === 'environment-edit' || currentView === 'gathering-task-edit' || currentView === 'gathering-event-edit'}
-          {#if (currentView === 'environments' && activeGatheringTab === 'tasks') || currentView === 'gathering-task-edit'}
+          {#if (currentView === 'environments' && displayedGatheringTab === 'tasks') || currentView === 'gathering-task-edit'}
             {#if selectedGatheringTask}
               {#if currentView !== 'gathering-task-edit'}
                 <section class="manager-inspector-card" data-gathering-task-inspector>
@@ -9526,7 +9539,7 @@
                 )}
               />
             {/if}
-          {:else if (currentView === 'environments' && activeGatheringTab === 'encounters') || currentView === 'gathering-event-edit'}
+          {:else if (currentView === 'environments' && displayedGatheringTab === 'encounters') || currentView === 'gathering-event-edit'}
             {#if currentView === 'gathering-event-edit' && editingGatheringEvent}
               <div class="manager-drop-inspector-stack" data-gathering-event-inspector-stack>
                 <div class="manager-drop-inspector-scroll">
@@ -10048,7 +10061,7 @@
                 )}
               />
             {/if}
-          {:else if currentView === 'environments' && activeGatheringTab === 'settings'}
+          {:else if currentView === 'environments' && displayedGatheringTab === 'settings'}
             <section
               class="manager-inspector-card manager-gathering-rules-card"
               data-gathering-inspector-rules
@@ -10534,7 +10547,7 @@
                 </div>
               </div>
             </section>
-          {:else if currentView === 'environments' && activeGatheringTab === 'travel'}
+          {:else if currentView === 'environments' && displayedGatheringTab === 'travel'}
             <section
               class="manager-inspector-card manager-travel-inspector"
               data-gathering-inspector-travel
@@ -10566,9 +10579,9 @@
                     <h3 class="manager-card-title">
                       {text('FABRICATE.Admin.Manager.Travel.EvidenceLabel', 'Current realm')}
                     </h3>
-                    {#if selectedTravelParty.currentRealmEvidence.realms.length > 0}
+                    {#if selectedTravelParty.currentRealmEvidence?.realms?.length > 0}
                       <ul class="manager-travel-evidence-realms">
-                        {#each selectedTravelParty.currentRealmEvidence.realms as realm (realm.id)}
+                        {#each selectedTravelParty.currentRealmEvidence?.realms || [] as realm (realm.id)}
                           <li>
                             {realm.name}
                             {#if !realm.enabled}

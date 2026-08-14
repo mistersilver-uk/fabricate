@@ -167,6 +167,8 @@ export const SCREENSHOT_CAPTURE_ORDER = Object.freeze([
   'manager-environment-edit-placeholder',
   'manager-gathering-events-normal',
   'manager-gathering-event-editor-normal',
+  'manager-world-default-collapsed',
+  'manager-world-travel-expanded-neutral',
   'manager-world-parties-normal',
   'manager-world-realms-normal',
   'manager-world-realms-stacked',

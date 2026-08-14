@@ -61,7 +61,7 @@ Turning the toggle on reveals **World → Parties**, **World → Travel → Real
 With **Enable Travel & Realms** turned on, open the Crafting System Manager and select the crafting system.
 Choose **World → Parties** for the world party list and selected party editor (name, enabled state, members, travel actor, and selected-system current-realm override), or expand **World → Travel** for **Realms** and **Map Region Links**.
 The right-hand inspector echoes the selected party's read-only current-realm evidence.
-When no parties exist yet, the panel shows a setup checklist: create a realm, create a party, add members, assign a travel actor, then set the party's current realm.
+When no parties exist yet, the panel shows a simple **No parties yet** empty state; it does not render a setup checklist.
 
 All four World entries are hidden whenever the toggle is off.
 The `WORLD / every system` heading is presentation only: parties and their count are world-level, while overrides, realms, and authored map links re-project for the selected crafting system.

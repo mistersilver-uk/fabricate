@@ -814,14 +814,14 @@ async function switchScopeSystemTo(systemId) {
 // Mount the manager against a fresh store on a fresh host element. Assigns the
 // module-level `mounted`/`target` (so afterEach can clean up) and returns the target,
 // so the routing helpers below differ only in where they navigate afterwards.
-function mountManager(calls = [], storeOptions = {}) {
+function mountManager(calls = [], storeOptions = {}, services = {}) {
   target = document.createElement('div');
   document.body.appendChild(target);
   mounted = mount(Component, {
     target,
     props: {
       store: createStore(calls, storeOptions),
-      services: { openCurrentAdmin: () => {} },
+      services: { openCurrentAdmin: () => {}, ...services },
     },
   });
   flushSync();
@@ -1108,7 +1108,7 @@ function createStore(calls = [], options = {}) {
       name: 'Smithing',
       description: 'Heavy equipment work',
       resolutionMode: 'routedByCheck',
-      features: {
+      features: options.smithingFeatures || {
         gathering: false,
         itemTags: false,
         recipeCategories: true,
@@ -1719,21 +1719,26 @@ function createStore(calls = [], options = {}) {
         },
       },
     },
-    gatheringRealmSettings: { enabled: options.gatheringRealmsEnabled === true },
+    gatheringRealmSettings:
+      options.worldTravelBySystem?.alchemy?.gatheringRealmSettings || {
+        enabled: options.gatheringRealmsEnabled === true,
+      },
     travelParties: options.travelParties || [
       { id: 'party-one', name: 'Wayfarers', enabled: true, memberCount: 2 },
       { id: 'party-two', name: 'Night Watch', enabled: false, memberCount: 1 },
     ],
     selectedPartyId: 'party-one',
-    selectedSystemRealms: options.selectedSystemRealms || [
-      {
-        id: 'realm-forest',
-        name: 'Green March',
-        enabled: true,
-        environmentCount: 1,
-        partyCount: 1,
-      },
-    ],
+    selectedSystemRealms:
+      options.worldTravelBySystem?.alchemy?.realms ||
+      options.selectedSystemRealms || [
+        {
+          id: 'realm-forest',
+          name: 'Green March',
+          enabled: true,
+          environmentCount: 1,
+          partyCount: 1,
+        },
+      ],
     currentSceneRegions: options.currentSceneRegions || [],
     currentSceneUuid: options.currentSceneUuid || '',
     foundrySystemId: options.foundrySystemId || '',
@@ -1751,6 +1756,11 @@ function createStore(calls = [], options = {}) {
     viewState.update((state) => ({
       ...state,
       selectedSystem: nextSelected,
+      gatheringRealmSettings:
+        options.worldTravelBySystem?.[id]?.gatheringRealmSettings ||
+        state.gatheringRealmSettings,
+      selectedSystemRealms:
+        options.worldTravelBySystem?.[id]?.realms || state.selectedSystemRealms,
       itemCards: componentCardsFor(id),
       essenceCards: essenceCardsBySystem[id] || [],
       itemSearchTerm: '',
@@ -13181,7 +13191,10 @@ describe('CraftingSystemManager mounted behavior', () => {
     mounted = mount(Component, {
       target,
       props: {
-        store: createStore(calls, { gatheringRealmsEnabled: true }),
+        store: createStore(calls, {
+          gatheringRealmsEnabled: true,
+          experimentalFeaturesEnabled: true,
+        }),
         services: { openCurrentAdmin: () => {} },
       },
     });
@@ -13191,12 +13204,12 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(world, 'World renders when Gathering and Travel & Realms are enabled');
     assert.equal(world.querySelector('#manager-world-heading').textContent.trim(), 'WORLD');
     assert.equal(world.querySelector('#manager-world-scope').textContent.trim(), 'every system');
+    const navChildren = Array.from(target.querySelector('.manager-nav').children);
+    const graph = navChildren.find((item) => item.textContent.includes('Graph'));
+    assert.ok(graph, 'the experimental Graph placeholder is visible in this ordering fixture');
     assert.ok(
-      Array.from(target.querySelector('.manager-nav').children).indexOf(world) >
-        Array.from(target.querySelector('.manager-nav').children).indexOf(
-          target.querySelector('#manager-nav-gathering').closest('.manager-nav-group')
-        ),
-      'World follows all selected-system navigation'
+      navChildren.indexOf(world) > navChildren.indexOf(graph),
+      'World follows every selected-system entry, including Graph'
     );
     assert.deepEqual(
       Array.from(world.querySelectorAll('[data-world-nav-item]')).map((item) => item.id),
@@ -13206,6 +13219,14 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(worldNavItem('travel').querySelector('.fa-route'));
     assert.equal(worldNavItem('parties').querySelector('.manager-nav-count').textContent.trim(), '2');
     assert.ok(!gatheringSubitem('Travel'), 'Gathering no longer owns a Travel child');
+    assert.equal(worldNavItem('parties').getAttribute('aria-label'), 'Parties');
+    assert.equal(worldNavItem('travel').getAttribute('aria-label'), 'Travel');
+    assert.equal(
+      worldNavItem('travel').getAttribute('aria-controls'),
+      'manager-world-travel-submenu'
+    );
+    assert.equal(worldNavItem('travel').getAttribute('aria-expanded'), 'false');
+    assert.equal(target.querySelector('[data-world-travel-submenu]'), null);
 
     worldNavItem('travel').click();
     await tick();
@@ -13219,6 +13240,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(worldNavItem('realms').querySelector('.fa-mountain-sun'));
     assert.ok(worldNavItem('map').querySelector('.fa-map-location-dot'));
     assert.equal(worldNavItem('parties').getAttribute('aria-current'), 'page');
+    assert.ok(worldNavItem('parties').classList.contains('manager-world-nav-item'));
     assert.equal(target.querySelector('[data-travel-panel="parties"]').getAttribute('role'), 'region');
     assert.equal(
       target.querySelector('[data-travel-panel="parties"]').getAttribute('aria-labelledby'),
@@ -13235,8 +13257,51 @@ describe('CraftingSystemManager mounted behavior', () => {
       'only the concrete destination is current'
     );
     assert.ok(worldNavItem('travel').classList.contains('is-active'));
+    assert.ok(worldNavItem('realms').classList.contains('manager-world-travel-child'));
+    assert.equal(
+      worldNavItem('realms').parentElement,
+      target.querySelector('#manager-world-travel-submenu'),
+      'the full-width child button is not wrapped in an inset selection container'
+    );
     assert.ok(target.querySelector('[data-manager-travel-realm-id="realm-forest"]'));
     assert.ok(!target.querySelector('[id^="travel-tab-"]'), 'the retired horizontal tabs are absent');
+  });
+
+  it('keeps either active Travel child selected when the expanded parent is activated', async () => {
+    mountManager([], { gatheringRealmsEnabled: true });
+    worldNavItem('travel').click();
+    await tick();
+    flushSync();
+
+    for (const childId of ['realms', 'map']) {
+      worldNavItem(childId).click();
+      await tick();
+      flushSync();
+      worldNavItem('travel').click();
+      await tick();
+      flushSync();
+
+      assert.equal(worldNavItem('travel').getAttribute('aria-expanded'), 'true');
+      assert.equal(worldNavItem(childId).getAttribute('aria-current'), 'page');
+      assert.equal(
+        target.querySelectorAll('[data-world-nav-section] [aria-current="page"]').length,
+        1
+      );
+    }
+  });
+
+  it('keeps World controls named and reachable in the persisted 56px rail', () => {
+    mountManager(
+      [],
+      { gatheringRealmsEnabled: true },
+      { getSetting: (key) => key === 'managerRailCollapsed' }
+    );
+
+    assert.ok(target.querySelector('.manager-body').classList.contains('is-rail-collapsed'));
+    assert.equal(worldNavItem('parties').getAttribute('aria-label'), 'Parties');
+    assert.equal(worldNavItem('travel').getAttribute('aria-label'), 'Travel');
+    assert.equal(worldNavItem('parties').tagName, 'BUTTON');
+    assert.equal(worldNavItem('travel').tagName, 'BUTTON');
   });
 
   it('flips Travel & Realms and reveals World without restoring Gathering Travel', async () => {
@@ -13284,11 +13349,12 @@ describe('CraftingSystemManager mounted behavior', () => {
 
   it('falls back from a stale Travel tab to Environments when Travel & Realms is disabled', async () => {
     const calls = [];
+    const store = createStore(calls, { gatheringRealmsEnabled: true });
     target = document.createElement('div');
     document.body.appendChild(target);
     mounted = mount(Component, {
       target,
-      props: { store: createStore(calls), services: { openCurrentAdmin: () => {} } },
+      props: { store, services: { openCurrentAdmin: () => {} } },
     });
     flushSync();
 
@@ -13296,38 +13362,96 @@ describe('CraftingSystemManager mounted behavior', () => {
     await tick();
     flushSync();
 
-    // Enable the subsystem, then route to World Parties.
-    gatheringSubitem('Settings').click();
-    await tick();
-    flushSync();
-    target.querySelector('[data-gathering-realm-toggle]').click();
-    await tick();
-    flushSync();
+    // Route to World Parties, then turn the selected system's setting off underneath it.
     worldNavItem('parties').click();
     await tick();
     flushSync();
     assert.equal(worldNavItem('parties').getAttribute('aria-current'), 'page');
 
-    // Disabling the flag must drop the stale Travel tab back to Environments, not
-    // leave the manager stranded on a hidden tab. Re-enter Settings to flip it off
-    // (the Travel surface has no toggle).
-    gatheringSubitem('Settings').click();
-    await tick();
-    flushSync();
-    target.querySelector('[data-gathering-realm-toggle]').click();
+    store.viewState.update((state) => ({
+      ...state,
+      gatheringRealmSettings: { ...state.gatheringRealmSettings, enabled: false },
+    }));
     await tick();
     flushSync();
 
     assert.ok(!target.querySelector('[data-world-nav-section]'), 'World is hidden again');
-    // The active tab is no longer World; Settings remains the current selection.
-    const activeSubitem = Array.from(target.querySelectorAll('.manager-nav-subitem')).find(
-      (item) => item.getAttribute('aria-current') === 'page'
-    );
-    assert.notEqual(
-      activeSubitem?.textContent.trim(),
-      'Parties',
-      'stale World destination is not the active tab'
-    );
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'environments');
+    assert.ok(target.querySelector('[data-environment-id]'));
+    assert.equal(target.querySelector('[data-world-nav-section] [aria-current="page"]'), null);
+  });
+
+  it('reprojects system-owned World records while keeping the party list global', async () => {
+    const travelBySystem = {
+      alchemy: {
+        gatheringRealmSettings: { enabled: true },
+        realms: [{ id: 'realm-forest', name: 'Green March', enabled: true }],
+      },
+      smithing: {
+        gatheringRealmSettings: { enabled: true },
+        realms: [{ id: 'realm-forge', name: 'Forge Quarter', enabled: true }],
+      },
+    };
+    mountManager([], {
+      worldTravelBySystem: travelBySystem,
+      smithingFeatures: { gathering: true, salvage: true },
+    });
+    worldNavItem('travel').click();
+    await tick();
+    flushSync();
+    worldNavItem('realms').click();
+    await tick();
+    flushSync();
+    assert.ok(target.textContent.includes('Green March'));
+    assert.equal(worldNavItem('parties').querySelector('.manager-nav-count').textContent.trim(), '2');
+
+    assert.equal(await switchScopeSystemTo('smithing'), 'environments');
+    assert.ok(target.textContent.includes('Forge Quarter'));
+    assert.equal(target.textContent.includes('Green March'), false);
+    assert.equal(worldNavItem('parties').querySelector('.manager-nav-count').textContent.trim(), '2');
+  });
+
+  it('removes hidden active World routes when Gathering or its selected system vanishes', async () => {
+    for (const fallback of ['gathering-off', 'selection-cleared']) {
+      const store = createStore([], { gatheringRealmsEnabled: true });
+      target = document.createElement('div');
+      document.body.appendChild(target);
+      mounted = mount(Component, {
+        target,
+        props: { store, services: { openCurrentAdmin: () => {} } },
+      });
+      flushSync();
+      worldNavItem('parties').click();
+      await tick();
+      flushSync();
+
+      store.viewState.update((state) => ({
+        ...state,
+        canShowEnvironmentsTab: false,
+        selectedSystem:
+          fallback === 'selection-cleared'
+            ? null
+            : {
+                ...state.selectedSystem,
+                features: { ...state.selectedSystem.features, gathering: false },
+              },
+        systems: state.systems.map((system) => ({
+          ...system,
+          selected: fallback !== 'selection-cleared' && system.id === 'alchemy',
+        })),
+      }));
+      await tick();
+      flushSync();
+
+      assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'systems');
+      assert.equal(target.querySelector('[data-world-nav-section]'), null);
+      assert.equal(target.querySelector('[data-world-nav-section] [aria-current="page"]'), null);
+
+      unmount(mounted);
+      mounted = null;
+      target.remove();
+      target = null;
+    }
   });
 
   it('deletes the editing gathering task from the editor toolbar and returns to the task browser', async () => {
@@ -17902,6 +18026,72 @@ describe('CraftingSystemManager mounted behavior', () => {
     setInputValue(target.querySelector('[data-gathering-event-field="name"]'), 'Bramble Snare');
     await settleSaveAttempt();
   }
+
+  async function attemptDirtyGatheringWorldExit(kind, outcome) {
+    const calls = [];
+    const title = kind === 'task' ? 'Task' : 'Event';
+    const storeOptions = {
+      gatheringRealmsEnabled: true,
+      [`confirmDiscardGathering${title}Result`]: outcome.action,
+    };
+    if (outcome.saveResult === false) {
+      storeOptions[`updateGatheringLibrary${title}Result`] = false;
+    }
+    if (outcome.rejectSave) {
+      storeOptions[`updateGatheringLibrary${title}Reject`] = true;
+    }
+    if (kind === 'task') await openDirtyGatheringTaskEditor(calls, storeOptions);
+    else await openDirtyGatheringEventEditor(calls, storeOptions);
+
+    const activateParties = async () => {
+      worldNavItem('parties').click();
+      await settleRouteExit();
+    };
+    if (outcome.rejectSave) await withSilencedConsoleError(activateParties);
+    else await activateParties();
+
+    const expectedView = outcome.proceeds ? 'environments' : `gathering-${kind}-edit`;
+    assert.equal(
+      target.querySelector('.fabricate-manager').dataset.managerView,
+      expectedView,
+      `${kind} ${outcome.name} should ${outcome.proceeds ? '' : 'not '}leave the editor; rendered: ${JSON.stringify(Array.from(target.querySelectorAll('.fabricate-manager')).map((node) => node.dataset.managerView))}; calls: ${JSON.stringify(calls)}`
+    );
+    assert.equal(
+      worldNavItem('parties').getAttribute('aria-current'),
+      outcome.proceeds ? 'page' : null,
+      `${kind} ${outcome.name} must not leave a hidden active World control`
+    );
+    assert.ok(
+      calls.some((call) => call[0] === `confirmDiscardDirtyGathering${title}Draft`),
+      `${kind} ${outcome.name} routes through its dirty-exit confirmation`
+    );
+    const saveCalls = calls.filter((call) => call[0] === `updateGatheringLibrary${title}`);
+    assert.equal(
+      saveCalls.length > 0,
+      outcome.action === 'save',
+      `${kind} ${outcome.name} ${outcome.action === 'save' ? 'does' : 'does not'} save`
+    );
+  }
+
+  it('guards dirty gathering task and event exits through the actual World Parties control', async () => {
+    const outcomes = [
+      { name: 'cancel', action: 'cancel', proceeds: false },
+      { name: 'save false', action: 'save', saveResult: false, proceeds: false },
+      { name: 'rejected save', action: 'save', rejectSave: true, proceeds: false },
+      { name: 'successful save', action: 'save', proceeds: true },
+      { name: 'discard', action: 'discard', proceeds: true },
+    ];
+
+    for (const kind of ['task', 'event']) {
+      for (const outcome of outcomes) {
+        await attemptDirtyGatheringWorldExit(kind, outcome);
+        unmount(mounted);
+        mounted = null;
+        target.remove();
+        target = null;
+      }
+    }
+  });
 
   async function openDirtyRecipeItemEditor(calls, storeOptions) {
     Object.assign(storeOptions, {

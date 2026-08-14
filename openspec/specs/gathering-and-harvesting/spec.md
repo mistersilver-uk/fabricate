@@ -242,6 +242,8 @@ The entire realm/travel/availability subsystem is gated by a per-system `gatheri
 When disabled, every gate point — the engine location-block choke point, the current-realm resolver, the location-aware public API, the Manager World Parties/Travel navigation, and environment realm selectors — behaves as if no environment is location-gated and no travel surfaces exist.
 In Manager, parties are reached through the world-level `Parties` destination and selected-system
 realm/map authoring through `World > Travel > Realms` and `World > Travel > Map Region Links`.
+Travel is collapsed when Manager opens; its parent opens Parties unless Realms or Map Region Links
+is already current, in which case the parent preserves that child and keeps the group expanded.
 This presentation does not change ownership: the party list and count are world-global, while
 current-realm overrides remain keyed by selected `systemId`, realms remain owned by that crafting
 system, and Map Region Links writes the active-scene Region choice only into those realms'
@@ -275,7 +277,7 @@ GatheringRealm = {
 5. Secret realms may affect runtime availability, but their identity must not be disclosed to a non-GM viewer until the selected actor has discovered the realm or `GatheringRealmSettings.revealMode === "alwaysVisible"`.
 6. Disabled realms must not satisfy environment availability for non-GM users, except when a GM manual override explicitly includes a disabled realm for diagnostic/preview purposes.
 7. Stale realm ids in environments, party overrides, or discovery flags are ignored at runtime and surfaced to GMs as repair evidence.
-8. `sceneMappings` normalize, validate (unique ids, known enums, finite values), and round-trip; they are authored via World > Travel > Map Region Links (single-valued per scene region, `adminStore.setMapRegionLink`) and are **applied at runtime** by live token-derived sensing (Phase 3, shipped).
+8. `sceneMappings` normalize, validate (unique ids, known enums, finite values), and round-trip; they are authored via World > Travel > Map Region Links (single-valued per scene region, `adminStore.setMapRegionLink`) and are **applied at runtime** by shipped live token-derived sensing.
 `modifiers` normalize, validate, and round-trip but are **not yet applied at runtime** — realm modifier application (Phase 4) is not shipped.
 The `sceneMappings[].sceneRegionUuid`/`sceneUuid` fields name Foundry `RegionDocument` objects and are **not** renamed.
 
@@ -297,7 +299,7 @@ GatheringRealmSettings = {
 4. `enabled` gates the entire realm/travel/availability subsystem.
 When `false` (the default, including for all migrated systems), every environment behaves as ungated (no location blocking), the current-realm resolver fast-exits to the unresolved-empty shape, the location-aware public API returns null/false, and the Manager hides World Parties/Travel and the environment realm selectors.
 A shared `isGatheringRealmsEnabled(system)` helper is the single source of truth every gate reads.
-5. `manual` reveal mode means only GM/API reveal actions add actor discovery for secret realms. `alwaysVisible` discloses realm identities to players (while still allowing discovery history). `onPartyTokenEntry` is reserved for Phase 3 token automation and is not yet active.
+5. `manual` reveal mode means only GM/API reveal actions add actor discovery for secret realms. `alwaysVisible` discloses realm identities to players (while still allowing discovery history). `onPartyTokenEntry` automatic discovery is not yet active; that follow-up is distinct from the shipped live token-derived realm sensing used for current-realm resolution.
 
 ### Gathering Party
 
@@ -325,7 +327,7 @@ GatheringParty = {
 2. Parties are excluded from crafting-system import/export.
 Overrides referencing missing systems or realms persist as stale repair evidence.
 3. `travelActorUuid` identifies the single Actor that represents the party on a campaign map — the **Travel Actor**.
-It is an Actor document UUID, not a placed Token UUID or prototype-token reference; Phase 3 realm presence sensing will resolve the travel actor's placed token(s).
+It is an Actor document UUID, not a placed Token UUID or prototype-token reference; shipped realm presence sensing resolves the travel actor's placed token(s).
 4. An enabled party must have exactly one travel actor; a newly created party defaults to `enabled: false`, and setting `enabled: true` without a travel actor is rejected at save.
 5. **Composite uniqueness invariant:** an actor may be associated with at most one *enabled* party in total — as a member, as the travel actor, or both (when both, it must be the same party).
 The travel actor may also be a member of its own party.
@@ -404,7 +406,7 @@ The `sceneUuid`/`sceneRegionUuid` entry members are Foundry-bridge fields and ar
 ### Reserved Records (Not Yet Applied)
 
 ```js
-GatheringRealmSceneMapping = { id: string, sceneUuid: string, sceneRegionUuid: string } // Foundry bridge — member field names NOT renamed; Phase 3
+GatheringRealmSceneMapping = { id: string, sceneUuid: string, sceneRegionUuid: string } // shipped live-sensing Foundry bridge — member field names NOT renamed
 GatheringRealmModifier = {
   id: string, enabled: boolean,
   kind: "eventChance" | "dropRate" | "yield" | "difficulty" | "staminaCost" | "attemptLimit" | "custom",
@@ -413,7 +415,8 @@ GatheringRealmModifier = {
 } // Phase 4
 ```
 
-These records normalize, validate (unique ids, known enums, finite values, stale uuids stay readable for repair), and round-trip through realm persistence and import/export. Fabricate resolves Scene Region mappings through live token sensing (Phase 3 shipped), but does not yet apply realm modifiers to listing/attempt calculations (Phase 4).
+These records normalize, validate (unique ids, known enums, finite values, stale uuids stay readable for repair), and round-trip through realm persistence and import/export.
+Fabricate resolves Scene Region mappings through shipped live token sensing, but does not yet apply realm modifiers to listing/attempt calculations (Phase 4).
 When implemented, modifiers must adjust gathering behavior only and must not rewrite source environment, task, event, drop, or component records.
 
 ## System Gathering Rules
