@@ -54,12 +54,28 @@ describe('JournalView layout + effects', () => {
     // Pin the reflow contract (container seam + narrow-width single-column
     // breakpoint), not the exact fr/minmax track literal — the column ratios are
     // tunable design details that should not break this wiring guard.
+    const narrowBreakpoint = '@container fabricate-journal (max-width: 960px)';
+
     assert.ok(viewSource.includes('grid-template-columns:'), 'declares an explicit column track');
     assert.ok(viewSource.includes('container-type: inline-size;'), 'establishes a size container');
     assert.ok(viewSource.includes('container-name: fabricate-journal;'), 'names the journal container');
     assert.ok(
-      viewSource.includes('@container fabricate-journal (max-width: 900px)'),
-      'reflows to a single column below the narrow breakpoint'
+      viewSource.includes(narrowBreakpoint),
+      'uses the shared reachable 960px narrow breakpoint'
+    );
+    assert.ok(
+      viewSource.slice(viewSource.indexOf(narrowBreakpoint)).includes('grid-template-columns: 1fr;'),
+      'reflows to a single column at the narrow breakpoint'
+    );
+    assert.match(
+      viewSource.slice(viewSource.indexOf(narrowBreakpoint)),
+      /\.journal-view-grid\s+\.journal-view-column-left\s*\{\s*overflow:\s*visible;/,
+      'the stacked grid does not clip the first list header beneath the player bar'
+    );
+    assert.match(
+      viewSource.slice(viewSource.indexOf(narrowBreakpoint)),
+      /\.journal-view-grid\s+\.journal-view-column\s*\{\s*min-height:\s*220px;/,
+      'the stacked grid retains the 220px minimum despite desktop flex defaults'
     );
   });
 

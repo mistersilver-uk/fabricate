@@ -15,6 +15,10 @@ import { flushSync, mount } from 'svelte';
 import { APP_CHROME } from '../../scripts/lib/foundryChromeSpec.js';
 import { assertWindowGeometry, buildAppWindow, configureLabPage } from './foundryFrame.js';
 import { DEFAULT_LAB_DIALOG_ANSWER } from './foundryDialog.js';
+import {
+  findLabInjectedContentWidthLosses,
+  measureWithoutLabStyles,
+} from './labInjectedLayoutGuard.js';
 import { buildLabWorld } from './world/labWorld.js';
 
 const READY_ATTRIBUTE = 'data-view-lab-ready';
@@ -64,6 +68,7 @@ function installDeterminismStyles() {
     */
   `;
   document.head.appendChild(style);
+  return style;
 }
 
 function readParams() {
@@ -341,7 +346,7 @@ async function assertChromeFontsLoaded() {
 }
 
 /**
- * Fail the render when a lab-injected style has resized an element's content box.
+ * Measure content widths that can be compared with the same render minus lab styles.
  *
  * The determinism styles above are the lab's own, and they are the one thing in the page that
  * production does not have — so when one of them changes layout, the frame lies and nothing else
@@ -349,47 +354,47 @@ async function assertChromeFontsLoaded() {
  * for months: it reserves gutter space on any scroll container, `overflow: hidden` makes one, and
  * so every clipping element rendered ~10px narrower than its own box.
  *
- * The invariant is arithmetic and holds for any element that is not scrolling: content width ==
- * border width - padding - border. A reserved gutter breaks it, and nothing legitimate does.
- * Elements that genuinely scroll are exempt, because a real scrollbar breaks it too — and that is
- * production behaviour, not a lab artefact.
- *
  * @param {HTMLElement} frame The application frame.
- * @throws {Error} Naming the offending elements, because a silent 10px is exactly what shipped.
+ * @returns {Array<{element: Element, boxWidth: number, clientWidth: number}>} Measurements.
  */
-function assertNoLabInducedClipping(frame) {
-  const offenders = [];
-  for (const element of frame.querySelectorAll('*')) {
+function measureContentWidths(frame) {
+  return [...frame.querySelectorAll('*')].flatMap((element) => {
     const style = getComputedStyle(element);
     const box = element.getBoundingClientRect();
-    if (box.width === 0) continue;
-    // `clientWidth` is defined only for elements that generate a CSS box with client geometry.
-    // A non-replaced INLINE box — every `span`, `strong`, `em` — reports 0, which read as "loses
-    // its whole width" and failed 106 of 150 frames the first time this guard ran.
-    if (style.display.startsWith('inline') && style.display !== 'inline-block') continue;
-    // A real scrollbar legitimately eats content width; only non-scrolling elements are pinned.
-    if (element.scrollHeight > element.clientHeight || element.scrollWidth > element.clientWidth) {
-      continue;
+    // Inline text nodes report no client geometry, so their zero width is not layout evidence.
+    if (box.width === 0 || (style.display.startsWith('inline') && style.display !== 'inline-block')) {
+      return [];
     }
-    const chrome =
-      Number.parseFloat(style.paddingLeft) +
-      Number.parseFloat(style.paddingRight) +
-      Number.parseFloat(style.borderLeftWidth) +
-      Number.parseFloat(style.borderRightWidth);
-    const expected = style.boxSizing === 'border-box' ? box.width - chrome : box.width;
-    const lost = expected - element.clientWidth;
-    // 1px of tolerance for sub-pixel rounding; a reserved gutter is an order of magnitude larger.
-    if (lost > 1) {
-      offenders.push(
-        `${element.tagName.toLowerCase()}.${[...element.classList].join('.') || '(no class)'} ` +
-          `loses ${lost.toFixed(1)}px of content width (box ${box.width.toFixed(1)}, client ${element.clientWidth})`
-      );
-    }
-  }
+    return [{ element, boxWidth: box.width, clientWidth: element.clientWidth }];
+  });
+}
+
+/**
+ * Fail only when the View Lab's own stylesheet, rather than production CSS, shrinks content.
+ *
+ * @param {HTMLElement} frame The application frame.
+ * @param {HTMLStyleElement} determinismStyle The View Lab's own stylesheet.
+ * @throws {Error} Naming the offending elements, because a silent 10px is exactly what shipped.
+ */
+function assertNoLabInducedClipping(frame, determinismStyle) {
+  const withLab = measureContentWidths(frame);
+  const sheet = determinismStyle.sheet;
+  if (!sheet) throw new Error('view lab: determinism stylesheet did not create a CSS stylesheet');
+
+  const withoutLab = measureWithoutLabStyles(sheet, () => measureContentWidths(frame));
+
+  const offenders = findLabInjectedContentWidthLosses(withLab, withoutLab);
   if (offenders.length > 0) {
     throw new Error(
       'view lab: a lab-injected style is resizing content boxes, so this frame would not depict ' +
-        `production layout:\n  ${offenders.slice(0, 8).join('\n  ')}` +
+        `production layout:\n  ${offenders
+          .slice(0, 8)
+          .map(
+            ({ element, boxWidth, clientWidth, lost }) =>
+              `${element.tagName.toLowerCase()}.${[...element.classList].join('.') || '(no class)'} ` +
+              `loses ${lost.toFixed(1)}px of content width (box ${boxWidth.toFixed(1)}, client ${clientWidth})`
+          )
+          .join('\n  ')}` +
         (offenders.length > 8 ? `\n  ... and ${offenders.length - 8} more` : '')
     );
   }
@@ -410,7 +415,7 @@ async function boot() {
   const params = readParams();
   if (!APP_CHROME[params.appId]) throw new Error(`unknown app: ${params.appId}`);
 
-  installDeterminismStyles();
+  const determinismStyle = installDeterminismStyles();
 
   const world = params.chromeOnly
     ? null
@@ -449,7 +454,7 @@ async function boot() {
     await settle([built.frame], mounted?.services ?? null);
     // After settle, because the check needs the populated tree — an empty window has nothing
     // clipped to measure.
-    assertNoLabInducedClipping(built.frame);
+    assertNoLabInducedClipping(built.frame, determinismStyle);
   } else {
     await document.fonts.ready;
     await new Promise((resolve) => requestAnimationFrame(resolve));

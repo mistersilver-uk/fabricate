@@ -451,12 +451,14 @@
     color: var(--fab-text);
   }
 
-  /* Below the combined three-column minimum (3 x 280px + 2 gutters) the columns
+  /* At the supported 1024px window floor this container's content box is roughly
+     938px wide, so the shared 960px boundary is deliberately reachable.
+     Below the combined three-column minimum (3 x 280px + 2 gutters) the columns
      reflow into a single vertical stack so the view stays usable on a narrow
      window instead of overflowing or clipping the side columns. The grid scrolls
      vertically in this mode; each column gets a sensible minimum height so its
      content is not crushed. */
-  @container fabricate-gathering (max-width: 900px) {
+  @container fabricate-gathering (max-width: 960px) {
     .gathering-view-grid {
       grid-template-columns: 1fr;
       grid-auto-rows: minmax(min-content, max-content);

@@ -27,14 +27,18 @@ const UI_PATH_PATTERN = /^(src\/ui\/|styles\/)|\.(svelte|css)$/;
 
 /**
  * The harness's own inputs: the fixture world every frame renders from, the page that mounts it,
- * the Foundry shim it renders against, and this registry. None of these is a render file, so none
- * is selectable by {@link isUiFile} — but a change to any of them can move every frame at once.
+ * the Foundry shim it renders against, its capture and layout-assertion helpers, and this registry.
+ * None of these is a render file, so none is selectable by {@link isUiFile} — but a change to any
+ * of them can move or invalidate captured frames.
  */
 const LAB_INFRASTRUCTURE_PATTERN =
-  /^(tests\/view-lab\/|scripts\/lib\/viewLabCases\.js$|scripts\/lib\/foundryChromeSpec\.js$|scripts\/view-lab-screenshots\.mjs$)/;
+  /^(tests\/view-lab\/|scripts\/lib\/viewLab(?:Cases|LayoutAssertion)\.js$|scripts\/lib\/foundryChromeSpec\.js$|scripts\/view-lab-screenshots\.mjs$)/;
 
 /** This registry's own path, as a diff names it. */
 const REGISTRY_PATH = 'scripts/lib/viewLabCases.js';
+
+/** The helper that enforces the opt-in responsive layout contract. */
+const LAYOUT_ASSERTION_PATH = 'scripts/lib/viewLabLayoutAssertion.js';
 
 /** The lab's actor fixture, as a diff names it. Attributed by fixture table — see below. */
 const LAB_ACTORS_PATH = 'tests/view-lab/world/labActors.js';
@@ -319,6 +323,10 @@ function playerCase(entry) {
     publish: true,
     ...entry,
   };
+}
+
+function responsiveLayout(containerSelector, gridSelector) {
+  return { containerSelector, gridSelector, maxContentBoxInlineSize: 960 };
 }
 
 /**
@@ -4116,15 +4124,8 @@ export const VIEW_LAB_CASES = Object.freeze([
     // go through, so this is the real floor rather than a chosen size — 900 is refused by the
     // harness's own geometry gate before anything renders.
     //
-    // IT DOES NOT REACH THE CONTAINER BREAKPOINT, and saying so is the point of this comment.
-    // `.inventory-view-container` measures 938px inside a 1024px window, and
-    // `@container fabricate-inventory (max-width: 900px)` therefore never matches — by design:
-    // `MIN_WINDOW_WIDTH`'s own comment says the floor keeps the columns usable "before the
-    // narrow-width stacking breakpoint takes over". `player-gathering-stacked` sits at the same
-    // 1024 and is in the same position. So this frame is evidence about the narrowest permitted
-    // GEOMETRY, not about the stacked block: the detail column falls from ~500px to 342px, which
-    // is where a queue row's name competes with its certainty chip, its broken chip and its remove
-    // control, and where the footer's note-left / actions-right row is most likely to break.
+    // `.inventory-view-container` measures roughly 938px inside the supported 1024px floor, so the
+    // shared 960px query now stacks this frame and the computed-layout expectation proves it.
     steps: [
       { selector: CARD_BUTTON('lab-smithing:sm-air-shard') },
       SHIFT_CLICK('lab-herbalism:hb-cracked-alembic'),
@@ -4133,6 +4134,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     ],
     position: { width: 1024, height: 860 },
     kinds: ['player', 'inventory', 'bulk', 'responsive'],
+    expectLayout: responsiveLayout('.inventory-view-container', '.inventory-view-grid'),
     expectSelector:
       '.fabricate-app-shell' +
       `:has(${CARD('lab-smithing:sm-air-shard')}[data-inventory-card-bulk-selected="true"])` +
@@ -4552,6 +4554,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     steps: [],
     position: { width: 1024, height: 860 },
     kinds: ['player', 'gathering', 'responsive'],
+    expectLayout: responsiveLayout('.gathering-view-container', '.gathering-view-grid'),
     sourceMatches: [/^src\/ui\/svelte\/apps\/gathering\//],
   }),
   playerCase({
@@ -5005,21 +5008,13 @@ export const VIEW_LAB_CASES = Object.freeze([
     id: 'player-crafting-progressive-stacked',
     label: 'Player app — Crafting progressive stacked',
     smokeLabels: ['player-crafting-progressive-stacked'],
-    // WINDOW, and the blocker is a WIDTH the lab cannot reach rather than a fixture gap.
+    // The shared 960px boundary makes the smoke counterpart's stacked condition reachable at
+    // production's 1024px player-window floor: the named container is roughly 938px wide there.
     //
-    // The counterpart shrinks `#fabricate-app` to 780px by writing `min-width: 0` inline, which
-    // takes the grid under its 900px container breakpoint so the three columns STACK and the stage
-    // rows get the full width. The lab cannot do that: `assertWindowGeometry` requires the applied
-    // box to equal the declared one, and production's `.fabricate-app { min-width: 1024px }` is
-    // therefore the floor for a PLAYER case. (That floor is player-only: `.fabricate-app` is the
-    // player shell, so the manager's responsive cases sit below it at 1000, 900 and 680.)
-    //
-    // At 1024 the grid does NOT stack; the centre column lands at ~290px, and the counterpart's
-    // own assertions fail there. Measured: `rowOverflow: 3` where the counterpart demands 0, and
-    // all three stage names compute to zero width rather than ellipsing. That is a real finding
-    // about the un-stacked narrow band — the smoke never renders this width — and the frame is
-    // published as evidence of it, not as the counterpart's state.
-    reaches: 'window',
+    // The smoke still forces its shell to 780px by clearing the production minimum, but both walks
+    // now render the same single-column progressive layout with full-width stage rows. Keep the
+    // 1024px geometry here so the lab proves that production's supported floor reaches that state.
+    reaches: 'exact',
     query: { tab: 'crafting' },
     steps: [
       { selector: '.crafting-browser-search input', fill: 'Reduce a Stillroom' },
@@ -5042,6 +5037,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     steps: [],
     position: { width: 1024, height: 860 },
     kinds: ['player', 'crafting', 'responsive'],
+    expectLayout: responsiveLayout('.crafting-view-container', '.crafting-view-grid'),
     sourceMatches: [CRAFTING_SHARED, /^src\/ui\/svelte\/stores\/craftingStore/],
   }),
   playerCase({
@@ -5081,7 +5077,20 @@ export const VIEW_LAB_CASES = Object.freeze([
     steps: [],
     position: { width: 1024, height: 860 },
     kinds: ['player', 'alchemy', 'responsive'],
+    expectLayout: responsiveLayout('.alchemy-view-container', '.alchemy-view-grid'),
     sourceMatches: [/^src\/ui\/svelte\/apps\/alchemy\//],
+  }),
+  playerCase({
+    id: 'player-journal-stacked',
+    label: 'Player app — Journal stacked',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: 'journal' },
+    steps: [],
+    position: { width: 1024, height: 860 },
+    kinds: ['player', 'journal', 'responsive'],
+    expectLayout: responsiveLayout('.journal-view-container', '.journal-view-grid'),
+    sourceMatches: [/^src\/ui\/svelte\/apps\/journal\//, /^src\/ui\/svelte\/stores\/journalStore/],
   }),
   playerCase({
     id: 'fabricate-journal',
@@ -5820,7 +5829,9 @@ export function isUiFile(filePath) {
  */
 export function hasUiChanges(files = []) {
   const normalized = files.map((file) => normalizePath(file));
-  if (normalized.some((file) => isUiFile(file))) return true;
+  if (normalized.some((file) => isUiFile(file) || file === LAYOUT_ASSERTION_PATH)) {
+    return true;
+  }
   return false;
 }
 
@@ -6411,8 +6422,15 @@ function touchedRegionKeys(patch, readSource, readRegions) {
  *     seeds `craftingSystems`, `recipes`, `gatheringEnvironments` and `gatheringConfig`, which is
  *     the definition set BOTH windows render, and it owns the five `lab-*` system ids that 51 cases
  *     name in `query.system`. It is the broadest input the lab has.
+ *
+ * `viewLabLayoutAssertion.js` also qualifies whole-file. Every path through the helper validates
+ * only cases carrying `expectLayout`, so that case-owned field derives its complete readership.
  */
 const ATTRIBUTED_LAB_INPUTS = Object.freeze([
+  Object.freeze({
+    path: LAYOUT_ASSERTION_PATH,
+    selects: (viewCase) => Boolean(viewCase.expectLayout),
+  }),
   Object.freeze({
     path: 'tests/view-lab/world/labRunStates.js',
     selects: (viewCase) => viewCase.app === PLAYER,

@@ -600,7 +600,7 @@ Salvage has its own separate mode enum and is not covered by that claim — see 
 A `window`-reach case does not carry its own written excuse.
 Near-identical case comments would rot, so the shortfalls are recorded once per **class** in the
 known-gaps register below, which is where a reviewer can actually find them.
-There are 138 `exact` cases, 4 `window`, and 39 `beyond`, out of 181 total.
+There are 138 `exact` cases, 3 `window`, and 78 `beyond`, out of 219 total.
 
 ## Fidelity gap
 
@@ -619,7 +619,6 @@ Where the two disagree about the same view, the smoke is right.
 | A confirm or prompt dialog is real; one import path still is not | `DialogV2.confirm` and `.prompt`, transcribed from the harvested `client/applications/api/dialog.mjs`, let a case leave the dialog open (`query: { dialog: 'open' }`), press its default button (`'enter'`, the lab default), or press a named button action. This is what moved the multistep-disable confirmation, the player crafting run/roll cases, and `manager-import-report` — which uploads a real export envelope and drives the import end to end — to `exact`. `input` and `query` are not wired. `manager-import-folder-mapping` remains out of reach: its modal opens only from a drag-and-drop carrying a folder or compendium-pack payload, and the runner has no `drop` verb. |
 | Operations needing real Foundry documents | `game.fabricate` is the REAL runtime facade (`labWorld.js` installs it after `initialize()`), so service calls through it do run — that is how the import case reaches its report. What is not drivable is anything needing document or compendium behaviour past what the shim models: `Item` supports creation and uuid resolution, not the full document API. Those END states are fixture-able; the operations are not. |
 | Legacy set-level essence requirements | `RecipeManager.initialize()` migrates a stored `ingredientSet.essences` map into a first-class essence group, so the pre-migration shape cannot be reached from settings-seeded data at all. The smoke escapes it only because it authors that recipe through `createRecipe` after init. |
-| The un-stacked narrow band at 1024px | `player-crafting-progressive-stacked` cannot reach its smoke counterpart's stacked three-column layout. The counterpart shrinks past production's own `.fabricate-app { min-width: 1024px }` floor, and the lab's geometry assertion will not let a capture violate its declared box. At 1024 the grid does not stack and its stage rows overflow. That is a real product finding the live smoke never renders at that width, published as evidence of the finding rather than claimed as the counterpart's own state. |
 | Chrome is one Foundry build | Frames carry the harvested version in their manifest; a reviewer on a newer Foundry may see small differences. |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
