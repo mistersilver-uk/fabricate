@@ -204,10 +204,11 @@ const requirementRailFrame = (id, label) => ({
 
 const WORLD_NAVIGATION_MATCHES = [
   /^src\/ui\/svelte\/apps\/manager\/CraftingSystemManagerRoot\.svelte$/,
+  /^src\/ui\/svelte\/apps\/manager\/EnvironmentsBrowserView\.svelte$/,
   /^src\/ui\/svelte\/apps\/manager\/Gathering(Parties|Realms|MapLinks)Tab\.svelte$/,
 ];
 
-// All twelve states are independently publishable. A multi-label recipe would collect only its
+// All live-smoke states are independently publishable. A multi-label recipe would collect only its
 // first filename-sorted candidate and silently discard the disclosure/child/width evidence.
 const worldNavigationFrame = (id, label) => ({
   id,
@@ -600,10 +601,6 @@ export const VIEW_RECIPES = Object.freeze([
     'Manager Travel — expanded neutral'
   ),
   worldNavigationFrame('manager-world-parties-normal', 'Manager World — Parties'),
-  worldNavigationFrame(
-    'manager-world-parties-no-selection',
-    'Manager World — Parties without a selected system'
-  ),
   worldNavigationFrame('manager-system-travel-card-off', 'Manager Travel — card off'),
   worldNavigationFrame(
     'manager-system-travel-with-gathering-expanded',
@@ -619,10 +616,6 @@ export const VIEW_RECIPES = Object.freeze([
   worldNavigationFrame(
     'manager-system-travel-map-collapsed-rail',
     'Manager Travel — Map collapsed rail'
-  ),
-  worldNavigationFrame(
-    'manager-system-travel-long-label-focus',
-    'Manager Travel — long label keyboard focus'
   ),
   {
     id: 'manager-recipes',

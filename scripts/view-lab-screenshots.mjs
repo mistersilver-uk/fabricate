@@ -699,6 +699,7 @@ async function commandApps() {
   await warmUpLabServer(browser, server.baseUrl);
   const rendered = [];
   const failures = [];
+  const distinctEvidence = new Map();
   try {
     for (const viewCase of cases) {
       try {
@@ -722,6 +723,20 @@ async function commandApps() {
           expectSelector: viewCase.expectSelector ?? null,
           expectLayout: viewCase.expectLayout ?? null,
         });
+        if (viewCase.distinctEvidenceGroup) {
+          const prior = distinctEvidence.get(viewCase.distinctEvidenceGroup) ?? [];
+          const duplicate = prior.find((entry) => entry.buffer.equals(buffer));
+          if (duplicate) {
+            throw new Error(
+              `evidence frame is byte-identical to ${duplicate.id} in distinct group ` +
+                `'${viewCase.distinctEvidenceGroup}'`
+            );
+          }
+          distinctEvidence.set(viewCase.distinctEvidenceGroup, [
+            ...prior,
+            { id: viewCase.id, buffer },
+          ]);
+        }
         writeFileSync(join(outputDir, `${viewCase.id}.png`), buffer);
         rendered.push({
           id: viewCase.id,

@@ -312,12 +312,11 @@ describe('UI PR screenshot evidence', () => {
     assert.ok(views[0].smokeLabels.includes('manager-environment-edit-placeholder'));
   });
 
-  it('pins World Parties and system Travel sources to the twelve navigation captures', () => {
+  it('pins World Parties and system Travel sources to the ten truthful smoke captures', () => {
     const worldLabels = [
       'manager-system-travel-default-collapsed',
       'manager-system-travel-expanded-neutral',
       'manager-world-parties-normal',
-      'manager-world-parties-no-selection',
       'manager-system-travel-card-off',
       'manager-system-travel-with-gathering-expanded',
       'manager-system-travel-realms-normal',
@@ -325,7 +324,6 @@ describe('UI PR screenshot evidence', () => {
       'manager-system-travel-map-normal',
       'manager-system-travel-map-stacked',
       'manager-system-travel-map-collapsed-rail',
-      'manager-system-travel-long-label-focus',
     ];
     for (const label of worldLabels) {
       assert.deepEqual(
@@ -337,6 +335,7 @@ describe('UI PR screenshot evidence', () => {
 
     for (const file of [
       'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte',
+      'src/ui/svelte/apps/manager/EnvironmentsBrowserView.svelte',
       'src/ui/svelte/apps/manager/GatheringPartiesTab.svelte',
       'src/ui/svelte/apps/manager/GatheringRealmsTab.svelte',
       'src/ui/svelte/apps/manager/GatheringMapLinksTab.svelte',
@@ -345,6 +344,17 @@ describe('UI PR screenshot evidence', () => {
       for (const label of worldLabels) {
         assert.ok(mappedIds.includes(label), `${file} must publish ${label}`);
       }
+    }
+
+    for (const viewLabOnly of [
+      'manager-world-parties-no-selection',
+      'manager-system-travel-long-label-focus',
+    ]) {
+      assert.equal(
+        VIEW_RECIPES.some((view) => view.id === viewLabOnly),
+        false,
+        `${viewLabOnly} must not claim a live-smoke counterpart`
+      );
     }
 
     assert.equal(
@@ -1300,7 +1310,7 @@ describe('UI PR screenshot evidence', () => {
   });
 
   it('keeps smoke screenshot collection available as an explicit fallback', () => {
-    const changedFiles = ['src/ui/svelte/apps/manager/EnvironmentsBrowserView.svelte'];
+    const changedFiles = ['src/ui/svelte/apps/manager/EnvironmentEditView.svelte'];
     withScreenshotFixtures(
       changedFileEvidenceFixtures(changedFiles),
       (root) => {
@@ -1329,7 +1339,7 @@ describe('UI PR screenshot evidence', () => {
   });
 
   it('requires exact-run provenance for an ordinary collected view', () => {
-    const changedFiles = ['src/ui/svelte/apps/manager/EnvironmentsBrowserView.svelte'];
+    const changedFiles = ['src/ui/svelte/apps/manager/EnvironmentEditView.svelte'];
     withScreenshotFixtures(changedFileEvidenceFixtures(changedFiles), (root) => {
       const result = collectScreenshotEvidence({
         changedFiles,
@@ -1365,7 +1375,7 @@ describe('UI PR screenshot evidence', () => {
   });
 
   it('runs the documented local producer/collect provenance path against the exact git head', () => {
-    const changedFiles = ['src/ui/svelte/apps/manager/EnvironmentsBrowserView.svelte'];
+    const changedFiles = ['src/ui/svelte/apps/manager/EnvironmentEditView.svelte'];
     const gitHead = spawnSync('git', ['rev-parse', '--verify', 'HEAD'], {
       cwd: process.cwd(),
       encoding: 'utf8',
@@ -1411,7 +1421,7 @@ describe('UI PR screenshot evidence', () => {
 
   it('validates ordinary and Tool Studio captures as one mixed exact run', () => {
     const changedFiles = [
-      'src/ui/svelte/apps/manager/EnvironmentsBrowserView.svelte',
+      'src/ui/svelte/apps/manager/EnvironmentEditView.svelte',
       'src/ui/svelte/apps/manager/ToolsBrowserView.svelte',
     ];
     const views = mapChangedFilesToViews(changedFiles);
@@ -1436,7 +1446,7 @@ describe('UI PR screenshot evidence', () => {
   });
 
   it('rejects failed, degraded, mismatched, stale, and wrong-target ordinary runs', () => {
-    const changedFiles = ['src/ui/svelte/apps/manager/EnvironmentsBrowserView.svelte'];
+    const changedFiles = ['src/ui/svelte/apps/manager/EnvironmentEditView.svelte'];
     const cases = [
       // The refusal names the condition that tripped and the value it measured (issue
       // #1019). It deliberately no longer contains the old "failed or degraded smoke
@@ -1491,7 +1501,7 @@ describe('UI PR screenshot evidence', () => {
   // builder that is never reached is a builder whose absence no test can detect: the
   // mutation that established the need for this block replaced the whole throw with
   // `new Error('MUTANT …')` and this suite still returned 83 pass / 0 fail.
-  const EVIDENCE_CHANGED_FILES = ['src/ui/svelte/apps/manager/EnvironmentsBrowserView.svelte'];
+  const EVIDENCE_CHANGED_FILES = ['src/ui/svelte/apps/manager/EnvironmentEditView.svelte'];
 
   // One shared driver over the existing `summaryPatch` extension point, which spreads last
   // and reaches both fixture factories. Table-driven rather than a dozen copied blocks:
@@ -1707,7 +1717,7 @@ describe('UI PR screenshot evidence', () => {
   });
 
   it('rejects an ordinary capture without binding or truthful PNG dimensions', () => {
-    const changedFiles = ['src/ui/svelte/apps/manager/EnvironmentsBrowserView.svelte'];
+    const changedFiles = ['src/ui/svelte/apps/manager/EnvironmentEditView.svelte'];
     const dimensionsMismatch = changedFileEvidenceFixtures(changedFiles);
     const image = Object.keys(dimensionsMismatch).find(name => name.endsWith('.png'));
     dimensionsMismatch[image] = minimalPng(799, 600);
@@ -1777,7 +1787,7 @@ describe('UI PR screenshot evidence', () => {
   it('accepts an unclipped capture that declares no geometry in the manifest', () => {
     // `screenshot()` records `options.clip?.width ?? null`, so a full-page frame — most
     // of the walk — declares null. Comparing real pixels against null was fatal.
-    const changedFiles = ['src/ui/svelte/apps/manager/EnvironmentsBrowserView.svelte'];
+    const changedFiles = ['src/ui/svelte/apps/manager/EnvironmentEditView.svelte'];
     // Null the DECLARED geometry only. Patching it through `capturePatch` would also
     // shrink the generated PNG, since the helper builds pixels from the same array —
     // that would test a zero-sized image, not an unclipped one.
@@ -1925,7 +1935,7 @@ describe('UI PR screenshot evidence', () => {
   });
 
   it('reports missing non-Tool screenshots and supports allowMissing', () => {
-    const changedFiles = ['src/ui/svelte/apps/manager/EnvironmentsBrowserView.svelte'];
+    const changedFiles = ['src/ui/svelte/apps/manager/EnvironmentEditView.svelte'];
     const fixtures = changedFileEvidenceFixtures(changedFiles);
     for (const file of Object.keys(fixtures).filter(name => name.endsWith('.png'))) delete fixtures[file];
     withScreenshotFixtures(fixtures, (root) => {

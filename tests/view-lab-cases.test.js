@@ -796,9 +796,31 @@ test('the no-selection World Parties case clears selection through the real Mana
   const mountSource = readFileSync(resolve(ROOT, 'tests/view-lab/mount.js'), 'utf8');
 
   assert.equal(noSelection.query?.clearSystem, '1');
+  assert.deepEqual(noSelection.smokeLabels, []);
   assert.match(mountSource, /clearSystem: params\.get\('clearSystem'\) === '1'/);
   assert.match(mountSource, /clearSystem: params\.clearSystem/);
   assert.match(mountSource, /if \(params\.clearSystem\) await props\.store\.selectSystem\(''\)/);
+});
+
+test('system Travel Map evidence is populated and long-label focus cannot duplicate stacked', () => {
+  const normal = getCaseById('manager-system-travel-map-normal');
+  const stacked = getCaseById('manager-system-travel-map-stacked');
+  const longLabel = getCaseById('manager-system-travel-long-label-focus');
+  const mountSource = readFileSync(resolve(ROOT, 'tests/view-lab/mount.js'), 'utf8');
+  const worldSource = readFileSync(resolve(ROOT, 'tests/view-lab/world/labWorld.js'), 'utf8');
+  const runnerSource = readFileSync(resolve(ROOT, 'scripts/view-lab-screenshots.mjs'), 'utf8');
+
+  for (const viewCase of [normal, stacked]) {
+    assert.match(viewCase.expectSelector, /Scene\.lab-map\.Region\.deep-gate/);
+    assert.match(viewCase.expectSelector, /Deep Gate Approach/);
+    assert.match(viewCase.expectSelector, /The Underdeep/);
+  }
+  assert.equal(longLabel.query?.longTravelLabels, '1');
+  assert.deepEqual(longLabel.smokeLabels, []);
+  assert.equal(longLabel.distinctEvidenceGroup, stacked.distinctEvidenceGroup);
+  assert.match(mountSource, /longTravelLabels: params\.get\('longTravelLabels'\) === '1'/);
+  assert.match(worldSource, /Map Region Links Across the Active Scene/);
+  assert.match(runnerSource, /evidence frame is byte-identical to/);
 });
 
 test('every crafting case claims exactly the resolution-mode body it renders', () => {

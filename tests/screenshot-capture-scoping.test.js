@@ -389,6 +389,24 @@ test('every capture-map label appears as a literal in the harness (no phantom ro
   }
 });
 
+test('World Parties and system Travel capture-map order mirrors the live Foundry walk', () => {
+  const start = HARNESS.indexOf('// World Parties plus system Travel (#1179)');
+  const end = HARNESS.indexOf('// Doc journey (quickstart Step 7', start);
+  assert.ok(start >= 0 && end > start, 'the #1179 Foundry capture block must remain bounded');
+  const harnessLabels = [
+    ...HARNESS.slice(start, end).matchAll(
+      /label: '(manager-(?:world-parties|system-travel)[^']+)'/g
+    ),
+  ].map((match) => match[1]);
+  const mappedLabels = SCREENSHOT_CAPTURE_ORDER.filter(
+    (label) => label.startsWith('manager-world-parties') || label.startsWith('manager-system-travel')
+  );
+
+  assert.deepEqual(mappedLabels, harnessLabels);
+  assert.ok(!harnessLabels.includes('manager-world-parties-no-selection'));
+  assert.ok(!harnessLabels.includes('manager-system-travel-long-label-focus'));
+});
+
 test('phase assignment matches the manager/player prefix split', () => {
   for (const label of SCREENSHOT_CAPTURE_ORDER) {
     const phase = phaseForCaptureLabel(label);

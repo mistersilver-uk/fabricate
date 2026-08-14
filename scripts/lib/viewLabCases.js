@@ -3267,8 +3267,10 @@ export const VIEW_LAB_CASES = Object.freeze([
   managerCase({
     id: 'manager-world-parties-no-selection',
     label: 'Manager — World Parties with no crafting system selected',
-    smokeLabels: ['manager-world-parties-no-selection'],
-    reaches: 'exact',
+    // The live smoke always has systems and normalizes an empty selection to the first one. This
+    // honest no-systems state is therefore View-Lab-only, not a Foundry smoke counterpart.
+    smokeLabels: [],
+    reaches: 'beyond',
     query: { clearSystem: '1' },
     steps: [{ selector: '#manager-world-nav-parties', press: 'Enter' }],
     expectView: 'world',
@@ -3366,7 +3368,10 @@ export const VIEW_LAB_CASES = Object.freeze([
       { selector: '#manager-travel-nav-map', press: 'Enter' },
     ],
     expectView: 'environments',
-    expectSelector: '.manager-travel-inspector[aria-label="Selected map region link"]',
+    expectSelector:
+      '.fabricate-manager:has([data-manager-map-region-uuid="Scene.lab-map.Region.deep-gate"]' +
+      ':has-text("Deep Gate Approach")):has(.manager-travel-inspector' +
+      '[aria-label="Selected map region link"]:has-text("The Underdeep"))',
     position: { width: 1330, height: 900 },
     kinds: ['manager', 'environments', 'world'],
     sourceMatches: [
@@ -3378,13 +3383,17 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Manager — system Travel Map Region Links stacked',
     smokeLabels: ['manager-system-travel-map-stacked'],
     reaches: 'exact',
+    distinctEvidenceGroup: 'manager-system-travel-map-label-focus',
     query: { system: 'lab-smithing' },
     steps: [
       { selector: '#manager-travel-toggle', press: 'Space' },
       { selector: '#manager-travel-nav-map', press: 'Enter' },
     ],
     expectView: 'environments',
-    expectSelector: '[data-travel-panel="map"]',
+    expectSelector:
+      '.fabricate-manager:has([data-manager-map-region-uuid="Scene.lab-map.Region.deep-gate"]' +
+      ':has-text("Deep Gate Approach")):has(.manager-travel-inspector' +
+      '[aria-label="Selected map region link"]:has-text("The Underdeep"))',
     position: { width: 1000, height: 720 },
     kinds: ['manager', 'environments', 'world', 'responsive'],
     sourceMatches: [
@@ -3413,9 +3422,12 @@ export const VIEW_LAB_CASES = Object.freeze([
   managerCase({
     id: 'manager-system-travel-long-label-focus',
     label: 'Manager — system Travel long child label keyboard focus',
-    smokeLabels: ['manager-system-travel-long-label-focus'],
-    reaches: 'exact',
-    query: { system: 'lab-smithing' },
+    // The live smoke uses shipped localization, so its ordinary focused Map row is not long-label
+    // evidence. The View Lab supplies the localized stress string and guards it against duplicates.
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { system: 'lab-smithing', longTravelLabels: '1' },
+    distinctEvidenceGroup: 'manager-system-travel-map-label-focus',
     steps: [
       { selector: '#manager-travel-toggle', press: 'Space' },
       { selector: '#manager-travel-nav-map', press: 'Space' },

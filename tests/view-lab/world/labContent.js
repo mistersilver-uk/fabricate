@@ -2365,8 +2365,14 @@ const SMITHING_REALMS = [
     craftingSystemId: LAB_SYSTEM_IDS.SMITHING,
     name: 'The Underdeep',
     description: 'Below the lowest worked gallery, where the old seams run.',
+    img: `${ICON_BASE}/environment/wilderness/cave-entrance-dwarven-hill.webp`,
     enabled: true,
-    sceneMappings: [],
+    sceneMappings: [
+      {
+        sceneUuid: 'Scene.lab-map',
+        sceneRegionUuid: 'Scene.lab-map.Region.deep-gate',
+      },
+    ],
   },
 ];
 

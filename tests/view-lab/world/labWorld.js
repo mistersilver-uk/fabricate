@@ -22,7 +22,7 @@
  */
 import { buildLabActors, buildDocumentIndex } from './labActors.js';
 import { buildLabBlindRunSecret, buildLabRunStates, installLabRunStates } from './labRunStates.js';
-import { buildLabContent, LAB_SYSTEM_IDS } from './labContent.js';
+import { buildLabContent, ICON_BASE, LAB_SYSTEM_IDS } from './labContent.js';
 import { installFoundryShim, settingsKey } from '../foundry/installFoundryShim.js';
 import { createLocalizer, toI18nStub } from '../labI18n.js';
 
@@ -97,6 +97,7 @@ export async function buildLabWorld({
   managedSystemId = null,
   experimentalFeatures = true,
   clearSystem = false,
+  longTravelLabels = false,
 } = {}) {
   const content = buildLabContent();
   // A real Manager refresh resolves an empty selection to the first available crafting system.
@@ -105,7 +106,11 @@ export async function buildLabWorld({
   if (clearSystem) content.systems = [];
   const actors = buildLabActors(content);
   const documents = buildDocumentIndex(content, actors);
-  const localize = await createLocalizer();
+  const shippedLocalize = await createLocalizer();
+  const localize = (key) =>
+    longTravelLabels && key === 'FABRICATE.Admin.Manager.Travel.Tabs.MapLinks'
+      ? 'Map Region Links Across the Active Scene'
+      : shippedLocalize(key);
 
   const world = {
     seed,
@@ -113,7 +118,24 @@ export async function buildLabWorld({
     settings: seedSettings(content, actors, managedSystemId, experimentalFeatures),
     documents,
     actorList: actors,
-    scenes: [{ id: 'lab-scene', uuid: 'Scene.lab-map', name: 'The Verdant Reach', regions: [] }],
+    scenes: [
+      {
+        id: 'lab-scene',
+        uuid: 'Scene.lab-map',
+        name: 'The Verdant Reach',
+        background: {
+          src: `${ICON_BASE}/environment/wilderness/cave-entrance-dwarven-hill.webp`,
+        },
+        regions: [
+          {
+            id: 'deep-gate',
+            uuid: 'Scene.lab-map.Region.deep-gate',
+            name: 'Deep Gate Approach',
+            color: '#8b6f47',
+          },
+        ],
+      },
+    ],
     worldTime: LAB_WORLD_TIME,
     i18n: toI18nStub(localize),
     localize,

@@ -8426,7 +8426,7 @@ async function main() {
         // instead of the empty setup-checklist state. Seeding must precede the
         // app .show() because entering the Travel tab does not itself re-read the
         // party store. Idempotent across reruns: clears any prior party first.
-        await page.evaluate(async ({ sysId, crafterId, travelMemberId }) => {
+        await page.evaluate(async ({ sysId, crafterId, travelMemberId, sceneId, regionId }) => {
           const realmStore = game.fabricate.getGatheringRealmStore?.();
           const partyStore = game.fabricate.getGatheringPartyStore?.();
           if (!realmStore || !partyStore) {
@@ -8452,6 +8452,20 @@ async function main() {
             .find(realm => realm.name === 'Northreach Vale');
           const realm = existingRealm
             || await realmStore.create(sysId, { name: 'Northreach Vale', enabled: true });
+          const scene = game.scenes.get(sceneId);
+          const sceneRegion = scene?.regions?.get(regionId);
+          if (!scene || !sceneRegion) {
+            throw new Error('Smoke Travel map Region fixture is unavailable.');
+          }
+          const otherMappings = (realm.sceneMappings || []).filter(
+            mapping => mapping?.sceneRegionUuid !== sceneRegion.uuid
+          );
+          await realmStore.update(sysId, realm.id, {
+            sceneMappings: [
+              ...otherMappings,
+              { sceneUuid: scene.uuid, sceneRegionUuid: sceneRegion.uuid }
+            ]
+          });
           const party = await partyStore.create({ name: 'The Vale Wardens' });
           await partyStore.addMember(party.id, crafter.uuid);
           if (travelMember) await partyStore.addMember(party.id, travelMember.uuid);
@@ -8491,8 +8505,11 @@ async function main() {
         }, {
           sysId: craftingSetup.systemId,
           crafterId: cleanup.crafterId,
-          travelMemberId: cleanup.travelMemberId
+          travelMemberId: cleanup.travelMemberId,
+          sceneId: craftingSetup.interactable.sceneId,
+          regionId: craftingSetup.interactable.regionId
         });
+        await activateSceneAndAwaitCanvasReady(page, craftingSetup.interactable.sceneId);
         await page.evaluate(async () => {
           globalThis.__fabricateSmokeManagerApp = (await game.fabricate.api.loadCraftingSystemManagerAppClass()).show();
         });
@@ -10207,6 +10224,13 @@ async function main() {
         await page.keyboard.press('Space');
         await page.locator('.fabricate-manager [data-travel-panel="map"]')
           .first().waitFor({ state: 'visible', timeout: 10_000 });
+        await page.locator(
+          '.fabricate-manager [data-manager-map-region-uuid]:has-text("Fabricate Forage Node")'
+        ).first().waitFor({ state: 'visible', timeout: 10_000 });
+        await page.locator(
+          '.fabricate-manager .manager-travel-inspector' +
+          '[aria-label="Selected map region link"]:has-text("Northreach Vale")'
+        ).first().waitFor({ state: 'visible', timeout: 10_000 });
         await captureStableManagerView(page, {
           layout: 'System Travel Map Region Links normal',
           label: 'manager-system-travel-map-normal'
@@ -10216,14 +10240,6 @@ async function main() {
           height: 720,
           layout: 'System Travel Map Region Links stacked',
           label: 'manager-system-travel-map-stacked',
-          settleMs: 250
-        });
-        await mapDestination.focus();
-        await captureStableManagerView(page, {
-          width: 1000,
-          height: 720,
-          layout: 'System Travel long label keyboard focus',
-          label: 'manager-system-travel-long-label-focus',
           settleMs: 250
         });
         await setManagerWindowSize(page, { width: 1280, height: 820 });
@@ -10250,18 +10266,6 @@ async function main() {
           await captureStableManagerView(page, {
             layout: 'System Travel card off',
             label: 'manager-system-travel-card-off'
-          });
-
-          await page.evaluate(async () => {
-            await globalThis.__fabricateSmokeManagerApp?._adminStore?.selectSystem?.('');
-          });
-          await page.locator('.fabricate-manager #manager-world-nav-parties').first().click();
-          await page.locator(
-            '.fabricate-manager [data-travel-panel="parties"] [data-party-realm-override-unavailable]'
-          ).first().waitFor({ state: 'visible', timeout: 5_000 });
-          await captureStableManagerView(page, {
-            layout: 'World Parties without a selected crafting system',
-            label: 'manager-world-parties-no-selection'
           });
         } finally {
           await page.evaluate(async (systemId) => {
