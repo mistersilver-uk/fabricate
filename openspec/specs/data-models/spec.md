@@ -88,10 +88,17 @@ CraftingSystem = {
     // Salvage reuses the crafting check sub-object shapes (so the GM Checks-tab
     // editors are shared); the active one is selected by salvageResolutionMode. The
     // simple/routed default DC is the sub-object's `dc`; a per-component override
-    // lives on Component.salvage.dcOverride. Salvage has no recipes, so the simple
-    // `tiers`/`dcMode`/`macroUuid` and the routed `tiers`/`dcMode`/`macroUuid` (the
-    // routed slot gained its own `dcMode`/`macroUuid` in issue 1096) are persisted but
-    // not authored, and no salvage runtime path reads them.
+    // lives on Component.salvage.dcOverride. Salvage has no recipes, so salvage DC
+    // RESOLUTION reads no `tiers`, `dcMode` or `macroUuid` on either slot (the routed
+    // slot gained its own `dcMode`/`macroUuid` in issue 1096): `_resolveSalvageDc` is
+    // arithmetic over the per-component override and the slot's own `dc`. That is a
+    // statement about DC resolution ALONE and not a licence to drop the fields:
+    // `simple.tiers` is the preset source for the per-component salvage DC control and
+    // `simple.dcMode` selects that control's system-default label, in EVERY resolution
+    // mode including routed — see the Dynamic DC Macro Contract. No salvage editor
+    // renders a tier table (the Checks tab mounts the simple editor with its DC-source
+    // half hidden and the routed editor with tiers hidden), so neither slot's `tiers`
+    // is authored there.
     simple: SimpleCheck,               // { rollFormula, dc, thresholdMode, dcMode, tiers, macroUuid, checkBreakage }
     routed: RoutedCheck,               // { type, rollFormula, dc, thresholdMode, dcMode, macroUuid, tiers, relativeOutcomes, fixedOutcomes, checkBreakage }
     progressive: {
@@ -2550,7 +2557,12 @@ Those are `craftingCheck.simple` — the shared pass/fail slot backing the `simp
 Both resolve their DC through `CraftingEngine._resolveSimpleCheckDc`, which is the sole caller of `CraftingEngine._resolveCheckAnchorDc` and the sole dynamic-DC caller of the shared macro executor.
 No other check reaches either symbol.
 The crafting `progressive` check has no DC at all, and salvage and gathering resolve theirs arithmetically through `CraftingEngine._resolveSalvageDc` and `GatheringEngine._resolveGatheringRoutedDc` — a per-record `dcOverride` when finite, else the slot's static `dc`, else a literal `15` — consulting no `checkTierId`, no `tiers`, and no macro.
-Salvage and gathering nonetheless persist `dcMode`, `macroUuid`, and `tiers`, because they reuse the `SimpleCheck` and `RoutedCheck` shapes so the Checks-tab editors can be shared; no runtime path reads those three fields outside the crafting check.
+Salvage and gathering nonetheless persist `dcMode`, `macroUuid`, and `tiers`, because they reuse the `SimpleCheck` and `RoutedCheck` shapes so the Checks-tab editors can be shared.
+No DC-resolution path outside the crafting check reads any of the three.
+They are not inert for that reason.
+Outside the shared Checks-tab editors, which round-trip whatever their slot holds, salvage's `simple.tiers` and `simple.dcMode` have one reader: the per-component salvage DC control (`src/ui/svelte/apps/manager/component/salvageDcPresets.js`) builds its preset options from `salvageCraftingCheck.simple.tiers` in EVERY salvage resolution mode, routed included — there is no `.routed.tiers` sibling for presets — and renders its system-default option without a DC number when `salvageCraftingCheck.simple.dcMode` is `dynamic`, because a macro-computed DC has no number to show.
+Dropping salvage's `simple.tiers` would therefore silently empty that preset list, and dropping its `simple.dcMode` would mislabel the default option, so arithmetic DC resolution licenses removing neither.
+`macroUuid` is the one of the three with no reader at all on salvage or gathering, and gathering has no manager-side reader of any of them.
 
 Before the configured macro runs, `_resolveCheckAnchorDc` computes an **anchor DC** for the crafting check slot being resolved.
 The anchor is the recipe's selected difficulty tier — `Recipe.checkTierId` matched against that slot's `tiers[].id` — when it names a tier that still exists, and the slot's static `dc` otherwise.
