@@ -36,6 +36,19 @@ import {
   VIEW_RECIPES,
   validateChangedFilesForCheck,
 } from '../scripts/ui-pr-screenshot-evidence.mjs';
+// The gate fakes are SHARED with tests/screenshot-evidence-matching.test.js rather than copied:
+// `sonar.cpd.exclusions` is inert under SonarCloud Automatic Analysis while `tests/**` duplication
+// counts against the new-code gate. `captureConsole` is the error-capturing variant the
+// `::error::<code>` assertions below need — the module-local `captureLog` sets
+// `console.error = () => {}` and would swallow exactly the line under test.
+import {
+  captureConsole,
+  makeGateClock,
+  makeGhFake,
+  managedScreenshotBlock,
+  runPreservingExitCode,
+  workflowRun,
+} from './helpers/screenshot-gate-fakes.js';
 
 // A `resolveDefaultBase`-shaped git runner: `rev-parse --verify --quiet <ref>` returns
 // status 0 only for a ref in `verifiable`, else status 1. Shared so the fallback-order
@@ -2382,6 +2395,186 @@ describe('UI PR screenshot evidence', () => {
       assert.equal(calls.filter(args => args[0] === 'pr').length, 0);
     } finally {
       rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  // ── The `check` command's flag wiring (issue 1133) ─────────────────────────────────────────
+  //
+  // The gate's own decision logic lives in `scripts/lib/screenshotEvidenceMatching.js` and is
+  // driven end to end by `tests/screenshot-evidence-matching.test.js`. What is pinned HERE is the
+  // adapter's flag surface, and above all its UNCHANGED DEFAULT: `npm run screenshots:ui:check`
+  // passes no `--await-capture`, so it must behave exactly as it did before this change — no
+  // polling, no API call, and the same message.
+
+  const CHECK_UI_FILES = ['src/ui/svelte/apps/manager/ToolsBrowserView.svelte'];
+
+  function writeCheckInputs({ body = '', labels = [], changedFiles = CHECK_UI_FILES } = {}) {
+    const root = mkdtempSync(join(tmpdir(), 'fabricate-ui-check-'));
+    const paths = {
+      root,
+      changedFiles: join(root, 'changed-files.txt'),
+      body: join(root, 'pr-body.md'),
+      labels: join(root, 'labels.txt'),
+    };
+    writeFileSync(paths.changedFiles, changedFiles.join('\n'));
+    writeFileSync(paths.body, body);
+    writeFileSync(paths.labels, labels.join('\n'));
+    return paths;
+  }
+
+  function checkArgs(paths, extra = []) {
+    return [
+      'check',
+      '--changed-files', paths.changedFiles,
+      '--body-file', paths.body,
+      '--labels', paths.labels,
+      '--exempt-label', 'screenshots-exempt',
+      '--pr', '1133',
+      ...extra,
+    ];
+  }
+
+  it('check without --await-capture keeps today behaviour exactly on the failing path', async () => {
+    const paths = writeCheckInputs({ body: 'No evidence here.' });
+    const gh = makeGhFake({});
+    const clock = makeGateClock({});
+    try {
+      let exitCode;
+      const captured = await captureConsole(async () => {
+        exitCode = await runPreservingExitCode(() => main(
+          checkArgs(paths),
+          { runGh: gh.runGh, sleep: clock.sleep, now: clock.now },
+        ));
+      });
+
+      assert.equal(exitCode, 1);
+      assert.equal(captured.error.length, 1);
+      // Today's prose verbatim. The one difference from before this change is the `no-screenshots-
+      // section:` diagnostic prefix, which is the honest code for this condition — no producer was
+      // expected for this head, so the evidence really is owed by the author.
+      assert.match(
+        captured.error[0],
+        /^::error::no-screenshots-section: This PR changes UI files/,
+      );
+      assert.match(captured.error[0], /Add a "## Screenshots" heading to the PR body/);
+      assert.equal(gh.calls.length, 0, 'the default path must make no API call at all');
+      assert.equal(clock.sleepCalls, 0);
+    } finally {
+      rmSync(paths.root, { recursive: true, force: true });
+    }
+  });
+
+  it('check without --await-capture keeps today behaviour exactly on the passing path', async () => {
+    const paths = writeCheckInputs({
+      body: '## Screenshots\n\n![a shot](https://github.test/attachments/1)\n',
+    });
+    const gh = makeGhFake({});
+    const clock = makeGateClock({});
+    try {
+      let exitCode;
+      const captured = await captureConsole(async () => {
+        exitCode = await runPreservingExitCode(() => main(
+          checkArgs(paths),
+          { runGh: gh.runGh, sleep: clock.sleep, now: clock.now },
+        ));
+      });
+
+      assert.equal(exitCode, 0);
+      assert.equal(captured.error.length, 0);
+      assert.equal(gh.calls.length, 0);
+    } finally {
+      rmSync(paths.root, { recursive: true, force: true });
+    }
+  });
+
+  it('check honours the exempt label without --await-capture, exactly as before', async () => {
+    const paths = writeCheckInputs({ labels: ['screenshots-exempt'] });
+    const gh = makeGhFake({});
+    const clock = makeGateClock({});
+    try {
+      let exitCode;
+      const captured = await captureConsole(async () => {
+        exitCode = await runPreservingExitCode(() => main(
+          checkArgs(paths),
+          { runGh: gh.runGh, sleep: clock.sleep, now: clock.now },
+        ));
+      });
+
+      assert.equal(exitCode, 0);
+      assert.ok(captured.log.some(line => /screenshots-exempt/.test(line)));
+      assert.equal(gh.calls.length, 0);
+    } finally {
+      rmSync(paths.root, { recursive: true, force: true });
+    }
+  });
+
+  it('--await-capture turns the same inputs into an awaited, matched decision', async () => {
+    // The same PR that fails above passes here, because the producer's run concludes and the body
+    // it republished carries this head's frames. This is the flag's whole point, and it is what
+    // makes the two default-path cases above a real control rather than an assertion about nothing.
+    const headSha = 'f'.repeat(40);
+    const paths = writeCheckInputs({ body: 'No evidence yet.' });
+    const published = managedScreenshotBlock({
+      prNumber: 1133,
+      caseIds: ['manager-tool-parity-01-library-1280x720'],
+      headSha,
+    });
+    const gh = makeGhFake({
+      runs: state => [workflowRun({ status: state.runListCalls === 0 ? 'in_progress' : 'completed' })],
+      body: state => (state.runListCalls >= 2 ? published : ''),
+    });
+    const clock = makeGateClock({ start: 0, step: 1000 });
+    try {
+      let exitCode;
+      await captureConsole(async () => {
+        exitCode = await runPreservingExitCode(() => main(
+          checkArgs(paths, [
+            '--repo', 'misterpotts/fabricate',
+            '--head-sha', headSha,
+            '--await-capture',
+            '--capture-eligible', 'true',
+            '--capture-workflow', 'pr-screenshots.yml',
+            '--capture-timeout-minutes', '40',
+          ]),
+          { runGh: gh.runGh, sleep: clock.sleep, now: clock.now },
+        ));
+      });
+
+      assert.equal(exitCode, 0);
+      assert.ok(gh.calls.some(args => args[0] === 'api'), '--await-capture must reach the module');
+      assert.equal(clock.sleepCalls, 1);
+    } finally {
+      rmSync(paths.root, { recursive: true, force: true });
+    }
+  });
+
+  it('rejects a --capture-eligible value that is neither the literal true nor false', async () => {
+    const paths = writeCheckInputs({});
+    try {
+      await assert.rejects(
+        () => captureConsole(() => main(
+          checkArgs(paths, ['--await-capture', '--capture-eligible', 'yes']),
+          { runGh: makeGhFake({}).runGh },
+        )),
+        /--capture-eligible must be the literal/,
+      );
+    } finally {
+      rmSync(paths.root, { recursive: true, force: true });
+    }
+  });
+
+  it('rejects a --capture-timeout-minutes that is not a positive number', async () => {
+    const paths = writeCheckInputs({});
+    try {
+      await assert.rejects(
+        () => captureConsole(() => main(
+          checkArgs(paths, ['--capture-timeout-minutes', 'soon']),
+          { runGh: makeGhFake({}).runGh },
+        )),
+        /--capture-timeout-minutes must be a positive number/,
+      );
+    } finally {
+      rmSync(paths.root, { recursive: true, force: true });
     }
   });
 });
