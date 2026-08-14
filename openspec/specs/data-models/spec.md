@@ -89,9 +89,11 @@ CraftingSystem = {
     // editors are shared); the active one is selected by salvageResolutionMode. The
     // simple/routed default DC is the sub-object's `dc`; a per-component override
     // lives on Component.salvage.dcOverride. Salvage has no recipes, so the simple
-    // `tiers`/`dcMode`/`macroUuid` and routed `tiers` are persisted but not authored.
+    // `tiers`/`dcMode`/`macroUuid` and the routed `tiers`/`dcMode`/`macroUuid` (the
+    // routed slot gained its own `dcMode`/`macroUuid` in issue 1096) are persisted but
+    // not authored, and no salvage runtime path reads them.
     simple: SimpleCheck,               // { rollFormula, dc, thresholdMode, dcMode, tiers, macroUuid, checkBreakage }
-    routed: RoutedCheck,               // { type, rollFormula, dc, thresholdMode, tiers, relativeOutcomes, fixedOutcomes, checkBreakage }
+    routed: RoutedCheck,               // { type, rollFormula, dc, thresholdMode, dcMode, macroUuid, tiers, relativeOutcomes, fixedOutcomes, checkBreakage }
     progressive: {
       awardMode: "partial" | "equal" | "exceed",
       rollFormula: string,             // default ""; total drives progressive awarding
@@ -276,6 +278,8 @@ CraftingSystem = {
   //   RoutedCheck = {
   //     type: "relative" | "fixed",                // default "relative"
   //     rollFormula: string, dc: number, thresholdMode: "meet" | "exceed",
+  //     dcMode: "static" | "dynamic",              // default "static" (crafting only)
+  //     macroUuid: string | null,                  // dynamic-DC macro (crafting only)
   //     tiers: { id, name, dc }[],                 // recipe-DC overrides (crafting only)
   //     relativeOutcomes: { id, name, success, breakTools, dc }[],
   //     fixedOutcomes: { id, name, success, breakTools, start, end }[],
