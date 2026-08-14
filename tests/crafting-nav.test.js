@@ -325,7 +325,10 @@ test('the manager root reads one craftingNavArgs for both the rail and the route
     rootSource,
     /import \{[\s\S]*?isCraftingViewAvailable[\s\S]*?\} from '\.\/crafting\/craftingNav\.js'/
   );
-  assert.match(rootSource, /const craftingVisibilityMode = \$derived\(\s*selectedSystem\?\./);
+  assert.match(
+    rootSource,
+    /const craftingVisibilityMode = \$derived\(selectedSystem\?\.visibilityMode \|\| 'knowledge'\)/
+  );
   assert.match(
     rootSource,
     /const craftingNavArgs = \$derived\(\{\s*visibilityMode: craftingVisibilityMode,\s*resolutionMode: craftingResolutionMode,/
