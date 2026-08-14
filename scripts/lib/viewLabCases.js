@@ -37,6 +37,9 @@ const LAB_INFRASTRUCTURE_PATTERN =
 /** This registry's own path, as a diff names it. */
 const REGISTRY_PATH = 'scripts/lib/viewLabCases.js';
 
+/** The helper that enforces the opt-in responsive layout contract. */
+const LAYOUT_ASSERTION_PATH = 'scripts/lib/viewLabLayoutAssertion.js';
+
 /** The lab's actor fixture, as a diff names it. Attributed by fixture table — see below. */
 const LAB_ACTORS_PATH = 'tests/view-lab/world/labActors.js';
 
@@ -5826,7 +5829,7 @@ export function isUiFile(filePath) {
  */
 export function hasUiChanges(files = []) {
   const normalized = files.map((file) => normalizePath(file));
-  if (normalized.some((file) => isUiFile(file) || LAB_INFRASTRUCTURE_PATTERN.test(file))) {
+  if (normalized.some((file) => isUiFile(file) || file === LAYOUT_ASSERTION_PATH)) {
     return true;
   }
   return false;
@@ -6425,7 +6428,7 @@ function touchedRegionKeys(patch, readSource, readRegions) {
  */
 const ATTRIBUTED_LAB_INPUTS = Object.freeze([
   Object.freeze({
-    path: 'scripts/lib/viewLabLayoutAssertion.js',
+    path: LAYOUT_ASSERTION_PATH,
     selects: (viewCase) => Boolean(viewCase.expectLayout),
   }),
   Object.freeze({

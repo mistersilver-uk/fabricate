@@ -121,6 +121,7 @@ const GATE_TARGETS = [
   'scripts/lib/foundryChromeCache.js',
   'scripts/lib/foundryChromeSpec.js',
   'scripts/lib/viewLabCases.js',
+  'scripts/lib/viewLabLayoutAssertion.js',
   'scripts/view-lab-chrome.mjs',
   'scripts/view-lab-screenshots.mjs',
   'scripts/lib/viewLabIndex.js',
