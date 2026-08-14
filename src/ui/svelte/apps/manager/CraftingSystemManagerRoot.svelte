@@ -2383,6 +2383,37 @@
       }))
   );
   const travelParties = $derived($viewState.travelParties || []);
+
+  // World > Parties page-header subtitle (issue 1182). `enabled` counts `enabled === true`
+  // and NOT the prototype's `enabled && members.length`: an enabled party always has a
+  // travel actor (gathering-and-harvesting req 4) and resolves that actor's current realm
+  // with or without members (req 6), so a member-less enabled party is in use.
+  //
+  // `assigned` / `total` are PLAYER CHARACTERS only, each counted once across all parties.
+  // Travel actors are deliberately outside the numerator — their candidate set is every
+  // world actor, so a vehicle standing in as one would otherwise be counted against a
+  // player-character denominator and render "5 of 4 characters assigned". Stale member
+  // uuids resolve to no projected actor and drop out for the same reason.
+  const playerCharacterUuids = $derived(
+    new Set(
+      ($viewState.actorOptions || [])
+        .filter((actor) => actor.isPlayerCharacter === true)
+        .map((actor) => actor.uuid)
+    )
+  );
+  const assignedCharacterCount = $derived.by(() => {
+    const assigned = [];
+    for (const party of travelParties) {
+      for (const uuid of party.memberActorUuids || []) {
+        if (playerCharacterUuids.has(uuid) && !assigned.includes(uuid)) assigned.push(uuid);
+      }
+    }
+    return assigned.length;
+  });
+  const enabledPartyCount = $derived(
+    travelParties.filter((party) => party.enabled === true).length
+  );
+
   const selectedTravelPartyId = $derived($viewState.selectedPartyId || '');
   const selectedTravelParty = $derived(
     travelParties.find((party) => party.id === selectedTravelPartyId) || null
@@ -3042,11 +3073,28 @@
         'FABRICATE.Admin.Manager.Environment.GatheringTabs.TasksHint',
         'Browse gathering tasks before attaching them to environments.'
       );
-    if (currentView === 'world')
-      return text(
-        'FABRICATE.Admin.Manager.World.PartiesSubtitle',
-        'Manage Fabricate parties shared across every crafting system.'
-      );
+    if (currentView === 'world') {
+      if (travelParties.length === 0)
+        return text(
+          'FABRICATE.Admin.Manager.World.Parties.SubtitleEmpty',
+          'No parties yet · world-level, shared by gathering and travel in every system'
+        );
+      const template =
+        travelParties.length === 1
+          ? text(
+              'FABRICATE.Admin.Manager.World.Parties.SubtitleOne',
+              '1 party · {enabled} enabled · {assigned} of {total} characters assigned'
+            )
+          : text(
+              'FABRICATE.Admin.Manager.World.Parties.Subtitle',
+              '{count} parties · {enabled} enabled · {assigned} of {total} characters assigned'
+            );
+      return template
+        .replace('{count}', String(travelParties.length))
+        .replace('{enabled}', String(enabledPartyCount))
+        .replace('{assigned}', String(assignedCharacterCount))
+        .replace('{total}', String(playerCharacterUuids.size));
+    }
     if (currentView === 'environments' && displayedGatheringTab === 'travel') {
       if (activeTravelTab === 'map')
         return text(
@@ -7313,7 +7361,7 @@
               disabled={$viewState.travelSaving}
             >
               <i class="fas fa-plus" aria-hidden="true"></i>
-              <span>{text('FABRICATE.Admin.Manager.Travel.CreateParty', 'Create party')}</span>
+              <span>{text('FABRICATE.Admin.Manager.World.Parties.CreateAction', 'New party')}</span>
             </button>
           {:else if currentView === 'environments' && displayedGatheringTab === 'travel' && activeTravelTab === 'realms'}
             <button
@@ -10673,54 +10721,10 @@
                     {/if}
                   </section>
 
-                  <div class="manager-travel-inspector-actions">
-                    {#if selectedTravelParty.enabled}
-                      <button
-                        type="button"
-                        class="manager-button manager-party-enable-toggle is-on"
-                        disabled={$viewState.travelSaving === true}
-                        onclick={() => store.setPartyEnabled?.(selectedTravelParty.id, false)}
-                      >
-                        <i class="fas fa-toggle-on" aria-hidden="true"></i>
-                        <span
-                          >{text('FABRICATE.Admin.Manager.Travel.Parties.Disable', 'Disable')}</span
-                        >
-                      </button>
-                    {:else}
-                      <button
-                        type="button"
-                        class="manager-button manager-party-enable-toggle is-off"
-                        disabled={$viewState.travelSaving === true ||
-                          !selectedTravelParty.travelActorUuid}
-                        title={selectedTravelParty.travelActorUuid
-                          ? undefined
-                          : text(
-                              'FABRICATE.Admin.Manager.Travel.Parties.EnableNeedsTravelActor',
-                              'Assign a travel actor to enable this party.'
-                            )}
-                        onclick={() => store.setPartyEnabled?.(selectedTravelParty.id, true)}
-                      >
-                        <i class="fas fa-toggle-off" aria-hidden="true"></i>
-                        <span
-                          >{text('FABRICATE.Admin.Manager.Travel.Parties.Enable', 'Enable')}</span
-                        >
-                      </button>
-                    {/if}
-                    <button
-                      type="button"
-                      class="manager-button is-danger"
-                      disabled={$viewState.travelSaving === true}
-                      onclick={() => store.deleteParty?.(selectedTravelParty.id)}
-                    >
-                      <i class="fas fa-trash" aria-hidden="true"></i>
-                      <span
-                        >{text(
-                          'FABRICATE.Admin.Manager.Travel.Parties.Delete',
-                          'Delete party'
-                        )}</span
-                      >
-                    </button>
-                  </div>
+                  <!-- No Enable / Delete here (issue 1182). `ui-integration/spec.md:1603`
+                       declares this inspector a READ-ONLY evidence echo and pins every
+                       editing control to the centre column, where each card now carries
+                       its own gated enable pill and its own delete. -->
                 {:else}
                   <p class="manager-muted">
                     {text(

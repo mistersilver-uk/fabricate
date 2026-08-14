@@ -67,10 +67,13 @@
     onDeleteGatheringVocabularyValue = () => {},
     gatheringRealmSettings = { enabled: false },
     onSetGatheringRealmsEnabled = () => {},
-    // The suppressed props below (the image-picker wire plus Travel CRUD callbacks) have no
-    // reader in the retained World content. Party rename is the exception and carries no
-    // suppression: `onRenameParty` is forwarded to the live Parties region below. Deleting
-    // these destructures would leave
+    // The suppressed props below (the image-picker wire plus the remaining Travel CRUD
+    // callbacks) have no reader in the retained World content. The PARTY callbacks are no
+    // longer among them: issue 1182 rebuilt World > Parties as a card list that renders
+    // create, enable and delete per card, so `onCreateParty`, `onSetPartyEnabled`,
+    // `onDeleteParty`, `travelError` and `travelFieldErrors` are all forwarded to the live
+    // Parties region below and carry no suppression. Deleting the remaining
+    // destructures would leave
     // the parent attributes wired to nothing and erase the evidence — Svelte silently ignores
     // a prop the child does not destructure, so no test would fail. They are kept and
     // suppressed until their corresponding controls reconnect the surface.
@@ -79,9 +82,7 @@
     travelParties = [],
     travelSelectedPartyId = '',
     travelSaving = false,
-    // eslint-disable-next-line no-unused-vars
     travelError = null,
-    // eslint-disable-next-line no-unused-vars
     travelFieldErrors = {},
     travelActorOptions = [],
     travelSystemRealms = [],
@@ -92,12 +93,9 @@
     onAddEnvironmentToRealm = () => {},
     onRemoveEnvironmentFromRealm = () => {},
     onSelectParty = () => {},
-    // eslint-disable-next-line no-unused-vars -- retained unwired Travel CRUD; see note above
     onCreateParty = () => {},
     onRenameParty = () => {},
-    // eslint-disable-next-line no-unused-vars -- retained unwired Travel CRUD; see note above
     onSetPartyEnabled = () => {},
-    // eslint-disable-next-line no-unused-vars -- retained unwired Travel CRUD; see note above
     onDeleteParty = () => {},
     onAddPartyMember = () => {},
     onRemovePartyMember = () => {},
@@ -1192,7 +1190,11 @@
       />
     </div>
   {:else if activeGatheringTab === 'travel'}
-    <div class="manager-gathering-panel manager-travel-view" data-manager-travel-view>
+    <div
+      class="manager-gathering-panel manager-travel-view"
+      class:is-parties-pane={activeTravelTab === 'parties'}
+      data-manager-travel-view
+    >
       {#if activeTravelTab === 'parties'}
         <GatheringPartiesTab
           parties={travelParties}
@@ -1201,12 +1203,17 @@
           selectedPartyId={travelSelectedPartyId}
           actorOptions={travelActorOptions}
           saving={travelSaving}
+          {travelError}
+          {travelFieldErrors}
           realmOverridesAvailable={partyRealmOverridesAvailable}
           realmOverridesUnavailableHint={partyRealmOverridesUnavailableHint}
           {onSelectParty}
+          {onCreateParty}
           onSetRealmOverride={onSetPartyRealmOverride}
           onClearRealmOverride={onClearPartyRealmOverride}
           {onRenameParty}
+          {onSetPartyEnabled}
+          {onDeleteParty}
           onAddMember={onAddPartyMember}
           onRemoveMember={onRemovePartyMember}
           onMoveMember={onMovePartyMember}
