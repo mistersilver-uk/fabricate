@@ -325,6 +325,28 @@ Richer client-side auto-fill for multi-set / alternatives / tags / essences is a
 - May show result descriptions.
 - Non-revealed recipes must not appear for non-GM users; only their count is surfaced (`undiscoveredCount = valid − revealed`), and no non-revealed name/signature/result reaches any client field.
 
+## Summary Projection Disclosure
+
+The canonical recipe summary defined in `data-models/spec.md` § Summary Projections is a PLAYER-facing payload whenever it is built for a player audience.
+Its redaction obeys the same teaser rule the detail model obeys, and the two MUST agree: a recipe that is a teaser in the list and not in the inspector, or the reverse, is a disclosure either way round.
+
+The following are normative.
+
+- **The redaction test is the same test.**
+A summary is redacted when the viewer is not a GM AND the recipe's access reason is `teaser`, and the hidden-field list is the recipe's authored `teaserState.hiddenFields`, falling back to the documented default of ingredients, results and description.
+- **An omitted audience defaults to the REDACTING one.**
+Failing safe matters more than caller convenience: a default of GM would ship an unredacted teaser to whichever caller forgot the argument.
+- **A redacted summary carries no availability, and MUST NOT compute one.**
+Material availability is derived from the recipe's INGREDIENTS, which the default teaser configuration hides, so an availability answer on an undiscovered recipe discloses the shape of a requirement the player is not meant to see yet — refreshable once per inventory change, across a whole corpus.
+The guard belongs at the derivation, not at the write-out: blanking a computed value is equivalent for today's shape and wrong the first time a field is added beside it.
+- **Identity and grouping metadata are NOT redacted.**
+A teaser is shown to the player deliberately, so its name, image, category and tags are the part they are meant to see.
+This matches the shipped listing model, which records the same decision for `category`.
+- **Authoring state does not cross.**
+A player-audience summary carries no GM-only field, which today means the recipe's lock state.
+
+Tests MUST cover the redacted player summary directly — that it withholds availability, that the snapshot is never consulted to build it, that it reports the discovery browse status, and that the same recipe is unredacted for a GM.
+
 ## Knowledge Access Evaluation
 
 Input:

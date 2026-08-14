@@ -24,6 +24,7 @@ import { progressiveStageThresholds } from '../utils/progressiveStageThresholds.
 import { normalizeRecipeCategory, getRecipeCategoryLabel } from '../utils/recipeCategories.js';
 
 import { buildCheckModifierContext } from './checkModifierResolver.js';
+import { CRAFTING_BROWSE_STATUS, deriveBrowseStatus } from './craftingBrowseStatus.js';
 import { activeRunStepState, buildStepRecipeView } from './stepRecipeView.js';
 
 /**
@@ -42,18 +43,16 @@ const RESOLUTION_MODE_LABEL_KEYS = {
 };
 
 /**
- * The browse-status vocabulary the player Crafting list keys its callout on.
- * `incomplete` is intentionally absent — a recipe is either visible (and thus
- * projected) or filtered out upstream by the visibility service.
+ * The browse-status vocabulary the player Crafting list keys its callout on, re-exported
+ * from the import-free leaf that now owns it (issue 1091).
+ *
+ * It moved because #1091's summary projection needs the SAME vocabulary and the same
+ * precedence rule, and could not take them from here without dragging this whole builder
+ * into every consumer's graph — which is exactly why `craftingStore.svelte.js` already
+ * kept a private copy. One vocabulary, one owner, and this re-export so nothing that
+ * imported it from the builder has to move.
  */
-export const CRAFTING_BROWSE_STATUS = Object.freeze({
-  AVAILABLE: 'available',
-  LOCKED: 'locked',
-  UNKNOWN: 'unknown',
-  EXHAUSTED: 'exhausted',
-  MISSING_MATERIALS: 'missingMaterials',
-  DISCOVERY: 'discovery',
-});
+export { CRAFTING_BROWSE_STATUS } from './craftingBrowseStatus.js';
 
 /**
  * Localization keys for a recipe's primary blocking reason, keyed by browse
@@ -620,15 +619,20 @@ export class CraftingListingBuilder {
    *   otherwise available.
    * Teaser is handled before this is reached (redacted recipes short-circuit), so
    * the `reason === 'teaser'` branch is a defensive fallback.
+   *
+   * Delegates to the shared rule (issue 1091) so this detail model and the summary
+   * projection the page rows are built from cannot label the same recipe differently.
+   * The rule reads `materialsAvailable` as a TRISTATE — `null` means no material check
+   * ran — and this builder always ran one, so it passes a boolean and behaves exactly
+   * as the inlined version did.
    * @private
    */
   _deriveBrowseStatus({ reason, canCraftMaterials, exhausted }) {
-    if (reason === 'teaser') return CRAFTING_BROWSE_STATUS.DISCOVERY;
-    if (reason === 'locked') return CRAFTING_BROWSE_STATUS.LOCKED;
-    if (reason === 'knowledge') return CRAFTING_BROWSE_STATUS.UNKNOWN;
-    if (exhausted) return CRAFTING_BROWSE_STATUS.EXHAUSTED;
-    if (!canCraftMaterials) return CRAFTING_BROWSE_STATUS.MISSING_MATERIALS;
-    return CRAFTING_BROWSE_STATUS.AVAILABLE;
+    return deriveBrowseStatus({
+      reason,
+      materialsAvailable: canCraftMaterials === true,
+      exhausted: exhausted === true,
+    });
   }
 
   _blockingReasons(browseStatus) {
