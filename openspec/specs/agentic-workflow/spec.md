@@ -609,10 +609,12 @@ The evidence gate MUST NOT decide before the automated producer for that same he
 #### Scenario: naming which evidence problem a failure is
 
 - **WHEN** the gate fails a pull request that changes render files
-- **THEN** the failure names which of these it is: no screenshot section where none was ever going to be produced automatically, a producer that was expected and never appeared, a producer that failed, a producer that concluded while publishing nothing, frames published for a different head, frames that depict none of the views this change selects, or a producer that did not conclude
+- **THEN** the failure names which of these it is: no screenshot section where none was ever going to be produced automatically, a producer that was expected and never appeared, a producer that failed, a producer that concluded while publishing nothing, frames published for a different head, frames that depict none of the views this change selects, a producer that did not conclude, or the gate itself being unable to read the pull request's body when it goes to check what the producer published
 - **AND** a producer that was expected for this head and has not appeared is never reported as evidence the author failed to supply, because that is the same red this requirement exists to remove
 - **AND** a producer that concludes successfully while publishing nothing — because the infrastructure it depends on was unavailable, which it treats as outside the pull request's control — is reported as that, and never as a fault in the change
 - **AND** a producer that fails is reported as a failure of that run, distinctly from an infrastructure gap, because the two point the reader at different things to fix
+- **AND** the gate being unable to read the pull request's body is reported as that, and never as the producer having published nothing, because an unread body carries no evidence of what the producer did and conflating the two sends the reader to debug the wrong system
+- **AND** a body the gate cannot read fails the gate rather than passing it, because a check that passes when it cannot read its own evidence can be satisfied by breaking that read
 - **AND** automatically published frames are identified by the case they depict and the head they were drawn for, carried in their published location rather than in their caption
 - **AND** evidence supplied by a person, which carries no such identity, satisfies the gate without that identification, so the maintainer-supplied path is unchanged
 - **AND** identification requires the automatically published frames to overlap the selected views rather than to equal them, because a run that renders only some of its selection has still produced evidence
