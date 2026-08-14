@@ -1,9 +1,9 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  Manager — Travel tab "Map Region Links" section (central column). A selectable
+  Manager — selected-system Travel > Map Region Links section (central column). A selectable
   list of every Foundry Scene Region on the currently active scene: each row
   shows the scene region's colour swatch + name (the selectable header) plus a
-  searchable picker to link it to a Fabricate region. Selecting a row surfaces
+  searchable picker to link it to a Fabricate Gathering Realm. Selecting a row surfaces
   its detail (parties present) in the right inspector; the parent auto-selects
   the first region. Empty states cover "no active scene" and "scene has no
   regions".

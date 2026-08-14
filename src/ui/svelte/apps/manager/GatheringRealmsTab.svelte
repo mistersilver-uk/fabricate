@@ -1,6 +1,6 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  Manager — Travel tab "Realms" section. Paginated, searchable accordion list
+  Manager — selected-system Travel > Realms section. Paginated, searchable accordion list
   of the selected system's gathering realms, mirroring the Parties tab. Each
   row header shows a fixed realm icon, the realm name, and chips for the
   number of environments that include the realm and the number of parties

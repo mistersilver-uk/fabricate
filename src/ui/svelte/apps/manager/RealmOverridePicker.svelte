@@ -1,6 +1,6 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  Searchable realm-override picker for a party row on the Travel > Parties tab.
+  Searchable realm-override picker for a party row on World > Parties.
   Thin wrapper over the generic SearchablePopover: builds the option list
   (leading "Auto" option to clear the override, then the system realms with a
   "(disabled)" trailing chip) and maps the chosen id back to the override value

@@ -1,6 +1,6 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  Manager — Travel tab "Parties" section. Paginated, searchable accordion list
+  Manager — World > Parties section. Paginated, searchable accordion list
   of Fabricate parties styled after the gathering tools browser.
 
   - Selecting (clicking / Enter / Space) a row expands it AND marks it the

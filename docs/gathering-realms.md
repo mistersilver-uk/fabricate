@@ -7,13 +7,13 @@ nav_order: 8.3
 # Gathering Realms & Travel
 
 Location-aware gathering lets a GM describe campaign geography as first-class **realms**, group actors into Fabricate-managed **parties**, and make gathering environments available or unavailable based on where the party currently is.
-This page covers realms, parties, the GM **World** navigation, manual current-realm overrides, actor-scoped realm discovery, and location-gated environment availability.
+This page covers World Parties, selected-system Travel navigation, realms, manual current-realm overrides, actor-scoped realm discovery, and location-gated environment availability.
 Token-driven realm sensing from the travel actor's placed token is available.
 Realm modifiers applied to gathering calculations remain planned.
 
 {: .gm }
 > Realm-aware travel is **off by default** per crafting system and is enabled with the **Enable Travel & Realms** toggle in gathering Settings (see [Enabling Travel & Realms](#enabling-travel--realms)).
-> World Party management is always available.
+> **World > Parties** is always available for global Party management.
 > Only GMs can manage realms and parties and set current-realm overrides.
 > Players experience locations through the gathering app's blocked reasons and the redaction-safe location API.
 

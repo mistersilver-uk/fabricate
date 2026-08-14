@@ -1,6 +1,6 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  Expanded accordion body for a selected party on the Travel > Parties tab.
+  Expanded accordion body for a selected party on World > Parties.
   Split into two columns: members (2/3) on the left and the travel marker (1/3)
   on the right.
 
