@@ -66,7 +66,9 @@ test('View Lab passes its installed stylesheet through the A/B guard before read
   const installedAt = mountSource.indexOf('const determinismStyle = installDeterminismStyles();');
   const settledAt = mountSource.indexOf('await settle([built.frame], mounted?.services ?? null);');
   const guardAt = mountSource.indexOf('assertNoLabInducedClipping(built.frame, determinismStyle);');
-  const readyAt = mountSource.indexOf('globalThis.__FABRICATE_VIEW__ = {');
+  const readyAt = mountSource.indexOf(
+    'document.body.setAttribute(READY_ATTRIBUTE, params.caseId ?? params.appId);'
+  );
 
   assert.ok(installedAt >= 0, 'installs the determinism stylesheet');
   assert.ok(settledAt >= 0, 'settles the populated frame');
