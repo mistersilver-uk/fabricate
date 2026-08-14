@@ -552,6 +552,7 @@ const RESPONSIVE_LAYOUT_CASE_IDS = [
   'player-alchemy-stacked',
   'player-journal-stacked',
 ];
+const LAYOUT_ASSERTION_PATH = 'scripts/lib/viewLabLayoutAssertion.js';
 
 test('exactly the five 1024px player responsive cases declare complete layout expectations', () => {
   const declared = VIEW_LAB_CASES.filter((viewCase) => viewCase.expectLayout);
@@ -588,6 +589,10 @@ test('layout expectation selectors name UI that still exists', () => {
     );
   }
   assert.deepEqual(missing, [], `these layout selectors no longer exist:\n  ${missing.join('\n  ')}`);
+});
+
+test('a layout assertion helper change selects every case whose layout it validates', () => {
+  assert.deepEqual(selectedIds([LAYOUT_ASSERTION_PATH]), RESPONSIVE_LAYOUT_CASE_IDS);
 });
 
 test('the capture runner threads and asserts declared layouts before taking a screenshot', () => {

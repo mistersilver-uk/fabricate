@@ -6,9 +6,9 @@
   populated 3-column layout.
 
   The grid is cloned from GatheringView: a container-query 3-column layout
-  (minmax(280px,1fr) / 1.5fr / 1fr) that reflows to a single column below 900px of
-  app width. Left column = active runs + history; centre = the selected run's
-  detail; right column (mockup order) = about this run → what to expect →
+  (minmax(280px,1fr) / 1.5fr / 1fr) that reflows to a single column when its
+  content box is 960px or narrower. Left column = active runs + history; centre =
+  the selected run's detail; right column (mockup order) = about this run → what to expect →
   recent results → tips. World-time guidance lives in the Tips card.
 
   This view HOSTS the re-fetch effects (so the store stays Foundry-global-free):
