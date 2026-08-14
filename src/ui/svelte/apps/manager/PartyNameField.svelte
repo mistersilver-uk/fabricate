@@ -1,15 +1,21 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  Inline party-name editor for the World > Parties inspector. Keeps a local
-  draft seeded from the upstream name (reseeded when a different party is
-  selected or the name changes externally) and commits on blur / Enter; Escape
-  reverts.
+  Always-editable party-name field on a World > Parties card. Keeps a local draft
+  seeded from the upstream name (reseeded when a different party is selected or the
+  name changes externally) and commits on blur / Enter; Escape reverts, and an empty
+  name reverts rather than persisting a nameless party.
+
+  The visible "Party name" label is deliberately gone (issue 1182): on a card the
+  field sits directly beneath the party's own icon tile and above its meta line, so a
+  label above it is a third line of chrome saying what the value already says. The
+  accessible name is carried by `aria-label` instead, so a screen-reader user loses
+  nothing.
 -->
 <script>
   import { untrack } from 'svelte';
   import { localize } from '../../util/foundryBridge.js';
 
-  let { name = '', disabled = false, onRename = () => {} } = $props();
+  let { name = '', disabled = false, label = '', onRename = () => {} } = $props();
 
   // Seed without subscribing to `name` here; the $effect below keeps it synced.
   // Not a writable $derived: this is a seed-then-resync draft that commits on blur/Enter and
@@ -28,6 +34,10 @@
     const translated = localize(key);
     return translated && translated !== key ? translated : fallback;
   }
+
+  const fieldLabel = $derived(
+    label || text('FABRICATE.Admin.Manager.World.Parties.NameLabel', 'Party name')
+  );
 
   function commit() {
     const next = String(draft ?? '').trim();
@@ -49,14 +59,36 @@
   }
 </script>
 
-<div class="manager-field manager-party-name-field" data-manager-party-name-field>
-  <span>{text('FABRICATE.Admin.Manager.Travel.Parties.NameLabel', 'Party name')}</span>
-  <input
-    type="text"
-    bind:value={draft}
-    {disabled}
-    onblur={commit}
-    onkeydown={onKeydown}
-    aria-label={text('FABRICATE.Admin.Manager.Travel.Parties.NameLabel', 'Party name')}
-  />
-</div>
+<input
+  class="manager-party-name-input"
+  data-manager-party-name-field
+  type="text"
+  bind:value={draft}
+  {disabled}
+  onblur={commit}
+  onkeydown={onKeydown}
+  aria-label={fieldLabel}
+/>
+
+<style>
+  /* Theme-ROOT tokens only. Written as `input.manager-party-name-input` so the scoped
+     selector computes to (0,2,1) and TIES with the manager's permanent free-text
+     baseline (`.fabricate-manager input[type="text"]`, which pins min-height 34px and
+     radius 9px); the tie is then won on source order, because injected component CSS
+     lands after the global sheet. At a bare class it would be (0,2,0) and silently lose
+     its height and radius to the baseline. */
+  input.manager-party-name-input {
+    box-sizing: border-box;
+    width: 100%;
+    min-height: 30px;
+    height: 30px;
+    padding: 0 10px;
+    border: 1px solid var(--fab-border);
+    border-radius: 8px;
+    color: var(--fab-text);
+    background: var(--fab-bg-0);
+    font-family: var(--fab-font-serif);
+    font-size: 13px;
+    font-weight: 600;
+  }
+</style>
