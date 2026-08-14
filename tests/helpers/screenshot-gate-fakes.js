@@ -17,9 +17,71 @@
  * asserting its own stubs.
  */
 
+import { mkdtempSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
 /** The managed screenshot block's delimiters, as `upsertScreenshotsBlock` writes them. */
 export const BLOCK_START = '<!-- fabricate:screenshots:start -->';
 export const BLOCK_END = '<!-- fabricate:screenshots:end -->';
+
+/**
+ * The head branch both suites use, and the one {@link workflowRun} reports by default.
+ *
+ * ONE constant rather than two, because they have to agree for the `head_branch` fallback in
+ * `runBelongsToPullRequest` to be exercised at all: while the fixture's branch differed from the
+ * suite's, every run matched on `pull_requests[].number` first and deleting that fallback outright
+ * left the suite green.
+ */
+export const DEFAULT_HEAD_BRANCH = 'agent/1133-screenshot-gate';
+
+/**
+ * The `check` command's three (optionally four) file inputs, in a fresh temp directory.
+ *
+ * Shared rather than written per suite: both `tests/screenshot-evidence-matching.test.js` and
+ * `tests/ui-pr-screenshot-evidence.test.js` drive the real `main(['check', …])`, which reads its
+ * changed-file list, body, labels and patch map from disk — and `tests/**` duplication counts
+ * against the SonarCloud new-code gate, so two copies of this would fail the gate on correct code.
+ *
+ * The caller owns `root` and must remove it; every one of these directories used to leak, one per
+ * adapter case per run.
+ *
+ * @param {object} [inputs] The files to write.
+ * @param {string} [inputs.prefix] The temp directory's name prefix.
+ * @param {string[]} [inputs.changedFiles] The changed-file list.
+ * @param {string} [inputs.body] The pull request body.
+ * @param {string[]} [inputs.labels] The label list.
+ * @param {Record<string, string>} [inputs.patches] Unified diffs by path, written as the JSONL
+ *   `{filename, patch}` stream `gh api …/pulls/{n}/files --jq '… | @json'` emits.
+ * @returns {{root: string, changedFiles: string, body: string, labels: string, patchesFile: string}}
+ *   The directory and the absolute paths of the files in it.
+ */
+export function writeGateCliInputs({
+  prefix = 'fabricate-screenshot-gate-',
+  changedFiles = [],
+  body = '',
+  labels = [],
+  patches = {},
+} = {}) {
+  const root = mkdtempSync(join(tmpdir(), prefix));
+  const paths = {
+    root,
+    changedFiles: join(root, 'changed-files.txt'),
+    body: join(root, 'pr-body.md'),
+    labels: join(root, 'labels.txt'),
+    patchesFile: join(root, 'changed-files.jsonl'),
+  };
+  writeFileSync(paths.changedFiles, changedFiles.join('\n'));
+  writeFileSync(paths.body, body);
+  writeFileSync(paths.labels, labels.join('\n'));
+  writeFileSync(
+    paths.patchesFile,
+    Object.entries(patches)
+      .map(([filename, patch]) => JSON.stringify({ filename, patch }))
+      .join('\n')
+  );
+  return paths;
+}
 
 /**
  * Resolve a fixture that may be a value or a function of the fake's call state.
@@ -126,6 +188,36 @@ export function makeGateClock({ start = 0, step = 0 } = {}) {
 }
 
 /**
+ * The `check` command's argument vector: the four file/label flags every invocation carries, the
+ * pull request number, then whatever the case is about.
+ *
+ * Shared with the same duplication argument as {@link writeGateCliInputs}, and it travels with it:
+ * a flag renamed on one side and not the other is then one edit, not two files' worth.
+ *
+ * @param {{changedFiles: string, body: string, labels: string}} paths The written inputs.
+ * @param {object} [options] The invocation's shape.
+ * @param {string|number} [options.prNumber] The pull request number.
+ * @param {string[]} [options.extra] The case's own flags, appended.
+ * @returns {string[]} The argument vector.
+ */
+export function gateCheckArgv(paths, { prNumber = 1133, extra = [] } = {}) {
+  return [
+    'check',
+    '--changed-files',
+    paths.changedFiles,
+    '--body-file',
+    paths.body,
+    '--labels',
+    paths.labels,
+    '--exempt-label',
+    'screenshots-exempt',
+    '--pr',
+    String(prNumber),
+    ...extra,
+  ];
+}
+
+/**
  * Run `fn` with `console.log` and `console.error` captured.
  *
  * The error half is why this exists rather than reusing the `captureLog` already in
@@ -216,6 +308,10 @@ export function atClock(ms) {
 /**
  * A workflow run as the runs LIST resource reports it.
  *
+ * `prNumber: null` is the run the API reports with an EMPTY `pull_requests` array — a real and
+ * undocumented answer from that endpoint, and the only shape under which `runBelongsToPullRequest`
+ * consults `head_branch` and `head_repository` at all.
+ *
  * @param {object} run The run's shape.
  * @returns {object} The run.
  */
@@ -226,7 +322,7 @@ export function workflowRun({
   createdAt = atClock(0),
   runStartedAt = atClock(0),
   prNumber = 1133,
-  headBranch = 'agent/1133',
+  headBranch = DEFAULT_HEAD_BRANCH,
   headRepository = 'misterpotts/fabricate',
   htmlUrl = 'https://github.test/run/1',
 } = {}) {
@@ -239,6 +335,6 @@ export function workflowRun({
     html_url: htmlUrl,
     head_branch: headBranch,
     head_repository: { full_name: headRepository },
-    pull_requests: [{ number: prNumber }],
+    pull_requests: prNumber === null ? [] : [{ number: prNumber }],
   };
 }

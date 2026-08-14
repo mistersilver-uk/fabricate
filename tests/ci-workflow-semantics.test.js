@@ -170,6 +170,29 @@ test('the screenshot gate awaits the capture run for its own head, within pinned
     'the gate step interpolates a workflow expression into its shell body; pass it through env: instead'
   );
 
+  // EVERY shell variable reaching the CLI is double-quoted. An unquoted one that renders EMPTY
+  // vanishes from the argument list entirely, so the flag before it swallows the flag after it and
+  // argument parsing fails before the gate's first step runs — a red the `screenshots-exempt` label
+  // cannot clear, because parsing precedes the label check. This is not hypothetical:
+  // `$PR_HEAD_REPO` is empty whenever a contributor deletes their fork while the pull request is
+  // open, since `github.event.pull_request.head.repo` is then null. The CLI's half of that contract
+  // — an empty string is a VALUE, and the gate degrades on it — is case (p5) in
+  // tests/screenshot-evidence-matching.test.js.
+  const quotedFlagValues = gateStep.run.match(/--[a-z-]+ "\$[A-Za-z_]+"/g) ?? [];
+  assert.ok(
+    quotedFlagValues.length >= 5,
+    `expected the gate step to pass several shell variables as flag values, found ${quotedFlagValues.length}`
+  );
+  assert.ok(
+    quotedFlagValues.includes('--head-repository "$PR_HEAD_REPO"'),
+    'the head repository must reach the CLI from env:, quoted'
+  );
+  assert.doesNotMatch(
+    gateStep.run,
+    /--[a-z-]+ \$[A-Za-z_]/,
+    'an unquoted shell variable disappears from the argument list when it renders empty'
+  );
+
   // The producer's own selection inputs, requested identically, so the two selections are the same
   // by construction rather than by coincidence. ONE paginated call feeds both the filename list and
   // the patch map — two calls could snapshot different heads.

@@ -181,6 +181,15 @@ jobs:
           PR_REPO: ${{ github.repository }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           PR_HEAD_BRANCH: ${{ github.event.pull_request.head.ref }}
+          # RENDERS EMPTY when a contributor deletes their fork while the PR is open: `head.repo`
+          # is then null, and a property read on null renders as the empty string. Deliberately NOT
+          # given a `|| '<sentinel>'` default — the empty string is the honest answer ("this run
+          # cannot be narrowed by head repository"), the CLI accepts it as a value (see `parseArgs`)
+          # and `runBelongsToPullRequest` degrades to the `pull_requests[].number` and head-branch
+          # rules, whereas a sentinel would have to be recognised and unwrapped in a second place.
+          # The quoting of "$PR_HEAD_REPO" below is load-bearing for the same reason and is pinned
+          # by tests/ci-workflow-semantics.test.js: unquoted, an empty value would VANISH from the
+          # argument list and `--head-repository` would swallow the next flag.
           PR_HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
           # The SAME expression `capture`'s `if:` uses in pr-screenshots.yml, so the two cannot
           # drift into disagreeing about whether a producer run can exist for this head. A fork PR

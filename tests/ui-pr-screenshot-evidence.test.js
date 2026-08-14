@@ -43,11 +43,13 @@ import {
 // `console.error = () => {}` and would swallow exactly the line under test.
 import {
   captureConsole,
+  gateCheckArgv,
   makeGateClock,
   makeGhFake,
   managedScreenshotBlock,
   runPreservingExitCode,
   workflowRun,
+  writeGateCliInputs,
 } from './helpers/screenshot-gate-fakes.js';
 
 // A `resolveDefaultBase`-shaped git runner: `rev-parse --verify --quiet <ref>` returns
@@ -2408,31 +2410,13 @@ describe('UI PR screenshot evidence', () => {
 
   const CHECK_UI_FILES = ['src/ui/svelte/apps/manager/ToolsBrowserView.svelte'];
 
-  function writeCheckInputs({ body = '', labels = [], changedFiles = CHECK_UI_FILES } = {}) {
-    const root = mkdtempSync(join(tmpdir(), 'fabricate-ui-check-'));
-    const paths = {
-      root,
-      changedFiles: join(root, 'changed-files.txt'),
-      body: join(root, 'pr-body.md'),
-      labels: join(root, 'labels.txt'),
-    };
-    writeFileSync(paths.changedFiles, changedFiles.join('\n'));
-    writeFileSync(paths.body, body);
-    writeFileSync(paths.labels, labels.join('\n'));
-    return paths;
-  }
+  // Both the inputs and the argument vector come from the shared gate fakes rather than being
+  // spelled out here as well: `tests/screenshot-evidence-matching.test.js` drives the same `check`
+  // command, and `tests/**` duplication counts against the SonarCloud new-code gate.
+  const writeCheckInputs = (inputs = {}) =>
+    writeGateCliInputs({ prefix: 'fabricate-ui-check-', changedFiles: CHECK_UI_FILES, ...inputs });
 
-  function checkArgs(paths, extra = []) {
-    return [
-      'check',
-      '--changed-files', paths.changedFiles,
-      '--body-file', paths.body,
-      '--labels', paths.labels,
-      '--exempt-label', 'screenshots-exempt',
-      '--pr', '1133',
-      ...extra,
-    ];
-  }
+  const checkArgs = (paths, extra = []) => gateCheckArgv(paths, { prNumber: 1133, extra });
 
   it('check without --await-capture keeps today behaviour exactly on the failing path', async () => {
     const paths = writeCheckInputs({ body: 'No evidence here.' });

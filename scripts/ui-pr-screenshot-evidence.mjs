@@ -1900,7 +1900,16 @@ function parseArgs(argv) {
       continue;
     }
     const next = argv[i + 1];
-    if (!next || next.startsWith('--')) {
+    // AN EMPTY STRING IS A VALUE, not a missing one. This read `!next`, which conflated the two —
+    // and CI hands this script empty values on a path nobody chooses: when a contributor deletes
+    // their fork while the PR is open, `github.event.pull_request.head.repo` is null, so
+    // `--head-repository "$PR_HEAD_REPO"` renders as `--head-repository ''`. Parsing threw before
+    // step 1 of the gate ran, so the required `check-screenshots` job died with a bare message and
+    // no `::error::<code>` — and, because the throw preceded the exempt-label check, not even a
+    // maintainer-applied `screenshots-exempt` label could clear it. An unskippable red for a
+    // reason outside the author's control is the exact failure class this gate exists to remove.
+    // `undefined` (the flag is last) and a following `--flag` are still missing values.
+    if (next === undefined || next.startsWith('--')) {
       throw new Error(`Missing value for --${rawKey}`);
     }
     args[key] = next;
@@ -2057,7 +2066,11 @@ export async function main(argv = process.argv.slice(2), deps = {}) {
       repo: args.repo,
       headBranch: args.headBranch,
       headRepository: args.headRepository,
-      captureWorkflow: args.captureWorkflow,
+      // `|| undefined` so an EMPTY flag means "absent" and the module's own exported default
+      // applies, rather than `''` reaching the runs query as `workflows//runs`. Now that an empty
+      // string parses as a value (see `parseArgs`), every string flag has to say which of the two
+      // it means; the head-* three below mean "cannot narrow on this" and degrade in the module.
+      captureWorkflow: args.captureWorkflow || undefined,
       awaitCapture: args.awaitCapture === true,
       captureEligible: parseCaptureEligible(args.captureEligible),
       captureTimeoutMs: parseCaptureTimeoutMs(args.captureTimeoutMinutes),

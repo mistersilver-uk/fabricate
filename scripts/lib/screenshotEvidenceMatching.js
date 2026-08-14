@@ -373,6 +373,13 @@ export function parseScreenshotEvidenceImages(body = '', { prNumber } = {}) {
  * `pull_requests[].number` is the direct answer; `head_branch` plus `head_repository.full_name` is
  * the fallback for a run whose `pull_requests` array the API left empty.
  *
+ * EACH NARROWING INPUT IS OPTIONAL, AND AN ABSENT ONE NARROWS NOTHING — it does not reject
+ * everything. `headRepository` is empty on a real CI path: when a contributor deletes their fork
+ * while the pull request is open, `head.repo` is null and `ci.yml` renders `--head-repository ''`.
+ * The runs list is already scoped to this head SHA and this event, and the two rules above it are
+ * the discriminating ones, so dropping an unusable input is the correct degradation. Rejecting
+ * every run instead would answer `capture-run-not-found` on a pull request whose producer ran.
+ *
  * @param {object} run A workflow run from the runs LIST resource.
  * @param {object} scope The pull request's identity.
  * @returns {boolean} True when the run is this pull request's.
@@ -423,8 +430,13 @@ export function selectCaptureRun(runs = [], scope = {}) {
   // SEEDED WITH `null`, not left seedless. A seedless `reduce` throws on an empty array, so its
   // safety is a property of the two guards above it rather than of this line; the seed makes the
   // empty case answer `null` — the documented "no run belongs to this pull request" answer — instead
-  // of depending on a caller-visible invariant staying true. The comparison is unchanged: `>=` keeps
-  // the LAST of equally-created runs, which is the selection rule (i) and (i3) pin.
+  // of depending on a caller-visible invariant staying true. `>=` keeps the LAST of equally-created
+  // runs.
+  //
+  // The RECENCY rule itself is pinned by (i4), and by that case alone: (i) and (i3) put their two
+  // runs in different terminality classes, so `pending` narrows to one candidate there and this
+  // reduce never compares a pair. (i4) supplies two equally-classed runs, which is the shape
+  // `opened` then `reopened` — and a synchronize landing on the same SHA — actually produces.
   return candidates.reduce(
     (best, run) => (best === null || createdAtMs(run) >= createdAtMs(best) ? run : best),
     null

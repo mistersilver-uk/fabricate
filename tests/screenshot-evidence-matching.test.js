@@ -18,9 +18,9 @@
  *
  * THE MUTATION MAP IS THE ACCEPTANCE BAR
  * --------------------------------------
- * Each of the 28 mutations below must flip the named test to FAIL. A test that passes under its
- * mutation is not evidence of the behaviour it claims to cover. The delta's map named 24; the last
- * four are decision points post-implementation review found unpinned, and are listed here so a later
+ * Each of the 45 mutations below must flip the named test to FAIL. A test that passes under its
+ * mutation is not evidence of the behaviour it claims to cover. The delta's map named 24; the rest
+ * are decision points post-implementation review found unpinned, and are listed here so a later
  * revision that removes one without removing its test is visible.
  *
  *   delete the await                                        -> (a)
@@ -35,22 +35,39 @@
  *   most-recent-only run selection                          -> (i3)
  *   oldest-run selection                                    -> (i)
  *   drop the pull_requests[].number filter                  -> (i2)
+ *   `>=` -> `<=` in the recency reduce                      -> (i4)
+ *   `candidates[0]` instead of the recency reduce           -> (i4)
+ *   drop the head_branch fallback                           -> (x1)
+ *   reject a run when headRepository is empty               -> (x2)
  *   gate-start deadline anchor                              -> (j)
  *   collapse capture-run-failed into capture-published-nothing   -> (l)
  *   collapse capture-run-not-found into no-screenshots-section   -> (k2)
  *   delete step 1 (the exempt label)                        -> (r)
  *   delete step 2 (the changed-files guard)                 -> (s)
- *   always-armed step 3                                     -> (a)
+ *   always-unarmed step 3                                   -> (a)
+ *   always-armed step 3                                     -> (t)
  *   outsideBlock collects every image in the body           -> (u)
  *   adapter: drop the exit-code application                 -> (p)
  *   adapter: restate a bound literal                        -> (p)
  *   adapter: map the base SHA into headSha                  -> (p)
  *   adapter: never forward --await-capture                  -> (p)
+ *   adapter: forward the wrong repo                         -> (p)
+ *   adapter: forward the wrong capture workflow             -> (p)
+ *   adapter: validate --capture-timeout-minutes and discard it   -> (p2)
+ *   adapter: forward headBranch empty                       -> (p3)
+ *   adapter: forward headRepository empty                   -> (p3)
+ *   adapter: forward patches as undefined                   -> (p4)
+ *   parseArgs: treat an empty flag value as missing         -> (p5)
  *   maxPolls * pollIntervalMs < maxWaitMs                   -> tests/ci-workflow-semantics.test.js
  *   judge staleness with no head SHA to judge against       -> (v)
  *   skip the staleness rule when a head SHA IS available    -> (v2)
  *   name a managed block the body does not contain          -> (w)
  *   blame the producer for a run list never read            -> (k3)
+ *   htmlImageSrc returns ''                                 -> the image-parser test
+ *   htmlImageSrc takes the LEFTMOST src                     -> the image-parser test
+ *   markdownImageUrl keeps the CommonMark title             -> the image-parser test
+ *   drop imageUrlsIn's .filter(Boolean)                     -> the image-parser test
+ *   accept a URL the evidence predicate rejects             -> the image-predicate drift test
  *
  * WHY `# cancelled` IS THE RISK HERE AND `# fail` IS NOT ALWAYS ENOUGH
  * --------------------------------------------------------------------
@@ -61,9 +78,7 @@
  */
 
 import assert from 'node:assert/strict';
-import { mkdtempSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { readFileSync, rmSync } from 'node:fs';
 import test, { describe, it } from 'node:test';
 
 import {
@@ -76,8 +91,10 @@ import {
   SLACK_MS,
   classifyPublishedFrameUrl,
   decideScreenshotGate,
+  parseScreenshotEvidenceImages,
 } from '../scripts/lib/screenshotEvidenceMatching.js';
 import {
+  FALLBACK_CASE_ID,
   VIEW_LAB_CASES,
   hasUiChanges as labHasUiChanges,
   mapChangedFilesToCases,
@@ -85,31 +102,76 @@ import {
 import {
   VIEW_RECIPES,
   explainScreenshotEvidenceFailure,
+  hasScreenshotEvidence,
   hasUiChanges,
   isExemptByLabel,
   main,
   validateChangedFilesForCheck,
 } from '../scripts/ui-pr-screenshot-evidence.mjs';
 import {
+  DEFAULT_HEAD_BRANCH,
   atClock,
   captureConsole,
+  gateCheckArgv,
   makeGateClock,
   makeGhFake,
   managedScreenshotBlock,
   runPreservingExitCode,
   workflowRun,
+  writeGateCliInputs,
 } from './helpers/screenshot-gate-fakes.js';
 
 const PR = 1133;
 const REPO = 'misterpotts/fabricate';
-const HEAD_BRANCH = 'agent/1133-screenshot-gate';
+/** The same branch {@link workflowRun} reports, so the `head_branch` fallback is reachable. */
+const HEAD_BRANCH = DEFAULT_HEAD_BRANCH;
 const HEAD = 'a'.repeat(40);
 const PREVIOUS_HEAD = 'b'.repeat(40);
 const NEXT_HEAD = 'c'.repeat(40);
+const CAPTURE_WORKFLOW = 'pr-screenshots.yml';
+const MS_PER_MINUTE = 60_000;
 
 /** A render change that selects a small, stable case set — small enough to name a proper subset. */
 const CHANGED_FILES = ['src/ui/svelte/apps/manager/ToolsBrowserView.svelte'];
 const EXPECTED_CASE_IDS = mapChangedFilesToCases(CHANGED_FILES).map((viewCase) => viewCase.id);
+
+/** The View Lab case registry, which is both a lab input and a patch-attributable one. */
+const REGISTRY_PATH = 'scripts/lib/viewLabCases.js';
+
+/**
+ * The 1-based line on which the registry declares the fallback case's id, asserted present so a
+ * rename fails loudly instead of quietly turning the patch below into an assertion about line 0.
+ *
+ * @returns {number} The line number.
+ */
+function fallbackCaseIdLine() {
+  const source = readFileSync(REGISTRY_PATH, 'utf8').split('\n');
+  const index = source.indexOf(`    id: '${FALLBACK_CASE_ID}',`);
+  assert.notEqual(index, -1, `${REGISTRY_PATH} no longer declares ${FALLBACK_CASE_ID} inline`);
+  return index + 1;
+}
+
+/**
+ * A unified diff claiming one line of the registry was just added, with the three lines of context
+ * either side that `git` emits.
+ *
+ * The `+` line carries the file's CURRENT text because case attribution anchors on the window's
+ * CONTENT rather than on the hunk header's line numbers — a patch built from invented text would
+ * fail to anchor and widen back to the whole corpus, which is the answer this fixture must not get.
+ *
+ * @param {number} line The 1-based line to mark as added.
+ * @returns {string} The patch.
+ */
+function registryPatchAddingLine(line) {
+  const source = readFileSync(REGISTRY_PATH, 'utf8').split('\n');
+  const from = Math.max(1, line - 3);
+  const to = Math.min(source.length, line + 3);
+  const body = [];
+  for (let number = from; number <= to; number += 1) {
+    body.push(`${number === line ? '+' : ' '}${source[number - 1]}`);
+  }
+  return [`@@ -${from},${body.length - 1} +${from},${body.length} @@`, ...body].join('\n');
+}
 
 /**
  * The REAL predicates. This is a cycle-avoidance seam, not a test double — see the file header.
@@ -162,7 +224,7 @@ function decide({ gh, clock, bounds = FAST_BOUNDS, ...overrides }) {
     repo: REPO,
     headBranch: HEAD_BRANCH,
     headRepository: REPO,
-    captureWorkflow: 'pr-screenshots.yml',
+    captureWorkflow: CAPTURE_WORKFLOW,
     awaitCapture: true,
     captureEligible: true,
     exemptLabel: 'screenshots-exempt',
@@ -408,6 +470,78 @@ describe('decideScreenshotGate', () => {
     assert.equal(decision.runUrl, 'https://github.test/run/rerun');
   });
 
+  it('(i4) reports the newer of two equally-classed runs, not the one the list happens to lead with', async () => {
+    // THE TIE-BREAK ITSELF, which (i) and (i3) do not reach: both of those put their two runs in
+    // DIFFERENT terminality classes, so `pending` narrows to a single candidate and the recency
+    // reduce never compares a pair. Two completed runs for one head is the ordinary shape — `opened`
+    // then `reopened`, or a synchronize landing on the same SHA — and there the reduce is the only
+    // thing choosing. Picking the older reports a stale conclusion and points the reader at the
+    // wrong log, which is a wrong-problem red of exactly the kind this issue exists to remove.
+    const older = workflowRun({
+      id: 1,
+      conclusion: 'failure',
+      createdAt: atClock(0),
+      htmlUrl: 'https://github.test/run/first-attempt',
+    });
+    const newer = workflowRun({
+      id: 2,
+      conclusion: 'success',
+      createdAt: atClock(5_000),
+      htmlUrl: 'https://github.test/run/second-attempt',
+    });
+    const gh = makeGhFake({ runs: [older, newer], body: bodyWithBlock() });
+    const clock = makeGateClock({ start: 0, step: 1_000 });
+
+    const decision = await decide({ gh, clock });
+
+    assert.equal(decision.exitCode, 0, decision.message);
+    assert.equal(decision.runUrl, 'https://github.test/run/second-attempt');
+    assert.equal(decision.runConclusion, 'success');
+  });
+
+  it('(x1) narrows an unattached run by head branch, and keeps the one that matches', async () => {
+    // The API leaves `pull_requests` empty often enough that the head-branch fallback is load-
+    // bearing, and every other fixture here carries an attached number — so the fallback was dead
+    // code as far as this suite could see, and deleting it outright left the suite green. Two runs,
+    // one for this branch and one for somebody else's, on the same head SHA.
+    const mine = workflowRun({ id: 1, prNumber: null, htmlUrl: 'https://github.test/run/mine' });
+    const theirs = workflowRun({
+      id: 2,
+      prNumber: null,
+      headBranch: 'agent/9999-someone-else',
+      createdAt: atClock(9_000),
+      htmlUrl: 'https://github.test/run/theirs',
+    });
+    const gh = makeGhFake({ runs: [mine, theirs], body: bodyWithBlock() });
+    const clock = makeGateClock({ start: 0, step: 1_000 });
+
+    const decision = await decide({ gh, clock });
+
+    assert.equal(decision.exitCode, 0, decision.message);
+    assert.equal(
+      decision.runUrl,
+      'https://github.test/run/mine',
+      "the newer run is on another branch; matching it would report another pull request's capture"
+    );
+  });
+
+  it('(x2) still finds the run when the head repository is unknown, as a deleted fork makes it', async () => {
+    // `ci.yml` renders `--head-repository ''` when a contributor deletes their fork while the pull
+    // request is open (`head.repo` is then null). An absent narrowing input must narrow NOTHING —
+    // rejecting every run instead would answer `capture-run-not-found` on a pull request whose
+    // producer ran, which is an unskippable red for a reason outside the author's control.
+    const gh = makeGhFake({
+      runs: [workflowRun({ prNumber: null, headRepository: 'deleted-fork/fabricate' })],
+      body: bodyWithBlock(),
+    });
+    const clock = makeGateClock({ start: 0, step: 1_000 });
+
+    const decision = await decide({ gh, clock, headRepository: '' });
+
+    assert.equal(decision.exitCode, 0, decision.message);
+    assert.equal(decision.runUrl, 'https://github.test/run/1');
+  });
+
   it('(j) tolerates a queue longer than the capture timeout, because the anchor is job start', async () => {
     // Against a gate-start anchor this is a guaranteed fail, and against a `run_started_at` anchor
     // populated DURING the queued phase it is too — which is what makes it discriminate rather than
@@ -552,6 +686,7 @@ describe('decideScreenshotGate', () => {
     assert.equal(decision.exitCode, 1);
     assert.match(decision.message, /Changed-files input is empty/);
     assert.equal(gh.calls.length, 0);
+    assert.equal(clock.sleepCalls, 0, 'a guard that fails closed must not wait first');
   });
 
   it('(t) passes an unarmed, non-UI changed set with no API call', async () => {
@@ -562,6 +697,7 @@ describe('decideScreenshotGate', () => {
 
     assert.equal(decision.exitCode, 0, decision.message);
     assert.equal(gh.calls.length, 0);
+    assert.equal(clock.sleepCalls, 0, 'an unarmed gate must not wait out a producer either');
   });
 
   it('(u) does not accept an image outside a Screenshots section', async () => {
@@ -679,27 +815,81 @@ describe('decideScreenshotGate', () => {
 });
 
 describe('the check command adapter', () => {
+  /** The flags the CI step passes for a same-repository pull request, minus the case's own. */
+  const AWAIT_FLAGS = Object.freeze([
+    '--repo',
+    REPO,
+    '--head-sha',
+    HEAD,
+    '--head-branch',
+    HEAD_BRANCH,
+    '--head-repository',
+    REPO,
+    '--await-capture',
+    '--capture-eligible',
+    'true',
+    '--capture-workflow',
+    CAPTURE_WORKFLOW,
+  ]);
+
   /**
-   * Write the CLI's file inputs into a fresh temp dir.
+   * The CLI's file inputs, removed when the case ends.
    *
-   * @param {object} files The inputs.
+   * @param {object} t The running test, whose `after` hook owns the cleanup.
+   * @param {object} [inputs] Overrides for the written files.
    * @returns {Record<string, string>} Their absolute paths.
    */
-  function writeCliInputs({ changedFiles = CHANGED_FILES, body = '', labels = [] } = {}) {
-    const root = mkdtempSync(join(tmpdir(), 'fabricate-screenshot-gate-'));
-    const paths = {
-      changedFiles: join(root, 'changed-files.txt'),
-      body: join(root, 'pr-body.md'),
-      labels: join(root, 'labels.txt'),
-    };
-    writeFileSync(paths.changedFiles, changedFiles.join('\n'));
-    writeFileSync(paths.body, body);
-    writeFileSync(paths.labels, labels.join('\n'));
+  function cliInputs(t, inputs = {}) {
+    const paths = writeGateCliInputs({ changedFiles: CHANGED_FILES, ...inputs });
+    t.after(() => rmSync(paths.root, { recursive: true, force: true }));
     return paths;
   }
 
-  it('(p) forwards the head SHA, the await flag and the module’s own bounds, and applies the exit code', async () => {
-    const paths = writeCliInputs({});
+  /**
+   * Drive the real `main(['check', …])` with faked collaborators and captured output.
+   *
+   * @param {string[]} argv The argument vector.
+   * @param {object} collaborators The `gh` fake and the fake clock.
+   * @returns {Promise<{exitCode: number, captured: object}>} The exit code and console output.
+   */
+  async function runCheck(argv, { gh, clock }) {
+    let exitCode;
+    const captured = await captureConsole(async () => {
+      exitCode = await runPreservingExitCode(() =>
+        main(argv, { runGh: gh.runGh, sleep: clock.sleep, now: clock.now })
+      );
+    });
+    return { exitCode, captured };
+  }
+
+  /**
+   * The runs-list queries a case's `gh` fake was asked for.
+   *
+   * @param {object} gh The `gh` fake.
+   * @returns {string[]} The query paths.
+   */
+  function runsQueries(gh) {
+    return gh.calls.filter((args) => args[0] === 'api').map((args) => args[1]);
+  }
+
+  /**
+   * Assert the adapter annotated its verdict with one gate code, rather than printing prose or
+   * nothing at all — the annotation being what puts the diagnosis on the pull request.
+   *
+   * @param {object} captured The captured console output.
+   * @param {string} code The expected gate code.
+   * @param {string} [names] Text the diagnostic must also carry.
+   * @returns {void}
+   */
+  function assertAnnotated(captured, code, names = '') {
+    assert.ok(
+      captured.error.some((line) => line.startsWith(`::error::${code}: `) && line.includes(names)),
+      `expected a ::error::${code} line${names ? ` naming ${names}` : ''}, got ${JSON.stringify(captured.error)}`
+    );
+  }
+
+  it('(p) forwards the head SHA, the repo, the workflow, the await flag and the module’s own bounds, and applies the exit code', async (t) => {
+    const paths = cliInputs(t);
     const gh = makeGhFake({
       runs: [workflowRun({ status: 'in_progress', conclusion: null })],
       body: '',
@@ -708,101 +898,216 @@ describe('the check command adapter', () => {
     // module's exported `MAX_POLLS` through the adapter rather than restating a bound.
     const clock = makeGateClock({ start: 0, step: 0 });
 
-    let exitCode;
-    const captured = await captureConsole(async () => {
-      exitCode = await runPreservingExitCode(() =>
-        main(
-          [
-            'check',
-            '--changed-files',
-            paths.changedFiles,
-            '--body-file',
-            paths.body,
-            '--labels',
-            paths.labels,
-            '--exempt-label',
-            'screenshots-exempt',
-            '--pr',
-            String(PR),
-            '--repo',
-            REPO,
-            '--head-sha',
-            HEAD,
-            '--head-branch',
-            HEAD_BRANCH,
-            '--head-repository',
-            REPO,
-            '--await-capture',
-            '--capture-eligible',
-            'true',
-            '--capture-workflow',
-            'pr-screenshots.yml',
-            '--capture-timeout-minutes',
-            '40',
-          ],
-          { runGh: gh.runGh, sleep: clock.sleep, now: clock.now }
-        )
-      );
-    });
-
-    assert.equal(exitCode, 1, 'the adapter must apply the returned exit code');
-    assert.ok(
-      captured.error.some((line) =>
-        line.startsWith(`::error::${GATE_CODES.CAPTURE_DID_NOT_CONCLUDE}: `)
-      ),
-      `expected a ::error::${GATE_CODES.CAPTURE_DID_NOT_CONCLUDE} line, got ${JSON.stringify(captured.error)}`
+    const { exitCode, captured } = await runCheck(
+      gateCheckArgv(paths, {
+        prNumber: PR,
+        extra: [...AWAIT_FLAGS, '--capture-timeout-minutes', '40'],
+      }),
+      { gh, clock }
     );
 
+    assert.equal(exitCode, 1, 'the adapter must apply the returned exit code');
+    assertAnnotated(captured, GATE_CODES.CAPTURE_DID_NOT_CONCLUDE);
+
     // --await-capture reached the call: without it this decides on the body alone and never polls.
-    const runListCalls = gh.calls.filter((args) => args[0] === 'api');
-    assert.ok(runListCalls.length > 0, '--await-capture must be forwarded into the call');
+    const queries = runsQueries(gh);
+    assert.ok(queries.length > 0, '--await-capture must be forwarded into the call');
     assert.ok(clock.sleepCalls > 0, 'waited === true when --await-capture is passed');
+
+    // --repo and --capture-workflow reached the call too. The runs query is the ONLY place either
+    // is observable, and asserting the head SHA alone left both free: a gate polling the wrong
+    // repository, or another workflow, waits out its whole budget and reds a pull request whose
+    // producer succeeded — with the same `capture-did-not-conclude` code this case already saw.
+    assert.ok(
+      queries.every((query) =>
+        query.startsWith(`repos/${REPO}/actions/workflows/${CAPTURE_WORKFLOW}/runs`)
+      ),
+      `expected every runs query under repos/${REPO}/actions/workflows/${CAPTURE_WORKFLOW}, got ${JSON.stringify([...new Set(queries)])}`
+    );
 
     // --head-sha reached the call as the HEAD sha, not some other revision.
     assert.ok(
-      runListCalls.every((args) => args[1].includes(`head_sha=${HEAD}`)),
-      `expected every runs query to carry head_sha=${HEAD}, got ${JSON.stringify(runListCalls)}`
+      queries.every((query) => query.includes(`head_sha=${HEAD}`)),
+      `expected every runs query to carry head_sha=${HEAD}, got ${JSON.stringify([...new Set(queries)])}`
     );
 
     // The bounds the module observed are the module's exported defaults, not adapter literals.
-    assert.equal(runListCalls.length, MAX_POLLS);
+    assert.equal(queries.length, MAX_POLLS);
     assert.ok(
       clock.sleeps.every((ms) => ms === POLL_INTERVAL_MS),
       `expected every sleep to be POLL_INTERVAL_MS (${POLL_INTERVAL_MS}), got ${JSON.stringify([...new Set(clock.sleeps)])}`
     );
   });
 
-  it('(q) parses --capture-eligible as a literal string, so a fork never enters the wait loop', async () => {
-    const paths = writeCliInputs({});
+  it('(p2) forwards --capture-timeout-minutes as the producer deadline, not merely validating it', async (t) => {
+    // The flag was VALIDATED by a test and its value pinned by nothing: an adapter that parsed it
+    // and then passed `undefined` left the whole suite green. The latent failure is exact — raise
+    // `capture`'s own `timeout-minutes` to 60, and `tests/ci-workflow-semantics.test.js` follows the
+    // YAML while the module keeps waiting 40, so every capture past 40 minutes reds
+    // `capture-did-not-conclude`: this issue's symptom under a new code, suite green.
+    const paths = cliInputs(t);
+    const gh = makeGhFake({
+      runs: [workflowRun({ status: 'in_progress', conclusion: null })],
+      body: '',
+    });
+    // Advancing, so the DEADLINE ends this wait rather than the iteration cap — the deadline being
+    // the only thing the forwarded value can be observed through.
+    const clock = makeGateClock({ start: 0, step: POLL_INTERVAL_MS });
+
+    const { exitCode, captured } = await runCheck(
+      gateCheckArgv(paths, {
+        prNumber: PR,
+        extra: [...AWAIT_FLAGS, '--capture-timeout-minutes', '1'],
+      }),
+      { gh, clock }
+    );
+
+    assert.equal(exitCode, 1);
+    assertAnnotated(captured, GATE_CODES.CAPTURE_DID_NOT_CONCLUDE);
+
+    // One minute plus the module's own slack, observed on the injected clock: the wait ended at the
+    // first poll at or after that deadline, so it lands inside one poll interval of it.
+    const deadline = MS_PER_MINUTE + SLACK_MS;
+    assert.ok(
+      clock.now() >= deadline && clock.now() < deadline + POLL_INTERVAL_MS,
+      `expected the wait to end at the 1-minute deadline (${deadline}ms + slack), but the clock read ${clock.now()}ms`
+    );
+    assert.ok(
+      clock.now() < CAPTURE_TIMEOUT_MS,
+      `a discarded --capture-timeout-minutes falls back to the module's ${CAPTURE_TIMEOUT_MS}ms default, which this clock reading (${clock.now()}ms) must be nowhere near`
+    );
+  });
+
+  it('(p3) forwards --head-branch and --head-repository, so another PR’s run is not adopted', async (t) => {
+    // Both are pure run-selection inputs, invisible in the runs query, and each degrades to "narrow
+    // on nothing" when empty — so forwarding either as `''` is silent. Two unattached runs on this
+    // head, one on somebody else's branch and one from a different head repository: forwarding both
+    // flags rejects both runs, and dropping EITHER adopts the run that flag was rejecting.
+    const paths = cliInputs(t);
+    const gh = makeGhFake({
+      runs: [
+        workflowRun({ id: 1, prNumber: null, headBranch: 'agent/9999-someone-else' }),
+        workflowRun({ id: 2, prNumber: null, headRepository: 'someone-else/fabricate' }),
+      ],
+      body: '',
+    });
+    const clock = makeGateClock({ start: 0, step: MS_PER_MINUTE });
+
+    const { exitCode, captured } = await runCheck(
+      gateCheckArgv(paths, { prNumber: PR, extra: [...AWAIT_FLAGS] }),
+      { gh, clock }
+    );
+
+    assert.equal(exitCode, 1);
+    assertAnnotated(captured, GATE_CODES.CAPTURE_RUN_NOT_FOUND);
+    assert.ok(runsQueries(gh).length > 1, 'the grace window must have been polled more than once');
+  });
+
+  it('(p4) forwards --patches-file, so the narrowed case selection actually narrows', async (t) => {
+    // `--patches-file` is the only input that changes WHICH frames count as evidence, and an
+    // adapter that read the file and passed `undefined` was invisible: every other case here
+    // changes files whose selection is patch-independent. A registry change with a patch confined
+    // to one case selects that case; without the patch it selects the whole corpus, which
+    // accepts any frame at all.
+    const patches = { [REGISTRY_PATH]: registryPatchAddingLine(fallbackCaseIdLine()) };
+    // The registry ships BESIDE a render file, because the registry alone does not arm this gate —
+    // and that is the realistic shape anyway: a case is added in the same push as the view it draws.
+    const changedFiles = [...CHANGED_FILES, REGISTRY_PATH];
+    const publishedCaseId = 'player-gathering-environments';
+    // The fixture's own preconditions, stated rather than assumed: a patch that stopped narrowing
+    // would make the assertions below pass for the wrong reason.
+    const narrowed = mapChangedFilesToCases(changedFiles, { patches }).map(
+      (viewCase) => viewCase.id
+    );
+    assert.ok(
+      narrowed.includes(FALLBACK_CASE_ID) && !narrowed.includes(publishedCaseId),
+      `the patch must narrow the registry onto ${FALLBACK_CASE_ID} and off ${publishedCaseId}, but selected ${JSON.stringify(narrowed)}`
+    );
+    assert.ok(
+      mapChangedFilesToCases(changedFiles)
+        .map((viewCase) => viewCase.id)
+        .includes(publishedCaseId),
+      'and the same change with no patch must select it, or this case cannot see the difference'
+    );
+
+    const paths = cliInputs(t, {
+      changedFiles,
+      body: bodyWithBlock({ caseIds: [publishedCaseId] }),
+      patches,
+    });
+    const gh = makeGhFake({});
+    const clock = makeGateClock({});
+
+    const { exitCode, captured } = await runCheck(
+      gateCheckArgv(paths, {
+        prNumber: PR,
+        extra: ['--repo', REPO, '--head-sha', HEAD, '--patches-file', paths.patchesFile],
+      }),
+      { gh, clock }
+    );
+
+    assert.equal(exitCode, 1, 'a frame for a case the patch does not touch is not evidence for it');
+    assertAnnotated(captured, GATE_CODES.NO_FRAMES_FOR_CHANGED_VIEWS, FALLBACK_CASE_ID);
+    assert.equal(gh.calls.length, 0, 'this decision needs no producer run');
+  });
+
+  it('(p5) reaches a coded verdict on an EMPTY --head-repository, and the exempt label still clears it', async (t) => {
+    // `ci.yml` passes `--head-repository "$PR_HEAD_REPO"`, and that variable renders EMPTY when a
+    // contributor deletes their fork while the pull request is open (`head.repo` is then null).
+    // Argument parsing treated an empty next token as a MISSING value and threw, so the required
+    // check died with a bare message and no `::error::<code>` — and, because parsing precedes step
+    // 1, not even a maintainer-applied `screenshots-exempt` label could clear it. An unskippable
+    // red for a reason outside the author's control is the failure class this whole issue is about.
+    const paths = cliInputs(t, { body: 'No evidence here.' });
+    const emptyHeadRepository = ['--repo', REPO, '--head-sha', HEAD, '--head-repository', ''];
+    const gh = makeGhFake({});
+    const clock = makeGateClock({});
+
+    const failing = await runCheck(
+      gateCheckArgv(paths, { prNumber: PR, extra: emptyHeadRepository }),
+      { gh, clock }
+    );
+
+    assert.equal(failing.exitCode, 1);
+    assert.ok(
+      failing.captured.error.every((line) => line.startsWith('::error::')),
+      `a verdict is annotated, never bare; got ${JSON.stringify(failing.captured.error)}`
+    );
+    assertAnnotated(failing.captured, GATE_CODES.NO_SCREENSHOTS_SECTION);
+
+    const exempt = cliInputs(t, { body: 'No evidence here.', labels: ['screenshots-exempt'] });
+    const exempted = await runCheck(
+      gateCheckArgv(exempt, { prNumber: PR, extra: emptyHeadRepository }),
+      { gh, clock }
+    );
+
+    assert.equal(exempted.exitCode, 0, exempted.captured.error.join('\n'));
+    assert.ok(
+      exempted.captured.log.some((line) => line.includes('screenshots-exempt')),
+      'the maintainer label must still be readable on this path'
+    );
+  });
+
+  it('(q) parses --capture-eligible as a literal string, so a fork never enters the wait loop', async (t) => {
+    const paths = cliInputs(t);
     const gh = makeGhFake({ runs: [workflowRun({})], body: bodyWithBlock() });
     const clock = makeGateClock({ start: 0, step: 1_000 });
 
-    let exitCode;
-    await captureConsole(async () => {
-      exitCode = await runPreservingExitCode(() =>
-        main(
-          [
-            'check',
-            '--changed-files',
-            paths.changedFiles,
-            '--body-file',
-            paths.body,
-            '--labels',
-            paths.labels,
-            '--pr',
-            String(PR),
-            '--repo',
-            REPO,
-            '--head-sha',
-            HEAD,
-            '--await-capture',
-            '--capture-eligible',
-            'false',
-          ],
-          { runGh: gh.runGh, sleep: clock.sleep, now: clock.now }
-        )
-      );
-    });
+    const { exitCode } = await runCheck(
+      gateCheckArgv(paths, {
+        prNumber: PR,
+        extra: [
+          '--repo',
+          REPO,
+          '--head-sha',
+          HEAD,
+          '--await-capture',
+          '--capture-eligible',
+          'false',
+        ],
+      }),
+      { gh, clock }
+    );
 
     assert.equal(exitCode, 1);
     assert.equal(
@@ -834,6 +1139,95 @@ test('the published key discriminator anchors on the PR number, not on a hex-loo
     null,
     "another pull request's frame is not this one's"
   );
+});
+
+/**
+ * The image URLs a body's Screenshots section carries, for the two tests below.
+ *
+ * @param {string} markup The section's markup.
+ * @returns {string[]} The URLs.
+ */
+function screenshotSectionUrls(markup) {
+  return parseScreenshotEvidenceImages(`## Screenshots\n\n${markup}\n`).outsideBlock;
+}
+
+test('the image parser reads a URL out of each markup form, and none out of the empty ones', () => {
+  // The single-regex forms these rules were extracted from were AMBIGUOUS and backtracked
+  // super-linearly (SonarCloud S5852), so the narrowing moved into plain code — where it is
+  // testable, and where it was untested: no fixture in either suite carried an `<img>` tag, a
+  // titled Markdown target or an empty target, so four mutations of that code survived the suite.
+  assert.deepEqual(screenshotSectionUrls('<img alt="a shot" src="https://cdn.test/one.png">'), [
+    'https://cdn.test/one.png',
+  ]);
+  assert.deepEqual(
+    screenshotSectionUrls('<img src=one.png src="two.png">'),
+    ['two.png'],
+    'the RIGHTMOST src wins, as the greedy single-regex form it replaced did'
+  );
+  assert.deepEqual(
+    screenshotSectionUrls('![a shot](https://cdn.test/three.png "A title")'),
+    ['https://cdn.test/three.png'],
+    "CommonMark's optional title is not part of the destination"
+  );
+  assert.deepEqual(
+    screenshotSectionUrls('![a]()\n\n<img src="">\n\n![b](   )'),
+    [],
+    'markup with no destination is markup without an image; counting it would satisfy the gate on nothing'
+  );
+});
+
+/**
+ * The markup forms the two hand-maintained "what counts as an image" implementations are most
+ * likely to disagree about: both syntaxes, both quoting styles, an unquoted value, a repeated
+ * attribute, a tag broken over lines, and every empty-destination shape.
+ */
+const IMAGE_MARKUP_SAMPLES = Object.freeze([
+  '![a shot](https://cdn.test/a.png)',
+  '![a shot](https://cdn.test/a.png "A title")',
+  '![](https://cdn.test/a.png)',
+  'Some prose ![a shot](https://cdn.test/a.png) around it.',
+  '![a shot](<https://cdn.test/a.png>)',
+  '<img src="https://cdn.test/a.png">',
+  "<IMG SRC='https://cdn.test/a.png'>",
+  '<img alt="a shot" src=https://cdn.test/a.png>',
+  '<img src="a.png" src="b.png">',
+  '<img\n  alt="a shot"\n  src="https://cdn.test/a.png"\n>',
+  '![a]()',
+  '![a](   )',
+  '<img src="">',
+  '<img alt="no source at all">',
+]);
+
+test('the image parser never claims a URL the evidence predicate would not call evidence', () => {
+  // `containsImage`/`hasScreenshotEvidence` in `scripts/ui-pr-screenshot-evidence.mjs` and
+  // `imageUrlsIn`/`screenshotSections` here are two hand-maintained mirrors of one rule, and the
+  // ESM cycle described in this module's header is why they cannot be one. This is the drift
+  // detector for the direction that would WEAKEN the gate: a URL the parser accepts satisfies the
+  // gate outright through the human-pasted precedence rule, without the predicate being consulted
+  // at all, so a parser that read images the predicate rejects would quietly widen what passes.
+  let withUrls = 0;
+  for (const markup of IMAGE_MARKUP_SAMPLES) {
+    const body = `## Screenshots\n\n${markup}\n`;
+    if (parseScreenshotEvidenceImages(body).outsideBlock.length === 0) continue;
+    withUrls += 1;
+    assert.ok(
+      hasScreenshotEvidence(body),
+      `the parser reads an image URL out of markup the evidence predicate rejects: ${JSON.stringify(markup)}`
+    );
+  }
+  // NON-VACUITY. A parser that read nothing at all would satisfy the loop above for free.
+  assert.ok(
+    withUrls >= 10,
+    `only ${withUrls} sample(s) produced a URL, so this check is near-vacuous`
+  );
+
+  // The OTHER direction is a KNOWN, one-way gap rather than an oversight: the predicate accepts an
+  // empty `src` and an empty target as images while the parser reads no URL out of either. That is
+  // the case (w) diagnostic's whole reason for existing, and it is asserted here so a change that
+  // closes it in either implementation has to come past this test.
+  const emptySource = '## Screenshots\n\n<img src="">\n';
+  assert.equal(hasScreenshotEvidence(emptySource), true);
+  assert.deepEqual(parseScreenshotEvidenceImages(emptySource).outsideBlock, []);
 });
 
 /**
