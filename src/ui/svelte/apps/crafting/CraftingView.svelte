@@ -300,7 +300,9 @@
     color: var(--fab-text);
   }
 
-  @container fabricate-crafting (max-width: 900px) {
+  /* At the supported 1024px window floor this container's content box is roughly
+     938px wide, so the shared 960px boundary is deliberately reachable. */
+  @container fabricate-crafting (max-width: 960px) {
     .crafting-view-grid {
       grid-template-columns: 1fr;
       grid-auto-rows: minmax(min-content, max-content);

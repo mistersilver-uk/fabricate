@@ -314,6 +314,9 @@ Foundry ApplicationV2 windows can be resized independently of the browser viewpo
 Responsive layout rules for application bodies must therefore be keyed to the app or shell container width, not only to viewport media queries.
 
 - Use CSS container queries for application-specific narrow-window layout changes.
+- The unified player application supports a 1024px minimum window width.
+  At that floor, Inventory, Gathering, Crafting, Alchemy, and Journal use their named layout containers to enter one-column narrow mode when the container content-box inline size is 960px or less.
+  Narrow mode retains automatic rows, normal vertical scrolling, and each view's existing 220px or 240px minimum column height.
 - The GM `Environments` editor responds to the admin main container width: list/editor panes stack, nested task/result/catalyst layouts collapse, independently scrollable regions remain usable, and save actions stay reachable.
 - The player `Gathering` app responds to its own app container width: active/history regions collapse to one column, task rows reserve icon width, and row metadata stacks without horizontal overflow.
 - The player `Gathering` view's three columns (environments list, centre detail, right inspector) all carry the same non-zero minimum width so the centre column cannot collapse to nothing ahead of the side columns; the three columns scale down together proportionally as the window narrows.
@@ -321,7 +324,17 @@ Responsive layout rules for application bodies must therefore be keyed to the ap
 - The player `Crafting` view's requirement rail responds to its own app container width: slot tiles wrap onto further rows rather than shrinking below their minimum tile size, and the essence pool's carrier and requirement bars reflow rather than crushing when a set carries three or more essence requirements.
 - The unified Fabricate window enforces a minimum window width and height, derived from the gathering view's column minimums plus the navigation rail and chrome, so a resize can never shrink the window below the size where the columns would be clipped.
 - These responsive rules are presentation-only.
-  They must not change gathering runtime semantics, validation behavior, task visibility, attemptability, or persistence.
+  They must not change crafting, gathering, inventory, alchemy, journal, validation, task visibility, attemptability, or persistence behaviour.
+
+### Scenario: Minimum-width player app reaches every narrow layout
+
+- **WHEN** the player application opens at its 1024px minimum width on Inventory, Gathering, Crafting, Alchemy, or Journal
+- **THEN** the named layout container has a content-box inline size at most 960px and the rendered grid resolves to one column with its existing narrow-mode behaviour
+
+### Scenario: View Lab capture detects a responsive regression
+
+- **WHEN** a 1024px narrow View Lab case is captured locally or in CI
+- **THEN** the capture runner verifies the declared content-box width and one-column computed layout before writing or publishing the screenshot
 
 ## Integration Points
 

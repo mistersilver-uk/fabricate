@@ -321,6 +321,10 @@ function playerCase(entry) {
   };
 }
 
+function responsiveLayout(containerSelector, gridSelector) {
+  return { containerSelector, gridSelector, maxContentBoxInlineSize: 960 };
+}
+
 /**
  * The Journal's in-flight BLIND gathering run, from both sides of the redaction (issue 901).
  *
@@ -4116,15 +4120,8 @@ export const VIEW_LAB_CASES = Object.freeze([
     // go through, so this is the real floor rather than a chosen size — 900 is refused by the
     // harness's own geometry gate before anything renders.
     //
-    // IT DOES NOT REACH THE CONTAINER BREAKPOINT, and saying so is the point of this comment.
-    // `.inventory-view-container` measures 938px inside a 1024px window, and
-    // `@container fabricate-inventory (max-width: 900px)` therefore never matches — by design:
-    // `MIN_WINDOW_WIDTH`'s own comment says the floor keeps the columns usable "before the
-    // narrow-width stacking breakpoint takes over". `player-gathering-stacked` sits at the same
-    // 1024 and is in the same position. So this frame is evidence about the narrowest permitted
-    // GEOMETRY, not about the stacked block: the detail column falls from ~500px to 342px, which
-    // is where a queue row's name competes with its certainty chip, its broken chip and its remove
-    // control, and where the footer's note-left / actions-right row is most likely to break.
+    // `.inventory-view-container` measures roughly 938px inside the supported 1024px floor, so the
+    // shared 960px query now stacks this frame and the computed-layout expectation proves it.
     steps: [
       { selector: CARD_BUTTON('lab-smithing:sm-air-shard') },
       SHIFT_CLICK('lab-herbalism:hb-cracked-alembic'),
@@ -4133,6 +4130,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     ],
     position: { width: 1024, height: 860 },
     kinds: ['player', 'inventory', 'bulk', 'responsive'],
+    expectLayout: responsiveLayout('.inventory-view-container', '.inventory-view-grid'),
     expectSelector:
       '.fabricate-app-shell' +
       `:has(${CARD('lab-smithing:sm-air-shard')}[data-inventory-card-bulk-selected="true"])` +
@@ -4552,6 +4550,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     steps: [],
     position: { width: 1024, height: 860 },
     kinds: ['player', 'gathering', 'responsive'],
+    expectLayout: responsiveLayout('.gathering-view-container', '.gathering-view-grid'),
     sourceMatches: [/^src\/ui\/svelte\/apps\/gathering\//],
   }),
   playerCase({
@@ -5042,6 +5041,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     steps: [],
     position: { width: 1024, height: 860 },
     kinds: ['player', 'crafting', 'responsive'],
+    expectLayout: responsiveLayout('.crafting-view-container', '.crafting-view-grid'),
     sourceMatches: [CRAFTING_SHARED, /^src\/ui\/svelte\/stores\/craftingStore/],
   }),
   playerCase({
@@ -5081,7 +5081,20 @@ export const VIEW_LAB_CASES = Object.freeze([
     steps: [],
     position: { width: 1024, height: 860 },
     kinds: ['player', 'alchemy', 'responsive'],
+    expectLayout: responsiveLayout('.alchemy-view-container', '.alchemy-view-grid'),
     sourceMatches: [/^src\/ui\/svelte\/apps\/alchemy\//],
+  }),
+  playerCase({
+    id: 'player-journal-stacked',
+    label: 'Player app — Journal stacked',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: 'journal' },
+    steps: [],
+    position: { width: 1024, height: 860 },
+    kinds: ['player', 'journal', 'responsive'],
+    expectLayout: responsiveLayout('.journal-view-container', '.journal-view-grid'),
+    sourceMatches: [/^src\/ui\/svelte\/apps\/journal\//, /^src\/ui\/svelte\/stores\/journalStore/],
   }),
   playerCase({
     id: 'fabricate-journal',

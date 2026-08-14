@@ -44,6 +44,7 @@ import { missingChromeMessage, resolveChromeCache } from './lib/foundryChromeCac
 import { APP_CHROME, APP_CHROME_IDS, minimumViewportFor } from './lib/foundryChromeSpec.js';
 import { publishableCases } from './lib/viewLabCases.js';
 import { groupFrames, renderIndexHtml, summarise } from './lib/viewLabIndex.js';
+import { assertViewLabLayout } from './lib/viewLabLayoutAssertion.js';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const ARTIFACT_DIR = join(ROOT, 'ui-screenshot-artifact');
@@ -312,7 +313,16 @@ async function warmUpLabServer(browser, baseUrl) {
 async function renderPage(
   browser,
   baseUrl,
-  { appId, query, label, steps = [], expectView = null, expectTab = null, expectSelector = null }
+  {
+    appId,
+    query,
+    label,
+    steps = [],
+    expectView = null,
+    expectTab = null,
+    expectSelector = null,
+    expectLayout = null,
+  }
 ) {
   const context = await browser.newContext(BROWSER_CONTEXT);
   // Every wait in this harness, not only the ones that name a timeout: against a COLD Vite
@@ -441,6 +451,8 @@ async function renderPage(
         );
       }
     }
+
+    await assertViewLabLayout(page, expectLayout, label);
 
     const frame = page.locator(`[data-view-lab-frame="${appId}"]`);
     const buffer = await frame.screenshot({ animations: 'disabled', caret: 'hide' });
@@ -698,6 +710,7 @@ async function commandApps() {
           // query that produced the frame.
           expectTab: viewCase.app === 'fabricate-app' ? (viewCase.query?.tab ?? 'crafting') : null,
           expectSelector: viewCase.expectSelector ?? null,
+          expectLayout: viewCase.expectLayout ?? null,
         });
         writeFileSync(join(outputDir, `${viewCase.id}.png`), buffer);
         rendered.push({

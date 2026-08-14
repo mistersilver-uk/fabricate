@@ -13,6 +13,13 @@ function read(relPath) {
 const rootSource = read('../../src/ui/svelte/apps/FabricateAppRoot.svelte');
 const appSource = read('../../src/ui/SvelteFabricateApp.svelte.js');
 const viewSource = read('../../src/ui/svelte/apps/gathering/GatheringView.svelte');
+const responsiveViewSources = [
+  ['inventory', read('../../src/ui/svelte/apps/inventory/InventoryView.svelte'), '220px'],
+  ['gathering', viewSource, '220px'],
+  ['crafting', read('../../src/ui/svelte/apps/crafting/CraftingView.svelte'), '220px'],
+  ['alchemy', read('../../src/ui/svelte/apps/alchemy/AlchemyView.svelte'), '240px'],
+  ['journal', read('../../src/ui/svelte/apps/journal/JournalView.svelte'), '220px'],
+];
 const listSource = read('../../src/ui/svelte/apps/gathering/GatheringEnvironmentList.svelte');
 const cardSource = read('../../src/ui/svelte/apps/gathering/EnvironmentCard.svelte');
 const cssSource = read('../../styles/fabricate.css');
@@ -79,7 +86,7 @@ describe('GatheringView 3-column layout and states', () => {
     );
   });
 
-  it('reflows the columns into a single vertical stack below the narrow-width breakpoint', () => {
+  it('reflows every player layout at the reachable shared narrow-width breakpoint', () => {
     // Container query, not a viewport media query: the app width (not the
     // viewport) is what matters because the window is resizable/dockable.
     assert.ok(
@@ -90,17 +97,23 @@ describe('GatheringView 3-column layout and states', () => {
       viewSource.includes('container-name: fabricate-gathering;'),
       'the grid container should be named for the gathering container query'
     );
-    assert.ok(
-      viewSource.includes('@container fabricate-gathering (max-width: 900px)'),
-      'a container query should drive the narrow-width stacking breakpoint'
-    );
-    const narrowQuery = viewSource.slice(
-      viewSource.indexOf('@container fabricate-gathering (max-width: 900px)')
-    );
-    assert.ok(
-      narrowQuery.includes('grid-template-columns: 1fr;'),
-      'below the breakpoint the grid should collapse to a single column (stacked layout)'
-    );
+    for (const [name, source, minimumHeight] of responsiveViewSources) {
+      const marker = `@container fabricate-${name} (max-width: 960px)`;
+      assert.ok(source.includes(marker), `${name} should use the shared 960px breakpoint`);
+      const narrowQuery = source.slice(source.indexOf(marker));
+      assert.ok(
+        narrowQuery.includes('grid-template-columns: 1fr;') &&
+          narrowQuery.includes('grid-auto-rows: minmax(min-content, max-content);') &&
+          narrowQuery.includes('overflow-y: auto;') &&
+          narrowQuery.includes(`min-height: ${minimumHeight};`),
+        `${name} should retain its one-column, auto-row, scrolling, ${minimumHeight} minimum layout`
+      );
+      assert.match(
+        source.slice(source.lastIndexOf('/*', source.indexOf(marker)), source.indexOf(marker)),
+        /1024px.*938px.*960px/s,
+        `${name} should explain the 1024px window, approximately 938px content box, and 960px coupling`
+      );
+    }
   });
 
   it('enforces a minimum window size on the Fabricate app so the columns cannot be clipped', () => {

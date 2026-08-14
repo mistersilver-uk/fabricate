@@ -159,9 +159,11 @@
     color: var(--fab-text);
   }
 
-  /* Below the combined three-column minimum the grid reflows into a single
+  /* At the supported 1024px window floor this container's content box is roughly
+     938px wide, so the shared 960px boundary is deliberately reachable.
+     Below the combined three-column minimum the grid reflows into a single
      vertical stack so the view stays usable on a narrow window. */
-  @container fabricate-journal (max-width: 900px) {
+  @container fabricate-journal (max-width: 960px) {
     .journal-view-grid {
       grid-template-columns: 1fr;
       grid-auto-rows: minmax(min-content, max-content);

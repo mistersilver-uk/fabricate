@@ -536,8 +536,68 @@ function caseSelectors(viewCase) {
     if (typeof step === 'object' && typeof step.selector === 'string') selectors.push(step.selector);
   }
   if (typeof viewCase.expectSelector === 'string') selectors.push(viewCase.expectSelector);
+  if (typeof viewCase.expectLayout?.containerSelector === 'string') {
+    selectors.push(viewCase.expectLayout.containerSelector);
+  }
+  if (typeof viewCase.expectLayout?.gridSelector === 'string') {
+    selectors.push(viewCase.expectLayout.gridSelector);
+  }
   return selectors;
 }
+
+const RESPONSIVE_LAYOUT_CASE_IDS = [
+  'player-inventory-bulk-mixed-narrow',
+  'player-gathering-stacked',
+  'player-crafting-stacked',
+  'player-alchemy-stacked',
+  'player-journal-stacked',
+];
+
+test('exactly the five 1024px player responsive cases declare complete layout expectations', () => {
+  const declared = VIEW_LAB_CASES.filter((viewCase) => viewCase.expectLayout);
+  assert.deepEqual(
+    declared.map((viewCase) => viewCase.id),
+    RESPONSIVE_LAYOUT_CASE_IDS
+  );
+  for (const viewCase of declared) {
+    assert.deepEqual(viewCase.position, { width: 1024, height: 860 });
+    assert.equal(typeof viewCase.expectLayout.containerSelector, 'string');
+    assert.equal(typeof viewCase.expectLayout.gridSelector, 'string');
+    assert.equal(viewCase.expectLayout.maxContentBoxInlineSize, 960);
+  }
+});
+
+test('layout expectation selectors name UI that still exists', () => {
+  const sources = renderSources();
+  const haystack = [...sources.values()].join('\n');
+  const missing = [];
+  for (const viewCase of VIEW_LAB_CASES.filter((entry) => entry.expectLayout)) {
+    collectSelectorHookFailures(
+      viewCase,
+      viewCase.expectLayout.containerSelector,
+      sources,
+      haystack,
+      missing
+    );
+    collectSelectorHookFailures(
+      viewCase,
+      viewCase.expectLayout.gridSelector,
+      sources,
+      haystack,
+      missing
+    );
+  }
+  assert.deepEqual(missing, [], `these layout selectors no longer exist:\n  ${missing.join('\n  ')}`);
+});
+
+test('the capture runner threads and asserts declared layouts before taking a screenshot', () => {
+  const driver = readFileSync(resolve(ROOT, 'scripts/view-lab-screenshots.mjs'), 'utf8');
+  assert.match(driver, /expectLayout: viewCase\.expectLayout \?\? null/);
+  const assertion = driver.indexOf('await assertViewLabLayout(page, expectLayout, label)');
+  const screenshot = driver.indexOf('frame.screenshot(', assertion);
+  assert.ok(assertion >= 0, 'the runner must invoke the generic layout assertion');
+  assert.ok(screenshot > assertion, 'the layout assertion must run before frame.screenshot()');
+});
 
 test('every combination-rule value the registry targets is a real MODIFIER_POLICIES member', () => {
   // Nine selectors in this registry pin a rule option by its VALUE, and NOTHING else could
