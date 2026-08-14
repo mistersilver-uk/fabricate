@@ -606,7 +606,6 @@ The qualifying threshold in a counting formula must resolve to a single whole nu
 Write either a literal number, or one character-data path on its own.
 Fabricate's own formula reader recognises only those two shapes in that position.
 A composed expression, such as two paths added together, anything in brackets, or anything containing a space, is not supported there.
-Fabricate's reader stops at the first operator or bracket, so the remainder of a composed threshold is silently read as a separate term added to the roll rather than as part of the threshold.
 For example, a two-die pool that qualifies when each die rolls at or under a character's skill value could use a formula that reads that skill from one character-data path, such as `2d20cs<=@skills.survival.value`.
 Notice that this example qualifies by rolling low, so it is also the example that breaks the usual assumption that a higher roll is better.
 When your game system does not already expose the number you need as one path, write an Active Effect that computes the value and writes it onto the character.
