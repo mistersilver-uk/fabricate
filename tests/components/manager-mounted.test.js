@@ -18069,10 +18069,15 @@ describe('CraftingSystemManager mounted behavior', () => {
     else await openDirtyGatheringEventEditor(calls, storeOptions);
 
     if (destination !== 'parties') {
-      worldNavItem('travel').click();
+      target.querySelector('#manager-world-travel-toggle').click();
       await tick();
       flushSync();
       assert.equal(worldNavItem('travel').getAttribute('aria-expanded'), 'true');
+      assert.equal(
+        calls.some((call) => call[0] === `confirmDiscardDirtyGathering${title}Draft`),
+        false,
+        `${kind} ${outcome.name} disclosure must not consume the dirty-route guard`
+      );
     }
 
     const activateDestination = async () => {

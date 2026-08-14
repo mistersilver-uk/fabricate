@@ -3164,7 +3164,6 @@
             "EncountersHint": "Browse reusable events before attaching them to environments.",
             "Travel": "Travel",
             "TravelTitle": "Travel and parties",
-            "TravelHint": "Manage Fabricate parties and set the current realm for this crafting system.",
             "TravelActions": "Travel and party actions",
             "TravelInspector": "Selected party inspector",
             "SettingsPlaceholderTitle": "Gathering settings",

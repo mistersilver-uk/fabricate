@@ -2052,9 +2052,7 @@
   const gatheringRealmsEnabled = $derived($viewState.gatheringRealmSettings?.enabled === true);
   const canShowWorldTravel = $derived(canShowEnvironments && gatheringRealmsEnabled);
   const displayedGatheringTab = $derived(
-    activeGatheringTab === 'travel' && !canShowWorldTravel
-      ? 'environments'
-      : activeGatheringTab
+    activeGatheringTab === 'travel' && !canShowWorldTravel ? 'environments' : activeGatheringTab
   );
   const visibleGatheringNavItems = gatheringNavItems;
   const gatheringInspectorTabs = $derived(
@@ -8006,7 +8004,10 @@
                 class={`manager-nav-button manager-nav-parent manager-world-nav-item ${isWorldTravelChildRoute ? 'is-active' : ''}`}
                 id="manager-world-nav-travel"
                 data-world-nav-item="travel"
-                aria-label={text('FABRICATE.Admin.Manager.Environment.GatheringTabs.Travel', 'Travel')}
+                aria-label={text(
+                  'FABRICATE.Admin.Manager.Environment.GatheringTabs.Travel',
+                  'Travel'
+                )}
                 aria-controls="manager-world-travel-submenu"
                 aria-expanded={worldTravelExpanded}
                 onclick={activateWorldTravelParent}
@@ -8038,16 +8039,17 @@
                   class="manager-nav-submenu manager-world-travel-submenu"
                   id="manager-world-travel-submenu"
                   data-world-travel-submenu
-                  aria-label={text('FABRICATE.Admin.Manager.World.TravelDestinations', 'Travel destinations')}
+                  aria-label={text(
+                    'FABRICATE.Admin.Manager.World.TravelDestinations',
+                    'Travel destinations'
+                  )}
                 >
                   <button
                     type="button"
                     class={`manager-nav-subitem manager-world-travel-child ${isWorldRoute && activeTravelTab === 'realms' ? 'is-active' : ''}`}
                     id="manager-world-nav-realms"
                     data-world-nav-item="realms"
-                    aria-current={isWorldRoute && activeTravelTab === 'realms'
-                      ? 'page'
-                      : undefined}
+                    aria-current={isWorldRoute && activeTravelTab === 'realms' ? 'page' : undefined}
                     onclick={() => openWorldDestination('realms')}
                   >
                     <i class="fas fa-mountain-sun" aria-hidden="true"></i>

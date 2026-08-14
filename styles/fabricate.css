@@ -12116,7 +12116,6 @@
 .fabricate-manager .manager-world-heading-row h2,
 .fabricate-manager .manager-world-heading-row span {
   margin: 0;
-  font-family: var(--fab-font-sans);
   font-size: 0.58rem;
   line-height: 1.2;
 }
