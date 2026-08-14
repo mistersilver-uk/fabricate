@@ -12400,9 +12400,16 @@
 .fabricate-manager #manager-world-nav-parties.is-active,
 .fabricate-manager .manager-world-travel-child.is-active {
   color: var(--fab-mv2-text);
-  border-color: var(--fab-mv2-border-strong);
   background: var(--fab-surface-active);
   box-shadow: none;
+}
+
+.fabricate-manager #manager-world-nav-parties.is-active {
+  border-color: var(--fab-mv2-border-strong);
+}
+
+.fabricate-manager .manager-world-travel-child.is-active {
+  border-color: transparent;
 }
 
 .fabricate-manager #manager-world-nav-parties.is-active:focus,
@@ -12411,7 +12418,10 @@
 }
 
 .fabricate-manager #manager-world-nav-parties.is-active .manager-nav-count {
-  color: var(--fab-mv2-text);
+  color: var(--fab-text-subtle);
+  font-family: var(--fab-font-mono);
+  font-size: 0.625rem;
+  font-weight: 600;
 }
 
 .fabricate-manager .manager-world-travel-group.is-expanded {
@@ -12424,7 +12434,7 @@
   color: var(--fab-mv2-accent);
   border-color: var(--fab-accent-border);
   background: var(--fab-accent-soft);
-  box-shadow: inset 3px 0 0 var(--fab-mv2-accent);
+  box-shadow: none;
 }
 
 /*

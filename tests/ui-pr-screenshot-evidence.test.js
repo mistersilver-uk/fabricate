@@ -312,6 +312,58 @@ describe('UI PR screenshot evidence', () => {
     assert.ok(views[0].smokeLabels.includes('manager-environment-edit-placeholder'));
   });
 
+  it('pins World navigation sources and the Foundry walk to the six World captures', () => {
+    const worldLabels = [
+      'manager-world-default-collapsed',
+      'manager-world-travel-expanded-neutral',
+      'manager-world-parties-normal',
+      'manager-world-realms-normal',
+      'manager-world-realms-stacked',
+      'manager-world-map-collapsed',
+    ];
+    for (const label of worldLabels) {
+      assert.deepEqual(
+        VIEW_RECIPES.find((view) => view.id === label)?.smokeLabels,
+        [label],
+        `${label} must remain independently publishable`
+      );
+    }
+
+    for (const file of [
+      'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte',
+      'src/ui/svelte/apps/manager/GatheringPartiesTab.svelte',
+      'src/ui/svelte/apps/manager/GatheringRealmsTab.svelte',
+      'src/ui/svelte/apps/manager/GatheringMapLinksTab.svelte',
+    ]) {
+      const mappedIds = mapChangedFilesToViews([file]).map((view) => view.id);
+      for (const label of worldLabels) {
+        assert.ok(mappedIds.includes(label), `${file} must publish ${label}`);
+      }
+    }
+
+    assert.equal(
+      VIEW_RECIPES.some((view) => view.id === 'manager-travel'),
+      false,
+      'the retired Gathering Travel evidence recipe must not survive'
+    );
+
+    const harness = readFileSync('scripts/foundry-test-run.mjs', 'utf8');
+    assert.equal(harness.includes('#manager-gathering-nav-travel'), false);
+    assert.equal(harness.includes('manager-gathering-travel-normal'), false);
+    assert.equal(harness.includes('manager-gathering-travel-stacked'), false);
+    for (const selector of [
+      '#manager-world-nav-parties',
+      '#manager-world-travel-toggle',
+      '#manager-world-nav-realms',
+      '#manager-world-nav-map',
+    ]) {
+      assert.ok(harness.includes(selector), `the World walk must use ${selector}`);
+    }
+    for (const label of worldLabels) {
+      assert.ok(harness.includes(label), `the Foundry walk must capture ${label}`);
+    }
+  });
+
   it('maps the issue-767 system-details dirty frame to its own view id', () => {
     // The SystemEditView (chip) republishes BOTH the clean settings frames and the
     // dedicated dirty frame; CraftingSystemManagerRoot (the guard + lifted draft)

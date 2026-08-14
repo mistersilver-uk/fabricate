@@ -13304,6 +13304,31 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.equal(worldNavItem('travel').tagName, 'BUTTON');
   });
 
+  it('keeps a World child reachable after collapsing and re-expanding the rail', async () => {
+    mountManager([], { gatheringRealmsEnabled: true });
+
+    assert.equal(worldNavItem('travel').getAttribute('aria-expanded'), 'false');
+    const railToggle = target.querySelector('[data-manager-rail-toggle]');
+    railToggle.click();
+    await tick();
+    flushSync();
+    assert.ok(target.querySelector('.manager-body').classList.contains('is-rail-collapsed'));
+
+    target.querySelector('[data-manager-rail-toggle]').click();
+    await tick();
+    flushSync();
+    assert.ok(!target.querySelector('.manager-body').classList.contains('is-rail-collapsed'));
+
+    worldNavItem('travel').click();
+    await tick();
+    flushSync();
+    assert.equal(worldNavItem('travel').getAttribute('aria-expanded'), 'true');
+    worldNavItem('realms').click();
+    await settleRouteExit();
+    assert.equal(worldNavItem('realms').getAttribute('aria-current'), 'page');
+    assert.ok(target.querySelector('[data-travel-panel="realms"]'));
+  });
+
   it('flips Travel & Realms and reveals World without restoring Gathering Travel', async () => {
     const calls = [];
     target = document.createElement('div');
@@ -18027,7 +18052,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     await settleSaveAttempt();
   }
 
-  async function attemptDirtyGatheringWorldExit(kind, outcome) {
+  async function attemptDirtyGatheringWorldExit(kind, outcome, destination) {
     const calls = [];
     const title = kind === 'task' ? 'Task' : 'Event';
     const storeOptions = {
@@ -18043,12 +18068,19 @@ describe('CraftingSystemManager mounted behavior', () => {
     if (kind === 'task') await openDirtyGatheringTaskEditor(calls, storeOptions);
     else await openDirtyGatheringEventEditor(calls, storeOptions);
 
-    const activateParties = async () => {
-      worldNavItem('parties').click();
+    if (destination !== 'parties') {
+      worldNavItem('travel').click();
+      await tick();
+      flushSync();
+      assert.equal(worldNavItem('travel').getAttribute('aria-expanded'), 'true');
+    }
+
+    const activateDestination = async () => {
+      worldNavItem(destination).click();
       await settleRouteExit();
     };
-    if (outcome.rejectSave) await withSilencedConsoleError(activateParties);
-    else await activateParties();
+    if (outcome.rejectSave) await withSilencedConsoleError(activateDestination);
+    else await activateDestination();
 
     const expectedView = outcome.proceeds ? 'environments' : `gathering-${kind}-edit`;
     assert.equal(
@@ -18057,9 +18089,9 @@ describe('CraftingSystemManager mounted behavior', () => {
       `${kind} ${outcome.name} should ${outcome.proceeds ? '' : 'not '}leave the editor; rendered: ${JSON.stringify(Array.from(target.querySelectorAll('.fabricate-manager')).map((node) => node.dataset.managerView))}; calls: ${JSON.stringify(calls)}`
     );
     assert.equal(
-      worldNavItem('parties').getAttribute('aria-current'),
+      worldNavItem(destination).getAttribute('aria-current'),
       outcome.proceeds ? 'page' : null,
-      `${kind} ${outcome.name} must not leave a hidden active World control`
+      `${kind} ${outcome.name} ${destination} must not leave a hidden active World control`
     );
     assert.ok(
       calls.some((call) => call[0] === `confirmDiscardDirtyGathering${title}Draft`),
@@ -18073,7 +18105,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     );
   }
 
-  it('guards dirty gathering task and event exits through the actual World Parties control', async () => {
+  it('guards dirty gathering task and event exits through World Parties and a Travel child', async () => {
     const outcomes = [
       { name: 'cancel', action: 'cancel', proceeds: false },
       { name: 'save false', action: 'save', saveResult: false, proceeds: false },
@@ -18082,13 +18114,15 @@ describe('CraftingSystemManager mounted behavior', () => {
       { name: 'discard', action: 'discard', proceeds: true },
     ];
 
-    for (const kind of ['task', 'event']) {
-      for (const outcome of outcomes) {
-        await attemptDirtyGatheringWorldExit(kind, outcome);
-        unmount(mounted);
-        mounted = null;
-        target.remove();
-        target = null;
+    for (const destination of ['parties', 'realms']) {
+      for (const kind of ['task', 'event']) {
+        for (const outcome of outcomes) {
+          await attemptDirtyGatheringWorldExit(kind, outcome, destination);
+          unmount(mounted);
+          mounted = null;
+          target.remove();
+          target = null;
+        }
       }
     }
   });

@@ -10141,30 +10141,63 @@ async function main() {
         await assertNoScreenshotOverlays(page);
         await screenshot(page, 'manager-gathering-event-editor-normal');
 
-        // Travel route (#257): clicks the gathering Travel subitem and screenshots
-        // the party/region management surface. The subitem is targeted by id so
-        // adding it as a 5th gathering nav item does not shift any pinned .nth()
-        // selector. Captures a default-width and a narrow-width shot, mirroring
-        // the stacked-capture pattern used by the gathering task editor above.
+        // World route (#1179): the disclosure starts collapsed, then exposes the
+        // global Parties destination and the selected-system Realms/Map destinations.
+        // Capture each disclosure/selection state through its stable World id; the
+        // retired Gathering Travel subitem no longer exists.
         await setManagerWindowSize(page, { width: 1280, height: 820 });
-        await page.locator('.fabricate-manager #manager-gathering-nav-travel').first().click();
-        await page.locator('.fabricate-manager .manager-travel-view').first()
-          .waitFor({ state: 'visible', timeout: 10_000 });
+        await page.locator('.fabricate-manager #manager-world-nav-travel[aria-expanded="false"]')
+          .first().waitFor({ state: 'visible', timeout: 10_000 });
+        await captureStableManagerView(page, {
+          layout: 'World Travel collapsed by default',
+          label: 'manager-world-default-collapsed'
+        });
+
+        await page.locator('.fabricate-manager #manager-world-travel-toggle').first().click();
+        await page.locator('.fabricate-manager #manager-world-nav-travel[aria-expanded="true"]')
+          .first().waitFor({ state: 'visible', timeout: 5_000 });
+        await captureStableManagerView(page, {
+          layout: 'World Travel expanded neutral',
+          label: 'manager-world-travel-expanded-neutral'
+        });
+
+        await page.locator('.fabricate-manager #manager-world-nav-parties').first().click();
         await page.locator('.fabricate-manager .manager-travel-parties-row').first()
           .waitFor({ state: 'visible', timeout: 10_000 });
         await captureStableManagerView(page, {
-          layout: 'gathering travel normal',
-          label: 'manager-gathering-travel-normal'
+          layout: 'World Parties normal',
+          label: 'manager-world-parties-normal'
         });
 
+        await page.locator('.fabricate-manager #manager-world-nav-realms').first().click();
+        await page.locator('.fabricate-manager [data-travel-panel="realms"]')
+          .first().waitFor({ state: 'visible', timeout: 10_000 });
+        await captureStableManagerView(page, {
+          layout: 'World Realms normal',
+          label: 'manager-world-realms-normal'
+        });
         await captureStableManagerView(page, {
           width: 1000,
           height: 720,
-          layout: 'gathering travel stacked',
-          label: 'manager-gathering-travel-stacked',
+          layout: 'World Realms stacked',
+          label: 'manager-world-realms-stacked',
           settleMs: 250
         });
+
         await setManagerWindowSize(page, { width: 1280, height: 820 });
+        await page.locator('.fabricate-manager #manager-world-nav-map').first().click();
+        await page.locator('.fabricate-manager [data-travel-panel="map"]')
+          .first().waitFor({ state: 'visible', timeout: 10_000 });
+        await page.locator('.fabricate-manager [data-manager-rail-toggle]').first().click();
+        await page.locator('.fabricate-manager .manager-body.is-rail-collapsed')
+          .first().waitFor({ state: 'visible', timeout: 5_000 });
+        await captureStableManagerView(page, {
+          layout: 'World Map Region Links collapsed rail',
+          label: 'manager-world-map-collapsed'
+        });
+        await page.locator('.fabricate-manager [data-manager-rail-toggle]').first().click();
+        await page.locator('.fabricate-manager .manager-body:not(.is-rail-collapsed)')
+          .first().waitFor({ state: 'visible', timeout: 5_000 });
 
         // Doc journey (quickstart Step 7 — Configure the Gathering Environment):
         // the gathering Settings tab hosts the d100 Gathering Rules (reward / event
