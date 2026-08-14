@@ -32,6 +32,11 @@ You can also set the visibility mode through the API.
 Teaser mode is a separate discovery layer on top of these modes and is not one of the card's choices.
 See [Teaser Mode]({% link visibility-teaser.md %}) for how to turn it on.
 
+If you are viewing **Access**, **Books & Scrolls**, or **Knowledge** and that section stops being available, Fabricate does not leave you stranded there.
+This can happen when you change the visibility mode, or when you switch to a different crafting system.
+Fabricate moves you to another section the new mode offers, trying **Access** first, then **Books & Scrolls**, then **Knowledge**.
+When none of those apply, it moves you to **Recipes** instead.
+
 ### Global Mode
 
 All recipes in the system are visible to all users.
