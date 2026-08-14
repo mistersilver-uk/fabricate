@@ -781,6 +781,33 @@ function craftingSubitem(labelText) {
   );
 }
 
+// The Crafting sub-entries currently carrying BOTH halves of the active treatment
+// (issue 1151). Read as a list rather than a boolean so "exactly one, and it is the
+// redirect target" is provable — "nothing is highlighted" is half of the reported
+// dead end, and two highlighted entries would be the other failure this can catch.
+function activeCraftingSubitemIds() {
+  return Array.from(target.querySelectorAll('#manager-crafting-submenu .manager-nav-subitem'))
+    .filter(
+      (button) =>
+        button.classList.contains('is-active') && button.getAttribute('aria-current') === 'page'
+    )
+    .map((button) => button.id.replace('manager-crafting-nav-', ''));
+}
+
+// The ONE scope-switch driver for the route-reconciliation cases (issue 1151): set the
+// select, dispatch a real bubbling `change`, settle, and report the rendered route.
+// Repeating that sequence per case is precisely the near-identical block SonarCloud's
+// new-code duplication gate counts against `tests/**` exactly as it does against `src/`.
+async function switchScopeSystemTo(systemId) {
+  const scopeSelect = target.querySelector('[data-manager-scope-select]');
+  assert.ok(scopeSelect, 'the rail card exposes a system scope select');
+  scopeSelect.value = systemId;
+  scopeSelect.dispatchEvent(new globalThis.window.Event('change', { bubbles: true }));
+  await tick();
+  flushSync();
+  return target.querySelector('.fabricate-manager').dataset.managerView;
+}
+
 // Mount the manager against a fresh store on a fresh host element. Assigns the
 // module-level `mounted`/`target` (so afterEach can clean up) and returns the target,
 // so the routing helpers below differ only in where they navigate afterwards.
@@ -899,6 +926,23 @@ function applySelectedCurrency(systemDetails, selectedCurrency) {
     ...systemDetails.alchemy,
     requirements: { ...systemDetails.alchemy.requirements, currency: selectedCurrency },
   };
+}
+
+// Per-system crafting visibility/resolution modes (issue 1151), keyed by system id.
+// Opt-in: with no option the shared default fixture is untouched.
+//
+// These are written into `systemDetails` rather than through
+// `options.selectedSystemOverrides`, and the difference is load-bearing:
+// `applySelectedSystem` republishes `systemDetails[id]` RAW on a scope switch, while
+// the overrides only ever reach the INITIALLY selected system. A mode written the
+// second way would vanish the moment the switch under test happened, and every
+// post-switch assertion would pass vacuously. Mutates the passed map, like
+// `applySelectedCurrency` above, and is kept out of `createStore` for the same
+// cognitive-complexity reason.
+function applySystemCraftingModes(systemDetails, modesById) {
+  for (const [id, modes] of Object.entries(modesById || {})) {
+    if (systemDetails[id]) systemDetails[id] = { ...systemDetails[id], ...modes };
+  }
 }
 
 function createStore(calls = [], options = {}) {
@@ -1309,6 +1353,7 @@ function createStore(calls = [], options = {}) {
         },
       ];
   applySelectedCurrency(systemDetails, options.selectedCurrency);
+  applySystemCraftingModes(systemDetails, options.systemCraftingModes);
   const baseSelectedSystem =
     options.noSystems || options.selected === false ? null : systemDetails.alchemy;
   const selectedSystemWithMode = applyRecipeKnowledgeMode(
@@ -11547,6 +11592,166 @@ describe('CraftingSystemManager mounted behavior', () => {
       target.querySelector('[data-access-roster]'),
       'the grant-access inspector renders on select'
     );
+  });
+
+  // ── Crafting route reconciliation across a scope switch (issue 1151) ──────────────
+  //
+  // The reported dead end: the rail drops the mode-conditional entry the newly selected
+  // system does not offer, while the router keeps rendering the route it owned. The GM
+  // is left on a surface the system cannot use, with no rail entry highlighted and no
+  // way back to it. Every case below drives a REAL `change` on the scope select through
+  // the one shared `switchScopeSystemTo` helper and reads the reconciled route.
+  //
+  // The two fixture systems carry their modes through `systemCraftingModes`, which
+  // writes into `systemDetails` per id — the switch republishes that map, so the mode
+  // under test survives the very navigation the case is about.
+  const RESTRICTED_SIMPLE = { visibilityMode: 'restricted', resolutionMode: 'simple' };
+  const KNOWLEDGE_SIMPLE = { visibilityMode: 'knowledge', resolutionMode: 'simple' };
+  const GLOBAL_ALCHEMY = { visibilityMode: 'global', resolutionMode: 'alchemy' };
+  const KNOWLEDGE_TO_RESTRICTED = { alchemy: KNOWLEDGE_SIMPLE, smithing: RESTRICTED_SIMPLE };
+
+  // Mount with per-system modes, open the Crafting group, and route to one submenu
+  // entry, asserting it exists first: a silently missing entry would leave every
+  // assertion afterwards reading the previous screen and passing for the wrong reason.
+  async function openCraftingEntry(calls, systemCraftingModes, label, storeOptions = {}) {
+    mountManager(calls, {
+      experimentalFeaturesEnabled: true,
+      systemCraftingModes,
+      ...storeOptions,
+    });
+    craftingParent().click();
+    await tick();
+    flushSync();
+    const entry = craftingSubitem(label);
+    assert.ok(entry, `the Crafting submenu offers "${label}" for the selected system`);
+    entry.click();
+    await tick();
+    flushSync();
+    return target.querySelector('.fabricate-manager').dataset.managerView;
+  }
+
+  // The shared arrangement for the three `recipe-item-edit` cases: a knowledge-mode
+  // system whose sibling is restricted, routed into the editor for `ri1`.
+  async function openRecipeItemEditorForSwitch(calls, storeOptions = {}) {
+    await openCraftingEntry(calls, KNOWLEDGE_TO_RESTRICTED, 'Books & Scrolls', {
+      recipeItemDefinitions: booksScrollsFixtures,
+      ...storeOptions,
+    });
+    target.querySelector('[data-books-scrolls-edit="ri1"]').click();
+    await tick();
+    flushSync();
+    return target.querySelector('.fabricate-manager').dataset.managerView;
+  }
+
+  // Make the open recipe-item draft dirty through its enabled toggle.
+  async function dirtyOpenRecipeItem() {
+    target.querySelector('[data-recipe-item-enabled]').click();
+    await tick();
+    flushSync();
+  }
+
+  it('reconciles Access onto the new system’s Books & Scrolls on a scope switch', async () => {
+    const calls = [];
+    const start = await openCraftingEntry(
+      calls,
+      { alchemy: RESTRICTED_SIMPLE, smithing: KNOWLEDGE_SIMPLE },
+      'Access'
+    );
+    assert.equal(start, 'access');
+
+    assert.equal(
+      await switchScopeSystemTo('smithing'),
+      'books-scrolls',
+      'a knowledge-mode system offers no Access entry, so the router must not keep rendering it'
+    );
+    assert.deepEqual(
+      activeCraftingSubitemIds(),
+      ['books-scrolls'],
+      'exactly one Crafting sub-entry is highlighted, and it is the redirect target'
+    );
+  });
+
+  it('reconciles Books & Scrolls onto the new system’s Access on a scope switch', async () => {
+    const calls = [];
+    const start = await openCraftingEntry(calls, KNOWLEDGE_TO_RESTRICTED, 'Books & Scrolls');
+    assert.equal(start, 'books-scrolls');
+
+    assert.equal(await switchScopeSystemTo('smithing'), 'access');
+    assert.deepEqual(activeCraftingSubitemIds(), ['access']);
+  });
+
+  it('reconciles a recipe-item editor onto Access, never a Books & Scrolls the system lacks', async () => {
+    const calls = [];
+    assert.equal(await openRecipeItemEditorForSwitch(calls), 'recipe-item-edit');
+
+    // `recipe-item-edit` is owned by Books & Scrolls, so it collapses onto its parent:
+    // the scope change maps it to `books-scrolls`, which the restricted system does not
+    // offer either, and the router resolves that system's own first conditional entry.
+    assert.equal(await switchScopeSystemTo('smithing'), 'access');
+    assert.deepEqual(activeCraftingSubitemIds(), ['access']);
+  });
+
+  it('reconciles onto Knowledge when the new system is global + alchemy', async () => {
+    // The settled edge case, asserted at the mounted level because it is the ONLY cell
+    // whose answer depends on `resolutionMode` reaching `buildCraftingNavItems` through
+    // `craftingNavArgs`: every other cell resolves the same target either way, so a bag
+    // that dropped `resolutionMode` would pass every other assertion here.
+    const calls = [];
+    const start = await openCraftingEntry(
+      calls,
+      { alchemy: RESTRICTED_SIMPLE, smithing: GLOBAL_ALCHEMY },
+      'Access'
+    );
+    assert.equal(start, 'access');
+
+    assert.equal(
+      await switchScopeSystemTo('smithing'),
+      'knowledge',
+      'a global alchemy system DOES offer a mode-conditional entry, so Recipes would be wrong'
+    );
+    assert.deepEqual(activeCraftingSubitemIds(), ['knowledge']);
+  });
+
+  it('leaves an always-present Crafting route alone across a scope switch', async () => {
+    // The negative control: `recipes` is unconditional, so the clause must not fire.
+    const calls = [];
+    const start = await openCraftingEntry(calls, KNOWLEDGE_TO_RESTRICTED, 'Recipes');
+    assert.equal(start, 'recipes');
+
+    assert.equal(await switchScopeSystemTo('smithing'), 'recipes');
+    assert.deepEqual(activeCraftingSubitemIds(), ['recipes']);
+  });
+
+  it('still guards a dirty recipe-item editor before reconciling (cancel keeps it open)', async () => {
+    // The route-exit guard is not weakened by the read-time normalization, and this is
+    // the case the issue calls doubly exposed: the guard runs on `books-scrolls` BEFORE
+    // `selectSystem`, so cancelling aborts the switch entirely and no redirect fires.
+    const calls = [];
+    await openRecipeItemEditorForSwitch(calls, { confirmDiscardRecipeItemResult: 'cancel' });
+    await dirtyOpenRecipeItem();
+
+    assert.equal(await switchScopeSystemTo('smithing'), 'recipe-item-edit');
+    assert.ok(
+      calls.some((call) => call[0] === 'confirmDiscardDirtyRecipeItemDraft'),
+      'the recipe-item discard confirmation is consulted before the system switch'
+    );
+    assert.ok(
+      !calls.some((call) => call[0] === 'selectSystem' && call[1] === 'smithing'),
+      'cancelling the discard aborts the system switch, so no reconciliation happens'
+    );
+  });
+
+  it('lands a discarded dirty recipe-item editor on the new system’s Access', async () => {
+    const calls = [];
+    await openRecipeItemEditorForSwitch(calls, { confirmDiscardRecipeItemResult: 'discard' });
+    await dirtyOpenRecipeItem();
+
+    assert.equal(await switchScopeSystemTo('smithing'), 'access');
+    assert.ok(
+      calls.some((call) => call[0] === 'confirmDiscardDirtyRecipeItemDraft'),
+      'the discard confirmation still runs on the way out'
+    );
+    assert.deepEqual(activeCraftingSubitemIds(), ['access']);
   });
 
   it('shows the Books & Scrolls empty state when the system has no recipe items', async () => {

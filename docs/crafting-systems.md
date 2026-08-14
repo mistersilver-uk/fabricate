@@ -308,7 +308,7 @@ It is always available.
 Whenever a crafting system is selected, the panel's left menu shows an expandable **Crafting** group, in the same style as the **Gathering** group.
 
 Expand it to reveal its sections.
-**Settings** and **Recipes** are always present, and the system's [visibility mode](#recipe-visibility) decides which of the other two sections appear.
+**Settings** and **Recipes** are always present, and the system's [visibility mode](#recipe-visibility) decides which of the other sections appear, with **Knowledge** also depending on the system's resolution mode.
 
 - **Settings** hosts the system-level crafting rules: the recipe resolution mode, the salvage resolution mode, and the **Recipe Visibility** card.
   These cards used to live on the System settings page and moved here.
@@ -324,6 +324,9 @@ Expand it to reveal its sections.
 - **Knowledge** appears whenever **Books & Scrolls** does, and also for a system whose recipe resolution mode is Alchemy, even in a visibility mode that would not otherwise show Books & Scrolls.
   It audits and corrects what each character actually carries and has learned, separately from the recipe items and access grants themselves.
   See [Knowledge]({% link visibility.md %}#knowledge).
+
+If you are on **Access**, **Books & Scrolls**, or **Knowledge** and a visibility mode change or a crafting system switch removes that section, Fabricate automatically takes you to another section instead of leaving you on one with no way back.
+See [Visibility Modes]({% link visibility.md %}#visibility-modes) for the order it tries.
 
 ---
 

@@ -105,6 +105,8 @@
     buildCraftingNavItems,
     activeCraftingTab as resolveActiveCraftingTab,
     isCraftingRoute as isCraftingView,
+    isCraftingViewAvailable,
+    resolveCraftingRedirect,
   } from './crafting/craftingNav.js';
   import {
     CHECKS_VIEWS,
@@ -2107,14 +2109,26 @@
   const craftingResolutionMode = $derived(selectedSystem?.resolutionMode || '');
   const recipeCount = $derived($viewState.recipes?.length || 0);
   const recipeItemCount = $derived(recipeItemDefinitions.length);
-  const craftingNavItems = $derived(
-    buildCraftingNavItems({
-      visibilityMode: craftingVisibilityMode,
-      resolutionMode: craftingResolutionMode,
-      recipeCount,
-      recipeItemCount,
-    })
-  );
+  // ONE argument bag, read by the rail AND by route reconciliation in
+  // `normalizedActiveView` (issue 1151), mirroring `checksNavArgs`/`checksNavItems`
+  // below. Two bags could disagree about what the selected system offers, which is
+  // the defect: the rail would drop the entry while the router kept rendering it.
+  //
+  // `visibilityMode` is the DEFAULTED `craftingVisibilityMode`, not a bare
+  // `selectedSystem?.visibilityMode`. The difference is invisible to
+  // `buildCraftingNavItems` (`craftingEffect` resolves undefined to `knowledge`
+  // anyway), but this same derived is the prop source for BooksScrollsView,
+  // RecipeItemEditor and ItemPageInspector, and RecipeItemEditor's own prop default
+  // is `'item'` — so feeding an undefined-bearing field through would silently flip
+  // its Limits card from learning caps to use caps for a system with no persisted
+  // mode. None of the four inputs reads `currentView`, so the graph stays acyclic.
+  const craftingNavArgs = $derived({
+    visibilityMode: craftingVisibilityMode,
+    resolutionMode: craftingResolutionMode,
+    recipeCount,
+    recipeItemCount,
+  });
+  const craftingNavItems = $derived(buildCraftingNavItems(craftingNavArgs));
   // The Crafting parent-group badge totals its visible sub-tabs (Recipes + Books &
   // Scrolls where that surface applies), mirroring the gathering group's total, so
   // the collapsed group count reflects everything inside it — not recipes alone.
@@ -2816,6 +2830,25 @@
     // redirect rather than rendering a route the rail no longer offers.
     if (system && CHECKS_VIEWS.includes(view) && !checksNavItems.some((item) => item.view === view))
       return resolveChecksRedirect(checksNavArgs);
+    // The same reconciliation for the Crafting group (issue 1151): a crafting-system
+    // scope change or a `visibilityMode` edit must not leave the GM rendering a
+    // mode-conditional entry the selected system no longer offers, with no rail entry
+    // to return to it.
+    //
+    // The membership test is taken over the entry that OWNS the view, not over the
+    // view — `isCraftingViewAvailable` maps through `activeCraftingTab` — so
+    // `recipes`, `recipe-edit` and `crafting-settings` are never caught, and
+    // `recipe-item-edit` follows its Books & Scrolls parent. The Checks clause above
+    // can compare views directly because every Checks child IS a view; the crafting
+    // model's ids and views deliberately differ.
+    //
+    // This is a read-time normalization, so it invokes no route-exit guard and does
+    // not weaken one: every path reaching it has already passed the guard. A scope
+    // change maps an editor route to its browser through `SCOPE_BROWSER_BY_VIEW` and
+    // prompts BEFORE `selectSystem`, and `setVisibilityMode` is reachable only from
+    // the unconditional Settings entry.
+    if (system && isCraftingView(view) && !isCraftingViewAvailable(view, craftingNavArgs))
+      return resolveCraftingRedirect(craftingNavArgs);
     // The standalone `system-overview` route was folded into the `system-edit`
     // page's Validation tab; a stale value (no system selected) falls through to
     // the `systems` library here.
@@ -3606,9 +3639,14 @@
   // A per-record editor/detail view is bound to ONE system's record, so switching the
   // crafting system from the rail scope-select must return the GM to the corresponding
   // studio BROWSER for the new system rather than stranding them in an editor for a
-  // record that does not exist under the new system (e.g. recipe-edit → recipes). Browser,
-  // list, and settings views are not listed and stay put — they simply reload for the new
-  // system, which is the desired behaviour.
+  // record that does not exist under the new system (e.g. recipe-edit → recipes).
+  //
+  // Browser, list, and settings views are not listed here, but "they simply reload for
+  // the new system" is only true once the ROUTER has reconciled them (issue 1151): a
+  // mode-conditional Crafting browser such as `access` or `books-scrolls` may not exist
+  // under the new system at all. `normalizedActiveView` owns that answer, so this map
+  // stays a per-record editor concern and every entry path — a scope change, a
+  // `visibilityMode` edit, a restored stale `activeView` — is reconciled in one place.
   const SCOPE_BROWSER_BY_VIEW = {
     'recipe-edit': 'recipes',
     'recipe-item-edit': 'books-scrolls',
