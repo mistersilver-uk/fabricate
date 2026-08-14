@@ -27,6 +27,11 @@ import { readFileSync } from 'node:fs';
 import { describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
+import {
+  DEFAULT_CRAFTING_IMAGE,
+  GENERIC_ITEM_IMAGE,
+} from '../src/ui/svelte/util/craftingImageDefaults.js';
+
 import { countCalls, createOperationCounters } from './helpers/scale/scaleCounters.js';
 
 function getProperty(object, path) {
@@ -36,8 +41,12 @@ function getProperty(object, path) {
     .reduce((value, key) => (value == null ? undefined : value[key]), object);
 }
 
-globalThis.foundry = { utils: { getProperty } };
+globalThis.foundry = { utils: { getProperty, randomID: () => 'id-fixture' } };
+// `Recipe`'s constructor stamps `metadata.author` from the active user; the drift guard
+// below builds one, so the global has to exist before the module is imported.
+globalThis.game = { user: { name: 'Fixture GM' } };
 
+const { Recipe } = await import('../src/models/Recipe.js');
 const { buildInventorySnapshot } = await import('../src/systems/inventorySnapshot.js');
 const { CRAFTING_BROWSE_STATUS, deriveBrowseStatus } = await import(
   '../src/systems/craftingBrowseStatus.js'
@@ -98,11 +107,50 @@ function makeItem(name, quantity) {
   return { uuid: `item-${name}-${quantity}`, name, system: { quantity } };
 }
 
-/** A snapshot over one actor holding `quantity` Iron. */
-function snapshotHolding(quantity) {
+/**
+ * A snapshot over one actor holding `quantity` Iron.
+ *
+ * `counters` is optional and, when supplied, counts every `resolveComponent` invocation.
+ * That is the COST probe the memoisation tests need: `actor.items` reads sit below TWO
+ * independent memo layers in `inventorySnapshot` (the lazy item walk and the per-system
+ * tally cache) and are satisfied by either one alone, so an item-read count cannot see the
+ * tally cache disappear. Resolver invocations can — they track `items x systems asked`.
+ */
+function snapshotHolding(quantity, counters = null) {
   return buildInventorySnapshot({
     craftingActor: { id: 'actor-1', items: [makeItem('Iron Ingot', quantity)] },
-    resolveComponent: (item) => (item.name === IRON.name ? IRON : null),
+    resolveComponent: (item) => {
+      counters?.bump('resolveComponent');
+      return item.name === IRON.name ? IRON : null;
+    },
+  });
+}
+
+/** An explicit multi-step recipe: requirements on `steps[]`, top-level sets EMPTY. */
+function makeSteppedRecipe(requiredIron) {
+  return makeRecipe({
+    id: 'recipe-stepped',
+    ingredientSets: [],
+    steps: [
+      {
+        id: 'step-1',
+        name: 'Draw the wire',
+        ingredientSets: [
+          {
+            id: 'set-1',
+            ingredientGroups: [
+              {
+                options: [
+                  { quantity: requiredIron, match: { type: 'component', componentId: IRON.id } },
+                ],
+              },
+            ],
+            essences: {},
+          },
+        ],
+        resultGroups: [],
+      },
+    ],
   });
 }
 
@@ -189,6 +237,50 @@ describe('summary shape — one documented shape per entity', () => {
     });
     assert.equal(summary.enabled, true);
   });
+
+  it('takes systemId from the RECIPE, never from the system it was handed', () => {
+    // Pinned with the two deliberately DIFFERENT, because the default fixture has them
+    // equal — under which reading the wrong object is indistinguishable, and `system` is
+    // optional, so the mistake would surface as a null systemId for every caller that
+    // omits it.
+    const summary = projectRecipeSummary({
+      recipe: makeRecipe({ craftingSystemId: 'from-the-recipe' }),
+      system: { id: 'from-the-system', name: 'Alchemical Arts' },
+      audience: SUMMARY_AUDIENCE.GM,
+    });
+    assert.equal(summary.systemId, 'from-the-recipe');
+    assert.equal(summary.systemName, 'Alchemical Arts', 'the NAME does come from the system');
+  });
+
+  it('resolves the recipe image through the shared sentinel chokepoint', () => {
+    // `resolveRecipeImage` maps both "" and Foundry's generic item-bag to the blueprint
+    // default. Reading `recipe.img` directly would render the BAG for a bag-valued recipe,
+    // which the repo records as an explicit product requirement never to do.
+    for (const authored of ['', GENERIC_ITEM_IMAGE]) {
+      assert.equal(
+        projectRecipeSummary({ recipe: makeRecipe({ img: authored }), system: SYSTEM }).img,
+        DEFAULT_CRAFTING_IMAGE
+      );
+    }
+    assert.equal(
+      projectRecipeSummary({ recipe: makeRecipe({ img: 'icons/own.webp' }), system: SYSTEM }).img,
+      'icons/own.webp',
+      'an authored image still wins'
+    );
+  });
+
+  it('projects an absent recipe and component without throwing', () => {
+    const recipe = projectRecipeSummary({ audience: SUMMARY_AUDIENCE.GM });
+    assert.equal(recipe.id, null);
+    assert.equal(recipe.name, '');
+    assert.equal(recipe.availability, null);
+    assert.deepEqual(
+      Object.keys(recipe).sort((left, right) => left.localeCompare(right)),
+      summaryFieldsFor(RECIPE_SUMMARY_FIELDS, SUMMARY_AUDIENCE.GM),
+      'the shape is uniform even for an absent record'
+    );
+    assert.equal(projectComponentSummary({}).id, null);
+  });
 });
 
 describe('summary purity — zero exact-evaluation calls', () => {
@@ -242,6 +334,47 @@ describe('summary purity — zero exact-evaluation calls', () => {
     assert.equal(counters.get('resolveIngredientSelection'), 1);
   });
 
+  it('ignores a manager-shaped collaborator handed to it under any plausible name', () => {
+    // The tripwires above sit on objects the projection is STRUCTURALLY unable to call, so
+    // on their own they only rule out the least likely regression. `evaluateCraftability`
+    // is a method on `RecipeManager`, so the realistic reintroduction is a new collaborator
+    // PARAMETER — this offers one under every name such a parameter would plausibly take,
+    // and pins that none of them is consulted. A future signature that accepted one would
+    // fail here rather than at review time.
+    const counters = createOperationCounters();
+    const manager = {
+      evaluateCraftability: () => ({ canCraft: false }),
+      resolveIngredientSelection: () => ({ selection: [] }),
+      getRecipes: () => [],
+    };
+    countCalls(manager, 'evaluateCraftability', counters, 'evaluateCraftability');
+    countCalls(manager, 'resolveIngredientSelection', counters, 'resolveIngredientSelection');
+
+    const collaborators = {
+      recipeManager: manager,
+      manager,
+      recipeVisibility: manager,
+      craftingSystemManager: manager,
+      listingBuilder: manager,
+    };
+    projectRecipeSummary({
+      recipe: makeRecipe(),
+      system: SYSTEM,
+      audience: SUMMARY_AUDIENCE.PLAYER,
+      access: VISIBLE_ACCESS,
+      snapshot: snapshotHolding(9),
+      ...collaborators,
+    });
+    projectComponentSummary({ component: IRON, systemId: SYSTEM_ID, ...collaborators });
+
+    assert.equal(counters.get('evaluateCraftability'), 0);
+    assert.equal(counters.get('resolveIngredientSelection'), 0);
+
+    // …and the counter is bound to methods that really can move it.
+    manager.evaluateCraftability();
+    assert.equal(counters.get('evaluateCraftability'), 1);
+  });
+
   it('builds N component summaries with zero exact-evaluation calls', () => {
     const counters = createOperationCounters();
     const component = { ...IRON };
@@ -259,21 +392,52 @@ describe('summary purity — zero exact-evaluation calls', () => {
     // The structural half of the invariant. A summary takes VALUES, so the counter test
     // above pins a property the module has no way to violate by accident — but only for
     // as long as that stays true, which is what this asserts.
+    //
+    // An ALLOWLIST, not a blocklist of known-bad names. A blocklist has to be maintained
+    // against every collaborator anyone might reach for, and misses the one nobody
+    // predicted; an allowlist fails on ANY new import until a reviewer has looked at it.
+    // Same drift-detection shape the mount harness already uses for its module lists.
     const source = readFileSync(
       fileURLToPath(new URL('../src/systems/summaryProjection.js', import.meta.url)),
       'utf8'
     );
-    const imports = [...source.matchAll(/^import\s.*?from\s+'([^']+)';$/gm)].map(
-      (match) => match[1]
+
+    // Matches the multi-line form Prettier produces past the print width, and either
+    // quote style. A line-anchored single-quote regex misses both, and would report green
+    // while the module held exactly the collaborator this forbids.
+    const withClause = [...source.matchAll(/\bimport\b[\s\S]*?\bfrom\s*(['"])([^'"]+)\1/g)].map(
+      (match) => match[2]
     );
-    assert.ok(imports.length > 0, 'the import scan must not silently match nothing');
-    for (const specifier of imports) {
-      assert.doesNotMatch(
-        specifier,
-        /RecipeManager|CraftingEngine|CraftingListingBuilder|RecipeVisibilityService/,
-        `summaryProjection must not import ${specifier}`
-      );
-    }
+    // Side-effect imports (`import './x.js';`) carry no `from` clause at all.
+    const sideEffect = [...source.matchAll(/\bimport\s*(['"])([^'"]+)\1/g)].map(
+      (match) => match[2]
+    );
+    const specifiers = [...new Set([...withClause, ...sideEffect])].sort((left, right) =>
+      left.localeCompare(right)
+    );
+
+    assert.deepEqual(
+      specifiers,
+      [
+        '../ui/svelte/util/craftingImageDefaults.js',
+        '../utils/componentCategories.js',
+        '../utils/recipeCategories.js',
+        './craftingBrowseStatus.js',
+        './inventorySnapshot.js',
+        './stepRecipeView.js',
+      ],
+      'summaryProjection may hold only pure projection leaves — no manager, engine, ' +
+        'builder or visibility service. Adding an import here is a deliberate act.'
+    );
+
+    // The scan must also be exhaustive: every `import` keyword in the file has to have
+    // been captured above, or a form neither pattern understands could slip past both.
+    assert.equal(
+      (source.match(/\bimport\b/g) ?? []).length,
+      withClause.length,
+      'every import statement must be visible to the scan'
+    );
+    assert.doesNotMatch(source, /\bimport\s*\(/, 'no dynamic import may smuggle one in');
   });
 });
 
@@ -327,6 +491,59 @@ describe('the cheap-availability rule, defined once', () => {
     assert.equal(summary.browseStatus, CRAFTING_BROWSE_STATUS.MISSING_MATERIALS);
   });
 
+  it('reads a MULTI-STEP recipe from its first execution step, not its empty top level', () => {
+    // An explicit multi-step recipe carries its requirements on `steps[]` and leaves the
+    // raw top-level `ingredientSets` EMPTY. Projected raw, the rule sees "no requirements"
+    // and answers `available: true` against an empty inventory — every stepped recipe
+    // reading "looks makeable" forever, and a craftable-only filter retaining all of them.
+    // That is not the documented optimism: optimism is being wrong about CONTENTION, not
+    // blind to a whole recipe class.
+    const stepped = makeSteppedRecipe(4);
+    assert.deepEqual(stepped.ingredientSets, [], 'the fixture is the real shape, not a prop');
+
+    const short = projectRecipeSummary({
+      recipe: stepped,
+      system: SYSTEM,
+      audience: SUMMARY_AUDIENCE.PLAYER,
+      access: VISIBLE_ACCESS,
+      snapshot: snapshotHolding(1),
+    });
+    assert.equal(short.availability.available, false, 'the step requires 4, the actor holds 1');
+    assert.equal(short.browseStatus, CRAFTING_BROWSE_STATUS.MISSING_MATERIALS);
+
+    const met = projectRecipeSummary({
+      recipe: stepped,
+      system: SYSTEM,
+      audience: SUMMARY_AUDIENCE.PLAYER,
+      access: VISIBLE_ACCESS,
+      snapshot: snapshotHolding(9),
+    });
+    assert.equal(met.availability.available, true);
+  });
+
+  it('narrows a Recipe INSTANCE through getExecutionSteps, and a plain object through steps', () => {
+    // A caller may hold either: a `Recipe` answers `getExecutionSteps()`, a deserialized
+    // row does not. Reading only the method would leave every plain-object caller on the
+    // silently-vacuous path above.
+    const plain = makeSteppedRecipe(4);
+    const instanceLike = {
+      ...plain,
+      steps: undefined,
+      getExecutionSteps: () => makeSteppedRecipe(4).steps,
+    };
+    for (const [label, recipe] of [
+      ['plain object', plain],
+      ['Recipe-like instance', instanceLike],
+    ]) {
+      assert.equal(
+        projectSummaryAvailability({ snapshot: snapshotHolding(1), system: SYSTEM, recipe })
+          .available,
+        false,
+        label
+      );
+    }
+  });
+
   it('distinguishes "not asked" from "unavailable" when no snapshot is in view', () => {
     // The GM browser projects definitions rather than one actor's view of them. A `false`
     // here would paint every row of a 5,000-recipe system as short of materials.
@@ -340,13 +557,21 @@ describe('the cheap-availability rule, defined once', () => {
     assert.equal(summary.browseStatus, CRAFTING_BROWSE_STATUS.AVAILABLE);
   });
 
-  it('walks the inventory once for a whole page of recipes of one system', () => {
-    // The rule's cost claim: the snapshot memoises per-system tallies, so N summaries read
-    // the actor's items ONCE. Counted through the snapshot's own accessor rather than
-    // inferred, because "cheap" is the reason both surfaces are allowed to call this.
+  it('resolves the inventory once for a whole page of recipes of one system', () => {
+    // The rule's cost claim, and the reason both surfaces are allowed to call it per row.
+    //
+    // THREE probes, because no single one covers the claim. `itemReads` sits below both of
+    // `inventorySnapshot`'s memo layers and stays at 1 if EITHER survives, so on its own it
+    // cannot see the per-system tally cache disappear. `resolveComponent` can — it tracks
+    // `items x systems actually resolved`, so dropping the tally cache moves it from 1 to
+    // the page size. The `heldItems` wrapper catches a third shape: it intercepts only
+    // EXTERNAL calls (the tallies reach the walk through a closure, not through this
+    // property), so it is exactly the probe for a projection that grew its own per-recipe
+    // rescan beside the tallies — which would leave the other two counts untouched.
     const counters = createOperationCounters();
-    const snapshot = snapshotHolding(20);
+    const snapshot = snapshotHolding(20, counters);
     countCalls(snapshot, 'componentTallies', counters, 'componentTallies');
+    countCalls(snapshot, 'heldItems', counters, 'heldItems');
 
     let itemReads = 0;
     const actorItems = snapshot.actors[0].items;
@@ -358,7 +583,8 @@ describe('the cheap-availability rule, defined once', () => {
       },
     });
 
-    for (let index = 0; index < 25; index += 1) {
+    const PAGE = 25;
+    for (let index = 0; index < PAGE; index += 1) {
       projectRecipeSummary({
         recipe: makeRecipe({ id: `recipe-${index}` }),
         system: SYSTEM,
@@ -368,11 +594,14 @@ describe('the cheap-availability rule, defined once', () => {
       });
     }
 
-    assert.equal(counters.get('componentTallies'), 25, 'once per summary, by construction');
-    // …but the tallies themselves are memoised per system, so the inventory is WALKED once
-    // for the whole page. Without that the count would track the page size, which is the
-    // `recipes x items` product #1070's field report hit.
-    assert.equal(itemReads, 1, 'one lazy walk for 25 summaries, not 25');
+    assert.equal(counters.get('componentTallies'), PAGE, 'once per summary, by construction');
+    assert.equal(itemReads, 1, 'one lazy walk for the whole page, not one per row');
+    assert.equal(
+      counters.get('resolveComponent'),
+      1,
+      'one identity resolution per held item for the whole page — not one per row'
+    );
+    assert.equal(counters.get('heldItems'), 0, 'and no walk of its own beside the tallies');
   });
 });
 
@@ -447,6 +676,27 @@ describe('player-facing redaction', () => {
     });
     assert.deepEqual(summary.redaction.hiddenFields, ['ingredients', 'results', 'description']);
   });
+
+  it("that fallback does not drift from the Recipe model's own normalized default", () => {
+    // The default list is a hand-maintained mirror — the model owns it, and nothing binds
+    // the copies. Pinned against the model's OBSERVABLE default (what a teaser with no
+    // authored hiddenFields normalizes to) rather than against its private constant, so
+    // this guards the behaviour a player actually gets.
+    const authoritative = new Recipe({
+      id: 'drift',
+      name: 'Drift Guard',
+      craftingSystemId: SYSTEM_ID,
+      teaser: { enabled: true },
+    }).teaser.hiddenFields;
+
+    const projected = projectRecipeSummary({
+      recipe: makeRecipe(),
+      audience: SUMMARY_AUDIENCE.PLAYER,
+      access: { visible: true, reason: 'teaser', teaserState: { isTeaser: true } },
+    }).redaction.hiddenFields;
+
+    assert.deepEqual(projected, authoritative);
+  });
 });
 
 describe('browse-status precedence', () => {
@@ -463,6 +713,33 @@ describe('browse-status precedence', () => {
   for (const [label, input, expected] of cases) {
     it(`resolves ${label} to ${expected}`, () => {
       assert.equal(deriveBrowseStatus(input), expected);
+    });
+  }
+
+  // The one-hot table above cannot pin the ORDER of two conditions — it only ever sets one
+  // at a time, so swapping a pair of branches leaves it green. Precedence is spec-normative
+  // (`data-models/spec.md` § Browse-status precedence), so each adjacent pair is pinned
+  // directly. `exhausted` over `missingMaterials` is the one that bites: a player whose
+  // book is used up AND who is short on reagents would otherwise get the danger-toned
+  // "missing materials" badge, pointing them at the wrong remedy.
+  // `reason` holds one value at a time, so the three reason branches cannot be ordered
+  // against EACH OTHER by any input; what is pinned is each one outranking every lower
+  // non-reason condition, plus the exhaustion/materials pair that can genuinely co-occur.
+  const precedencePairs = [
+    ['teaser over everything below it', { reason: 'teaser' }, CRAFTING_BROWSE_STATUS.DISCOVERY],
+    ['locked over everything below it', { reason: 'locked' }, CRAFTING_BROWSE_STATUS.LOCKED],
+    ['knowledge over everything below it', { reason: 'knowledge' }, CRAFTING_BROWSE_STATUS.UNKNOWN],
+    ['exhaustion over a material shortfall', {}, CRAFTING_BROWSE_STATUS.EXHAUSTED],
+  ];
+
+  for (const [label, higher, expected] of precedencePairs) {
+    it(`resolves ${label} with every lower condition also set`, () => {
+      // Every condition BELOW the one under test is set too, so the assertion is about
+      // order rather than about the branch in isolation.
+      assert.equal(
+        deriveBrowseStatus({ ...higher, exhausted: true, materialsAvailable: false }),
+        expected
+      );
     });
   }
 
@@ -483,6 +760,22 @@ describe('browse-status precedence', () => {
       exhausted: true,
     });
     assert.equal(summary.browseStatus, CRAFTING_BROWSE_STATUS.EXHAUSTED);
+  });
+
+  it('never reports a GM row exhausted, because a GM bypasses the knowledge gate', () => {
+    // `browseStatus` is a SHARED field, so honouring a caller's `exhausted` for a GM would
+    // make a shared field's derivation depend on the audience — the one thing this contract
+    // forbids. The shipped listing builder gates it the same way (`!isGM && …`), and its
+    // suite pins "a GM never sees an exhausted status".
+    const summary = projectRecipeSummary({
+      recipe: makeRecipe(),
+      system: SYSTEM,
+      audience: SUMMARY_AUDIENCE.GM,
+      access: VISIBLE_ACCESS,
+      snapshot: snapshotHolding(9),
+      exhausted: true,
+    });
+    assert.equal(summary.browseStatus, CRAFTING_BROWSE_STATUS.AVAILABLE);
   });
 });
 
@@ -518,6 +811,34 @@ describe('component summary', () => {
   it('falls back to the essence id when no definition is indexed', () => {
     const summary = projectComponentSummary({ component: IRON, systemId: SYSTEM_ID });
     assert.deepEqual(summary.essences, [{ id: 'earth', quantity: 2, name: 'earth' }]);
+  });
+
+  it('accepts the definition index as a Map OR a plain object', () => {
+    // The failure mode of a Map-only read is SILENT: a plain object misses, the name falls
+    // back to the raw id, and an id is a valid name — so the wrong shape would ship green
+    // with ids showing in the UI rather than throwing anywhere.
+    const expected = [{ id: 'earth', quantity: 2, name: 'Earth' }];
+    for (const [label, index] of [
+      ['Map', new Map([['earth', { id: 'earth', name: 'Earth' }]])],
+      ['plain object', { earth: { id: 'earth', name: 'Earth' } }],
+    ]) {
+      assert.deepEqual(
+        projectComponentSummary({ component: IRON, essenceDefinitionsById: index }).essences,
+        expected,
+        label
+      );
+    }
+  });
+
+  it('reports salvageEnabled false for a component carrying no salvage block', () => {
+    // The only component fixture has salvage enabled, so a `!== false` read would pass
+    // every assertion while flipping every unsalvageable component ON in the GM filter.
+    assert.equal(projectComponentSummary({ component: { id: 'c' } }).salvageEnabled, false);
+    assert.equal(
+      projectComponentSummary({ component: { id: 'c', salvage: { enabled: false } } })
+        .salvageEnabled,
+      false
+    );
   });
 
   it('orders essences by id so two summaries of one component compare equal', () => {

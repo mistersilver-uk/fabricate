@@ -2734,20 +2734,26 @@ A surface that needs a field this contract does not define amends the contract; 
 | --- | --- | --- |
 | `id` | shared | `Recipe.id` |
 | `name` | shared | `Recipe.name` |
-| `img` | shared | `Recipe.img`, resolved through the shared recipe-image default (Foundry's generic item bag is the "no image" sentinel). NEVER the containing book's artwork — see `## Recipe` requirement 16 |
-| `systemId` | shared | `Recipe.craftingSystemId` |
+| `img` | shared | `Recipe.img`, resolved through the shared recipe-image default (Foundry's generic item bag is the "no image" sentinel). NEVER the containing book's artwork — see `## Recipe` requirement 16. `ComponentSummary.img` is deliberately NOT defaulted this way: the sentinel is a recipe-icon rule, and a component has no equivalent |
+| `systemId` | shared | `Recipe.craftingSystemId` — the RECIPE's own field, never the id of whatever system object the projection was handed |
 | `systemName` | shared | The owning `CraftingSystem.name`, read through the per-system runtime index |
 | `category` | shared | `Recipe.category`, normalized to the reserved `general` bucket when absent |
 | `tags` | shared | `Recipe.tags`, trimmed and deduped in authored order |
-| `enabled` | shared | `Recipe.enabled`, absent reading as ON per the model default |
 | `browseStatus` | shared | The single browse-status precedence rule below |
 | `availability` | shared | The single cheap-availability rule below, or `null` |
 | `redaction` | shared | `{ redacted, hiddenFields }` derived from the visibility access result |
 | `audience` | shared | The contract the row was built under, `gm` or `player` |
 | `locked` | GM only | `Recipe.locked`. Authoring state; it says nothing a player can act on and MUST NOT cross to a player client |
+| `enabled` | GM only | `Recipe.enabled`, absent reading as ON per the model default. Authoring state for the same reason `locked` is, and it would be a constant `true` on a player summary in any case, since the visibility service never surfaces a disabled recipe to one |
 | `favourite` | player only | That viewer's stored favourite recipe ids. It is per-VIEWER, and the GM manager has no viewer to read it for, so a `false` there would assert something untrue rather than something absent |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
+
+The GM browsers' SORT keys are NOT served by this contract yet, and the gap is recorded rather than left to be discovered.
+The recipe browser sorts on activation-blocked state, check DC, ingredient count and result count; the component browser sorts on salvage result-group count.
+Sorting runs over the whole filtered cohort before pagination, so those values cannot be deferred to a page-row tier — a browser built on summaries alone would render name order under a "DC" label, silently.
+They are omitted rather than guessed because two of them are owned elsewhere (the cached alchemy signature report, and the check-resolution path) and none can be validated without its consuming surface.
+Adding a caller-supplied field for each is the intended amendment and belongs in the change that can prove the shape.
 
 ### ComponentSummary
 
@@ -2783,7 +2789,8 @@ It reads the inventory snapshot's per-system component quantities, per-tag quant
 | **The imprecision is carried, not laundered** | The result carries an explicit optimism marker so a consumer cannot read it as exact by accident, and a surface presents a positive answer as "looks makeable", never as "you can make this". Exactness stays at craft time. |
 | **Tools, checks, knowledge and currency are not consulted** | Each can only ever make a recipe LESS craftable, so ignoring them keeps the result an upper bound. A surface needing them asks the paths that own them. |
 | **"Not asked" is distinct from "unavailable"** | A surface with no actor in view — the GM browser projects definitions rather than one actor's view of them — receives `null`, and MUST NOT be rendered as a material shortfall. |
-| **Cost is per SNAPSHOT, not per row** | Per-system tallies are resolved once per snapshot, so projecting a page of summaries walks the held inventory once, not once per row. |
+| **Cost is per SNAPSHOT, not per row** | Per-system tallies are resolved once per snapshot, so projecting a page of summaries walks the held inventory once and performs one component-identity resolution per held document, not one per row. |
+| **A multi-step recipe is read from its FIRST execution step** | An explicit multi-step recipe carries its requirements on `steps[]` and leaves its top-level ingredient sets empty, so a rule reading only the top level would treat every stepped recipe as having no requirements and answer "plausible" against an empty inventory. That is not the documented optimism — optimism is being wrong about contention, not blind to a whole recipe class. The FIRST step is used, not the actor's active step, because that is what the detail surface's requirement rail shows; a summary pointed at a mid-run step would disagree with the inspector opened from it. |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 

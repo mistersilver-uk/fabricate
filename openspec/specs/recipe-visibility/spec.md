@@ -340,10 +340,14 @@ Failing safe matters more than caller convenience: a default of GM would ship an
 Material availability is derived from the recipe's INGREDIENTS, which the default teaser configuration hides, so an availability answer on an undiscovered recipe discloses the shape of a requirement the player is not meant to see yet — refreshable once per inventory change, across a whole corpus.
 The guard belongs at the derivation, not at the write-out: blanking a computed value is equivalent for today's shape and wrong the first time a field is added beside it.
 - **Identity and grouping metadata are NOT redacted.**
-A teaser is shown to the player deliberately, so its name, image, category and tags are the part they are meant to see.
-This matches the shipped listing model, which records the same decision for `category`.
+A teaser is shown to the player deliberately, so its name, image and category are the part they are meant to see; the shipped listing model records that decision for `category` already.
+`tags` is likewise not redacted, and that is a NEW decision rather than an inherited one — no player-facing surface has carried recipe tags before, so it does not follow from the `category` precedent.
+It is taken because a tag is GM grouping metadata of exactly the same kind as a category, because `teaserState.hiddenFields` cannot name it (the authored vocabulary is ingredients, results, description, tools and essences), and because withholding it would break the filtering a summary exists to serve.
 - **Authoring state does not cross.**
-A player-audience summary carries no GM-only field, which today means the recipe's lock state.
+A player-audience summary carries no GM-only field, which today means the recipe's lock state and its enabled state.
+- **Exhaustion is a player-only status.**
+A GM bypasses the knowledge gate, so a GM-audience summary MUST NOT report a recipe exhausted even when the caller supplies an exhaustion result.
+Because the browse status is a field both audiences share, honouring it for a GM would make a shared field's derivation depend on the audience, which this contract forbids.
 
 Tests MUST cover the redacted player summary directly — that it withholds availability, that the snapshot is never consulted to build it, that it reports the discovery browse status, and that the same recipe is unredacted for a GM.
 

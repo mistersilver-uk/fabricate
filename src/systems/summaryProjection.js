@@ -79,6 +79,7 @@ import { normalizeRecipeCategory } from '../utils/recipeCategories.js';
 
 import { deriveBrowseStatus } from './craftingBrowseStatus.js';
 import { projectRecipeAvailability } from './inventorySnapshot.js';
+import { buildStepRecipeView } from './stepRecipeView.js';
 
 /**
  * Who a summary is being built for. The value rides on the summary itself so a consumer
@@ -108,9 +109,32 @@ const DEFAULT_TEASER_HIDDEN_FIELDS = Object.freeze(['ingredients', 'results', 'd
  * - `favourite` is `playerOnly` because it is a per-VIEWER preference read from that
  *   player's own stored favourites. The GM manager has no viewer to read it for, and a
  *   `false` there would assert something untrue rather than something absent.
- * - `locked` is `gmOnly` because it is authoring state — whether the GM has pinned the
- *   recipe against edits. It says nothing a player can act on, and shipping authoring
- *   state to a player client is the habit this contract exists to prevent.
+ * - `locked` and `enabled` are `gmOnly` because both are authoring state — whether the GM
+ *   pinned the recipe against edits, and the GM's own on/off toggle. Neither says anything
+ *   a player can act on, and shipping authoring state to a player client is the habit this
+ *   contract exists to prevent. `enabled` in particular would be a constant `true` on a
+ *   player summary, since the visibility service never surfaces a disabled recipe to one.
+ *
+ * ## Known gap: the GM browsers' SORT keys are not served yet
+ *
+ * The issue that defines this contract scoped the GM half to "counts and filtering", and
+ * that is what the manifest serves: `enabled`, `locked` and `category` cover the recipe
+ * browser's filters, and `category` plus `essences` cover the component browser's.
+ *
+ * Its SORT keys are deliberately NOT served, and the gap is written down here rather than
+ * discovered later. `recipeBrowserModel`'s `attention`, `dc`, `ingredients` and `results`
+ * sort on `enableBlocked`, `checkSummary.dc`, `ingredientCount` and `resultItemCount`;
+ * `componentBrowserModel`'s `salvage` sorts on `salvageSummary.resultGroupCount`. Sorting
+ * runs over the whole FILTERED cohort before pagination, so those cannot be deferred to
+ * the page-row tier — a browser built on summaries alone would render name order under a
+ * "DC" label, silently.
+ *
+ * They are omitted rather than guessed because none can be validated against a real
+ * consumer yet, and two of them are owned elsewhere: `enableBlocked` comes from the cached
+ * alchemy signature report, and `checkSummary` from the check-resolution path. Adding a
+ * caller-supplied field for each is the intended amendment, and it belongs in the PR that
+ * can prove the shape — the whole point of an enumerated manifest is that the amendment is
+ * cheap and visible rather than a fork.
  */
 export const RECIPE_SUMMARY_FIELDS = Object.freeze({
   shared: Object.freeze([
@@ -118,7 +142,6 @@ export const RECIPE_SUMMARY_FIELDS = Object.freeze({
     'availability',
     'browseStatus',
     'category',
-    'enabled',
     'id',
     'img',
     'name',
@@ -127,7 +150,7 @@ export const RECIPE_SUMMARY_FIELDS = Object.freeze({
     'systemName',
     'tags',
   ]),
-  gmOnly: Object.freeze(['locked']),
+  gmOnly: Object.freeze(['enabled', 'locked']),
   playerOnly: Object.freeze(['favourite']),
 });
 
@@ -163,7 +186,11 @@ export function summaryFieldsFor(manifest, audience) {
   return [...manifest.shared, ...extra].sort((left, right) => left.localeCompare(right));
 }
 
-/** A trimmed string, or `''`. */
+/**
+ * A string, or `''` for absent. Deliberately does NOT trim: a display name is surfaced as
+ * the GM authored it, and silently trimming here would make the summary and the editor
+ * disagree about what the name is.
+ */
 function text(value) {
   if (typeof value === 'string') return value;
   return value == null ? '' : String(value);
@@ -220,7 +247,45 @@ function tagList(value) {
  */
 export function projectSummaryAvailability({ snapshot = null, system = null, recipe = null } = {}) {
   if (!snapshot || typeof snapshot.componentTallies !== 'function' || !recipe) return null;
-  return projectRecipeAvailability(snapshot.componentTallies(system), recipe);
+  return projectRecipeAvailability(
+    snapshot.componentTallies(system),
+    stepNarrowedRecipe(recipe) ?? recipe
+  );
+}
+
+/**
+ * The recipe narrowed to its FIRST execution step, or `null` when it has no explicit
+ * steps and its own top-level arrays are already the answer.
+ *
+ * ## Why this exists, and what breaks without it
+ *
+ * An explicit multi-step recipe stores its requirements on `steps[].ingredientSets` and
+ * leaves the raw top-level `ingredientSets` **empty**. `projectRecipeAvailability` reads
+ * `recipe.ingredientSets` and treats an empty list as "no requirements", so a stepped
+ * recipe projected raw answers `available: true` **against an empty inventory** — every
+ * stepped recipe reads "looks makeable" forever, and a craftable-only filter retains all
+ * of them. That is not the documented optimism: optimism is being wrong about CONTENTION,
+ * not being blind to a whole recipe class.
+ *
+ * The FIRST step is the right one, and deliberately not the actor's active step. It is
+ * what the detail model's requirement rail shows (`CraftingListingBuilder._firstStep`), and
+ * re-pointing a summary at a mid-run step would make the row disagree with the inspector
+ * the player opens from it — the exact divergence this contract exists to prevent.
+ *
+ * Tolerates both shapes a caller may hold: a `Recipe` instance, which answers
+ * `getExecutionSteps()`, and a plain deserialized object, which does not. Narrowing runs
+ * through the SAME `buildStepRecipeView` the engine and the listing builder use, so the
+ * step's tool-id union and result groups cannot drift from theirs.
+ *
+ * @param {object} recipe
+ * @returns {object|null}
+ */
+function stepNarrowedRecipe(recipe) {
+  const authored = Array.isArray(recipe?.steps) ? recipe.steps : [];
+  const steps =
+    typeof recipe?.getExecutionSteps === 'function' ? recipe.getExecutionSteps() : authored;
+  const first = Array.isArray(steps) ? steps[0] : null;
+  return first ? buildStepRecipeView(recipe, first) : null;
 }
 
 /**
@@ -257,10 +322,18 @@ function redactionOf(audience, access) {
  * materials for this" for an undiscovered recipe would leak the shape of a requirement the
  * player is not meant to see yet — one probe per inventory change, over a whole corpus.
  *
- * `name`, `img`, `category` and `tags` are NOT redacted, matching the shipped listing
- * model: a teaser is shown to the player deliberately, so its identity and its grouping
- * metadata are the part they are meant to see. `CraftingListingBuilder` records the same
- * decision for `category` in as many words.
+ * `name`, `img` and `category` are NOT redacted: a teaser is shown to the player
+ * deliberately, so its identity and its grouping metadata are the part they are meant to
+ * see. `CraftingListingBuilder` records that decision for `category` in as many words.
+ *
+ * `tags` is NOT redacted either, and that is a NEW decision rather than an inherited one —
+ * the shipped `RecipeListingModel` carries no `tags` field at all, so no player-facing
+ * surface has disclosed recipe tags before. It is taken deliberately: a tag is GM grouping
+ * metadata of exactly the same kind as `category`, it is not one of the fields
+ * `teaserState.hiddenFields` can name (the authored vocabulary is ingredients, results,
+ * description, tools, essences), and withholding it would break the filtering a summary
+ * exists to serve. Recorded here and in `recipe-visibility/spec.md` so it is a choice on
+ * the record rather than a precedent borrowed from a field it does not cover.
  *
  * @param {object} input
  * @param {object} input.recipe The authored recipe. Source of `id`, `name`, `img`,
@@ -275,6 +348,7 @@ function redactionOf(audience, access) {
  * @param {boolean} [input.exhausted] Whether every owned copy of the recipe's book has
  *   reached its cap, as already established by the knowledge access evaluation. NOT
  *   recomputed here — recipe-visibility/spec.md forbids a second candidate collection.
+ *   Ignored for the GM audience, which bypasses the knowledge gate.
  * @param {boolean} [input.favourite] Whether this viewer has favourited the recipe, from
  *   the player's stored favourites. Ignored for the GM audience.
  * @returns {object} A summary carrying exactly {@link summaryFieldsFor}'s keys.
@@ -303,13 +377,14 @@ export function projectRecipeSummary({
       // `null` rather than `false` when nothing was asked, so a surface holding no
       // snapshot does not paint every row `missingMaterials`.
       materialsAvailable: availability === null ? null : availability.available,
-      exhausted: exhausted === true,
+      // Gated on audience exactly as `CraftingListingBuilder` gates it (`!isGM && …`).
+      // A GM bypasses the knowledge gate entirely, so a GM row can never be `exhausted` —
+      // the builder's suite pins that as "a GM never sees an exhausted status". Since
+      // `browseStatus` is a SHARED field, honouring a caller's `exhausted` for a GM would
+      // be an audience-dependent derivation of a shared field, which this contract forbids.
+      exhausted: !isGM && exhausted === true,
     }),
     category: normalizeRecipeCategory(recipe?.category),
-    // `!== false`, matching the GM browser's own filter and `Recipe`'s default-true
-    // constructor: absent means enabled, and a summary that read absent as OFF would hide
-    // every hand-authored recipe from the `on` filter.
-    enabled: recipe?.enabled !== false,
     id: idOrNull(recipe?.id),
     // The recipe's OWN image, through the shared resolver that treats Foundry's generic
     // item-bag as the "no image" sentinel. Never the containing book's artwork: book
@@ -323,10 +398,36 @@ export function projectRecipeSummary({
     tags: tagList(recipe?.tags),
   };
 
-  if (isGM) summary.locked = recipe?.locked === true;
-  else summary.favourite = favourite === true;
+  if (isGM) {
+    summary.locked = recipe?.locked === true;
+    // `!== false`, matching the GM browser's own filter and `Recipe`'s default-true
+    // constructor: absent means enabled, and a summary that read absent as OFF would hide
+    // every hand-authored recipe from the `on` filter.
+    summary.enabled = recipe?.enabled !== false;
+  } else {
+    summary.favourite = favourite === true;
+  }
 
   return summary;
+}
+
+/**
+ * One entry of a definition index, tolerating either shape a caller may hold.
+ *
+ * The retained runtime indexes are `Map`-backed, but a caller assembling one ad hoc — or
+ * deserializing it — reasonably reaches for a plain object. Accepting both is not
+ * defensiveness for its own sake: the failure mode of a `Map`-only read is SILENT, since
+ * the miss path falls back to the raw id and an id is a valid display name, so the wrong
+ * shape would ship green with ids showing in the UI.
+ *
+ * @param {Map<string, object>|Record<string, object>|null|undefined} index
+ * @param {string} key
+ * @returns {object|null}
+ */
+function lookupDefinition(index, key) {
+  if (!index) return null;
+  if (typeof index.get === 'function') return index.get(key) ?? null;
+  return Object.prototype.hasOwnProperty.call(index, key) ? (index[key] ?? null) : null;
 }
 
 /**
@@ -341,8 +442,12 @@ export function projectRecipeSummary({
  * Sorted by id so two summaries of the same component compare equal regardless of key
  * insertion order, which matters for any consumer memoising on a summary.
  *
+ * The index is read through {@link lookupDefinition}, which accepts a `Map` or a plain
+ * object. A `Map`-only read would degrade SILENTLY against a plain object — every display
+ * name falling back to its raw id — and ship green, because an id is a valid name here.
+ *
  * @param {object|null} component
- * @param {Map<string, object>|null} essenceDefinitionsById
+ * @param {Map<string, object>|Record<string, object>|null} essenceDefinitionsById
  * @returns {Array<{id: string, quantity: number, name: string}>}
  */
 function essenceList(component, essenceDefinitionsById) {
@@ -353,7 +458,7 @@ function essenceList(component, essenceDefinitionsById) {
     const quantity = Number(raw) || 0;
     if (quantity <= 0) continue;
     const id = String(essenceId);
-    const definition = essenceDefinitionsById?.get?.(id) ?? null;
+    const definition = lookupDefinition(essenceDefinitionsById, id);
     entries.push({ id, quantity, name: text(definition?.name) || id });
   }
   // An EXPLICIT comparator: a bare `sort()` is lexicographic-by-string and is a
