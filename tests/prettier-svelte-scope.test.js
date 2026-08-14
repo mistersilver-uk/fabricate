@@ -166,6 +166,9 @@ const GATE_TARGETS = [
   'scripts/lib/foundryPerfScenarios.js',
   'scripts/foundry-perf-run.mjs',
   'scripts/visual-parity/lib/view-lab.js',
+  // The screenshot-evidence matcher (issue 1133): the pure derivation that decides which
+  // published frames answer a PR's changed files, shared by the evidence gate and its workflow.
+  'scripts/lib/screenshotEvidenceMatching.js',
   'eslint.config.js',
 ];
 const FORMAT_ARGV = ['prettier', '--write', ...GATE_TARGETS];
