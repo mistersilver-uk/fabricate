@@ -2717,6 +2717,116 @@ It is per-client and per-process: it is never persisted, never replicated, and c
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 
+## Summary Projections
+
+A **summary** is the cheap, serializable row shape a browse surface pages, filters, sorts and counts BEFORE hydrating any expensive detail.
+Like the read indexes above it is derived, in-memory, per-client state: it changes no persisted shape, is never serialized to a setting or a flag, and is rebuildable in full from the authoritative definitions plus one inventory snapshot.
+
+There is exactly ONE summary shape per entity, and every browse surface — the player crafting listing and the GM manager browsers alike — MUST consume it rather than define its own.
+The two audiences MAY differ in which FIELDS they carry, and MUST NOT differ in how a shared field is DERIVED.
+A surface that needs a field this contract does not define amends the contract; it does not define a second shape.
+
+The projection is a per-entity function over VALUES, and it performs no cohort selection of its own.
+Choosing WHICH entities to project — and, for a player audience, projecting only recipes the visibility evaluation made visible — belongs to the calling surface, which also supplies each recipe's own access result.
+A summary built with no access result is unredacted and reads as available, which is correct for a visible recipe and a disclosure for one that is not; see `recipe-visibility/spec.md` § Summary Projection Disclosure.
+
+### RecipeSummary
+
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
+
+| Field | Audience | Source |
+| --- | --- | --- |
+| `id` | shared | `Recipe.id` |
+| `name` | shared | `Recipe.name` |
+| `img` | shared | `Recipe.img`, resolved through the shared recipe-image default (Foundry's generic item bag is the "no image" sentinel). NEVER the containing book's artwork — see `## Recipe` requirement 16. `ComponentSummary.img` is deliberately NOT defaulted this way: the sentinel is a recipe-icon rule, and a component has no equivalent |
+| `systemId` | shared | `Recipe.craftingSystemId` — the RECIPE's own field, never the id of whatever system object the projection was handed |
+| `systemName` | shared | The owning `CraftingSystem.name`, off the system the caller supplies. The caller resolves that system through the per-system runtime read index; the projection never looks one up |
+| `category` | shared | `Recipe.category`, normalized to the reserved `general` bucket when absent |
+| `tags` | shared | `Recipe.tags`, trimmed and deduped in authored order |
+| `browseStatus` | shared | The single browse-status precedence rule below |
+| `availability` | shared | The single cheap-availability rule below, or `null` |
+| `redaction` | shared | `{ redacted, hiddenFields }` derived from the visibility access result |
+| `audience` | shared | The contract the row was built under, `gm` or `player` |
+| `locked` | GM only | `Recipe.locked`. Authoring state; it says nothing a player can act on and MUST NOT cross to a player client |
+| `enabled` | GM only | `Recipe.enabled`, absent reading as ON per the model default. Authoring state for the same reason `locked` is, and it would be a constant `true` on a player summary in any case, since the visibility service never surfaces a disabled recipe to one |
+| `favourite` | player only | That viewer's stored favourite recipe ids. It is per-VIEWER, and the GM manager has no viewer to read it for, so a `false` there would assert something untrue rather than something absent |
+
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
+
+The GM browsers' SORT keys are NOT served by this contract yet, and the gap is recorded rather than left to be discovered.
+The recipe browser sorts on activation-blocked state, check DC, ingredient count and result count; the component browser sorts on salvage result-group count.
+Sorting runs over the whole filtered cohort before pagination, so those values cannot be deferred to a page-row tier — a browser built on summaries alone would render name order under a "DC" label, silently.
+They are omitted rather than guessed because two of them are owned elsewhere (the cached alchemy signature report, and the check-resolution path) and none can be validated without its consuming surface.
+Adding a caller-supplied field for each is the intended amendment and belongs in the change that can prove the shape.
+
+### ComponentSummary
+
+A component carries no teaser gate, no knowledge gate and no per-viewer state, so its summary has NO audience split.
+That is a finding rather than an omission: a later surface needing an audience-specific component field amends this contract explicitly rather than assuming an axis that does not exist today.
+
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
+
+| Field | Source |
+| --- | --- |
+| `id` | `Component.id` |
+| `name` | `Component.name` |
+| `img` | `Component.img` |
+| `systemId` | Supplied by the caller, NOT read off the component. Component ids are unique only within a system, so a summary that could not name its system would be ambiguous the moment two systems were browsed together |
+| `category` | `Component.category`, normalized to the reserved `general` bucket when absent |
+| `tags` | `Component.tags`, trimmed and deduped in authored order |
+| `essences` | `Component.essences`, projected to an id-ordered list of `{ id, quantity, name }` with the display name resolved through the per-system essence-definition index. Non-positive quantities are dropped |
+| `salvageEnabled` | `Component.salvage.enabled` |
+| `held` | `{ quantity, stacks }` for this component from the inventory snapshot's per-system tallies, or `null`. As with the cheap-availability rule, `null` is "not asked" and is deliberately distinct from a held quantity of zero |
+
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
+
+### The cheap-availability rule
+
+One rule answers "does this actor plausibly have the materials for this recipe?", and both surfaces consume it rather than each deriving one.
+It reads the inventory snapshot's per-system component quantities, per-tag quantities and essence totals, and nothing else.
+
+This is the same rule the inventory snapshot introduced as the **indexed availability projection**.
+"Cheap availability" and "indexed availability projection" name one rule with one implementation; a second name for it is not a second rule, and no surface may hold a second implementation.
+
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
+
+| Requirement | Rule |
+| --- | --- |
+| **It is an UPPER BOUND** | A positive answer means nothing in the tallies rules the recipe out; contended requirements drawing on the same held stacks are counted for each independently, so exact evaluation may still refuse. A negative answer is definitive, because a requirement the totals cannot cover cannot be covered by any assignment of them either. |
+| **The imprecision is carried, not laundered** | The result carries an explicit optimism marker so a consumer cannot read it as exact by accident, and a surface presents a positive answer as "looks makeable", never as "you can make this". Exactness stays at craft time. |
+| **Tools, checks, knowledge and currency are not consulted** | Each can only ever make a recipe LESS craftable, so ignoring them keeps the result an upper bound. A surface needing them asks the paths that own them. |
+| **"Not asked" is distinct from "unavailable"** | A surface with no actor in view — the GM browser projects definitions rather than one actor's view of them — receives `null`, and MUST NOT be rendered as a material shortfall. An unresolvable recipe answers `null` for the same reason: an index miss must not present as a recipe with no requirements, which the empty-requirements case would otherwise report as plausible. |
+| **Cost is per SNAPSHOT, not per row** | Per-system tallies are resolved once per snapshot, so projecting a page of summaries walks the held inventory once and performs one component-identity resolution per held document, not one per row. |
+| **A multi-step recipe is read from its FIRST execution step** | An explicit multi-step recipe carries its requirements on `steps[]` and leaves its top-level ingredient sets empty, so a rule reading only the top level would treat every stepped recipe as having no requirements and answer "plausible" against an empty inventory. That is not the documented optimism — optimism is being wrong about contention, not blind to a whole recipe class. The FIRST step is used, not the actor's active step, because that is what the detail surface's requirement rail shows; a summary pointed at a mid-run step would disagree with the inspector opened from it. |
+
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
+
+### Browse-status precedence
+
+A row's browse status is derived by ONE rule, highest precedence first: teaser, then locked, then knowledge-gated, then recipe-item exhausted, then a material shortfall, otherwise available.
+Exhaustion is READ from the knowledge access evaluation that already established it and MUST NOT be recomputed — see `recipe-visibility/spec.md` § One Candidate Collection Per Evaluation.
+The material term reads the cheap-availability rule's tristate: only a definitive negative yields a material shortfall, and "not asked" does not.
+
+The browse status is a SHARED field, so the rule that derives it is one rule for both audiences.
+Its exhaustion INPUT is nevertheless empty for a GM, because a GM bypasses the knowledge gate that produces exhaustion at all; a GM-audience row is therefore never exhausted.
+That is a property of the knowledge gate rather than an audience-dependent derivation, and it is the distinction to hold: the rule may not branch on audience, and an input the gate never produces for that audience is not a branch.
+
+### What a summary MUST NOT contain, and MUST NOT call
+
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
+
+| Prohibition | Rule |
+| --- | --- |
+| **No exact craftability** | Building any number of summaries MUST invoke exact craftability evaluation and ingredient selection ZERO times. This is a counter-asserted invariant, not a guideline: it is the property the paging surfaces depend on, and the one most likely to erode silently behind a helpfully-named private method. |
+| **No redacted content** | A summary crossing to a player client carries no field the recipe's teaser hides, and no signal DERIVED from one. |
+| **No localized text** | Summaries carry tokens; the consuming surface localizes. A localized summary would key a row's sort on the active language. |
+| **No documents** | Only ids, plain strings, numbers, booleans and arrays of those, so a summary is serializable and cheap to hold by the page. |
+
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
+
+The prohibition on exact evaluation is also enforced structurally: the projection accepts VALUES — a definition, a system, a snapshot, an access result — and never a manager or a listing builder, so there is no collaborator present to call either function on.
+Tests MUST cover the counted invariant over a run of N summaries, and MUST prove the counter non-vacuous rather than reporting a green baseline forever.
+
 ## Behavioural Ownership
 
 - Resolution mode semantics and mode validation: `resolution-modes/spec.md`

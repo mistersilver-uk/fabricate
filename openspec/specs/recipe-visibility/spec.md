@@ -325,6 +325,37 @@ Richer client-side auto-fill for multi-set / alternatives / tags / essences is a
 - May show result descriptions.
 - Non-revealed recipes must not appear for non-GM users; only their count is surfaced (`undiscoveredCount = valid − revealed`), and no non-revealed name/signature/result reaches any client field.
 
+## Summary Projection Disclosure
+
+The canonical recipe summary defined in `data-models/spec.md` § Summary Projections is a PLAYER-facing payload whenever it is built for a player audience.
+Its redaction obeys the same teaser rule the detail model obeys, and the two MUST agree: a recipe that is a teaser in the list and not in the inspector, or the reverse, is a disclosure either way round.
+
+The following are normative.
+
+- **The redaction test is the same test.**
+A summary is redacted when the viewer is not a GM AND the recipe's access reason is `teaser`, and the hidden-field list is the recipe's authored `teaserState.hiddenFields`, falling back to the documented default of ingredients, results and description.
+- **An omitted audience defaults to the REDACTING one.**
+Failing safe matters more than caller convenience: a default of GM would ship an unredacted teaser to whichever caller forgot the argument.
+- **A redacted summary carries no availability, and MUST NOT compute one.**
+Material availability is derived from the recipe's INGREDIENTS, which the default teaser configuration hides, so an availability answer on an undiscovered recipe discloses the shape of a requirement the player is not meant to see yet — refreshable once per inventory change, across a whole corpus.
+The guard belongs at the derivation, not at the write-out: blanking a computed value is equivalent for today's shape and wrong the first time a field is added beside it.
+- **Identity and grouping metadata are NOT redacted.**
+A teaser is shown to the player deliberately, so its name, image and category are the part they are meant to see; the shipped listing model records that decision for `category` already.
+`tags` is likewise not redacted, and that is a NEW decision rather than an inherited one — no player-facing surface has carried recipe tags before, so it does not follow from the `category` precedent.
+It is taken because a tag is GM grouping metadata of exactly the same kind as a category, because `teaserState.hiddenFields` cannot name it (the authored vocabulary is ingredients, results, description, tools and essences), and because withholding it would break the filtering a summary exists to serve.
+- **Authoring state does not cross.**
+A player-audience summary carries no GM-only field, which today means the recipe's lock state and its enabled state.
+- **Exhaustion is a player-only status.**
+A GM bypasses the knowledge gate, so a GM-audience summary MUST NOT report a recipe exhausted even when the caller supplies an exhaustion result.
+Because the browse status is a field both audiences share, honouring it for a GM would make a shared field's derivation depend on the audience, which this contract forbids.
+- **The summary does not gate visibility; the calling surface does.**
+The projection answers what a summary of THIS recipe for THIS audience is, given an access result the visibility evaluation already produced.
+It performs no cohort selection and no visibility filtering of its own, so a surface building player-audience summaries MUST build them only for recipes that evaluation made visible, and MUST pass each recipe's own access result.
+Omitting the access result yields an unredacted summary reporting the available browse status — correct for a visible recipe, and a disclosure for one that is not.
+The gate is upstream and stays there; this contract does not move it and MUST NOT be read as duplicating it.
+
+Tests MUST cover the redacted player summary directly — that it withholds availability, that the snapshot is never consulted to build it, that it reports the discovery browse status, and that the same recipe is unredacted for a GM.
+
 ## Knowledge Access Evaluation
 
 Input:

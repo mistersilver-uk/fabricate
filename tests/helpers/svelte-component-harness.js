@@ -237,6 +237,12 @@ export const CRAFTING_APP_RAW_MODULES = Object.freeze([
   // only foundryBridge.js (already listed above), so this single entry suffices.
   'src/ui/svelte/util/recipeDuration.js',
   'src/systems/CraftingListingBuilder.js',
+  // Same rule, issue 1091: the browse-status vocabulary and its precedence rule moved out
+  // of the builder into an import-free leaf so #1091's summary projection can share them
+  // without pulling the builder in. The builder re-exports the vocabulary and imports the
+  // rule, so this entry must accompany it — an omission HANGS every mounted crafting suite
+  // (# cancelled) rather than failing one. The leaf imports nothing, so it suffices alone.
+  'src/systems/craftingBrowseStatus.js',
   // Same rule, issue 1055: the builder resolves the displayed check formula through the
   // SAME check-modifier context the engine rolls, so it imports the resolver.
   'src/systems/checkModifierResolver.js',
