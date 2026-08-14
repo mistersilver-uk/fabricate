@@ -207,7 +207,7 @@ const WORLD_NAVIGATION_MATCHES = [
   /^src\/ui\/svelte\/apps\/manager\/Gathering(Parties|Realms|MapLinks)Tab\.svelte$/,
 ];
 
-// All six states are independently publishable. A multi-label recipe would collect only its
+// All twelve states are independently publishable. A multi-label recipe would collect only its
 // first filename-sorted candidate and silently discard the disclosure/child/width evidence.
 const worldNavigationFrame = (id, label) => ({
   id,
@@ -591,15 +591,39 @@ export const VIEW_RECIPES = Object.freeze([
   toolStudioFrame('stress-immune', 'Tool Studio stress — check-driven Immune', 'manager-tool-stress-immune', TOOL_STUDIO_MATCHES),
   toolStudioFrame('stress-invalid-validation', 'Tool Studio stress — failing Validation', 'manager-tool-stress-invalid-validation', TOOL_STUDIO_MATCHES),
   toolStudioFrame('stress-wrapping-680', 'Tool Studio stress — 680px wrapping', 'manager-tool-stress-wrapping-680', TOOL_STUDIO_MATCHES),
-  worldNavigationFrame('manager-world-default-collapsed', 'Manager Travel — default collapsed'),
   worldNavigationFrame(
-    'manager-world-travel-expanded-neutral',
+    'manager-system-travel-default-collapsed',
+    'Manager Travel — default collapsed'
+  ),
+  worldNavigationFrame(
+    'manager-system-travel-expanded-neutral',
     'Manager Travel — expanded neutral'
   ),
   worldNavigationFrame('manager-world-parties-normal', 'Manager World — Parties'),
-  worldNavigationFrame('manager-world-realms-normal', 'Manager Travel — Realms'),
-  worldNavigationFrame('manager-world-realms-stacked', 'Manager Travel — Realms stacked'),
-  worldNavigationFrame('manager-world-map-collapsed', 'Manager Travel — Map collapsed rail'),
+  worldNavigationFrame(
+    'manager-world-parties-no-selection',
+    'Manager World — Parties without a selected system'
+  ),
+  worldNavigationFrame('manager-system-travel-card-off', 'Manager Travel — card off'),
+  worldNavigationFrame(
+    'manager-system-travel-with-gathering-expanded',
+    'Manager Travel — Gathering and Travel expanded'
+  ),
+  worldNavigationFrame('manager-system-travel-realms-normal', 'Manager Travel — Realms'),
+  worldNavigationFrame(
+    'manager-system-travel-realms-stacked',
+    'Manager Travel — Realms stacked'
+  ),
+  worldNavigationFrame('manager-system-travel-map-normal', 'Manager Travel — Map'),
+  worldNavigationFrame('manager-system-travel-map-stacked', 'Manager Travel — Map stacked'),
+  worldNavigationFrame(
+    'manager-system-travel-map-collapsed-rail',
+    'Manager Travel — Map collapsed rail'
+  ),
+  worldNavigationFrame(
+    'manager-system-travel-long-label-focus',
+    'Manager Travel — long label keyboard focus'
+  ),
   {
     id: 'manager-recipes',
     label: 'Manager recipes',

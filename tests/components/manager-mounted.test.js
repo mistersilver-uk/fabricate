@@ -1729,10 +1729,32 @@ function createStore(calls = [], options = {}) {
       enabled: options.gatheringRealmsEnabled === true,
     },
     travelParties: options.travelParties || [
-      { id: 'party-one', name: 'Wayfarers', enabled: true, memberCount: 2 },
-      { id: 'party-two', name: 'Night Watch', enabled: false, memberCount: 1 },
+      {
+        id: 'party-one',
+        name: 'Wayfarers',
+        enabled: true,
+        memberCount: 1,
+        memberCards: [{ uuid: 'Actor.member', name: 'Mira', img: '', stale: false }],
+        travelActorUuid: 'Actor.marker',
+        travelActor: { uuid: 'Actor.marker', name: 'Mira', img: '' },
+      },
+      {
+        id: 'party-two',
+        name: 'Night Watch',
+        enabled: false,
+        memberCount: 0,
+        memberCards: [],
+        travelActorUuid: null,
+        travelActor: null,
+      },
     ],
     selectedPartyId: 'party-one',
+    actorOptions: options.actorOptions || [
+      { uuid: 'Actor.member', name: 'Mira', img: '', isPlayerCharacter: true },
+      { uuid: 'Actor.scout', name: 'Scout', img: '', isPlayerCharacter: true },
+    ],
+    partyRealmOverridesAvailable:
+      options.partyRealmOverridesAvailable ?? options.gatheringRealmsEnabled === true,
     selectedSystemRealms: options.worldTravelBySystem?.alchemy?.realms ||
       options.selectedSystemRealms || [
         {
@@ -2325,6 +2347,67 @@ function createStore(calls = [], options = {}) {
         ...state,
         gatheringRealmSettings: { ...(state.gatheringRealmSettings || {}), enabled },
       }));
+      return true;
+    },
+    selectParty: (id) => {
+      calls.push(['selectParty', id]);
+      viewState.update((state) => ({ ...state, selectedPartyId: id }));
+      return true;
+    },
+    createParty: () => {
+      calls.push(['createParty']);
+      return true;
+    },
+    renameParty: (id, name) => {
+      calls.push(['renameParty', id, name]);
+      return true;
+    },
+    addOrMovePartyMember: (id, uuid) => {
+      calls.push(['addOrMovePartyMember', id, uuid]);
+      return true;
+    },
+    removePartyMember: (id, uuid) => {
+      calls.push(['removePartyMember', id, uuid]);
+      return true;
+    },
+    movePartyMember: (from, to, uuid) => {
+      calls.push(['movePartyMember', from, to, uuid]);
+      return true;
+    },
+    setPartyTravelActor: (id, uuid) => {
+      calls.push(['setPartyTravelActor', id, uuid]);
+      viewState.update((state) => ({
+        ...state,
+        travelParties: state.travelParties.map((party) =>
+          party.id === id
+            ? {
+                ...party,
+                travelActorUuid: uuid,
+                travelActor: { uuid, name: 'Scout', img: '' },
+              }
+            : party
+        ),
+      }));
+      return true;
+    },
+    clearPartyTravelActor: (id) => {
+      calls.push(['clearPartyTravelActor', id]);
+      return true;
+    },
+    setPartyEnabled: (id, enabled) => {
+      calls.push(['setPartyEnabled', id, enabled]);
+      return true;
+    },
+    deleteParty: (id) => {
+      calls.push(['deleteParty', id]);
+      return true;
+    },
+    setPartyRealmOverride: (id, systemId, realmIds) => {
+      calls.push(['setPartyRealmOverride', id, systemId, realmIds]);
+      return true;
+    },
+    clearPartyRealmOverride: (id, systemId) => {
+      calls.push(['clearPartyRealmOverride', id, systemId]);
       return true;
     },
     addGatheringLibraryTask: (systemId) => {
@@ -13241,7 +13324,6 @@ describe('CraftingSystemManager mounted behavior', () => {
       props: {
         store: createStore(calls, {
           gatheringRealmsEnabled: true,
-          experimentalFeaturesEnabled: true,
         }),
         services: { openCurrentAdmin: () => {} },
       },
@@ -13252,13 +13334,6 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(world, 'World always renders');
     assert.equal(world.querySelector('#manager-world-heading').textContent.trim(), 'WORLD');
     assert.equal(world.querySelector('#manager-world-scope').textContent.trim(), 'every system');
-    const navChildren = Array.from(target.querySelector('.manager-nav').children);
-    const graph = navChildren.find((item) => item.textContent.includes('Graph'));
-    assert.ok(graph, 'the experimental Graph placeholder is visible in this ordering fixture');
-    assert.ok(
-      navChildren.indexOf(world) > navChildren.indexOf(graph),
-      'World follows every selected-system entry, including Graph'
-    );
     assert.deepEqual(
       Array.from(world.querySelectorAll('[data-world-nav-item]')).map((item) => item.id),
       ['manager-world-nav-parties']
@@ -13279,7 +13354,15 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.equal(systemTravelItem('travel').getAttribute('aria-expanded'), 'false');
     assert.equal(target.querySelector('[data-system-travel-submenu]'), null);
 
-    systemTravelItem('travel').click();
+    // Enter the shared Gathering browser through the direct-mount suite's established route
+    // before selecting a Travel destination. The real-Chromium View Lab case pins the
+    // destination inspector itself; happy-dom reliably exercises the destination projection
+    // only after this parent route has settled.
+    navButton('Gathering').click();
+    await settleRouteExit();
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'environments');
+
+    target.querySelector('#manager-travel-toggle').click();
     await tick();
     flushSync();
     assert.equal(systemTravelItem('travel').getAttribute('aria-expanded'), 'true');
@@ -13290,6 +13373,14 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(target.querySelector('[data-system-travel-submenu]'));
     assert.ok(systemTravelItem('realms').querySelector('.fa-mountain-sun'));
     assert.ok(systemTravelItem('map').querySelector('.fa-map-location-dot'));
+    systemTravelItem('realms').click();
+    await settleRouteExit();
+    assert.equal(
+      target.querySelector('.fabricate-manager').dataset.managerView,
+      'environments',
+      'the Realms destination commits the system Travel route'
+    );
+    assert.equal(target.querySelectorAll('.fabricate-manager').length, 1);
     assert.equal(systemTravelItem('realms').getAttribute('aria-current'), 'page');
     assert.ok(worldNavItem('parties').classList.contains('manager-world-nav-item'));
     assert.equal(
@@ -13300,7 +13391,24 @@ describe('CraftingSystemManager mounted behavior', () => {
       target.querySelector('[data-travel-panel="realms"]').getAttribute('aria-labelledby'),
       'manager-travel-nav-realms'
     );
-
+    assert.equal(
+      target.querySelector('.manager-header .manager-title').textContent.trim(),
+      'Realms'
+    );
+    assert.equal(
+      target.querySelector('.manager-header-actions').getAttribute('aria-label'),
+      'Realm actions'
+    );
+    systemTravelItem('map').click();
+    await settleRouteExit();
+    assert.equal(
+      target.querySelector('.manager-header .manager-title').textContent.trim(),
+      'Map Region Links'
+    );
+    assert.equal(
+      target.querySelector('.manager-header-actions').getAttribute('aria-label'),
+      'Map region link actions'
+    );
     worldNavItem('parties').click();
     await tick();
     flushSync();
@@ -13315,6 +13423,22 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(
       !target.querySelector('[id^="travel-tab-"]'),
       'the retired horizontal tabs are absent'
+    );
+  });
+
+  it('places permanent World navigation after every selected-system entry, including Graph', () => {
+    mountManager([], {
+      gatheringRealmsEnabled: true,
+      experimentalFeaturesEnabled: true,
+    });
+
+    const navChildren = Array.from(target.querySelector('.manager-nav').children);
+    const graph = navChildren.find((item) => item.textContent.includes('Graph'));
+    const world = target.querySelector('[data-world-nav-section]');
+    assert.ok(graph, 'the experimental Graph placeholder is visible in this ordering fixture');
+    assert.ok(
+      navChildren.indexOf(world) > navChildren.indexOf(graph),
+      'World follows every selected-system entry, including Graph'
     );
   });
 
@@ -13537,8 +13661,9 @@ describe('CraftingSystemManager mounted behavior', () => {
     }
   });
 
-  it('opens World Parties and global create controls with no selected system', async () => {
-    mountManager([], { noSystems: true });
+  it('presents and operates World Parties without a selected system while withholding overrides', async () => {
+    const calls = [];
+    mountManager(calls, { noSystems: true });
     worldNavItem('parties').click();
     await tick();
     flushSync();
@@ -13546,10 +13671,96 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'world');
     assert.ok(target.querySelector('[data-travel-panel="parties"]'));
     assert.equal(
-      target.querySelector('.manager-header-actions .manager-button.is-primary').disabled,
-      false
+      target.querySelector('.manager-header .manager-title').textContent.trim(),
+      'World Parties'
     );
+    const worldHeading = target.querySelector('.manager-main .manager-section-header');
+    assert.equal(
+      worldHeading.querySelector('.manager-kicker').textContent.trim(),
+      'WORLD / every system'
+    );
+    assert.equal(worldHeading.querySelector('.manager-title').textContent.trim(), 'World Parties');
+    assert.match(
+      worldHeading.querySelector('.manager-subtitle').textContent,
+      /shared across every crafting system/
+    );
+    assert.equal(
+      target.querySelector('.manager-header-actions').getAttribute('aria-label'),
+      'World party actions'
+    );
+    assert.equal(
+      target.querySelector('.manager-travel-inspector').getAttribute('aria-label'),
+      'Selected world party'
+    );
+    const createButton = target.querySelector('.manager-header-actions .manager-button.is-primary');
+    assert.equal(createButton.disabled, false);
     assert.ok(target.querySelector('[data-party-realm-override-unavailable]'));
+    assert.match(
+      target.querySelector('[data-party-realm-evidence-unavailable]').textContent,
+      /Select a crafting system with Gathering enabled/
+    );
+    assert.equal(target.textContent.includes('No current realm set for this system.'), false);
+
+    createButton.click();
+    target
+      .querySelector('[data-manager-travel-party-id="party-two"] .manager-travel-parties-header')
+      .click();
+    await tick();
+    flushSync();
+
+    const nameInput = target.querySelector('[data-manager-party-name-field] input');
+    setInputValue(nameInput, 'Nightwardens');
+    nameInput.dispatchEvent(new Event('blur'));
+    await tick();
+    flushSync();
+
+    target.querySelector('.manager-party-add-trigger').click();
+    await tick();
+    flushSync();
+    const scoutOption = Array.from(document.querySelectorAll('.manager-travel-option')).find(
+      (option) => option.textContent.includes('Scout')
+    );
+    assert.ok(scoutOption, 'the no-selection party editor exposes the global actor roster');
+    scoutOption.click();
+
+    dispatchDrop(target.querySelector('[data-manager-party-marker]'), {
+      type: 'Actor',
+      uuid: 'Actor.scout',
+    });
+    await tick();
+    flushSync();
+    const enableButton = target.querySelector('.manager-party-enable-toggle.is-off');
+    assert.equal(enableButton.disabled, false);
+    enableButton.click();
+    target.querySelector('.manager-travel-inspector .manager-button.is-danger').click();
+
+    assert.deepEqual(
+      calls.filter((call) =>
+        [
+          'createParty',
+          'selectParty',
+          'renameParty',
+          'addOrMovePartyMember',
+          'setPartyTravelActor',
+          'setPartyEnabled',
+          'deleteParty',
+        ].includes(call[0])
+      ),
+      [
+        ['createParty'],
+        ['selectParty', 'party-two'],
+        ['renameParty', 'party-two', 'Nightwardens'],
+        ['addOrMovePartyMember', 'party-two', 'Actor.scout'],
+        ['setPartyTravelActor', 'party-two', 'Actor.scout'],
+        ['setPartyEnabled', 'party-two', true],
+        ['deleteParty', 'party-two'],
+      ]
+    );
+    assert.equal(
+      calls.some((call) => ['setPartyRealmOverride', 'clearPartyRealmOverride'].includes(call[0])),
+      false,
+      'no-selection Party CRUD must not write a system override'
+    );
   });
 
   it('falls back from active system Travel when Gathering or the selection vanishes', async () => {

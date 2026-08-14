@@ -312,14 +312,20 @@ describe('UI PR screenshot evidence', () => {
     assert.ok(views[0].smokeLabels.includes('manager-environment-edit-placeholder'));
   });
 
-  it('pins World Parties and system Travel sources to the six navigation captures', () => {
+  it('pins World Parties and system Travel sources to the twelve navigation captures', () => {
     const worldLabels = [
-      'manager-world-default-collapsed',
-      'manager-world-travel-expanded-neutral',
+      'manager-system-travel-default-collapsed',
+      'manager-system-travel-expanded-neutral',
       'manager-world-parties-normal',
-      'manager-world-realms-normal',
-      'manager-world-realms-stacked',
-      'manager-world-map-collapsed',
+      'manager-world-parties-no-selection',
+      'manager-system-travel-card-off',
+      'manager-system-travel-with-gathering-expanded',
+      'manager-system-travel-realms-normal',
+      'manager-system-travel-realms-stacked',
+      'manager-system-travel-map-normal',
+      'manager-system-travel-map-stacked',
+      'manager-system-travel-map-collapsed-rail',
+      'manager-system-travel-long-label-focus',
     ];
     for (const label of worldLabels) {
       assert.deepEqual(

@@ -2935,12 +2935,12 @@
         'Gathering Tasks'
       );
     if (currentView === 'world')
-      return text('FABRICATE.Admin.Manager.Travel.Tabs.Parties', 'Parties');
-    if (currentView === 'environments' && displayedGatheringTab === 'travel')
-      return text(
-        'FABRICATE.Admin.Manager.Environment.GatheringTabs.TravelTitle',
-        'Travel and parties'
-      );
+      return text('FABRICATE.Admin.Manager.World.PartiesTitle', 'World Parties');
+    if (currentView === 'environments' && displayedGatheringTab === 'travel') {
+      if (activeTravelTab === 'map')
+        return text('FABRICATE.Admin.Manager.Travel.MapLinksTitle', 'Map Region Links');
+      return text('FABRICATE.Admin.Manager.Travel.RealmsTitle', 'Realms');
+    }
     if (currentView === 'tools') return text('FABRICATE.Admin.Manager.Tools.Title', 'Tools');
     if (currentView === 'tool-edit')
       return text('FABRICATE.Admin.Manager.Tools.EditTitle', 'Edit Tool');
@@ -3047,11 +3047,17 @@
         'FABRICATE.Admin.Manager.World.PartiesSubtitle',
         'Manage Fabricate parties shared across every crafting system.'
       );
-    if (currentView === 'environments' && displayedGatheringTab === 'travel')
+    if (currentView === 'environments' && displayedGatheringTab === 'travel') {
+      if (activeTravelTab === 'map')
+        return text(
+          'FABRICATE.Admin.Manager.Travel.MapLinksHint',
+          'Link active Scene Regions to realms in the selected crafting system.'
+        );
       return text(
-        'FABRICATE.Admin.Manager.Travel.Subtitle',
-        'Manage Fabricate parties and set the current realm for the selected crafting system.'
+        'FABRICATE.Admin.Manager.Travel.RealmsHint',
+        'Manage the realms available to the selected crafting system.'
       );
+    }
     if (currentView === 'tools')
       return text(
         'FABRICATE.Admin.Manager.Tools.Subtitle',
@@ -3131,14 +3137,12 @@
       return text('FABRICATE.Admin.Manager.Essence.Actions', 'Essence actions');
     if (currentView === 'environments' && displayedGatheringTab === 'tasks')
       return text('FABRICATE.Admin.Manager.Environment.Tasks.Actions', 'Gathering task actions');
-    if (
-      currentView === 'world' ||
-      (currentView === 'environments' && displayedGatheringTab === 'travel')
-    )
-      return text(
-        'FABRICATE.Admin.Manager.Environment.GatheringTabs.TravelActions',
-        'Travel and party actions'
-      );
+    if (currentView === 'world')
+      return text('FABRICATE.Admin.Manager.World.PartiesActions', 'World party actions');
+    if (currentView === 'environments' && displayedGatheringTab === 'travel')
+      return activeTravelTab === 'map'
+        ? text('FABRICATE.Admin.Manager.Travel.MapLinksActions', 'Map region link actions')
+        : text('FABRICATE.Admin.Manager.Travel.RealmsActions', 'Realm actions');
     if (currentView === 'tools')
       return text('FABRICATE.Admin.Manager.Tools.Actions', 'Tools actions');
     if (currentView === 'knowledge')
@@ -3184,14 +3188,12 @@
         'FABRICATE.Admin.Manager.Environment.Tasks.Inspector',
         'Selected gathering task inspector'
       );
-    if (
-      currentView === 'world' ||
-      (currentView === 'environments' && displayedGatheringTab === 'travel')
-    )
-      return text(
-        'FABRICATE.Admin.Manager.Environment.GatheringTabs.TravelInspector',
-        'Selected party inspector'
-      );
+    if (isWorldRoute)
+      return text('FABRICATE.Admin.Manager.World.PartiesInspector', 'Selected world party');
+    if (isSystemTravelRoute)
+      return activeTravelTab === 'map'
+        ? text('FABRICATE.Admin.Manager.Travel.MapLinksInspector', 'Selected map region link')
+        : text('FABRICATE.Admin.Manager.Travel.RealmsInspector', 'Selected realm');
     if (currentView === 'tools')
       return text('FABRICATE.Admin.Manager.Tools.Inspector', 'Selected tool inspector');
     if (currentView === 'environments')
@@ -8136,6 +8138,7 @@
         {shouldUseEnvironmentDraftForDisplay}
         activeGatheringTab={isWorldRoute ? 'travel' : displayedGatheringTab}
         activeTravelTab={isWorldRoute ? 'parties' : activeTravelTab}
+        worldParties={isWorldRoute}
         selectedTaskId={selectedGatheringTask?.id || selectedGatheringTaskId}
         selectedEventId={selectedGatheringEvent?.id || selectedGatheringEventId}
         managedItemOptions={selectedSystem?.managedItemOptions || []}
@@ -8771,7 +8774,14 @@
          its third column (roster · detail), so a fourth would clip the detail pane's
          action cluster at the 1024px minimum with no scrollbar. -->
     {#if currentView !== 'environment-edit' && !isChecksRoute && currentView !== 'system-edit' && currentView !== 'crafting-settings' && currentView !== 'recipe-item-edit' && currentView !== 'component-edit' && currentView !== 'recipe-edit' && currentView !== 'tool-edit' && currentView !== 'knowledge'}
-      <aside class="manager-inspector" aria-label={inspectorLabel()}>
+      <aside
+        class="manager-inspector"
+        aria-label={isSystemTravelRoute
+          ? activeTravelTab === 'map'
+            ? text('FABRICATE.Admin.Manager.Travel.MapLinksInspector', 'Selected map region link')
+            : text('FABRICATE.Admin.Manager.Travel.RealmsInspector', 'Selected realm')
+          : inspectorLabel()}
+      >
         {#if currentView === 'tags' && selectedSystem}
           <section class="manager-inspector-card" data-tags-evidence="at-a-glance">
             <h3 class="manager-card-title">
@@ -10598,6 +10608,14 @@
               class="manager-inspector-card manager-travel-inspector"
               data-gathering-inspector-travel
               data-travel-inspector={activeTravelTab}
+              aria-label={activeTravelTab === 'parties'
+                ? text('FABRICATE.Admin.Manager.World.PartiesInspector', 'Selected world party')
+                : activeTravelTab === 'map'
+                  ? text(
+                      'FABRICATE.Admin.Manager.Travel.MapLinksInspector',
+                      'Selected map region link'
+                    )
+                  : text('FABRICATE.Admin.Manager.Travel.RealmsInspector', 'Selected realm')}
             >
               {#if activeTravelTab === 'parties'}
                 {#if selectedTravelParty}
@@ -10625,7 +10643,11 @@
                     <h3 class="manager-card-title">
                       {text('FABRICATE.Admin.Manager.Travel.EvidenceLabel', 'Current realm')}
                     </h3>
-                    {#if selectedTravelParty.currentRealmEvidence?.realms?.length > 0}
+                    {#if !canShowSystemTravel || $viewState.partyRealmOverridesAvailable !== true}
+                      <p class="manager-muted" data-party-realm-evidence-unavailable>
+                        {partyRealmOverridesUnavailableHint}
+                      </p>
+                    {:else if selectedTravelParty.currentRealmEvidence?.realms?.length > 0}
                       <ul class="manager-travel-evidence-realms">
                         {#each selectedTravelParty.currentRealmEvidence?.realms || [] as realm (realm.id)}
                           <li>

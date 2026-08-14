@@ -10149,7 +10149,7 @@ async function main() {
           .first().waitFor({ state: 'visible', timeout: 10_000 });
         await captureStableManagerView(page, {
           layout: 'System Travel collapsed by default',
-          label: 'manager-world-default-collapsed'
+          label: 'manager-system-travel-default-collapsed'
         });
 
         await page.locator('.fabricate-manager #manager-travel-toggle').first().click();
@@ -10157,8 +10157,26 @@ async function main() {
           .first().waitFor({ state: 'visible', timeout: 5_000 });
         await captureStableManagerView(page, {
           layout: 'System Travel expanded neutral',
-          label: 'manager-world-travel-expanded-neutral'
+          label: 'manager-system-travel-expanded-neutral'
         });
+
+        const gatheringToggle = page.locator(
+          '.fabricate-manager .manager-nav-toggle[aria-controls="manager-gathering-submenu"]'
+        ).first();
+        const gatheringSubmenu = page.locator('.fabricate-manager #manager-gathering-submenu').first();
+        const gatheringWasExpanded = await gatheringSubmenu.isVisible();
+        if (!gatheringWasExpanded) {
+          await gatheringToggle.click();
+          await gatheringSubmenu.waitFor({ state: 'visible', timeout: 5_000 });
+        }
+        await captureStableManagerView(page, {
+          layout: 'Gathering and system Travel expanded together',
+          label: 'manager-system-travel-with-gathering-expanded'
+        });
+        if (!gatheringWasExpanded) {
+          await gatheringToggle.click();
+          await gatheringSubmenu.waitFor({ state: 'hidden', timeout: 5_000 });
+        }
 
         await page.locator('.fabricate-manager #manager-world-nav-parties').first().click();
         await page.locator('.fabricate-manager .manager-travel-parties-row').first()
@@ -10173,30 +10191,85 @@ async function main() {
           .first().waitFor({ state: 'visible', timeout: 10_000 });
         await captureStableManagerView(page, {
           layout: 'System Travel Realms normal',
-          label: 'manager-world-realms-normal'
+          label: 'manager-system-travel-realms-normal'
         });
         await captureStableManagerView(page, {
           width: 1000,
           height: 720,
           layout: 'System Travel Realms stacked',
-          label: 'manager-world-realms-stacked',
+          label: 'manager-system-travel-realms-stacked',
           settleMs: 250
         });
 
         await setManagerWindowSize(page, { width: 1280, height: 820 });
-        await page.locator('.fabricate-manager #manager-travel-nav-map').first().click();
+        const mapDestination = page.locator('.fabricate-manager #manager-travel-nav-map').first();
+        await mapDestination.focus();
+        await page.keyboard.press('Space');
         await page.locator('.fabricate-manager [data-travel-panel="map"]')
           .first().waitFor({ state: 'visible', timeout: 10_000 });
+        await captureStableManagerView(page, {
+          layout: 'System Travel Map Region Links normal',
+          label: 'manager-system-travel-map-normal'
+        });
+        await captureStableManagerView(page, {
+          width: 1000,
+          height: 720,
+          layout: 'System Travel Map Region Links stacked',
+          label: 'manager-system-travel-map-stacked',
+          settleMs: 250
+        });
+        await mapDestination.focus();
+        await captureStableManagerView(page, {
+          width: 1000,
+          height: 720,
+          layout: 'System Travel long label keyboard focus',
+          label: 'manager-system-travel-long-label-focus',
+          settleMs: 250
+        });
+        await setManagerWindowSize(page, { width: 1280, height: 820 });
         await page.locator('.fabricate-manager [data-manager-rail-toggle]').first().click();
         await page.locator('.fabricate-manager .manager-body.is-rail-collapsed')
           .first().waitFor({ state: 'visible', timeout: 5_000 });
         await captureStableManagerView(page, {
           layout: 'System Travel Map Region Links collapsed rail',
-          label: 'manager-world-map-collapsed'
+          label: 'manager-system-travel-map-collapsed-rail'
         });
         await page.locator('.fabricate-manager [data-manager-rail-toggle]').first().click();
         await page.locator('.fabricate-manager .manager-body:not(.is-rail-collapsed)')
           .first().waitFor({ state: 'visible', timeout: 5_000 });
+
+        try {
+          await page.evaluate(async (systemId) => {
+            await globalThis.__fabricateSmokeManagerApp?._adminStore?.setGatheringRealmsEnabled?.(
+              systemId,
+              false
+            );
+          }, craftingSetup.systemId);
+          await page.locator('.fabricate-manager #manager-nav-travel')
+            .first().waitFor({ state: 'detached', timeout: 5_000 });
+          await captureStableManagerView(page, {
+            layout: 'System Travel card off',
+            label: 'manager-system-travel-card-off'
+          });
+
+          await page.evaluate(async () => {
+            await globalThis.__fabricateSmokeManagerApp?._adminStore?.selectSystem?.('');
+          });
+          await page.locator('.fabricate-manager #manager-world-nav-parties').first().click();
+          await page.locator(
+            '.fabricate-manager [data-travel-panel="parties"] [data-party-realm-override-unavailable]'
+          ).first().waitFor({ state: 'visible', timeout: 5_000 });
+          await captureStableManagerView(page, {
+            layout: 'World Parties without a selected crafting system',
+            label: 'manager-world-parties-no-selection'
+          });
+        } finally {
+          await page.evaluate(async (systemId) => {
+            const store = globalThis.__fabricateSmokeManagerApp?._adminStore;
+            await store?.setGatheringRealmsEnabled?.(systemId, true);
+            await store?.selectSystem?.(systemId);
+          }, craftingSetup.systemId);
+        }
 
         // Doc journey (quickstart Step 7 — Configure the Gathering Environment):
         // the gathering Settings tab hosts the d100 Gathering Rules (reward / event

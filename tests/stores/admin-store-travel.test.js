@@ -46,12 +46,14 @@ function createServices({
   partyError = null,
   sceneRegions = null,
   insideActorUuids = [],
-  autoRegionIds = {}
+  autoRegionIds = {},
+  selectedSystemId = 'system-a',
+  hasSystems = true
 } = {}) {
-  const settings = { lastManagedCraftingSystem: 'system-a' };
+  const settings = { lastManagedCraftingSystem: selectedSystemId };
   const system = makeSystem({ gatheringRealms: realms });
   const systemManager = {
-    getSystems: () => [system],
+    getSystems: () => (hasSystems ? [system] : []),
     getSystem: (id) => (id === system.id ? system : null),
     getItems: () => [],
     updateSystem: async (id, updates) => { Object.assign(system, updates); }
@@ -346,6 +348,26 @@ describe('adminStore travel section', () => {
     system.gatheringRealmSettings.enabled = false;
     const store = createAdminStore(services);
     await flush();
+    assert.equal(await store.renameParty('p1', 'Wayfarers'), true);
+    assert.equal(await store.setPartyRealmOverride('p1', 'system-a', ['r1']), false);
+    assert.equal(await store.clearPartyRealmOverride('p1', 'system-a'), false);
+    assert.equal(await store.dropStaleOverrideRealm('p1', 'system-a', 'r1'), false);
+    assert.equal(calls.update.length, 1);
+    assert.equal(calls.setOverride.length, 0);
+    assert.equal(calls.clearOverride.length, 0);
+    assert.equal(get(store.viewState).partyRealmOverridesAvailable, false);
+    store.destroy();
+  });
+
+  it('keeps Party CRUD global but performs no realm override writes without a selected system', async () => {
+    const { services, calls } = createServices({
+      selectedSystemId: '',
+      hasSystems: false,
+      parties: [{ id: 'p1', name: 'Vanguard', enabled: false, memberActorUuids: [], travelActorUuid: null, currentRealmOverrides: {} }]
+    });
+    const store = createAdminStore(services);
+    await flush();
+
     assert.equal(await store.renameParty('p1', 'Wayfarers'), true);
     assert.equal(await store.setPartyRealmOverride('p1', 'system-a', ['r1']), false);
     assert.equal(await store.clearPartyRealmOverride('p1', 'system-a'), false);

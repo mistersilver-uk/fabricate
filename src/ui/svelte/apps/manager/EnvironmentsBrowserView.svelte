@@ -33,6 +33,7 @@
     shouldUseEnvironmentDraftForDisplay = false,
     activeGatheringTab = 'environments',
     activeTravelTab = 'parties',
+    worldParties = false,
     services = null,
     selectedTaskId = '',
     selectedEventId = '',
@@ -701,12 +702,36 @@
   }
 
   function gatheringHeaderTitle() {
+    if (activeGatheringTab === 'travel') {
+      if (worldParties) return text('FABRICATE.Admin.Manager.World.PartiesTitle', 'World Parties');
+      if (activeTravelTab === 'realms')
+        return text('FABRICATE.Admin.Manager.Travel.RealmsTitle', 'Realms');
+      if (activeTravelTab === 'map')
+        return text('FABRICATE.Admin.Manager.Travel.MapLinksTitle', 'Map Region Links');
+    }
     const titleKey = activeGatheringTabConfig?.titleKey;
     if (titleKey) return text(titleKey, activeGatheringTabConfig.titleFallback);
     return text('FABRICATE.Admin.Manager.Environment.Library', 'Gathering environments');
   }
 
   function gatheringHeaderHint() {
+    if (activeGatheringTab === 'travel') {
+      if (worldParties)
+        return text(
+          'FABRICATE.Admin.Manager.World.PartiesHint',
+          'Create and manage parties shared across every crafting system.'
+        );
+      if (activeTravelTab === 'realms')
+        return text(
+          'FABRICATE.Admin.Manager.Travel.RealmsHint',
+          'Manage the realms available to the selected crafting system.'
+        );
+      if (activeTravelTab === 'map')
+        return text(
+          'FABRICATE.Admin.Manager.Travel.MapLinksHint',
+          'Link active Scene Regions to realms in the selected crafting system.'
+        );
+    }
     const hintKey = activeGatheringTabConfig?.hintKey;
     if (hintKey) return text(hintKey, activeGatheringTabConfig.hintFallback);
     return text(
@@ -723,7 +748,9 @@
   <section class="manager-section-header">
     <div class="manager-heading">
       <p class="manager-kicker">
-        {selectedSystemName || text('FABRICATE.Admin.Manager.SelectSystem', 'Select a system')}
+        {worldParties
+          ? text('FABRICATE.Admin.Manager.World.PartiesKicker', 'WORLD / every system')
+          : selectedSystemName || text('FABRICATE.Admin.Manager.SelectSystem', 'Select a system')}
       </p>
       <h2 class="manager-title">{gatheringHeaderTitle()}</h2>
       <p class="manager-subtitle">{gatheringHeaderHint()}</p>

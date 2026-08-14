@@ -4093,6 +4093,14 @@
         "Travel": {
           "Title": "Travel",
           "Subtitle": "Manage Fabricate parties and set the current realm for the selected crafting system.",
+          "RealmsTitle": "Realms",
+          "RealmsHint": "Manage the realms available to the selected crafting system.",
+          "RealmsActions": "Realm actions",
+          "RealmsInspector": "Selected realm",
+          "MapLinksTitle": "Map Region Links",
+          "MapLinksHint": "Link active Scene Regions to realms in the selected crafting system.",
+          "MapLinksActions": "Map region link actions",
+          "MapLinksInspector": "Selected map region link",
           "Tabs": {
             "Label": "Travel sections",
             "Parties": "Parties",
@@ -4303,7 +4311,12 @@
           "ExpandTravel": "Expand Travel",
           "CollapseTravel": "Collapse Travel",
           "TravelDestinations": "Travel destinations",
+          "PartiesTitle": "World Parties",
+          "PartiesKicker": "WORLD / every system",
           "PartiesSubtitle": "Manage Fabricate parties shared across every crafting system.",
+          "PartiesHint": "Create and manage parties shared across every crafting system.",
+          "PartiesActions": "World party actions",
+          "PartiesInspector": "Selected world party",
           "PartyOverrideGatheringRequired": "Select a crafting system with Gathering enabled to set a current-realm override.",
           "PartyOverrideTravelRequired": "Enable Travel & Realms in Gathering settings to set a current-realm override."
         },
