@@ -7770,13 +7770,6 @@ async function main() {
               vocabularies: {
                 regions: { values: ['northreach'] }
               },
-              // Two character modifiers so the System Settings Character Modifiers
-              // list renders populated for the issue-768 list-ergonomics evidence
-              // (icon picker, section collapse, copy-to-prerequisites).
-              characterModifiers: [
-                { id: 'smoke-mod-herbalism', label: 'Herbalism Training', icon: 'fa-solid fa-leaf', expression: '@skills.nature.value' },
-                { id: 'smoke-mod-survival', label: 'Wilderness Survival', icon: 'fa-solid fa-campground', expression: '@skills.survival.value' }
-              ],
               tasks: [{
                 id: 'smoke-forage-library',
                 name: 'Forage Wild Herbs',
@@ -7831,11 +7824,25 @@ async function main() {
           }
         });
 
-        // Tools are SYSTEM-OWNED (the `craftingSystems` setting) — the Tools
-        // manager and the gathering tool gate read getSystem(id).tools, not
-        // gatheringConfig. Mirror the canonical persist so the manager Tools view
-        // renders and tool-blocked tasks resolve their requirement.
+        // Modifiers and Tools are SYSTEM-OWNED (the `craftingSystems` setting). Persist both
+        // through the canonical manager update after the Gathering fixture exists: the System
+        // Settings list reads `getSystem(id).modifiers`, while the Tools view and gathering tool
+        // gate read `getSystem(id).tools`.
         await csm.updateSystem(systemId, {
+          modifiers: [
+            {
+              id: 'smoke-mod-herbalism',
+              label: 'Herbalism Training',
+              icon: 'fa-solid fa-leaf',
+              expression: '@skills.nature.value'
+            },
+            {
+              id: 'smoke-mod-survival',
+              label: 'Wilderness Survival',
+              icon: 'fa-solid fa-campground',
+              expression: '@skills.survival.value'
+            }
+          ],
           tools: game.settings.get('fabricate', 'gatheringConfig')?.systems?.[systemId]?.tools || []
         });
 
@@ -8609,6 +8616,14 @@ async function main() {
         await setManagerWindowSize(page, { width: 1280, height: 980 });
         const modifierCard = page.locator('.fabricate-manager [data-system-modifiers]').first();
         await modifierCard.waitFor({ state: 'visible', timeout: 5_000 });
+        const modifierRows = modifierCard.locator('[data-system-modifier]');
+        await modifierRows.nth(1).waitFor({ state: 'visible', timeout: 5_000 });
+        const modifierRowCount = await modifierRows.count();
+        if (modifierRowCount !== 2) {
+          throw new Error(
+            `System Settings modifier fixture expected 2 rendered rows, found ${modifierRowCount}.`
+          );
+        }
         await modifierCard.evaluate((el) => el.scrollIntoView({ block: 'start' }));
         await page.waitForTimeout(200);
 
@@ -8621,7 +8636,7 @@ async function main() {
 
         // Open the first modifier in edit mode and open its IconPicker so the icon
         // dropdown is visible (parity with Currency Units / Character Prerequisites).
-        const firstModifierRow = modifierCard.locator('[data-system-modifier]').first();
+        const firstModifierRow = modifierRows.first();
         await firstModifierRow.locator('[data-toggle-modifier]').first().click();
         await page.waitForTimeout(150);
         const modifierIconTrigger = firstModifierRow.locator('.essence-icon-picker-trigger').first();

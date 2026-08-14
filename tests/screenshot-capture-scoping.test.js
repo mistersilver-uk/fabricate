@@ -407,6 +407,43 @@ test('World Parties and system Travel capture-map order mirrors the live Foundry
   assert.ok(!harnessLabels.includes('manager-system-travel-long-label-focus'));
 });
 
+test('Phase C seeds system modifiers canonically before the settings-list action', () => {
+  const phaseCStart = HARNESS.indexOf("startPhase('phase-C')");
+  const gatheringStart = HARNESS.indexOf(
+    "await game.settings.set('fabricate', 'gatheringConfig'",
+    phaseCStart
+  );
+  const systemPatchStart = HARNESS.indexOf(
+    '// Modifiers and Tools are SYSTEM-OWNED',
+    gatheringStart
+  );
+  const systemPatchEnd = HARNESS.indexOf(
+    '// Reference the deliberately-unlabelled tool',
+    systemPatchStart
+  );
+  const listStart = HARNESS.indexOf('// --- Settings-list ergonomics (issue 768) ---');
+  const firstAction = HARNESS.indexOf("locator('[data-toggle-modifier]')", listStart);
+  assert.ok(
+    gatheringStart >= 0 && systemPatchStart > gatheringStart && systemPatchEnd > systemPatchStart,
+    'the Phase-C gathering and canonical system patches must remain bounded'
+  );
+  assert.ok(
+    listStart >= 0 && firstAction > listStart,
+    'the settings-list action must remain bounded'
+  );
+
+  const gatheringPatch = HARNESS.slice(gatheringStart, systemPatchStart);
+  const systemPatch = HARNESS.slice(systemPatchStart, systemPatchEnd);
+  const beforeFirstAction = HARNESS.slice(listStart, firstAction);
+  assert.doesNotMatch(gatheringPatch, /\bcharacterModifiers\s*:/);
+  assert.match(systemPatch, /await csm\.updateSystem\(systemId, \{[\s\S]*?modifiers:\s*\[/);
+  assert.match(systemPatch, /smoke-mod-herbalism/);
+  assert.match(systemPatch, /smoke-mod-survival/);
+  assert.match(systemPatch, /tools:\s*game\.settings\.get/);
+  assert.match(beforeFirstAction, /modifierRows\.nth\(1\)\.waitFor/);
+  assert.match(beforeFirstAction, /modifierRowCount !== 2/);
+});
+
 test('phase assignment matches the manager/player prefix split', () => {
   for (const label of SCREENSHOT_CAPTURE_ORDER) {
     const phase = phaseForCaptureLabel(label);
