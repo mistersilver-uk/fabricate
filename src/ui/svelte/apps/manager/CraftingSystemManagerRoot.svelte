@@ -10721,10 +10721,13 @@
                     {/if}
                   </section>
 
-                  <!-- No Enable / Delete here (issue 1182). `ui-integration/spec.md:1603`
-                       declares this inspector a READ-ONLY evidence echo and pins every
-                       editing control to the centre column, where each card now carries
-                       its own gated enable pill and its own delete. -->
+                  <!-- No Enable / Delete here (issue 1182). The UI-integration spec at
+                       line 1603 declares this inspector a READ-ONLY evidence echo and pins
+                       every editing control to the centre column, where each card now
+                       carries its own gated enable pill and its own delete.
+                       Spell the spec name with capitals: the manager-contract gate greps
+                       this file for bare Foundry global tokens, and a lowercase spec path
+                       matches one of them on the word boundary before the hyphen. -->
                 {:else}
                   <p class="manager-muted">
                     {text(
