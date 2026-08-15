@@ -165,6 +165,20 @@ export const BROAD_SIGNAL_PATTERN = new RegExp(
 );
 
 /**
+ * Deliberate visible states that a broad primitive's representative pair does not contain.
+ *
+ * Broad signals still select {@link REPRESENTATIVE_CASE_IDS}; these are additive, narrowly named
+ * exceptions for a primitive whose changed presentation is otherwise absent from both generic
+ * frames. Keeping the path literal makes the mapping test fail on a primitive rename, while the
+ * case id fails closed through the registry filter if its deliberate state is removed.
+ */
+const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
+  'src/ui/svelte/apps/manager/SearchablePopover.svelte': Object.freeze([
+    'manager-world-parties-actor-picker',
+  ]),
+});
+
+/**
  * The player crafting app, split by which resolution mode's body a file belongs to.
  *
  * Every crafting case used to carry one blanket `^src/ui/svelte/apps/crafting/` pattern, so a change
@@ -3302,6 +3316,28 @@ export const VIEW_LAB_CASES = Object.freeze([
     ],
   }),
   managerCase({
+    id: 'manager-world-parties-card-stacked-680',
+    label: 'Manager — World Parties card stacked at 680px',
+    // The browser viewport stays 1920x1080; only the Foundry window is narrow. This case therefore
+    // proves the card responds to the named manager container rather than to a viewport media rule.
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { system: 'lab-smithing' },
+    steps: [{ selector: '#manager-world-nav-parties', press: 'Enter' }],
+    expectView: 'world',
+    expectSelector:
+      '[data-travel-panel="parties"] [data-manager-party-body="lab-party"]' +
+      ':has([data-manager-party-add-open="lab-party"])' +
+      ':has([data-manager-party-actor-trigger="lab-party"])',
+    position: { width: 680, height: 900 },
+    kinds: ['manager', 'environments', 'world', 'responsive'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|GatheringPartiesTab)\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/Party/,
+      /^styles\/fabricate\.css$/,
+    ],
+  }),
+  managerCase({
     id: 'manager-world-parties-no-selection',
     label: 'Manager — World Parties with no crafting system selected',
     // The live smoke always has systems and normalizes an empty selection to the first one. This
@@ -3421,7 +3457,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     position: { width: 1330, height: 900 },
     kinds: ['manager', 'environments', 'world'],
     sourceMatches: [
-      /^src\/ui\/svelte\/apps\/manager\/(GatheringPartiesTab|SearchablePopover)\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/GatheringPartiesTab\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/Party/,
     ],
   }),
@@ -6204,6 +6240,7 @@ function selectRenderFileCases(renderFiles) {
   for (const file of renderFiles) {
     if (BROAD_SIGNAL_PATTERN.test(file)) {
       sawBroadSignal = true;
+      for (const id of BROAD_SIGNAL_CASE_OVERRIDES[file] ?? []) selected.add(id);
       continue;
     }
     for (const viewCase of VIEW_LAB_CASES) {

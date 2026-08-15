@@ -17,6 +17,7 @@
   import EmptyState from './EmptyState.svelte';
   import Pagination from '../../components/Pagination.svelte';
   import PartyExpandedBody from './PartyExpandedBody.svelte';
+  import { tick } from 'svelte';
   import { localize } from '../../util/foundryBridge.js';
 
   let {
@@ -56,6 +57,14 @@
   // `_travelErrorState` carries no party id, so which card issued the failing mutation
   // is component-held state.
   let errorPartyId = $state('');
+  // Confirmation-bearing actions return `false` both when the GM cancels and when a real store
+  // attempt fails validation. While one is pending, a saving pulse or changed error state proves
+  // the action crossed the confirmation boundary; without either signal, `false` means cancel and
+  // the pre-existing error must stay attributed to its original card.
+  let pendingActionId = $state(0);
+  let pendingPreviousPartyId = $state('');
+  let pendingErrorSignature = $state('');
+  let pendingActionExecuted = $state(false);
 
   function text(key, fallback) {
     const translated = localize(key);
@@ -159,6 +168,37 @@
   // card that caused it and on no other.
   function note(partyId) {
     errorPartyId = partyId;
+  }
+
+  function errorSignature() {
+    return JSON.stringify([travelError, travelFieldErrors || {}]);
+  }
+
+  $effect(() => {
+    if (!pendingActionId) return;
+    if (saving || errorSignature() !== pendingErrorSignature) {
+      pendingActionExecuted = true;
+    }
+  });
+
+  function noteConfirmedAction(partyId, action) {
+    pendingActionId += 1;
+    const actionId = pendingActionId;
+    pendingPreviousPartyId = errorPartyId;
+    pendingErrorSignature = errorSignature();
+    pendingActionExecuted = false;
+    const result = action();
+    if (!result || typeof result.then !== 'function') {
+      if (result !== false) errorPartyId = partyId;
+      return result;
+    }
+    return result.then(async (resolved) => {
+      await tick();
+      if (pendingActionId !== actionId) return resolved;
+      errorPartyId = resolved !== false || pendingActionExecuted ? partyId : pendingPreviousPartyId;
+      pendingActionId = 0;
+      return resolved;
+    });
   }
 </script>
 
@@ -275,20 +315,17 @@
                   onSetPartyEnabled(id, enabled);
                 }}
                 onDelete={(id) => {
-                  note(id);
-                  onDeleteParty(id);
+                  void noteConfirmedAction(id, () => onDeleteParty(id));
                 }}
                 onAddMember={(id, uuid) => {
-                  note(id);
-                  onAddMember(id, uuid);
+                  void noteConfirmedAction(id, () => onAddMember(id, uuid));
                 }}
                 onRemoveMember={(id, uuid) => {
                   note(id);
                   onRemoveMember(id, uuid);
                 }}
                 onMoveMember={(from, to, uuid) => {
-                  note(from);
-                  onMoveMember(from, to, uuid);
+                  void noteConfirmedAction(from, () => onMoveMember(from, to, uuid));
                 }}
                 onSetTravelActor={(id, uuid) => {
                   note(id);

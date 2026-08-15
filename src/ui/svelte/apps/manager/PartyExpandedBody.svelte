@@ -1,10 +1,9 @@
 <!-- Svelte 5 runes mode -->
 <!--
   The contents of ONE World > Parties card — head plus body — rendered
-  unconditionally for every party on the page. There is no accordion any more:
-  selection drives the right inspector only and never gates a card's controls, so
-  rename, enable/disable, delete, member add/remove/move and travel-actor
-  link/unlink are all reachable without selecting the party first.
+  unconditionally for every party on the page. There is no accordion or party
+  inspector: rename, enable/disable, delete, member add/remove/move and travel-actor
+  link/unlink are all reachable directly on every rendered card.
 
   Head: icon tile · always-editable name over a meta line · enable pill · delete.
   Body: `minmax(0, 1fr) 210px` — members on the left, the travel actor on the right.
@@ -20,10 +19,9 @@
    - Delete routes through the shared confirm seam (`adminStore.deleteParty`), which
      names the party: deleting one drops its membership, its travel actor and its
      per-system current-realm overrides across every crafting system.
-   - The realm-override control lives HERE, in the card's right column, not in the
-     right inspector — `ui-integration/spec.md`'s GM Travel Route layout-split rule pins every editing control
-     including override Set/Clear to the centre column and declares the inspector a
-     read-only evidence echo.
+   - The realm-override control lives HERE, in the card's travel column —
+     `ui-integration/spec.md`'s GM Travel Route layout-split rule pins every editing control,
+     including override Set/Clear, to the full-width Parties content area.
 
   Store validation errors are CARD-SCOPED: the pane records which card issued the
   failing mutation and passes the duplicate-member message down here for the member
@@ -561,7 +559,7 @@
     line-height: 1.4;
   }
 
-  @media (max-width: 720px) {
+  @container fabricate-manager (max-width: 720px) {
     .manager-party-body {
       grid-template-columns: 1fr;
     }

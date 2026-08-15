@@ -202,7 +202,7 @@ describe('GatheringPartiesTab (mounted)', () => {
     assert.equal(cards(root).length, 4);
   });
 
-  it('force-closes an open move drawer and travel-actor picker on a page-SIZE change', async () => {
+  it('force-closes page-local controls and resets actor search on a page-SIZE change', async () => {
     const root = await mountTab({
       parties: [
         makeParty({
@@ -214,7 +214,11 @@ describe('GatheringPartiesTab (mounted)', () => {
         }),
         ...makeParties(4).map((party, index) => makeParty({ id: `q${index}`, name: `Q${index}` })),
       ],
-      actorOptions: [{ uuid: 'Actor.a', id: 'a', name: 'Alara', img: '', isPlayerCharacter: true }],
+      actorOptions: [
+        { uuid: 'Actor.a', id: 'a', name: 'Alara', img: '', isPlayerCharacter: true },
+        { uuid: 'Actor.b', id: 'b', name: 'Bromm', img: '', isPlayerCharacter: true },
+        { uuid: 'Actor.w', id: 'w', name: 'Wagon', img: '', isPlayerCharacter: false },
+      ],
     });
 
     root.querySelector('.manager-party-member-move').click();
@@ -223,6 +227,12 @@ describe('GatheringPartiesTab (mounted)', () => {
     flushSync();
     assert.ok(Boolean(root.querySelector('[data-manager-party-move-drawer]')), 'drawer opened');
     assert.ok(Boolean(root.querySelector('.manager-travel-popover')), 'picker opened');
+    const pickerSearch = root.querySelector('.manager-travel-picker-inline input');
+    pickerSearch.value = 'wagon';
+    pickerSearch.dispatchEvent(new window.Event('input', { bubbles: true }));
+    flushSync();
+    assert.equal(root.querySelectorAll('.manager-travel-option').length, 1, 'picker is filtered');
+    assert.equal(root.querySelector('[data-popover-filtered-count]').textContent.trim(), '1 of 3');
 
     // A page CHANGE would unmount the keyed cards and close both incidentally; a page
     // SIZE change keeps them mounted, so it is the only case that proves the close.
@@ -233,6 +243,15 @@ describe('GatheringPartiesTab (mounted)', () => {
 
     assert.ok(!root.querySelector('[data-manager-party-move-drawer]'), 'drawer closed');
     assert.ok(!root.querySelector('.manager-travel-popover'), 'picker closed');
+
+    root.querySelector('[data-manager-party-actor-trigger="p1"]').click();
+    flushSync();
+    assert.equal(
+      root.querySelectorAll('.manager-travel-option').length,
+      3,
+      'the surviving card reopens with every actor option'
+    );
+    assert.equal(root.querySelector('[data-popover-filtered-count]').textContent.trim(), '3 of 3');
   });
 
   it('places the persistent pager in a full-width sibling footer outside the card scroller', async () => {
@@ -268,6 +287,65 @@ describe('GatheringPartiesTab (mounted)', () => {
       !root.querySelector('[data-manager-party-summary-error]'),
       'a field error does not also render the pane summary'
     );
+  });
+
+  it('keeps an existing card error attributed when another card action is cancelled', async () => {
+    const parties = [
+      makeParty({ id: 'p1', name: 'Wardens' }),
+      makeParty({
+        id: 'p2',
+        name: 'Scouts',
+        memberCards: [{ uuid: 'Actor.b', name: 'Bromm', img: '', stale: false }],
+        memberActorUuids: ['Actor.b'],
+        memberCount: 1,
+      }),
+    ];
+    const root = await mountTab({
+      parties,
+      actorOptions: [
+        { uuid: 'Actor.a', id: 'a', name: 'Alara', img: '', isPlayerCharacter: true },
+        { uuid: 'Actor.b', id: 'b', name: 'Bromm', img: '', isPlayerCharacter: true },
+      ],
+      onDeleteParty: async () => false,
+      onAddMember: async () => false,
+      onMoveMember: async () => false,
+    });
+
+    root.querySelector('[data-manager-party-travel-actor="p1"]').dispatchEvent(
+      Object.assign(new window.Event('drop', { bubbles: true }), {
+        dataTransfer: {
+          getData: () => JSON.stringify({ type: 'Actor', uuid: 'Actor.a' }),
+        },
+      })
+    );
+    flushSync();
+    await harness.setProps({
+      travelError: 'This travel actor is already used by another enabled party.',
+      travelFieldErrors: {
+        travelActor: 'This travel actor is already used by another enabled party.',
+      },
+    });
+    assert.ok(Boolean(root.querySelector('#party-travel-actor-error-p1')));
+
+    root.querySelector('[data-manager-party-delete="p2"]').click();
+    await Promise.resolve();
+    flushSync();
+    assert.ok(Boolean(root.querySelector('#party-travel-actor-error-p1')), 'delete cancel');
+
+    root.querySelector('[data-manager-party-add-open="p2"]').click();
+    flushSync();
+    root.querySelector('[data-manager-party-candidate="Actor.a"]').click();
+    await Promise.resolve();
+    flushSync();
+    assert.ok(Boolean(root.querySelector('#party-travel-actor-error-p1')), 'add/move cancel');
+
+    root.querySelector('.manager-party-member-move').click();
+    flushSync();
+    root.querySelector('.manager-party-move-target').click();
+    await Promise.resolve();
+    flushSync();
+    assert.ok(Boolean(root.querySelector('#party-travel-actor-error-p1')), 'move cancel');
+    assert.ok(!root.querySelector('#party-travel-actor-error-p2'));
   });
 
   it('routes a rejected travel-actor assignment beneath that card travel-actor panel', async () => {

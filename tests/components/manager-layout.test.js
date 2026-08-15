@@ -46,6 +46,10 @@ const iconFactRowPath = resolve(__dirname, '../../src/ui/svelte/apps/manager/Ico
 // The shared chip (issue 883) owns its appearance in its own scoped block for the same
 // reason, so its scale is read out of the component rather than the global sheet.
 const chipPath = resolve(__dirname, '../../src/ui/svelte/apps/manager/Chip.svelte');
+const partyExpandedBodyPath = resolve(
+  __dirname,
+  '../../src/ui/svelte/apps/manager/PartyExpandedBody.svelte'
+);
 const managerComponentDir = resolve(__dirname, '../../src/ui/svelte/apps/manager');
 const css = readFileSync(cssPath, 'utf8');
 const colorPickerSource = readFileSync(colorPickerPath, 'utf8');
@@ -110,6 +114,7 @@ function blockFor(selector) {
 // container is left alone.
 const chipScoped = scopedComponentCss(chipPath);
 const chipCss = chipScoped.css;
+const partyExpandedBodyScoped = scopedComponentCss(partyExpandedBodyPath);
 
 function withChipHash(markup) {
   return withScopeHash(markup, 'manager-chip', chipScoped.hashClass);
@@ -6656,6 +6661,69 @@ test('World Parties preserves the shared stacked rail and body layout at narrow 
       1,
       `World Parties uses the shared stacked rail/body layout at ${width}px`
     );
+  }
+});
+
+test('a 680px manager container stacks each party body without viewport coupling or overflow', async () => {
+  const context = await sharedBrowser.newContext({
+    viewport: { width: 1400, height: 1000 },
+    deviceScaleFactor: 1,
+  });
+  const page = await context.newPage();
+  try {
+    const markup = withScopeHash(
+      `<div class="fabricate-manager" style="container: fabricate-manager / inline-size; width: 680px">
+        <div class="manager-party-body">
+          <div class="manager-party-members-col"><button>Add a member</button></div>
+          <div class="manager-party-travel-col"><button>Link an actor</button></div>
+        </div>
+      </div>`,
+      'manager-party-body',
+      partyExpandedBodyScoped.hashClass
+    );
+    await page.setContent(`<style>${partyExpandedBodyScoped.css}</style>${markup}`);
+    const report = await page.evaluate(() => {
+      const root = document.querySelector('.fabricate-manager');
+      const body = document.querySelector('.manager-party-body');
+      const rootRect = root.getBoundingClientRect();
+      const controls = Array.from(body.querySelectorAll('button'), (button) => {
+        const rect = button.getBoundingClientRect();
+        const hit = document.elementFromPoint(
+          rect.left + rect.width / 2,
+          rect.top + rect.height / 2
+        );
+        return {
+          left: rect.left,
+          right: rect.right,
+          width: rect.width,
+          height: rect.height,
+          selfHit: hit === button || button.contains(hit),
+        };
+      });
+      return {
+        viewportWidth: document.documentElement.clientWidth,
+        columns: getComputedStyle(body).gridTemplateColumns.split(' ').length,
+        overflow: body.scrollWidth > body.clientWidth + 1,
+        rootLeft: rootRect.left,
+        rootRight: rootRect.right,
+        controls,
+      };
+    });
+
+    assert.ok(report.viewportWidth > 720, 'the outer browser viewport stays above the breakpoint');
+    assert.equal(report.columns, 1, 'the 680px manager container selects one party column');
+    assert.equal(report.overflow, false, 'the stacked body has no horizontal overflow');
+    for (const control of report.controls) {
+      assert.ok(control.width > 0 && control.height > 0, 'each editing control has a hit box');
+      assert.ok(
+        control.left >= report.rootLeft - 1,
+        'each editing control starts inside the manager'
+      );
+      assert.ok(control.right <= report.rootRight + 1, 'each editing control remains reachable');
+      assert.equal(control.selfHit, true, 'each editing control owns its pointer target');
+    }
+  } finally {
+    await context.close();
   }
 });
 

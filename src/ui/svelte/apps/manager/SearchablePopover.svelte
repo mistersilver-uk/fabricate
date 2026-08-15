@@ -227,6 +227,14 @@
     if (restoreFocus) restoreTriggerFocus();
   }
 
+  // A bound caller can force the picker shut without going through `close()` — World Parties
+  // does that when a page-size change keeps the card mounted but invalidates its page-local UI.
+  // Keep the query owned by the primitive in step with that externally controlled state, or the
+  // next open resurrects a filter the caller cannot see or reset while the picker is closed.
+  $effect(() => {
+    if (!open && search) search = '';
+  });
+
   // ESCAPE, in every mode including `inlineSearchTrigger`, is handled by
   // `dismissOnOutsideClick` on the picker root below: that action registers a
   // DOCUMENT-level capture-phase keydown while `enabled` (`dismissOnOutsideClick.js:47-56`),
