@@ -811,26 +811,93 @@ test('the World Parties fixture is legal, and its search and pager cases claim w
     'utf8'
   );
 
-  // The seeded party list, read out of the fixture rather than restated here. Every claim
-  // below is derived from it, so a rename or an extra party fails by name instead of quietly
-  // changing what a published frame shows.
+  // The actor definitions, read out of the fixture: id, name and the DECLARED type, which is
+  // what makes `characterActors` resolvable below rather than assumed.
+  const actorsStart = actorSource.indexOf('const ACTOR_DEFINITIONS = [');
+  assert.ok(actorsStart > 0, 'the actor definitions must remain locatable');
+  const actors = [
+    ...actorSource
+      .slice(actorsStart, actorSource.indexOf('\n];', actorsStart))
+      .matchAll(/id: '([\w-]+)',\s*\n\s*name: '([^']+)',(?:\s*\n\s*type: '([\w-]+)',)?/g),
+  ].map(([, id, name, type]) => ({ id, name, type: type ?? 'character', uuid: `Actor.${id}` }));
+  const actorNames = actors.map((actor) => actor.name);
+  const characterActors = actors.filter((actor) => actor.type === 'character');
+  const uuidOf = (id) => actors.find((actor) => actor.id === id)?.uuid ?? null;
+  // The uuid shape this walk composes is `buildLabActors`' own, not a guess.
+  assert.match(actorSource, /uuid: `Actor\.\$\{definition\.id\}`,/);
+
+  // The seeded party list, read out of the fixture rather than restated here — with the
+  // three fields legality depends on RESOLVED against those actors, not merely matched.
+  // Every claim below is derived from it, so a rename or an extra party fails by name
+  // instead of quietly changing what a published frame shows.
   const seedStart = worldSource.indexOf("put(\n    'gatheringParties',");
   assert.ok(seedStart > 0, 'the gatheringParties seed must remain locatable');
   const seedEnd = worldSource.indexOf("put('lastCraftingActor'", seedStart);
   const seed = worldSource.slice(seedStart, seedEnd);
-  const parties = [...seed.matchAll(/id: '(lab-party[\w-]*)',\s*\n\s*name: '([^']+)'/g)].map(
-    ([, id, name]) => ({ id, name })
-  );
-  const actorsStart = actorSource.indexOf('const ACTOR_DEFINITIONS = [');
-  assert.ok(actorsStart > 0, 'the actor definitions must remain locatable');
-  const actorNames = [
-    ...actorSource
-      .slice(actorsStart, actorSource.indexOf('\n];', actorsStart))
-      .matchAll(/name: '([^']+)'/g),
-  ].map(([, name]) => name);
+
+  // Field reads are anchored to the START of a line, so a field NAMED in one of the seed's
+  // comments cannot be read as a value.
+  const fieldIn = (block, name) => new RegExp(`^\\s*${name}: (.+?),\\s*$`, 'm').exec(block)?.[1];
+
+  // `characterActors`, optionally `.slice(a[, b])`, optionally `.map(...)` to uuids.
+  function resolveCharacterSubset(expression) {
+    const match = /^characterActors(?:\.slice\((\d+)(?:,\s*(\d+))?\))?/.exec(expression);
+    if (!match) return null;
+    const [, from, to] = match;
+    const subset =
+      from === undefined
+        ? characterActors
+        : characterActors.slice(Number(from), to === undefined ? undefined : Number(to));
+    return subset.map((actor) => actor.uuid);
+  }
+
+  function resolveActorUuid(expression, partyId) {
+    if (expression === 'null') return null;
+    const named = /^uuidOf\('([\w-]+)'\)$/.exec(expression);
+    if (named) {
+      const uuid = uuidOf(named[1]);
+      assert.ok(uuid, `${partyId} names actor '${named[1]}', which no actor definition declares`);
+      return uuid;
+    }
+    const indexed = /^characterActors\[(\d+)\]\??\.uuid(?:\s*\?\?\s*(.+))?$/.exec(expression);
+    if (indexed) {
+      const direct = characterActors[Number(indexed[1])]?.uuid;
+      if (direct) return direct;
+      return indexed[2] ? resolveActorUuid(indexed[2].trim(), partyId) : null;
+    }
+    return assert.fail(
+      `${partyId} sets travelActorUuid to \`${expression}\`, which this legality walk cannot ` +
+        'resolve. Extend the resolver rather than deleting the walk: an unresolvable expression ' +
+        'is an unchecked one, and the lab writes this map RAW.'
+    );
+  }
+
+  const starts = [...seed.matchAll(/id: '(lab-party[\w-]*)',\s*\n\s*name: '([^']+)'/g)];
+  const parties = starts.map((match, index) => {
+    const block = seed.slice(match.index, starts[index + 1]?.index ?? seed.length);
+    const id = match[1];
+    const memberExpression = fieldIn(block, 'memberActorUuids');
+    const travelExpression = fieldIn(block, 'travelActorUuid');
+    assert.ok(memberExpression, `${id} must declare memberActorUuids`);
+    assert.ok(travelExpression, `${id} must declare travelActorUuid`);
+    const members = memberExpression === '[]' ? [] : resolveCharacterSubset(memberExpression);
+    assert.ok(
+      members,
+      `${id} sets memberActorUuids to \`${memberExpression}\`, which this legality walk cannot ` +
+        'resolve. Members must derive from `characterActors` (so the vehicle can never be ' +
+        'enrolled as one) or be `[]`.'
+    );
+    return {
+      id,
+      name: match[2],
+      enabled: fieldIn(block, 'enabled') === 'true',
+      members,
+      travelActorUuid: resolveActorUuid(travelExpression, id),
+    };
+  });
 
   assert.equal(parties.length, 5, 'the pane pages at four, so five parties is the point');
-  assert.equal(actorNames.length, 4);
+  assert.equal(actors.length, 4);
 
   // The vehicle. Its `type` must be DECLARED and must survive `buildLabActors`, which spreads
   // the definition and then sets `type` — a hardcoded `'character'` there would have made it a
@@ -840,13 +907,37 @@ test('the World Parties fixture is legal, and its search and pager cases claim w
 
   // Legality under `GatheringPartyStore._validateList`, which the lab does NOT run: it writes
   // the settings map raw and validation lives in `_persist`, so an impossible world would
-  // render and publish. Exactly two parties are enabled, each with its own travel actor, and
-  // membership everywhere derives from `characterActors` — so the wagon can never be enrolled
-  // as a member and collide with its role as the second enabled party's travel actor.
-  const enabledCount = [...seed.matchAll(/enabled: true,/g)].length;
-  assert.equal(enabledCount, 2);
-  assert.equal([...seed.matchAll(/memberActorUuids: (?!characterActors|\[\])/g)].length, 0);
-  assert.equal([...seed.matchAll(/travelActorUuid: uuidOf\('lab-actor-wagon'\)/g)].length, 1);
+  // render and publish. The two invariants are computed, not approximated by matching the
+  // shapes today's seed happens to use: a shape check passes any NEW illegal shape it did not
+  // anticipate — giving `lab-party-long-haul` a member drawn from `characterActors` satisfies
+  // every such check while putting Brenna in two enabled parties at once.
+  const enabled = parties.filter((party) => party.enabled);
+  assert.deepEqual(
+    enabled.map((party) => party.id),
+    ['lab-party', 'lab-party-long-haul'],
+    'exactly these two parties are enabled'
+  );
+  for (const party of enabled) {
+    assert.ok(
+      party.travelActorUuid,
+      `${party.id} is enabled, and req 4 refuses to enable a party with no travel actor`
+    );
+  }
+  const holder = new Map();
+  for (const party of enabled) {
+    // Deduped per party: an actor may be BOTH a member and that same party's travel actor,
+    // which `lab-party` relies on. Composite uniqueness is across enabled parties.
+    for (const uuid of new Set([...party.members, party.travelActorUuid].filter(Boolean))) {
+      const held = holder.get(uuid);
+      assert.equal(
+        held,
+        undefined,
+        `${uuid} is associated with BOTH '${held}' and '${party.id}', and both are enabled — an ` +
+          'actor may be associated with at most one enabled party'
+      );
+      holder.set(uuid, party.id);
+    }
+  }
 
   // The search term matches exactly two of the five, and it matches them by DIFFERENT routes:
   // one on its own name, one on its travel actor's name. Anything else renamed into range
@@ -859,7 +950,12 @@ test('the World Parties fixture is legal, and its search and pager cases claim w
     ['lab-party-wagonwright']
   );
   assert.deepEqual(byActorName, ['The Ashfall Wagon']);
-  assert.match(seed, /id: 'lab-party-long-haul',[\s\S]*?travelActorUuid: uuidOf\('lab-actor-wagon'\)/);
+  assert.equal(
+    parties.find((party) => party.id === 'lab-party-long-haul')?.travelActorUuid,
+    uuidOf('lab-actor-wagon'),
+    'the second match is by TRAVEL ACTOR name, which is the widened filter domain the ' +
+      'filtered case exists to photograph'
+  );
 
   const filtered = getCaseById('manager-world-parties-search-filtered');
   assert.deepEqual(filtered.steps.at(-1), {

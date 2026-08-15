@@ -7328,10 +7328,23 @@ describe('CraftingSystemManager mounted behavior', () => {
   }
 
   it('root: the World Parties capture cases satisfy their own selectors (issue 1182)', async () => {
-    // Empty.
+    // Empty, with its negative control first: the populated pane. This case's selector is
+    // a bare presence check, so without the control it could not fail on a pane that
+    // rendered the no-parties panel over a full card list — the frame it must never publish.
+    const empty = labCaseSelector('manager-world-parties-empty');
+    await openLabMirrorParties();
+    assert.ok(
+      !target.querySelector(empty),
+      'five seeded parties must not also render the no-parties panel'
+    );
+    unmount(mounted);
+    mounted = null;
+    target.remove();
+    target = null;
+
     await openLabMirrorParties([]);
     assert.ok(
-      Boolean(target.querySelector(labCaseSelector('manager-world-parties-empty'))),
+      Boolean(target.querySelector(empty)),
       'the no-parties pane must render the SHARED EmptyState primitive, not a bespoke panel'
     );
     unmount(mounted);

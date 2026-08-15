@@ -157,10 +157,18 @@ describe('GatheringPartiesTab (mounted)', () => {
 
   it('renders the shared filtered panel and NO card list when nothing matches', async () => {
     const root = await mountTab({ parties: makeParties(3) });
+    // The negative control for the pager assertion below: matched, the bar is drawn even
+    // though three parties fit on one page, which is what `persistent` buys.
+    assert.ok(Boolean(root.querySelector('.manager-pagination')), 'the matched pane pages');
+
     typeSearch(root, 'zzz');
     assert.ok(Boolean(root.querySelector('[data-travel-parties-no-match]')), 'filtered panel');
     assert.ok(!root.querySelector('.manager-travel-parties-list'), 'no card list');
     assert.equal(cards(root).length, 0);
+    // `tpl:2545` is `pager: { show: matched.length > 0 }`. Outside the matched branch the
+    // pager drew "Showing 0-0 of 0 / Page 1 of 1" under the no-match panel — and the
+    // zero-parties state above already draws no pager, so it was inconsistent with itself.
+    assert.ok(!root.querySelector('.manager-pagination'), 'nothing matched, so nothing to page');
   });
 
   it('returns to page 1 on a search keystroke', async () => {
@@ -283,6 +291,28 @@ describe('GatheringPartiesTab (mounted)', () => {
     });
     press(cards(root)[0].querySelector('[data-manager-party-delete="p1"]'));
     assert.deepEqual(selections, [], 'selectParty clears store errors, so it must not re-fire');
+  });
+
+  it('stops re-selecting once the store reports the selection back, through the action UPDATE path', async () => {
+    // The production sequence, which the assertion above cannot reach: the card is
+    // selected by a press, the store round-trips, the prop changes, and only then does
+    // `selectsParty.update()` run. Mounting with `selectedPartyId` already set exercises
+    // the action's INITIAL options object instead, so an `update` that dropped the new
+    // options on the floor — keeping the stale `selectedPartyId: ''` — would pass it while
+    // wiping a live validation error on the GM's every subsequent click.
+    const selections = [];
+    const root = await mountTab({
+      parties: makeParties(2),
+      selectedPartyId: '',
+      onSelectParty: (id) => selections.push(id),
+    });
+
+    press(cards(root)[0].querySelector('.manager-party-name-input'));
+    assert.deepEqual(selections, ['p1'], 'the first press selects');
+
+    await harness.setProps({ selectedPartyId: 'p1' });
+    press(cards(root)[0].querySelector('[data-manager-party-delete="p1"]'));
+    assert.deepEqual(selections, ['p1'], 'and the second, inside the now-selected card, does not');
   });
 
   it('keeps an uncommitted name draft across a selection change', async () => {

@@ -1,7 +1,7 @@
 import { describe, it, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
-import { flushSync } from '../../node_modules/svelte/src/index-client.js';
+import { flushSync, tick } from '../../node_modules/svelte/src/index-client.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
@@ -61,10 +61,15 @@ function member(overrides = {}) {
 // it is what an `actor.type === 'character'` filter grows back out of. The fixtures
 // mirror the real projection, so a component that went back to reading `type` would
 // filter everything out rather than pass.
+// The last entry is issue 1024's regression guard and the ONLY fixture shape that can
+// distinguish `isPlayerCharacter === true` from `isPlayerCharacter !== false`: an actor the
+// projection never annotated at all. `isPlayerCharacter: false` is excluded by BOTH
+// predicates, so a suite holding only that shape pins nothing about the strict test.
 const actors = [
   { uuid: 'Actor.a', id: 'a', name: 'Alara', img: 'icons/a.webp', isPlayerCharacter: true },
   { uuid: 'Actor.b', id: 'b', name: 'Bromm', img: '', isPlayerCharacter: true },
   { uuid: 'Actor.n', id: 'n', name: 'Nasty NPC', img: '', isPlayerCharacter: false },
+  { uuid: 'Actor.u', id: 'u', name: 'Unprojected Ancient', img: '' },
 ];
 
 function mountBody(props = {}) {
@@ -116,8 +121,13 @@ describe('PartyExpandedBody (mounted)', () => {
     assert.ok(Boolean(hint), 'the gate explains its missing prerequisite in visible text');
     assert.equal(pill.getAttribute('aria-describedby'), 'party-enable-gate-p1');
     assert.match(hint.textContent, /travel actor/i);
-    // The hint stands IN PLACE OF the "travel actor: none" fragment, not after it.
-    assert.ok(!root.querySelector('.manager-party-meta').textContent.includes('travel actor:'));
+    // The hint stands IN PLACE OF the "travel actor: none" fragment, not after it — and
+    // in place of the disabled suffix too. `enableGated` implies `enabled !== true`, so a
+    // gated card carries BOTH strings into one `nowrap` ellipsised line and the suffix is
+    // the half the ellipsis eats; the pill two elements away already says "Disabled".
+    const gatedMeta = root.querySelector('.manager-party-meta').textContent;
+    assert.ok(!gatedMeta.includes('travel actor:'));
+    assert.ok(!gatedMeta.includes('ignored by current-realm resolution'), 'no clipped suffix');
 
     pill.click();
     flushSync();
@@ -135,7 +145,11 @@ describe('PartyExpandedBody (mounted)', () => {
     });
     const pill = root.querySelector('[data-manager-party-enable="p1"]');
     assert.ok(!pill.hasAttribute('aria-disabled'));
-    assert.match(root.querySelector('.manager-party-meta').textContent, /travel actor: Vosk/);
+    const meta = root.querySelector('.manager-party-meta').textContent;
+    assert.match(meta, /travel actor: Vosk/);
+    // Ungated and still disabled: this is where the suffix belongs, and the negative
+    // control for the gated card's suppression of it.
+    assert.match(meta, /ignored by current-realm resolution/);
     pill.click();
     flushSync();
     assert.deepEqual(toggles, [['p1', true]]);
@@ -313,7 +327,10 @@ describe('PartyExpandedBody (mounted)', () => {
         row.querySelector('.manager-party-add-meta').textContent.trim(),
       ])
     );
-    // The NPC is excluded by the STRICT `isPlayerCharacter === true` test.
+    // The NPC and the UNPROJECTED actor are both excluded by the STRICT
+    // `isPlayerCharacter === true` test. The unprojected one is what makes this fail under
+    // a `!== false` test (issue 1024) — the NPC alone cannot, because both predicates
+    // reject an explicit `false`.
     assert.deepEqual(Object.keys(byName).sort(), ['Alara', 'Bromm']);
     assert.equal(byName.Alara, 'In no party');
     assert.equal(byName.Bromm, 'In Scouts — adding moves them');
@@ -546,6 +563,92 @@ describe('PartyExpandedBody (mounted)', () => {
     assert.ok(Boolean(current.querySelector('.manager-travel-option-marker')), 'and carries a check');
   });
 
+  it('counts MATCHED of total in the picker header as the search narrows the list', async () => {
+    const root = await mountBody({
+      actorOptions: [
+        { uuid: 'Actor.v', name: 'Vosk', img: '', isPlayerCharacter: false },
+        { uuid: 'Actor.w', name: 'The Ashfall Wagon', img: '', isPlayerCharacter: false },
+        { uuid: 'Actor.b', name: 'Bromm', img: '', isPlayerCharacter: true },
+      ],
+    });
+    root.querySelector('[data-manager-party-actor-trigger="p1"]').click();
+    flushSync();
+    const count = () => root.querySelector('.manager-party-actor-popover-count').textContent.trim();
+    assert.equal(count(), '3 of 3');
+
+    const search = root.querySelector('.manager-travel-picker-inline input');
+    search.value = 'wagon';
+    search.dispatchEvent(new window.Event('input', { bubbles: true }));
+    flushSync();
+
+    // The search term lives in `SearchablePopover`'s own state, so a count derived from
+    // the CALLER's option array is inert by construction: the list shrinks to one row
+    // while the header keeps reading "3 of 3" and the published picker frame shows a
+    // live-looking number that can never change.
+    assert.deepEqual(optionNames(root), ['The Ashfall Wagon']);
+    assert.equal(count(), '1 of 3');
+  });
+
+  it('dismisses the inline picker on Escape from its search field', async () => {
+    const root = await mountBody({
+      actorOptions: [{ uuid: 'Actor.w', name: 'Wagon', img: '', isPlayerCharacter: false }],
+    });
+    root.querySelector('[data-manager-party-actor-trigger="p1"]').click();
+    flushSync();
+    assert.ok(Boolean(root.querySelector('.manager-travel-popover')), 'the picker is open');
+
+    root
+      .querySelector('.manager-travel-picker-inline input')
+      .dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    flushSync();
+
+    // CHARACTERIZATION, and deliberately so: the popover's own Escape handler is on the
+    // portaled dialog, which this field — a sibling of the trigger, in a different subtree
+    // from the portaled panel — never reaches. Dismissal comes instead from
+    // `dismissOnOutsideClick.js:47-56`, a DOCUMENT-level capture-phase keydown the picker
+    // root registers in every mode. That is what makes the delta's "Escape dismissal is
+    // inherited" claim true here, and it is invisible in this file without this test.
+    assert.ok(!root.querySelector('.manager-travel-popover'), 'Escape dismissed the picker');
+  });
+
+  it('returns focus to the trigger when a picker closes, in BOTH trigger modes', async () => {
+    let root = await mountBody({
+      actorOptions: [{ uuid: 'Actor.w', name: 'Wagon', img: '', isPlayerCharacter: false }],
+    });
+    root.querySelector('[data-manager-party-actor-trigger="p1"]').click();
+    flushSync();
+    // The inline mode UNMOUNTS its trigger while open, so the bound reference is null when
+    // the close runs and the element focus must return to does not exist yet. The restore
+    // is therefore deferred past the DOM update rather than by a bare microtask, which
+    // would depend on Svelte scheduling its own flush first.
+    assert.ok(!root.querySelector('[data-manager-party-actor-trigger="p1"]'), 'trigger unmounted');
+
+    root.querySelector('.manager-travel-picker-inline-close').click();
+    flushSync();
+    await tick();
+    await tick();
+    assert.equal(
+      document.activeElement,
+      root.querySelector('[data-manager-party-actor-trigger="p1"]'),
+      'the remounted trigger takes focus back'
+    );
+    harness.remount();
+
+    // The default mode, whose trigger stays mounted throughout: the same timing change
+    // covers all 19 shipped consumers of the primitive, so it is pinned here too.
+    root = await mountBody({ systemRealms: [{ id: 'r1', name: 'Northreach', enabled: true }] });
+    const trigger = root.querySelector('.manager-travel-parties-override-trigger');
+    trigger.click();
+    flushSync();
+    root
+      .querySelector('.manager-travel-popover')
+      .dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    flushSync();
+    await tick();
+    await tick();
+    assert.equal(document.activeElement, trigger, 'the shipped mode still restores focus');
+  });
+
   it('sets the travel actor from the picker', async () => {
     const set = [];
     const root = await mountBody({
@@ -611,6 +714,27 @@ describe('PartyExpandedBody (mounted)', () => {
       root.querySelector('[data-manager-party-travel-actor="p1"]').getAttribute('aria-describedby'),
       'party-travel-actor-error-p1'
     );
+    harness.remount();
+
+    // The state a REJECTED ADD actually leaves on a zero-member party: the member list is
+    // not rendered (no members) and the add-open button is not rendered (the panel is
+    // open), so both of the anchors above are absent and the message would be orphaned.
+    // This is the case the assertions above cannot reach, and the one the GM is in at the
+    // moment the error appears.
+    const zeroMembers = await mountBody({
+      actorOptions: actors,
+      memberError: 'This actor already belongs to another enabled party.',
+    });
+    zeroMembers.querySelector('[data-manager-party-add-open="p1"]').click();
+    flushSync();
+    assert.ok(!zeroMembers.querySelector('[data-manager-party-member-rows]'), 'no member list');
+    assert.ok(!zeroMembers.querySelector('[data-manager-party-add-open="p1"]'), 'no add button');
+    assert.ok(Boolean(zeroMembers.querySelector('#party-member-error-p1')), 'the message is shown');
+    assert.equal(
+      zeroMembers.querySelector('[data-manager-party-add]').getAttribute('aria-describedby'),
+      'party-member-error-p1',
+      'so the open panel — the only control left — is what describes it'
+    );
   });
 
   it('disables every card control while the store is saving', async () => {
@@ -645,10 +769,16 @@ describe('PartyExpandedBody (mounted)', () => {
     flushSync();
     root.querySelector('[data-manager-party-actor-trigger="p1"]').click();
     flushSync();
-    root.querySelector('[data-manager-party-add-open="p1"]');
+    root.querySelector('[data-manager-party-add-open="p1"]').click();
+    flushSync();
+    assert.ok(Boolean(root.querySelector('[data-manager-party-add]')), 'add panel opened');
 
     await harness.setProps({ closeToken: 1 });
     assert.ok(!root.querySelector('[data-manager-party-move-drawer]'), 'drawer closed');
     assert.ok(!root.querySelector('.manager-travel-popover'), 'picker closed');
+    // The third thing the token force-closes. It is a SEPARATE piece of card state from
+    // the other two, so leaving it open would outlive the card the page change unmounts.
+    assert.ok(!root.querySelector('[data-manager-party-add]'), 'add panel closed');
+    assert.ok(Boolean(root.querySelector('[data-manager-party-add-open="p1"]')), 'trigger back');
   });
 });
