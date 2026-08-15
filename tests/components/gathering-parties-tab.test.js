@@ -21,9 +21,6 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/actions/dismissOnOutsideClick.js',
     'src/ui/svelte/actions/portal.js',
     'src/ui/svelte/actions/dragDrop.js',
-    // The card's selection seam: capture-phase pointerdown/focusin, so a card can be
-    // the inspector's selection target without being a control.
-    'src/ui/svelte/actions/selectsParty.js',
   ],
   compiledModules: [
     // The manager's ONE chip (issue 883) and ONE no-state primitive (issue 785).
@@ -74,12 +71,6 @@ function cards(root) {
   return root.querySelectorAll('.manager-travel-parties-row');
 }
 
-function press(node) {
-  node.dispatchEvent(new window.Event('pointerdown', { bubbles: true }));
-  node.click();
-  flushSync();
-}
-
 function typeSearch(root, value) {
   const input = root.querySelector('.manager-travel-parties-query');
   input.value = value;
@@ -115,9 +106,15 @@ describe('GatheringPartiesTab (mounted)', () => {
   it('reports MATCHED of TOTAL, not page of total', async () => {
     const root = await mountTab({ parties: makeParties(5) });
     // Page size is 4, so a page-of-total counter would read "4 of 5".
-    assert.equal(root.querySelector('[data-manager-party-match-count]').textContent.trim(), '5 of 5');
+    assert.equal(
+      root.querySelector('[data-manager-party-match-count]').textContent.trim(),
+      '5 of 5'
+    );
     typeSearch(root, 'Party 3');
-    assert.equal(root.querySelector('[data-manager-party-match-count]').textContent.trim(), '1 of 5');
+    assert.equal(
+      root.querySelector('[data-manager-party-match-count]').textContent.trim(),
+      '1 of 5'
+    );
   });
 
   it('matches a member name as well as a party name', async () => {
@@ -238,106 +235,15 @@ describe('GatheringPartiesTab (mounted)', () => {
     assert.ok(!root.querySelector('.manager-travel-popover'), 'picker closed');
   });
 
-  it('selects a card on pointer and on focus, adds no tab stop, and marks it aria-current', async () => {
-    const selections = [];
-    const root = await mountTab({
-      parties: makeParties(2),
-      selectedPartyId: '',
-      onSelectParty: (id) => selections.push(id),
-    });
+  it('places the persistent pager in a full-width sibling footer outside the card scroller', async () => {
+    const root = await mountTab({ parties: makeParties(5) });
+    const scroller = root.querySelector('.manager-travel-parties-content');
+    const footer = root.querySelector('[data-manager-party-pagination]');
+    const pager = footer.querySelector('.manager-pagination');
 
-    const first = cards(root)[0];
-    assert.ok(!first.hasAttribute('tabindex'), 'the card itself is not a tab stop');
-    assert.ok(!first.hasAttribute('role') || first.getAttribute('role') === 'listitem');
-
-    first.querySelector('.manager-party-name-input').dispatchEvent(
-      new window.Event('pointerdown', { bubbles: true })
-    );
-    flushSync();
-    assert.deepEqual(selections, ['p1']);
-
-    cards(root)[1]
-      .querySelector('.manager-party-name-input')
-      .dispatchEvent(new window.Event('focusin', { bubbles: true }));
-    flushSync();
-    assert.deepEqual(selections, ['p1', 'p2']);
-
-    await harness.setProps({ selectedPartyId: 'p2' });
-    assert.equal(cards(root)[1].getAttribute('aria-current'), 'true');
-    assert.ok(!cards(root)[0].hasAttribute('aria-current'));
-  });
-
-  it('lets an inner control select its own card AND still run its own handler exactly once', async () => {
-    const selections = [];
-    const deleted = [];
-    const root = await mountTab({
-      parties: makeParties(2),
-      selectedPartyId: '',
-      onSelectParty: (id) => selections.push(id),
-      onDeleteParty: (id) => deleted.push(id),
-    });
-
-    press(root.querySelector('[data-manager-party-delete="p2"]'));
-    assert.deepEqual(deleted, ['p2'], 'the control ran its own handler once');
-    assert.deepEqual(selections, ['p2'], 'and selected its own card, not another');
-  });
-
-  it('does not re-select the already-selected card, so a live validation error survives a press', async () => {
-    const selections = [];
-    const root = await mountTab({
-      parties: makeParties(2),
-      selectedPartyId: 'p1',
-      onSelectParty: (id) => selections.push(id),
-    });
-    press(cards(root)[0].querySelector('[data-manager-party-delete="p1"]'));
-    assert.deepEqual(selections, [], 'selectParty clears store errors, so it must not re-fire');
-  });
-
-  it('stops re-selecting once the store reports the selection back, through the action UPDATE path', async () => {
-    // The production sequence, which the assertion above cannot reach: the card is
-    // selected by a press, the store round-trips, the prop changes, and only then does
-    // `selectsParty.update()` run. Mounting with `selectedPartyId` already set exercises
-    // the action's INITIAL options object instead, so an `update` that dropped the new
-    // options on the floor — keeping the stale `selectedPartyId: ''` — would pass it while
-    // wiping a live validation error on the GM's every subsequent click.
-    const selections = [];
-    const root = await mountTab({
-      parties: makeParties(2),
-      selectedPartyId: '',
-      onSelectParty: (id) => selections.push(id),
-    });
-
-    press(cards(root)[0].querySelector('.manager-party-name-input'));
-    assert.deepEqual(selections, ['p1'], 'the first press selects');
-
-    await harness.setProps({ selectedPartyId: 'p1' });
-    press(cards(root)[0].querySelector('[data-manager-party-delete="p1"]'));
-    assert.deepEqual(selections, ['p1'], 'and the second, inside the now-selected card, does not');
-  });
-
-  it('keeps an uncommitted name draft across a selection change', async () => {
-    const root = await mountTab({ parties: makeParties(2), selectedPartyId: '' });
-    const input = cards(root)[0].querySelector('.manager-party-name-input');
-    input.value = 'Half-typed';
-    input.dispatchEvent(new window.Event('input', { bubbles: true }));
-    flushSync();
-
-    await harness.setProps({ selectedPartyId: 'p2' });
-    // The `{#each}` key is what guarantees this: an unkeyed list would re-create the
-    // input and silently discard the edit in progress.
-    assert.equal(cards(root)[0].querySelector('.manager-party-name-input').value, 'Half-typed');
-  });
-
-  it('keeps the inspector selection when the selected party is filtered off the page', async () => {
-    const selections = [];
-    const root = await mountTab({
-      parties: [makeParty({ id: 'p1', name: 'Wardens' }), makeParty({ id: 'p2', name: 'Scouts' })],
-      selectedPartyId: 'p1',
-      onSelectParty: (id) => selections.push(id),
-    });
-    typeSearch(root, 'scouts');
-    assert.equal(cards(root).length, 1);
-    assert.deepEqual(selections, [], 'a search must not silently retarget the inspector');
+    assert.equal(footer.parentElement, root.querySelector('.manager-travel-parties'));
+    assert.ok(!scroller.contains(footer), 'the footer cannot scroll over cards');
+    assert.equal(pager.parentElement, footer, 'the shared paginator fills that footer');
   });
 
   it('routes a rejected member add to the card that issued it, and to no other', async () => {
@@ -462,7 +368,10 @@ describe('GatheringPartiesTab (mounted)', () => {
     trigger.click();
     flushSync();
 
-    assert.ok(Boolean(root.querySelector('.manager-travel-popover-search input')), 'in-popover search');
+    assert.ok(
+      Boolean(root.querySelector('.manager-travel-popover-search input')),
+      'in-popover search'
+    );
     assert.ok(
       Boolean(root.querySelector('.manager-travel-parties-override-trigger')),
       'the trigger button stays mounted in the default mode'
@@ -483,9 +392,7 @@ describe('GatheringPartiesTab (mounted)', () => {
       resolve(repoRoot, 'src/ui/svelte/apps/manager/SearchablePopover.svelte'),
       'utf8'
     );
-    const ancestorList = source
-      .split('\n')
-      .find((line) => line.includes("'.admin-main"));
+    const ancestorList = source.split('\n').find((line) => line.includes("'.admin-main"));
     assert.ok(Boolean(ancestorList), 'getHorizontalBounds still walks a named ancestor list');
     assert.match(ancestorList, /\.manager-table-scroll/);
     assert.match(ancestorList, /\.manager-travel-parties/);

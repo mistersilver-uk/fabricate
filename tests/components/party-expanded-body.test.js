@@ -83,9 +83,9 @@ function mountBody(props = {}) {
 }
 
 function optionNames(root) {
-  return Array.from(root.querySelectorAll('.manager-travel-option .manager-travel-option-name')).map(
-    (node) => node.textContent.trim()
-  );
+  return Array.from(
+    root.querySelectorAll('.manager-travel-option .manager-travel-option-name')
+  ).map((node) => node.textContent.trim());
 }
 
 before(() => harness.setup());
@@ -179,7 +179,10 @@ describe('PartyExpandedBody (mounted)', () => {
       parties: [makeParty({ id: 'p2', name: 'Scouts' })],
     });
     const rows = root.querySelectorAll('.manager-party-member-row');
-    assert.equal(rows[0].querySelector('.manager-party-member-meta').textContent.trim(), 'Travel actor');
+    assert.equal(
+      rows[0].querySelector('.manager-party-member-meta').textContent.trim(),
+      'Travel actor'
+    );
     assert.ok(!rows[1].querySelector('.manager-party-member-meta'), 'no empty meta line');
   });
 
@@ -253,8 +256,8 @@ describe('PartyExpandedBody (mounted)', () => {
     assert.ok(row.classList.contains('is-moving'), 'the row reads as selected while it is open');
     assert.match(drawer.querySelector('.manager-party-move-eyebrow').textContent, /Move Alara to/);
 
-    const metas = Array.from(drawer.querySelectorAll('.manager-party-move-target-meta')).map((node) =>
-      node.textContent.trim()
+    const metas = Array.from(drawer.querySelectorAll('.manager-party-move-target-meta')).map(
+      (node) => node.textContent.trim()
     );
     assert.equal(metas[0], '3 members');
     assert.equal(metas[1], '1 member · disabled · already a member');
@@ -308,13 +311,19 @@ describe('PartyExpandedBody (mounted)', () => {
   it('offers Add a member on a zero-member party, beside the shared no-state hint', async () => {
     const root = await mountBody();
     assert.ok(Boolean(root.querySelector('[data-manager-party-members-empty]')), 'no-state hint');
-    assert.ok(Boolean(root.querySelector('[data-manager-party-add-open="p1"]')), 'add still offered');
+    assert.ok(
+      Boolean(root.querySelector('[data-manager-party-add-open="p1"]')),
+      'add still offered'
+    );
   });
 
   it('annotates add candidates as unassigned or already in another party', async () => {
     const root = await mountBody({
       party: makeParty({ id: 'p1' }),
-      parties: [makeParty({ id: 'p1' }), makeParty({ id: 'p2', name: 'Scouts', memberActorUuids: ['Actor.b'] })],
+      parties: [
+        makeParty({ id: 'p1' }),
+        makeParty({ id: 'p2', name: 'Scouts', memberActorUuids: ['Actor.b'] }),
+      ],
       actorOptions: actors,
     });
     root.querySelector('[data-manager-party-add-open="p1"]').click();
@@ -339,7 +348,10 @@ describe('PartyExpandedBody (mounted)', () => {
   it('adds (which the store resolves as add-or-MOVE) on choosing a candidate', async () => {
     const added = [];
     const root = await mountBody({
-      parties: [makeParty({ id: 'p1' }), makeParty({ id: 'p2', name: 'Scouts', memberActorUuids: ['Actor.b'] })],
+      parties: [
+        makeParty({ id: 'p1' }),
+        makeParty({ id: 'p2', name: 'Scouts', memberActorUuids: ['Actor.b'] }),
+      ],
       actorOptions: actors,
       onAddMember: (id, uuid) => added.push([id, uuid]),
     });
@@ -354,7 +366,9 @@ describe('PartyExpandedBody (mounted)', () => {
 
   it('keeps THREE distinct add-panel empty reasons apart', async () => {
     // 1. no player-character actors configured at all — names the module setting.
-    let root = await mountBody({ actorOptions: [{ uuid: 'Actor.n', name: 'Nasty NPC', isPlayerCharacter: false }] });
+    let root = await mountBody({
+      actorOptions: [{ uuid: 'Actor.n', name: 'Nasty NPC', isPlayerCharacter: false }],
+    });
     root.querySelector('[data-manager-party-add-open="p1"]').click();
     flushSync();
     let panel = root.querySelector('[data-manager-party-add-empty]');
@@ -404,7 +418,11 @@ describe('PartyExpandedBody (mounted)', () => {
   it('renders the unlinked travel-actor tile through the shared no-state primitive', async () => {
     const root = await mountBody();
     const tile = root.querySelector('[data-manager-party-travel-actor="p1"]');
-    assert.equal(tile.tagName, 'BUTTON', 'the button WRAPS the primitive so drop/right-click survive');
+    assert.equal(
+      tile.tagName,
+      'BUTTON',
+      'the button WRAPS the primitive so drop/right-click survive'
+    );
     const empty = tile.querySelector('[data-manager-party-travel-actor-empty]');
     assert.ok(Boolean(empty), 'the tile is the primitive in its compact treatment');
     assert.ok(empty.classList.contains('is-compact'));
@@ -480,25 +498,18 @@ describe('PartyExpandedBody (mounted)', () => {
     assert.deepEqual(cleared, ['p1']);
   });
 
-  it('clears and closes from the picker unlink footer', async () => {
-    const cleared = [];
+  it('keeps unlink out of the picker because the persistent accessible button already owns it', async () => {
     const root = await mountBody({
       party: makeParty({
         travelActorUuid: 'Actor.v',
         travelActor: { uuid: 'Actor.v', name: 'Vosk', img: '' },
       }),
       actorOptions: [{ uuid: 'Actor.v', name: 'Vosk', img: '', isPlayerCharacter: false }],
-      onClearTravelActor: (id) => cleared.push(id),
     });
     root.querySelector('[data-manager-party-actor-trigger="p1"]').click();
     flushSync();
-    const footer = root.querySelector('[data-manager-party-actor-unlink-footer]');
-    assert.ok(Boolean(footer), 'the footer names the actor it would unlink');
-    assert.match(footer.textContent, /Unlink Vosk/);
-    footer.click();
-    flushSync();
-    assert.deepEqual(cleared, ['p1']);
-    assert.ok(!root.querySelector('.manager-travel-popover'), 'the picker closed with it');
+    assert.equal(root.querySelector('[data-manager-party-actor-unlink-footer]'), null);
+    assert.ok(root.querySelector('[data-manager-party-actor-unlink="p1"]'));
   });
 
   it('offers EVERY world actor as a travel actor, annotated with where it already stands', async () => {
@@ -560,7 +571,10 @@ describe('PartyExpandedBody (mounted)', () => {
     );
     assert.ok(Boolean(current), 'the linked actor is aria-selected');
     assert.match(current.textContent, /Vosk/);
-    assert.ok(Boolean(current.querySelector('.manager-travel-option-marker')), 'and carries a check');
+    assert.ok(
+      Boolean(current.querySelector('.manager-travel-option-marker')),
+      'and carries a check'
+    );
   });
 
   it('counts MATCHED of total in the picker header as the search narrows the list', async () => {
@@ -573,7 +587,8 @@ describe('PartyExpandedBody (mounted)', () => {
     });
     root.querySelector('[data-manager-party-actor-trigger="p1"]').click();
     flushSync();
-    const count = () => root.querySelector('.manager-party-actor-popover-count').textContent.trim();
+    assert.equal(root.querySelector('[data-popover-header]').textContent.trim(), 'Actors 3 of 3');
+    const count = () => root.querySelector('[data-popover-filtered-count]').textContent.trim();
     assert.equal(count(), '3 of 3');
 
     const search = root.querySelector('.manager-travel-picker-inline input');

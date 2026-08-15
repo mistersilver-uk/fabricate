@@ -82,13 +82,17 @@
                    activation rather than stacking a second field inside the popover;
                    the popover's own search row is suppressed in this mode, because
                    there is exactly one query and it must live in exactly one field.
+    popoverTitle / showFilteredCount / filteredCountTemplate — OPTIONAL shared header
+                   additions. `popoverTitle` renders at top-left and a live
+                   `{matched} of {total}` count at top-right when `showFilteredCount`
+                   is true. `filteredCountTemplate` is supplied by the caller so its
+                   words remain localised, while this primitive owns the live numbers
+                   because it owns the query. `compactOptionRows` opts a caller into
+                   the dense full-width actor-list presentation without redesigning
+                   existing popover consumers.
     header / footer — OPTIONAL snippets rendered inside the popover, above the option
-                   list and below it. They exist for a picker whose panel states
-                   something the option rows cannot: the travel-actor picker heads its
-                   list with an `ACTORS` eyebrow and a matched-of-total count, and foots
-                   it with a danger "Unlink {name}" affordance that is not one of the
-                   choices. Authored in the CALLING component, so their scoped styles
-                   belong to the caller even though this component renders them.
+                   list and below it. They remain for exceptional caller-owned content;
+                   the standard title/count header should use the shared props above.
                    `header` is rendered with `(matched, total)` — the length of the
                    FILTERED list and of the whole option list. It has to be: the search
                    term lives in this component's own state, so a caller counting its own
@@ -131,6 +135,10 @@
     showSearch = true,
     inlineSearchTrigger = false,
     inlineCloseLabel = '',
+    popoverTitle = '',
+    showFilteredCount = false,
+    filteredCountTemplate = '{matched} of {total}',
+    compactOptionRows = false,
     header = undefined,
     footer = undefined,
     maxHeight = 0,
@@ -190,6 +198,11 @@
     return buckets.filter((bucket) => bucket.options.length > 0);
   });
   const isGrouped = $derived(groupedOptions.length > 0);
+  const filteredCount = $derived(
+    String(filteredCountTemplate)
+      .replace('{matched}', String(filteredOptions.length))
+      .replace('{total}', String(options.length))
+  );
 
   // Focus restoration waits for `tick()`, NOT a bare microtask. In `inlineSearchTrigger`
   // mode the trigger is UNMOUNTED while open, so `bind:this` has already nulled
@@ -252,7 +265,8 @@
     // that pane scrolls itself rather than sitting inside `.manager-table-scroll`, so
     // without it here a card's travel-actor picker is bounded by the manager shell and
     // can be laid out past the pane's right edge.
-    const selector = '.admin-main, .manager-main, .manager-table-scroll, .manager-travel-parties';
+    const selector =
+      '.admin-main, .manager-main, .manager-table-scroll, .manager-travel-parties-content, .manager-travel-parties';
     let candidate = pickerRoot.parentElement;
     while (candidate) {
       if (candidate.matches?.(selector)) {
@@ -416,7 +430,7 @@
   {#if open}
     <div
       bind:this={popoverRoot}
-      class={`manager-travel-popover ${popoverClass}`}
+      class={`manager-travel-popover ${popoverClass} ${compactOptionRows ? 'is-compact-option-rows' : ''}`}
       style={popoverStyle}
       role="dialog"
       tabindex="-1"
@@ -478,6 +492,19 @@
         </button>
       {/snippet}
 
+      {#if popoverTitle || showFilteredCount}
+        <div class="manager-travel-popover-header" data-popover-header>
+          {#if popoverTitle}
+            <span class="manager-travel-popover-title">{popoverTitle}</span>
+          {/if}
+          {#if showFilteredCount}
+            <span class="manager-travel-popover-count" data-popover-filtered-count
+              >{filteredCount}</span
+            >
+          {/if}
+        </div>
+      {/if}
+
       {#if header}{@render header(filteredOptions.length, options.length)}{/if}
 
       <div
@@ -514,3 +541,47 @@
     </div>
   {/if}
 </div>
+
+<style>
+  .manager-travel-popover-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--fab-space-2);
+    padding: 4px 7px 6px;
+  }
+
+  .manager-travel-popover-title {
+    min-width: 0;
+    color: var(--fab-text-subtle);
+    font-family: var(--font-primary);
+    font-size: 8px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  .manager-travel-popover-count {
+    flex: 0 0 auto;
+    color: var(--fab-text-subtle);
+    font-family: var(--fab-font-mono);
+    font-size: 9px;
+    font-weight: 500;
+  }
+
+  .manager-travel-popover.is-compact-option-rows .manager-travel-popover-options {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .manager-travel-popover.is-compact-option-rows .manager-travel-option {
+    min-height: 38px;
+    border: 1px solid var(--fab-mv2-border);
+    border-radius: 7px;
+    background: var(--fab-mv2-surface-2);
+  }
+</style>

@@ -3385,15 +3385,17 @@ export const VIEW_LAB_CASES = Object.freeze([
       { selector: '[data-manager-party-actor-trigger="lab-party"]' },
     ],
     expectView: 'world',
-    // Content, not the trigger. The trigger-only frame satisfies none of these four claims:
-    // the popover exists, it is portaled into the manager (the reason it escapes the pane's
-    // own `overflow: auto`), it carries the `Unlink {name}` footer that only a LINKED party
-    // gets, and its rows carry the placement meta line that surfaces a composite-uniqueness
+    // Content, not the trigger. The trigger-only frame satisfies none of these claims:
+    // the popover exists and is portaled into the manager (the reason it escapes the pane's
+    // own `overflow: auto`), it uses the shared title/count header with no duplicated unlink
+    // footer, and its rows carry the placement meta line that surfaces a composite-uniqueness
     // collision BEFORE the pick fails. Asserting the trigger alone would pass over a closed
     // picker, which is precisely the frame this case exists to distinguish itself from.
     expectSelector:
       '.fabricate-manager .manager-travel-actor-popover' +
-      ':has([data-manager-party-actor-unlink-footer])' +
+      ':has([data-popover-header])' +
+      ':has([data-popover-filtered-count])' +
+      ':not(:has([data-manager-party-actor-unlink-footer]))' +
       ' .manager-travel-option .manager-travel-option-meta',
     position: { width: 1330, height: 900 },
     kinds: ['manager', 'environments', 'world'],

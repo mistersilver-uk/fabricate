@@ -9091,6 +9091,18 @@
   grid-template-columns: 56px minmax(0, 1fr);
 }
 
+/* World > Parties owns the entire content column: the card editor makes the former
+   inspector redundant. The route marker comes from the root so World does not release
+   its column for any future world surface by accident. This list and the root's
+   `!isWorldPartiesRoute` aside guard are one decision. */
+.fabricate-manager[data-manager-view="world"][data-world-travel-tab="parties"] .manager-body {
+  grid-template-columns: 220px minmax(0, 1fr);
+}
+
+.fabricate-manager[data-manager-view="world"][data-world-travel-tab="parties"] .manager-body.is-rail-collapsed {
+  grid-template-columns: 56px minmax(0, 1fr);
+}
+
 .fabricate-manager .manager-environment-edit-view {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
@@ -20973,7 +20985,6 @@
 .fabricate-manager .manager-party-add-candidate,
 .fabricate-manager .manager-party-actor-tile,
 .fabricate-manager .manager-party-actor-unlink,
-.fabricate-manager .manager-party-actor-unlink-footer,
 .fabricate-manager .manager-party-actor-open,
 .fabricate-manager .manager-travel-picker-inline-close {
   appearance: none;
@@ -21015,16 +21026,20 @@
   box-shadow: inset 0 0 0 2px var(--fab-accent-border);
 }
 
-/* The pager: the prototype's bordered radius-11 bar on `--fab-bg-0`, replacing the
-   primitive's border-top strip. THREE classes, so it beats that shipped rule without
-   touching any other manager surface. It is `sticky` inside the pane scroller because
-   four expanded cards exceed the pane height, and without it the arrow the reader just
-   pressed would leave the viewport on every activation; its chrome is already opaque,
-   so it renders pixel-identically whenever the content is short. */
-.fabricate-manager .manager-travel-parties .manager-pagination {
-  position: sticky;
-  bottom: 0;
-  margin-top: 12px;
+/* The pager is the pane's full-width sibling footer, outside the card scroller. The
+   three-class selector intentionally beats the primitive strip without touching its
+   other consumers. */
+.fabricate-manager .manager-travel-parties .manager-travel-parties-pagination {
+  flex: 0 0 auto;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0 18px 14px;
+}
+
+.fabricate-manager .manager-travel-parties .manager-travel-parties-pagination .manager-pagination {
+  width: 100%;
+  box-sizing: border-box;
+  margin: 0;
   padding: 11px 13px;
   border: 1px solid var(--fab-border);
   border-radius: 11px;
@@ -21149,18 +21164,6 @@
   text-align: left;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-/* The right inspector's party thumbnail. It is NOT part of the card list; the card's own
-   tiles live in the components that render them. */
-.fabricate-manager .manager-travel-parties-thumb {
-  width: 38px;
-  height: 38px;
-  border-radius: 6px;
-  border: 1px solid var(--fab-mv2-border);
-  background: var(--fab-overlay-light-04);
-  object-fit: cover;
-  flex: 0 0 auto;
 }
 
 .fabricate-manager .manager-travel-inspector-actions {

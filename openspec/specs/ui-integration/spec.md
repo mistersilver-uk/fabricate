@@ -483,7 +483,7 @@ Selected-system navigation:
   Switching from enabled system A to enabled system B preserves the active child while re-projecting B's realms, map links, and Party override evidence.
   Switching to a Gathering system whose card is off returns to Gathering Environments; losing Gathering or clearing the selected system returns to the systems browser.
   A current World Parties route survives every one of these capability, card, and selection transitions.
-- World Parties has dedicated `WORLD / every system`, title, hint, action-region, and inspector names rather than inheriting Gathering Environments presentation.
+- World Parties has dedicated `WORLD / every system`, title, hint, and action-region names rather than inheriting Gathering Environments presentation.
   It remains fully operable without a selected system.
   Realms and Map Region Links likewise expose destination-specific visible titles, hints, action-region names, and inspector names; Party copy is not reused for either child.
 - The World-derived navigation appearance is a shared Manager contract rather than a World-only exception.
@@ -1619,22 +1619,23 @@ Shipped capabilities:
   It matches a party's name, any member's name, or its travel actor's name, and states how many of the total parties are showing.
   A search matching nothing renders the shared filtered no-state treatment quoting the query; the World rail's party count is the world total and is unaffected by the filter.
 - The Parties pane pages its card list and offers a per-page control of 2, 4, 6 or 10 cards, defaulting to 4.
+  The pagination controls render as a full-width sibling footer outside the independently scrolling card content, so they stay reachable without overlaying a card.
   Changing page or page size closes any open travel-actor picker and any open move drawer, so no popover outlives the card that anchored it.
 - Each party card carries its own enable control bound to that party's `enabled` state, so enabling and disabling never require selecting the party first.
   The travel-actor gate stated earlier in this section applies per card, and the hint renders on the card that is gated.
 - Each party card carries its own delete control, which routes through the shared confirm seam naming the party, because deleting a party drops its membership, its travel actor and its per-system current-realm overrides across every crafting system.
-- A party card's travel-actor panel names the linked actor or states that none is linked, and offers link, change and unlink in that one place.
-  Its picker anchors to the panel, flips above its trigger when the pane is short of room below, marks the currently linked actor, and offers unlink by name while one is linked.
+- A party card's travel-actor panel names the linked actor or states that none is linked, and offers link, change and a persistent accessible unlink button in that one place.
+  Its picker reuses the shared searchable-popover primitive, anchors to the panel, flips above its trigger when the pane is short of room below, marks the currently linked actor, and presents full-width compact actor rows.
+  The primitive may add the optional `Actors` title at top-left and its live matched-of-total count at top-right; unlink is not duplicated as a picker row or footer.
   Right-clicking the panel unlinks a linked travel actor and opens the picker when none is linked, and the panel keeps accepting an actor dropped onto it.
 - Adding a member who already belongs to another party is the move path: the GM confirms a move naming both parties, and the actor ends in exactly one party.
   The shipped store moves out of the source party whether or not that party is enabled, which is stricter than the invariant motivating it — an actor may be associated with at most one _enabled_ party — and that stricter behaviour is deliberate, because a membership silently split across a disabled and an enabled party is the state a GM cannot see.
 - A store validation failure renders on the card that caused it: the duplicate-travel-actor error beneath that card's travel-actor panel and the duplicate-member error beneath that card's member list, each associated with its control by `aria-describedby`; an error carrying no control context renders once above the card list.
   A party can be rejected on enable by the composite-uniqueness invariant even when the travel-actor gate permits the toggle, so the enable control is never the only feedback surface.
 - The pane's user-facing term for `travelActorUuid` is "travel actor", matching the canonical current-realm evidence source label; "travel marker" is retired from Manager copy.
-- Layout split: the party list and all editing controls (rename, enable, members, travel actor, override Set/Clear) live in the center column; the right inspector is a read-only evidence echo for the selected party (current-realm evidence per source state, member/travel-actor summary, stale references).
-  Every party on the current page renders its editing controls unconditionally, so rename, enable/disable, delete, member add/remove/move and travel-actor link/unlink are reachable without first selecting the party.
-  Selection is inspector scope only: it decides which party the inspector echoes and never gates a card's controls.
-  Override editing exists in exactly one place (center).
+- Layout split: World Parties intentionally has no right inspector; its party-card editor occupies the full available content width.
+  Every party on the current page renders its editing controls unconditionally, so rename, enable/disable, delete, member add/remove/move and travel-actor link/unlink are reachable without first selecting a party.
+  Override editing exists in exactly one place (the party card).
 - The current-realm evidence component renders all three source states using the canonical labels `GM override`, `Travel actor`, and `No current realm`.
   The GM evidence panel renders the live `Travel actor` source label when a party's realm resolves from shipped token-derived sensing.
 - The selected-system Travel group presents **Map Region Links** as a rail destination (`GatheringMapLinksTab.svelte`) that lists the Scene Regions on the active scene with a per-region realm picker (`MapRegionLinkPicker.svelte`) linking each scene region to at most one realm (single-valued per scene region, written by `adminStore.setMapRegionLink`).

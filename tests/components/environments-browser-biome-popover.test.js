@@ -30,9 +30,6 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/actions/dismissOnOutsideClick.js',
     'src/ui/svelte/actions/portal.js',
     'src/ui/svelte/actions/dragDrop.js',
-    // The World > Parties card carries selection on a `use:` action rather than a
-    // `role="button"` root, so the card list pulls this into the closure (issue 1182).
-    'src/ui/svelte/actions/selectsParty.js',
   ],
   compiledModules: [
     'src/ui/svelte/apps/manager/Chip.svelte',

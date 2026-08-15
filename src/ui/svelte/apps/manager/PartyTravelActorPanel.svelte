@@ -96,19 +96,6 @@
         )
   );
 
-  // Both numbers come from the POPOVER, which owns the search term: `pickerOptions` is a
-  // 1:1 map over `actorOptions`, so a count derived from either array here is the same
-  // number by construction and the header would read "4 of 4" while the list below it
-  // showed one row.
-  function pickerCountLabel(matched, total) {
-    return text(
-      'FABRICATE.Admin.Manager.World.Parties.TravelActor.PickerCount',
-      '{matched} of {total}'
-    )
-      .replace('{matched}', String(matched))
-      .replace('{total}', String(total));
-  }
-
   const unlinkLabel = $derived(
     text('FABRICATE.Admin.Manager.World.Parties.TravelActor.Unlink', 'Unlink {name}').replace(
       '{name}',
@@ -232,33 +219,19 @@
           'FABRICATE.Admin.Manager.World.Parties.TravelActor.PickerClose',
           'Close the actor search'
         )}
+        popoverTitle={text(
+          'FABRICATE.Admin.Manager.World.Parties.TravelActor.PickerEyebrow',
+          'Actors'
+        )}
+        showFilteredCount
+        filteredCountTemplate={text(
+          'FABRICATE.Admin.Manager.World.Parties.TravelActor.PickerCount',
+          '{matched} of {total}'
+        )}
+        compactOptionRows
         emptyHint={pickerEmptyHint}
         onChoose={(uuid) => onSet(party.id, uuid)}
-      >
-        {#snippet header(matched, total)}
-          <div class="manager-party-actor-popover-head">
-            <span class="manager-party-actor-popover-eyebrow">
-              {text('FABRICATE.Admin.Manager.World.Parties.TravelActor.PickerEyebrow', 'Actors')}
-            </span>
-            <span class="manager-party-actor-popover-count">{pickerCountLabel(matched, total)}</span
-            >
-          </div>
-        {/snippet}
-        {#snippet footer()}
-          {#if hasTravelActor}
-            <button
-              type="button"
-              class="manager-party-actor-unlink-footer"
-              data-manager-party-actor-unlink-footer
-              disabled={saving}
-              onclick={unlink}
-            >
-              <i class="fas fa-link-slash" aria-hidden="true"></i>
-              <span>{unlinkLabel}</span>
-            </button>
-          {/if}
-        {/snippet}
-      </SearchablePopover>
+      />
 
       {#if hasTravelActor}
         <button
@@ -418,50 +391,6 @@
     color: var(--fab-danger-text);
     background: var(--fab-surface-soft);
     font-size: 10px;
-  }
-
-  .manager-party-actor-popover-head {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 4px 7px 6px;
-  }
-
-  .manager-party-actor-popover-eyebrow {
-    color: var(--fab-text-subtle);
-    font-family: var(--font-primary);
-    font-size: 8px;
-    font-weight: 700;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-  }
-
-  .manager-party-actor-popover-count {
-    color: var(--fab-text-subtle);
-    font-family: var(--fab-font-mono);
-    font-size: 9px;
-    font-weight: 500;
-  }
-
-  .manager-party-actor-unlink-footer {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 7px;
-    width: 100%;
-    height: 28px;
-    margin-top: 5px;
-    border: 1px solid var(--fab-danger-border);
-    border-radius: 7px;
-    color: var(--fab-danger-text);
-    background: var(--fab-danger-soft);
-    font-family: var(--font-primary);
-    font-size: 10px;
-    font-weight: 600;
-  }
-
-  .manager-party-actor-unlink-footer > i {
-    font-size: 9px;
   }
 
   .manager-party-actor-error {

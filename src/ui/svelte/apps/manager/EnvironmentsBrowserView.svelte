@@ -80,7 +80,6 @@
     // eslint-disable-next-line no-unused-vars
     onPickImagePath = null,
     travelParties = [],
-    travelSelectedPartyId = '',
     travelSaving = false,
     travelError = null,
     travelFieldErrors = {},
@@ -92,7 +91,6 @@
     onSelectRealm = () => {},
     onAddEnvironmentToRealm = () => {},
     onRemoveEnvironmentFromRealm = () => {},
-    onSelectParty = () => {},
     onCreateParty = () => {},
     onRenameParty = () => {},
     onSetPartyEnabled = () => {},
@@ -1200,14 +1198,12 @@
           parties={travelParties}
           systemId={selectedSystemId}
           systemRealms={travelSystemRealms}
-          selectedPartyId={travelSelectedPartyId}
           actorOptions={travelActorOptions}
           saving={travelSaving}
           {travelError}
           {travelFieldErrors}
           realmOverridesAvailable={partyRealmOverridesAvailable}
           realmOverridesUnavailableHint={partyRealmOverridesUnavailableHint}
-          {onSelectParty}
           {onCreateParty}
           onSetRealmOverride={onSetPartyRealmOverride}
           onClearRealmOverride={onClearPartyRealmOverride}

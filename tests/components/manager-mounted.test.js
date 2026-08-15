@@ -716,15 +716,7 @@ function compileManagerRoot() {
     writeFileSync(rawDestination, readFileSync(resolve(repoRoot, rawPath), 'utf8'));
   }
 
-  // `selectsParty.js` carries World > Parties card selection (issue 1182): the card is a
-  // `role="listitem"` holding a text input and three buttons, so it cannot be a
-  // `role="button"` and a `tabindex`/`onclick` root will not compile warning-free.
-  for (const actionPath of [
-    'dragDrop.js',
-    'dismissOnOutsideClick.js',
-    'portal.js',
-    'selectsParty.js',
-  ]) {
+  for (const actionPath of ['dragDrop.js', 'dismissOnOutsideClick.js', 'portal.js']) {
     const actionDestination = join(tempRoot, `src/ui/svelte/actions/${actionPath}`);
     mkdirSync(dirname(actionDestination), { recursive: true });
     writeFileSync(
@@ -7277,7 +7269,12 @@ describe('CraftingSystemManager mounted behavior', () => {
   // enabled flags, same travel actors — because a selector proved against a different world
   // proves nothing about the frame.
   const LAB_MIRROR_ACTORS = [
-    { uuid: 'Actor.lab-actor-brenna', name: 'Brenna Karrunsdottir', img: '', isPlayerCharacter: true },
+    {
+      uuid: 'Actor.lab-actor-brenna',
+      name: 'Brenna Karrunsdottir',
+      img: '',
+      isPlayerCharacter: true,
+    },
     { uuid: 'Actor.lab-actor-idrin', name: 'Idrin Ashfall', img: '', isPlayerCharacter: true },
     { uuid: 'Actor.lab-actor-vosk', name: 'Vosk', img: '', isPlayerCharacter: true },
     // The vehicle. Not a player character, so it is never a member and always a candidate.
@@ -7318,7 +7315,13 @@ describe('CraftingSystemManager mounted behavior', () => {
       'Actor.lab-actor-brenna'
     ),
     labMirrorParty('lab-party-second-kiln', 'Second Kiln Crew', false, [], null),
-    labMirrorParty('lab-party-wagonwright', 'The Wagonwright Circle', false, characters.slice(2), null),
+    labMirrorParty(
+      'lab-party-wagonwright',
+      'The Wagonwright Circle',
+      false,
+      characters.slice(2),
+      null
+    ),
   ];
 
   async function openLabMirrorParties(travelParties = LAB_MIRROR_PARTIES) {
@@ -7393,7 +7396,10 @@ describe('CraftingSystemManager mounted behavior', () => {
     // Last page.
     const lastPage = labCaseSelector('manager-world-parties-last-page');
     await openLabMirrorParties();
-    assert.ok(!target.querySelector(lastPage), 'page one holds the first card, which the case refuses');
+    assert.ok(
+      !target.querySelector(lastPage),
+      'page one holds the first card, which the case refuses'
+    );
     target.querySelector('.manager-travel-parties [data-pagination-next]').click();
     await tick();
     flushSync();
@@ -13875,33 +13881,24 @@ describe('CraftingSystemManager mounted behavior', () => {
       target.querySelector('.manager-header-actions').getAttribute('aria-label'),
       'World party actions'
     );
+    assert.equal(target.querySelector('.manager-travel-inspector'), null, 'no Parties inspector');
     assert.equal(
-      target.querySelector('.manager-travel-inspector').getAttribute('aria-label'),
-      'Selected world party'
+      target.querySelector('.fabricate-manager').dataset.worldTravelTab,
+      'parties',
+      'the full-width layout is scoped to the World Parties route'
     );
     const createButton = target.querySelector('.manager-header-actions .manager-button.is-primary');
     assert.equal(createButton.disabled, false);
     assert.ok(target.querySelector('[data-party-realm-override-unavailable]'));
-    assert.match(
-      target.querySelector('[data-party-realm-evidence-unavailable]').textContent,
-      /Select a crafting system with Gathering enabled/
-    );
+    assert.equal(target.querySelector('[data-party-realm-evidence-unavailable]'), null);
     assert.equal(target.textContent.includes('No current realm set for this system.'), false);
 
-    // Every card renders its own controls, so the CRUD walk below never opens an accordion
-    // and never reaches into the inspector: `ui-integration/spec.md`'s GM Travel Route layout-split rule pins editing
-    // to the centre column and makes the inspector a read-only evidence echo.
-    assert.equal(target.querySelector('.manager-travel-inspector .manager-button.is-danger'), null);
+    // Every card renders its own controls in the full-width pane; no party selection or
+    // inspector echo is needed to reach this CRUD walk.
     assert.equal(target.querySelector('.manager-party-enable-toggle'), null);
 
     createButton.click();
-    // Selection is carried by `use:selectsParty` — a capture-phase pointerdown on the card,
-    // not a click on a header row, because the card is no longer a disclosure.
     const secondCard = target.querySelector('[data-manager-travel-party-id="party-two"]');
-    secondCard.dispatchEvent(new Event('pointerdown', { bubbles: true }));
-    await tick();
-    flushSync();
-    assert.equal(secondCard.getAttribute('aria-current'), 'true');
 
     const nameInput = secondCard.querySelector('[data-manager-party-name-field]');
     setInputValue(nameInput, 'Nightwardens');
@@ -13912,9 +13909,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     secondCard.querySelector('[data-manager-party-add-open="party-two"]').click();
     await tick();
     flushSync();
-    const scoutCandidate = secondCard.querySelector(
-      '[data-manager-party-candidate="Actor.scout"]'
-    );
+    const scoutCandidate = secondCard.querySelector('[data-manager-party-candidate="Actor.scout"]');
     assert.ok(scoutCandidate, 'the no-selection party card exposes the global actor roster');
     scoutCandidate.click();
 
@@ -13935,7 +13930,6 @@ describe('CraftingSystemManager mounted behavior', () => {
       calls.filter((call) =>
         [
           'createParty',
-          'selectParty',
           'renameParty',
           'addOrMovePartyMember',
           'setPartyTravelActor',
@@ -13945,7 +13939,6 @@ describe('CraftingSystemManager mounted behavior', () => {
       ),
       [
         ['createParty'],
-        ['selectParty', 'party-two'],
         ['renameParty', 'party-two', 'Nightwardens'],
         ['addOrMovePartyMember', 'party-two', 'Actor.scout'],
         ['setPartyTravelActor', 'party-two', 'Actor.scout'],

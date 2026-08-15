@@ -4107,7 +4107,6 @@
             "MapLinksPlaceholder": "Scene Region links will live here."
           },
           "Inspector": {
-            "PartiesPlaceholder": "Select a party to see its details.",
             "RealmsPlaceholder": "Select a realm to see its details.",
             "MapLinksPlaceholder": "Select a region to map it to Scene Regions."
           },
@@ -4187,12 +4186,10 @@
           "SetOverride": "Set current realm",
           "ClearOverride": "Clear current realm",
           "DisabledRealmChip": "Disabled",
-          "EvidenceLabel": "Current realm",
           "EvidenceSourceManualOverride": "GM override",
           "EvidenceSourceTravelActor": "Travel actor",
           "EvidenceSourceUnresolved": "No current realm",
           "EvidenceTravelActorPending": "Automation not yet available.",
-          "EvidenceNoRealms": "No current realm set for this system.",
           "StaleSectionLabel": "References to repair",
           "StaleMemberLabel": "Stale member",
           "StaleTravelActorLabel": "Stale travel actor",
@@ -4206,7 +4203,6 @@
           "ChecklistStep3": "Add actor members.",
           "ChecklistStep4": "Assign a travel actor.",
           "ChecklistStep5": "Set the party's current realm.",
-          "InspectorKicker": "Selected party",
           "InspectorMembersSummary": "Members",
           "InspectorTravelActorSummary": "Travel actor",
           "InspectorNoPartySelected": "Select a party to see its current-realm evidence.",

@@ -3,17 +3,9 @@
   Manager — World > Parties. A paged, searchable list of CARDS, one per party, each
   fully expanded: there is no accordion any more.
 
-  Selection is inspector scope only. It decides which party the right inspector
-  echoes and never gates a card's controls, so it is carried by `use:selectsParty`
-  on the card root rather than by a `role="button"` header — see that action for why
-  a `tabindex`/`onclick` container cannot compile clean here, and why the action must
-  stay idempotent.
-
-  This pane owns its OWN scroll, as the prototype does, so the intro, search bar and
-  match counter scroll away with a tall page instead of being pinned by a three-row
-  grid. The pager is `position: sticky; bottom: 0` inside that scroller (a rule in
-  `styles/fabricate.css`, because `Pagination` renders it), or the arrow the reader
-  just pressed would leave the viewport on every activation.
+  This pane owns its own scroll, as the prototype does, so the intro, search bar and
+  match counter scroll away with a tall page. The pager is a sibling footer outside that
+  scroller: it stays visible, spans the whole content area and never covers a card.
 
   Store validation errors are routed to the CARD that issued the failing mutation:
   the pane records that party id and hands the duplicate-member message to its member
@@ -26,13 +18,11 @@
   import Pagination from '../../components/Pagination.svelte';
   import PartyExpandedBody from './PartyExpandedBody.svelte';
   import { localize } from '../../util/foundryBridge.js';
-  import { selectsParty } from '../../actions/selectsParty.js';
 
   let {
     parties = [],
     systemId = '',
     systemRealms = [],
-    selectedPartyId = '',
     actorOptions = [],
     saving = false,
     travelError = null,
@@ -41,7 +31,6 @@
     // this component's established direct-mount/API behaviour for isolated consumers.
     realmOverridesAvailable = true,
     realmOverridesUnavailableHint = '',
-    onSelectParty = () => {},
     onCreateParty = () => {},
     onSetRealmOverride = () => {},
     onClearRealmOverride = () => {},
@@ -179,154 +168,157 @@
   role="region"
   aria-labelledby="manager-world-nav-parties"
   data-travel-panel="parties"
-  bind:this={scroller}
 >
-  <p class="manager-travel-parties-intro">
-    {text(
-      'FABRICATE.Admin.Manager.World.Parties.Intro',
-      'Parties belong to the world, not to a crafting system. Gathering and travel both read them, in every system. A character belongs to one enabled party at a time, and can be moved between them. A party needs one travel actor before it can be enabled: a single actor that stands for the whole party on the map.'
-    )}
-  </p>
-
-  {#if parties.length === 0}
-    <EmptyState
-      icon="fas fa-users"
-      title={text('FABRICATE.Admin.Manager.World.Parties.Empty.Title', 'No parties yet')}
-      hint={text(
-        'FABRICATE.Admin.Manager.World.Parties.Empty.Body',
-        'Gathering still runs: a character in no party has no current realm, so ungated environments stay open and location-gated ones stay out of reach. Create a party when you want realm gating to apply.'
+  <div class="manager-travel-parties-content" bind:this={scroller}>
+    <p class="manager-travel-parties-intro">
+      {text(
+        'FABRICATE.Admin.Manager.World.Parties.Intro',
+        'Parties belong to the world, not to a crafting system. Gathering and travel both read them, in every system. A character belongs to one enabled party at a time, and can be moved between them. A party needs one travel actor before it can be enabled: a single actor that stands for the whole party on the map.'
       )}
-      dataAttr="data-travel-parties-none"
-    >
-      <button
-        type="button"
-        class="manager-travel-parties-create"
-        data-manager-party-create
-        disabled={saving}
-        onclick={() => onCreateParty()}
+    </p>
+
+    {#if parties.length === 0}
+      <EmptyState
+        icon="fas fa-users"
+        title={text('FABRICATE.Admin.Manager.World.Parties.Empty.Title', 'No parties yet')}
+        hint={text(
+          'FABRICATE.Admin.Manager.World.Parties.Empty.Body',
+          'Gathering still runs: a character in no party has no current realm, so ungated environments stay open and location-gated ones stay out of reach. Create a party when you want realm gating to apply.'
+        )}
+        dataAttr="data-travel-parties-none"
       >
-        <i class="fas fa-plus" aria-hidden="true"></i>
-        <span>{text('FABRICATE.Admin.Manager.World.Parties.Empty.Action', 'Create a party')}</span>
-      </button>
-    </EmptyState>
-  {:else}
-    {#if showSearch}
-      <div class="manager-travel-parties-search">
-        <i class="fas fa-magnifying-glass" aria-hidden="true"></i>
-        <input
-          class="manager-travel-parties-query"
-          type="search"
-          value={searchTerm}
-          oninput={onSearchInput}
-          placeholder={text(
-            'FABRICATE.Admin.Manager.World.Parties.Search.Placeholder',
-            'Search by party, member or travel actor'
-          )}
-          aria-label={text('FABRICATE.Admin.Manager.World.Parties.Search.Label', 'Search parties')}
-          aria-describedby="manager-world-parties-match-count"
-        />
-        <span
-          class="manager-travel-parties-count"
-          id="manager-world-parties-match-count"
-          data-manager-party-match-count
-          aria-live="polite"
+        <button
+          type="button"
+          class="manager-travel-parties-create"
+          data-manager-party-create
+          disabled={saving}
+          onclick={() => onCreateParty()}
         >
-          {matchCountLabel}
-        </span>
-      </div>
-    {/if}
-
-    {#if paneError}
-      <p class="manager-travel-parties-summary-error" data-manager-party-summary-error role="alert">
-        {paneError}
-      </p>
-    {/if}
-
-    {#if filteredParties.length === 0}
-      <EmptyState filtered hint={noMatchHint} dataAttr="data-travel-parties-no-match" />
-    {:else}
-      <div
-        class="manager-travel-parties-list"
-        role="list"
-        aria-label={text('FABRICATE.Admin.Manager.World.Parties.ListLabel', 'Parties')}
-      >
-        {#each pagedParties as party (party.id)}
-          {@const isSelected = party.id === selectedPartyId}
-          <div
-            class="manager-travel-parties-row"
-            class:is-selected={isSelected}
-            class:is-disabled={party.enabled !== true}
-            role="listitem"
-            aria-current={isSelected ? 'true' : undefined}
-            data-manager-travel-party-id={party.id}
-            use:selectsParty={{
-              partyId: party.id,
-              selectedPartyId,
-              onSelect: onSelectParty,
-            }}
+          <i class="fas fa-plus" aria-hidden="true"></i>
+          <span>{text('FABRICATE.Admin.Manager.World.Parties.Empty.Action', 'Create a party')}</span
           >
-            <PartyExpandedBody
-              {party}
-              {parties}
-              {actorOptions}
-              {saving}
-              {systemId}
-              {systemRealms}
-              {closeToken}
-              {realmOverridesAvailable}
-              {realmOverridesUnavailableHint}
-              memberError={errorPartyId === party.id ? memberError : ''}
-              travelActorError={errorPartyId === party.id ? travelActorError : ''}
-              onRename={(id, name) => {
-                note(id);
-                onRenameParty(id, name);
-              }}
-              onSetEnabled={(id, enabled) => {
-                note(id);
-                onSetPartyEnabled(id, enabled);
-              }}
-              onDelete={(id) => {
-                note(id);
-                onDeleteParty(id);
-              }}
-              onAddMember={(id, uuid) => {
-                note(id);
-                onAddMember(id, uuid);
-              }}
-              onRemoveMember={(id, uuid) => {
-                note(id);
-                onRemoveMember(id, uuid);
-              }}
-              onMoveMember={(from, to, uuid) => {
-                note(from);
-                onMoveMember(from, to, uuid);
-              }}
-              onSetTravelActor={(id, uuid) => {
-                note(id);
-                onSetTravelActor(id, uuid);
-              }}
-              onClearTravelActor={(id) => {
-                note(id);
-                onClearTravelActor(id);
-              }}
-              onSetRealmOverride={(id, sys, ids) => {
-                note(id);
-                onSetRealmOverride(id, sys, ids);
-              }}
-              onClearRealmOverride={(id, sys) => {
-                note(id);
-                onClearRealmOverride(id, sys);
-              }}
-            />
-          </div>
-        {/each}
-      </div>
+        </button>
+      </EmptyState>
+    {:else}
+      {#if showSearch}
+        <div class="manager-travel-parties-search">
+          <i class="fas fa-magnifying-glass" aria-hidden="true"></i>
+          <input
+            class="manager-travel-parties-query"
+            type="search"
+            value={searchTerm}
+            oninput={onSearchInput}
+            placeholder={text(
+              'FABRICATE.Admin.Manager.World.Parties.Search.Placeholder',
+              'Search by party, member or travel actor'
+            )}
+            aria-label={text(
+              'FABRICATE.Admin.Manager.World.Parties.Search.Label',
+              'Search parties'
+            )}
+            aria-describedby="manager-world-parties-match-count"
+          />
+          <span
+            class="manager-travel-parties-count"
+            id="manager-world-parties-match-count"
+            data-manager-party-match-count
+            aria-live="polite"
+          >
+            {matchCountLabel}
+          </span>
+        </div>
+      {/if}
 
-      <!-- INSIDE the matched branch. `persistent` is what draws the bar for a single
-           short page (`tpl:2545`, `pager: { show: matched.length > 0 }`) — but the same
-           authority hides it when nothing matched, and outside this branch it drew
-           "Showing 0–0 of 0 · Page 1 of 1" under the no-match panel, which is also the
-           opposite of what the zero-parties state above does. -->
+      {#if paneError}
+        <p
+          class="manager-travel-parties-summary-error"
+          data-manager-party-summary-error
+          role="alert"
+        >
+          {paneError}
+        </p>
+      {/if}
+
+      {#if filteredParties.length === 0}
+        <EmptyState filtered hint={noMatchHint} dataAttr="data-travel-parties-no-match" />
+      {:else}
+        <div
+          class="manager-travel-parties-list"
+          role="list"
+          aria-label={text('FABRICATE.Admin.Manager.World.Parties.ListLabel', 'Parties')}
+        >
+          {#each pagedParties as party (party.id)}
+            <div
+              class="manager-travel-parties-row"
+              class:is-disabled={party.enabled !== true}
+              role="listitem"
+              data-manager-travel-party-id={party.id}
+            >
+              <PartyExpandedBody
+                {party}
+                {parties}
+                {actorOptions}
+                {saving}
+                {systemId}
+                {systemRealms}
+                {closeToken}
+                {realmOverridesAvailable}
+                {realmOverridesUnavailableHint}
+                memberError={errorPartyId === party.id ? memberError : ''}
+                travelActorError={errorPartyId === party.id ? travelActorError : ''}
+                onRename={(id, name) => {
+                  note(id);
+                  onRenameParty(id, name);
+                }}
+                onSetEnabled={(id, enabled) => {
+                  note(id);
+                  onSetPartyEnabled(id, enabled);
+                }}
+                onDelete={(id) => {
+                  note(id);
+                  onDeleteParty(id);
+                }}
+                onAddMember={(id, uuid) => {
+                  note(id);
+                  onAddMember(id, uuid);
+                }}
+                onRemoveMember={(id, uuid) => {
+                  note(id);
+                  onRemoveMember(id, uuid);
+                }}
+                onMoveMember={(from, to, uuid) => {
+                  note(from);
+                  onMoveMember(from, to, uuid);
+                }}
+                onSetTravelActor={(id, uuid) => {
+                  note(id);
+                  onSetTravelActor(id, uuid);
+                }}
+                onClearTravelActor={(id) => {
+                  note(id);
+                  onClearTravelActor(id);
+                }}
+                onSetRealmOverride={(id, sys, ids) => {
+                  note(id);
+                  onSetRealmOverride(id, sys, ids);
+                }}
+                onClearRealmOverride={(id, sys) => {
+                  note(id);
+                  onClearRealmOverride(id, sys);
+                }}
+              />
+            </div>
+          {/each}
+        </div>
+      {/if}
+    {/if}
+  </div>
+
+  {#if filteredParties.length > 0}
+    <div class="manager-travel-parties-pagination" data-manager-party-pagination>
+      <!-- This footer deliberately sits OUTSIDE `.manager-travel-parties-content`: the
+           content scrolls, while the pagination controls remain in a full-width sibling
+           bar like the other manager studios. -->
       <Pagination
         persistent={true}
         totalCount={filteredParties.length}
@@ -336,15 +328,23 @@
         onPageChange={goToPage}
         onPageSizeChange={changePageSize}
       />
-    {/if}
+    </div>
   {/if}
 </div>
 
 <style>
-  /* Theme-ROOT tokens only (`--fab-mv2-*` is declared on `.fabricate-manager`). The pane
-     is its own scroller, at the prototype's `14px 18px 26px`. */
+  /* Theme-ROOT tokens only (`--fab-mv2-*` is declared on `.fabricate-manager`). The
+     content child is the pane's scroller; the paginator remains its sibling below. */
   .manager-travel-parties {
-    flex: 1;
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+  }
+
+  .manager-travel-parties-content {
+    flex: 1 1 auto;
     min-width: 0;
     min-height: 0;
     padding: 14px 18px 26px;
@@ -426,11 +426,6 @@
 
   .manager-travel-parties-row.is-disabled {
     border-color: var(--fab-border-strong);
-  }
-
-  /* Selection supersedes both state borders: it is what the right inspector echoes. */
-  .manager-travel-parties-row.is-selected {
-    border-color: var(--fab-accent-border);
   }
 
   .manager-travel-parties-create {
