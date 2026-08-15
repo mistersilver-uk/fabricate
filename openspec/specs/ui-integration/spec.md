@@ -1611,19 +1611,22 @@ Shipped capabilities:
 - Create, rename, enable/disable, and delete Fabricate parties.
 - Assign actor members to a party and assign exactly one **travel actor** (the actor that represents the party on a campaign map).
   Assigning a travel actor already used by another enabled party, or an actor already associated with another enabled party, is rejected with an inline error associated with the relevant control (the duplicate-travel-actor error routes to the travel-actor control).
-- The enable toggle is disabled (with an "assign a travel actor to enable" hint) while a party has no travel actor; newly created parties visibly show their disabled state.
+- The enable toggle is never gated on the travel actor: a party with no travel actor can be enabled, and the card's meta line states "travel actor: none" so the consequence is visible without the configuration being refused.
+  Newly created parties visibly show their disabled state.
 - When the world has no actors, the member and travel-actor pickers show an explicit empty state directing the GM to create an Actor first.
 - The Parties pane exposes a search field only when the world holds more than one party.
   It matches a party's name, any member's name, or its travel actor's name, and states how many of the total parties are showing.
   A search matching nothing renders the shared filtered no-state treatment quoting the query; the World rail's party count is the world total and is unaffected by the filter.
-- The Parties pane pages its card list and offers a per-page control of 2, 4, 6 or 10 cards, defaulting to 4.
-  The pagination controls render as a full-width sibling footer outside the independently scrolling card content, so they stay reachable without overlaying a card.
+- The Parties pane pages its card list and offers a per-page control of 3, 6 or 9 cards, defaulting to 3.
+  The pagination controls render only once the matched set reaches the smallest offered size, because below it there is one page by construction and the bar could state nothing the GM cannot already see.
+  They render as a squared-off, full-bleed sibling footer under the independently scrolling card content, so they stay reachable without overlaying a card and read as the pane's own bottom edge rather than as another item in the scrolled list.
   Changing page or page size closes any open travel-actor picker and any open move drawer, so no popover outlives the card that anchored it.
   Closing a travel-actor picker through either paging path also clears its search query, so reopening a surviving card's picker starts from the unfiltered actor list.
 - Each party card carries its own enable control bound to that party's `enabled` state, so enabling and disabling never require selecting the party first.
   The travel-actor gate stated earlier in this section applies per card, and the hint renders on the card that is gated.
 - Each party card carries its own delete control, which routes through the shared confirm seam naming the party, because deleting a party drops its membership, its travel actor and its per-system current-realm overrides across every crafting system.
 - A party card's travel-actor panel names the linked actor or states that none is linked, and offers link, change and a persistent accessible unlink button in that one place.
+  Its picker offers the actors whose type is one the GM configured under Player Character Actor Types, the same membership the member picker uses, and states that setting by name when the world holds actors but none are eligible; dropping an actor onto the panel stays unfiltered, so a one-off outside the configured types remains assignable.
   Its picker reuses the shared searchable-popover primitive, anchors to the panel, flips above its trigger when the pane is short of room below, marks the currently linked actor, and presents full-width compact actor rows.
   The primitive may add the optional `Actors` title at top-left and its live matched-of-total count at top-right; unlink is not duplicated as a picker row or footer.
   On the GM Travel World > Parties card, the unassigned travel actor occupies its own panel above its picker rather than an inline value slot, so that state renders through the shared `EmptyState` compact treatment.

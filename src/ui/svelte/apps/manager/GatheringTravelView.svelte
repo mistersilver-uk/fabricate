@@ -367,21 +367,16 @@
               class={`manager-travel-status-toggle ${selectedParty.enabled ? 'is-on' : 'is-off'}`}
               aria-pressed={selectedParty.enabled}
               aria-label={text('FABRICATE.Admin.Manager.Travel.EnableToggleLabel', 'Enable party')}
-              disabled={saving || (!selectedParty.enabled && !selectedParty.travelActorUuid)}
+              disabled={saving}
               onclick={() => onSetPartyEnabled(selectedParty.id, !selectedParty.enabled)}
             >
               {selectedParty.enabled
                 ? text('FABRICATE.Admin.Manager.Travel.EnabledChip', 'Enabled')
                 : text('FABRICATE.Admin.Manager.Travel.DisabledChip', 'Disabled')}
             </button>
-            {#if !selectedParty.travelActorUuid}
-              <p class="manager-travel-hint">
-                {text(
-                  'FABRICATE.Admin.Manager.Travel.EnableToggleHint',
-                  'Assign a travel actor to enable this party.'
-                )}
-              </p>
-            {/if}
+            <!-- No travel-actor gate. The store stopped rejecting it, and a surface that
+                 kept refusing the toggle would be the only place in the module still
+                 claiming a rule the domain no longer has. -->
           </div>
 
           <button

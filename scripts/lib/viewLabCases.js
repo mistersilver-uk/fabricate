@@ -3416,7 +3416,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       { selector: '.manager-travel-parties [data-pagination-next]' },
     ],
     expectView: 'world',
-    // Five records at the default page size of four: page two holds exactly the fifth, so the
+    // Five records at the default page size of three: page two holds the trailing two, so the
     // absence of the first card is as load-bearing as the presence of the last. This is also
     // the only frame in which the pager's own state — a live prev arrow, "Page 2 of 2" and the
     // per-page select — is anything other than its resting one.

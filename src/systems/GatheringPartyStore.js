@@ -267,12 +267,18 @@ export class GatheringPartyStore {
       if (count > 1) errors.push(`Duplicate party id "${id}"`);
     }
 
-    // Enabled parties require exactly one travel actor.
-    for (const party of parties) {
-      if (party.enabled && !party.travelActorUuid) {
-        errors.push(`Party "${party.name}" cannot be enabled without a travel actor`);
-      }
-    }
+    // A travel actor is NOT a precondition of enabling. It was, and the gate cost more
+    // than it bought: a party with no travel actor senses no scene regions, so
+    // `resolveCurrentRealms` already resolves it to `unresolved` (Current Realm
+    // Resolution req 3) and its members gather exactly as they would with realms off.
+    // That is a legitimate configuration — downtime parties exist to group characters
+    // without ever standing on a map — and the gate turned it into an unreachable state
+    // rather than a harmless one. Realm gating is opt-in by assigning a travel actor,
+    // not a tax on grouping characters at all.
+    //
+    // The composite-uniqueness invariant below is unaffected: it reasons over the actors
+    // an enabled party ASSOCIATES, and a party with no travel actor simply associates one
+    // fewer.
 
     // Composite uniqueness invariant across ENABLED parties: an actor uuid may
     // associate with at most one enabled party (member, travel actor, or both).

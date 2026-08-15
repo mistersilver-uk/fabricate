@@ -7449,23 +7449,22 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.equal(scroller.scrollTop, 160, 'precondition: the party scroller has moved');
 
     const pageSize = pagination.querySelector('[data-pagination-size]');
-    pageSize.value = '2';
+    pageSize.value = '6';
     pageSize.dispatchEvent(new Event('change', { bubbles: true }));
     await tick();
     flushSync();
 
     assert.equal(
       pagination.querySelector('[data-pagination-page]').textContent.trim(),
-      'Page 1 of 3',
+      'Page 1 of 1',
       'a page-size mutation always returns the party list to its first page'
     );
+    // The load-bearing half. The walk left the pane on page TWO, which does not hold
+    // `lab-party`, so this card can only be back on screen because the index reset — a
+    // pane that kept `pageIndex = 1` at the new size would render an empty second page.
     assert.ok(
       Boolean(parties.querySelector('[data-manager-travel-party-id="lab-party"]')),
       'the first-page party is rendered again'
-    );
-    assert.ok(
-      !parties.querySelector('[data-manager-travel-party-id="lab-party-wagonwright"]'),
-      'the former last-page party is no longer rendered'
     );
     assert.equal(scroller.scrollTop, 0, 'the party scroller returns to its top');
   });

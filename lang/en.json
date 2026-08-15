@@ -4136,6 +4136,8 @@
             "OverrideStale": "Unknown realm",
             "OverrideSearchPlaceholder": "Search realms...",
             "OverrideSearchLabel": "Search realms",
+            "OverrideEyebrow": "Realms",
+            "OverrideCount": "{matched} of {total}",
             "NoRealmMatches": "No realms match your search."
           },
           "MoveMemberTitle": "Move {actor}?",
@@ -4158,7 +4160,6 @@
           "RenameLabel": "Party name",
           "RenamePlaceholder": "Party name",
           "EnableToggleLabel": "Enable party",
-          "EnableToggleHint": "Assign a travel actor to enable this party.",
           "DeleteParty": "Delete party",
           "DeletePartyTitle": "Delete {name}?",
           "DeletePartyContent": "Delete Fabricate party <strong>{name}</strong>? Members, travel actor, and current-realm overrides for this party are removed across every crafting system.",
@@ -4289,7 +4290,6 @@
             "MetaDisabledSuffix": " · disabled, ignored by current-realm resolution",
             "Enabled": "Enabled",
             "Disabled": "Disabled",
-            "EnableNeedsTravelActor": "Assign a travel actor to enable this party.",
             "Delete": "Delete party",
             "NoMatch": "No party, member or travel actor matches “{query}”.",
             "Empty": {
@@ -4346,6 +4346,7 @@
               "PickerSearchLabel": "Search actors",
               "PickerClose": "Close the actor search",
               "PickerNoMatches": "No actor matches your search.",
+              "PickerNoEligibleActors": "No actor has one of the configured player-character types. Fabricate counts the actor types listed under Player Character Actor Types in its module settings — add yours there if the actor you want is missing.",
               "OptionTravelActorFor": "Travel actor for {name}",
               "OptionInParty": "In {name}"
             },

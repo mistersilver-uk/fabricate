@@ -87,9 +87,17 @@
                    `{matched} of {total}` count at top-right when `showFilteredCount`
                    is true. `filteredCountTemplate` is supplied by the caller so its
                    words remain localised, while this primitive owns the live numbers
-                   because it owns the query. `compactOptionRows` opts a caller into
-                   the dense full-width actor-list presentation without redesigning
-                   existing popover consumers.
+                   because it owns the query. The header renders ABOVE the search field:
+                   it names and counts the list, and a field sitting over its own heading
+                   reads as belonging to the popover rather than to the list it filters.
+    compactOptionRows — opts a caller into the dense full-width presentation as a WHOLE,
+                   not just the row metrics: the 5px popover frame, bordered rows with
+                   their 24px leading tile, the accent fill on the row that is the
+                   current value, and a search field drawn as the same 30px bordered
+                   control with a leading glyph that `inlineSearchTrigger` renders. Both
+                   World > Parties pickers use it, so the two stacked in one 210px column
+                   read as one kind of control over two vocabularies. Existing popover
+                   consumers are untouched.
     header / footer — OPTIONAL snippets rendered inside the popover, above the option
                    list and below it. They remain for exceptional caller-owned content;
                    the standard title/count header should use the shared props above.
@@ -452,17 +460,6 @@
         }
       }}
     >
-      {#if showSearch && !inlineSearchTrigger}
-        <div class="manager-travel-popover-search">
-          <input
-            bind:this={searchInput}
-            bind:value={search}
-            type="text"
-            placeholder={searchPlaceholder}
-            aria-label={searchAriaLabel || undefined}
-          />
-        </div>
-      {/if}
       {#snippet optionRow(option)}
         <button
           type="button"
@@ -510,6 +507,29 @@
               >{filteredCount}</span
             >
           {/if}
+        </div>
+      {/if}
+
+      <!-- BELOW the title/count header, not above it. The header names the list and
+           counts it; a search field sitting over its own heading reads as belonging to
+           the popover rather than to the list it filters. Only order changes, and only
+           where a header exists — the callers that pass no `popoverTitle` and no
+           `showFilteredCount` render no header at all, so for them this is the same DOM.
+
+           The leading glyph is part of the COMPACT presentation, not of every search row:
+           `inlineSearchTrigger` mode already carries one, so a compact caller that keeps
+           its value-bearing trigger (the realm-override picker) would otherwise read as a
+           different control from the actor picker directly above it in the same column. -->
+      {#if showSearch && !inlineSearchTrigger}
+        <div class="manager-travel-popover-search" class:is-compact={compactOptionRows}>
+          {#if compactOptionRows}<i class="fas fa-magnifying-glass" aria-hidden="true"></i>{/if}
+          <input
+            bind:this={searchInput}
+            bind:value={search}
+            type="text"
+            placeholder={searchPlaceholder}
+            aria-label={searchAriaLabel || undefined}
+          />
         </div>
       {/if}
 
@@ -580,16 +600,167 @@
     font-weight: 500;
   }
 
+  /* The 5px frame the compact popover draws around its own contents, so the header, the
+     search field and the option list all sit on one inset. It hangs on the MODE rather
+     than on a caller class — it used to be `.manager-travel-actor-popover`'s in
+     `styles/fabricate.css`, which the realm-override picker could only have reached by
+     borrowing a class named after actors. */
+  .manager-travel-popover.is-compact-option-rows {
+    padding: 5px;
+  }
+
+  /* The header is a column flex item too, and the same shrink applies to it. */
+  .manager-travel-popover.is-compact-option-rows .manager-travel-popover-header {
+    flex: 0 0 auto;
+  }
+
+  /* The row that IS the current value: an accent fill beside the marker glyph, so the
+     marked row reads as marked without relying on an icon alone. */
+  .manager-travel-popover.is-compact-option-rows .manager-travel-option[aria-selected='true'] {
+    border-color: var(--fab-accent-border);
+    background: var(--fab-accent-soft);
+  }
+
+  /* The compact search row, matching `.manager-travel-picker-inline`'s 30px bordered field
+     with its leading glyph — so a compact picker that keeps its value-bearing trigger reads
+     as the same control as one that swaps its trigger for the field. `margin: 0 7px` lands
+     its edges on the option rows' 7px list padding rather than on the popover's 5px frame,
+     so the field and the rows below it share one left edge.
+
+     The row IS the field, so the ring goes on the row: the input inside it is borderless,
+     and an outset ring around a borderless input lands outside the boundary a GM sees —
+     the defect `styles/fabricate.css` records at the composite search fields.
+
+     `flex: 0 0 auto` is LOAD-BEARING, not tidiness. The popover is a column flex container
+     under a `max-height` cap, so a full option list makes every item a shrink candidate:
+     with the default `flex-shrink: 1` the `height: 30px` below is only a hint, and the
+     field is squeezed to whatever is left over — visibly shorter than the identical
+     add-a-member field two columns away, and by a different amount per list length. */
+  .manager-travel-popover-search.is-compact {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 7px;
+    min-width: 0;
+    box-sizing: border-box;
+    height: 30px;
+    margin: 2px 7px 6px;
+    padding: 0 8px;
+    border: 1px solid var(--fab-accent-border);
+    border-bottom: 1px solid var(--fab-accent-border);
+    border-radius: 8px;
+    background: var(--fab-bg-0);
+  }
+
+  .manager-travel-popover-search.is-compact > i {
+    flex: 0 0 auto;
+    color: var(--fab-text-subtle);
+    font-size: 9px;
+  }
+
+  .manager-travel-popover-search.is-compact input {
+    flex: 1;
+    align-self: stretch;
+    min-width: 0;
+    min-height: 0;
+    height: auto;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    color: var(--fab-text);
+    background: transparent;
+    font-size: 10.5px;
+    font-weight: 500;
+  }
+
+  .manager-travel-popover-search.is-compact:focus-within {
+    border-color: var(--fab-mv2-accent);
+    box-shadow: inset 0 0 0 1px var(--fab-mv2-accent);
+  }
+
+  .manager-travel-popover-search.is-compact input:focus-visible {
+    outline: none;
+    border-color: transparent;
+    box-shadow: none;
+  }
+
+  /* `both-edges`, not plain `stable`: the list scrolls, so a gutter reserved on the
+     scrolling edge alone makes the gap to the right of a row the padding PLUS the
+     scrollbar while the gap to its left is the padding alone. Reserving on both edges
+     keeps the two equal whether or not the engine draws a track (Firefox's overlay
+     scrollbar ignores the property, and needs no reservation to stay symmetric). */
   .manager-travel-popover.is-compact-option-rows .manager-travel-popover-options {
     display: flex;
     flex-direction: column;
     gap: 4px;
+    padding: 7px;
+    scrollbar-gutter: stable both-edges;
+    scrollbar-width: thin;
   }
 
+  /* One 7px inset on every side of the row, and a portrait sized to sit INSIDE it
+     (24px + 2 × 7px padding + 2 × 1px border = 40px) rather than fill it. At the
+     shipped 32px the portrait left 2px above and below itself against 8px to its
+     left, so a row read as an image jammed into a box that was generously padded
+     everywhere else. */
   .manager-travel-popover.is-compact-option-rows .manager-travel-option {
-    min-height: 38px;
+    min-height: 40px;
+    padding: 7px;
+    gap: 7px;
     border: 1px solid var(--fab-mv2-border);
     border-radius: 7px;
     background: var(--fab-mv2-surface-2);
+  }
+
+  .manager-travel-popover.is-compact-option-rows .manager-travel-portrait {
+    width: 24px;
+    height: 24px;
+  }
+
+  /* An option that carries an ICON rather than an `img` gets the SAME 24px leading tile
+     the portrait gets, instead of a bare glyph. Without it the two compact pickers on one
+     card disagree twice over: the realm rows' names started at a different indent from the
+     actor rows' names, and a 14px glyph against a 24px tile put different visual weight at
+     the head of otherwise identical rows.
+
+     `:not(.manager-travel-option-marker)` is required, not defensive — the trailing
+     "this is the current value" check is also a direct `<i>` child of the row, and tiling
+     it would frame the marker as though it were a second leading element. */
+  .manager-travel-popover.is-compact-option-rows
+    .manager-travel-option
+    > i:not(.manager-travel-option-marker) {
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 6px;
+    color: var(--fab-text-muted);
+    background: var(--fab-surface-raised);
+    font-size: 11px;
+  }
+
+  /* Pinned, not inherited. The row is a `<button>` under `.fabricate-manager button {
+     font: inherit }`, so its label was rendering at the manager's inherited body size —
+     larger and heavier than every other list on this card, including the add-a-member
+     candidate rows (`PartyAddMemberPanel.svelte`) that sit directly beneath it in the same
+     column at 11.5px/500 over a 9.5px meta. Stating the scale here puts both compact
+     pickers and that list on one type family instead of leaving it to whatever the
+     manager root happens to inherit from Foundry. */
+  .manager-travel-popover.is-compact-option-rows .manager-travel-option {
+    font-family: var(--font-primary);
+    font-size: 11.5px;
+    font-weight: 500;
+  }
+
+  .manager-travel-popover.is-compact-option-rows .manager-travel-option-name {
+    font-size: 11.5px;
+    font-weight: 500;
+  }
+
+  .manager-travel-popover.is-compact-option-rows .manager-travel-option-meta {
+    font-size: 9.5px;
+    font-weight: 400;
   }
 </style>

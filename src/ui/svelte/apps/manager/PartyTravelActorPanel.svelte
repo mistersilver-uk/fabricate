@@ -20,10 +20,20 @@
      the prototype's `--fab-bg-1` fill and its radius all hang on the WRAPPER — the slot
      both states occupy — so the linked tile is filled as the prototype draws it without
      any of it reaching `EmptyState`'s chrome or its no-fill contract.
-  3. The picker's candidate set is EVERY world actor, not only player characters — a
-     travel actor is frequently a group token, vehicle or NPC. Its per-option meta says
-     where that actor already stands ("Travel actor for X" / "In X"), which surfaces the
-     composite-uniqueness collision before the pick fails instead of after.
+  3. The picker's candidate set is the GM-CONFIGURED player-character actor types, the
+     same membership the member picker uses — a world's NPC roster is unbounded (bestiary
+     imports run to hundreds of actors), and a picker that lists all of them buries the
+     handful of actors that could plausibly stand for a party. A GM who wants a group
+     token, vehicle or mount to be eligible adds that actor type under Player Character
+     Actor Types in the module settings, which is the one place the module decides which
+     actors it is allowed to touch. Membership is read from the projected
+     `isPlayerCharacter` flag, tested STRICTLY (`=== true`) for the reason
+     `PartyAddMemberPanel.svelte` documents. Dropping an actor onto the tile is
+     deliberately NOT filtered: a drop names one actor explicitly, so it is the escape
+     hatch for a one-off that the type list does not cover.
+     Each option's meta says where that actor already stands ("Travel actor for X" /
+     "In X"), which surfaces the composite-uniqueness collision before the pick fails
+     instead of after.
 
   A separate unlink button is present whenever a travel actor is set, because the
   right-click affordance on the tile is not keyboard-reachable.
@@ -73,8 +83,14 @@
         : '')
   );
 
+  // The eligible set, not the world roster: an actor whose type is not one the GM listed
+  // under Player Character Actor Types is not offered.
+  const eligibleActors = $derived(
+    actorOptions.filter((option) => option.isPlayerCharacter === true)
+  );
+
   const pickerOptions = $derived(
-    actorOptions.map((option) => ({
+    eligibleActors.map((option) => ({
       id: option.uuid,
       label: option.name,
       img: option.img || undefined,
@@ -84,16 +100,25 @@
     }))
   );
 
+  // THREE reasons, in precedence order, mirroring `PartyAddMemberPanel`: an empty world
+  // and a world whose actors are all of an unconfigured type are different problems with
+  // different fixes, and collapsing them into "no actor matches your search" tells a GM
+  // staring at a world full of actors to search harder.
   const pickerEmptyHint = $derived(
     actorOptions.length === 0
       ? text(
           'FABRICATE.Admin.Manager.Travel.NoActorsInWorld',
           'No actors exist in this world yet — create an Actor first.'
         )
-      : text(
-          'FABRICATE.Admin.Manager.World.Parties.TravelActor.PickerNoMatches',
-          'No actor matches your search.'
-        )
+      : eligibleActors.length === 0
+        ? text(
+            'FABRICATE.Admin.Manager.World.Parties.TravelActor.PickerNoEligibleActors',
+            'No actor has one of the configured player-character types. Fabricate counts the actor types listed under Player Character Actor Types in its module settings — add yours there if the actor you want is missing.'
+          )
+        : text(
+            'FABRICATE.Admin.Manager.World.Parties.TravelActor.PickerNoMatches',
+            'No actor matches your search.'
+          )
   );
 
   const unlinkLabel = $derived(

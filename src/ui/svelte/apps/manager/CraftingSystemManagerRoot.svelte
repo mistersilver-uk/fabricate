@@ -2386,9 +2386,10 @@
   const travelParties = $derived($viewState.travelParties || []);
 
   // World > Parties page-header subtitle (issue 1182). `enabled` counts `enabled === true`
-  // and NOT the prototype's `enabled && members.length`: an enabled party always has a
-  // travel actor (gathering-and-harvesting req 4) and resolves that actor's current realm
-  // with or without members (req 6), so a member-less enabled party is in use.
+  // and NOT the prototype's `enabled && members.length`: an enabled party resolves its
+  // travel actor's current realm with or without members (gathering-and-harvesting req 6),
+  // and an enabled party with neither members nor a travel actor is still the record a
+  // downtime group is grouped by, so a member-less enabled party is in use.
   //
   // `assigned` / `total` are PLAYER CHARACTERS only, each counted once across all parties.
   // Travel actors are deliberately outside the numerator — their candidate set is every

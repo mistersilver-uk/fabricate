@@ -1017,11 +1017,17 @@ test('the World Parties fixture is legal, and its search and pager cases claim w
 
   // The page arithmetic the last-page case photographs, derived from the same seed and from
   // the tab's own default rather than asserted as two magic numbers.
-  assert.match(tabSource, /const PAGE_SIZE_OPTIONS = \[2, 4, 6, 10\];/);
+  assert.match(tabSource, /const PAGE_SIZE_OPTIONS = \[3, 6, 9\];/);
   const declaredPageSize = Number(/let pageSize = \$state\((\d+)\)/.exec(tabSource)?.[1]);
-  assert.equal(declaredPageSize, 4);
+  assert.equal(declaredPageSize, 3);
   assert.equal(Math.ceil(parties.length / declaredPageSize), 2, 'five records is two pages');
-  assert.equal(parties.length - declaredPageSize, 1, 'the last page holds exactly one card');
+  assert.equal(parties.length - declaredPageSize, 2, 'the last page holds the trailing two cards');
+  // The pager itself is gated on the smallest offered size, so a seed below it would
+  // photograph a pane with no footer at all — and the last-page case would have no
+  // control to reach page two with.
+  const declaredPagerThreshold = Number(/const PAGER_THRESHOLD = (\d+);/.exec(tabSource)?.[1]);
+  assert.equal(declaredPagerThreshold, 3);
+  assert.ok(parties.length >= declaredPagerThreshold, 'the seed opens the pager gate');
   const lastPage = getCaseById('manager-world-parties-last-page');
   assert.ok(
     lastPage.expectSelector.includes(`[data-manager-travel-party-id="${parties.at(-1).id}"]`)

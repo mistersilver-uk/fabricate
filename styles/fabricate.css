@@ -21050,21 +21050,28 @@
 
 /* The pager is the pane's full-width sibling footer, outside the card scroller. The
    three-class selector intentionally beats the primitive strip without touching its
-   other consumers. */
+   other consumers.
+
+   SQUARED OFF and full-bleed, not an inset rounded card: it is the bottom edge of the
+   pane, and a rounded panel floating inside a gutter reads as one more item in the
+   scrolled list rather than as the pane's own footer. The only chrome it needs is the
+   rule separating it from the cards above; its horizontal padding matches the
+   scroller's 18px, so the summary lines up with the card column. */
 .fabricate-manager .manager-travel-parties .manager-travel-parties-pagination {
   flex: 0 0 auto;
   width: 100%;
   box-sizing: border-box;
-  padding: 0 18px 14px;
+  padding: 0;
 }
 
 .fabricate-manager .manager-travel-parties .manager-travel-parties-pagination .manager-pagination {
   width: 100%;
   box-sizing: border-box;
   margin: 0;
-  padding: 11px 13px;
-  border: 1px solid var(--fab-border);
-  border-radius: 11px;
+  padding: 11px 18px;
+  border: 0;
+  border-top: 1px solid var(--fab-border);
+  border-radius: 0;
   background: var(--fab-bg-0);
 }
 
@@ -21113,10 +21120,16 @@
   font-size: 9px;
 }
 
+/* `align-self: stretch` with `height: auto` pins the input to the ROW's height. Foundry
+   core gives every input `height: var(--input-height)` (~32px), which overflows this
+   30px row by a pixel top and bottom — invisible until the field takes focus, at which
+   point its ring is drawn around the overflowing box rather than the row. */
 .fabricate-manager .manager-travel-picker-inline input {
   flex: 1;
+  align-self: stretch;
   min-width: 0;
   min-height: 0;
+  height: auto;
   padding: 0;
   border: none;
   color: var(--fab-text);
@@ -21134,16 +21147,39 @@
   font-size: 10px;
 }
 
-.fabricate-manager .manager-travel-actor-popover {
-  padding: 5px;
+/*
+  COMPOSITE SEARCH FIELDS — the World > Parties actor search, add-a-member search and
+  parties search. Each is a bordered ROW holding a leading glyph, a borderless `<input>`
+  and a trailing control, so what a GM reads as "the field" is the row, not the input.
+
+  The manager's default ring (`input:focus-visible { outline: 2px; outline-offset: 2px }`
+  above) is drawn around the INPUT and pushed 2px further out, and Foundry's own
+  `--input-height` leaves that input marginally taller than the 30px row it sits in. The
+  two compound: the ring lands roughly 4px outside the row on every side and reads as a
+  large highlight floating around a smaller field. Ringing the row instead — inset, so it
+  can never exceed the field it marks — is the same affordance at the boundary the GM
+  sees, and keyboard focus stays just as visible.
+*/
+.fabricate-manager .manager-travel-picker-inline input:focus-visible,
+.fabricate-manager .manager-party-add-search .manager-party-add-query:focus-visible,
+.fabricate-manager .manager-travel-parties-search .manager-travel-parties-query:focus-visible {
+  outline: none;
 }
 
-/* The currently linked actor: an accent fill beside the check glyph, so the marked row
-   reads as marked without relying on an icon alone. */
-.fabricate-manager .manager-travel-actor-popover .manager-travel-option[aria-selected="true"] {
-  border: 1px solid var(--fab-accent-border);
-  background: var(--fab-accent-soft);
+.fabricate-manager .manager-travel-picker-inline:has(input:focus-visible),
+.fabricate-manager .manager-party-add-search:has(.manager-party-add-query:focus-visible),
+.fabricate-manager
+  .manager-travel-parties-search:has(.manager-travel-parties-query:focus-visible) {
+  border-color: var(--fab-mv2-accent);
+  box-shadow: inset 0 0 0 1px var(--fab-mv2-accent);
 }
+
+/* `.manager-travel-actor-popover` carries no style: it is the View Lab capture hook that
+   names the travel-actor picker's panel (`scripts/lib/viewLabCases.js`). The 5px frame and
+   the accent fill on the selected row moved into `SearchablePopover`'s scoped
+   `is-compact-option-rows` block, because they belong to the compact PRESENTATION — the
+   realm-override picker opted into the same one and would otherwise have needed to borrow
+   a class named after actors to get them. */
 
 .fabricate-manager .manager-travel-option-marker {
   flex: 0 0 auto;

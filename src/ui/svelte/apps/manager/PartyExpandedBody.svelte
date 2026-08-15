@@ -8,14 +8,14 @@
   Head: icon tile · always-editable name over a meta line · enable pill · delete.
   Body: `minmax(0, 1fr) 210px` — members on the left, the travel actor on the right.
 
-  Three Fabricate rules the prototype has no equivalent of:
+  Two Fabricate rules the prototype has no equivalent of:
 
-   - The enable pill is GATED on the travel actor (`ui-integration/spec.md`'s GM Travel Route enable-toggle rule,
-     `gathering-and-harvesting` req 4, enforced at `GatheringPartyStore.js:272-273`).
-     While the gate is closed it uses `aria-disabled` plus `aria-describedby` rather
-     than `disabled`, because a `disabled` button is not keyboard-reachable and
-     suppresses hover in some engines, which would make the hint invisible. The hint
-     renders IN PLACE OF the meta line's "travel actor: none" fragment, not after it.
+   - The enable pill is UNGATED. A travel actor used to be a precondition of enabling;
+     it is not, because a party without one senses no scene regions and so resolves to
+     `unresolved` anyway (`gathering-and-harvesting` Current Realm Resolution req 3) —
+     which is to say a downtime party that never stands on a map behaves exactly as it
+     would with realms switched off. The meta line still states "travel actor: none", so
+     the consequence is visible without the configuration being forbidden.
    - Delete routes through the shared confirm seam (`adminStore.deleteParty`), which
      names the party: deleting one drops its membership, its travel actor and its
      per-system current-realm overrides across every crafting system.
@@ -99,9 +99,6 @@
         : '')
   );
 
-  // The gate: a party with no travel actor cannot be enabled (req 4).
-  const enableGated = $derived(party?.enabled !== true && !party?.travelActorUuid);
-  const gateHintId = $derived(party ? `party-enable-gate-${party.id}` : '');
   const memberErrorId = $derived(memberError && party ? `party-member-error-${party.id}` : '');
 
   const memberCountLabel = $derived(
@@ -126,13 +123,6 @@
           ' · disabled, ignored by current-realm resolution'
         )
   );
-  const enableGateHint = $derived(
-    text(
-      'FABRICATE.Admin.Manager.World.Parties.EnableNeedsTravelActor',
-      'Assign a travel actor to enable this party.'
-    )
-  );
-
   // uuid -> the FIRST other party that lists it, by name.
   const otherPartyNameByUuid = $derived.by(() => {
     const map = {};
@@ -229,18 +219,8 @@
       <div class="manager-party-meta">
         <span>{memberCountLabel}</span>
         <span> · </span>
-        {#if enableGated}
-          <span class="manager-party-gate-hint" id={gateHintId}>{enableGateHint}</span>
-        {:else}
-          <span>{travelActorFragment}</span>
-        {/if}
-        <!-- The suffix is SUPPRESSED while the gate is closed. `enableGated` implies
-             `enabled !== true`, so a gated card would otherwise carry both strings — about
-             103 characters into a `nowrap` ellipsised slot of roughly 550px at full card
-             width — and the first thing the ellipsis eats is the suffix. The gate hint
-             states the precondition, the suffix states the consequence, and "Disabled" is
-             already on the pill two elements away. -->
-        {#if disabledSuffix && !enableGated}<span>{disabledSuffix}</span>{/if}
+        <span>{travelActorFragment}</span>
+        {#if disabledSuffix}<span>{disabledSuffix}</span>{/if}
       </div>
     </div>
 
@@ -250,13 +230,8 @@
       class:is-on={party.enabled === true}
       data-manager-party-enable={party.id}
       aria-pressed={party.enabled === true}
-      aria-disabled={enableGated ? 'true' : undefined}
-      aria-describedby={enableGated ? gateHintId : undefined}
       disabled={saving}
-      onclick={() => {
-        if (enableGated) return;
-        onSetEnabled(party.id, party.enabled !== true);
-      }}
+      onclick={() => onSetEnabled(party.id, party.enabled !== true)}
     >
       <i
         class={party.enabled === true ? 'fas fa-circle-check' : 'fas fa-circle-pause'}
@@ -389,24 +364,32 @@
 
 <style>
   /* Theme-ROOT tokens only (`--fab-mv2-*` is declared on `.fabricate-manager`). Geometry
-     is the prototype's: an 11px head gap over a `minmax(0,1fr) 210px` body at 12px. */
+     is the prototype's: an 11px head gap over a `minmax(0,1fr) 210px` body at 12px.
+
+     `flex-start`, NOT `center`. The identity cell is TWO lines — the name field over the
+     meta line — while the enable pill and delete are one control each, so centring the
+     row hangs both buttons against the height of that stack and drops them roughly half a
+     meta line below the name field they act on. Top-aligning puts every head control on
+     one 30px band: icon, name input, pill and delete all share that height, so the
+     controls read as being ON the name row and the meta line hangs beneath it. */
   .manager-party-head {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     gap: 11px;
   }
 
+  /* 30px, matching the name field and both head buttons, so the band is uniform. */
   .manager-party-icon {
     display: flex;
     flex: 0 0 auto;
     align-items: center;
     justify-content: center;
-    width: 34px;
-    height: 34px;
-    border-radius: 9px;
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
     color: var(--fab-accent);
     background: var(--fab-bg-0);
-    font-size: 14px;
+    font-size: 13px;
   }
 
   .manager-party-identity {
@@ -425,10 +408,6 @@
     font-weight: 400;
     text-overflow: ellipsis;
     white-space: nowrap;
-  }
-
-  .manager-party-gate-hint {
-    color: var(--fab-warning-text);
   }
 
   .manager-party-enable-pill {

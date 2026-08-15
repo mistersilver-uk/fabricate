@@ -106,35 +106,32 @@ describe('PartyExpandedBody (mounted)', () => {
     assert.deepEqual(renamed, [['p1', 'Vanguard']]);
   });
 
-  it('makes the enable pill inoperable and self-explaining while the party has no travel actor', async () => {
+  it('enables a party that has NO travel actor, and still states that it has none', async () => {
     const toggles = [];
     const root = await mountBody({ onSetEnabled: (id, next) => toggles.push([id, next]) });
     const pill = root.querySelector('[data-manager-party-enable="p1"]');
 
     assert.equal(pill.getAttribute('aria-pressed'), 'false');
-    assert.equal(pill.getAttribute('aria-disabled'), 'true');
-    // `aria-disabled`, not `disabled`: a disabled button is not keyboard-reachable and
-    // suppresses hover in some engines, which would make the hint invisible.
-    assert.ok(!pill.hasAttribute('disabled'), 'the gated pill stays keyboard-reachable');
+    // The travel-actor gate is gone. A party with no travel actor senses no scene
+    // regions, so it resolves to `unresolved` and its members gather exactly as they
+    // would with realms off — which is what a downtime party is for. Both halves of the
+    // old gate go together: no `aria-disabled`, and no hint standing in for the meta.
+    assert.ok(!pill.hasAttribute('aria-disabled'), 'the pill is not gated');
+    assert.equal(pill.getAttribute('aria-describedby'), null);
+    assert.equal(root.querySelector('#party-enable-gate-p1'), null, 'no gate hint element');
 
-    const hint = root.querySelector('#party-enable-gate-p1');
-    assert.ok(Boolean(hint), 'the gate explains its missing prerequisite in visible text');
-    assert.equal(pill.getAttribute('aria-describedby'), 'party-enable-gate-p1');
-    assert.match(hint.textContent, /travel actor/i);
-    // The hint stands IN PLACE OF the "travel actor: none" fragment, not after it — and
-    // in place of the disabled suffix too. `enableGated` implies `enabled !== true`, so a
-    // gated card carries BOTH strings into one `nowrap` ellipsised line and the suffix is
-    // the half the ellipsis eats; the pill two elements away already says "Disabled".
-    const gatedMeta = root.querySelector('.manager-party-meta').textContent;
-    assert.ok(!gatedMeta.includes('travel actor:'));
-    assert.ok(!gatedMeta.includes('ignored by current-realm resolution'), 'no clipped suffix');
+    // The consequence stays VISIBLE even though the configuration is allowed: the meta
+    // line reports the missing travel actor rather than the card hiding it.
+    const meta = root.querySelector('.manager-party-meta').textContent;
+    assert.match(meta, /travel actor: none/);
+    assert.match(meta, /ignored by current-realm resolution/);
 
     pill.click();
     flushSync();
-    assert.deepEqual(toggles, [], 'the gate refuses the toggle (req 4)');
+    assert.deepEqual(toggles, [['p1', true]], 'and the toggle reaches the store');
   });
 
-  it('toggles enable once a travel actor is linked', async () => {
+  it('toggles enable when a travel actor IS linked', async () => {
     const toggles = [];
     const root = await mountBody({
       party: makeParty({
@@ -147,8 +144,6 @@ describe('PartyExpandedBody (mounted)', () => {
     assert.ok(!pill.hasAttribute('aria-disabled'));
     const meta = root.querySelector('.manager-party-meta').textContent;
     assert.match(meta, /travel actor: Vosk/);
-    // Ungated and still disabled: this is where the suffix belongs, and the negative
-    // control for the gated card's suppression of it.
     assert.match(meta, /ignored by current-realm resolution/);
     pill.click();
     flushSync();
@@ -504,7 +499,7 @@ describe('PartyExpandedBody (mounted)', () => {
         travelActorUuid: 'Actor.v',
         travelActor: { uuid: 'Actor.v', name: 'Vosk', img: '' },
       }),
-      actorOptions: [{ uuid: 'Actor.v', name: 'Vosk', img: '', isPlayerCharacter: false }],
+      actorOptions: [{ uuid: 'Actor.v', name: 'Vosk', img: '', isPlayerCharacter: true }],
     });
     root.querySelector('[data-manager-party-actor-trigger="p1"]').click();
     flushSync();
@@ -512,7 +507,7 @@ describe('PartyExpandedBody (mounted)', () => {
     assert.ok(root.querySelector('[data-manager-party-actor-unlink="p1"]'));
   });
 
-  it('offers EVERY world actor as a travel actor, annotated with where it already stands', async () => {
+  it('offers only CONFIGURED player-character actors, annotated with where they already stand', async () => {
     const root = await mountBody({
       party: makeParty({ id: 'p1' }),
       parties: [
@@ -525,7 +520,7 @@ describe('PartyExpandedBody (mounted)', () => {
         }),
       ],
       actorOptions: [
-        { uuid: 'Actor.v', name: 'Vosk', img: '', isPlayerCharacter: false },
+        { uuid: 'Actor.v', name: 'Vosk', img: '', isPlayerCharacter: true },
         { uuid: 'Actor.b', name: 'Bromm', img: '', isPlayerCharacter: true },
         { uuid: 'Actor.w', name: 'The Ashfall Wagon', img: '', isPlayerCharacter: false },
       ],
@@ -533,9 +528,12 @@ describe('PartyExpandedBody (mounted)', () => {
     root.querySelector('[data-manager-party-actor-trigger="p1"]').click();
     flushSync();
 
-    // A travel actor is frequently a group token, vehicle or NPC, so the candidate set
-    // is NOT the player-character list the member picker uses.
-    assert.deepEqual(optionNames(root).sort(), ['Bromm', 'The Ashfall Wagon', 'Vosk']);
+    // The candidate set is the GM-configured player-character types, the same membership
+    // the member picker uses: a world's NPC roster is unbounded, and listing it buries
+    // the handful of actors that could stand for a party. The Wagon is present in
+    // `actorOptions` and absent from the picker, which is the whole assertion — a GM who
+    // wants it eligible adds its type under Player Character Actor Types.
+    assert.deepEqual(optionNames(root).sort(), ['Bromm', 'Vosk']);
     const metas = Array.from(root.querySelectorAll('.manager-travel-option-meta')).map((node) =>
       node.textContent.trim()
     );
@@ -553,6 +551,24 @@ describe('PartyExpandedBody (mounted)', () => {
     );
   });
 
+  it('names the actor-types setting when the world has actors but none are eligible', async () => {
+    // The third empty reason, and the one the type filter created. Collapsing it into
+    // "no actor matches your search" tells a GM staring at a world full of actors — with
+    // an empty query — to search harder.
+    const root = await mountBody({
+      actorOptions: [
+        { uuid: 'Actor.w', name: 'The Ashfall Wagon', img: '', isPlayerCharacter: false },
+      ],
+    });
+    root.querySelector('[data-manager-party-actor-trigger="p1"]').click();
+    flushSync();
+    assert.equal(optionNames(root).length, 0);
+    assert.match(
+      root.querySelector('.manager-travel-popover').textContent,
+      /Player Character Actor Types/
+    );
+  });
+
   it('marks the currently linked actor in the picker', async () => {
     const root = await mountBody({
       party: makeParty({
@@ -560,8 +576,8 @@ describe('PartyExpandedBody (mounted)', () => {
         travelActor: { uuid: 'Actor.v', name: 'Vosk', img: '' },
       }),
       actorOptions: [
-        { uuid: 'Actor.v', name: 'Vosk', img: '', isPlayerCharacter: false },
-        { uuid: 'Actor.w', name: 'Wagon', img: '', isPlayerCharacter: false },
+        { uuid: 'Actor.v', name: 'Vosk', img: '', isPlayerCharacter: true },
+        { uuid: 'Actor.w', name: 'Wagon', img: '', isPlayerCharacter: true },
       ],
     });
     root.querySelector('[data-manager-party-actor-trigger="p1"]').click();
@@ -580,8 +596,8 @@ describe('PartyExpandedBody (mounted)', () => {
   it('counts MATCHED of total in the picker header as the search narrows the list', async () => {
     const root = await mountBody({
       actorOptions: [
-        { uuid: 'Actor.v', name: 'Vosk', img: '', isPlayerCharacter: false },
-        { uuid: 'Actor.w', name: 'The Ashfall Wagon', img: '', isPlayerCharacter: false },
+        { uuid: 'Actor.v', name: 'Vosk', img: '', isPlayerCharacter: true },
+        { uuid: 'Actor.w', name: 'The Ashfall Wagon', img: '', isPlayerCharacter: true },
         { uuid: 'Actor.b', name: 'Bromm', img: '', isPlayerCharacter: true },
       ],
     });
@@ -606,7 +622,7 @@ describe('PartyExpandedBody (mounted)', () => {
 
   it('dismisses the inline picker on Escape from its search field', async () => {
     const root = await mountBody({
-      actorOptions: [{ uuid: 'Actor.w', name: 'Wagon', img: '', isPlayerCharacter: false }],
+      actorOptions: [{ uuid: 'Actor.w', name: 'Wagon', img: '', isPlayerCharacter: true }],
     });
     root.querySelector('[data-manager-party-actor-trigger="p1"]').click();
     flushSync();
@@ -628,7 +644,7 @@ describe('PartyExpandedBody (mounted)', () => {
 
   it('returns focus to the trigger when a picker closes, in BOTH trigger modes', async () => {
     let root = await mountBody({
-      actorOptions: [{ uuid: 'Actor.w', name: 'Wagon', img: '', isPlayerCharacter: false }],
+      actorOptions: [{ uuid: 'Actor.w', name: 'Wagon', img: '', isPlayerCharacter: true }],
     });
     root.querySelector('[data-manager-party-actor-trigger="p1"]').click();
     flushSync();
@@ -667,7 +683,7 @@ describe('PartyExpandedBody (mounted)', () => {
   it('sets the travel actor from the picker', async () => {
     const set = [];
     const root = await mountBody({
-      actorOptions: [{ uuid: 'Actor.w', name: 'Wagon', img: '', isPlayerCharacter: false }],
+      actorOptions: [{ uuid: 'Actor.w', name: 'Wagon', img: '', isPlayerCharacter: true }],
       onSetTravelActor: (id, uuid) => set.push([id, uuid]),
     });
     root.querySelector('[data-manager-party-actor-trigger="p1"]').click();
@@ -777,7 +793,7 @@ describe('PartyExpandedBody (mounted)', () => {
     const root = await mountBody({
       party: makeParty({ memberCards: [member()], memberActorUuids: ['Actor.a'], memberCount: 1 }),
       parties: [makeParty({ id: 'p1' }), makeParty({ id: 'p2', name: 'Scouts' })],
-      actorOptions: [{ uuid: 'Actor.w', name: 'Wagon', img: '', isPlayerCharacter: false }],
+      actorOptions: [{ uuid: 'Actor.w', name: 'Wagon', img: '', isPlayerCharacter: true }],
       closeToken: 0,
     });
     root.querySelector('.manager-party-member-move').click();

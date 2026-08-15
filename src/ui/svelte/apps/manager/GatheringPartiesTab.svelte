@@ -4,8 +4,10 @@
   fully expanded: there is no accordion any more.
 
   This pane owns its own scroll, as the prototype does, so the intro, search bar and
-  match counter scroll away with a tall page. The pager is a sibling footer outside that
-  scroller: it stays visible, spans the whole content area and never covers a card.
+  match counter scroll away with a tall page. The pager is a squared-off, full-bleed
+  sibling footer outside that scroller: it stays visible, spans the whole content area,
+  never covers a card, and appears only once the matched set reaches the smallest page
+  size (three).
 
   Store validation errors are routed to the CARD that issued the failing mutation:
   the pane records that party id and hands the duplicate-member message to its member
@@ -45,11 +47,15 @@
     onClearTravelActor = () => {},
   } = $props();
 
-  const PAGE_SIZE_OPTIONS = [2, 4, 6, 10];
+  // A party card is TALL — head, member list, add control and a travel-actor column —
+  // so the page sizes step in threes rather than the manager's usual 10/25/50 table
+  // rhythm, and the smallest is also the threshold at which the footer appears.
+  const PAGE_SIZE_OPTIONS = [3, 6, 9];
+  const PAGER_THRESHOLD = 3;
 
   let searchTerm = $state('');
   let pageIndex = $state(0);
-  let pageSize = $state(4);
+  let pageSize = $state(3);
   let scroller = $state(null);
   // Bumped on every page / page-size change; each card watches it and shuts any open
   // travel-actor picker, move drawer or add panel.
@@ -115,6 +121,13 @@
   const pagedParties = $derived(
     filteredParties.slice(pageIndex * pageSize, (pageIndex + 1) * pageSize)
   );
+
+  // The footer appears at the smallest page size and not before. Under it there is one
+  // page by construction, so a full pager bar would be three inert controls stating
+  // "Showing 1–2 of 2 · Page 1 of 1" — chrome describing a list the GM can already see
+  // in full. It is gated on the FILTERED set, the same set every number in the bar
+  // counts, so the bar never outlives the rows it describes.
+  const showPager = $derived(filteredParties.length >= PAGER_THRESHOLD);
 
   const memberError = $derived(travelFieldErrors?.members || '');
   const travelActorError = $derived(travelFieldErrors?.travelActor || '');
@@ -351,7 +364,7 @@
     {/if}
   </div>
 
-  {#if filteredParties.length > 0}
+  {#if showPager}
     <div class="manager-travel-parties-pagination" data-manager-party-pagination>
       <!-- This footer deliberately sits OUTSIDE `.manager-travel-parties-content`: the
            content scrolls, while the pagination controls remain in a full-width sibling
@@ -414,10 +427,15 @@
     font-size: 10px;
   }
 
+  /* `align-self: stretch` with `height: auto` pins the input to the 32px ROW. Foundry
+     core gives every input its own `height: var(--input-height)`, which otherwise
+     overflows the row and drags the focus ring out with it. */
   input.manager-travel-parties-query {
     flex: 1;
+    align-self: stretch;
     min-width: 0;
     min-height: 0;
+    height: auto;
     padding: 0;
     border: none;
     color: var(--fab-text);

@@ -116,15 +116,18 @@ describe('GatheringTravelView mounted behavior', () => {
     remount();
   });
 
-  it('disables the enable toggle while no travel actor is assigned and shows the hint', async () => {
+  it('leaves the enable toggle operable while no travel actor is assigned', async () => {
     await mountView(baseProps({
       parties: [makeParty({ travelActorUuid: null })],
       selectedPartyId: 'p1'
     }));
     const toggle = target.querySelector('.manager-travel-enable .manager-travel-status-toggle');
     assert.ok(toggle, 'enable toggle should render');
-    assert.equal(toggle.disabled, true, 'enable toggle should be disabled without a travel actor');
-    assert.ok(target.textContent.includes('Assign a travel actor to enable this party.'), 'should show the enable hint');
+    // The travel-actor gate is gone from the store, so no surface may keep enforcing it:
+    // a party with no travel actor senses no regions and resolves to `unresolved`, which
+    // is what a downtime party wants.
+    assert.equal(toggle.disabled, false, 'enable toggle is not gated on a travel actor');
+    assert.ok(!target.textContent.includes('Assign a travel actor to enable this party.'), 'and no gate hint survives');
     remount();
   });
 

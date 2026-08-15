@@ -105,7 +105,7 @@ describe('GatheringPartiesTab (mounted)', () => {
 
   it('reports MATCHED of TOTAL, not page of total', async () => {
     const root = await mountTab({ parties: makeParties(5) });
-    // Page size is 4, so a page-of-total counter would read "4 of 5".
+    // Page size is 3, so a page-of-total counter would read "3 of 5".
     assert.equal(
       root.querySelector('[data-manager-party-match-count]').textContent.trim(),
       '5 of 5'
@@ -154,8 +154,9 @@ describe('GatheringPartiesTab (mounted)', () => {
 
   it('renders the shared filtered panel and NO card list when nothing matches', async () => {
     const root = await mountTab({ parties: makeParties(3) });
-    // The negative control for the pager assertion below: matched, the bar is drawn even
-    // though three parties fit on one page, which is what `persistent` buys.
+    // The negative control for the pager assertion below: at exactly the threshold the
+    // bar is drawn even though three parties fit on one page, which is what `persistent`
+    // buys once the gate opens.
     assert.ok(Boolean(root.querySelector('.manager-pagination')), 'the matched pane pages');
 
     typeSearch(root, 'zzz');
@@ -177,6 +178,23 @@ describe('GatheringPartiesTab (mounted)', () => {
     assert.match(root.querySelector('[data-pagination-page]').textContent, /Page 1 of 3/);
   });
 
+  it('holds the pager back below three matches, and brings it in at three', async () => {
+    let root = await mountTab({ parties: makeParties(2) });
+    // Two parties are one page at every offered size, so the bar could only state
+    // "Showing 1–2 of 2 · Page 1 of 1" over a list the GM is already seeing in full.
+    assert.ok(!root.querySelector('[data-manager-party-pagination]'), 'no footer at two');
+    harness.remount();
+
+    root = await mountTab({ parties: makeParties(3) });
+    assert.ok(Boolean(root.querySelector('[data-manager-party-pagination]')), 'footer at three');
+
+    // The gate reads the FILTERED set — the set every number in the bar counts — so a
+    // query that narrows the page below the threshold takes the bar with it.
+    typeSearch(root, 'Party 1');
+    assert.equal(cards(root).length, 1);
+    assert.ok(!root.querySelector('[data-manager-party-pagination]'), 'and goes with the match');
+  });
+
   it('clears the query when the search gate closes, so a delete cannot strand the pane', async () => {
     const root = await mountTab({ parties: makeParties(2) });
     typeSearch(root, 'Party 2');
@@ -190,16 +208,16 @@ describe('GatheringPartiesTab (mounted)', () => {
     assert.equal(cards(root).length, 1);
   });
 
-  it('offers exactly 2/4/6/10 per page and defaults to 4', async () => {
+  it('offers exactly 3/6/9 per page and defaults to 3', async () => {
     const root = await mountTab({ parties: makeParties(9) });
     const select = root.querySelector('[data-pagination-size]');
     // Counted, not merely present: the select renders unconditionally, so a presence
     // assertion cannot fail.
     assert.deepEqual(
       Array.from(select.querySelectorAll('option')).map((option) => option.value),
-      ['2', '4', '6', '10']
+      ['3', '6', '9']
     );
-    assert.equal(cards(root).length, 4);
+    assert.equal(cards(root).length, 3);
   });
 
   it('force-closes page-local controls and resets actor search on a page-SIZE change', async () => {
@@ -228,11 +246,13 @@ describe('GatheringPartiesTab (mounted)', () => {
     assert.ok(Boolean(root.querySelector('[data-manager-party-move-drawer]')), 'drawer opened');
     assert.ok(Boolean(root.querySelector('.manager-travel-popover')), 'picker opened');
     const pickerSearch = root.querySelector('.manager-travel-picker-inline input');
-    pickerSearch.value = 'wagon';
+    pickerSearch.value = 'bromm';
     pickerSearch.dispatchEvent(new window.Event('input', { bubbles: true }));
     flushSync();
     assert.equal(root.querySelectorAll('.manager-travel-option').length, 1, 'picker is filtered');
-    assert.equal(root.querySelector('[data-popover-filtered-count]').textContent.trim(), '1 of 3');
+    // 2, not 3: the Wagon is not of a configured player-character type, so it is not a
+    // travel-actor candidate and is not in the denominator either.
+    assert.equal(root.querySelector('[data-popover-filtered-count]').textContent.trim(), '1 of 2');
 
     // A page CHANGE would unmount the keyed cards and close both incidentally; a page
     // SIZE change keeps them mounted, so it is the only case that proves the close.
@@ -248,10 +268,10 @@ describe('GatheringPartiesTab (mounted)', () => {
     flushSync();
     assert.equal(
       root.querySelectorAll('.manager-travel-option').length,
-      3,
-      'the surviving card reopens with every actor option'
+      2,
+      'the surviving card reopens with every eligible actor option'
     );
-    assert.equal(root.querySelector('[data-popover-filtered-count]').textContent.trim(), '3 of 3');
+    assert.equal(root.querySelector('[data-popover-filtered-count]').textContent.trim(), '2 of 2');
   });
 
   it('places the persistent pager in a full-width sibling footer outside the card scroller', async () => {

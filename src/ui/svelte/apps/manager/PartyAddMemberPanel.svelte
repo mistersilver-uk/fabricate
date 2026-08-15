@@ -192,10 +192,16 @@
     font-size: 10px;
   }
 
+  /* `align-self: stretch` with `height: auto` pins the input to the 30px ROW. Foundry
+     core gives every input `height: var(--input-height)` (~32px), which overflows the
+     row top and bottom — invisible until focus, when the ring is drawn around the
+     overflowing box rather than around the field a GM can see. */
   input.manager-party-add-query {
     flex: 1;
+    align-self: stretch;
     min-width: 0;
     min-height: 0;
+    height: auto;
     padding: 0;
     border: none;
     color: var(--fab-text);
