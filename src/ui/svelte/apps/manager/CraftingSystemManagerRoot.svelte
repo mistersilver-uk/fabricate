@@ -7284,7 +7284,7 @@
               does nothing is dead UI, so it carries the same subscription link as the hero.
             -->
             <a
-              class="manager-button is-primary manager-downtime-unlock"
+              class="manager-button manager-downtime-unlock"
               data-downtime-unlock
               href={PATREON_URL}
               target="_blank"

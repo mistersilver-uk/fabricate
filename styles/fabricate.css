@@ -12379,6 +12379,19 @@
 }
 
 /*
+  The header's premium unlock action (issue 1185). It is deliberately NOT `.is-primary`:
+  that variant is the green Save treatment, and a promotional unlock in Save-green would
+  read as the page's commit action. It takes the brand accent instead, and declares
+  `text-decoration` because `.manager-button` assumes a `<button>` and this one is a link.
+*/
+.fabricate-manager .manager-downtime-unlock {
+  border-color: var(--fab-accent-border);
+  color: var(--fab-on-accent);
+  background: var(--fab-accent);
+  text-decoration: none;
+}
+
+/*
   The Downtime rail group (issue 1185). Its four children are a step LOUDER than an ordinary
   rail child — weight 600 against 500, and a full-strength active row — because they are the
   premium previews rather than plain destinations. The indent is `padding-left`, never an
