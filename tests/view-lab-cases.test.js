@@ -839,9 +839,18 @@ test('the World Parties fixture is legal, and its search and pager cases claim w
   // comments cannot be read as a value.
   const fieldIn = (block, name) => new RegExp(`^\\s*${name}: (.+?),\\s*$`, 'm').exec(block)?.[1];
 
-  // `characterActors`, optionally `.slice(a[, b])`, optionally `.map(...)` to uuids.
+  // `characterActors`, optionally `.slice(a[, b])`, mapped to uuids.
+  // ANCHORED at both ends, and the `.map(...)` is required rather than optional: an
+  // unanchored prefix match discards the tail, so `characterActors.map((actor) => actor.id)`
+  // — bare ids, the exact defect `labWorld.js:90-94` records as having shipped once and
+  // rendered "Disabled · 0 members" — would resolve to uuids and pass, and
+  // `characterActors.map(…).concat([uuidOf('lab-actor-wagon')])` would silently drop the
+  // wagon from the uniqueness walk. Anything unmodelled returns null and fails loud below.
   function resolveCharacterSubset(expression) {
-    const match = /^characterActors(?:\.slice\((\d+)(?:,\s*(\d+))?\))?/.exec(expression);
+    const match =
+      /^characterActors(?:\.slice\((\d+)(?:,\s*(\d+))?\))?\.map\(\(actor\) => actor\.uuid\)$/.exec(
+        expression
+      );
     if (!match) return null;
     const [, from, to] = match;
     const subset =

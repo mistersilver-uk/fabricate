@@ -7291,7 +7291,13 @@ describe('CraftingSystemManager mounted behavior', () => {
     memberActorUuids: memberUuids,
     memberCards: memberUuids.map((uuid) => ({
       uuid,
-      name: LAB_MIRROR_ACTORS.find((actor) => actor.uuid === uuid).name,
+      // `?? uuid` rather than a bare `.name`: this fixture is built at DESCRIBE-BODY scope
+      // inside a describe holding 301 `it()`s, so a mirror that drifts out of
+      // `LAB_MIRROR_ACTORS` would throw while the body runs, deregister all 301, and still
+      // summarise `# fail 0` — the same shape that hid a failure in
+      // `player-character-actor-types.test.js` on this branch. Falling back to the uuid keeps
+      // drift visible as an ordinary assertion failure in the one test that reads the name.
+      name: LAB_MIRROR_ACTORS.find((actor) => actor.uuid === uuid)?.name ?? uuid,
       img: '',
       stale: false,
     })),
