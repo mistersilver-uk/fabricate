@@ -27,10 +27,35 @@ test('normalizes defaults: disabled, empty members, null travel actor, empty ove
   assert.deepEqual(party.currentRealmOverrides, {});
 });
 
-test('enabling a party without a travel actor is rejected at save', async () => {
+test('a party with NO travel actor can be enabled', async () => {
+  // The gate this replaces rejected the save. It bought nothing: such a party senses no
+  // scene regions, so `resolveCurrentRealms` already returns the unresolved shape and its
+  // members gather exactly as an actor in NO party does — not as they would with realms
+  // disabled, which is a different claim and a false one (an unresolved realm still
+  // blocks an inclusion-gated environment). Downtime parties group characters without
+  // ever standing on a map, and the gate made that an unreachable state.
   const { store } = makeStore();
   const party = await store.create({ name: 'Heroes' });
-  await assert.rejects(() => store.setEnabled(party.id, true), GatheringPartyValidationError);
+  const enabled = await store.setEnabled(party.id, true);
+  assert.equal(enabled.enabled, true);
+  assert.equal(enabled.travelActorUuid, null);
+});
+
+test('an actor still cannot be a member of two enabled travel-actor-less parties', async () => {
+  // The composite-uniqueness invariant is INDEPENDENT of the removed gate: dropping the
+  // travel-actor requirement must not open a second route to an ambiguous resolution.
+  // Before the removal this pair could not both be enabled for the wrong reason.
+  const { store } = makeStore();
+  const a = await store.create({ name: 'A', memberActorUuids: ['Actor.alice'] });
+  await store.setEnabled(a.id, true);
+  const b = await store.create({ name: 'B', memberActorUuids: ['Actor.alice'] });
+  // The MESSAGE too, not just the class: every validation failure throws this one error
+  // type, so a class-only assertion would keep passing if some future rule rejected the
+  // save first and the uniqueness branch stopped running.
+  await assert.rejects(() => store.setEnabled(b.id, true), {
+    name: 'GatheringPartyValidationError',
+    message: /associated with more than one enabled party/,
+  });
 });
 
 test('composite invariant: travel actor may also be a member of its own party', async () => {

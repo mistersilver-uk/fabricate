@@ -139,6 +139,22 @@ const RECIPE_BULK_EDIT_MATCHES = [
   /^src\/utils\/recipeBulkEditModel\.js$/,
 ];
 
+/**
+ * The literal typed into the World > Parties search field by `manager-world-parties-search-filtered`.
+ *
+ * EXPORTED, and that is the point. The World > Parties filter matches a party's name, any
+ * member's name AND its travel actor's name, so which parties survive a given term is a fact
+ * about the lab fixture rather than about this case — and an over-match is invisible in a
+ * screenshot, because a frame showing three cards where two were meant looks like a frame.
+ * `tests/view-lab-cases.test.js` derives the survivors from `labWorld.js` and `labActors.js`
+ * and fails by name when a rename makes this term match a third party.
+ *
+ * It sits outside every case region for the same reason `RECIPE_BULK_EDIT_MATCHES` does.
+ *
+ * @type {string}
+ */
+export const WORLD_PARTIES_SEARCH_TERM = 'wagon';
+
 export const BROAD_SIGNAL_PATTERN = new RegExp(
   [
     '^styles/',
@@ -147,6 +163,27 @@ export const BROAD_SIGNAL_PATTERN = new RegExp(
     String.raw`^src/ui/svelte/apps/manager/(${MANAGER_PRIMITIVES.join('|')})\.svelte$`,
   ].join('|')
 );
+
+/**
+ * Deliberate visible states that a broad primitive's representative pair does not contain.
+ *
+ * Broad signals still select {@link REPRESENTATIVE_CASE_IDS}; these are additive, narrowly named
+ * exceptions for a primitive whose changed presentation is otherwise absent from both generic
+ * frames. Keeping the path literal makes the mapping test fail on a primitive rename, while the
+ * case id fails closed through the registry filter if its deliberate state is removed.
+ */
+const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
+  // BOTH parties pickers, because between them they are the primitive's two modes and
+  // neither renders the other's chrome. `inlineSearchTrigger` (the actor picker) replaces
+  // its trigger with the search field and suppresses the in-popover search row; the
+  // realm-override picker keeps its value-bearing trigger and renders that row. A change
+  // to the search row, the header ordering or the compact field is invisible in the first
+  // frame and a change to the inline trigger is invisible in the second.
+  'src/ui/svelte/apps/manager/SearchablePopover.svelte': Object.freeze([
+    'manager-world-parties-actor-picker',
+    'manager-world-parties-realm-override-picker',
+  ]),
+});
 
 /**
  * The player crafting app, split by which resolution mode's body a file belongs to.
@@ -3265,6 +3302,49 @@ export const VIEW_LAB_CASES = Object.freeze([
     ],
   }),
   managerCase({
+    id: 'manager-world-parties-stacked',
+    label: 'Manager — World Parties stacked',
+    // Same populated state as the normal frame, pinned inside the manager's 1120px responsive
+    // breakpoint so the full-width Parties route is photographed after the shell restacks.
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { system: 'lab-smithing' },
+    steps: [{ selector: '#manager-world-nav-parties', press: 'Enter' }],
+    expectView: 'world',
+    expectSelector: '[data-travel-panel="parties"]',
+    position: { width: 1100, height: 900 },
+    kinds: ['manager', 'environments', 'world', 'responsive'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/CraftingSystemManagerRoot\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/Environment/,
+      /^src\/ui\/svelte\/apps\/manager\/Gathering(MapLinksTab|PartiesTab|RealmsTab)/,
+      /^src\/ui\/svelte\/apps\/manager\/(Party|Realm|RosterRow|MapRegionLinkPicker)/,
+      /^styles\/fabricate\.css$/,
+    ],
+  }),
+  managerCase({
+    id: 'manager-world-parties-card-stacked-680',
+    label: 'Manager — World Parties card stacked at 680px',
+    // The browser viewport stays 1920x1080; only the Foundry window is narrow. This case therefore
+    // proves the card responds to the named manager container rather than to a viewport media rule.
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { system: 'lab-smithing' },
+    steps: [{ selector: '#manager-world-nav-parties', press: 'Enter' }],
+    expectView: 'world',
+    expectSelector:
+      '[data-travel-panel="parties"] [data-manager-party-body="lab-party"]' +
+      ':has([data-manager-party-add-open="lab-party"])' +
+      ':has([data-manager-party-actor-trigger="lab-party"])',
+    position: { width: 680, height: 900 },
+    kinds: ['manager', 'environments', 'world', 'responsive'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|GatheringPartiesTab)\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/Party/,
+      /^styles\/fabricate\.css$/,
+    ],
+  }),
+  managerCase({
     id: 'manager-world-parties-no-selection',
     label: 'Manager — World Parties with no crafting system selected',
     // The live smoke always has systems and normalizes an empty selection to the first one. This
@@ -3279,6 +3359,155 @@ export const VIEW_LAB_CASES = Object.freeze([
     kinds: ['manager', 'environments', 'world'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|EnvironmentsBrowserView|GatheringPartiesTab)\.svelte$/,
+      // The gate lock this case is NAMED for is drawn by `PartyExpandedBody`, in the card's
+      // right column. Without this pattern, editing that component selects every other party
+      // case and not the only one that photographs the unavailable state.
+      /^src\/ui\/svelte\/apps\/manager\/Party/,
+    ],
+  }),
+  // The World > Parties states the populated frame cannot hold. Each is `beyond`: none has a
+  // Foundry smoke counterpart, because the smoke world seeds neither an empty party list nor a
+  // fifth party, and no smoke walk opens a travel-actor picker.
+  managerCase({
+    id: 'manager-world-parties-empty',
+    label: 'Manager — World Parties empty',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { system: 'lab-smithing', noParties: '1' },
+    steps: [{ selector: '#manager-world-nav-parties', press: 'Enter' }],
+    expectView: 'world',
+    // The primitive's own hook, so the frame proves the pane rendered `EmptyState` rather than
+    // a bespoke panel — `ui-integration/spec.md:174` requires every manager "nothing here"
+    // message to go through the one primitive and `:182` forbids a per-screen size override.
+    expectSelector: '[data-travel-panel="parties"] [data-travel-parties-none]',
+    position: { width: 1330, height: 900 },
+    kinds: ['manager', 'environments', 'world'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|EnvironmentsBrowserView|GatheringPartiesTab|EmptyState)\.svelte$/,
+    ],
+  }),
+  managerCase({
+    id: 'manager-world-parties-search-filtered',
+    label: 'Manager — World Parties filtered by search',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { system: 'lab-smithing' },
+    steps: [
+      { selector: '#manager-world-nav-parties', press: 'Enter' },
+      { selector: '.manager-travel-parties-query', fill: WORLD_PARTIES_SEARCH_TERM },
+    ],
+    expectView: 'world',
+    // Both survivors on ONE page is the claim, and it is unreachable unfiltered: the five
+    // parties page at three, and these two are the second and the fifth, so they are never
+    // siblings in the same list without the filter. The `long-haul` card matches on its TRAVEL
+    // ACTOR's name alone — the widened domain this change added — which a party-name-only
+    // filter cannot fake.
+    //
+    // The filtered set is TWO, which is below `PAGER_THRESHOLD`, so this frame deliberately
+    // shows the pane with NO pager footer. That is the state under test — a filtered pane
+    // whose bar has gone with the matches it described — and not a missing control.
+    expectSelector:
+      '[data-travel-panel="parties"] .manager-travel-parties-list' +
+      ':has([data-manager-travel-party-id="lab-party-long-haul"])' +
+      ':has([data-manager-travel-party-id="lab-party-wagonwright"])',
+    position: { width: 1330, height: 900 },
+    kinds: ['manager', 'environments', 'world'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/(EnvironmentsBrowserView|GatheringPartiesTab)\.svelte$/,
+    ],
+  }),
+  managerCase({
+    id: 'manager-world-parties-last-page',
+    label: 'Manager — World Parties last page',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { system: 'lab-smithing' },
+    steps: [
+      { selector: '#manager-world-nav-parties', press: 'Enter' },
+      { selector: '.manager-travel-parties [data-pagination-next]' },
+    ],
+    expectView: 'world',
+    // Five records at the default page size of three: page two holds the trailing two, so the
+    // absence of the first card is as load-bearing as the presence of the last. This is also
+    // the only frame in which the pager's own state — a live prev arrow, "Page 2 of 2" and the
+    // per-page select — is anything other than its resting one.
+    expectSelector:
+      '[data-travel-panel="parties"] .manager-travel-parties-list' +
+      ':has([data-manager-travel-party-id="lab-party-wagonwright"])' +
+      ':not(:has([data-manager-travel-party-id="lab-party"]))',
+    position: { width: 1330, height: 900 },
+    kinds: ['manager', 'environments', 'world'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/(EnvironmentsBrowserView|GatheringPartiesTab)\.svelte$/,
+      /^src\/ui\/svelte\/components\/Pagination\.svelte$/,
+    ],
+  }),
+  managerCase({
+    id: 'manager-world-parties-actor-picker',
+    label: 'Manager — World Parties travel-actor picker open',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { system: 'lab-smithing' },
+    steps: [
+      { selector: '#manager-world-nav-parties', press: 'Enter' },
+      { selector: '[data-manager-party-actor-trigger="lab-party"]' },
+    ],
+    expectView: 'world',
+    // Content, not the trigger. The trigger-only frame satisfies none of these claims:
+    // the popover exists and is portaled into the manager (the reason it escapes the pane's
+    // own `overflow: auto`), it uses the shared title/count header with no duplicated unlink
+    // footer, and its rows carry the placement meta line that surfaces a composite-uniqueness
+    // collision BEFORE the pick fails. Asserting the trigger alone would pass over a closed
+    // picker, which is precisely the frame this case exists to distinguish itself from.
+    expectSelector:
+      '.fabricate-manager .manager-travel-actor-popover' +
+      ':has([data-popover-header])' +
+      ':has([data-popover-filtered-count])' +
+      ':not(:has([data-manager-party-actor-unlink-footer]))' +
+      ' .manager-travel-option .manager-travel-option-meta',
+    position: { width: 1330, height: 900 },
+    kinds: ['manager', 'environments', 'world'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/GatheringPartiesTab\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/Party/,
+    ],
+  }),
+  managerCase({
+    id: 'manager-world-parties-realm-override-picker',
+    label: 'Manager — World Parties realm-override picker open',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { system: 'lab-smithing' },
+    steps: [
+      { selector: '#manager-world-nav-parties', press: 'Enter' },
+      { selector: '.manager-travel-parties-override-trigger' },
+    ],
+    expectView: 'world',
+    // The ONLY frame that renders `SearchablePopover`'s in-popover search row. The
+    // travel-actor picker next to it is `inlineSearchTrigger`, which suppresses that row
+    // entirely and replaces its trigger instead — so the actor-picker case above, which
+    // `BROAD_SIGNAL_CASE_OVERRIDES` routes a `SearchablePopover.svelte` change to, cannot
+    // photograph the compact search field, its leading glyph, or the fact that it now sits
+    // BELOW the title/count header rather than above it.
+    //
+    // The selector demands all three of the things that distinguish this presentation from
+    // the plain popover the other 13 consumers render: the shared header, the compact
+    // search row, and a compact option row. The DOM order of the header before the search
+    // row is what `:has(...) + ...` would assert; `:has()` is unordered, so the ordering
+    // claim is left to `tests/components/party-expanded-body.test.js` and this frame
+    // carries the visual one.
+    expectSelector:
+      '.fabricate-manager .manager-travel-popover.is-compact-option-rows' +
+      ':has([data-popover-header])' +
+      ':has([data-popover-filtered-count])' +
+      ':has(.manager-travel-popover-search.is-compact)' +
+      ' .manager-travel-option',
+    position: { width: 1330, height: 900 },
+    kinds: ['manager', 'environments', 'world'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/RealmOverridePicker\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/GatheringPartiesTab\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/Party/,
     ],
   }),
   managerCase({
@@ -6060,6 +6289,7 @@ function selectRenderFileCases(renderFiles) {
   for (const file of renderFiles) {
     if (BROAD_SIGNAL_PATTERN.test(file)) {
       sawBroadSignal = true;
+      for (const id of BROAD_SIGNAL_CASE_OVERRIDES[file] ?? []) selected.add(id);
       continue;
     }
     for (const viewCase of VIEW_LAB_CASES) {

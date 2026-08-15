@@ -47,6 +47,11 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/SearchablePopover.svelte',
     'src/ui/svelte/apps/manager/PartyNameField.svelte',
     'src/ui/svelte/apps/manager/RealmOverridePicker.svelte',
+    // The three card components the parties rebuild added (issue 1182), each imported
+    // by PartyExpandedBody, so each must be compiled before it.
+    'src/ui/svelte/apps/manager/PartyMemberRow.svelte',
+    'src/ui/svelte/apps/manager/PartyAddMemberPanel.svelte',
+    'src/ui/svelte/apps/manager/PartyTravelActorPanel.svelte',
     'src/ui/svelte/apps/manager/PartyExpandedBody.svelte',
     'src/ui/svelte/apps/manager/GatheringPartiesTab.svelte',
     'src/ui/svelte/apps/manager/RealmEnvironmentsEditor.svelte',

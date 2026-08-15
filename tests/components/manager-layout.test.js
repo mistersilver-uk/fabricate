@@ -46,6 +46,16 @@ const iconFactRowPath = resolve(__dirname, '../../src/ui/svelte/apps/manager/Ico
 // The shared chip (issue 883) owns its appearance in its own scoped block for the same
 // reason, so its scale is read out of the component rather than the global sheet.
 const chipPath = resolve(__dirname, '../../src/ui/svelte/apps/manager/Chip.svelte');
+const partyExpandedBodyPath = resolve(
+  __dirname,
+  '../../src/ui/svelte/apps/manager/PartyExpandedBody.svelte'
+);
+const partiesTabPath = resolve(
+  __dirname,
+  '../../src/ui/svelte/apps/manager/GatheringPartiesTab.svelte'
+);
+const partiesTabSource = readFileSync(partiesTabPath, 'utf8');
+const partiesTabScoped = scopedComponentCss(partiesTabPath);
 const managerComponentDir = resolve(__dirname, '../../src/ui/svelte/apps/manager');
 const css = readFileSync(cssPath, 'utf8');
 const colorPickerSource = readFileSync(colorPickerPath, 'utf8');
@@ -110,6 +120,7 @@ function blockFor(selector) {
 // container is left alone.
 const chipScoped = scopedComponentCss(chipPath);
 const chipCss = chipScoped.css;
+const partyExpandedBodyScoped = scopedComponentCss(partyExpandedBodyPath);
 
 function withChipHash(markup) {
   return withScopeHash(markup, 'manager-chip', chipScoped.hashClass);
@@ -3415,7 +3426,7 @@ test('chance slider rails clip continuous Tool gradients at thumb-centre endpoin
 
   try {
     await page.setContent(`
-      <style>${css}</style>
+      <style>${css}</style><style>${partiesTabScoped.css}</style>
       <main class="fabricate-manager" style="padding: 24px;">
         <span
           class="manager-drop-rate-control has-continuous-gradient"
@@ -6549,7 +6560,7 @@ test('every manager select paints an opaque background, so its popup opens dark'
 // A rendered measurement can see both. `chromium` is already this file's tool for exactly
 // this reason: happy-dom applies no stylesheet and computes no cascade, so nothing in a
 // mounted suite could ever have caught either.
-async function readWorkspaceGrid(width, view) {
+async function readWorkspaceGrid(width, view, worldTravelTab = '') {
   const context = await sharedBrowser.newContext({
     viewport: { width, height: 720 },
     deviceScaleFactor: 1,
@@ -6559,7 +6570,7 @@ async function readWorkspaceGrid(width, view) {
     await page.setContent(
       `<style>${css}</style>` +
         `<div style="width:${width}px;height:640px">` +
-        `<div class="fabricate-manager" data-manager-view="${view}">` +
+        `<div class="fabricate-manager" data-manager-view="${view}" data-world-travel-tab="${worldTravelTab}">` +
         `<div class="manager-body"><aside class="manager-rail">Rail</aside>` +
         `<main class="manager-main"><div class="manager-environment-edit-view">` +
         `<div class="manager-environment-workspace">` +
@@ -6639,6 +6650,219 @@ test('the environment, tags and system studios restack at the same floor', async
   for (const view of ['environment-edit', 'system-edit', 'crafting-settings']) {
     const floor = await readWorkspaceGrid(1024, view);
     assert.equal(floor.workspaceColumns, 1, `${view} stacks its workspace at the floor`);
+  }
+});
+
+test('World Parties preserves the shared stacked rail and body layout at narrow widths', async () => {
+  // The World route deliberately releases the unused inspector at desktop widths. Its route
+  // rule is more specific than the shared 1120px stack, however, so this must be measured:
+  // a source-text assertion would pass while the cascade left the two desktop tracks alive.
+  const wide = await readWorkspaceGrid(1280, 'world', 'parties');
+  assert.equal(wide.bodyColumns, 2, 'wide World Parties keeps its rail beside the full-width body');
+
+  for (const width of [1100, 1024]) {
+    const narrow = await readWorkspaceGrid(width, 'world', 'parties');
+    assert.equal(
+      narrow.bodyColumns,
+      1,
+      `World Parties uses the shared stacked rail/body layout at ${width}px`
+    );
+  }
+});
+
+test('World Parties keeps its card scroller and sibling pager independently reachable at 1100px', async () => {
+  // `gathering-parties-tab.test.js` mounts this component and pins the sibling DOM. This
+  // source join keeps the Chromium geometry below attached to those real rendered classes:
+  // deleting or renaming either node fails here instead of leaving a stale layout fixture.
+  const contentAt = partiesTabSource.indexOf('class="manager-travel-parties-content"');
+  const footerAt = partiesTabSource.indexOf('class="manager-travel-parties-pagination"');
+  assert.ok(contentAt > -1, 'the product component renders the card scroller class');
+  assert.ok(footerAt > contentAt, 'the product component renders the sibling pager after it');
+
+  const hash = partiesTabScoped.hashClass;
+  const cards = Array.from(
+    { length: 4 },
+    (_, index) =>
+      `<div class="manager-travel-parties-row ${hash}" data-manager-travel-party-id="party-${index + 1}"><div class="probe-card-editor">Party ${index + 1} editor</div></div>`
+  ).join('');
+  const productContractMarkup = `<div class="manager-travel-parties ${hash}">
+    <div class="manager-travel-parties-content ${hash}">
+      <div class="manager-travel-parties-list ${hash}">${cards}</div>
+    </div>
+    <div class="manager-travel-parties-pagination ${hash}" data-manager-party-pagination>
+      <div class="manager-pagination"><span>Showing 1-4 of 8</span><select data-pagination-size><option>4</option></select></div>
+    </div>
+  </div>`;
+
+  const context = await sharedBrowser.newContext({
+    viewport: { width: 1100, height: 720 },
+    deviceScaleFactor: 1,
+  });
+  const page = await context.newPage();
+  try {
+    const nav = Array.from(
+      { length: 10 },
+      (_, index) =>
+        `<button class="manager-nav-button"><span class="manager-nav-label">Section ${index + 1}</span></button>`
+    ).join('');
+    // The component's OWN scoped CSS, after the global sheet — the same pairing every
+    // other probe in this file uses (see the components-route probe above) and matching
+    // `css: 'injected'`, which puts a component's block in `document.head` after Foundry's
+    // `<link>`. Omitting it is what disabled this test: the fixture carried the real hash
+    // class but nothing declared `.manager-travel-parties` or its content child, so the
+    // pane rendered `display: block; overflow: visible`, the scroller sized to its cards,
+    // and the opening `scrollRange > 100` precondition read 0 — a fixture that proved
+    // nothing rather than a product regression.
+    await page.setContent(`<!doctype html><html><head><meta charset="utf-8">
+      <style>${css}</style>
+      <style>${partiesTabScoped.css}</style>
+      <style>
+        html, body { margin: 0; width: 100%; height: 100%; }
+        :root { --font-primary: Arial, sans-serif; }
+        .probe-titlebar { height: 28px; }
+        .probe-header { height: 76px; }
+        .probe-card-editor { height: 220px; }
+      </style></head><body>
+      <div class="fabricate fabricate-manager" data-fabricate-theme="fabricate"
+        data-manager-view="world" data-world-travel-tab="parties">
+        <div class="probe-titlebar"></div><div class="probe-header"></div>
+        <div class="manager-body">
+          <aside class="manager-rail"><nav class="manager-nav">${nav}</nav></aside>
+          <main class="manager-main">
+            <section class="manager-section-header"><div class="manager-heading"><h2>World Parties</h2></div></section>
+            <div class="manager-gathering-panel manager-travel-view is-parties-pane">${productContractMarkup}</div>
+          </main>
+        </div>
+      </div></body></html>`);
+
+    const report = await page.evaluate(() => {
+      const body = document.querySelector('.manager-body');
+      const main = document.querySelector('.manager-main');
+      const pane = document.querySelector('.manager-travel-parties');
+      const scroller = document.querySelector('.manager-travel-parties-content');
+      const footer = document.querySelector('[data-manager-party-pagination]');
+      const pagerControl = footer.querySelector('[data-pagination-size]');
+      const before = footer.getBoundingClientRect();
+      const paneBox = pane.getBoundingClientRect();
+      const mainBox = main.getBoundingClientRect();
+      const scrollRange = scroller.scrollHeight - scroller.clientHeight;
+      scroller.scrollTop = scroller.scrollHeight;
+      const after = footer.getBoundingClientRect();
+      const controlBox = pagerControl.getBoundingClientRect();
+      const hit = document.elementFromPoint(
+        controlBox.left + controlBox.width / 2,
+        controlBox.top + controlBox.height / 2
+      );
+      const horizontalOverflow = [body, main, pane, scroller].map(
+        (element) => element.scrollWidth - element.clientWidth
+      );
+      return {
+        scrollRange,
+        scrolledBy: scroller.scrollTop,
+        scrollerOverflowY: getComputedStyle(scroller).overflowY,
+        footerIsSibling: footer.parentElement === pane && !scroller.contains(footer),
+        footerFullWidth:
+          Math.abs(before.left - paneBox.left) <= 1 && Math.abs(before.right - paneBox.right) <= 1,
+        footerVisible: before.top >= mainBox.top - 1 && before.bottom <= mainBox.bottom + 1,
+        footerStable:
+          Math.abs(before.top - after.top) <= 1 &&
+          Math.abs(before.bottom - after.bottom) <= 1 &&
+          Math.abs(before.left - after.left) <= 1 &&
+          Math.abs(before.right - after.right) <= 1,
+        pagerControlHit: hit === pagerControl || pagerControl.contains(hit),
+        pagerControlVisible:
+          controlBox.width > 0 &&
+          controlBox.height > 0 &&
+          controlBox.top >= mainBox.top - 1 &&
+          controlBox.bottom <= mainBox.bottom + 1,
+        bodyScrollRange: body.scrollHeight - body.clientHeight,
+        bodyScrollTop: body.scrollTop,
+        mainScrollRange: main.scrollHeight - main.clientHeight,
+        horizontalOverflow,
+      };
+    });
+
+    assert.ok(report.scrollRange > 100, `cards must overflow the pane (got ${report.scrollRange}px)`);
+    assert.equal(report.scrollerOverflowY, 'auto', 'the card content remains the scroll node');
+    assert.ok(report.scrolledBy > 0, 'the card scroller accepts an independent scroll');
+    assert.equal(report.footerIsSibling, true, 'the pager is a sibling outside the scroll node');
+    assert.equal(report.footerFullWidth, true, 'the sibling footer spans the full Parties pane');
+    assert.equal(report.footerVisible, true, 'the footer remains visible inside the bounded main');
+    assert.equal(report.footerStable, true, 'inner scrolling does not move the footer bounds');
+    assert.equal(report.pagerControlVisible, true, 'a pager control remains visibly reachable');
+    assert.equal(report.pagerControlHit, true, 'the visible pager control owns its pointer target');
+    assert.ok(report.bodyScrollRange <= 1, 'the outer manager body must not scroll the footer');
+    assert.equal(report.bodyScrollTop, 0, 'inner scrolling leaves the manager body fixed');
+    assert.ok(report.mainScrollRange <= 1, 'the main column does not become a second scroller');
+    assert.ok(
+      report.horizontalOverflow.every((overflow) => overflow <= 1),
+      `the 1100px route has no horizontal overflow (${report.horizontalOverflow.join(', ')})`
+    );
+  } finally {
+    await context.close();
+  }
+});
+
+test('a 680px manager container stacks each party body without viewport coupling or overflow', async () => {
+  const context = await sharedBrowser.newContext({
+    viewport: { width: 1400, height: 1000 },
+    deviceScaleFactor: 1,
+  });
+  const page = await context.newPage();
+  try {
+    const markup = withScopeHash(
+      `<div class="fabricate-manager" style="container: fabricate-manager / inline-size; width: 680px">
+        <div class="manager-party-body">
+          <div class="manager-party-members-col"><button>Add a member</button></div>
+          <div class="manager-party-travel-col"><button>Link an actor</button></div>
+        </div>
+      </div>`,
+      'manager-party-body',
+      partyExpandedBodyScoped.hashClass
+    );
+    await page.setContent(`<style>${partyExpandedBodyScoped.css}</style>${markup}`);
+    const report = await page.evaluate(() => {
+      const root = document.querySelector('.fabricate-manager');
+      const body = document.querySelector('.manager-party-body');
+      const rootRect = root.getBoundingClientRect();
+      const controls = Array.from(body.querySelectorAll('button'), (button) => {
+        const rect = button.getBoundingClientRect();
+        const hit = document.elementFromPoint(
+          rect.left + rect.width / 2,
+          rect.top + rect.height / 2
+        );
+        return {
+          left: rect.left,
+          right: rect.right,
+          width: rect.width,
+          height: rect.height,
+          selfHit: hit === button || button.contains(hit),
+        };
+      });
+      return {
+        viewportWidth: document.documentElement.clientWidth,
+        columns: getComputedStyle(body).gridTemplateColumns.split(' ').length,
+        overflow: body.scrollWidth > body.clientWidth + 1,
+        rootLeft: rootRect.left,
+        rootRight: rootRect.right,
+        controls,
+      };
+    });
+
+    assert.ok(report.viewportWidth > 720, 'the outer browser viewport stays above the breakpoint');
+    assert.equal(report.columns, 1, 'the 680px manager container selects one party column');
+    assert.equal(report.overflow, false, 'the stacked body has no horizontal overflow');
+    for (const control of report.controls) {
+      assert.ok(control.width > 0 && control.height > 0, 'each editing control has a hit box');
+      assert.ok(
+        control.left >= report.rootLeft - 1,
+        'each editing control starts inside the manager'
+      );
+      assert.ok(control.right <= report.rootRight + 1, 'each editing control remains reachable');
+      assert.equal(control.selfHit, true, 'each editing control owns its pointer target');
+    }
+  } finally {
+    await context.close();
   }
 });
 

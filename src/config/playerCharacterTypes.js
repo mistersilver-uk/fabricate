@@ -14,9 +14,10 @@
  *
  * This module is a sibling of `preferencesCleanup.js`, which holds the OTHER actor
  * predicate, so the "these answer different questions" comments stay checkable. The
- * player-character concept governs FOUR surfaces — the actor-selection bar, the GM
- * stamina roster, the manager's Access and Knowledge rosters, and the party member
- * picker — and is deliberately distinct from three predicates that MUST NOT be
+ * player-character concept governs FIVE surfaces — the actor-selection bar, the GM
+ * stamina roster, the manager's Access and Knowledge rosters, the party member picker
+ * and the party TRAVEL-ACTOR picker (issue 1182) — and is deliberately distinct from
+ * three predicates that MUST NOT be
  * narrowed to match it:
  *
  *   - attempt authorization (`isGatheringActorSelectableByUser`, ownership-based),

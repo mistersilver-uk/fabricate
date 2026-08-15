@@ -348,6 +348,14 @@ describe('UI PR screenshot evidence', () => {
 
     for (const viewLabOnly of [
       'manager-world-parties-no-selection',
+      // The World > Parties states added by issue 1182. The smoke world seeds neither an
+      // empty party list nor a fifth party, and no smoke walk types into the pane's search
+      // field or opens a travel-actor picker, so a live-smoke counterpart for any of these
+      // would be a claim about a frame the harness cannot take.
+      'manager-world-parties-empty',
+      'manager-world-parties-search-filtered',
+      'manager-world-parties-last-page',
+      'manager-world-parties-actor-picker',
       'manager-system-travel-long-label-focus',
     ]) {
       assert.equal(

@@ -2075,6 +2075,7 @@
     currentView === 'environments' && activeGatheringTab === 'travel' && canShowSystemTravel
   );
   const isWorldRoute = $derived(currentView === 'world');
+  const isWorldPartiesRoute = $derived(currentView === 'world' && activeTravelTab === 'parties');
   const isSystemTravelChildRoute = $derived(
     isSystemTravelRoute && (activeTravelTab === 'realms' || activeTravelTab === 'map')
   );
@@ -2383,10 +2384,39 @@
       }))
   );
   const travelParties = $derived($viewState.travelParties || []);
-  const selectedTravelPartyId = $derived($viewState.selectedPartyId || '');
-  const selectedTravelParty = $derived(
-    travelParties.find((party) => party.id === selectedTravelPartyId) || null
+
+  // World > Parties page-header subtitle (issue 1182). `enabled` counts `enabled === true`
+  // and NOT the prototype's `enabled && members.length`: an enabled party resolves its
+  // travel actor's current realm with or without members (gathering-and-harvesting req 6),
+  // and an enabled party with neither members nor a travel actor is still the record a
+  // downtime group is grouped by, so a member-less enabled party is in use.
+  //
+  // `assigned` / `total` are PLAYER CHARACTERS only, each counted once across all parties.
+  // Travel actors are deliberately outside the numerator — a currently linked one is
+  // offered by its picker whether or not its type is configured, so a vehicle standing in
+  // as one would otherwise be counted against a player-character denominator and render
+  // "5 of 4 characters assigned". Stale member
+  // uuids resolve to no projected actor and drop out for the same reason.
+  const playerCharacterUuids = $derived(
+    new Set(
+      ($viewState.actorOptions || [])
+        .filter((actor) => actor.isPlayerCharacter === true)
+        .map((actor) => actor.uuid)
+    )
   );
+  const assignedCharacterCount = $derived.by(() => {
+    const assigned = [];
+    for (const party of travelParties) {
+      for (const uuid of party.memberActorUuids || []) {
+        if (playerCharacterUuids.has(uuid) && !assigned.includes(uuid)) assigned.push(uuid);
+      }
+    }
+    return assigned.length;
+  });
+  const enabledPartyCount = $derived(
+    travelParties.filter((party) => party.enabled === true).length
+  );
+
   // Realm selection is UI-local (no store resolution needed); the inspector
   // reads the selected realm from the system-realm projection.
   let selectedTravelRealmId = $state('');
@@ -3042,11 +3072,28 @@
         'FABRICATE.Admin.Manager.Environment.GatheringTabs.TasksHint',
         'Browse gathering tasks before attaching them to environments.'
       );
-    if (currentView === 'world')
-      return text(
-        'FABRICATE.Admin.Manager.World.PartiesSubtitle',
-        'Manage Fabricate parties shared across every crafting system.'
-      );
+    if (currentView === 'world') {
+      if (travelParties.length === 0)
+        return text(
+          'FABRICATE.Admin.Manager.World.Parties.SubtitleEmpty',
+          'No parties yet · world-level, shared by gathering and travel in every system'
+        );
+      const template =
+        travelParties.length === 1
+          ? text(
+              'FABRICATE.Admin.Manager.World.Parties.SubtitleOne',
+              '1 party · {enabled} enabled · {assigned} of {total} characters assigned'
+            )
+          : text(
+              'FABRICATE.Admin.Manager.World.Parties.Subtitle',
+              '{count} parties · {enabled} enabled · {assigned} of {total} characters assigned'
+            );
+      return template
+        .replace('{count}', String(travelParties.length))
+        .replace('{enabled}', String(enabledPartyCount))
+        .replace('{assigned}', String(assignedCharacterCount))
+        .replace('{total}', String(playerCharacterUuids.size));
+    }
     if (currentView === 'environments' && displayedGatheringTab === 'travel') {
       if (activeTravelTab === 'map')
         return text(
@@ -6802,7 +6849,11 @@
   }
 </script>
 
-<div class="fabricate-manager" data-manager-view={currentView}>
+<div
+  class="fabricate-manager"
+  data-manager-view={currentView}
+  data-world-travel-tab={isWorldRoute ? activeTravelTab : undefined}
+>
   <!--
     The manager titlebar: a thin, always-present identity strip above the header.
     It answers "which crafting system am I editing, and how does it resolve?" from
@@ -7313,7 +7364,7 @@
               disabled={$viewState.travelSaving}
             >
               <i class="fas fa-plus" aria-hidden="true"></i>
-              <span>{text('FABRICATE.Admin.Manager.Travel.CreateParty', 'Create party')}</span>
+              <span>{text('FABRICATE.Admin.Manager.World.Parties.CreateAction', 'New party')}</span>
             </button>
           {:else if currentView === 'environments' && displayedGatheringTab === 'travel' && activeTravelTab === 'realms'}
             <button
@@ -8175,7 +8226,6 @@
           store.setGatheringRealmsEnabled?.(sys, enabled)}
         onPickImagePath={services?.pickImagePath}
         {travelParties}
-        travelSelectedPartyId={selectedTravelPartyId}
         travelSaving={$viewState.travelSaving === true}
         travelError={$viewState.travelError}
         travelFieldErrors={$viewState.travelFieldErrors || {}}
@@ -8190,7 +8240,6 @@
           store.setEnvironmentRealmMembership?.(envId, realmId, true)}
         onRemoveEnvironmentFromRealm={(envId, realmId) =>
           store.setEnvironmentRealmMembership?.(envId, realmId, false)}
-        onSelectParty={(id) => store.selectParty?.(id)}
         onCreateParty={() => store.createParty?.()}
         onRenameParty={(id, name) => store.renameParty?.(id, name)}
         onSetPartyEnabled={(id, enabled) => store.setPartyEnabled?.(id, enabled)}
@@ -8773,7 +8822,7 @@
          `knowledge` joined it in issue 785 for the opposite reason: the surface OWNS
          its third column (roster · detail), so a fourth would clip the detail pane's
          action cluster at the 1024px minimum with no scrollbar. -->
-    {#if currentView !== 'environment-edit' && !isChecksRoute && currentView !== 'system-edit' && currentView !== 'crafting-settings' && currentView !== 'recipe-item-edit' && currentView !== 'component-edit' && currentView !== 'recipe-edit' && currentView !== 'tool-edit' && currentView !== 'knowledge'}
+    {#if currentView !== 'environment-edit' && !isChecksRoute && currentView !== 'system-edit' && currentView !== 'crafting-settings' && currentView !== 'recipe-item-edit' && currentView !== 'component-edit' && currentView !== 'recipe-edit' && currentView !== 'tool-edit' && currentView !== 'knowledge' && !isWorldPartiesRoute}
       <aside
         class="manager-inspector"
         aria-label={isSystemTravelRoute
@@ -10608,128 +10657,14 @@
               class="manager-inspector-card manager-travel-inspector"
               data-gathering-inspector-travel
               data-travel-inspector={activeTravelTab}
-              aria-label={activeTravelTab === 'parties'
-                ? text('FABRICATE.Admin.Manager.World.PartiesInspector', 'Selected world party')
-                : activeTravelTab === 'map'
-                  ? text(
-                      'FABRICATE.Admin.Manager.Travel.MapLinksInspector',
-                      'Selected map region link'
-                    )
-                  : text('FABRICATE.Admin.Manager.Travel.RealmsInspector', 'Selected realm')}
+              aria-label={activeTravelTab === 'map'
+                ? text(
+                    'FABRICATE.Admin.Manager.Travel.MapLinksInspector',
+                    'Selected map region link'
+                  )
+                : text('FABRICATE.Admin.Manager.Travel.RealmsInspector', 'Selected realm')}
             >
-              {#if activeTravelTab === 'parties'}
-                {#if selectedTravelParty}
-                  <div class="manager-inspector-title-row">
-                    <span class="manager-inspector-icon" aria-hidden="true">
-                      {#if selectedTravelParty.travelActor?.img}
-                        <img
-                          class="manager-travel-parties-thumb"
-                          src={selectedTravelParty.travelActor.img}
-                          alt=""
-                        />
-                      {:else}
-                        <i class="fas fa-people-group"></i>
-                      {/if}
-                    </span>
-                    <div class="manager-inspector-copy">
-                      <p class="manager-kicker">
-                        {text('FABRICATE.Admin.Manager.Travel.InspectorKicker', 'Selected party')}
-                      </p>
-                      <h2 class="manager-inspector-name">{selectedTravelParty.name}</h2>
-                    </div>
-                  </div>
-
-                  <section class="manager-inspector-card">
-                    <h3 class="manager-card-title">
-                      {text('FABRICATE.Admin.Manager.Travel.EvidenceLabel', 'Current realm')}
-                    </h3>
-                    {#if !canShowSystemTravel || $viewState.partyRealmOverridesAvailable !== true}
-                      <p class="manager-muted" data-party-realm-evidence-unavailable>
-                        {partyRealmOverridesUnavailableHint}
-                      </p>
-                    {:else if selectedTravelParty.currentRealmEvidence?.realms?.length > 0}
-                      <ul class="manager-travel-evidence-realms">
-                        {#each selectedTravelParty.currentRealmEvidence?.realms || [] as realm (realm.id)}
-                          <li>
-                            {realm.name}
-                            {#if !realm.enabled}
-                              <Chip tone="disabled"
-                                >{text(
-                                  'FABRICATE.Admin.Manager.Travel.DisabledRealmChip',
-                                  'Disabled'
-                                )}</Chip
-                              >
-                            {/if}
-                          </li>
-                        {/each}
-                      </ul>
-                    {:else}
-                      <p class="manager-muted">
-                        {text(
-                          'FABRICATE.Admin.Manager.Travel.EvidenceNoRealms',
-                          'No current realm set for this system.'
-                        )}
-                      </p>
-                    {/if}
-                  </section>
-
-                  <div class="manager-travel-inspector-actions">
-                    {#if selectedTravelParty.enabled}
-                      <button
-                        type="button"
-                        class="manager-button manager-party-enable-toggle is-on"
-                        disabled={$viewState.travelSaving === true}
-                        onclick={() => store.setPartyEnabled?.(selectedTravelParty.id, false)}
-                      >
-                        <i class="fas fa-toggle-on" aria-hidden="true"></i>
-                        <span
-                          >{text('FABRICATE.Admin.Manager.Travel.Parties.Disable', 'Disable')}</span
-                        >
-                      </button>
-                    {:else}
-                      <button
-                        type="button"
-                        class="manager-button manager-party-enable-toggle is-off"
-                        disabled={$viewState.travelSaving === true ||
-                          !selectedTravelParty.travelActorUuid}
-                        title={selectedTravelParty.travelActorUuid
-                          ? undefined
-                          : text(
-                              'FABRICATE.Admin.Manager.Travel.Parties.EnableNeedsTravelActor',
-                              'Assign a travel actor to enable this party.'
-                            )}
-                        onclick={() => store.setPartyEnabled?.(selectedTravelParty.id, true)}
-                      >
-                        <i class="fas fa-toggle-off" aria-hidden="true"></i>
-                        <span
-                          >{text('FABRICATE.Admin.Manager.Travel.Parties.Enable', 'Enable')}</span
-                        >
-                      </button>
-                    {/if}
-                    <button
-                      type="button"
-                      class="manager-button is-danger"
-                      disabled={$viewState.travelSaving === true}
-                      onclick={() => store.deleteParty?.(selectedTravelParty.id)}
-                    >
-                      <i class="fas fa-trash" aria-hidden="true"></i>
-                      <span
-                        >{text(
-                          'FABRICATE.Admin.Manager.Travel.Parties.Delete',
-                          'Delete party'
-                        )}</span
-                      >
-                    </button>
-                  </div>
-                {:else}
-                  <p class="manager-muted">
-                    {text(
-                      'FABRICATE.Admin.Manager.Travel.Inspector.PartiesPlaceholder',
-                      'Select a party to see its details.'
-                    )}
-                  </p>
-                {/if}
-              {:else if activeTravelTab === 'realms'}
+              {#if activeTravelTab === 'realms'}
                 {#if selectedTravelRealm}
                   <div class="manager-inspector-title-row">
                     <span class="manager-inspector-icon" aria-hidden="true">
@@ -10939,7 +10874,7 @@
                       <p class="manager-muted">
                         {text(
                           'FABRICATE.Admin.Manager.Travel.MapLinks.NoPartiesInMapRegion',
-                          'No party travel markers are in this map region.'
+                          'No party travel actors are in this map region.'
                         )}
                       </p>
                     {/if}

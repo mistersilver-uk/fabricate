@@ -481,7 +481,7 @@ Selected-system navigation:
   Switching from enabled system A to enabled system B preserves the active child while re-projecting B's realms, map links, and Party override evidence.
   Switching to a Gathering system whose card is off returns to Gathering Environments; losing Gathering or clearing the selected system returns to the systems browser.
   A current World Parties route survives every one of these capability, card, and selection transitions.
-- World Parties has dedicated `WORLD / every system`, title, hint, action-region, and inspector names rather than inheriting Gathering Environments presentation.
+- World Parties has dedicated `WORLD / every system`, title, hint, and action-region names rather than inheriting Gathering Environments presentation.
   It remains fully operable without a selected system.
   Realms and Map Region Links likewise expose destination-specific visible titles, hints, action-region names, and inspector names; Party copy is not reused for either child.
 - The World-derived navigation appearance is a shared Manager contract rather than a World-only exception.
@@ -1611,10 +1611,37 @@ Shipped capabilities:
 - Create, rename, enable/disable, and delete Fabricate parties.
 - Assign actor members to a party and assign exactly one **travel actor** (the actor that represents the party on a campaign map).
   Assigning a travel actor already used by another enabled party, or an actor already associated with another enabled party, is rejected with an inline error associated with the relevant control (the duplicate-travel-actor error routes to the travel-actor control).
-- The enable toggle is disabled (with an "assign a travel actor to enable" hint) while a party has no travel actor; newly created parties visibly show their disabled state.
+- The enable toggle is never gated on the travel actor: a party with no travel actor can be enabled, and the card's meta line states "travel actor: none" so the consequence is visible without the configuration being refused.
+  Newly created parties visibly show their disabled state.
 - When the world has no actors, the member and travel-actor pickers show an explicit empty state directing the GM to create an Actor first.
-- Layout split: the party list and all editing controls (rename, enable, members, travel actor, override Set/Clear) live in the center column; the right inspector is a read-only evidence echo for the selected party (current-realm evidence per source state, member/travel-actor summary, stale references).
-  Override editing exists in exactly one place (center).
+- The Parties pane exposes a search field only when the world holds more than one party.
+  It matches a party's name, any member's name, or its travel actor's name, and states how many of the total parties are showing.
+  A search matching nothing renders the shared filtered no-state treatment quoting the query; the World rail's party count is the world total and is unaffected by the filter.
+- The Parties pane pages its card list and offers a per-page control of 3, 6 or 9 cards, defaulting to 3.
+  The pagination controls render only once the matched set reaches the smallest offered size, because below it there is one page by construction and the bar could state nothing the GM cannot already see.
+  They render as a squared-off, full-bleed sibling footer under the independently scrolling card content, so they stay reachable without overlaying a card and read as the pane's own bottom edge rather than as another item in the scrolled list.
+  Changing page or page size closes any open travel-actor picker and any open move drawer, so no popover outlives the card that anchored it.
+  Closing a travel-actor picker through either paging path also clears its search query, so reopening a surviving card's picker starts from the unfiltered actor list.
+- Each party card carries its own enable control bound to that party's `enabled` state, so enabling and disabling never require selecting the party first.
+  Enabling is not gated on the travel actor, so a card whose travel actor is unassigned still toggles; its meta line reports "travel actor: none" rather than a card-scoped gate hint.
+- Each party card carries its own delete control, which routes through the shared confirm seam naming the party, because deleting a party drops its membership, its travel actor and its per-system current-realm overrides across every crafting system.
+- A party card's travel-actor panel names the linked actor or states that none is linked, and offers link, change and a persistent accessible unlink button in that one place.
+  Its picker offers the actors whose type is one the GM configured under Player Character Actor Types, the same membership the member picker uses, and states that setting by name when the world holds actors but none are eligible; dropping an actor onto the panel stays unfiltered, so a one-off outside the configured types remains assignable.
+  A travel actor that is currently linked is always offered, eligible or not, so the picker marks and counts the value it is being opened to change rather than hiding it.
+  Its picker reuses the shared searchable-popover primitive, anchors to the panel, flips above its trigger when the pane is short of room below, marks the currently linked actor, and presents full-width compact actor rows.
+  The primitive may add the optional `Actors` title at top-left and its live matched-of-total count at top-right; unlink is not duplicated as a picker row or footer.
+  On the GM Travel World > Parties card, the unassigned travel actor occupies its own panel above its picker rather than an inline value slot, so that state renders through the shared `EmptyState` compact treatment.
+  Right-clicking the panel unlinks a linked travel actor and opens the picker when none is linked, and the panel keeps accepting an actor dropped onto it.
+- Adding a member who already belongs to another party is the move path: the GM confirms a move naming both parties, and the actor ends in exactly one party.
+  The shipped store moves out of the source party whether or not that party is enabled, which is stricter than the invariant motivating it — an actor may be associated with at most one _enabled_ party — and that stricter behaviour is deliberate, because a membership silently split across a disabled and an enabled party is the state a GM cannot see.
+- A store validation failure renders on the card that caused it: the duplicate-travel-actor error beneath that card's travel-actor panel and the duplicate-member error beneath that card's member list, each associated with its control by `aria-describedby`; an error carrying no control context renders once above the card list.
+  A party can still be rejected on enable by the composite-uniqueness invariant, which no travel-actor state predicts, so the enable control is never the only feedback surface.
+  Cancelling a confirm-backed action on another card does not reattribute an existing inline validation error; attribution changes only when the later action crosses confirmation and attempts its store mutation.
+- The pane's user-facing term for `travelActorUuid` is "travel actor", matching the canonical current-realm evidence source label; "travel marker" is retired from Manager copy.
+- Layout split: World Parties intentionally has no right inspector; its party-card editor occupies the full available content width.
+  Every party on the current page renders its editing controls unconditionally, so rename, enable/disable, delete, member add/remove/move and travel-actor link/unlink are reachable without first selecting a party.
+  Override editing exists in exactly one place (the party card).
+  At manager-container widths of 720px or less, each party card's body reflows through the named `fabricate-manager` container into one column, independent of the outer browser viewport; the card has no horizontal overflow and every editing control remains reachable.
 - The current-realm evidence component renders all three source states using the canonical labels `GM override`, `Travel actor`, and `No current realm`.
   The GM evidence panel renders the live `Travel actor` source label when a party's realm resolves from shipped token-derived sensing.
 - The selected-system Travel group presents **Map Region Links** as a rail destination (`GatheringMapLinksTab.svelte`) that lists the Scene Regions on the active scene with a per-region realm picker (`MapRegionLinkPicker.svelte`) linking each scene region to at most one realm (single-valued per scene region, written by `adminStore.setMapRegionLink`).
@@ -1624,7 +1651,8 @@ Shipped capabilities:
   Delete is destructive and routes through the confirm dialog with referenced-by evidence (a deliberate change from the prior immediate-delete quick list).
 - This realm authoring is the source of the realms an environment can be assigned to via its `includedRealmIds` multi-select; the multi-realm data is authored here, not in the environments browser.
   The legacy environments-browser "Region" filter has been removed.
-- Validation lives in the party store; the view surfaces store validation errors inline next to the relevant control using the Manager's `aria-invalid`/`aria-describedby` pattern.
+- Validation lives in the party store; the view surfaces store validation errors inline next to the relevant control, associated with that control by `aria-describedby` and announced through `role="alert"`.
+  `aria-invalid` rides along only where the associated control is a form field whose role supports it; a party card anchors its errors on a member list, an add-member group and the travel-actor button, none of which is a form field, so the alert role carries the announcement there.
   Actor pickers follow the accessible semantics established by `ActorSelectTopBar`.
 - The retained Parties, Realms, and Map Region Links content renders as labelled regions connected
   to the corresponding World Parties or selected-system Travel destination.
