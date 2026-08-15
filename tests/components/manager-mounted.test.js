@@ -7258,8 +7258,8 @@ describe('CraftingSystemManager mounted behavior', () => {
   });
 
   // The four World > Parties capture cases (issue 1182). Each asserts a RELATIONSHIP — two
-  // cards inside one list, a last card without a first, a popover containing both its unlink
-  // footer and an option meta line — and one bad `expectSelector` fails the capture job WHOLE
+  // cards inside one list, a last card without a first, a popover with title/count metadata,
+  // no unlink footer, and an option meta line — and one bad `expectSelector` fails the capture job WHOLE
   // and publishes nothing, so each is run here against the real rendered DOM before it can
   // cost twenty minutes of a job that needs harvested Foundry chrome. Every one carries its
   // negative control: the state the pane is in BEFORE the case's steps, which is the frame
@@ -7425,9 +7425,9 @@ describe('CraftingSystemManager mounted behavior', () => {
     flushSync();
     assert.ok(
       Boolean(target.querySelector(picker)),
-      'the open picker must carry BOTH the unlink footer only a linked party gets and an ' +
-        'option meta line — the placement that surfaces a composite-uniqueness collision ' +
-        'before the pick fails rather than after'
+      'the open picker must carry its title/count metadata and an option meta line while ' +
+        'omitting the picker unlink footer; the persistent on-screen unlink button remains ' +
+        'the linked party action that surfaces a composite-uniqueness collision before the pick fails'
     );
   });
 
