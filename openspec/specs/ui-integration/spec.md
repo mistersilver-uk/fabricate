@@ -1613,7 +1613,25 @@ Shipped capabilities:
   Assigning a travel actor already used by another enabled party, or an actor already associated with another enabled party, is rejected with an inline error associated with the relevant control (the duplicate-travel-actor error routes to the travel-actor control).
 - The enable toggle is disabled (with an "assign a travel actor to enable" hint) while a party has no travel actor; newly created parties visibly show their disabled state.
 - When the world has no actors, the member and travel-actor pickers show an explicit empty state directing the GM to create an Actor first.
+- The Parties pane exposes a search field only when the world holds more than one party.
+  It matches a party's name, any member's name, or its travel actor's name, and states how many of the total parties are showing.
+  A search matching nothing renders the shared filtered no-state treatment quoting the query; the World rail's party count is the world total and is unaffected by the filter.
+- The Parties pane pages its card list and offers a per-page control of 2, 4, 6 or 10 cards, defaulting to 4.
+  Changing page or page size closes any open travel-actor picker and any open move drawer, so no popover outlives the card that anchored it.
+- Each party card carries its own enable control bound to that party's `enabled` state, so enabling and disabling never require selecting the party first.
+  The travel-actor gate stated earlier in this section applies per card, and the hint renders on the card that is gated.
+- Each party card carries its own delete control, which routes through the shared confirm seam naming the party, because deleting a party drops its membership, its travel actor and its per-system current-realm overrides across every crafting system.
+- A party card's travel-actor panel names the linked actor or states that none is linked, and offers link, change and unlink in that one place.
+  Its picker anchors to the panel, flips above its trigger when the pane is short of room below, marks the currently linked actor, and offers unlink by name while one is linked.
+  Right-clicking the panel unlinks a linked travel actor and opens the picker when none is linked, and the panel keeps accepting an actor dropped onto it.
+- Adding a member who already belongs to another party is the move path: the GM confirms a move naming both parties, and the actor ends in exactly one party.
+  The shipped store moves out of the source party whether or not that party is enabled, which is stricter than the invariant motivating it — an actor may be associated with at most one _enabled_ party — and that stricter behaviour is deliberate, because a membership silently split across a disabled and an enabled party is the state a GM cannot see.
+- A store validation failure renders on the card that caused it: the duplicate-travel-actor error beneath that card's travel-actor panel and the duplicate-member error beneath that card's member list, each associated with its control by `aria-describedby`; an error carrying no control context renders once above the card list.
+  A party can be rejected on enable by the composite-uniqueness invariant even when the travel-actor gate permits the toggle, so the enable control is never the only feedback surface.
+- The pane's user-facing term for `travelActorUuid` is "travel actor", matching the canonical current-realm evidence source label; "travel marker" is retired from Manager copy.
 - Layout split: the party list and all editing controls (rename, enable, members, travel actor, override Set/Clear) live in the center column; the right inspector is a read-only evidence echo for the selected party (current-realm evidence per source state, member/travel-actor summary, stale references).
+  Every party on the current page renders its editing controls unconditionally, so rename, enable/disable, delete, member add/remove/move and travel-actor link/unlink are reachable without first selecting the party.
+  Selection is inspector scope only: it decides which party the inspector echoes and never gates a card's controls.
   Override editing exists in exactly one place (center).
 - The current-realm evidence component renders all three source states using the canonical labels `GM override`, `Travel actor`, and `No current realm`.
   The GM evidence panel renders the live `Travel actor` source label when a party's realm resolves from shipped token-derived sensing.
