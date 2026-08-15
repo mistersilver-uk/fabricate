@@ -21,12 +21,8 @@
  *   5. flip the viewer for player frames.
  */
 import { buildLabActors, buildDocumentIndex } from './labActors.js';
-import {
-  buildLabBlindRunSecret,
-  buildLabRunStates,
-  installLabRunStates,
-} from './labRunStates.js';
-import { buildLabContent, LAB_SYSTEM_IDS } from './labContent.js';
+import { buildLabBlindRunSecret, buildLabRunStates, installLabRunStates } from './labRunStates.js';
+import { buildLabContent, ICON_BASE, LAB_SYSTEM_IDS } from './labContent.js';
 import { installFoundryShim, settingsKey } from '../foundry/installFoundryShim.js';
 import { createLocalizer, toI18nStub } from '../labI18n.js';
 
@@ -53,12 +49,12 @@ function seedSettings(content, actors, managedSystemId, experimentalFeatures) {
       // No `craftingSystemId`. Parties are world-level and cross-system by design
       // (`GatheringPartyStore`), and `_normalizeParty` returns a fixed six-field record that has no
       // such key — so authoring one asserts a scoping that does not exist and is dropped on read.
-      // It also read as a CONTRADICTION of the frame it feeds: `manager-gathering-travel-normal`
-      // photographs this herbalism-named party on SMITHING's Travel tab, which is correct precisely
-      // because the scoping is not real.
+      // It also read as a CONTRADICTION of the frame it feeds: `manager-world-parties-normal`
+      // photographs this herbalism-named party on the system-independent World → Parties path,
+      // correct precisely because the scoping is not real.
       // `GatheringPartyStore._normalizeParty` reads `memberActorUuids` and `enabled`, and it takes
       // UUIDs rather than ids. This was authored as `memberActorIds` with bare ids and
-      // `travelActorUuid: null`, so every field normalised away and the Travel tab rendered
+      // `travelActorUuid: null`, so every field normalised away and World → Parties rendered
       // "Disabled · 0 members" — the ninth instance of the same defect class on this branch: a
       // shape production does not read, degrading to a default that looks like a rendered state.
       enabled: true,
@@ -100,11 +96,21 @@ export async function buildLabWorld({
   seed = 20_260_601,
   managedSystemId = null,
   experimentalFeatures = true,
+  clearSystem = false,
+  longTravelLabels = false,
 } = {}) {
   const content = buildLabContent();
+  // A real Manager refresh resolves an empty selection to the first available crafting system.
+  // The dedicated World Parties no-selection case therefore needs the truthful world state that
+  // makes an empty selection stable: no crafting systems, while global Parties and actors remain.
+  if (clearSystem) content.systems = [];
   const actors = buildLabActors(content);
   const documents = buildDocumentIndex(content, actors);
-  const localize = await createLocalizer();
+  const shippedLocalize = await createLocalizer();
+  const localize = (key) =>
+    longTravelLabels && key === 'FABRICATE.Admin.Manager.Travel.Tabs.MapLinks'
+      ? 'Map Region Links Across the Active Scene'
+      : shippedLocalize(key);
 
   const world = {
     seed,
@@ -112,7 +118,24 @@ export async function buildLabWorld({
     settings: seedSettings(content, actors, managedSystemId, experimentalFeatures),
     documents,
     actorList: actors,
-    scenes: [{ id: 'lab-scene', uuid: 'Scene.lab-map', name: 'The Verdant Reach', regions: [] }],
+    scenes: [
+      {
+        id: 'lab-scene',
+        uuid: 'Scene.lab-map',
+        name: 'The Verdant Reach',
+        background: {
+          src: `${ICON_BASE}/environment/wilderness/cave-entrance-dwarven-hill.webp`,
+        },
+        regions: [
+          {
+            id: 'deep-gate',
+            uuid: 'Scene.lab-map.Region.deep-gate',
+            name: 'Deep Gate Approach',
+            color: '#8b6f47',
+          },
+        ],
+      },
+    ],
     worldTime: LAB_WORLD_TIME,
     i18n: toI18nStub(localize),
     localize,

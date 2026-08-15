@@ -1,6 +1,6 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  Manager — Travel tab "Parties" section. Paginated, searchable accordion list
+  Manager — World > Parties section. Paginated, searchable accordion list
   of Fabricate parties styled after the gathering tools browser.
 
   - Selecting (clicking / Enter / Space) a row expands it AND marks it the
@@ -31,6 +31,10 @@
     selectedPartyId = '',
     actorOptions = [],
     saving = false,
+    // Root always supplies the real selected-system gate. Defaulting to available preserves
+    // this component's established direct-mount/API behaviour for isolated consumers.
+    realmOverridesAvailable = true,
+    realmOverridesUnavailableHint = '',
     onSelectParty = () => {},
     onSetRealmOverride = () => {},
     onClearRealmOverride = () => {},
@@ -116,8 +120,8 @@
 <div
   class="manager-gathering-panel manager-travel-parties"
   id="travel-panel-parties"
-  role="tabpanel"
-  aria-labelledby="travel-tab-parties"
+  role="region"
+  aria-labelledby="manager-world-nav-parties"
   data-travel-panel="parties"
 >
   <section
@@ -194,11 +198,22 @@
             </div>
 
             <div class="manager-travel-parties-right">
-              <RealmOverridePicker
-                value={overrideValue(party)}
-                realms={systemRealms}
-                onChoose={(realmId) => chooseOverride(party, realmId)}
-              />
+              {#if realmOverridesAvailable}
+                <RealmOverridePicker
+                  value={overrideValue(party)}
+                  realms={systemRealms}
+                  onChoose={(realmId) => chooseOverride(party, realmId)}
+                />
+              {:else}
+                <span
+                  class="manager-travel-parties-override-unavailable"
+                  data-party-realm-override-unavailable
+                  title={realmOverridesUnavailableHint}
+                  aria-label={realmOverridesUnavailableHint}
+                >
+                  <i class="fas fa-lock" aria-hidden="true"></i>
+                </span>
+              {/if}
 
               <span class="manager-travel-parties-chevron" aria-hidden="true">
                 <i class={isExpanded ? 'fas fa-chevron-up' : 'fas fa-chevron-down'}></i>

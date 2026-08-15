@@ -215,7 +215,6 @@ function compileManagerRoot() {
   writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringTasksBrowserView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringEventsBrowserView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringEventEditView.svelte');
-  writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringTravelTabs.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringPartiesTab.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringRealmsTab.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringMapLinksTab.svelte');
@@ -768,6 +767,16 @@ function gatheringToggle() {
   return target.querySelector('#manager-nav-gathering + .manager-nav-toggle');
 }
 
+function worldNavItem(id) {
+  return target.querySelector(`#manager-world-nav-${id}`);
+}
+
+function systemTravelItem(id) {
+  return target.querySelector(
+    id === 'travel' ? '#manager-nav-travel' : `#manager-travel-nav-${id}`
+  );
+}
+
 // The gated Crafting nav group (issue 511) nests Recipes as a sub-route. Clicking
 // the "Crafting" parent from a non-crafting route routes straight to Recipes and
 // expands the group; the parent also carries the recipes count badge.
@@ -811,14 +820,14 @@ async function switchScopeSystemTo(systemId) {
 // Mount the manager against a fresh store on a fresh host element. Assigns the
 // module-level `mounted`/`target` (so afterEach can clean up) and returns the target,
 // so the routing helpers below differ only in where they navigate afterwards.
-function mountManager(calls = [], storeOptions = {}) {
+function mountManager(calls = [], storeOptions = {}, services = {}) {
   target = document.createElement('div');
   document.body.appendChild(target);
   mounted = mount(Component, {
     target,
     props: {
       store: createStore(calls, storeOptions),
-      services: { openCurrentAdmin: () => {} },
+      services: { openCurrentAdmin: () => {}, ...services },
     },
   });
   flushSync();
@@ -1105,7 +1114,7 @@ function createStore(calls = [], options = {}) {
       name: 'Smithing',
       description: 'Heavy equipment work',
       resolutionMode: 'routedByCheck',
-      features: {
+      features: options.smithingFeatures || {
         gathering: false,
         itemTags: false,
         recipeCategories: true,
@@ -1716,6 +1725,48 @@ function createStore(calls = [], options = {}) {
         },
       },
     },
+    gatheringRealmSettings: options.worldTravelBySystem?.alchemy?.gatheringRealmSettings || {
+      enabled: options.gatheringRealmsEnabled === true,
+    },
+    travelParties: options.travelParties || [
+      {
+        id: 'party-one',
+        name: 'Wayfarers',
+        enabled: true,
+        memberCount: 1,
+        memberCards: [{ uuid: 'Actor.member', name: 'Mira', img: '', stale: false }],
+        travelActorUuid: 'Actor.marker',
+        travelActor: { uuid: 'Actor.marker', name: 'Mira', img: '' },
+      },
+      {
+        id: 'party-two',
+        name: 'Night Watch',
+        enabled: false,
+        memberCount: 0,
+        memberCards: [],
+        travelActorUuid: null,
+        travelActor: null,
+      },
+    ],
+    selectedPartyId: 'party-one',
+    actorOptions: options.actorOptions || [
+      { uuid: 'Actor.member', name: 'Mira', img: '', isPlayerCharacter: true },
+      { uuid: 'Actor.scout', name: 'Scout', img: '', isPlayerCharacter: true },
+    ],
+    partyRealmOverridesAvailable:
+      options.partyRealmOverridesAvailable ?? options.gatheringRealmsEnabled === true,
+    selectedSystemRealms: options.worldTravelBySystem?.alchemy?.realms ||
+      options.selectedSystemRealms || [
+        {
+          id: 'realm-forest',
+          name: 'Green March',
+          enabled: true,
+          environmentCount: 1,
+          partyCount: 1,
+        },
+      ],
+    currentSceneRegions: options.currentSceneRegions || [],
+    currentSceneUuid: options.currentSceneUuid || '',
     foundrySystemId: options.foundrySystemId || '',
     // The `evaluateSystemValidation` report drives the System Overview page's
     // Validation tab, its nav badge, and the system-blocker banner.
@@ -1731,6 +1782,9 @@ function createStore(calls = [], options = {}) {
     viewState.update((state) => ({
       ...state,
       selectedSystem: nextSelected,
+      gatheringRealmSettings:
+        options.worldTravelBySystem?.[id]?.gatheringRealmSettings || state.gatheringRealmSettings,
+      selectedSystemRealms: options.worldTravelBySystem?.[id]?.realms || state.selectedSystemRealms,
       itemCards: componentCardsFor(id),
       essenceCards: essenceCardsBySystem[id] || [],
       itemSearchTerm: '',
@@ -2295,6 +2349,67 @@ function createStore(calls = [], options = {}) {
       }));
       return true;
     },
+    selectParty: (id) => {
+      calls.push(['selectParty', id]);
+      viewState.update((state) => ({ ...state, selectedPartyId: id }));
+      return true;
+    },
+    createParty: () => {
+      calls.push(['createParty']);
+      return true;
+    },
+    renameParty: (id, name) => {
+      calls.push(['renameParty', id, name]);
+      return true;
+    },
+    addOrMovePartyMember: (id, uuid) => {
+      calls.push(['addOrMovePartyMember', id, uuid]);
+      return true;
+    },
+    removePartyMember: (id, uuid) => {
+      calls.push(['removePartyMember', id, uuid]);
+      return true;
+    },
+    movePartyMember: (from, to, uuid) => {
+      calls.push(['movePartyMember', from, to, uuid]);
+      return true;
+    },
+    setPartyTravelActor: (id, uuid) => {
+      calls.push(['setPartyTravelActor', id, uuid]);
+      viewState.update((state) => ({
+        ...state,
+        travelParties: state.travelParties.map((party) =>
+          party.id === id
+            ? {
+                ...party,
+                travelActorUuid: uuid,
+                travelActor: { uuid, name: 'Scout', img: '' },
+              }
+            : party
+        ),
+      }));
+      return true;
+    },
+    clearPartyTravelActor: (id) => {
+      calls.push(['clearPartyTravelActor', id]);
+      return true;
+    },
+    setPartyEnabled: (id, enabled) => {
+      calls.push(['setPartyEnabled', id, enabled]);
+      return true;
+    },
+    deleteParty: (id) => {
+      calls.push(['deleteParty', id]);
+      return true;
+    },
+    setPartyRealmOverride: (id, systemId, realmIds) => {
+      calls.push(['setPartyRealmOverride', id, systemId, realmIds]);
+      return true;
+    },
+    clearPartyRealmOverride: (id, systemId) => {
+      calls.push(['clearPartyRealmOverride', id, systemId]);
+      return true;
+    },
     addGatheringLibraryTask: (systemId) => {
       calls.push(['addGatheringLibraryTask', systemId]);
       return { id: 'task-new', name: 'New Gathering Task', dropRows: [] };
@@ -2748,6 +2863,7 @@ describe('CraftingSystemManager mounted behavior', () => {
         'Tools',
         'Checks',
         'Gathering',
+        'Parties',
       ]
     );
     assert.equal(
@@ -2872,10 +2988,7 @@ describe('CraftingSystemManager mounted behavior', () => {
 
     // Activating the group PARENT redirects to the first available child (issue 1096), so
     // the route id names the activity rather than the studio.
-    assert.equal(
-      target.querySelector('.fabricate-manager').dataset.managerView,
-      'checks-crafting'
-    );
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'checks-crafting');
     assert.deepEqual(
       Array.from(target.querySelectorAll('[data-checks-nav-item]')).map((button) =>
         // The rail's badge column can carry an issue count and a dirty marker beside the
@@ -3009,10 +3122,7 @@ describe('CraftingSystemManager mounted behavior', () => {
       '[data-checks-digest]',
       '[data-checks-sections]',
     ]) {
-      assert.ok(
-        !target.querySelector(absent),
-        `the Validation route must not render ${absent}`
-      );
+      assert.ok(!target.querySelector(absent), `the Validation route must not render ${absent}`);
     }
 
     // The shared manager inspector is not rendered for the Checks view.
@@ -3372,12 +3482,16 @@ describe('CraftingSystemManager mounted behavior', () => {
     // wrap them was invented here — the structural parity pass reported it as an extra
     // card, and the exemption that excused it has been overruled rather than reworded.
     assert.ok(
-      !target.querySelector('[data-checks-panel="crafting"] .manager-inspector-card [data-recipe-section="failure-consume-ingredients"]'),
+      !target.querySelector(
+        '[data-checks-panel="crafting"] .manager-inspector-card [data-recipe-section="failure-consume-ingredients"]'
+      ),
       'no card wraps the two failure flags'
     );
     // The prototype's glyphs, not the more literal ones this screen had chosen.
     assert.ok(
-      Boolean(policy.querySelector('[data-recipe-section="failure-consume-ingredients"] i.fa-fire')),
+      Boolean(
+        policy.querySelector('[data-recipe-section="failure-consume-ingredients"] i.fa-fire')
+      ),
       'consume-on-fail wears the prototype’s fa-fire'
     );
     assert.ok(
@@ -3392,7 +3506,10 @@ describe('CraftingSystemManager mounted behavior', () => {
     // was carrying — it names the two policies this screen does NOT govern.
     const note = target.querySelector('[data-failure-salvage-note]');
     assert.ok(Boolean(note), 'the salvage note closes the screen');
-    assert.ok(Boolean(note.querySelector('i.fa-circle-info')), 'glyph-led, as the prototype has it');
+    assert.ok(
+      Boolean(note.querySelector('i.fa-circle-info')),
+      'glyph-led, as the prototype has it'
+    );
     assert.match(note.textContent, /Salvage failures follow their own separate policy/);
   });
 
@@ -3515,10 +3632,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     flushSync();
     await openChecksSection('outcomes');
 
-    assert.equal(
-      target.querySelector('.fabricate-manager').dataset.managerView,
-      'checks-crafting'
-    );
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'checks-crafting');
     assert.ok(
       target.querySelector('[data-crafting-check-editor]'),
       'routed mode shows the crafting check editor'
@@ -4404,9 +4518,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     // The comparison is a SEGMENTED CONTROL now (issue 1096), not a <select>: two options is
     // not a list to open, and both readings are on screen with the one in force lit.
     assert.ok(
-      target
-        .querySelector('[data-threshold-mode-option="meet"]')
-        .classList.contains('is-active'),
+      target.querySelector('[data-threshold-mode-option="meet"]').classList.contains('is-active'),
       'the meet-or-exceed segment is the lit one'
     );
 
@@ -4421,10 +4533,7 @@ describe('CraftingSystemManager mounted behavior', () => {
       c2.querySelector('[data-trigger-outcome="success"]').classList.contains('is-active'),
       'the success trigger shows the Automatic success segment selected'
     );
-    assert.ok(
-      !triggers.querySelector('[data-trigger-break]'),
-      'no break card under toolSpecific'
-    );
+    assert.ok(!triggers.querySelector('[data-trigger-break]'), 'no break card under toolSpecific');
 
     // Choosing a segment emits the new outcome.
     chooseSegment(c2, 'data-trigger-outcome', 'none');
@@ -4555,10 +4664,7 @@ describe('CraftingSystemManager mounted behavior', () => {
       'failure reads "Award none"'
     );
     // Default toolSpecific authority hides the per-trigger break card.
-    assert.ok(
-      !triggers.querySelector('[data-trigger-break]'),
-      'no break card under toolSpecific'
-    );
+    assert.ok(!triggers.querySelector('[data-trigger-break]'), 'no break card under toolSpecific');
 
     // The award-mode selector renders, defaults to equal, and emits the chosen mode.
     const awardCard = target.querySelector('[data-award-mode]');
@@ -4876,12 +4982,15 @@ describe('CraftingSystemManager mounted behavior', () => {
   }
 
   it('checks view: a checkDriven crafting editor shows the break pill; the gathering tab is hidden when gathering is off', () => {
-    mountChecksView({
-      breakageAuthority: 'checkDriven',
-      features: { gathering: false },
-      gatheringResolutionMode: 'routed',
-      gatheringCheckRouted: routedBreakageValue,
-    }, 'triggers');
+    mountChecksView(
+      {
+        breakageAuthority: 'checkDriven',
+        features: { gathering: false },
+        gatheringResolutionMode: 'routed',
+        gatheringCheckRouted: routedBreakageValue,
+      },
+      'triggers'
+    );
     // Crafting (always on) honours the system authority and shows the break card.
     const craftingTriggers = target.querySelector('[data-check-triggers]');
     assert.ok(craftingTriggers, 'crafting editor renders the unified triggers');
@@ -4935,14 +5044,17 @@ describe('CraftingSystemManager mounted behavior', () => {
 
   it('checks view: the modifier card renders when the check is usable and emits SELECTION edits (issues 770, 1117)', () => {
     const patches = [];
-    mountChecksView({
-      resolutionMode: 'simple',
-      craftingCheckSimple: { rollFormula: '1d20 + 4' },
-      modifiers: [{ id: 'med', label: 'Medicine', expression: '@abilities.med.mod' }],
-      craftingDefaultModifierPolicy: 'highest',
-      craftingDefaultModifierIds: ['med'],
-      onUpdateCraftingCheckModifiers: (patch) => patches.push(patch),
-    }, 'modifiers');
+    mountChecksView(
+      {
+        resolutionMode: 'simple',
+        craftingCheckSimple: { rollFormula: '1d20 + 4' },
+        modifiers: [{ id: 'med', label: 'Medicine', expression: '@abilities.med.mod' }],
+        craftingDefaultModifierPolicy: 'highest',
+        craftingDefaultModifierIds: ['med'],
+        onUpdateCraftingCheckModifiers: (patch) => patches.push(patch),
+      },
+      'modifiers'
+    );
     const card = target.querySelector('[data-crafting-modifier-catalogue]');
     assert.ok(card, 'the modifier card renders in the crafting stack when a formula is authored');
     // THE RULE GRID IS ITS OWN CARD since issue 1096's parity round — `How they combine` is a
@@ -5006,7 +5118,11 @@ describe('CraftingSystemManager mounted behavior', () => {
     const eligibility = card.querySelector('[data-crafting-modifier-eligibility="med"]');
     assert.ok(eligibility, 'each catalogue row carries its own eligibility control');
     assert.equal(eligibility.tagName, 'BUTTON', 'the accessible CONTROL is the pill itself');
-    assert.equal(eligibility.getAttribute('aria-pressed'), 'true', 'the eligible entry reads as on');
+    assert.equal(
+      eligibility.getAttribute('aria-pressed'),
+      'true',
+      'the eligible entry reads as on'
+    );
     // Nothing interactive NESTS: an interactive control inside an interactive one lands DOM the
     // browser did not build as authored, and a half-finished conversion is exactly how a stray
     // checkbox would survive inside the pill.
@@ -5089,12 +5205,15 @@ describe('CraftingSystemManager mounted behavior', () => {
   // authoring-ordered third so the two non-selecting rules sit on the top row of the 2x2
   // and the two selecting rules on the bottom one.
   it('checks view: the modifier rule group keeps its capture-harness hooks and shows an icon per option (issues 855, 1055)', () => {
-    mountChecksView({
-      resolutionMode: 'simple',
-      craftingCheckSimple: { rollFormula: '1d20 + 4' },
-      modifiers: [{ id: 'med', label: 'Medicine', expression: '@abilities.med.mod' }],
-      craftingDefaultModifierPolicy: 'bySubject',
-    }, 'modifiers');
+    mountChecksView(
+      {
+        resolutionMode: 'simple',
+        craftingCheckSimple: { rollFormula: '1d20 + 4' },
+        modifiers: [{ id: 'med', label: 'Medicine', expression: '@abilities.med.mod' }],
+        craftingDefaultModifierPolicy: 'bySubject',
+      },
+      'modifiers'
+    );
     // SCOPED TO THE RULE CARD, not the library card: issue 1096's parity round split
     // `How they combine` out into its own studio card, and the capture registry's selectors
     // were re-pointed with it.
@@ -5148,14 +5267,20 @@ describe('CraftingSystemManager mounted behavior', () => {
     // A cap on a selection nobody makes is a control with no effect, so the two
     // non-selecting rules do not render it at all.
     for (const craftingDefaultModifierPolicy of ['addAll', 'highest']) {
-      mountChecksView({ ...props, craftingDefaultModifierPolicy, craftingMaxModifierPicks: 2 }, 'modifiers');
+      mountChecksView(
+        { ...props, craftingDefaultModifierPolicy, craftingMaxModifierPicks: 2 },
+        'modifiers'
+      );
       assert.ok(
         !target.querySelector('[data-crafting-modifier-max-picks]'),
         `${craftingDefaultModifierPolicy} selects nothing, so it shows no cap field`
       );
     }
     for (const craftingDefaultModifierPolicy of ['bySubject', 'playerPicks']) {
-      mountChecksView({ ...props, craftingDefaultModifierPolicy, craftingMaxModifierPicks: null }, 'modifiers');
+      mountChecksView(
+        { ...props, craftingDefaultModifierPolicy, craftingMaxModifierPicks: null },
+        'modifiers'
+      );
       const field = target.querySelector('[data-crafting-modifier-max-picks]');
       assert.ok(
         Boolean(field),
@@ -5186,14 +5311,17 @@ describe('CraftingSystemManager mounted behavior', () => {
   // field through this card, so the patch it emits was only ever exercised by a capture run.
   it('checks view: emptying the pick-cap Stepper patches a null cap, not an omission (issue 1055)', () => {
     const patches = [];
-    mountChecksView({
-      resolutionMode: 'simple',
-      craftingCheckSimple: { rollFormula: '1d20 + 4' },
-      modifiers: [{ id: 'med', label: 'Medicine', expression: '@abilities.med.mod' }],
-      craftingDefaultModifierPolicy: 'playerPicks',
-      craftingMaxModifierPicks: 3,
-      onUpdateCraftingCheckModifiers: (patch) => patches.push(patch),
-    }, 'modifiers');
+    mountChecksView(
+      {
+        resolutionMode: 'simple',
+        craftingCheckSimple: { rollFormula: '1d20 + 4' },
+        modifiers: [{ id: 'med', label: 'Medicine', expression: '@abilities.med.mod' }],
+        craftingDefaultModifierPolicy: 'playerPicks',
+        craftingMaxModifierPicks: 3,
+        onUpdateCraftingCheckModifiers: (patch) => patches.push(patch),
+      },
+      'modifiers'
+    );
     const input = target.querySelector('[data-crafting-modifier-max-picks-input]');
     assert.equal(input.value, '3', 'the authored cap is in the field before it is cleared');
     input.value = '';
@@ -5209,13 +5337,16 @@ describe('CraftingSystemManager mounted behavior', () => {
   });
 
   it('checks view: an authored cap is rendered on the hook and in the Stepper', () => {
-    mountChecksView({
-      resolutionMode: 'simple',
-      craftingCheckSimple: { rollFormula: '1d20 + 4' },
-      modifiers: [{ id: 'med', label: 'Medicine', expression: '@abilities.med.mod' }],
-      craftingDefaultModifierPolicy: 'playerPicks',
-      craftingMaxModifierPicks: 1,
-    }, 'modifiers');
+    mountChecksView(
+      {
+        resolutionMode: 'simple',
+        craftingCheckSimple: { rollFormula: '1d20 + 4' },
+        modifiers: [{ id: 'med', label: 'Medicine', expression: '@abilities.med.mod' }],
+        craftingDefaultModifierPolicy: 'playerPicks',
+        craftingMaxModifierPicks: 1,
+      },
+      'modifiers'
+    );
     const field = target.querySelector('[data-crafting-modifier-max-picks]');
     assert.equal(field.getAttribute('data-crafting-modifier-max-picks'), '1');
     assert.equal(field.querySelector('[data-crafting-modifier-max-picks-input]').value, '1');
@@ -5223,13 +5354,16 @@ describe('CraftingSystemManager mounted behavior', () => {
     // truncates nothing: the field routes through `resolveMaxModifierPicks`, so `0` and
     // `-2` both come back as the blank unlimited state.
     for (const junk of [0, -2, 2.5]) {
-      mountChecksView({
-        resolutionMode: 'simple',
-        craftingCheckSimple: { rollFormula: '1d20 + 4' },
-        modifiers: [{ id: 'med', label: 'Medicine', expression: '@med' }],
-        craftingDefaultModifierPolicy: 'playerPicks',
-        craftingMaxModifierPicks: junk,
-      }, 'modifiers');
+      mountChecksView(
+        {
+          resolutionMode: 'simple',
+          craftingCheckSimple: { rollFormula: '1d20 + 4' },
+          modifiers: [{ id: 'med', label: 'Medicine', expression: '@med' }],
+          craftingDefaultModifierPolicy: 'playerPicks',
+          craftingMaxModifierPicks: junk,
+        },
+        'modifiers'
+      );
       assert.equal(
         target
           .querySelector('[data-crafting-modifier-max-picks]')
@@ -5248,11 +5382,14 @@ describe('CraftingSystemManager mounted behavior', () => {
     // A non-empty catalogue is part of the fixture, not incidental: the notice reports a
     // CATALOGUE that reaches no roll, so an empty one has nothing to warn about and is
     // deliberately silent (see the `inert` gate in `CraftingModifierCatalogueCard`).
-    mountChecksView({
-      resolutionMode: 'simple',
-      craftingCheckSimple: { rollFormula: '' },
-      modifiers: [{ id: 'med', label: 'Medicine', expression: '@abilities.med.mod' }],
-    }, 'modifiers');
+    mountChecksView(
+      {
+        resolutionMode: 'simple',
+        craftingCheckSimple: { rollFormula: '' },
+        modifiers: [{ id: 'med', label: 'Medicine', expression: '@abilities.med.mod' }],
+      },
+      'modifiers'
+    );
     const card = target.querySelector('[data-crafting-modifier-catalogue]');
     assert.ok(Boolean(card), 'a formula-less check still shows the catalogue, with a warning');
     const notice = card.querySelector('[data-crafting-modifier-inert]');
@@ -5286,10 +5423,13 @@ describe('CraftingSystemManager mounted behavior', () => {
     mounted = null;
     target.remove();
     // Same cause, one modifier: the notice appears and still names the cause.
-    mountChecksView({
-      ...props,
-      modifiers: [{ id: 'med', label: 'Medicine', expression: '@abilities.med.mod' }],
-    }, 'modifiers');
+    mountChecksView(
+      {
+        ...props,
+        modifiers: [{ id: 'med', label: 'Medicine', expression: '@abilities.med.mod' }],
+      },
+      'modifiers'
+    );
     const notice = target.querySelector('[data-crafting-modifier-inert]');
     assert.ok(Boolean(notice), 'one authored modifier is enough to make the notice worth showing');
     assert.equal(
@@ -5334,11 +5474,14 @@ describe('CraftingSystemManager mounted behavior', () => {
     }
     // …and an ORDINARY authored formula — the exact input that used to raise
     // `noPlaceholder` — shows no notice at all.
-    mountChecksView({
-      resolutionMode: 'simple',
-      craftingCheckSimple: { rollFormula: '1d20 + 4' },
-      modifiers: catalogue,
-    }, 'modifiers');
+    mountChecksView(
+      {
+        resolutionMode: 'simple',
+        craftingCheckSimple: { rollFormula: '1d20 + 4' },
+        modifiers: catalogue,
+      },
+      'modifiers'
+    );
     assert.ok(
       !target.querySelector('[data-crafting-modifier-inert]'),
       'an authored formula is never inert: the modifiers are appended to it'
@@ -5351,13 +5494,16 @@ describe('CraftingSystemManager mounted behavior', () => {
   // to switch to one that rolls, when the two gathering modes that take modifiers are the
   // ones rendered disabled. Both halves below fail against that component.
   it('checks view: gathering d100 names the missing MODIFIER SUPPORT, not a missing check', () => {
-    mountChecksView({
-      activity: 'gathering',
-      features: { gathering: true },
-      gatheringResolutionMode: 'd100',
-      modifiers: [{ id: 'med', label: 'Medicine', expression: '@abilities.med.mod' }],
-      gatheringDefaultModifierIds: ['med'],
-    }, 'modifiers');
+    mountChecksView(
+      {
+        activity: 'gathering',
+        features: { gathering: true },
+        gatheringResolutionMode: 'd100',
+        modifiers: [{ id: 'med', label: 'Medicine', expression: '@abilities.med.mod' }],
+        gatheringDefaultModifierIds: ['med'],
+      },
+      'modifiers'
+    );
     const notice = target.querySelector('[data-crafting-modifier-inert]');
     assert.ok(Boolean(notice), 'a selection that reaches no roll is still reported');
     assert.equal(
@@ -5372,12 +5518,15 @@ describe('CraftingSystemManager mounted behavior', () => {
   });
 
   it('checks view: an unstamped system shows the rule the ENGINE would apply, not a blank group (issue 1055)', () => {
-    mountChecksView({
-      resolutionMode: 'simple',
-      craftingCheckSimple: { rollFormula: '1d20 + 4' },
-      modifiers: [{ id: 'med', label: 'Medicine', expression: '@abilities.med.mod' }],
-      // No `craftingDefaultModifierPolicy` at all — the never-authored state.
-    }, 'modifiers');
+    mountChecksView(
+      {
+        resolutionMode: 'simple',
+        craftingCheckSimple: { rollFormula: '1d20 + 4' },
+        modifiers: [{ id: 'med', label: 'Medicine', expression: '@abilities.med.mod' }],
+        // No `craftingDefaultModifierPolicy` at all — the never-authored state.
+      },
+      'modifiers'
+    );
     const checked = [...target.querySelectorAll('[data-crafting-modifier-policy-option]')].filter(
       (option) => option.querySelector('input').checked
     );
@@ -6080,7 +6229,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     const navLabels = Array.from(target.querySelectorAll('.manager-nav-label')).map((label) =>
       label.textContent.trim()
     );
-    assert.deepEqual(navLabels, []);
+    assert.deepEqual(navLabels, ['Parties']);
     assert.ok(target.textContent.includes('Crafting Systems'));
     assert.ok(target.textContent.includes('No crafting systems yet'));
     assert.ok(target.textContent.includes('Set up your first system'));
@@ -6175,7 +6324,15 @@ describe('CraftingSystemManager mounted behavior', () => {
       Array.from(target.querySelectorAll('.manager-nav-label')).map((label) =>
         label.textContent.trim()
       ),
-      ['System Overview', 'Crafting', 'Components', 'Tags & Categories', 'Tools', 'Checks']
+      [
+        'System Overview',
+        'Crafting',
+        'Components',
+        'Tags & Categories',
+        'Tools',
+        'Checks',
+        'Parties',
+      ]
     );
 
     const environmentFact = target.querySelector('[data-count-id="environments"]');
@@ -6291,6 +6448,7 @@ describe('CraftingSystemManager mounted behavior', () => {
         'Checks',
         'Gathering',
         'Graph',
+        'Parties',
       ]
     );
     assert.ok(target.textContent.includes('System library'));
@@ -8183,8 +8341,8 @@ describe('CraftingSystemManager mounted behavior', () => {
     });
 
     assert.deepEqual(messages, [
-      'Applied bulk changes to 2 recipes. Books & scrolls updated — 1 addition. '
-        + "1 recipe couldn't be enabled yet.",
+      'Applied bulk changes to 2 recipes. Books & scrolls updated — 1 addition. ' +
+        "1 recipe couldn't be enabled yet.",
     ]);
   });
 
@@ -8668,7 +8826,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     tickComponentRow('c2');
     assert.ok(
       Boolean(target.querySelector('[data-component-bulk-difficulty]')),
-      'and so does the panel\'s progressive DC section'
+      "and so does the panel's progressive DC section"
     );
 
     target.querySelector('[data-component-bulk-essences-staged]').click();
@@ -10209,7 +10367,10 @@ describe('CraftingSystemManager mounted behavior', () => {
       'inspector should not show an edit action while already editing'
     );
     // The editor opens on IDENTITY and the shell's rail carries the live preview.
-    assert.equal(target.querySelector('[data-essence-tab-panel]').dataset.essenceTabPanel, 'identity');
+    assert.equal(
+      target.querySelector('[data-essence-tab-panel]').dataset.essenceTabPanel,
+      'identity'
+    );
     assert.ok(
       target.querySelector('.manager-inspector [data-essence-behavior-preview]'),
       'the editor rail is the live behaviour preview'
@@ -10246,9 +10407,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     await tick();
     flushSync();
     assert.equal(
-      target
-        .querySelector('[data-essence-preview-tile] .inventory-card-name')
-        .textContent.trim(),
+      target.querySelector('[data-essence-preview-tile] .inventory-card-name').textContent.trim(),
       'Rain',
       'the live preview follows the draft'
     );
@@ -10343,9 +10502,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     flushSync();
     assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'essence-edit');
     assert.equal(
-      target
-        .querySelector('[data-essence-preview-tile] .inventory-card-name')
-        .textContent.trim(),
+      target.querySelector('[data-essence-preview-tile] .inventory-card-name').textContent.trim(),
       'New essence draft'
     );
     assert.equal(
@@ -10358,9 +10515,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     await tick();
     flushSync();
     assert.equal(
-      target
-        .querySelector('[data-essence-preview-tile] .inventory-card-name')
-        .textContent.trim(),
+      target.querySelector('[data-essence-preview-tile] .inventory-card-name').textContent.trim(),
       'Air'
     );
 
@@ -10373,13 +10528,15 @@ describe('CraftingSystemManager mounted behavior', () => {
       'none'
     );
     assert.equal(
-      target.querySelectorAll('[data-manager-essence-colour] [data-manager-color-token].is-selected')
-        .length,
+      target.querySelectorAll(
+        '[data-manager-essence-colour] [data-manager-color-token].is-selected'
+      ).length,
       0,
       'no preset claims to be the current choice while none is authored'
     );
     assert.ok(
-      target.querySelector('[data-manager-essence-colour] [data-manager-color-none]')
+      target
+        .querySelector('[data-manager-essence-colour] [data-manager-color-none]')
         .classList.contains('is-selected'),
       'the No-colour cell is the one marked, and it is the only route back to unset'
     );
@@ -10507,7 +10664,10 @@ describe('CraftingSystemManager mounted behavior', () => {
     target.querySelector('[data-essence-select="water"]').click();
     await tick();
     flushSync();
-    assert.ok(target.querySelector('[data-essence-bulk-panel]'), 'the bulk panel replaces the inspector');
+    assert.ok(
+      target.querySelector('[data-essence-bulk-panel]'),
+      'the bulk panel replaces the inspector'
+    );
     assert.ok(
       !target.querySelector('[data-essence-browser-inspector]'),
       'and the single-essence inspector is gone while a selection exists'
@@ -10550,7 +10710,9 @@ describe('CraftingSystemManager mounted behavior', () => {
       'still nothing is blocked — the carried essence deletes like any other'
     );
 
-    const deleteButton = target.querySelector('[data-essence-bulk-delete-card] .manager-button.is-danger');
+    const deleteButton = target.querySelector(
+      '[data-essence-bulk-delete-card] .manager-button.is-danger'
+    );
     assert.ok(deleteButton, 'the bulk delete is a real button, armed rather than dialogged');
     deleteButton.click();
     await tick();
@@ -10560,9 +10722,7 @@ describe('CraftingSystemManager mounted behavior', () => {
       false,
       'the FIRST click only arms — nothing is written'
     );
-    target
-      .querySelector('[data-essence-bulk-delete-card] .manager-button.is-danger')
-      .click();
+    target.querySelector('[data-essence-bulk-delete-card] .manager-button.is-danger').click();
     await tick();
     await tick();
     flushSync();
@@ -10783,10 +10943,7 @@ describe('CraftingSystemManager mounted behavior', () => {
       target.querySelector('[data-essence-on-craft-empty]'),
       'both gates off renders an explanatory empty state, not an empty tab'
     );
-    assert.ok(
-      !target.querySelector('[data-essence-section="macro"]'),
-      'and no macro card at all'
-    );
+    assert.ok(!target.querySelector('[data-essence-section="macro"]'), 'and no macro card at all');
 
     target.querySelector('[data-essence-tab="identity"]').click();
     await tick();
@@ -12343,7 +12500,11 @@ describe('CraftingSystemManager mounted behavior', () => {
     inspectorRateInput.dispatchEvent(new Event('blur', { bubbles: true }));
     await tick();
     flushSync();
-    assert.equal(inspectorRateInput.value, '9', 'blur restores the model value, it does not commit empty');
+    assert.equal(
+      inspectorRateInput.value,
+      '9',
+      'blur restores the model value, it does not commit empty'
+    );
     let refreshedInspectorRateInput = selectedDropInspector.querySelector(
       '[data-gathering-drop-inspector-rate] .manager-drop-rate-percent input'
     );
@@ -13154,7 +13315,196 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(target.textContent.includes('Quiet Cavern'));
   });
 
-  it('flips the Travel & Realms toggle (aria-pressed) and reveals the Travel nav item', async () => {
+  it('renders permanent World Parties and gated top-level Travel after Gathering', async () => {
+    const calls = [];
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore(calls, {
+          gatheringRealmsEnabled: true,
+        }),
+        services: { openCurrentAdmin: () => {} },
+      },
+    });
+    flushSync();
+
+    const world = target.querySelector('[data-world-nav-section]');
+    assert.ok(world, 'World always renders');
+    assert.equal(world.querySelector('#manager-world-heading').textContent.trim(), 'WORLD');
+    assert.equal(world.querySelector('#manager-world-scope').textContent.trim(), 'every system');
+    assert.deepEqual(
+      Array.from(world.querySelectorAll('[data-world-nav-item]')).map((item) => item.id),
+      ['manager-world-nav-parties']
+    );
+    assert.ok(worldNavItem('parties').querySelector('.fa-users'));
+    assert.ok(systemTravelItem('travel').querySelector('.fa-route'));
+    assert.equal(
+      worldNavItem('parties').querySelector('.manager-nav-count').textContent.trim(),
+      '2'
+    );
+    assert.ok(!gatheringSubitem('Travel'), 'Travel is a top-level sibling, not a Gathering child');
+    assert.equal(worldNavItem('parties').getAttribute('aria-label'), 'Parties');
+    assert.equal(systemTravelItem('travel').textContent.trim(), 'Travel');
+    assert.equal(
+      systemTravelItem('travel').getAttribute('aria-controls'),
+      'manager-travel-submenu'
+    );
+    assert.equal(systemTravelItem('travel').getAttribute('aria-expanded'), 'false');
+    assert.equal(target.querySelector('[data-system-travel-submenu]'), null);
+
+    // Enter the shared Gathering browser through the direct-mount suite's established route
+    // before selecting a Travel destination. The real-Chromium View Lab case pins the
+    // destination inspector itself; happy-dom reliably exercises the destination projection
+    // only after this parent route has settled.
+    navButton('Gathering').click();
+    await settleRouteExit();
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'environments');
+
+    target.querySelector('#manager-travel-toggle').click();
+    await tick();
+    flushSync();
+    assert.equal(systemTravelItem('travel').getAttribute('aria-expanded'), 'true');
+    assert.equal(
+      target.querySelector('#manager-travel-toggle').getAttribute('aria-controls'),
+      'manager-travel-submenu'
+    );
+    assert.ok(target.querySelector('[data-system-travel-submenu]'));
+    assert.ok(systemTravelItem('realms').querySelector('.fa-mountain-sun'));
+    assert.ok(systemTravelItem('map').querySelector('.fa-map-location-dot'));
+    systemTravelItem('realms').click();
+    await settleRouteExit();
+    assert.equal(
+      target.querySelector('.fabricate-manager').dataset.managerView,
+      'environments',
+      'the Realms destination commits the system Travel route'
+    );
+    assert.equal(target.querySelectorAll('.fabricate-manager').length, 1);
+    assert.equal(systemTravelItem('realms').getAttribute('aria-current'), 'page');
+    assert.ok(worldNavItem('parties').classList.contains('manager-world-nav-item'));
+    assert.equal(
+      target.querySelector('[data-travel-panel="realms"]').getAttribute('role'),
+      'region'
+    );
+    assert.equal(
+      target.querySelector('[data-travel-panel="realms"]').getAttribute('aria-labelledby'),
+      'manager-travel-nav-realms'
+    );
+    assert.equal(
+      target.querySelector('.manager-header .manager-title').textContent.trim(),
+      'Realms'
+    );
+    assert.equal(
+      target.querySelector('.manager-header-actions').getAttribute('aria-label'),
+      'Realm actions'
+    );
+    systemTravelItem('map').click();
+    await settleRouteExit();
+    assert.equal(
+      target.querySelector('.manager-header .manager-title').textContent.trim(),
+      'Map Region Links'
+    );
+    assert.equal(
+      target.querySelector('.manager-header-actions').getAttribute('aria-label'),
+      'Map region link actions'
+    );
+    worldNavItem('parties').click();
+    await tick();
+    flushSync();
+    assert.equal(worldNavItem('parties').getAttribute('aria-current'), 'page');
+    assert.equal(
+      target.querySelectorAll('[aria-current="page"]').length,
+      1,
+      'only the concrete destination is current'
+    );
+    assert.ok(worldNavItem('parties').classList.contains('manager-world-nav-item'));
+    assert.ok(target.querySelector('[data-travel-panel="parties"]'));
+    assert.ok(
+      !target.querySelector('[id^="travel-tab-"]'),
+      'the retired horizontal tabs are absent'
+    );
+  });
+
+  it('places permanent World navigation after every selected-system entry, including Graph', () => {
+    mountManager([], {
+      gatheringRealmsEnabled: true,
+      experimentalFeaturesEnabled: true,
+    });
+
+    const navChildren = Array.from(target.querySelector('.manager-nav').children);
+    const graph = navChildren.find((item) => item.textContent.includes('Graph'));
+    const world = target.querySelector('[data-world-nav-section]');
+    assert.ok(graph, 'the experimental Graph placeholder is visible in this ordering fixture');
+    assert.ok(
+      navChildren.indexOf(world) > navChildren.indexOf(graph),
+      'World follows every selected-system entry, including Graph'
+    );
+  });
+
+  it('keeps either active top-level Travel child selected when the parent is activated', async () => {
+    mountManager([], { gatheringRealmsEnabled: true });
+    systemTravelItem('travel').click();
+    await tick();
+    flushSync();
+
+    for (const childId of ['realms', 'map']) {
+      systemTravelItem(childId).click();
+      await tick();
+      flushSync();
+      systemTravelItem('travel').click();
+      await tick();
+      flushSync();
+
+      assert.equal(systemTravelItem('travel').getAttribute('aria-expanded'), 'true');
+      assert.equal(systemTravelItem(childId).getAttribute('aria-current'), 'page');
+      assert.equal(
+        target.querySelectorAll('#manager-travel-submenu [aria-current="page"]').length,
+        1
+      );
+    }
+  });
+
+  it('keeps World controls named and reachable in the persisted 56px rail', () => {
+    mountManager(
+      [],
+      { gatheringRealmsEnabled: true },
+      { getSetting: (key) => key === 'managerRailCollapsed' }
+    );
+
+    assert.ok(target.querySelector('.manager-body').classList.contains('is-rail-collapsed'));
+    assert.equal(worldNavItem('parties').getAttribute('aria-label'), 'Parties');
+    assert.equal(systemTravelItem('travel').getAttribute('aria-label'), 'Travel');
+    assert.equal(worldNavItem('parties').tagName, 'BUTTON');
+    assert.equal(systemTravelItem('travel').tagName, 'BUTTON');
+  });
+
+  it('keeps a system Travel child reachable after collapsing and re-expanding the rail', async () => {
+    mountManager([], { gatheringRealmsEnabled: true });
+
+    assert.equal(systemTravelItem('travel').getAttribute('aria-expanded'), 'false');
+    const railToggle = target.querySelector('[data-manager-rail-toggle]');
+    railToggle.click();
+    await tick();
+    flushSync();
+    assert.ok(target.querySelector('.manager-body').classList.contains('is-rail-collapsed'));
+
+    target.querySelector('[data-manager-rail-toggle]').click();
+    await tick();
+    flushSync();
+    assert.ok(!target.querySelector('.manager-body').classList.contains('is-rail-collapsed'));
+
+    systemTravelItem('travel').click();
+    await tick();
+    flushSync();
+    assert.equal(systemTravelItem('travel').getAttribute('aria-expanded'), 'true');
+    systemTravelItem('realms').click();
+    await settleRouteExit();
+    assert.equal(systemTravelItem('realms').getAttribute('aria-current'), 'page');
+    assert.ok(target.querySelector('[data-travel-panel="realms"]'));
+  });
+
+  it('flips Travel & Realms and reveals top-level Travel while World remains', async () => {
     const calls = [];
     target = document.createElement('div');
     document.body.appendChild(target);
@@ -13171,8 +13521,8 @@ describe('CraftingSystemManager mounted behavior', () => {
     await tick();
     flushSync();
 
-    // Travel is hidden while the toggle is off.
-    assert.equal(Boolean(gatheringSubitem('Travel')), false, 'Travel nav item hidden by default');
+    assert.ok(target.querySelector('[data-world-nav-section]'), 'World is available before opt-in');
+    assert.equal(systemTravelItem('travel'), null, 'Travel nav item hidden by default');
     const toggle = target.querySelector('[data-gathering-realm-toggle]');
     assert.ok(toggle, 'realm toggle card renders on the settings tab');
     assert.equal(toggle.getAttribute('aria-pressed'), 'false', 'toggle starts unpressed');
@@ -13193,20 +13543,18 @@ describe('CraftingSystemManager mounted behavior', () => {
       'true',
       'toggle reflects the new pressed state'
     );
-    // Enabling the flag reveals the Travel nav item.
-    assert.ok(
-      gatheringSubitem('Travel'),
-      'Travel nav item appears once Travel & Realms is enabled'
-    );
+    assert.ok(systemTravelItem('travel'), 'top-level Travel becomes available');
+    assert.ok(!gatheringSubitem('Travel'), 'Travel is not nested inside Gathering');
   });
 
   it('falls back from a stale Travel tab to Environments when Travel & Realms is disabled', async () => {
     const calls = [];
+    const store = createStore(calls, { gatheringRealmsEnabled: true });
     target = document.createElement('div');
     document.body.appendChild(target);
     mounted = mount(Component, {
       target,
-      props: { store: createStore(calls), services: { openCurrentAdmin: () => {} } },
+      props: { store, services: { openCurrentAdmin: () => {} } },
     });
     flushSync();
 
@@ -13214,41 +13562,248 @@ describe('CraftingSystemManager mounted behavior', () => {
     await tick();
     flushSync();
 
-    // Enable the subsystem, then route to the Travel tab.
-    gatheringSubitem('Settings').click();
+    systemTravelItem('travel').click();
     await tick();
     flushSync();
-    target.querySelector('[data-gathering-realm-toggle]').click();
-    await tick();
-    flushSync();
-    gatheringSubitem('Travel').click();
-    await tick();
-    flushSync();
-    assert.ok(
-      gatheringSubitem('Travel')?.getAttribute('aria-current') === 'page',
-      'Travel tab is active'
-    );
+    assert.equal(systemTravelItem('realms').getAttribute('aria-current'), 'page');
 
-    // Disabling the flag must drop the stale Travel tab back to Environments, not
-    // leave the manager stranded on a hidden tab. Re-enter Settings to flip it off
-    // (the Travel surface has no toggle).
-    gatheringSubitem('Settings').click();
-    await tick();
-    flushSync();
-    target.querySelector('[data-gathering-realm-toggle]').click();
+    store.viewState.update((state) => ({
+      ...state,
+      gatheringRealmSettings: { ...state.gatheringRealmSettings, enabled: false },
+    }));
     await tick();
     flushSync();
 
-    assert.equal(Boolean(gatheringSubitem('Travel')), false, 'Travel nav item hidden again');
-    // The active tab is no longer Travel; Settings remains the current selection.
-    const activeSubitem = Array.from(target.querySelectorAll('.manager-nav-subitem')).find(
-      (item) => item.getAttribute('aria-current') === 'page'
+    assert.ok(target.querySelector('[data-world-nav-section]'), 'World remains available');
+    assert.equal(systemTravelItem('travel'), null, 'system Travel is hidden again');
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'environments');
+    assert.ok(target.querySelector('[data-environment-id]'));
+    assert.equal(target.querySelector('#manager-nav-travel'), null);
+  });
+
+  it('reprojects system-owned Travel records while keeping the World party list global', async () => {
+    const travelBySystem = {
+      alchemy: {
+        gatheringRealmSettings: { enabled: true },
+        realms: [{ id: 'realm-forest', name: 'Green March', enabled: true }],
+      },
+      smithing: {
+        gatheringRealmSettings: { enabled: true },
+        realms: [{ id: 'realm-forge', name: 'Forge Quarter', enabled: true }],
+      },
+    };
+    mountManager([], {
+      worldTravelBySystem: travelBySystem,
+      smithingFeatures: { gathering: true, salvage: true },
+    });
+    systemTravelItem('travel').click();
+    await tick();
+    flushSync();
+    systemTravelItem('realms').click();
+    await tick();
+    flushSync();
+    assert.ok(target.textContent.includes('Green March'));
+    assert.equal(
+      worldNavItem('parties').querySelector('.manager-nav-count').textContent.trim(),
+      '2'
     );
-    assert.notEqual(
-      activeSubitem?.textContent.trim(),
-      'Travel',
-      'stale Travel tab is not the active tab'
+
+    assert.equal(await switchScopeSystemTo('smithing'), 'environments');
+    assert.ok(target.textContent.includes('Forge Quarter'));
+    assert.equal(target.textContent.includes('Green March'), false);
+    assert.equal(
+      worldNavItem('parties').querySelector('.manager-nav-count').textContent.trim(),
+      '2'
     );
+  });
+
+  it('keeps active World Parties when Gathering or its selected system vanishes', async () => {
+    for (const fallback of ['gathering-off', 'selection-cleared']) {
+      const store = createStore([], { gatheringRealmsEnabled: true });
+      target = document.createElement('div');
+      document.body.appendChild(target);
+      mounted = mount(Component, {
+        target,
+        props: { store, services: { openCurrentAdmin: () => {} } },
+      });
+      flushSync();
+      worldNavItem('parties').click();
+      await tick();
+      flushSync();
+
+      store.viewState.update((state) => ({
+        ...state,
+        canShowEnvironmentsTab: false,
+        selectedSystem:
+          fallback === 'selection-cleared'
+            ? null
+            : {
+                ...state.selectedSystem,
+                features: { ...state.selectedSystem.features, gathering: false },
+              },
+        systems: state.systems.map((system) => ({
+          ...system,
+          selected: fallback !== 'selection-cleared' && system.id === 'alchemy',
+        })),
+      }));
+      await tick();
+      flushSync();
+
+      assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'world');
+      assert.ok(target.querySelector('[data-world-nav-section]'));
+      assert.equal(worldNavItem('parties').getAttribute('aria-current'), 'page');
+      assert.equal(target.querySelector('[data-party-realm-override-unavailable]') !== null, true);
+
+      unmount(mounted);
+      mounted = null;
+      target.remove();
+      target = null;
+    }
+  });
+
+  it('presents and operates World Parties without a selected system while withholding overrides', async () => {
+    const calls = [];
+    mountManager(calls, { noSystems: true });
+    worldNavItem('parties').click();
+    await tick();
+    flushSync();
+
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'world');
+    assert.ok(target.querySelector('[data-travel-panel="parties"]'));
+    assert.equal(
+      target.querySelector('.manager-header .manager-title').textContent.trim(),
+      'World Parties'
+    );
+    const worldHeading = target.querySelector('.manager-main .manager-section-header');
+    assert.equal(
+      worldHeading.querySelector('.manager-kicker').textContent.trim(),
+      'WORLD / every system'
+    );
+    assert.equal(worldHeading.querySelector('.manager-title').textContent.trim(), 'World Parties');
+    assert.match(
+      worldHeading.querySelector('.manager-subtitle').textContent,
+      /shared across every crafting system/
+    );
+    assert.equal(
+      target.querySelector('.manager-header-actions').getAttribute('aria-label'),
+      'World party actions'
+    );
+    assert.equal(
+      target.querySelector('.manager-travel-inspector').getAttribute('aria-label'),
+      'Selected world party'
+    );
+    const createButton = target.querySelector('.manager-header-actions .manager-button.is-primary');
+    assert.equal(createButton.disabled, false);
+    assert.ok(target.querySelector('[data-party-realm-override-unavailable]'));
+    assert.match(
+      target.querySelector('[data-party-realm-evidence-unavailable]').textContent,
+      /Select a crafting system with Gathering enabled/
+    );
+    assert.equal(target.textContent.includes('No current realm set for this system.'), false);
+
+    createButton.click();
+    target
+      .querySelector('[data-manager-travel-party-id="party-two"] .manager-travel-parties-header')
+      .click();
+    await tick();
+    flushSync();
+
+    const nameInput = target.querySelector('[data-manager-party-name-field] input');
+    setInputValue(nameInput, 'Nightwardens');
+    nameInput.dispatchEvent(new Event('blur'));
+    await tick();
+    flushSync();
+
+    target.querySelector('.manager-party-add-trigger').click();
+    await tick();
+    flushSync();
+    const scoutOption = Array.from(document.querySelectorAll('.manager-travel-option')).find(
+      (option) => option.textContent.includes('Scout')
+    );
+    assert.ok(scoutOption, 'the no-selection party editor exposes the global actor roster');
+    scoutOption.click();
+
+    dispatchDrop(target.querySelector('[data-manager-party-marker]'), {
+      type: 'Actor',
+      uuid: 'Actor.scout',
+    });
+    await tick();
+    flushSync();
+    const enableButton = target.querySelector('.manager-party-enable-toggle.is-off');
+    assert.equal(enableButton.disabled, false);
+    enableButton.click();
+    target.querySelector('.manager-travel-inspector .manager-button.is-danger').click();
+
+    assert.deepEqual(
+      calls.filter((call) =>
+        [
+          'createParty',
+          'selectParty',
+          'renameParty',
+          'addOrMovePartyMember',
+          'setPartyTravelActor',
+          'setPartyEnabled',
+          'deleteParty',
+        ].includes(call[0])
+      ),
+      [
+        ['createParty'],
+        ['selectParty', 'party-two'],
+        ['renameParty', 'party-two', 'Nightwardens'],
+        ['addOrMovePartyMember', 'party-two', 'Actor.scout'],
+        ['setPartyTravelActor', 'party-two', 'Actor.scout'],
+        ['setPartyEnabled', 'party-two', true],
+        ['deleteParty', 'party-two'],
+      ]
+    );
+    assert.equal(
+      calls.some((call) => ['setPartyRealmOverride', 'clearPartyRealmOverride'].includes(call[0])),
+      false,
+      'no-selection Party CRUD must not write a system override'
+    );
+  });
+
+  it('falls back from active system Travel when Gathering or the selection vanishes', async () => {
+    for (const fallback of ['gathering-off', 'selection-cleared']) {
+      const store = createStore([], { gatheringRealmsEnabled: true });
+      target = document.createElement('div');
+      document.body.appendChild(target);
+      mounted = mount(Component, {
+        target,
+        props: { store, services: { openCurrentAdmin: () => {} } },
+      });
+      flushSync();
+      systemTravelItem('travel').click();
+      await tick();
+      flushSync();
+
+      store.viewState.update((state) => ({
+        ...state,
+        canShowEnvironmentsTab: false,
+        selectedSystem:
+          fallback === 'selection-cleared'
+            ? null
+            : {
+                ...state.selectedSystem,
+                features: { ...state.selectedSystem.features, gathering: false },
+              },
+        systems: state.systems.map((system) => ({
+          ...system,
+          selected: fallback !== 'selection-cleared' && system.id === 'alchemy',
+        })),
+      }));
+      await tick();
+      flushSync();
+
+      assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'systems');
+      assert.equal(target.querySelector('#manager-nav-travel'), null);
+      assert.ok(target.querySelector('[data-world-nav-section]'));
+
+      unmount(mounted);
+      mounted = null;
+      target.remove();
+      target = null;
+    }
   });
 
   it('deletes the editing gathering task from the editor toolbar and returns to the task browser', async () => {
@@ -17824,6 +18379,96 @@ describe('CraftingSystemManager mounted behavior', () => {
     await settleSaveAttempt();
   }
 
+  async function attemptDirtyGatheringWorldExit(kind, outcome, destination) {
+    const calls = [];
+    const title = kind === 'task' ? 'Task' : 'Event';
+    const storeOptions = {
+      gatheringRealmsEnabled: true,
+      [`confirmDiscardGathering${title}Result`]: outcome.action,
+    };
+    if (outcome.saveResult === false) {
+      storeOptions[`updateGatheringLibrary${title}Result`] = false;
+    }
+    if (outcome.rejectSave) {
+      storeOptions[`updateGatheringLibrary${title}Reject`] = true;
+    }
+    if (kind === 'task') await openDirtyGatheringTaskEditor(calls, storeOptions);
+    else await openDirtyGatheringEventEditor(calls, storeOptions);
+
+    if (destination !== 'parties') {
+      target.querySelector('#manager-travel-toggle').click();
+      await tick();
+      flushSync();
+      assert.equal(systemTravelItem('travel').getAttribute('aria-expanded'), 'true');
+      assert.equal(
+        calls.some((call) => call[0] === `confirmDiscardDirtyGathering${title}Draft`),
+        false,
+        `${kind} ${outcome.name} disclosure must not consume the dirty-route guard`
+      );
+    }
+
+    const activateDestination = async () => {
+      (destination === 'parties'
+        ? worldNavItem(destination)
+        : systemTravelItem(destination)
+      ).click();
+      await settleRouteExit();
+    };
+    if (outcome.rejectSave) await withSilencedConsoleError(activateDestination);
+    else await activateDestination();
+
+    const expectedView = outcome.proceeds
+      ? destination === 'parties'
+        ? 'world'
+        : 'environments'
+      : `gathering-${kind}-edit`;
+    assert.equal(
+      target.querySelector('.fabricate-manager').dataset.managerView,
+      expectedView,
+      `${kind} ${outcome.name} should ${outcome.proceeds ? '' : 'not '}leave the editor; rendered: ${JSON.stringify(Array.from(target.querySelectorAll('.fabricate-manager')).map((node) => node.dataset.managerView))}; calls: ${JSON.stringify(calls)}`
+    );
+    assert.equal(
+      (destination === 'parties'
+        ? worldNavItem(destination)
+        : systemTravelItem(destination)
+      ).getAttribute('aria-current'),
+      outcome.proceeds ? 'page' : null,
+      `${kind} ${outcome.name} ${destination} must not leave a hidden active navigation control`
+    );
+    assert.ok(
+      calls.some((call) => call[0] === `confirmDiscardDirtyGathering${title}Draft`),
+      `${kind} ${outcome.name} routes through its dirty-exit confirmation`
+    );
+    const saveCalls = calls.filter((call) => call[0] === `updateGatheringLibrary${title}`);
+    assert.equal(
+      saveCalls.length > 0,
+      outcome.action === 'save',
+      `${kind} ${outcome.name} ${outcome.action === 'save' ? 'does' : 'does not'} save`
+    );
+  }
+
+  it('guards dirty gathering task and event exits through World Parties and a Travel child', async () => {
+    const outcomes = [
+      { name: 'cancel', action: 'cancel', proceeds: false },
+      { name: 'save false', action: 'save', saveResult: false, proceeds: false },
+      { name: 'rejected save', action: 'save', rejectSave: true, proceeds: false },
+      { name: 'successful save', action: 'save', proceeds: true },
+      { name: 'discard', action: 'discard', proceeds: true },
+    ];
+
+    for (const destination of ['parties', 'realms']) {
+      for (const kind of ['task', 'event']) {
+        for (const outcome of outcomes) {
+          await attemptDirtyGatheringWorldExit(kind, outcome, destination);
+          unmount(mounted);
+          mounted = null;
+          target.remove();
+          target = null;
+        }
+      }
+    }
+  });
+
   async function openDirtyRecipeItemEditor(calls, storeOptions) {
     Object.assign(storeOptions, {
       experimentalFeaturesEnabled: true,
@@ -17909,7 +18554,10 @@ describe('CraftingSystemManager mounted behavior', () => {
     );
 
     await clickHeaderSave();
-    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'gathering-task-edit');
+    assert.equal(
+      target.querySelector('.fabricate-manager').dataset.managerView,
+      'gathering-task-edit'
+    );
     assertSaveErrorRendered('[data-gathering-task-save-error]');
 
     storeOptions.updateGatheringLibraryTaskResult = true;
@@ -17926,7 +18574,10 @@ describe('CraftingSystemManager mounted behavior', () => {
     await openDirtyGatheringTaskEditor(calls, storeOptions);
 
     await withSilencedConsoleError(clickHeaderSave);
-    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'gathering-task-edit');
+    assert.equal(
+      target.querySelector('.fabricate-manager').dataset.managerView,
+      'gathering-task-edit'
+    );
     assertSaveErrorRendered('[data-gathering-task-save-error]');
 
     storeOptions.updateGatheringLibraryTaskReject = false;
@@ -18029,7 +18680,10 @@ describe('CraftingSystemManager mounted behavior', () => {
     );
 
     await clickRecipeItemSave();
-    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'recipe-item-edit');
+    assert.equal(
+      target.querySelector('.fabricate-manager').dataset.managerView,
+      'recipe-item-edit'
+    );
     assertSaveErrorRendered('[data-recipe-item-save-error]');
 
     storeOptions.saveRecipeItemResult = true;
@@ -18047,7 +18701,10 @@ describe('CraftingSystemManager mounted behavior', () => {
     await openDirtyRecipeItemEditor(calls, storeOptions);
 
     await clickRecipeItemSave();
-    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'recipe-item-edit');
+    assert.equal(
+      target.querySelector('.fabricate-manager').dataset.managerView,
+      'recipe-item-edit'
+    );
     assertSaveErrorRendered('[data-recipe-item-save-error]');
 
     storeOptions.saveRecipeItemReject = false;
@@ -18437,15 +19094,18 @@ describe('CraftingSystemManager mounted behavior', () => {
 
     // The rail row renders its second line — the mode + formula — in its own detail span.
     const detailOf = (id) =>
-      target.querySelector(
-        `[data-checks-all-checks-row="${id}"] .manager-checks-rail-row-detail`
-      )?.textContent || '';
+      target.querySelector(`[data-checks-all-checks-row="${id}"] .manager-checks-rail-row-detail`)
+        ?.textContent || '';
     const card = target.querySelector('[data-checks-all-checks]');
     assert.ok(Boolean(card), 'the Validation rail renders the All checks card');
     const cardText = card.textContent;
 
     // The GM-facing name, on BOTH rows, and it is the SAME words for the same mode.
-    assert.match(cardText, /Routed by check/, 'the routed modes are named as the pickers name them');
+    assert.match(
+      cardText,
+      /Routed by check/,
+      'the routed modes are named as the pickers name them'
+    );
     assert.ok(
       !/routedByCheck/.test(cardText),
       `no internal identifier reaches the card:\n${cardText}`
@@ -18886,7 +19546,10 @@ describe('CraftingSystemManager mounted behavior', () => {
     // The other four reference nothing rather than an id that resolves to nothing: an IDREF
     // to nowhere is reported as a broken relationship, not as "not currently shown".
     for (const tab of tabs.filter((candidate) => candidate !== controlled[0])) {
-      assert.ok(!tab.hasAttribute('aria-controls'), `${tab.dataset.checksSectionButton} names none`);
+      assert.ok(
+        !tab.hasAttribute('aria-controls'),
+        `${tab.dataset.checksSectionButton} names none`
+      );
     }
   });
 
@@ -18945,7 +19608,8 @@ describe('CraftingSystemManager mounted behavior', () => {
         panel: 'data-essence-bulk-panel',
         deleteCard: 'data-essence-bulk-delete-card',
         apply: 'data-essence-bulk-apply',
-        stage: () => target.querySelector('[data-essence-bulk-status-option="disable"] input').click(),
+        stage: () =>
+          target.querySelector('[data-essence-bulk-status-option="disable"] input').click(),
         applyResultOption: 'applyEssenceBulkEditResult',
         applied: 'Updated 2 essences.',
         appliedNone: 'No essences needed changing.',
@@ -19097,7 +19761,8 @@ describe('CraftingSystemManager mounted behavior', () => {
       const previousUi = globalThis.ui;
       globalThis.ui = { notifications: { info: (message) => messages.push(message) } };
       try {
-        const button = () => target.querySelector(`[${studio.deleteCard}] .manager-button.is-danger`);
+        const button = () =>
+          target.querySelector(`[${studio.deleteCard}] .manager-button.is-danger`);
         button().click();
         await settle();
         button().click();
@@ -19255,7 +19920,11 @@ describe('CraftingSystemManager mounted behavior', () => {
         // three hardcoded sentences: a studio that re-words its toast cannot leave the
         // screen-reader user on a stale copy of the old one.
         assert.equal(announcement(), messages[0]);
-        assert.match(announcement(), /^Deleted /, 'and it is the completion sentence, not "Selection cleared."');
+        assert.match(
+          announcement(),
+          /^Deleted /,
+          'and it is the completion sentence, not "Selection cleared."'
+        );
         assert.equal(focusHolder(studio), 'studio toolbar');
         assert.ok(
           !target.querySelector(`[${studio.deleteCard}]`),

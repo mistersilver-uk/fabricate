@@ -3148,7 +3148,7 @@
             "Title": "Travel & Realms",
             "Enable": "Enable Travel & Realms",
             "Disable": "Disable Travel & Realms",
-            "Hint": "Enabling this reveals the Travel tab, where you build realms and place parties, and lets environments be assigned to realms. Leave it off if your game does not use travel or location-gated gathering."
+            "Hint": "World Parties are always available. Enabling this reveals Gathering → Travel → Realms / Map Region Links for this crafting system, enables party realm overrides, and lets environments be assigned to realms."
           },
           "GatheringTabs": {
             "Label": "Gathering sections",
@@ -3163,10 +3163,6 @@
             "EncountersTitle": "Gathering events",
             "EncountersHint": "Browse reusable events before attaching them to environments.",
             "Travel": "Travel",
-            "TravelTitle": "Travel and parties",
-            "TravelHint": "Manage Fabricate parties and set the current realm for this crafting system.",
-            "TravelActions": "Travel and party actions",
-            "TravelInspector": "Selected party inspector",
             "SettingsPlaceholderTitle": "Gathering settings",
             "SettingsPlaceholderHint": "Set system-level drop resolution and event rules for gathering.",
             "OpenTasks": "Review tasks",
@@ -4093,7 +4089,14 @@
         },
         "Travel": {
           "Title": "Travel",
-          "Subtitle": "Manage Fabricate parties and set the current realm for the selected crafting system.",
+          "RealmsTitle": "Realms",
+          "RealmsHint": "Manage the realms available to the selected crafting system.",
+          "RealmsActions": "Realm actions",
+          "RealmsInspector": "Selected realm",
+          "MapLinksTitle": "Map Region Links",
+          "MapLinksHint": "Link active Scene Regions to realms in the selected crafting system.",
+          "MapLinksActions": "Map region link actions",
+          "MapLinksInspector": "Selected map region link",
           "Tabs": {
             "Label": "Travel sections",
             "Parties": "Parties",
@@ -4297,6 +4300,21 @@
             "SecretChip": "Secret",
             "RevealedChip": "Revealed"
           }
+        },
+        "World": {
+          "Heading": "WORLD",
+          "Scope": "every system",
+          "ExpandTravel": "Expand Travel",
+          "CollapseTravel": "Collapse Travel",
+          "TravelDestinations": "Travel destinations",
+          "PartiesTitle": "World Parties",
+          "PartiesKicker": "WORLD / every system",
+          "PartiesSubtitle": "Manage Fabricate parties shared across every crafting system.",
+          "PartiesHint": "Create and manage parties shared across every crafting system.",
+          "PartiesActions": "World party actions",
+          "PartiesInspector": "Selected world party",
+          "PartyOverrideGatheringRequired": "Select a crafting system with Gathering enabled to set a current-realm override.",
+          "PartyOverrideTravelRequired": "Enable Travel & Realms in Gathering settings to set a current-realm override."
         },
         "Tools": {
           "Title": "Tools",

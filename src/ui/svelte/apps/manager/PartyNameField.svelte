@@ -1,6 +1,6 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  Inline party-name editor for the Travel > Parties inspector. Keeps a local
+  Inline party-name editor for the World > Parties inspector. Keeps a local
   draft seeded from the upstream name (reseeded when a different party is
   selected or the name changes externally) and commits on blur / Enter; Escape
   reverts.

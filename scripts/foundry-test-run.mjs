@@ -1540,6 +1540,8 @@ async function assertManagerLayoutStable(page, label) {
       '.environment-task-layout',
       '.manager-travel-view',
       '.manager-travel-parties-row',
+      '.manager-travel-realms-row',
+      '.manager-map-link-row',
       '.manager-party-member-row',
       '.manager-fact'
     ];
@@ -1582,6 +1584,8 @@ async function assertManagerLayoutStable(page, label) {
       || metric.selector === '.manager-knowledge-copy-row'
       || metric.selector === '.manager-knowledge-learned-row'
       || metric.selector === '.manager-travel-parties-row'
+      || metric.selector === '.manager-travel-realms-row'
+      || metric.selector === '.manager-map-link-row'
   ).length;
   const editFormCount = metrics.filter(metric =>
     metric.selector === '.manager-system-edit-form'
@@ -7770,13 +7774,6 @@ async function main() {
               vocabularies: {
                 regions: { values: ['northreach'] }
               },
-              // Two character modifiers so the System Settings Character Modifiers
-              // list renders populated for the issue-768 list-ergonomics evidence
-              // (icon picker, section collapse, copy-to-prerequisites).
-              characterModifiers: [
-                { id: 'smoke-mod-herbalism', label: 'Herbalism Training', icon: 'fa-solid fa-leaf', expression: '@skills.nature.value' },
-                { id: 'smoke-mod-survival', label: 'Wilderness Survival', icon: 'fa-solid fa-campground', expression: '@skills.survival.value' }
-              ],
               tasks: [{
                 id: 'smoke-forage-library',
                 name: 'Forage Wild Herbs',
@@ -7831,11 +7828,25 @@ async function main() {
           }
         });
 
-        // Tools are SYSTEM-OWNED (the `craftingSystems` setting) — the Tools
-        // manager and the gathering tool gate read getSystem(id).tools, not
-        // gatheringConfig. Mirror the canonical persist so the manager Tools view
-        // renders and tool-blocked tasks resolve their requirement.
+        // Modifiers and Tools are SYSTEM-OWNED (the `craftingSystems` setting). Persist both
+        // through the canonical manager update after the Gathering fixture exists: the System
+        // Settings list reads `getSystem(id).modifiers`, while the Tools view and gathering tool
+        // gate read `getSystem(id).tools`.
         await csm.updateSystem(systemId, {
+          modifiers: [
+            {
+              id: 'smoke-mod-herbalism',
+              label: 'Herbalism Training',
+              icon: 'fa-solid fa-leaf',
+              expression: '@skills.nature.value'
+            },
+            {
+              id: 'smoke-mod-survival',
+              label: 'Wilderness Survival',
+              icon: 'fa-solid fa-campground',
+              expression: '@skills.survival.value'
+            }
+          ],
           tools: game.settings.get('fabricate', 'gatheringConfig')?.systems?.[systemId]?.tools || []
         });
 
@@ -8426,7 +8437,7 @@ async function main() {
         // instead of the empty setup-checklist state. Seeding must precede the
         // app .show() because entering the Travel tab does not itself re-read the
         // party store. Idempotent across reruns: clears any prior party first.
-        await page.evaluate(async ({ sysId, crafterId, travelMemberId }) => {
+        await page.evaluate(async ({ sysId, crafterId, travelMemberId, sceneId, regionId }) => {
           const realmStore = game.fabricate.getGatheringRealmStore?.();
           const partyStore = game.fabricate.getGatheringPartyStore?.();
           if (!realmStore || !partyStore) {
@@ -8452,6 +8463,20 @@ async function main() {
             .find(realm => realm.name === 'Northreach Vale');
           const realm = existingRealm
             || await realmStore.create(sysId, { name: 'Northreach Vale', enabled: true });
+          const scene = game.scenes.get(sceneId);
+          const sceneRegion = scene?.regions?.get(regionId);
+          if (!scene || !sceneRegion) {
+            throw new Error('Smoke Travel map Region fixture is unavailable.');
+          }
+          const otherMappings = (realm.sceneMappings || []).filter(
+            mapping => mapping?.sceneRegionUuid !== sceneRegion.uuid
+          );
+          await realmStore.update(sysId, realm.id, {
+            sceneMappings: [
+              ...otherMappings,
+              { sceneUuid: scene.uuid, sceneRegionUuid: sceneRegion.uuid }
+            ]
+          });
           const party = await partyStore.create({ name: 'The Vale Wardens' });
           await partyStore.addMember(party.id, crafter.uuid);
           if (travelMember) await partyStore.addMember(party.id, travelMember.uuid);
@@ -8491,8 +8516,11 @@ async function main() {
         }, {
           sysId: craftingSetup.systemId,
           crafterId: cleanup.crafterId,
-          travelMemberId: cleanup.travelMemberId
+          travelMemberId: cleanup.travelMemberId,
+          sceneId: craftingSetup.interactable.sceneId,
+          regionId: craftingSetup.interactable.regionId
         });
+        await activateSceneAndAwaitCanvasReady(page, craftingSetup.interactable.sceneId);
         await page.evaluate(async () => {
           globalThis.__fabricateSmokeManagerApp = (await game.fabricate.api.loadCraftingSystemManagerAppClass()).show();
         });
@@ -8592,6 +8620,14 @@ async function main() {
         await setManagerWindowSize(page, { width: 1280, height: 980 });
         const modifierCard = page.locator('.fabricate-manager [data-system-modifiers]').first();
         await modifierCard.waitFor({ state: 'visible', timeout: 5_000 });
+        const modifierRows = modifierCard.locator('[data-system-modifier]');
+        await modifierRows.nth(1).waitFor({ state: 'visible', timeout: 5_000 });
+        const modifierRowCount = await modifierRows.count();
+        if (modifierRowCount !== 2) {
+          throw new Error(
+            `System Settings modifier fixture expected 2 rendered rows, found ${modifierRowCount}.`
+          );
+        }
         await modifierCard.evaluate((el) => el.scrollIntoView({ block: 'start' }));
         await page.waitForTimeout(200);
 
@@ -8604,7 +8640,7 @@ async function main() {
 
         // Open the first modifier in edit mode and open its IconPicker so the icon
         // dropdown is visible (parity with Currency Units / Character Prerequisites).
-        const firstModifierRow = modifierCard.locator('[data-system-modifier]').first();
+        const firstModifierRow = modifierRows.first();
         await firstModifierRow.locator('[data-toggle-modifier]').first().click();
         await page.waitForTimeout(150);
         const modifierIconTrigger = firstModifierRow.locator('.essence-icon-picker-trigger').first();
@@ -10141,30 +10177,124 @@ async function main() {
         await assertNoScreenshotOverlays(page);
         await screenshot(page, 'manager-gathering-event-editor-normal');
 
-        // Travel route (#257): clicks the gathering Travel subitem and screenshots
-        // the party/region management surface. The subitem is targeted by id so
-        // adding it as a 5th gathering nav item does not shift any pinned .nth()
-        // selector. Captures a default-width and a narrow-width shot, mirroring
-        // the stacked-capture pattern used by the gathering task editor above.
+        // World Parties plus system Travel (#1179): disclosure starts collapsed.
+        // Capture each disclosure/selection state through its stable navigation id; the
+        // retired Gathering Travel subitem no longer exists.
         await setManagerWindowSize(page, { width: 1280, height: 820 });
-        await page.locator('.fabricate-manager #manager-gathering-nav-travel').first().click();
-        await page.locator('.fabricate-manager .manager-travel-view').first()
-          .waitFor({ state: 'visible', timeout: 10_000 });
+        await page.locator('.fabricate-manager #manager-nav-travel[aria-expanded="false"]')
+          .first().waitFor({ state: 'visible', timeout: 10_000 });
+        await captureStableManagerView(page, {
+          layout: 'System Travel collapsed by default',
+          label: 'manager-system-travel-default-collapsed'
+        });
+
+        await page.locator('.fabricate-manager #manager-travel-toggle').first().click();
+        await page.locator('.fabricate-manager #manager-nav-travel[aria-expanded="true"]')
+          .first().waitFor({ state: 'visible', timeout: 5_000 });
+        await captureStableManagerView(page, {
+          layout: 'System Travel expanded neutral',
+          label: 'manager-system-travel-expanded-neutral'
+        });
+
+        const gatheringToggle = page.locator(
+          '.fabricate-manager .manager-nav-toggle[aria-controls="manager-gathering-submenu"]'
+        ).first();
+        const gatheringSubmenu = page.locator('.fabricate-manager #manager-gathering-submenu').first();
+        const gatheringWasExpanded = await gatheringSubmenu.isVisible();
+        if (!gatheringWasExpanded) {
+          await gatheringToggle.click();
+          await gatheringSubmenu.waitFor({ state: 'visible', timeout: 5_000 });
+        }
+        await captureStableManagerView(page, {
+          layout: 'Gathering and system Travel expanded together',
+          label: 'manager-system-travel-with-gathering-expanded'
+        });
+        if (!gatheringWasExpanded) {
+          await gatheringToggle.click();
+          await gatheringSubmenu.waitFor({ state: 'hidden', timeout: 5_000 });
+        }
+
+        await page.locator('.fabricate-manager #manager-world-nav-parties').first().click();
         await page.locator('.fabricate-manager .manager-travel-parties-row').first()
           .waitFor({ state: 'visible', timeout: 10_000 });
         await captureStableManagerView(page, {
-          layout: 'gathering travel normal',
-          label: 'manager-gathering-travel-normal'
+          layout: 'World Parties normal',
+          label: 'manager-world-parties-normal'
         });
 
+        await page.locator('.fabricate-manager #manager-travel-nav-realms').first().click();
+        await page.locator('.fabricate-manager [data-travel-panel="realms"]')
+          .first().waitFor({ state: 'visible', timeout: 10_000 });
+        await captureStableManagerView(page, {
+          layout: 'System Travel Realms normal',
+          label: 'manager-system-travel-realms-normal'
+        });
         await captureStableManagerView(page, {
           width: 1000,
           height: 720,
-          layout: 'gathering travel stacked',
-          label: 'manager-gathering-travel-stacked',
+          layout: 'System Travel Realms stacked',
+          label: 'manager-system-travel-realms-stacked',
+          settleMs: 250
+        });
+
+        await setManagerWindowSize(page, { width: 1280, height: 820 });
+        const mapDestination = page.locator('.fabricate-manager #manager-travel-nav-map').first();
+        // The View Lab long-label-focus case owns native Space activation and focus-visible
+        // evidence for this exact control. Use a targeted pointer transition here so the live
+        // Foundry capture isolates populated Map content from keyboard-focus timing.
+        await mapDestination.click();
+        await page.locator('.fabricate-manager [data-travel-panel="map"]')
+          .first().waitFor({ state: 'visible', timeout: 10_000 });
+        await page.locator(
+          '.fabricate-manager [data-manager-map-region-uuid]:has-text("Fabricate Forage Node")'
+        ).first().waitFor({ state: 'visible', timeout: 10_000 });
+        await page.locator(
+          '.fabricate-manager .manager-travel-inspector' +
+          '[aria-label="Selected map region link"]:has-text("Northreach Vale")'
+        ).first().waitFor({ state: 'visible', timeout: 10_000 });
+        await captureStableManagerView(page, {
+          layout: 'System Travel Map Region Links normal',
+          label: 'manager-system-travel-map-normal'
+        });
+        await captureStableManagerView(page, {
+          width: 1000,
+          height: 720,
+          layout: 'System Travel Map Region Links stacked',
+          label: 'manager-system-travel-map-stacked',
           settleMs: 250
         });
         await setManagerWindowSize(page, { width: 1280, height: 820 });
+        await page.locator('.fabricate-manager [data-manager-rail-toggle]').first().click();
+        await page.locator('.fabricate-manager .manager-body.is-rail-collapsed')
+          .first().waitFor({ state: 'visible', timeout: 5_000 });
+        await captureStableManagerView(page, {
+          layout: 'System Travel Map Region Links collapsed rail',
+          label: 'manager-system-travel-map-collapsed-rail'
+        });
+        await page.locator('.fabricate-manager [data-manager-rail-toggle]').first().click();
+        await page.locator('.fabricate-manager .manager-body:not(.is-rail-collapsed)')
+          .first().waitFor({ state: 'visible', timeout: 5_000 });
+
+        try {
+          await page.evaluate(async (systemId) => {
+            await globalThis.__fabricateSmokeManagerApp?._adminStore?.setGatheringRealmsEnabled?.(
+              systemId,
+              false
+            );
+          }, craftingSetup.systemId);
+          await page.locator('.fabricate-manager #manager-nav-travel')
+            .first().waitFor({ state: 'detached', timeout: 5_000 });
+          await captureStableManagerView(page, {
+            layout: 'System Travel card off',
+            label: 'manager-system-travel-card-off'
+          });
+        } finally {
+          await page.evaluate(async (systemId) => {
+            const store = globalThis.__fabricateSmokeManagerApp?._adminStore;
+            await store?.setGatheringRealmsEnabled?.(systemId, true);
+            await store?.selectSystem?.(systemId);
+          }, craftingSetup.systemId);
+        }
 
         // Doc journey (quickstart Step 7 — Configure the Gathering Environment):
         // the gathering Settings tab hosts the d100 Gathering Rules (reward / event

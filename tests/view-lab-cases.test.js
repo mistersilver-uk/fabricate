@@ -145,7 +145,8 @@ function navDeclarationScope(sources, template) {
  * The step keys `runSteps` dispatches on. Hoisted out of the step test so the drift check below can
  * compare them against the runner's own lists.
  */
-const VERBS = ['select', 'fill', 'scroll', 'upload'];
+const VERBS = ['select', 'fill', 'scroll', 'upload', 'press'];
+const PRESS_KEYS = ['Enter', 'Space'];
 
 /**
  * `modifiers` is a MODIFIER, not a verb: it does not choose which action runs, it changes how the
@@ -455,6 +456,12 @@ test('every interaction step names text that exists in the manager UI', () => {
       if (VERBS.filter((verb) => verb in step).length > 1) {
         missing.push(`${viewCase.id}: step for "${step.selector}" names more than one verb`);
       }
+      if ('press' in step && !PRESS_KEYS.includes(step.press)) {
+        missing.push(
+          `${viewCase.id}: step for "${step.selector}" names unknown key ` +
+            `${JSON.stringify(step.press)} — press accepts ${PRESS_KEYS.join(', ')}`
+        );
+      }
       // The runner rejects both of these too, but that throw only fires during a capture run, which
       // is not an `npm test` gate — so a bad step would sit green in the registry until somebody
       // spent twenty minutes discovering it. Both rules are therefore enforced HERE as well.
@@ -738,6 +745,11 @@ test('the modifier vocabulary this file enforces is the one the capture driver e
     [...VERBS].sort(),
     'the driver refuses to pair `modifiers` with a different set of verbs than this file knows'
   );
+  assert.deepEqual(
+    declaredArray('PRESS_KEYS'),
+    [...PRESS_KEYS].sort(),
+    'the driver accepts a different press-key vocabulary than this file admits'
+  );
 });
 
 test('no two cases claiming exact reach produce the same frame', () => {
@@ -777,6 +789,42 @@ test('no two cases claiming exact reach produce the same frame', () => {
       'distinguishes it, or downgrade the ones that fall short to `window`:\n  ' +
       collisions.join('\n  ')
   );
+});
+
+test('the no-selection World Parties case clears selection through the real Manager store', () => {
+  const noSelection = getCaseById('manager-world-parties-no-selection');
+  const mountSource = readFileSync(resolve(ROOT, 'tests/view-lab/mount.js'), 'utf8');
+
+  assert.equal(noSelection.query?.clearSystem, '1');
+  assert.deepEqual(noSelection.smokeLabels, []);
+  assert.match(mountSource, /clearSystem: params\.get\('clearSystem'\) === '1'/);
+  assert.match(mountSource, /clearSystem: params\.clearSystem/);
+  assert.match(mountSource, /if \(params\.clearSystem\) await props\.store\.selectSystem\(''\)/);
+});
+
+test('system Travel Map evidence is populated and long-label focus cannot duplicate stacked', () => {
+  const normal = getCaseById('manager-system-travel-map-normal');
+  const stacked = getCaseById('manager-system-travel-map-stacked');
+  const longLabel = getCaseById('manager-system-travel-long-label-focus');
+  const mountSource = readFileSync(resolve(ROOT, 'tests/view-lab/mount.js'), 'utf8');
+  const contentSource = readFileSync(resolve(ROOT, 'tests/view-lab/world/labContent.js'), 'utf8');
+  const worldSource = readFileSync(resolve(ROOT, 'tests/view-lab/world/labWorld.js'), 'utf8');
+  const runnerSource = readFileSync(resolve(ROOT, 'scripts/view-lab-screenshots.mjs'), 'utf8');
+
+  for (const viewCase of [normal, stacked]) {
+    assert.match(viewCase.expectSelector, /Scene\.lab-map\.Region\.deep-gate/);
+    assert.match(viewCase.expectSelector, /manager-map-link-name/);
+    assert.match(viewCase.expectSelector, /manager-travel-region-item-name/);
+  }
+  assert.match(contentSource, /name: 'The Underdeep'/);
+  assert.match(contentSource, /sceneRegionUuid: 'Scene\.lab-map\.Region\.deep-gate'/);
+  assert.match(worldSource, /name: 'Deep Gate Approach'/);
+  assert.equal(longLabel.query?.longTravelLabels, '1');
+  assert.deepEqual(longLabel.smokeLabels, []);
+  assert.equal(longLabel.distinctEvidenceGroup, stacked.distinctEvidenceGroup);
+  assert.match(mountSource, /longTravelLabels: params\.get\('longTravelLabels'\) === '1'/);
+  assert.match(worldSource, /Map Region Links Across the Active Scene/);
+  assert.match(runnerSource, /evidence frame is byte-identical to/);
 });
 
 test('every crafting case claims exactly the resolution-mode body it renders', () => {

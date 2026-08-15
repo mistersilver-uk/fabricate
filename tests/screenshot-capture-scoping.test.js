@@ -389,6 +389,136 @@ test('every capture-map label appears as a literal in the harness (no phantom ro
   }
 });
 
+test('World Parties and system Travel capture-map order mirrors the live Foundry walk', () => {
+  const start = HARNESS.indexOf('// World Parties plus system Travel (#1179)');
+  const end = HARNESS.indexOf('// Doc journey (quickstart Step 7', start);
+  assert.ok(start >= 0 && end > start, 'the #1179 Foundry capture block must remain bounded');
+  const harnessLabels = [
+    ...HARNESS.slice(start, end).matchAll(
+      /label: '(manager-(?:world-parties|system-travel)[^']+)'/g
+    ),
+  ].map((match) => match[1]);
+  const mappedLabels = SCREENSHOT_CAPTURE_ORDER.filter(
+    (label) => label.startsWith('manager-world-parties') || label.startsWith('manager-system-travel')
+  );
+
+  assert.deepEqual(mappedLabels, harnessLabels);
+  assert.ok(!harnessLabels.includes('manager-world-parties-no-selection'));
+  assert.ok(!harnessLabels.includes('manager-system-travel-long-label-focus'));
+});
+
+test('the Foundry Map capture uses a deterministic click while View Lab retains keyboard evidence', () => {
+  const blockStart = HARNESS.indexOf('// World Parties plus system Travel (#1179)');
+  const mapDestinationStart = HARNESS.indexOf('const mapDestination = page.locator', blockStart);
+  const mapPanelWait = HARNESS.indexOf('[data-travel-panel="map"]', mapDestinationStart);
+  assert.ok(
+    blockStart >= 0 && blockStart < mapDestinationStart && mapDestinationStart < mapPanelWait,
+    'the #1179 Map interaction must remain bounded before its panel wait'
+  );
+
+  const mapInteraction = HARNESS.slice(mapDestinationStart, mapPanelWait);
+  assert.match(mapInteraction, /await mapDestination\.click\(\)/);
+  assert.doesNotMatch(mapInteraction, /\.press\('(?:Enter|Space)'\)/);
+
+  const viewLabCases = CAPTURE_PRODUCERS.find(
+    ({ path }) => path === 'scripts/lib/viewLabCases.js'
+  ).source;
+  const keyboardCaseStart = viewLabCases.indexOf(
+    "id: 'manager-system-travel-long-label-focus'"
+  );
+  const keyboardCaseEnd = viewLabCases.indexOf('\n  managerCase({', keyboardCaseStart);
+  assert.ok(
+    keyboardCaseStart >= 0 && keyboardCaseEnd > keyboardCaseStart,
+    'the View Lab Map keyboard evidence case must remain bounded'
+  );
+  const keyboardCase = viewLabCases.slice(keyboardCaseStart, keyboardCaseEnd);
+  assert.match(
+    keyboardCase,
+    /selector: '#manager-travel-nav-map', press: 'Space'/
+  );
+  assert.match(keyboardCase, /#manager-travel-nav-map\[aria-current="page"\]:focus-visible/);
+});
+
+test('Phase C seeds system modifiers canonically before the settings-list action', () => {
+  const phaseCStart = HARNESS.indexOf("startPhase('phase-C')");
+  const gatheringStart = HARNESS.indexOf(
+    "await game.settings.set('fabricate', 'gatheringConfig'",
+    phaseCStart
+  );
+  const systemPatchStart = HARNESS.indexOf(
+    '// Modifiers and Tools are SYSTEM-OWNED',
+    gatheringStart
+  );
+  const systemPatchEnd = HARNESS.indexOf(
+    '// Reference the deliberately-unlabelled tool',
+    systemPatchStart
+  );
+  const listStart = HARNESS.indexOf('// --- Settings-list ergonomics (issue 768) ---');
+  const firstAction = HARNESS.indexOf("locator('[data-toggle-modifier]')", listStart);
+  assert.ok(
+    phaseCStart >= 0 &&
+      phaseCStart < gatheringStart &&
+      gatheringStart < systemPatchStart &&
+      systemPatchStart < systemPatchEnd &&
+      systemPatchEnd < listStart &&
+      listStart < firstAction,
+    'the Phase-C gathering patch, canonical system patch, and list action must remain strictly ordered'
+  );
+
+  const gatheringPatch = HARNESS.slice(gatheringStart, systemPatchStart);
+  const systemPatch = HARNESS.slice(systemPatchStart, systemPatchEnd);
+  const beforeFirstAction = HARNESS.slice(listStart, firstAction);
+  const systemObjectMatch = gatheringPatch.match(/^(\s*)\[systemId\]: \{/m);
+  assert.ok(systemObjectMatch, 'the Phase-C gathering fixture must retain its system object');
+  const topLevelCharacterModifiers = new RegExp(
+    `^${systemObjectMatch[1]}  characterModifiers\\s*:`,
+    'm'
+  );
+  assert.match(
+    `${systemObjectMatch[1]}  characterModifiers: []`,
+    topLevelCharacterModifiers,
+    'the retired-key guard must detect a top-level system fixture library'
+  );
+  assert.doesNotMatch(
+    `${systemObjectMatch[1]}    characterModifiers: []`,
+    topLevelCharacterModifiers,
+    'the retired-key guard must permit nested task, drop-row, and event references'
+  );
+  assert.doesNotMatch(gatheringPatch, topLevelCharacterModifiers);
+  assert.match(systemPatch, /await csm\.updateSystem\(systemId, \{[\s\S]*?modifiers:\s*\[/);
+  assert.match(systemPatch, /smoke-mod-herbalism/);
+  assert.match(systemPatch, /smoke-mod-survival/);
+  assert.match(systemPatch, /tools:\s*game\.settings\.get/);
+  assert.match(beforeFirstAction, /modifierRows\.nth\(1\)\.waitFor/);
+  assert.match(beforeFirstAction, /modifierRowCount !== 2/);
+});
+
+test('manager stability counts populated system Travel realm and map rows', () => {
+  const guardStart = HARNESS.indexOf('async function assertManagerLayoutStable(page, label)');
+  const rowCountStart = HARNESS.indexOf('const rowCount = metrics.filter', guardStart);
+  const editFormCountStart = HARNESS.indexOf(
+    'const editFormCount = metrics.filter',
+    rowCountStart
+  );
+  assert.ok(
+    guardStart >= 0 && guardStart < rowCountStart && rowCountStart < editFormCountStart,
+    'the Manager layout measurement and row-count guard must remain bounded'
+  );
+
+  const measurementBlock = HARNESS.slice(guardStart, rowCountStart);
+  const rowCountBlock = HARNESS.slice(rowCountStart, editFormCountStart);
+  for (const selector of ['.manager-travel-realms-row', '.manager-map-link-row']) {
+    assert.ok(
+      measurementBlock.includes(`'${selector}'`),
+      `${selector} must participate in overflow measurement`
+    );
+    assert.ok(
+      rowCountBlock.includes(`metric.selector === '${selector}'`),
+      `${selector} must satisfy the populated-row backstop`
+    );
+  }
+});
+
 test('phase assignment matches the manager/player prefix split', () => {
   for (const label of SCREENSHOT_CAPTURE_ORDER) {
     const phase = phaseForCaptureLabel(label);

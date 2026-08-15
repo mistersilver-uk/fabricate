@@ -92,6 +92,13 @@ function readParams() {
     // three manager surfaces exist only for a system in the right visibility mode - clicking to
     // them is impossible when the rail entry is not rendered at all.
     system: params.get('system') ?? null,
+    // World Parties is the one Manager route that remains operable with no selected system.
+    // Clearing through the real admin store after construction reaches that state without
+    // weakening production's persisted-selection normalization.
+    clearSystem: params.get('clearSystem') === '1',
+    // Evidence-only localization stress. It changes no shipped string and exists solely so the
+    // named long-label frame cannot collapse to the ordinary stacked Map frame.
+    longTravelLabels: params.get('longTravelLabels') === '1',
     // The Graph rail placeholder is advertised only behind the experimental toggle, so a case that
     // reproduces the smoke's experimental-off frame has to turn it back off.
     experimental: params.get('experimental') !== '0',
@@ -190,6 +197,7 @@ async function mountManagerApp(content, params) {
   });
   const props = app._prepareSvelteProps();
   const services = props.services;
+  if (params.clearSystem) await props.store.selectSystem('');
   const instance = mount(CraftingSystemManagerRoot, { target: content, props });
   return { instance, services, props, store: props.store, tab: params.tab };
 }
@@ -422,6 +430,8 @@ async function boot() {
     : await buildLabWorld({
         managedSystemId: params.system,
         experimentalFeatures: params.experimental,
+        clearSystem: params.clearSystem,
+        longTravelLabels: params.longTravelLabels,
       });
   const localize = world ? world.localize : (key) => key;
   configureLabPage({ colorScheme: params.colorScheme });

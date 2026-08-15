@@ -1,7 +1,9 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  GatheringTravelView is the center-column surface for the gathering `Travel`
-  route (issue 257, first slice). It manages WORLD-LEVEL Fabricate parties
+  GatheringTravelView is the legacy center-column surface for Fabricate's
+  WORLD-LEVEL party editor (issue 257, first slice). The Manager now reaches
+  permanent party management through World > Parties, while selected-system
+  Travel contains Realms and Map Region Links. This component manages parties
   (create/rename/enable/members/travel actor) plus the PER-SYSTEM current-realm
   override for the selected crafting system. The right inspector renders a
   read-only evidence echo; all editing controls live here so override editing

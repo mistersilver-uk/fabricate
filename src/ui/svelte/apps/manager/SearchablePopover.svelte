@@ -1,7 +1,7 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  Generic searchable popover used by the Travel tab (region-override picker and
-  move-to-party picker). The popover is portaled to the `.fabricate-manager`
+  Generic searchable popover used by the World > Parties and selected-system
+  Travel surfaces (realm-override picker and move-to-party picker). The popover is portaled to the `.fabricate-manager`
   host so it escapes the `overflow: hidden` manager panel, positioned with
   `computeIconPickerPopoverLayout`, and dismissed on outside click / Escape (the
   portaled popover is registered as an additional "inside" node so clicking

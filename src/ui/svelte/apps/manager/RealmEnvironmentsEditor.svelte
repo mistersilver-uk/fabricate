@@ -1,6 +1,6 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  Expanded-body editor for a realm row on the Travel > Realms tab. Two
+  Expanded-body editor for a realm row on selected-system Travel > Realms. Two
   columns: available environments (not in the realm) on the left with an Add
   button, and included environments (in the realm) on the right with a Remove
   button. Add/Remove toggle the realm "tag" on the environment's

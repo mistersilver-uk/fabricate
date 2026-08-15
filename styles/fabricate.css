@@ -2113,6 +2113,15 @@
   box-shadow: none;
 }
 
+.fabricate-manager .manager-body.is-rail-collapsed .manager-world-nav {
+  margin-top: var(--fab-space-1);
+  padding-top: var(--fab-space-2);
+}
+
+.fabricate-manager .manager-body.is-rail-collapsed .manager-world-heading-row {
+  display: none;
+}
+
 .fabricate-manager .manager-main {
   display: grid;
   grid-template-rows: auto auto 1fr;
@@ -12084,6 +12093,44 @@
   overflow: hidden auto;
 }
 
+/* World is a presentation group after the selected-system navigation, not another
+   persistence scope. Its divider and two-line micro-heading follow the Downtime Studio
+   reference while every interactive row continues to use the shipped manager-nav contract. */
+.fabricate-manager .manager-world-nav {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-1);
+  margin-top: calc(var(--fab-space-3) + var(--fab-space-2xs));
+  padding-top: var(--fab-space-3);
+  border-top: 1px solid var(--fab-mv2-border);
+}
+
+.fabricate-manager .manager-world-heading-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: flex-start;
+  gap: var(--fab-space-chip);
+  padding: 0 var(--fab-space-1) var(--fab-space-2);
+}
+
+.fabricate-manager .manager-world-heading-row h2,
+.fabricate-manager .manager-world-heading-row span {
+  margin: 0;
+  font-size: 0.58rem;
+  line-height: 1.2;
+}
+
+.fabricate-manager .manager-world-heading-row h2 {
+  color: var(--fab-text-subtle);
+  font-weight: 700;
+  letter-spacing: 0.14em;
+}
+
+.fabricate-manager .manager-world-heading-row span {
+  color: var(--fab-mv2-text-muted);
+  font-weight: 500;
+}
+
 /* The two blocks above the nav are not the scroller, so they must not absorb its shrink —
    a flex item defaults to `flex-shrink: 1` and would otherwise compress instead. */
 .fabricate-manager .manager-rail > .manager-rail-title,
@@ -12136,16 +12183,14 @@
   background: var(--fab-overlay-light-04);
 }
 
-/*
-  The active nav row is ACCENT, not success: the rail's selected state is an identity
-  cue ("you are here"), never a status. Success/amber stay reserved for enabled and
-  warning states on the rows the manager screens list.
-*/
+/* World established the manager rail's quiet selected language. The same link styling is
+   shared by every system-specific direct, parent, and child route so changing scope does
+   not change the meaning of an active navigation row. */
 .fabricate-manager .manager-nav-button.is-active {
-  color: var(--fab-mv2-accent);
-  border-color: var(--fab-accent-border);
-  background: var(--fab-accent-soft);
-  box-shadow: inset 3px 0 0 var(--fab-mv2-accent);
+  color: var(--fab-mv2-text);
+  border-color: var(--fab-mv2-border-strong);
+  background: var(--fab-surface-active);
+  box-shadow: none;
   font-weight: 600;
 }
 
@@ -12155,7 +12200,7 @@
 }
 
 .fabricate-manager .manager-nav-button.is-active:focus {
-  box-shadow: inset 3px 0 0 var(--fab-mv2-accent);
+  box-shadow: none;
 }
 
 .fabricate-manager .manager-nav-group {
@@ -12182,6 +12227,11 @@
   border-color: transparent;
   background: transparent;
   box-shadow: none;
+}
+
+.fabricate-manager .manager-nav-group.is-expanded .manager-nav-parent.is-active {
+  color: var(--fab-mv2-text);
+  background: var(--fab-surface-active);
 }
 
 .fabricate-manager .manager-nav-group.is-expanded .manager-nav-parent:hover {
@@ -12261,10 +12311,10 @@
 }
 
 .fabricate-manager .manager-nav-subitem.is-active {
-  color: var(--fab-mv2-accent);
-  border-color: var(--fab-accent-border);
-  background: var(--fab-accent-soft);
-  box-shadow: inset 3px 0 0 var(--fab-mv2-accent);
+  color: var(--fab-mv2-text);
+  border-color: transparent;
+  background: var(--fab-surface-active);
+  box-shadow: none;
   font-weight: 600;
 }
 
@@ -12274,7 +12324,7 @@
 }
 
 .fabricate-manager .manager-nav-subitem.is-active:focus {
-  box-shadow: inset 3px 0 0 var(--fab-mv2-accent);
+  box-shadow: none;
 }
 
 .fabricate-manager .manager-nav-subitem:focus-visible {
@@ -12329,8 +12379,19 @@
 
 .fabricate-manager .manager-nav-button.is-active .manager-nav-count,
 .fabricate-manager .manager-nav-subitem.is-active .manager-nav-count {
-  color: var(--fab-mv2-accent);
-  font-weight: 700;
+  color: var(--fab-text-subtle);
+  font-weight: 600;
+}
+
+/* A Party row explains why its system-specific realm override is unavailable without
+   disabling the global party editor around it. */
+.fabricate-manager .manager-travel-parties-override-unavailable {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  color: var(--fab-text-subtle);
 }
 
 /*

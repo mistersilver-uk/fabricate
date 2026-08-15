@@ -9,7 +9,7 @@ const repoRoot = resolve(import.meta.dirname, '../..');
 
 // EnvironmentsBrowserView's Settings tab renders the biome vocabulary panel, which
 // mounts IconPicker + (conditionally) ManagerColorPopover side by side, plus every
-// other Gathering sub-view EnvironmentsBrowserView statically imports. A `.svelte`
+// retained Gathering and World content views EnvironmentsBrowserView statically imports. A `.svelte`
 // or `.js` the mounted tree renders but this allowlist omits does NOT fail the
 // suite — it HANGS (reported as `# cancelled`).
 const harness = createMountedComponentHarness({
@@ -44,7 +44,6 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/GatheringEconomyView.svelte',
     'src/ui/svelte/apps/manager/ResolutionModeCard.svelte',
     'src/ui/svelte/apps/manager/RadioCardGroup.svelte',
-    'src/ui/svelte/apps/manager/GatheringTravelTabs.svelte',
     'src/ui/svelte/apps/manager/SearchablePopover.svelte',
     'src/ui/svelte/apps/manager/PartyNameField.svelte',
     'src/ui/svelte/apps/manager/RealmOverridePicker.svelte',

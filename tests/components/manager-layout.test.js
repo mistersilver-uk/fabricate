@@ -794,10 +794,7 @@ test('manager nav buttons clear host mouse focus and keep green keyboard focus',
     navFocusBlock.includes('box-shadow: none;'),
     'mouse focus on nav buttons should not inherit the host orange focus shadow'
   );
-  assert.ok(
-    activeNavFocusBlock.includes('box-shadow: inset 3px 0 0 var(--fab-mv2-accent);'),
-    'active nav focus should keep the active left accent'
-  );
+  assert.ok(activeNavFocusBlock.includes('box-shadow: none;'), 'active nav focus stays neutral');
   assert.ok(
     navFocusVisibleBlock.includes('outline: 2px solid var(--fab-mv2-accent);'),
     'keyboard focus on nav buttons should use the manager accent'
@@ -899,26 +896,22 @@ test('manager gathering rail submenu controls clear host mouse focus and keep gr
     subitemBlock.includes('grid-template-columns: 20px minmax(0, 1fr) auto auto;'),
     'gathering submenu entries should keep count chips inside their rows'
   );
-  // Issue 643: the rail's selected state is an IDENTITY cue ("you are here"), so it
-  // moved off the success family onto the accent family. Success stays reserved for
-  // the enabled/disabled status the manager screens' rows report.
+  // Issue 1179: World established the neutral active language and every corresponding
+  // selected-system link now shares it.
   assert.ok(
-    activeSubitemBlock.includes('background: var(--fab-accent-soft);'),
-    'only selected gathering submenu entries should use selected fill'
+    activeSubitemBlock.includes('background: var(--fab-surface-active);'),
+    'selected submenu entries should use the neutral active fill'
   );
   assert.ok(
-    activeSubitemBlock.includes('border-color: var(--fab-accent-border);'),
-    'selected gathering submenu entries should carry the accent edge'
+    activeSubitemBlock.includes('border-color: transparent;'),
+    'selected submenu entries should not add a strong edge'
   );
   assert.equal(
     activeSubitemBlock.includes('var(--fab-success'),
     false,
     'the rail selected state should not reuse the enabled-status success family'
   );
-  assert.ok(
-    activeSubitemBlock.includes('box-shadow: inset 3px 0 0 var(--fab-mv2-accent);'),
-    'selected gathering submenu entries should keep the active left accent'
-  );
+  assert.ok(activeSubitemBlock.includes('box-shadow: none;'), 'selected entries have no stripe');
   assert.ok(
     toggleFocusBlock.includes('outline: none;'),
     'mouse focus on gathering toggle should not inherit the host outline'
@@ -939,10 +932,7 @@ test('manager gathering rail submenu controls clear host mouse focus and keep gr
     subitemFocusBlock.includes('box-shadow: none;'),
     'mouse focus on gathering submenu entries should not inherit the host orange focus shadow'
   );
-  assert.ok(
-    activeSubitemFocusBlock.includes('box-shadow: inset 3px 0 0 var(--fab-mv2-accent);'),
-    'active gathering submenu focus should keep the active left accent'
-  );
+  assert.ok(activeSubitemFocusBlock.includes('box-shadow: none;'), 'active focus stays neutral');
   assert.ok(
     subitemFocusVisibleBlock.includes('outline: 2px solid var(--fab-mv2-accent);'),
     'keyboard focus on gathering submenu entries should use the manager accent'

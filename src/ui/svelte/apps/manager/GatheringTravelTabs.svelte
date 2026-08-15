@@ -1,4 +1,9 @@
 <!-- Svelte 5 runes mode -->
+<!--
+  Legacy sub-navigation for the formerly combined Travel surface. The Manager
+  now reaches permanent party management through World > Parties. Selected-
+  system Travel contains Realms and Map Region Links only.
+-->
 <script>
   import { localize } from '../../util/foundryBridge.js';
 
