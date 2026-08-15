@@ -13714,6 +13714,21 @@ describe('CraftingSystemManager mounted behavior', () => {
     await settleRouteExit();
 
     assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'world-downtime');
+    // world-downtime is a two-column route: the `{#if}` that renders the inspector
+    // excludes it, and `styles/fabricate.css` releases its column to match. Those are
+    // one decision expressed twice, so drop the guard and this (empty) aside wraps to
+    // an implicit grid row under the preview — which `expectNoHorizontalOverflow` in
+    // the View Lab cases cannot see, because a stray ROW costs no horizontal width.
+    assert.equal(
+      target.querySelector('.manager-inspector'),
+      null,
+      'world-downtime renders no inspector aside — the guard and the released CSS column stay in step'
+    );
+    assert.equal(
+      target.querySelector('.manager-header .manager-subtitle').textContent.trim(),
+      'Preview campaign downtime workflows or open an installed companion extension.',
+      'the world-downtime subtitle branch survives beside the counted World Parties one'
+    );
     assert.equal(worldNavItem('parties').getAttribute('aria-current'), null);
     assert.equal(worldNavItem('downtime').getAttribute('aria-current'), 'page');
     const tabs = Array.from(target.querySelectorAll('[data-downtime-tab]'));
