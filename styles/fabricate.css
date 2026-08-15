@@ -15997,6 +15997,14 @@
     overflow-y: auto;
   }
 
+  /* World Parties releases its unused inspector at desktop widths. Its route rule has more
+     class/attribute specificity than the shared stack above, so it must explicitly join the
+     one-column rail/body layout here rather than retaining its desktop two-track grid. */
+  .fabricate-manager[data-manager-view="world"][data-world-travel-tab="parties"] .manager-body,
+  .fabricate-manager[data-manager-view="world"][data-world-travel-tab="parties"] .manager-body.is-rail-collapsed {
+    grid-template-columns: 1fr;
+  }
+
   /*
     Stacked, the rail is a full-height nav sitting ABOVE the content it navigates to.
     Left at its content height it is ~650px of chrome the GM must scroll past before

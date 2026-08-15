@@ -7431,6 +7431,45 @@ describe('CraftingSystemManager mounted behavior', () => {
     );
   });
 
+  it('returns to the first page and the top of the party scroller when the page size changes', async () => {
+    await openLabMirrorParties();
+    const parties = target.querySelector('.manager-travel-parties');
+    const scroller = parties.querySelector('.manager-travel-parties-content');
+    const pagination = parties.querySelector('[data-manager-party-pagination]');
+
+    parties.querySelector('[data-pagination-next]').click();
+    scroller.scrollTop = 160;
+    await tick();
+    flushSync();
+    assert.equal(
+      pagination.querySelector('[data-pagination-page]').textContent.trim(),
+      'Page 2 of 2',
+      'precondition: the last party is on the later default-size page'
+    );
+    assert.equal(scroller.scrollTop, 160, 'precondition: the party scroller has moved');
+
+    const pageSize = pagination.querySelector('[data-pagination-size]');
+    pageSize.value = '2';
+    pageSize.dispatchEvent(new Event('change', { bubbles: true }));
+    await tick();
+    flushSync();
+
+    assert.equal(
+      pagination.querySelector('[data-pagination-page]').textContent.trim(),
+      'Page 1 of 3',
+      'a page-size mutation always returns the party list to its first page'
+    );
+    assert.ok(
+      Boolean(parties.querySelector('[data-manager-travel-party-id="lab-party"]')),
+      'the first-page party is rendered again'
+    );
+    assert.ok(
+      !parties.querySelector('[data-manager-travel-party-id="lab-party-wagonwright"]'),
+      'the former last-page party is no longer rendered'
+    );
+    assert.equal(scroller.scrollTop, 0, 'the party scroller returns to its top');
+  });
+
   it('stages editor edits without persisting until the header Save is pressed', async () => {
     const calls = [];
     const target = await openRecipeEditor(calls);

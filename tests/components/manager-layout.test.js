@@ -6549,7 +6549,7 @@ test('every manager select paints an opaque background, so its popup opens dark'
 // A rendered measurement can see both. `chromium` is already this file's tool for exactly
 // this reason: happy-dom applies no stylesheet and computes no cascade, so nothing in a
 // mounted suite could ever have caught either.
-async function readWorkspaceGrid(width, view) {
+async function readWorkspaceGrid(width, view, worldTravelTab = '') {
   const context = await sharedBrowser.newContext({
     viewport: { width, height: 720 },
     deviceScaleFactor: 1,
@@ -6559,7 +6559,7 @@ async function readWorkspaceGrid(width, view) {
     await page.setContent(
       `<style>${css}</style>` +
         `<div style="width:${width}px;height:640px">` +
-        `<div class="fabricate-manager" data-manager-view="${view}">` +
+        `<div class="fabricate-manager" data-manager-view="${view}" data-world-travel-tab="${worldTravelTab}">` +
         `<div class="manager-body"><aside class="manager-rail">Rail</aside>` +
         `<main class="manager-main"><div class="manager-environment-edit-view">` +
         `<div class="manager-environment-workspace">` +
@@ -6639,6 +6639,23 @@ test('the environment, tags and system studios restack at the same floor', async
   for (const view of ['environment-edit', 'system-edit', 'crafting-settings']) {
     const floor = await readWorkspaceGrid(1024, view);
     assert.equal(floor.workspaceColumns, 1, `${view} stacks its workspace at the floor`);
+  }
+});
+
+test('World Parties preserves the shared stacked rail and body layout at narrow widths', async () => {
+  // The World route deliberately releases the unused inspector at desktop widths. Its route
+  // rule is more specific than the shared 1120px stack, however, so this must be measured:
+  // a source-text assertion would pass while the cascade left the two desktop tracks alive.
+  const wide = await readWorkspaceGrid(1280, 'world', 'parties');
+  assert.equal(wide.bodyColumns, 2, 'wide World Parties keeps its rail beside the full-width body');
+
+  for (const width of [1100, 1024]) {
+    const narrow = await readWorkspaceGrid(width, 'world', 'parties');
+    assert.equal(
+      narrow.bodyColumns,
+      1,
+      `World Parties uses the shared stacked rail/body layout at ${width}px`
+    );
   }
 });
 
