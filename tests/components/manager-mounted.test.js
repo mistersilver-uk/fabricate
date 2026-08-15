@@ -13719,9 +13719,11 @@ describe('CraftingSystemManager mounted behavior', () => {
     // one decision expressed twice, so drop the guard and this (empty) aside wraps to
     // an implicit grid row under the preview — which `expectNoHorizontalOverflow` in
     // the View Lab cases cannot see, because a stray ROW costs no horizontal width.
-    assert.equal(
-      target.querySelector('.manager-inspector'),
-      null,
+    // assert.ok(!el) rather than assert.equal(el, null): on failure, assert.equal
+    // tries to build an inline diff of a happy-dom element — a circular, whole-subtree
+    // graph — and dies with an unmessaged heap OOM. Same detection, readable failure.
+    assert.ok(
+      !target.querySelector('.manager-inspector'),
       'world-downtime renders no inspector aside — the guard and the released CSS column stay in step'
     );
     assert.equal(
