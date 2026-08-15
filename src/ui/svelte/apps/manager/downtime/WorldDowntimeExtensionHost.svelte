@@ -4,14 +4,19 @@
   import WorldDowntimeTabs from './WorldDowntimeTabs.svelte';
   import { WORLD_DOWNTIME_PREVIEW_PROVIDER } from './worldDowntimePreviewProvider.js';
 
+  // `activeTabId` is bindable because the selected preview is no longer private to this
+  // host: the route's title, subtitle and breadcrumb leaf all name it, and the rail's four
+  // Downtime sub-items are a second trigger for the same navigation as the tab strip. One
+  // owner, two triggers — binding keeps the host authoritative while letting the shell read
+  // and drive it. Unbound (the direct-mount tests), it is ordinary local state.
   let {
     managerExtensions = null,
     context = Object.freeze({}),
     reportError = console.error,
+    activeTabId = $bindable('tracking'),
   } = $props();
   let provider = $state(WORLD_DOWNTIME_PREVIEW_PROVIDER);
   let coreFallback = $state(true);
-  let activeTabId = $state('tracking');
   let extensionTarget = $state(null);
   let shell = $state(null);
   let activeMount = null;

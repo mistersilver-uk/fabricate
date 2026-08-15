@@ -1139,6 +1139,21 @@ test('World Downtime publishes four tabs plus narrow/collapsed frames with gener
     'expectClick does not fall back to a synthetic DOM click'
   );
 
+  // The four tab cases hand-copy `Tabs.<Tab>.Tooltip` into an `expectVisible` text match, so
+  // the registry is a MIRROR of `lang/en.json` and mirrors rot silently: a lang edit would
+  // leave these frames waiting for a caption that no longer exists, and the failure would
+  // surface in the capture run rather than here. Pin the mirror instead.
+  const lang = JSON.parse(readFileSync(resolve(ROOT, 'lang/en.json'), 'utf8'));
+  const downtimeTabs = lang.FABRICATE.Admin.Manager.World.Downtime.Tabs;
+  for (const viewCase of cases.slice(0, 4)) {
+    const tabId = viewCase.id.replace('manager-world-downtime-', '');
+    const tabKey = tabId[0].toUpperCase() + tabId.slice(1);
+    assert.ok(
+      viewCase.expectVisible.includes(downtimeTabs[tabKey].Tooltip),
+      `${viewCase.id} expects the shipped ${tabKey} tooltip verbatim`
+    );
+  }
+
   const mountSource = readFileSync(resolve(ROOT, 'tests/view-lab/mount.js'), 'utf8');
   assert.match(mountSource, /applyLongDowntimeLocalization\(world\)/);
   assert.doesNotMatch(

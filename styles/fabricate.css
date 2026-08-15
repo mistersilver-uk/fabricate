@@ -252,6 +252,7 @@
   --fab-tag-butter: #E7DBB1;
   --fab-tag-aqua: #B9DDD7;
   --fab-tag-mauve: #D8BED4;
+  --fab-tag-ember: #D98B6A;
   --fab-drop-rate-guaranteed: #75C98E;
   --fab-drop-rate-common: #5EC3B0;
   --fab-drop-rate-uncommon: #6FA8E8;
@@ -374,6 +375,7 @@
   --fab-tag-butter: #E7DBB1;
   --fab-tag-aqua: #B9DDD7;
   --fab-tag-mauve: #D8BED4;
+  --fab-tag-ember: #D98B6A;
   --fab-drop-rate-guaranteed: #75C98E;
   --fab-drop-rate-common: #5EC3B0;
   --fab-drop-rate-uncommon: #6FA8E8;
@@ -496,6 +498,7 @@
   --fab-tag-butter: #D6C08E;
   --fab-tag-aqua: #B8C4CB;
   --fab-tag-mauve: #A39AA2;
+  --fab-tag-ember: #C57142;
   --fab-drop-rate-guaranteed: #75C98E;
   --fab-drop-rate-common: #5EC3B0;
   --fab-drop-rate-uncommon: #6FA8E8;
@@ -618,6 +621,7 @@
   --fab-tag-butter: #E7D8A2;
   --fab-tag-aqua: #B8C8A5;
   --fab-tag-mauve: #E7D9B8;
+  --fab-tag-ember: #D78866;
   --fab-drop-rate-guaranteed: #75C98E;
   --fab-drop-rate-common: #5EC3B0;
   --fab-drop-rate-uncommon: #6FA8E8;
@@ -740,6 +744,7 @@
   --fab-tag-butter: #E6E0C8;
   --fab-tag-aqua: #9DC9BD;
   --fab-tag-mauve: #C3C2DA;
+  --fab-tag-ember: #DB9CA0;
   --fab-drop-rate-guaranteed: #75C98E;
   --fab-drop-rate-common: #5EC3B0;
   --fab-drop-rate-uncommon: #6FA8E8;
@@ -882,6 +887,7 @@
   --fab-tag-butter: #D5C09A;
   --fab-tag-aqua: #948F90;
   --fab-tag-mauve: #706B70;
+  --fab-tag-ember: #BC642B;
   --fab-drop-rate-guaranteed: #75C98E;
   --fab-drop-rate-common: #5EC3B0;
   --fab-drop-rate-uncommon: #6FA8E8;
@@ -1004,6 +1010,7 @@
   --fab-tag-butter: #E6D08A;
   --fab-tag-aqua: #A9CFCB;
   --fab-tag-mauve: #CBB2C8;
+  --fab-tag-ember: #D48654;
   --fab-drop-rate-guaranteed: #75C98E;
   --fab-drop-rate-common: #5EC3B0;
   --fab-drop-rate-uncommon: #6FA8E8;
@@ -2104,7 +2111,8 @@
 }
 
 .fabricate-manager .manager-body.is-rail-collapsed .manager-nav-toggle,
-.fabricate-manager .manager-body.is-rail-collapsed .manager-nav-submenu {
+.fabricate-manager .manager-body.is-rail-collapsed .manager-nav-submenu,
+.fabricate-manager .manager-body.is-rail-collapsed .manager-nav-callout {
   display: none;
 }
 
@@ -12368,6 +12376,81 @@
   color: var(--fab-mv2-text-muted);
   cursor: default;
   opacity: 0.72;
+}
+
+/*
+  The Downtime rail group (issue 1185). Its four children are a step LOUDER than an ordinary
+  rail child — weight 600 against 500, and a full-strength active row — because they are the
+  premium previews rather than plain destinations. The indent is `padding-left`, never an
+  inset: the row keeps the same x and width as every other rail row so its active fill lines
+  up with the group header above it.
+*/
+.fabricate-manager .manager-downtime-subitem {
+  padding: var(--fab-space-1) var(--fab-space-2) var(--fab-space-1) var(--fab-space-5);
+  border-radius: 7px;
+  border-color: transparent;
+  font-weight: 600;
+}
+
+.fabricate-manager .manager-downtime-subitem.is-active {
+  color: var(--fab-mv2-text);
+  background: var(--fab-surface-active);
+}
+
+/*
+  The padlock does NOT dim with its row. It is the premium marker on a working control, not
+  a disabled state, so it holds the accent whether or not the row is the current one — the
+  one place in this rail where a trailing mark deliberately outranks the label beside it.
+*/
+.fabricate-manager .manager-nav-lock {
+  flex: 0 0 auto;
+  margin-left: auto;
+  color: var(--fab-mv2-accent);
+  font-size: 0.56rem;
+  line-height: 1;
+}
+
+/*
+  The premium badge on the Downtime parent row. It rides `.manager-nav-count` so the
+  collapsed 56px rail hides it with every other trailing marker, and only re-tones from a
+  mono numeral to a lettered premium mark.
+*/
+.fabricate-manager .manager-nav-premium {
+  color: var(--fab-mv2-accent);
+
+  /* A lettered mark, not a numeral: drop `.manager-nav-count`'s mono face. */
+  font-family: inherit;
+  font-size: 0.52rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+/*
+  The rail's premium-preview note: what the padlocks above it mean. It sits at the foot of
+  the group and, like the design's own, is below the fold at the rail's resting scroll —
+  the rail scrolls, and this is real copy a default screenshot will not show.
+*/
+.fabricate-manager .manager-nav-callout {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-2xs);
+  margin: var(--fab-space-2) var(--fab-space-chip) 0;
+  padding: var(--fab-space-2);
+  border: 1px solid var(--fab-accent-border);
+  border-radius: 8px;
+  color: var(--fab-mv2-text-muted);
+  font-size: 0.6rem;
+  line-height: 1.4;
+}
+
+.fabricate-manager .manager-nav-callout-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--fab-space-chip);
+  color: var(--fab-mv2-accent);
+  font-size: 0.55rem;
+  font-weight: 700;
+  letter-spacing: 0.09em;
 }
 
 .fabricate-manager .manager-nav-label {

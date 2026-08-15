@@ -788,6 +788,30 @@ function worldNavItem(id) {
   return target.querySelector(`#manager-world-nav-${id}`);
 }
 
+// The mounted harness stubs `game.i18n.localize` as `(key) => key`, which makes the root's
+// `text(key, fallback)` return the FALLBACK for everything. That is fine for behaviour, and
+// useless for copy: a component reading the WRONG key and a lang value that has drifted from
+// its fallback both pass. The Downtime route is copy-shaped work, so its suites resolve
+// against the real shipped `lang/en.json` and pin what a GM will actually read.
+const SHIPPED_LANG = JSON.parse(readFileSync(resolve(repoRoot, 'lang/en.json'), 'utf8'));
+
+const identityLocalize = (key) => key;
+
+function shippedString(key) {
+  let node = SHIPPED_LANG;
+  for (const part of key.split('.')) {
+    if (node == null || typeof node !== 'object') return key;
+    node = node[part];
+  }
+  return typeof node === 'string' ? node : key;
+}
+
+// Paired with the suite's `afterEach`, which restores the identity localizer whether the
+// test passed or threw.
+function useShippedLocalization() {
+  globalThis.game.i18n.localize = shippedString;
+}
+
 function downtimeProvider({ prefix = 'Companion', mount: mountProvider, ...overrides } = {}) {
   return {
     apiVersion: 1,
@@ -2778,7 +2802,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     globalThis.Comment = document.createComment('').constructor;
     globalThis.game = {
       i18n: {
-        localize: (key) => key,
+        localize: identityLocalize,
         format: (key) => key,
       },
     };
@@ -2865,6 +2889,10 @@ describe('CraftingSystemManager mounted behavior', () => {
     }
     target?.remove();
     target = null;
+    // Restore the identity localizer unconditionally. A test that swaps in the shipped
+    // strings and then FAILS would otherwise leak its localizer into every later test,
+    // turning one failure into a cascade that hides its own cause.
+    globalThis.game.i18n.localize = identityLocalize;
   });
 
   after(() => {
@@ -13728,7 +13756,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     );
     assert.equal(
       target.querySelector('.manager-header .manager-subtitle').textContent.trim(),
-      'Preview campaign downtime workflows or open an installed companion extension.',
+      'Fabricate Premium · Your party-wide command board for every activity and shared project.',
       'the world-downtime subtitle branch survives beside the counted World Parties one'
     );
     assert.equal(worldNavItem('parties').getAttribute('aria-current'), null);
@@ -13808,6 +13836,285 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.equal(cta.rel, 'noopener noreferrer');
     assert.deepEqual(calls, [], 'the Core preview and tab interactions call no store write seam');
     globalThis.game.i18n.localize = originalLocalize;
+  });
+
+  // The maintainer's own report was "all of the sub-tabs are missing": the design nests the
+  // same four previews under the rail's Downtime entry, each carrying a premium padlock, and
+  // Core rendered only the strip inside the panel. These assertions pin the rail treatment,
+  // and that BOTH triggers — a rail child and a studio-card button — drive one navigation.
+  it('nests four locked Downtime previews in the rail and drives one navigation from either trigger', async () => {
+    useShippedLocalization();
+    const calls = [];
+    mountManager(calls, {}, {}, { managerExtensions: createManagerExtensionsRegistry() });
+
+    assert.ok(
+      !target.querySelector('[data-world-downtime-submenu]'),
+      'the group stays collapsed until the route is entered, like the Travel group'
+    );
+    const parent = worldNavItem('downtime');
+    assert.equal(
+      parent.getAttribute('title'),
+      'Unlock Downtime Studio with Fabricate Premium',
+      'the rail entry carries the premium tooltip the design puts on it'
+    );
+    assert.equal(parent.getAttribute('aria-controls'), 'manager-downtime-submenu');
+    assert.equal(parent.getAttribute('aria-expanded'), 'false');
+    assert.equal(
+      parent.querySelector('[data-world-nav-premium]').textContent.trim(),
+      'PREMIUM',
+      'the premium mark is a WORD, not an icon a sighted reader loses'
+    );
+    assert.ok(
+      parent.querySelector('[data-world-nav-premium]').classList.contains('manager-nav-count'),
+      'the badge rides the count class so the collapsed 56px rail hides it with the rest'
+    );
+
+    parent.click();
+    await settleRouteExit();
+
+    assert.equal(parent.getAttribute('aria-expanded'), 'true');
+    const subitems = Array.from(target.querySelectorAll('[data-world-downtime-item]'));
+    assert.deepEqual(
+      subitems.map((item) => item.dataset.worldDowntimeItem),
+      ['tracking', 'activities', 'factions', 'settings']
+    );
+    assert.deepEqual(
+      subitems.map((item) => item.id),
+      [
+        'manager-downtime-nav-tracking',
+        'manager-downtime-nav-activities',
+        'manager-downtime-nav-factions',
+        'manager-downtime-nav-settings',
+      ]
+    );
+    assert.deepEqual(
+      subitems.map((item) => item.querySelector('.manager-nav-label').textContent.trim()),
+      ['Tracking', 'Activities', 'Factions', 'Settings']
+    );
+    assert.deepEqual(
+      subitems.map((item) => item.getAttribute('title')),
+      [
+        'Preview Downtime Tracking · Fabricate Premium',
+        'Preview Downtime Activities · Fabricate Premium',
+        'Preview Factions & Reputation · Fabricate Premium',
+        'Preview Downtime Settings · Fabricate Premium',
+      ]
+    );
+    assert.ok(
+      subitems.every((item) => Boolean(item.querySelector('[data-world-downtime-lock] .fa-lock'))),
+      'every child carries the premium padlock'
+    );
+    assert.ok(
+      subitems.every((item) => item.tagName === 'BUTTON' && !item.disabled),
+      'the padlock marks a premium preview on a WORKING control, never a disabled one'
+    );
+    assert.deepEqual(
+      subitems.map((item) => item.getAttribute('aria-current')),
+      ['true', null, null, null]
+    );
+    assert.equal(
+      target.querySelectorAll('[aria-current="page"]').length,
+      1,
+      'the route is current once — the children mark themselves within the set, not as pages'
+    );
+
+    const callout = target.querySelector('[data-world-downtime-callout]');
+    assert.match(callout.textContent, /PREMIUM PREVIEW/);
+    assert.match(
+      callout.textContent,
+      /Open any Downtime page to preview how Fabricate Premium can help you run downtime\./
+    );
+
+    const unlock = target.querySelector('[data-downtime-unlock]');
+    assert.equal(unlock.textContent.trim(), 'Unlock with Premium');
+    assert.equal(unlock.href, 'https://www.patreon.com/c/mistersilver');
+    assert.equal(unlock.target, '_blank');
+    assert.equal(unlock.rel, 'noopener noreferrer');
+    assert.equal(
+      target.querySelector('.manager-header-actions').getAttribute('aria-label'),
+      'Downtime actions',
+      'un-suppressing the actions block for this route is what makes that label reachable'
+    );
+
+    // Trigger one: the rail child.
+    target.querySelector('[data-world-downtime-item="factions"]').click();
+    await settleRouteExit();
+    assert.equal(
+      target.querySelector('[data-downtime-tab="factions"]').getAttribute('aria-selected'),
+      'true',
+      'the panel strip follows the rail'
+    );
+    assert.equal(
+      target.querySelector('[data-world-downtime-item="factions"]').getAttribute('aria-current'),
+      'true'
+    );
+    assert.ok(Boolean(target.querySelector('[data-downtime-panel="factions"]:not([hidden])')));
+
+    // Trigger two: the studio-card button, which must reach the same state.
+    target.querySelector('[data-downtime-tab="settings"]').click();
+    await settleRouteExit();
+    assert.equal(
+      target.querySelector('[data-world-downtime-item="settings"]').getAttribute('aria-current'),
+      'true',
+      'the rail follows the card — two triggers, one navigation'
+    );
+    assert.deepEqual(
+      Array.from(target.querySelectorAll('[data-world-downtime-item]')).map((item) =>
+        item.getAttribute('aria-current')
+      ),
+      [null, null, null, 'true']
+    );
+    assert.deepEqual(calls, [], 'the rail preview navigation calls no store write seam');
+  });
+
+  it('titles the Downtime route after the preview on screen, in the header and the breadcrumb', async () => {
+    useShippedLocalization();
+    mountManager([], {}, {}, { managerExtensions: createManagerExtensionsRegistry() });
+    worldNavItem('downtime').click();
+    await settleRouteExit();
+
+    const title = () => target.querySelector('.manager-header .manager-title').textContent.trim();
+    const subtitle = () =>
+      target.querySelector('.manager-header .manager-subtitle').textContent.trim();
+    const leafCrumb = () => target.querySelector('[data-breadcrumb-downtime-tab]');
+
+    assert.equal(
+      target.querySelector('[data-breadcrumb-world]').textContent.trim(),
+      'World',
+      'the crumb is Title Case: the rail micro-label is the string authored in caps, not this'
+    );
+    assert.equal(title(), 'Downtime tracking');
+    assert.equal(
+      subtitle(),
+      'Fabricate Premium · Your party-wide command board for every activity and shared project.'
+    );
+    assert.equal(leafCrumb().textContent.trim(), 'Tracking');
+    assert.equal(leafCrumb().dataset.breadcrumbDowntimeTab, 'tracking');
+
+    for (const [tabId, expectedTitle, expectedCrumb] of [
+      ['activities', 'Downtime activities', 'Activities'],
+      ['factions', 'Factions & reputation', 'Factions'],
+      ['settings', 'Downtime settings', 'Settings'],
+    ]) {
+      target.querySelector(`[data-world-downtime-item="${tabId}"]`).click();
+      await settleRouteExit();
+      assert.equal(title(), expectedTitle, `${tabId} retitles the page`);
+      assert.equal(leafCrumb().textContent.trim(), expectedCrumb, `${tabId} retitles the crumb`);
+      assert.equal(leafCrumb().dataset.breadcrumbDowntimeTab, tabId);
+      assert.match(subtitle(), /^Fabricate Premium · /, `${tabId} keeps the branded subtitle`);
+    }
+    assert.equal(
+      subtitle(),
+      'Fabricate Premium · Set campaign-wide rules that keep every activity consistent.'
+    );
+  });
+
+  it('renders every Downtime board row as thing, detail and reading, with its closing notes', async () => {
+    useShippedLocalization();
+    mountManager([], {}, {}, { managerExtensions: createManagerExtensionsRegistry() });
+    worldNavItem('downtime').click();
+    await settleRouteExit();
+
+    const panel = (tabId) => target.querySelector(`[data-downtime-panel="${tabId}"]`);
+    const rowsOf = (tabId) =>
+      Array.from(panel(tabId).querySelectorAll('[data-downtime-board-row]')).map((row) => [
+        row.querySelector('.downtime-board-row-primary').textContent.trim(),
+        row.querySelector('.downtime-board-row-secondary').textContent.trim(),
+        row.querySelector('.downtime-board-row-value').textContent.trim(),
+      ]);
+
+    assert.deepEqual(rowsOf('tracking'), [
+      ['Ilyra Vance', 'Master of Ravens', '60%'],
+      ['Rebuild the Blackfeather Tavern', 'Shared project · 3 contributors', '17 / 42 days'],
+      ['Player choice waiting', 'Work a Profession is ready to resolve', 'ACTION'],
+    ]);
+    assert.deepEqual(rowsOf('settings'), [
+      ['World time drives progress', 'Calendar advances credit active work', 'ON'],
+      ['Players may self-initiate', 'Assigned activities can begin in the player app', 'ON'],
+      ['Solo activities per character', 'Separate limit for group projects', '1'],
+    ]);
+    // U+2212 MINUS SIGN, not a hyphen — the design's own codepoint for a negative standing.
+    assert.equal(rowsOf('factions')[2][2], '−28');
+
+    assert.ok(
+      !panel('tracking').querySelector('[data-downtime-board-row] .fa-lock'),
+      'a row shows its reading, not a padlock — the board locks once, in its PREVIEW badge'
+    );
+    assert.equal(
+      panel('tracking').querySelectorAll('.downtime-board .fa-lock').length,
+      1,
+      'exactly one padlock on the board'
+    );
+
+    assert.equal(
+      panel('tracking').querySelector('[data-downtime-board-subtitle]').textContent.trim(),
+      'The Blackfeather Company · live campaign view'
+    );
+    assert.equal(
+      panel('activities').querySelector('[data-downtime-board-subtitle]').textContent.trim(),
+      'Reusable definitions · ready to assign',
+      'the board subtitle is per tab, not a single shared line'
+    );
+    assert.match(
+      panel('tracking').querySelector('[data-downtime-board-note]').textContent,
+      /With Premium, this view responds to your players’ actions, advances with world time, grants rewards and stays connected to the rest of Fabricate\./
+    );
+    assert.equal(
+      panel('tracking').querySelector('[data-downtime-cta-note]').textContent.trim(),
+      'Subscribe to unlock Downtime Studio for your campaign and download Fabricate Premium.'
+    );
+    assert.equal(
+      panel('tracking').querySelector('[data-downtime-benefits-note]').textContent.trim(),
+      'Unlock this workflow with Fabricate Premium'
+    );
+    assert.match(
+      panel('tracking').querySelector('.downtime-preview-note').textContent,
+      /Its campaign controls unlock with Fabricate Premium\./,
+      'the preview note keeps the sentence that says what unlocking gets you'
+    );
+    assert.equal(
+      panel('factions').querySelector('.downtime-hero-copy h2').textContent.trim(),
+      'Let downtime reshape the balance of power.'
+    );
+    assert.equal(
+      panel('tracking').querySelector('.downtime-benefits article p').textContent.trim(),
+      'See active, paused, pending and attention-needed work for every character at a glance.'
+    );
+
+    // The tint travels with the SLOT, not the glyph: `fa-house-chimney` is ember on
+    // Tracking and vitality on Activities, so a per-glyph rule would flatten one of them.
+    assert.deepEqual(
+      Array.from(panel('tracking').querySelectorAll('[data-downtime-board-row]')).map(
+        (row) => row.dataset.downtimeBoardRow
+      ),
+      ['tag', 'ember', 'warning']
+    );
+    assert.deepEqual(
+      Array.from(panel('activities').querySelectorAll('[data-downtime-board-row]')).map(
+        (row) => row.dataset.downtimeBoardRow
+      ),
+      ['ember', 'tag', 'vitality']
+    );
+    assert.ok(
+      Boolean(
+        panel('tracking').querySelector('.downtime-board-row-icon.is-tint-ember .fa-house-chimney')
+      ),
+      'the tint class rides the tile wrapper so the glyph inherits it'
+    );
+    assert.ok(
+      Boolean(
+        panel('activities').querySelector(
+          '.downtime-board-row-icon.is-tint-vitality .fa-house-chimney'
+        )
+      ),
+      'the same glyph carries a different tint on another tab'
+    );
+    assert.deepEqual(
+      Array.from(panel('settings').querySelectorAll('.downtime-feature-icon')).map((icon) =>
+        Array.from(icon.classList).find((name) => name.startsWith('is-tint-'))
+      ),
+      ['is-tint-accent', 'is-tint-info', 'is-tint-warning', 'is-tint-vitality']
+    );
   });
 
   it('updates an open Downtime host and cleans each companion mount exactly once', async () => {

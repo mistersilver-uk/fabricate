@@ -4264,6 +4264,7 @@
         },
         "World": {
           "Heading": "WORLD",
+          "Breadcrumb": "World",
           "Scope": "every system",
           "ExpandTravel": "Expand Travel",
           "CollapseTravel": "Collapse Travel",
@@ -4276,49 +4277,73 @@
           "Downtime": {
             "Title": "Downtime",
             "Nav": "Downtime",
-            "Subtitle": "Preview campaign downtime workflows or open an installed companion extension.",
             "Actions": "Downtime actions",
-            "Premium": "Premium",
-            "Brand": "Fabricate Premium",
-            "PreviewBadge": "Preview",
+            "Premium": "PREMIUM",
+            "PremiumTooltip": "Unlock Downtime Studio with Fabricate Premium",
+            "Unlock": "Unlock with Premium",
+            "ExpandNav": "Expand Downtime",
+            "CollapseNav": "Collapse Downtime",
+            "NavSections": "Downtime previews",
+            "RailKicker": "PREMIUM PREVIEW",
+            "RailNote": "Open any Downtime page to preview how Fabricate Premium can help you run downtime.",
+            "Brand": "FABRICATE PREMIUM",
+            "PreviewBadge": "PREVIEW",
             "Tablist": "Downtime preview sections",
             "Subscribe": "Subscribe on Patreon & download Fabricate Premium",
-            "PreviewNote": "Explore this preview to see how the workflow would support your campaign.",
-            "BenefitsKicker": "What Premium gives you",
+            "SubscribeNote": "Subscribe to unlock Downtime Studio for your campaign and download Fabricate Premium.",
+            "PreviewNote": "Explore this preview to see how the workflow would support your campaign. Its campaign controls unlock with Fabricate Premium.",
+            "BoardNote": "With Premium, this view responds to your players’ actions, advances with world time, grants rewards and stays connected to the rest of Fabricate.",
+            "BenefitsKicker": "WHAT PREMIUM GIVES YOU",
             "BenefitsTitle": "Less administration. More meaningful downtime.",
+            "BenefitsNote": "Unlock this workflow with Fabricate Premium",
             "ConnectedTitle": "One connected Downtime Studio",
             "ConnectedDescription": "Explore tracking, activity authoring, factions and campaign rules to see how each part can support the way you run downtime.",
             "Tabs": {
               "Tracking": {
                 "Label": "Tracking",
                 "AccessibleName": "Open the Tracking preview",
-                "Tooltip": "Preview Tracking in Fabricate Premium"
+                "Tooltip": "Preview Downtime Tracking · Fabricate Premium"
               },
               "Activities": {
                 "Label": "Activities",
                 "AccessibleName": "Open the Activities preview",
-                "Tooltip": "Preview Activities in Fabricate Premium"
+                "Tooltip": "Preview Downtime Activities · Fabricate Premium"
               },
               "Factions": {
                 "Label": "Factions",
                 "AccessibleName": "Open the Factions preview",
-                "Tooltip": "Preview Factions in Fabricate Premium"
+                "Tooltip": "Preview Factions & Reputation · Fabricate Premium"
               },
               "Settings": {
                 "Label": "Settings",
                 "AccessibleName": "Open the Settings preview",
-                "Tooltip": "Preview Settings in Fabricate Premium"
+                "Tooltip": "Preview Downtime Settings · Fabricate Premium"
               }
             },
             "Preview": {
               "Tracking": {
+                "Title": "Downtime tracking",
+                "Subtitle": "Fabricate Premium · Your party-wide command board for every activity and shared project.",
                 "Headline": "Run downtime without the spreadsheet.",
-                "Description": "Keep every character, solo activity and shared project on one board. Advance your world calendar, credit work automatically, and resolve finished downtime without chasing notes across journals and chat.",
+                "Description": "Keep every character, solo activity and shared project on one board. Advance your world calendar, credit work automatically, spot rolls and reward choices awaiting your decision, and resolve finished downtime without chasing notes across journals and chat.",
                 "PreviewTitle": "Party board",
+                "PreviewSubtitle": "The Blackfeather Company · live campaign view",
                 "Rows": {
-                  "1": "Ilyra Vance",
-                  "2": "Rebuild the Blackfeather Tavern",
-                  "3": "Player choice waiting"
+                  "1": {
+                    "Primary": "Ilyra Vance",
+                    "Secondary": "Master of Ravens",
+                    "Value": "60%"
+                  },
+                  "2": {
+                    "Primary": "Rebuild the Blackfeather Tavern",
+                    "Secondary": "Shared project · 3 contributors",
+                    "Value": "17 / 42 days"
+                  },
+                  "3": {
+                    "Primary": "Player choice waiting",
+                    "Secondary": "Work a Profession is ready to resolve",
+                    "Value": "ACTION"
+                  }
                 },
                 "Features": {
                   "1": {
@@ -4327,99 +4352,144 @@
                   },
                   "2": {
                     "Title": "World-time automation",
-                    "Description": "Let advances in your world calendar credit every active activity."
+                    "Description": "Let advances in your world calendar credit every active activity, or keep progress fully manual."
                   },
                   "3": {
                     "Title": "Shared group projects",
-                    "Description": "Pool player effort across a shared project while preserving each character’s contribution."
+                    "Description": "Pool your players’ effort across a shared project while preserving each character’s individual investment."
                   },
                   "4": {
                     "Title": "Guided resolution",
-                    "Description": "Bring checks, stalled work and player choices to your attention exactly when they matter."
+                    "Description": "Bring checks, stalled work, player choices and rewards to your attention exactly when they matter."
                   }
                 }
               },
               "Activities": {
+                "Title": "Downtime activities",
+                "Subtitle": "Fabricate Premium · Create reusable activities for individual characters and group projects.",
                 "Headline": "Build it once. Reuse it throughout your campaign.",
-                "Description": "Create reusable solo and group activities with stages, durations, prerequisites, checks, objectives, costs and rewards. Assign them in seconds instead of rewriting the procedure every time a character trains, researches, works or undertakes a long-term project.",
+                "Description": "Create reusable solo and group activities with stages, durations, prerequisites, checks, objectives, costs and rewards. Assign them in seconds instead of rewriting the procedure every time one of your characters trains, researches, works or undertakes a long-term project.",
                 "PreviewTitle": "Activity library",
+                "PreviewSubtitle": "Reusable definitions · ready to assign",
                 "Rows": {
-                  "1": "Train a Skill",
-                  "2": "Research",
-                  "3": "Rebuild the Blackfeather Tavern"
+                  "1": {
+                    "Primary": "Train a Skill",
+                    "Secondary": "Training · individual",
+                    "Value": "30 days"
+                  },
+                  "2": {
+                    "Primary": "Research",
+                    "Secondary": "Research · check + objective",
+                    "Value": "2 stages"
+                  },
+                  "3": {
+                    "Primary": "Rebuild the Blackfeather Tavern",
+                    "Secondary": "Project · shared",
+                    "Value": "42 days"
+                  }
                 },
                 "Features": {
                   "1": {
                     "Title": "Multi-stage activities",
-                    "Description": "Break complex downtime into clear stages with their own time, requirements and objectives."
+                    "Description": "Break your most complex downtime into clear stages with their own time, requirements and objectives."
                   },
                   "2": {
                     "Title": "Solo or shared",
-                    "Description": "Use the same authoring model for individual pursuits and collaborative group projects."
+                    "Description": "Use the same authoring model for individual pursuits and genuinely collaborative group projects."
                   },
                   "3": {
                     "Title": "Checks & prerequisites",
-                    "Description": "Require tools, components, currency, prior activities or checks before players continue."
+                    "Description": "Require tools, components, currency, prior activities or checks before your players can continue."
                   },
                   "4": {
                     "Title": "Meaningful outcomes",
-                    "Description": "Grant items, currency, recipe knowledge and rewards chosen by your players."
+                    "Description": "Grant items, currency, recipe knowledge, crafted results and rewards chosen by your players."
                   }
                 }
               },
               "Factions": {
-                "Headline": "Let factions remember what the party changes.",
-                "Description": "Track standing, obligations and campaign-scale relationships beside the downtime activities that shape them. Keep faction progress visible without turning Fabricate Core into a second campaign database.",
+                "Title": "Factions & reputation",
+                "Subtitle": "Fabricate Premium · Connect standing, tiers and rewards directly to your downtime outcomes.",
+                "Headline": "Let downtime reshape the balance of power.",
+                "Description": "Track your party’s shared standing and each character’s personal reputation, define tiers and their benefits, and let downtime outcomes change those relationships. Give your players visible progress and claimable rewards without maintaining a second ledger.",
                 "PreviewTitle": "Reputation overview",
+                "PreviewSubtitle": "Party standing · character modifiers · tier progress",
                 "Rows": {
-                  "1": "The Rookery",
-                  "2": "Blackfeather Commons",
-                  "3": "Ashen Circle"
+                  "1": {
+                    "Primary": "The Rookery",
+                    "Secondary": "Trusted · next tier at 60",
+                    "Value": "+34"
+                  },
+                  "2": {
+                    "Primary": "Blackfeather Commons",
+                    "Secondary": "A face · next tier at 25",
+                    "Value": "+12"
+                  },
+                  "3": {
+                    "Primary": "Ashen Circle",
+                    "Secondary": "Watched · party standing",
+                    "Value": "−28"
+                  }
                 },
                 "Features": {
                   "1": {
                     "Title": "Party & character standing",
-                    "Description": "See allies, rivals and unresolved obligations together."
+                    "Description": "Track your party’s shared relationship while preserving each character’s personal history."
                   },
                   "2": {
                     "Title": "Tiered reputation",
-                    "Description": "Relate faction movement to the work that caused it."
+                    "Description": "Define named tiers, thresholds, notes for your players and the privileges each tier grants."
                   },
                   "3": {
                     "Title": "Activity-driven change",
-                    "Description": "Keep sensitive campaign rules in the companion that owns them."
+                    "Description": "Let completed downtime improve or damage standing as a natural consequence of your campaign."
                   },
                   "4": {
                     "Title": "Claims & benefits",
-                    "Description": "Carry consequences forward from one downtime cycle to the next."
+                    "Description": "Review earned rewards and resolve your players’ claims from the same connected workflow."
                   }
                 }
               },
               "Settings": {
+                "Title": "Downtime settings",
+                "Subtitle": "Fabricate Premium · Set campaign-wide rules that keep every activity consistent.",
                 "Headline": "Set your campaign rules once.",
-                "Description": "Configure companion-owned calendars, permissions, activity defaults and resolution rules without adding downtime records, settings or flags to Fabricate Core.",
+                "Description": "Choose how your campaign advances time, who can begin assigned work, how simultaneous activities are limited, and how reputation is calculated. Downtime Studio applies your decisions consistently, so you do not have to remember a different exception for every character.",
                 "PreviewTitle": "Campaign rules",
+                "PreviewSubtitle": "Applied across every downtime activity",
                 "Rows": {
-                  "1": "World time drives progress",
-                  "2": "Players may self-initiate",
-                  "3": "Solo activities per character"
+                  "1": {
+                    "Primary": "World time drives progress",
+                    "Secondary": "Calendar advances credit active work",
+                    "Value": "ON"
+                  },
+                  "2": {
+                    "Primary": "Players may self-initiate",
+                    "Secondary": "Assigned activities can begin in the player app",
+                    "Value": "ON"
+                  },
+                  "3": {
+                    "Primary": "Solo activities per character",
+                    "Secondary": "Separate limit for group projects",
+                    "Value": "1"
+                  }
                 },
                 "Features": {
                   "1": {
                     "Title": "Automatic or manual time",
-                    "Description": "Choose how companion activities respond to your campaign clock."
+                    "Description": "Connect progress to your world calendar or keep every credited day under your control."
                   },
                   "2": {
                     "Title": "Player self-service",
-                    "Description": "Decide which companion workflows players may see or operate."
+                    "Description": "Decide whether your players may begin assigned activities themselves or require your approval."
                   },
                   "3": {
                     "Title": "Concurrency limits",
-                    "Description": "Set practical defaults while retaining per-activity control."
+                    "Description": "Set the limits that suit your campaign for solo activities and group-project participation."
                   },
                   "4": {
                     "Title": "Consistent reputation rules",
-                    "Description": "All downtime persistence stays outside Fabricate Core."
+                    "Description": "Choose how your party’s shared standing and each character’s reputation combine throughout the faction system."
                   }
                 }
               }

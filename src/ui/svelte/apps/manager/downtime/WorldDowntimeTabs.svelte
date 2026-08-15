@@ -166,8 +166,19 @@
     outline-offset: 2px;
   }
 
+  /*
+    Lock colour tracks CURRENCY, not lockedness: the design paints the current tab's padlock
+    with the accent and drops the other three to subtle, so a locked idle tab stops shouting
+    as loudly as the selected one. This padlock is deliberately self-coloured — it is one of
+    the twelve glyphs the design colours on the `<i>` — so it does NOT follow the button's
+    hover, which is why there is no hover rule here even though the label has one.
+  */
   .downtime-tab-lock {
     font-size: 0.72em;
+    color: var(--fab-text-subtle);
+  }
+
+  button.is-active .downtime-tab-lock {
     color: var(--fab-accent);
   }
 

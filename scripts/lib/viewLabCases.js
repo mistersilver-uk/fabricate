@@ -3510,16 +3510,34 @@ export const VIEW_LAB_CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/Party/,
     ],
   }),
+  // The tooltip column is the shipped `Tabs.<Tab>.Tooltip` string verbatim (issue 1185
+  // aligned it to the design's own wording), so a lang edit that forgets these frames
+  // fails the case rather than publishing a frame whose caption no longer exists.
   ...[
-    ['tracking', 'Tracking', 'Open the Tracking preview', 'Preview Tracking in Fabricate Premium'],
+    [
+      'tracking',
+      'Tracking',
+      'Open the Tracking preview',
+      'Preview Downtime Tracking · Fabricate Premium',
+    ],
     [
       'activities',
       'Activities',
       'Open the Activities preview',
-      'Preview Activities in Fabricate Premium',
+      'Preview Downtime Activities · Fabricate Premium',
     ],
-    ['factions', 'Factions', 'Open the Factions preview', 'Preview Factions in Fabricate Premium'],
-    ['settings', 'Settings', 'Open the Settings preview', 'Preview Settings in Fabricate Premium'],
+    [
+      'factions',
+      'Factions',
+      'Open the Factions preview',
+      'Preview Factions & Reputation · Fabricate Premium',
+    ],
+    [
+      'settings',
+      'Settings',
+      'Open the Settings preview',
+      'Preview Downtime Settings · Fabricate Premium',
+    ],
   ].map(([tabId, tabLabel, accessibleName, tooltip]) =>
     managerCase({
       id: `manager-world-downtime-${tabId}`,
@@ -3566,6 +3584,13 @@ export const VIEW_LAB_CASES = Object.freeze([
           name: 'aria-controls',
           value: `world-downtime-panel-${id}`,
         })),
+        // The rail child and the studio-card button are two triggers for ONE navigation,
+        // so the frame proves the rail followed the card that drove it (issue 1185).
+        {
+          selector: `[data-world-downtime-item="${tabId}"]`,
+          name: 'aria-current',
+          value: 'true',
+        },
       ],
       expectVisible: `[data-downtime-tooltip="${tabId}"]:has-text("${tooltip}")`,
       expectContained: [
