@@ -64,7 +64,8 @@ Turning the toggle on reveals **Gathering > Travel > Realms** and **Gathering > 
 Choose **World > Parties** at any time for the world party list and editor (name, enabled state, members, and travel actor), including when no crafting system is selected.
 Select a Gathering-enabled crafting system and turn on **Enable Travel & Realms** to use its current-realm override or expand top-level **Travel** for **Realms** and **Map Region Links**.
 **Travel** is initially collapsed when the Crafting System Manager opens.
-The right-hand inspector echoes the selected party's read-only current-realm evidence.
+Each party is a fully expanded card in a full-width content area, so its editing controls are available without selecting the party first.
+When the list has more than one page, the pagination controls stay below the scrolling party cards and do not cover them.
 When no parties exist yet, the panel shows a simple **No parties yet** empty state.
 It does not render a setup checklist.
 
@@ -170,7 +171,7 @@ This control is available only while its Gathering-enabled crafting system is se
 Both writes are stamped with the updating user and time.
 Including a disabled realm still resolves it (the UI marks it **Disabled**), and override ids referencing deleted realms surface as stale repair evidence and do not resolve.
 
-The inspector echoes the resulting evidence: the resolution source (**GM override**, **Travel actor**, or **No current realm**) and the resolved realm list.
+The party card includes the current-realm override control for the selected system.
 
 ## Environment Realm Membership
 
