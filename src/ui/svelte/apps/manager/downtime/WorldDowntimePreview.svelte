@@ -220,7 +220,7 @@
     font-size: 11px;
   }
 
-  .downtime-board-row span {
+  .downtime-board-row > span:not(.downtime-board-icon) {
     flex: 1;
     min-width: 0;
     font-weight: 600;
