@@ -152,7 +152,9 @@ A party stores a name, an enabled flag, member actor UUIDs, one optional travel 
 ### Stale references
 
 Members or travel actors whose actor no longer exists, and override realm ids whose realm was deleted, are preserved verbatim rather than silently dropped.
-The party row shows a **Needs repair** badge and the panel lists each stale reference with a one-click repair action (remove the stale member, clear the stale travel actor, drop the stale override realm).
+A stale member's row is labeled **Stale member** and keeps its remove control.
+A stale travel actor is labeled **Stale travel actor** on its tile and keeps its unlink control.
+A stale override realm shows as **Unknown realm** on the override control until you choose **Auto** or a different realm.
 
 ## Setting A Party's Current Realm
 
