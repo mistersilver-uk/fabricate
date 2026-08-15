@@ -178,9 +178,7 @@ Every manager "nothing here" message renders through one shared no-state primiti
 - The `filtered` treatment is the filtered-to-nothing case, which is not an absence of content: it deliberately omits the icon and title apparatus and states the miss in one sentence beside its way out.
 
 Trailing content inside the panel — a Clear-filters control, a primary CTA, or a docs link — is part of the primitive, because a no-state message that offers no way out is a dead end.
-An inline value slot is NOT a no-state message: text standing where a value would be inside a control row — a picker trigger reading `Auto` where a chosen realm would stand — stays an inline hint, since a dashed panel inside a control row is a layout defect rather than reuse.
-Falling outside this exemption returns an element to the rule above rather than licensing a bespoke panel of its own.
-World Parties' unassigned travel actor is the worked example: it is a panel occupying its own column above a picker of its own, not text inside a control row, so it renders through the `compact` treatment.
+An inline value slot is NOT a no-state message: text standing where a value would be inside a control row (an unassigned travel actor beside its clear button and picker) stays an inline hint, since a dashed panel inside a control row is a layout defect rather than reuse.
 A single per-screen size override of the shared panel is a second empty-state design and is forbidden; every no-state message shares one tile and type scale.
 
 #### Modal dialogs
@@ -1628,6 +1626,7 @@ Shipped capabilities:
 - A party card's travel-actor panel names the linked actor or states that none is linked, and offers link, change and a persistent accessible unlink button in that one place.
   Its picker reuses the shared searchable-popover primitive, anchors to the panel, flips above its trigger when the pane is short of room below, marks the currently linked actor, and presents full-width compact actor rows.
   The primitive may add the optional `Actors` title at top-left and its live matched-of-total count at top-right; unlink is not duplicated as a picker row or footer.
+  On the GM Travel World > Parties card, the unassigned travel actor occupies its own panel above its picker rather than an inline value slot, so that state renders through the shared `EmptyState` compact treatment.
   Right-clicking the panel unlinks a linked travel actor and opens the picker when none is linked, and the panel keeps accepting an actor dropped onto it.
 - Adding a member who already belongs to another party is the move path: the GM confirms a move naming both parties, and the actor ends in exactly one party.
   The shipped store moves out of the source party whether or not that party is enabled, which is stricter than the invariant motivating it — an actor may be associated with at most one _enabled_ party — and that stricter behaviour is deliberate, because a membership silently split across a disabled and an enabled party is the state a GM cannot see.

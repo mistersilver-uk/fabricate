@@ -50,6 +50,12 @@ const partyExpandedBodyPath = resolve(
   __dirname,
   '../../src/ui/svelte/apps/manager/PartyExpandedBody.svelte'
 );
+const partiesTabPath = resolve(
+  __dirname,
+  '../../src/ui/svelte/apps/manager/GatheringPartiesTab.svelte'
+);
+const partiesTabSource = readFileSync(partiesTabPath, 'utf8');
+const partiesTabScoped = scopedComponentCss(partiesTabPath);
 const managerComponentDir = resolve(__dirname, '../../src/ui/svelte/apps/manager');
 const css = readFileSync(cssPath, 'utf8');
 const colorPickerSource = readFileSync(colorPickerPath, 'utf8');
@@ -6661,6 +6667,130 @@ test('World Parties preserves the shared stacked rail and body layout at narrow 
       1,
       `World Parties uses the shared stacked rail/body layout at ${width}px`
     );
+  }
+});
+
+test('World Parties keeps its card scroller and sibling pager independently reachable at 1100px', async () => {
+  // `gathering-parties-tab.test.js` mounts this component and pins the sibling DOM. This
+  // source join keeps the Chromium geometry below attached to those real rendered classes:
+  // deleting or renaming either node fails here instead of leaving a stale layout fixture.
+  const contentAt = partiesTabSource.indexOf('class="manager-travel-parties-content"');
+  const footerAt = partiesTabSource.indexOf('class="manager-travel-parties-pagination"');
+  assert.ok(contentAt > -1, 'the product component renders the card scroller class');
+  assert.ok(footerAt > contentAt, 'the product component renders the sibling pager after it');
+
+  const hash = partiesTabScoped.hashClass;
+  const cards = Array.from(
+    { length: 4 },
+    (_, index) =>
+      `<div class="manager-travel-parties-row ${hash}" data-manager-travel-party-id="party-${index + 1}"><div class="probe-card-editor">Party ${index + 1} editor</div></div>`
+  ).join('');
+  const productContractMarkup = `<div class="manager-travel-parties ${hash}">
+    <div class="manager-travel-parties-content ${hash}">
+      <div class="manager-travel-parties-list ${hash}">${cards}</div>
+    </div>
+    <div class="manager-travel-parties-pagination ${hash}" data-manager-party-pagination>
+      <div class="manager-pagination"><span>Showing 1-4 of 8</span><select data-pagination-size><option>4</option></select></div>
+    </div>
+  </div>`;
+
+  const context = await sharedBrowser.newContext({
+    viewport: { width: 1100, height: 720 },
+    deviceScaleFactor: 1,
+  });
+  const page = await context.newPage();
+  try {
+    const nav = Array.from(
+      { length: 10 },
+      (_, index) =>
+        `<button class="manager-nav-button"><span class="manager-nav-label">Section ${index + 1}</span></button>`
+    ).join('');
+    await page.setContent(`<!doctype html><html><head><meta charset="utf-8">
+      <style>${css}</style><style>${partiesTabScoped.css}</style>
+      <style>
+        html, body { margin: 0; width: 100%; height: 100%; }
+        :root { --font-primary: Arial, sans-serif; }
+        .probe-titlebar { height: 28px; }
+        .probe-header { height: 76px; }
+        .probe-card-editor { height: 220px; }
+      </style></head><body>
+      <div class="fabricate fabricate-manager" data-fabricate-theme="fabricate"
+        data-manager-view="world" data-world-travel-tab="parties">
+        <div class="probe-titlebar"></div><div class="probe-header"></div>
+        <div class="manager-body">
+          <aside class="manager-rail"><nav class="manager-nav">${nav}</nav></aside>
+          <main class="manager-main">
+            <section class="manager-section-header"><div class="manager-heading"><h2>World Parties</h2></div></section>
+            <div class="manager-gathering-panel manager-travel-view is-parties-pane">${productContractMarkup}</div>
+          </main>
+        </div>
+      </div></body></html>`);
+
+    const report = await page.evaluate(() => {
+      const body = document.querySelector('.manager-body');
+      const main = document.querySelector('.manager-main');
+      const pane = document.querySelector('.manager-travel-parties');
+      const scroller = document.querySelector('.manager-travel-parties-content');
+      const footer = document.querySelector('[data-manager-party-pagination]');
+      const pagerControl = footer.querySelector('[data-pagination-size]');
+      const before = footer.getBoundingClientRect();
+      const paneBox = pane.getBoundingClientRect();
+      const mainBox = main.getBoundingClientRect();
+      const scrollRange = scroller.scrollHeight - scroller.clientHeight;
+      scroller.scrollTop = scroller.scrollHeight;
+      const after = footer.getBoundingClientRect();
+      const controlBox = pagerControl.getBoundingClientRect();
+      const hit = document.elementFromPoint(
+        controlBox.left + controlBox.width / 2,
+        controlBox.top + controlBox.height / 2
+      );
+      const horizontalOverflow = [body, main, pane, scroller].map(
+        (element) => element.scrollWidth - element.clientWidth
+      );
+      return {
+        scrollRange,
+        scrolledBy: scroller.scrollTop,
+        scrollerOverflowY: getComputedStyle(scroller).overflowY,
+        footerIsSibling: footer.parentElement === pane && !scroller.contains(footer),
+        footerFullWidth:
+          Math.abs(before.left - paneBox.left) <= 1 && Math.abs(before.right - paneBox.right) <= 1,
+        footerVisible: before.top >= mainBox.top - 1 && before.bottom <= mainBox.bottom + 1,
+        footerStable:
+          Math.abs(before.top - after.top) <= 1 &&
+          Math.abs(before.bottom - after.bottom) <= 1 &&
+          Math.abs(before.left - after.left) <= 1 &&
+          Math.abs(before.right - after.right) <= 1,
+        pagerControlHit: hit === pagerControl || pagerControl.contains(hit),
+        pagerControlVisible:
+          controlBox.width > 0 &&
+          controlBox.height > 0 &&
+          controlBox.top >= mainBox.top - 1 &&
+          controlBox.bottom <= mainBox.bottom + 1,
+        bodyScrollRange: body.scrollHeight - body.clientHeight,
+        bodyScrollTop: body.scrollTop,
+        mainScrollRange: main.scrollHeight - main.clientHeight,
+        horizontalOverflow,
+      };
+    });
+
+    assert.ok(report.scrollRange > 100, `cards must overflow the pane (got ${report.scrollRange}px)`);
+    assert.equal(report.scrollerOverflowY, 'auto', 'the card content remains the scroll node');
+    assert.ok(report.scrolledBy > 0, 'the card scroller accepts an independent scroll');
+    assert.equal(report.footerIsSibling, true, 'the pager is a sibling outside the scroll node');
+    assert.equal(report.footerFullWidth, true, 'the sibling footer spans the full Parties pane');
+    assert.equal(report.footerVisible, true, 'the footer remains visible inside the bounded main');
+    assert.equal(report.footerStable, true, 'inner scrolling does not move the footer bounds');
+    assert.equal(report.pagerControlVisible, true, 'a pager control remains visibly reachable');
+    assert.equal(report.pagerControlHit, true, 'the visible pager control owns its pointer target');
+    assert.ok(report.bodyScrollRange <= 1, 'the outer manager body must not scroll the footer');
+    assert.equal(report.bodyScrollTop, 0, 'inner scrolling leaves the manager body fixed');
+    assert.ok(report.mainScrollRange <= 1, 'the main column does not become a second scroller');
+    assert.ok(
+      report.horizontalOverflow.every((overflow) => overflow <= 1),
+      `the 1100px route has no horizontal overflow (${report.horizontalOverflow.join(', ')})`
+    );
+  } finally {
+    await context.close();
   }
 });
 

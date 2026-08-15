@@ -15999,10 +15999,24 @@
 
   /* World Parties releases its unused inspector at desktop widths. Its route rule has more
      class/attribute specificity than the shared stack above, so it must explicitly join the
-     one-column rail/body layout here rather than retaining its desktop two-track grid. */
+     one-column rail/body layout here rather than retaining its desktop two-track grid.
+
+     It is also the one stacked route whose main owns a persistent SIBLING footer below an
+     inner card scroller. Letting the shared `.manager-body` scroller size that main to
+     max-content carries the footer away with the cards. Bound the second row to the body's
+     remaining height and keep both ancestors out of the scroll chain; the Parties content
+     child remains the only card scrollport while the rail keeps its independent 232px one. */
   .fabricate-manager[data-manager-view="world"][data-world-travel-tab="parties"] .manager-body,
   .fabricate-manager[data-manager-view="world"][data-world-travel-tab="parties"] .manager-body.is-rail-collapsed {
     grid-template-columns: 1fr;
+    grid-template-rows: auto minmax(0, 1fr);
+    overflow: hidden;
+  }
+
+  .fabricate-manager[data-manager-view="world"][data-world-travel-tab="parties"] .manager-main {
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+    overflow: hidden;
   }
 
   /*
