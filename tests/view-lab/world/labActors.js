@@ -419,10 +419,11 @@ const ACTOR_DEFINITIONS = [
   // The one NON-player-character actor in the lab world, and it is APPENDED rather than
   // inserted: `labWorld.js` picks `lab-party`'s travel actor by position out of the
   // character subset, and the manager's "Preview as" and knowledge rosters read this list
-  // in order. It exists so the World > Parties travel-actor picker's documented candidate
-  // set — EVERY world actor, not only player characters — is photographable and testable
-  // rather than merely asserted: a vehicle can stand for a party on the map, and the same
-  // vehicle must never be offered as a party MEMBER.
+  // in order. It exists so the two exclusions the World > Parties pickers apply are
+  // photographable and testable rather than merely asserted: a vehicle is offered by
+  // neither the member picker nor the travel-actor picker's eligible set, yet a vehicle
+  // ALREADY linked as a travel actor is still offered by that picker so it can be seen
+  // and changed — which is `lab-party-long-haul`'s state.
   {
     id: 'lab-actor-wagon',
     name: 'The Ashfall Wagon',

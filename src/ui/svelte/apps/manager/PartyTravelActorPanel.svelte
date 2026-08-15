@@ -30,7 +30,9 @@
      `isPlayerCharacter` flag, tested STRICTLY (`=== true`) for the reason
      `PartyAddMemberPanel.svelte` documents. Dropping an actor onto the tile is
      deliberately NOT filtered: a drop names one actor explicitly, so it is the escape
-     hatch for a one-off that the type list does not cover.
+     hatch for a one-off that the type list does not cover — and because that escape
+     hatch exists, the CURRENT travel actor is always offered even when it is
+     ineligible, so the picker never hides the value it is being opened to change.
      Each option's meta says where that actor already stands ("Travel actor for X" /
      "In X"), which surfaces the composite-uniqueness collision before the pick fails
      instead of after.
@@ -85,12 +87,29 @@
 
   // The eligible set, not the world roster: an actor whose type is not one the GM listed
   // under Player Character Actor Types is not offered.
+  //
+  // Plus the CURRENT travel actor, always, even when it is not eligible. A drop onto the
+  // tile is deliberately unfiltered, and the GM may also have set this before narrowing
+  // the configured types, so a linked actor outside the eligible set is a state the panel
+  // can genuinely be in. Filtering it out of its own picker would mean opening the picker
+  // to change a travel actor and finding nothing marked, no check glyph, and a count whose
+  // denominator silently omits the very actor the tile above is displaying — and choosing
+  // any row would then be the only way out. It is appended rather than merged into the
+  // filter so the eligibility rule stays exactly one predicate.
   const eligibleActors = $derived(
     actorOptions.filter((option) => option.isPlayerCharacter === true)
   );
 
+  const offeredActors = $derived.by(() => {
+    const current = party?.travelActorUuid
+      ? actorOptions.find((option) => option.uuid === party.travelActorUuid)
+      : null;
+    if (!current || current.isPlayerCharacter === true) return eligibleActors;
+    return [...eligibleActors, current];
+  });
+
   const pickerOptions = $derived(
-    eligibleActors.map((option) => ({
+    offeredActors.map((option) => ({
       id: option.uuid,
       label: option.name,
       img: option.img || undefined,
@@ -113,12 +132,25 @@
       : eligibleActors.length === 0
         ? text(
             'FABRICATE.Admin.Manager.World.Parties.TravelActor.PickerNoEligibleActors',
-            'No actor has one of the configured player-character types. Fabricate counts the actor types listed under Player Character Actor Types in its module settings — add yours there if the actor you want is missing.'
+            'No eligible actors'
           )
         : text(
             'FABRICATE.Admin.Manager.World.Parties.TravelActor.PickerNoMatches',
             'No actor matches your search.'
           )
+  );
+
+  // The explanation, rendered as the panel's BODY rather than appended to its title: it
+  // names the setting to change, which is prose, and `EmptyState` sets a title as a serif
+  // heading with no width cap. Only the unconfigured-types reason has one — the other two
+  // are complete in a line.
+  const pickerEmptyDetail = $derived(
+    actorOptions.length > 0 && eligibleActors.length === 0
+      ? text(
+          'FABRICATE.Admin.Manager.World.Parties.TravelActor.PickerNoEligibleActorsDetail',
+          'Fabricate offers the actor types listed under Player Character Actor Types in its module settings. Adding a type there also makes those actors eligible party members. You can still drag any actor onto the tile above to assign it directly.'
+        )
+      : ''
   );
 
   const unlinkLabel = $derived(
@@ -255,6 +287,7 @@
         )}
         compactOptionRows
         emptyHint={pickerEmptyHint}
+        emptyDetail={pickerEmptyDetail}
         onChoose={(uuid) => onSet(party.id, uuid)}
       />
 

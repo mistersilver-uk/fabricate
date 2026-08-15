@@ -24,8 +24,8 @@ export class GatheringPartyValidationError extends Error {
  * may associate with at most one ENABLED party in total (as a member, as the
  * travel actor, or both — and when both, the same party). Disabled parties never
  * count toward this invariant, and stale actor/system/realm references are
- * preserved verbatim for GM repair. Enabling a party requires exactly one travel
- * actor; the invariant runs across the whole list at every save boundary.
+ * preserved verbatim for GM repair. A travel actor is NOT a precondition of enabling
+ * (see `_validateList`); the invariant runs across the whole list at every save boundary.
  *
  * Mutators stamp `updatedAt`/`updatedByUserId` on override writes (including the
  * `mode: 'none'` clear, which still stamps and empties `realmIds`). `moveMember`
@@ -270,11 +270,21 @@ export class GatheringPartyStore {
     // A travel actor is NOT a precondition of enabling. It was, and the gate cost more
     // than it bought: a party with no travel actor senses no scene regions, so
     // `resolveCurrentRealms` already resolves it to `unresolved` (Current Realm
-    // Resolution req 3) and its members gather exactly as they would with realms off.
-    // That is a legitimate configuration — downtime parties exist to group characters
-    // without ever standing on a map — and the gate turned it into an unreachable state
-    // rather than a harmless one. Realm gating is opt-in by assigning a travel actor,
-    // not a tax on grouping characters at all.
+    // Resolution req 3) and its members gather exactly as an actor in NO party at all
+    // does — `GatheringLocationService.resolveForActor` returns the same unresolved
+    // shape for both.
+    //
+    // NOT "as they would with realms disabled", which is a different and stronger claim
+    // that is false: with realms enabled, `evaluateLocationAvailability` answers an
+    // unresolved realm against an environment declaring `includedRealmIds` with
+    // `available: false, reasons: ['NO_CURRENT_REALM']` (`gatheringLocation.js:91-101`),
+    // whereas realms disabled makes every environment ungated. So enabling such a party
+    // does have a consequence — inclusion-gated environments stay out of reach for its
+    // members — and that consequence is exactly the one they already had with no party.
+    //
+    // The gate turned a legitimate configuration into an unreachable one: downtime
+    // parties exist to group characters without ever standing on a map. Realm gating is
+    // opted into by assigning a travel actor, not a tax on grouping characters at all.
     //
     // The composite-uniqueness invariant below is unaffected: it reasons over the actors
     // an enabled party ASSOCIATES, and a party with no travel actor simply associates one

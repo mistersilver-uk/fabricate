@@ -1623,10 +1623,11 @@ Shipped capabilities:
   Changing page or page size closes any open travel-actor picker and any open move drawer, so no popover outlives the card that anchored it.
   Closing a travel-actor picker through either paging path also clears its search query, so reopening a surviving card's picker starts from the unfiltered actor list.
 - Each party card carries its own enable control bound to that party's `enabled` state, so enabling and disabling never require selecting the party first.
-  The travel-actor gate stated earlier in this section applies per card, and the hint renders on the card that is gated.
+  Enabling is not gated on the travel actor, so a card whose travel actor is unassigned still toggles; its meta line reports "travel actor: none" rather than a card-scoped gate hint.
 - Each party card carries its own delete control, which routes through the shared confirm seam naming the party, because deleting a party drops its membership, its travel actor and its per-system current-realm overrides across every crafting system.
 - A party card's travel-actor panel names the linked actor or states that none is linked, and offers link, change and a persistent accessible unlink button in that one place.
   Its picker offers the actors whose type is one the GM configured under Player Character Actor Types, the same membership the member picker uses, and states that setting by name when the world holds actors but none are eligible; dropping an actor onto the panel stays unfiltered, so a one-off outside the configured types remains assignable.
+  A travel actor that is currently linked is always offered, eligible or not, so the picker marks and counts the value it is being opened to change rather than hiding it.
   Its picker reuses the shared searchable-popover primitive, anchors to the panel, flips above its trigger when the pane is short of room below, marks the currently linked actor, and presents full-width compact actor rows.
   The primitive may add the optional `Actors` title at top-left and its live matched-of-total count at top-right; unlink is not duplicated as a picker row or footer.
   On the GM Travel World > Parties card, the unassigned travel actor occupies its own panel above its picker rather than an inline value slot, so that state renders through the shared `EmptyState` compact treatment.
@@ -1634,7 +1635,7 @@ Shipped capabilities:
 - Adding a member who already belongs to another party is the move path: the GM confirms a move naming both parties, and the actor ends in exactly one party.
   The shipped store moves out of the source party whether or not that party is enabled, which is stricter than the invariant motivating it — an actor may be associated with at most one _enabled_ party — and that stricter behaviour is deliberate, because a membership silently split across a disabled and an enabled party is the state a GM cannot see.
 - A store validation failure renders on the card that caused it: the duplicate-travel-actor error beneath that card's travel-actor panel and the duplicate-member error beneath that card's member list, each associated with its control by `aria-describedby`; an error carrying no control context renders once above the card list.
-  A party can be rejected on enable by the composite-uniqueness invariant even when the travel-actor gate permits the toggle, so the enable control is never the only feedback surface.
+  A party can still be rejected on enable by the composite-uniqueness invariant, which no travel-actor state predicts, so the enable control is never the only feedback surface.
   Cancelling a confirm-backed action on another card does not reattribute an existing inline validation error; attribution changes only when the later action crosses confirmation and attempts its store mutation.
 - The pane's user-facing term for `travelActorUuid` is "travel actor", matching the canonical current-realm evidence source label; "travel marker" is retired from Manager copy.
 - Layout split: World Parties intentionally has no right inspector; its party-card editor occupies the full available content width.

@@ -173,8 +173,15 @@ export const BROAD_SIGNAL_PATTERN = new RegExp(
  * case id fails closed through the registry filter if its deliberate state is removed.
  */
 const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
+  // BOTH parties pickers, because between them they are the primitive's two modes and
+  // neither renders the other's chrome. `inlineSearchTrigger` (the actor picker) replaces
+  // its trigger with the search field and suppresses the in-popover search row; the
+  // realm-override picker keeps its value-bearing trigger and renders that row. A change
+  // to the search row, the header ordering or the compact field is invisible in the first
+  // frame and a change to the inline trigger is invisible in the second.
   'src/ui/svelte/apps/manager/SearchablePopover.svelte': Object.freeze([
     'manager-world-parties-actor-picker',
+    'manager-world-parties-realm-override-picker',
   ]),
 });
 
@@ -3391,10 +3398,14 @@ export const VIEW_LAB_CASES = Object.freeze([
     ],
     expectView: 'world',
     // Both survivors on ONE page is the claim, and it is unreachable unfiltered: the five
-    // parties page at four, and these two are the second and the fifth, so they are never
+    // parties page at three, and these two are the second and the fifth, so they are never
     // siblings in the same list without the filter. The `long-haul` card matches on its TRAVEL
     // ACTOR's name alone — the widened domain this change added — which a party-name-only
     // filter cannot fake.
+    //
+    // The filtered set is TWO, which is below `PAGER_THRESHOLD`, so this frame deliberately
+    // shows the pane with NO pager footer. That is the state under test — a filtered pane
+    // whose bar has gone with the matches it described — and not a missing control.
     expectSelector:
       '[data-travel-panel="parties"] .manager-travel-parties-list' +
       ':has([data-manager-travel-party-id="lab-party-long-haul"])' +
@@ -3457,6 +3468,44 @@ export const VIEW_LAB_CASES = Object.freeze([
     position: { width: 1330, height: 900 },
     kinds: ['manager', 'environments', 'world'],
     sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/GatheringPartiesTab\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/Party/,
+    ],
+  }),
+  managerCase({
+    id: 'manager-world-parties-realm-override-picker',
+    label: 'Manager — World Parties realm-override picker open',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { system: 'lab-smithing' },
+    steps: [
+      { selector: '#manager-world-nav-parties', press: 'Enter' },
+      { selector: '.manager-travel-parties-override-trigger' },
+    ],
+    expectView: 'world',
+    // The ONLY frame that renders `SearchablePopover`'s in-popover search row. The
+    // travel-actor picker next to it is `inlineSearchTrigger`, which suppresses that row
+    // entirely and replaces its trigger instead — so the actor-picker case above, which
+    // `BROAD_SIGNAL_CASE_OVERRIDES` routes a `SearchablePopover.svelte` change to, cannot
+    // photograph the compact search field, its leading glyph, or the fact that it now sits
+    // BELOW the title/count header rather than above it.
+    //
+    // The selector demands all three of the things that distinguish this presentation from
+    // the plain popover the other 13 consumers render: the shared header, the compact
+    // search row, and a compact option row. The DOM order of the header before the search
+    // row is what `:has(...) + ...` would assert; `:has()` is unordered, so the ordering
+    // claim is left to `tests/components/party-expanded-body.test.js` and this frame
+    // carries the visual one.
+    expectSelector:
+      '.fabricate-manager .manager-travel-popover.is-compact-option-rows' +
+      ':has([data-popover-header])' +
+      ':has([data-popover-filtered-count])' +
+      ':has(.manager-travel-popover-search.is-compact)' +
+      ' .manager-travel-option',
+    position: { width: 1330, height: 900 },
+    kinds: ['manager', 'environments', 'world'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/RealmOverridePicker\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/GatheringPartiesTab\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/Party/,
     ],

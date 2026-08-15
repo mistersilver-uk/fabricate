@@ -1025,8 +1025,22 @@ test('the World Parties fixture is legal, and its search and pager cases claim w
   // The pager itself is gated on the smallest offered size, so a seed below it would
   // photograph a pane with no footer at all — and the last-page case would have no
   // control to reach page two with.
-  const declaredPagerThreshold = Number(/const PAGER_THRESHOLD = (\d+);/.exec(tabSource)?.[1]);
-  assert.equal(declaredPagerThreshold, 3);
+  //
+  // The RULE is asserted, not a second literal: the source derives the threshold from the
+  // page-size list, so this pins that derivation. Restating `=== 3` here would let the two
+  // drift apart with only the `[3, 6, 9]` regex above noticing.
+  const declaredPageSizes = /const PAGE_SIZE_OPTIONS = \[([\d, ]+)\];/
+    .exec(tabSource)?.[1]
+    .split(',')
+    .map((size) => Number(size.trim()));
+  assert.ok(Array.isArray(declaredPageSizes) && declaredPageSizes.length > 0);
+  assert.match(
+    tabSource,
+    /const PAGER_THRESHOLD = PAGE_SIZE_OPTIONS\[0\];/,
+    'the threshold is derived from the smallest offered page size, not restated'
+  );
+  const declaredPagerThreshold = declaredPageSizes[0];
+  assert.equal(declaredPagerThreshold, declaredPageSize, 'and equals the default page size');
   assert.ok(parties.length >= declaredPagerThreshold, 'the seed opens the pager gate');
   const lastPage = getCaseById('manager-world-parties-last-page');
   assert.ok(
@@ -1277,14 +1291,25 @@ test('changed files map to the windows they affect', () => {
   assert.deepEqual(ids(['src/ui/svelte/apps/SomeBrandNewRoot.svelte']), [FALLBACK_CASE_ID]);
 });
 
-test('the broad SearchablePopover signal also captures its deliberate actor-picker state', () => {
+test('the broad SearchablePopover signal captures BOTH of its deliberate picker states', () => {
   const selected = mapChangedFilesToCases([
     'src/ui/svelte/apps/manager/SearchablePopover.svelte',
   ]).map((viewCase) => viewCase.id);
 
+  // Two overrides, not one, because the primitive has two modes and neither frame shows
+  // the other's chrome. `inlineSearchTrigger` (the actor picker) replaces its trigger with
+  // the search field and renders NO in-popover search row at all, so the compact search
+  // field, its leading glyph and its position below the title/count header are invisible
+  // in that frame; the realm-override picker keeps its value-bearing trigger and is the
+  // only surface that renders them.
   assert.deepEqual(
     selected.sort((a, b) => a.localeCompare(b)),
-    ['fabricate-app-shell', 'manager-components-normal', 'manager-world-parties-actor-picker']
+    [
+      'fabricate-app-shell',
+      'manager-components-normal',
+      'manager-world-parties-actor-picker',
+      'manager-world-parties-realm-override-picker',
+    ]
   );
 });
 

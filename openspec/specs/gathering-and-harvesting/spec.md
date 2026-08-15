@@ -331,7 +331,8 @@ Overrides referencing missing systems or realms persist as stale repair evidence
 3. `travelActorUuid` identifies the single Actor that represents the party on a campaign map — the **Travel Actor**.
 It is an Actor document UUID, not a placed Token UUID or prototype-token reference; shipped realm presence sensing resolves the travel actor's placed token(s).
 4. A party has at most one travel actor, and a newly created party defaults to `enabled: false`.
-Enabling does **not** require a travel actor: a party without one senses no scene regions, so Current Realm Resolution req 3 already resolves it to `unresolved` and its members gather exactly as they would with realms disabled.
+Enabling does **not** require a travel actor: a party without one senses no scene regions, so Current Realm Resolution req 3 already resolves it to `unresolved` and its members gather exactly as an actor in no party at all does.
+That equivalence is to the no-party case and **not** to realms being disabled: with realms enabled an unresolved current realm still blocks an environment that declares included realms or biomes (`NO_CURRENT_REALM`), so enabling such a party leaves its members exactly where they already were rather than making every environment ungated.
 A downtime party that never stands on a map is therefore a supported configuration rather than a rejected one, and realm gating is opted into by assigning a travel actor.
 5. **Composite uniqueness invariant:** an actor may be associated with at most one *enabled* party in total — as a member, as the travel actor, or both (when both, it must be the same party).
 The travel actor may also be a member of its own party.

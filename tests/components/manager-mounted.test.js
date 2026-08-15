@@ -7277,7 +7277,8 @@ describe('CraftingSystemManager mounted behavior', () => {
     },
     { uuid: 'Actor.lab-actor-idrin', name: 'Idrin Ashfall', img: '', isPlayerCharacter: true },
     { uuid: 'Actor.lab-actor-vosk', name: 'Vosk', img: '', isPlayerCharacter: true },
-    // The vehicle. Not a player character, so it is never a member and always a candidate.
+    // The vehicle. Not a player character, so neither picker offers it — unless it is
+    // already this party's travel actor, which is the one case that overrides the filter.
     { uuid: 'Actor.lab-actor-wagon', name: 'The Ashfall Wagon', img: '', isPlayerCharacter: false },
   ];
   const labMirrorParty = (id, name, enabled, memberUuids, travelActorUuid) => ({
@@ -7405,7 +7406,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     flushSync();
     assert.ok(
       Boolean(target.querySelector(lastPage)),
-      'five records at a page size of four put exactly the fifth on page two'
+      'five records at a page size of three put the trailing two on page two'
     );
     unmount(mounted);
     mounted = null;

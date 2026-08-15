@@ -113,9 +113,9 @@ describe('PartyExpandedBody (mounted)', () => {
 
     assert.equal(pill.getAttribute('aria-pressed'), 'false');
     // The travel-actor gate is gone. A party with no travel actor senses no scene
-    // regions, so it resolves to `unresolved` and its members gather exactly as they
-    // would with realms off — which is what a downtime party is for. Both halves of the
-    // old gate go together: no `aria-disabled`, and no hint standing in for the meta.
+    // regions, so it resolves to `unresolved` and its members gather exactly as an actor
+    // in NO party does — which is what a downtime party is for. Both halves of the old
+    // gate go together: no `aria-disabled`, and no hint standing in for the meta.
     assert.ok(!pill.hasAttribute('aria-disabled'), 'the pill is not gated');
     assert.equal(pill.getAttribute('aria-describedby'), null);
     assert.equal(root.querySelector('#party-enable-gate-p1'), null, 'no gate hint element');
@@ -125,6 +125,12 @@ describe('PartyExpandedBody (mounted)', () => {
     const meta = root.querySelector('.manager-party-meta').textContent;
     assert.match(meta, /travel actor: none/);
     assert.match(meta, /ignored by current-realm resolution/);
+
+    // The name is the ACTION and names the party; the state is `aria-pressed`. Without an
+    // explicit label the pill's accessible name is its own visible text — "Disabled" —
+    // which changes as the control is used and reads as the control being unavailable,
+    // and nine cards on a page would give nine identically named buttons.
+    assert.equal(pill.getAttribute('aria-label'), 'Enable Wardens');
 
     pill.click();
     flushSync();
@@ -505,6 +511,14 @@ describe('PartyExpandedBody (mounted)', () => {
     flushSync();
     assert.equal(root.querySelector('[data-manager-party-actor-unlink-footer]'), null);
     assert.ok(root.querySelector('[data-manager-party-actor-unlink="p1"]'));
+    // `.manager-travel-actor-popover` carries NO styling any more — it is purely the hook
+    // `scripts/lib/viewLabCases.js` selects the travel-actor frame on. Nothing else fails
+    // if it is dropped, and one bad View Lab selector fails the whole capture run rather
+    // than one frame, so it is pinned here where it fails immediately and by name.
+    assert.ok(
+      root.querySelector('.manager-travel-popover.manager-travel-actor-popover'),
+      'the picker keeps the View Lab capture hook'
+    );
   });
 
   it('offers only CONFIGURED player-character actors, annotated with where they already stand', async () => {
@@ -523,6 +537,13 @@ describe('PartyExpandedBody (mounted)', () => {
         { uuid: 'Actor.v', name: 'Vosk', img: '', isPlayerCharacter: true },
         { uuid: 'Actor.b', name: 'Bromm', img: '', isPlayerCharacter: true },
         { uuid: 'Actor.w', name: 'The Ashfall Wagon', img: '', isPlayerCharacter: false },
+        // The issue-1024 regression guard, and the ONLY fixture shape that separates
+        // `=== true` from `!== false`: an actor the projection never annotated at all.
+        // `isPlayerCharacter: false` above is rejected by BOTH predicates and so pins
+        // nothing about the strict test — without this entry, relaxing the filter to
+        // `!== false` passes every suite while silently making an unannotated actor
+        // travel-actor-eligible.
+        { uuid: 'Actor.u', name: 'Unprojected Ancient', img: '' },
       ],
     });
     root.querySelector('[data-manager-party-actor-trigger="p1"]').click();
@@ -549,6 +570,54 @@ describe('PartyExpandedBody (mounted)', () => {
       root.querySelector('.manager-travel-popover').textContent,
       /No actors exist in this world yet — create an Actor first\./
     );
+  });
+
+  it('still offers the CURRENT travel actor when its type is not a configured one', async () => {
+    // A drop onto the tile is unfiltered, and the GM may have narrowed the configured
+    // types after linking, so a linked-but-ineligible travel actor is reachable state.
+    // Filtering it out of its own picker leaves the GM opening the picker to change the
+    // actor and finding nothing marked, no check, and a count denominator that omits the
+    // actor the tile above is displaying.
+    const root = await mountBody({
+      party: makeParty({
+        travelActorUuid: 'Actor.w',
+        travelActor: { uuid: 'Actor.w', name: 'The Ashfall Wagon', img: '' },
+      }),
+      actorOptions: [
+        { uuid: 'Actor.b', name: 'Bromm', img: '', isPlayerCharacter: true },
+        { uuid: 'Actor.w', name: 'The Ashfall Wagon', img: '', isPlayerCharacter: false },
+      ],
+    });
+    root.querySelector('[data-manager-party-actor-trigger="p1"]').click();
+    flushSync();
+
+    assert.deepEqual(optionNames(root).sort(), ['Bromm', 'The Ashfall Wagon']);
+    // Marked AND counted: both are the reason it is offered at all.
+    const current = Array.from(root.querySelectorAll('.manager-travel-option')).find(
+      (option) => option.getAttribute('aria-selected') === 'true'
+    );
+    assert.match(current.textContent, /The Ashfall Wagon/);
+    assert.ok(Boolean(current.querySelector('.manager-travel-option-marker')), 'carries a check');
+    assert.equal(root.querySelector('[data-popover-filtered-count]').textContent.trim(), '2 of 2');
+  });
+
+  it('does not offer an ineligible actor that is NOT the current travel actor', async () => {
+    // The negative control for the test above. Without it, "always offer the current
+    // travel actor" could be implemented as "do not filter at all" and still pass.
+    const root = await mountBody({
+      party: makeParty({
+        travelActorUuid: 'Actor.b',
+        travelActor: { uuid: 'Actor.b', name: 'Bromm', img: '' },
+      }),
+      actorOptions: [
+        { uuid: 'Actor.b', name: 'Bromm', img: '', isPlayerCharacter: true },
+        { uuid: 'Actor.w', name: 'The Ashfall Wagon', img: '', isPlayerCharacter: false },
+      ],
+    });
+    root.querySelector('[data-manager-party-actor-trigger="p1"]').click();
+    flushSync();
+    assert.deepEqual(optionNames(root), ['Bromm']);
+    assert.equal(root.querySelector('[data-popover-filtered-count]').textContent.trim(), '1 of 1');
   });
 
   it('names the actor-types setting when the world has actors but none are eligible', async () => {
@@ -691,6 +760,62 @@ describe('PartyExpandedBody (mounted)', () => {
     root.querySelector('.manager-travel-option').click();
     flushSync();
     assert.deepEqual(set, [['p1', 'Actor.w']]);
+  });
+
+  it('gives the realm-override picker the SAME compact presentation as the actor picker', async () => {
+    // The two pickers sit stacked in one 210px column, so they must read as one kind of
+    // control. Asserted through the DOM the presentation is made of, not by comparing
+    // screenshots: the compact mode class, the shared title/count header, the compact
+    // search row, and rows carrying the compact class.
+    const root = await mountBody({
+      systemRealms: [
+        { id: 'r1', name: 'Northreach', enabled: true },
+        { id: 'r2', name: 'Ashen March', enabled: true },
+      ],
+    });
+    root.querySelector('.manager-travel-parties-override-trigger').click();
+    flushSync();
+
+    const popover = root.querySelector('.manager-travel-popover');
+    assert.ok(popover.classList.contains('is-compact-option-rows'), 'compact mode is on');
+    assert.equal(
+      popover.querySelector('[data-popover-header]').textContent.trim(),
+      // Auto + two realms.
+      'Realms 3 of 3'
+    );
+    assert.ok(
+      Boolean(popover.querySelector('.manager-travel-popover-search.is-compact')),
+      'the compact search row renders'
+    );
+
+    // ORDER, which no `:has()`-based frame selector can assert: the header names and
+    // counts the list, so a search field standing above its own heading would read as
+    // belonging to the popover rather than to the list it filters.
+    const children = Array.from(popover.children);
+    const headerIndex = children.findIndex((node) => node.hasAttribute('data-popover-header'));
+    const searchIndex = children.findIndex((node) =>
+      node.classList.contains('manager-travel-popover-search')
+    );
+    assert.ok(headerIndex >= 0 && searchIndex >= 0, 'both are direct children of the popover');
+    assert.ok(headerIndex < searchIndex, 'the header precedes the search field');
+  });
+
+  it('keeps the trigger MOUNTED while the realm-override picker is open', async () => {
+    // The one half of the actor picker's presentation the realm picker deliberately does
+    // NOT adopt. `inlineSearchTrigger` unmounts its trigger while open, which is right for
+    // a button labelled "Change actor" and wrong for a trigger whose whole job is to
+    // display the current override: erasing it forces the GM to close the picker to
+    // re-read what they are changing.
+    const root = await mountBody({
+      systemRealms: [{ id: 'r1', name: 'Northreach', enabled: true }],
+    });
+    root.querySelector('.manager-travel-parties-override-trigger').click();
+    flushSync();
+    assert.ok(
+      Boolean(root.querySelector('.manager-travel-parties-override-trigger')),
+      'the value-bearing trigger survives opening'
+    );
+    assert.equal(root.querySelector('.manager-travel-picker-inline'), null, 'and is not inlined');
   });
 
   it('renders the realm-override control in the card RIGHT COLUMN, not the inspector', async () => {

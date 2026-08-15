@@ -4280,7 +4280,7 @@
             "SubtitleOne": "1 party · {enabled} enabled · {assigned} of {total} characters assigned",
             "SubtitleEmpty": "No parties yet · world-level, shared by gathering and travel in every system",
             "CreateAction": "New party",
-            "Intro": "Parties belong to the world, not to a crafting system. Gathering and travel both read them, in every system. A character belongs to one enabled party at a time, and can be moved between them. A party needs one travel actor before it can be enabled: a single actor that stands for the whole party on the map.",
+            "Intro": "Parties belong to the world, not to a crafting system. Gathering and travel both read them, in every system. A character belongs to one enabled party at a time, and can be moved between them. A travel actor is the single actor that stands for the whole party on the map; a party without one is still a party, it simply has no current realm.",
             "ListLabel": "Parties",
             "NameLabel": "Party name",
             "MetaMembers": "{count} members",
@@ -4291,6 +4291,7 @@
             "Enabled": "Enabled",
             "Disabled": "Disabled",
             "Delete": "Delete party",
+            "EnableToggleLabel": "Enable {name}",
             "NoMatch": "No party, member or travel actor matches “{query}”.",
             "Empty": {
               "Title": "No parties yet",
@@ -4346,7 +4347,8 @@
               "PickerSearchLabel": "Search actors",
               "PickerClose": "Close the actor search",
               "PickerNoMatches": "No actor matches your search.",
-              "PickerNoEligibleActors": "No actor has one of the configured player-character types. Fabricate counts the actor types listed under Player Character Actor Types in its module settings — add yours there if the actor you want is missing.",
+              "PickerNoEligibleActors": "No eligible actors",
+              "PickerNoEligibleActorsDetail": "Fabricate offers the actor types listed under Player Character Actor Types in its module settings. Adding a type there also makes those actors eligible party members. You can still drag any actor onto the tile above to assign it directly.",
               "OptionTravelActorFor": "Travel actor for {name}",
               "OptionInParty": "In {name}"
             },

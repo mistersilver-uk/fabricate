@@ -345,7 +345,7 @@ Additional causes:
 
 ## Character Missing From the Character Bar or Rosters
 
-**Symptom:** A player's character does not appear in the character-selection bar at the top of the unified Fabricate window, in the GM's gathering stamina roster, in the Access or Knowledge rosters in the Crafting Admin panel, or in the party member picker.
+**Symptom:** A player's character does not appear in the character-selection bar at the top of the unified Fabricate window, in the GM's gathering stamina roster, in the Access or Knowledge rosters in the Crafting Admin panel, in the party member picker, or in a party's travel-actor picker.
 The player owns the actor, and it is otherwise a normal player character for the game system.
 
 **Likely cause:**
@@ -365,11 +365,15 @@ The player owns the actor, and it is otherwise a normal player character for the
 4. Click **Save**.
    The change takes effect for every connected player immediately, without a reload.
 
-**What this setting does and does not change:** Adding an actor type here only changes which actors are offered in the character bar, the gathering stamina roster, the Access and Knowledge rosters, and the party member picker.
+**What this setting does and does not change:** Adding an actor type here only changes which actors are offered in the character bar, the gathering stamina roster, the Access and Knowledge rosters, the party member picker, and a party's travel-actor picker.
 It does not change who is allowed to attempt a craft or a gathering task.
 That always depends on who owns or controls the actor.
 An actor of an unconfigured type remains fully usable for crafting and gathering.
-It is simply not offered as a choice in those four lists.
+It is simply not offered as a choice in those five lists.
+
+Note that these lists share one setting.
+Adding an actor type so that a group, vehicle or caravan actor can be chosen as a party's travel actor also makes actors of that type eligible party members.
+If you would rather not widen both, drag the actor onto the travel-actor panel instead: a drop assigns any actor directly and ignores the type list.
 
 **See also:** [Gathering Environments]({% link gathering-environments.md %}#actor-selection-bar) covers the character bar from the player's side.
 

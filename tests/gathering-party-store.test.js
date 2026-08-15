@@ -30,8 +30,10 @@ test('normalizes defaults: disabled, empty members, null travel actor, empty ove
 test('a party with NO travel actor can be enabled', async () => {
   // The gate this replaces rejected the save. It bought nothing: such a party senses no
   // scene regions, so `resolveCurrentRealms` already returns the unresolved shape and its
-  // members gather as they would with realms off. Downtime parties group characters
-  // without ever standing on a map, and the gate made that an unreachable state.
+  // members gather exactly as an actor in NO party does — not as they would with realms
+  // disabled, which is a different claim and a false one (an unresolved realm still
+  // blocks an inclusion-gated environment). Downtime parties group characters without
+  // ever standing on a map, and the gate made that an unreachable state.
   const { store } = makeStore();
   const party = await store.create({ name: 'Heroes' });
   const enabled = await store.setEnabled(party.id, true);
@@ -47,7 +49,13 @@ test('an actor still cannot be a member of two enabled travel-actor-less parties
   const a = await store.create({ name: 'A', memberActorUuids: ['Actor.alice'] });
   await store.setEnabled(a.id, true);
   const b = await store.create({ name: 'B', memberActorUuids: ['Actor.alice'] });
-  await assert.rejects(() => store.setEnabled(b.id, true), GatheringPartyValidationError);
+  // The MESSAGE too, not just the class: every validation failure throws this one error
+  // type, so a class-only assertion would keep passing if some future rule rejected the
+  // save first and the uniqueness branch stopped running.
+  await assert.rejects(() => store.setEnabled(b.id, true), {
+    name: 'GatheringPartyValidationError',
+    message: /associated with more than one enabled party/,
+  });
 });
 
 test('composite invariant: travel actor may also be a member of its own party', async () => {

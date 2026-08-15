@@ -2392,9 +2392,10 @@
   // downtime group is grouped by, so a member-less enabled party is in use.
   //
   // `assigned` / `total` are PLAYER CHARACTERS only, each counted once across all parties.
-  // Travel actors are deliberately outside the numerator — their candidate set is every
-  // world actor, so a vehicle standing in as one would otherwise be counted against a
-  // player-character denominator and render "5 of 4 characters assigned". Stale member
+  // Travel actors are deliberately outside the numerator — a currently linked one is
+  // offered by its picker whether or not its type is configured, so a vehicle standing in
+  // as one would otherwise be counted against a player-character denominator and render
+  // "5 of 4 characters assigned". Stale member
   // uuids resolve to no projected actor and drop out for the same reason.
   const playerCharacterUuids = $derived(
     new Set(

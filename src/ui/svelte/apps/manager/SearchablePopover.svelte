@@ -113,7 +113,16 @@
     popoverClass — optional extra class on the portaled popover element (the
                    pickerClass lands on the trigger's root, which the portaled
                    popover escapes, so a popover-scoped style needs its own hook)
-    *AriaLabel / searchPlaceholder / emptyHint — localized strings
+    *AriaLabel / searchPlaceholder / emptyHint — localized strings. `emptyHint` is the
+                   no-matches TITLE, so it must stay short: `EmptyState` renders a title
+                   as a 13px/600 serif heading with no width cap, and a sentence handed
+                   to it sets as a multi-line heading under the hero glyph.
+    emptyDetail  — OPTIONAL explanatory sentence rendered as `EmptyState`'s BODY beneath
+                   that title. It exists because at least one empty reason is a
+                   configuration explanation rather than a name — the travel-actor
+                   picker's "no actor has a configured player-character type" names the
+                   module setting to change — and prose belongs in a body, not in a
+                   heading. Callers passing only `emptyHint` render exactly as before.
     open         — OPTIONAL `$bindable` open state (default false). Bind it when a
                    surface must open the picker from something OTHER than the trigger,
                    or must force it shut from outside — the World > Parties card does
@@ -159,6 +168,7 @@
     searchPlaceholder = '',
     searchAriaLabel = '',
     emptyHint = '',
+    emptyDetail = '',
     pickerClass = '',
     minWidth = 240,
     maxWidth = 340,
@@ -560,7 +570,12 @@
           {#each filteredOptions as option (option.id)}
             {@render optionRow(option)}
           {:else}
-            <EmptyState compact icon="fas fa-magnifying-glass" title={emptyHint} />
+            <EmptyState
+              compact
+              icon="fas fa-magnifying-glass"
+              title={emptyHint}
+              hint={emptyDetail || undefined}
+            />
           {/each}
         {/if}
       </div>
@@ -621,6 +636,25 @@
     background: var(--fab-accent-soft);
   }
 
+  /* Pointer feedback, restated for this mode. The compact row's resting
+     `background: var(--fab-mv2-surface-2)` below computes to (0,4,0) and so OUTRANKS the
+     global `.fabricate-manager .manager-travel-option:hover` at (0,2,0) — meaning the
+     shared hover silently stopped landing the moment a caller opted in. The actor picker
+     had already lost it; opting the realm-override picker in would have taken pointer
+     feedback off ten clickable realms as well. */
+  .manager-travel-popover.is-compact-option-rows .manager-travel-option:hover {
+    border-color: var(--fab-mv2-border-strong);
+    background: var(--fab-surface-raised);
+  }
+
+  /* The selected row keeps its accent on hover rather than reverting to the neutral
+     surface, so hovering the current value does not read as deselecting it. */
+  .manager-travel-popover.is-compact-option-rows
+    .manager-travel-option[aria-selected='true']:hover {
+    border-color: var(--fab-accent-border);
+    background: var(--fab-accent-soft);
+  }
+
   /* The compact search row, matching `.manager-travel-picker-inline`'s 30px bordered field
      with its leading glyph — so a compact picker that keeps its value-bearing trigger reads
      as the same control as one that swaps its trigger for the field. `margin: 0 7px` lands
@@ -669,7 +703,11 @@
     border-radius: 0;
     color: var(--fab-text);
     background: transparent;
-    font-size: 10.5px;
+    /* 11.5px, matching the ROWS this field filters and the add-a-member field two columns
+       away — not the 10.5px of `.manager-travel-picker-inline`, which is sized to a
+       210px-column button rather than to a list. A field smaller than its own list reads
+       as secondary to it. */
+    font-size: 11.5px;
     font-weight: 500;
   }
 
@@ -684,17 +722,26 @@
     box-shadow: none;
   }
 
-  /* `both-edges`, not plain `stable`: the list scrolls, so a gutter reserved on the
-     scrolling edge alone makes the gap to the right of a row the padding PLUS the
-     scrollbar while the gap to its left is the padding alone. Reserving on both edges
-     keeps the two equal whether or not the engine draws a track (Firefox's overlay
-     scrollbar ignores the property, and needs no reservation to stay symmetric). */
+  /* The scroll box carries NO right padding: the reserved gutter IS the right inset, so
+     it replaces padding instead of adding to it.
+
+     `both-edges` was the obvious reading and it is wrong, because it fixes the wrong
+     asymmetry. It equalises a row's left and right gaps by reserving ~10px on each side —
+     but it reserves them INSIDE the scroll box only, so the rows end up 10px inboard of
+     the header and the search field, which are not in that box. Measured at 268px: rows
+     43->265 under a header and field at 33->275, a visible three-step indent, plus 20px of
+     a 256px content box permanently blank whether or not the list scrolls.
+
+     Single-edge `stable` with `padding-right: 0` puts every left edge on 7px exactly and
+     leaves the right edges differing by the gutter minus that padding (~3px) rather than
+     by the full gutter. The gutter width is engine-determined, so no static margin on the
+     header or the field could have matched `both-edges` anyway. */
   .manager-travel-popover.is-compact-option-rows .manager-travel-popover-options {
     display: flex;
     flex-direction: column;
     gap: 4px;
-    padding: 7px;
-    scrollbar-gutter: stable both-edges;
+    padding: 7px 0 7px 7px;
+    scrollbar-gutter: stable;
     scrollbar-width: thin;
   }
 

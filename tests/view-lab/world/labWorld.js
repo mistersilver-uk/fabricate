@@ -60,8 +60,8 @@ function seedSettings(content, actors, managedSystemId, experimentalFeatures, no
   //
   // The set is legal under `GatheringPartyStore._validateList`, which is checked here because
   // the lab does NOT check it: the settings map is written raw and validation runs only in
-  // `_persist`. Enabled parties need exactly one travel actor (`:271-274`) and an actor uuid
-  // may associate with at most ONE enabled party as member or travel actor (`:277-291`);
+  // `_persist`. A travel actor is not required to enable, and an actor uuid
+  // may associate with at most ONE enabled party as member or travel actor;
   // disabled parties are skipped entirely (`:280`), so they may reuse any actor freely.
   //
   //   - `lab-party` — enabled; the three characters; Vosk as travel actor. Content unchanged.

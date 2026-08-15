@@ -143,8 +143,13 @@ A party stores a name, an enabled flag, member actor UUIDs, one optional travel 
 - **Travel actor** is the actor that represents the party on a campaign map (for example, a banner or caravan actor whose token sits on an overworld or hexcrawl scene).
   Fabricate senses the party's realm presence from that actor's placed token and the selected system's map links.
   Set or clear it from **World > Parties**.
-- **Enabling a party** is only possible once it has a travel actor assigned.
-  The toggle stays disabled (with a hint) until one is set.
+  The picker offers only actors whose type is listed under **Player Character Actor Types** in the module settings, which by default is the "Character" type alone.
+  To pick a banner, caravan or group actor from the list, add its actor type there — noting that doing so also makes actors of that type eligible party members.
+  Alternatively, drag the actor straight onto the travel-actor panel: a drop assigns any actor regardless of its type.
+  An actor already assigned as a travel actor stays assigned and stays visible in the picker even if its type is not listed.
+- **Enabling a party** does not require a travel actor.
+  A party without one resolves to no current realm, which leaves its members exactly where an actor in no party stands: ungated environments stay open and location-gated ones stay out of reach.
+  Assign a travel actor when you want that party's realm to resolve from its token on the map.
 - **One enabled party per actor** means an actor may be associated with at most one *enabled* party in total, whether as a member, as the travel actor, or both (and when both, the same party).
   Disabled parties never count toward this limit.
   Violations are rejected at save time and shown inline next to the control that caused them.

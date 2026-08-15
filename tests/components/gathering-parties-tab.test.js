@@ -178,6 +178,34 @@ describe('GatheringPartiesTab (mounted)', () => {
     assert.match(root.querySelector('[data-pagination-page]').textContent, /Page 1 of 3/);
   });
 
+  it('returns to page ONE on a page-size change, where the clamp cannot do it for us', async () => {
+    // 13 parties, walked to page 3 of 5 at size 3, then resized to 6. The out-of-range
+    // clamp at `GatheringPartiesTab.svelte` only fires when `pageIndex * pageSize >=
+    // filteredParties.length` — here 2 * 6 = 12 < 13, so it does NOT fire and the ONLY
+    // thing that can put the pane back on page one is `changePageSize`'s explicit reset.
+    // The equivalent assertion in `manager-mounted.test.js` cannot discriminate: its
+    // 5-party lab fixture trips the clamp at every offered size above three, so the
+    // reset could be deleted there and the suite would stay green.
+    const root = await mountTab({ parties: makeParties(13) });
+    root.querySelector('[data-pagination-next]').click();
+    flushSync();
+    root.querySelector('[data-pagination-next]').click();
+    flushSync();
+    assert.match(root.querySelector('[data-pagination-page]').textContent, /Page 3 of 5/);
+
+    const select = root.querySelector('[data-pagination-size]');
+    select.value = '6';
+    select.dispatchEvent(new window.Event('change', { bubbles: true }));
+    flushSync();
+
+    assert.match(root.querySelector('[data-pagination-page]').textContent, /Page 1 of 3/);
+    assert.equal(
+      cards(root)[0].getAttribute('data-manager-travel-party-id'),
+      'p1',
+      'the first party is back on screen, so the index really reset'
+    );
+  });
+
   it('holds the pager back below three matches, and brings it in at three', async () => {
     let root = await mountTab({ parties: makeParties(2) });
     // Two parties are one page at every offered size, so the bar could only state
@@ -447,10 +475,16 @@ describe('GatheringPartiesTab (mounted)', () => {
     assert.ok(!root.querySelector('.manager-travel-parties-override-trigger'));
   });
 
-  it('renders the realm-override picker through the SHIPPED default trigger mode', async () => {
-    // Characterization for `SearchablePopover`'s untouched path: the World > Parties
-    // travel-actor control opts into a new inline-search trigger, and 19 other consumers
-    // must keep rendering a plain trigger button with a chevron and an in-popover search.
+  it('keeps the realm-override picker on the value-bearing trigger with an in-popover search', async () => {
+    // NOT a characterization of the primitive's untouched path any more — this consumer
+    // now opts into `compactOptionRows` and the shared title/count header, so it is a
+    // changed surface. What it still pins is the deliberate HALF it did not adopt: the
+    // trigger stays mounted and keeps displaying the current override rather than being
+    // replaced by the search field, because a trigger that erases the value it reports
+    // makes the GM close the picker to re-read what they are changing. That makes this
+    // the only mounted coverage of the in-popover search row, which `inlineSearchTrigger`
+    // suppresses entirely — see `party-expanded-body.test.js` for the header/search
+    // ORDER, and `manager-world-parties-realm-override-picker` for its rendered frame.
     const chosen = [];
     const root = await mountTab({
       parties: [makeParty({ id: 'p1', name: 'Wardens' })],

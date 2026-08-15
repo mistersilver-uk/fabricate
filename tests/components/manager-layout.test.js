@@ -6670,7 +6670,7 @@ test('World Parties preserves the shared stacked rail and body layout at narrow 
   }
 });
 
-test.skip('World Parties keeps its card scroller and sibling pager independently reachable at 1100px', async () => {
+test('World Parties keeps its card scroller and sibling pager independently reachable at 1100px', async () => {
   // `gathering-parties-tab.test.js` mounts this component and pins the sibling DOM. This
   // source join keeps the Chromium geometry below attached to those real rendered classes:
   // deleting or renaming either node fails here instead of leaving a stale layout fixture.
@@ -6705,8 +6705,17 @@ test.skip('World Parties keeps its card scroller and sibling pager independently
       (_, index) =>
         `<button class="manager-nav-button"><span class="manager-nav-label">Section ${index + 1}</span></button>`
     ).join('');
+    // The component's OWN scoped CSS, after the global sheet — the same pairing every
+    // other probe in this file uses (see the components-route probe above) and matching
+    // `css: 'injected'`, which puts a component's block in `document.head` after Foundry's
+    // `<link>`. Omitting it is what disabled this test: the fixture carried the real hash
+    // class but nothing declared `.manager-travel-parties` or its content child, so the
+    // pane rendered `display: block; overflow: visible`, the scroller sized to its cards,
+    // and the opening `scrollRange > 100` precondition read 0 — a fixture that proved
+    // nothing rather than a product regression.
     await page.setContent(`<!doctype html><html><head><meta charset="utf-8">
       <style>${css}</style>
+      <style>${partiesTabScoped.css}</style>
       <style>
         html, body { margin: 0; width: 100%; height: 100%; }
         :root { --font-primary: Arial, sans-serif; }

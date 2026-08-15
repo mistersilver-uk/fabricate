@@ -51,7 +51,9 @@
   // so the page sizes step in threes rather than the manager's usual 10/25/50 table
   // rhythm, and the smallest is also the threshold at which the footer appears.
   const PAGE_SIZE_OPTIONS = [3, 6, 9];
-  const PAGER_THRESHOLD = 3;
+  // DERIVED, not restated. The rule is "the footer appears at the smallest offered size";
+  // a second literal could drift from the first and only the page-size list would notice.
+  const PAGER_THRESHOLD = PAGE_SIZE_OPTIONS[0];
 
   let searchTerm = $state('');
   let pageIndex = $state(0);
@@ -226,7 +228,7 @@
     <p class="manager-travel-parties-intro">
       {text(
         'FABRICATE.Admin.Manager.World.Parties.Intro',
-        'Parties belong to the world, not to a crafting system. Gathering and travel both read them, in every system. A character belongs to one enabled party at a time, and can be moved between them. A party needs one travel actor before it can be enabled: a single actor that stands for the whole party on the map.'
+        'Parties belong to the world, not to a crafting system. Gathering and travel both read them, in every system. A character belongs to one enabled party at a time, and can be moved between them. A travel actor is the single actor that stands for the whole party on the map; a party without one is still a party, it simply has no current realm.'
       )}
     </p>
 

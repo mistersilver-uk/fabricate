@@ -8,14 +8,17 @@
   Head: icon tile · always-editable name over a meta line · enable pill · delete.
   Body: `minmax(0, 1fr) 210px` — members on the left, the travel actor on the right.
 
-  Two Fabricate rules the prototype has no equivalent of:
+  Three Fabricate rules the prototype has no equivalent of:
 
    - The enable pill is UNGATED. A travel actor used to be a precondition of enabling;
      it is not, because a party without one senses no scene regions and so resolves to
      `unresolved` anyway (`gathering-and-harvesting` Current Realm Resolution req 3) —
-     which is to say a downtime party that never stands on a map behaves exactly as it
-     would with realms switched off. The meta line still states "travel actor: none", so
-     the consequence is visible without the configuration being forbidden.
+     which is to say a downtime party that never stands on a map leaves its members
+     exactly where an actor in NO party stands. That is not the same as realms being
+     switched off: with realms on, an unresolved realm still blocks an environment that
+     declares included realms or biomes. The meta line therefore keeps stating "travel
+     actor: none", so the consequence stays visible without the configuration being
+     forbidden.
    - Delete routes through the shared confirm seam (`adminStore.deleteParty`), which
      names the party: deleting one drops its membership, its travel actor and its
      per-system current-realm overrides across every crafting system.
@@ -123,6 +126,19 @@
           ' · disabled, ignored by current-realm resolution'
         )
   );
+  // A STABLE accessible name. Without it the pill's name is its own visible text, which
+  // is the STATE ("Enabled" / "Disabled") — so a screen reader announced "Disabled, toggle
+  // button, not pressed", a name that changes as the control is used and that reads as the
+  // control being unavailable. `aria-pressed` already carries the state, so the name should
+  // carry the action. It names the PARTY too, because a page renders up to nine of these
+  // and nine buttons called "Enable party" are indistinguishable in an element list.
+  const enableToggleLabel = $derived(
+    text('FABRICATE.Admin.Manager.World.Parties.EnableToggleLabel', 'Enable {name}').replace(
+      '{name}',
+      party?.name || ''
+    )
+  );
+
   // uuid -> the FIRST other party that lists it, by name.
   const otherPartyNameByUuid = $derived.by(() => {
     const map = {};
@@ -230,6 +246,7 @@
       class:is-on={party.enabled === true}
       data-manager-party-enable={party.id}
       aria-pressed={party.enabled === true}
+      aria-label={enableToggleLabel}
       disabled={saving}
       onclick={() => onSetEnabled(party.id, party.enabled !== true)}
     >
