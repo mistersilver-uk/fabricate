@@ -2,6 +2,36 @@ export const DOWNTIME_TAB_IDS = Object.freeze(['tracking', 'activities', 'factio
 
 const DOWNTIME_TAB_SEQUENCE = DOWNTIME_TAB_IDS.join(', ');
 
+/**
+ * A labelled tab in a World navigation provider.
+ *
+ * @typedef {object} WorldNavProviderTab
+ * @property {'tracking'|'activities'|'factions'|'settings'} id Fixed tab id in the required order.
+ * @property {string} label Localized visible tab label.
+ * @property {string} accessibleName Localized accessible tab name.
+ * @property {string} tooltip Localized keyboard-visible tab tooltip.
+ * @property {string} icon Font Awesome icon class string.
+ */
+
+/**
+ * The mount context supplied to a World navigation provider.
+ *
+ * @typedef {object} WorldNavMountOptions
+ * @property {HTMLElement} target Empty connected element that receives companion content.
+ * @property {'tracking'|'activities'|'factions'|'settings'} tabId Active fixed tab id.
+ * @property {object} context Manager context supplied by Fabricate.
+ */
+
+/**
+ * A companion-owned replacement for the Core World > Downtime preview.
+ *
+ * @typedef {object} WorldNavProvider
+ * @property {1} apiVersion API version supported by this provider.
+ * @property {'downtime'} id Provider identity.
+ * @property {WorldNavProviderTab[]} tabs The complete ordered fixed tab sequence.
+ * @property {(options: WorldNavMountOptions) => (void|Function)} mount Synchronous mount callback.
+ */
+
 function validateTab(tab, expectedId, index) {
   if (!tab || typeof tab !== 'object' || tab.id !== expectedId) {
     throw new TypeError(
@@ -56,6 +86,17 @@ export function createManagerExtensionsRegistry({ reportError = console.error } 
     }
   }
 
+  /**
+   * Register the page session's only World > Downtime provider.
+   *
+   * The returned function is idempotent and restores the Core preview when it unregisters the
+   * currently registered provider.
+   *
+   * @param {WorldNavProvider} provider Companion-owned provider definition.
+   * @returns {() => void} Idempotent unregister function.
+   * @throws {TypeError} When the provider does not meet API-v1 requirements.
+   * @throws {Error} When another provider is already registered.
+   */
   function registerWorldNavProvider(provider) {
     validateProvider(provider);
     if (worldNavProvider) {
@@ -106,6 +147,10 @@ export function createManagerExtensionsRegistry({ reportError = console.error } 
   });
 }
 
-// One registry per evaluated Fabricate module. `bindFabricateGlobal()` replays the
-// same public object at init and ready, so companion registrations survive both binds.
+/**
+ * Page-session manager-extension registry.
+ *
+ * `bindFabricateGlobal()` replays its public object at init and ready, so a companion provider
+ * registered during init survives the ready lifecycle bind.
+ */
 export const managerExtensions = createManagerExtensionsRegistry();

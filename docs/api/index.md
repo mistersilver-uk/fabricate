@@ -16,7 +16,7 @@ Fabricate exposes its API through two Foundry globals:
 - **`game.fabricate.api`**.
   Constructor references for all public classes, plus public constants (`HOOKS` — the published hook names).
 
-All APIs are available after the `fabricate.ready` hook fires:
+All APIs except manager-extension registration are available after the `fabricate.ready` hook fires:
 
 ```javascript
 Hooks.on('fabricate.ready', () => {
@@ -28,6 +28,8 @@ Hooks.on('fabricate.ready', () => {
 {: .warning }
 > Do not call Fabricate APIs before the `fabricate.ready` hook.
 > The module initialises during Foundry's `ready` hook, and services are not available until initialisation completes.
+> A companion's Manager extension registration is the exception.
+> Register it during the companion's `init` callback as described in [Manager Downtime Extension](#manager-downtime-extension).
 
 ---
 
@@ -502,9 +504,11 @@ Hooks.once('fabricate.ready', () => {
 
 ## Manager Downtime Extension
 
-Companion modules can replace Fabricate Core's read-only World > Downtime preview through the stable API-v1 manager extension seam.
-Declare Fabricate as a required module dependency in the companion manifest, then register during `init`.
-If Fabricate evaluated after the companion's init callback, use one existing Foundry `ready` fallback; do not add a Fabricate hook, patch the Manager DOM, or use Foundry render hooks.
+Companion modules can replace Fabricate Core's read-only **World > Downtime** preview through the stable API-v1 manager extension seam.
+Declare Fabricate as a required module dependency in the companion manifest.
+Attempt registration once from the companion's `init` callback.
+If the API is unavailable there, arm one existing Foundry `ready` fallback.
+Do not add a Fabricate hook, patch the Manager DOM, or use Foundry render hooks.
 
 ```json
 {
@@ -514,8 +518,10 @@ If Fabricate evaluated after the companion's init callback, use one existing Fou
 }
 ```
 
-`relationships.requires` governs dependency availability and activation, not ordinary-module script priority.
-The one-shot `ready` fallback above is therefore required; do not try to replace it with an order assumption or with a render-hook/DOM-patching integration.
+`relationships.requires` governs dependency availability and activation.
+It does not establish ordinary-module script priority.
+The one-shot `ready` fallback is therefore part of the load contract.
+Do not replace it with an order assumption or a render-hook or DOM-patching integration.
 
 ```javascript
 let unregisterDowntime = null;
@@ -557,6 +563,7 @@ Hooks.once('init', () => {
 ```
 
 The four tab ids and their order are fixed: `tracking`, `activities`, `factions`, `settings`.
+Every tab supplies localized non-empty `label`, `accessibleName`, `tooltip`, and Font Awesome `icon` strings.
 `mount({ target, tabId, context })` must be synchronous and return either one cleanup function or nothing.
 Fabricate calls that cleanup exactly once before switching tabs, replacing or unregistering the provider, leaving the route, or closing the Manager.
 A mount or cleanup error is contained and the Core preview is restored.
