@@ -819,7 +819,10 @@ describe('player-write guardrail for the actor-types key', () => {
 describe('empty-state copy', () => {
   const lang = JSON.parse(readFileSync(resolve(import.meta.dirname, '../lang/en.json'), 'utf8'));
   const barEmpty = lang.FABRICATE.App.ActorBar.NoActors;
-  const partyEmpty = lang.FABRICATE.Admin.Manager.Travel.Members.NoActors;
+  // Issue 1182 rehomed this string with the World > Parties pane rebuild: the pane is
+  // world-scoped, so its copy moved out of the selected-system `Travel.*` namespace and
+  // the whole `Travel.Members.*` subtree was retired.
+  const partyEmpty = lang.FABRICATE.Admin.Manager.World.Parties.Members.NoActorsConfigured;
   const menu = lang.FABRICATE.Settings.PlayerCharacterActorTypes;
 
   it('defines every key the picker localizes', () => {
