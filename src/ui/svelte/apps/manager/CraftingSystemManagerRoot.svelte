@@ -10946,7 +10946,7 @@
                       <p class="manager-muted">
                         {text(
                           'FABRICATE.Admin.Manager.Travel.MapLinks.NoPartiesInMapRegion',
-                          'No party travel markers are in this map region.'
+                          'No party travel actors are in this map region.'
                         )}
                       </p>
                     {/if}
