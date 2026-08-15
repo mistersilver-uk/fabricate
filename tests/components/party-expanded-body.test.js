@@ -669,7 +669,7 @@ describe('PartyExpandedBody (mounted)', () => {
     const column = root.querySelector('.manager-party-travel-col');
     assert.ok(
       Boolean(column.querySelector('.manager-travel-parties-override-trigger')),
-      'ui-integration/spec.md:1603-1604 pins every editing control to the centre column'
+      "ui-integration/spec.md's GM Travel Route layout split pins every editing control to the centre column"
     );
     assert.ok(
       Boolean(column.querySelector('.manager-party-actor-panel')),

@@ -13889,7 +13889,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.equal(target.textContent.includes('No current realm set for this system.'), false);
 
     // Every card renders its own controls, so the CRUD walk below never opens an accordion
-    // and never reaches into the inspector: `ui-integration/spec.md:1603-1604` pins editing
+    // and never reaches into the inspector: `ui-integration/spec.md`'s GM Travel Route layout-split rule pins editing
     // to the centre column and makes the inspector a read-only evidence echo.
     assert.equal(target.querySelector('.manager-travel-inspector .manager-button.is-danger'), null);
     assert.equal(target.querySelector('.manager-party-enable-toggle'), null);

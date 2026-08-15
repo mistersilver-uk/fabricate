@@ -11,7 +11,7 @@
 
   Three Fabricate rules the prototype has no equivalent of:
 
-   - The enable pill is GATED on the travel actor (`ui-integration/spec.md:1601`,
+   - The enable pill is GATED on the travel actor (`ui-integration/spec.md`'s GM Travel Route enable-toggle rule,
      `gathering-and-harvesting` req 4, enforced at `GatheringPartyStore.js:272-273`).
      While the gate is closed it uses `aria-disabled` plus `aria-describedby` rather
      than `disabled`, because a `disabled` button is not keyboard-reachable and
@@ -21,7 +21,7 @@
      names the party: deleting one drops its membership, its travel actor and its
      per-system current-realm overrides across every crafting system.
    - The realm-override control lives HERE, in the card's right column, not in the
-     right inspector — `ui-integration/spec.md:1603-1604` pins every editing control
+     right inspector — `ui-integration/spec.md`'s GM Travel Route layout-split rule pins every editing control
      including override Set/Clear to the centre column and declares the inspector a
      read-only evidence echo.
 
