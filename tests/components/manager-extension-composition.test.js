@@ -60,6 +60,9 @@ test('the production init/ready replay preserves a provider registered through g
     const initApi = globalThis.game.fabricate.api.managerExtensions;
     unregister = initApi.registerWorldNavProvider(provider());
 
+    // Model the late-evaluated-entry recovery that `ready` owns: the init-bound facade has
+    // disappeared, but the page-session registry still contains the companion provider.
+    globalThis.game.fabricate = { stale: true };
     await ready();
     const readyApi = globalThis.game.fabricate.api.managerExtensions;
     assert.equal(readyApi, initApi, 'the actual ready callback retains the public API identity');

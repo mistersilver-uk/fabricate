@@ -9084,7 +9084,10 @@
 .fabricate-manager[data-manager-view="recipe-edit"] .manager-body,
 .fabricate-manager[data-manager-view="crafting-settings"] .manager-body,
 .fabricate-manager[data-manager-view="recipe-item-edit"] .manager-body,
-.fabricate-manager[data-manager-view="system-edit"] .manager-body,
+.fabricate-manager[data-manager-view="system-edit"] .manager-body {
+  grid-template-columns: 220px minmax(0, 1fr);
+}
+
 .fabricate-manager[data-manager-view="world-downtime"] .manager-body {
   grid-template-columns: 220px minmax(0, 1fr);
 }
@@ -9095,7 +9098,10 @@
 .fabricate-manager[data-manager-view="recipe-edit"] .manager-body.is-rail-collapsed,
 .fabricate-manager[data-manager-view="crafting-settings"] .manager-body.is-rail-collapsed,
 .fabricate-manager[data-manager-view="recipe-item-edit"] .manager-body.is-rail-collapsed,
-.fabricate-manager[data-manager-view="system-edit"] .manager-body.is-rail-collapsed,
+.fabricate-manager[data-manager-view="system-edit"] .manager-body.is-rail-collapsed {
+  grid-template-columns: 56px minmax(0, 1fr);
+}
+
 .fabricate-manager[data-manager-view="world-downtime"] .manager-body.is-rail-collapsed {
   grid-template-columns: 56px minmax(0, 1fr);
 }

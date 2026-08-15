@@ -3526,18 +3526,17 @@
 
   function confirmRouteExit(nextView, nextRouteId = '') {
     const result = confirmRouteExitGuards(nextView, nextRouteId);
-    const disposeDowntime = () => {
-      if (activeView === 'world-downtime' && nextView !== 'world-downtime') {
-        downtimeExtensionHost?.disposeBeforeRemoval?.();
-      }
+    if (activeView !== 'world-downtime' || nextView === 'world-downtime') return result;
+
+    // Keep the original route-guard promise identity. `afterTruthyResult` already subscribes to
+    // it immediately; wrapping it would put route activation one microtask later and regress
+    // every existing async discard path. Reactions run in registration order, so this cleanup
+    // still happens before the caller's route activation removes the host target.
+    const disposeDowntime = (confirmed) => {
+      if (confirmed !== false) downtimeExtensionHost?.disposeBeforeRemoval?.();
     };
-    if (isPromise(result)) {
-      return result.then((value) => {
-        if (value !== false) disposeDowntime();
-        return value;
-      });
-    }
-    if (result !== false) disposeDowntime();
+    if (isPromise(result)) result.then(disposeDowntime);
+    else disposeDowntime(result);
     return result;
   }
 

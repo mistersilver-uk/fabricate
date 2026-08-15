@@ -42,23 +42,23 @@
     </div>
     <div class="downtime-board" aria-label={localize(`${copyBase}.PreviewTitle`)}>
       <header>
-        <i class={preview.icon} aria-hidden="true"></i><strong
-          >{localize(`${copyBase}.PreviewTitle`)}</strong
-        ><span
+        <span class="downtime-board-icon" aria-hidden="true"><i class={preview.icon}></i></span
+        ><strong>{localize(`${copyBase}.PreviewTitle`)}</strong><span
           ><i class="fas fa-lock" aria-hidden="true"></i>
           {localize('FABRICATE.Admin.Manager.World.Downtime.PreviewBadge')}</span
         >
       </header>
       {#each previewRows as row, index (row)}
         <div class="downtime-board-row">
-          <i
-            class={index === 0
-              ? preview.icon
-              : index === 1
-                ? 'fas fa-hammer'
-                : 'fas fa-hand-pointer'}
-            aria-hidden="true"
-          ></i>
+          <span class="downtime-board-icon downtime-board-row-icon" aria-hidden="true"
+            ><i
+              class={index === 0
+                ? preview.icon
+                : index === 1
+                  ? 'fas fa-hammer'
+                  : 'fas fa-hand-pointer'}
+            ></i></span
+          >
           <span>{row}</span>
           <i class="fas fa-lock" aria-hidden="true"></i>
         </div>
@@ -74,7 +74,7 @@
     <div class="downtime-feature-grid">
       {#each preview.featureIcons as icon, index (icon)}
         <article>
-          <i class={icon} aria-hidden="true"></i>
+          <span class="downtime-feature-icon" aria-hidden="true"><i class={icon}></i></span>
           <h4>{localize(`${copyBase}.Features.${index + 1}.Title`)}</h4>
           <p>{localize(`${copyBase}.Features.${index + 1}.Description`)}</p>
         </article>
@@ -105,7 +105,7 @@
   }
 
   .downtime-premium,
-  .downtime-board header > span {
+  .downtime-board header > span:not(.downtime-board-icon) {
     display: inline-flex;
     align-items: center;
     gap: 6px;
@@ -180,7 +180,25 @@
     margin-bottom: 10px;
   }
 
-  .downtime-board header > span {
+  .downtime-board-icon,
+  .downtime-feature-icon {
+    display: inline-grid;
+    flex: 0 0 auto;
+    width: 30px;
+    height: 30px;
+    place-items: center;
+    border-radius: 8px;
+    background: var(--fab-accent-soft);
+    color: var(--fab-accent);
+    font-size: 12px;
+  }
+
+  .downtime-board-icon i,
+  .downtime-feature-icon i {
+    font-size: 0.75rem;
+  }
+
+  .downtime-board header > span:not(.downtime-board-icon) {
     margin-left: auto;
     font-size: 0.58rem;
   }
@@ -192,6 +210,14 @@
     border: 1px solid var(--fab-border);
     border-radius: 8px;
     background: var(--fab-surface);
+  }
+
+  .downtime-board-row-icon {
+    width: 28px;
+    height: 28px;
+    border-radius: 7px;
+    background: var(--fab-bg-0);
+    font-size: 11px;
   }
 
   .downtime-board-row span {
@@ -230,9 +256,16 @@
     background: var(--fab-surface-soft);
   }
 
-  article > i {
-    color: var(--fab-accent);
-    font-size: 1.1rem;
+  .downtime-feature-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    background: var(--fab-bg-0);
+    font-size: 13px;
+  }
+
+  .downtime-feature-icon i {
+    font-size: 0.8125rem;
   }
 
   h4 {
