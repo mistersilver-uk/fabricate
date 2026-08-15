@@ -96,6 +96,11 @@ function readParams() {
     // Clearing through the real admin store after construction reaches that state without
     // weakening production's persisted-selection normalization.
     clearSystem: params.get('clearSystem') === '1',
+    // Seed an EMPTY party list, for the World > Parties empty state. It takes no
+    // post-construction store call the way `clearSystem` does: the pane's empty state is a
+    // function of the persisted `gatheringParties` setting, so the fixture seeds `[]` and
+    // the real store reads it exactly as it reads a populated one.
+    noParties: params.get('noParties') === '1',
     // Evidence-only localization stress. It changes no shipped string and exists solely so the
     // named long-label frame cannot collapse to the ordinary stacked Map frame.
     longTravelLabels: params.get('longTravelLabels') === '1',
@@ -431,6 +436,7 @@ async function boot() {
         managedSystemId: params.system,
         experimentalFeatures: params.experimental,
         clearSystem: params.clearSystem,
+        noParties: params.noParties,
         longTravelLabels: params.longTravelLabels,
       });
   const localize = world ? world.localize : (key) => key;

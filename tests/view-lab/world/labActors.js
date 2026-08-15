@@ -416,6 +416,19 @@ const ACTOR_DEFINITIONS = [
     name: 'Vosk',
     img: `${PORTRAIT_BASE}/commodities/leather/fur-brown-gold.webp`,
   },
+  // The one NON-player-character actor in the lab world, and it is APPENDED rather than
+  // inserted: `labWorld.js` picks `lab-party`'s travel actor by position out of the
+  // character subset, and the manager's "Preview as" and knowledge rosters read this list
+  // in order. It exists so the World > Parties travel-actor picker's documented candidate
+  // set — EVERY world actor, not only player characters — is photographable and testable
+  // rather than merely asserted: a vehicle can stand for a party on the map, and the same
+  // vehicle must never be offered as a party MEMBER.
+  {
+    id: 'lab-actor-wagon',
+    name: 'The Ashfall Wagon',
+    type: 'vehicle',
+    img: `${PORTRAIT_BASE}/environment/settlement/wagon.webp`,
+  },
 ];
 
 /**
@@ -442,7 +455,11 @@ export function buildLabActors(content) {
     const actor = {
       ...definition,
       uuid: `Actor.${definition.id}`,
-      type: 'character',
+      // Read from the definition, and it MUST be: this line sits after the `...definition`
+      // spread, so a hardcoded `'character'` silently overwrote any type a definition
+      // declared — a `type: 'vehicle'` actor would have become a player character with no
+      // error, falsifying every claim made for it.
+      type: definition.type ?? 'character',
       // Iterated with `[...actor.items]` throughout the engine, so a plain array is enough.
       items,
       system: {

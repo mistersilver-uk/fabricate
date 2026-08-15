@@ -32,6 +32,7 @@ import {
   normalizePath,
   parseLabActorTableRegions,
   publishableCases,
+  WORLD_PARTIES_SEARCH_TERM,
 } from '../scripts/lib/viewLabCases.js';
 
 import { MODIFIER_POLICY_OPTION_ATTR } from '../src/ui/svelte/apps/manager/checks/modifierPolicyAttrs.js';
@@ -800,6 +801,95 @@ test('the no-selection World Parties case clears selection through the real Mana
   assert.match(mountSource, /clearSystem: params\.get\('clearSystem'\) === '1'/);
   assert.match(mountSource, /clearSystem: params\.clearSystem/);
   assert.match(mountSource, /if \(params\.clearSystem\) await props\.store\.selectSystem\(''\)/);
+});
+
+test('the World Parties fixture is legal, and its search and pager cases claim what it seeds', () => {
+  const worldSource = readFileSync(resolve(ROOT, 'tests/view-lab/world/labWorld.js'), 'utf8');
+  const actorSource = readFileSync(resolve(ROOT, 'tests/view-lab/world/labActors.js'), 'utf8');
+  const tabSource = readFileSync(
+    resolve(ROOT, 'src/ui/svelte/apps/manager/GatheringPartiesTab.svelte'),
+    'utf8'
+  );
+
+  // The seeded party list, read out of the fixture rather than restated here. Every claim
+  // below is derived from it, so a rename or an extra party fails by name instead of quietly
+  // changing what a published frame shows.
+  const seedStart = worldSource.indexOf("put(\n    'gatheringParties',");
+  assert.ok(seedStart > 0, 'the gatheringParties seed must remain locatable');
+  const seedEnd = worldSource.indexOf("put('lastCraftingActor'", seedStart);
+  const seed = worldSource.slice(seedStart, seedEnd);
+  const parties = [...seed.matchAll(/id: '(lab-party[\w-]*)',\s*\n\s*name: '([^']+)'/g)].map(
+    ([, id, name]) => ({ id, name })
+  );
+  const actorsStart = actorSource.indexOf('const ACTOR_DEFINITIONS = [');
+  assert.ok(actorsStart > 0, 'the actor definitions must remain locatable');
+  const actorNames = [
+    ...actorSource
+      .slice(actorsStart, actorSource.indexOf('\n];', actorsStart))
+      .matchAll(/name: '([^']+)'/g),
+  ].map(([, name]) => name);
+
+  assert.equal(parties.length, 5, 'the pane pages at four, so five parties is the point');
+  assert.equal(actorNames.length, 4);
+
+  // The vehicle. Its `type` must be DECLARED and must survive `buildLabActors`, which spreads
+  // the definition and then sets `type` — a hardcoded `'character'` there would have made it a
+  // player character with no error, and every claim made for it false.
+  assert.match(actorSource, /id: 'lab-actor-wagon',\s*\n\s*name: 'The Ashfall Wagon',\s*\n\s*type: 'vehicle',/);
+  assert.match(actorSource, /type: definition\.type \?\? 'character',/);
+
+  // Legality under `GatheringPartyStore._validateList`, which the lab does NOT run: it writes
+  // the settings map raw and validation lives in `_persist`, so an impossible world would
+  // render and publish. Exactly two parties are enabled, each with its own travel actor, and
+  // membership everywhere derives from `characterActors` — so the wagon can never be enrolled
+  // as a member and collide with its role as the second enabled party's travel actor.
+  const enabledCount = [...seed.matchAll(/enabled: true,/g)].length;
+  assert.equal(enabledCount, 2);
+  assert.equal([...seed.matchAll(/memberActorUuids: (?!characterActors|\[\])/g)].length, 0);
+  assert.equal([...seed.matchAll(/travelActorUuid: uuidOf\('lab-actor-wagon'\)/g)].length, 1);
+
+  // The search term matches exactly two of the five, and it matches them by DIFFERENT routes:
+  // one on its own name, one on its travel actor's name. Anything else renamed into range
+  // fails here rather than over-matching silently in a frame nobody can count.
+  const term = WORLD_PARTIES_SEARCH_TERM.toLowerCase();
+  const byPartyName = parties.filter((party) => party.name.toLowerCase().includes(term));
+  const byActorName = actorNames.filter((name) => name.toLowerCase().includes(term));
+  assert.deepEqual(
+    byPartyName.map((party) => party.id),
+    ['lab-party-wagonwright']
+  );
+  assert.deepEqual(byActorName, ['The Ashfall Wagon']);
+  assert.match(seed, /id: 'lab-party-long-haul',[\s\S]*?travelActorUuid: uuidOf\('lab-actor-wagon'\)/);
+
+  const filtered = getCaseById('manager-world-parties-search-filtered');
+  assert.deepEqual(filtered.steps.at(-1), {
+    selector: '.manager-travel-parties-query',
+    fill: WORLD_PARTIES_SEARCH_TERM,
+  });
+  assert.deepEqual(filtered.smokeLabels, []);
+  for (const id of ['lab-party-long-haul', 'lab-party-wagonwright']) {
+    assert.ok(filtered.expectSelector.includes(`[data-manager-travel-party-id="${id}"]`));
+  }
+
+  // The page arithmetic the last-page case photographs, derived from the same seed and from
+  // the tab's own default rather than asserted as two magic numbers.
+  assert.match(tabSource, /const PAGE_SIZE_OPTIONS = \[2, 4, 6, 10\];/);
+  const declaredPageSize = Number(/let pageSize = \$state\((\d+)\)/.exec(tabSource)?.[1]);
+  assert.equal(declaredPageSize, 4);
+  assert.equal(Math.ceil(parties.length / declaredPageSize), 2, 'five records is two pages');
+  assert.equal(parties.length - declaredPageSize, 1, 'the last page holds exactly one card');
+  const lastPage = getCaseById('manager-world-parties-last-page');
+  assert.ok(lastPage.expectSelector.includes(`[data-manager-travel-party-id="${parties.at(-1).id}"]`));
+  assert.ok(lastPage.expectSelector.includes(`:not(:has([data-manager-travel-party-id="${parties[0].id}"]))`));
+
+  // The empty state reaches its world through the seeded setting, not a post-construction call.
+  const mountSource = readFileSync(resolve(ROOT, 'tests/view-lab/mount.js'), 'utf8');
+  const empty = getCaseById('manager-world-parties-empty');
+  assert.equal(empty.query?.noParties, '1');
+  assert.deepEqual(empty.smokeLabels, []);
+  assert.match(mountSource, /noParties: params\.get\('noParties'\) === '1'/);
+  assert.match(mountSource, /noParties: params\.noParties/);
+  assert.match(worldSource, /noParties\s*\n?\s*\? \[\]/);
 });
 
 test('system Travel Map evidence is populated and long-label focus cannot duplicate stacked', () => {
