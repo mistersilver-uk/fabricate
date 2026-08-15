@@ -163,8 +163,8 @@ test('assertion A: every FABRICATE key literal in src resolves to something in e
   const objectResolving = resolved.filter(([, value]) => value !== undefined && typeof value !== 'string');
   assert.equal(
     objectResolving.length,
-    42,
-    'expected 42 legitimate namespace bases to resolve to an object — ' +
+    44,
+    'expected 44 legitimate namespace bases to resolve to an object — ' +
       'update this count only if the number of such bases genuinely changes. The 39th is ' +
       '`MANAGER_COLOR_TOKEN_KEY_PREFIX` in `src/ui/svelte/util/managerColorTokens.js` (issue ' +
       '1036), the shared base the eight colour-token labels are localized under. The 40th is ' +
@@ -178,7 +178,9 @@ test('assertion A: every FABRICATE key literal in src resolves to something in e
       '42nd is `NAMESPACE` in ' +
       '`src/ui/svelte/apps/manager/checks/checkTriggerPresets.js` (issue 1096), the base its ' +
       'two preset labels and their six per-kind effect phrases are localized under — the same ' +
-      'pure-data-table shape, for the same reason.'
+      'pure-data-table shape, for the same reason. The 43rd and 44th are the Preview and Tabs ' +
+      'bases in `src/ui/svelte/apps/manager/downtime/`; each composes one of the four fixed ' +
+      'Downtime tab suffixes from provider data, so the complete leaf key is only known at render time.'
   );
 });
 

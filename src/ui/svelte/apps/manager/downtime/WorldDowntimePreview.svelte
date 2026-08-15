@@ -143,7 +143,7 @@
     border: 1px solid var(--fab-accent-border);
     border-radius: 9px;
     background: var(--fab-accent);
-    color: var(--fab-bg-0);
+    color: var(--fab-on-accent);
     font-size: 11.5px;
     font-weight: 700;
     text-decoration: none;

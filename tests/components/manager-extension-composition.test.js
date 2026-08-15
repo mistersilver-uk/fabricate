@@ -1,17 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createServer } from 'vite';
 
-import { createManagerExtensionsRegistry } from '../../src/ui/managerExtensions.js';
-
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
-
-function bindManagerExtensionsApi(game, registry) {
-  game.fabricate ??= {};
-  game.fabricate.api = registry.bindPublicApi({});
-}
 
 function provider() {
   return {
@@ -28,21 +22,73 @@ function provider() {
   };
 }
 
-test('the init/ready API replay preserves the registered manager-extension provider', () => {
-  const registry = createManagerExtensionsRegistry();
-  const game = {};
+test('the production init/ready replay preserves a provider registered through game.fabricate.api', async () => {
+  const originalFetch = globalThis.fetch;
+  const originalConfig = globalThis.CONFIG;
+  let world = null;
+  let unregister = null;
+  const vite = await createServer({
+    root: repoRoot,
+    server: { middlewareMode: true, hmr: false },
+    appType: 'custom',
+  });
 
-  bindManagerExtensionsApi(game, registry);
-  const initApi = game.fabricate.api.managerExtensions;
-  const unregister = initApi.registerWorldNavProvider(provider());
+  // `buildLabWorld` is the smallest faithful Foundry host for evaluating the real entry module.
+  // Its browser-side fetches need this direct file response when the composition test runs in Node.
+  globalThis.fetch = async (url) => {
+    if (String(url) !== '/lang/en.json') return new Response('', { status: 404 });
+    return new Response(await readFile(resolve(repoRoot, 'lang/en.json')), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    });
+  };
+  globalThis.CONFIG = {};
 
-  bindManagerExtensionsApi(game, registry);
-  const readyApi = game.fabricate.api.managerExtensions;
+  try {
+    const { buildLabWorld } = await vite.ssrLoadModule('/tests/view-lab/world/labWorld.js');
+    world = await buildLabWorld();
+    const hookEntries = [...globalThis.Hooks.registrations.values()];
+    const init = hookEntries.find((entry) => entry.event === 'init')?.handler;
+    const ready = hookEntries.find((entry) => entry.event === 'ready')?.handler;
+    assert.equal(typeof init, 'function', 'main.js should register its actual init callback');
+    assert.equal(typeof ready, 'function', 'main.js should register its actual ready callback');
 
-  assert.equal(readyApi, initApi, 'both lifecycle binds publish the same registration object');
-  assert.equal(registry.getWorldNavProvider('downtime')?.id, 'downtime');
-  unregister();
-  assert.equal(registry.getWorldNavProvider('downtime'), null);
+    // Prove the public seam as a companion sees it: init binds `game.fabricate.api`, then a
+    // companion registers before ready rebinds the live global.
+    globalThis.game.fabricate = undefined;
+    await init();
+    const initApi = globalThis.game.fabricate.api.managerExtensions;
+    unregister = initApi.registerWorldNavProvider(provider());
+
+    await ready();
+    const readyApi = globalThis.game.fabricate.api.managerExtensions;
+    assert.equal(readyApi, initApi, 'the actual ready callback retains the public API identity');
+    assert.equal(
+      typeof readyApi.registerWorldNavProvider,
+      'function',
+      'ready must restore the extension registration API on the actual Fabricate global'
+    );
+    assert.equal(
+      world.fabricate,
+      globalThis.game.fabricate,
+      'ready must restore the live Fabricate facade before companion access'
+    );
+    assert.throws(
+      () => readyApi.registerWorldNavProvider(provider()),
+      /already registered/,
+      'the provider registered between the actual lifecycle callbacks must survive ready'
+    );
+    unregister();
+    unregister = null;
+    const unregisterAfterReady = readyApi.registerWorldNavProvider(provider());
+    unregisterAfterReady();
+  } finally {
+    unregister?.();
+    world?.shim.restore();
+    globalThis.fetch = originalFetch;
+    globalThis.CONFIG = originalConfig;
+    await vite.close();
+  }
 });
 
 test('the production manager closes a mounted companion before ApplicationV2 removes its target', async () => {
