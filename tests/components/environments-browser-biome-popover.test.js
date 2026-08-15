@@ -30,6 +30,9 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/actions/dismissOnOutsideClick.js',
     'src/ui/svelte/actions/portal.js',
     'src/ui/svelte/actions/dragDrop.js',
+    // The World > Parties card carries selection on a `use:` action rather than a
+    // `role="button"` root, so the card list pulls this into the closure (issue 1182).
+    'src/ui/svelte/actions/selectsParty.js',
   ],
   compiledModules: [
     'src/ui/svelte/apps/manager/Chip.svelte',
@@ -47,6 +50,11 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/SearchablePopover.svelte',
     'src/ui/svelte/apps/manager/PartyNameField.svelte',
     'src/ui/svelte/apps/manager/RealmOverridePicker.svelte',
+    // The three card components the parties rebuild added (issue 1182), each imported
+    // by PartyExpandedBody, so each must be compiled before it.
+    'src/ui/svelte/apps/manager/PartyMemberRow.svelte',
+    'src/ui/svelte/apps/manager/PartyAddMemberPanel.svelte',
+    'src/ui/svelte/apps/manager/PartyTravelActorPanel.svelte',
     'src/ui/svelte/apps/manager/PartyExpandedBody.svelte',
     'src/ui/svelte/apps/manager/GatheringPartiesTab.svelte',
     'src/ui/svelte/apps/manager/RealmEnvironmentsEditor.svelte',

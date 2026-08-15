@@ -223,6 +223,12 @@ function compileManagerRoot() {
   writeCompiledSvelte('src/ui/svelte/apps/manager/RealmNameField.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/SearchablePopover.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/RealmOverridePicker.svelte');
+  // The World > Parties card tree (issue 1182). `PartyExpandedBody` imports all three of
+  // these, and this suite hand-rolls its compile list with no dependency validator, so an
+  // omission here HANGS every mounted manager test (`# cancelled`) rather than failing one.
+  writeCompiledSvelte('src/ui/svelte/apps/manager/PartyMemberRow.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/PartyAddMemberPanel.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/PartyTravelActorPanel.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/PartyExpandedBody.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/PartyNameField.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringTravelView.svelte');
@@ -710,7 +716,15 @@ function compileManagerRoot() {
     writeFileSync(rawDestination, readFileSync(resolve(repoRoot, rawPath), 'utf8'));
   }
 
-  for (const actionPath of ['dragDrop.js', 'dismissOnOutsideClick.js', 'portal.js']) {
+  // `selectsParty.js` carries World > Parties card selection (issue 1182): the card is a
+  // `role="listitem"` holding a text input and three buttons, so it cannot be a
+  // `role="button"` and a `tabindex`/`onclick` root will not compile warning-free.
+  for (const actionPath of [
+    'dragDrop.js',
+    'dismissOnOutsideClick.js',
+    'portal.js',
+    'selectsParty.js',
+  ]) {
     const actionDestination = join(tempRoot, `src/ui/svelte/actions/${actionPath}`);
     mkdirSync(dirname(actionDestination), { recursive: true });
     writeFileSync(
@@ -1728,12 +1742,17 @@ function createStore(calls = [], options = {}) {
     gatheringRealmSettings: options.worldTravelBySystem?.alchemy?.gatheringRealmSettings || {
       enabled: options.gatheringRealmsEnabled === true,
     },
+    // `memberActorUuids` is carried by the REAL projection — `adminStore` spreads the stored
+    // party before adding `memberCards` — and the card body and the page-header subtitle both
+    // read it. A double that omitted it was looser than the helper it stands for, which is
+    // exactly how a subtitle that always counted zero assigned characters would pass green.
     travelParties: options.travelParties || [
       {
         id: 'party-one',
         name: 'Wayfarers',
         enabled: true,
         memberCount: 1,
+        memberActorUuids: ['Actor.member'],
         memberCards: [{ uuid: 'Actor.member', name: 'Mira', img: '', stale: false }],
         travelActorUuid: 'Actor.marker',
         travelActor: { uuid: 'Actor.marker', name: 'Mira', img: '' },
@@ -1743,6 +1762,7 @@ function createStore(calls = [], options = {}) {
         name: 'Night Watch',
         enabled: false,
         memberCount: 0,
+        memberActorUuids: [],
         memberCards: [],
         travelActorUuid: null,
         travelActor: null,
@@ -7242,6 +7262,147 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(
       !bounded.querySelector(selector),
       'a system carrying a cap states it standing, so this case cannot publish that frame'
+    );
+  });
+
+  // The four World > Parties capture cases (issue 1182). Each asserts a RELATIONSHIP — two
+  // cards inside one list, a last card without a first, a popover containing both its unlink
+  // footer and an option meta line — and one bad `expectSelector` fails the capture job WHOLE
+  // and publishes nothing, so each is run here against the real rendered DOM before it can
+  // cost twenty minutes of a job that needs harvested Foundry chrome. Every one carries its
+  // negative control: the state the pane is in BEFORE the case's steps, which is the frame
+  // that would otherwise be published under the case's name.
+  //
+  // The party fixture MIRRORS `tests/view-lab/world/labWorld.js` — same ids, same names, same
+  // enabled flags, same travel actors — because a selector proved against a different world
+  // proves nothing about the frame.
+  const LAB_MIRROR_ACTORS = [
+    { uuid: 'Actor.lab-actor-brenna', name: 'Brenna Karrunsdottir', img: '', isPlayerCharacter: true },
+    { uuid: 'Actor.lab-actor-idrin', name: 'Idrin Ashfall', img: '', isPlayerCharacter: true },
+    { uuid: 'Actor.lab-actor-vosk', name: 'Vosk', img: '', isPlayerCharacter: true },
+    // The vehicle. Not a player character, so it is never a member and always a candidate.
+    { uuid: 'Actor.lab-actor-wagon', name: 'The Ashfall Wagon', img: '', isPlayerCharacter: false },
+  ];
+  const labMirrorParty = (id, name, enabled, memberUuids, travelActorUuid) => ({
+    id,
+    name,
+    enabled,
+    memberCount: memberUuids.length,
+    memberActorUuids: memberUuids,
+    memberCards: memberUuids.map((uuid) => ({
+      uuid,
+      name: LAB_MIRROR_ACTORS.find((actor) => actor.uuid === uuid).name,
+      img: '',
+      stale: false,
+    })),
+    travelActorUuid,
+    travelActor: travelActorUuid
+      ? LAB_MIRROR_ACTORS.find((actor) => actor.uuid === travelActorUuid)
+      : null,
+  });
+  const characters = LAB_MIRROR_ACTORS.slice(0, 3).map((actor) => actor.uuid);
+  const LAB_MIRROR_PARTIES = [
+    labMirrorParty('lab-party', 'The Ashfall Company', true, characters, 'Actor.lab-actor-vosk'),
+    labMirrorParty('lab-party-long-haul', 'The Long Haul', true, [], 'Actor.lab-actor-wagon'),
+    labMirrorParty(
+      'lab-party-emberwatch',
+      'Emberwatch Foragers',
+      false,
+      characters.slice(0, 2),
+      'Actor.lab-actor-brenna'
+    ),
+    labMirrorParty('lab-party-second-kiln', 'Second Kiln Crew', false, [], null),
+    labMirrorParty('lab-party-wagonwright', 'The Wagonwright Circle', false, characters.slice(2), null),
+  ];
+
+  async function openLabMirrorParties(travelParties = LAB_MIRROR_PARTIES) {
+    mountManager([], {
+      gatheringRealmsEnabled: true,
+      travelParties,
+      actorOptions: LAB_MIRROR_ACTORS,
+    });
+    worldNavItem('parties').click();
+    await tick();
+    flushSync();
+    return target;
+  }
+
+  it('root: the World Parties capture cases satisfy their own selectors (issue 1182)', async () => {
+    // Empty.
+    await openLabMirrorParties([]);
+    assert.ok(
+      Boolean(target.querySelector(labCaseSelector('manager-world-parties-empty'))),
+      'the no-parties pane must render the SHARED EmptyState primitive, not a bespoke panel'
+    );
+    unmount(mounted);
+    mounted = null;
+    target.remove();
+    target = null;
+
+    // Search, with its negative control first: unfiltered, those two cards are the second and
+    // the fifth of five at a page size of four, so they are never siblings in one list.
+    const filtered = labCaseSelector('manager-world-parties-search-filtered');
+    await openLabMirrorParties();
+    assert.ok(
+      !target.querySelector(filtered),
+      'unfiltered, the last-page card is not on the page at all — so an unfiltered frame ' +
+        'cannot be published under the filtered case'
+    );
+    // The term is READ FROM THE CASE's own step, not restated: a restated copy would keep
+    // passing after the case it mirrors started typing something else.
+    const searchStep = VIEW_LAB_CASES.find(
+      (entry) => entry.id === 'manager-world-parties-search-filtered'
+    ).steps.at(-1);
+    assert.equal(searchStep.selector, '.manager-travel-parties-query');
+    setInputValue(target.querySelector(searchStep.selector), searchStep.fill);
+    await tick();
+    flushSync();
+    assert.ok(
+      Boolean(target.querySelector(filtered)),
+      'searching "wagon" must leave exactly the party named for it and the one whose TRAVEL ' +
+        'ACTOR is named for it — the widened filter domain this case exists to photograph'
+    );
+    assert.equal(
+      target.querySelector('[data-manager-party-match-count]').textContent.trim(),
+      '2 of 5'
+    );
+    unmount(mounted);
+    mounted = null;
+    target.remove();
+    target = null;
+
+    // Last page.
+    const lastPage = labCaseSelector('manager-world-parties-last-page');
+    await openLabMirrorParties();
+    assert.ok(!target.querySelector(lastPage), 'page one holds the first card, which the case refuses');
+    target.querySelector('.manager-travel-parties [data-pagination-next]').click();
+    await tick();
+    flushSync();
+    assert.ok(
+      Boolean(target.querySelector(lastPage)),
+      'five records at a page size of four put exactly the fifth on page two'
+    );
+    unmount(mounted);
+    mounted = null;
+    target.remove();
+    target = null;
+
+    // Travel-actor picker. `SearchablePopover` portals into the nearest `.fabricate-manager`,
+    // which the mounted root renders inside `target`, so the case's selector runs verbatim.
+    const picker = labCaseSelector('manager-world-parties-actor-picker');
+    await openLabMirrorParties();
+    assert.ok(
+      !target.querySelector(picker),
+      'the closed picker is the frame this case must not be able to publish'
+    );
+    target.querySelector('[data-manager-party-actor-trigger="lab-party"]').click();
+    await tick();
+    flushSync();
+    assert.ok(
+      Boolean(target.querySelector(picker)),
+      'the open picker must carry BOTH the unlink footer only a linked party gets and an ' +
+        'option meta line — the placement that surfaces a composite-uniqueness collision ' +
+        'before the pick fails rather than after'
     );
   });
 
@@ -13684,6 +13845,13 @@ describe('CraftingSystemManager mounted behavior', () => {
       worldHeading.querySelector('.manager-subtitle').textContent,
       /shared across every crafting system/
     );
+    // The PAGE header carries the computed census. It is a different element from the
+    // section heading above, and the regex there matches both strings, so this one is
+    // pinned exactly or the count could drift unnoticed.
+    assert.equal(
+      target.querySelector('.manager-header .manager-subtitle').textContent.trim(),
+      '2 parties · 1 enabled · 1 of 2 characters assigned'
+    );
     assert.equal(
       target.querySelector('.manager-header-actions').getAttribute('aria-label'),
       'World party actions'
@@ -13701,38 +13869,48 @@ describe('CraftingSystemManager mounted behavior', () => {
     );
     assert.equal(target.textContent.includes('No current realm set for this system.'), false);
 
+    // Every card renders its own controls, so the CRUD walk below never opens an accordion
+    // and never reaches into the inspector: `ui-integration/spec.md:1603-1604` pins editing
+    // to the centre column and makes the inspector a read-only evidence echo.
+    assert.equal(target.querySelector('.manager-travel-inspector .manager-button.is-danger'), null);
+    assert.equal(target.querySelector('.manager-party-enable-toggle'), null);
+
     createButton.click();
-    target
-      .querySelector('[data-manager-travel-party-id="party-two"] .manager-travel-parties-header')
-      .click();
+    // Selection is carried by `use:selectsParty` — a capture-phase pointerdown on the card,
+    // not a click on a header row, because the card is no longer a disclosure.
+    const secondCard = target.querySelector('[data-manager-travel-party-id="party-two"]');
+    secondCard.dispatchEvent(new Event('pointerdown', { bubbles: true }));
     await tick();
     flushSync();
+    assert.equal(secondCard.getAttribute('aria-current'), 'true');
 
-    const nameInput = target.querySelector('[data-manager-party-name-field] input');
+    const nameInput = secondCard.querySelector('[data-manager-party-name-field]');
     setInputValue(nameInput, 'Nightwardens');
     nameInput.dispatchEvent(new Event('blur'));
     await tick();
     flushSync();
 
-    target.querySelector('.manager-party-add-trigger').click();
+    secondCard.querySelector('[data-manager-party-add-open="party-two"]').click();
     await tick();
     flushSync();
-    const scoutOption = Array.from(document.querySelectorAll('.manager-travel-option')).find(
-      (option) => option.textContent.includes('Scout')
+    const scoutCandidate = secondCard.querySelector(
+      '[data-manager-party-candidate="Actor.scout"]'
     );
-    assert.ok(scoutOption, 'the no-selection party editor exposes the global actor roster');
-    scoutOption.click();
+    assert.ok(scoutCandidate, 'the no-selection party card exposes the global actor roster');
+    scoutCandidate.click();
 
-    dispatchDrop(target.querySelector('[data-manager-party-marker]'), {
+    dispatchDrop(secondCard.querySelector('[data-manager-party-travel-actor="party-two"]'), {
       type: 'Actor',
       uuid: 'Actor.scout',
     });
     await tick();
     flushSync();
-    const enableButton = target.querySelector('.manager-party-enable-toggle.is-off');
-    assert.equal(enableButton.disabled, false);
+    // The gate opens only once the drop lands a travel actor (req 4): before it, the pill
+    // is `aria-disabled` and explains itself rather than being `disabled` and unreachable.
+    const enableButton = secondCard.querySelector('[data-manager-party-enable="party-two"]');
+    assert.equal(enableButton.getAttribute('aria-disabled'), null);
     enableButton.click();
-    target.querySelector('.manager-travel-inspector .manager-button.is-danger').click();
+    secondCard.querySelector('[data-manager-party-delete="party-two"]').click();
 
     assert.deepEqual(
       calls.filter((call) =>
@@ -13761,6 +13939,138 @@ describe('CraftingSystemManager mounted behavior', () => {
       false,
       'no-selection Party CRUD must not write a system override'
     );
+  });
+
+  it('counts a multi-party character once and counts only enabled parties in the World Parties subtitle', async () => {
+    mountManager([], {
+      noSystems: true,
+      // Mira is in BOTH parties; Vale is a member of the disabled one only; Wagon is a
+      // travel actor and not a player character, so it is outside both the numerator and
+      // the denominator — counting it would render "3 of 2 characters assigned".
+      travelParties: [
+        {
+          id: 'party-one',
+          name: 'Wayfarers',
+          enabled: true,
+          memberCount: 1,
+          memberActorUuids: ['Actor.member'],
+          memberCards: [{ uuid: 'Actor.member', name: 'Mira', img: '', stale: false }],
+          travelActorUuid: 'Actor.wagon',
+          travelActor: { uuid: 'Actor.wagon', name: 'The Wagon', img: '' },
+        },
+        {
+          id: 'party-two',
+          name: 'Night Watch',
+          enabled: false,
+          memberCount: 2,
+          memberActorUuids: ['Actor.member', 'Actor.vale'],
+          memberCards: [
+            { uuid: 'Actor.member', name: 'Mira', img: '', stale: false },
+            { uuid: 'Actor.vale', name: 'Vale', img: '', stale: false },
+          ],
+          travelActorUuid: null,
+          travelActor: null,
+        },
+      ],
+      actorOptions: [
+        { uuid: 'Actor.member', name: 'Mira', img: '', isPlayerCharacter: true },
+        { uuid: 'Actor.vale', name: 'Vale', img: '', isPlayerCharacter: true },
+        { uuid: 'Actor.wagon', name: 'The Wagon', img: '', isPlayerCharacter: false },
+      ],
+    });
+    worldNavItem('parties').click();
+    await tick();
+    flushSync();
+
+    assert.equal(
+      target.querySelector('.manager-header .manager-subtitle').textContent.trim(),
+      '2 parties · 1 enabled · 2 of 2 characters assigned'
+    );
+  });
+
+  it('routes a World Parties store validation failure to the card that caused it', async () => {
+    const store = createStore([], { noSystems: true });
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: { store, services: { openCurrentAdmin: () => {} } },
+    });
+    flushSync();
+    worldNavItem('parties').click();
+    await tick();
+    flushSync();
+
+    // The pane records the card that issued the failing mutation, so the rejection has to be
+    // provoked from a card rather than injected: `_travelErrorState` carries no party id.
+    const firstCard = target.querySelector('[data-manager-travel-party-id="party-one"]');
+    firstCard.querySelector('[data-manager-party-add-open="party-one"]').click();
+    await tick();
+    flushSync();
+    firstCard.querySelector('[data-manager-party-candidate="Actor.scout"]').click();
+    await tick();
+    flushSync();
+
+    store.viewState.update((state) => ({
+      ...state,
+      travelError: 'Scout is already in an enabled party.',
+      travelFieldErrors: { members: 'Scout is already in an enabled party.' },
+    }));
+    await tick();
+    flushSync();
+
+    const secondCard = target.querySelector('[data-manager-travel-party-id="party-two"]');
+    const errors = Array.from(firstCard.querySelectorAll('.manager-party-field-error'));
+    assert.equal(errors.length, 1);
+    assert.equal(errors[0].textContent.trim(), 'Scout is already in an enabled party.');
+    assert.equal(
+      firstCard.querySelector('[data-manager-party-member-rows]').getAttribute('aria-describedby'),
+      errors[0].id,
+      'the message is associated with the member list that produced it'
+    );
+    assert.equal(secondCard.querySelector('.manager-party-field-error'), null);
+    // A field error whose card is on the page suppresses the pane-level summary, so the GM
+    // reads it once and in context.
+    assert.equal(target.querySelector('[data-manager-party-summary-error]'), null);
+
+    unmount(mounted);
+    mounted = null;
+    target.remove();
+    target = null;
+  });
+
+  it('renders a context-free World Parties rejection once above the card list', async () => {
+    const store = createStore([], { noSystems: true });
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: { store, services: { openCurrentAdmin: () => {} } },
+    });
+    flushSync();
+    worldNavItem('parties').click();
+    await tick();
+    flushSync();
+
+    // `setPartyEnabled` passes no field context, and req 5 can reject an enable the
+    // travel-actor gate allowed, so the enable control is never the only feedback surface.
+    store.viewState.update((state) => ({
+      ...state,
+      travelError: 'Mira is already in an enabled party.',
+      travelFieldErrors: {},
+    }));
+    await tick();
+    flushSync();
+
+    const summaries = target.querySelectorAll('[data-manager-party-summary-error]');
+    assert.equal(summaries.length, 1);
+    assert.equal(summaries[0].textContent.trim(), 'Mira is already in an enabled party.');
+    assert.equal(target.querySelector('.manager-party-field-error'), null);
+
+    unmount(mounted);
+    mounted = null;
+    target.remove();
+    target = null;
   });
 
   it('falls back from active system Travel when Gathering or the selection vanishes', async () => {
