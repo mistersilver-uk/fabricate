@@ -83,6 +83,7 @@ import {
   getInteractablesManagerAppClass
 } from './ui/appFactory.js';
 import { addInteractableSceneControl } from './ui/interactableSceneControl.js';
+import { managerExtensions } from './ui/managerExtensions.js';
 import { applyCurrentFabricateTheme } from './ui/theme.js';
 import { findItemsDirectoryActionsContainer, syncGatheringDirectoryButton } from './ui/itemsDirectoryButtons.js';
 import { buildCompendiumImportContextOption, promptSelectCraftingSystem } from './ui/compendiumDirectoryContext.js';
@@ -3200,6 +3201,7 @@ function bindFabricateGlobal() {
     // `Hooks.on(game.fabricate.api.HOOKS.gathering.ATTEMPT_COMPLETED, handler)`.
     HOOKS: FABRICATE_HOOKS
   };
+  managerExtensions.bindPublicApi(game.fabricate.api);
 
   game.fabricate.importFromPack = (packData, options) =>
     fabricate.compendiumImporter?.importFromPackData(packData, options);

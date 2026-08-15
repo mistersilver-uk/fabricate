@@ -212,6 +212,28 @@ function sourceName(filePath) {
 }
 
 describe('CraftingSystemManager source contract', () => {
+  it('injects the exact page-session manager extension registry into the Svelte root', () => {
+    assert.ok(appSource.includes("import { managerExtensions } from './managerExtensions.js';"));
+    assert.ok(appSource.includes('managerExtensions,'));
+    assert.ok(
+      rootSource.includes('let { store, services = null, managerExtensions = null } = $props()')
+    );
+    assert.ok(rootSource.includes('<WorldDowntimeExtensionHost'));
+  });
+  it('disposes a Downtime companion before ApplicationV2 closes and removes its Svelte target', () => {
+    const closeStart = appSource.indexOf('async close(options) {');
+    const closeEnd = appSource.indexOf('  static show()', closeStart);
+    const closeSource = appSource.slice(closeStart, closeEnd);
+    const dispose = closeSource.indexOf('disposeDowntimeProviderBeforeRemoval?.()');
+    const superClose = closeSource.indexOf('return super.close(options);');
+    assert.ok(dispose >= 0, 'the production manager close invokes the root disposal bridge');
+    assert.ok(superClose > dispose, 'the bridge runs before ApplicationV2 removes the Svelte target');
+    assert.match(
+      closeSource,
+      /disposeDowntimeProviderBeforeRemoval\?\.\(\);[\s\S]*?return super\.close\(options\);/,
+      'the real manager close keeps disposal and ApplicationV2 close in one ordered composition'
+    );
+  });
   it('self-registers as the sole crafting system manager app', () => {
     assert.ok(
       appSource.includes('extends SvelteApplicationMixin('),

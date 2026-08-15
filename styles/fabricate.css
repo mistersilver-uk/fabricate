@@ -2200,6 +2200,13 @@
   grid-template-rows: minmax(0, 1fr);
 }
 
+/* The World Downtime host owns the one scrolling workspace row. Without this explicit
+   route layout, the shared three-row shell gives the host an auto-sized first row, so
+   narrow copy grows the Manager instead of scrolling inside its panel. */
+.fabricate-manager[data-manager-view="world-downtime"] .manager-main {
+  grid-template-rows: minmax(0, 1fr);
+}
+
 .fabricate-manager .manager-checks-page {
   display: grid;
   gap: var(--fab-space-3);
@@ -9077,7 +9084,8 @@
 .fabricate-manager[data-manager-view="recipe-edit"] .manager-body,
 .fabricate-manager[data-manager-view="crafting-settings"] .manager-body,
 .fabricate-manager[data-manager-view="recipe-item-edit"] .manager-body,
-.fabricate-manager[data-manager-view="system-edit"] .manager-body {
+.fabricate-manager[data-manager-view="system-edit"] .manager-body,
+.fabricate-manager[data-manager-view="world-downtime"] .manager-body {
   grid-template-columns: 220px minmax(0, 1fr);
 }
 
@@ -9087,7 +9095,8 @@
 .fabricate-manager[data-manager-view="recipe-edit"] .manager-body.is-rail-collapsed,
 .fabricate-manager[data-manager-view="crafting-settings"] .manager-body.is-rail-collapsed,
 .fabricate-manager[data-manager-view="recipe-item-edit"] .manager-body.is-rail-collapsed,
-.fabricate-manager[data-manager-view="system-edit"] .manager-body.is-rail-collapsed {
+.fabricate-manager[data-manager-view="system-edit"] .manager-body.is-rail-collapsed,
+.fabricate-manager[data-manager-view="world-downtime"] .manager-body.is-rail-collapsed {
   grid-template-columns: 56px minmax(0, 1fr);
 }
 
@@ -16211,6 +16220,34 @@
 
   .fabricate-manager .manager-recipe-visibility-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  /* Downtime is a bounded workspace, unlike the stacked reading surfaces above.
+     Keep the permanent rail beside it and reserve the remaining row for the host's
+     own preview scroller. */
+  .fabricate-manager[data-manager-view="world-downtime"] .manager-body,
+  .fabricate-manager[data-manager-view="world-downtime"] .manager-body.is-rail-collapsed {
+    grid-template-columns: 220px minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
+    grid-auto-rows: unset;
+    overflow: hidden;
+  }
+
+  .fabricate-manager[data-manager-view="world-downtime"] .manager-body.is-rail-collapsed {
+    grid-template-columns: 56px minmax(0, 1fr);
+  }
+
+  .fabricate-manager[data-manager-view="world-downtime"] .manager-rail {
+    max-height: none;
+    overflow: hidden auto;
+    border-right: 1px solid var(--fab-mv2-border);
+    border-bottom: 0;
+  }
+
+  .fabricate-manager[data-manager-view="world-downtime"] .manager-main {
+    display: grid;
+    min-height: 0;
+    overflow: hidden;
   }
 }
 

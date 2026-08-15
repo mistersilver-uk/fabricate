@@ -3266,6 +3266,26 @@ Alchemy makes that the DEFAULT case: brewing is never gated by visibility, and d
 - Because a redacted model carries no `recipeId`, `Fabricate#advanceCraftingRun` resolves the recipe from the PERSISTED RUN rather than from its caller.
 The client-supplied `recipeId` is ignored; trusting it also allowed advancing one run while naming another run's recipe.
 
+### Downtime Preview and Premium Extension
+
+- The GM Manager's permanent World navigation contains both `Parties` and `Downtime`.
+- `Parties` retains its identifiers, count, availability, route-exit behavior, CRUD, membership, travel-actor validation, realm resolution, `GatheringParty` aggregate, and `fabricate.gatheringParties` persistence unchanged.
+- Core Downtime is a read-only four-tab preview with the fixed ordered ids `tracking`, `activities`, `factions`, and `settings`.
+- Core's preview and extension registry create, read, and write no downtime record, setting, flag, actor data, reward, world-time state, party role, assignment, mirror, or reference.
+- One page-session API-v1 registry is published as `game.fabricate.api.managerExtensions.registerWorldNavProvider(provider)` and survives the `init` and `ready` API rebinding.
+- A provider is `{ apiVersion: 1, id: 'downtime', tabs, mount }`; each ordered tab supplies a localized label, accessible name, keyboard-visible tooltip, and Font Awesome icon.
+- A conflicting provider, unsupported version/id, malformed tab sequence, or asynchronous mount fails with a deterministic error.
+- `mount({ target, tabId, context })` is synchronous and returns a cleanup function or nothing.
+- Core calls cleanup exactly once while the target is connected and before a tab, provider, route, or window removes it.
+- Mount and cleanup faults are reported and contained; partial content is cleared, the Core provider becomes the fallback, and a later valid provider may mount without navigating away.
+- Core owns the Manager shell, GM gate, World rail/route/focus state, target, and teardown.
+- The companion owns its content, localization, authorization, domain data, persistence, and created resources, and mounts only into the supplied target.
+- A companion does not patch Manager DOM, use render hooks, or require a new Fabricate hook.
+- The tablist is labelled and uses native buttons, roving tabindex, stable tab/panel IDREFs, localized accessible names, keyboard-visible tooltips, Left/Right/Home/End focus-and-activation, and focus recovery when a provider change removes the focused panel.
+- The Patreon CTA is `https://www.patreon.com/c/mistersilver`, opens `_blank`, carries `rel="noopener noreferrer"`, uses Font Awesome-only imagery, and remains usable at narrow widths and with the Manager rail collapsed.
+- A companion declares Fabricate in `relationships.requires`, which governs dependency availability and activation rather than ordinary-module script priority.
+- A companion attempts registration during its own `init`, uses one idempotent `Hooks.once('ready', tryRegister)` fallback only when the API is absent, retains exactly one unregister handle, and treats `tryRegister` as a no-op after success.
+
 ## Data Storage (UI-relevant)
 
 All keys below use the literal `fabricate.*` namespace.

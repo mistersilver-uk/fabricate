@@ -332,6 +332,14 @@ async function renderPage(
     expectTab = null,
     expectSelector = null,
     expectLayout = null,
+    expectAttributes = [],
+    expectVisible = null,
+    expectContained = [],
+    expectCenterHit = null,
+    expectClick = null,
+    expectNoHorizontalOverflow = null,
+    expectOverflowY = null,
+    expectScrollable = null,
   }
 ) {
   const context = await browser.newContext(BROWSER_CONTEXT);
@@ -460,6 +468,105 @@ async function renderPage(
             `this case is named for.`
         );
       }
+    }
+
+    for (const expectation of expectAttributes) {
+      const actual = await page.locator(expectation.selector).getAttribute(expectation.name);
+      if (actual !== expectation.value) {
+        throw new Error(
+          `${label}: expected ${expectation.selector} ${expectation.name}="${expectation.value}", got "${actual}".`
+        );
+      }
+    }
+
+    if (expectVisible) {
+      const visible = await page.locator(expectVisible).isVisible();
+      if (!visible) throw new Error(`${label}: expected ${expectVisible} to be visibly rendered.`);
+    }
+
+    for (const expectation of expectContained) {
+      const contained = await page.evaluate(({ container, target }) => {
+        const outer = globalThis.document.querySelector(container);
+        const inner = globalThis.document.querySelector(target);
+        if (!outer || !inner) return false;
+        const outerBox = outer.getBoundingClientRect();
+        const innerBox = inner.getBoundingClientRect();
+        return (
+          innerBox.width > 0 &&
+          innerBox.height > 0 &&
+          innerBox.left >= outerBox.left &&
+          innerBox.right <= outerBox.right &&
+          innerBox.top >= outerBox.top &&
+          innerBox.bottom <= outerBox.bottom
+        );
+      }, expectation);
+      if (!contained) {
+        throw new Error(
+          `${label}: ${expectation.target} is clipped or extends outside ${expectation.container}.`
+        );
+      }
+    }
+
+    if (expectCenterHit) {
+      const hit = await page.evaluate((selector) => {
+        const element = globalThis.document.querySelector(selector);
+        if (!element) return false;
+        const box = element.getBoundingClientRect();
+        const target = globalThis.document.elementFromPoint(
+          box.left + box.width / 2,
+          box.top + box.height / 2
+        );
+        return target === element || element.contains(target);
+      }, expectCenterHit);
+      if (!hit)
+        throw new Error(`${label}: ${expectCenterHit} does not own its centre pointer target.`);
+    }
+
+    if (expectClick) {
+      const clickTarget = page.locator(expectClick);
+      await clickTarget.evaluate((element) => {
+        element.dataset.viewLabPointerClicks = '0';
+        element.addEventListener('click', (event) => {
+          event.preventDefault();
+          element.dataset.viewLabPointerClicks = String(
+            Number(element.dataset.viewLabPointerClicks) + 1
+          );
+        });
+      });
+      await clickTarget.click();
+      const clicked = await clickTarget.evaluate((element) => {
+        return element.dataset.viewLabPointerClicks === '1';
+      });
+      if (!clicked) throw new Error(`${label}: ${expectClick} did not accept an actual click.`);
+    }
+
+    if (expectNoHorizontalOverflow) {
+      const selectors = Array.isArray(expectNoHorizontalOverflow)
+        ? expectNoHorizontalOverflow
+        : [expectNoHorizontalOverflow];
+      for (const selector of selectors) {
+        const overflows = await page
+          .locator(selector)
+          .evaluate((element) => element.scrollWidth > element.clientWidth + 1);
+        if (overflows) throw new Error(`${label}: ${selector} overflows horizontally.`);
+      }
+    }
+
+    if (expectScrollable) {
+      const scrollable = await page.locator(expectScrollable).evaluate((element) => {
+        const style = globalThis.getComputedStyle(element);
+        return /auto|scroll/.test(style.overflowY) && element.scrollHeight > element.clientHeight;
+      });
+      if (!scrollable)
+        throw new Error(`${label}: ${expectScrollable} is not vertically scrollable.`);
+    }
+
+    if (expectOverflowY) {
+      const ownsVerticalOverflow = await page.locator(expectOverflowY).evaluate((element) => {
+        return /auto|scroll/.test(globalThis.getComputedStyle(element).overflowY);
+      });
+      if (!ownsVerticalOverflow)
+        throw new Error(`${label}: ${expectOverflowY} does not own vertical overflow.`);
     }
 
     await assertViewLabLayout(page, expectLayout, label);
@@ -722,6 +829,14 @@ async function commandApps() {
           expectTab: viewCase.app === 'fabricate-app' ? (viewCase.query?.tab ?? 'crafting') : null,
           expectSelector: viewCase.expectSelector ?? null,
           expectLayout: viewCase.expectLayout ?? null,
+          expectAttributes: viewCase.expectAttributes ?? [],
+          expectVisible: viewCase.expectVisible ?? null,
+          expectContained: viewCase.expectContained ?? [],
+          expectCenterHit: viewCase.expectCenterHit ?? null,
+          expectClick: viewCase.expectClick ?? null,
+          expectNoHorizontalOverflow: viewCase.expectNoHorizontalOverflow ?? null,
+          expectOverflowY: viewCase.expectOverflowY ?? null,
+          expectScrollable: viewCase.expectScrollable ?? null,
         });
         if (viewCase.distinctEvidenceGroup) {
           const prior = distinctEvidence.get(viewCase.distinctEvidenceGroup) ?? [];

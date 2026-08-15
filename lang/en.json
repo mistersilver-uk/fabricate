@@ -4273,6 +4273,158 @@
           "PartiesHint": "Create and manage parties shared across every crafting system.",
           "PartiesActions": "World party actions",
           "PartiesInspector": "Selected world party",
+          "Downtime": {
+            "Title": "Downtime",
+            "Nav": "Downtime",
+            "Subtitle": "Preview campaign downtime workflows or open an installed companion extension.",
+            "Actions": "Downtime actions",
+            "Premium": "Premium",
+            "Brand": "Fabricate Premium",
+            "PreviewBadge": "Preview",
+            "Tablist": "Downtime preview sections",
+            "Subscribe": "Subscribe on Patreon & download Fabricate Premium",
+            "PreviewNote": "Explore this preview to see how the workflow would support your campaign.",
+            "BenefitsKicker": "What Premium gives you",
+            "BenefitsTitle": "Less administration. More meaningful downtime.",
+            "ConnectedTitle": "One connected Downtime Studio",
+            "ConnectedDescription": "Explore tracking, activity authoring, factions and campaign rules to see how each part can support the way you run downtime.",
+            "Tabs": {
+              "Tracking": {
+                "Label": "Tracking",
+                "AccessibleName": "Open the Tracking preview",
+                "Tooltip": "Preview Tracking in Fabricate Premium"
+              },
+              "Activities": {
+                "Label": "Activities",
+                "AccessibleName": "Open the Activities preview",
+                "Tooltip": "Preview Activities in Fabricate Premium"
+              },
+              "Factions": {
+                "Label": "Factions",
+                "AccessibleName": "Open the Factions preview",
+                "Tooltip": "Preview Factions in Fabricate Premium"
+              },
+              "Settings": {
+                "Label": "Settings",
+                "AccessibleName": "Open the Settings preview",
+                "Tooltip": "Preview Settings in Fabricate Premium"
+              }
+            },
+            "Preview": {
+              "Tracking": {
+                "Headline": "Run downtime without the spreadsheet.",
+                "Description": "Keep every character, solo activity and shared project on one board. Advance your world calendar, credit work automatically, and resolve finished downtime without chasing notes across journals and chat.",
+                "PreviewTitle": "Party board",
+                "Rows": {
+                  "1": "Ilyra Vance",
+                  "2": "Rebuild the Blackfeather Tavern",
+                  "3": "Player choice waiting"
+                },
+                "Features": {
+                  "1": {
+                    "Title": "One party-wide view",
+                    "Description": "See active, paused, pending and attention-needed work for every character at a glance."
+                  },
+                  "2": {
+                    "Title": "World-time automation",
+                    "Description": "Let advances in your world calendar credit every active activity."
+                  },
+                  "3": {
+                    "Title": "Shared group projects",
+                    "Description": "Pool player effort across a shared project while preserving each character’s contribution."
+                  },
+                  "4": {
+                    "Title": "Guided resolution",
+                    "Description": "Bring checks, stalled work and player choices to your attention exactly when they matter."
+                  }
+                }
+              },
+              "Activities": {
+                "Headline": "Build it once. Reuse it throughout your campaign.",
+                "Description": "Create reusable solo and group activities with stages, durations, prerequisites, checks, objectives, costs and rewards. Assign them in seconds instead of rewriting the procedure every time a character trains, researches, works or undertakes a long-term project.",
+                "PreviewTitle": "Activity library",
+                "Rows": {
+                  "1": "Train a Skill",
+                  "2": "Research",
+                  "3": "Rebuild the Blackfeather Tavern"
+                },
+                "Features": {
+                  "1": {
+                    "Title": "Multi-stage activities",
+                    "Description": "Break complex downtime into clear stages with their own time, requirements and objectives."
+                  },
+                  "2": {
+                    "Title": "Solo or shared",
+                    "Description": "Use the same authoring model for individual pursuits and collaborative group projects."
+                  },
+                  "3": {
+                    "Title": "Checks & prerequisites",
+                    "Description": "Require tools, components, currency, prior activities or checks before players continue."
+                  },
+                  "4": {
+                    "Title": "Meaningful outcomes",
+                    "Description": "Grant items, currency, recipe knowledge and rewards chosen by your players."
+                  }
+                }
+              },
+              "Factions": {
+                "Headline": "Let factions remember what the party changes.",
+                "Description": "Track standing, obligations and campaign-scale relationships beside the downtime activities that shape them. Keep faction progress visible without turning Fabricate Core into a second campaign database.",
+                "PreviewTitle": "Reputation overview",
+                "Rows": {
+                  "1": "The Rookery",
+                  "2": "Blackfeather Commons",
+                  "3": "Ashen Circle"
+                },
+                "Features": {
+                  "1": {
+                    "Title": "Party & character standing",
+                    "Description": "See allies, rivals and unresolved obligations together."
+                  },
+                  "2": {
+                    "Title": "Tiered reputation",
+                    "Description": "Relate faction movement to the work that caused it."
+                  },
+                  "3": {
+                    "Title": "Activity-driven change",
+                    "Description": "Keep sensitive campaign rules in the companion that owns them."
+                  },
+                  "4": {
+                    "Title": "Claims & benefits",
+                    "Description": "Carry consequences forward from one downtime cycle to the next."
+                  }
+                }
+              },
+              "Settings": {
+                "Headline": "Set your campaign rules once.",
+                "Description": "Configure companion-owned calendars, permissions, activity defaults and resolution rules without adding downtime records, settings or flags to Fabricate Core.",
+                "PreviewTitle": "Campaign rules",
+                "Rows": {
+                  "1": "World time drives progress",
+                  "2": "Players may self-initiate",
+                  "3": "Solo activities per character"
+                },
+                "Features": {
+                  "1": {
+                    "Title": "Automatic or manual time",
+                    "Description": "Choose how companion activities respond to your campaign clock."
+                  },
+                  "2": {
+                    "Title": "Player self-service",
+                    "Description": "Decide which companion workflows players may see or operate."
+                  },
+                  "3": {
+                    "Title": "Concurrency limits",
+                    "Description": "Set practical defaults while retaining per-activity control."
+                  },
+                  "4": {
+                    "Title": "Consistent reputation rules",
+                    "Description": "All downtime persistence stays outside Fabricate Core."
+                  }
+                }
+              }
+            }
+          },
           "PartyOverrideGatheringRequired": "Select a crafting system with Gathering enabled to set a current-realm override.",
           "PartyOverrideTravelRequired": "Enable Travel & Realms in Gathering settings to set a current-realm override.",
           "Parties": {

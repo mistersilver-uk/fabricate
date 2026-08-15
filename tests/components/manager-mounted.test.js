@@ -29,6 +29,7 @@ import { getModifierExpressionSuggestions } from '../../src/config/modifierExpre
 // bulk-selection block below waits on it rather than restating the number, so a change to the
 // rule cannot leave these tests quietly asserting the un-delayed state.
 import { ANNOUNCE_AFTER_FOCUS_MS } from '../../src/ui/svelte/util/announceAfterFocus.js';
+import { createManagerExtensionsRegistry } from '../../src/ui/managerExtensions.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 const sharedComponentNames = [
@@ -74,6 +75,11 @@ let target;
 
 function rewriteClientImports(code) {
   return code
+    .replace(
+      "import { onDestroy, tick } from 'svelte';",
+      'import { onDestroy } from "svelte";\nimport { tick } from \'svelte/internal/client\';'
+    )
+    .replace("import { onDestroy } from 'svelte';", 'import { onDestroy } from "svelte";')
     .replace(/from 'svelte';/g, "from 'svelte/internal/client';")
     .replace(/(from\s+['"][^'"]+\.svelte)(['"])/g, '$1.js$2');
 }
@@ -216,6 +222,9 @@ function compileManagerRoot() {
   writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringEventsBrowserView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringEventEditView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringPartiesTab.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/downtime/WorldDowntimeExtensionHost.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/downtime/WorldDowntimePreview.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/downtime/WorldDowntimeTabs.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringRealmsTab.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringMapLinksTab.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/MapRegionLinkPicker.svelte');
@@ -643,6 +652,8 @@ function compileManagerRoot() {
     // too, but it lands here because the compiled Knowledge components import it
     // directly; it is a dependency-free leaf, so this single entry suffices.
     'src/ui/svelte/apps/manager/knowledge/knowledgeStudio.js',
+    'src/ui/svelte/apps/manager/downtime/worldDowntimePreviewProvider.js',
+    'src/ui/managerExtensions.js',
     // SystemEditView imports the pure modifier↔prerequisite copy-mapping helpers
     // (issue 768); omitting it HANGS every mounted manager test as `# cancelled`.
     'src/systems/characterModifierPrerequisiteCopy.js',
@@ -777,6 +788,29 @@ function worldNavItem(id) {
   return target.querySelector(`#manager-world-nav-${id}`);
 }
 
+function downtimeProvider({ prefix = 'Companion', mount: mountProvider, ...overrides } = {}) {
+  return {
+    apiVersion: 1,
+    id: 'downtime',
+    tabs: ['tracking', 'activities', 'factions', 'settings'].map((id) => ({
+      id,
+      label: `${prefix} ${id}`,
+      accessibleName: `Open ${prefix} ${id}`,
+      tooltip: `${prefix} ${id} tools`,
+      icon: 'fas fa-star',
+    })),
+    mount: mountProvider ?? (() => undefined),
+    ...overrides,
+  };
+}
+
+async function settleDowntimeProvider() {
+  await Promise.resolve();
+  await tick();
+  await tick();
+  flushSync();
+}
+
 function systemTravelItem(id) {
   return target.querySelector(
     id === 'travel' ? '#manager-nav-travel' : `#manager-travel-nav-${id}`
@@ -826,7 +860,7 @@ async function switchScopeSystemTo(systemId) {
 // Mount the manager against a fresh store on a fresh host element. Assigns the
 // module-level `mounted`/`target` (so afterEach can clean up) and returns the target,
 // so the routing helpers below differ only in where they navigate afterwards.
-function mountManager(calls = [], storeOptions = {}, services = {}) {
+function mountManager(calls = [], storeOptions = {}, services = {}, rootProps = {}) {
   target = document.createElement('div');
   document.body.appendChild(target);
   mounted = mount(Component, {
@@ -834,6 +868,7 @@ function mountManager(calls = [], storeOptions = {}, services = {}) {
     props: {
       store: createStore(calls, storeOptions),
       services: { openCurrentAdmin: () => {}, ...services },
+      ...rootProps,
     },
   });
   flushSync();
@@ -2876,6 +2911,7 @@ describe('CraftingSystemManager mounted behavior', () => {
         'Checks',
         'Gathering',
         'Parties',
+        'Downtime',
       ]
     );
     assert.equal(
@@ -6241,7 +6277,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     const navLabels = Array.from(target.querySelectorAll('.manager-nav-label')).map((label) =>
       label.textContent.trim()
     );
-    assert.deepEqual(navLabels, ['Parties']);
+    assert.deepEqual(navLabels, ['Parties', 'Downtime']);
     assert.ok(target.textContent.includes('Crafting Systems'));
     assert.ok(target.textContent.includes('No crafting systems yet'));
     assert.ok(target.textContent.includes('Set up your first system'));
@@ -6344,6 +6380,7 @@ describe('CraftingSystemManager mounted behavior', () => {
         'Tools',
         'Checks',
         'Parties',
+        'Downtime',
       ]
     );
 
@@ -6461,6 +6498,7 @@ describe('CraftingSystemManager mounted behavior', () => {
         'Gathering',
         'Graph',
         'Parties',
+        'Downtime',
       ]
     );
     assert.ok(target.textContent.includes('System library'));
@@ -13561,9 +13599,10 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.equal(world.querySelector('#manager-world-scope').textContent.trim(), 'every system');
     assert.deepEqual(
       Array.from(world.querySelectorAll('[data-world-nav-item]')).map((item) => item.id),
-      ['manager-world-nav-parties']
+      ['manager-world-nav-parties', 'manager-world-nav-downtime']
     );
     assert.ok(worldNavItem('parties').querySelector('.fa-users'));
+    assert.ok(worldNavItem('downtime').querySelector('.fa-hourglass-half'));
     assert.ok(systemTravelItem('travel').querySelector('.fa-route'));
     assert.equal(
       worldNavItem('parties').querySelector('.manager-nav-count').textContent.trim(),
@@ -13648,6 +13687,279 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(
       !target.querySelector('[id^="travel-tab-"]'),
       'the retired horizontal tabs are absent'
+    );
+  });
+
+  it('opens the read-only World Downtime preview with accessible tabs and a secure CTA', async () => {
+    const calls = [];
+    const registry = createManagerExtensionsRegistry();
+    const originalLocalize = globalThis.game.i18n.localize;
+    const localized = new Map([
+      ['FABRICATE.Admin.Manager.World.Downtime.Tablist', 'Localized downtime sections'],
+      ['FABRICATE.Admin.Manager.World.Downtime.Brand', 'Localized Fabricate Premium'],
+      ['FABRICATE.Admin.Manager.World.Downtime.Tabs.Tracking.Label', 'Localized tracking'],
+      [
+        'FABRICATE.Admin.Manager.World.Downtime.Tabs.Tracking.AccessibleName',
+        'Open localized tracking preview',
+      ],
+      [
+        'FABRICATE.Admin.Manager.World.Downtime.Tabs.Tracking.Tooltip',
+        'Localized tracking tooltip',
+      ],
+    ]);
+    globalThis.game.i18n.localize = (key) => localized.get(key) ?? originalLocalize(key);
+    mountManager(calls, {}, {}, { managerExtensions: registry });
+
+    worldNavItem('downtime').click();
+    await settleRouteExit();
+
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'world-downtime');
+    assert.equal(worldNavItem('parties').getAttribute('aria-current'), null);
+    assert.equal(worldNavItem('downtime').getAttribute('aria-current'), 'page');
+    const tabs = Array.from(target.querySelectorAll('[data-downtime-tab]'));
+    assert.deepEqual(
+      tabs.map((tab) => tab.dataset.downtimeTab),
+      ['tracking', 'activities', 'factions', 'settings']
+    );
+    assert.deepEqual(
+      tabs.map((tab) => tab.getAttribute('tabindex')),
+      ['0', '-1', '-1', '-1']
+    );
+    assert.equal(tabs[0].getAttribute('aria-selected'), 'true');
+    assert.equal(tabs[0].getAttribute('aria-controls'), 'world-downtime-panel-tracking');
+    assert.equal(tabs[0].getAttribute('aria-label'), 'Open localized tracking preview');
+    assert.equal(
+      target.querySelector('[data-downtime-tablist]').getAttribute('aria-label'),
+      'Localized downtime sections'
+    );
+    assert.match(target.querySelector('.downtime-premium').textContent, /Localized Fabricate Premium/);
+    assert.equal(
+      tabs[0].getAttribute('aria-describedby'),
+      'world-downtime-tooltip-tracking'
+    );
+    assert.equal(
+      target.querySelector('#world-downtime-tooltip-tracking').textContent.trim(),
+      'Localized tracking tooltip'
+    );
+    assert.equal(
+      target.querySelectorAll('[role="tabpanel"][id^="world-downtime-panel-"]').length,
+      4,
+      'every tab owns a stable panel IDREF even while inactive'
+    );
+    assert.equal(
+      target.querySelector('[data-downtime-connected-studio]')?.nextElementSibling,
+      target.querySelector('[data-downtime-tablist]'),
+      'the fallback keeps the prototype connected-studio card immediately above its tabs'
+    );
+
+    tabs[0].dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+    await tick();
+    flushSync();
+    const activitiesTab = target.querySelector('[data-downtime-tab="activities"]');
+    assert.equal(document.activeElement, activitiesTab);
+    assert.equal(activitiesTab.getAttribute('aria-selected'), 'true');
+
+    activitiesTab.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true }));
+    await tick();
+    flushSync();
+    assert.equal(document.activeElement, tabs[0]);
+    assert.equal(tabs[0].getAttribute('aria-selected'), 'true');
+
+    tabs[0].dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true }));
+    await tick();
+    flushSync();
+    const settingsTab = target.querySelector('[data-downtime-tab="settings"]');
+    assert.equal(document.activeElement, settingsTab);
+    assert.equal(settingsTab.getAttribute('aria-selected'), 'true');
+
+    settingsTab.dispatchEvent(new KeyboardEvent('keydown', { key: 'Home', bubbles: true }));
+    await tick();
+    flushSync();
+    assert.equal(document.activeElement, tabs[0]);
+    assert.equal(tabs[0].getAttribute('aria-selected'), 'true');
+
+    tabs[0].dispatchEvent(new KeyboardEvent('keydown', { key: 'End', bubbles: true }));
+    await tick();
+    flushSync();
+    assert.equal(document.activeElement, settingsTab);
+    assert.equal(settingsTab.getAttribute('aria-selected'), 'true');
+    assert.ok(target.querySelector('[data-downtime-panel="settings"]'));
+
+    const cta = target.querySelector('.downtime-cta');
+    assert.equal(cta.href, 'https://www.patreon.com/c/mistersilver');
+    assert.equal(cta.target, '_blank');
+    assert.equal(cta.rel, 'noopener noreferrer');
+    assert.deepEqual(calls, [], 'the Core preview and tab interactions call no store write seam');
+    globalThis.game.i18n.localize = originalLocalize;
+  });
+
+  it('updates an open Downtime host and cleans each companion mount exactly once', async () => {
+    const registry = createManagerExtensionsRegistry();
+    const cleanups = [];
+    mountManager([], {}, {}, { managerExtensions: registry });
+    worldNavItem('downtime').click();
+    await settleRouteExit();
+
+    const extension = downtimeProvider({
+      mount({ target: mountTarget, tabId }) {
+        mountTarget.textContent = `Mounted ${tabId}`;
+        return () => cleanups.push(tabId);
+      },
+    });
+    const unregister = registry.publicApi.registerWorldNavProvider(extension);
+    await tick();
+    await tick();
+    flushSync();
+    assert.ok(target.textContent.includes('Companion tracking'), target.innerHTML);
+    assert.match(
+      target.querySelector('[data-downtime-extension-panel]').textContent,
+      /Mounted tracking/
+    );
+    assert.ok(
+      !target.querySelector('.downtime-tab-lock'),
+      'an installed companion never inherits the Core fallback lock treatment'
+    );
+
+    target.querySelector('[data-downtime-tab="activities"]').click();
+    await tick();
+    flushSync();
+    assert.deepEqual(cleanups, ['tracking']);
+    assert.match(
+      target.querySelector('[data-downtime-extension-panel]').textContent,
+      /Mounted activities/
+    );
+
+    const mountedPanel = target.querySelector('[data-downtime-extension-panel="activities"]');
+    mountedPanel.focus();
+    assert.equal(document.activeElement, mountedPanel, 'the companion panel owns focus before removal');
+    unregister();
+    await settleDowntimeProvider();
+    assert.deepEqual(cleanups, ['tracking', 'activities']);
+    assert.ok(target.querySelector('[data-downtime-panel="activities"]'));
+    assert.equal(
+      document.activeElement,
+      target.querySelector('[data-downtime-tab="activities"]'),
+      'provider removal returns a focused companion panel to its active Core tab'
+    );
+  });
+
+  it('contains mount faults, rejects invalid cleanup returns, and recovers with replacement tabs', async () => {
+    const registry = createManagerExtensionsRegistry();
+    const errors = [];
+    const originalError = console.error;
+    console.error = (...args) => errors.push(args);
+    try {
+      mountManager([], {}, {}, { managerExtensions: registry });
+      worldNavItem('downtime').click();
+      await settleRouteExit();
+
+      const unregisterBroken = registry.publicApi.registerWorldNavProvider(
+        downtimeProvider({
+          prefix: 'Broken',
+          mount({ target: mountTarget }) {
+            mountTarget.textContent = 'partial broken content';
+            throw new Error('mount exploded');
+          },
+        })
+      );
+      await settleDowntimeProvider();
+      assert.ok(target.querySelector('[data-downtime-panel="tracking"]'));
+      assert.ok(!target.textContent.includes('Broken tracking'));
+      assert.ok(!target.textContent.includes('partial broken content'));
+
+      unregisterBroken();
+      const unregisterInvalid = registry.publicApi.registerWorldNavProvider(
+        downtimeProvider({
+          prefix: 'Invalid',
+          mount({ target: mountTarget }) {
+            mountTarget.textContent = 'partial invalid content';
+            return { dispose: true };
+          },
+        })
+      );
+      await settleDowntimeProvider();
+      assert.ok(target.querySelector('[data-downtime-panel="tracking"]'));
+      assert.ok(!target.textContent.includes('Invalid tracking'));
+      assert.ok(!target.textContent.includes('partial invalid content'));
+
+      unregisterInvalid();
+      registry.publicApi.registerWorldNavProvider(
+        downtimeProvider({
+          prefix: 'Recovered',
+          coreFallback: true,
+          mount({ target: mountTarget, tabId }) {
+            mountTarget.textContent = `Recovered ${tabId}`;
+          },
+        })
+      );
+      await settleDowntimeProvider();
+      assert.match(target.textContent, /Recovered tracking/);
+      assert.match(target.textContent, /Recovered activities/);
+      assert.ok(
+        !target.querySelector('.downtime-tab-lock'),
+        'a companion cannot opt into Core-only fallback behavior with coreFallback'
+      );
+      assert.equal(errors.length, 2);
+      assert.match(errors[0][0], /provider mount failed/);
+      assert.match(errors[1][0], /provider mount failed/);
+    } finally {
+      console.error = originalError;
+    }
+  });
+
+  it('continues to fallback after a cleanup throws and reports the fault once', async () => {
+    const registry = createManagerExtensionsRegistry();
+    const errors = [];
+    const originalError = console.error;
+    console.error = (...args) => errors.push(args);
+    try {
+      mountManager([], {}, {}, { managerExtensions: registry });
+      worldNavItem('downtime').click();
+      await settleRouteExit();
+      const unregister = registry.publicApi.registerWorldNavProvider(
+        downtimeProvider({
+          mount: () => () => {
+            throw new Error('cleanup exploded');
+          },
+        })
+      );
+      await settleDowntimeProvider();
+
+      unregister();
+      await settleDowntimeProvider();
+      assert.ok(target.querySelector('[data-downtime-panel="tracking"]'));
+      assert.equal(errors.length, 1, 'cleanup is attempted and reported exactly once');
+      assert.match(errors[0][0], /provider cleanup failed/);
+    } finally {
+      console.error = originalError;
+    }
+  });
+
+  it('runs companion cleanup while its target is connected on route exit and manager destruction', async () => {
+    const registry = createManagerExtensionsRegistry();
+    const cleanupConnections = [];
+    registry.publicApi.registerWorldNavProvider(
+      downtimeProvider({
+        mount: ({ target: mountTarget }) => () => cleanupConnections.push(mountTarget.isConnected),
+      })
+    );
+    mountManager([], {}, {}, { managerExtensions: registry });
+    worldNavItem('downtime').click();
+    await settleRouteExit();
+
+    worldNavItem('parties').click();
+    await settleRouteExit();
+    assert.deepEqual(cleanupConnections, [true], 'route exit cleans before removing the target');
+
+    worldNavItem('downtime').click();
+    await settleRouteExit();
+    mounted.disposeDowntimeProviderBeforeRemoval();
+    unmount(mounted);
+    mounted = null;
+    assert.deepEqual(
+      cleanupConnections,
+      [true, true],
+      'manager destruction cleans exactly once while the target remains connected'
     );
   });
 
@@ -18756,7 +19068,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     if (kind === 'task') await openDirtyGatheringTaskEditor(calls, storeOptions);
     else await openDirtyGatheringEventEditor(calls, storeOptions);
 
-    if (destination !== 'parties') {
+    if (!['parties', 'downtime'].includes(destination)) {
       target.querySelector('#manager-travel-toggle').click();
       await tick();
       flushSync();
@@ -18769,7 +19081,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     }
 
     const activateDestination = async () => {
-      (destination === 'parties'
+      (['parties', 'downtime'].includes(destination)
         ? worldNavItem(destination)
         : systemTravelItem(destination)
       ).click();
@@ -18779,8 +19091,10 @@ describe('CraftingSystemManager mounted behavior', () => {
     else await activateDestination();
 
     const expectedView = outcome.proceeds
-      ? destination === 'parties'
-        ? 'world'
+      ? ['parties', 'downtime'].includes(destination)
+        ? destination === 'downtime'
+          ? 'world-downtime'
+          : 'world'
         : 'environments'
       : `gathering-${kind}-edit`;
     assert.equal(
@@ -18789,7 +19103,7 @@ describe('CraftingSystemManager mounted behavior', () => {
       `${kind} ${outcome.name} should ${outcome.proceeds ? '' : 'not '}leave the editor; rendered: ${JSON.stringify(Array.from(target.querySelectorAll('.fabricate-manager')).map((node) => node.dataset.managerView))}; calls: ${JSON.stringify(calls)}`
     );
     assert.equal(
-      (destination === 'parties'
+      (['parties', 'downtime'].includes(destination)
         ? worldNavItem(destination)
         : systemTravelItem(destination)
       ).getAttribute('aria-current'),
@@ -18808,7 +19122,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     );
   }
 
-  it('guards dirty gathering task and event exits through World Parties and a Travel child', async () => {
+  it('guards dirty gathering task and event exits through World Parties, Downtime, and a Travel child', async () => {
     const outcomes = [
       { name: 'cancel', action: 'cancel', proceeds: false },
       { name: 'save false', action: 'save', saveResult: false, proceeds: false },
@@ -18817,7 +19131,7 @@ describe('CraftingSystemManager mounted behavior', () => {
       { name: 'discard', action: 'discard', proceeds: true },
     ];
 
-    for (const destination of ['parties', 'realms']) {
+    for (const destination of ['parties', 'downtime', 'realms']) {
       for (const kind of ['task', 'event']) {
         for (const outcome of outcomes) {
           await attemptDirtyGatheringWorldExit(kind, outcome, destination);

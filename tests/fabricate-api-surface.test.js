@@ -8,6 +8,22 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const mainPath = resolve(__dirname, '../src/main.js');
 const mainSource = readFileSync(mainPath, 'utf8');
 
+test('Fabricate publishes the stable manager extension API through both lifecycle binds', () => {
+  assert.ok(
+    mainSource.includes("import { managerExtensions } from './ui/managerExtensions.js';"),
+    'main.js should import the page-session registry singleton'
+  );
+  assert.ok(
+    mainSource.includes('managerExtensions.bindPublicApi(game.fabricate.api);'),
+    'game.fabricate.api should receive the stable public registration object from the registry'
+  );
+  assert.equal(
+    (mainSource.match(/const managerExtensions/g) || []).length,
+    0,
+    'bindFabricateGlobal must not recreate the registry during init/ready replay'
+  );
+});
+
 test('Fabricate exposes deleteRecipe on the main Foundry API object', () => {
   assert.ok(
     mainSource.includes('async deleteRecipe(recipeId)'),

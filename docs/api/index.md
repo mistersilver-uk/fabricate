@@ -500,6 +500,69 @@ Hooks.once('fabricate.ready', () => {
 });
 ```
 
+## Manager Downtime Extension
+
+Companion modules can replace Fabricate Core's read-only World > Downtime preview through the stable API-v1 manager extension seam.
+Declare Fabricate as a required module dependency in the companion manifest, then register during `init`.
+If Fabricate evaluated after the companion's init callback, use one existing Foundry `ready` fallback; do not add a Fabricate hook, patch the Manager DOM, or use Foundry render hooks.
+
+```json
+{
+  "relationships": {
+    "requires": [{ "id": "fabricate", "type": "module" }]
+  }
+}
+```
+
+`relationships.requires` governs dependency availability and activation, not ordinary-module script priority.
+The one-shot `ready` fallback above is therefore required; do not try to replace it with an order assumption or with a render-hook/DOM-patching integration.
+
+```javascript
+let unregisterDowntime = null;
+let readyFallbackArmed = false;
+
+function tryRegisterDowntime() {
+  if (unregisterDowntime) return true;
+  const register = game.fabricate?.api?.managerExtensions?.registerWorldNavProvider;
+  if (typeof register !== 'function') return false;
+
+  unregisterDowntime = register({
+    apiVersion: 1,
+    id: 'downtime',
+    tabs: [
+      ['tracking', 'Tracking', 'fa-chart-simple'],
+      ['activities', 'Activities', 'fa-list-check'],
+      ['factions', 'Factions', 'fa-flag'],
+      ['settings', 'Settings', 'fa-sliders'],
+    ].map(([id, label, icon]) => ({
+      id,
+      label: game.i18n.localize(`MY_MODULE.Downtime.${label}`),
+      accessibleName: game.i18n.localize(`MY_MODULE.Downtime.${label}Accessible`),
+      tooltip: game.i18n.localize(`MY_MODULE.Downtime.${label}Tooltip`),
+      icon: `fas ${icon}`,
+    })),
+    mount({ target, tabId, context }) {
+      const view = mountCompanionDowntime({ target, tabId, context });
+      return () => view.destroy();
+    },
+  });
+  return true;
+}
+
+Hooks.once('init', () => {
+  if (tryRegisterDowntime() || readyFallbackArmed) return;
+  readyFallbackArmed = true;
+  Hooks.once('ready', tryRegisterDowntime);
+});
+```
+
+The four tab ids and their order are fixed: `tracking`, `activities`, `factions`, `settings`.
+`mount({ target, tabId, context })` must be synchronous and return either one cleanup function or nothing.
+Fabricate calls that cleanup exactly once before switching tabs, replacing or unregistering the provider, leaving the route, or closing the Manager.
+A mount or cleanup error is contained and the Core preview is restored.
+The companion owns all authorization, localization, domain data, persistence, and resources it creates; Fabricate supplies only the target and Manager shell.
+Call the retained unregister function when disabling the companion.
+
 ## Data Persistence
 
 Fabricate stores data in Foundry's settings and flags:

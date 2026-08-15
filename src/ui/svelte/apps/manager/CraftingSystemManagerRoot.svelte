@@ -1,5 +1,6 @@
 <!-- Svelte 5 runes mode -->
 <script>
+  import { onDestroy } from 'svelte';
   import ChanceSlider from '../../components/ChanceSlider.svelte';
   import CharacterModifierBoundsRow from './environment/CharacterModifierBoundsRow.svelte';
   import GatheringRuleLimitStepper from './environment/GatheringRuleLimitStepper.svelte';
@@ -128,8 +129,20 @@
   import SystemEditView from './SystemEditView.svelte';
   import SystemsBrowserView from './SystemsBrowserView.svelte';
   import TagsCategoriesView from './TagsCategoriesView.svelte';
+  import WorldDowntimeExtensionHost from './downtime/WorldDowntimeExtensionHost.svelte';
 
-  let { store, services = null } = $props();
+  let { store, services = null, managerExtensions = null } = $props();
+  const worldDowntimeContext = Object.freeze({ surface: 'manager', route: 'world-downtime' });
+  let downtimeExtensionHost = $state(null);
+
+  // The ApplicationV2 shell calls this before it unmounts the Svelte root, while a
+  // companion target is still connected. `onDestroy` remains the safety net for
+  // direct Svelte teardown paths that do not go through the application shell.
+  export function disposeDowntimeProviderBeforeRemoval() {
+    downtimeExtensionHost?.disposeBeforeRemoval?.();
+  }
+
+  onDestroy(disposeDowntimeProviderBeforeRemoval);
 
   // svelte-ignore state_referenced_locally
   const viewState = store.viewState;
@@ -2076,6 +2089,7 @@
   );
   const isWorldRoute = $derived(currentView === 'world');
   const isWorldPartiesRoute = $derived(currentView === 'world' && activeTravelTab === 'parties');
+  const isWorldDowntimeRoute = $derived(currentView === 'world-downtime');
   const isSystemTravelChildRoute = $derived(
     isSystemTravelRoute && (activeTravelTab === 'realms' || activeTravelTab === 'map')
   );
@@ -2894,7 +2908,7 @@
     // The standalone `system-overview` route was folded into the `system-edit`
     // page's Validation tab; a stale value (no system selected) falls through to
     // the `systems` library here.
-    if (view === 'world') return 'world';
+    if (view === 'world' || view === 'world-downtime') return view;
     if (!system) return 'systems';
     if (view === 'system-overview') return 'system-edit';
     if (view === 'tool-edit' && !$viewState.toolDraft) return 'tools';
@@ -2966,6 +2980,8 @@
       );
     if (currentView === 'world')
       return text('FABRICATE.Admin.Manager.World.PartiesTitle', 'World Parties');
+    if (currentView === 'world-downtime')
+      return text('FABRICATE.Admin.Manager.World.Downtime.Title', 'Downtime');
     if (currentView === 'environments' && displayedGatheringTab === 'travel') {
       if (activeTravelTab === 'map')
         return text('FABRICATE.Admin.Manager.Travel.MapLinksTitle', 'Map Region Links');
@@ -3094,6 +3110,11 @@
         .replace('{assigned}', String(assignedCharacterCount))
         .replace('{total}', String(playerCharacterUuids.size));
     }
+    if (currentView === 'world-downtime')
+      return text(
+        'FABRICATE.Admin.Manager.World.Downtime.Subtitle',
+        'Preview campaign downtime workflows or open an installed companion extension.'
+      );
     if (currentView === 'environments' && displayedGatheringTab === 'travel') {
       if (activeTravelTab === 'map')
         return text(
@@ -3186,6 +3207,8 @@
       return text('FABRICATE.Admin.Manager.Environment.Tasks.Actions', 'Gathering task actions');
     if (currentView === 'world')
       return text('FABRICATE.Admin.Manager.World.PartiesActions', 'World party actions');
+    if (currentView === 'world-downtime')
+      return text('FABRICATE.Admin.Manager.World.Downtime.Actions', 'Downtime actions');
     if (currentView === 'environments' && displayedGatheringTab === 'travel')
       return activeTravelTab === 'map'
         ? text('FABRICATE.Admin.Manager.Travel.MapLinksActions', 'Map region link actions')
@@ -3476,7 +3499,7 @@
   // `nextRouteId` is the identity of the SUBJECT the caller is navigating to, for the
   // routes whose view token does not change when the subject does. Only the essence guard
   // reads it today; every other caller keeps its one-argument shape.
-  function confirmRouteExit(nextView, nextRouteId = '') {
+  function confirmRouteExitGuards(nextView, nextRouteId = '') {
     const environmentConfirmed = confirmEnvironmentRouteExit(nextView);
     if (isPromise(environmentConfirmed)) {
       return environmentConfirmed.then((value) => {
@@ -3499,6 +3522,23 @@
     }
     if (essenceResult === false) return false;
     return continueRouteExitAfterEssence(nextView);
+  }
+
+  function confirmRouteExit(nextView, nextRouteId = '') {
+    const result = confirmRouteExitGuards(nextView, nextRouteId);
+    const disposeDowntime = () => {
+      if (activeView === 'world-downtime' && nextView !== 'world-downtime') {
+        downtimeExtensionHost?.disposeBeforeRemoval?.();
+      }
+    };
+    if (isPromise(result)) {
+      return result.then((value) => {
+        if (value !== false) disposeDowntime();
+        return value;
+      });
+    }
+    if (result !== false) disposeDowntime();
+    return result;
   }
 
   function continueRouteExitAfterEssence(nextView) {
@@ -5866,6 +5906,12 @@
     });
   }
 
+  function openWorldDowntime() {
+    return afterTruthyResult(confirmRouteExit('world-downtime'), () => {
+      activeView = 'world-downtime';
+    });
+  }
+
   function openSystemTravelDestination(destination = 'realms') {
     if (!canShowSystemTravel || !['realms', 'map'].includes(destination)) return;
     return afterTruthyResult(confirmRouteExit('environments'), () => {
@@ -6905,11 +6951,19 @@
           <button type="button" onclick={() => selectSystemAndShowBrowser()}
             >{text('FABRICATE.Admin.Manager.Nav.Systems', 'Crafting Systems')}</button
           >
-          {#if selectedSystem && currentView !== 'systems'}
+          {#if selectedSystem && currentView !== 'systems' && !isWorldRoute && !isWorldDowntimeRoute}
             <i class="fas fa-chevron-right" aria-hidden="true"></i>
             <button type="button" onclick={() => editSystem(selectedSystem.id)}
               >{selectedSystem.name}</button
             >
+          {/if}
+          {#if isWorldRoute || isWorldDowntimeRoute}
+            <i class="fas fa-chevron-right" aria-hidden="true"></i>
+            <span>{text('FABRICATE.Admin.Manager.World.Heading', 'World')}</span>
+            {#if isWorldDowntimeRoute}
+              <i class="fas fa-chevron-right" aria-hidden="true"></i>
+              <span>{text('FABRICATE.Admin.Manager.World.Downtime.Title', 'Downtime')}</span>
+            {/if}
           {/if}
           {#if currentView === 'recipes'}
             <i class="fas fa-chevron-right" aria-hidden="true"></i>
@@ -7157,7 +7211,7 @@
           </div>
         {/if}
       </div>
-      {#if currentView !== 'tools' && currentView !== 'tool-edit'}
+      {#if currentView !== 'tools' && currentView !== 'tool-edit' && currentView !== 'world-downtime'}
         <div class="manager-header-actions" aria-label={headerActionsLabel()}>
           {#if currentView === 'recipes'}
             <button
@@ -8168,11 +8222,41 @@
             </span>
             <span class="manager-nav-count">{travelParties.length}</span>
           </button>
+          <button
+            type="button"
+            class={`manager-nav-button manager-world-nav-item ${isWorldDowntimeRoute ? 'is-active' : ''}`}
+            id="manager-world-nav-downtime"
+            data-world-nav-item="downtime"
+            aria-label={text('FABRICATE.Admin.Manager.World.Downtime.Nav', 'Downtime')}
+            aria-current={isWorldDowntimeRoute ? 'page' : undefined}
+            onclick={openWorldDowntime}
+          >
+            <i class="fas fa-hourglass-half" aria-hidden="true"></i>
+            <span class="manager-nav-label">
+              {text('FABRICATE.Admin.Manager.World.Downtime.Nav', 'Downtime')}
+            </span>
+            <span
+              class="manager-nav-count"
+              aria-label={text('FABRICATE.Admin.Manager.World.Downtime.Premium', 'Premium')}
+              ><i class="fas fa-crown" aria-hidden="true"></i></span
+            >
+          </button>
         </section>
       </nav>
     </aside>
 
-    {#if currentView === 'environments' || currentView === 'world'}
+    {#if currentView === 'world-downtime'}
+      <main
+        class="manager-main"
+        aria-label={text('FABRICATE.Admin.Manager.World.Downtime.Title', 'Downtime')}
+      >
+        <WorldDowntimeExtensionHost
+          bind:this={downtimeExtensionHost}
+          {managerExtensions}
+          context={worldDowntimeContext}
+        />
+      </main>
+    {:else if currentView === 'environments' || currentView === 'world'}
       <EnvironmentsBrowserView
         environments={environmentList}
         environmentsLoading={$viewState.environmentsLoading}
@@ -8822,7 +8906,7 @@
          `knowledge` joined it in issue 785 for the opposite reason: the surface OWNS
          its third column (roster · detail), so a fourth would clip the detail pane's
          action cluster at the 1024px minimum with no scrollbar. -->
-    {#if currentView !== 'environment-edit' && !isChecksRoute && currentView !== 'system-edit' && currentView !== 'crafting-settings' && currentView !== 'recipe-item-edit' && currentView !== 'component-edit' && currentView !== 'recipe-edit' && currentView !== 'tool-edit' && currentView !== 'knowledge' && !isWorldPartiesRoute}
+    {#if currentView !== 'environment-edit' && !isChecksRoute && currentView !== 'system-edit' && currentView !== 'crafting-settings' && currentView !== 'recipe-item-edit' && currentView !== 'component-edit' && currentView !== 'recipe-edit' && currentView !== 'tool-edit' && currentView !== 'knowledge' && !isWorldPartiesRoute && !isWorldDowntimeRoute}
       <aside
         class="manager-inspector"
         aria-label={isSystemTravelRoute

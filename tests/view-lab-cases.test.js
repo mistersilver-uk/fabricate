@@ -1062,6 +1062,92 @@ test('the World Parties fixture is legal, and its search and pager cases claim w
   assert.match(worldSource, /noParties\s*\n?\s*\? \[\]/);
 });
 
+test('World Downtime publishes four tabs plus narrow/collapsed frames with generic browser assertions', () => {
+  const cases = VIEW_LAB_CASES.filter((entry) => entry.id.startsWith('manager-world-downtime-'));
+  assert.deepEqual(
+    cases.map((entry) => entry.id),
+    [
+      'manager-world-downtime-tracking',
+      'manager-world-downtime-activities',
+      'manager-world-downtime-factions',
+      'manager-world-downtime-settings',
+      'manager-world-downtime-narrow',
+      'manager-world-downtime-collapsed',
+    ]
+  );
+  for (const viewCase of cases) {
+    assert.equal(viewCase.expectView, 'world-downtime');
+    assert.ok(viewCase.expectNoHorizontalOverflow);
+    assert.ok(viewCase.expectOverflowY);
+    assert.ok(viewCase.expectScrollable, `${viewCase.id} proves the panel really scrolls`);
+    assert.ok(viewCase.expectVisible, `${viewCase.id} proves its keyboard tooltip is visible`);
+    assert.equal(viewCase.expectContained.length, 2, `${viewCase.id} checks both World rail icons`);
+    assert.equal(
+      viewCase.expectCenterHit,
+      '.downtime-preview:not([hidden]) .downtime-cta',
+      `${viewCase.id} checks the CTA pointer target`
+    );
+    assert.equal(
+      viewCase.expectClick,
+      '.downtime-preview:not([hidden]) .downtime-cta',
+      `${viewCase.id} checks the CTA accepts a real pointer click`
+    );
+  }
+  const normal = cases.slice(0, 4);
+  for (const viewCase of normal) {
+    assert.ok(
+      ['tracking', 'activities', 'factions', 'settings'].every((tabId) =>
+        viewCase.expectAttributes.some(
+          (entry) =>
+            entry.selector === `[data-downtime-tab="${tabId}"]` &&
+            entry.name === 'aria-controls' &&
+            entry.value === `world-downtime-panel-${tabId}`
+        )
+      ),
+      `${viewCase.id} proves all four tab/panel IDREFs`
+    );
+  }
+  const narrow = cases.find((entry) => entry.id.endsWith('-narrow'));
+  assert.deepEqual(narrow.expectNoHorizontalOverflow, [
+    '[data-world-downtime-host]',
+    '.manager-main',
+    '.manager-body',
+    '.fabricate-manager',
+  ]);
+  assert.deepEqual(narrow.position, { width: 960, height: 900 });
+  assert.match(
+    narrow.expectAttributes.find((entry) => entry.name === 'aria-label').value,
+    /campaign-wide tracking and pending decisions/i
+  );
+  const driver = readFileSync(resolve(ROOT, 'scripts/view-lab-screenshots.mjs'), 'utf8');
+  for (const contract of [
+    'expectAttributes: viewCase.expectAttributes ?? []',
+    'expectVisible: viewCase.expectVisible ?? null',
+    'expectContained: viewCase.expectContained ?? []',
+    'expectCenterHit: viewCase.expectCenterHit ?? null',
+    'expectClick: viewCase.expectClick ?? null',
+    'expectNoHorizontalOverflow: viewCase.expectNoHorizontalOverflow ?? null',
+    'expectOverflowY: viewCase.expectOverflowY ?? null',
+    'expectScrollable: viewCase.expectScrollable ?? null',
+  ]) {
+    assert.ok(driver.includes(contract), `capture runner should thread ${contract}`);
+  }
+  assert.match(driver, /await clickTarget\.click\(\)/, 'expectClick uses Playwright pointer input');
+  assert.doesNotMatch(
+    driver,
+    /element\.click\(\);\s*return count === 1/,
+    'expectClick does not fall back to a synthetic DOM click'
+  );
+
+  const mountSource = readFileSync(resolve(ROOT, 'tests/view-lab/mount.js'), 'utf8');
+  assert.match(mountSource, /applyLongDowntimeLocalization\(world\)/);
+  assert.doesNotMatch(
+    mountSource,
+    /longDowntimeLabels[\s\S]{0,900}registerWorldNavProvider/,
+    'long-copy evidence keeps the real Core fallback provider active'
+  );
+});
+
 test('system Travel Map evidence is populated and long-label focus cannot duplicate stacked', () => {
   const normal = getCaseById('manager-system-travel-map-normal');
   const stacked = getCaseById('manager-system-travel-map-stacked');
