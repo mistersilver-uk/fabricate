@@ -803,6 +803,21 @@ test('the no-selection World Parties case clears selection through the real Mana
   assert.match(mountSource, /if \(params\.clearSystem\) await props\.store\.selectSystem\(''\)/);
 });
 
+test('the narrow World Parties case reuses the normal populated state below the stack breakpoint', () => {
+  const normal = getCaseById('manager-world-parties-normal');
+  const narrow = getCaseById('manager-world-parties-stacked');
+
+  assert.ok(narrow, 'the responsive Parties layout needs registered screenshot evidence');
+  assert.deepEqual(narrow.position, { width: 1100, height: 900 });
+  assert.deepEqual(narrow.query, normal.query);
+  assert.deepEqual(narrow.steps, normal.steps);
+  assert.equal(narrow.expectView, normal.expectView);
+  assert.equal(narrow.expectSelector, normal.expectSelector);
+  assert.deepEqual(narrow.smokeLabels, []);
+  assert.equal(narrow.reaches, 'beyond');
+  assert.ok(narrow.kinds.includes('responsive'));
+});
+
 test('the World Parties fixture is legal, and its search and pager cases claim what it seeds', () => {
   const worldSource = readFileSync(resolve(ROOT, 'tests/view-lab/world/labWorld.js'), 'utf8');
   const actorSource = readFileSync(resolve(ROOT, 'tests/view-lab/world/labActors.js'), 'utf8');

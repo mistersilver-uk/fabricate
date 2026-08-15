@@ -3281,6 +3281,27 @@ export const VIEW_LAB_CASES = Object.freeze([
     ],
   }),
   managerCase({
+    id: 'manager-world-parties-stacked',
+    label: 'Manager — World Parties stacked',
+    // Same populated state as the normal frame, pinned inside the manager's 1120px responsive
+    // breakpoint so the full-width Parties route is photographed after the shell restacks.
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { system: 'lab-smithing' },
+    steps: [{ selector: '#manager-world-nav-parties', press: 'Enter' }],
+    expectView: 'world',
+    expectSelector: '[data-travel-panel="parties"]',
+    position: { width: 1100, height: 900 },
+    kinds: ['manager', 'environments', 'world', 'responsive'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/CraftingSystemManagerRoot\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/Environment/,
+      /^src\/ui\/svelte\/apps\/manager\/Gathering(MapLinksTab|PartiesTab|RealmsTab)/,
+      /^src\/ui\/svelte\/apps\/manager\/(Party|Realm|RosterRow|MapRegionLinkPicker)/,
+      /^styles\/fabricate\.css$/,
+    ],
+  }),
+  managerCase({
     id: 'manager-world-parties-no-selection',
     label: 'Manager — World Parties with no crafting system selected',
     // The live smoke always has systems and normalizes an empty selection to the first one. This
