@@ -178,7 +178,9 @@ Every manager "nothing here" message renders through one shared no-state primiti
 - The `filtered` treatment is the filtered-to-nothing case, which is not an absence of content: it deliberately omits the icon and title apparatus and states the miss in one sentence beside its way out.
 
 Trailing content inside the panel — a Clear-filters control, a primary CTA, or a docs link — is part of the primitive, because a no-state message that offers no way out is a dead end.
-An inline value slot is NOT a no-state message: text standing where a value would be inside a control row (an unassigned travel actor beside its clear button and picker) stays an inline hint, since a dashed panel inside a control row is a layout defect rather than reuse.
+An inline value slot is NOT a no-state message: text standing where a value would be inside a control row — a picker trigger reading `Auto` where a chosen realm would stand — stays an inline hint, since a dashed panel inside a control row is a layout defect rather than reuse.
+Falling outside this exemption returns an element to the rule above rather than licensing a bespoke panel of its own.
+World Parties' unassigned travel actor is the worked example: it is a panel occupying its own column above a picker of its own, not text inside a control row, so it renders through the `compact` treatment.
 A single per-screen size override of the shared panel is a second empty-state design and is forbidden; every no-state message shares one tile and type scale.
 
 #### Modal dialogs
@@ -1642,7 +1644,8 @@ Shipped capabilities:
   Delete is destructive and routes through the confirm dialog with referenced-by evidence (a deliberate change from the prior immediate-delete quick list).
 - This realm authoring is the source of the realms an environment can be assigned to via its `includedRealmIds` multi-select; the multi-realm data is authored here, not in the environments browser.
   The legacy environments-browser "Region" filter has been removed.
-- Validation lives in the party store; the view surfaces store validation errors inline next to the relevant control using the Manager's `aria-invalid`/`aria-describedby` pattern.
+- Validation lives in the party store; the view surfaces store validation errors inline next to the relevant control, associated with that control by `aria-describedby` and announced through `role="alert"`.
+  `aria-invalid` rides along only where the associated control is a form field whose role supports it; a party card anchors its errors on a member list, an add-member group and the travel-actor button, none of which is a form field, so the alert role carries the announcement there.
   Actor pickers follow the accessible semantics established by `ActorSelectTopBar`.
 - The retained Parties, Realms, and Map Region Links content renders as labelled regions connected
   to the corresponding World Parties or selected-system Travel destination.
