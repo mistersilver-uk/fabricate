@@ -89,6 +89,12 @@
                    it with a danger "Unlink {name}" affordance that is not one of the
                    choices. Authored in the CALLING component, so their scoped styles
                    belong to the caller even though this component renders them.
+                   `header` is rendered with `(matched, total)` — the length of the
+                   FILTERED list and of the whole option list. It has to be: the search
+                   term lives in this component's own state, so a caller counting its own
+                   `options` array computes a number that can never change while the list
+                   below it shrinks on every keystroke. A header snippet declaring no
+                   parameters is unaffected.
     maxHeight    — OPTIONAL px cap clamped against the computed layout height (0 = the
                    layout's own value). A picker anchored in a narrow column wants a
                    shorter panel than the viewport would allow.
@@ -103,6 +109,7 @@
     onChoose(id) — called with the chosen option id
 -->
 <script>
+  import { tick } from 'svelte';
   import Chip from './Chip.svelte';
   import EmptyState from './EmptyState.svelte';
   import { dismissOnOutsideClick } from '../../actions/dismissOnOutsideClick.js';
@@ -184,15 +191,36 @@
   });
   const isGrouped = $derived(groupedOptions.length > 0);
 
+  // Focus restoration waits for `tick()`, NOT a bare microtask. In `inlineSearchTrigger`
+  // mode the trigger is UNMOUNTED while open, so `bind:this` has already nulled
+  // `triggerButton` when `close()` runs: the element focus must return to does not exist
+  // yet, and the restore is only correct once Svelte has remounted it. A `queueMicrotask`
+  // callback lands on a null reference and silently does nothing unless Svelte's own flush
+  // happens to have been scheduled first — true today, but an internal ordering of the
+  // framework's batching that this primitive must not depend on. `tick()` states the
+  // requirement instead of relying on it. The `querySelector` fallback covers a trigger
+  // shape that is not the bound element. Shared by all 19 consumers, so it is not branched
+  // on the mode.
+  function restoreTriggerFocus() {
+    tick().then(() => {
+      const target = triggerButton ?? pickerRoot?.querySelector?.('button');
+      if (target?.isConnected !== false) target?.focus?.();
+    });
+  }
+
   function close({ restoreFocus = true } = {}) {
     open = false;
     search = '';
-    if (restoreFocus) {
-      queueMicrotask(() => {
-        if (triggerButton?.isConnected !== false) triggerButton?.focus?.();
-      });
-    }
+    if (restoreFocus) restoreTriggerFocus();
   }
+
+  // ESCAPE, in every mode including `inlineSearchTrigger`, is handled by
+  // `dismissOnOutsideClick` on the picker root below: that action registers a
+  // DOCUMENT-level capture-phase keydown while `enabled` (`dismissOnOutsideClick.js:47-56`),
+  // so it does not depend on the key reaching the portaled dialog's own handler — which the
+  // inline search field, a sibling of the trigger and in a different subtree from the
+  // portaled panel, never would. A second handler on the inline field would close an
+  // already-closed picker and restore focus twice.
 
   function toggle(event) {
     event.stopPropagation();
@@ -450,7 +478,7 @@
         </button>
       {/snippet}
 
-      {#if header}{@render header()}{/if}
+      {#if header}{@render header(filteredOptions.length, options.length)}{/if}
 
       <div
         class="manager-travel-popover-options"

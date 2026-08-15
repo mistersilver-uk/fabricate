@@ -27,7 +27,11 @@
 
   Store validation errors are CARD-SCOPED: the pane records which card issued the
   failing mutation and passes the duplicate-member message down here for the member
-  list and the duplicate-travel-actor message for the travel-actor panel.
+  list and the duplicate-travel-actor message for the travel-actor panel. The
+  duplicate-member message is associated with THREE anchors, because no one of them is
+  present in every state a rejected add can leave behind: the member `<ul>` (members
+  only), the add-open button (panel closed only) and the open add panel itself — which is
+  the only one on screen when a zero-member party's add is rejected.
 -->
 <script>
   import EmptyState from './EmptyState.svelte';
@@ -232,7 +236,13 @@
         {:else}
           <span>{travelActorFragment}</span>
         {/if}
-        {#if disabledSuffix}<span>{disabledSuffix}</span>{/if}
+        <!-- The suffix is SUPPRESSED while the gate is closed. `enableGated` implies
+             `enabled !== true`, so a gated card would otherwise carry both strings — about
+             103 characters into a `nowrap` ellipsised slot of roughly 550px at full card
+             width — and the first thing the ellipsis eats is the suffix. The gate hint
+             states the precondition, the suffix states the consequence, and "Disabled" is
+             already on the pill two elements away. -->
+        {#if disabledSuffix && !enableGated}<span>{disabledSuffix}</span>{/if}
       </div>
     </div>
 
@@ -314,6 +324,7 @@
           {memberUuids}
           {otherPartyNameByUuid}
           {saving}
+          describedById={memberErrorId}
           onAdd={addMember}
           onClose={() => (adding = false)}
         />

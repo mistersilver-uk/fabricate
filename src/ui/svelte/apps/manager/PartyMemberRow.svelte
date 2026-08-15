@@ -13,6 +13,15 @@
   empty line. Fabricate's actor projection carries no class or level, so the
   prototype's "Wizard 6" has no equivalent here.
 
+  DELIBERATE NON-REUSE of `Medallion`: it is a BORDERED `--fab-bg-3` tile at radius 9
+  carrying an accent glyph, and none of this pane's three tiles is that — the card head's
+  is unbordered on `--fab-bg-0` (`tpl:1469`), this member tile is radius 7 with a MUTED
+  glyph (`tpl:1482`), and the travel-actor portrait sits on `--fab-surface-soft` mirroring
+  `EmptyState`'s compact tile. Routing them through it would mean parameterising away the
+  border, the fill, the radius and the glyph tone — everything the primitive asserts —
+  across every one of its shipped call sites, to reach three tiles that would then share
+  nothing but a `<span>`.
+
   Props:
    - member: a projected member card `{ uuid, name, img, stale }`.
    - isTravelActor: this member is also the party's travel actor.
@@ -159,7 +168,10 @@
             disabled={saving}
             onclick={() => onMove(target.id, member.uuid)}
           >
-            <i class="fas fa-people-group" aria-hidden="true"></i>
+            <!-- `fa-users`, as every other party glyph in this pane is: the card head's
+                 icon tile and the pane's own empty state both use it, and a move target
+                 IS a party. -->
+            <i class="fas fa-users" aria-hidden="true"></i>
             <span class="manager-party-move-target-name">{target.name}</span>
             <span class="manager-party-move-target-meta">{targetMeta(target)}</span>
           </button>

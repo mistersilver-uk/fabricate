@@ -16,8 +16,10 @@
      while the dashed border lives inside the primitive's scoped style.
   2. The LINKED state mirrors the compact metrics (32px tile at radius 9, the same
      padding, gap and type) rather than the prototype's 38px tile, or linking an actor
-     visibly shrinks the panel and swaps tile sizes in the same slot. The `min-height`
-     hangs on the wrapper, the slot both states occupy.
+     visibly shrinks the panel and swaps tile sizes in the same slot. The `min-height`,
+     the prototype's `--fab-bg-1` fill and its radius all hang on the WRAPPER — the slot
+     both states occupy — so the linked tile is filled as the prototype draws it without
+     any of it reaching `EmptyState`'s chrome or its no-fill contract.
   3. The picker's candidate set is EVERY world actor, not only player characters — a
      travel actor is frequently a group token, vehicle or NPC. Its per-option meta says
      where that actor already stands ("Travel actor for X" / "In X"), which surfaces the
@@ -94,11 +96,18 @@
         )
   );
 
-  const pickerCountLabel = $derived(
-    text('FABRICATE.Admin.Manager.World.Parties.TravelActor.PickerCount', '{matched} of {total}')
-      .replace('{matched}', String(pickerOptions.length))
-      .replace('{total}', String(actorOptions.length))
-  );
+  // Both numbers come from the POPOVER, which owns the search term: `pickerOptions` is a
+  // 1:1 map over `actorOptions`, so a count derived from either array here is the same
+  // number by construction and the header would read "4 of 4" while the list below it
+  // showed one row.
+  function pickerCountLabel(matched, total) {
+    return text(
+      'FABRICATE.Admin.Manager.World.Parties.TravelActor.PickerCount',
+      '{matched} of {total}'
+    )
+      .replace('{matched}', String(matched))
+      .replace('{total}', String(total));
+  }
 
   const unlinkLabel = $derived(
     text('FABRICATE.Admin.Manager.World.Parties.TravelActor.Unlink', 'Unlink {name}').replace(
@@ -226,12 +235,13 @@
         emptyHint={pickerEmptyHint}
         onChoose={(uuid) => onSet(party.id, uuid)}
       >
-        {#snippet header()}
+        {#snippet header(matched, total)}
           <div class="manager-party-actor-popover-head">
             <span class="manager-party-actor-popover-eyebrow">
               {text('FABRICATE.Admin.Manager.World.Parties.TravelActor.PickerEyebrow', 'Actors')}
             </span>
-            <span class="manager-party-actor-popover-count">{pickerCountLabel}</span>
+            <span class="manager-party-actor-popover-count">{pickerCountLabel(matched, total)}</span
+            >
           </div>
         {/snippet}
         {#snippet footer()}
@@ -240,6 +250,7 @@
               type="button"
               class="manager-party-actor-unlink-footer"
               data-manager-party-actor-unlink-footer
+              disabled={saving}
               onclick={unlink}
             >
               <i class="fas fa-link-slash" aria-hidden="true"></i>
@@ -290,11 +301,24 @@
 
   /* The slot BOTH tile states occupy, so the panel does not resize on link/unlink.
      `height: auto` and the padding/border reset are what stop Foundry's fixed button
-     height from cropping the wrapped `EmptyState`. */
+     height from cropping the wrapped `EmptyState`.
+
+     The FILL and the radius are the prototype's tile, measured like-for-like against its
+     LINKED state, and they hang here rather than on `.is-linked` for two reasons: the
+     wrapper is the slot, and `EmptyState`'s own chrome — its dashed border, its geometry
+     and its no-fill contract — stays untouched, which Deviation 9 requires of the
+     unlinked state.
+
+     `align-items: stretch` is load-bearing, not tidiness. `.manager-empty` is a
+     shrink-to-fit grid child, so under `center` a shorter localized string narrows the
+     dashed panel inside a full-width button — and the `is-drop-active` ring, which lives
+     on the BUTTON, then rings a wider box than the panel it is meant to outline. The
+     linked state puts `center` back below, because its children are a fixed 32px tile
+     over centred text rather than one full-width panel. */
   .manager-party-actor-tile {
     display: flex;
     flex-direction: column;
-    align-items: center;
+    align-items: stretch;
     justify-content: center;
     gap: var(--fab-space-chip);
     width: 100%;
@@ -302,7 +326,8 @@
     min-height: 96px;
     padding: 0;
     border: 0;
-    background: none;
+    border-radius: 12px;
+    background: var(--fab-bg-1);
     text-align: inherit;
   }
 
@@ -311,9 +336,9 @@
      linking an actor does not visibly shrink the panel. */
   .manager-party-actor-tile.is-linked {
     box-sizing: border-box;
+    align-items: center;
     padding: var(--fab-space-4) var(--fab-space-3);
     border: 1.5px dashed var(--fab-accent-border);
-    border-radius: 12px;
   }
 
   /* `.manager-party-actor-tile.is-drop-active` lives in `styles/fabricate.css`, not
@@ -322,6 +347,12 @@
      warning — which fails `scripts/check-svelte-warnings.mjs` AND silently deletes the
      affordance. */
 
+  /* HAND-MAINTAINED COPY of `EmptyState.svelte:180-185`'s compact tile (32px at radius 9),
+     because the linked state renders an actor rather than a no-state message and so cannot
+     reach that scoped block. The two are the two halves of ONE slot: an edit to the
+     primitive's compact tile that is not mirrored here makes the panel change size on
+     link/unlink, which is the whole defect the mirroring exists to prevent. The font-size
+     and colour are this file's own — the primitive's glyph rule is not a portrait frame. */
   .manager-party-actor-portrait {
     display: inline-flex;
     align-items: center;

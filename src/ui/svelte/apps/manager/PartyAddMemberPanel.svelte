@@ -13,8 +13,12 @@
 
   Membership comes from the projected `isPlayerCharacter` flag the manager app
   computes from the GM-configured actor types, tested STRICTLY (`=== true`): a
-  `!== false` test would admit every NPC in a world whose projection ever regressed,
-  pass every fixture, and trip no gate.
+  `!== false` test would admit every NPC in a world whose projection ever regressed.
+  Only ONE fixture shape can tell the two predicates apart — an actor carrying no
+  `isPlayerCharacter` KEY, which `=== true` rejects and `!== false` admits — so the
+  candidate-annotation test in `tests/components/party-expanded-body.test.js` keeps an
+  unprojected actor in its actor list for exactly that purpose (issue 1024). Every
+  `isPlayerCharacter: false` fixture is excluded by both and guards nothing.
 
   Choosing a candidate who already belongs to another party is the MOVE path — the
   store confirms and moves rather than adding a second membership, because an actor
@@ -29,6 +33,12 @@
     memberUuids = [],
     otherPartyNameByUuid = {},
     saving = false,
+    // The id of the card's duplicate-member error, when one is live. It lands on this
+    // panel's `role="group"` root because THIS panel is what a rejected add leaves on
+    // screen: the card's other two anchors — the member `<ul>` and the closed-panel add
+    // button — are each absent in exactly that state on a zero-member party, which would
+    // orphan the message the add attempt produced.
+    describedById = '',
     onAdd = () => {},
     onClose = () => {},
   } = $props();
@@ -102,6 +112,7 @@
     'FABRICATE.Admin.Manager.World.Parties.Members.AddPanelLabel',
     'Add a member to {name}'
   ).replace('{name}', partyName)}
+  aria-describedby={describedById || undefined}
 >
   <div class="manager-party-add-search">
     <i class="fas fa-magnifying-glass" aria-hidden="true"></i>
@@ -132,13 +143,13 @@
         disabled={saving}
         onclick={() => onAdd(actor.uuid)}
       >
-        {#if actor.img}
-          <span class="manager-party-add-portrait" aria-hidden="true"
-            ><img src={actor.img} alt="" /></span
-          >
-        {:else}
-          <i class="fas fa-user" aria-hidden="true"></i>
-        {/if}
+        <!-- ONE fixed tile holding EITHER the portrait or the fallback glyph, which is
+             `PartyMemberRow.svelte:117-119`'s shape. Rendered as two SIBLING leading
+             elements of different widths (a 20px span, a 14px `<i>`) the candidate names
+             in a mixed portrait set start at two different indents down one list. -->
+        <span class="manager-party-add-portrait" aria-hidden="true">
+          {#if actor.img}<img src={actor.img} alt="" />{:else}<i class="fas fa-user"></i>{/if}
+        </span>
         <span class="manager-party-add-copy">
           <span class="manager-party-add-name">{actor.name}</span>
           <span class="manager-party-add-meta">{candidateMeta(actor)}</span>
@@ -230,19 +241,19 @@
     background: var(--fab-surface-soft);
   }
 
-  .manager-party-add-candidate > i {
-    flex: 0 0 auto;
-    width: 14px;
-    color: var(--fab-text-muted);
-    font-size: 11px;
-  }
-
+  /* The tile is the row's ONLY leading element, portrait or not, so every candidate name
+     starts at the same indent. It carries no fill: the fallback glyph is framed by the
+     row, which already has one. */
   .manager-party-add-portrait {
     display: inline-flex;
     flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
     width: 20px;
     height: 20px;
     border-radius: 6px;
+    color: var(--fab-text-muted);
+    font-size: 10px;
     overflow: hidden;
   }
 
@@ -279,10 +290,10 @@
     white-space: nowrap;
   }
 
-  /* Written as a descendant of the row so it outranks the leading-glyph rule above,
-     which also matches this element as a direct `i` child. */
-  .manager-party-add-candidate > i.manager-party-add-plus {
-    width: auto;
+  /* The row's one direct `<i>` child, now that the leading glyph lives inside the portrait
+     tile — so this needs no specificity workaround to outrank a leading-glyph rule. */
+  .manager-party-add-plus {
+    flex: 0 0 auto;
     color: var(--fab-text-subtle);
     font-size: 9px;
   }

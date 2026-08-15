@@ -321,17 +321,22 @@
           </div>
         {/each}
       </div>
-    {/if}
 
-    <Pagination
-      persistent={true}
-      totalCount={filteredParties.length}
-      {pageSize}
-      {pageIndex}
-      pageSizeOptions={PAGE_SIZE_OPTIONS}
-      onPageChange={goToPage}
-      onPageSizeChange={changePageSize}
-    />
+      <!-- INSIDE the matched branch. `persistent` is what draws the bar for a single
+           short page (`tpl:2545`, `pager: { show: matched.length > 0 }`) — but the same
+           authority hides it when nothing matched, and outside this branch it drew
+           "Showing 0–0 of 0 · Page 1 of 1" under the no-match panel, which is also the
+           opposite of what the zero-parties state above does. -->
+      <Pagination
+        persistent={true}
+        totalCount={filteredParties.length}
+        {pageSize}
+        {pageIndex}
+        pageSizeOptions={PAGE_SIZE_OPTIONS}
+        onPageChange={goToPage}
+        onPageSizeChange={changePageSize}
+      />
+    {/if}
   {/if}
 </div>
 
