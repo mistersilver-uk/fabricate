@@ -2236,8 +2236,14 @@ and the browse half is the one that scales with the corpus.
   It carries exact craftability derived from live actor inventory, so it MUST be discarded
   whenever the listing is refetched — which the app does on mount, on an actor change, after
   a craft, on a scene change, on a world-time tick and on a relevant inventory mutation.
-- **Changing search, a filter or the page does not hydrate anything.**
-  Those are pure reads over the summary rows.
+- **Changing search, a filter or the page never re-hydrates an explicit selection.**
+  Those are pure reads over the summary rows, and hydration is memoised per recipe for the
+  life of the read pass, so a filter cannot re-hydrate a recipe already hydrated in it.
+  The one exception is the no-selection fallback: with nothing explicitly selected the app
+  shows the first visible row, and a filter that moves which row that is hydrates the new
+  one — once, and only when the fallback row actually changes.
+  That is bounded by the number of distinct rows a player's typing lands on, not by the
+  corpus, and it is the cost of showing the top result rather than an empty inspector.
 - **The row and the inspector may disagree about materials, and only in one direction.**
   The row's optimistic verdict can read "available" where exact evaluation refuses, because
   contended requirements are counted for every set that draws on them.
