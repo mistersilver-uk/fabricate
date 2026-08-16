@@ -133,6 +133,63 @@ function twoSystemWorld() {
 const storedSystems = (env) => env.settings.get(SETTING_KEYS.CRAFTING_SYSTEMS);
 const storedRecipes = (env) => env.settings.get(SETTING_KEYS.RECIPES);
 
+/**
+ * The persisted corpus with ONE record rewritten, exactly as another client's save leaves it.
+ *
+ * Hoisted rather than repeated per test: every narrowing test below is "edit one record,
+ * reload, assert the other one is untouched", and a copied `map`-with-a-ternary block in each
+ * is both noise and new duplicated lines the SonarCloud gate counts against `tests/**`.
+ */
+const withSystem = (env, systemId, rewrite) =>
+  storedSystems(env).map((system) => (system.id === systemId ? rewrite(system) : system));
+const withRecipe = (env, recipeId, rewrite) =>
+  storedRecipes(env).map((recipe) => (recipe.id === recipeId ? rewrite(recipe) : recipe));
+
+/**
+ * Both narrow scopes plus the domain scope, read in one go.
+ *
+ * The assertion every narrowing test makes is a COMPARISON of the two systems' tokens across
+ * one reload, so capturing them singly is what the helper exists to prevent.
+ */
+const systemTokens = (systemManager) => ({
+  a: systemManager.revision(REVISION_SCOPES.system(SYS_A)),
+  b: systemManager.revision(REVISION_SCOPES.system(SYS_B)),
+  domain: systemManager.revision(REVISION_SCOPES.systems),
+});
+const recipeTokens = (recipeManager) => ({
+  a: recipeManager.revision(REVISION_SCOPES.recipesOfSystem(SYS_A)),
+  b: recipeManager.revision(REVISION_SCOPES.recipesOfSystem(SYS_B)),
+  domain: recipeManager.revision(REVISION_SCOPES.recipes),
+});
+
+/**
+ * Publish one compendium pack of Item documents on the CURRENT `game`.
+ *
+ * `installFoundryEnv` deliberately owns no pack list, and each `remoteClient()` reinstalls
+ * `game` wholesale, so this attaches to the world the calling test just built and is torn
+ * down with it.
+ *
+ * @param {string} packId
+ * @param {object[]} documents
+ * @returns {void}
+ */
+function installPack(packId, documents) {
+  const packs = new Map([[packId, { getDocuments: async () => documents }]]);
+  globalThis.game.packs = { get: (id) => packs.get(id) ?? null };
+}
+
+/**
+ * A repository seam whose replicated snapshot a test can WITHDRAW between two reloads,
+ * standing in for a document-backed adapter that has none.
+ *
+ * @param {object[]} records
+ * @returns {{snapshot: object[]|null, readReplicatedSnapshot: () => object[]|null}}
+ */
+function withdrawableSnapshot(records) {
+  const seam = { snapshot: records, readReplicatedSnapshot: () => seam.snapshot };
+  return seam;
+}
+
 /** How many full signature audits have been compiled since the last reset. */
 const audits = () => readSignatureCounters().reportBuilds;
 
@@ -199,6 +256,40 @@ describe('issue 1078 — a no-op remote reload no longer defeats the shipped gua
     );
   });
 
+  it('holds every identity across a reload from the shape a SAVE actually persists', async () => {
+    // Every other test in this file seeds the LEGACY `items` shape and reloads from that, so
+    // without this one the suite never exercises the steady state a real world sits in: the
+    // corpus a `save()` wrote, re-read by the very next `updateSetting` hook. Both hydrators
+    // have to be idempotent for the optimisation to hold there, and nothing else asserts it —
+    // a non-idempotent normalizer would turn every reload on every client back into a full
+    // rebuild with the whole suite green.
+    const { systemManager, recipeManager, env } = twoSystemWorld();
+    await systemManager.save();
+    await recipeManager.save();
+    assert.ok(
+      !Object.hasOwn(storedSystems(env)[0], 'items'),
+      'the premise: the save really did rewrite storage out of the legacy shape, so a green ' +
+        'run here is not just the fixture shape passing twice'
+    );
+    const systemRecord = systemManager.getSystem(SYS_A);
+    const components = systemRecord.components;
+    const index = getDefinitionIndex(components);
+    const recipeMap = recipeManager.recipes;
+    const recipe = recipeManager.getRecipe('r-a1');
+
+    assert.equal(systemManager.reload(), false, 'the persisted steady state is not a change');
+    assert.equal(recipeManager.reload(), false);
+
+    assert.ok(systemManager.getSystem(SYS_A) === systemRecord, 'the system record survives');
+    assert.ok(systemManager.getSystem(SYS_A).components === components);
+    assert.ok(
+      getDefinitionIndex(systemManager.getSystem(SYS_A).components) === index,
+      'and with the array, the index keyed on it'
+    );
+    assert.ok(recipeManager.recipes === recipeMap, 'the recipe map object survives');
+    assert.ok(recipeManager.getRecipe('r-a1') === recipe);
+  });
+
   it('returns the SAME definition index object across a no-op reload', () => {
     const { systemManager } = twoSystemWorld();
     const before = getDefinitionIndex(systemManager.getSystem(SYS_A).components);
@@ -222,15 +313,12 @@ describe('issue 1078 — a reload advances only the systems that actually change
     const { systemManager, env, write } = twoSystemWorld();
     const untouchedRecord = systemManager.getSystem(SYS_B);
     const untouchedIndex = getDefinitionIndex(untouchedRecord.components);
-    const tokens = {
-      a: systemManager.revision(REVISION_SCOPES.system(SYS_A)),
-      b: systemManager.revision(REVISION_SCOPES.system(SYS_B)),
-    };
+    const tokens = systemTokens(systemManager);
 
-    const next = storedSystems(env).map((system) =>
-      system.id === SYS_A ? { ...system, name: 'System A renamed' } : system
+    write(
+      withSystem(env, SYS_A, (system) => ({ ...system, name: 'System A renamed' })),
+      null
     );
-    write(next, null);
     assert.equal(systemManager.reload(), true);
 
     assert.notEqual(
@@ -251,16 +339,11 @@ describe('issue 1078 — a reload advances only the systems that actually change
   it('leaves an unrelated system untouched by a recipe edit', () => {
     const { recipeManager, env, write } = twoSystemWorld();
     const untouched = recipeManager.getRecipe('r-b1');
-    const tokens = {
-      a: recipeManager.revision(REVISION_SCOPES.recipesOfSystem(SYS_A)),
-      b: recipeManager.revision(REVISION_SCOPES.recipesOfSystem(SYS_B)),
-    };
+    const tokens = recipeTokens(recipeManager);
 
     write(
       null,
-      storedRecipes(env).map((recipe) =>
-        recipe.id === 'r-a1' ? { ...recipe, name: 'Renamed' } : recipe
-      )
+      withRecipe(env, 'r-a1', (recipe) => ({ ...recipe, name: 'Renamed' }))
     );
     assert.equal(recipeManager.reload(), true);
 
@@ -276,16 +359,11 @@ describe('issue 1078 — a reload advances only the systems that actually change
 
   it('names both systems when a recipe MOVES between them', () => {
     const { recipeManager, env, write } = twoSystemWorld();
-    const tokens = {
-      a: recipeManager.revision(REVISION_SCOPES.recipesOfSystem(SYS_A)),
-      b: recipeManager.revision(REVISION_SCOPES.recipesOfSystem(SYS_B)),
-    };
+    const tokens = recipeTokens(recipeManager);
 
     write(
       null,
-      storedRecipes(env).map((recipe) =>
-        recipe.id === 'r-a1' ? { ...recipe, craftingSystemId: SYS_B } : recipe
-      )
+      withRecipe(env, 'r-a1', (recipe) => ({ ...recipe, craftingSystemId: SYS_B }))
     );
     assert.equal(recipeManager.reload(), true);
 
@@ -312,16 +390,12 @@ describe('issue 1078 — identity is preserved only where the record is structur
     const staleIndex = getDefinitionIndex(staleArray);
     assert.equal(staleIndex.byName.get('Iron Ore')?.id, `${SYS_A}-c0`);
 
-    const next = storedSystems(env).map((system) =>
-      system.id === SYS_A
-        ? {
-            ...system,
-            items: system.items.map((component, index) =>
-              index === 0 ? { ...component, name: 'Iron Ore Refined' } : component
-            ),
-          }
-        : system
-    );
+    const next = withSystem(env, SYS_A, (system) => ({
+      ...system,
+      items: system.items.map((component, index) =>
+        index === 0 ? { ...component, name: 'Iron Ore Refined' } : component
+      ),
+    }));
     assert.equal(next[0].items.length, staleArray.length, 'the length is deliberately equal');
     write(next, null);
     assert.equal(systemManager.reload(), true);
@@ -337,10 +411,7 @@ describe('issue 1078 — identity is preserved only where the record is structur
   it('does not reuse an INSERTED or DELETED record, and advances its owning system', () => {
     const { recipeManager, env, write } = twoSystemWorld();
     const survivor = recipeManager.getRecipe('r-a2');
-    const tokens = {
-      a: recipeManager.revision(REVISION_SCOPES.recipesOfSystem(SYS_A)),
-      b: recipeManager.revision(REVISION_SCOPES.recipesOfSystem(SYS_B)),
-    };
+    const tokens = recipeTokens(recipeManager);
 
     const stored = storedRecipes(env);
     write(null, [
@@ -370,9 +441,10 @@ describe('issue 1078 — identity is preserved only where the record is structur
     );
   });
 
-  it('preserves the ids and order of a corpus after a DELETION', () => {
+  it('preserves the ids and order of a corpus after a DELETION, and advances its owner', () => {
     const { recipeManager, env, write } = twoSystemWorld();
     const survivor = recipeManager.getRecipe('r-b1');
+    const tokens = recipeTokens(recipeManager);
 
     write(
       null,
@@ -382,6 +454,52 @@ describe('issue 1078 — identity is preserved only where the record is structur
 
     assert.deepEqual([...recipeManager.recipes.keys()], ['r-a2', 'r-b1']);
     assert.ok(recipeManager.getRecipe('r-b1') === survivor);
+    assert.notEqual(
+      recipeManager.revision(REVISION_SCOPES.recipesOfSystem(SYS_A)),
+      tokens.a,
+      'a REMOVED record is a mutation of its owning cohort exactly as a change is — a narrow ' +
+        'advance that walked only the changed entries would leave this token stale, and the ' +
+        'signature guard would mask it rather than report a wrong answer'
+    );
+    assert.equal(
+      recipeManager.revision(REVISION_SCOPES.recipesOfSystem(SYS_B)),
+      tokens.b,
+      'and the deletion still says nothing about system B'
+    );
+  });
+
+  it('routes a pure recipe REORDERING broadly on all three axes', () => {
+    // The recipes-side mirror of the systems-side reorder test below it. Without this the
+    // whole `reordered` branch of `RecipeManager.reload()` — map replacement, cohort drop and
+    // broad advance alike — is deletable with the suite green, even though the spec row this
+    // change adds makes broad routing on an unattributable change a MUST.
+    const { recipeManager, env, write } = twoSystemWorld();
+    const staleRecipe = recipeManager.getRecipe('r-a1');
+    const staleMap = recipeManager.recipes;
+    const tokens = recipeTokens(recipeManager);
+
+    write(null, storedRecipes(env).toReversed());
+    assert.equal(recipeManager.reload(), true, 'order is significant, so a reorder IS a change');
+
+    const delta = recipeManager.consumeReloadDelta();
+    assert.equal(delta.reordered, true);
+    assert.equal(delta.perRecord.size, 0, 'nothing is attributable to an individual record');
+    assert.notEqual(
+      recipeManager.revision(REVISION_SCOPES.recipesOfSystem(SYS_A)),
+      tokens.a,
+      'axis 1: every cohort the corpus mentions advances'
+    );
+    assert.notEqual(recipeManager.revision(REVISION_SCOPES.recipesOfSystem(SYS_B)), tokens.b);
+    assert.ok(recipeManager.recipes !== staleMap, 'axis 2: the map is replaced');
+    assert.ok(
+      recipeManager.getRecipe('r-a1') !== staleRecipe,
+      'axis 3: no identity is preserved, because none of it was proved'
+    );
+    assert.deepEqual(
+      [...recipeManager.recipes.keys()],
+      ['r-b1', 'r-a2', 'r-a1'],
+      'and the replacement map carries the persisted order'
+    );
   });
 
   it('routes a pure REORDERING broadly on all three axes', () => {
@@ -389,10 +507,7 @@ describe('issue 1078 — identity is preserved only where the record is structur
     const staleA = systemManager.getSystem(SYS_A);
     const staleMap = systemManager.systems;
     const staleIndex = getDefinitionIndex(staleA.components);
-    const tokens = {
-      a: systemManager.revision(REVISION_SCOPES.system(SYS_A)),
-      b: systemManager.revision(REVISION_SCOPES.system(SYS_B)),
-    };
+    const tokens = systemTokens(systemManager);
 
     write(storedSystems(env).toReversed(), null);
     assert.equal(systemManager.reload(), true, 'order is significant, so a reorder IS a change');
@@ -421,9 +536,7 @@ describe('issue 1078 — consumeReloadDelta is one-shot and reload keeps its boo
     const { recipeManager, env, write } = twoSystemWorld();
     write(
       null,
-      storedRecipes(env).map((recipe) =>
-        recipe.id === 'r-a1' ? { ...recipe, name: 'Renamed' } : recipe
-      )
+      withRecipe(env, 'r-a1', (recipe) => ({ ...recipe, name: 'Renamed' }))
     );
     assert.equal(recipeManager.reload(), true, 'the boolean contract is unchanged');
 
@@ -441,9 +554,7 @@ describe('issue 1078 — consumeReloadDelta is one-shot and reload keeps its boo
   it('replaces a delta nobody consumed rather than letting a stale one be read', () => {
     const { systemManager, env, write } = twoSystemWorld();
     write(
-      storedSystems(env).map((system) =>
-        system.id === SYS_A ? { ...system, name: 'First edit' } : system
-      ),
+      withSystem(env, SYS_A, (system) => ({ ...system, name: 'First edit' })),
       null
     );
     systemManager.reload();
@@ -460,6 +571,36 @@ describe('issue 1078 — consumeReloadDelta is one-shot and reload keeps its boo
     assert.equal(new RecipeManager({}).consumeReloadDelta(), null);
     assert.equal(new CraftingSystemManager(new RecipeManager({})).consumeReloadDelta(), null);
   });
+
+  it('clears the pending delta when the backend has no replicated snapshot to read', () => {
+    // `readReplicatedSnapshot()` is an OPTIONAL repository capability whose base
+    // implementation returns `null` — the honest answer for anything document-backed. The
+    // settings-backed adapter never does, so nothing else in the suite reaches the `!saved`
+    // early return, and the eager clear that precedes it is the only thing stopping the
+    // PREVIOUS reload's delta from being consumed after a reload that read nothing at all.
+    installFoundryEnv();
+    const seams = {
+      systems: withdrawableSnapshot([{ id: SYS_A, name: 'System A', components: [] }]),
+      recipes: withdrawableSnapshot([persistedRecipe('r-a1', SYS_A, `${SYS_A}-c0`)]),
+    };
+    const recipeManager = new RecipeManager({ repository: seams.recipes });
+    const systemManager = new CraftingSystemManager(recipeManager, { repository: seams.systems });
+    assert.equal(systemManager.reload(), true, 'the first reload reads a real snapshot');
+    assert.equal(recipeManager.reload(), true);
+
+    seams.systems.snapshot = null;
+    seams.recipes.snapshot = null;
+    assert.equal(systemManager.reload(), false, 'no snapshot is a no-op, not a change');
+    assert.equal(recipeManager.reload(), false);
+
+    assert.equal(
+      systemManager.consumeReloadDelta(),
+      null,
+      'and the delta from the reload BEFORE it must not still be readable — a consumer would ' +
+        'act on a transition that is now two reloads old'
+    );
+    assert.equal(recipeManager.consumeReloadDelta(), null);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -472,11 +613,7 @@ describe('issue 1078 — the item-sync metadata refresh names the systems it tou
     // `save()`'s whole-corpus branch — so every GM item rename, image or description edit in
     // the world advanced every crafting system's token.
     const { systemManager } = twoSystemWorld();
-    const tokens = {
-      a: systemManager.revision(REVISION_SCOPES.system(SYS_A)),
-      b: systemManager.revision(REVISION_SCOPES.system(SYS_B)),
-      domain: systemManager.revision(REVISION_SCOPES.systems),
-    };
+    const tokens = systemTokens(systemManager);
 
     const result = await systemManager.refreshComponentMetadataForUpdatedItem(
       { uuid: `Item.${SYS_A}-c0`, name: 'Iron Ore Renamed' },
@@ -516,6 +653,39 @@ describe('issue 1078 — the item-sync metadata refresh names the systems it tou
     assert.equal(
       persisted.find((system) => system.id === SYS_A).components[0].name,
       'Iron Ore Renamed'
+    );
+  });
+
+  it('does not advance an unrelated system when a compendium pack is imported', async () => {
+    // The sibling of the rename test above, and the reason it is here rather than in
+    // `compendium-drop.test.js`: that suite replaces `save` with a no-op stub, so the only
+    // suite exercising `addItemsFromPack` is structurally blind to which save branch it takes.
+    // A bare `save()` takes the whole-corpus branch and advances EVERY system's token for an
+    // import into one of them — the precise over-broad behaviour this change removes.
+    const { systemManager } = twoSystemWorld();
+    installPack('world.ore-pack', [
+      { id: 'doc-a', documentName: 'Item', name: 'Silver Ore', img: 'silver.png' },
+      { id: 'doc-b', documentName: 'Item', name: 'Gold Ore', img: 'gold.png' },
+    ]);
+    const tokens = systemTokens(systemManager);
+
+    const result = await systemManager.addItemsFromPack(SYS_A, 'world.ore-pack');
+
+    assert.equal(result.added, 2, 'both pack items landed in system A');
+    assert.notEqual(
+      systemManager.revision(REVISION_SCOPES.system(SYS_A)),
+      tokens.a,
+      'the system the batch was imported into advances'
+    );
+    assert.equal(
+      systemManager.revision(REVISION_SCOPES.system(SYS_B)),
+      tokens.b,
+      'and a system the import never touched does not'
+    );
+    assert.notEqual(
+      systemManager.revision(REVISION_SCOPES.systems),
+      tokens.domain,
+      'the domain scope still advances for a consumer that cannot attribute its cache'
     );
   });
 
