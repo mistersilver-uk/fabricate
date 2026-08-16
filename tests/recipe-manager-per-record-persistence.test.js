@@ -336,13 +336,33 @@ describe('RecipeManager.applyReplicatedRecordChange (issue 1080 -b, B4)', () => 
 
     const changed = manager.applyReplicatedRecordChange({
       key: 'fabricate.recipe.r1',
-      operation: 'create',
+      operation: 'update',
       document: {},
     });
 
     assert.equal(changed, true);
     assert.equal(manager.getRecipe('r1')?.name, 'Recipe r1');
-    assert.equal(manager.initialized, true);
+  });
+
+  it('initializes a client whose FIRST sight of the corpus is a replicated record', () => {
+    // Deliberately NOT `seededManager`, which sets `initialized` itself: asserted against a
+    // manager that already claimed it, this cannot fail, and the flag matters exactly for
+    // the client that has never loaded — a player who joins mid-conversion and is handed
+    // records one document at a time.
+    const repository = new ReplicatingRepository();
+    const manager = new RecipeManager({ repository });
+    assert.equal(manager.initialized, false, 'control: nothing has loaded this manager');
+    repository.wire.set('fabricate.recipe.r1', recipeData('r1'));
+
+    assert.equal(
+      manager.applyReplicatedRecordChange({
+        key: 'fabricate.recipe.r1',
+        operation: 'update',
+        document: {},
+      }),
+      true
+    );
+    assert.equal(manager.initialized, true, 'the replicated record IS this client’s load');
   });
 
   it('replaces a changed record and advances that system revision', () => {
