@@ -39,7 +39,9 @@ import { createOperationCounters } from './helpers/scale/scaleCounters.js';
 
 globalThis.foundry = { utils: { randomID: () => crypto.randomUUID() } };
 
-const { IngredientSet } = await import('../src/models/IngredientSet.js');
+const { IngredientSet, INGREDIENT_SEARCH_NODE_CAP } = await import(
+  '../src/models/IngredientSet.js'
+);
 
 /**
  * A `remaining` ledger that counts the operations performed on it.
@@ -238,6 +240,110 @@ test('the ledger counter moves when the SEARCH grows, so it is not stuck', () =>
     twoContentions.ledgerOps > oneContention.ledgerOps,
     `a bigger search must cost more ledger operations: ${oneContention.ledgerOps} -> ` +
       `${twoContentions.ledgerOps}`
+  );
+});
+
+/**
+ * The stated wall-clock budget for the adversarial fixture below, on the reference machine
+ * (Windows 11, Node 22.22.2, this checkout).
+ *
+ * The issue asks for a budget rather than "bounded by the node cap", because the cap never
+ * bounded time. It is set at roughly 25x the measured figure on purpose. A wall-clock assertion
+ * is a flaky test if it is tight — see `tests/helpers/scale/scaleProbes.js` on why this
+ * repository asserts counts and not milliseconds — so the REGRESSION guard here is the
+ * machine-invariant ledger-operation count below, and this ceiling exists only to catch the
+ * specific failure the counts cannot express: a resolve that no longer completes in human time.
+ *
+ * Measured on this checkout for the cap-hitting fixture at 1,000 held stacks:
+ *
+ * | held stacks | before (snapshot/restore) | after (undo journal) |
+ * |-------------|---------------------------|----------------------|
+ * | 20          | 98 ms                     | 47 ms                |
+ * | 500         | 814 ms                    | 42 ms                |
+ * | 1,000       | 1,694 ms                  | 35 ms                |
+ *
+ * The shape is the point, not the ratio: the before column is linear in held stacks and the
+ * after column is flat. A 1,000 ms budget is met by the after column with 28x of headroom and
+ * missed by the before column at the same fixture.
+ */
+const ADVERSARIAL_BUDGET_MS = 1000;
+
+/**
+ * The adversarial fixture: ten groups all drawing `quantity: 2` from the SAME six-stack pool
+ * that holds twelve units in total, so twenty units are demanded from twelve.
+ *
+ * Unsatisfiable, and expensively so. Every group has twenty-one distinct unit plans over the
+ * pool, they all contend, and no prefix can be pruned by a shortfall the solver can see early —
+ * so the search explores until it reaches its node bound. That is the ONLY fixture shape that
+ * exercises the per-node ledger term at full scale: an enumeration blow-up inside a single
+ * group (`_enumerateUnitPlansFrom`) bumps the same budget but never copied the ledger, so it
+ * would have shown no difference at all.
+ */
+function adversarialSet() {
+  return new IngredientSet({
+    id: 'adversarial',
+    ingredientGroups: Array.from({ length: 10 }, (_unused, index) => ({
+      id: `g-${index}`,
+      options: [tagOption(2)],
+    })),
+  });
+}
+
+const ADVERSARIAL_MATCHER = (option, held) =>
+  option?.match?.type === 'tags' && held.uuid.startsWith('pool-');
+
+function adversarialInventory(fillerStacks) {
+  const items = Array.from({ length: 6 }, (_unused, index) => item(`pool-${index}`, 2));
+  for (let index = 0; index < fillerStacks; index += 1) items.push(item(`filler-${index}`, 3));
+  return items;
+}
+
+test('an adversarial cap-hitting search completes inside its stated wall-clock budget', () => {
+  const items = adversarialInventory(994);
+  assert.equal(items.length, 1000);
+
+  const started = performance.now();
+  const selection = adversarialSet().resolveIngredientSelection(items, ADVERSARIAL_MATCHER);
+  const elapsed = performance.now() - started;
+
+  assert.equal(selection.success, false, 'the fixture must be genuinely unsatisfiable');
+  assert.equal(
+    selection.searchStats.capHit,
+    true,
+    'the fixture must reach the node bound, or it is not measuring the adversarial case'
+  );
+  assert.ok(
+    elapsed < ADVERSARIAL_BUDGET_MS,
+    `a full ${INGREDIENT_SEARCH_NODE_CAP}-node search over ${items.length} held stacks took ` +
+      `${elapsed.toFixed(0)} ms, over the stated ${ADVERSARIAL_BUDGET_MS} ms budget`
+  );
+});
+
+test('the adversarial search costs the same ledger operations at 20 and 1,000 stacks', () => {
+  // The machine-invariant half of the criterion above, and the one that is a real regression
+  // guard. The node bound is reached at the identical node count either way, so the two runs
+  // perform the identical search; only the inventory around it differs.
+  const measure = (fillerStacks) => {
+    const counters = createOperationCounters();
+    const set = adversarialSet();
+    const probe = installCountingLedger(set, counters, 'ledgerOps');
+    const items = adversarialInventory(fillerStacks);
+    const selection = set.resolveIngredientSelection(items, ADVERSARIAL_MATCHER);
+    probe.assertUsed(items.length);
+    return { ledgerOps: counters.get('ledgerOps'), stats: selection.searchStats };
+  };
+
+  const small = measure(14);
+  const large = measure(994);
+
+  assert.equal(small.stats.capHit, true);
+  assert.equal(large.stats.nodes, small.stats.nodes, 'both runs must explore the same tree');
+  assert.ok(small.ledgerOps > 0);
+  assert.equal(
+    large.ledgerOps,
+    small.ledgerOps,
+    `a cap-hitting search must cost the same ledger operations at any inventory size: ` +
+      `${small.ledgerOps} at 20 stacks -> ${large.ledgerOps} at 1,000`
   );
 });
 
