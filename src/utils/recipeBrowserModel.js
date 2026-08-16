@@ -719,6 +719,7 @@ export function buildRecipeRoutingModel(recipe) {
  *   filtered: object[],
  *   page: object[],
  *   groups: {category: string, recipes: object[], total: number}[],
+ *   categoryTotals: Map<string, number>,
  *   pageIndex: number, pageCount: number, totalCount: number,
  *   rangeStart: number, rangeEnd: number,
  *   chips: {id: string, value: string}[]
@@ -732,15 +733,24 @@ export function buildRecipeBrowserModel(recipes, options = {}) {
     // contiguous run across page boundaries rather than an interleaved slice per page.
     categoryMajor: !!options.groupByCategory,
   });
+  // COUNTED BEFORE PAGINATION, unconditionally (issue 1081). It is computed here rather
+  // than inside the `groupByCategory` branch so that counting is a step of this pipeline
+  // rather than a side effect of grouping: the row projection is page-scoped now, and a
+  // count derived downstream of `paginateRecipes` would silently describe the page.
+  const categoryTotals = countByCategory(filtered, recipeCategoryOf);
   const paged = paginateRecipes(filtered, options);
   const groups = options.groupByCategory
-    ? groupRecipesByCategory(paged.recipes, countByCategory(filtered, recipeCategoryOf))
+    ? groupRecipesByCategory(paged.recipes, categoryTotals)
     : [{ category: '', recipes: paged.recipes, total: paged.recipes.length }];
 
   return {
     filtered,
     page: paged.recipes,
     groups,
+    // The FILTERED-COHORT counts, exported so a caller that renders its own header (or a
+    // test that pins the scope) reads the same map the group headers do instead of
+    // recounting whatever array it happens to hold.
+    categoryTotals,
     pageIndex: paged.pageIndex,
     pageCount: paged.pageCount,
     totalCount: paged.totalCount,
