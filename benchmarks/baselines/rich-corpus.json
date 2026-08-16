@@ -37,7 +37,9 @@
         "identityIndexBuilds": 1,
         "ingredientMatcherInvocations": 10020,
         "selectionsResolved": 36,
-        "selectionsSatisfied": 12
+        "selectionsSatisfied": 12,
+        "searchNodes": 596,
+        "searchCapHits": 0
       }
     },
     "recipeVisibility.getVisibleRecipes.global": {
