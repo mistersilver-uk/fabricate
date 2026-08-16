@@ -567,6 +567,71 @@ B(1) is sufficient if real worlds sit far enough below 10,000 records that the p
 Issue 1080 MUST measure the connect payload at the corpus sizes real installations actually reach, and MUST record the crossover point at which B(1) becomes worse than doing nothing.
 If a supported corpus crosses it, this ADR is superseded rather than amended, and A+ is the option already measured and waiting.
 
+#### AMENDED by issue 1080's measurement — the condition above is false as written
+
+The paragraph above is preserved verbatim because it is what the decision was taken against, and it should not be edited to agree with the outcome.
+It is nonetheless **wrong**, and the numbers that show it are already in this document.
+
+The "whole-array saving" it weighs 340 bytes against is the array punctuation — and § What a cold client receives at connect, reading 1, already says what that is: *"10,001 bytes of array punctuation that 10,000 separate values no longer pay."*
+For `n` records that is `n + 1` bytes in total, so `n × 340 > n + 1` holds from the first record and the gap widens linearly forever.
+There is no corpus size below which the envelope "never accumulates", and the crossover is not a function of corpus size after all.
+
+Issue 1080 measured it and confirmed this from the corpus: crossover at n = 1 on every record shape tested, from 50 bytes to 100,000 bytes per record; −2 bytes at n = 0 (`"[]"`), +338 at n = 1.
+That harness reproduces this ADR's own arithmetic byte-for-byte at the archived tree — `sum(recordBytes)` 12,203,076, whole-array 12,213,077, B(1) 15,603,076 = +27.76% — so the correction is to the *condition*, not to the measurements.
+
+**The accounting convention behind "n = 1", because an amendment about mis-accounting must be exact about its own.**
+Both layouts are compared *exclusive* of the container `Setting` document's own envelope — the convention of the connect table above, which reads the baseline at 12,213,077 and B(1) at 12,203,076 as serialized values on both sides, and which reading 1 states explicitly.
+Issue 1080's harness adds back the term one key pays once and 10,000 keys pay 10,000 times, and does not subtract the once term.
+Charge the baseline its single envelope too and the difference is `339n − 341` rather than `339n − 1`: the per-record penalty is 339 bytes either way, the corpus-scale figures move by exactly one envelope (340 bytes in 3.39 MB, 0.01%), and the divergence lands on the **second** record instead of the first.
+Neither accounting yields a size threshold, which is the finding; and the one used here reports B(1) as 340 bytes worse than the symmetric one does, so its residual error runs toward this amendment's conclusion rather than away from it.
+`benchmarks/README.md` § The crossover is at ONE record carries the same disclosure, and `tests/persistence-connect-payload.test.js` pins both readings.
+
+**The honest decision input is a constant, not a crossover.**
+Two curves that differ by a fixed per-record term never cross; they diverge from the first record.
+B(1) costs **339 bytes per record more at connect, at every corpus size, on every record shape**.
+
+Everything else is that constant divided by something: the **absolute** penalty is 34 KB at 100 records, 339 KB at 1,000 and 3.39 MB at 10,000, independent of shape; the **relative** penalty is `339 / meanRecordBytes`, which is driven entirely by shape and is essentially flat in record count, ranging from **9.0% to 44.1% — a factor of 4.9 — across the measured corpora on this tree**.
+Read those two figures off the same tree: 9.0% is `rich-corpus` post-#1135 and 44.1% is `simple-corpus` post-#1135, both at their full corpus, as `benchmarks/README.md` § Both payload shapes tabulates them.
+The pre-#1135 rich figure of 3.7% belongs to a payload shape that no longer exists and must not be paired with a post-#1135 number to widen the range.
+A relative bound therefore cannot bound corpus size, which is why the replacement condition below is stated in absolute bytes.
+
+**Issue 1135 has since made the relative regression worse, and this decision should be read against the new number.**
+It cut the serialized payload 37% (simple) and 59% (rich) while the envelope stayed at 340, so the 28% recorded above is now **44.1%** on the simple corpus at 10,000 records.
+The absolute penalty is unchanged at 3.39 MB.
+If 28% was the figure this decision was taken against, it is now being asked to stand against 44%.
+
+**One caveat on that headline, stated here rather than only in the harness README.**
+`Setting#value` is a string field, so a transmitted `Setting` document escapes the JSON inside it and both layouts grow by the same absolute bytes.
+Modelled that way — `escapedRecordBytes` in `tests/helpers/scale/connectPayloadModel.js`, committed per case — `simple-corpus` reads **+38.60%** rather than +44.13%, and `rich-corpus` +7.64% rather than +8.98%.
+Escaping cannot touch the per-record penalty, which stays at 339 bytes because the same term is added to both layouts and array punctuation is not escaped, nor the absolute delta, which stays at 3.39 MB.
+**+38.6% is the conservative reading of the headline and the replacement condition below is unaffected**, which is the point of stating that condition in absolute bytes.
+
+**Replacement condition.**
+B(1) stands while the connect overhead it adds stays within a stated absolute budget:
+
+> **B(1) is sufficient while `record count × 339 bytes` remains at or below 1.41 MB — approximately 4,160 records.**
+
+**That bound is a chosen tolerance pegged to a measured reference, not a crossing point, and the distinction matters here more than anywhere.**
+This amendment's whole subject is a condition that read a bookkeeping artefact as a threshold, so it must not repeat the move.
+
+The reference: 1.41 MB is issue 1088's directly measured **compendium index at 10,000 records**, and it corroborates candidate **A**, whose live extrapolation § The real index rate puts at ≈1.65 MB at the same scale.
+It is not A+'s payload — § One `Setting` document costs 340 bytes of envelope records A+ at **≈1.81 MB**.
+
+There is no crossing point to find between the two.
+A+ costs ≈181 bytes per record at the 10,000-record target (1.81 MB / 10,000) against B(1)'s 339 bytes of overhead per record, so `339n > 181n` holds at **every** n and "B(1)'s overhead alone exceeds A+'s entire payload" is true from the first record.
+That comparison is size-mismatched — a *rate* against a *total fixed at one scale* — and cannot be what makes ~4,160 records special.
+
+What the bound actually asserts is a budget: **B(1)'s connect overhead at n records may not exceed what the index alternative would cost in total at this epic's 10,000-record target.**
+That is falsifiable, it is stated in the escaping-robust quantity, and the arithmetic behind the record count is plain — 1,410,000 / 339 = 4,159.
+It is a tolerance a maintainer set against a reference fixed at one scale, and it should be quoted as one rather than as a derivation.
+
+Crossing this bound supersedes the decision rather than amending it again, on the original terms: A+ is measured and waiting, and issue 1092's replacement transport returns to scope with it.
+
+**What remains unmeasured, and is the real exposure.**
+The module collects no telemetry, and the only field datum in this issue tree is one user with 1,080 components — comfortably inside the bound, at ~366 KB.
+"Real worlds sit far below 10,000 records" is still an **assumption of this ADR, not a finding**.
+Issue 1080's harness spans 1 to 10,000 so the penalty can be read at whatever corpus size is believed in, but nothing here establishes which size that is.
+
 ### Scope: components as well as recipes
 
 **The change extends to components, and that is a different shape of work from recipes.**
@@ -592,6 +657,10 @@ Issue 1080 is rewritten to B(1).
 - Issue 1091 defines the canonical summary projection, which decides whether A+'s index suffices or a replicated summary setting is also needed.
 - Issue 1073's `propagation-unhydrated` measurement gains a real subject and can be implemented.
 - The prototypes are already deleted — see **Provenance of these numbers**.
+- **Issue 1080's connect measurement amended this ADR's decision condition** — see § The kill criterion this option fired.
+  The condition as originally written is false at every corpus size; B(1) still stands, now bounded by a chosen absolute budget of 1.41 MB of connect overhead (~4,160 records) rather than by a crossover.
+  That 1.41 MB is issue 1088's measured compendium index at 10,000 records — candidate **A**'s corroborating reference, not A+'s payload — and the budget is a maintainer tolerance pegged to it at that scale, not a derived crossing point.
+  The measurement instrument is `tests/helpers/scale/connectPayloadModel.js`, and the reading is re-derived on every run rather than pinned.
 
 ---
 

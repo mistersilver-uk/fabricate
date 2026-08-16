@@ -21,9 +21,11 @@
  * also what keeps the fixture generators honest: a generator that silently produced the wrong
  * scale would move every count in the file.
  *
- * The pass costs roughly ten seconds in total, which is the reason `held-inventory` pins its
- * recipe corpus at 6 rows and `rich-corpus` bounds its solver case at 12 — see the ceilings
- * recorded on each profile. Those bounds buy a guard that runs in the normal suite instead of a
+ * The pass costs a measured 3.3 seconds in total (three runs, median, at the commit that added
+ * the connect cases), which is the reason `held-inventory` pins its recipe corpus at 6 rows and
+ * `rich-corpus` bounds its solver case at 12 — see the ceilings recorded on each profile. That
+ * figure is measured rather than estimated, so a case added later has a real budget to reason
+ * against; the previous "roughly ten seconds" was an estimate and was already 4x high. Those bounds buy a guard that runs in the normal suite instead of a
  * fuller measurement that would only ever run by hand and would therefore never catch anything.
  */
 import assert from 'node:assert/strict';

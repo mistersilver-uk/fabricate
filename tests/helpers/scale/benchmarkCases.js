@@ -29,8 +29,23 @@
  * | `CraftingSystemManager` normalization/import | `craftingSystemManager.normalizeImport` |
  * | Pure browser models + pagination             | `recipeBrowserModel.*`, `componentBrowserModel.*`, `browserPagination.*` |
  */
+import {
+  SETTING_DOCUMENT_ENVELOPE_BYTES,
+  assertEscapedArrayIdentity,
+  assertWholeArrayIdentity,
+  connectPayloadAt,
+  connectPayloadSeries,
+  escapedRecordBytes,
+  findConnectCrossover,
+  serializedRecordBytes,
+} from './connectPayloadModel.js';
 import { INVENTORY_SERIES } from './scaleInventory.js';
-import { createBenchWorld, hydrateRecipes, useHydratedRecipes } from './scaleWorld.js';
+import {
+  createBenchWorld,
+  hydrateRecipes,
+  useHydratedRecipes,
+  withFreshRecordIds,
+} from './scaleWorld.js';
 
 /** How many rows a bulk salvage/destroy run is simulated at. Bounded: the run is O(rows x items x components). */
 const BULK_ROWS = 5;
@@ -81,6 +96,22 @@ const GM_BROWSER_PAGE_SIZE = 25;
 const SOLVER_RECIPES = 12;
 
 /**
+ * Record counts the connect-payload overhead is reported at, spanning four orders of magnitude
+ * from one record to each profile's full corpus.
+ *
+ * A SWEEP rather than a single reading, because ADR 0001's condition is stated in corpus size —
+ * "B(1) is sufficient if real worlds sit far enough below 10,000 records" — so the reading has
+ * to be taken at sizes real worlds actually sit at and not only at the target scale. Four points
+ * is enough to show whether the curve has a knee; committing every intermediate point would add
+ * class-1 keys that carry the same one fact.
+ * @type {readonly number[]}
+ */
+const CONNECT_SWEEP_SIMPLE = Object.freeze([1, 100, 1000, 10_000]);
+
+/** The same sweep against `rich-corpus`, whose corpus tops out at 5,000. */
+const CONNECT_SWEEP_RICH = Object.freeze([1, 100, 1000, 5000]);
+
+/**
  * Serialized payload bytes for a world-setting write.
  *
  * `#1070` names whole-corpus serialization as its #1 persistence risk and asks for the BYTES,
@@ -103,6 +134,126 @@ function worldFor(context, options = {}) {
     counters: context.counters,
     ...options,
   });
+}
+
+/**
+ * One connect-payload case: what a corpus costs a connecting client as one whole-array `world`
+ * setting versus one `world` setting key per record.
+ *
+ * ADR 0001 selected B(1) — one setting key per record — against its own spike's recommendation,
+ * and made the selection conditional on a measurement it asked issue 1080 to take: the record
+ * count at which the per-key `Setting` envelope makes the connect payload worse than doing
+ * nothing. This case is that measurement. It implements NO backend and changes no persistence:
+ * it reads the array the shipped `SettingsCraftingDefinitionRepository` actually writes and
+ * models the same records under the other layout.
+ *
+ * Two shapes are registered, not one, because the answer is a property of the RECORD SHAPE
+ * rather than of the record count. A simple recipe and a rich one differ by roughly 5x in
+ * serialized size, and the envelope is a fixed cost, so the relative penalty differs by roughly
+ * 5x with them. A single-shape measurement would read as a single number and be quoted as one.
+ *
+ * @param {object} options
+ * @param {string} options.id
+ * @param {string} options.profile
+ * @param {string} options.shape Prose naming the corpus this case measures.
+ * @param {number[]} options.sweep Record counts to report the overhead ratio at.
+ * @param {string} [options.freshIdComparison] The consequence of the fresh id space ON THIS
+ *   PROFILE. Parameterised because the shared template previously asserted a comparison to
+ *   `recipeManager.save.serializedBytes` on every profile, and only `simple-corpus` registers
+ *   that case at all.
+ * @returns {object}
+ */
+function connectPayloadCase({ id, profile, shape, sweep, freshIdComparison = '' }) {
+  return {
+    id,
+    profile,
+    description:
+      `CONNECT PAYLOAD (#1080): ${shape} as one whole-array \`world\` setting versus one ` +
+      "`world` setting key per record (ADR 0001's B(1)), including the live-measured " +
+      `${SETTING_DOCUMENT_ENVELOPE_BYTES}-byte \`Setting\` envelope. ` +
+      'The overhead is reported at several corpus sizes because ADR 0001 conditioned its ' +
+      'choice on corpus size, and the reading barely moves across three orders of magnitude ' +
+      "of it. Both layouts are counted exclusive of the container `Setting` document's own " +
+      'envelope, which is how ADR 0001 counts them. Hydrated against a FRESH id space, so the ' +
+      `bytes depend on {profile, seed} alone rather than on how many earlier cases hydrated.${freshIdComparison}`,
+    setup: async (context) => {
+      const world = worldFor(context);
+      useHydratedRecipes(
+        world,
+        withFreshRecordIds(() => hydrateRecipes(world.modules, context.fixture.recipes))
+      );
+      // The real repository write, not a re-implementation of it: the payload measured here is
+      // the payload production replicates.
+      await world.recipeManager.save();
+      const payloads = world.settings.get('recipes');
+      return {
+        payloads,
+        recordBytes: serializedRecordBytes(payloads),
+        // The same corpus as a `Setting#value` string field actually carries it. Committed
+        // because it is the one sensitivity this measurement has, and because the previous
+        // attempt to state it was hand-computed on an order-dependent corpus and came out
+        // wrong — see `escapedRecordBytes`.
+        escapedBytes: escapedRecordBytes(payloads),
+      };
+    },
+    run: ({ recordBytes }) => ({
+      series: connectPayloadSeries({ recordBytes, sizes: sweep }),
+      crossover: findConnectCrossover({ recordBytes }),
+    }),
+    counts: ({ payloads, recordBytes, escapedBytes }, { series, crossover }) => {
+      const corpus = connectPayloadAt({ recordBytes, records: recordBytes.length });
+      const escaped = connectPayloadAt({
+        recordBytes: escapedBytes,
+        records: escapedBytes.length,
+      });
+      return {
+        connectRecords: corpus.records,
+        connectEnvelopeBytesPerRecord: SETTING_DOCUMENT_ENVELOPE_BYTES,
+        wholeArrayConnectBytes: corpus.wholeArrayBytes,
+        perRecordKeyConnectBytes: corpus.perRecordKeyBytes,
+        connectDeltaBytes: corpus.deltaBytes,
+        // Guarded for the empty corpus like every other count here. Unguarded the division is
+        // `-2 / 0`, so the count would be `-Infinity` and would land in a committed class-1
+        // file as `null` — a value that reads as a missing measurement rather than as a
+        // degenerate one. Unreachable from the registered profiles, and there is no seam to
+        // reach it from a test because this factory is module-private; the branch is here
+        // because every other count in this file guards `count === 0` and one that did not
+        // would be the odd one out.
+        connectDeltaBytesPerRecord:
+          corpus.records === 0 ? 0 : Math.round(corpus.deltaBytes / corpus.records),
+        // `0` means B(1) never costs more than the whole array within this corpus — the ONLY
+        // outcome that satisfies ADR 0001's condition. Any other value is the record count at
+        // which it first does, on the accounting convention `connectPayloadModel.js` states in
+        // its header: both layouts exclusive of the container `Setting`'s own envelope, as
+        // ADR 0001's own connect table counts them. Charging the baseline that one envelope too
+        // reports 2 here instead of 1 and moves nothing else by more than 340 bytes.
+        connectCrossoverRecords: crossover?.records ?? 0,
+        connectCrossoverDeltaBytesBelow: crossover?.below.deltaBytes ?? 0,
+        connectCrossoverDeltaBytesAt: crossover?.at.deltaBytes ?? 0,
+        // The baseline term is an arithmetic claim about JSON punctuation that every conclusion
+        // here subtracts from, so it is checked against real `JSON.stringify` on the real corpus
+        // and committed as a fact rather than left to a comment.
+        wholeArrayPunctuationModelHolds: assertWholeArrayIdentity(payloads).matches ? 1 : 0,
+        // The escaped model — `Setting#value` is a string field, so a transmitted document
+        // escapes the JSON inside it. Four keys, because this is the ONLY sensitivity the
+        // measurement has and it must be re-derivable rather than recomputed by hand: the two
+        // byte counts, the ratio they move, and the punctuation identity that lets the escaped
+        // bytes be fed to the unescaped formulae. The DELTA is deliberately not committed
+        // twice: escaping adds the same term to both layouts, so `escaped*ConnectBytes`
+        // subtract to exactly `connectDeltaBytes` above, and the drift test asserts that.
+        escapedWholeArrayConnectBytes: escaped.wholeArrayBytes,
+        escapedPerRecordKeyConnectBytes: escaped.perRecordKeyBytes,
+        escapedConnectOverheadBasisPoints: escaped.overheadBasisPoints,
+        escapedArrayPunctuationModelHolds: assertEscapedArrayIdentity(payloads).matches ? 1 : 0,
+        ...Object.fromEntries(
+          series.map((row) => [
+            `connectOverheadBasisPoints@${row.records}`,
+            row.overheadBasisPoints,
+          ])
+        ),
+      };
+    },
+  };
 }
 
 /**
@@ -309,6 +460,18 @@ function simpleCorpusCases() {
         availableRecipes: listing.counts.available,
       }),
     })),
+    // Registered LAST, and it matters. Every case before it hydrates against the ambient
+    // process-lifetime id counter, so inserting a hydrating case earlier would widen the ids
+    // `recipeManager.save` mints and move its committed `serializedBytes`.
+    connectPayloadCase({
+      id: 'persistence.connectPayload.simpleRecipes',
+      profile: 'simple-corpus',
+      shape: '10,000 simple recipes',
+      sweep: CONNECT_SWEEP_SIMPLE,
+      freshIdComparison:
+        ' It therefore reads at or below `recipeManager.save.serializedBytes`, which measures ' +
+        'the same corpus hydrated against the ambient counter this case resets.',
+    }),
   ];
 }
 
@@ -378,6 +541,12 @@ function richCorpusCases() {
         }),
       counts: (_world, entries) => ({ visibleRecipes: entries.length }),
     },
+    connectPayloadCase({
+      id: 'persistence.connectPayload.richRecipes',
+      profile: 'rich-corpus',
+      shape: '5,000 alternative/tag/tool/essence-heavy recipes',
+      sweep: CONNECT_SWEEP_RICH,
+    }),
   ];
 }
 
