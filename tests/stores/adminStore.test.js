@@ -8756,13 +8756,23 @@ describe('adminStore item-card hydration and cohort fetching (issue 1081)', () =
   }
 
   /**
-   * A card fills itself IN PLACE, which Svelte cannot see: `itemCards` is still the same
-   * array of the same objects, and the cards are plain rather than `$state`. The republish
-   * handing out a NEW array is therefore the ONLY thing that makes hydration visible at all
-   * — without it the GM keeps the un-hydrated reading forever, and no assertion about the
-   * projection would notice.
+   * A card fills itself IN PLACE, which Svelte cannot see — and a NEW ARRAY of the SAME
+   * objects does not fix that.
+   *
+   * This store publishes through a `writable`, which does not proxy, so every hop between
+   * the published array and a rendered string compares by `===`: `selectedComponent` and
+   * `componentForEdit` re-run `find(...)` and return the identical object, the browser
+   * model's filter/sort/paginate chain slices and spreads without cloning, and a keyed
+   * `{#each}` reconciling an unchanged item does not update the row. The array identity gets
+   * the readers to look; only the CARD identity makes them see anything different. Publishing
+   * the same object back to all three surfaces does not keep them from diverging — it keeps
+   * them wrong together, on the pre-hydration reading, permanently.
+   *
+   * Only the cards that reported a fill are replaced, and the untouched pair below is the
+   * control for that: swapping an un-hydrated card would strand its eventual in-place fill on
+   * an object nothing publishes any more.
    */
-  it('republishes itemCards as a NEW array once a page of cards has hydrated', async () => {
+  it('republishes each HYDRATED card as a new object, leaving un-hydrated cards alone', async () => {
     const services = createMockServices();
     seedLinkedComponents(services, 5);
 
@@ -8782,32 +8792,139 @@ describe('adminStore item-card hydration and cohort fetching (issue 1081)', () =
       assert.equal(before.length, 5);
       assert.equal(before[0].description, '', 'pre-condition: the cards arrive un-hydrated');
 
-      await Promise.all(before.map((card) => card.hydrate()));
+      // A PAGE, not the cohort: two cards are deliberately never asked.
+      await Promise.all(before.slice(0, 3).map((card) => card.hydrate()));
       await new Promise((resolve) => setTimeout(resolve, 0));
       unsubscribe();
 
       const after = get(store.viewState).itemCards;
       assert.ok(
         after !== before,
-        'the store hands out a NEW array — the only signal a reader can see, because the ' +
-          'cards were filled in place'
+        'the store hands out a NEW array, so every reader of `itemCards` re-runs'
+      );
+      for (const index of [0, 1, 2]) {
+        assert.ok(
+          after[index] !== before[index],
+          `card ${index} hydrated, so it is republished as a NEW object — a card whose ` +
+            'identity did not move is invisible to every `===` comparison between here and ' +
+            'the rendered row, inspector and editor'
+        );
+        assert.equal(after[index].id, before[index].id, 'and its `{#each}` key does not move');
+        assert.equal(after[index].description, 'Live prose', 'the resolved reading is published');
+      }
+      // SAME-FIXTURE CONTROL: identity is replaced for the cards that filled, not for every
+      // card in the array, so this is a targeted swap rather than a blanket re-clone.
+      for (const index of [3, 4]) {
+        assert.equal(
+          after[index],
+          before[index],
+          `card ${index} was never asked to hydrate, so it is published unchanged — its fill, ` +
+            'if it is ever asked for, lands on the object that is still published'
+        );
+      }
+      assert.equal(
+        typeof after[0].hydrate,
+        'function',
+        'the replacement carries the NON-ENUMERABLE `hydrate` seam across, so a later ask is ' +
+          'still answered (and answered from the memo)'
       );
       assert.equal(
-        after[0],
-        before[0],
-        'and the SAME card objects: the browser row, the browser inspector and the component ' +
-          'editor all hold this one object, so replacing it is how they come to disagree'
+        Object.keys(after[0]).includes('hydrate'),
+        false,
+        'and it is still non-enumerable, so spread, JSON and the bulk-edit models cannot see it'
       );
-      assert.equal(after[0].description, 'Live prose', 'the resolved reading is now published');
       assert.equal(
         publishes,
         1,
-        'five cards resolving on five separate microtasks coalesce into ONE republish; ' +
+        'three cards resolving on three separate microtasks coalesce into ONE republish; ' +
           'without the coalescing a page turn re-runs every reader 25 times'
       );
     } finally {
       globalThis.fromUuid = originalFromUuid;
     }
+  });
+
+  /**
+   * The recipe half of the Tags & Categories reference count is published as DATA, and the
+   * count has to accompany the rows it describes in every state the store publishes — not
+   * merely arrive by the time the refresh settles.
+   *
+   * The stake is destructive rather than cosmetic. `VocabularyPanel` gates its confirm strip
+   * on the row's `totalUsage`: a tag reading `0 references` renders the `Unused` chip and is
+   * deleted on ONE CLICK with no confirmation. A tag that is referenced only as a recipe
+   * ingredient tag-placeholder — exactly the population issue 689 exists to count — reads
+   * that way the moment this record goes missing or empty while the recipes are published,
+   * and deleting it breaks ingredient matching in every recipe whose placeholder named it.
+   *
+   * Asserted over the whole publish SEQUENCE for that reason: a snapshot taken after the
+   * refresh settles cannot see a phase that published rows without their counts.
+   */
+  it('publishes tag-placeholder counts alongside the recipes in every published state', async () => {
+    const services = createMockServices();
+    const originalRecipeManager = services.getRecipeManager();
+    const placeholderRecipe = makeRecipe({
+      id: 'r-placeholder',
+      name: 'Any Herb Tincture',
+      craftingSystemId: 'sys1',
+      ingredientSets: [
+        {
+          id: 'set-any-herb',
+          name: 'Any herb',
+          ingredientGroups: [
+            {
+              id: 'group-any-herb',
+              // The placeholder shape: it names TAGS rather than a component, so no
+              // component-level count can stand in for it.
+              options: [{ match: { type: 'tags', tags: ['Herb', 'moon'] }, quantity: 1 }],
+            },
+          ],
+        },
+      ],
+    });
+    services.getRecipeManager = () => ({
+      ...originalRecipeManager,
+      getRecipes: (filter) =>
+        [placeholderRecipe].filter(
+          (recipe) =>
+            !filter?.craftingSystemId || recipe.craftingSystemId === filter.craftingSystemId
+        ),
+    });
+
+    const store = createAdminStore(services);
+    const published = [];
+    const unsubscribe = store.viewState.subscribe((state) => {
+      published.push({
+        recipeCount: (state.recipes || []).length,
+        counts: state.recipeTagPlaceholderCounts,
+      });
+    });
+    try {
+      await store.selectSystem('sys1');
+      await store.refresh();
+    } finally {
+      unsubscribe();
+    }
+
+    const withRecipes = published.filter((entry) => entry.recipeCount > 0);
+    assert.ok(
+      withRecipes.length >= 2,
+      'PRE-CONDITION: the cohort really was published, by both `selectSystem` and `refresh` ' +
+        '— a run that published no recipes would satisfy the rule below vacuously'
+    );
+    for (const entry of withRecipes) {
+      assert.deepEqual(
+        entry.counts,
+        { herb: 1, moon: 1 },
+        'every state that carries the recipes carries their placeholder counts, lowercased ' +
+          'and one per named tag — an empty record here reads as "no references" and offers ' +
+          'the tag for one-click deletion'
+      );
+    }
+    assert.deepEqual(
+      get(store.viewState).recipeTagPlaceholderCounts,
+      { herb: 1, moon: 1 },
+      'and the settled state agrees'
+    );
   });
 
   /**

@@ -22,12 +22,14 @@
  * instead of inheriting it. The signature itself is UNCHANGED — a hand-narrowed key would
  * serve a stale card, which is the defect the whole-record serialization exists to prevent.
  *
- * `hydrate()` fills the card IN PLACE and then tells its caller through `onHydrated`. That
- * is a deliberate exception to this module's otherwise-immutable projections: the browser
- * row, the browser inspector and the component editor all read the SAME published card
- * object, and only the browser knows which cards are on screen. Filling in place is what
- * keeps those three surfaces from disagreeing about one component; `onHydrated` is what
- * lets the store re-publish so Svelte sees it.
+ * `hydrate()` fills the card IN PLACE and then tells its caller through `onHydrated`. The
+ * in-place fill is a PRIVATE staging step and nothing more: only the browser knows which
+ * cards are on screen, so the resolution has to land somewhere the asker can reach without
+ * routing a new object back through it. It is NOT how the answer reaches the screen.
+ * `republishHydratedItemCards` is — it swaps each filled card for a fresh object of the same
+ * shape, because a filled-in-place card is invisible to every `===` comparison Svelte makes
+ * on the way to a row, an inspector or an editor. Publishing the same object back is not
+ * "keeping the three surfaces from diverging"; it is keeping all three wrong together.
  *
  * The memo cache is INJECTED (`options.cache`) rather than owned here, so the store keeps
  * its per-store instance and its existing system-id invalidation chokepoint, and a direct
@@ -318,6 +320,15 @@ function _createItemCard(item, systemId, options) {
   // projection. Clearing the slot restores the pre-1081 property that a failed resolution is
   // transient: the next render tries again. The rejection is still re-thrown, because
   // `hydrateItemCards` is awaited by callers that need to see a failure.
+  //
+  // It is also LOGGED here, once per rejection, and that placement is the point. All three
+  // view-side callers swallow the rejection deliberately (a card that cannot resolve keeps
+  // its un-hydrated reading, which renders correctly rather than blankly), so before this
+  // line a persistently failing enricher was completely silent: the GM read a stale
+  // description and the console said nothing. Pre-1081 the same throw aborted the refresh
+  // loudly and tripped the smoke's console-error gate. `console.warn` rather than `error`
+  // because the surface degrades rather than breaks, and because the retry above means one
+  // failing card can re-report on a later render.
   Object.defineProperty(card, 'hydrate', {
     enumerable: false,
     configurable: true,
@@ -325,6 +336,11 @@ function _createItemCard(item, systemId, options) {
     value: () =>
       (pending ??= resolve().catch((error) => {
         pending = null;
+        console.warn(
+          `Fabricate | could not resolve the source document for component "${item.id}"; ` +
+            'the card keeps its stored description and its unverified link state',
+          error
+        );
         throw error;
       })),
   });
@@ -381,5 +397,49 @@ export function hydrateItemCards(cards) {
     (Array.isArray(cards) ? cards : []).map((card) =>
       typeof card?.hydrate === 'function' ? card.hydrate() : card
     )
+  );
+}
+
+/**
+ * Build the array to publish after one or more cards have filled themselves in place, with
+ * every card that just hydrated REPLACED by a fresh object carrying the same own properties
+ * (issue 1081).
+ *
+ * A new array alone is not enough, and that was the defect. The store publishes through a
+ * `writable`, which does not proxy, so Svelte compares by `===` at every hop between the
+ * published array and a rendered string: a `$derived` recomputing to the same object does
+ * not invalidate its dependents, and a keyed `{#each}` reconciling an unchanged item does
+ * not update the row. `selectedComponent`, `componentForEdit`, the browser model's
+ * filter/sort/paginate chain and the row props are all such hops, so re-wrapping the SAME
+ * card objects in a new array left every consumer on the pre-hydration reading permanently —
+ * "No description has been added." for a compendium-linked component whose prose lives on
+ * its source document, and an accent "Linked" pill for a source document that has been
+ * deleted.
+ *
+ * `Object.create(getPrototypeOf, getOwnPropertyDescriptors)` rather than a spread, because
+ * the spread would drop the NON-ENUMERABLE `hydrate` seam and any accessor the card carries.
+ * The copy shares the `hydrate` closure with the original, so it is already settled: asking
+ * the copy to hydrate returns the memoized promise and re-fills the original, which nothing
+ * reads any more. That is why only cards REPORTED as hydrated are replaced — swapping an
+ * un-hydrated card for a copy would strand its eventual fill on an object no longer
+ * published.
+ *
+ * Replacement is safe for the rendered surfaces: `{#each}` keys on `item.id`, which does not
+ * move, so nothing remounts and scroll, focus, the bulk selection and an open editor all
+ * survive. The cost is one extra filter/sort/paginate pass per coalesced republish.
+ *
+ * @param {object[]} cards the currently published card array.
+ * @param {Set<object>} hydratedCards the card objects that reported `onHydrated`, by
+ *   IDENTITY rather than by id — a later refresh can publish a different card under the
+ *   same id, and that one has its own fill still to come.
+ * @returns {object[]} a new array, with the hydrated entries swapped for fresh objects.
+ */
+export function republishHydratedItemCards(cards, hydratedCards) {
+  const published = Array.isArray(cards) ? cards : [];
+  const hydrated = hydratedCards instanceof Set ? hydratedCards : new Set();
+  return published.map((card) =>
+    hydrated.has(card)
+      ? Object.create(Object.getPrototypeOf(card), Object.getOwnPropertyDescriptors(card))
+      : card
   );
 }

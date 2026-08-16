@@ -135,7 +135,10 @@ import {
   DERIVED_RECIPE_PROJECTION_FIELDS,
   withoutDerivedRecipeProjectionFields,
 } from './adminRecipeRowProjection.js';
-import { buildItemCards as _buildItemCards } from './adminComponentRowProjection.js';
+import {
+  buildItemCards as _buildItemCards,
+  republishHydratedItemCards as _republishHydratedItemCards,
+} from './adminComponentRowProjection.js';
 import {
   buildSelectedSystemViewData as _buildSelectedSystemViewData,
   enrichRecipeItemLibrary as _enrichRecipeItemLibrary,
@@ -1763,6 +1766,10 @@ export function createAdminStore(services) {
   // (issue 1081). A page hydrates 25 cards, each resolving on its own microtask, and 25
   // republishes would re-run every `$derived` reading `itemCards` 25 times per page turn.
   let itemCardRepublishScheduled = false;
+  // The cards that reported a fill since the last republish, held by IDENTITY. Only these
+  // get a fresh object; see `_scheduleItemCardRepublish`. Cleared on every republish, so it
+  // never outlives one microtask's worth of hydrations.
+  const hydratedItemCards = new Set();
 
   // --- Computed state ---
   const viewState = writable({
@@ -1863,23 +1870,38 @@ export function createAdminStore(services) {
   }
 
   /**
-   * Republish `itemCards` as a NEW array after one or more cards have filled themselves in
-   * place (issue 1081).
+   * Republish `itemCards` after one or more cards have filled themselves in place
+   * (issue 1081), with each filled card swapped for a FRESH object.
    *
-   * The card objects are deliberately the SAME ones — three surfaces hold references to a
-   * given card and must not diverge — so the only thing that changes is the array identity,
-   * which is what Svelte's `$derived` compares. Coalesced onto a microtask because a page
-   * hydrates 25 cards independently and 25 republishes would re-run every reader 25 times
-   * per page turn.
+   * A new array holding the same card objects is not enough. This store publishes through a
+   * `writable`, which does not proxy, so Svelte compares by `===` at every hop between the
+   * published array and a rendered string — `selectedComponent`, `componentForEdit`, the
+   * browser model's filter/sort/paginate chain, and the keyed `{#each}` reconciling a row.
+   * A card whose identity did not move stops at the first of them, so re-wrapping the same
+   * objects left every surface on the pre-hydration reading permanently rather than for a
+   * beat. Preserving card identity looked like it kept the three surfaces from diverging; it
+   * kept all three wrong together.
+   *
+   * Which cards to swap comes from the `onHydrated` callbacks themselves, by identity: a
+   * refresh that landed between the fill and this microtask has published different card
+   * objects, and those have their own fills still to come.
+   *
+   * Coalesced onto a microtask because a page hydrates 25 cards independently and 25
+   * republishes would re-run every reader 25 times per page turn.
+   *
+   * @param {object} [card] the card that just hydrated.
    */
-  function _scheduleItemCardRepublish() {
+  function _scheduleItemCardRepublish(card) {
+    if (card) hydratedItemCards.add(card);
     if (itemCardRepublishScheduled) return;
     itemCardRepublishScheduled = true;
     queueMicrotask(() => {
       itemCardRepublishScheduled = false;
+      const hydrated = new Set(hydratedItemCards);
+      hydratedItemCards.clear();
       viewState.update((state) => ({
         ...state,
-        itemCards: [...(state.itemCards || [])],
+        itemCards: _republishHydratedItemCards(state.itemCards || [], hydrated),
       }));
     });
   }
@@ -4600,11 +4622,11 @@ export function createAdminStore(services) {
         essenceDefinitionById,
         enrichToHtml: services?.enrichToHtml,
         cache: itemCardCache,
-        // A card fills itself IN PLACE when the browser hydrates it (issue 1081), which
-        // Svelte cannot see: `itemCards` is still the same array of the same objects. The
-        // republish below hands out a NEW array so every `$derived` reading it — the browser
-        // rows, the browser inspector and the component editor, which all read the same card
-        // object — re-runs against the filled card.
+        // A card fills itself IN PLACE when a view hydrates it (issue 1081), which Svelte
+        // cannot see: the array and the object are both unchanged by `===`. The republish
+        // this schedules hands out a new array AND a fresh object for each filled card, which
+        // is what actually reaches the browser rows, the browser inspector, the component
+        // editor and the gathering picker.
         onHydrated: _scheduleItemCardRepublish,
       });
     }

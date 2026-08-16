@@ -466,8 +466,14 @@ describe('adminRecipeRowProjection: summary tier vs detail tier', () => {
     assert.equal(
       calls.previewSets,
       25,
-      'including the preview builder — one ingredient set mapped per row read, and it is ' +
-        'the counter that would move first if the preview went back to being eager'
+      'including the preview builder — one ingredient set MAPPED per row read. What this ' +
+        'counter observes is `map` specifically, which is precisely what separates the ' +
+        "preview from the summary tier's `for...of` fold over the same array. So a red here " +
+        'means one of two things, and they are not the same thing: the preview went eager ' +
+        'again (the regression this guards), or the preview kept its behaviour and stopped ' +
+        'using `map`, which blinds the instrument. In the second case re-point the counter ' +
+        'at the new iteration — do not relax the assertion, which is how the separation ' +
+        'stops being measured at all.'
     );
 
     for (const row of rows.slice(0, 25)) void row.enableBlocked;
@@ -672,8 +678,14 @@ describe('adminComponentRowProjection.buildItemCards (direct, no store)', () => 
    * rejected promise turns one transient failure into a permanent one for that card, plus an
    * unhandled rejection on every subsequent render, where the previous behaviour was a loud
    * failure of the whole refresh that the next refresh cleared.
+   *
+   * It must also be AUDIBLE. All three view-side callers swallow the rejection deliberately —
+   * a card that cannot resolve keeps its un-hydrated reading, which renders correctly rather
+   * than blankly — so without a log here a persistently failing enricher leaves the GM on a
+   * stale description with nothing at all in the console. Pre-1081 the same throw aborted the
+   * refresh loudly and tripped the smoke run's console-error gate.
    */
-  it('does not memoize a REJECTED hydration, so a later render retries', async () => {
+  it('does not memoize a REJECTED hydration, so a later render retries — and says so', async () => {
     const component = {
       id: 'c-throw',
       name: 'Thrown',
@@ -686,6 +698,9 @@ describe('adminComponentRowProjection.buildItemCards (direct, no store)', () => 
     };
     const originalFromUuid = globalThis.fromUuid;
     globalThis.fromUuid = async () => ({ system: { description: { value: 'Live prose' } } });
+    const originalWarn = console.warn;
+    const warnings = [];
+    console.warn = (...args) => warnings.push(args);
     let enrichAttempts = 0;
     try {
       const [card] = await buildItemCards(
@@ -707,11 +722,30 @@ describe('adminComponentRowProjection.buildItemCards (direct, no store)', () => 
       await assert.rejects(() => card.hydrate(), /enricher blew up/);
       assert.equal(card.description, '', 'the card keeps its un-hydrated reading');
 
+      assert.equal(
+        warnings.length,
+        1,
+        'the failure is LOGGED — every view-side caller swallows this rejection, so without ' +
+          'a warning here a persistently failing card is completely silent'
+      );
+      assert.match(
+        String(warnings[0][0]),
+        /Fabricate \| could not resolve the source document for component "c-throw"/,
+        'and it names the component, so a GM staring at a stale description can be told which'
+      );
+      assert.match(String(warnings[0][1]), /enricher blew up/, 'carrying the original error');
+
       await card.hydrate();
       assert.equal(enrichAttempts, 2, 'the retry really re-ran the resolution');
       assert.equal(card.description, 'Live prose', 'and the second attempt fills the card');
+      assert.equal(
+        warnings.length,
+        1,
+        'a SUCCESSFUL retry adds nothing — the log follows the rejection, not the render'
+      );
     } finally {
       globalThis.fromUuid = originalFromUuid;
+      console.warn = originalWarn;
     }
   });
 

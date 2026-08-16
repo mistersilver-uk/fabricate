@@ -1207,6 +1207,8 @@ Enabling a recipe still refuses exactly the recipes the row pills mark, because 
 
 Scoping is a matter of WHEN the work happens and never of what the surface reports: a paged library's counts, order, chips, selection and every rendered value are identical to those an unpaged one would show.
 The selected entity's inspector stays fully detailed and current, and a GM who never leaves page 1 pays for page 1.
+Where the page-scoped work is asynchronous — a component's linked source document is a real document fetch — the row and the inspector first render the stored reading and then **correct in place** as each resolution lands: a component's description settles to its source document's prose, and its source pill settles from the accent `Linked` to the amber `Missing` for a document that has been deleted.
+The correction must actually reach every surface reading that entity, and rows keep their identity across it, so nothing remounts and scroll position, focus, the bulk selection and an open inspector or editor all survive.
 
 The **blocked-enable flash**: enabling a recipe is gated — an incomplete recipe, or one whose signature conflicts, is refused.
 The refusal renders as an in-window, dismissible `role="alert"` flash inside the library, and the store **suppresses** its Foundry notification whenever the library claims that message, so the same error is never reported twice (once in-window and once in a toast behind a maximised manager window).

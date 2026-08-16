@@ -31,6 +31,12 @@ import { getModifierExpressionSuggestions } from '../../src/config/modifierExpre
 import { ANNOUNCE_AFTER_FOCUS_MS } from '../../src/ui/svelte/util/announceAfterFocus.js';
 import { createManagerExtensionsRegistry } from '../../src/ui/managerExtensions.js';
 import { MANAGER_HOOKS } from '../../src/config/hooks.js';
+// The shipped array transform the store publishes hydrated cards through (issue 1081). The
+// DOM guards below drive the REAL one rather than restating it, so a revert to re-wrapping
+// the same card objects turns them red. Safe to import here: the projection is a deliberate
+// leaf with no `.svelte` and no Foundry globals in its graph, and this is the test file's own
+// module scope rather than the compiled mount closure.
+import { republishHydratedItemCards } from '../../src/ui/svelte/stores/adminComponentRowProjection.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 const sharedComponentNames = [
@@ -1693,6 +1699,13 @@ function createStore(calls = [], options = {}) {
       { name: 'elixirs', count: 1 },
       { name: 'potions', count: 1 },
     ],
+    // The recipe half of the Tags & Categories reference count, published as DATA by the
+    // real store (issue 1081) so the always-mounted nav badge does not have to walk the
+    // rows' detail tier for it. Left UNDEFINED by default, which is what makes the default
+    // rows' counts unchanged: an absent record means "not published", and the component
+    // falls back to walking exactly as it did before. Tests asserting on the pre-counted
+    // branch publish it, as the store does on every one of its publishes.
+    recipeTagPlaceholderCounts: options.recipeTagPlaceholderCounts,
     recipeSearchTerm: '',
     itemSearchTerm: options.itemSearchTerm || '',
     experimentalFeaturesEnabled: options.experimentalFeaturesEnabled === true,
@@ -21963,6 +21976,326 @@ describe('CraftingSystemManager mounted behavior', () => {
         requests.has('c2'),
         true,
         'the picker asked its own rendered page to hydrate'
+      );
+    });
+  });
+
+  // ── A hydrated card actually REACHES the screen (issue 1081) ─────────────────────────
+  //
+  // Every other assertion about hydration in this repo is a spy: it proves `hydrate()` was
+  // CALLED. All of them stay green while the answer never reaches a pixel, because the card
+  // fills itself IN PLACE and the store publishes through a `writable`, which does not proxy
+  // — so Svelte compares by `===` at `selectedComponent`, at the browser model, and at the
+  // keyed `{#each}`, and a card whose identity did not move stops at the first of them.
+  //
+  // These read the DOM, and they use the SAME fixture for the pre-hydration reading, which
+  // is the control: the "before" strings are what a defect leaves on the screen for ever,
+  // not for a beat. The republish is driven through the shipped
+  // `republishHydratedItemCards`, so reverting it to a re-wrap of the same objects turns
+  // these red.
+  //
+  // Do NOT restate this against a `$state` fixture. `$state` deep-proxies, so a fresh proxy
+  // has fresh per-property sources and the defect disappears; production does not proxy.
+  describe('a hydrated component card reaches the rendered surfaces (issue 1081)', () => {
+    /** The resolution `hydrate()` produces for a linked component whose document is gone. */
+    const RESOLVED = Object.freeze({
+      description: 'Prose from the source document',
+      hasDescription: true,
+      sourceMissing: true,
+      sourceOrigin: 'missing',
+      sourceOriginLabel: 'Missing',
+    });
+
+    /**
+     * A card in the shape the real projection hands out for a compendium-linked component
+     * with NO stored description: the un-hydrated reading, plus the non-enumerable `hydrate`
+     * seam. Its promise is settled by the returned `fill`, so the test controls exactly when
+     * the resolution lands and can read the DOM on both sides of it.
+     */
+    function makeLinkedCard(onHydrated) {
+      const card = {
+        id: 'linked-1',
+        name: 'Aether Salt',
+        img: 'icons/svg/item-bag.svg',
+        description: '',
+        hasDescription: false,
+        category: 'general',
+        tags: [],
+        essences: [],
+        salvageSummary: null,
+        registeredItemUuidDisplay: 'Compendium.pack.Item.source-1',
+        hasRegisteredItemUuid: true,
+        sourceMissing: false,
+        sourceOrigin: 'compendium',
+        sourceOriginLabel: 'Linked Compendium',
+        showTags: true,
+        showEssences: true,
+      };
+      let settle;
+      const pending = new Promise((resolve) => {
+        settle = resolve;
+      });
+      Object.defineProperty(card, 'hydrate', {
+        enumerable: false,
+        configurable: true,
+        writable: true,
+        value: () => pending,
+      });
+      return {
+        card,
+        // Exactly what the projection's `resolve()` does, in exactly that order.
+        fill: () => {
+          Object.assign(card, RESOLVED);
+          onHydrated(card);
+          settle(card);
+        },
+      };
+    }
+
+    /** The store's coalesced republish, over the shipped array transform. */
+    function republisher(store) {
+      const hydrated = new Set();
+      let scheduled = false;
+      return (card) => {
+        hydrated.add(card);
+        if (scheduled) return;
+        scheduled = true;
+        queueMicrotask(() => {
+          scheduled = false;
+          const batch = new Set(hydrated);
+          hydrated.clear();
+          store.viewState.update((state) => ({
+            ...state,
+            itemCards: republishHydratedItemCards(state.itemCards, batch),
+          }));
+        });
+      };
+    }
+
+    async function openComponentStudioWithLinkedCard() {
+      const store = createStore([], {});
+      const { card, fill } = makeLinkedCard(republisher(store));
+      store.viewState.update((state) => ({ ...state, itemCards: [card] }));
+
+      target = document.createElement('div');
+      document.body.appendChild(target);
+      mounted = mount(Component, {
+        target,
+        props: { store, services: { openCurrentAdmin: () => {}, onDropItem: () => {} } },
+      });
+      flushSync();
+      navButton('Components').click();
+      await tick();
+      flushSync();
+      return { fill };
+    }
+
+    const inspectorDescription = () =>
+      target.querySelector('[data-component-inspector] .manager-component-browser-inspector-flavour')
+        .textContent.trim();
+    const inspectorPillTone = () =>
+      target.querySelector('[data-component-inspector] [data-status-pill]').dataset.statusPill;
+    const rowDescription = () =>
+      target
+        .querySelector('[data-component-id="linked-1"] .manager-system-description')
+        .textContent.trim();
+
+    it('replaces the inspector prose and flips the source pill from Linked to Missing', async () => {
+      const { fill } = await openComponentStudioWithLinkedCard();
+
+      // CONTROL, same fixture: the pre-hydration reading. This is the regression issue 676
+      // filed and issue 800 preserved, and an accent pill telling the GM a dangling link is
+      // healthy — so these three strings are what a broken republish leaves on screen.
+      assert.equal(
+        inspectorDescription(),
+        'No description has been added.',
+        'pre-condition: the un-hydrated card has no prose to show'
+      );
+      assert.equal(inspectorPillTone(), 'accent', 'pre-condition: it reads as a healthy link');
+      assert.ok(
+        !target.querySelector('[data-component-source-missing]'),
+        'pre-condition: and offers no remediation paragraph'
+      );
+
+      fill();
+      await tick();
+      await tick();
+      flushSync();
+
+      assert.equal(
+        inspectorDescription(),
+        RESOLVED.description,
+        'the resolved prose REACHES the inspector — a fill the GM never sees is the whole ' +
+          'defect, and every spy in this repo stays green through it'
+      );
+      assert.equal(
+        inspectorPillTone(),
+        'warning',
+        'and the pill flips to the amber Missing tone, so a deleted source document is not ' +
+          'reported as a healthy link'
+      );
+      assert.ok(
+        Boolean(target.querySelector('[data-component-source-missing]')),
+        'and the remediation paragraph renders'
+      );
+    });
+
+    it('replaces the browser row prose too, through the keyed each and the row props', async () => {
+      const { fill } = await openComponentStudioWithLinkedCard();
+
+      assert.equal(
+        rowDescription(),
+        'No description',
+        'pre-condition: the row shows its own (shorter) empty-description fallback'
+      );
+
+      fill();
+      await tick();
+      await tick();
+      flushSync();
+
+      assert.equal(
+        rowDescription(),
+        RESOLVED.description,
+        'the row updates as well — the keyed `{#each}` compares the ITEM by `===`, so a card ' +
+          'filled in place and handed back is invisible to it'
+      );
+      assert.ok(
+        Boolean(target.querySelector('[data-component-id="linked-1"]')),
+        'and the row is the same key, so nothing remounted'
+      );
+    });
+  });
+
+  // ── The nav badge reads the pre-counted tag placeholders (issue 1081) ────────────────
+  //
+  // The Tags & Categories count badge is a SIBLING of the view switch, so it re-derives on
+  // every render of the manager in every view. Counting recipe tag placeholders in the
+  // component reads `ingredientSets` and `steps` off each projected row, and those are
+  // DETAIL-tier fields sharing one memoized producer whose first read deep-clones the whole
+  // recipe body — so an always-mounted badge materialised the entire library before first
+  // paint. The store publishes the count as data instead.
+  //
+  // Both legs are stated here because the threading has a destructive failure mode as well
+  // as a slow one: `VocabularyPanel` deletes a row reading `0 references` in ONE CLICK with
+  // no confirm strip, and a tag referenced only by a recipe ingredient placeholder is
+  // exactly the population that reads that way when the count goes missing.
+  describe('the Tags & Categories badge reads pre-counted placeholders (issue 1081)', () => {
+    /**
+     * A projected recipe row whose detail-tier fields are COUNTING getters.
+     *
+     * They are the two fields `countRecipeTagPlaceholders` walks, and on a real row reading
+     * either one builds the whole detail bundle. A row that simply carried the arrays could
+     * not tell a pre-counted read from a walk.
+     */
+    function countingRecipeRow(reads) {
+      const ingredientSets = [
+        {
+          id: 'set-any-herb',
+          name: 'Any herb',
+          ingredientGroups: [
+            {
+              id: 'group-any-herb',
+              options: [{ match: { type: 'tags', tags: ['herb'] }, quantity: 1 }],
+            },
+          ],
+        },
+      ];
+      const row = {
+        id: 'r-placeholder',
+        name: 'Any Herb Tincture',
+        img: 'icons/consumables/potions/potion-bottle-corked-red.webp',
+        description: 'Accepts any herb.',
+        category: 'potions',
+        enabled: true,
+        locked: false,
+        isSimple: true,
+        structureLabel: 'Simple',
+        stepCount: 1,
+        resultGroupCount: 1,
+        ingredientCount: 1,
+        toolCount: 0,
+        requirementsPreview: [],
+        visibilitySummary: 'All players',
+        ingredients: new Array(1),
+        tools: [],
+      };
+      for (const [field, value] of [
+        ['ingredientSets', ingredientSets],
+        ['steps', []],
+      ]) {
+        Object.defineProperty(row, field, {
+          enumerable: true,
+          configurable: true,
+          get() {
+            reads[field] += 1;
+            return value;
+          },
+        });
+      }
+      return row;
+    }
+
+    it('renders the reference without reading the detail tier, and CAN read it', async () => {
+      const reads = { ingredientSets: 0, steps: 0 };
+      const row = countingRecipeRow(reads);
+      mountManager([], {
+        recipes: [row],
+        // As the real store publishes it, on every one of its publishes: `herb` is named by
+        // one recipe placeholder and by no component in this fixture.
+        recipeTagPlaceholderCounts: { herb: 1 },
+      });
+
+      // THE PERF LEG. The badge has already rendered — it is a sibling of every view — and
+      // this route is not the Recipe Studio, so nothing here has any business touching a
+      // recipe's detail tier.
+      assert.equal(
+        target.querySelectorAll('[data-tag-id]').length,
+        0,
+        'pre-condition: the Tags & Categories screen is not the mounted route'
+      );
+      assert.deepEqual(
+        reads,
+        { ingredientSets: 0, steps: 0 },
+        'the always-mounted badge answered from the published record and walked nothing'
+      );
+
+      // THE CORRECTNESS LEG, same fixture. `herb` is referenced ONLY as a recipe ingredient
+      // tag-placeholder. Reading it as unused would render the Unused chip and make it
+      // deletable in one click with no confirm strip, breaking ingredient matching in every
+      // recipe whose placeholder named it.
+      navButton('Tags & Categories').click();
+      await tick();
+      flushSync();
+      target.querySelector('[data-vocabulary-tab="tag"]').click();
+      await tick();
+      flushSync();
+
+      const herbRow = target.querySelector('[data-tag-id="herb"]');
+      assert.ok(Boolean(herbRow), 'pre-condition: the tag tab lists `herb`');
+      assert.ok(
+        !herbRow.querySelector('.manager-vocabulary-chip-unused'),
+        'a tag used only as a recipe ingredient placeholder is NOT unused'
+      );
+      assert.match(
+        herbRow.textContent,
+        /1 reference/,
+        'and the row reports that one reference'
+      );
+      assert.deepEqual(
+        reads,
+        { ingredientSets: 0, steps: 0 },
+        'reaching the screen that renders the number still walked nothing'
+      );
+
+      // POSITIVE CONTROL, same fixture and the same counters: the getters are live, so the
+      // zeros above are a measurement rather than two fields nothing could ever have read.
+      void row.ingredientSets;
+      void row.steps;
+      assert.deepEqual(
+        reads,
+        { ingredientSets: 1, steps: 1 },
+        'the counters CAN go up — reading either field is what does it'
       );
     });
   });
