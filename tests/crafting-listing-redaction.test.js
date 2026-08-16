@@ -53,6 +53,16 @@ const LIBRARY = Object.freeze([
   },
   { id: 'c-slag', name: 'Cooled Slag', img: 'icons/slag.webp', difficulty: 3 },
   { id: 'c-warding-nail', name: 'Warding Nail', img: 'icons/nail.webp', difficulty: 4 },
+  // Tags are authored on the COMPONENT definition, which is the only place Fabricate ever
+  // writes them (issue 857). The tag-matched fixtures below hold an item that carries no
+  // `flags.fabricate.tags` of its own, exactly as a real owned stack does.
+  {
+    id: 'c-brine-salt',
+    name: 'Brine Salt',
+    img: 'icons/salt.webp',
+    difficulty: 1,
+    tags: ['quenchant'],
+  },
 ]);
 
 /** The one authored result group every fixture recipe routes to. */
@@ -206,8 +216,8 @@ const ACTOR = Object.freeze({
  * THE ADAPTER — see the header. `rows` is what the browser list renders; `detailFor` is
  * what the inspector renders for one recipe.
  */
-function playerView({ builder }, viewer = PLAYER) {
-  const listing = builder.buildListing({ craftingActor: ACTOR, viewer });
+function playerView({ builder }, viewer = PLAYER, craftingActor = ACTOR) {
+  const listing = builder.buildListing({ craftingActor, viewer });
   const rows = listing.summaries;
   return {
     listing,
@@ -216,7 +226,7 @@ function playerView({ builder }, viewer = PLAYER) {
     // Deliberately by ID and with no `access` argument, so the detail phase re-resolves
     // visibility for itself. Handing it the row's access would test the projection while
     // skipping the gate that decides whether the projection may run at all.
-    detailFor: (id) => builder.buildRecipeDetail({ recipeId: id, craftingActor: ACTOR, viewer }),
+    detailFor: (id) => builder.buildRecipeDetail({ recipeId: id, craftingActor, viewer }),
   };
 }
 
@@ -468,5 +478,173 @@ describe('crafting redaction — a blocked system exposes nothing to a player', 
       })
     );
     assert.equal(view.rows.length, 1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The material verdict a row actually carries
+// ---------------------------------------------------------------------------
+
+/** A tag-matched recipe: 2x anything carrying the authored `quenchant` tag. */
+function brineRecipe() {
+  return forgeRecipe({
+    id: 'r-brined-nails',
+    name: 'Brined Nails',
+    ingredientSets: [
+      {
+        id: 'set-brine',
+        name: 'Quenched in brine',
+        essences: {},
+        ingredientGroups: [
+          {
+            id: 'grp-quenchant',
+            options: [
+              { quantity: 2, match: { type: 'tags', tags: ['quenchant'], tagMatch: 'any' } },
+            ],
+          },
+        ],
+      },
+    ],
+  });
+}
+
+/**
+ * An actor holding `quantity` Brine Salt and NOTHING ELSE.
+ *
+ * The held item carries no `flags.fabricate.tags`, because Fabricate never stamps that flag
+ * onto an inventory item — its tags come from the `c-brine-salt` component it resolves to.
+ */
+function brineActor(quantity) {
+  return {
+    id: 'actor-brine',
+    name: 'Wren',
+    items: [{ uuid: 'Item.salt-1', name: 'Brine Salt', system: { quantity } }],
+  };
+}
+
+const visible = (recipe) => ({ recipe, access: { visible: true, reason: 'ok' } });
+
+describe('crafting availability — a row says what the actor really holds', () => {
+  it('reports a tag-matched recipe AVAILABLE from the component-authored tags', () => {
+    // The defect this pins (issue 857 read forwards): authored tags live on the managed
+    // component, never on the owned item's flags. A tally reading only the item flag is
+    // empty in every real world, so every tag-matched option reported `false` — the row
+    // painted "Missing materials" while the inspector this PR hydrates from the exact model
+    // said "Available", on the same screen, in the direction the contract forbids.
+    const view = playerView(
+      forgeBuilder({ entries: [visible(brineRecipe())] }),
+      PLAYER,
+      brineActor(4)
+    );
+    const row = view.rowFor('r-brined-nails');
+
+    assert.equal(row.availability.available, true, 'four salts cover a 2x quenchant requirement');
+    assert.equal(row.availability.optimistic, true, 'and it still advertises its imprecision');
+    assert.equal(row.browseStatus, CRAFTING_BROWSE_STATUS.AVAILABLE);
+    assert.equal(view.listing.counts.available, 1);
+  });
+
+  it('non-vacuity: the same tag requirement goes short when the actor holds too few', () => {
+    // Without this the assertion above passes for a projection that answers `true` for
+    // everything, which is precisely what a summary phase that stopped consulting the
+    // snapshot would do — the FAIL-OPEN direction.
+    const view = playerView(
+      forgeBuilder({ entries: [visible(brineRecipe())] }),
+      PLAYER,
+      brineActor(1)
+    );
+    const row = view.rowFor('r-brined-nails');
+
+    assert.equal(row.availability.available, false, 'one salt cannot cover a 2x requirement');
+    assert.equal(row.browseStatus, CRAFTING_BROWSE_STATUS.MISSING_MATERIALS);
+    assert.equal(view.listing.counts.available, 0);
+  });
+
+  it('carries a non-null availability on an ordinary component-matched row', () => {
+    // `assert.ok(!row.availability)` on the redacted row is only a controlled negative if
+    // something asserts the field IS populated when it should be. Without this pair, a
+    // summary phase that stopped passing the snapshot altogether would leave every
+    // assertion in this file green while every player row read "available" regardless of
+    // inventory.
+    const row = playerView(forgeBuilder({ entries: [visible(forgeRecipe())] })).rowFor(
+      'r-warding-nails'
+    );
+    assert.equal(row.availability.available, true, 'the actor holds 4 of the 2 required');
+    assert.equal(row.availability.optimistic, true);
+    assert.equal(row.browseStatus, CRAFTING_BROWSE_STATUS.AVAILABLE);
+  });
+
+  it('paints missingMaterials for a component requirement the actor cannot cover', () => {
+    const bare = { id: 'actor-bare', name: 'Fern', items: [] };
+    const view = playerView(forgeBuilder({ entries: [visible(forgeRecipe())] }), PLAYER, bare);
+    const row = view.rowFor('r-warding-nails');
+
+    assert.equal(row.availability.available, false);
+    assert.equal(row.browseStatus, CRAFTING_BROWSE_STATUS.MISSING_MATERIALS);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The detail phase's own gates — an id is not a permission
+// ---------------------------------------------------------------------------
+
+describe('crafting detail gates — hydrating by id re-applies every summary-phase gate', () => {
+  it('answers nothing for an id no recipe exists for', () => {
+    const view = playerView(forgeBuilder({ entries: [visible(forgeRecipe())] }));
+    assert.equal(view.detailFor('r-not-a-recipe'), null);
+    assert.ok(view.detailFor('r-warding-nails'), 'non-vacuity: the real id still hydrates');
+  });
+
+  it('re-applies the system block; an id is not a permission', () => {
+    // `hydrateCraftingRecipe({recipeId})` is client-reachable and the id arrives from the
+    // client. Without this gate a player passes a blocked system's recipe id and receives
+    // the full rich model — description, ingredient sets, check DC, outcome tiers.
+    const blocked = () =>
+      forgeBuilder({
+        entries: [visible(forgeRecipe())],
+        isSystemBlockedForRecipes: (id) => id === FORGE_ID,
+      });
+
+    assert.equal(playerView(blocked()).detailFor('r-warding-nails'), null);
+    assert.ok(
+      playerView(blocked(), GAME_MASTER).detailFor('r-warding-nails'),
+      'non-vacuity: the GM bypass still hydrates it'
+    );
+  });
+
+  it('answers nothing when access resolves invisible for an entry that IS in the pass', () => {
+    // This pins the deliberate `=== false` rather than `!== true` read: an access result
+    // that explicitly says `visible: false` blanks the inspector, while a hand-built result
+    // carrying only a `reason` does not.
+    const hidden = forgeBuilder({
+      entries: [{ recipe: forgeRecipe(), access: { visible: false, reason: 'visibility' } }],
+    });
+    assert.equal(playerView(hidden).detailFor('r-warding-nails'), null);
+
+    const reasonOnly = forgeBuilder({
+      entries: [{ recipe: forgeRecipe(), access: { reason: 'ok' } }],
+    });
+    assert.ok(
+      playerView(reasonOnly).detailFor('r-warding-nails'),
+      'non-vacuity: an access result with no `visible` flag is not read as invisible'
+    );
+  });
+
+  it('answers nothing for a recipe the GM has disabled', () => {
+    // The summary phase sources from `getRecipes({enabled: true})`, so it can never project
+    // a disabled recipe. `recipeManager.getRecipe` applies no such filter, so without this
+    // gate a player who holds an id from before the GM disabled it — or any id at all —
+    // hydrates the full model of a recipe the summary phase would refuse to list.
+    const disabled = () => forgeBuilder({ entries: [visible(forgeRecipe({ enabled: false }))] });
+
+    assert.equal(playerView(disabled()).detailFor('r-warding-nails'), null);
+    assert.ok(
+      playerView(disabled(), GAME_MASTER).detailFor('r-warding-nails'),
+      'non-vacuity: a GM authoring the disabled recipe still sees it'
+    );
+    assert.ok(
+      playerView(forgeBuilder({ entries: [visible(forgeRecipe())] })).detailFor('r-warding-nails'),
+      'non-vacuity: the same recipe hydrates for a player while it is enabled'
+    );
   });
 });
