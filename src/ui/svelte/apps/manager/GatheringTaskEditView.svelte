@@ -123,6 +123,18 @@
       (componentPageIndex + 1) * componentPageSize
     )
   );
+  // This picker paginates the SAME `itemCards` the component browser renders, and since
+  // issue 1081 a card's linked source document — and therefore the live description fallback
+  // this picker's "No description has been added." message is the absence of — resolves on
+  // demand rather than during the store's refresh. This view never mounts
+  // `ComponentsBrowserView`, so without asking here a GM who comes straight to the gathering
+  // task editor sees that fallback on every compendium-linked component with an empty stored
+  // description, permanently. Scoped to this picker's own page, exactly as the browser scopes
+  // to its own; see `ComponentsBrowserView` for why it is called off the card rather than
+  // through the projection helper, and why the rejection is swallowed.
+  $effect(() => {
+    for (const card of paginatedComponentCards) card?.hydrate?.()?.catch?.(() => {});
+  });
   const componentShowingStart = $derived(
     filteredComponentCards.length === 0 ? 0 : componentPageIndex * componentPageSize + 1
   );

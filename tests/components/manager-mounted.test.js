@@ -82,6 +82,30 @@ let target;
 // `# cancelled 348` behind one "does not provide an export named 'onDestroy'" (issue 1185).
 const SVELTE_PACKAGE_EXPORTS = new Set(['onDestroy', 'onMount', 'mount', 'unmount', 'hydrate']);
 
+/**
+ * A copy of `card` carrying the projection's non-enumerable `hydrate()` seam, recording its
+ * own id in `requests` when a view asks for it (issue 1081).
+ *
+ * Non-enumerable exactly as `adminComponentRowProjection` defines it, so the spread, the
+ * `JSON.stringify` and the bulk-edit models the manager runs over these cards cannot see it.
+ *
+ * @param {object} card
+ * @param {Set<string>} requests
+ * @returns {object}
+ */
+function withHydrateSpy(card, requests) {
+  const copy = { ...card };
+  Object.defineProperty(copy, 'hydrate', {
+    enumerable: false,
+    configurable: true,
+    value: () => {
+      requests.add(copy.id);
+      return Promise.resolve(copy);
+    },
+  });
+  return copy;
+}
+
 function rewriteClientImports(code) {
   return code
     .replace(/import \{([^}]*)\} from 'svelte';/g, (_match, names) => {
@@ -1934,11 +1958,22 @@ function createStore(calls = [], options = {}) {
     const padded = options.extraComponentItems
       ? [...(componentItems[id] || []), ...options.extraComponentItems]
       : componentItems[id] || [];
-    const cards = padded.map((item) =>
-      options.missingComponentSource && item.id === 'c1'
-        ? { ...item, sourceMissing: true, sourceOrigin: 'missing', sourceOriginLabel: 'Missing' }
-        : item
-    );
+    const cards = padded
+      .map((item) =>
+        options.missingComponentSource && item.id === 'c1'
+          ? { ...item, sourceMissing: true, sourceOrigin: 'missing', sourceOriginLabel: 'Missing' }
+          : item
+      )
+      // Issue 1081: the real projection hands out cards carrying a NON-ENUMERABLE `hydrate()`
+      // that resolves the card's linked source document — the "Missing" verdict and the live
+      // description fallback — only when a view asks for it. Opting in records which cards
+      // the manager asked for; a fresh copy per call, because a refresh really does project
+      // fresh card objects and the request has to be re-made against them.
+      .map((item) =>
+        options.componentHydrationRequests
+          ? withHydrateSpy(item, options.componentHydrationRequests)
+          : item
+      );
     // `itemCards` is the SEARCH-FILTERED list. In production `_buildItemCards` calls
     // `CraftingSystemManager.getItems(systemId, itemSearchTerm)`, which returns the whole
     // managed list for an empty search and a name/description/uuid/tag-matched subset
@@ -21754,6 +21789,181 @@ describe('CraftingSystemManager mounted behavior', () => {
       await settleRail();
       await settleRail();
       assert.ok(!isExpanded(downtime), 'and the collapse sticks off-route');
+    });
+  });
+
+  // ── The selected and edited component card hydrate too (issue 1081) ──────────────────
+  //
+  // A component card arrives cheap and resolves its linked source document — the "Missing"
+  // verdict and the live description fallback — only when a view asks it to.
+  // `ComponentsBrowserView` asks for the page it renders, and that is the ONLY ask in the
+  // application. But the inspector's selection and the editor's subject are both resolved
+  // from the WHOLE cohort rather than from that page, so without an ask here they render the
+  // pre-hydration reading permanently: "No description has been added." for a
+  // compendium-linked component whose prose lives on its source document, which is the
+  // regression issue 676 filed and issue 800 preserved, and an accent "Linked" pill telling
+  // the GM a dangling link is healthy.
+  describe('component hydration reaches the selected and edited card (issue 1081)', () => {
+    /** 30 cards in their own category, so they fill page 1 and push the stored-first card off it. */
+    const AETHER_LIBRARY = Array.from({ length: 30 }, (_, index) => ({
+      id: `x${String(index + 1).padStart(2, '0')}`,
+      name: `Aether ${String(index + 1).padStart(2, '0')}`,
+      img: 'icons/svg/item-bag.svg',
+      description: '',
+      category: 'Aether',
+      tags: [],
+      essences: [],
+      registeredItemUuidDisplay: '',
+      hasRegisteredItemUuid: false,
+      sourceOrigin: 'unknown',
+      sourceOriginLabel: 'Unknown',
+      sourceMissing: false,
+      showTags: true,
+      showEssences: true,
+    }));
+
+    function mountManager(storeOptions) {
+      target = document.createElement('div');
+      document.body.appendChild(target);
+      mounted = mount(Component, {
+        target,
+        props: {
+          store: createStore([], storeOptions),
+          services: { openCurrentAdmin: () => {}, onDropItem: () => {} },
+        },
+      });
+      flushSync();
+      return target;
+    }
+
+    function renderedComponentIds() {
+      return Array.from(target.querySelectorAll('[data-component-id]')).map(
+        (row) => row.dataset.componentId
+      );
+    }
+
+    it('asks the OFF-PAGE default selection to hydrate, and no other off-page card', async () => {
+      const requests = new Set();
+      mountManager({
+        extraComponentItems: AETHER_LIBRARY,
+        componentHydrationRequests: requests,
+      });
+      navButton('Components').click();
+      await tick();
+      flushSync();
+
+      // The fixture's point: `selectedComponentId` starts empty, so the inspector falls back
+      // to `itemCards[0]` — the manager's STORED order — while the browser renders the
+      // name-sorted, category-major page 1. On any library past one page those are different
+      // cards, which is why the default selection is off-page from the moment the studio opens.
+      const rendered = renderedComponentIds();
+      assert.equal(rendered.length, 25, 'page 1 holds 25 rows');
+      assert.equal(rendered.includes('c1'), false, 'and the stored-first card is NOT among them');
+
+      assert.equal(
+        requests.has('c1'),
+        true,
+        'the off-page default selection was asked to hydrate — the inspector renders it, so ' +
+          'nothing else in the application will ask'
+      );
+      // The negative half, in the same fixture against the same spy: an off-page card that is
+      // NOT the selection costs nothing. Without it, a cohort-wide hydrate would satisfy the
+      // assertion above and defeat the page scoping entirely.
+      assert.equal(
+        requests.has('c2'),
+        false,
+        'an off-page card that is not selected is not asked'
+      );
+      for (const id of rendered) {
+        assert.equal(requests.has(id), true, `the rendered row ${id} was asked`);
+      }
+    });
+
+    it('asks the EDITED card to hydrate on a route that never mounts the browser', async () => {
+      const requests = new Set();
+      mountManager({ componentHydrationRequests: requests });
+
+      // The essence-usage thumbnail routes straight into `component-edit`, so the components
+      // browser — the application's only other ask — is never mounted on this path at all.
+      navButton('Essences').click();
+      await tick();
+      flushSync();
+      assert.equal(
+        target.querySelectorAll('[data-component-id]').length,
+        0,
+        'pre-condition: the components browser is not mounted on the Essences route'
+      );
+
+      requests.clear();
+      target.querySelector('.manager-essence-usage-item').click();
+      flushSync();
+      await tick();
+      flushSync();
+
+      assert.equal(
+        target.querySelector('.fabricate-manager').dataset.managerView,
+        'component-edit',
+        'pre-condition: the thumbnail routed into the component editor'
+      );
+      assert.equal(
+        target.querySelectorAll('[data-component-id]').length,
+        0,
+        'and the editor route still does not mount the browser, so its page effect cannot ' +
+          'be what performs the ask below'
+      );
+      assert.equal(
+        requests.has('c1'),
+        true,
+        'the edited card was asked to hydrate — otherwise the identity strip shows the stale ' +
+          'stored image, "Linked Compendium" for an unresolved source, and an em dash for a ' +
+          'description that lives on the source document'
+      );
+    });
+
+    // The gathering task editor's component picker paginates the SAME `itemCards`, and it
+    // renders the very "No description has been added." fallback that an un-hydrated
+    // compendium-linked component produces. It never mounts the components browser, so
+    // without its own ask a GM who comes straight here sees that fallback permanently. This
+    // is a regression THIS change would otherwise cause on a gathering surface, so the repair
+    // is scoped to that picker's own page and nothing else about gathering moves.
+    it('asks the gathering task picker page to hydrate, on a route with no components browser', async () => {
+      const requests = new Set();
+      mountManager({ componentHydrationRequests: requests });
+
+      gatheringToggle().click();
+      await tick();
+      flushSync();
+      gatheringSubitem('Tasks').click();
+      await tick();
+      flushSync();
+      target
+        .querySelector('[data-gathering-task-id="task-herbs"] [aria-label="Edit Gather Moon Herbs"]')
+        .click();
+      await tick();
+      flushSync();
+
+      assert.equal(
+        target.querySelector('.fabricate-manager').dataset.managerView,
+        'gathering-task-edit',
+        'pre-condition: the task editor is open'
+      );
+      assert.equal(
+        target.querySelectorAll('[data-component-id]').length,
+        0,
+        'pre-condition: the components browser is not mounted on this route'
+      );
+      const picked = Array.from(
+        target.querySelectorAll('[data-gathering-component-card]')
+      ).map((node) => node.dataset.gatheringComponentCard);
+      assert.ok(picked.includes('c2'), 'pre-condition: the picker rendered the second component');
+
+      // `c2` is never the inspector's selection and never the editor's subject, so the picker
+      // is the only thing in this tree that can have asked for it.
+      assert.equal(
+        requests.has('c2'),
+        true,
+        'the picker asked its own rendered page to hydrate'
+      );
     });
   });
 });

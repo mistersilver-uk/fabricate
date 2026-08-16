@@ -7836,7 +7836,11 @@ describe('createAdminStore', () => {
       delete sys.items;
 
       const originalFromUuid = globalThis.fromUuid;
-      globalThis.fromUuid = async () => liveDoc;
+      const sourceLookups = [];
+      globalThis.fromUuid = async (uuid) => {
+        sourceLookups.push(uuid);
+        return liveDoc;
+      };
       try {
         const store = createAdminStore(services);
         await store.selectSystem('sys1');
@@ -7847,14 +7851,14 @@ describe('createAdminStore', () => {
         // card fills IN PLACE, which is why the same object is returned.
         const card = get(store.viewState).itemCards[0];
         await card?.hydrate?.();
-        return { card, enrichCalls };
+        return { card, enrichCalls, sourceLookups };
       } finally {
         globalThis.fromUuid = originalFromUuid;
       }
     }
 
     it('itemCards prefer a NON-EMPTY stored description over a differing live document (issue 800)', async () => {
-      const { card, enrichCalls } = await itemCardFor(
+      const { card, enrichCalls, sourceLookups } = await itemCardFor(
         {
           id: 'comp-stored',
           name: 'Alchemist’s Supplies',
@@ -7864,6 +7868,15 @@ describe('createAdminStore', () => {
         { liveDoc: { system: { description: { value: 'Something else entirely.' } } } }
       );
 
+      // POSITIVE CONTROL, same fixture, same seam, and load-bearing since issue 1081 made the
+      // resolution on-demand: an un-hydrated card ALREADY carries the stored description and
+      // has already made zero enrich calls, so without proving that hydration actually ran,
+      // both assertions below are satisfied by a card that never resolved anything.
+      assert.deepEqual(
+        sourceLookups,
+        ['Compendium.dnd5e.equipment24.Item.supplies'],
+        'the card really did hydrate — it resolved its linked source document exactly once'
+      );
       assert.equal(card.description, REPORTER_RESOLVED_EXPECTED);
       assert.equal(
         enrichCalls.length,
@@ -8719,5 +8732,123 @@ describe('createAdminStore — failure-result policy (issue 1098)', () => {
       'the sibling consumption flag is carried, not re-defaulted'
     );
     assert.ok(Object.hasOwn(args.updates.salvageCraftingCheck, 'enabled'));
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Issue 1081 — the store's half of the page-scoped component browser
+// ---------------------------------------------------------------------------
+
+describe('adminStore item-card hydration and cohort fetching (issue 1081)', () => {
+  /** Seed `sys1` with `count` compendium-linked components carrying no stored description. */
+  function seedLinkedComponents(services, count) {
+    const sys = services.getCraftingSystemManager().getSystem('sys1');
+    sys.components = Array.from({ length: count }, (_, index) =>
+      makeItem({
+        id: `comp-${index}`,
+        name: `Component ${index}`,
+        description: '',
+        registeredItemUuid: `Compendium.pack.Item.source-${index}`,
+      })
+    );
+    delete sys.items;
+    return sys;
+  }
+
+  /**
+   * A card fills itself IN PLACE, which Svelte cannot see: `itemCards` is still the same
+   * array of the same objects, and the cards are plain rather than `$state`. The republish
+   * handing out a NEW array is therefore the ONLY thing that makes hydration visible at all
+   * — without it the GM keeps the un-hydrated reading forever, and no assertion about the
+   * projection would notice.
+   */
+  it('republishes itemCards as a NEW array once a page of cards has hydrated', async () => {
+    const services = createMockServices();
+    seedLinkedComponents(services, 5);
+
+    const originalFromUuid = globalThis.fromUuid;
+    globalThis.fromUuid = async () => ({ system: { description: { value: 'Live prose' } } });
+    try {
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+
+      let publishes = 0;
+      const unsubscribe = store.viewState.subscribe(() => {
+        publishes += 1;
+      });
+      publishes = 0; // discard `subscribe`'s immediate replay of the current value
+
+      const before = get(store.viewState).itemCards;
+      assert.equal(before.length, 5);
+      assert.equal(before[0].description, '', 'pre-condition: the cards arrive un-hydrated');
+
+      await Promise.all(before.map((card) => card.hydrate()));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      unsubscribe();
+
+      const after = get(store.viewState).itemCards;
+      assert.ok(
+        after !== before,
+        'the store hands out a NEW array — the only signal a reader can see, because the ' +
+          'cards were filled in place'
+      );
+      assert.equal(
+        after[0],
+        before[0],
+        'and the SAME card objects: the browser row, the browser inspector and the component ' +
+          'editor all hold this one object, so replacing it is how they come to disagree'
+      );
+      assert.equal(after[0].description, 'Live prose', 'the resolved reading is now published');
+      assert.equal(
+        publishes,
+        1,
+        'five cards resolving on five separate microtasks coalesce into ONE republish; ' +
+          'without the coalescing a page turn re-runs every reader 25 times'
+      );
+    } finally {
+      globalThis.fromUuid = originalFromUuid;
+    }
+  });
+
+  /**
+   * The roster the essence cards are built from is THREADED into the row projection rather
+   * than re-fetched there, so a 10,000-recipe library is not copied an extra time per GM
+   * refresh. `buildRecipeList`'s own half of that contract is pinned directly in
+   * `admin-projection-modules.test.js` (a supplied roster performs zero fetches, an omitted
+   * one performs exactly one); this pins that the STORE actually supplies it.
+   *
+   * An exact budget rather than a bound, because the quantity is a per-refresh fetch count
+   * and every one of them copies the whole library. The three are the system list's per-system
+   * `recipeCount`, this cohort fetch, and the validation report — dropping the threading adds
+   * a fourth, and any newly added cohort read has to move this number deliberately.
+   */
+  it('fetches the recipe cohort on a fixed per-refresh budget, threading it to the row projection', async () => {
+    const services = createMockServices();
+    const realRecipeManager = services.getRecipeManager();
+    let cohortFetches = 0;
+    services.getRecipeManager = () => ({
+      ...realRecipeManager,
+      getRecipes: (filter) => {
+        if (filter?.craftingSystemId) cohortFetches += 1;
+        return realRecipeManager.getRecipes(filter);
+      },
+    });
+
+    const store = createAdminStore(services);
+    await store.selectSystem('sys1');
+
+    cohortFetches = 0;
+    await store.refresh();
+    assert.equal(
+      cohortFetches,
+      3,
+      'one GM refresh reads the system recipe cohort three times, and the row projection is ' +
+        'not one of them: it projects from the array the refresh already holds'
+    );
+
+    // POSITIVE CONTROL, same fixture, same counter: the counter is live and the budget is
+    // per-refresh rather than a one-off.
+    await store.refresh();
+    assert.equal(cohortFetches, 6, 'the counter CAN go up — by exactly one refresh worth');
   });
 });

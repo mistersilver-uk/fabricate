@@ -411,3 +411,72 @@ describe('ComponentsBrowserView progressive DC badge re-gate (issue 772)', () =>
     );
   });
 });
+
+/**
+ * The hydration REQUEST (issue 1081).
+ *
+ * Since issue 1081 a component card arrives cheap and resolves its linked source document —
+ * the "Missing" verdict and the live description fallback — only when something asks it to.
+ * `hydrateItemCards` is pinned by the projection suites, but the wiring that must CALL it is
+ * a render effect in this component, and deleting that effect outright left every one of
+ * those suites green: what is proven there is the helper, not that anything invokes it.
+ *
+ * Asserted through a spy on the card rather than a real projection, because the claim is
+ * about WHICH cards the view asks for — exactly the ones it renders — and the view reaches
+ * them through `card.hydrate()` off the published object.
+ */
+describe('ComponentsBrowserView hydration is scoped to the rendered page (issue 1081)', () => {
+  /** Cards carrying a non-enumerable `hydrate` spy, exactly as the projection defines it. */
+  function spyLibrary(count, requested) {
+    return manyGeneral(count).map((card) => {
+      Object.defineProperty(card, 'hydrate', {
+        enumerable: false,
+        configurable: true,
+        value: () => {
+          requested.add(card.id);
+          return Promise.resolve(card);
+        },
+      });
+      return card;
+    });
+  }
+
+  it('asks the rendered page to hydrate, asks nothing off it, and asks page 2 on a page turn', async () => {
+    const requested = new Set();
+    const cards = spyLibrary(30, requested);
+    const root = await browser.mount({ itemCards: cards });
+
+    assert.equal(root.querySelectorAll('.manager-component-row').length, 25, 'page 1 holds 25');
+    assert.deepEqual(
+      [...requested].sort(),
+      cards.slice(0, 25).map((card) => card.id).sort(),
+      'the browser asked exactly the page it rendered'
+    );
+    // The negative half stated against the same set: the five off-page cards cost nothing,
+    // which is the whole point of scoping the request to the page.
+    assert.equal(
+      cards.slice(25).some((card) => requested.has(card.id)),
+      false,
+      'and asked nothing off the page'
+    );
+
+    // POSITIVE CONTROL, same fixture, same spy: turning the page is what asks for the rest.
+    const size = root.querySelector('[data-pagination-size]');
+    size.value = '25';
+    size.dispatchEvent(new globalThis.Event('change', { bubbles: true }));
+    flushSync();
+    root.querySelector('[data-pagination-next]').click();
+    flushSync();
+
+    assert.deepEqual(
+      [...requested].sort(),
+      cards.map((card) => card.id).sort(),
+      'the tail is reachable — the bound is page scope, not a dropped tail'
+    );
+  });
+
+  it('renders a card with no `hydrate` at all, so an isolated fixture is not a crash', async () => {
+    const root = await browser.mount({ itemCards: manyGeneral(3) });
+    assert.equal(root.querySelectorAll('.manager-component-row').length, 3);
+  });
+});

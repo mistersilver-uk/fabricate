@@ -311,11 +311,22 @@ function _createItemCard(item, systemId, options) {
     return card;
   };
 
+  // A REJECTION is not memoized (issue 1081). `_resolveSourceDocumentState` catches its own
+  // throws, but the live-description fallback's `enrichToHtml` does not, and the browser
+  // calls `hydrate()` from a render effect — so caching a rejected promise would re-throw it
+  // on every subsequent render and leave that one card unable to hydrate for the life of the
+  // projection. Clearing the slot restores the pre-1081 property that a failed resolution is
+  // transient: the next render tries again. The rejection is still re-thrown, because
+  // `hydrateItemCards` is awaited by callers that need to see a failure.
   Object.defineProperty(card, 'hydrate', {
     enumerable: false,
     configurable: true,
     writable: true,
-    value: () => (pending ??= resolve()),
+    value: () =>
+      (pending ??= resolve().catch((error) => {
+        pending = null;
+        throw error;
+      })),
   });
   return card;
 }

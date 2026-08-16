@@ -1880,6 +1880,38 @@
       ? itemCards.find((item) => item.id === selectedComponentId) || null
       : null
   );
+  // The expensive half of a component card — its linked source document, the "Missing"
+  // verdict and the live description fallback — resolves on demand (issue 1081), and
+  // `ComponentsBrowserView` only ever asks for the page it renders. Both cards above are
+  // resolved from the WHOLE cohort rather than from that page, so unless this asks, nothing
+  // does. Three independent routes reach an un-asked-for card:
+  //   - first open, where `selectedComponentId` is still empty so the inspector falls back
+  //     to `itemCards[0]` — the manager's STORED order, while the browser renders the
+  //     name-sorted page 1, so on any library past one page the default selection is
+  //     off-page from the moment the studio opens;
+  //   - a selection made on one page and still held after paging elsewhere, because every
+  //     refresh rebuilds every card un-hydrated and only the rendered page is re-asked;
+  //   - the component editor, which UNMOUNTS the browser entirely — and Replace source /
+  //     Unlink source refresh without navigating away from it.
+  // Left un-asked, all three render the pre-hydration reading permanently: "No description
+  // has been added." for a compendium-linked component whose prose lives on the source
+  // document, which is the regression issue 676 filed and issue 800 preserved, and an accent
+  // "Linked" pill telling the GM a dangling link is healthy.
+  //
+  // Called off the card rather than through the projection's `hydrateItemCards` helper for
+  // the reason `ComponentsBrowserView` states at its own effect: importing that store module
+  // here would pull it into the dependency closure of every mounted suite rendering this
+  // tree, where a module missing from the harness allowlist HANGS the suite rather than
+  // failing it. A card with no `hydrate` — a fixture's plain object — is left as it is.
+  //
+  // The rejection is swallowed deliberately: a card that could not resolve keeps its
+  // un-hydrated reading, which renders correctly rather than blankly, and the projection
+  // drops its memo on rejection so the next render retries rather than re-throwing forever.
+  $effect(() => {
+    for (const card of [selectedComponent, componentForEdit]) {
+      card?.hydrate?.()?.catch?.(() => {});
+    }
+  });
   const componentEditTagOptions = $derived(componentTagOptionsFor(componentForEdit));
   const componentEditEssenceOptions = $derived(componentEssenceOptionsFor(componentForEdit));
   const componentEditShowTags = $derived(componentShowTagsFor(componentForEdit));

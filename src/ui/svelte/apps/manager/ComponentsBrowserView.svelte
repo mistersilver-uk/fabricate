@@ -151,8 +151,13 @@
   // renders this tree, where a module missing from the harness allowlist HANGS the suite as
   // `# cancelled` rather than failing. A card with no `hydrate` — an isolated mount's plain
   // fixture — is simply left as it is.
+  //
+  // The rejection is swallowed deliberately rather than left to become an unhandled
+  // rejection on every render: a card that could not resolve keeps its un-hydrated reading,
+  // which renders correctly rather than blankly, and the projection drops its memo on
+  // rejection so the next render retries.
   $effect(() => {
-    for (const card of model.page) card?.hydrate?.();
+    for (const card of model.page) card?.hydrate?.()?.catch?.(() => {});
   });
   const page = $derived({
     components: model.page,
