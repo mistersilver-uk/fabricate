@@ -1917,7 +1917,7 @@
   // Left un-asked, all three render the pre-hydration reading permanently: "No description
   // has been added." for a compendium-linked component whose prose lives on the source
   // document, which is the regression issue 676 filed and issue 800 preserved, and an accent
-  // "Linked" pill telling the GM a dangling link is healthy.
+  // `Compendium` / `Items Directory` pill telling the GM a dangling link is healthy.
   //
   // Called off the card rather than through the projection's `hydrateItemCards` helper for
   // the reason `ComponentsBrowserView` states at its own effect: importing that store module

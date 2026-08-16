@@ -413,8 +413,8 @@ export function hydrateItemCards(cards) {
  * filter/sort/paginate chain and the row props are all such hops, so re-wrapping the SAME
  * card objects in a new array left every consumer on the pre-hydration reading permanently —
  * "No description has been added." for a compendium-linked component whose prose lives on
- * its source document, and an accent "Linked" pill for a source document that has been
- * deleted.
+ * its source document, and an accent `Compendium` / `Items Directory` pill for a source
+ * document that has been deleted.
  *
  * `Object.create(getPrototypeOf, getOwnPropertyDescriptors)` rather than a spread, because
  * the spread would drop the NON-ENUMERABLE `hydrate` seam and any accessor the card carries.
