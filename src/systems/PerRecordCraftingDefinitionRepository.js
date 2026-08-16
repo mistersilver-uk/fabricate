@@ -433,6 +433,14 @@ export class PerRecordCraftingDefinitionRepository extends CraftingDefinitionRep
    * A duplicate key keeps the FIRST document encountered, mirroring `getSetting`, and
    * deletes nothing — see the module documentation for why reaping is unsafe.
    *
+   * **User-scoped documents are skipped**, which is the second half of mirroring
+   * `getSetting`: `ClientSettings` aliases USER scope onto the SAME `WorldSettings`
+   * instance as world scope, so a user-scoped `Setting` document lives in this very
+   * collection, and `getSetting` selects on `user` as well as `key`. Fabricate registers no
+   * user-scoped key under a record prefix today, so nothing is filtered on a live world —
+   * this is the boundary that keeps the claim above true rather than aspirational, and it
+   * matters the moment a companion registers `fabricate.recipe.*` for a single user.
+   *
    * @returns {Map<string, any>}
    */
   refreshIndex() {
@@ -440,6 +448,7 @@ export class PerRecordCraftingDefinitionRepository extends CraftingDefinitionRep
     for (const setting of this._collection() ?? []) {
       const key = setting?.key;
       if (typeof key !== 'string' || !key.startsWith(this.qualifiedPrefix)) continue;
+      if (setting?.user != null) continue;
       if (!index.has(key)) index.set(key, setting);
     }
     this._index = index;
@@ -582,11 +591,26 @@ export class PerRecordCraftingDefinitionRepository extends CraftingDefinitionRep
     await this._writeLegs(this._differential(desired, removals, { skipUnchanged: true }));
   }
 
-  /** @inheritdoc */
+  /**
+   * @inheritdoc
+   *
+   * **The work's own error wins.** The abstract contract mandates the flush on a throw —
+   * memory has already moved, so storage must not be left behind — but says nothing about
+   * which error a caller sees when the flush fails too. Left to chance, the flush's
+   * rejection propagates out of the `finally` and REPLACES the original: a caller catching
+   * the batch would be told the write failed while the reason its work aborted is gone. So
+   * a failed flush is reported on its own channel and the work's error is the one that
+   * surfaces. The flush failure is never silent, and the index has already absorbed
+   * whatever did land, so the next write converges.
+   */
   async runBatch(work) {
     this._batchDepth += 1;
+    let workFailed = false;
     try {
       return await work();
+    } catch (error) {
+      workFailed = true;
+      throw error;
     } finally {
       this._batchDepth -= 1;
       if (this._batchDepth === 0) {
@@ -595,7 +619,18 @@ export class PerRecordCraftingDefinitionRepository extends CraftingDefinitionRep
         this._pendingPuts = new Map();
         this._pendingDeletes = new Set();
         if (puts.size > 0 || deletes.size > 0) {
-          await this._writeLegs(this._differential(puts, deletes));
+          try {
+            await this._writeLegs(this._differential(puts, deletes));
+          } catch (flushError) {
+            // Nothing else went wrong, so this IS the batch's failure and the caller must
+            // see it. When the body already threw, rethrowing here would replace the
+            // caller's own error with this one, so it is reported instead.
+            if (!workFailed) throw flushError;
+            console.error(
+              'Fabricate | per-record definition batch flush failed after the batch body threw',
+              flushError
+            );
+          }
         }
       }
     }
@@ -707,14 +742,33 @@ export class PerRecordCraftingDefinitionRepository extends CraftingDefinitionRep
   }
 
   /**
+   * Delete documents and prune the index by what was ASKED FOR, not by what came back.
+   *
+   * Foundry silently drops an `_id` it does not have, so a delete of a document another
+   * client already removed resolves SHORT. Pruning only the returned keys would leave that
+   * stale entry indexed forever: the next `putAll` recomputes exactly the same delete,
+   * returns short again, and throws again — non-convergent, and unreachable by any retry.
+   * An id the server does not have is already in the desired state, so dropping it here is
+   * what makes the retry converge.
+   *
+   * The same reasoning covers a `preDeleteSetting` veto, where the document DOES survive:
+   * the entry leaves this client's index, {@link _verifyReturned} still raises, and the
+   * next {@link refreshIndex} picks the surviving document back up. A stale index entry
+   * that can never be cleared has no such recovery.
+   *
    * @param {string[]} ids
    * @private
    */
   async _deleteDocuments(ids) {
-    const deleted = (await this._requireDocumentClass().deleteDocuments(ids)) ?? [];
     const index = this._ensureIndex();
-    for (const document of deleted) {
-      if (typeof document?.key === 'string') index.delete(document.key);
+    // Captured BEFORE the await: these ids were derived from this index, and the await is
+    // exactly the window in which a replicated change could rewrite it.
+    const keyByDocumentId = new Map();
+    for (const [key, setting] of index) keyByDocumentId.set(_documentId(setting), key);
+    const deleted = (await this._requireDocumentClass().deleteDocuments(ids)) ?? [];
+    for (const id of ids) {
+      const key = keyByDocumentId.get(String(id));
+      if (key !== undefined) index.delete(key);
     }
     this._verifyReturned('delete', ids.length, deleted.length);
   }

@@ -253,6 +253,10 @@ describe('the per-record adapter addresses one document per record', () => {
     // `recipeStorageTarget` as well as the legacy `recipes`. Naming all three matters: a
     // later reader who deletes the legacy key must not conclude the dot became optional.
     assert.throws(() => makeRepository(new SettingHost(), { keyPrefix: 'recipe' }), /separator/);
+    // NARRATIVE, not a guard. These two compare a literal to a literal and cannot fail for
+    // any change in this module; they are here so the reader can see WHICH live keys the
+    // separator-less prefix would swallow, immediately above the two assertions that do
+    // depend on the shipped prefix.
     assert.ok(`${FABRICATE_SETTINGS_NAMESPACE}.recipes`.startsWith('fabricate.recipe'));
     assert.ok(`${FABRICATE_SETTINGS_NAMESPACE}.recipeStorageLayout`.startsWith('fabricate.recipe'));
     assert.ok(!`${FABRICATE_SETTINGS_NAMESPACE}.recipes`.startsWith(RECIPE_KEY_PREFIX));
@@ -390,6 +394,62 @@ describe('call counts are the acceptance criterion, not an optimisation', () => 
     assert.equal(host.collection.countFor(`${RECIPE_KEY_PREFIX}doomed`), 0);
   });
 
+  // ---- The SAME id twice inside one batch ----------------------------------------------
+  //
+  // The batch above uses three distinct ids, so it never reaches the interaction that
+  // matters. Within one batch the last instruction for an id has to CANCEL the pending
+  // opposite one, and the consequence of losing that is not a redundant call — it is
+  // destruction. Deletes are issued LAST by requirement, so a pending delete that a later
+  // `put` failed to cancel runs AFTER the write it was supposed to supersede and the record
+  // ends up gone, with every leg reporting success.
+
+  it('a put later in the batch cancels the pending delete, so the record SURVIVES', async () => {
+    const host = new SettingHost();
+    seed(host, [recipe('r1'), recipe('untouched')]);
+    const repository = makeRepository(host);
+
+    await repository.runBatch(async () => {
+      await repository.delete('r1');
+      await repository.put(recipe('r1', { name: 'Reinstated' }));
+    });
+
+    assert.deepEqual(
+      host.legs,
+      ['update'],
+      'an uncancelled delete would be issued after the update and annihilate the record'
+    );
+    assert.deepEqual(host.collection.keys().sort(byCodePoint), [
+      `${RECIPE_KEY_PREFIX}r1`,
+      `${RECIPE_KEY_PREFIX}untouched`,
+    ]);
+    assert.equal((await repository.get('r1'))?.name, 'Reinstated');
+  });
+
+  // No sibling case for a delete-then-put of an id that is NOT indexed: there, the record
+  // survives whether or not the put cancels the pending delete, because the differential
+  // drops a removal whose key it cannot find. Such a test could not be made to fail for any
+  // single change to the cancellation, so it is deliberately absent rather than present and
+  // vacuous. The unknown-removal filter itself is pinned by "treats deleting an absent
+  // record as a no-op" above.
+
+  it('a delete later in the batch cancels the pending put, so nothing is rewritten first', async () => {
+    const host = new SettingHost();
+    seed(host, [recipe('r1')]);
+    const repository = makeRepository(host);
+
+    await repository.runBatch(async () => {
+      await repository.put(recipe('r1', { name: 'Edited' }));
+      await repository.delete('r1');
+    });
+
+    assert.deepEqual(
+      host.legs,
+      ['delete'],
+      'an uncancelled put would write a record the same batch already said to remove'
+    );
+    assert.deepEqual(host.collection.keys(), []);
+  });
+
   it('serves every read from the index, with no further collection scan and no linear find', async () => {
     const host = new SettingHost();
     seed(
@@ -400,6 +460,10 @@ describe('call counts are the acceptance criterion, not an optimisation', () => 
 
     await repository.loadAll();
     const scansAfterIndexing = host.collection.scans;
+    // The ABSOLUTE cost, not a delta from whatever indexing happened to spend. Pinning only
+    // the delta leaves a build that scanned once per record green, and removing that O(N^2)
+    // path is the entire justification for this backend.
+    assert.equal(scansAfterIndexing, 1, 'building the index costs exactly ONE pass');
 
     for (let index = 0; index < 25; index += 1) {
       assert.ok(await repository.get(`r${index}`));
@@ -450,11 +514,168 @@ describe('call counts are the acceptance criterion, not an optimisation', () => 
   });
 });
 
+describe('the index is maintained, not merely built', () => {
+  // The O(1) index is this adapter's whole reason to exist, and every read is served from
+  // it. Proving it is built and read from proves nothing about it STAYING correct, and each
+  // way it can rot is silent: a pruned-nothing delete leaves a GHOST record readable after
+  // it is gone, and an unmaintained replication path makes a remote create invisible and a
+  // remote delete invisible. Reads never rescan, so nothing self-heals within a session.
+
+  it('drops a deleted record from the index, so it stops being readable', async () => {
+    const host = new SettingHost();
+    seed(host, [recipe('r1'), recipe('r2')]);
+    const repository = makeRepository(host);
+    await repository.loadAll();
+
+    await repository.delete('r1');
+
+    assert.equal(await repository.get('r1'), null, 'a deleted record must not read as a ghost');
+    assert.deepEqual(
+      (await repository.listSummaries()).map((summary) => summary.id),
+      ['r2']
+    );
+  });
+
+  it('leaves the next putAll with nothing left to delete for a record already removed', async () => {
+    // A stale index entry is not merely a stale read: `putAll` recomputes the removal from
+    // the index, so the entry would be re-deleted on every subsequent whole-corpus write,
+    // return short, and throw — forever.
+    const host = new SettingHost();
+    seed(host, [recipe('r1'), recipe('r2')]);
+    const repository = makeRepository(host);
+    await repository.loadAll();
+    await repository.delete('r1');
+    host.calls.length = 0;
+
+    await repository.putAll([recipe('r2')]);
+
+    assert.deepEqual(host.legs, [], 'nothing to create, nothing changed, nothing left to delete');
+  });
+
+  it('converges when a delete returns SHORT because the document was already gone', async () => {
+    // Reachable whenever a remote delete was not delivered through `readReplicatedRecord`:
+    // Foundry silently drops an `_id` it does not hold, so the call resolves with fewer
+    // documents than asked for. Pruning only what came back would leave the stale entry
+    // indexed, and every later `putAll` would recompute the same delete and throw again.
+    const host = new SettingHost();
+    seed(host, [recipe('r1'), recipe('r2')]);
+    const repository = makeRepository(host);
+    await repository.loadAll();
+    // Another client's delete, which this client never saw.
+    for (const [documentId, document] of host.collection.documents) {
+      if (document.key === `${RECIPE_KEY_PREFIX}r1`) host.collection.documents.delete(documentId);
+    }
+
+    await assert.rejects(
+      repository.putAll([recipe('r2')]),
+      /per-record definition delete returned 0 of 1 documents/
+    );
+
+    host.calls.length = 0;
+    await repository.putAll([recipe('r2')]);
+    assert.deepEqual(host.legs, [], 'the retry has nothing to do, rather than throwing forever');
+    assert.equal(await repository.get('r1'), null);
+  });
+
+  it('indexes a replicated record this client never held, making it readable at once', async () => {
+    // The wire shape of a remote CREATE. The bridge reports it as `'update'` — a delivering
+    // leg — because the seam's question is whether a record arrived, not which hook carried
+    // it, and this is the case where the answer is "one that was not in the index".
+    const host = new SettingHost();
+    seed(host, [recipe('r1')]);
+    const repository = makeRepository(host);
+    await repository.loadAll();
+    const scansAfterIndexing = host.collection.scans;
+
+    const created = new SettingDouble({
+      _id: deriveSettingDocumentId(`${RECIPE_KEY_PREFIX}r9`),
+      key: `${RECIPE_KEY_PREFIX}r9`,
+      value: recipe('r9'),
+    });
+    repository.readReplicatedRecord({
+      key: created.key,
+      operation: 'update',
+      document: created,
+    });
+
+    assert.equal((await repository.get('r9'))?.name, 'Recipe r9', 'a record delivered by replication must be visible');
+    assert.equal(host.collection.scans, scansAfterIndexing, 'and visible without a rescan');
+  });
+
+  it('removes a replicated delete from the index, so the record stops being readable', async () => {
+    const host = new SettingHost();
+    seed(host, [recipe('r1'), recipe('r2')]);
+    const repository = makeRepository(host);
+    await repository.loadAll();
+
+    repository.readReplicatedRecord({ key: `${RECIPE_KEY_PREFIX}r1`, operation: 'delete' });
+
+    assert.equal(await repository.get('r1'), null, 'a remote delete must not leave a ghost');
+    assert.deepEqual(
+      (await repository.listSummaries()).map((summary) => summary.id),
+      ['r2']
+    );
+  });
+
+  it('refuses to index a returned document whose key belongs to another prefix', async () => {
+    // Defence in depth: nothing in the adapter asks for a foreign key back. It matters
+    // because the index is keyed by the FULL setting key and read through `keyFor`, so a
+    // `fabricate.component.c1` entry admitted here would be invisible to every read and
+    // would be recomputed as a removal by the next `putAll` — a delete of another store's
+    // document.
+    const host = new SettingHost();
+    const repository = makeRepository(host);
+    repository.refreshIndex();
+
+    repository._indexDocument(
+      new SettingDouble({
+        _id: 'cccccccccccccccc',
+        key: `${FABRICATE_SETTINGS_NAMESPACE}.component.c1`,
+        value: { id: 'c1' },
+      })
+    );
+
+    assert.deepEqual([...repository._ensureIndex().keys()], []);
+  });
+
+  it('skips a USER-scoped document, mirroring getSetting rather than only the key', async () => {
+    // `ClientSettings` aliases USER scope onto the SAME `WorldSettings` instance as world
+    // scope, so a user-scoped `Setting` document really does live in the indexed collection
+    // and really would prefix-match. `getSetting` selects on `user` as well as `key`.
+    const host = new SettingHost();
+    seed(host, [recipe('r1')]);
+    const mine = new SettingDouble({
+      _id: 'dddddddddddddddd',
+      key: `${RECIPE_KEY_PREFIX}r2`,
+      value: recipe('r2'),
+    });
+    mine.user = 'user-1';
+    host.collection.documents.set(mine.id, mine);
+
+    const repository = makeRepository(host);
+
+    assert.deepEqual(
+      (await repository.loadAll()).map((record) => record.id),
+      ['r1'],
+      'a user-scoped document is not a world record of this store'
+    );
+    assert.equal(await repository.get('r2'), null);
+  });
+});
+
 describe('the derived document id makes a duplicate key unrepresentable', () => {
   it('produces a valid, stable Foundry id', () => {
     const id = deriveSettingDocumentId(`${RECIPE_KEY_PREFIX}r1`);
     assert.match(id, FOUNDRY_DOCUMENT_ID_PATTERN);
-    assert.match(id, CORE_ID_PATTERN, 'the exported pattern must be core’s, not a looser one');
+    // The PATTERNS are compared, not two matches of the same id. A derived id matches both
+    // patterns for any loosening of the exported one, so matching twice proves nothing about
+    // the exported pattern still being core's — and it is what `_createDocuments` refuses on.
+    assert.equal(
+      FOUNDRY_DOCUMENT_ID_PATTERN.source,
+      CORE_ID_PATTERN.source,
+      'the exported pattern must be core’s, not a looser one'
+    );
+    assert.equal(FOUNDRY_DOCUMENT_ID_PATTERN.flags, CORE_ID_PATTERN.flags);
     assert.equal(id, deriveSettingDocumentId(`${RECIPE_KEY_PREFIX}r1`));
     assert.notEqual(id, deriveSettingDocumentId(`${RECIPE_KEY_PREFIX}r2`));
     assert.notEqual(
@@ -610,6 +831,56 @@ describe('every call verifies what came back', () => {
     const repository = makeRepository(host, { documentClass: () => null });
     await assert.rejects(repository.put(recipe('r1')), TypeError);
   });
+
+  it('still flushes when the batch body throws, so storage is not left behind memory', async () => {
+    // The convention the settings adapter is held to (`tests/crafting-definition-repository
+    // .test.js`, "memory already moved, so storage must not be left behind"). The manager
+    // mutates its map as it goes, so a batch that abandons its pending writes on a throw
+    // leaves the in-memory corpus ahead of the world with no signal.
+    const host = new SettingHost();
+    seed(host, [recipe('doomed')]);
+    const repository = makeRepository(host);
+
+    await assert.rejects(
+      repository.runBatch(async () => {
+        await repository.put(recipe('r1'));
+        await repository.delete('doomed');
+        throw new Error('boom');
+      }),
+      /boom/
+    );
+
+    assert.deepEqual(host.legs, ['create', 'delete'], 'the pending legs were still issued');
+    assert.deepEqual(host.collection.keys(), [`${RECIPE_KEY_PREFIX}r1`]);
+  });
+
+  it('lets the batch body’s error win when the mandated flush fails as well', async () => {
+    // Both fail. Left to chance the flush rejects out of the `finally` and REPLACES the
+    // original, so the caller is told the write failed and the reason its work aborted is
+    // gone. The flush failure is reported on its own channel instead of masking it.
+    const host = new SettingHost();
+    host.vetoedKeys.add(`${RECIPE_KEY_PREFIX}r1`);
+    const repository = makeRepository(host);
+    const reported = [];
+    const previousError = console.error;
+    console.error = (...args) => reported.push(args);
+    try {
+      await assert.rejects(
+        repository.runBatch(async () => {
+          await repository.put(recipe('r1'));
+          throw new Error('boom');
+        }),
+        /boom/
+      );
+    } finally {
+      console.error = previousError;
+    }
+
+    assert.deepEqual(host.legs, ['create'], 'the flush was still attempted');
+    assert.equal(reported.length, 1, 'and its failure was reported rather than swallowed');
+    assert.match(String(reported[0][0]), /batch flush failed/);
+    assert.match(String(reported[0][1]?.message ?? ''), /create returned 0 of 1 documents/);
+  });
 });
 
 describe('writes route through the Setting document API', () => {
@@ -674,7 +945,7 @@ describe('the per-record replication capability', () => {
       value: recipe('r9'),
     });
     assert.deepEqual(
-      repository.readReplicatedRecord({ key: created.key, operation: 'create', document: created }),
+      repository.readReplicatedRecord({ key: created.key, operation: 'update', document: created }),
       { id: 'r9', record: recipe('r9') }
     );
     assert.deepEqual(
