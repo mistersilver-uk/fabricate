@@ -557,6 +557,10 @@ function compileManagerRoot() {
     'src/ui/svelte/components/stepperLabels.js',
     'src/models/Recipe.js',
     'src/models/Ingredient.js',
+    // Recipe, Ingredient and IngredientSet all filter their payloads through the shared
+    // omitted-when-default machinery (issue 1135). Same rule as the rest of this list:
+    // omitting a transitive raw module HANGS this suite rather than failing it.
+    'src/models/reconstructibleDefaults.js',
     'src/models/IngredientSet.js',
     // IngredientSet imports the shared essence allocator (issue 917). This list is
     // hand-rolled with no validator, so omitting a transitive raw module HANGS this
