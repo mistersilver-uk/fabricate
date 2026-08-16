@@ -596,6 +596,9 @@ Routed keeps its multi-group list and Add group; progressive is unchanged.
   A recipe or component category may carry a persisted per-category icon, edited inline from its row.
 - The screen has a right inspector rail: a "Vocabulary at a glance" tile set (recipe categories, component categories, item tags, total references), contextual "How it works" help, and a "Reference-safe by default" reassurance card.
   The total-references tile sums all three vocabularies, and a tag's reference count includes the recipe tag-placeholder ingredients that name it, not only the components carrying it.
+  **Known defect, recorded rather than implied correct (issue 1191):** every reference count on this screen is taken over the recipe and component cohorts as the two library searches currently filter them, not over the system's roster.
+  A recipe or component that an active library search excludes therefore contributes nothing, so a vocabulary entry can read `Unused` while the system still references it — and an `Unused` row deletes in **one click**, because the confirm strip's copy reassigns references and is skipped for a zero-reference row.
+  The intended contract is that `Unused` means unused _in this system_; issue 1081 preserved the existing cohort deliberately rather than change a rendered number under a performance heading.
 - Item tag list editor
 - Essences toggle (`features.essences`)
 - Property macros toggle (`features.propertyMacros`)
@@ -1195,6 +1198,24 @@ A group shown **whole** reports one number (`25 recipes`), never `25 of 25`.
 The total counts the filtered rows, so an active search / status / lock / category / essence filter is always respected; a total over the raw roster would be a third wrong number.
 Both singulars are localized — `1 recipe` and `1 of 282 recipes`, never `1 recipes`.
 The Component Studio's library follows the identical rule.
+
+The category **filter's** own option counts are the one number on this screen deliberately taken over the **unfiltered roster** rather than the filtered rows, and that is a different question rather than a fourth wrong answer.
+The filter offers what the GM could switch to, so an option whose count fell to zero as they typed in the search box would withdraw the escape route from an empty result.
+Sharing one derivation between it and the group totals is a correctness regression, not a cleanup — the two cohorts must stay distinct even when they are served from one fetch.
+
+Because both libraries page, **expensive per-entity work is scoped to what is on screen**: the rendered page plus the selected entity.
+A recipe's execution structure, requirements preview, completeness verdict and authoring body, and a component's linked source document — its resolved description fallback and its `Missing` badge — are prepared for the page's rows and the selected row, never for every definition the filter matched.
+What is prepared for the **whole filtered cohort** is everything a GM can act on without the row being on screen: the filter fields, the category totals above, every sort key, and the bulk selection.
+The two lists must not be confused in either direction, and each direction fails differently.
+A sort key demoted to the page tier renders **name order under the label of the key the GM chose**, silently and with no empty state to notice — so `enableBlocked`, the check DC, the ingredient and result counts and a component's salvage result-group count are all cohort-scoped facts.
+A count taken over the page instead of the cohort states that a 282-strong category holds 25, which the `N of M` rule above exists to prevent.
+Bulk actions operate on selected ids and cohorts, so `select all N results` selects the whole filtered cohort and an Apply reaches rows the GM has never scrolled to.
+Enabling a recipe still refuses exactly the recipes the row pills mark, because the refusal predicate is cohort-scoped like the pills that read it.
+
+Scoping is a matter of WHEN the work happens and never of what the surface reports: a paged library's counts, order, chips, selection and every rendered value are identical to those an unpaged one would show.
+The selected entity's inspector stays fully detailed and current, and a GM who never leaves page 1 pays for page 1.
+Where the page-scoped work is asynchronous — a component's linked source document is a real document fetch — the row and the inspector first render the stored reading and then **correct in place** as each resolution lands: a component's description settles to its source document's prose, and its source pill settles from the accent origin label it derives from the uuid's shape alone (`Compendium` or `Items Directory`) to the amber `Missing` for a document that has been deleted.
+The correction must actually reach every surface reading that entity, and rows keep their identity across it, so nothing remounts and scroll position, focus, the bulk selection and an open inspector or editor all survive.
 
 The **blocked-enable flash**: enabling a recipe is gated — an incomplete recipe, or one whose signature conflicts, is refused.
 The refusal renders as an in-window, dismissible `role="alert"` flash inside the library, and the store **suppresses** its Foundry notification whenever the library claims that message, so the same error is never reported twice (once in-window and once in a toast behind a maximised manager window).

@@ -7836,18 +7836,29 @@ describe('createAdminStore', () => {
       delete sys.items;
 
       const originalFromUuid = globalThis.fromUuid;
-      globalThis.fromUuid = async () => liveDoc;
+      const sourceLookups = [];
+      globalThis.fromUuid = async (uuid) => {
+        sourceLookups.push(uuid);
+        return liveDoc;
+      };
       try {
         const store = createAdminStore(services);
         await store.selectSystem('sys1');
-        return { card: get(store.viewState).itemCards[0], enrichCalls };
+        // The store projects every card CHEAPLY and the browser hydrates the page it
+        // renders (issue 1081), so the linked-source half — the live description fallback
+        // and the "Missing" verdict — resolves on `hydrate()`, not on refresh. This suite
+        // drives the store with no view, so it plays the browser's part explicitly. The
+        // card fills IN PLACE, which is why the same object is returned.
+        const card = get(store.viewState).itemCards[0];
+        await card?.hydrate?.();
+        return { card, enrichCalls, sourceLookups };
       } finally {
         globalThis.fromUuid = originalFromUuid;
       }
     }
 
     it('itemCards prefer a NON-EMPTY stored description over a differing live document (issue 800)', async () => {
-      const { card, enrichCalls } = await itemCardFor(
+      const { card, enrichCalls, sourceLookups } = await itemCardFor(
         {
           id: 'comp-stored',
           name: 'Alchemist’s Supplies',
@@ -7857,6 +7868,15 @@ describe('createAdminStore', () => {
         { liveDoc: { system: { description: { value: 'Something else entirely.' } } } }
       );
 
+      // POSITIVE CONTROL, same fixture, same seam, and load-bearing since issue 1081 made the
+      // resolution on-demand: an un-hydrated card ALREADY carries the stored description and
+      // has already made zero enrich calls, so without proving that hydration actually ran,
+      // both assertions below are satisfied by a card that never resolved anything.
+      assert.deepEqual(
+        sourceLookups,
+        ['Compendium.dnd5e.equipment24.Item.supplies'],
+        'the card really did hydrate — it resolved its linked source document exactly once'
+      );
       assert.equal(card.description, REPORTER_RESOLVED_EXPECTED);
       assert.equal(
         enrichCalls.length,
@@ -8012,6 +8032,11 @@ describe('createAdminStore', () => {
      * counter, create the store, and run `body` with a `count()` reader and a
      * `reset()`. Restores `fromUuid` afterwards. Shared by the memo tests so the
      * seam swap is written once (Sonar new-code duplication).
+     *
+     * `hydrateAll()` plays the browser's part (issue 1081): the store projects every card
+     * cheaply and the view hydrates the page it renders, so a suite with no view has to say
+     * which cards it is looking at. These tests are about the MEMO — what a second look at
+     * an unchanged component costs — so they look at all of them.
      */
     async function withMemoStore(components, servicesOverrides, body) {
       const services = createMockServices(servicesOverrides);
@@ -8026,10 +8051,14 @@ describe('createAdminStore', () => {
       };
       try {
         const store = createAdminStore(services);
+        const hydrateAll = () =>
+          Promise.all(get(store.viewState).itemCards.map((card) => card?.hydrate?.()));
         await store.selectSystem('sys1');
+        await hydrateAll();
         return await body({
           store,
           sys,
+          hydrateAll,
           count: () => calls,
           reset: () => {
             calls = 0;
@@ -8049,9 +8078,9 @@ describe('createAdminStore', () => {
           description: '',
         })
       );
-      await withMemoStore(components, undefined, async ({ store, sys, count, reset }) => {
-        // Baseline: every one of the 75 components forces a source resolution.
-        assert.ok(count() >= 75, `initial selectSystem resolves all components (got ${count()})`);
+      await withMemoStore(components, undefined, async ({ store, sys, count, reset, hydrateAll }) => {
+        // Baseline: looking at all 75 components forces 75 source resolutions.
+        assert.ok(count() >= 75, `hydrating all 75 components resolves each (got ${count()})`);
 
         // Mutate exactly ONE component (new object, same id, changed name).
         reset();
@@ -8059,12 +8088,29 @@ describe('createAdminStore', () => {
           i === 0 ? makeItem({ ...item, name: 'Component 0 EDITED' }) : item
         );
         await store.refresh();
+        await hydrateAll();
         assert.equal(count(), 1, 'only the edited component re-resolves — not O(all)');
 
         // A no-op refresh (nothing changed) hits the cache for every card.
         reset();
         await store.refresh();
+        await hydrateAll();
         assert.equal(count(), 0, 'an unchanged same-system refresh resolves nothing');
+
+        // PAGE SCOPE (issue 1081): the refresh itself resolves nothing at all, so a GM who
+        // never scrolls past page 1 never pays for the other 50.
+        reset();
+        sys.components = sys.components.map((item, i) =>
+          i === 1 ? makeItem({ ...item, name: 'Component 1 EDITED' }) : item
+        );
+        await store.refresh();
+        assert.equal(count(), 0, 'a refresh with nothing on screen resolves nothing');
+        await Promise.all(
+          get(store.viewState)
+            .itemCards.slice(0, 25)
+            .map((card) => card.hydrate())
+        );
+        assert.equal(count(), 1, 'and one page of hydration resolves only what changed on it');
       });
     });
 
@@ -8686,5 +8732,240 @@ describe('createAdminStore — failure-result policy (issue 1098)', () => {
       'the sibling consumption flag is carried, not re-defaulted'
     );
     assert.ok(Object.hasOwn(args.updates.salvageCraftingCheck, 'enabled'));
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Issue 1081 — the store's half of the page-scoped component browser
+// ---------------------------------------------------------------------------
+
+describe('adminStore item-card hydration and cohort fetching (issue 1081)', () => {
+  /** Seed `sys1` with `count` compendium-linked components carrying no stored description. */
+  function seedLinkedComponents(services, count) {
+    const sys = services.getCraftingSystemManager().getSystem('sys1');
+    sys.components = Array.from({ length: count }, (_, index) =>
+      makeItem({
+        id: `comp-${index}`,
+        name: `Component ${index}`,
+        description: '',
+        registeredItemUuid: `Compendium.pack.Item.source-${index}`,
+      })
+    );
+    delete sys.items;
+    return sys;
+  }
+
+  /**
+   * A card fills itself IN PLACE, which Svelte cannot see — and a NEW ARRAY of the SAME
+   * objects does not fix that.
+   *
+   * This store publishes through a `writable`, which does not proxy, so every hop between
+   * the published array and a rendered string compares by `===`: `selectedComponent` and
+   * `componentForEdit` re-run `find(...)` and return the identical object, the browser
+   * model's filter/sort/paginate chain slices and spreads without cloning, and a keyed
+   * `{#each}` reconciling an unchanged item does not update the row. The array identity gets
+   * the readers to look; only the CARD identity makes them see anything different. Publishing
+   * the same object back to all three surfaces does not keep them from diverging — it keeps
+   * them wrong together, on the pre-hydration reading, permanently.
+   *
+   * Only the cards that reported a fill are replaced, and the untouched pair below is the
+   * control for that: swapping an un-hydrated card would strand its eventual in-place fill on
+   * an object nothing publishes any more.
+   */
+  it('republishes each HYDRATED card as a new object, leaving un-hydrated cards alone', async () => {
+    const services = createMockServices();
+    seedLinkedComponents(services, 5);
+
+    const originalFromUuid = globalThis.fromUuid;
+    globalThis.fromUuid = async () => ({ system: { description: { value: 'Live prose' } } });
+    try {
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+
+      let publishes = 0;
+      const unsubscribe = store.viewState.subscribe(() => {
+        publishes += 1;
+      });
+      publishes = 0; // discard `subscribe`'s immediate replay of the current value
+
+      const before = get(store.viewState).itemCards;
+      assert.equal(before.length, 5);
+      assert.equal(before[0].description, '', 'pre-condition: the cards arrive un-hydrated');
+
+      // A PAGE, not the cohort: two cards are deliberately never asked.
+      await Promise.all(before.slice(0, 3).map((card) => card.hydrate()));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      unsubscribe();
+
+      const after = get(store.viewState).itemCards;
+      assert.ok(
+        after !== before,
+        'the store hands out a NEW array, so every reader of `itemCards` re-runs'
+      );
+      for (const index of [0, 1, 2]) {
+        assert.ok(
+          after[index] !== before[index],
+          `card ${index} hydrated, so it is republished as a NEW object — a card whose ` +
+            'identity did not move is invisible to every `===` comparison between here and ' +
+            'the rendered row, inspector and editor'
+        );
+        assert.equal(after[index].id, before[index].id, 'and its `{#each}` key does not move');
+        assert.equal(after[index].description, 'Live prose', 'the resolved reading is published');
+      }
+      // SAME-FIXTURE CONTROL: identity is replaced for the cards that filled, not for every
+      // card in the array, so this is a targeted swap rather than a blanket re-clone.
+      for (const index of [3, 4]) {
+        assert.equal(
+          after[index],
+          before[index],
+          `card ${index} was never asked to hydrate, so it is published unchanged — its fill, ` +
+            'if it is ever asked for, lands on the object that is still published'
+        );
+      }
+      assert.equal(
+        typeof after[0].hydrate,
+        'function',
+        'the replacement carries the NON-ENUMERABLE `hydrate` seam across, so a later ask is ' +
+          'still answered (and answered from the memo)'
+      );
+      assert.equal(
+        Object.keys(after[0]).includes('hydrate'),
+        false,
+        'and it is still non-enumerable, so spread, JSON and the bulk-edit models cannot see it'
+      );
+      assert.equal(
+        publishes,
+        1,
+        'three cards resolving on three separate microtasks coalesce into ONE republish; ' +
+          'without the coalescing a page turn re-runs every reader 25 times'
+      );
+    } finally {
+      globalThis.fromUuid = originalFromUuid;
+    }
+  });
+
+  /**
+   * The recipe half of the Tags & Categories reference count is published as DATA, and the
+   * count has to accompany the rows it describes in every state the store publishes — not
+   * merely arrive by the time the refresh settles.
+   *
+   * The stake is destructive rather than cosmetic. `VocabularyPanel` gates its confirm strip
+   * on the row's `totalUsage`: a tag reading `0 references` renders the `Unused` chip and is
+   * deleted on ONE CLICK with no confirmation. A tag that is referenced only as a recipe
+   * ingredient tag-placeholder — exactly the population issue 689 exists to count — reads
+   * that way the moment this record goes missing or empty while the recipes are published,
+   * and deleting it breaks ingredient matching in every recipe whose placeholder named it.
+   *
+   * Asserted over the whole publish SEQUENCE for that reason: a snapshot taken after the
+   * refresh settles cannot see a phase that published rows without their counts.
+   */
+  it('publishes tag-placeholder counts alongside the recipes in every published state', async () => {
+    const services = createMockServices();
+    const originalRecipeManager = services.getRecipeManager();
+    const placeholderRecipe = makeRecipe({
+      id: 'r-placeholder',
+      name: 'Any Herb Tincture',
+      craftingSystemId: 'sys1',
+      ingredientSets: [
+        {
+          id: 'set-any-herb',
+          name: 'Any herb',
+          ingredientGroups: [
+            {
+              id: 'group-any-herb',
+              // The placeholder shape: it names TAGS rather than a component, so no
+              // component-level count can stand in for it.
+              options: [{ match: { type: 'tags', tags: ['Herb', 'moon'] }, quantity: 1 }],
+            },
+          ],
+        },
+      ],
+    });
+    services.getRecipeManager = () => ({
+      ...originalRecipeManager,
+      getRecipes: (filter) =>
+        [placeholderRecipe].filter(
+          (recipe) =>
+            !filter?.craftingSystemId || recipe.craftingSystemId === filter.craftingSystemId
+        ),
+    });
+
+    const store = createAdminStore(services);
+    const published = [];
+    const unsubscribe = store.viewState.subscribe((state) => {
+      published.push({
+        recipeCount: (state.recipes || []).length,
+        counts: state.recipeTagPlaceholderCounts,
+      });
+    });
+    try {
+      await store.selectSystem('sys1');
+      await store.refresh();
+    } finally {
+      unsubscribe();
+    }
+
+    const withRecipes = published.filter((entry) => entry.recipeCount > 0);
+    assert.ok(
+      withRecipes.length >= 2,
+      'PRE-CONDITION: the cohort really was published, by both `selectSystem` and `refresh` ' +
+        '— a run that published no recipes would satisfy the rule below vacuously'
+    );
+    for (const entry of withRecipes) {
+      assert.deepEqual(
+        entry.counts,
+        { herb: 1, moon: 1 },
+        'every state that carries the recipes carries their placeholder counts, lowercased ' +
+          'and one per named tag — an empty record here reads as "no references" and offers ' +
+          'the tag for one-click deletion'
+      );
+    }
+    assert.deepEqual(
+      get(store.viewState).recipeTagPlaceholderCounts,
+      { herb: 1, moon: 1 },
+      'and the settled state agrees'
+    );
+  });
+
+  /**
+   * The roster the essence cards are built from is THREADED into the row projection rather
+   * than re-fetched there, so a 10,000-recipe library is not copied an extra time per GM
+   * refresh. `buildRecipeList`'s own half of that contract is pinned directly in
+   * `admin-projection-modules.test.js` (a supplied roster performs zero fetches, an omitted
+   * one performs exactly one); this pins that the STORE actually supplies it.
+   *
+   * An exact budget rather than a bound, because the quantity is a per-refresh fetch count
+   * and every one of them copies the whole library. The three are the system list's per-system
+   * `recipeCount`, this cohort fetch, and the validation report — dropping the threading adds
+   * a fourth, and any newly added cohort read has to move this number deliberately.
+   */
+  it('fetches the recipe cohort on a fixed per-refresh budget, threading it to the row projection', async () => {
+    const services = createMockServices();
+    const realRecipeManager = services.getRecipeManager();
+    let cohortFetches = 0;
+    services.getRecipeManager = () => ({
+      ...realRecipeManager,
+      getRecipes: (filter) => {
+        if (filter?.craftingSystemId) cohortFetches += 1;
+        return realRecipeManager.getRecipes(filter);
+      },
+    });
+
+    const store = createAdminStore(services);
+    await store.selectSystem('sys1');
+
+    cohortFetches = 0;
+    await store.refresh();
+    assert.equal(
+      cohortFetches,
+      3,
+      'one GM refresh reads the system recipe cohort three times, and the row projection is ' +
+        'not one of them: it projects from the array the refresh already holds'
+    );
+
+    // POSITIVE CONTROL, same fixture, same counter: the counter is live and the budget is
+    // per-refresh rather than a one-off.
+    await store.refresh();
+    assert.equal(cohortFetches, 6, 'the counter CAN go up — by exactly one refresh worth');
   });
 });

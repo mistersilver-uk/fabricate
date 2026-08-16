@@ -135,7 +135,10 @@ import {
   DERIVED_RECIPE_PROJECTION_FIELDS,
   withoutDerivedRecipeProjectionFields,
 } from './adminRecipeRowProjection.js';
-import { buildItemCards as _buildItemCards } from './adminComponentRowProjection.js';
+import {
+  buildItemCards as _buildItemCards,
+  republishHydratedItemCards as _republishHydratedItemCards,
+} from './adminComponentRowProjection.js';
 import {
   buildSelectedSystemViewData as _buildSelectedSystemViewData,
   enrichRecipeItemLibrary as _enrichRecipeItemLibrary,
@@ -1759,6 +1762,14 @@ export function createAdminStore(services) {
   // changes deliberately do NOT invalidate.
   const itemCardCache = new Map();
   let itemCardCacheSystemId = '';
+  // Coalesces the per-card `onHydrated` callbacks of one page into ONE republish
+  // (issue 1081). A page hydrates 25 cards, each resolving on its own microtask, and 25
+  // republishes would re-run every `$derived` reading `itemCards` 25 times per page turn.
+  let itemCardRepublishScheduled = false;
+  // The cards that reported a fill since the last republish, held by IDENTITY. Only these
+  // get a fresh object; see `_scheduleItemCardRepublish`. Cleared on every republish, so it
+  // never outlives one microtask's worth of hydrations.
+  const hydratedItemCards = new Set();
 
   // --- Computed state ---
   const viewState = writable({
@@ -1771,6 +1782,11 @@ export function createAdminStore(services) {
     essenceCards: [],
     recipes: [],
     recipeCategories: [],
+    // The recipe half of the Tags & Categories reference count, folded by the row
+    // projection off the recipe MODELS (issue 1081). Published as data because its reader —
+    // the manager's persistent left nav badge — is a sibling of every view, so deriving it
+    // from the projected rows walked their DETAIL tier on every render, in every view.
+    recipeTagPlaceholderCounts: {},
     showVisibilitySummary: false,
     worldUsers: [],
     // EVERY world actor (not the player-character roster), each carrying its
@@ -1851,6 +1867,43 @@ export function createAdminStore(services) {
       ...state,
       ..._currentEnvironmentViewPatch(),
     }));
+  }
+
+  /**
+   * Republish `itemCards` after one or more cards have filled themselves in place
+   * (issue 1081), with each filled card swapped for a FRESH object.
+   *
+   * A new array holding the same card objects is not enough. This store publishes through a
+   * `writable`, which does not proxy, so Svelte compares by `===` at every hop between the
+   * published array and a rendered string — `selectedComponent`, `componentForEdit`, the
+   * browser model's filter/sort/paginate chain, and the keyed `{#each}` reconciling a row.
+   * A card whose identity did not move stops at the first of them, so re-wrapping the same
+   * objects left every surface on the pre-hydration reading permanently rather than for a
+   * beat. Preserving card identity looked like it kept the three surfaces from diverging; it
+   * kept all three wrong together.
+   *
+   * Which cards to swap comes from the `onHydrated` callbacks themselves, by identity: a
+   * refresh that landed between the fill and this microtask has published different card
+   * objects, and those have their own fills still to come.
+   *
+   * Coalesced onto a microtask because a page hydrates 25 cards independently and 25
+   * republishes would re-run every reader 25 times per page turn.
+   *
+   * @param {object} [card] the card that just hydrated.
+   */
+  function _scheduleItemCardRepublish(card) {
+    if (card) hydratedItemCards.add(card);
+    if (itemCardRepublishScheduled) return;
+    itemCardRepublishScheduled = true;
+    queueMicrotask(() => {
+      itemCardRepublishScheduled = false;
+      const hydrated = new Set(hydratedItemCards);
+      hydratedItemCards.clear();
+      viewState.update((state) => ({
+        ...state,
+        itemCards: _republishHydratedItemCards(state.itemCards || [], hydrated),
+      }));
+    });
   }
 
   function _currentToolsDraftViewPatch() {
@@ -4044,6 +4097,7 @@ export function createAdminStore(services) {
       essenceCards: prev.systems.length > 0 ? prev.essenceCards : [],
       recipes: [],
       recipeCategories: [],
+      recipeTagPlaceholderCounts: {},
       showVisibilitySummary: false,
       recipeSearchTerm: get(recipeSearch),
       itemSearchTerm: get(itemSearch),
@@ -4449,7 +4503,12 @@ export function createAdminStore(services) {
 
     let selectedSystemData = null;
     let essenceCards = [];
-    let recipeListData = { recipes: [], recipeCategories: [], showVisibilitySummary: false };
+    let recipeListData = {
+      recipes: [],
+      recipeCategories: [],
+      recipeTagPlaceholderCounts: {},
+      showVisibilitySummary: false,
+    };
 
     if (selectedSystem) {
       const managedItems = _getManagedItems(selectedSystem);
@@ -4485,6 +4544,13 @@ export function createAdminStore(services) {
           associatedItemName: associatedItem?.name || null,
         };
       });
+      // THE system-recipe cohort for this refresh, fetched ONCE (issue 1081). Three
+      // consumers used to fetch it independently — the essence cards here, and the row
+      // projection's rows and category counts — so a 10,000-recipe library was copied three
+      // times per GM refresh. It is threaded into `_buildRecipeList` as its roster; that
+      // function still derives its category counts over this UNFILTERED array and its rows
+      // over the search-filtered subset, because the two cohorts are genuinely different
+      // and collapsing them would be a correctness regression rather than a cleanup.
       const systemRecipes = recipeManager.getRecipes({ craftingSystemId: selectedSystem.id }) || [];
 
       essenceCards = _buildEssenceCards(
@@ -4507,7 +4573,8 @@ export function createAdminStore(services) {
         systemManager,
         recipeManager,
         selectedSystem,
-        get(recipeSearch)
+        get(recipeSearch),
+        { roster: systemRecipes }
       );
     }
 
@@ -4532,6 +4599,7 @@ export function createAdminStore(services) {
       gatheringConfig: _clonePlain(_currentGatheringConfig()),
       recipes: recipeListData.recipes,
       recipeCategories: recipeListData.recipeCategories,
+      recipeTagPlaceholderCounts: recipeListData.recipeTagPlaceholderCounts,
       showVisibilitySummary: recipeListData.showVisibilitySummary,
       worldUsers,
       accessCharacters,
@@ -4554,6 +4622,12 @@ export function createAdminStore(services) {
         essenceDefinitionById,
         enrichToHtml: services?.enrichToHtml,
         cache: itemCardCache,
+        // A card fills itself IN PLACE when a view hydrates it (issue 1081), which Svelte
+        // cannot see: the array and the object are both unchanged by `===`. The republish
+        // this schedules hands out a new array AND a fresh object for each filled card, which
+        // is what actually reaches the browser rows, the browser inspector, the component
+        // editor and the gathering picker.
+        onHydrated: _scheduleItemCardRepublish,
       });
     }
 
@@ -4617,6 +4691,7 @@ export function createAdminStore(services) {
       gatheringConfig: _clonePlain(_currentGatheringConfig()),
       recipes: recipeListData.recipes,
       recipeCategories: recipeListData.recipeCategories,
+      recipeTagPlaceholderCounts: recipeListData.recipeTagPlaceholderCounts,
       showVisibilitySummary: recipeListData.showVisibilitySummary,
       worldUsers,
       accessCharacters,
