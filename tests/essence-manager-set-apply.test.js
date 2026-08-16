@@ -467,8 +467,9 @@ test('1036/1135: the stale flat mirror is DROPPED for a grouped set, never filte
   // A group whose essence option is stripped but which still carries a component option
   // must never leave `ingredients` naming the deleted essence. This used to be settled by
   // RECOMPUTING the mirror from the surviving groups; since issue 1135 `toJSON` does not
-  // emit the alias at all, so recomputing it here would put the retired alias straight back
-  // into the `updateRecipe` payload on every essence-delete cascade. Dropping it is the
+  // emit the alias at all. Recomputing it here would not reach disk — `updateRecipe` rebuilds
+  // via `Recipe.fromJSON` and persists `toJSON()` — but it would leave the intermediate patch
+  // carrying a second ingredient authority per set, the issue-1036 hazard. Dropping it is the
   // stronger answer, because `IngredientSet` derives the mirror from the stripped groups on
   // read — which the second assertion proves, and which is the property the original test
   // was really after.

@@ -70,8 +70,10 @@ test('stripComponentsFromRecipeJson removes every selected component in ONE pass
   const surviving = json.ingredientSets[0].ingredientGroups[0].options.map((o) => o.componentId);
   assert.deepEqual(surviving, ['copper'], 'only the unselected option survives');
   // Since issue 1135 the flat mirror is DROPPED for a set that has groups rather than
-  // recomputed from them: `toJSON` no longer emits the alias, so recomputing it here would
-  // put the retired alias back into the `updateRecipe` payload on every component delete.
+  // recomputed from them: `toJSON` no longer emits the alias. Recomputing it here would not
+  // reach disk — `updateRecipe` rebuilds via `Recipe.fromJSON` and persists `toJSON()`, which
+  // strips it either way — but it would leave the intermediate patch carrying a SECOND
+  // ingredient authority per set, which is the issue-1036 resurrection hazard.
   // The set's own constructor is what re-derives it, which is what this now pins.
   assert.ok(
     !('ingredients' in json.ingredientSets[0]),
