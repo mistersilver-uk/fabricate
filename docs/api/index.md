@@ -42,6 +42,9 @@ game.fabricate.getRecipeManager()          // Recipe CRUD and queries
 game.fabricate.getCraftingEngine()          // Execute crafting
 game.fabricate.getCraftingSystemManager()   // System and component CRUD
 game.fabricate.getCraftingRunManager()      // Multi-step run management
+game.fabricate.listCraftingForActor({ rememberedActorId, componentSourceActorIds }) // Player-visible crafting listing (summary phase)
+game.fabricate.hydrateCraftingRecipe({ recipeId, actorId, componentSourceActorIds }) // Exact detail model for one recipe (detail phase)
+game.fabricate.craftRecipe({ actorId, recipeId, ingredientSetId, componentSourceActorIds, interactive }) // Craft the selected recipe
 game.fabricate.salvageComponent({ actorId, systemId, componentId, interactive }) // Salvage one owned component
 game.fabricate.salvageComponents({ actorId, targets, interactive, onProgress }) // Salvage many owned components in one run
 game.fabricate.destroyComponents({ actorId, targets, onProgress }) // Permanently destroy many owned components in one run
@@ -128,6 +131,41 @@ backward compatibility, but it now throws until the manager has been opened at
 least once (i.e. until `loadCraftingSystemManagerAppClass()`, the header button,
 or `fabricate.openRecipeManager()` has loaded the chunk).
 Prefer the async accessor.
+
+### Crafting Runtime Facade
+
+Use these public `game.fabricate` methods when macros or integrations need to browse or craft for the current user.
+They back the player Crafting tab and inject the current Foundry user as the viewer before delegating to runtime internals.
+Browsing and crafting are split into two phases (issue 1075) so the browse cost tracks the page rather than the whole recipe corpus.
+
+```javascript
+Hooks.once('fabricate.ready', async () => {
+  const listing = game.fabricate.listCraftingForActor();
+  const row = listing.summaries[0];
+  if (!row) return;
+
+  // Exact per-recipe model, fetched only for the row the player opened.
+  const detail = game.fabricate.hydrateCraftingRecipe({ recipeId: row.id });
+  if (!detail) return; // Gone, disabled, blocked, or no longer visible.
+
+  const outcome = await game.fabricate.craftRecipe({ recipeId: row.id });
+  console.log(outcome.success ? 'Crafted' : `Failed: ${outcome.message}`);
+});
+```
+
+- `listCraftingForActor({ rememberedActorId, componentSourceActorIds })` is the **summary phase**.
+  It returns cheap, redaction-safe summary rows for every recipe the viewer may see, projected without running exact craftability against the whole corpus.
+  `rememberedActorId` and `componentSourceActorIds` default to the persisted crafting selections when omitted.
+  Each row's material verdict (its `browseStatus`) and the listing's own `counts.available` are **optimistic** — an upper bound read from an indexed availability snapshot, not exact evaluation.
+  A recipe whose ingredient sets contend for the same held stacks can read available in the list and still refuse once hydrated or crafted.
+  A row reporting unavailable is definitive; the optimism only ever runs in the makeable direction.
+- `hydrateCraftingRecipe({ recipeId, actorId, componentSourceActorIds })` is the **detail phase**.
+  It returns the exact rich model — per-set craftability, ingredient assignment, check resolution, outcome tiers, steps and progressive stages — for the one recipe the player has opened.
+  `recipeId` arrives from a client and is not trusted: the recipe's visibility, its `enabled` flag, and its crafting system's blocked state are all re-evaluated from scratch rather than taken from the summary pass.
+  The call returns `null`, never throws, when the recipe does not exist, is disabled, sits in a blocked crafting system, or the viewer may not see it.
+  An id is not a permission.
+- `craftRecipe({ actorId, recipeId, ingredientSetId, ingredientEssenceAllocation, componentSourceActorIds, interactive })` executes the attempt, delegating to the same pipeline documented in [CraftingEngine]({% link api/crafting-engine.md %}).
+  Exact craft-time validation is always authoritative, independent of what either listing phase reported.
 
 ### Gathering Runtime Facade
 
