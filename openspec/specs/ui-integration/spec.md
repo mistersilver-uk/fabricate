@@ -1196,6 +1196,18 @@ The total counts the filtered rows, so an active search / status / lock / catego
 Both singulars are localized — `1 recipe` and `1 of 282 recipes`, never `1 recipes`.
 The Component Studio's library follows the identical rule.
 
+Because both libraries page, **expensive per-entity work is scoped to what is on screen**: the rendered page plus the selected entity.
+A recipe's execution structure, requirements preview, completeness verdict and authoring body, and a component's linked source document — its resolved description fallback and its `Missing` badge — are prepared for the page's rows and the selected row, never for every definition the filter matched.
+What is prepared for the **whole filtered cohort** is everything a GM can act on without the row being on screen: the filter fields, the category totals above, every sort key, and the bulk selection.
+The two lists must not be confused in either direction, and each direction fails differently.
+A sort key demoted to the page tier renders **name order under the label of the key the GM chose**, silently and with no empty state to notice — so `enableBlocked`, the check DC, the ingredient and result counts and a component's salvage result-group count are all cohort-scoped facts.
+A count taken over the page instead of the cohort states that a 282-strong category holds 25, which the `N of M` rule above exists to prevent.
+Bulk actions operate on selected ids and cohorts, so `select all N results` selects the whole filtered cohort and an Apply reaches rows the GM has never scrolled to.
+Enabling a recipe still refuses exactly the recipes the row pills mark, because the refusal predicate is cohort-scoped like the pills that read it.
+
+Scoping is a matter of WHEN the work happens and never of what the surface reports: a paged library's counts, order, chips, selection and every rendered value are identical to those an unpaged one would show.
+The selected entity's inspector stays fully detailed and current, and a GM who never leaves page 1 pays for page 1.
+
 The **blocked-enable flash**: enabling a recipe is gated — an incomplete recipe, or one whose signature conflicts, is refused.
 The refusal renders as an in-window, dismissible `role="alert"` flash inside the library, and the store **suppresses** its Foundry notification whenever the library claims that message, so the same error is never reported twice (once in-window and once in a toast behind a maximised manager window).
 The flash **floats** over the list rather than sitting in flow above it: an in-flow banner shoves every row down the page as it appears, moving the row the GM just clicked out from under the cursor.

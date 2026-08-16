@@ -62,6 +62,15 @@ const ALCHEMY_ROWS = 100;
 const GM_ROWS = 200;
 
 /**
+ * The recipe library's default page size (`RECIPE_DEFAULT_PAGE_SIZE`).
+ *
+ * Restated here rather than imported so a benchmark case never depends on a `src/` constant
+ * that a product decision could move underneath a committed baseline — the number a baseline
+ * was measured at has to be readable in this file.
+ */
+const GM_BROWSER_PAGE_SIZE = 25;
+
+/**
  * Recipes the adversarial ingredient-solver case runs.
  *
  * Bounded hard. Each rich recipe carries 3 sets x 3 groups x 3 options, and every matcher
@@ -439,11 +448,13 @@ function alchemyCases() {
       id: 'adminRecipeRows.buildRecipeList',
       profile: 'alchemy-signatures',
       description:
-        'The GM recipe browser open over the signature corpus, bounded to ' +
-        `${GM_ROWS} rows. Each row derives \`enableBlocked\` through ` +
-        '`canActivateRecipe`, which before issue 1074 ran one FULL system audit and copied ' +
-        'the whole recipe corpus PER ROW. The three counters below are the criteria: one ' +
-        'report build, one audit worth of comparisons, and a bounded number of corpus copies.',
+        'The GM recipe browser COHORT projection over the signature corpus, bounded to ' +
+        `${GM_ROWS} rows. This is the tier the browser model filters, sorts, counts and ` +
+        'paginates, so it runs for every matching definition and must stay cheap: since ' +
+        'issue 1081 it derives no recipe body, no requirements preview and no activation ' +
+        'verdict. The `blockedRows` count below is taken OUTSIDE the timed region, which ' +
+        'is the whole point — reading it is what materialises the tier this case proves ' +
+        'the cohort no longer pays for.',
       setup: (context) => {
         const recipes = hydrateRecipes(context.modules, context.fixture.recipes.slice(0, GM_ROWS));
         const world = worldFor(context, { recipes });
@@ -470,6 +481,99 @@ function alchemyCases() {
       counts: (world, list) => ({
         rows: list.recipes.length,
         blockedRows: list.recipes.filter((row) => row.enableBlocked).length,
+        ...world.modules.signatureCounters.read(),
+      }),
+    },
+    {
+      id: 'adminRecipeRows.browsePage',
+      profile: 'alchemy-signatures',
+      description:
+        'What a GM actually does: project the cohort, then filter, sort, count, paginate ' +
+        `and RENDER page 1 of it — ${GM_BROWSER_PAGE_SIZE} rows out of ${GM_ROWS}. This is ` +
+        'the case issue 1081 exists to move, and the criteria are the two page-scope ' +
+        'counters: one report build for the whole open, and per-row detail work bounded by ' +
+        'the page rather than by the cohort.',
+      setup: (context) => {
+        const recipes = hydrateRecipes(context.modules, context.fixture.recipes.slice(0, GM_ROWS));
+        const world = worldFor(context, { recipes });
+        const readRecipes = world.recipeManager.getRecipes.bind(world.recipeManager);
+        world.recipeManager.getRecipes = (filters) => {
+          context.counters.bump('recipeCorpusCopies');
+          return readRecipes(filters);
+        };
+        world.modules.signatureCounters.reset();
+        return world;
+      },
+      run: (world) => {
+        const list = world.modules.recipeRowProjection.buildRecipeList(
+          world.craftingSystemManager,
+          world.recipeManager,
+          world.system,
+          ''
+        );
+        const model = world.modules.recipeBrowser.buildRecipeBrowserModel(list.recipes, {
+          status: 'all',
+          lock: 'all',
+          category: 'all',
+          sortKey: 'name',
+          sortDirection: 'asc',
+          groupByCategory: true,
+          pageIndex: 0,
+          pageSize: GM_BROWSER_PAGE_SIZE,
+        });
+        // Reading the fields a rendered row renders is what materialises the detail tier,
+        // so the timed region covers the same work the browser performs on screen.
+        for (const row of model.page) {
+          void row.requirementsPreview.length;
+          void row.structureLabel;
+          void row.incomplete;
+          void row.enableBlocked;
+        }
+        return { list, model };
+      },
+      counts: (world, { list, model }) => ({
+        rows: list.recipes.length,
+        pagedRows: model.page.length,
+        blockedPageRows: model.page.filter((row) => row.enableBlocked).length,
+        ...world.modules.signatureCounters.read(),
+      }),
+    },
+    {
+      id: 'adminRecipeRows.sortByAttention',
+      profile: 'alchemy-signatures',
+      description:
+        'The WORST case for the activation gate: the `attention` sort key reads ' +
+        '`enableBlocked` for every row in the filtered cohort before pagination, so it ' +
+        'cannot be page-scoped and must instead be amortised. `reportBuilds` is the ' +
+        `criterion — ${GM_ROWS} rows must still cost ONE full-system audit, not ` +
+        `${GM_ROWS} of them.`,
+      setup: (context) => {
+        const recipes = hydrateRecipes(context.modules, context.fixture.recipes.slice(0, GM_ROWS));
+        const world = worldFor(context, { recipes });
+        world.modules.signatureCounters.reset();
+        return world;
+      },
+      run: (world) => {
+        const list = world.modules.recipeRowProjection.buildRecipeList(
+          world.craftingSystemManager,
+          world.recipeManager,
+          world.system,
+          ''
+        );
+        return world.modules.recipeBrowser.buildRecipeBrowserModel(list.recipes, {
+          status: 'all',
+          lock: 'all',
+          category: 'all',
+          sortKey: 'attention',
+          sortDirection: 'desc',
+          groupByCategory: false,
+          pageIndex: 0,
+          pageSize: GM_BROWSER_PAGE_SIZE,
+        });
+      },
+      counts: (world, model) => ({
+        rows: model.filtered.length,
+        blockedRows: model.filtered.filter((row) => row.enableBlocked).length,
         ...world.modules.signatureCounters.read(),
       }),
     },
