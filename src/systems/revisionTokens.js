@@ -331,7 +331,7 @@ export function corpusDelta(before, after, { project = (record) => record, ident
 
   if (!leftById || !rightById) {
     const changed = corpusChanged(left, right, project);
-    return Object.freeze({ changed, reordered: changed, perRecord });
+    return sealedDelta(changed, changed, perRecord);
   }
 
   for (const [id, record] of leftById) {
@@ -359,7 +359,34 @@ export function corpusDelta(before, after, { project = (record) => record, ident
   }
 
   const reordered = commonOrderDiffers(leftById, rightById);
-  return Object.freeze({ changed: reordered || perRecord.size > 0, reordered, perRecord });
+  return sealedDelta(reordered || perRecord.size > 0, reordered, perRecord);
+}
+
+/**
+ * A delta neither half of which a consumer can rewrite.
+ *
+ * `Object.freeze` does not reach inside a `Map`, so freezing the delta object alone still
+ * handed out a `perRecord` a consumer could `delete` from — and deleting an entry is
+ * precisely the mutation that would license {@link patchCorpusInPlace} to reuse a record the
+ * delta reported CHANGED, which is the one failure direction that corrupts a cache. The
+ * mutators are therefore replaced rather than merely documented away, ahead of Part B handing
+ * one delta to more than one reader.
+ *
+ * @param {boolean} changed
+ * @param {boolean} reordered
+ * @param {Map<*, CorpusRecordDelta>} perRecord Sealed in place; the caller must not retain a
+ *   writable alias to it.
+ * @returns {CorpusDelta}
+ */
+function sealedDelta(changed, reordered, perRecord) {
+  for (const mutator of ['set', 'delete', 'clear']) {
+    Object.defineProperty(perRecord, mutator, {
+      value: () => {
+        throw new TypeError(`A corpus delta is read-only: perRecord.${mutator}() is refused.`);
+      },
+    });
+  }
+  return Object.freeze({ changed, reordered, perRecord: Object.freeze(perRecord) });
 }
 
 /**
@@ -376,8 +403,11 @@ export function corpusDelta(before, after, { project = (record) => record, ident
  * clauses of `definitionIndex`'s invalidation rule needs: a reused record's arrays are
  * byte-equivalent element by element, so a same-object array cannot hide a moved field.
  *
- * The caller must NOT pass a `reordered` delta: a reordering is not attributable per record,
- * so there is nothing here to reuse and the corpus is replaced wholesale instead.
+ * A `reordered` delta is REFUSED rather than merely documented against: a reordering is not
+ * attributable per record, so there is nothing here to reuse and the corpus must be replaced
+ * wholesale instead. Both callers already return before reaching this, so the throw is
+ * unreachable in production — its job is to keep the single audit this function exists to
+ * concentrate from being quietly widened by a third caller.
  *
  * `next` is CONSUMED — its values are rewritten in place, which is safe only because both
  * callers discard it immediately. `Map#set` on an existing key updates the value and keeps
@@ -389,10 +419,17 @@ export function corpusDelta(before, after, { project = (record) => record, ident
  *
  * @param {Map<*, object>} retained The manager's live map, kept by identity.
  * @param {Map<*, object>} next The freshly hydrated corpus, in persisted order. Consumed.
- * @param {CorpusDelta} delta The delta between the two.
+ * @param {CorpusDelta} delta The delta between the two. Must not be `reordered`.
+ * @throws {TypeError} When the delta is `reordered`.
  * @returns {void}
  */
 export function patchCorpusInPlace(retained, next, delta) {
+  if (delta.reordered) {
+    throw new TypeError(
+      'patchCorpusInPlace cannot patch a reordered delta: a reordering is attributable to no ' +
+        'record, so the corpus must be replaced wholesale instead.'
+    );
+  }
   for (const [id] of next) {
     const previous = retained.get(id);
     if (previous !== undefined && !delta.perRecord.has(id)) next.set(id, previous);

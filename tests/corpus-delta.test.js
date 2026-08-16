@@ -327,6 +327,47 @@ describe('patchCorpusInPlace — the reuse licence, in one place', () => {
 
     assert.deepEqual([...retained.keys()], ['a']);
   });
+
+  it('REFUSES a reordered delta rather than half-applying one', () => {
+    // The stated precondition, made executable. A reordering reports an empty `perRecord`, so
+    // patching one would reuse every record — which happens to be safe today only because
+    // reuse is licensed per record regardless of order. This function exists so that the
+    // reuse rule has one audit rather than two copies, and an unenforced precondition is
+    // exactly how a third caller quietly widens it.
+    const { retained, next, delta } = corpora(
+      [record('a'), record('b')],
+      [record('b'), record('a')]
+    );
+    assert.equal(delta.reordered, true, 'the premise: this really is a reordering');
+
+    assert.throws(
+      () => patchCorpusInPlace(retained, next, delta),
+      /reordered delta/,
+      'the caller must replace the corpus wholesale instead'
+    );
+  });
+});
+
+describe('corpusDelta — the delta it hands back is read-only', () => {
+  it('refuses every mutation of perRecord, not just of the wrapper', () => {
+    // `Object.freeze` does not reach inside a `Map`. Deleting an entry is the mutation that
+    // matters: it would license `patchCorpusInPlace` to reuse a record the delta reported
+    // changed, which is the one failure direction that corrupts a cache.
+    const delta = corpusDelta([record('a')], [record('a', { name: 'Renamed' })]);
+
+    assert.equal(Object.isFrozen(delta), true);
+    assert.throws(() => delta.perRecord.delete('a'), /read-only/);
+    assert.throws(() => delta.perRecord.set('z', {}), /read-only/);
+    assert.throws(() => delta.perRecord.clear(), /read-only/);
+    assert.deepEqual(attributed(delta), ['a'], 'and the delta still reads as it was built');
+  });
+
+  it('seals the unattributable delta too, which returns down a different path', () => {
+    const delta = corpusDelta([record('dup'), record('dup')], [record('dup'), record('dup')]);
+
+    assert.equal(Object.isFrozen(delta), true);
+    assert.throws(() => delta.perRecord.set('a', {}), /read-only/);
+  });
 });
 
 describe('corpusChanged keeps its own contract', () => {
