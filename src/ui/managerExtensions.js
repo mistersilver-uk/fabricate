@@ -1,4 +1,5 @@
 import { MANAGER_HOOKS } from '../config/hooks.js';
+import { createExtensionRegistry, requireNonEmptyString } from './extensionRegistry.js';
 
 /**
  * The surface id Core's GM Manager looks a World navigation provider up under for its
@@ -118,10 +119,6 @@ export function emitManagerHook(name, payload) {
   globalThis.Hooks?.callAll?.(name, payload);
 }
 
-function requireNonEmptyString(value, message) {
-  if (typeof value !== 'string' || value.trim() === '') throw new TypeError(message);
-}
-
 function validateActionTarget(action, label) {
   const hasHref = action.href !== undefined;
   const hasSelect = action.onSelect !== undefined;
@@ -206,163 +203,38 @@ function validateProvider(provider) {
   }
 }
 
-function providerHookPayload(provider) {
-  return Object.freeze({
-    schemaVersion: 1,
-    surfaceId: provider.id,
-    tabIds: Object.freeze(provider.tabs.map((tab) => tab.id)),
-  });
-}
-
+/**
+ * Create a Manager extension registry.
+ *
+ * Everything structural — the surface keying, the listener sets, the fault-contained
+ * notify guard, the tokened idempotent unregister, the frozen surface-id broadcast and the
+ * public API bind — comes from the shared factory in `extensionRegistry.js`, which the
+ * player registry is built from too (issue 1198). What stays here is what is genuinely
+ * Manager-specific: the provider shape, its route chrome and header actions, and the names
+ * this registry's callers already depend on.
+ *
+ * @param {object} [options] Injectable edges.
+ * @param {(...args: unknown[]) => void} [options.reportError] Error sink for a throwing subscriber.
+ * @param {(name: string, payload: object) => void} [options.emitHook] Hook edge.
+ * @returns {Readonly<object>} Frozen registry.
+ */
 export function createManagerExtensionsRegistry({
   reportError = console.error,
   emitHook = emitManagerHook,
 } = {}) {
-  // One provider per surface id, not one provider full stop. The registry never
-  // enumerates the ids it will accept, so a companion may claim a surface Core has never
-  // heard of; Core simply renders the surfaces it knows how to host.
-  const providers = new Map();
-  const registrationTokens = new Map();
-  const listeners = new Map();
-  // Subscribers to the SET of claimed surfaces rather than to one surface's provider.
-  // Core's Manager uses this to answer "is a companion module present at all", a question
-  // no per-surface subscription can answer: a companion that claims only a surface Core
-  // has never heard of publishes to nobody, and the shell would never learn it exists.
-  const surfaceSetListeners = new Set();
-
-  function notify(listener, value) {
-    try {
-      listener(value);
-    } catch (error) {
-      reportError('Fabricate | Manager extension subscriber failed:', error);
-    }
-  }
-
-  function currentSurfaceIds() {
-    return [...providers.keys()];
-  }
-
-  /**
-   * Add one listener to a listener set, replay the current value into it, and return an
-   * idempotent unsubscribe.
-   *
-   * The immediate replay goes through the same guard as a later publication: a subscriber
-   * that throws on its first snapshot must not take the SUBSCRIBING caller down with it,
-   * and Core's own Manager shell is one of those callers.
-   *
-   * @param {Set<Function>} set Listener set to join.
-   * @param {Function} listener Subscriber.
-   * @param {*} initialValue Value replayed immediately.
-   * @returns {() => void} Idempotent unsubscribe.
-   */
-  function addListener(set, listener, initialValue) {
-    set.add(listener);
-    notify(listener, initialValue);
-    let subscribed = true;
-    return () => {
-      if (!subscribed) return;
-      subscribed = false;
-      set.delete(listener);
-    };
-  }
-
-  function publish(surfaceId) {
-    const provider = providers.get(surfaceId) ?? null;
-    for (const listener of listeners.get(surfaceId) ?? []) {
-      notify(listener, provider);
-    }
-    // Frozen because every surface-set subscriber receives the SAME array; a mutable
-    // broadcast would let one subscriber rewrite what the next one reads.
-    const surfaceIds = Object.freeze(currentSurfaceIds());
-    for (const listener of surfaceSetListeners) {
-      notify(listener, surfaceIds);
-    }
-  }
-
-  /**
-   * Register the page session's provider for one Manager surface.
-   *
-   * The returned function is idempotent and restores the Core surface when it unregisters
-   * the currently registered provider.
-   *
-   * @param {WorldNavProvider} provider Companion-owned provider definition.
-   * @returns {() => void} Idempotent unregister function.
-   * @throws {TypeError} When the provider does not meet API-v1 requirements.
-   * @throws {Error} When another provider already holds that surface.
-   */
-  function registerWorldNavProvider(provider) {
-    validateProvider(provider);
-    if (providers.has(provider.id)) {
-      throw new Error(`World navigation provider "${provider.id}" is already registered`);
-    }
-
-    const token = {};
-    registrationTokens.set(provider.id, token);
-    providers.set(provider.id, provider);
-    publish(provider.id);
-    emitHook(MANAGER_HOOKS.NAV_PROVIDER_REGISTERED, providerHookPayload(provider));
-
-    let registered = true;
-    return () => {
-      if (!registered) return;
-      registered = false;
-      if (registrationTokens.get(provider.id) !== token) return;
-      registrationTokens.delete(provider.id);
-      providers.delete(provider.id);
-      publish(provider.id);
-      emitHook(MANAGER_HOOKS.NAV_PROVIDER_UNREGISTERED, providerHookPayload(provider));
-    };
-  }
-
-  const publicApi = Object.freeze({ registerWorldNavProvider });
-
-  return Object.freeze({
-    publicApi,
-    bindPublicApi(api) {
-      if (!api || typeof api !== 'object') {
-        throw new TypeError('Fabricate manager extension API target must be an object');
-      }
-      api.managerExtensions = publicApi;
-      return api;
-    },
-    getWorldNavProvider: (surfaceId) => providers.get(surfaceId) ?? null,
-    listWorldNavSurfaceIds: currentSurfaceIds,
-    // Core's own hook edge, shared with the Manager host so the route/tab hooks travel
-    // through the same injectable seam the registry's own hooks do.
+  return createExtensionRegistry({
+    validateProvider,
+    registeredHook: MANAGER_HOOKS.NAV_PROVIDER_REGISTERED,
+    unregisteredHook: MANAGER_HOOKS.NAV_PROVIDER_UNREGISTERED,
+    apiPropertyName: 'managerExtensions',
+    registerMethodName: 'registerWorldNavProvider',
+    getProviderMethodName: 'getWorldNavProvider',
+    listSurfaceIdsMethodName: 'listWorldNavSurfaceIds',
+    conflictNoun: 'World navigation provider',
+    errorNoun: 'manager extension',
+    subscriberFailureMessage: 'Fabricate | Manager extension subscriber failed:',
+    reportError,
     emitHook,
-    subscribe(surfaceId, listener) {
-      requireNonEmptyString(
-        surfaceId,
-        'Fabricate manager extension surface id must be a non-empty string'
-      );
-      if (typeof listener !== 'function') {
-        throw new TypeError('Fabricate manager extension subscriber must be a function');
-      }
-      let surfaceListeners = listeners.get(surfaceId);
-      if (!surfaceListeners) {
-        surfaceListeners = new Set();
-        listeners.set(surfaceId, surfaceListeners);
-      }
-      return addListener(surfaceListeners, listener, providers.get(surfaceId) ?? null);
-    },
-    /**
-     * Subscribe to the set of surface ids a companion currently claims.
-     *
-     * Deliberately NOT keyed on a surface id: the question it answers is "is any companion
-     * module registered", which is what the Manager's title bar reports. Keying it on
-     * `downtime` would make that report a claim about one Core route rather than about the
-     * companion module, and a future premium surface would never light it.
-     *
-     * @param {(surfaceIds: readonly string[]) => void} listener Receives the current ids
-     *   immediately and again on every registration and unregistration.
-     * @returns {() => void} Idempotent unsubscribe.
-     */
-    subscribeSurfaceIds(listener) {
-      if (typeof listener !== 'function') {
-        throw new TypeError('Fabricate manager extension subscriber must be a function');
-      }
-      return addListener(surfaceSetListeners, listener, Object.freeze(currentSurfaceIds()));
-    },
   });
 }
 
