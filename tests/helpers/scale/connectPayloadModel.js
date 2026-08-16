@@ -117,6 +117,36 @@ export function serializedRecordBytes(payloads) {
 }
 
 /**
+ * Record bytes as a `Setting` document actually carries them: escaped inside a string field.
+ *
+ * `Setting#value` is a **string** holding `JSON.stringify(value)`, so serializing the document
+ * escapes everything inside it that JSON escapes — quotes, backslashes and control characters.
+ * This is that length, and it is derived from the serializer rather than from a quote tally so
+ * the `\\`, `\n` and `\uXXXX` forms are counted too.
+ *
+ * **Minus the two quote delimiters, and that subtraction is the whole subtlety.**
+ * {@link SETTING_DOCUMENT_ENVELOPE_BYTES} was derived as 391 - 51 from a real document that
+ * already contained its value's delimiters, so charging them again per record double-counts
+ * them. An earlier hand-computed sensitivity did exactly that and reported that escaping moved
+ * the per-record penalty "from 339 to 341 bytes". It cannot, and this function exists so the
+ * figure comes out of the harness instead of out of a calculator.
+ *
+ * The result drops straight into {@link wholeArrayConnectBytes} and
+ * {@link perRecordKeyConnectBytes} in place of {@link serializedRecordBytes}: array punctuation
+ * carries nothing escapable, so the escaped whole array is still `sum + n + 1`, which
+ * {@link assertEscapedArrayIdentity} proves against a real double `JSON.stringify` rather than
+ * asserting. Escaping therefore adds the SAME term to both layouts and cancels out of their
+ * difference exactly — it moves the *relative* overhead (44.13% to 38.60% on `simple-corpus`)
+ * and cannot move the per-record penalty off `envelope - 1`.
+ *
+ * @param {object[]} payloads
+ * @returns {number[]}
+ */
+export function escapedRecordBytes(payloads) {
+  return payloads.map((payload) => JSON.stringify(JSON.stringify(payload)).length - 2);
+}
+
+/**
  * What the whole-array `world` setting costs at connect for the first `records` of a corpus.
  *
  * Exclusive of this setting's OWN `Setting` document envelope — see the accounting convention in
@@ -258,6 +288,23 @@ export function findConnectCrossover({
 export function assertWholeArrayIdentity(payloads) {
   const modelled = wholeArrayConnectBytes(serializedRecordBytes(payloads));
   const actual = JSON.stringify(payloads).length;
+  return { modelled, actual, matches: modelled === actual };
+}
+
+/**
+ * The same proof for the escaped model: array punctuation is not escaped.
+ *
+ * `sum(escapedRecordBytes) + n + 1` is the claim that lets {@link escapedRecordBytes} be fed to
+ * the unescaped formulae unchanged, and it holds only because `[`, `]` and `,` carry nothing
+ * JSON escapes. Checked against a real double `JSON.stringify` on the caller's own corpus, on
+ * the same delimiter-excluding convention as {@link escapedRecordBytes}.
+ *
+ * @param {object[]} payloads
+ * @returns {{modelled: number, actual: number, matches: boolean}}
+ */
+export function assertEscapedArrayIdentity(payloads) {
+  const modelled = wholeArrayConnectBytes(escapedRecordBytes(payloads));
+  const actual = JSON.stringify(JSON.stringify(payloads)).length - 2;
   return { modelled, actual, matches: modelled === actual };
 }
 

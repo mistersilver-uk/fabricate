@@ -39,9 +39,11 @@ import { fileURLToPath } from 'node:url';
 
 import {
   SETTING_DOCUMENT_ENVELOPE_BYTES,
+  assertEscapedArrayIdentity,
   assertWholeArrayIdentity,
   connectPayloadAt,
   connectPayloadSeries,
+  escapedRecordBytes,
   findConnectCrossover,
   perRecordKeyConnectBytes,
   serializedRecordBytes,
@@ -109,6 +111,76 @@ describe('the per-record-key term', () => {
     // The constant is an INPUT from the issue-1079 live spike, not something this module can
     // derive. Pinned so a silent edit is a failing test rather than a quietly different report.
     assert.equal(SETTING_DOCUMENT_ENVELOPE_BYTES, 340);
+  });
+});
+
+describe('the escaped model, where a `Setting` value is a string field', () => {
+  /** A record whose serialization is nothing but quotes and escapes. */
+  const QUOTED = [{ 'a"b': 'c\\d\ne' }, { f: '"""' }];
+
+  it('counts every escape JSON applies, not just quotes, and excludes the delimiters', () => {
+    // Derived from the serializer rather than from a quote count: `JSON.stringify` also escapes
+    // backslashes and control characters, and a hand-rolled quote tally would miss both. The
+    // `- 2` is the whole subtlety — `SETTING_DOCUMENT_ENVELOPE_BYTES` was derived as 391 - 51
+    // from a document that already carried that value's own quote delimiters, so charging them
+    // again per record double-counts them.
+    for (const payload of QUOTED) {
+      const serialized = JSON.stringify(payload);
+      const [escaped] = escapedRecordBytes([payload]);
+      assert.equal(escaped, JSON.stringify(serialized).length - 2);
+      assert.ok(escaped > serialized.length, 'this fixture must actually need escaping');
+    }
+  });
+
+  it('leaves the whole-array formula intact, because array punctuation is not escaped', () => {
+    // The arithmetic claim the escaped figures rest on, checked against a real double
+    // `JSON.stringify` rather than restated: `[`, `]` and `,` carry nothing escapable, so the
+    // escaped array is still `sum(escapedRecordBytes) + n + 1`.
+    const held = assertEscapedArrayIdentity(QUOTED);
+    assert.equal(held.matches, true);
+    assert.equal(held.actual, JSON.stringify(JSON.stringify(QUOTED)).length - 2);
+
+    const escaped = escapedRecordBytes(QUOTED);
+    const sum = escaped.reduce((total, value) => total + value, 0);
+    assert.equal(held.actual - sum, QUOTED.length + 1);
+  });
+
+  it('CANNOT move the per-record penalty off 339, whatever the corpus', () => {
+    // The claim this replaces said escaping moved the penalty "from 339 to 341 bytes". That is
+    // arithmetically impossible: escaping adds the same per-record term to both layouts, so it
+    // cancels out of the difference exactly. Asserted over a corpus that is mostly escapes, so
+    // a model that leaked the term into one side only would be red here by a wide margin.
+    const plain = serializedRecordBytes(UNEVEN);
+    const escaped = escapedRecordBytes(UNEVEN);
+    for (const records of [1, 2, 4]) {
+      assert.equal(
+        connectPayloadAt({ recordBytes: escaped, records }).deltaBytes,
+        connectPayloadAt({ recordBytes: plain, records }).deltaBytes,
+        `${records} record(s)`
+      );
+    }
+    const quoted = escapedRecordBytes(QUOTED);
+    assert.ok(
+      quoted.reduce((total, value) => total + value, 0) >
+        serializedRecordBytes(QUOTED).reduce((total, value) => total + value, 0),
+      'the escaped corpus must differ from the plain one or this proves nothing'
+    );
+    assert.equal(
+      connectPayloadAt({ recordBytes: quoted, records: 2 }).deltaBytes,
+      2 * (SETTING_DOCUMENT_ENVELOPE_BYTES - 1) - 1
+    );
+  });
+
+  it('moves the RELATIVE overhead down, which is the only thing it can move', () => {
+    // Escaping inflates both layouts by the same absolute bytes, so it grows the denominator and
+    // leaves the numerator alone: the ratio must fall, and it must fall on the corpus rather than
+    // on a constructed example.
+    const plain = connectPayloadAt({ recordBytes: serializedRecordBytes(QUOTED), records: 2 });
+    const escaped = connectPayloadAt({ recordBytes: escapedRecordBytes(QUOTED), records: 2 });
+    assert.ok(
+      escaped.overheadBasisPoints < plain.overheadBasisPoints,
+      `${escaped.overheadBasisPoints} bp is not below ${plain.overheadBasisPoints} bp`
+    );
   });
 });
 
@@ -252,6 +324,35 @@ describe('the committed reading', () => {
       assert.equal(
         counts.perRecordKeyConnectBytes - counts.wholeArrayConnectBytes,
         counts.connectDeltaBytes
+      );
+    });
+
+    it(`${profile} records the escaped model as moving the ratio and nothing else`, () => {
+      const counts = readBaseline(profile).cases[caseId].counts;
+      assert.equal(counts.escapedArrayPunctuationModelHolds, 1);
+      // The correction this replaces claimed escaping moved the per-record penalty to 341
+      // bytes. The committed figures have to make that unstatable: escaping adds the same term
+      // to both layouts, so the delta and the per-record penalty are byte-identical to the
+      // unescaped ones and only the denominator grows.
+      assert.equal(
+        counts.escapedPerRecordKeyConnectBytes - counts.escapedWholeArrayConnectBytes,
+        counts.connectDeltaBytes
+      );
+      assert.equal(
+        Math.round(
+          (counts.escapedPerRecordKeyConnectBytes - counts.escapedWholeArrayConnectBytes) /
+            counts.connectRecords
+        ),
+        counts.connectDeltaBytesPerRecord
+      );
+      assert.ok(
+        counts.escapedWholeArrayConnectBytes > counts.wholeArrayConnectBytes,
+        'escaping must actually inflate the corpus or these keys prove nothing'
+      );
+      assert.ok(
+        counts.escapedConnectOverheadBasisPoints <
+          counts[`connectOverheadBasisPoints@${counts.connectRecords}`],
+        'escaping grows the denominator, so the relative overhead must fall'
       );
     });
   }

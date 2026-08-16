@@ -305,10 +305,22 @@ simple ones pays 44% for the *same* 339 bytes per record.
   unescaped value from the escaped document, which charges the value's own
   escaping to the envelope.
 - **`Setting#value` is a string field, so a transmitted document escapes the JSON
-  inside it.** Modelling both layouts fully escaped moves `simple-corpus` from
-  +44.1% to **+38.8%** (8,793,405 against 12,203,062 bytes) and the per-record
-  penalty from 339 to 341 bytes.
+  inside it.** This is modelled rather than estimated — `escapedRecordBytes` in
+  `connectPayloadModel.js`, committed per case as
+  `escapedWholeArrayConnectBytes`, `escapedPerRecordKeyConnectBytes`,
+  `escapedConnectOverheadBasisPoints` and `escapedArrayPunctuationModelHolds`.
+  Modelling both layouts escaped moves `simple-corpus` from +44.13% to
+  **+38.60%** (8,781,957 against 12,171,956 bytes) and `rich-corpus` from +8.98%
+  to **+7.64%** (22,172,096 against 23,867,095).
   The direction is favourable to B(1) and the conclusion does not move.
+
+  **The per-record penalty stays at 339 bytes, and cannot do anything else.**
+  Escaping adds the same term to both layouts, and array punctuation contains
+  nothing escapable — measured on both corpora, the escaped array is exactly
+  `n + 1` bytes larger than the sum of the escaped records — so it cancels out of
+  the difference and only the denominator grows.
+  The absolute delta is byte-identical: +3,389,999 on `simple-corpus`, +1,694,999
+  on `rich-corpus`.
 - **Corpus sizes real installations actually reach are not measured here and
   cannot be**, because the module collects no telemetry.
   The sweep spans one record to the epic's 10,000-record target so a maintainer

@@ -31,9 +31,11 @@
  */
 import {
   SETTING_DOCUMENT_ENVELOPE_BYTES,
+  assertEscapedArrayIdentity,
   assertWholeArrayIdentity,
   connectPayloadAt,
   connectPayloadSeries,
+  escapedRecordBytes,
   findConnectCrossover,
   serializedRecordBytes,
 } from './connectPayloadModel.js';
@@ -180,14 +182,26 @@ function connectPayloadCase({ id, profile, shape, sweep }) {
       // the payload production replicates.
       await world.recipeManager.save();
       const payloads = world.settings.get('recipes');
-      return { payloads, recordBytes: serializedRecordBytes(payloads) };
+      return {
+        payloads,
+        recordBytes: serializedRecordBytes(payloads),
+        // The same corpus as a `Setting#value` string field actually carries it. Committed
+        // because it is the one sensitivity this measurement has, and because the previous
+        // attempt to state it was hand-computed on an order-dependent corpus and came out
+        // wrong — see `escapedRecordBytes`.
+        escapedBytes: escapedRecordBytes(payloads),
+      };
     },
     run: ({ recordBytes }) => ({
       series: connectPayloadSeries({ recordBytes, sizes: sweep }),
       crossover: findConnectCrossover({ recordBytes }),
     }),
-    counts: ({ payloads, recordBytes }, { series, crossover }) => {
+    counts: ({ payloads, recordBytes, escapedBytes }, { series, crossover }) => {
       const corpus = connectPayloadAt({ recordBytes, records: recordBytes.length });
+      const escaped = connectPayloadAt({
+        recordBytes: escapedBytes,
+        records: escapedBytes.length,
+      });
       return {
         connectRecords: corpus.records,
         connectEnvelopeBytesPerRecord: SETTING_DOCUMENT_ENVELOPE_BYTES,
@@ -208,6 +222,17 @@ function connectPayloadCase({ id, profile, shape, sweep }) {
         // here subtracts from, so it is checked against real `JSON.stringify` on the real corpus
         // and committed as a fact rather than left to a comment.
         wholeArrayPunctuationModelHolds: assertWholeArrayIdentity(payloads).matches ? 1 : 0,
+        // The escaped model — `Setting#value` is a string field, so a transmitted document
+        // escapes the JSON inside it. Four keys, because this is the ONLY sensitivity the
+        // measurement has and it must be re-derivable rather than recomputed by hand: the two
+        // byte counts, the ratio they move, and the punctuation identity that lets the escaped
+        // bytes be fed to the unescaped formulae. The DELTA is deliberately not committed
+        // twice: escaping adds the same term to both layouts, so `escaped*ConnectBytes`
+        // subtract to exactly `connectDeltaBytes` above, and the drift test asserts that.
+        escapedWholeArrayConnectBytes: escaped.wholeArrayBytes,
+        escapedPerRecordKeyConnectBytes: escaped.perRecordKeyBytes,
+        escapedConnectOverheadBasisPoints: escaped.overheadBasisPoints,
+        escapedArrayPunctuationModelHolds: assertEscapedArrayIdentity(payloads).matches ? 1 : 0,
         ...Object.fromEntries(
           series.map((row) => [
             `connectOverheadBasisPoints@${row.records}`,
