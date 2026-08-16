@@ -1,5 +1,5 @@
 import { getFabricateFlag, isSafeFlagKeySegment } from '../config/flags.js';
-import { SETTING_KEYS } from '../config/settings.js';
+import { DEFINITION_STORAGE_TARGETS, getSetting, SETTING_KEYS } from '../config/settings.js';
 import { matchGatheringTools, classifyGatheringToolStates } from '../gatheringToolRuntime.js';
 import { getIngredientComponentId, getMatchHandler } from '../models/match/matchTypes.js';
 import { DEFAULT_RECIPE_IMAGE, Recipe } from '../models/Recipe.js';
@@ -21,9 +21,14 @@ import { applyDefinitionChange } from './CraftingDefinitionRepository.js';
 import { buildCurrencyAffordProbe, getCurrencyRequirementConfig } from './currencyAffordance.js';
 import { formatCurrencyRequirement, normalizeCurrencyUnit } from './currencyProfile.js';
 import { readStackQuantity } from './itemStackQuantity.js';
+import {
+  PerRecordCraftingDefinitionRepository,
+  RECIPE_RECORD_KEY_PREFIX,
+} from './PerRecordCraftingDefinitionRepository.js';
 import { RecipeActivationError } from './RecipeActivationError.js';
 import { RecipePersistenceError } from './RecipePersistenceError.js';
 import {
+  corpusChanged,
   corpusDelta,
   patchCorpusInPlace,
   REVISION_SCOPES,
@@ -121,6 +126,65 @@ function importConflictReason(issues) {
 }
 
 /**
+ * The **Definition Storage Target** for recipes, read defensively.
+ *
+ * Issue 1080 (-b). `game.settings.get` throws for a key that is not registered, and `game`
+ * itself is absent in a great many unit fixtures that construct a bare `new RecipeManager()`
+ * — so a thrown or missing read is answered with `singleArray`, today's arrangement. The
+ * failure direction is deliberate: an unreadable target must never be able to promote a
+ * world onto the granular backend, only ever leave it where it already is.
+ *
+ * @returns {string} a member of `DEFINITION_STORAGE_TARGETS`.
+ */
+function readRecipeStorageTarget() {
+  try {
+    return (
+      getSetting(SETTING_KEYS.RECIPE_STORAGE_TARGET) ?? DEFINITION_STORAGE_TARGETS.SINGLE_ARRAY
+    );
+  } catch {
+    return DEFINITION_STORAGE_TARGETS.SINGLE_ARRAY;
+  }
+}
+
+/**
+ * The repository the manager builds when the caller injects none — the ONE place the
+ * recipe backend is chosen (issue 1080 -b).
+ *
+ * `singleArray` (the registered default, and therefore every world today) yields the
+ * unchanged {@link SettingsCraftingDefinitionRepository}, which is what makes -b
+ * behaviour-neutral: no world reaches the per-record branch until the Storage Layout
+ * Conversion in -c flips the target.
+ *
+ * The two adapters differ in ONE argument, and the difference is the statement of what
+ * each backend can do: the settings adapter takes a `corpus` thunk because it can only
+ * ever replace the whole array, and the per-record adapter takes none because it addresses
+ * a single record. Everything else — hydrate, serialize, scopeOf — is shared, so the two
+ * cannot drift into disagreeing about a recipe's persisted form.
+ *
+ * @param {object} options
+ * @param {() => Map<string, object>} options.corpus The manager's own recipe map.
+ * @returns {import('./CraftingDefinitionRepository.js').CraftingDefinitionRepository}
+ */
+function buildDefaultRecipeRepository({ corpus }) {
+  const shared = {
+    hydrate: (raw) => Recipe.fromJSON(raw),
+    serialize: (recipe) => recipe.toJSON(),
+    scopeOf: (recipe) => recipe?.craftingSystemId ?? null,
+  };
+  if (readRecipeStorageTarget() === DEFINITION_STORAGE_TARGETS.PER_RECORD) {
+    return new PerRecordCraftingDefinitionRepository({
+      keyPrefix: RECIPE_RECORD_KEY_PREFIX,
+      ...shared,
+    });
+  }
+  return new SettingsCraftingDefinitionRepository({
+    settingKey: SETTING_KEYS.RECIPES,
+    corpus,
+    ...shared,
+  });
+}
+
+/**
  * Manages recipe storage, retrieval, and CRUD operations
  */
 export class RecipeManager {
@@ -164,20 +228,17 @@ export class RecipeManager {
     this.getCraftingSystem = typeof getCraftingSystem === 'function' ? getCraftingSystem : null;
     this._getCraftingSystemManager =
       typeof getCraftingSystemManager === 'function' ? getCraftingSystemManager : null;
-    // The adapter shares THIS map rather than mirroring it — see
+    // The SETTINGS adapter shares THIS map rather than mirroring it — see
     // `SettingsCraftingDefinitionRepository` for why a second ordered map would be a
     // silent corruption of the persisted array's order. The manager still owns every
     // in-memory `set`/`delete` on it: the repository is the persistence seam, not the
-    // domain state, and a document-backed adapter (#1080) will not maintain this map.
-    this._repository =
-      repository ??
-      new SettingsCraftingDefinitionRepository({
-        settingKey: SETTING_KEYS.RECIPES,
-        corpus: () => this.recipes,
-        hydrate: (raw) => Recipe.fromJSON(raw),
-        serialize: (recipe) => recipe.toJSON(),
-        scopeOf: (recipe) => recipe?.craftingSystemId ?? null,
-      });
+    // domain state, and the per-record adapter (#1080 -b) takes no corpus thunk at all,
+    // because it addresses one record and needs nothing else.
+    //
+    // Which of the two is built is decided ONCE, here, by the recipe Definition Storage
+    // Target — see `buildDefaultRecipeRepository`. It reads `singleArray` on every world
+    // today, so this construction is byte-for-byte the one it replaced.
+    this._repository = repository ?? buildDefaultRecipeRepository({ corpus: () => this.recipes });
   }
 
   /**
@@ -321,6 +382,38 @@ export class RecipeManager {
    * information is now carried to the seam instead of being discarded at the call
    * site, which is the whole point of landing this before the persistence ADR.
    *
+   * ## The in-place mutation audit (issue 1080 -b, task B3)
+   *
+   * Under the settings adapter a NAMED `save({put})` still writes `[...corpus().values()]`,
+   * so it flushes every in-memory mutation — including ones made by code paths that never
+   * called `save()` themselves. A per-record `put` writes exactly one document. Any site
+   * that mutated recipe A in place and then issued `save({ put: B })` would therefore stop
+   * persisting A the moment the target flips, silently and with no test failing.
+   *
+   * Every call site was audited, and the invariant that came out of it is stated here
+   * because it is what future work must preserve:
+   *
+   * > **A named `save({put|delete|batch})` may only be issued for records the SAME
+   * > operation created, replaced or removed. A site that mutates a stored recipe in place
+   * > must flush through the argument-less whole-corpus `save()`** — which is differential
+   * > under the per-record adapter and so writes exactly the records whose stored value
+   * > actually moved.
+   *
+   * | Site | Shape | Why it is safe |
+   * |---|---|---|
+   * | {@link RecipeManager#createRecipe} | `save({put})` | The only in-place write is the draft clamp `recipe.enabled = false` on the record being put. |
+   * | {@link RecipeManager#updateRecipe} | `save({put})` | `updatedRecipe` is a fresh `Recipe.fromJSON`; nothing else in the map is touched. |
+   * | {@link RecipeManager#deleteRecipe} | `save({delete})` | Removes one map entry and mutates no other record. |
+   * | {@link RecipeManager#deleteRecipes} | `save()` | Whole-corpus, so the differential carries any pending in-place mutation as well as the removals. |
+   * | {@link RecipeManager#importRecipes} | `save()` | Whole-corpus, same. |
+   * | {@link RecipeManager#disableSignatureConflicts} | `save({batch})` | The ONE in-place writer in this manager (`recipe.enabled = false`), and the batch is derived from the same `disabled` list, so the mutated set and the persisted set are the same array by construction. |
+   *
+   * The three EXTERNAL in-place mutators of a hydrated recipe are all in
+   * `CraftingSystemManager` — the recipe-item link repair (`recipe.recipeItemId`, both
+   * branches) and `deleteRecipeItemDefinition`
+   * (`recipe.recipeItemId` / `recipe.linkedRecipeItemUuid`) — and all three already flush
+   * through the argument-less `recipeManager.save()`. No mutation call site changed shape.
+   *
    * @param {import('./CraftingDefinitionRepository.js').DefinitionChange} [change]
    */
   async save(change = null) {
@@ -411,6 +504,57 @@ export class RecipeManager {
     patchCorpusInPlace(this.recipes, next, delta);
     // Also drops the cohort index, whose token clause this advance would fail anyway.
     this._advanceRecipeRevision(...touched);
+    return true;
+  }
+
+  /**
+   * Apply ONE replicated per-record change to the in-memory map (issue 1080 -b).
+   *
+   * The per-record sibling of {@link RecipeManager#reload}, and the reason the seam grew
+   * {@link CraftingDefinitionRepository#supportsPerRecordReplication}: under the granular
+   * backend a replication event names a single `fabricate.recipe.<id>` key, so re-reading
+   * the whole corpus per event would restore exactly the O(N)-per-edit cost the backend
+   * exists to remove. A repository that does not support it answers `false` here and the
+   * caller falls back to `reload()`, which is today's behaviour and stays correct.
+   *
+   * **The boolean means the same thing `reload()`'s does**, and for the same reason: the
+   * `createSetting` / `updateSetting` / `deleteSetting` hooks fire on the WRITING client
+   * too, where the map already holds the record. Answering `true` there would re-emit
+   * `fabricate.recipesChanged` once per record on top of the single change hook the writer
+   * already emits, which `import-export/spec.md` fixes at one per batch. So an incoming
+   * record structurally equal to the held one is reported as no change, and the held object
+   * is KEPT — preserving the container and record identity that #1076's cohort index and
+   * #1074's signature guard are keyed on.
+   *
+   * Equality is {@link corpusChanged} over the single-record pair, so it cannot drift from
+   * the comparison `reload()` performs over the whole corpus.
+   *
+   * @param {import('./CraftingDefinitionRepository.js').ReplicatedDefinitionChange} change
+   * @returns {boolean} `true` only when this manager's map actually moved.
+   */
+  applyReplicatedRecordChange(change) {
+    if (this._repository.supportsPerRecordReplication?.() !== true) return false;
+    const applied = this._repository.readReplicatedRecord?.(change);
+    if (!applied) return false;
+
+    const { id, record } = applied;
+    const previous = this.recipes.get(id) ?? null;
+    if (!record) {
+      // A delete for an id this client never held is not a change; it is a replay.
+      if (!previous) return false;
+      this.recipes.delete(id);
+      this._advanceRecipeRevision(previous.craftingSystemId);
+      return true;
+    }
+
+    if (previous && !corpusChanged([previous], [record], projectRecipe)) return false;
+    this.recipes.set(id, record);
+    // A replicated edit that MOVED a recipe names both systems, exactly as `updateRecipe`
+    // and `reload()` do.
+    this._advanceRecipeRevision(previous?.craftingSystemId, record.craftingSystemId);
+    // A client whose first sight of the corpus is a replicated record is initialized by it,
+    // mirroring `reload()`.
+    this.initialized = true;
     return true;
   }
 

@@ -66,8 +66,13 @@ test('Fabricate exposes deleteRecipe on the main Foundry API object', () => {
 });
 
 test('Fabricate bridges replicated crafting-data setting changes into local refresh hooks', () => {
-  assert.ok(
-    mainSource.includes("import { handleFabricateSettingChange } from './config/settingChangeBridge.js'"),
+  // Matched as a pattern rather than a literal line: issue 1080 (-b) added a second named
+  // import from the same module (the per-record batch coalescer), and pinning the exact
+  // brace contents would fail on an addition that leaves the asserted wiring intact. What
+  // must hold is that main.js takes the handler from the bridge module.
+  assert.match(
+    mainSource,
+    /import \{[^}]*\bhandleFabricateSettingChange\b[^}]*\} from '\.\/config\/settingChangeBridge\.js'/,
     'main.js should import the setting-change bridge'
   );
   assert.ok(

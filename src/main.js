@@ -94,7 +94,7 @@ import { registerFabricateSettings, getSetting, setSetting, SETTING_KEYS, FABRIC
 import { notifyUnresolvedItemDescriptions } from './config/repairItemData.js';
 import { setFabricateFlag } from './config/flags.js';
 import { isPlayerCharacterActor } from './config/playerCharacterTypes.js';
-import { handleFabricateSettingChange } from './config/settingChangeBridge.js';
+import { createRecipeRefreshCoalescer, handleFabricateSettingChange } from './config/settingChangeBridge.js';
 import { configureItemStackQuantityPath, probeStackQuantityPath, stackQuantityAdvisory } from './systems/itemStackQuantity.js';
 import { stackQuantityPathPresetFor } from './config/stackQuantityPathPresets.js';
 import { FABRICATE_HOOKS } from './config/hooks.js';
@@ -3550,6 +3550,22 @@ Hooks.once('ready', async () => {
   // surfaces as a core `Hooks.onError` line naming this handler (a named `const`, so the
   // line is not anonymous), with no clue which of the four branches below failed or
   // which setting triggered it.
+  //
+  // `recipeRefresh` is the per-record batch bracket (issue 1080 -b). Created ONCE here
+  // rather than per event, because its whole job is to span the three awaited bulk document
+  // calls one flush issues — a per-event coalescer would collapse nothing.
+  const recipeRefresh = createRecipeRefreshCoalescer();
+  // The live collaborators every leg hands the bridge. Resolved per call, because
+  // `fabricate.recipeManager` is assembled during `ready` and a value captured here would be
+  // stale for the rest of the session. Shared by the update/create listener and the delete
+  // listener so the two cannot drift into passing different managers.
+  const fabricateSettingChangeTargets = () => ({
+    craftingSystemManager: fabricate.craftingSystemManager,
+    recipeManager: fabricate.recipeManager,
+    gatheringEnvironmentStore: fabricate.gatheringEnvironmentStore,
+    callAll: (hook, payload) => Hooks.callAll(hook, payload),
+    recipeRefresh
+  });
   const handleFabricateSettingDocumentChange = (setting) => {
     try {
       const key = setting?.key ?? `${setting?.namespace ?? ''}.${setting?.id ?? ''}`;
@@ -3567,10 +3583,13 @@ Hooks.once('ready', async () => {
       // client when the replicated world setting lands, so reload the stale in-memory
       // manager here and re-emit the local change hook so open player apps refresh.
       handleFabricateSettingChange(key, {
-        craftingSystemManager: fabricate.craftingSystemManager,
-        recipeManager: fabricate.recipeManager,
-        gatheringEnvironmentStore: fabricate.gatheringEnvironmentStore,
-        callAll: (hook, payload) => Hooks.callAll(hook, payload),
+        ...fabricateSettingChangeTargets(),
+        // The record is present in the delivered document — a create or an update. The
+        // `deleteSetting` leg below is the one that says otherwise, and removal is the only
+        // distinction the repository seam draws: `readReplicatedRecord` reads the record out
+        // of the document on both of these legs and branches only on a delete.
+        operation: 'update',
+        document: setting
       });
     } catch (error) {
       console.error('Fabricate | Failed to handle a Fabricate setting change', error);
@@ -3585,7 +3604,38 @@ Hooks.once('ready', async () => {
   // propagates to nobody until reload. Wiring it at the shared handler also closes the
   // same latent first-write hole for the `craftingSystems`, `recipes`, and
   // `gatheringEnvironments` branches.
+  //
+  // Under the per-record backend (#1080 -b) this stops being the edge case it was for issue
+  // 1024 and becomes the DOMINANT leg: every record's first write is a create, so a Storage
+  // Layout Conversion and an import both arrive here rather than at `updateSetting`. The
+  // shared handler already covers it, which is why this line is extended rather than added —
+  // and the create leg reports the same `operation` as the update leg deliberately, because
+  // a directly-registered listener may take ONE parameter (see above) and so cannot tell the
+  // two apart, while the repository seam does not ask it to.
   Hooks.on('createSetting', handleFabricateSettingDocumentChange);
+  // `deleteSetting` was never wired at all. Under the whole-corpus arrangement that was
+  // survivable — nothing deletes a Fabricate setting document — but per-record REMOVAL is a
+  // document delete (`ClientSettings` has no delete, and `set(key, null)` would leave the
+  // envelope in existence forever), so without this a recipe deleted by the GM stays visible
+  // on every other client until reload, with no error anywhere.
+  //
+  // This leg needs its own listener because the operation is the whole point: by the time
+  // the hook fires the document is already out of the world collection, so "this record is
+  // gone" is not inferable from the key. It takes the document ONLY, exactly as the shared
+  // listener does — `deleteSetting` emits `(doc, options, userId)`, so a second positional
+  // parameter would receive `options`.
+  const handleFabricateSettingDocumentDelete = (setting) => {
+    try {
+      handleFabricateSettingChange(setting?.key ?? '', {
+        ...fabricateSettingChangeTargets(),
+        operation: 'delete',
+        document: setting
+      });
+    } catch (error) {
+      console.error('Fabricate | Failed to handle a Fabricate setting deletion', error);
+    }
+  };
+  Hooks.on('deleteSetting', handleFabricateSettingDocumentDelete);
   Hooks.on('canvasReady', () => {
     void runInteractableMarkerSync();
   });
