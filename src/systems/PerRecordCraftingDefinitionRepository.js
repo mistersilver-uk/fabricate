@@ -605,35 +605,50 @@ export class PerRecordCraftingDefinitionRepository extends CraftingDefinitionRep
    */
   async runBatch(work) {
     this._batchDepth += 1;
-    let workFailed = false;
+    let workError = null;
+    let result;
+    // The flush deliberately sits AFTER this block rather than inside its `finally`. It has
+    // to run whether or not the body threw, but a `throw` inside a `finally` is
+    // `no-unsafe-finally`: it abandons any in-flight completion, which is exactly the
+    // original-error-replacement this method exists to prevent. So `finally` only unwinds
+    // the depth, and the two errors are reconciled below where the precedence is explicit.
     try {
-      return await work();
+      result = await work();
     } catch (error) {
-      workFailed = true;
-      throw error;
+      workError = error;
     } finally {
       this._batchDepth -= 1;
-      if (this._batchDepth === 0) {
-        const puts = this._pendingPuts;
-        const deletes = this._pendingDeletes;
-        this._pendingPuts = new Map();
-        this._pendingDeletes = new Set();
-        if (puts.size > 0 || deletes.size > 0) {
-          try {
-            await this._writeLegs(this._differential(puts, deletes));
-          } catch (flushError) {
-            // Nothing else went wrong, so this IS the batch's failure and the caller must
-            // see it. When the body already threw, rethrowing here would replace the
-            // caller's own error with this one, so it is reported instead.
-            if (!workFailed) throw flushError;
-            console.error(
-              'Fabricate | per-record definition batch flush failed after the batch body threw',
-              flushError
-            );
-          }
+    }
+
+    let flushError = null;
+    if (this._batchDepth === 0) {
+      const puts = this._pendingPuts;
+      const deletes = this._pendingDeletes;
+      this._pendingPuts = new Map();
+      this._pendingDeletes = new Set();
+      if (puts.size > 0 || deletes.size > 0) {
+        try {
+          await this._writeLegs(this._differential(puts, deletes));
+        } catch (error) {
+          flushError = error;
         }
       }
     }
+
+    if (workError) {
+      // The body's error wins. Reporting the flush failure on its own channel keeps it from
+      // being silent without letting it replace the reason the caller's work aborted.
+      if (flushError) {
+        console.error(
+          'Fabricate | per-record definition batch flush failed after the batch body threw',
+          flushError
+        );
+      }
+      throw workError;
+    }
+    // Nothing else went wrong, so this IS the batch's failure and the caller must see it.
+    if (flushError) throw flushError;
+    return result;
   }
 
   /**
