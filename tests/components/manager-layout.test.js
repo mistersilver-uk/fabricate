@@ -5177,13 +5177,26 @@ test('the manager titlebar caps the selected system badge and keeps the status l
     'the titlebar must be allowed to shrink inside the manager grid'
   );
   // The badge carries the SELECTED SYSTEM's name — user-authored text of any length.
+  //
+  // Its gold pair is stated ONCE, in a rule it SHARES with the rail's Downtime PREMIUM chip
+  // (issue 1185). Two marks that must stay the same colour must not name that colour twice:
+  // a second copy is a second thing to keep in step across all seven palettes. So the pair is
+  // asserted on the shared rule, and the badge's own block is asserted NOT to restate it.
+  const goldChipBlock =
+    /\.fabricate-manager \.manager-titlebar-badge,\s*\.fabricate-manager \.manager-nav-button \.manager-nav-count\.manager-nav-premium \{[\s\S]*?\}/.exec(
+      withoutComments(css)
+    )?.[0] ?? '';
   assert.ok(
-    badgeBlock.includes('background: var(--fab-badge-gold);'),
-    'the system badge should use the gold badge token'
+    goldChipBlock.includes('background: var(--fab-badge-gold);'),
+    'the gold chip rule should fill both marks from the gold badge token'
   );
   assert.ok(
-    badgeBlock.includes('color: var(--fab-on-badge-gold);'),
-    'the system badge should use its paired on-gold text token'
+    goldChipBlock.includes('color: var(--fab-on-badge-gold);'),
+    'and ink both from its paired on-gold token'
+  );
+  assert.ok(
+    !badgeBlock.includes('--fab-badge-gold'),
+    'the badge must take the pair from the shared rule rather than repeating it'
   );
   assert.ok(
     badgeBlock.includes('max-width:'),
@@ -8154,5 +8167,215 @@ test('an odds row keeps its bar between a bounded label and a pinned percentage'
     assert.ok(geometry.bar > 40, `the bar keeps real width beside it (got ${geometry.bar}px)`);
   } finally {
     await browser.close();
+  }
+});
+
+// -- The GM Downtime preview at a real window width (issue 1185) ------------------------
+//
+// A container query is measured against the CONTENT box, so a threshold reads far larger
+// than the window it actually fires in. The shipped preview collapsed at `max-width: 1040px`
+// and an ordinary 1314px Foundry window gives this panel 1052px: the board dropped below the
+// hero and the four feature cards folded to 2x2 on a window nobody would call narrow. The
+// visual-parity harness could not see it either, because it ran at the one width that cleared
+// the breakpoint -- by four pixels.
+//
+// So this gate measures the arrangement at the width the defect was reported from, and at the
+// widths where the layout is SUPPOSED to fold, in a real browser with the component's own
+// compiled CSS. Nothing else in the repository can evaluate a container query: happy-dom
+// cannot compute a cascade, and a source assertion on the breakpoint number would pass on any
+// arithmetic somebody wrote down.
+const downtimePreviewPath = resolve(
+  __dirname,
+  '../../src/ui/svelte/apps/manager/downtime/WorldDowntimePreview.svelte'
+);
+const downtimePreviewScoped = scopedComponentCss(downtimePreviewPath);
+
+/**
+ * Render the preview's own markup at one manager-pane width and read its two track counts.
+ *
+ * @param {number} paneWidth width of the manager main pane, in px
+ * @returns {Promise<object>} track counts, the container's content width, and two box widths
+ */
+async function readDowntimePreviewArrangement(paneWidth) {
+  const hash = downtimePreviewScoped.hashClass;
+  const context = await sharedBrowser.newContext({
+    viewport: { width: 1920, height: 1000 },
+    deviceScaleFactor: 1,
+  });
+  const page = await context.newPage();
+  try {
+    const card = (index) =>
+      `<article class="${hash}">` +
+      `<span class="downtime-feature-icon is-tint-accent ${hash}"><i class="fas fa-star"></i></span>` +
+      `<h4 class="${hash}">Benefit ${index}</h4>` +
+      `<p class="${hash}">A short line of benefit copy for card ${index}.</p></article>`;
+    await page.setContent(
+      `<style>${css}</style><style>${downtimePreviewScoped.css}</style>` +
+        `<div class="fabricate-manager" data-manager-view="world-downtime">` +
+        `<div style="width:${paneWidth}px">` +
+        `<div class="downtime-preview ${hash}">` +
+        `<section class="downtime-hero ${hash}">` +
+        `<div class="downtime-hero-copy ${hash}"><h2 class="${hash}">Run downtime.</h2></div>` +
+        `<div class="downtime-board ${hash}"><header class="${hash}">Party board</header></div>` +
+        `</section>` +
+        `<section class="downtime-benefits ${hash}">` +
+        `<div class="downtime-feature-grid ${hash}">${[1, 2, 3, 4].map(card).join('')}</div>` +
+        `</section></div></div></div>`
+    );
+    return await page.evaluate(() => {
+      const at = (selector) => document.querySelector(selector);
+      const tracks = (selector) =>
+        getComputedStyle(at(selector)).gridTemplateColumns.trim().split(/\s+/).length;
+      const boxWidth = (selector) => Math.round(at(selector).getBoundingClientRect().width);
+      const panel = at('.downtime-preview');
+      const panelStyle = getComputedStyle(panel);
+      return {
+        containerWidth: Math.round(
+          panel.clientWidth -
+            Number.parseFloat(panelStyle.paddingLeft) -
+            Number.parseFloat(panelStyle.paddingRight)
+        ),
+        heroTracks: tracks('.downtime-hero'),
+        gridTracks: tracks('.downtime-feature-grid'),
+        boardWidth: boxWidth('.downtime-board'),
+        cardWidth: boxWidth('.downtime-feature-grid > article'),
+      };
+    });
+  } finally {
+    await context.close();
+  }
+}
+
+test('the downtime preview keeps a two-column hero and a four-across grid in an ordinary Foundry window', async () => {
+  // 1092px is what a 1314px Foundry window -- the reported one -- leaves `.manager-main`.
+  const real = await readDowntimePreviewArrangement(1092);
+  assert.equal(
+    real.containerWidth,
+    1052,
+    'the pane arithmetic this gate rests on: a 1092px main pane is a 1052px query container'
+  );
+  assert.equal(
+    real.heroTracks,
+    2,
+    `the hero keeps the board beside the copy at a real window width (got ${real.heroTracks})`
+  );
+  assert.equal(
+    real.gridTracks,
+    4,
+    `the four benefit cards stay four-across at a real window width (got ${real.gridTracks})`
+  );
+  assert.ok(
+    real.boardWidth < 400,
+    `and the board is still the narrow column, not a half-width block (${real.boardWidth}px)`
+  );
+
+  // The fallbacks are half the claim: a breakpoint low enough to survive a real window must
+  // still fold where the content genuinely stops fitting, or "it never collapses" is the bug.
+  const narrow = await readDowntimePreviewArrangement(960);
+  assert.equal(narrow.gridTracks, 2, 'the grid folds to 2x2 once a card would go under 228px');
+  assert.equal(narrow.heroTracks, 2, 'and the hero, with far more room, does not fold with it');
+
+  const tight = await readDowntimePreviewArrangement(700);
+  assert.equal(tight.heroTracks, 1, 'the hero stacks once its copy column would drop under 420px');
+
+  const smallest = await readDowntimePreviewArrangement(660);
+  assert.equal(smallest.gridTracks, 1, 'and the existing 640px stage still stacks the cards');
+});
+
+test('the rail Downtime premium mark renders as the shared gold badge chip', async () => {
+  const context = await sharedBrowser.newContext({
+    viewport: { width: 1280, height: 720 },
+    deviceScaleFactor: 1,
+  });
+  const page = await context.newPage();
+  try {
+    await page.setContent(
+      `<style>${css}</style>` +
+        `<div class="fabricate-manager">` +
+        `<span class="manager-titlebar-badge" id="titlebar">Mythwright Core</span>` +
+        `<nav class="manager-rail"><div class="manager-world-nav">` +
+        `<button class="manager-nav-button manager-nav-parent manager-world-nav-item is-active"` +
+        ` data-world-nav-item="downtime" id="row">` +
+        `<i class="fas fa-hourglass-half"></i>` +
+        `<span class="manager-nav-label">Downtime</span>` +
+        `<span class="manager-nav-count manager-nav-premium" id="chip">PREMIUM</span>` +
+        `</button>` +
+        `<button class="manager-nav-button manager-nav-parent" id="plain">` +
+        `<span class="manager-nav-label">Parties</span>` +
+        `<span class="manager-nav-count" id="count">10</span>` +
+        `</button>` +
+        `</div></nav></div>`
+    );
+    const read = await page.evaluate(() => {
+      const of = (id) => {
+        const computed = getComputedStyle(document.getElementById(id));
+        return {
+          background: computed.backgroundColor,
+          color: computed.color,
+          weight: computed.fontWeight,
+          radius: computed.borderTopLeftRadius,
+          padding: computed.paddingLeft,
+        };
+      };
+      // Line boxes, counted by the browser rather than derived from a computed line-height:
+      // this fixture sets none, so `line-height` computes to `normal` and any arithmetic on it
+      // is NaN — which an `=== 1` check reads as a pass-shaped failure.
+      const label = document.querySelector('#row .manager-nav-label');
+      const range = document.createRange();
+      range.selectNodeContents(label);
+      return {
+        chip: of('chip'),
+        titlebar: of('titlebar'),
+        count: of('count'),
+        row: of('row'),
+        labelLines: range.getClientRects().length,
+      };
+    });
+
+    // The chip is asserted against the SHIPPED chip rather than against a hex, because the
+    // point of the change is that one gold pair serves both marks: a literal here would pass
+    // just as happily with the pair copied into a second place, which is what it must not be.
+    assert.equal(
+      read.chip.background,
+      read.titlebar.background,
+      'the rail chip fills with the same gold as the title bar badge'
+    );
+    assert.equal(
+      read.chip.color,
+      read.titlebar.color,
+      'and inks with the same dark pair, rather than the rail count colour'
+    );
+    assert.equal(read.chip.weight, '700', 'the chip is a badge weight, not the count weight');
+    assert.notEqual(
+      read.chip.background,
+      'rgba(0, 0, 0, 0)',
+      'a transparent chip is the reported defect: bare tan lettering rather than a mark'
+    );
+    assert.notEqual(
+      read.chip.color,
+      read.count.color,
+      'the chip must beat the later nav-count rules that re-tone every trailing marker'
+    );
+    assert.equal(read.chip.radius, '4px', 'at the rail scale the design draws a 4px chip');
+    // 5px, one pixel tighter each side than the design's own `2px 6px`: this rail row ends in
+    // a real 28px expand/collapse button where the design's ends in an inert chevron, and at
+    // the design's exact padding the row's label broke `Downtime` across two lines mid-word.
+    // The row height is the assertion that matters — the pixel is only how it was bought.
+    assert.equal(read.chip.padding, '5px', 'the rail chip keeps its filled-chip padding');
+    assert.ok(
+      read.labelLines === 1,
+      `the chip must not squeeze the label into a second line (got ${read.labelLines})`
+    );
+
+    // The active Downtime row is the rail's premium state marker, and its accent treatment
+    // has to beat `.manager-nav-group.is-expanded .manager-nav-parent.is-active`, which is a
+    // five-class rule that re-states the ordinary active colours.
+    assert.notEqual(
+      read.row.background,
+      'rgba(0, 0, 0, 0)',
+      'the active Downtime row paints its own accent fill'
+    );
+  } finally {
+    await context.close();
   }
 });

@@ -886,6 +886,13 @@ function activeCompanionPanel() {
   return target.querySelector('[data-downtime-extension-panel]');
 }
 
+// The route header's identity tile. Its glyph is read from the ACTIVE TAB descriptor rather
+// than written into the shell, which is the whole point of asserting on it: a Core-hardcoded
+// glyph would satisfy any single-tab check and still give every companion Core's icon.
+function routeIconGlyph() {
+  return target.querySelector('.manager-header [data-manager-route-icon] i')?.className ?? null;
+}
+
 function managerTitle() {
   return target.querySelector('.manager-header .manager-title').textContent.trim();
 }
@@ -13820,6 +13827,11 @@ describe('CraftingSystemManager mounted behavior', () => {
     );
     assert.equal(worldNavItem('parties').getAttribute('aria-current'), null);
     assert.equal(worldNavItem('downtime').getAttribute('aria-current'), 'page');
+    assert.equal(
+      routeIconGlyph(),
+      'fas fa-chart-simple',
+      'the route header leads with the identity tile carrying the active tab glyph'
+    );
     const tabs = Array.from(target.querySelectorAll('[data-downtime-tab]'));
     assert.deepEqual(
       tabs.map((tab) => tab.dataset.downtimeTab),
@@ -13888,6 +13900,11 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.equal(document.activeElement, settingsTab);
     assert.equal(settingsTab.getAttribute('aria-selected'), 'true');
     assert.ok(target.querySelector('[data-downtime-panel="settings"]'));
+    assert.equal(
+      routeIconGlyph(),
+      'fas fa-sliders',
+      'the identity tile follows the tab rather than naming one route glyph'
+    );
 
     const cta = target.querySelector('.downtime-cta');
     assert.equal(cta.href, 'https://www.patreon.com/c/mistersilver');
@@ -14384,6 +14401,12 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(
       !target.querySelector('[data-world-downtime-callout]'),
       'the premium rail note advertises CORE preview and must not sit under companion screens'
+    );
+
+    assert.equal(
+      routeIconGlyph(),
+      'fas fa-star',
+      'the route identity tile takes the COMPANION tab glyph, never a Core-hardcoded one'
     );
 
     target.querySelector('#manager-downtime-nav-crew').click();

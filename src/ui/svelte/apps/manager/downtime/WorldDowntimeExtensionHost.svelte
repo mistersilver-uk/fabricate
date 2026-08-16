@@ -177,14 +177,21 @@
 </section>
 
 <style>
+  /*
+    The workspace surface is a step DARKER than a card, not lighter. The design's ladder runs
+    backdrop -> frame (`--fab-bg-1`) -> cards (`--fab-bg-2`), and the Manager's default main
+    pane paints `--fab-bg-2` — which inverts it, leaving this route's cards reading as wells
+    cut into a lighter pane instead of panels raised off a darker one. The host states its own
+    surface so the preview's cards, the board's rows and a companion's panel all sit on the
+    one the design draws.
+  */
   .downtime-host {
     display: grid;
     grid-template-rows: auto minmax(0, 1fr);
     min-width: 0;
     min-height: 0;
     height: 100%;
-    gap: 12px;
-    padding: 14px;
+    background: var(--fab-bg-1);
     overflow: hidden;
   }
 
@@ -197,6 +204,16 @@
     min-width: 0;
     min-height: 0;
     overflow: auto;
+  }
+
+  /*
+    The host states NO inset of its own. The design puts the pane's whole inset on the block
+    that holds the stacks, and splitting it between a host and a panel doubled it — a 20px
+    left gutter in the design was landing at 34px on screen, on every side, with nothing
+    measuring the sum. Each row below owns its own margin instead.
+  */
+  .downtime-extension-panels {
+    padding: 12px 20px 24px;
   }
 
   .downtime-extension-target {

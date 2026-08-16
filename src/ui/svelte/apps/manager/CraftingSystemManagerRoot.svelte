@@ -7090,6 +7090,18 @@
 
   {#if !isToolStudioRoute}
     <header class="manager-header">
+      {#if isWorldDowntimeRoute && activeDowntimeTab}
+        <!--
+          The route's identity tile. The design leads the page header with a 42px rounded tile
+          carrying the glyph of the screen you are on, and this route's screen is a TAB — so
+          the glyph is read from the active tab descriptor rather than written here. That is
+          what makes it work for a companion: a registered provider's tab supplies its own
+          `icon` and gets its own tile, and Core's four are one provider among them.
+        -->
+        <span class="manager-route-icon" data-manager-route-icon aria-hidden="true">
+          <i class={activeDowntimeTab.icon}></i>
+        </span>
+      {/if}
       <div class="manager-heading">
         <nav
           class="manager-breadcrumbs"

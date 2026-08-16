@@ -1695,10 +1695,7 @@
   max-width: 220px;
   padding: var(--fab-space-2xs) var(--fab-space-2);
   border-radius: 5px;
-  color: var(--fab-on-badge-gold);
-  background: var(--fab-badge-gold);
   font-size: 0.62rem;
-  font-weight: 700;
   letter-spacing: 0.06em;
   text-overflow: ellipsis;
   text-transform: uppercase;
@@ -1742,6 +1739,25 @@
 
 .fabricate-manager .manager-heading {
   min-width: 0;
+}
+
+/*
+  The route identity tile (issue 1185). The design leads its page header with a 42px rounded
+  tile carrying the glyph of the screen you are on, and it is the ONE tile on that screen that
+  paints no chip: a 10px radius over a transparent fill, the glyph alone in the brand accent.
+  The glyph itself is supplied by whatever declares the screen, so nothing here names one.
+*/
+.fabricate-manager .manager-route-icon {
+  display: inline-flex;
+  width: 42px;
+  height: 42px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--fab-accent);
+  font-size: 17px;
 }
 
 .fabricate-manager .manager-kicker {
@@ -12253,9 +12269,15 @@
   box-shadow: inset 0 0 0 1px var(--fab-mv2-border);
 }
 
+/*
+  36px, not 40px: the toggle is 28px wide and sits at `right: 4px`, so 36px still clears it by
+  4px and returns the other 4px to the label track. The Downtime row is what made that matter —
+  it is the one parent row carrying a filled chip as well as a label, and at 40px its label had
+  no room left and broke `Downtime` across two lines mid-word.
+*/
 .fabricate-manager .manager-nav-parent {
   grid-template-columns: 24px minmax(0, 1fr) auto;
-  padding-right: 40px;
+  padding-right: 36px;
 }
 
 .fabricate-manager .manager-nav-group.is-expanded .manager-nav-parent {
@@ -12383,12 +12405,42 @@
   that variant is the green Save treatment, and a promotional unlock in Save-green would
   read as the page's commit action. It takes the brand accent instead, and declares
   `text-decoration` because `.manager-button` assumes a `<button>` and this one is a link.
+
+  It is selected through `.manager-header-actions` rather than on its own, and that is
+  load-bearing rather than cosmetic: `.manager-header-actions .manager-button` is (0,3,0) and
+  a bare `.manager-downtime-unlock` is (0,2,0), so the accent fill this rule exists to state
+  was losing to the ghost button's and the shipped control read as ordinary header chrome.
 */
-.fabricate-manager .manager-downtime-unlock {
+.fabricate-manager .manager-header-actions .manager-downtime-unlock {
+  min-height: 34px;
+  padding: 0 14px;
   border-color: var(--fab-accent-border);
+  border-radius: 8px;
   color: var(--fab-on-accent);
   background: var(--fab-accent);
+  font-size: 11.5px;
+  font-weight: 600;
   text-decoration: none;
+}
+
+/*
+  The Downtime group row is the rail's one PREMIUM state marker, and the design colours it as
+  such: accent ink over an accent-soft fill inside an accent border, where every other active
+  rail row is plain text over `--fab-surface-active` with no border. Only the colour is taken
+  from the design here — its 34px row against this rail's uniform 36px is the rail's own
+  rhythm, and one row standing 2px shorter than its neighbours would be a defect rather than
+  parity. Keyed on the world-nav entry, not on any of the tab ids a provider owns.
+
+  `.manager-nav-parent` is in the selector to reach FIVE classes, because
+  `.manager-nav-group.is-expanded .manager-nav-parent.is-active` above is five and re-states
+  the ordinary active colours: at four this rule set the border and lost the fill and the ink
+  to it, which reads as a half-applied treatment rather than as a cascade fault.
+*/
+.fabricate-manager
+  .manager-nav-parent.manager-world-nav-item[data-world-nav-item='downtime'].is-active {
+  border-color: var(--fab-accent-border);
+  color: var(--fab-accent);
+  background: var(--fab-accent-soft);
 }
 
 /*
@@ -12399,10 +12451,28 @@
   up with the group header above it.
 */
 .fabricate-manager .manager-downtime-subitem {
-  padding: var(--fab-space-1) var(--fab-space-2) var(--fab-space-1) var(--fab-space-5);
+  gap: 10px;
+
+  /*
+    `height: auto` releases Foundry core's `button { height: var(--button-size) }`, which is a
+    FIXED height rather than a floor: the row stayed 29px while a long localized label wrapped
+    to four lines inside it and overflowed onto the three rows below. `min-height` alone could
+    not fix that — it raises a floor and core had set a ceiling. The design's 32px indent makes
+    this row the narrowest label track in the rail, so it is where the ceiling shows first.
+  */
+  height: auto;
+  min-height: 29px;
+  padding: 7px 10px 7px 32px;
   border-radius: 7px;
   border-color: transparent;
+  font-size: 12px;
   font-weight: 600;
+}
+
+/* The label follows the row rather than the rail's ordinary 12.5px, so the indent and the
+   type read as one step louder together — see the note above. */
+.fabricate-manager .manager-downtime-subitem .manager-nav-label {
+  font-size: inherit;
 }
 
 .fabricate-manager .manager-downtime-subitem.is-active {
@@ -12419,23 +12489,37 @@
   flex: 0 0 auto;
   margin-left: auto;
   color: var(--fab-mv2-accent);
-  font-size: 0.56rem;
+  font-size: 9px;
   line-height: 1;
 }
 
 /*
   The premium badge on the Downtime parent row. It rides `.manager-nav-count` so the
-  collapsed 56px rail hides it with every other trailing marker, and only re-tones from a
-  mono numeral to a lettered premium mark.
+  collapsed 56px rail hides it with every other trailing marker — this rule declares no
+  `display`, so that hide still wins — and re-tones from a mono numeral to the gold chip the
+  design draws, whose colour pair is stated once beside `.manager-titlebar-badge` above.
+
+  It is selected through `.manager-nav-button` (0,4,0) rather than on its own, because TWO
+  later rules in this sheet re-tone a nav count at lower or equal weight — `.manager-nav-count`
+  itself (0,2,0) and `.manager-nav-button.is-active .manager-nav-count` (0,3,0), which is the
+  one the Downtime row is always in. Both won on source order against a single-class version,
+  and the chip drew in the subtle text colour at weight 600: bare tan lettering, not a badge.
 */
-.fabricate-manager .manager-nav-premium {
-  color: var(--fab-mv2-accent);
+.fabricate-manager .manager-nav-button .manager-nav-count.manager-nav-premium {
+  /*
+    `2px 5px`, one pixel tighter each side than the design's `2px 6px`. The design's rail row
+    ends in an inert chevron; this one ends in a real 28px expand/collapse BUTTON, so the same
+    chip on the same 175px row leaves the label a pixel short and it breaks mid-word. A pixel
+    of chip padding at 7.5px is invisible; a hyphenated `Downtime` is not.
+  */
+  padding: 2px 5px;
+  border-radius: 4px;
 
   /* A lettered mark, not a numeral: drop `.manager-nav-count`'s mono face. */
   font-family: inherit;
-  font-size: 0.52rem;
-  font-weight: 700;
+  font-size: 7.5px;
   letter-spacing: 0.08em;
+  line-height: 1.5;
 }
 
 /*
@@ -12447,8 +12531,8 @@
   display: flex;
   flex-direction: column;
   gap: var(--fab-space-2xs);
-  margin: var(--fab-space-2) var(--fab-space-chip) 0;
-  padding: var(--fab-space-2);
+  margin: 10px var(--fab-space-chip) 0;
+  padding: 9px 10px;
   border: 1px solid var(--fab-accent-border);
   border-radius: 8px;
   color: var(--fab-mv2-text-muted);
@@ -12461,7 +12545,7 @@
   align-items: center;
   gap: var(--fab-space-chip);
   color: var(--fab-mv2-accent);
-  font-size: 0.55rem;
+  font-size: 8px;
   font-weight: 700;
   letter-spacing: 0.09em;
 }
@@ -12504,6 +12588,31 @@
 .fabricate-manager .manager-nav-subitem.is-active .manager-nav-count {
   color: var(--fab-text-subtle);
   font-weight: 600;
+}
+
+/*
+  THE GOLD BADGE CHIP, stated once (issue 1185).
+
+  Two marks in this Manager are the same object at two scales: the title bar's system badge
+  and the rail's Downtime PREMIUM chip. The design draws both as a filled gold chip with dark
+  ink, and two chips that must stay the same colour must not name that colour twice — a second
+  copy is a second thing to keep in step across all seven palettes. Each chip's own rule owns
+  only its SCALE; the pair is here.
+
+  IT SITS HERE, under the count rules, because it has to beat them and it ties with one on
+  weight: `.manager-nav-button.is-active .manager-nav-count` is also four classes, and the
+  Downtime row is always the active row on its own route. Declared earlier, this block lost on
+  source order and the chip drew as subtle tan lettering at weight 600 — the reported defect.
+
+  `text-transform` is deliberately NOT shared. The title bar's source is a GM-authored system
+  name and has to be shouted in CSS; the rail chip's source is the literal string `PREMIUM`,
+  and uppercasing an already-uppercase word is how a translation gets shouted twice.
+*/
+.fabricate-manager .manager-titlebar-badge,
+.fabricate-manager .manager-nav-button .manager-nav-count.manager-nav-premium {
+  color: var(--fab-on-badge-gold);
+  background: var(--fab-badge-gold);
+  font-weight: 700;
 }
 
 /*
