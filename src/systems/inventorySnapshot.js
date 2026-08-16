@@ -153,9 +153,7 @@ function enumerateHeldItems(actors) {
 function tagsOf(item, component) {
   const flagTags = getFabricateFlag(item, 'tags', []);
   const componentTags = Array.isArray(component?.tags) ? component.tags : [];
-  return new Set(
-    [...(Array.isArray(flagTags) ? flagTags : []), ...componentTags].map((tag) => String(tag))
-  );
+  return new Set([...(Array.isArray(flagTags) ? flagTags : []), ...componentTags].map(String));
 }
 
 /**
