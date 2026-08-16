@@ -300,12 +300,15 @@ export class CraftingListingBuilder {
     const target = recipe ?? this.recipeManager?.getRecipe?.(recipeId) ?? null;
     if (!target) return null;
     if (!isGM && this._isSystemBlockedForRecipes(target.craftingSystemId)) return null;
-    // The `enabled` gate the summary phase gets for free. `getVisibleRecipes` sources from
-    // `getRecipes({enabled: true})`, so a disabled recipe can never be a row; `getRecipe`
-    // applies no such filter, so without this line a client-supplied id hydrates a recipe
-    // the GM has switched off. `=== false` rather than falsy: `enabled` is absent-means-ON
-    // per the model default, and reading an omitted field as "disabled" would blank the
-    // inspector for every fixture and every pre-`enabled` authored recipe.
+    // Mirrors the READER convention this field uses everywhere else (absent-means-ON,
+    // tested via `!== false` — see Recipe.js's `enabled` default), NOT the summary phase's
+    // corpus query: `getVisibleRecipes` sources from `getRecipes({enabled: true})`, whose
+    // filter is strict `r.enabled === filters.enabled` (RecipeManager.js). So a non-boolean
+    // `enabled` (e.g. `null` from an import or a macro write) is excluded from a summary
+    // row yet still hydrates here, since `=== false` reads it as on — a narrow, known
+    // residual asymmetry, not a bug to fix here. `=== false` must stay: reading an omitted
+    // field as "disabled" would blank the inspector for every fixture and every
+    // pre-`enabled` authored recipe.
     if (!isGM && target.enabled === false) return null;
 
     const resolvedAccess =
