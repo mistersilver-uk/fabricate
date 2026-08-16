@@ -567,6 +567,46 @@ B(1) is sufficient if real worlds sit far enough below 10,000 records that the p
 Issue 1080 MUST measure the connect payload at the corpus sizes real installations actually reach, and MUST record the crossover point at which B(1) becomes worse than doing nothing.
 If a supported corpus crosses it, this ADR is superseded rather than amended, and A+ is the option already measured and waiting.
 
+#### AMENDED by issue 1080's measurement — the condition above is false as written
+
+The paragraph above is preserved verbatim because it is what the decision was taken against, and it should not be edited to agree with the outcome.
+It is nonetheless **wrong**, and the numbers that show it are already in this document.
+
+The "whole-array saving" it weighs 340 bytes against is the array punctuation — and § What a cold client receives at connect, reading 1, already says what that is: *"10,001 bytes of array punctuation that 10,000 separate values no longer pay."*
+That is **one byte per record**.
+So `key count × 340 > key count × 1.0001` holds at **one record**, and the gap widens linearly forever.
+There is no corpus size below which the envelope "never accumulates", and the crossover is not a function of corpus size after all.
+
+Issue 1080 measured it and confirmed this from the corpus: crossover at n = 1 on every record shape tested, from 50 bytes to 100,000 bytes per record; −2 bytes at n = 0 (`"[]"`), +338 at n = 1.
+That harness reproduces this ADR's own arithmetic byte-for-byte at the archived tree — `sum(recordBytes)` 12,203,076, whole-array 12,213,077, B(1) 15,603,076 = +27.76% — so the correction is to the *condition*, not to the measurements.
+
+**The honest decision input is a constant, not a crossover.**
+Two curves that differ by a fixed per-record term never cross; they diverge from the first record.
+B(1) costs **339 bytes per record more at connect, at every corpus size, on every record shape**.
+
+Everything else is that constant divided by something: the **absolute** penalty is 34 KB at 100 records, 339 KB at 1,000 and 3.39 MB at 10,000, independent of shape; the **relative** penalty is `339 / meanRecordBytes`, which is driven entirely by shape and is essentially flat in record count, ranging from 3.7% to 44% across the measured corpora.
+A relative bound therefore cannot bound corpus size, which is why the replacement condition below is stated in absolute bytes.
+
+**Issue 1135 has since made the relative regression worse, and this decision should be read against the new number.**
+It cut the serialized payload 37% (simple) and 59% (rich) while the envelope stayed at 340, so the 28% recorded above is now **44.1%** on the simple corpus at 10,000 records.
+The absolute penalty is unchanged at 3.39 MB.
+If 28% was the figure this decision was taken against, it is now being asked to stand against 44%.
+
+**Replacement condition.**
+B(1) stands while the connect overhead it adds stays within a stated absolute budget:
+
+> **B(1) is sufficient while `record count × 339 bytes` remains at or below 1.41 MB — approximately 4,160 records.**
+
+That bound is derived rather than chosen by taste: 1.41 MB is issue 1088's directly measured compendium-index connect payload, and § The real index rate records the same order live.
+Past it, B(1)'s *overhead alone* exceeds the *entire* connect payload of A+, the option this ADR declined — at which point no connect-axis argument for B(1) survives, whatever one thinks of A+'s sidebar cost.
+
+Crossing this bound supersedes the decision rather than amending it again, on the original terms: A+ is measured and waiting, and issue 1092's replacement transport returns to scope with it.
+
+**What remains unmeasured, and is the real exposure.**
+The module collects no telemetry, and the only field datum in this issue tree is one user with 1,080 components — comfortably inside the bound, at ~366 KB.
+"Real worlds sit far below 10,000 records" is still an **assumption of this ADR, not a finding**.
+Issue 1080's harness spans 1 to 10,000 so the penalty can be read at whatever corpus size is believed in, but nothing here establishes which size that is.
+
 ### Scope: components as well as recipes
 
 **The change extends to components, and that is a different shape of work from recipes.**
@@ -592,6 +632,9 @@ Issue 1080 is rewritten to B(1).
 - Issue 1091 defines the canonical summary projection, which decides whether A+'s index suffices or a replicated summary setting is also needed.
 - Issue 1073's `propagation-unhydrated` measurement gains a real subject and can be implemented.
 - The prototypes are already deleted — see **Provenance of these numbers**.
+- **Issue 1080's connect measurement amended this ADR's decision condition** — see § The kill criterion this option fired.
+  The condition as originally written is false at every corpus size; B(1) still stands, now bounded by an absolute budget of 1.41 MB of connect overhead (~4,160 records) rather than by a crossover.
+  The measurement instrument is `tests/helpers/scale/connectPayloadModel.js`, and the reading is re-derived on every run rather than pinned.
 
 ---
 
