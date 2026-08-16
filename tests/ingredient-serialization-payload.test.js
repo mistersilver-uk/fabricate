@@ -20,8 +20,8 @@
  *   - the two omission tables are hand-maintained mirrors of their constructors, so each is
  *     checked mechanically against a maximal and a minimal model rather than by eye;
  *   - the reduction is measured against the pre-retirement shape DERIVED FROM THE LIVE
- *     MODEL, recursing through set, group, option and `alternatives`, so the floor cannot
- *     drift away from the tables as fields are added;
+ *     MODEL, recursing through step, set, group, option and `alternatives`, so the floor
+ *     cannot drift away from the tables as fields are added;
  *   - the three production writers that would otherwise re-introduce the alias are pinned,
  *     including the one shape whose flat array is its ONLY ingredient data.
  */
@@ -692,10 +692,37 @@ function preRetirementResultGroup(group) {
   };
 }
 
-/** The whole recipe payload written before this change. */
+/**
+ * The whole recipe payload written before this change, INCLUDING the per-step subtree.
+ *
+ * The step recursion is inert on both corpora below, since neither authors a step — but a
+ * floor that silently weakens is worse than one that fails. Without it, a corpus that later
+ * gained a step would move its whole `steps[]` ingredient and result payload from the
+ * `before` side to neither side, understating the reduction and letting the asserted floor
+ * pass on a smaller real win than it claims to measure.
+ *
+ * `toJSON` maps `this.steps` 1:1 and in order, so the index resolves each serialized step
+ * back to the live one whose sets and result groups are the INSTANCES the two reinstatement
+ * helpers read their omitted values off.
+ *
+ * The key is written back only when the recipe HAS a step, and that is not a tidiness
+ * detail. `steps: []` is omitted by `RECIPE_OMITTED_WHEN_DEFAULT`, which is issue 1087's
+ * recipe-level table and not this change's — so writing the empty array onto the `before`
+ * side would credit another issue's 11 bytes per recipe to this one and inflate both
+ * measured floors. `ingredientSets` and `resultGroups` need no such guard: both are
+ * deliberately absent from that table and are always emitted.
+ */
 function preRetirementRecipe(recipe) {
+  const json = recipe.toJSON();
   return {
-    ...recipe.toJSON(),
+    ...json,
+    ...(recipe.steps.length > 0 && {
+      steps: json.steps.map((step, index) => ({
+        ...step,
+        ingredientSets: recipe.steps[index].ingredientSets.map(preRetirementSet),
+        resultGroups: recipe.steps[index].resultGroups.map(preRetirementResultGroup),
+      })),
+    }),
     ingredientSets: recipe.ingredientSets.map(preRetirementSet),
     resultGroups: recipe.resultGroups.map(preRetirementResultGroup),
   };
@@ -819,6 +846,59 @@ test('1135: a RICH-shaped corpus serializes at least 50% smaller than the pre-re
     reduction >= 0.5,
     `expected at least a 50% reduction, got ${(reduction * 100).toFixed(1)}% ` +
       `(${before} bytes before, ${after} bytes after)`
+  );
+});
+
+test('1135: the pre-retirement shape reinstates the STEP subtree, not just recipe level', () => {
+  // Neither corpus authors a step, so the step recursion above is inert TODAY and this is
+  // the only thing holding it live. Measuring a corpus that gained a step against a
+  // recipe-level-only `before` would understate the reduction and quietly weaken the floor.
+  const recipe = new Recipe({
+    id: 'r-stepped',
+    name: 'Stepped',
+    metadata: METADATA,
+    steps: [
+      {
+        id: 'step-1',
+        name: 'Forge',
+        ingredientSets: [
+          {
+            id: 'set-1',
+            ingredientGroups: [{ id: 'grp-1', name: 'Metals', options: [componentOption('c-a')] }],
+          },
+        ],
+        resultGroups: [
+          { id: 'rg-1', name: 'Billet', results: [{ id: 'res-1', componentId: 'c-mid' }] },
+        ],
+      },
+    ],
+  });
+
+  const [step] = preRetirementRecipe(recipe).steps;
+  const [set] = step.ingredientSets;
+
+  assert.ok('ingredients' in set, 'the retired flat alias is reinstated on the step set');
+  assert.deepEqual(
+    Object.keys(INGREDIENT_SET_OMITTED_WHEN_DEFAULT).filter((key) => !(key in set)),
+    [],
+    'as is every omitted set-level default'
+  );
+  const [option] = set.ingredientGroups[0].options;
+  assert.ok('systemItemId' in option, 'and the duplicate on the step set own options');
+  assert.deepEqual(
+    Object.keys(INGREDIENT_OMITTED_WHEN_DEFAULT).filter((key) => !(key in option)),
+    [],
+    'as is every omitted option-level default'
+  );
+  assert.ok(
+    'checkOutcomeIds' in step.resultGroups[0],
+    'and the step result group carries the reinstated default too'
+  );
+
+  // The point of all of the above: the step subtree lands on the `before` side of the ratio.
+  assert.ok(
+    measure([recipe]).reduction > 0,
+    'so a stepped recipe measures a reduction rather than none'
   );
 });
 
