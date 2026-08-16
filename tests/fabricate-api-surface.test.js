@@ -208,3 +208,35 @@ test('game.fabricate.gathering exposes the canonical realm helpers', () => {
   assert.ok(mainSource.includes('setPartyRealmOverride: (options) => fabricate.setGatheringPartyRealmOverride(options)'), 'setPartyRealmOverride helper');
   assert.ok(mainSource.includes('revealRealmForActor: (options) => fabricate.revealGatheringRealmForActor(options)'), 'revealRealmForActor helper');
 });
+
+test('Fabricate wires the crafting listing builder with a component resolver (issue 1075)', () => {
+  // The builder's privilege gates and matching logic are unit-tested directly, but the
+  // composition that hands them a resolver is not: without this line every crafting row's
+  // owned-material tally silently reads as if the player owns nothing, and no existing
+  // test goes red.
+  assert.ok(
+    mainSource.includes("import { findMatchingComponent } from './utils/essenceResolver.js';"),
+    'main.js should import the same component resolver InventoryListingBuilder matches with'
+  );
+  assert.ok(
+    mainSource.includes('resolveComponentForItem: findMatchingComponent,'),
+    'the crafting listing builder should receive the component resolver, or every player row silently reads "missing materials"'
+  );
+});
+
+test('Fabricate hydrates the crafting recipe detail phase through the crafting listing builder (issue 1075)', () => {
+  // `hydrateCraftingRecipe` is the detail-phase companion to the cheap `listCraftingForActor`
+  // summary rows (issue 1075). The builder's `buildRecipeDetail` re-evaluation is unit-tested
+  // directly, but nothing else pins that this method actually routes there rather than, say,
+  // re-deriving a summary row or returning a stale cached value.
+  assert.ok(
+    mainSource.includes(
+      'hydrateCraftingRecipe({ recipeId = null, actorId = null, componentSourceActorIds = null } = {}) {'
+    ),
+    'main.js should expose hydrateCraftingRecipe on the Fabricate API object'
+  );
+  assert.ok(
+    mainSource.includes('return this._getCraftingListingBuilder().buildRecipeDetail({'),
+    "hydrateCraftingRecipe should route through the crafting listing builder's detail phase"
+  );
+});
