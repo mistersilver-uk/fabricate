@@ -189,6 +189,113 @@ Twelve keeps the same shape and the same per-node signal at a cost the drift tes
 can re-derive, and the bound stays because the solver's own per-node
 `O(inventory)` ledger copy (#1083) is untouched by that work.
 
+## The B(1) connect-payload crossover (issue 1080)
+
+ADR 0001 selected **B(1) — one `world` setting key per record** — against its own
+spike's recommendation, and made that selection conditional on a measurement it
+asked issue 1080 to take:
+
+> B(1) is sufficient if real worlds sit far enough below 10,000 records that the
+> per-key envelope never accumulates to the crossover — which is at roughly the
+> point where key count × 340 bytes exceeds the whole-array saving.
+> [...] If a supported corpus crosses it, this ADR is superseded rather than
+> amended.
+
+Two cases answer it, and they implement no backend:
+`persistence.connectPayload.simpleRecipes` on `simple-corpus` and
+`persistence.connectPayload.richRecipes` on `rich-corpus`.
+Each runs the real `RecipeManager.save()`, reads the array the shipped
+repository wrote, and models the same records under the other layout with
+`tests/helpers/scale/connectPayloadModel.js`.
+
+```sh
+npm run benchmark:performance -- --profile=simple-corpus,rich-corpus
+```
+
+### The crossover is at ONE record, and that is not a threshold
+
+Both layouts replicate in full at connect, so the only difference between them is
+what each adds around the *same* record payloads:
+
+<!-- markdownlint-disable MD013 markdownlint-sentences-per-line -->
+
+| Layout | Connect bytes for `n` records |
+|---|---|
+| Baseline — one whole-array `world` setting | `sum(recordBytes) + n + 1` (the records, `n - 1` commas, two brackets) |
+| B(1) — one `world` setting key per record | `sum(recordBytes) + n × 340` (the records, one `Setting` envelope each) |
+| **Difference** | **`n × 339 − 1`** |
+
+<!-- markdownlint-enable MD013 markdownlint-sentences-per-line -->
+
+The "whole-array saving" the ADR weighs 340 bytes against is the array
+punctuation, and that is **one byte per record**.
+So a 340-byte envelope exceeds it at the *first* record: measured crossover
+`connectCrossoverRecords = 1`, with the delta going from −2 bytes at zero records
+to +338 at one, on every shape measured.
+There is no corpus size below which the envelope "has not yet accumulated", and
+the gap then grows by a flat 339 bytes per record forever.
+
+**The corpus size is therefore not the variable the ADR's condition assumed it
+was.**
+The penalty in *absolute* terms is `339 bytes × record count` regardless
+of record shape or payload size — 34 KB at 100 records, 339 KB at 1,000, and
+3.39 MB at 10,000 — and in *relative* terms it is `339 / meanRecordBytes`, which
+is a property of the **record shape** and barely moves with the count at all.
+The committed `connectOverheadBasisPoints@1 / @100 / @1000 / @10000` readings are
+in the baseline precisely so that flatness is visible rather than asserted.
+
+### Both payload shapes, because #1135 moved one of them
+
+Issue 1135 cut the serialized recipe payload by 37% on `simple-corpus` and by 59%
+on `rich-corpus`.
+The `Setting` envelope is a fixed 340 bytes and did not shrink with it, so
+shrinking the payload makes the envelope **relatively heavier**.
+Measured on both trees, at the full corpus, against a fresh id space:
+
+<!-- markdownlint-disable MD013 markdownlint-sentences-per-line -->
+
+| Corpus | Payload shape | Baseline | B(1) | Delta | B(1) overhead |
+|---|---|---:|---:|---:|---:|
+| `simple-corpus`, 10,000 | pre-#1135 (`af58030e`) | 12,213,077 | 15,603,076 | +3,389,999 | **+27.8%** |
+| `simple-corpus`, 10,000 | post-#1135 | 7,681,957 | 11,071,956 | +3,389,999 | **+44.1%** |
+| `rich-corpus`, 5,000 | pre-#1135 (`af58030e`) | 45,857,111 | 47,552,110 | +1,694,999 | **+3.7%** |
+| `rich-corpus`, 5,000 | post-#1135 | 18,872,096 | 20,567,095 | +1,694,999 | **+9.0%** |
+
+<!-- markdownlint-enable MD013 markdownlint-sentences-per-line -->
+
+The pre-#1135 column **reproduces ADR 0001 exactly**: it names 12,213,077 bytes
+as what `RecipeManager.save()` writes and extrapolates B(1) to "≈15.6 MB against
+the baseline's 12.21 MB — 28% worse".
+This measurement derives 15,603,076 and +27.8% from the corpus rather than from
+an extrapolation, so the ADR's arithmetic is confirmed rather than merely restated.
+What the ADR could not have known is that **#1135 makes the same regression 1.6×
+worse in relative terms** while leaving it identical in absolute ones.
+
+The two corpora differ by 4.9× in relative penalty at the same record count, which
+is the whole shape sensitivity: a world of rich recipes pays 9% and a world of
+simple ones pays 44% for the *same* 339 bytes per record.
+
+### What would change these numbers, stated because it is a modelled term
+
+- **The 340-byte envelope is a live-measured input, not a derivation.** It came
+  from the issue-1079 spike reading a real `Setting` document back out of
+  `game.settings.storage` on Foundry 14.365 (51-byte value, 391-byte document).
+  It is a named constant in `connectPayloadModel.js` so a re-measurement replaces
+  one value.
+  It is also an upper bound on the *fixed* term: the spike subtracted the
+  unescaped value from the escaped document, which charges the value's own
+  escaping to the envelope.
+- **`Setting#value` is a string field, so a transmitted document escapes the JSON
+  inside it.** Modelling both layouts fully escaped moves `simple-corpus` from
+  +44.1% to **+38.8%** (8,793,405 against 12,203,062 bytes) and the per-record
+  penalty from 339 to 341 bytes.
+  The direction is favourable to B(1) and the conclusion does not move.
+- **Corpus sizes real installations actually reach are not measured here and
+  cannot be**, because the module collects no telemetry.
+  The sweep spans one record to the epic's 10,000-record target so a maintainer
+  can read the penalty at whatever size they believe in; the *relative* penalty
+  is the same at all of them.
+
 ## Fixture construction: literals versus real models
 
 Stated per profile in `benchmarks/baselines/<profile>.json` under
