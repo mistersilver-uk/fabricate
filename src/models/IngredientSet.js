@@ -1001,10 +1001,17 @@ export class IngredientSet {
    * greedy front-loaded pick BEFORE enumerating any alternative unit plan, and returns
    * without enumerating when even the full matching pool is short. So neither a hit nor
    * a miss reaches {@link _enumerateUnitPlansFrom}, and neither bumps the node budget.
+   *
+   * The generator is therefore advanced ONCE, by hand. A `for…of` that returns from its
+   * first iteration would read as a loop while being a single `next()` — the shape
+   * SonarCloud reports as `javascript:S1751` — and it would also invite the "simplify" that
+   * this docblock exists to forbid: collecting the choices into an array first would
+   * enumerate every alternative unit plan for a group whose FIRST pick is always the
+   * answer, which is the whole cost the fast path was added to avoid.
    * @private
    */
   _firstGroupChoice(group, frame) {
-    for (const choice of this._groupChoices(
+    const choices = this._groupChoices(
       group,
       group.options || [],
       frame.remaining,
@@ -1012,10 +1019,9 @@ export class IngredientSet {
       frame.matcher,
       frame.ctx,
       frame.budget
-    )) {
-      return choice;
-    }
-    return null;
+    );
+    const { done, value } = choices.next();
+    return done ? null : value;
   }
 
   /**
