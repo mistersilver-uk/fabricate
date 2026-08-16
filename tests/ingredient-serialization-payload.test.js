@@ -246,6 +246,35 @@ test('1135: a fully defaulted set emits EXACTLY the un-omittable field set', () 
   ]);
 });
 
+test('1135: a group emits EXACTLY {id, name, options} and omits none of its own keys', () => {
+  // IngredientGroup requirement 5: the group level has NO omission table, because none of
+  // its three keys has a reconstructible default worth omitting — the whole group-level
+  // saving comes from its options. Nothing pinned that, so a field added to
+  // `IngredientGroup.toJSON` would be paid once per group, per set, per recipe unnoticed.
+  const [group] = maximalSet().toJSON().ingredientGroups;
+
+  assert.deepEqual(Object.keys(group).sort((a, b) => a.localeCompare(b)), [
+    'id',
+    'name',
+    'options',
+  ]);
+  // An UNNAMED group emits the same three keys. Both set fixtures author a group name, so
+  // without this the assertion above could not tell "no omission table" from "the fixture
+  // happened to author every key" — and `name` is the one group key a future table would
+  // reach for, since `''` is exactly what the constructor rebuilds from absence.
+  const unnamed = new IngredientSet({
+    id: 'set-unnamed-group',
+    ingredientGroups: [{ id: 'grp-unnamed', options: [minimalOption().toJSON()] }],
+  }).toJSON().ingredientGroups[0];
+
+  assert.equal(unnamed.name, '', 'the group name defaulted');
+  assert.deepEqual(Object.keys(unnamed).sort((a, b) => a.localeCompare(b)), [
+    'id',
+    'name',
+    'options',
+  ]);
+});
+
 test('1135: a defaulted option and set rebuild every omitted field to the omitted value', () => {
   // The other direction: a predicate that fires on a value the constructor does NOT rebuild
   // is silent data loss on the next save. Deep equality over the whole model catches it.
@@ -369,6 +398,35 @@ test('1135: an empty checkOutcomeIds is omitted from both result-group emitters'
     [],
     'and absence rebuilds the empty list the two routed-group arbiters already treat as none'
   );
+});
+
+test('1135: a defaulted result group emits EXACTLY the un-omittable field set', () => {
+  // The omission test above is scoped to `checkOutcomeIds`, and tests 17/19 plus the
+  // round-trips catch a DROPPED field — but nothing caught an ADDED one, unlike the option
+  // (`a fully defaulted option emits EXACTLY…`) and set equivalents. `serializeResultGroup`
+  // is shared by the recipe-level and step-level emitters, so both are pinned here rather
+  // than trusting the sharing to hold.
+  const recipe = new Recipe({
+    id: 'r-group-keys',
+    name: 'Group Keys',
+    metadata: METADATA,
+    resultGroups: [{ id: 'rg-1', name: 'Output', results: [{ id: 'res-1', componentId: 'c-out' }] }],
+    steps: [
+      {
+        id: 'step-1',
+        name: 'Forge',
+        resultGroups: [
+          { id: 'rg-2', name: 'Billet', results: [{ id: 'res-2', componentId: 'c-mid' }] },
+        ],
+      },
+    ],
+  });
+
+  const json = recipe.toJSON();
+  const keysOf = (group) => Object.keys(group).sort((a, b) => a.localeCompare(b));
+
+  assert.deepEqual(keysOf(json.resultGroups[0]), ['id', 'name', 'results'], 'at recipe level');
+  assert.deepEqual(keysOf(json.steps[0].resultGroups[0]), ['id', 'name', 'results'], 'and at step');
 });
 
 test('1135: an authored checkOutcomeIds is still emitted at both levels', () => {
