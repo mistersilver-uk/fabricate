@@ -192,12 +192,6 @@ export class CraftingListingBuilder {
    * @param {object|null} options.craftingActor - The acting character.
    * @param {object[]} [options.componentSourceActors] - Additional inventory sources.
    * @param {object|null} [options.viewer] - Foundry user; falls back to `getViewer()`.
-   * @param {Array<{recipe: object, access: object}>|null} [options.visibleRecipeEntries] - An
-   *   ALREADY-COMPUTED corpus-wide visibility pass, handed in by a caller that has to run
-   *   the same pass for another consumer in the same read (issue 1075). Explicitly a
-   *   parameter and never a field: a retained pass would be a cache of knowledge results
-   *   derived from live inventory, which `inventorySnapshot`'s invalidation rule forbids.
-   *   Omitted, this method runs the pass itself, exactly as before.
    * @returns {{
    *   selectedActorId: string|null,
    *   actor: object|null,
@@ -208,12 +202,7 @@ export class CraftingListingBuilder {
    *   counts: { available: number, total: number }
    * }}
    */
-  buildListing({
-    craftingActor = null,
-    componentSourceActors = [],
-    viewer = null,
-    visibleRecipeEntries = null,
-  } = {}) {
+  buildListing({ craftingActor = null, componentSourceActors = [], viewer = null } = {}) {
     const resolvedViewer = viewer ?? this._getViewer?.() ?? null;
     const isGM = resolvedViewer?.isGM === true;
     const knowledgeSources = Array.isArray(componentSourceActors)
@@ -222,13 +211,11 @@ export class CraftingListingBuilder {
     const craftSources = this._dedupeActors([craftingActor, ...knowledgeSources]);
 
     const visibleEntries =
-      visibleRecipeEntries ??
       this.recipeVisibility?.getVisibleRecipes?.({
         viewer: resolvedViewer,
         craftingActor,
         componentSourceActors: knowledgeSources,
-      }) ??
-      [];
+      }) ?? [];
 
     // ONE snapshot for the whole pass, discarded when this returns. Its per-system tallies
     // are memoised inside it, so N summaries of one system walk the inventory once — the

@@ -6,12 +6,22 @@
  *
  * 1. **Summaries are pure.** Building N of them invokes `evaluateCraftability()` and
  *    `resolveIngredientSelection()` zero times — at any N.
+ *
+ *    The two zeroes are NOT independent evidence, and saying so is the honest framing. In
+ *    production the solver is reached only through `RecipeManager.evaluateCraftability`, and
+ *    this fixture stubs that manager out entirely — so given the manager count is zero, the
+ *    solver count is entailed. What the SET-LEVEL tripwire adds is the one mutation the
+ *    manager count cannot see: a summary phase that reached PAST the manager into an
+ *    `IngredientSet` directly. That is a real regression and the set-level placement is the
+ *    only placement that catches it, but it is narrower than "the solver never ran".
  * 2. **A first-page load is bounded by the PAGE.** The exact-evaluation count for opening
  *    the app and hydrating one page is a function of page size and set count, and is
  *    independent of corpus size. That independence is the criterion: a bound that happened
  *    to hold at 200 recipes and grew at 400 would be a coincidence, not a guarantee.
- * 3. **The corpus-wide visibility pass is not duplicated.** One pass per read, and a caller
- *    that must feed both builders hands ONE pass to both rather than running two.
+ * 3. **The corpus-wide visibility pass is not duplicated.** One pass per crafting read, and
+ *    zero further passes for every recipe the player then hydrates — the split's most
+ *    plausible regression is a detail phase that re-runs the corpus-wide pass to find its
+ *    own recipe's access.
  *
  * Every count here is proved NON-VACUOUS in the same test that reads it, by invoking the
  * counted seam directly or by showing the number move on an axis it is supposed to move on.
@@ -23,7 +33,6 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 import { CraftingListingBuilder } from '../src/systems/CraftingListingBuilder.js';
-import { InventoryListingBuilder } from '../src/systems/InventoryListingBuilder.js';
 import { ResolutionModeService } from '../src/systems/ResolutionModeService.js';
 
 import { countCalls, createOperationCounters } from './helpers/scale/scaleCounters.js';
@@ -147,15 +156,7 @@ function millWorld({ corpusSize }) {
     items: [{ uuid: 'Item.grain-1', name: 'Grain', system: { quantity: 99 } }],
   };
 
-  return {
-    builder,
-    counters,
-    craftingActor,
-    recipeVisibility,
-    recipeManager,
-    craftingSystemManager,
-    entries,
-  };
+  return { builder, counters, craftingActor, recipeVisibility, recipeManager, recipes };
 }
 
 /** The browse path's own page window: A-Z by name, then slice — what the store does. */
@@ -167,7 +168,9 @@ function firstPage(summaries, pageSize) {
 
 describe('summary purity — building N rows costs no exact evaluation', () => {
   it('builds a whole 500-recipe listing with zero evaluateCraftability / resolveIngredientSelection calls', () => {
-    const { builder, counters, craftingActor, recipeManager } = millWorld({ corpusSize: 500 });
+    const { builder, counters, craftingActor, recipeManager, recipes } = millWorld({
+      corpusSize: 500,
+    });
 
     const listing = builder.buildListing({ craftingActor, viewer: VIEWER });
 
@@ -189,7 +192,7 @@ describe('summary purity — building N rows costs no exact evaluation', () => {
     recipeManager.evaluateCraftability();
     assert.equal(counters.get('evaluateCraftability'), 1);
     // The solver tripwire rides on the ingredient sets, which is where the real one lives.
-    millRecipeSolverProbe(counters);
+    millRecipeSolverProbe(counters, recipes);
   });
 
   it('keeps that zero as the corpus grows, so it is a property and not a small number', () => {
@@ -203,16 +206,22 @@ describe('summary purity — building N rows costs no exact evaluation', () => {
   });
 });
 
-/** Invoke a set's counted solver tripwire directly, proving that counter can move too. */
-function millRecipeSolverProbe(counters) {
+/**
+ * Invoke the tripwire INSTALLED ON THE FIXTURE'S OWN ingredient sets, proving that the
+ * wrapper the assertion depends on is intact.
+ *
+ * Deliberately not a fresh unrelated object with its own `countCalls`: that demonstrates
+ * `countCalls` works, which nobody doubts, while leaving the actual question — "is the
+ * wrapper still on `millRecipe`'s sets?" — unasked. Delete or misname the `countCalls` call
+ * at the fixture and a probe-object control still passes; this one does not.
+ */
+function millRecipeSolverProbe(counters, recipes) {
   const before = counters.get('resolveIngredientSelection');
-  const probe = { resolveIngredientSelection: () => ({ success: true }) };
-  countCalls(probe, 'resolveIngredientSelection', counters, 'resolveIngredientSelection');
-  probe.resolveIngredientSelection();
+  recipes[0].ingredientSets[0].resolveIngredientSelection();
   assert.equal(
     counters.get('resolveIngredientSelection'),
     before + 1,
-    'the solver counter can move'
+    'the tripwire installed on the fixture ingredient sets must still count'
   );
 }
 
@@ -298,92 +307,5 @@ describe('the corpus-wide visibility pass', () => {
       builder.buildRecipeDetail({ recipeId: row.id, craftingActor, viewer: VIEWER });
     }
     assert.equal(counters.get('getVisibleRecipes'), 1, 'still one, after twelve hydrations');
-  });
-
-  it('is handed to BOTH builders when one caller must feed both', () => {
-    // The double-pass case: a caller that needs the crafting listing AND the inventory
-    // listing in one read. Each builder runs its own pass by default, so the shared read
-    // hands ONE pass's result down rather than paying for it twice.
-    const {
-      builder,
-      counters,
-      craftingActor,
-      recipeVisibility,
-      recipeManager,
-      craftingSystemManager,
-    } = millWorld({ corpusSize: 100 });
-    const inventory = new InventoryListingBuilder({
-      recipeManager,
-      craftingSystemManager,
-      recipeVisibility,
-      localize: (key) => key,
-      nowWorldTime: () => 0,
-    });
-
-    // ONE pass, performed by the caller and handed to both.
-    const entries = recipeVisibility.getVisibleRecipes({ viewer: VIEWER, craftingActor });
-    assert.equal(counters.get('getVisibleRecipes'), 1);
-
-    builder.buildListing({ craftingActor, viewer: VIEWER, visibleRecipeEntries: entries });
-    inventory.buildListing({ craftingActor, viewer: VIEWER, visibleRecipeEntries: entries });
-
-    assert.equal(counters.get('getVisibleRecipes'), 1, 'both listings, one corpus-wide pass');
-  });
-
-  it('non-vacuity: the same two builds cost TWO passes without the hand-off', () => {
-    // Without this the assertion above passes for a probe that never counts anything, and
-    // for a hand-off that silently does nothing because both builders skipped the pass for
-    // an unrelated reason.
-    const {
-      builder,
-      counters,
-      craftingActor,
-      recipeVisibility,
-      recipeManager,
-      craftingSystemManager,
-    } = millWorld({ corpusSize: 100 });
-    const inventory = new InventoryListingBuilder({
-      recipeManager,
-      craftingSystemManager,
-      recipeVisibility,
-      localize: (key) => key,
-      nowWorldTime: () => 0,
-    });
-
-    builder.buildListing({ craftingActor, viewer: VIEWER });
-    inventory.buildListing({ craftingActor, viewer: VIEWER });
-
-    assert.equal(counters.get('getVisibleRecipes'), 2);
-  });
-
-  it('a hand-off cannot WIDEN what a player may see referenced', () => {
-    // The hand-off replaces the pass and nothing else — the teaser filter still runs over
-    // whatever it is given. Handing in a pass containing a teaser must not name that recipe
-    // in a used-by list, or the optimisation would become a disclosure.
-    const { recipeVisibility, recipeManager, craftingSystemManager, craftingActor, entries } =
-      millWorld({
-        corpusSize: 3,
-      });
-    const inventory = new InventoryListingBuilder({
-      recipeManager,
-      craftingSystemManager,
-      recipeVisibility,
-      localize: (key) => key,
-      nowWorldTime: () => 0,
-    });
-    const withTeaser = entries.map((entry, index) =>
-      index === 0 ? { ...entry, access: { visible: true, reason: 'teaser' } } : entry
-    );
-
-    const allowed = inventory._resolveAllowedRecipeIds({
-      isGM: false,
-      viewer: VIEWER,
-      craftingActor,
-      knowledgeSources: [],
-      visibleRecipeEntries: withTeaser,
-    });
-
-    assert.equal(allowed.has('r-0'), false, 'the teaser is filtered out of the handed-in pass');
-    assert.equal(allowed.has('r-1'), true, 'non-vacuity: the non-teaser entries survive it');
   });
 });

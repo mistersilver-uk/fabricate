@@ -373,9 +373,6 @@ A detail model for a recipe whose access reason is `teaser` is redacted exactly 
 - **The detail phase applies the same `enabled` filter the corpus query applies.**
 The summary phase reads the enabled corpus, so it can never project a disabled recipe; the detail phase resolves a recipe by id and MUST therefore re-apply that filter for a non-GM viewer.
 Absent `enabled` reads as ON, per the model default.
-- **A hand-off of one visibility pass MUST NOT widen a cohort.**
-A caller that performs the corpus-wide pass once and hands it to more than one consumer supplies the same entries the consumer would have computed.
-Every filter a consumer applies to its own pass — notably the used-by list's exclusion of undiscovered teasers — MUST still be applied to a handed-in one.
 
 ## Knowledge Access Evaluation
 
