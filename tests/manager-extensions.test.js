@@ -104,6 +104,53 @@ test('the registry is keyed by surface id and refuses only a conflict on the sam
   );
 });
 
+// Issue 1185 — the Manager's title bar reports whether a COMPANION MODULE is present, which
+// no per-surface subscription can answer: a companion claiming a surface Core has never heard
+// of publishes to nobody, so the shell would never learn it exists.
+test('subscribeSurfaceIds reports the whole claimed surface set, whatever the surface is', () => {
+  const registry = createManagerExtensionsRegistry({ emitHook: () => {} });
+  const seen = [];
+  const stop = registry.subscribeSurfaceIds((ids) => seen.push([...ids]));
+  assert.deepEqual(seen, [[]], 'a subscriber is replayed the empty set immediately');
+
+  const unregisterDowntime = registry.publicApi.registerWorldNavProvider(provider());
+  // The surface Core has never heard of is the whole point: it must move this signal.
+  const unregisterOther = registry.publicApi.registerWorldNavProvider(
+    provider({ id: 'crew-quarters', ids: ['roster'] })
+  );
+  assert.deepEqual(seen, [[], ['downtime'], ['downtime', 'crew-quarters']]);
+  assert.ok(
+    Object.isFrozen(registry.listWorldNavSurfaceIds()) === false,
+    'the public id list stays a mutable copy callers may sort'
+  );
+
+  unregisterOther();
+  unregisterDowntime();
+  assert.deepEqual(seen.at(-2), ['downtime']);
+  assert.deepEqual(seen.at(-1), []);
+
+  stop();
+  stop();
+  registry.publicApi.registerWorldNavProvider(provider());
+  assert.equal(seen.length, 5, 'unsubscribing is idempotent and really stops the feed');
+});
+
+test('a throwing surface-set subscriber cannot take the registering caller down with it', () => {
+  const errors = [];
+  const registry = createManagerExtensionsRegistry({
+    emitHook: () => {},
+    reportError: (...args) => errors.push(args),
+  });
+  registry.subscribeSurfaceIds(() => {
+    throw new Error('subscriber exploded');
+  });
+  assert.equal(errors.length, 1, 'the immediate replay is guarded like any later publication');
+
+  assert.doesNotThrow(() => registry.publicApi.registerWorldNavProvider(provider()));
+  assert.equal(errors.length, 2);
+  assert.throws(() => registry.subscribeSurfaceIds('not a function'), /must be a function/);
+});
+
 test('registerWorldNavProvider rejects malformed providers deterministically', () => {
   const cases = [
     [{ apiVersion: 2 }, /Unsupported World navigation provider API version: 2/],

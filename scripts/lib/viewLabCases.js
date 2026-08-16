@@ -3721,6 +3721,53 @@ export const VIEW_LAB_CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/downtime\//,
     ],
   }),
+  // Issue 1185 — the PREMIUM-INSTALLED chrome. Every other manager case renders the free
+  // module, so without this one the title bar's gold badge, the rail's muted Downtime chip
+  // and the installed-state rail tooltip have no frame at all, and a push would publish an
+  // unrelated free-module frame as evidence for them.
+  managerCase({
+    id: 'manager-world-downtime-premium-installed',
+    label: 'Manager — World Downtime with the premium companion installed',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { system: 'lab-smithing', downtimeProvider: '1' },
+    steps: [{ selector: '#manager-world-nav-downtime', press: 'Enter' }],
+    expectView: 'world-downtime',
+    expectSelector: '[data-manager-titlebar-premium]',
+    expectAttributes: [
+      {
+        selector: '[data-manager-titlebar-premium]',
+        name: 'aria-label',
+        value: 'Fabricate Premium is installed and connected',
+      },
+      {
+        selector: '#manager-world-nav-downtime',
+        name: 'title',
+        value: 'Downtime Studio is unlocked by Fabricate Premium',
+      },
+      {
+        selector: '[data-world-nav-premium]',
+        name: 'data-world-nav-premium-state',
+        value: 'installed',
+      },
+    ],
+    // The title bar carries the loud signal and the rail chip is muted beside it; the
+    // provider's own three tabs are rendered rather than Core's four.
+    expectVisible: '[data-manager-titlebar-premium]:has-text("PREMIUM")',
+    expectContained: [
+      { container: '#manager-world-nav-parties', target: '#manager-world-nav-parties > i' },
+      { container: '#manager-world-nav-downtime', target: '#manager-world-nav-downtime > i' },
+    ],
+    expectNoHorizontalOverflow: ['[data-world-downtime-host]', '.manager-main', '.manager-body'],
+    position: { width: 1330, height: 900 },
+    kinds: ['manager', 'world', 'downtime'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/CraftingSystemManagerRoot\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/downtime\//,
+      /^src\/ui\/managerExtensions\.js$/,
+      /^styles\/fabricate\.css$/,
+    ],
+  }),
   managerCase({
     id: 'manager-system-travel-card-off',
     label: 'Manager — system Travel card off',

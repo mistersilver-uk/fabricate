@@ -377,11 +377,10 @@ Header hierarchy:
 - The top bar must not render redundant eyebrow/kicker labels that merely repeat the current view name, such as `Systems View` above `Crafting Systems`.
 - Section headers inside the page may use short contextual labels when they add information, such as selected object state, but they must not duplicate adjacent title text.
 - A screen renders **one** page header.
-  A view must not stack a second header of its own beneath the shell's, restating the system name the breadcrumb and the titlebar's system badge already carry.
+  A view must not stack a second header of its own beneath the shell's, restating the system name the breadcrumb and the rail's crafting-system selector already carry.
 - The page title is the manager's display type and carries the weight that buys; the page's single primary action (`Create …`) is taller than a row button.
-- A route that declares a page-header identity tile renders it as the header's leading element, immediately adjacent to the breadcrumb/title/subtitle block, so the tile and that block read as one left-aligned unit.
-  The trailing page actions keep the header's right edge.
-  The heading block therefore absorbs the header's free space; the tile must not be stranded at the far left with the heading pushed toward the middle.
+- The page header holds exactly two blocks — the breadcrumb/title/subtitle heading and the trailing page actions — on every route.
+  No route leads its header with a route glyph or identity tile of its own.
 
 Selected-system rail:
 
@@ -3309,6 +3308,11 @@ Core's own `Unlock with Premium` header action belongs to Core's preview and is 
 - When a provider registers, unregisters, or re-registers with a different tab set, an active tab id the new set no longer declares falls back to that set's first tab rather than leaving an empty panel.
 - The Manager rail's Downtime children and the panel's tab strip render the active provider's tabs, or Core's fallback tabs when no provider holds the surface, from one list.
 Core's premium padlocks and rail note advertise Core's preview and are not rendered when a provider holds the surface.
+- The Manager title bar carries a gold `PREMIUM` badge when, and only when, at least one provider is registered on ANY surface id.
+The signal is a claim about the companion module rather than about Core's Downtime route, so a provider claiming a surface Core does not render lights it too.
+The free module renders nothing in that slot, and the title bar names no crafting system: the rail's crafting-system selector already does.
+- The rail's Downtime `PREMIUM` chip is prominent while Core's preview holds the surface and MUTED, not removed, while a provider holds it, so the loud signal is stated once and the rail still names the premium route.
+The Downtime rail entry's tooltip states the installed condition rather than an unlock offer whenever a provider holds the surface.
 - Fabricate publishes observational hooks — `fabricate.manager.navProviderRegistered`, `fabricate.manager.navProviderUnregistered`, `fabricate.manager.surfaceMounted`, `fabricate.manager.surfaceUnmounted`, and `fabricate.manager.surfaceTabChanged` — exposed on `game.fabricate.api.HOOKS.manager`.
 A listener's return value is ignored and nothing a listener does changes what the Manager renders.
 - Core owns the Manager shell, GM gate, World rail/route/focus state, target, and teardown.

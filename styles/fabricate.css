@@ -1674,10 +1674,13 @@
 
 /*
   The manager titlebar (issue 643) — a thin identity strip above the header, shared
-  by every manager screen. The gold badge carries the SELECTED crafting system's
-  name: user-authored text, so it is capped and ellipsised rather than allowed to
-  push the right-hand status line off the strip. Both are pure `--fab-*` tokens, so
-  the strip re-skins with every theme.
+  by every manager screen. The gold badge no longer carries the selected system's name
+  (issue 1185; the rail's crafting-system card already does): it is the PREMIUM signal,
+  and it renders only when a companion module is registered. It stays capped and
+  ellipsised anyway, because its content is a LOCALIZED product mark rather than the
+  seven English letters authored here, and a long translation must not push the
+  right-hand status line off the strip. Both are pure `--fab-*` tokens, so the strip
+  re-skins with every theme.
 */
 .fabricate-manager .manager-titlebar {
   display: flex;
@@ -1698,7 +1701,6 @@
   font-size: 0.62rem;
   letter-spacing: 0.06em;
   text-overflow: ellipsis;
-  text-transform: uppercase;
   white-space: nowrap;
 }
 
@@ -1738,38 +1740,15 @@
 }
 
 /*
-  The heading takes the header's free space so it sits IMMEDIATELY beside the route identity
-  tile, and the trailing actions keep their right edge (issue 1185).
-
-  `.manager-header` is `justify-content: space-between`, which reads correctly only while the
-  header holds two children. The route tile added a third, and space-between then parked the
-  heading in the middle of the row — the prototype measures the tile's right edge at 194px and
-  the title's left edge at 206px, one 12px gap apart, against several hundred px of gap here.
-  Growing the heading absorbs the free space instead, so the distribution has none left to
-  hand out and the two-child header is unchanged.
+  `flex: 1 1 auto` lived here while the Downtime route led the header with a glyph tile
+  (issue 1185): that tile was a THIRD child, and `space-between` then parked the heading in
+  the middle of the row rather than beside it. The tile is gone — no other Manager route has
+  one — so the header is a two-child `space-between` again and the growth rule has nothing
+  left to correct. It is removed rather than kept as insurance: a `flex` value nothing needs
+  is a rule the next reader has to disprove.
 */
 .fabricate-manager .manager-heading {
-  flex: 1 1 auto;
   min-width: 0;
-}
-
-/*
-  The route identity tile (issue 1185). The design leads its page header with a 42px rounded
-  tile carrying the glyph of the screen you are on, and it is the ONE tile on that screen that
-  paints no chip: a 10px radius over a transparent fill, the glyph alone in the brand accent.
-  The glyph itself is supplied by whatever declares the screen, so nothing here names one.
-*/
-.fabricate-manager .manager-route-icon {
-  display: inline-flex;
-  width: 42px;
-  height: 42px;
-  flex: 0 0 auto;
-  align-items: center;
-  justify-content: center;
-  border-radius: 10px;
-  background: transparent;
-  color: var(--fab-accent);
-  font-size: 17px;
 }
 
 .fabricate-manager .manager-kicker {
@@ -12450,60 +12429,34 @@
 }
 
 /*
-  The Downtime group row is the rail's one PREMIUM state marker, and the design colours it as
-  such: accent ink over an accent-soft fill inside an accent border, where every other active
-  rail row is plain text over `--fab-surface-active` with no border. Only the colour is taken
-  from the design here — its 34px row against this rail's uniform 36px is the rail's own
-  rhythm, and one row standing 2px shorter than its neighbours would be a defect rather than
-  parity. Keyed on the world-nav entry, not on any of the tab ids a provider owns.
+  The Downtime rail group (issue 1185).
 
-  `.manager-nav-parent` is in the selector to reach FIVE classes, because
-  `.manager-nav-group.is-expanded .manager-nav-parent.is-active` above is five and re-states
-  the ordinary active colours: at four this rule set the border and lost the fill and the ink
-  to it, which reads as a half-applied treatment rather than as a cascade fault.
-*/
-.fabricate-manager
-  .manager-nav-parent.manager-world-nav-item[data-world-nav-item='downtime'].is-active {
-  border-color: var(--fab-accent-border);
-  color: var(--fab-accent);
-  background: var(--fab-accent-soft);
-}
-
-/*
-  The Downtime rail group (issue 1185). Its four children are a step LOUDER than an ordinary
-  rail child — weight 600 against 500, and a full-strength active row — because they are the
-  premium previews rather than plain destinations. The indent is `padding-left`, never an
-  inset: the row keeps the same x and width as every other rail row so its active fill lines
-  up with the group header above it.
+  It used to carry the prototype's own row metrics — a 32px left indent, a 10px gap, a 29px
+  floor, a 7px radius — which put its children visibly further right than the Crafting and
+  Gathering children directly above them. They are rail sub-items like any other, so the
+  indent, gap, geometry and active treatment now come from `.manager-nav-subitem` and are not
+  restated here. What survives is the one thing that is genuinely downtime-specific: the
+  children are a step LOUDER than an ordinary rail child, at weight 600, because they are the
+  premium previews rather than plain destinations.
 */
 .fabricate-manager .manager-downtime-subitem {
-  gap: 10px;
-
   /*
     `height: auto` releases Foundry core's `button { height: var(--button-size) }`, which is a
-    FIXED height rather than a floor: the row stayed 29px while a long localized label wrapped
-    to four lines inside it and overflowed onto the three rows below. `min-height` alone could
-    not fix that — it raises a floor and core had set a ceiling. The design's 32px indent makes
-    this row the narrowest label track in the rail, so it is where the ceiling shows first.
+    FIXED height rather than a floor: the row stayed at core's height while a long localized
+    label wrapped to four lines inside it and overflowed onto the three rows below. `min-height`
+    alone could not fix that — it raises a floor and core had set a ceiling. This group is where
+    the ceiling shows first because its labels are provider-supplied and may be any length; the
+    rule is not group-specific in principle, only in the evidence that found it.
   */
   height: auto;
-  min-height: 29px;
-  padding: 7px 10px 7px 32px;
-  border-radius: 7px;
-  border-color: transparent;
   font-size: 12px;
   font-weight: 600;
 }
 
-/* The label follows the row rather than the rail's ordinary 12.5px, so the indent and the
-   type read as one step louder together — see the note above. */
+/* The label follows the row rather than the rail's ordinary 12.5px, so the group's type reads
+   as one step louder together — see the note above. */
 .fabricate-manager .manager-downtime-subitem .manager-nav-label {
   font-size: inherit;
-}
-
-.fabricate-manager .manager-downtime-subitem.is-active {
-  color: var(--fab-mv2-text);
-  background: var(--fab-surface-active);
 }
 
 /*
@@ -12576,13 +12529,39 @@
   letter-spacing: 0.09em;
 }
 
+/*
+  A rail label degrades by WRAPPING AT A SPACE, and then by ELLIPSIS — never by splitting a
+  word (issue 1185).
+
+  It used to carry `overflow-wrap: anywhere`, and that is what produced the reported
+  `Downtim` / `e`. `anywhere` differs from `break-word` in that it also lowers the element's
+  MIN-CONTENT width, so the surrounding `minmax(0, 1fr)` grid track is free to shrink below
+  the widest word and the word is then split to fit. Measured against the real Signika face
+  at the shipped 220px rail, the Downtime parent row leaves the label a 61.5px track for a
+  54.3px word — about seven pixels of slack — so anything that eats those pixels (a classic
+  rail scrollbar, a user-configured Foundry font, a longer localized `PREMIUM`, page zoom)
+  tips it over, and `anywhere` decided that the failure looked like a broken word.
+
+  The state the reporter noticed it in is NOT the cause: the chip measures 47.5px in the
+  active and the idle row alike, because `.manager-nav-button.is-active .manager-nav-count`
+  re-tones a count without resizing it and the gold chip rule pins weight 700 in both states.
+  So this is fixed as what it is — an ugly degradation on a tight track — rather than as a
+  state bug, and the fix holds for a COMPANION-supplied label, which may be any length and is
+  not ours to shorten.
+
+  `overflow: hidden` is what lets `text-overflow` apply at all; every one of these labels is a
+  grid item, so it is blockified and `text-overflow` is in scope on all of them.
+*/
 .fabricate-manager .manager-nav-label {
+  overflow: hidden;
   min-width: 0;
 
   /* Without this the label inherited Foundry's 14px app base (bleed) — a rail label
      stands 1.5px over the prototype's 12.5px. Pin it to the design (issue 643 audit). */
   font-size: 0.78rem;
-  overflow-wrap: anywhere;
+  text-overflow: ellipsis;
+  overflow-wrap: normal;
+  word-break: normal;
 }
 
 /*
@@ -12619,7 +12598,7 @@
 /*
   THE GOLD BADGE CHIP, stated once (issue 1185).
 
-  Two marks in this Manager are the same object at two scales: the title bar's system badge
+  Two marks in this Manager are the same object at two scales: the title bar's PREMIUM badge
   and the rail's Downtime PREMIUM chip. The design draws both as a filled gold chip with dark
   ink, and two chips that must stay the same colour must not name that colour twice — a second
   copy is a second thing to keep in step across all seven palettes. Each chip's own rule owns
@@ -12630,15 +12609,36 @@
   Downtime row is always the active row on its own route. Declared earlier, this block lost on
   source order and the chip drew as subtle tan lettering at weight 600 — the reported defect.
 
-  `text-transform` is deliberately NOT shared. The title bar's source is a GM-authored system
-  name and has to be shouted in CSS; the rail chip's source is the literal string `PREMIUM`,
-  and uppercasing an already-uppercase word is how a translation gets shouted twice.
+  Neither rule uppercases in CSS, and that is now a shared decision rather than a divergence:
+  both sources are the literal localized string `PREMIUM`, and uppercasing an already-uppercase
+  word is how a translation gets shouted twice.
 */
 .fabricate-manager .manager-titlebar-badge,
 .fabricate-manager .manager-nav-button .manager-nav-count.manager-nav-premium {
   color: var(--fab-on-badge-gold);
   background: var(--fab-badge-gold);
   font-weight: 700;
+}
+
+/*
+  THE SAME CHIP, MUTED — the rail's Downtime marker once a companion holds the surface
+  (issue 1185).
+
+  Gold on the rail is a SALES signal: it is selling the upgrade beside four padlocked
+  previews. With premium installed there is nothing left to sell, the title bar carries the
+  loud gold badge, and this mark's only remaining job is to say which route premium provides.
+  So it steps down — accent lettering on the accent tint, one weight lighter — rather than
+  disappearing: removing it would lose the answer to "which of these rows is the premium one".
+
+  Five classes, so it beats the four-class gold rule above on weight and does not depend on
+  staying below it. It restates ONLY the three declarations it overrides; the chip's shape,
+  scale, padding and radius still come from `.manager-nav-premium` above, which is what keeps
+  the row's label on one line in both states.
+*/
+.fabricate-manager .manager-nav-button .manager-nav-count.manager-nav-premium.is-installed {
+  color: var(--fab-mv2-accent);
+  background: var(--fab-accent-soft);
+  font-weight: 600;
 }
 
 /*

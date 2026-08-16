@@ -1063,9 +1063,9 @@ test('the World Parties fixture is legal, and its search and pager cases claim w
 });
 
 test('World Downtime publishes four tabs plus narrow/collapsed frames with generic browser assertions', () => {
-  const cases = VIEW_LAB_CASES.filter((entry) => entry.id.startsWith('manager-world-downtime-'));
+  const allCases = VIEW_LAB_CASES.filter((entry) => entry.id.startsWith('manager-world-downtime-'));
   assert.deepEqual(
-    cases.map((entry) => entry.id),
+    allCases.map((entry) => entry.id),
     [
       'manager-world-downtime-tracking',
       'manager-world-downtime-activities',
@@ -1073,8 +1073,15 @@ test('World Downtime publishes four tabs plus narrow/collapsed frames with gener
       'manager-world-downtime-settings',
       'manager-world-downtime-narrow',
       'manager-world-downtime-collapsed',
+      'manager-world-downtime-premium-installed',
     ]
   );
+  // The Core-preview frames and the premium-installed frame prove DIFFERENT things and cannot
+  // share one assertion loop: Core's `Unlock with Premium` CTA and its scrolling preview pane
+  // are Core's own content, and the spec says neither is rendered over a companion's screens
+  // — so requiring the CTA of every downtime case would pin exactly the defect it forbids.
+  const premium = allCases.find((entry) => entry.id.endsWith('-premium-installed'));
+  const cases = allCases.filter((entry) => entry !== premium);
   for (const viewCase of cases) {
     assert.equal(viewCase.expectView, 'world-downtime');
     assert.ok(viewCase.expectNoHorizontalOverflow);
@@ -1154,8 +1161,42 @@ test('World Downtime publishes four tabs plus narrow/collapsed frames with gener
     );
   }
 
+  // Issue 1185 — the premium-installed frame. Every other manager case renders the free
+  // module, so this is the only frame that can photograph the title bar's gold badge, the
+  // muted rail chip and the installed-state rail tooltip. Its assertions are pinned here
+  // because the values are hand-copied from `lang/en.json` and rot silently otherwise.
+  assert.equal(premium.expectView, 'world-downtime');
+  assert.equal(premium.query.downtimeProvider, '1', 'the premium frame registers a companion');
+  assert.equal(premium.expectSelector, '[data-manager-titlebar-premium]');
+  assert.ok(
+    premium.expectVisible.includes(lang.FABRICATE.Admin.Manager.Titlebar.Premium),
+    'the badge caption is the shipped titlebar premium mark'
+  );
+  const premiumAttribute = (selector, name) =>
+    premium.expectAttributes.find((entry) => entry.selector === selector && entry.name === name)
+      ?.value;
+  assert.equal(
+    premiumAttribute('[data-manager-titlebar-premium]', 'aria-label'),
+    lang.FABRICATE.Admin.Manager.Titlebar.PremiumStatus
+  );
+  assert.equal(
+    premiumAttribute('#manager-world-nav-downtime', 'title'),
+    lang.FABRICATE.Admin.Manager.World.Downtime.InstalledTooltip,
+    'and the rail tooltip is the installed wording, not the unlock offer'
+  );
+  assert.equal(
+    premiumAttribute('[data-world-nav-premium]', 'data-world-nav-premium-state'),
+    'installed',
+    'the frame proves the rail chip is the muted variant'
+  );
+
   const mountSource = readFileSync(resolve(ROOT, 'tests/view-lab/mount.js'), 'utf8');
   assert.match(mountSource, /applyLongDowntimeLocalization\(world\)/);
+  assert.match(
+    mountSource,
+    /params\.downtimeProvider[\s\S]{0,200}registerWorldNavProvider/,
+    'the premium frame registers its companion through the production registry'
+  );
   assert.doesNotMatch(
     mountSource,
     /longDowntimeLabels[\s\S]{0,900}registerWorldNavProvider/,

@@ -224,19 +224,58 @@ export function createManagerExtensionsRegistry({
   const providers = new Map();
   const registrationTokens = new Map();
   const listeners = new Map();
+  // Subscribers to the SET of claimed surfaces rather than to one surface's provider.
+  // Core's Manager uses this to answer "is a companion module present at all", a question
+  // no per-surface subscription can answer: a companion that claims only a surface Core
+  // has never heard of publishes to nobody, and the shell would never learn it exists.
+  const surfaceSetListeners = new Set();
 
-  function notify(listener, provider) {
+  function notify(listener, value) {
     try {
-      listener(provider);
+      listener(value);
     } catch (error) {
       reportError('Fabricate | Manager extension subscriber failed:', error);
     }
+  }
+
+  function currentSurfaceIds() {
+    return [...providers.keys()];
+  }
+
+  /**
+   * Add one listener to a listener set, replay the current value into it, and return an
+   * idempotent unsubscribe.
+   *
+   * The immediate replay goes through the same guard as a later publication: a subscriber
+   * that throws on its first snapshot must not take the SUBSCRIBING caller down with it,
+   * and Core's own Manager shell is one of those callers.
+   *
+   * @param {Set<Function>} set Listener set to join.
+   * @param {Function} listener Subscriber.
+   * @param {*} initialValue Value replayed immediately.
+   * @returns {() => void} Idempotent unsubscribe.
+   */
+  function addListener(set, listener, initialValue) {
+    set.add(listener);
+    notify(listener, initialValue);
+    let subscribed = true;
+    return () => {
+      if (!subscribed) return;
+      subscribed = false;
+      set.delete(listener);
+    };
   }
 
   function publish(surfaceId) {
     const provider = providers.get(surfaceId) ?? null;
     for (const listener of listeners.get(surfaceId) ?? []) {
       notify(listener, provider);
+    }
+    // Frozen because every surface-set subscriber receives the SAME array; a mutable
+    // broadcast would let one subscriber rewrite what the next one reads.
+    const surfaceIds = Object.freeze(currentSurfaceIds());
+    for (const listener of surfaceSetListeners) {
+      notify(listener, surfaceIds);
     }
   }
 
@@ -287,7 +326,7 @@ export function createManagerExtensionsRegistry({
       return api;
     },
     getWorldNavProvider: (surfaceId) => providers.get(surfaceId) ?? null,
-    listWorldNavSurfaceIds: () => [...providers.keys()],
+    listWorldNavSurfaceIds: currentSurfaceIds,
     // Core's own hook edge, shared with the Manager host so the route/tab hooks travel
     // through the same injectable seam the registry's own hooks do.
     emitHook,
@@ -304,17 +343,25 @@ export function createManagerExtensionsRegistry({
         surfaceListeners = new Set();
         listeners.set(surfaceId, surfaceListeners);
       }
-      surfaceListeners.add(listener);
-      // The immediate replay goes through the same guard as a later publication: a
-      // subscriber that throws on its first snapshot must not take the SUBSCRIBING caller
-      // down with it, and Core's own Manager shell is one of those callers.
-      notify(listener, providers.get(surfaceId) ?? null);
-      let subscribed = true;
-      return () => {
-        if (!subscribed) return;
-        subscribed = false;
-        surfaceListeners.delete(listener);
-      };
+      return addListener(surfaceListeners, listener, providers.get(surfaceId) ?? null);
+    },
+    /**
+     * Subscribe to the set of surface ids a companion currently claims.
+     *
+     * Deliberately NOT keyed on a surface id: the question it answers is "is any companion
+     * module registered", which is what the Manager's title bar reports. Keying it on
+     * `downtime` would make that report a claim about one Core route rather than about the
+     * companion module, and a future premium surface would never light it.
+     *
+     * @param {(surfaceIds: readonly string[]) => void} listener Receives the current ids
+     *   immediately and again on every registration and unregistration.
+     * @returns {() => void} Idempotent unsubscribe.
+     */
+    subscribeSurfaceIds(listener) {
+      if (typeof listener !== 'function') {
+        throw new TypeError('Fabricate manager extension subscriber must be a function');
+      }
+      return addListener(surfaceSetListeners, listener, Object.freeze(currentSurfaceIds()));
     },
   });
 }

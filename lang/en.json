@@ -1759,7 +1759,8 @@
         },
         "Titlebar": {
           "Label": "Crafting manager",
-          "SystemBadge": "Selected crafting system",
+          "Premium": "PREMIUM",
+          "PremiumStatus": "Fabricate Premium is installed and connected",
           "Status": "Selected system resolution",
           "OutcomeTier": "outcome tier",
           "OutcomeTiers": "outcome tiers"
@@ -4281,6 +4282,7 @@
             "Actions": "Downtime actions",
             "Premium": "PREMIUM",
             "PremiumTooltip": "Unlock Downtime Studio with Fabricate Premium",
+            "InstalledTooltip": "Downtime Studio is unlocked by Fabricate Premium",
             "Unlock": "Unlock with Premium",
             "ExpandNav": "Expand Downtime",
             "CollapseNav": "Collapse Downtime",

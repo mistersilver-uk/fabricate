@@ -144,6 +144,10 @@
   // Bumped by `context.requestRemount()`. The host's mount effect keys on the context
   // object, so a new identity is the whole re-render mechanism.
   let downtimeContextRevision = $state(0);
+  // Every surface a companion currently claims, not just Core's Downtime one. The title bar
+  // reports the MODULE, so it must not be keyed on one route: a premium module whose only
+  // surface is one Core has never heard of is still installed and still working.
+  let registeredSurfaceIds = $state([]);
 
   $effect(() => {
     if (!managerExtensions?.subscribe) return;
@@ -152,6 +156,13 @@
       // previous one's mount fault.
       downtimeFaultedProvider = null;
       downtimeProviderSnapshot = nextProvider;
+    });
+  });
+
+  $effect(() => {
+    if (!managerExtensions?.subscribeSurfaceIds) return;
+    return managerExtensions.subscribeSurfaceIds((surfaceIds) => {
+      registeredSurfaceIds = surfaceIds;
     });
   });
 
@@ -2181,6 +2192,12 @@
       : null
   );
   const downtimeCoreFallback = $derived(downtimeProvider === null);
+  // The title bar's premium signal (issue 1185). It is deliberately BROADER than
+  // `downtimeCoreFallback`: that flag answers "who owns the Downtime route", while this one
+  // answers "is a companion module registered at all", which is the claim the strip makes.
+  // Reading it off the surface SET rather than off Core's one surface id is what lets a
+  // premium module that ships some future surface light the same badge with no change here.
+  const premiumInstalled = $derived(registeredSurfaceIds.length > 0);
   const downtimeTabs = $derived(downtimeProvider?.tabs ?? WORLD_DOWNTIME_PREVIEW_PROVIDER.tabs);
   const activeDowntimeTab = $derived(
     downtimeTabs.find((tab) => tab.id === worldDowntimeTabId) ?? downtimeTabs[0]
@@ -7076,9 +7093,9 @@
 >
   <!--
     The manager titlebar: a thin, always-present identity strip above the header.
-    It answers "which crafting system am I editing, and how does it resolve?" from
-    every screen, so the gold badge carries the SELECTED SYSTEM's name (user-authored
-    text — hence max-width + ellipsis + title) and never a theme or product name.
+    Its right-hand end answers "how does the selected system resolve?" from every screen.
+    Its gold badge is the PREMIUM signal, and it appears only when a companion module has
+    registered with `managerExtensions` — in the free module the slot is simply empty.
   -->
   {#if !isToolStudioRoute}
     <div
@@ -7089,19 +7106,30 @@
       <!--
       The layer-group icon and "Crafting Systems" product label used to lead this
       strip, but the Foundry window's own title bar already names the app — a second
-      copy inside the window was duplicated chrome (issue 643). The gold SYSTEM badge
-      is now the left-most element, and the resolution status stays right-aligned.
+      copy inside the window was duplicated chrome (issue 643).
+
+      The gold badge used to carry the SELECTED SYSTEM's name and no longer does (issue
+      1185): the rail's crafting-system card already names the selected system on every
+      screen, so the strip was repeating it. The slot now carries the one thing nothing
+      else in the chrome says — that a premium companion module is installed and connected
+      — and the rail's own PREMIUM chip steps down to a quiet marker in that state, so the
+      loud signal is stated exactly once.
     -->
-      {#if selectedSystem}
+      {#if premiumInstalled}
         <span
           class="manager-titlebar-badge"
-          data-manager-titlebar-system
-          title={selectedSystem.name}
+          data-manager-titlebar-premium
+          title={text(
+            'FABRICATE.Admin.Manager.Titlebar.PremiumStatus',
+            'Fabricate Premium is installed and connected'
+          )}
           aria-label={text(
-            'FABRICATE.Admin.Manager.Titlebar.SystemBadge',
-            'Selected crafting system'
-          )}>{selectedSystem.name}</span
+            'FABRICATE.Admin.Manager.Titlebar.PremiumStatus',
+            'Fabricate Premium is installed and connected'
+          )}>{text('FABRICATE.Admin.Manager.Titlebar.Premium', 'PREMIUM')}</span
         >
+      {/if}
+      {#if selectedSystem}
         <span
           class="manager-titlebar-status"
           data-manager-titlebar-status
@@ -7116,19 +7144,14 @@
   {/if}
 
   {#if !isToolStudioRoute}
+    <!--
+      Two children, always: the heading block and the trailing actions. The Downtime route
+      briefly led this header with a 42px glyph tile from the prototype, and it was removed
+      (issue 1185) because no other Manager route has one — consistency across the app beats
+      parity with one screen's mockup. It is also why `.manager-header`'s `space-between` can
+      be trusted again: a third child parked the heading in the middle of the row.
+    -->
     <header class="manager-header">
-      {#if isWorldDowntimeRoute && activeDowntimeTab}
-        <!--
-          The route's identity tile. The design leads the page header with a 42px rounded tile
-          carrying the glyph of the screen you are on, and this route's screen is a TAB — so
-          the glyph is read from the active tab descriptor rather than written here. That is
-          what makes it work for a companion: a registered provider's tab supplies its own
-          `icon` and gets its own tile, and Core's four are one provider among them.
-        -->
-        <span class="manager-route-icon" data-manager-route-icon aria-hidden="true">
-          <i class={activeDowntimeTab.icon}></i>
-        </span>
-      {/if}
       <div class="manager-heading">
         <nav
           class="manager-breadcrumbs"
@@ -8525,10 +8548,15 @@
               class={`manager-nav-button manager-nav-parent manager-world-nav-item ${isWorldDowntimeRoute ? 'is-active' : ''}`}
               id="manager-world-nav-downtime"
               data-world-nav-item="downtime"
-              title={text(
-                'FABRICATE.Admin.Manager.World.Downtime.PremiumTooltip',
-                'Unlock Downtime Studio with Fabricate Premium'
-              )}
+              title={downtimeCoreFallback
+                ? text(
+                    'FABRICATE.Admin.Manager.World.Downtime.PremiumTooltip',
+                    'Unlock Downtime Studio with Fabricate Premium'
+                  )
+                : text(
+                    'FABRICATE.Admin.Manager.World.Downtime.InstalledTooltip',
+                    'Downtime Studio is unlocked by Fabricate Premium'
+                  )}
               aria-label={text('FABRICATE.Admin.Manager.World.Downtime.Nav', 'Downtime')}
               aria-current={isWorldDowntimeRoute ? 'page' : undefined}
               aria-controls="manager-downtime-submenu"
@@ -8539,7 +8567,17 @@
               <span class="manager-nav-label">
                 {text('FABRICATE.Admin.Manager.World.Downtime.Nav', 'Downtime')}
               </span>
-              <span class="manager-nav-count manager-nav-premium" data-world-nav-premium
+              <!--
+                The chip is MUTED, never removed, once a companion holds the surface (issue
+                1185): with premium installed the title bar carries the loud gold signal, and
+                two shouts of the same word is one too many — but the rail still has to say
+                which route premium provides. `is-installed` re-tones it to a quiet accent
+                marker and leaves its geometry alone.
+              -->
+              <span
+                class={`manager-nav-count manager-nav-premium ${downtimeCoreFallback ? '' : 'is-installed'}`}
+                data-world-nav-premium
+                data-world-nav-premium-state={downtimeCoreFallback ? 'preview' : 'installed'}
                 >{text('FABRICATE.Admin.Manager.World.Downtime.Premium', 'PREMIUM')}</span
               >
             </button>

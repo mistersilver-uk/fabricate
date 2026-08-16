@@ -462,21 +462,18 @@ describe('CraftingSystemManager source contract', () => {
     );
   });
 
-  // Issue 643 — the manager titlebar. The gold badge names the SELECTED CRAFTING
-  // SYSTEM. The prototype's "MYTHWRIGHT" is a THEME name and must never leak into
-  // the shipped chrome, and the badge's content is user-authored, so it also needs a
-  // `title` for the truncated case.
-  it('renders a titlebar naming the selected crafting system and its resolution', () => {
+  // Issue 643 established the manager titlebar; issue 1185 reassigned its gold badge.
+  // The badge USED to name the selected crafting system — which the rail's crafting-system
+  // card already does on every screen, so the strip was repeating the rail. It now carries
+  // the premium signal instead, and only when a companion module is registered.
+  it('renders a titlebar carrying the premium signal and the system resolution', () => {
     for (const snippet of [
       'class="manager-titlebar"',
       'data-manager-titlebar',
       'class="manager-titlebar-badge"',
-      'data-manager-titlebar-system',
-      'title={selectedSystem.name}',
-      // Prettier breaks a whitespace-sensitive close tag as `</span\n>` (issue 923), so the
-      // trailing `>` is no longer adjacent. What matters is that the name stays welded to the
-      // open tag — a space there would render inside the titlebar badge.
-      '>{selectedSystem.name}</span',
+      'data-manager-titlebar-premium',
+      '{#if premiumInstalled}',
+      "text('FABRICATE.Admin.Manager.Titlebar.Premium', 'PREMIUM')",
       'data-manager-titlebar-status',
       '{titlebarStatusLabel()}',
     ]) {
@@ -484,7 +481,7 @@ describe('CraftingSystemManager source contract', () => {
     }
     // The layer-group icon and "Crafting Systems" product label are gone (issue 643):
     // the Foundry window's own title bar already names the app, so a second copy inside
-    // the window was duplicated chrome. The gold badge is now the left-most element.
+    // the window was duplicated chrome.
     assert.equal(
       rootSource.includes('manager-titlebar-icon'),
       false,
@@ -495,10 +492,65 @@ describe('CraftingSystemManager source contract', () => {
       false,
       'the duplicated "Crafting Systems" titlebar label should be removed'
     );
+    // Issue 1185: the Downtime route briefly led the page header with a 42px glyph tile from
+    // the prototype. No other Manager route has one, so it is gone — and with it the third
+    // header child that broke `justify-content: space-between`.
+    assert.equal(
+      rootSource.includes('manager-route-icon'),
+      false,
+      'no route may lead the page header with an identity tile of its own'
+    );
+    assert.equal(
+      rootSource.includes('data-manager-route-icon'),
+      false,
+      'and its marker attribute goes with it'
+    );
+    // Issue 1185: the system name badge is gone in BOTH states, not merely hidden behind a
+    // flag. Its marker attribute and its lang key go with it.
+    assert.equal(
+      rootSource.includes('data-manager-titlebar-system'),
+      false,
+      'the redundant crafting-system titlebar badge should be removed'
+    );
+    assert.equal(
+      rootSource.includes('Titlebar.SystemBadge'),
+      false,
+      'and its accessible-name key with it'
+    );
+    assert.equal(
+      lang.FABRICATE.Admin.Manager.Titlebar.SystemBadge,
+      undefined,
+      'the orphaned SystemBadge string should be deleted from lang/en.json, not left behind'
+    );
     assert.equal(
       /mythwright/i.test(rootSource),
       false,
-      'the gold badge names the selected crafting system; "Mythwright" is a theme name and must not be hard-coded'
+      '"Mythwright" is a prototype theme name and must never be hard-coded into the chrome'
+    );
+    // The premium badge is driven by the REGISTRY, not by Core's Downtime route: a companion
+    // that ships some future surface is still installed and still lights the strip.
+    assert.ok(
+      rootSource.includes('const premiumInstalled = $derived(registeredSurfaceIds.length > 0)'),
+      'the titlebar premium signal should read the whole registered surface set'
+    );
+    assert.ok(
+      rootSource.includes('managerExtensions.subscribeSurfaceIds('),
+      'and should stay live through the registry surface-set subscription'
+    );
+    assert.equal(
+      /premiumInstalled[^\n]*downtime/i.test(rootSource),
+      false,
+      'the premium signal must not be keyed on the Core downtime surface id'
+    );
+    assert.equal(
+      lang.FABRICATE.Admin.Manager.Titlebar.Premium,
+      'PREMIUM',
+      'lang should expose the titlebar premium mark'
+    );
+    assert.equal(
+      lang.FABRICATE.Admin.Manager.Titlebar.PremiumStatus,
+      'Fabricate Premium is installed and connected',
+      'and the accessible name and tooltip that explain it'
     );
     // The status line reports the SYSTEM's resolution mode, and counts outcome tiers
     // only where tiers exist to count (routedByCheck).

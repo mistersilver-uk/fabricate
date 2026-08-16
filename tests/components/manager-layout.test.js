@@ -5156,7 +5156,7 @@ test('collapsed manager rail hides scope content but keeps its expand control an
   );
 });
 
-test('the manager titlebar caps the selected system badge and keeps the status line on one line', () => {
+test('the manager titlebar caps the premium badge and keeps the status line on one line', () => {
   const rootBlock = blockFor('.fabricate-manager');
   const titlebarBlock = blockFor('.fabricate-manager .manager-titlebar');
   const badgeBlock = blockFor('.fabricate-manager .manager-titlebar-badge');
@@ -5176,12 +5176,13 @@ test('the manager titlebar caps the selected system badge and keeps the status l
     titlebarBlock.includes('min-width: 0;'),
     'the titlebar must be allowed to shrink inside the manager grid'
   );
-  // The badge carries the SELECTED SYSTEM's name — user-authored text of any length.
+  // The badge carries the localized PREMIUM mark (issue 1185; it used to carry the selected
+  // system's name, which the rail's crafting-system card already shows).
   //
-  // Its gold pair is stated ONCE, in a rule it SHARES with the rail's Downtime PREMIUM chip
-  // (issue 1185). Two marks that must stay the same colour must not name that colour twice:
-  // a second copy is a second thing to keep in step across all seven palettes. So the pair is
-  // asserted on the shared rule, and the badge's own block is asserted NOT to restate it.
+  // Its gold pair is stated ONCE, in a rule it SHARES with the rail's Downtime PREMIUM chip.
+  // Two marks that must stay the same colour must not name that colour twice: a second copy
+  // is a second thing to keep in step across all seven palettes. So the pair is asserted on
+  // the shared rule, and the badge's own block is asserted NOT to restate it.
   const goldChipBlock =
     /\.fabricate-manager \.manager-titlebar-badge,\s*\.fabricate-manager \.manager-nav-button \.manager-nav-count\.manager-nav-premium \{[\s\S]*?\}/.exec(
       withoutComments(css)
@@ -5200,11 +5201,17 @@ test('the manager titlebar caps the selected system badge and keeps the status l
   );
   assert.ok(
     badgeBlock.includes('max-width:'),
-    'the system badge must cap its width against long system names'
+    'the premium badge must cap its width against a long localized mark'
   );
   assert.ok(
     badgeBlock.includes('text-overflow: ellipsis;') && badgeBlock.includes('white-space: nowrap;'),
-    'the system badge should ellipsis rather than push the status line off the strip'
+    'the premium badge should ellipsis rather than push the status line off the strip'
+  );
+  // Both sources are now the literal localized string `PREMIUM`, so neither mark uppercases
+  // in CSS — shouting an already-uppercase word is how a translation gets shouted twice.
+  assert.ok(
+    !badgeBlock.includes('text-transform:'),
+    'the premium badge should leave casing to the translation'
   );
   assert.ok(statusBlock.includes('margin-left: auto;'), 'the status line should sit right-aligned');
   assert.ok(
@@ -8289,16 +8296,27 @@ test('the rail Downtime premium mark renders as the shared gold badge chip', asy
   });
   const page = await context.newPage();
   try {
+    // One row shape, rendered twice: Core's preview state (gold) and the companion-installed
+    // state (muted). Writing the markup once is what makes the two frames comparable — and
+    // keeps a second near-identical block out of the SonarCloud duplication gate.
+    const downtimeRow = (rowId, chipId, chipModifier) =>
+      `<button class="manager-nav-button manager-nav-parent manager-world-nav-item is-active"` +
+      ` data-world-nav-item="downtime" id="${rowId}">` +
+      `<i class="fas fa-hourglass-half"></i>` +
+      `<span class="manager-nav-label">Downtime</span>` +
+      `<span class="manager-nav-count manager-nav-premium${chipModifier}" id="${chipId}">PREMIUM</span>` +
+      `</button>`;
     await page.setContent(
       `<style>${css}</style>` +
         `<div class="fabricate-manager">` +
-        `<span class="manager-titlebar-badge" id="titlebar">Mythwright Core</span>` +
+        `<span class="manager-titlebar-badge" id="titlebar">PREMIUM</span>` +
         `<nav class="manager-rail"><div class="manager-world-nav">` +
-        `<button class="manager-nav-button manager-nav-parent manager-world-nav-item is-active"` +
-        ` data-world-nav-item="downtime" id="row">` +
-        `<i class="fas fa-hourglass-half"></i>` +
-        `<span class="manager-nav-label">Downtime</span>` +
-        `<span class="manager-nav-count manager-nav-premium" id="chip">PREMIUM</span>` +
+        downtimeRow('row', 'chip', '') +
+        downtimeRow('row-installed', 'chip-installed', ' is-installed') +
+        `<button class="manager-nav-button manager-nav-parent is-active" id="plain-active">` +
+        `<i class="fas fa-users"></i>` +
+        `<span class="manager-nav-label">Parties</span>` +
+        `<span class="manager-nav-count">5</span>` +
         `</button>` +
         `<button class="manager-nav-button manager-nav-parent" id="plain">` +
         `<span class="manager-nav-label">Parties</span>` +
@@ -8315,20 +8333,26 @@ test('the rail Downtime premium mark renders as the shared gold badge chip', asy
           weight: computed.fontWeight,
           radius: computed.borderTopLeftRadius,
           padding: computed.paddingLeft,
+          borderColor: computed.borderTopColor,
         };
       };
       // Line boxes, counted by the browser rather than derived from a computed line-height:
       // this fixture sets none, so `line-height` computes to `normal` and any arithmetic on it
       // is NaN — which an `=== 1` check reads as a pass-shaped failure.
-      const label = document.querySelector('#row .manager-nav-label');
-      const range = document.createRange();
-      range.selectNodeContents(label);
+      const lineCount = (selector) => {
+        const range = document.createRange();
+        range.selectNodeContents(document.querySelector(selector));
+        return range.getClientRects().length;
+      };
       return {
         chip: of('chip'),
+        chipInstalled: of('chip-installed'),
         titlebar: of('titlebar'),
         count: of('count'),
         row: of('row'),
-        labelLines: range.getClientRects().length,
+        plainActive: of('plain-active'),
+        labelLines: lineCount('#row .manager-nav-label'),
+        installedLabelLines: lineCount('#row-installed .manager-nav-label'),
       };
     });
 
@@ -8367,14 +8391,202 @@ test('the rail Downtime premium mark renders as the shared gold badge chip', asy
       `the chip must not squeeze the label into a second line (got ${read.labelLines})`
     );
 
-    // The active Downtime row is the rail's premium state marker, and its accent treatment
-    // has to beat `.manager-nav-group.is-expanded .manager-nav-parent.is-active`, which is a
-    // five-class rule that re-states the ordinary active colours.
+    // Issue 1185 — the MUTED state. With a companion installed the title bar carries the loud
+    // gold signal, so the rail chip steps down. "Somewhat mute" is the whole requirement, so
+    // both halves are asserted: it must stop being gold, AND it must still be a filled chip.
+    assert.notEqual(
+      read.chipInstalled.background,
+      read.chip.background,
+      'an installed companion mutes the rail chip off the gold fill'
+    );
+    assert.notEqual(
+      read.chipInstalled.color,
+      read.chip.color,
+      'and off the dark on-gold ink with it'
+    );
+    assert.notEqual(
+      read.chipInstalled.background,
+      'rgba(0, 0, 0, 0)',
+      'muted is not removed: the row must still say which route premium provides'
+    );
+    assert.notEqual(
+      read.chipInstalled.color,
+      read.count.color,
+      'and it must still read as a marker rather than collapsing into a plain rail count'
+    );
+    assert.equal(read.chipInstalled.weight, '600', 'the muted chip drops one weight step');
+    // Geometry is NOT part of the mute: the muted rule restates colour and weight only, so
+    // the row cannot change height or break its label when a companion registers.
+    assert.equal(read.chipInstalled.radius, read.chip.radius, 'the muted chip keeps its radius');
+    assert.equal(read.chipInstalled.padding, read.chip.padding, 'and its padding');
+    assert.ok(
+      read.installedLabelLines === 1,
+      `and still leaves the label on one line (got ${read.installedLabelLines})`
+    );
+
+    // The active Downtime ROW is an ordinary active rail row and nothing more. It briefly
+    // carried the prototype's bespoke accent fill, border and ink, which made one row in the
+    // rail look like a different control; the premium signal lives in the chip and the title
+    // bar, not in the row. Asserted against a plain active row rather than against literals,
+    // so a change to the rail's selected language moves both or fails here.
+    assert.equal(
+      read.row.background,
+      read.plainActive.background,
+      'the active Downtime row fills exactly like any other active rail row'
+    );
+    assert.equal(read.row.color, read.plainActive.color, 'and inks like one');
+    assert.equal(
+      read.row.borderColor,
+      read.plainActive.borderColor,
+      'and borders like one — no accent outline of its own'
+    );
     assert.notEqual(
       read.row.background,
       'rgba(0, 0, 0, 0)',
-      'the active Downtime row paints its own accent fill'
+      'and the shared active fill is still a real fill, so the comparison is not two blanks'
     );
+  } finally {
+    await context.close();
+  }
+});
+
+// Issue 1185 — the Downtime children are RAIL SUB-ITEMS, and had stopped looking like it.
+// They carried the prototype's own 32px indent and 10px gap, which put them visibly further
+// right than the Crafting and Gathering children immediately above them. Measured against a
+// real sibling rather than against the numbers, so the two move together or this fails.
+test('the Downtime rail children sit on the same indent and gap as every other rail child', async () => {
+  const context = await sharedBrowser.newContext({
+    viewport: { width: 1280, height: 720 },
+    deviceScaleFactor: 1,
+  });
+  const page = await context.newPage();
+  try {
+    const subitem = (id, extraClass) =>
+      `<button class="manager-nav-subitem${extraClass}" id="${id}">` +
+      `<i class="fas fa-flask"></i>` +
+      `<span class="manager-nav-label">Recipes</span>` +
+      `<span class="manager-nav-count">7</span>` +
+      `</button>`;
+    await page.setContent(
+      `<style>${css}</style>` +
+        `<div class="fabricate-manager"><div class="manager-body"><aside class="manager-rail">` +
+        `<nav class="manager-nav">` +
+        `<div class="manager-nav-group is-expanded"><div class="manager-nav-submenu" id="crafting-submenu">` +
+        subitem('crafting-child', '') +
+        `</div></div>` +
+        `<div class="manager-nav-group is-expanded"><div class="manager-nav-submenu" id="downtime-submenu">` +
+        subitem('downtime-child', ' manager-downtime-subitem') +
+        `</div></div>` +
+        `</nav></aside><main class="manager-main"></main></div></div>`
+    );
+    const read = await page.evaluate(() => {
+      const of = (id, submenuId) => {
+        const button = document.getElementById(id);
+        const computed = getComputedStyle(button);
+        return {
+          // The visible indent is what a GM compares, so measure where the GLYPH lands
+          // relative to the group that holds it, not the declared padding.
+          glyphOffset:
+            +(
+              button.querySelector('i').getBoundingClientRect().left -
+              document.getElementById(submenuId).getBoundingClientRect().left
+            ).toFixed(2),
+          gap: computed.columnGap,
+          paddingLeft: computed.paddingLeft,
+          minHeight: computed.minHeight,
+          radius: computed.borderTopLeftRadius,
+          columns: computed.gridTemplateColumns,
+        };
+      };
+      return {
+        crafting: of('crafting-child', 'crafting-submenu'),
+        downtime: of('downtime-child', 'downtime-submenu'),
+      };
+    });
+
+    assert.equal(
+      read.downtime.glyphOffset,
+      read.crafting.glyphOffset,
+      `a Downtime child starts where a Crafting child starts (got ${read.downtime.glyphOffset} vs ${read.crafting.glyphOffset})`
+    );
+    assert.equal(read.downtime.paddingLeft, read.crafting.paddingLeft, 'same indent');
+    assert.equal(read.downtime.gap, read.crafting.gap, 'same gap between glyph and label');
+    assert.equal(read.downtime.minHeight, read.crafting.minHeight, 'same row floor');
+    assert.equal(read.downtime.radius, read.crafting.radius, 'same corner');
+    assert.equal(read.downtime.columns, read.crafting.columns, 'same four-track grid');
+  } finally {
+    await context.close();
+  }
+});
+
+// Issue 1185 — a rail label degrades by wrapping at a SPACE and then by ELLIPSIS, never by
+// splitting a word. `overflow-wrap: anywhere` used to lower the label's min-content width so
+// the `minmax(0, 1fr)` track could shrink under the widest word, and `Downtime` rendered as
+// `Downtim` / `e`. A companion supplies its own labels, so this has to hold for text that is
+// not ours to shorten.
+test('a rail label wraps at a space and ellipsises, and never splits a word', async () => {
+  const context = await sharedBrowser.newContext({
+    viewport: { width: 1280, height: 720 },
+    deviceScaleFactor: 1,
+  });
+  const page = await context.newPage();
+  try {
+    const row = (id, label) =>
+      `<div class="manager-nav-group" style="position:relative">` +
+      `<button class="manager-nav-button manager-nav-parent manager-world-nav-item" id="${id}">` +
+      `<i class="fas fa-hourglass-half"></i>` +
+      `<span class="manager-nav-label">${label}</span>` +
+      `<span class="manager-nav-count manager-nav-premium">PREMIUM</span>` +
+      `</button></div>`;
+    await page.setContent(
+      `<style>${css}</style>` +
+        `<div class="fabricate-manager"><div class="manager-body"><aside class="manager-rail">` +
+        `<nav class="manager-nav"><section class="manager-world-nav">` +
+        row('short', 'Downtime') +
+        row('oneword', 'Handelsverwaltungsuebersicht') +
+        row('twowords', 'Trade Administration') +
+        `</section></nav></aside><main class="manager-main"></main></div></div>`
+    );
+    const read = await page.evaluate(() => {
+      const of = (id) => {
+        const label = document.getElementById(id).querySelector('.manager-nav-label');
+        const range = document.createRange();
+        range.selectNodeContents(label);
+        // Count LINE BOXES by distinct top edge: a range yields several rects for one visual
+        // line, so `rects.length` reads a single line as two and passes a split as fine.
+        const lines = new Set([...range.getClientRects()].map((rect) => Math.round(rect.top)));
+        return {
+          lines: lines.size,
+          clipped: label.scrollWidth > label.clientWidth,
+          trackWidth: +label.getBoundingClientRect().width.toFixed(1),
+          overflow: getComputedStyle(label).overflow,
+          textOverflow: getComputedStyle(label).textOverflow,
+          wrap: getComputedStyle(label).overflowWrap,
+        };
+      };
+      return { short: of('short'), oneWord: of('oneword'), twoWords: of('twowords') };
+    });
+
+    assert.equal(read.short.lines, 1, 'the shipped Downtime label still fits on one line');
+    assert.equal(read.short.clipped, false, 'and is not ellipsised at the shipped rail width');
+
+    // The proof that a word is not split: one line, and the overflow taken by the clip.
+    assert.equal(
+      read.oneWord.lines,
+      1,
+      'a label too wide for its track stays on ONE line rather than breaking mid-word'
+    );
+    assert.ok(read.oneWord.clipped, 'and is clipped, which is what `text-overflow` ellipsises');
+    assert.equal(read.oneWord.overflow, 'hidden', 'the clip is what puts ellipsis in scope');
+    assert.equal(read.oneWord.textOverflow, 'ellipsis');
+    assert.notEqual(
+      read.oneWord.wrap,
+      'anywhere',
+      '`anywhere` is what produced the reported mid-word break'
+    );
+
+    // And a label that CAN break at a space still does, rather than ellipsising whole words.
+    assert.equal(read.twoWords.lines, 2, 'a multi-word label still wraps at its space');
   } finally {
     await context.close();
   }

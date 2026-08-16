@@ -886,13 +886,6 @@ function activeCompanionPanel() {
   return target.querySelector('[data-downtime-extension-panel]');
 }
 
-// The route header's identity tile. Its glyph is read from the ACTIVE TAB descriptor rather
-// than written into the shell, which is the whole point of asserting on it: a Core-hardcoded
-// glyph would satisfy any single-tab check and still give every companion Core's icon.
-function routeIconGlyph() {
-  return target.querySelector('.manager-header [data-manager-route-icon] i')?.className ?? null;
-}
-
 function managerTitle() {
   return target.querySelector('.manager-header .manager-title').textContent.trim();
 }
@@ -13835,11 +13828,6 @@ describe('CraftingSystemManager mounted behavior', () => {
     );
     assert.equal(worldNavItem('parties').getAttribute('aria-current'), null);
     assert.equal(worldNavItem('downtime').getAttribute('aria-current'), 'page');
-    assert.equal(
-      routeIconGlyph(),
-      'fas fa-chart-simple',
-      'the route header leads with the identity tile carrying the active tab glyph'
-    );
     const tabs = Array.from(target.querySelectorAll('[data-downtime-tab]'));
     assert.deepEqual(
       tabs.map((tab) => tab.dataset.downtimeTab),
@@ -13908,12 +13896,6 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.equal(document.activeElement, settingsTab);
     assert.equal(settingsTab.getAttribute('aria-selected'), 'true');
     assert.ok(target.querySelector('[data-downtime-panel="settings"]'));
-    assert.equal(
-      routeIconGlyph(),
-      'fas fa-sliders',
-      'the identity tile follows the tab rather than naming one route glyph'
-    );
-
     const cta = target.querySelector('.downtime-cta');
     assert.equal(cta.href, 'https://www.patreon.com/c/mistersilver');
     assert.equal(cta.target, '_blank');
@@ -14251,6 +14233,95 @@ describe('CraftingSystemManager mounted behavior', () => {
     );
   });
 
+  // Issue 1185 — where the premium signal LIVES. In the free module the title bar's badge
+  // slot is empty and the rail chip is the loud gold sell; once a companion registers, the
+  // loud signal moves to the title bar and the rail chip steps down to a quiet marker, so
+  // the same word is only ever shouted in one place.
+  it('moves the premium signal to the title bar when a companion registers', async () => {
+    useShippedLocalization();
+    const registry = createManagerExtensionsRegistry();
+    mountManager([], {}, {}, { managerExtensions: registry });
+
+    const titlebarPremium = () => target.querySelector('[data-manager-titlebar-premium]');
+    const railChip = () => target.querySelector('[data-world-nav-premium]');
+    const downtimeTitle = () => worldNavItem('downtime').getAttribute('title');
+
+    assert.ok(!titlebarPremium(), 'the free module carries no premium badge in the title bar');
+    assert.ok(
+      !target.querySelector('[data-manager-titlebar-system]'),
+      'and the crafting-system badge the rail already duplicates is gone from both states'
+    );
+    assert.equal(railChip().dataset.worldNavPremiumState, 'preview');
+    assert.ok(
+      !railChip().classList.contains('is-installed'),
+      'the rail chip keeps its prominent treatment while Core is previewing the surface'
+    );
+    assert.equal(downtimeTitle(), 'Unlock Downtime Studio with Fabricate Premium');
+
+    const unregister = registry.publicApi.registerWorldNavProvider(downtimeProvider());
+    await settleDowntimeProvider();
+
+    assert.equal(titlebarPremium().textContent.trim(), 'PREMIUM');
+    assert.equal(
+      titlebarPremium().getAttribute('aria-label'),
+      'Fabricate Premium is installed and connected'
+    );
+    assert.equal(
+      titlebarPremium().getAttribute('title'),
+      'Fabricate Premium is installed and connected'
+    );
+    assert.ok(
+      titlebarPremium().classList.contains('manager-titlebar-badge'),
+      'the badge reuses the shared gold treatment rather than stating a second colour pair'
+    );
+    assert.equal(railChip().dataset.worldNavPremiumState, 'installed');
+    assert.ok(railChip().classList.contains('is-installed'), 'and the rail chip mutes');
+    assert.equal(
+      railChip().textContent.trim(),
+      'PREMIUM',
+      'muted is not removed: the rail still names which route premium provides'
+    );
+    assert.equal(
+      downtimeTitle(),
+      'Downtime Studio is unlocked by Fabricate Premium',
+      'and the row stops offering to unlock what is already unlocked'
+    );
+
+    unregister();
+    await settleDowntimeProvider();
+    assert.ok(!titlebarPremium(), 'removing the companion takes the title-bar signal with it');
+    assert.equal(railChip().dataset.worldNavPremiumState, 'preview');
+    assert.equal(downtimeTitle(), 'Unlock Downtime Studio with Fabricate Premium');
+  });
+
+  // The badge is a claim about the MODULE, not about Core's Downtime route. A companion that
+  // claims a surface Core has never heard of is still installed and still working, so it must
+  // light the same badge — while Core, which still owns Downtime, keeps selling it there.
+  it('lights the title-bar premium badge for a surface Core does not host', async () => {
+    useShippedLocalization();
+    const registry = createManagerExtensionsRegistry();
+    mountManager([], {}, {}, { managerExtensions: registry });
+
+    registry.publicApi.registerWorldNavProvider(downtimeProvider({ id: 'crew-quarters' }));
+    await settleDowntimeProvider();
+
+    assert.equal(
+      target.querySelector('[data-manager-titlebar-premium]')?.textContent.trim(),
+      'PREMIUM',
+      'an unrecognised companion surface still proves the premium module is installed'
+    );
+    assert.equal(
+      target.querySelector('[data-world-nav-premium]').dataset.worldNavPremiumState,
+      'preview',
+      'but Core still holds the Downtime route, so its rail chip keeps the upgrade sell'
+    );
+    assert.equal(
+      worldNavItem('downtime').getAttribute('title'),
+      'Unlock Downtime Studio with Fabricate Premium',
+      'and the Downtime tooltip still describes the route it actually renders'
+    );
+  });
+
   it('contains mount faults, rejects invalid cleanup returns, and recovers with replacement tabs', async () => {
     const registry = createManagerExtensionsRegistry();
     const errors = [];
@@ -14409,12 +14480,6 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(
       !target.querySelector('[data-world-downtime-callout]'),
       'the premium rail note advertises CORE preview and must not sit under companion screens'
-    );
-
-    assert.equal(
-      routeIconGlyph(),
-      'fas fa-star',
-      'the route identity tile takes the COMPANION tab glyph, never a Core-hardcoded one'
     );
 
     target.querySelector('#manager-downtime-nav-crew').click();

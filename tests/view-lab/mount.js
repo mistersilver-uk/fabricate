@@ -144,6 +144,11 @@ function readParams() {
     // named long-label frame cannot collapse to the ordinary stacked Map frame.
     longTravelLabels: params.get('longTravelLabels') === '1',
     longDowntimeLabels: params.get('longDowntimeLabels') === '1',
+    // Register a stand-in companion World-nav provider before the manager mounts, so the
+    // frames can photograph the PREMIUM-INSTALLED chrome: the title bar's gold badge and the
+    // rail's muted Downtime chip. Nothing shipped changes — the provider lives here, and the
+    // registry it registers with is the production one the manager app hands to the root.
+    downtimeProvider: params.get('downtimeProvider') === '1',
     // The Graph rail placeholder is advertised only behind the experimental toggle, so a case that
     // reproduces the smoke's experimental-off frame has to turn it back off.
     experimental: params.get('experimental') !== '0',
@@ -225,6 +230,55 @@ async function mountPlayerApp(content, params) {
   return { instance, services, props };
 }
 
+/**
+ * A stand-in companion Downtime provider, for the premium-installed frames.
+ *
+ * It declares its OWN tab ids on purpose: Core must give an arbitrary tab set exactly the
+ * treatment it gives its own four, so a lab provider that copied Core's ids would photograph
+ * the one case that proves least.
+ *
+ * @returns {object} An API-v1 World navigation provider.
+ */
+function labDowntimeProvider() {
+  return {
+    apiVersion: 1,
+    id: 'downtime',
+    tabs: [
+      {
+        id: 'ledger',
+        label: 'Ledger',
+        accessibleName: 'Open the downtime ledger',
+        tooltip: 'Every character’s downtime, in one ledger',
+        icon: 'fas fa-scroll',
+        title: 'Downtime ledger',
+        subtitle: 'Downtime Studio · Every character’s work, in one place.',
+        breadcrumb: 'Ledger',
+      },
+      {
+        id: 'crew',
+        label: 'Crew',
+        accessibleName: 'Open the downtime crew roster',
+        tooltip: 'Who is working on what',
+        icon: 'fas fa-users-gear',
+      },
+      {
+        id: 'writs',
+        label: 'Writs',
+        accessibleName: 'Open downtime writs',
+        tooltip: 'Standing orders and commissions',
+        icon: 'fas fa-file-signature',
+      },
+    ],
+    mount({ target: mountTarget, tabId }) {
+      const panel = mountTarget.ownerDocument.createElement('div');
+      panel.style.padding = '20px';
+      panel.textContent = `Downtime Studio — ${tabId}`;
+      mountTarget.append(panel);
+      return () => panel.remove();
+    },
+  };
+}
+
 async function mountManagerApp(content, params) {
   const [{ SvelteCraftingSystemManagerApp }, { default: CraftingSystemManagerRoot }] =
     await Promise.all([
@@ -242,6 +296,9 @@ async function mountManagerApp(content, params) {
   });
   const props = app._prepareSvelteProps();
   const services = props.services;
+  if (params.downtimeProvider) {
+    props.managerExtensions.publicApi.registerWorldNavProvider(labDowntimeProvider());
+  }
   if (params.clearSystem) await props.store.selectSystem('');
   const instance = mount(CraftingSystemManagerRoot, { target: content, props });
   return { instance, services, props, store: props.store, tab: params.tab };
