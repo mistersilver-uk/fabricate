@@ -53,12 +53,45 @@ export const MANAGER_HOOKS = Object.freeze({
 });
 
 /**
+ * Player-window extension-surface hooks.
+ *
+ * Like the Manager set these are purely OBSERVATIONAL: Fabricate publishes them after it
+ * has already acted, a listener's return value is ignored, and nothing a listener does
+ * changes what the player window renders. A companion that wants to ADD content to the
+ * player window registers a player navigation provider
+ * (`game.fabricate.api.playerExtensions.registerPlayerNavProvider`).
+ *
+ * - `NAV_PROVIDER_REGISTERED` / `NAV_PROVIDER_UNREGISTERED` fire when a provider takes or
+ *   releases a player surface, with `{ schemaVersion, surfaceId, tabIds }`.
+ * - `SURFACE_MOUNTED` / `SURFACE_UNMOUNTED` fire when a hosted player surface is rendered
+ *   and torn down, with `{ schemaVersion, surface, surfaceId, tabId, providerId }`.
+ * - `SURFACE_TAB_CHANGED` fires when the active tab of a hosted surface changes, with the
+ *   same payload plus `previousTabId`.
+ *
+ * There is no `coreFallback` field: unlike the Manager's Downtime route the player window
+ * renders no Core content in a provider's place, so a tab exists only while its provider
+ * does. `surfaceId` and `providerId` are always equal here, because a player surface id IS
+ * the registering provider's own id; both are carried so the payload shape matches the
+ * Manager seam's.
+ *
+ * @type {Readonly<{NAV_PROVIDER_REGISTERED: string, NAV_PROVIDER_UNREGISTERED: string, SURFACE_MOUNTED: string, SURFACE_UNMOUNTED: string, SURFACE_TAB_CHANGED: string}>}
+ */
+export const PLAYER_HOOKS = Object.freeze({
+  NAV_PROVIDER_REGISTERED: 'fabricate.player.navProviderRegistered',
+  NAV_PROVIDER_UNREGISTERED: 'fabricate.player.navProviderUnregistered',
+  SURFACE_MOUNTED: 'fabricate.player.surfaceMounted',
+  SURFACE_UNMOUNTED: 'fabricate.player.surfaceUnmounted',
+  SURFACE_TAB_CHANGED: 'fabricate.player.surfaceTabChanged',
+});
+
+/**
  * Aggregate of every public Fabricate hook namespace, grouped by domain. Exposed on
  * `game.fabricate.api.HOOKS`.
  *
- * @type {Readonly<{gathering: typeof GATHERING_HOOKS, manager: typeof MANAGER_HOOKS}>}
+ * @type {Readonly<{gathering: typeof GATHERING_HOOKS, manager: typeof MANAGER_HOOKS, player: typeof PLAYER_HOOKS}>}
  */
 export const FABRICATE_HOOKS = Object.freeze({
   gathering: GATHERING_HOOKS,
   manager: MANAGER_HOOKS,
+  player: PLAYER_HOOKS,
 });
