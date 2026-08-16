@@ -378,6 +378,122 @@ describe('adminRecipeRowProjection.buildRecipeList (direct, no store)', () => {
   });
 });
 
+/**
+ * The two-tier row (issue 1081).
+ *
+ * The claim is narrow and mechanical: the fields `recipeBrowserModel` reads to filter, sort,
+ * count and paginate are computed for EVERY row in the cohort, and everything else is
+ * computed only for the rows something actually reads. Every negative assertion below is
+ * paired with a positive control in the same fixture — a counter that reads zero because the
+ * work was skipped is indistinguishable from one that reads zero because the seam was never
+ * wired, and this repository has shipped that mistake before.
+ */
+describe('adminRecipeRowProjection: summary tier vs detail tier', () => {
+  /** A recipe manager whose two expensive seams count their calls. */
+  function makeCountingRecipeManager(recipes, blockedIds = []) {
+    const calls = { canActivateRecipe: 0, toJSON: 0 };
+    const instrumented = recipes.map((recipe) => ({
+      ...recipe,
+      toJSON: () => {
+        calls.toJSON += 1;
+        return recipe.toJSON();
+      },
+    }));
+    return {
+      calls,
+      recipes: instrumented,
+      manager: {
+        getRecipes: () => instrumented,
+        canActivateRecipe: (recipe) => {
+          calls.canActivateRecipe += 1;
+          return { valid: !blockedIds.includes(recipe.id) };
+        },
+      },
+    };
+  }
+
+  function makeCohort(size) {
+    return Array.from({ length: size }, (_, index) =>
+      makeRecipe({ id: `r-${index}`, name: `Recipe ${String(index).padStart(3, '0')}` })
+    );
+  }
+
+  it('projects the whole cohort cheaply: no toJSON and no activation check per row', () => {
+    const { calls, manager } = makeCountingRecipeManager(makeCohort(50));
+    const result = buildRecipeList(null, manager, makeSystem(), '');
+
+    assert.equal(result.recipes.length, 50, 'the whole cohort is projected');
+    assert.equal(calls.toJSON, 0, 'no row body is cloned to build the cohort');
+    assert.equal(calls.canActivateRecipe, 0, 'no row runs the activation gate to build the cohort');
+  });
+
+  it('POSITIVE CONTROL: reading a detail field is what performs the work', () => {
+    const { calls, manager } = makeCountingRecipeManager(makeCohort(50));
+    const rows = buildRecipeList(null, manager, makeSystem(), '').recipes;
+
+    // Exactly the page a default browser open renders.
+    for (const row of rows.slice(0, 25)) void row.requirementsPreview;
+    assert.equal(calls.toJSON, 25, 'the counters CAN go up — one clone per row read');
+
+    for (const row of rows.slice(0, 25)) void row.enableBlocked;
+    assert.equal(calls.canActivateRecipe, 25, 'and one activation check per row read');
+  });
+
+  it('memoizes each tier per row, so a second read costs nothing', () => {
+    const { calls, manager } = makeCountingRecipeManager(makeCohort(3));
+    const [row] = buildRecipeList(null, manager, makeSystem(), '').recipes;
+
+    void row.steps;
+    void row.requirementsPreview;
+    void row.visibility;
+    void row.enableBlocked;
+    void row.enableBlocked;
+
+    assert.equal(calls.toJSON, 1, 'the detail bundle is produced once for the row');
+    assert.equal(calls.canActivateRecipe, 1, 'so is the activation verdict');
+  });
+
+  it('carries every SORT KEY in the summary tier, so a cohort sort is not a cohort hydrate', () => {
+    const { calls, manager } = makeCountingRecipeManager(makeCohort(20));
+    const rows = buildRecipeList(null, manager, makeSystem(), '').recipes;
+
+    // The four sort keys the recipe library offers besides `name`, plus the row's I/O
+    // readout, read over the WHOLE filtered cohort before pagination.
+    for (const row of rows) {
+      assert.equal(typeof row.ingredientCount, 'number');
+      assert.equal(typeof row.resultItemCount, 'number');
+      assert.equal(typeof row.resultGroupCount, 'number');
+      assert.equal(typeof row.checkSummary.dc, 'number');
+      assert.equal(typeof row.category, 'string');
+      assert.equal(typeof row.enabled, 'boolean');
+      assert.equal(typeof row.locked, 'boolean');
+    }
+    assert.equal(calls.toJSON, 0, 'reading every sort key materialised no detail');
+    assert.equal(calls.canActivateRecipe, 0, 'nor any activation verdict');
+
+    // `enableBlocked` is the fifth sort key. It IS answerable across the cohort — it just
+    // costs one activation check per row, which is why it is slotted on its own.
+    assert.deepEqual(
+      rows.map((row) => row.enableBlocked),
+      rows.map(() => false)
+    );
+    assert.equal(calls.canActivateRecipe, 20, 'sorting by attention answers every row');
+    assert.equal(calls.toJSON, 0, 'and still materialises no detail bundle');
+  });
+
+  it('materialises everything through a JSON round-trip, as the editor draft does', () => {
+    const { manager } = makeCountingRecipeManager(makeCohort(1));
+    const [row] = buildRecipeList(null, manager, makeSystem(), '').recipes;
+    // `cloneRecipeDraft` in the manager root is exactly this.
+    const draft = JSON.parse(JSON.stringify(row));
+
+    assert.deepEqual(sortedKeys(draft), RECIPE_ROW_FIELDS, 'a cloned draft carries every field');
+    assert.equal(draft.structureKey, 'simple');
+    assert.equal(draft.visibilitySummary, 'Restricted (2)');
+    assert.equal(Array.isArray(draft.requirementsPreview), true);
+  });
+});
+
 describe('adminComponentRowProjection.buildItemCards (direct, no store)', () => {
   it('projects every derived card field and reuses a memo hit verbatim', async () => {
     const cache = new Map();
