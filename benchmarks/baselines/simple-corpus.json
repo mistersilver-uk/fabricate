@@ -152,7 +152,7 @@
       }
     },
     "persistence.connectPayload.simpleRecipes": {
-      "description": "CONNECT PAYLOAD (#1080): 10,000 simple recipes as one whole-array `world` setting versus one `world` setting key per record (ADR 0001's B(1)), including the live-measured 340-byte `Setting` envelope. The overhead is reported at several corpus sizes because ADR 0001 conditioned its choice on corpus size, and the reading barely moves across three orders of magnitude of it. Hydrated against a FRESH id space, so the bytes depend on {profile, seed} alone rather than on how many earlier cases hydrated — which is why this number is a few thousand bytes below `recipeManager.save.serializedBytes` on `simple-corpus`.",
+      "description": "CONNECT PAYLOAD (#1080): 10,000 simple recipes as one whole-array `world` setting versus one `world` setting key per record (ADR 0001's B(1)), including the live-measured 340-byte `Setting` envelope. The overhead is reported at several corpus sizes because ADR 0001 conditioned its choice on corpus size, and the reading barely moves across three orders of magnitude of it. Both layouts are counted exclusive of the container `Setting` document's own envelope, which is how ADR 0001 counts them. Hydrated against a FRESH id space, so the bytes depend on {profile, seed} alone rather than on how many earlier cases hydrated. It therefore reads at or below `recipeManager.save.serializedBytes`, which measures the same corpus hydrated against the ambient counter this case resets.",
       "counts": {
         "identityCandidatesExamined": 0,
         "identityIndexBuilds": 0,

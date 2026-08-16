@@ -157,9 +157,13 @@ function worldFor(context, options = {}) {
  * @param {string} options.profile
  * @param {string} options.shape Prose naming the corpus this case measures.
  * @param {number[]} options.sweep Record counts to report the overhead ratio at.
+ * @param {string} [options.freshIdComparison] The consequence of the fresh id space ON THIS
+ *   PROFILE. Parameterised because the shared template previously asserted a comparison to
+ *   `recipeManager.save.serializedBytes` on every profile, and only `simple-corpus` registers
+ *   that case at all.
  * @returns {object}
  */
-function connectPayloadCase({ id, profile, shape, sweep }) {
+function connectPayloadCase({ id, profile, shape, sweep, freshIdComparison = '' }) {
   return {
     id,
     profile,
@@ -169,9 +173,9 @@ function connectPayloadCase({ id, profile, shape, sweep }) {
       `${SETTING_DOCUMENT_ENVELOPE_BYTES}-byte \`Setting\` envelope. ` +
       'The overhead is reported at several corpus sizes because ADR 0001 conditioned its ' +
       'choice on corpus size, and the reading barely moves across three orders of magnitude ' +
-      'of it. Hydrated against a FRESH id space, so the bytes depend on {profile, seed} alone ' +
-      'rather than on how many earlier cases hydrated — which is why this number is a few ' +
-      'thousand bytes below `recipeManager.save.serializedBytes` on `simple-corpus`.',
+      "of it. Both layouts are counted exclusive of the container `Setting` document's own " +
+      'envelope, which is how ADR 0001 counts them. Hydrated against a FRESH id space, so the ' +
+      `bytes depend on {profile, seed} alone rather than on how many earlier cases hydrated.${freshIdComparison}`,
     setup: async (context) => {
       const world = worldFor(context);
       useHydratedRecipes(
@@ -208,7 +212,15 @@ function connectPayloadCase({ id, profile, shape, sweep }) {
         wholeArrayConnectBytes: corpus.wholeArrayBytes,
         perRecordKeyConnectBytes: corpus.perRecordKeyBytes,
         connectDeltaBytes: corpus.deltaBytes,
-        connectDeltaBytesPerRecord: Math.round(corpus.deltaBytes / corpus.records),
+        // Guarded for the empty corpus like every other count here. Unguarded the division is
+        // `-2 / 0`, so the count would be `-Infinity` and would land in a committed class-1
+        // file as `null` — a value that reads as a missing measurement rather than as a
+        // degenerate one. Unreachable from the registered profiles, and there is no seam to
+        // reach it from a test because this factory is module-private; the branch is here
+        // because every other count in this file guards `count === 0` and one that did not
+        // would be the odd one out.
+        connectDeltaBytesPerRecord:
+          corpus.records === 0 ? 0 : Math.round(corpus.deltaBytes / corpus.records),
         // `0` means B(1) never costs more than the whole array within this corpus — the ONLY
         // outcome that satisfies ADR 0001's condition. Any other value is the record count at
         // which it first does, on the accounting convention `connectPayloadModel.js` states in
@@ -456,6 +468,9 @@ function simpleCorpusCases() {
       profile: 'simple-corpus',
       shape: '10,000 simple recipes',
       sweep: CONNECT_SWEEP_SIMPLE,
+      freshIdComparison:
+        ' It therefore reads at or below `recipeManager.save.serializedBytes`, which measures ' +
+        'the same corpus hydrated against the ambient counter this case resets.',
     }),
   ];
 }

@@ -271,6 +271,12 @@ export function findConnectCrossover({
   let sum = 0;
   for (let records = 1; records <= recordBytes.length; records++) {
     sum += recordBytes[records - 1];
+    // `sum + records + 1` is a DELIBERATE inline duplicate of the baseline term in
+    // `wholeArrayConnectBytes`, kept because calling it here would re-sum the prefix per
+    // candidate and make the scan quadratic. The duplication is real: a correction to the
+    // baseline term would not propagate into this line on its own. It is guarded rather than
+    // trusted — perturbing that term turns the interior-crossover test red, which is what makes
+    // this scan's answer on the live constant readable.
     if (sum + records * envelopeBytes > sum + records + 1) {
       return {
         records,

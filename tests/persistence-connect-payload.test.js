@@ -49,6 +49,7 @@ import {
   serializedRecordBytes,
   wholeArrayConnectBytes,
 } from './helpers/scale/connectPayloadModel.js';
+import { BENCHMARK_CASES, casesForProfile } from './helpers/scale/benchmarkCases.js';
 import { buildScaleFixture } from './helpers/scale/scaleProfiles.js';
 import {
   hydrateRecipes,
@@ -60,6 +61,15 @@ const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
 /** A corpus with a deliberately uneven record-size distribution. */
 const UNEVEN = [{ a: 1 }, { b: 'xxxxxxxxxx' }, { c: [1, 2, 3, 4, 5] }, { d: null }];
+
+/** The registered connect-payload cases, as `[profile, caseId]`. */
+const CONNECT_CASES = [
+  ['simple-corpus', 'persistence.connectPayload.simpleRecipes'],
+  ['rich-corpus', 'persistence.connectPayload.richRecipes'],
+];
+
+/** A backticked token shaped like a benchmark case id, e.g. `recipeManager.save`. */
+const CASE_ID_SHAPED = /`([a-z][A-Za-z]*(?:\.[A-Za-z][A-Za-z0-9]*)+)`/g;
 
 function readBaseline(profile) {
   return JSON.parse(
@@ -87,8 +97,13 @@ describe('the whole-array baseline term', () => {
     assert.equal(held.matches, true);
     assert.equal(held.actual, JSON.stringify(UNEVEN).length);
 
-    // And it must be able to say no. Hand it a payload set whose measured bytes it did not
-    // produce and the identity is meaningless — so prove the reporter is not hard-wired to true.
+    // **This is not a negative control and must not be read as one.** `matches` cannot be
+    // driven false through this module's public API at all: the reporter derives both sides
+    // from the same `payloads` argument, so there is no seam to disagree across. Falsifying it
+    // takes an edit to `wholeArrayConnectBytes`, which the prefix test above catches against
+    // the real serializer. What the line below actually checks is narrower and still worth
+    // having — that the modelled term responds to the record count, which a formula that
+    // ignored `records` would not.
     const bytes = serializedRecordBytes(UNEVEN);
     assert.notEqual(wholeArrayConnectBytes(bytes, 2), JSON.stringify(UNEVEN).length);
   });
@@ -136,6 +151,8 @@ describe('the escaped model, where a `Setting` value is a string field', () => {
     // The arithmetic claim the escaped figures rest on, checked against a real double
     // `JSON.stringify` rather than restated: `[`, `]` and `,` carry nothing escapable, so the
     // escaped array is still `sum(escapedRecordBytes) + n + 1`.
+    // Same caveat as `assertWholeArrayIdentity`: `matches` is derived from one argument on both
+    // sides, so `true` here is a claim about the arithmetic and not a negative control.
     const held = assertEscapedArrayIdentity(QUOTED);
     assert.equal(held.matches, true);
     assert.equal(held.actual, JSON.stringify(JSON.stringify(QUOTED)).length - 2);
@@ -309,10 +326,7 @@ describe('the committed reading', () => {
   // what the benchmark drift guard does. These assertions pin the CONCLUSION so that a future
   // payload change cannot quietly turn "B(1) is 44% worse at connect" into a different sentence
   // without someone having to restate it.
-  for (const [profile, caseId] of [
-    ['simple-corpus', 'persistence.connectPayload.simpleRecipes'],
-    ['rich-corpus', 'persistence.connectPayload.richRecipes'],
-  ]) {
+  for (const [profile, caseId] of CONNECT_CASES) {
     it(`${profile} records a crossover at the first record, on the stated convention`, () => {
       const counts = readBaseline(profile).cases[caseId].counts;
       assert.equal(counts.connectEnvelopeBytesPerRecord, SETTING_DOCUMENT_ENVELOPE_BYTES);
@@ -356,6 +370,26 @@ describe('the committed reading', () => {
       );
     });
   }
+
+  it('never cites a benchmark case its own profile does not register', () => {
+    // The two cases share one description template, and it used to end by comparing the reading
+    // to `recipeManager.save.serializedBytes` — a case only `simple-corpus` registers, so on
+    // `rich-corpus` it compared 18.9 MB to a number from a different corpus that does not exist
+    // there. The drift guard diffs counts and fixture identity, never descriptions, so nothing
+    // else in the harness can see this rot. Asserted against the committed file rather than the
+    // registry, because the committed file is what a reader quotes.
+    const registeredIds = BENCHMARK_CASES.map((entry) => entry.id);
+    for (const [profile, caseId] of CONNECT_CASES) {
+      const local = new Set(casesForProfile(profile).map((entry) => entry.id));
+      const description = readBaseline(profile).cases[caseId].description;
+      for (const [, token] of description.matchAll(CASE_ID_SHAPED)) {
+        // A citation is a case id, optionally suffixed with one of that case's count keys.
+        const cited = registeredIds.find((id) => token === id || token.startsWith(`${id}.`));
+        if (!cited) continue;
+        assert.ok(local.has(cited), `${profile} cites "${cited}", which it does not register`);
+      }
+    }
+  });
 
   it('records the simple shape as materially worse than the rich one', () => {
     const simple = readBaseline('simple-corpus').cases['persistence.connectPayload.simpleRecipes'];

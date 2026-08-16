@@ -300,8 +300,15 @@ export function useHydratedRecipes(world, recipes) {
  * counts to buy determinism they already have in practice is issue 1071's call, not a
  * side effect of adding a measurement.
  *
+ * **`work` must be synchronous.** The ambient id source is restored in a `finally`, which runs
+ * when `work` RETURNS — so an async `work` would have its promise restored out from under it and
+ * would mint ambient ids for everything after its first `await`. Every caller is synchronous
+ * (`hydrateRecipes` is), and the signature says `() => T` rather than `() => T|Promise<T>` for
+ * that reason. Making this safe for async work needs an `await` here and an async signature, not
+ * a wider parameter type.
+ *
  * @template T
- * @param {() => T} work
+ * @param {() => T} work Synchronous only — see above.
  * @returns {T}
  */
 export function withFreshRecordIds(work) {
