@@ -589,41 +589,76 @@ export class IngredientSet {
   _buildPassIndex(availableItems, matcher, ctx) {
     const items = Array.isArray(availableItems) ? availableItems : [];
     const optionItems = new Map();
-    const groupCandidateKeys = [];
     const essenceOptions = [];
-
-    for (const group of this.ingredientGroups) {
-      const keys = new Set();
-      for (const option of group.options || []) {
-        const type = option?.match?.type;
-        if (type === 'currency') continue;
-        if (type === 'essence') {
-          essenceOptions.push(this._essenceMember(group, option));
-          continue;
-        }
-        const matched = items.filter((item) =>
-          matcher ? matcher(option, item) : option.matches(item)
-        );
-        optionItems.set(option, matched);
-        for (const item of matched) keys.add(this._itemKey(item));
-      }
-      groupCandidateKeys.push(keys);
-    }
-
+    const groupCandidateKeys = this.ingredientGroups.map((group) =>
+      this._indexGroupCandidates(group, items, matcher, optionItems, essenceOptions)
+    );
     const essence = this._buildEssenceIndex(items, essenceOptions, ctx);
-    const blockGroups = new Set();
-    if (essence) {
-      for (const [groupIndex, group] of this.ingredientGroups.entries()) {
-        const live = (group.options || []).some(
-          (option) =>
-            option?.match?.type === 'essence' &&
-            this._essenceOptionIsFeasible(this._essenceMember(group, option), essence)
-        );
-        if (live) blockGroups.add(groupIndex);
+
+    return {
+      optionItems,
+      groupCandidateKeys,
+      blockGroups: this._groupsCarryingTheBlock(essence),
+      essence,
+    };
+  }
+
+  /**
+   * Index one group: record each non-currency option's matching stacks, collect its
+   * essence options for the block index, and return the group's candidate item keys — the
+   * vertex data {@link _contentionComponents} joins on.
+   *
+   * `optionItems` and `essenceOptions` accumulate across the whole call because both are
+   * SET-scoped rather than group-scoped: the option-to-stacks map is keyed by option
+   * identity across the set, and the essence block spans every group at once.
+   * @private
+   */
+  _indexGroupCandidates(group, items, matcher, optionItems, essenceOptions) {
+    const keys = new Set();
+    for (const option of group.options || []) {
+      const type = option?.match?.type;
+      if (type === 'currency') continue;
+      if (type === 'essence') {
+        essenceOptions.push(this._essenceMember(group, option));
+        continue;
+      }
+      const matched = items.filter((item) =>
+        matcher ? matcher(option, item) : option.matches(item)
+      );
+      optionItems.set(option, matched);
+      for (const item of matched) keys.add(this._itemKey(item));
+    }
+    return keys;
+  }
+
+  /**
+   * The groups that could still add a requirement to the essence block, and are therefore
+   * jointly constrained by it however disjoint their item candidates are.
+   *
+   * A group whose only essence options are provably unfundable is NOT one of them: it can
+   * never take the block branch, so treating it as a block member would couple it to
+   * groups it cannot interact with.
+   * @private
+   */
+  _groupsCarryingTheBlock(essence) {
+    const carrying = new Set();
+    if (!essence) return carrying;
+    for (const [groupIndex, group] of this.ingredientGroups.entries()) {
+      const options = group.options || [];
+      if (options.some((option) => this._isLiveEssenceOption(option, group, essence))) {
+        carrying.add(groupIndex);
       }
     }
+    return carrying;
+  }
 
-    return { optionItems, groupCandidateKeys, blockGroups, essence };
+  /**
+   * Whether `option` is an essence option this ledger could still fund.
+   * @private
+   */
+  _isLiveEssenceOption(option, group, essence) {
+    if (option?.match?.type !== 'essence') return false;
+    return this._essenceOptionIsFeasible(this._essenceMember(group, option), essence);
   }
 
   /**
@@ -675,22 +710,30 @@ export class IngredientSet {
       }
     }
 
-    // Only the carriers of essence ids that some option can still reach are contended
-    // for. A carrier whose only essence belongs to a pruned option is never drawn, so
-    // counting it as contention would couple groups that cannot interact.
+    const carrierKeys = this._contendedCarrierKeys(carriers, essenceOptions, ceiling);
+    return { carriers, ceiling, carrierKeys };
+  }
+
+  /**
+   * The carrier stacks a component/tag group can actually contend with the block for.
+   *
+   * Only the carriers of essence ids some option can still REACH count. A carrier whose
+   * only essence belongs to an option the ceiling already rules out is never drawn, so
+   * counting it as contention would couple groups that cannot interact.
+   * @private
+   */
+  _contendedCarrierKeys(carriers, essenceOptions, ceiling) {
     const liveIds = new Set(
       essenceOptions
         .filter((member) => this._essenceOptionIsFeasible(member, { ceiling }))
         .map((member) => member.essenceId)
         .filter(Boolean)
     );
-    const carrierKeys = new Set(
+    return new Set(
       carriers
         .filter((carrier) => Object.keys(carrier.perUnit).some((id) => liveIds.has(id)))
         .map((carrier) => carrier.itemKey)
     );
-
-    return { carriers, ceiling, carrierKeys };
   }
 
   /**
@@ -987,50 +1030,90 @@ export class IngredientSet {
    * @private
    */
   _searchComponentGroup(position, component, state, frame) {
-    const { budget, remaining, journal } = frame;
+    const { budget } = frame;
     if (budget.capHit) return false;
     if (position >= component.groups.length) {
-      if (++budget.nodes > INGREDIENT_SEARCH_NODE_CAP) {
-        budget.capHit = true;
-        return false;
-      }
-      return component.ownsBlock ? this._settleEssenceBlock(state, frame) : true;
+      return this._searchComponentTerminal(component, state, frame);
     }
-    if (++budget.nodes > INGREDIENT_SEARCH_NODE_CAP) {
-      budget.capHit = true;
-      return false;
-    }
+    if (this._chargeNode(budget)) return false;
 
     const group = this.ingredientGroups[component.groups[position]];
     for (const choice of this._groupChoices(
       group,
       group.options || [],
-      remaining,
+      frame.remaining,
       frame.availableItems,
       frame.matcher,
       frame.ctx,
       budget
     )) {
       if (budget.capHit) return false;
-      const mark = journal.length;
+      const mark = frame.journal.length;
       state.chosen[position] = choice;
-      if (choice.member) {
-        state.essenceMembers.push(choice.member);
-      } else if (!choice.currency) {
-        this._commitItemPlan(choice.plan, state.plan, remaining, journal);
-      }
+      this._applyChoice(choice, state, frame);
 
       if (this._searchComponentGroup(position + 1, component, state, frame)) return true;
 
       state.chosen[position] = null;
-      if (choice.member) {
-        state.essenceMembers.pop();
-      } else if (!choice.currency) {
-        state.plan.length -= choice.plan.length;
-      }
-      this._undoLedger(remaining, journal, mark);
+      this._revertChoice(choice, state, frame, mark);
     }
     return false;
+  }
+
+  /**
+   * Charge one node against the shared safeguard budget.
+   *
+   * One definition of "a node", used by the group traversal, its terminal and the unit-plan
+   * enumeration alike, so a search scoped to a contention component cannot quietly stop
+   * counting some of the work it does.
+   *
+   * @returns {boolean} true when this charge reached the bound, so the caller must stop.
+   * @private
+   */
+  _chargeNode(budget) {
+    if (++budget.nodes > INGREDIENT_SEARCH_NODE_CAP) {
+      budget.capHit = true;
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * The terminal node of one component's traversal. Only the component carrying the
+   * essence block settles it; every other component is complete once its groups are
+   * assigned.
+   * @private
+   */
+  _searchComponentTerminal(component, state, frame) {
+    if (this._chargeNode(frame.budget)) return false;
+    return component.ownsBlock ? this._settleEssenceBlock(state, frame) : true;
+  }
+
+  /**
+   * Commit one chosen choice. A currency choice draws nothing (it is free, which is
+   * exactly why it is ordered last) and an essence choice defers to the block, so only a
+   * component/tag choice touches the ledger.
+   * @private
+   */
+  _applyChoice(choice, state, frame) {
+    if (choice.member) {
+      state.essenceMembers.push(choice.member);
+    } else if (!choice.currency) {
+      this._commitItemPlan(choice.plan, state.plan, frame.remaining, frame.journal);
+    }
+  }
+
+  /**
+   * Undo {@link _applyChoice}, reverting the ledger to the caller's `mark`.
+   * @private
+   */
+  _revertChoice(choice, state, frame, mark) {
+    if (choice.member) {
+      state.essenceMembers.pop();
+    } else if (!choice.currency) {
+      state.plan.length -= choice.plan.length;
+    }
+    this._undoLedger(frame.remaining, frame.journal, mark);
   }
 
   /**
@@ -1297,10 +1380,7 @@ export class IngredientSet {
    * @private
    */
   *_enumerateUnitPlansFrom(option, matchingItems, index, remainingNeed, entries, budget) {
-    if (++budget.nodes > INGREDIENT_SEARCH_NODE_CAP) {
-      budget.capHit = true;
-      return;
-    }
+    if (this._chargeNode(budget)) return;
     if (remainingNeed === 0) {
       yield entries.map((entry) => ({
         item: entry.item,
