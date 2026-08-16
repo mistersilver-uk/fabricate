@@ -121,6 +121,21 @@ describe('corpusDelta — a pure REORDERING is broad', () => {
     assert.equal(delta.perRecord.size, 0);
   });
 
+  it('reports a corpus holding a record with NO id as unattributable', () => {
+    // The nullish half of the same fail-safe. The doc names "a nullish OR duplicated id", and
+    // only the duplicate half had a test — so `id == null ||` could be dropped and a record
+    // with no id would silently pair with the other side's id-less record, attributing a
+    // change to the key `undefined`.
+    const before = [record('a'), { name: 'No id at all' }];
+    const after = [record('a'), { name: 'No id, and renamed' }];
+
+    const delta = corpusDelta(before, after);
+
+    assert.equal(delta.changed, true);
+    assert.equal(delta.reordered, true, 'a nullish id routes broadly, as a duplicate one does');
+    assert.equal(delta.perRecord.size, 0, 'and attributes nothing, because nothing is pairable');
+  });
+
   it('reports an unchanged unpairable corpus as unchanged, not as a reorder', () => {
     const before = [record('dup'), record('dup')];
     const after = [record('dup'), record('dup')];
@@ -204,6 +219,46 @@ describe('corpusDelta — a CHANGED record yields its field set', () => {
     const delta = corpusDelta(before, after, { identify: (r) => r.key });
 
     assert.deepEqual(attributed(delta), ['a']);
+  });
+
+  it('reports a NON-OBJECT projection change with an empty field set, never as no change', () => {
+    // The `CorpusRecordDelta` typedef's stated contract, which nothing exercised: a change
+    // that is real but not attributable to any field carries an EMPTY set, and a consumer
+    // attributing work by field must read that as "everything", never as "nothing". A
+    // projection that is an array or a primitive is the case that produces it.
+    const before = [{ id: 'a', v: [1] }];
+    const after = [{ id: 'a', v: [2] }];
+
+    const delta = corpusDelta(before, after, { project: (entry) => entry.v });
+
+    assert.equal(delta.changed, true, 'the change is real even though no field can carry it');
+    const changed = delta.perRecord.get('a');
+    assert.equal(changed.kind, 'changed');
+    assert.deepEqual(changed.fields, [], 'an array projection has no top-level field names');
+    assert.deepEqual(changed.before, [1]);
+    assert.deepEqual(changed.after, [2]);
+  });
+
+  it('reports an EQUAL non-object projection as no change at all', () => {
+    // The other side of the branch above, so that reporting every non-object projection as
+    // changed would not pass either.
+    const delta = corpusDelta([{ id: 'a', v: [1] }], [{ id: 'a', v: [1] }], {
+      project: (entry) => entry.v,
+    });
+
+    assert.equal(delta.changed, false);
+    assert.equal(delta.perRecord.size, 0);
+  });
+
+  it('gives an ADDED record with a non-object projection an empty field set too', () => {
+    // Without its guard, `recordDelta` would call `presentKeys` on the array and name its
+    // INDEXES as changed fields — a field set that reads as real attribution and is not.
+    const delta = corpusDelta([], [{ id: 'a', v: [1, 2] }], { project: (entry) => entry.v });
+
+    const added = delta.perRecord.get('a');
+    assert.equal(added.kind, 'added');
+    assert.deepEqual(added.fields, [], "the array's indexes are not field names");
+    assert.deepEqual(added.after, [1, 2]);
   });
 
   it('takes the reference fast path for a record that is the SAME object', () => {
