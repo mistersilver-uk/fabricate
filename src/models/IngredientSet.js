@@ -21,6 +21,63 @@ import { getMatchHandler } from './match/matchTypes.js';
 export const INGREDIENT_SEARCH_NODE_CAP = 200_000;
 
 /**
+ * The SCAN context: everything the candidate generators read that is neither the option
+ * being considered nor the group it belongs to.
+ *
+ * It exists because that list is long and identical at every level of the generator chain
+ * (`_groupChoices` -> `_optionItemChoices` -> `_componentTagOptionChoices` ->
+ * `_matchingItemsWithAvail`/`_buildPlanForIngredient` -> `_optionCandidates`), so threading
+ * the fields one by one grew a five-deep parameter convoy that no signature could keep
+ * honest. Both resolution stages already build an object of this shape — the search's
+ * `frame` and the greedy pass's `pass` — so nothing is allocated to satisfy it and there is
+ * exactly one place a reader has to look to learn what a candidate generator depends on.
+ *
+ * `budget` is present only on the search's frame: the greedy pass never backtracks and so
+ * never reaches the node-charging unit-plan enumeration.
+ *
+ * @typedef {{availableItems: object[], matcher: Function|null,
+ *   remaining: Map<string, number>, index: object|null,
+ *   budget?: {nodes: number, capHit: boolean}}} SCAN
+ */
+
+/**
+ * A union-find (disjoint-set) forest over `size` vertices, with path compression and a
+ * deterministic tie-break: a union always keeps the LOWER vertex as the root, so a
+ * component's root is its lowest member and iterating roots in ascending order yields the
+ * components in author order. That determinism is load-bearing — the resolver's byte-identity
+ * guarantee depends on components being resolved in a fixed order, not merely on the
+ * partition being correct.
+ *
+ * Module-private and dependency-free: it reads nothing from the ingredient model, and
+ * `IngredientSet.js` is copied RAW into two hand-rolled mounted-component harnesses
+ * (`tests/components/manager-mounted.test.js`, `tests/components/recipe-edit-mounted.test.js`),
+ * where an uncopied transitive import HANGS the suite rather than failing it. Keeping this
+ * here rather than in a new leaf module keeps that allowlist unchanged.
+ *
+ * @param {number} size
+ * @returns {{find: (vertex: number) => number, union: (left: number, right: number) => void}}
+ */
+function unionFind(size) {
+  const parent = Array.from({ length: size }, (_unused, vertex) => vertex);
+  const find = (vertex) => {
+    let root = vertex;
+    while (parent[root] !== root) root = parent[root];
+    let cursor = vertex;
+    while (parent[cursor] !== root) {
+      const next = parent[cursor];
+      parent[cursor] = root;
+      cursor = next;
+    }
+    return root;
+  };
+  const union = (left, right) => {
+    const [a, b] = [find(left), find(right)];
+    if (a !== b) parent[Math.max(a, b)] = Math.min(a, b);
+  };
+  return { find, union };
+}
+
+/**
  * Represents a set of ingredients that can satisfy a recipe's input requirements
  * Multiple ingredient sets allow recipes to accept alternative combinations (e.g., "2xA OR 1xB + 1xC")
  */
@@ -377,6 +434,10 @@ export class IngredientSet {
       availableItems,
       matcher,
       ctx,
+      // The greedy pass is a {@link SCAN} too, so the candidate generators read one shape
+      // whichever resolution stage is driving them. It carries no `budget` because it never
+      // backtracks and so never reaches the node-charging enumeration.
+      index: ctx.index ?? null,
       remaining: this._initialRemaining(availableItems),
       plan: [],
       currencySpends: [],
@@ -438,14 +499,7 @@ export class IngredientSet {
     if (option?.match?.type === 'essence') {
       return { member: this._essenceMember(group, option) };
     }
-    const candidate = this._buildPlanForIngredient(
-      option,
-      pass.availableItems,
-      pass.remaining,
-      pass.matcher,
-      override.heldItemId,
-      pass.ctx.index
-    );
+    const candidate = this._buildPlanForIngredient(option, override.heldItemId, pass);
     if (!candidate.ok) {
       return {
         missing: { group, ingredient: option, have: candidate.have, need: option.quantity },
@@ -468,14 +522,7 @@ export class IngredientSet {
     for (const option of options) {
       if (option?.match?.type === 'currency') continue;
       if (option?.match?.type === 'essence') return { member: this._essenceMember(group, option) };
-      const candidate = this._buildPlanForIngredient(
-        option,
-        pass.availableItems,
-        pass.remaining,
-        pass.matcher,
-        null,
-        pass.ctx.index
-      );
+      const candidate = this._buildPlanForIngredient(option, null, pass);
       if (candidate.ok) {
         this._commitItemPlan(candidate.plan, pass.plan, pass.remaining);
         return { option };
@@ -777,40 +824,11 @@ export class IngredientSet {
   _contentionComponents(index) {
     const groupCount = this.ingredientGroups.length;
     const blockVertex = groupCount;
-    const parent = Array.from({ length: groupCount + 1 }, (_unused, vertex) => vertex);
-    const find = (vertex) => {
-      let root = vertex;
-      while (parent[root] !== root) root = parent[root];
-      let cursor = vertex;
-      while (parent[cursor] !== root) {
-        const next = parent[cursor];
-        parent[cursor] = root;
-        cursor = next;
-      }
-      return root;
-    };
-    const union = (left, right) => {
-      const [a, b] = [find(left), find(right)];
-      if (a !== b) parent[Math.max(a, b)] = Math.min(a, b);
-    };
+    const { find, union } = unionFind(groupCount + 1);
 
-    const claimedBy = new Map();
-    for (let groupIndex = 0; groupIndex < groupCount; groupIndex += 1) {
-      for (const key of index.groupCandidateKeys[groupIndex]) {
-        const prior = claimedBy.get(key);
-        if (prior === undefined) claimedBy.set(key, groupIndex);
-        else union(groupIndex, prior);
-      }
-    }
-
+    const claimedBy = this._joinGroupContention(index, groupCount, union);
     const blockLive = index.blockGroups.size > 0;
-    if (blockLive) {
-      for (const groupIndex of index.blockGroups) union(groupIndex, blockVertex);
-      for (const key of index.essence.carrierKeys) {
-        const prior = claimedBy.get(key);
-        if (prior !== undefined) union(blockVertex, prior);
-      }
-    }
+    if (blockLive) this._joinBlockContention(index, blockVertex, claimedBy, union);
 
     const byRoot = new Map();
     for (let groupIndex = 0; groupIndex < groupCount; groupIndex += 1) {
@@ -826,6 +844,43 @@ export class IngredientSet {
     }
 
     return [...byRoot].sort(([left], [right]) => left - right).map(([, component]) => component);
+  }
+
+  /**
+   * Join every pair of groups sharing a candidate held stack, and report which group first
+   * claimed each key so {@link _joinBlockContention} can join the block to it in one pass
+   * rather than re-walking the group index.
+   *
+   * @returns {Map<string, number>} candidate item key -> the lowest group index naming it.
+   * @private
+   */
+  _joinGroupContention(index, groupCount, union) {
+    const claimedBy = new Map();
+    for (let groupIndex = 0; groupIndex < groupCount; groupIndex += 1) {
+      for (const key of index.groupCandidateKeys[groupIndex]) {
+        const prior = claimedBy.get(key);
+        if (prior === undefined) claimedBy.set(key, groupIndex);
+        else union(groupIndex, prior);
+      }
+    }
+    return claimedBy;
+  }
+
+  /**
+   * Join the essence-block vertex to the groups it contends with, in BOTH directions the
+   * block contends: by membership (a group carrying a still-feasible essence option) and by
+   * draw (a group whose candidates include one of the block's carrier stacks).
+   *
+   * Missing either edge under-connects the graph, which is the unsound direction — two
+   * components would then be resolved against a ledger each believes it owns.
+   * @private
+   */
+  _joinBlockContention(index, blockVertex, claimedBy, union) {
+    for (const groupIndex of index.blockGroups) union(groupIndex, blockVertex);
+    for (const key of index.essence.carrierKeys) {
+      const prior = claimedBy.get(key);
+      if (prior !== undefined) union(blockVertex, prior);
+    }
   }
 
   /**
@@ -969,6 +1024,15 @@ export class IngredientSet {
    * so it changes no answer — but a ledger that stopped describing what the resolution
    * consumed would be a trap for the next reader.
    *
+   * That commit is DEFENCE IN DEPTH and has no test coverage BY CONSTRUCTION: deleting it
+   * leaves every suite in this repository green, because a singleton non-block component's
+   * stacks belong, by the definition of a connected component, to no other vertex. Do not
+   * read that as dead code. It is the belt that makes an UNDER-connection bug in
+   * {@link _contentionComponents} fail closed — a false "insufficient" a player reports —
+   * rather than open, with two groups silently drawing the same stack and the craft
+   * over-consuming. A guard for it cannot be written without first introducing the bug it
+   * guards against.
+   *
    * @returns {{chosen: object[], block: object|null}|null} null when the component has
    *   no satisfying assignment (or the node bound was reached inside it).
    * @private
@@ -1011,16 +1075,7 @@ export class IngredientSet {
    * @private
    */
   _firstGroupChoice(group, frame) {
-    const choices = this._groupChoices(
-      group,
-      group.options || [],
-      frame.remaining,
-      frame.availableItems,
-      frame.matcher,
-      frame.ctx,
-      frame.budget
-    );
-    const { done, value } = choices.next();
+    const { done, value } = this._groupChoices(group, frame).next();
     return done ? null : value;
   }
 
@@ -1044,15 +1099,7 @@ export class IngredientSet {
     if (this._chargeNode(budget)) return false;
 
     const group = this.ingredientGroups[component.groups[position]];
-    for (const choice of this._groupChoices(
-      group,
-      group.options || [],
-      frame.remaining,
-      frame.availableItems,
-      frame.matcher,
-      frame.ctx,
-      budget
-    )) {
+    for (const choice of this._groupChoices(group, frame)) {
       if (budget.capHit) return false;
       const mark = frame.journal.length;
       state.chosen[position] = choice;
@@ -1183,9 +1230,14 @@ export class IngredientSet {
    * option (author order) contributes its item-subset candidates, then every
    * affordable currency option (author order) contributes a free currency choice.
    * Laziness keeps the greedy-first success path to ~one candidate per group.
+   *
+   * @param {object} group
+   * @param {SCAN & {ctx: object}} frame the search frame, which is also a {@link SCAN}.
    * @private
    */
-  *_groupChoices(group, options, remaining, availableItems, matcher, ctx, budget) {
+  *_groupChoices(group, frame) {
+    const { ctx } = frame;
+    const options = group.options || [];
     const override = this._resolveGroupOverride(ctx.optionOverrides, group, options);
     if (override) {
       const option = options[override.optionIndex];
@@ -1194,31 +1246,13 @@ export class IngredientSet {
         if (spend) yield { option, plan: [], currency: spend };
         return;
       }
-      yield* this._optionItemChoices(
-        option,
-        availableItems,
-        remaining,
-        matcher,
-        group,
-        override.heldItemId,
-        budget,
-        ctx.index
-      );
+      yield* this._optionItemChoices(option, group, override.heldItemId, frame);
       return;
     }
 
     for (const option of options) {
       if (option?.match?.type === 'currency') continue;
-      yield* this._optionItemChoices(
-        option,
-        availableItems,
-        remaining,
-        matcher,
-        group,
-        null,
-        budget,
-        ctx.index
-      );
+      yield* this._optionItemChoices(option, group, null, frame);
     }
     for (const option of options) {
       if (option?.match?.type !== 'currency') continue;
@@ -1242,33 +1276,21 @@ export class IngredientSet {
    * fail, so choosing it could only ever cost a subtree and then backtrack. Withholding
    * it changes no verdict — the group is reported short by the greedy pass exactly as
    * before, with THAT option's have/need.
+   *
+   * @param {object} option
+   * @param {object} group
+   * @param {string|null} restrictItemId
+   * @param {SCAN} scan
    * @private
    */
-  *_optionItemChoices(
-    option,
-    availableItems,
-    remaining,
-    matcher,
-    group,
-    restrictItemId,
-    budget,
-    index = null
-  ) {
+  *_optionItemChoices(option, group, restrictItemId, scan) {
     if (option?.match?.type === 'essence') {
       const member = this._essenceMember(group, option);
-      if (!this._essenceOptionIsFeasible(member, index?.essence)) return;
+      if (!this._essenceOptionIsFeasible(member, scan.index?.essence)) return;
       yield { option, plan: [], currency: null, member };
       return;
     }
-    yield* this._componentTagOptionChoices(
-      option,
-      availableItems,
-      remaining,
-      matcher,
-      restrictItemId,
-      budget,
-      index
-    );
+    yield* this._componentTagOptionChoices(option, restrictItemId, scan);
   }
 
   /**
@@ -1277,38 +1299,21 @@ export class IngredientSet {
    * unit-count assignment over the matching stacks that also meets `quantity`.
    * Yields nothing when even the full matching pool cannot meet the quantity (no
    * subset can either), which prunes the branch.
+   *
+   * @param {object} option
+   * @param {string|null} restrictItemId
+   * @param {SCAN} scan
    * @private
    */
-  *_componentTagOptionChoices(
-    option,
-    availableItems,
-    remaining,
-    matcher,
-    restrictItemId,
-    budget,
-    index = null
-  ) {
-    const greedy = this._buildPlanForIngredient(
-      option,
-      availableItems,
-      remaining,
-      matcher,
-      restrictItemId,
-      index
-    );
+  *_componentTagOptionChoices(option, restrictItemId, scan) {
+    const { budget } = scan;
+    const greedy = this._buildPlanForIngredient(option, restrictItemId, scan);
     if (!greedy.ok) return;
 
     yield { option, plan: greedy.plan, currency: null };
 
     const seen = new Set([this._planSignature(greedy.plan)]);
-    const matchingItems = this._matchingItemsWithAvail(
-      option,
-      availableItems,
-      remaining,
-      matcher,
-      restrictItemId,
-      index
-    );
+    const matchingItems = this._matchingItemsWithAvail(option, restrictItemId, scan);
     for (const plan of this._enumerateUnitPlans(option, matchingItems, option.quantity, budget)) {
       if (budget.capHit) return;
       const signature = this._planSignature(plan);
@@ -1323,25 +1328,16 @@ export class IngredientSet {
    * remaining count, in availableItems order — the domain the unit-count
    * enumeration draws from (mirrors {@link _buildPlanForIngredient}'s filter, with
    * the availability snapshotted so later `remaining` mutations do not disturb it).
+   *
+   * @param {object} option
+   * @param {string|null} restrictItemId
+   * @param {SCAN} scan
    * @private
    */
-  _matchingItemsWithAvail(
-    option,
-    availableItems,
-    remaining,
-    matcher,
-    restrictItemId,
-    index = null
-  ) {
+  _matchingItemsWithAvail(option, restrictItemId, scan) {
     const out = [];
-    for (const item of this._optionCandidates(
-      option,
-      availableItems,
-      matcher,
-      restrictItemId,
-      index
-    )) {
-      const avail = Number(remaining.get(this._itemKey(item)) || 0);
+    for (const item of this._optionCandidates(option, restrictItemId, scan)) {
+      const avail = Number(scan.remaining.get(this._itemKey(item)) || 0);
       if (avail > 0) out.push({ item, avail });
     }
     return out;
@@ -1359,9 +1355,19 @@ export class IngredientSet {
    * `restrictItemId` (issue 552's tag-stack choice) narrows the result to one specific
    * held stack; it is applied to the indexed pool rather than baked into it, because the
    * index is shared by every branch and only one of them is pinned.
+   *
+   * The `??` fallback is a SILENT degradation — an index miss reinstates the per-node
+   * O(|availableItems|) matcher scan and answers identically, so no correctness test can
+   * see it. `tests/ingredient-set-solver-cost.test.js` therefore counts matcher
+   * invocations and asserts that not one of them happens after the pass index exists.
+   *
+   * @param {object} option
+   * @param {string|null} restrictItemId
+   * @param {SCAN} scan
    * @private
    */
-  _optionCandidates(option, availableItems, matcher, restrictItemId, index) {
+  _optionCandidates(option, restrictItemId, scan) {
+    const { index, matcher, availableItems } = scan;
     const pool =
       index?.optionItems.get(option) ??
       availableItems.filter((item) => (matcher ? matcher(option, item) : option.matches(item)));
@@ -1471,14 +1477,16 @@ export class IngredientSet {
     }
   }
 
-  _buildPlanForIngredient(
-    ingredient,
-    availableItems,
-    remaining,
-    matcher = null,
-    restrictItemId = null,
-    index = null
-  ) {
+  /**
+   * The greedy front-loaded item plan for one option against `scan.remaining`.
+   *
+   * @param {object} ingredient
+   * @param {string|null} restrictItemId
+   * @param {SCAN} scan
+   * @returns {{ok: boolean, plan: Array<object>, have: number}}
+   * @private
+   */
+  _buildPlanForIngredient(ingredient, restrictItemId, scan) {
     // A currency option is never item-satisfiable: short-circuit to not-satisfiable
     // so the resolver never item-matches it (currency is chosen by the affordability
     // probe in the fallback pass, not here).
@@ -1493,17 +1501,11 @@ export class IngredientSet {
     // The matching stacks, from the per-pass index when there is one. `restrictItemId`
     // (issue 552 tag-stack choice) narrows a tag option to one specific held stack the
     // player picked, so the craft consumes THAT item.
-    const matchingItems = this._optionCandidates(
-      ingredient,
-      availableItems,
-      matcher,
-      restrictItemId,
-      index
-    );
+    const matchingItems = this._optionCandidates(ingredient, restrictItemId, scan);
 
     for (const item of matchingItems) {
       const key = this._itemKey(item);
-      const availableQty = Number(remaining.get(key) || 0);
+      const availableQty = Number(scan.remaining.get(key) || 0);
       if (availableQty <= 0) continue;
 
       totalAvailable += availableQty;
