@@ -197,6 +197,13 @@ export function createBenchWorld({
     craftingSystemManager,
     localize: (key) => key,
     nowWorldTime: () => 0,
+    // The summary phase's held-quantity tallies (issue 1075) resolve item identity through
+    // the SAME full resolver `main.js` wires and `InventoryListingBuilder` already uses.
+    // Wiring it here is what keeps the benchmark honest on both axes: with no resolver the
+    // tallies stay empty, every row reports "missing materials", and the case would report a
+    // fast number for a listing that answered nothing. It also keeps the candidate-scan
+    // counters live on the summary path, since `components` is the counting array.
+    resolveComponentForItem: modules.essenceResolver.findMatchingComponent,
   });
   const inventoryListing = new modules.InventoryListingBuilder({
     recipeManager,

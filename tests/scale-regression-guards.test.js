@@ -103,30 +103,55 @@ function measureListing({
     nowWorldTime: () => 0,
   });
 
-  const listing = builder.buildListing({
-    craftingActor: countingActor(makeActor({ itemCount }), counters, 'actorItems'),
-    viewer: PLAYER,
-  });
+  const craftingActor = countingActor(makeActor({ itemCount }), counters, 'actorItems');
+  const listing = builder.buildListing({ craftingActor, viewer: PLAYER });
 
-  return { counters, listing };
+  return {
+    counters,
+    listing,
+    // The DETAIL phase for one row (issue 1075). Handed the recipe directly rather than by
+    // id because this fixture's manager holds no recipe map; the exact-evaluation cost the
+    // probe measures is identical either way.
+    hydrate: (index = 0) =>
+      builder.buildRecipeDetail({
+        recipe: recipes[index],
+        craftingActor,
+        viewer: PLAYER,
+      }),
+  };
 }
 
 describe('issue 1072 guard — player listing cost tracks what is VISIBLE, not the corpus', () => {
   it('never evaluates craftability for a recipe the viewer cannot see', () => {
     // The headline criterion: opening the player app must not do work proportional to the
-    // whole installed corpus. Today the bound is the VISIBLE set (page-scoping lands with
-    // #1075 and will only lower this); a regression that dropped the visibility filter and
-    // walked every stored recipe breaches it immediately.
-    const { counters, listing } = measureListing({ totalRecipes: 40, visibleRecipes: 5 });
+    // whole installed corpus. This guard's original budget was the VISIBLE set — one
+    // evaluation per set plus one per recipe — and it recorded that "page-scoping lands with
+    // #1075 and will only lower this". It did, all the way to the floor: the summary phase
+    // performs NO exact evaluation at any corpus size, because material availability comes
+    // from #1077's indexed projection instead.
+    //
+    // So the bound is now zero rather than `2 x visible`. That is a stronger guard, but only
+    // if it can still fail, which is why the non-vacuity proof moved to the detail phase
+    // rather than being dropped: it demonstrates both that the probe counts and that the
+    // cost went somewhere bounded rather than disappearing into an unmeasured path.
+    const { counters, listing, hydrate } = measureListing({ totalRecipes: 40, visibleRecipes: 5 });
 
+    assert.equal(listing.summaries.length, 5, 'fixture must project only the visible recipes');
+    assert.equal(
+      counters.get('recipeManagerEvaluateCraftability'),
+      0,
+      'the summary phase must not evaluate exact craftability for ANY row'
+    );
+
+    const detail = hydrate(0);
     const evaluations = counters.get('recipeManagerEvaluateCraftability');
-    assert.equal(listing.recipes.length, 5, 'fixture must project only the visible recipes');
-    assert.ok(evaluations > 0, 'non-vacuity: the probe must actually have counted something');
+    assert.ok(detail, 'non-vacuity: the detail phase must have produced a model');
+    assert.ok(evaluations > 0, 'non-vacuity: the probe must actually be able to count');
     assert.ok(
-      evaluations <= 5 * 2,
-      `evaluated craftability ${evaluations} times for 5 visible recipes with 1 set each ` +
-        `(budget: one per set plus one per recipe). A count near the 40-recipe corpus means ` +
-        `the listing stopped being scoped to the visible set.`
+      evaluations <= 2,
+      `hydrating ONE recipe with 1 set evaluated craftability ${evaluations} times ` +
+        `(budget: one per set plus one for the craft button). A count near the visible set ` +
+        `means detail hydration stopped being per-recipe.`
     );
   });
 

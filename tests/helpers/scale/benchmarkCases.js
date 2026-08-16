@@ -294,7 +294,7 @@ function simpleCorpusCases() {
           viewer: world.viewer,
         }),
       counts: (_world, listing) => ({
-        listedRecipes: listing.recipes.length,
+        listedRecipes: listing.summaries.length,
         availableRecipes: listing.counts.available,
       }),
     })),
@@ -689,7 +689,7 @@ function heldInventoryCases() {
             viewer: world.viewer,
           }),
         counts: (_world, listing) => ({
-          listedRecipes: listing.recipes.length,
+          listedRecipes: listing.summaries.length,
           availableRecipes: listing.counts.available,
         }),
       },

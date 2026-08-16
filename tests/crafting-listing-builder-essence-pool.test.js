@@ -142,7 +142,14 @@ function buildRecipeModel({ recipe = forgeRecipe(), craftingRunManager = null, a
     localize: (key) => key,
   });
   const actor = { id: 'actor-1', items: [heldEmberwood()] };
-  return builder.buildListing({ craftingActor: actor, viewer: { isGM: false } }).recipes[0];
+  // The rich model is the DETAIL phase's output since issue 1075; `buildListing` returns
+  // cheap summaries carrying no essence pool at all.
+  return builder.buildRecipeDetail({
+    recipe,
+    access: access ?? { reason: 'ok', visible: true },
+    craftingActor: actor,
+    viewer: { isGM: false },
+  });
 }
 
 // ---------------------------------------------------------------------------

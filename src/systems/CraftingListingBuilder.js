@@ -17,6 +17,31 @@
  * viewer (`access.reason === 'teaser'`) it redacts every field named in
  * `teaserState.hiddenFields`, surfacing only a generic name/img and a `discovery`
  * browse status so no ingredient/result/check detail leaks.
+ *
+ * ## Two phases, and why the split is a shape change rather than a cache (issue 1075)
+ *
+ * The read API is SUMMARY then DETAIL, and the two are separate methods because they have
+ * genuinely different costs and genuinely different audiences of consumer.
+ *
+ * - {@link CraftingListingBuilder#buildListing} answers "what may this viewer browse?" for
+ *   the whole visible corpus and returns #1091 summaries. It performs ZERO exact
+ *   craftability evaluations, at any corpus size: material availability comes from #1077's
+ *   indexed projection over ONE per-pass inventory snapshot. Everything the browser list
+ *   filters, sorts and paginates on — name, id, browse status, system, category — is on a
+ *   summary, so the page window is chosen before any expensive work happens.
+ * - {@link CraftingListingBuilder#buildRecipeDetail} answers "what does the inspector show
+ *   for THIS recipe?" and is the unchanged rich projection, exact evaluations included, for
+ *   one recipe at a time.
+ *
+ * The old shape ran the rich projection over every visible recipe before the store had even
+ * looked at the page size, so opening the app against a large corpus cost roughly
+ * `1 + setCount + stepSetCount` exact evaluations PER RECIPE for rows nobody would see.
+ *
+ * The two phases disagree about material availability BY DESIGN, and that is stated here
+ * rather than discovered: the summary's answer is #1077's documented upper bound (contended
+ * sets are counted for both, so it can say "looks makeable" where exact evaluation refuses),
+ * while the detail — and the craft guard behind it — stay exact. A row is a promise about
+ * what is worth opening, never a promise about what will craft.
  */
 
 import { resolveRecipeImage } from '../ui/svelte/util/craftingImageDefaults.js';
@@ -25,7 +50,9 @@ import { normalizeRecipeCategory, getRecipeCategoryLabel } from '../utils/recipe
 
 import { buildCheckModifierContext } from './checkModifierResolver.js';
 import { CRAFTING_BROWSE_STATUS, deriveBrowseStatus } from './craftingBrowseStatus.js';
+import { buildInventorySnapshot } from './inventorySnapshot.js';
 import { activeRunStepState, buildStepRecipeView } from './stepRecipeView.js';
+import { SUMMARY_AUDIENCE, projectRecipeSummary } from './summaryProjection.js';
 
 /**
  * Resolution-mode → localization key map. Kept in lockstep with the GM manager's
@@ -110,6 +137,14 @@ export class CraftingListingBuilder {
    * @param {Function} [deps.nowWorldTime] - `() => number` current world time.
    * @param {Function} [deps.isSystemBlockedForRecipes] - `(systemId) => boolean`; a blocked
    *   system exposes no recipes to a non-GM viewer. Defaults to never-blocked.
+   * @param {Function} [deps.resolveComponentForItem] - `(item, components, systemId) =>
+   *   component|null`, the item-identity resolution the per-pass inventory snapshot tallies
+   *   held stacks with (issue 1075). INJECTED rather than imported for two reasons: item
+   *   identity is not this builder's concern, and the real resolver drags a four-module
+   *   matcher graph the mounted-component harness would then have to copy alongside every
+   *   crafting suite. Omitted, the snapshot resolves no components, so every summary reports
+   *   `availability: false` — the FAIL-CLOSED direction, which shows as "missing materials"
+   *   rather than as a false "looks makeable".
    */
   constructor({
     recipeManager = null,
@@ -122,6 +157,7 @@ export class CraftingListingBuilder {
     nowWorldTime = () => 0,
     isSystemBlockedForRecipes = null,
     resolveCheckFormula = null,
+    resolveComponentForItem = null,
   } = {}) {
     this.recipeManager = recipeManager;
     this.recipeVisibility = recipeVisibility;
@@ -137,26 +173,47 @@ export class CraftingListingBuilder {
     // resolveCheckFormulaDisplay in main.js. Default no-op → resolvedFormula null.
     this._resolveCheckFormula =
       typeof resolveCheckFormula === 'function' ? resolveCheckFormula : () => null;
+    this._resolveComponentForItem =
+      typeof resolveComponentForItem === 'function' ? resolveComponentForItem : null;
   }
 
   /**
-   * Build the player Crafting listing for one crafting actor and a set of
-   * component-source actors.
+   * SUMMARY PHASE — the paged browse query (issue 1075).
+   *
+   * Every recipe the viewer may browse, projected into #1091's canonical summary. The cost
+   * is one corpus-wide visibility pass, one inventory snapshot, and one cheap projection per
+   * visible recipe; `evaluateCraftability` and `resolveIngredientSelection` are invoked
+   * ZERO times, which is asserted by counter rather than left as a review note.
+   *
+   * The caller filters, sorts and paginates these, then asks {@link buildRecipeDetail} for
+   * the one recipe it is about to render an inspector for.
    *
    * @param {object} options
    * @param {object|null} options.craftingActor - The acting character.
    * @param {object[]} [options.componentSourceActors] - Additional inventory sources.
    * @param {object|null} [options.viewer] - Foundry user; falls back to `getViewer()`.
+   * @param {Array<{recipe: object, access: object}>|null} [options.visibleRecipeEntries] - An
+   *   ALREADY-COMPUTED corpus-wide visibility pass, handed in by a caller that has to run
+   *   the same pass for another consumer in the same read (issue 1075). Explicitly a
+   *   parameter and never a field: a retained pass would be a cache of knowledge results
+   *   derived from live inventory, which `inventorySnapshot`'s invalidation rule forbids.
+   *   Omitted, this method runs the pass itself, exactly as before.
    * @returns {{
    *   selectedActorId: string|null,
    *   actor: object|null,
    *   componentSourceIds: Array<string|null>,
    *   worldTime: number,
-   *   recipes: object[],
+   *   summaries: object[],
+   *   total: number,
    *   counts: { available: number, total: number }
    * }}
    */
-  buildListing({ craftingActor = null, componentSourceActors = [], viewer = null } = {}) {
+  buildListing({
+    craftingActor = null,
+    componentSourceActors = [],
+    viewer = null,
+    visibleRecipeEntries = null,
+  } = {}) {
     const resolvedViewer = viewer ?? this._getViewer?.() ?? null;
     const isGM = resolvedViewer?.isGM === true;
     const knowledgeSources = Array.isArray(componentSourceActors)
@@ -165,31 +222,38 @@ export class CraftingListingBuilder {
     const craftSources = this._dedupeActors([craftingActor, ...knowledgeSources]);
 
     const visibleEntries =
+      visibleRecipeEntries ??
       this.recipeVisibility?.getVisibleRecipes?.({
         viewer: resolvedViewer,
         craftingActor,
         componentSourceActors: knowledgeSources,
-      }) ?? [];
+      }) ??
+      [];
 
-    const recipes = [];
+    // ONE snapshot for the whole pass, discarded when this returns. Its per-system tallies
+    // are memoised inside it, so N summaries of one system walk the inventory once — the
+    // whole reason a summary may consult held quantities per row at all.
+    const snapshot = this._passSnapshot(craftingActor, knowledgeSources);
+
+    const summaries = [];
     for (const entry of visibleEntries) {
       const recipe = entry?.recipe;
       if (!recipe) continue;
       if (!isGM && this._isSystemBlockedForRecipes(recipe.craftingSystemId)) continue;
-      recipes.push(
-        this._buildRecipeModel({
+      summaries.push(
+        this._buildRecipeSummary({
           recipe,
           access: entry.access ?? {},
           isGM,
+          snapshot,
           craftingActor,
-          craftSources,
           knowledgeSources,
         })
       );
     }
 
-    const available = recipes.filter(
-      (recipe) => recipe.browseStatus === CRAFTING_BROWSE_STATUS.AVAILABLE
+    const available = summaries.filter(
+      (summary) => summary.browseStatus === CRAFTING_BROWSE_STATUS.AVAILABLE
     ).length;
 
     return {
@@ -197,9 +261,130 @@ export class CraftingListingBuilder {
       actor: craftingActor ?? null,
       componentSourceIds: craftSources.map(actorKey),
       worldTime: Number(this._nowWorldTime() || 0),
-      recipes,
-      counts: { available, total: recipes.length },
+      summaries,
+      total: summaries.length,
+      counts: { available, total: summaries.length },
     };
+  }
+
+  /**
+   * DETAIL PHASE — the exact rich model for ONE recipe (issue 1075).
+   *
+   * Structurally the same projection the pre-split `buildListing` ran over the whole corpus,
+   * now asked for one recipe at a time. Exact per-set craftability, ingredient assignment,
+   * checks, outcome tiers, durations, steps and progressive stages all live here and only
+   * here.
+   *
+   * ## Every gate the summary phase applies is re-applied, from scratch
+   *
+   * A caller reaching this with a recipe id has NOT proved the viewer may see it: an id is
+   * whatever the client sent. So the system block is re-tested and access is re-evaluated
+   * (or accepted from the caller only when the caller is the same pass that computed it),
+   * and an invisible recipe answers `null` rather than a redacted model. Re-deriving is the
+   * cheap half of this call; trusting the id would make the split a privilege escalation.
+   *
+   * @param {object} options
+   * @param {string|null} [options.recipeId] Resolved through `recipeManager.getRecipe`.
+   * @param {object|null} [options.recipe] The recipe itself, when the caller already holds
+   *   it (avoids a redundant manager read; the gates below are identical either way).
+   * @param {object|null} [options.craftingActor]
+   * @param {object[]} [options.componentSourceActors]
+   * @param {object|null} [options.viewer]
+   * @param {object|null} [options.access] This recipe's already-evaluated access result.
+   * @returns {object|null} The `RecipeListingModel`, or `null` when no such recipe exists or
+   *   the viewer may not see it.
+   */
+  buildRecipeDetail({
+    recipeId = null,
+    recipe = null,
+    craftingActor = null,
+    componentSourceActors = [],
+    viewer = null,
+    access = null,
+  } = {}) {
+    const resolvedViewer = viewer ?? this._getViewer?.() ?? null;
+    const isGM = resolvedViewer?.isGM === true;
+    const knowledgeSources = Array.isArray(componentSourceActors)
+      ? componentSourceActors.filter(Boolean)
+      : [];
+    const craftSources = this._dedupeActors([craftingActor, ...knowledgeSources]);
+
+    const target = recipe ?? this.recipeManager?.getRecipe?.(recipeId) ?? null;
+    if (!target) return null;
+    if (!isGM && this._isSystemBlockedForRecipes(target.craftingSystemId)) return null;
+
+    const resolvedAccess =
+      access ??
+      this.recipeVisibility?.evaluateRecipeAccess?.({
+        recipe: target,
+        viewer: resolvedViewer,
+        craftingActor,
+        componentSourceActors: knowledgeSources,
+      }) ??
+      {};
+    // `=== false` rather than `!== true`: the shipped access results for a visible recipe
+    // always carry `visible: true`, but a hand-built fixture (and every pre-1075 caller that
+    // passes an entry's `access` straight through) carries only a `reason`. Reading an
+    // absent flag as "not visible" would blank the inspector for every one of those.
+    if (resolvedAccess.visible === false) return null;
+
+    return this._buildRecipeModel({
+      recipe: target,
+      access: resolvedAccess,
+      isGM,
+      craftingActor,
+      craftSources,
+      knowledgeSources,
+    });
+  }
+
+  /**
+   * The per-pass inventory snapshot the summary phase's availability projection reads.
+   *
+   * A per-pass VALUE, never a field: `inventorySnapshot`'s invalidation rule is that no
+   * snapshot outlives the synchronous pass that built it, because nothing mints a revision
+   * token when a player's `actor.items` changes and a stale inventory read would feed the
+   * craftability and knowledge gates. #1078 owns the item-side generation that would ever
+   * permit retention.
+   * @private
+   */
+  _passSnapshot(craftingActor, componentSourceActors) {
+    return buildInventorySnapshot({
+      craftingActor,
+      componentSourceActors,
+      resolveComponent: this._resolveComponentForItem,
+    });
+  }
+
+  /**
+   * Project one visible recipe into its #1091 summary.
+   *
+   * `exhausted` is skipped for a redacted teaser, matching the pre-split builder exactly:
+   * the teaser branch short-circuited before the exhaustion read, and asking for it here
+   * would add an inventory rescan for a row whose status is `discovery` regardless.
+   *
+   * `favourite` is always `false` and that is deliberate rather than a stub. Favourites are
+   * a per-VIEWER client setting the store reads and filters on directly
+   * (`craftingStore.favouriteIds`); this builder has no seam to that setting and inventing
+   * one would give the preference two owners. The manifest requires the key on a player
+   * summary, so it is emitted as its "not asserted here" value.
+   * @private
+   */
+  _buildRecipeSummary({ recipe, access, isGM, snapshot, craftingActor, knowledgeSources }) {
+    const redacted = !isGM && stringOrEmpty(access?.reason) === 'teaser';
+    return projectRecipeSummary({
+      recipe,
+      system: this.craftingSystemManager?.getSystem?.(recipe.craftingSystemId) ?? null,
+      audience: isGM ? SUMMARY_AUDIENCE.GM : SUMMARY_AUDIENCE.PLAYER,
+      access,
+      snapshot,
+      exhausted:
+        !isGM &&
+        !redacted &&
+        this._isKnowledgeExhausted(access, recipe, craftingActor, knowledgeSources),
+      favourite: false,
+      localize: this.localize,
+    });
   }
 
   _dedupeActors(actors) {

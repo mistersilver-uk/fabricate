@@ -44,7 +44,13 @@ const FORGE_ID = 'sys-emberforge';
 
 /** Components the fixture recipes consume and produce, with progressive difficulties. */
 const LIBRARY = Object.freeze([
-  { id: 'c-emberdust', name: 'Emberdust', img: 'icons/dust.webp', difficulty: 2 },
+  {
+    id: 'c-emberdust',
+    name: 'Emberdust',
+    img: 'icons/dust.webp',
+    difficulty: 2,
+    essences: { ember: 1 },
+  },
   { id: 'c-slag', name: 'Cooled Slag', img: 'icons/slag.webp', difficulty: 3 },
   { id: 'c-warding-nail', name: 'Warding Nail', img: 'icons/nail.webp', difficulty: 4 },
 ]);
@@ -172,12 +178,29 @@ function forgeBuilder({
     craftingSystemManager,
     localize: (key) => key,
     nowWorldTime: () => 4200,
+    // The summary phase's held-quantity tallies resolve item identity through this seam
+    // (issue 1075). Wired by NAME here, which is enough for a fixture and keeps the real
+    // four-module matcher graph out of the suite.
+    resolveComponentForItem: (item, components) =>
+      components.find((component) => component.name === item?.name) ?? null,
     ...(isSystemBlockedForRecipes && { isSystemBlockedForRecipes }),
   });
   return { builder, counters, recipeManager };
 }
 
-const ACTOR = Object.freeze({ id: 'actor-fern', name: 'Fern', items: [] });
+/**
+ * The viewing character, holding MORE than the fixture recipe requires.
+ *
+ * A stocked actor rather than an empty one, because after the summary/detail split the row's
+ * material verdict comes from what this actor really holds instead of from a stubbed
+ * `canCraft`. An empty actor would paint every row `missingMaterials`, which outranks nothing
+ * but does mask the statuses these tests are actually about.
+ */
+const ACTOR = Object.freeze({
+  id: 'actor-fern',
+  name: 'Fern',
+  items: [{ uuid: 'Item.emberdust-1', name: 'Emberdust', system: { quantity: 4 } }],
+});
 
 /**
  * THE ADAPTER — see the header. `rows` is what the browser list renders; `detailFor` is
@@ -185,12 +208,15 @@ const ACTOR = Object.freeze({ id: 'actor-fern', name: 'Fern', items: [] });
  */
 function playerView({ builder }, viewer = PLAYER) {
   const listing = builder.buildListing({ craftingActor: ACTOR, viewer });
-  const rows = listing.recipes;
+  const rows = listing.summaries;
   return {
     listing,
     rows,
     rowFor: (id) => rows.find((row) => row?.id === id) ?? null,
-    detailFor: (id) => rows.find((row) => row?.id === id) ?? null,
+    // Deliberately by ID and with no `access` argument, so the detail phase re-resolves
+    // visibility for itself. Handing it the row's access would test the projection while
+    // skipping the gate that decides whether the projection may run at all.
+    detailFor: (id) => builder.buildRecipeDetail({ recipeId: id, craftingActor: ACTOR, viewer }),
   };
 }
 
