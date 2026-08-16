@@ -276,3 +276,42 @@ export function hydrateRecipes(modules, payloads) {
 export function useHydratedRecipes(world, recipes) {
   world.recipeManager.recipes = new Map(recipes.map((recipe) => [recipe.id, recipe]));
 }
+
+/**
+ * Run `work` against a FRESH synthetic id space, restoring the ambient one afterwards.
+ *
+ * `Recipe.fromJSON` mints ids for sub-records through `foundry.utils.randomID()`, which
+ * `tests/helpers/foundryEnv.js` implements as a process-lifetime counter that is never reset.
+ * Ids therefore get WIDER as a process runs, so a byte count taken after other hydrations is
+ * larger than the same byte count taken first — which makes any committed byte count a function
+ * of how many earlier cases hydrated, not of `{profile, seed}` alone.
+ *
+ * That is not hypothetical and it is not small enough to ignore. Measured on this checkout, the
+ * `rich-corpus` corpus serializes to 18,872,129 bytes when its profile runs on its own and
+ * 18,878,203 bytes when `simple-corpus` has run first — a 6,074-byte difference with no cause
+ * but counter width. `npm run benchmark:performance -- --profile=rich-corpus` would therefore
+ * report class-1 drift against a baseline recorded by the full sweep.
+ *
+ * Existing byte-valued cases live only in `simple-corpus`, which the runner visits first, so
+ * they are deterministic by accident of ordering rather than by construction. ADR 0001 records
+ * the same hazard against `recipeManager.save` and reports it to issue 1071. Any case that
+ * commits bytes from a profile the runner does not visit first MUST wrap its hydration in this,
+ * and this helper deliberately does not touch the existing cases: re-recording their committed
+ * counts to buy determinism they already have in practice is issue 1071's call, not a
+ * side effect of adding a measurement.
+ *
+ * @template T
+ * @param {() => T} work
+ * @returns {T}
+ */
+export function withFreshRecordIds(work) {
+  const utils = globalThis.foundry.utils;
+  const ambient = utils.randomID;
+  let sequence = 0;
+  utils.randomID = () => `rid-${(sequence += 1)}`;
+  try {
+    return work();
+  } finally {
+    utils.randomID = ambient;
+  }
+}
