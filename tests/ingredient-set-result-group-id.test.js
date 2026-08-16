@@ -136,12 +136,18 @@ test('toJSON includes resultGroupId when set', () => {
   assert.equal(json.resultGroupId, 'rg-1');
 });
 
-test('toJSON includes resultGroupId: null when not set', () => {
+test('1135: toJSON OMITS resultGroupId when null, and absence rebuilds null', () => {
+  // This used to assert the opposite — that the key was always present, even as `null`.
+  // Issue 1135 retired it from the payload: the constructor rebuilds `null` from absence,
+  // and every reader coerces through `set?.resultGroupId || null`
+  // (`ResolutionModeService`'s reference-integrity check is the one that matters), so
+  // nothing distinguishes an omitted key from the written default.
   const set = new IngredientSet({});
   const json = set.toJSON();
-  assert.ok(Object.prototype.hasOwnProperty.call(json, 'resultGroupId'),
-    'toJSON() should include a resultGroupId key even when null');
-  assert.equal(json.resultGroupId, null);
+  assert.ok(!Object.prototype.hasOwnProperty.call(json, 'resultGroupId'),
+    'toJSON() omits an unset resultGroupId rather than writing null');
+  assert.equal(IngredientSet.fromJSON(json).resultGroupId, null,
+    'and the constructor rebuilds exactly the value that was omitted');
 });
 
 test('fromJSON round-trip preserves resultGroupId', () => {
