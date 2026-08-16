@@ -2820,7 +2820,7 @@ That is a property of the knowledge gate rather than an audience-dependent deriv
 | --- | --- |
 | **No exact craftability** | Building any number of summaries MUST invoke exact craftability evaluation and ingredient selection ZERO times. This is a counter-asserted invariant, not a guideline: it is the property the paging surfaces depend on, and the one most likely to erode silently behind a helpfully-named private method. |
 | **No redacted content** | A summary crossing to a player client carries no field the recipe's teaser hides, and no signal DERIVED from one. |
-| **No localized text** | Summaries carry tokens; the consuming surface localizes. A localized summary would key a row's sort on the active language. |
+| **No localized text, with ONE enumerated exception** | Summaries carry tokens; the consuming surface localizes. A localized summary would key a row's sort on the active language. The single exception is `RecipeSummary.categoryLabel`, admitted on the terms its field row above records: the localization seam is OPTIONAL, so no caller is forced to acquire i18n, and nothing sorts on it. The exception is enumerated rather than general — a surface needing a second localized field amends this row and states why the same two tests pass, and MUST NOT read `categoryLabel` as a precedent that summaries may localize. |
 | **No documents** | Only ids, plain strings, numbers, booleans and arrays of those, so a summary is serializable and cheap to hold by the page. |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->

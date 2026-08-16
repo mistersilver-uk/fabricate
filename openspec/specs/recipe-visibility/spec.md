@@ -370,9 +370,12 @@ It MUST apply every gate the summary phase applies — the system-blocked-for-re
 The detail phase evaluates access for ONE recipe through the same per-recipe evaluation the corpus-wide pass calls, so § One Candidate Collection Per Evaluation is unaffected: the corpus-wide pass is not repeated, and no second corpus-wide walk is introduced.
 - **Redaction is unchanged by the split.**
 A detail model for a recipe whose access reason is `teaser` is redacted exactly as before, so the row and the inspector cannot disagree about whether a recipe is undiscovered.
-- **The detail phase applies the same `enabled` filter the corpus query applies.**
-The summary phase reads the enabled corpus, so it can never project a disabled recipe; the detail phase resolves a recipe by id and MUST therefore re-apply that filter for a non-GM viewer.
-Absent `enabled` reads as ON, per the model default.
+- **The detail phase re-applies the `enabled` gate by the reader convention, not by mirroring the corpus query.**
+The summary phase reads the enabled corpus, so it can never project a disabled recipe; the detail phase resolves a recipe by id and MUST therefore re-apply that gate for a non-GM viewer.
+It applies the convention this field carries at every other reader — absent reads as ON, so only an explicit `false` refuses — whereas the corpus query filters on strict equality with `true`.
+The recipe model stores whatever non-`undefined` value it was given, so the two answers differ for a non-boolean `enabled` that an import or a macro can write: such a recipe is absent from the browse list yet still hydrates by id.
+That asymmetry is RECORDED rather than closed, and its direction is stated because it is the disclosing one.
+Closing it by reading an omitted `enabled` as OFF is not admissible, because that would blank the inspector for every recipe authored before the field existed.
 
 ## Knowledge Access Evaluation
 
