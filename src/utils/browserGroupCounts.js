@@ -21,7 +21,16 @@
 /**
  * Count rows per category.
  *
- * @param {object[]} rows the FILTERED rows (pre-pagination), in any order.
+ * PASS THE COHORT, NEVER THE PAGE (issue 1081). Once the row projection is page-scoped —
+ * only the current page's definitions are richly projected — the temptation is to count
+ * whatever array is already to hand, and the array to hand is the page. That produces a
+ * header which says a 282-strong bucket holds 25, and {@link categoryTotalOf} CANNOT catch
+ * it: it guards one direction only. `buildRecipeBrowserModel` and
+ * `buildComponentBrowserModel` are therefore the intended callers, because each computes
+ * this from its own `filtered` array before paginating and hands the page and the totals to
+ * the grouper together, so the two scopes cannot be mixed up at a call site.
+ *
+ * @param {object[]} rows the FILTERED COHORT (pre-pagination), in any order.
  * @param {(row: object) => string} categoryOf reads a row's normalized category key.
  * @returns {Map<string, number>} category key → how many filtered rows it holds.
  */

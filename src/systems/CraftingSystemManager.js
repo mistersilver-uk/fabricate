@@ -6492,11 +6492,11 @@ export class CraftingSystemManager {
    * from each group (dropping a group left with no options), then drop a set left with
    * no ingredient groups / ingredients / essences.
    *
-   * **`ingredients` is REWRITTEN, not carried through the spread (issue 1036).** It is
+   * **`ingredients` is RESOLVED, never carried through the spread (issue 1036).** It is
    * the flat legacy mirror `IngredientSet` derives from `ingredientGroups` — the first
-   * option of each group (`IngredientSet.js:42`) — and `toJSON` emits it alongside the
-   * groups, so a `...set` spread hands the STALE mirror to both the retention filter
-   * below and the `IngredientSet` constructor. Two live defects followed from that:
+   * option of each group — and a payload written before issue 1135 still carries it
+   * alongside the groups, so a `...set` spread hands the STALE mirror to both the retention
+   * filter below and the `IngredientSet` constructor. Two live defects followed from that:
    *
    *  1. the retention filter reads `set.ingredients?.length`, so a set whose ONLY
    *     requirement was the deleted essence survived the drop while still naming an
@@ -6509,9 +6509,25 @@ export class CraftingSystemManager {
    *     whenever `ingredientGroups` is empty (`IngredientSet.js:33-36`), so a stripped
    *     set with a stale mirror RESURRECTED the deleted essence option as a fresh group.
    *
-   * Recomputing the mirror from the stripped groups — rather than filtering the old
-   * array — is what keeps it a mirror: a group whose essence option was removed but
-   * which still carries a component option must surface THAT option, not nothing.
+   * **Since issue 1135 the mirror is DROPPED rather than recomputed** for a set authored
+   * with groups. `toJSON` no longer emits the flat alias at all, so recomputing it here
+   * re-created the write-retired alias in the patch this method feeds `updateRecipe` — the
+   * INTERMEDIATE object, not the file. It never reached disk either way: `updateRecipe`
+   * shallow-spreads the patch, rebuilds through `Recipe.fromJSON`, and persists
+   * `updatedRecipe.toJSON()`, which no longer emits the alias. What dropping it buys is that
+   * the patch and the merged object hydrated from it carry ONE ingredient authority, so no
+   * consumer can read a mirror that disagrees with the groups beside it — defects 1 and 2
+   * above are both consequences of a set travelling with a mirror that does. Dropping is
+   * safe because `IngredientSet` derives the mirror from the stripped groups on read.
+   *
+   * Dropping it UNCONDITIONALLY would not be safe: for a set authored in the LEGACY flat
+   * shape the array is the set's only ingredient data and the `set.ingredients?.length` leg
+   * of the retention filter is what keeps that set alive, so that array is filtered in place
+   * and kept.
+   *
+   * The same reasoning retires `essences: {}`: an emptied legacy map is the value the
+   * constructor rebuilds from absence, and the retention filter reads it through
+   * `Object.keys(set.essences || {})`.
    *
    * @param {object[]} sets
    * @param {string} essenceId
@@ -6519,6 +6535,8 @@ export class CraftingSystemManager {
    * @private
    */
   _stripEssenceFromSets(sets, essenceId) {
+    const isDeletedEssence = (ref) =>
+      ref?.match?.type === 'essence' && ref.match.essenceId === essenceId;
     return (sets || [])
       .map((set) => {
         const essences = { ...set.essences };
@@ -6526,25 +6544,18 @@ export class CraftingSystemManager {
         const ingredientGroups = (set.ingredientGroups || [])
           .map((group) => ({
             ...group,
-            options: (group.options || []).filter(
-              (option) =>
-                !(option?.match?.type === 'essence' && option.match.essenceId === essenceId)
-            ),
+            options: (group.options || []).filter((option) => !isDeletedEssence(option)),
           }))
           .filter((group) => (group.options?.length || 0) > 0);
-        const ingredients =
+        const next = { ...set, essences, ingredientGroups };
+        if (Object.keys(essences).length === 0) delete next.essences;
+        const surviving =
           (set.ingredientGroups?.length || 0) > 0
-            ? ingredientGroups.map((group) => group.options?.[0] || null).filter(Boolean)
-            : // A set authored in the LEGACY flat shape has no groups to mirror, so its
-              // own array is the authority and is filtered in place.
-              (set.ingredients || []).filter(
-                (ingredient) =>
-                  !(
-                    ingredient?.match?.type === 'essence' &&
-                    ingredient.match.essenceId === essenceId
-                  )
-              );
-        return { ...set, essences, ingredientGroups, ingredients };
+            ? []
+            : (set.ingredients || []).filter((ingredient) => !isDeletedEssence(ingredient));
+        if (surviving.length > 0) next.ingredients = surviving;
+        else delete next.ingredients;
+        return next;
       })
       .filter(
         (set) =>

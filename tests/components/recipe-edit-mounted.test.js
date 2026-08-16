@@ -35,6 +35,9 @@ const RAW_MODULES = [
   'src/ui/svelte/util/recipeCurrency.js',
   'src/models/Recipe.js',
   'src/models/Ingredient.js',
+  // Recipe, Ingredient and IngredientSet all filter their payloads through the shared
+  // omitted-when-default machinery (issue 1135).
+  'src/models/reconstructibleDefaults.js',
   'src/models/IngredientSet.js',
   // IngredientSet imports the shared essence allocator (issue 917); the harness's
   // dependency validator throws a named "add it to rawModules" error without it.

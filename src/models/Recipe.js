@@ -6,6 +6,7 @@ import { normalizeRoutedName, isReservedRoutedName } from '../utils/routedOutcom
 
 import { Ingredient } from './Ingredient.js';
 import { IngredientSet } from './IngredientSet.js';
+import { isEmptyArray, isNull, omitReconstructibleDefaults } from './reconstructibleDefaults.js';
 import { Result } from './Result.js';
 
 /**
@@ -24,12 +25,6 @@ export const DEFAULT_RECIPE_IMAGE = 'icons/sundries/documents/blueprint-recipe-a
  * @type {string[]}
  */
 const DEFAULT_TEASER_HIDDEN_FIELDS = ['ingredients', 'results', 'description'];
-
-/** @returns {boolean} whether `value` is an array holding nothing. */
-const isEmptyArray = (value) => Array.isArray(value) && value.length === 0;
-
-/** @returns {boolean} whether `value` is exactly `null`. */
-const isNull = (value) => value === null;
 
 /**
  * Whether a normalized teaser block is byte-for-byte the one `_normalizeTeaser` builds
@@ -117,18 +112,37 @@ export const RECIPE_OMITTED_WHEN_DEFAULT = {
 
 /**
  * Drop every key of a serialized recipe whose value is the one the constructor rebuilds from
- * absence. Key order is otherwise preserved, so the serialized text of an unchanged recipe is
- * stable across calls.
+ * absence, preserving the emitted key order.
  * @param {Record<string, unknown>} payload
  * @returns {Record<string, unknown>}
  */
-function omitReconstructibleDefaults(payload) {
-  const out = {};
-  for (const [key, value] of Object.entries(payload)) {
-    if (RECIPE_OMITTED_WHEN_DEFAULT[key]?.(value)) continue;
-    out[key] = value;
-  }
-  return out;
+const omitRecipeDefaults = (payload) =>
+  omitReconstructibleDefaults(payload, RECIPE_OMITTED_WHEN_DEFAULT);
+
+/**
+ * Serialize ONE result group — the recipe-level and step-level emitters share this so the
+ * two cannot disagree about the group payload.
+ *
+ * `role` and `checkOutcomeIds` are both emitted only when they carry information, as
+ * conditional spreads over the canonical key order (issue 1135). `checkOutcomeIds: []` is
+ * the value `_normalizeResultGroups` rebuilds from absence, and its only two arbiters —
+ * `ResolutionModeService`'s routed-group filters — treat an omitted key and `[]` identically.
+ *
+ * `results` tolerates a plain object as well as a `Result`, because the step emitter is
+ * handed step copies that a caller may have rewritten in place.
+ *
+ * @param {object} group
+ * @returns {Record<string, unknown>}
+ */
+function serializeResultGroup(group) {
+  const checkOutcomeIds = Array.isArray(group.checkOutcomeIds) ? [...group.checkOutcomeIds] : [];
+  return {
+    id: group.id,
+    name: group.name,
+    ...(group.role === 'failure' && { role: 'failure' }),
+    ...(checkOutcomeIds.length > 0 && { checkOutcomeIds }),
+    results: (group.results || []).map((result) => (result.toJSON ? result.toJSON() : result)),
+  };
 }
 
 /**
@@ -659,7 +673,7 @@ export class Recipe {
    * @returns {Record<string, unknown>}
    */
   toJSON() {
-    return omitReconstructibleDefaults({
+    return omitRecipeDefaults({
       id: this.id,
       name: this.name,
       description: this.description,
@@ -682,25 +696,11 @@ export class Recipe {
       steps: this.steps.map((step) => ({
         ...step,
         ingredientSets: (step.ingredientSets || []).map((set) => (set.toJSON ? set.toJSON() : set)),
-        resultGroups: (step.resultGroups || []).map((group) => ({
-          id: group.id,
-          name: group.name,
-          ...(group.role === 'failure' && { role: 'failure' }),
-          checkOutcomeIds: Array.isArray(group.checkOutcomeIds) ? [...group.checkOutcomeIds] : [],
-          results: (group.results || []).map((result) =>
-            result.toJSON ? result.toJSON() : result
-          ),
-        })),
+        resultGroups: (step.resultGroups || []).map(serializeResultGroup),
         toolIds: Array.isArray(step.toolIds) ? [...step.toolIds] : [],
       })),
       ingredientSets: this.ingredientSets.map((s) => s.toJSON()),
-      resultGroups: this.resultGroups.map((group) => ({
-        id: group.id,
-        name: group.name,
-        ...(group.role === 'failure' && { role: 'failure' }),
-        checkOutcomeIds: Array.isArray(group.checkOutcomeIds) ? [...group.checkOutcomeIds] : [],
-        results: group.results.map((r) => r.toJSON()),
-      })),
+      resultGroups: this.resultGroups.map(serializeResultGroup),
       toolIds: [...this.toolIds],
       timeRequirement: this.timeRequirement,
       isVariable: this.isVariable,

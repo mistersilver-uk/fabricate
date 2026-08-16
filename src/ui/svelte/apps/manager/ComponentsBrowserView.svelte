@@ -16,16 +16,10 @@
   } from '../../../../utils/componentBulkEditModel.js';
   import {
     COMPONENT_SORT_KEYS,
-    componentCategoryOf,
+    buildComponentBrowserModel,
     componentCategoryOptions,
     createComponentBrowserState,
-    describeActiveComponentFilters,
-    filterComponents,
-    groupComponentsByCategory,
-    paginateComponents,
-    sortComponents,
   } from '../../../../utils/componentBrowserModel.js';
-  import { countByCategory } from '../../../../utils/browserGroupCounts.js';
   import {
     GENERAL_COMPONENT_CATEGORY,
     getComponentCategoryLabel,
@@ -116,37 +110,66 @@
   );
   const categoryOptions = $derived(componentCategoryOptions(itemCards || [], categoryVocabulary));
 
-  const filteredComponents = $derived(
-    filterComponents(itemCards || [], {
-      category: ui.categoryFilter,
-      essence: ui.essenceFilter,
-    })
-  );
   // Grouping ON ⇒ order category-major BEFORE pagination (issue 801), so each category is
   // a contiguous run across page boundaries rather than an interleaved slice on every
-  // page. `groups` still groups the current `page.components`; the header's "N of M" stays
-  // truthful for a category that spans a boundary. When grouping is OFF the order is
-  // unchanged.
-  const sortedComponents = $derived(
-    sortComponents(filteredComponents, {
-      key: ui.sortKey,
-      direction: ui.sortDirection,
-      categoryMajor: ui.groupByCategory,
-    })
-  );
-  const page = $derived(
-    paginateComponents(sortedComponents, {
+  // page. `groups` still groups the current page; the header's "N of M" stays truthful for
+  // a category that spans a boundary. When grouping is OFF the order is unchanged.
+  //
+  // The four steps used to be composed here by hand. They moved into
+  // `buildComponentBrowserModel` for issue 1081: the per-category totals the group headers
+  // pair with their rendered count MUST be counted over the FILTERED COHORT, and once row
+  // projection is page-scoped a pipeline assembled at the call site is exactly where
+  // "count the array in scope" — the page — gets written.
+  const model = $derived(
+    buildComponentBrowserModel(itemCards || [], {
+      category: ui.categoryFilter,
+      essence: ui.essenceFilter,
+      // Not applied as a filter here (the store searches before projecting); it feeds the
+      // active-filter chip run only.
+      search: itemSearchTerm,
+      sortKey: ui.sortKey,
+      sortDirection: ui.sortDirection,
       pageIndex: ui.pageIndex,
       pageSize: ui.pageSize,
+      groupByCategory: ui.groupByCategory,
     })
   );
-  // The per-category totals the group headers pair with their rendered count. Counted
-  // over the FILTERED rows (`itemCards` arrives already search-filtered by the store),
-  // so a total can never ignore an active filter.
-  const categoryTotals = $derived(countByCategory(filteredComponents, componentCategoryOf));
-  const groups = $derived(
-    ui.groupByCategory ? groupComponentsByCategory(page.components, categoryTotals) : []
-  );
+  const filteredComponents = $derived(model.filtered);
+  // The expensive half of a component card — its linked source document, the "Missing"
+  // badge and the live description fallback — is resolved for the PAGE and nothing else
+  // (issue 1081). The store projects every card cheaply and only this view knows which of
+  // them are on screen, so the request has to originate here.
+  //
+  // `hydrate()` is idempotent and memoized per card, so re-running this effect on every
+  // re-render (including the store's own republish once the cards fill) costs nothing. The
+  // returned promise is deliberately not awaited: the card fills itself in place and the
+  // store republishes, which is what re-renders the rows.
+  //
+  // Called off the card rather than through the projection's `hydrateItemCards` helper on
+  // purpose: importing `stores/adminComponentRowProjection.js` here would pull that module
+  // (and its own imports) into the dependency closure of every mounted-component suite that
+  // renders this tree, where a module missing from the harness allowlist HANGS the suite as
+  // `# cancelled` rather than failing. A card with no `hydrate` — an isolated mount's plain
+  // fixture — is simply left as it is.
+  //
+  // The rejection is swallowed deliberately rather than left to become an unhandled
+  // rejection on every render: a card that could not resolve keeps its un-hydrated reading,
+  // which renders correctly rather than blankly, and the projection drops its memo on
+  // rejection so the next render retries.
+  $effect(() => {
+    for (const card of model.page) card?.hydrate?.()?.catch?.(() => {});
+  });
+  const page = $derived({
+    components: model.page,
+    pageIndex: model.pageIndex,
+    pageCount: model.pageCount,
+    totalCount: model.totalCount,
+    // The 1-based inclusive window the pager renders as "1–25 of 30". Dropping these makes
+    // the count read "undefined–undefined of 30" and nothing else fails.
+    rangeStart: model.rangeStart,
+    rangeEnd: model.rangeEnd,
+  });
+  const groups = $derived(model.groups);
 
   // ── Bulk selection (issue 772) ───────────────────────────────────────────────────
   // `pageIds` is the set of RENDERED row ids, NOT `page.components`: with grouping on
@@ -208,13 +231,7 @@
 
   // The active-filter chips, derived by the pure model so the run and the "is anything
   // on?" question can never disagree.
-  const chips = $derived(
-    describeActiveComponentFilters({
-      category: ui.categoryFilter,
-      essence: ui.essenceFilter,
-      search: itemSearchTerm,
-    })
-  );
+  const chips = $derived(model.chips);
 
   const sortOptions = $derived(
     COMPONENT_SORT_KEYS.map((key) => ({

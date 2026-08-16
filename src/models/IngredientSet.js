@@ -7,6 +7,52 @@ import { clampAllocation, deliveredEssences, greedyAllocate } from '../utils/ess
 
 import { IngredientGroup } from './IngredientGroup.js';
 import { getMatchHandler } from './match/matchTypes.js';
+import {
+  isEmptyArray,
+  isEmptyMap,
+  isEmptyString,
+  isNull,
+  omitReconstructibleDefaults,
+} from './reconstructibleDefaults.js';
+
+/**
+ * Serialized ingredient-SET fields the `IngredientSet` constructor rebuilds to EXACTLY this
+ * value when the key is absent, so emitting them is pure payload weight (issue 1135).
+ *
+ * Every candidate defaults to a value that is already falsy or already zero-length under
+ * every reader's coercion, which is the discriminator against issue 1134's live hazard —
+ * there the written default was the TRUTHY one, so absence flipped a predicate and silently
+ * emptied a scan.
+ *
+ * Two readers of `name` are semantic rather than structural and are cleared by argument
+ * rather than by assertion:
+ * - `systems/toolCheckBonus.js` treats a non-empty set name as "tools are active" for a
+ *   `routedByIngredients` system. It survives omission only because the written default `''`
+ *   is already the falsy side of that predicate; had the default been a non-empty sentinel,
+ *   omitting it would have deactivated every set's tools.
+ * - `SignatureValidator` reads `set.name || null` and falls back to the set position for
+ *   absence and `''` alike.
+ *
+ * `essences` is the legacy per-set map. Absence is already a live on-disk state for it:
+ * `migrateEssencesToIngredientGroups` DELETES the key outright once it has folded each
+ * positive entry into an essence option, and every one of its ~20 readers guards with
+ * `|| {}`, `?.` or `in`.
+ *
+ * **This is a hand-maintained mirror of the constructor**, guarded mechanically by
+ * `tests/ingredient-serialization-payload.test.js`.
+ *
+ * Deliberately ABSENT from this table: `id`, which is the set's identity (an absent id mints
+ * a new one), and `ingredientGroups`, which is its authored shape.
+ *
+ * @type {Record<string, (value: unknown) => boolean>}
+ */
+export const INGREDIENT_SET_OMITTED_WHEN_DEFAULT = {
+  name: isEmptyString,
+  essences: isEmptyMap,
+  toolIds: isEmptyArray,
+  resultMapping: isEmptyArray,
+  resultGroupId: isNull,
+};
 
 /**
  * Node/subset budget for the item-level backtracking assignment search (issue 663).
@@ -107,7 +153,9 @@ export class IngredientSet {
       group instanceof IngredientGroup ? group : IngredientGroup.fromJSON(group)
     );
 
-    // Legacy alias retained for older UI code paths.
+    // Legacy alias retained for older UI code paths. IN-MEMORY ONLY since issue 1135:
+    // `toJSON` no longer emits it, and this derivation is what keeps every runtime reader
+    // of `set.ingredients` working off a hydrated set.
     this.ingredients = this.ingredientGroups
       .map((group) => group.options?.[0] || null)
       .filter(Boolean);
@@ -144,6 +192,19 @@ export class IngredientSet {
     return out;
   }
 
+  /**
+   * PERMANENT INBOUND SHIM — do not remove with a "the alias is gone" cleanup.
+   *
+   * `toJSON` stopped EMITTING the flat `ingredients` alias (issue 1135), and that is a
+   * write-side change only. A world saved before ingredient groups existed, a crafting
+   * system exported before them, and any third-party payload authored against that shape
+   * carry the flat array as their ONLY ingredient data, and none of them is reachable to
+   * migrate. Each legacy ingredient becomes its own single-option group, which is what the
+   * alias meant before groups existed.
+   *
+   * @param {object[]} ingredients
+   * @returns {Array<{id: string, name: string, options: object[]}>}
+   */
   _legacyIngredientsToGroups(ingredients = []) {
     return (ingredients || []).map((ingredient, idx) => ({
       id: foundry.utils.randomID(),
@@ -1807,18 +1868,35 @@ export class IngredientSet {
     return item.uuid || item.id;
   }
 
+  /**
+   * Serialize this set, omitting every reconstructible default and the write-retired flat
+   * `ingredients` alias (issue 1135).
+   *
+   * The alias was DERIVED, never authored — the first option of each group, rebuilt by the
+   * constructor at `this.ingredients` — so it was a strictly lossy projection of
+   * `ingredientGroups` that duplicated ~20% of a serialized recipe corpus. It is
+   * WRITE-retired and READ permanently: the instance property and the constructor's
+   * `_legacyIngredientsToGroups` fallback stay exactly as they are, and so do the three
+   * projections that synthesize groups from it (`RecipeManager`'s two, and
+   * `adminRecipeRowProjection`). That fallback leg is reachable only for a pre-groups
+   * payload where the flat array is the set's ONLY ingredient data, so stripping it on
+   * import would delete a recipe's entire input requirement.
+   *
+   * @returns {Record<string, unknown>}
+   */
   toJSON() {
-    return {
-      id: this.id,
-      name: this.name,
-      ingredientGroups: this.ingredientGroups.map((group) => group.toJSON()),
-      // Legacy alias retained for compatibility with older consumers.
-      ingredients: this.ingredients.map((i) => i.toJSON()),
-      essences: this.essences,
-      toolIds: [...this.toolIds],
-      resultMapping: this.resultMapping,
-      resultGroupId: this.resultGroupId,
-    };
+    return omitReconstructibleDefaults(
+      {
+        id: this.id,
+        name: this.name,
+        ingredientGroups: this.ingredientGroups.map((group) => group.toJSON()),
+        essences: this.essences,
+        toolIds: [...this.toolIds],
+        resultMapping: this.resultMapping,
+        resultGroupId: this.resultGroupId,
+      },
+      INGREDIENT_SET_OMITTED_WHEN_DEFAULT
+    );
   }
 
   static fromJSON(data) {

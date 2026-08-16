@@ -1147,8 +1147,29 @@
     recipeCategories: selectedSystem?.categories?.length || 0,
   });
   const itemCards = $derived($viewState.itemCards || []);
+  // Reference counting for the Tags & Categories screen delegates to the pure
+  // `buildVocabularyUsage` helper (issue 689), which — unlike the pre-689 inline count —
+  // also credits a tag for every recipe tag-placeholder ingredient (`match.type === 'tags'`)
+  // that names it, so a tag only ever used as an ingredient filter no longer reads as
+  // "Unused".
+  //
+  // The recipe half of that tag count arrives PRE-COUNTED from the store (issue 1081). This
+  // derivation feeds the left nav rail's Tags & Categories badge, which is a sibling of the
+  // view switch rather than a child of one, so it is evaluated on every render of the
+  // manager in every view. Counting the placeholders here read `ingredientSets` and `steps`
+  // off each projected row, and those are detail-tier fields sharing one memoized producer
+  // — so an always-mounted badge deep-cloned the whole library before first paint. The
+  // recipe CATEGORY count below stays here because `category` is a summary-tier field.
+  // Passed RAW, with no `|| {}` default: an empty record is a legitimate pre-count (a system
+  // with no tag placeholders at all), so `buildVocabularyUsage` has to treat `{}` as
+  // authoritative — which means a defensive `|| {}` here would make its documented
+  // "omit it and the walk runs here" fallback unreachable and turn "not published" into
+  // "there are none". A tag referenced only by a recipe ingredient placeholder would then
+  // read as unused and be offered for one-click deletion with no confirm strip.
   const tagCategoryUsage = $derived(
-    buildTagCategoryUsage(selectedSystem, $viewState.recipes || [], itemCards)
+    buildVocabularyUsage($viewState.recipes || [], itemCards, {
+      recipeTagPlaceholderCounts: $viewState.recipeTagPlaceholderCounts,
+    })
   );
   const categoryRows = $derived(
     buildCategoryRows(
@@ -1880,6 +1901,38 @@
       ? itemCards.find((item) => item.id === selectedComponentId) || null
       : null
   );
+  // The expensive half of a component card — its linked source document, the "Missing"
+  // verdict and the live description fallback — resolves on demand (issue 1081), and
+  // `ComponentsBrowserView` only ever asks for the page it renders. Both cards above are
+  // resolved from the WHOLE cohort rather than from that page, so unless this asks, nothing
+  // does. Three independent routes reach an un-asked-for card:
+  //   - first open, where `selectedComponentId` is still empty so the inspector falls back
+  //     to `itemCards[0]` — the manager's STORED order, while the browser renders the
+  //     name-sorted page 1, so on any library past one page the default selection is
+  //     off-page from the moment the studio opens;
+  //   - a selection made on one page and still held after paging elsewhere, because every
+  //     refresh rebuilds every card un-hydrated and only the rendered page is re-asked;
+  //   - the component editor, which UNMOUNTS the browser entirely — and Replace source /
+  //     Unlink source refresh without navigating away from it.
+  // Left un-asked, all three render the pre-hydration reading permanently: "No description
+  // has been added." for a compendium-linked component whose prose lives on the source
+  // document, which is the regression issue 676 filed and issue 800 preserved, and an accent
+  // `Compendium` / `Items Directory` pill telling the GM a dangling link is healthy.
+  //
+  // Called off the card rather than through the projection's `hydrateItemCards` helper for
+  // the reason `ComponentsBrowserView` states at its own effect: importing that store module
+  // here would pull it into the dependency closure of every mounted suite rendering this
+  // tree, where a module missing from the harness allowlist HANGS the suite rather than
+  // failing it. A card with no `hydrate` — a fixture's plain object — is left as it is.
+  //
+  // The rejection is swallowed deliberately: a card that could not resolve keeps its
+  // un-hydrated reading, which renders correctly rather than blankly, and the projection
+  // drops its memo on rejection so the next render retries rather than re-throwing forever.
+  $effect(() => {
+    for (const card of [selectedComponent, componentForEdit]) {
+      card?.hydrate?.()?.catch?.(() => {});
+    }
+  });
   const componentEditTagOptions = $derived(componentTagOptionsFor(componentForEdit));
   const componentEditEssenceOptions = $derived(componentEssenceOptionsFor(componentForEdit));
   const componentEditShowTags = $derived(componentShowTagsFor(componentForEdit));
@@ -6987,14 +7040,6 @@
       .trim()
       .toLowerCase();
     return normalized || 'general';
-  }
-
-  // Reference counting delegates to the pure `buildVocabularyUsage` helper (issue
-  // 689), which — unlike the pre-689 inline count — also credits a tag for every
-  // recipe tag-placeholder ingredient (`match.type === 'tags'`) that names it, so a
-  // tag only ever used as an ingredient filter no longer reads as "Unused".
-  function buildTagCategoryUsage(system, recipes, items) {
-    return buildVocabularyUsage(recipes, items);
   }
 
   function buildCategoryRows(categories, usage, icons) {
