@@ -23,7 +23,12 @@ import { formatCurrencyRequirement, normalizeCurrencyUnit } from './currencyProf
 import { readStackQuantity } from './itemStackQuantity.js';
 import { RecipeActivationError } from './RecipeActivationError.js';
 import { RecipePersistenceError } from './RecipePersistenceError.js';
-import { corpusChanged, REVISION_SCOPES, RevisionRegistry } from './revisionTokens.js';
+import {
+  corpusDelta,
+  patchCorpusInPlace,
+  REVISION_SCOPES,
+  RevisionRegistry,
+} from './revisionTokens.js';
 import { SettingsCraftingDefinitionRepository } from './SettingsCraftingDefinitionRepository.js';
 import { SignatureValidator } from './SignatureValidator.js';
 import { computeSystemVisibility } from './systemValidation.js';
@@ -80,6 +85,18 @@ function signatureGuardsMatch(previous, next) {
     previous.componentCount === next.componentCount &&
     previous.members === next.members
   );
+}
+
+/**
+ * A recipe in its comparable, persisted form — the projection `reload()`'s corpus
+ * comparison runs over. A fixture may write a plain object straight into the map, which has
+ * no `toJSON`, so it stands in for its own projection.
+ *
+ * @param {object} recipe
+ * @returns {object}
+ */
+function projectRecipe(recipe) {
+  return typeof recipe?.toJSON === 'function' ? recipe.toJSON() : recipe;
 }
 
 /**
@@ -140,6 +157,10 @@ export class RecipeManager {
     // switch systems and a single slot would thrash between two open browsers.
     /** @type {Map<string, {guard: object, report: object}>} */
     this._signatureReports = new Map();
+    // The unconsumed delta from the most recent `reload()` (issue 1078), read once through
+    // `consumeReloadDelta()`.
+    /** @type {import('./revisionTokens.js').CorpusDelta|null} */
+    this._reloadDelta = null;
     this.getCraftingSystem = typeof getCraftingSystem === 'function' ? getCraftingSystem : null;
     this._getCraftingSystemManager =
       typeof getCraftingSystemManager === 'function' ? getCraftingSystemManager : null;
@@ -314,12 +335,39 @@ export class RecipeManager {
    * catches up here. Does NOT persist, so it is safe to call from a settings hook
    * without a write loop.
    *
-   * Change detection is {@link corpusChanged}, NOT `JSON.stringify` of the whole corpus
+   * Change detection is {@link corpusDelta}, NOT `JSON.stringify` of the whole corpus
    * (issue 1076). The old comparison serialized every recipe twice per reload — 22.3 MB of
    * string per pass at 10,000 recipes — on every connected client, purely to answer a
-   * boolean. The replacement compares record by record with a reference fast path and
-   * short-circuits at the first difference, and a reload that finds no change advances no
-   * revision token.
+   * boolean. The replacement compares record by record with a reference fast path, and a
+   * reload that finds no change advances no revision token.
+   *
+   * ## What the delta buys, and why it is not an optimisation of an optimisation
+   *
+   * A world setting replicates as ONE `Setting` document whose whole value is a JSON string,
+   * so a remote client re-parses the entire corpus and no object reference survives the
+   * wire. This method used to replace `this.recipes` unconditionally and advance EVERY
+   * system's token whenever anything changed, which meant that on every client except the
+   * writer's, every retained guard keyed on a token or on container identity missed on every
+   * reload — #1074's signature report and #1076's definition indexes included. Two shipped
+   * optimisations did nothing for a player (issue 1078).
+   *
+   * So this does two things instead, both driven by the same delta:
+   *
+   * 1. **It advances only the systems whose recipes actually moved.** An edit in system A
+   *    leaves a consumer scoped to system B holding a valid token.
+   * 2. **It preserves container identity.** The map object is patched IN PLACE, and a recipe
+   *    the delta proved unchanged keeps its EXISTING object — so the retained cohort index
+   *    and the signature guard's `recipeMap` / `members` clauses survive a no-op reload.
+   *    Reuse is licensed by the delta's record-level structural equality and by nothing
+   *    weaker.
+   *
+   * A change the delta cannot attribute to individual records — a reordering — routes
+   * exactly as this method always did: replace the map, preserve no identity, advance every
+   * system. The failure direction is deliberate, because an over-broad refresh is a
+   * performance bug while a stale read model is a correctness one.
+   *
+   * The boolean return is unchanged. The delta itself is read once through
+   * {@link consumeReloadDelta}.
    *
    * @returns {boolean} `true` only when the recipes actually changed, so
    *   callers can skip re-emitting a change hook (and avoid a redundant refresh on
@@ -331,25 +379,57 @@ export class RecipeManager {
     // document-backed (#1088 Q3). Reloading is then a no-op rather than a wrong
     // answer, and #1092 owns the replacement transport.
     const savedRecipes = this._repository.readReplicatedSnapshot();
+    // Every reload replaces the pending delta, including a reload that reads nothing, so a
+    // stale delta can never be consumed after a later one.
+    this._reloadDelta = null;
     if (!savedRecipes) return false;
     const next = new Map();
     for (const recipe of savedRecipes) {
       next.set(recipe.id, recipe);
     }
-    const changed = corpusChanged(this.recipes.values(), next.values(), (recipe) =>
-      typeof recipe?.toJSON === 'function' ? recipe.toJSON() : recipe
-    );
-    this.recipes = next;
+    const delta = corpusDelta(this.recipes.values(), next.values(), { project: projectRecipe });
+    this._reloadDelta = delta;
     this.initialized = true;
-    // The cohort index is keyed on the map object, so a replaced map is already a miss;
-    // dropping it here keeps that explicit rather than incidental.
-    this._cohortCache = null;
-    if (changed) {
+    if (!delta.changed) return false;
+
+    if (delta.reordered) {
+      this.recipes = next;
       const touched = new Set();
       for (const recipe of next.values()) touched.add(recipe?.craftingSystemId);
+      // Also drops the cohort index, which is keyed on the map object and so would have
+      // missed on the replacement above regardless.
       this._advanceRecipeRevision(...touched);
+      return true;
     }
-    return changed;
+
+    const touched = new Set();
+    for (const entry of delta.perRecord.values()) {
+      // A recipe MOVED between systems names both, exactly as `updateRecipe` does.
+      if (entry.before) touched.add(entry.before.craftingSystemId);
+      if (entry.after) touched.add(entry.after.craftingSystemId);
+    }
+    patchCorpusInPlace(this.recipes, next, delta);
+    // Also drops the cohort index, whose token clause this advance would fail anyway.
+    this._advanceRecipeRevision(...touched);
+    return true;
+  }
+
+  /**
+   * The delta from the most recent {@link reload}, cleared by this read (issue 1078).
+   *
+   * One-shot on purpose: a delta describes one transition, and a consumer that re-read a
+   * retained one would invalidate work a second time for a change that already happened. It
+   * is also cleared by the NEXT reload, so there is no window in which a stale delta is
+   * readable.
+   *
+   * @returns {import('./revisionTokens.js').CorpusDelta|null} `null` when there is no
+   *   unconsumed delta — never reloaded, already consumed, or a backend with no replicated
+   *   snapshot to read.
+   */
+  consumeReloadDelta() {
+    const delta = this._reloadDelta;
+    this._reloadDelta = null;
+    return delta;
   }
 
   _notifyRecipesChanged(action, details = {}) {

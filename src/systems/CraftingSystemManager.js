@@ -77,7 +77,12 @@ import { normalizeGatheringRealmList, normalizeGatheringRealmSettings } from './
 import { normalizePreviewSandbox } from './progressiveCheckSandbox.js';
 import { RecipeActivationError } from './RecipeActivationError.js';
 import { RecipePersistenceError } from './RecipePersistenceError.js';
-import { corpusChanged, REVISION_SCOPES, RevisionRegistry } from './revisionTokens.js';
+import {
+  corpusDelta,
+  patchCorpusInPlace,
+  REVISION_SCOPES,
+  RevisionRegistry,
+} from './revisionTokens.js';
 import { SettingsCraftingDefinitionRepository } from './SettingsCraftingDefinitionRepository.js';
 import { SignatureValidator } from './SignatureValidator.js';
 
@@ -114,6 +119,10 @@ export class CraftingSystemManager {
     // The revision-token registry this manager mints from (issue 1076). Per manager, never
     // a module singleton.
     this._revisions = new RevisionRegistry();
+    // The unconsumed delta from the most recent `reload()` (issue 1078), read once through
+    // `consumeReloadDelta()`.
+    /** @type {import('./revisionTokens.js').CorpusDelta|null} */
+    this._reloadDelta = null;
     // Shares THIS map rather than mirroring it, and hydrates through the manager's own
     // `_normalizeSystem`. That normalizer is a WHITELIST REBUILD — a key it does not
     // emit is dropped from storage on the next save — so the repository must call it
@@ -2365,16 +2374,24 @@ export class CraftingSystemManager {
   /**
    * Persist a crafting-system mutation through the definition repository (issue 1089).
    *
-   * `save()` with no argument stays the whole-corpus write, and three callers still
-   * need it because they are genuinely multi-system: the legacy recipe-item
-   * migration, the definition-description refresh, and the item-sync metadata refresh
-   * each iterate every system.
+   * `save()` with no argument stays the whole-corpus write, and TWO callers still need it
+   * because they are genuinely multi-system and unbounded: the legacy recipe-item migration
+   * (`_migrateLegacyRecipeItems`), which runs once at start-up, and the definition-
+   * description refresh inside `repairItemData`, a GM-invoked maintenance sweep. Both
+   * deliberately stay broad.
    *
-   * Every other mutation site — 21 of them — names the one system it touched with
-   * `save({ put: system })`, or the one it removed with `save({ delete: systemId })`.
-   * Under the settings adapter all of these write the same bytes, because
-   * `game.settings.set` replaces the whole value; the difference is that the record is
-   * now carried to the seam instead of being thrown away at the call site.
+   * Every other mutation site — 24 of them — names what it touched: `save({ put: system })`
+   * for the one system it modified, `save({ delete: systemId })` for the one it removed, or
+   * `save({ batch })` for the several a single pass rewrote. Under the settings adapter all
+   * of these write the same bytes, because `game.settings.set` replaces the whole value; the
+   * difference is that the record is now carried to the seam instead of being thrown away at
+   * the call site — and that the revision advance below is scoped to it (issue 1078).
+   *
+   * The item-sync metadata refresh (`refreshComponentMetadataForUpdatedItem`) used to be a
+   * third bare caller. It walks every system, but rewrites a component in almost none of
+   * them, so it names the ones it actually touched with `batch`. That matters far more than
+   * it looks: it runs on the `updateItem` hook, so while it was bare, every GM item rename in
+   * the world advanced every crafting system's token on every client.
    *
    * @param {import('./CraftingDefinitionRepository.js').DefinitionChange} [change]
    */
@@ -2401,6 +2418,34 @@ export class CraftingSystemManager {
    * catches up here. Does NOT re-run legacy migration and does NOT persist, so it is
    * safe to call from a settings hook without a write loop.
    *
+   * Change detection is {@link corpusDelta} (issues 1076 and 1078): record by record, with a
+   * reference fast path and no serialization of the corpus. The systems are already plain
+   * normalized objects, so they need no projection.
+   *
+   * ## Why it names the changed systems rather than answering a boolean
+   *
+   * This used to replace `this.systems` and advance EVERY system's token whenever anything
+   * changed at all. A world setting replicates as one JSON string, so a remote client
+   * re-parses the whole corpus and every `system.components` array is a new object on every
+   * reload — which made `getDefinitionIndex`'s array-keyed cache and #1074's signature guard
+   * miss unconditionally, on every client except the writer's, for any edit anywhere in the
+   * world. Two shipped optimisations did nothing for a player.
+   *
+   * So a reload now advances only the systems the delta reports changed, and PRESERVES
+   * CONTAINER IDENTITY: the map object is patched in place, and a system the delta proved
+   * unchanged keeps its EXISTING record — and therefore its `components`, `tools`,
+   * `essenceDefinitions` and `recipeItemDefinitions` array references, which are what the
+   * retained indexes are keyed on.
+   *
+   * Reuse is licensed by the delta's record-level structural equality and by nothing weaker.
+   * A coarser rule — reuse because the system id set is unchanged, say — would hand back a
+   * same-object, same-length array whose ELEMENTS had been replaced, which is exactly the
+   * hole clause 3 of `definitionIndex`'s invalidation rule exists to close.
+   *
+   * A change the delta cannot attribute to individual records — a reordering — routes
+   * exactly as this method always did: replace the map, preserve no identity, advance every
+   * system.
+   *
    * @returns {boolean} `true` only when the normalized systems actually changed, so
    *   callers can skip re-emitting a change hook (and avoid a redundant refresh on
    *   the writing client, whose map already holds the saved data).
@@ -2410,22 +2455,46 @@ export class CraftingSystemManager {
     // replicated snapshot to read (see `CraftingDefinitionRepository`), so reloading
     // is a no-op rather than a wrong answer.
     const saved = this._repository.readReplicatedSnapshot();
+    // Every reload replaces the pending delta, including a reload that reads nothing, so a
+    // stale delta can never be consumed after a later one.
+    this._reloadDelta = null;
     if (!saved) return false;
     const next = new Map();
     for (const normalized of saved) {
       next.set(normalized.id, normalized);
     }
-    // Change detection without serializing the corpus (issue 1076): record by record, with
-    // a reference fast path, short-circuiting at the first difference. The systems are
-    // already plain normalized objects, so they need no projection. A reload that finds no
-    // change advances no revision token.
-    const changed = corpusChanged(this.systems.values(), next.values());
-    this.systems = next;
+    const delta = corpusDelta(this.systems.values(), next.values());
+    this._reloadDelta = delta;
     this.initialized = true;
-    if (changed) {
+    if (!delta.changed) return false;
+
+    if (delta.reordered) {
+      this.systems = next;
       this._advanceSystemRevision(...next.keys());
+      return true;
     }
-    return changed;
+
+    patchCorpusInPlace(this.systems, next, delta);
+    this._advanceSystemRevision(...delta.perRecord.keys());
+    return true;
+  }
+
+  /**
+   * The delta from the most recent {@link reload}, cleared by this read (issue 1078).
+   *
+   * One-shot on purpose: a delta describes one transition, and a consumer that re-read a
+   * retained one would invalidate work a second time for a change that already happened. It
+   * is also cleared by the NEXT reload, so there is no window in which a stale delta is
+   * readable.
+   *
+   * @returns {import('./revisionTokens.js').CorpusDelta|null} `null` when there is no
+   *   unconsumed delta — never reloaded, already consumed, or a backend with no replicated
+   *   snapshot to read.
+   */
+  consumeReloadDelta() {
+    const delta = this._reloadDelta;
+    this._reloadDelta = null;
+    return delta;
   }
 
   /**
@@ -5004,7 +5073,12 @@ export class CraftingSystemManager {
       // for it. The error still propagates — this flushes the partial batch, it does not
       // swallow the failure — which matches `CompendiumImporter`, where a failed record
       // likewise leaves its predecessors in the single post-loop save.
-      if (dirty) await this.save();
+      //
+      // Named rather than bare (issue 1078): every item in the batch went into THIS system,
+      // and `addItemFromUuid` mutates that record in place, so the flush knows exactly which
+      // one moved. A bare `save()` took the whole-corpus branch and advanced every system's
+      // token for an import into one of them.
+      if (dirty) await this.save({ put: system });
     }
 
     return { added, updated, skipped, total: items.length, sourceFallbacks };
@@ -5060,6 +5134,14 @@ export class CraftingSystemManager {
     // already repaired, silently undoing the backfill one edit at a time.
     const nextDescription = refreshDescription ? await this._extractSourceDescription(item) : null;
     let updated = 0;
+    // The systems this walk actually rewrote a component in (issue 1078). It walks EVERY
+    // system by necessity — an item's identity references can name a component in any of
+    // them — but almost never touches more than one, and a bare `save()` here took the
+    // whole-corpus branch and advanced every system's token. On the `updateItem` hook
+    // `main.js` binds this to, that made every GM rename, image or description edit
+    // invalidate every token-keyed retained guard for every system, on every client.
+    /** @type {Set<object>} */
+    const touched = new Set();
 
     for (const system of this.systems.values()) {
       const components = Array.isArray(system.components) ? system.components : [];
@@ -5082,6 +5164,7 @@ export class CraftingSystemManager {
         }
         if (changed) {
           updated++;
+          touched.add(system);
           // A component's `name` is an indexed field of the name fallback, rewritten in
           // place on an element of an otherwise unchanged array (issue 1076).
           advanceDefinitionRevision(components);
@@ -5090,7 +5173,7 @@ export class CraftingSystemManager {
     }
 
     if (updated > 0) {
-      await this.save();
+      await this.save({ batch: touched });
       this._notifySystemsChanged();
     }
 
