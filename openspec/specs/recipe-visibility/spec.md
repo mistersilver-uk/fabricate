@@ -341,6 +341,8 @@ Material availability is derived from the recipe's INGREDIENTS, which the defaul
 The guard belongs at the derivation, not at the write-out: blanking a computed value is equivalent for today's shape and wrong the first time a field is added beside it.
 - **Identity and grouping metadata are NOT redacted.**
 A teaser is shown to the player deliberately, so its name, image and category are the part they are meant to see; the shipped listing model records that decision for `category` already.
+`categoryLabel`, the display form of `category`, is likewise not redacted and needs no separate judgement: it is a total function of `category` and the active language, so it can disclose nothing `category` does not.
+Redacting it while leaving `category` visible would render a blank chip for a bucket the player can still filter by.
 `tags` is likewise not redacted, and that is a NEW decision rather than an inherited one — no player-facing surface has carried recipe tags before, so it does not follow from the `category` precedent.
 It is taken because a tag is GM grouping metadata of exactly the same kind as a category, because `teaserState.hiddenFields` cannot name it (the authored vocabulary is ingredients, results, description, tools and essences), and because withholding it would break the filtering a summary exists to serve.
 - **Authoring state does not cross.**
@@ -355,6 +357,22 @@ Omitting the access result yields an unredacted summary reporting the available 
 The gate is upstream and stays there; this contract does not move it and MUST NOT be read as duplicating it.
 
 Tests MUST cover the redacted player summary directly — that it withholds availability, that the snapshot is never consulted to build it, that it reports the discovery browse status, and that the same recipe is unredacted for a GM.
+
+### Per-Recipe Detail Hydration
+
+The player crafting read is two phases: a corpus-wide summary phase and a per-recipe detail phase (see `ui-integration/spec.md` § Browse And Detail Phases).
+Splitting the read splits the gate, so the following are normative for the detail phase.
+
+- **A recipe id is not a permission.**
+The detail phase receives an id chosen by a client, so it MUST re-resolve the viewer's access for that recipe rather than trusting that a summary was built for it.
+It MUST apply every gate the summary phase applies — the system-blocked-for-recipes predicate for a non-GM, and the visibility evaluation — and MUST answer nothing rather than a redacted model when the viewer may not see the recipe.
+- **Re-evaluating is not a second candidate collection.**
+The detail phase evaluates access for ONE recipe through the same per-recipe evaluation the corpus-wide pass calls, so § One Candidate Collection Per Evaluation is unaffected: the corpus-wide pass is not repeated, and no second corpus-wide walk is introduced.
+- **Redaction is unchanged by the split.**
+A detail model for a recipe whose access reason is `teaser` is redacted exactly as before, so the row and the inspector cannot disagree about whether a recipe is undiscovered.
+- **A hand-off of one visibility pass MUST NOT widen a cohort.**
+A caller that performs the corpus-wide pass once and hands it to more than one consumer supplies the same entries the consumer would have computed.
+Every filter a consumer applies to its own pass — notably the used-by list's exclusion of undiscovered teasers — MUST still be applied to a handed-in one.
 
 ## Knowledge Access Evaluation
 

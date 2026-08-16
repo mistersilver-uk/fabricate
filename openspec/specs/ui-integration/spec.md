@@ -2205,6 +2205,45 @@ Gathering: `progressive` and `routed` render all five; `d100` renders Modifiers 
 - Persist the selected crafting actor in the `LAST_CRAFTING_ACTOR` client setting
   and the component-source ids in `fabricate.lastComponentSources`.
 
+### Browse And Detail Phases
+
+The player crafting read is TWO phases, because browsing and inspecting have different costs
+and the browse half is the one that scales with the corpus.
+
+- **The listing seam returns cheap summary rows.**
+  `listCraftingForActor` answers `{ summaries, total, counts }`, where each summary is the
+  canonical recipe summary (`data-models/spec.md` § Summary Projections) for the viewer's
+  audience.
+  Search, the favourite / craftable / system / category filters, the A–Z sort and pagination
+  all run against those rows, so the page window is chosen before any expensive work.
+- **Building the rows performs no exact craftability evaluation, at any corpus size.**
+  A row's material verdict is the indexed availability projection over one per-pass inventory
+  snapshot, and it is an UPPER BOUND: a positive answer means "looks makeable", never "you
+  can make this".
+  This MUST be asserted by an operation count rather than by review, and the count MUST be
+  shown to be non-vacuous.
+- **The detail seam hydrates ONE recipe.**
+  `hydrateCraftingRecipe({ recipeId, actorId, componentSourceActorIds })` returns the exact
+  rich model — per-set craftability, ingredient choices, the essence pool, checks, outcome
+  tiers, duration, steps and progressive stages — or `null` when no such recipe exists or the
+  viewer may not see it (`recipe-visibility/spec.md` § Per-Recipe Detail Hydration).
+- **Only the selection is hydrated.**
+  The player app hydrates the selected recipe, falling back to the first visible row when the
+  player has selected nothing.
+  A first page's exact-evaluation count is therefore bounded by the page size and MUST be
+  independent of corpus size.
+- **A hydrated model does not outlive its read pass.**
+  It carries exact craftability derived from live actor inventory, so it MUST be discarded
+  whenever the listing is refetched — which the app does on mount, on an actor change, after
+  a craft, on a scene change, on a world-time tick and on a relevant inventory mutation.
+- **Changing search, a filter or the page does not hydrate anything.**
+  Those are pure reads over the summary rows.
+- **The row and the inspector may disagree about materials, and only in one direction.**
+  The row's optimistic verdict can read "available" where exact evaluation refuses, because
+  contended requirements are counted for every set that draws on them.
+  It can never read unavailable for a recipe exact evaluation would allow.
+  Exact validation immediately before consumption remains authoritative and is unchanged.
+
 ### Craft Execution
 
 - The Crafting tab crafts through the existing `game.fabricate.craft` engine path
