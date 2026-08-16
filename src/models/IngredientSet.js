@@ -21,6 +21,75 @@ import { getMatchHandler } from './match/matchTypes.js';
 export const INGREDIENT_SEARCH_NODE_CAP = 200_000;
 
 /**
+ * The SCAN context: everything the candidate generators read that is neither the option
+ * being considered nor the group it belongs to.
+ *
+ * It exists because that list is long and identical at every level of the generator chain
+ * (`_groupChoices` -> `_optionItemChoices` -> `_componentTagOptionChoices` ->
+ * `_matchingItemsWithAvail`/`_buildPlanForIngredient` -> `_optionCandidates`), so threading
+ * the fields one by one grew a five-deep parameter convoy that no signature could keep
+ * honest. Both resolution stages already build an object of this shape — the search's
+ * `frame` and the greedy pass's `pass` — so nothing is allocated to satisfy it and there is
+ * exactly one place a reader has to look to learn what a candidate generator depends on.
+ *
+ * `budget` is present only on the search's frame: the greedy pass never backtracks and so
+ * never reaches the node-charging unit-plan enumeration.
+ *
+ * @typedef {{availableItems: object[], matcher: Function|null,
+ *   remaining: Map<string, number>, index: object|null,
+ *   budget?: {nodes: number, capHit: boolean}}} SCAN
+ */
+
+/**
+ * A union-find (disjoint-set) forest over `size` vertices, with path compression and a
+ * deterministic tie-break: a union always keeps the LOWER vertex as the root, so a
+ * component's root is its lowest member and iterating roots in ascending order yields the
+ * components in author order.
+ *
+ * The tie-break buys ORDERING, not the answer, and the distinction matters because it has
+ * been misread as a correctness guard. It makes the order components are resolved in a
+ * function of the authored set rather than of union-find internals, which keeps a debug
+ * trace — and the node count a failing resolve reports, since `_searchAssignment`'s
+ * component loop stops at the first component it cannot resolve — readable against the
+ * recipe as authored. The selection's byte-identity does NOT rest on it:
+ * `_composeSelection` re-imposes author order over the per-group choices whatever order the
+ * components were resolved in, and groups in different components have disjoint candidate
+ * stacks and so cannot alter each other's draws. Measured, not assumed: inverting this to
+ * keep the HIGHER vertex reorders the components of 273 resolves across the solver suites
+ * (interleaved partitions such as `[[0,2],[1]]` become `[[1],[0,2]]`) and still leaves
+ * every case of the frozen-oracle corpus
+ * (`tests/ingredient-set-solver-equivalence.test.js`) byte-identical.
+ *
+ * Module-private and dependency-free: it reads nothing from the ingredient model, and
+ * `IngredientSet.js` is copied RAW into two hand-rolled mounted-component harnesses
+ * (`tests/components/manager-mounted.test.js`, `tests/components/recipe-edit-mounted.test.js`),
+ * where an uncopied transitive import HANGS the suite rather than failing it. Keeping this
+ * here rather than in a new leaf module keeps that allowlist unchanged.
+ *
+ * @param {number} size
+ * @returns {{find: (vertex: number) => number, union: (left: number, right: number) => void}}
+ */
+function unionFind(size) {
+  const parent = Array.from({ length: size }, (_unused, vertex) => vertex);
+  const find = (vertex) => {
+    let root = vertex;
+    while (parent[root] !== root) root = parent[root];
+    let cursor = vertex;
+    while (parent[cursor] !== root) {
+      const next = parent[cursor];
+      parent[cursor] = root;
+      cursor = next;
+    }
+    return root;
+  };
+  const union = (left, right) => {
+    const [a, b] = [find(left), find(right)];
+    if (a !== b) parent[Math.max(a, b)] = Math.min(a, b);
+  };
+  return { find, union };
+}
+
+/**
  * Represents a set of ingredients that can satisfy a recipe's input requirements
  * Multiple ingredient sets allow recipes to accept alternative combinations (e.g., "2xA OR 1xB + 1xC")
  */
@@ -284,6 +353,13 @@ export class IngredientSet {
       essenceAllocation: essenceAllocation ?? null,
       allocate: typeof allocateEssences === 'function' ? allocateEssences : greedyAllocate,
     };
+    // The per-pass resolution index (issue 1083). Built ONCE here and reachable only
+    // through this call's `ctx`, so it is per-pass and never retained across a resolve
+    // — the same lifetime rule `inventorySnapshot.js` states for its own tallies, and
+    // for the same reason: nothing mints a token when `actor.items` changes, so a
+    // retained item-side index would report "unchanged" across the craft that consumed
+    // the very stacks it describes.
+    ctx.index = this._buildPassIndex(availableItems, matcher, ctx);
 
     // Item-level bounded backtracking (issue 663): find a satisfying item->group
     // assignment whenever one exists. The search tries the greedy author-order
@@ -292,12 +368,20 @@ export class IngredientSet {
     // rejected gains a newly found alternative.
     const search = this._searchAssignment(availableItems, matcher, ctx);
 
-    // The solver's own cost, surfaced rather than discarded (issue 1072). `nodes` is the
-    // ONLY deterministic measure of assignment work: the node cap bounds nodes, not work,
-    // because each node copies and restores the whole available-item ledger, so per-node
-    // cost is O(inventory) and the wall clock of a resolve is a product of two terms a
-    // timing assertion cannot separate. A regression guard asserts `nodes`; #1083's
-    // indexed fast paths are expected to lower it, and nothing else can observe that.
+    // The solver's own cost, surfaced rather than discarded (issue 1072). It is reported
+    // because a wall clock cannot report it: the elapsed time of a resolve is the PRODUCT
+    // of tree size and per-node cost, and a timing reading cannot separate the two terms,
+    // so only a deterministic operation count can bound assignment work at all.
+    // `nodes` is the tree-size term and ONLY that term — it is not a measure of work on
+    // its own, and reading it as one is what made "bounded by the node cap" an
+    // unfalsifiable claim about elapsed time before issue 1083. That issue bounded the
+    // other term instead, by removing both O(|availableItems|) per-node scans (the undo
+    // journal replayed by `_undoLedger`, and the per-pass index built by
+    // `_buildPassIndex`). The counts that express the per-node term — ledger
+    // operations, matcher invocations, essence probes, pass-index builds — are asserted in
+    // `tests/ingredient-set-solver-cost.test.js` rather than published here, because they
+    // measure the implementation and no caller has a use for them. Read `nodes` as how
+    // much of the search space was walked: contention scoping lowers it, and it MAY be 0.
     // Frozen so a consumer cannot mutate a shared statistic, and attached on BOTH exits
     // so a caller never has to branch on which one produced the result.
     const searchStats = Object.freeze({ nodes: search.nodes, capHit: search.capHit });
@@ -370,6 +454,10 @@ export class IngredientSet {
       availableItems,
       matcher,
       ctx,
+      // The greedy pass is a {@link SCAN} too, so the candidate generators read one shape
+      // whichever resolution stage is driving them. It carries no `budget` because it never
+      // backtracks and so never reaches the node-charging enumeration.
+      index: ctx.index ?? null,
       remaining: this._initialRemaining(availableItems),
       plan: [],
       currencySpends: [],
@@ -431,13 +519,7 @@ export class IngredientSet {
     if (option?.match?.type === 'essence') {
       return { member: this._essenceMember(group, option) };
     }
-    const candidate = this._buildPlanForIngredient(
-      option,
-      pass.availableItems,
-      pass.remaining,
-      pass.matcher,
-      override.heldItemId
-    );
+    const candidate = this._buildPlanForIngredient(option, override.heldItemId, pass);
     if (!candidate.ok) {
       return {
         missing: { group, ingredient: option, have: candidate.have, need: option.quantity },
@@ -460,12 +542,7 @@ export class IngredientSet {
     for (const option of options) {
       if (option?.match?.type === 'currency') continue;
       if (option?.match?.type === 'essence') return { member: this._essenceMember(group, option) };
-      const candidate = this._buildPlanForIngredient(
-        option,
-        pass.availableItems,
-        pass.remaining,
-        pass.matcher
-      );
+      const candidate = this._buildPlanForIngredient(option, null, pass);
       if (candidate.ok) {
         this._commitItemPlan(candidate.plan, pass.plan, pass.remaining);
         return { option };
@@ -540,23 +617,333 @@ export class IngredientSet {
   }
 
   /**
-   * Item-level bounded backtracking over the ingredient groups (issue 663).
-   * Traverses groups in AUTHOR order (preserving the positional
-   * `selectedIngredients` contract `RecipeManager._chosenOptionByGroup` reads); at
-   * each group tries its choices lazily in the order [non-currency options in author
-   * order, then currency options in author order], and for each non-currency option
-   * branches over candidate item subsets with the greedy subset first. The
-   * `remaining` ledger is snapshot/restored per node, so a committed choice is
-   * cleanly undone on backtrack — the first complete assignment under this fixed
-   * traversal wins.
+   * The PER-PASS resolution index (issue 1083): everything both resolution paths would
+   * otherwise re-derive per search node, derived once instead.
    *
-   * Every essence option is taken as a DEFERRED choice: it occupies its group's
-   * author position in `selectedIngredients` immediately but consumes nothing, and
-   * the whole set's essence block is settled at the terminal node
-   * ({@link _settleEssenceBlock}). A block that cannot fund therefore fails the
-   * terminal and forces the earlier component/tag groups to re-branch — the block is
-   * a genuine backtrackable node, not a post-pass, which is what makes joint essence
-   * resolution a strict relaxation rather than a new way to fail.
+   * ## Why the index is built here and not handed in
+   *
+   * #1077's `buildInventorySnapshot(...).componentTallies(system)` exposes exactly the
+   * shape this wants — `quantityByComponentId`, `stacksByComponentId`, `quantityByTag`.
+   * It cannot be consumed here: it resolves an item to a component through an injected
+   * `resolveComponent` against a SYSTEM's component library, and an ingredient set is
+   * handed neither. Its identity oracle is the caller's `matcher(option, item)` (or
+   * `option.matches(item)`), which is opaque and not invertible — `componentHandler`'s
+   * own `matchesItem` returns false by design, because component identity is resolved
+   * upstream in `RecipeManager.ingredientMatchesItem`.
+   *
+   * So the same index is built through the only oracle this boundary has, and it answers
+   * the same questions: `optionItems` is `stacksByComponentId`/`quantityByTag` for the
+   * options this set actually names, and the essence half is the carrier index
+   * `componentTallies` deliberately does NOT provide (`essenceTotals` is a scalar per
+   * essence id, not a carrier list, so `_essenceCarriers` had no index to consume).
+   *
+   * The lifetime rule is copied verbatim: per pass, never retained. Nothing mints a
+   * revision token when `actor.items` changes, so an index that outlived its pass would
+   * describe stacks a craft had already consumed.
+   *
+   * ## What it removes
+   *
+   * `_buildPlanForIngredient` filtered the whole of `availableItems` through the matcher
+   * on EVERY call, and so did `_matchingItemsWithAvail` — once per option per node. That
+   * is the second O(|availableItems|) per-node term, the one the undo journal does not
+   * touch. Here it is paid once per option per pass.
+   *
+   * @returns {{optionItems: Map<object, object[]>, groupCandidateKeys: Array<Set<string>>,
+   *   blockGroups: Set<number>, essence: {carriers: Array<object>,
+   *   ceiling: Map<string, number>, carrierKeys: Set<string>}|null}}
+   * @private
+   */
+  _buildPassIndex(availableItems, matcher, ctx) {
+    const items = Array.isArray(availableItems) ? availableItems : [];
+    const optionItems = new Map();
+    const essenceOptions = [];
+    const groupCandidateKeys = this.ingredientGroups.map((group) =>
+      this._indexGroupCandidates(group, items, matcher, optionItems, essenceOptions)
+    );
+    const essence = this._buildEssenceIndex(items, essenceOptions, ctx);
+
+    return {
+      optionItems,
+      groupCandidateKeys,
+      blockGroups: this._groupsCarryingTheBlock(essence),
+      essence,
+    };
+  }
+
+  /**
+   * Index one group: record each non-currency option's matching stacks, collect its
+   * essence options for the block index, and return the group's candidate item keys — the
+   * vertex data {@link _contentionComponents} joins on.
+   *
+   * `optionItems` and `essenceOptions` accumulate across the whole call because both are
+   * SET-scoped rather than group-scoped: the option-to-stacks map is keyed by option
+   * identity across the set, and the essence block spans every group at once.
+   * @private
+   */
+  _indexGroupCandidates(group, items, matcher, optionItems, essenceOptions) {
+    const keys = new Set();
+    for (const option of group.options || []) {
+      const type = option?.match?.type;
+      if (type === 'currency') continue;
+      if (type === 'essence') {
+        essenceOptions.push(this._essenceMember(group, option));
+        continue;
+      }
+      const matched = items.filter((item) =>
+        matcher ? matcher(option, item) : option.matches(item)
+      );
+      optionItems.set(option, matched);
+      for (const item of matched) keys.add(this._itemKey(item));
+    }
+    return keys;
+  }
+
+  /**
+   * The groups that could still add a requirement to the essence block, and are therefore
+   * jointly constrained by it however disjoint their item candidates are.
+   *
+   * A group whose only essence options are provably unfundable is NOT one of them: it can
+   * never take the block branch, so treating it as a block member would couple it to
+   * groups it cannot interact with.
+   * @private
+   */
+  _groupsCarryingTheBlock(essence) {
+    const carrying = new Set();
+    if (!essence) return carrying;
+    for (const [groupIndex, group] of this.ingredientGroups.entries()) {
+      const options = group.options || [];
+      if (options.some((option) => this._isLiveEssenceOption(option, group, essence))) {
+        carrying.add(groupIndex);
+      }
+    }
+    return carrying;
+  }
+
+  /**
+   * Whether `option` is an essence option this ledger could still fund.
+   * @private
+   */
+  _isLiveEssenceOption(option, group, essence) {
+    if (option?.match?.type !== 'essence') return false;
+    return this._essenceOptionIsFeasible(this._essenceMember(group, option), essence);
+  }
+
+  /**
+   * The essence half of the pass index: the stacks that could ever fund this set's
+   * essence block, and the CEILING each essence id can deliver from them.
+   *
+   * `_essenceCarriers` walked the whole of `availableItems` and ran a `resolveEssences`
+   * probe per item at EVERY terminal node. Both are paid once here instead; the terminal
+   * then only re-reads the ledger for the carriers, which is the part that legitimately
+   * changes as groups claim.
+   *
+   * The ceiling is computed against the UNTOUCHED ledger, so it is an upper bound on
+   * what the block can deliver at any point in any branch — `remaining` only ever
+   * decreases. That makes it sound to prune an essence option needing more than its
+   * ceiling ({@link _essenceOptionIsFeasible}): no assignment of the ledger can satisfy
+   * it, so every branch that chose it was destined to fail the terminal.
+   *
+   * Null when the set has no essence option at all, in which case there is no block and
+   * nothing to index.
+   * @private
+   */
+  _buildEssenceIndex(availableItems, essenceOptions, ctx) {
+    const essenceIds = new Set(essenceOptions.map((member) => member.essenceId).filter(Boolean));
+    if (essenceOptions.length === 0) return null;
+
+    const seeded = this._initialRemaining(availableItems);
+    const resolveEssences = ctx?.resolveEssences;
+    const carriers = [];
+    const ceiling = new Map();
+    const seen = new Set();
+
+    for (const item of availableItems) {
+      const itemKey = this._itemKey(item);
+      if (seen.has(itemKey)) continue;
+      seen.add(itemKey);
+
+      const essences = (resolveEssences ? resolveEssences(item) : null) || {};
+      const perUnit = {};
+      for (const essenceId of essenceIds) {
+        const amount = Number(essences?.[essenceId]) || 0;
+        if (amount > 0) perUnit[essenceId] = amount;
+      }
+      if (Object.keys(perUnit).length === 0) continue;
+
+      carriers.push({ itemKey, item, perUnit });
+      const units = Number(seeded.get(itemKey) || 0);
+      for (const [essenceId, amount] of Object.entries(perUnit)) {
+        ceiling.set(essenceId, (ceiling.get(essenceId) ?? 0) + amount * units);
+      }
+    }
+
+    const carrierKeys = this._contendedCarrierKeys(carriers, essenceOptions, ceiling);
+    return { carriers, ceiling, carrierKeys };
+  }
+
+  /**
+   * The carrier stacks a component/tag group can actually contend with the block for.
+   *
+   * Only the carriers of essence ids some option can still REACH count. A carrier whose
+   * only essence belongs to an option the ceiling already rules out is never drawn, so
+   * counting it as contention would couple groups that cannot interact.
+   * @private
+   */
+  _contendedCarrierKeys(carriers, essenceOptions, ceiling) {
+    const liveIds = new Set(
+      essenceOptions
+        .filter((member) => this._essenceOptionIsFeasible(member, { ceiling }))
+        .map((member) => member.essenceId)
+        .filter(Boolean)
+    );
+    return new Set(
+      carriers
+        .filter((carrier) => Object.keys(carrier.perUnit).some((id) => liveIds.has(id)))
+        .map((carrier) => carrier.itemKey)
+    );
+  }
+
+  /**
+   * Whether an essence option could be satisfied by ANY assignment of the untouched
+   * ledger. A degenerate member (blank essence id or a non-positive amount) is a runtime
+   * no-op that {@link _partitionBlock} settles as satisfied, so it is always feasible.
+   *
+   * This is a strict prune, not a heuristic: a false answer means every branch choosing
+   * that option fails the block terminal, so removing the branch removes only work.
+   * @private
+   */
+  _essenceOptionIsFeasible(member, essence) {
+    if (!member.essenceId || member.need <= 0) return true;
+    if (!essence) return true;
+    return (essence.ceiling.get(member.essenceId) ?? 0) >= member.need;
+  }
+
+  /**
+   * Partition the ingredient groups into CONTENTION COMPONENTS: the connected components
+   * of the graph whose vertices are the groups (plus one vertex for the essence block)
+   * and whose edges join any two that could draw on the same held stack.
+   *
+   * Two groups with no candidate stack in common cannot affect each other's choices at
+   * all, so searching them together multiplied two independent search spaces for nothing.
+   * Resolving each component alone turns that product back into a sum.
+   *
+   * The essence block is a vertex rather than an afterthought because it contends in TWO
+   * ways, and missing either one would silently break the joint-allocation guarantee:
+   *
+   *  - by MEMBERSHIP — every group carrying a still-feasible essence option may add a
+   *    requirement to the shared block, so their choices are jointly constrained even
+   *    when their item candidates are disjoint;
+   *  - by DRAW — a component/tag group whose candidates include a block carrier competes
+   *    for the units the block needs, which is exactly the #663/#917 worked case (a tag
+   *    group must take the non-carrier stack so the block can have the carrier).
+   *
+   * @returns {Array<{groups: number[], ownsBlock: boolean}>} components ordered by their
+   *   lowest group index, each listing its groups in author order.
+   * @private
+   */
+  _contentionComponents(index) {
+    const groupCount = this.ingredientGroups.length;
+    const blockVertex = groupCount;
+    const { find, union } = unionFind(groupCount + 1);
+
+    const claimedBy = this._joinGroupContention(index, groupCount, union);
+    const blockLive = index.blockGroups.size > 0;
+    if (blockLive) this._joinBlockContention(index, blockVertex, claimedBy, union);
+
+    const byRoot = new Map();
+    for (let groupIndex = 0; groupIndex < groupCount; groupIndex += 1) {
+      const root = find(groupIndex);
+      if (!byRoot.has(root)) byRoot.set(root, { groups: [], ownsBlock: false });
+      byRoot.get(root).groups.push(groupIndex);
+    }
+    if (blockLive) {
+      const blockRoot = find(blockVertex);
+      // The block always shares a root with at least one group, because a live block
+      // exists only when some group carries a feasible essence option.
+      if (byRoot.has(blockRoot)) byRoot.get(blockRoot).ownsBlock = true;
+    }
+
+    return [...byRoot].sort(([left], [right]) => left - right).map(([, component]) => component);
+  }
+
+  /**
+   * Join every pair of groups sharing a candidate held stack, and report which group first
+   * claimed each key so {@link _joinBlockContention} can join the block to it in one pass
+   * rather than re-walking the group index.
+   *
+   * @returns {Map<string, number>} candidate item key -> the lowest group index naming it.
+   * @private
+   */
+  _joinGroupContention(index, groupCount, union) {
+    const claimedBy = new Map();
+    for (let groupIndex = 0; groupIndex < groupCount; groupIndex += 1) {
+      for (const key of index.groupCandidateKeys[groupIndex]) {
+        const prior = claimedBy.get(key);
+        if (prior === undefined) claimedBy.set(key, groupIndex);
+        else union(groupIndex, prior);
+      }
+    }
+    return claimedBy;
+  }
+
+  /**
+   * Join the essence-block vertex to the groups it contends with, in BOTH directions the
+   * block contends: by membership (a group carrying a still-feasible essence option) and by
+   * draw (a group whose candidates include one of the block's carrier stacks).
+   *
+   * Missing either edge under-connects the graph, which is the unsound direction — two
+   * components would then be resolved against a ledger each believes it owns.
+   * @private
+   */
+  _joinBlockContention(index, blockVertex, claimedBy, union) {
+    for (const groupIndex of index.blockGroups) union(groupIndex, blockVertex);
+    for (const key of index.essence.carrierKeys) {
+      const prior = claimedBy.get(key);
+      if (prior !== undefined) union(blockVertex, prior);
+    }
+  }
+
+  /**
+   * Item-level bounded backtracking over the ingredient groups (issue 663), STAGED by
+   * contention (issue 1083).
+   *
+   * Groups are traversed in AUTHOR order (preserving the positional
+   * `selectedIngredients` contract `RecipeManager._chosenOptionByGroup` reads); at each
+   * group choices are tried lazily in the order [non-currency options in author order,
+   * then currency options in author order], and for each non-currency option the
+   * candidate item subsets branch with the greedy subset first. The first complete
+   * assignment under this fixed traversal wins.
+   *
+   * ## Two costs, removed separately
+   *
+   * The `remaining` ledger is mutated in place and reverted through a shared undo
+   * JOURNAL rather than copied and restored per node. Copying cost O(|availableItems|)
+   * on every branch, so the 200,000-node cap bounded the search TREE while leaving the
+   * work it implied unbounded — a 1,000-stack party inventory at the cap is on the order
+   * of 2x10^8 Map operations. A node now records only the keys it actually overwrote.
+   *
+   * Separately, the set is partitioned into CONTENTION COMPONENTS
+   * ({@link _contentionComponents}) and each is resolved on its own. Two groups whose
+   * candidate stacks do not intersect cannot affect each other's choices, so a single
+   * whole-set DFS spent its exponent re-exploring independent groups: a set of three
+   * groups that merely happened to be authored together was searched as one product
+   * rather than three sums. A component of one group with no essence block is not
+   * searched at all — its first choice is its answer.
+   *
+   * The result is byte-identical wherever the whole-set search already succeeded. The
+   * whole-set DFS enumerates choice tuples in lexicographic order and feasibility is a
+   * conjunction of independent per-component constraints, so its lexicographic minimum
+   * is exactly the concatenation of the per-component lexicographic minima. What changes
+   * is only how much of the space is walked to reach it, which `searchStats.nodes`
+   * reports and nothing else observes.
+   *
+   * Every essence option is taken as a DEFERRED choice: it occupies its group's author
+   * position in `selectedIngredients` immediately but consumes nothing, and the whole
+   * set's essence block is settled at the terminal node of the ONE component that
+   * carries it ({@link _settleEssenceBlock}). A block that cannot fund therefore fails
+   * that terminal and forces its component's component/tag groups to re-branch — the
+   * block is a genuine backtrackable node, not a post-pass, which is what makes joint
+   * essence resolution a strict relaxation rather than a new way to fail.
    *
    * @returns {{ selection: object|null, nodes: number, capHit: boolean }} `selection`
    *   is the success result (exact `resolveIngredientSelection` shape) or null when
@@ -564,95 +951,242 @@ export class IngredientSet {
    * @private
    */
   _searchAssignment(availableItems, matcher, ctx) {
-    const remaining = this._initialRemaining(availableItems);
-    const acc = {
-      selectedIngredients: [],
-      plan: [],
-      currencySpends: [],
-      essenceMembers: [],
-      essenceBlock: null,
-    };
+    // A caller holding the private ctx directly (the search-seam tests) has no index,
+    // so mint one rather than silently falling back to the unindexed scans.
+    ctx.index ??= this._buildPassIndex(availableItems, matcher, ctx);
     const budget = { nodes: 0, capHit: false };
-    const found = this._searchGroup(0, remaining, acc, availableItems, matcher, ctx, budget);
-    if (found) {
-      return {
-        selection: {
-          success: true,
-          selectedIngredients: [...acc.selectedIngredients],
-          plan: [...acc.plan],
-          currencySpends: [...acc.currencySpends],
-          missingGroups: [],
-          essenceAllocation: acc.essenceBlock?.allocation ?? {},
-          essencePool: this._essencePoolFrom(acc.essenceBlock),
-        },
-        nodes: budget.nodes,
-        capHit: budget.capHit,
-      };
-    }
-    return { selection: null, nodes: budget.nodes, capHit: budget.capHit };
-  }
-
-  /**
-   * Recursive DFS body for {@link _searchAssignment}. Returns true when groups
-   * `[index..]` all receive a satisfying assignment against `remaining`, mutating
-   * `acc` into the accumulated selection along the successful path.
-   * @private
-   */
-  _searchGroup(index, remaining, acc, availableItems, matcher, ctx, budget) {
-    if (budget.capHit) return false;
-    if (index >= this.ingredientGroups.length) {
-      if (++budget.nodes > INGREDIENT_SEARCH_NODE_CAP) {
-        budget.capHit = true;
-        return false;
-      }
-      return this._settleEssenceBlock(remaining, acc, availableItems, ctx);
-    }
-    if (++budget.nodes > INGREDIENT_SEARCH_NODE_CAP) {
-      budget.capHit = true;
-      return false;
-    }
-
-    const group = this.ingredientGroups[index];
-    const options = group.options || [];
-    for (const choice of this._groupChoices(
-      group,
-      options,
-      remaining,
+    const frame = {
       availableItems,
       matcher,
       ctx,
-      budget
-    )) {
-      if (budget.capHit) return false;
-      const snapshot = new Map(remaining);
-      acc.selectedIngredients.push(choice.option);
+      budget,
+      index: ctx.index,
+      remaining: this._initialRemaining(availableItems),
+      // The shared undo journal: `[key, previousValue, key, previousValue, ...]` in
+      // write order. One array for the whole search, sliced by per-node marks, so a
+      // node pays only for the ledger keys it actually overwrote.
+      journal: [],
+    };
+
+    const chosenByGroup = Array.from({ length: this.ingredientGroups.length }, () => null);
+    let block = null;
+    for (const component of this._contentionComponents(frame.index)) {
+      const resolved = this._resolveContentionComponent(component, frame);
+      if (!resolved) return { selection: null, nodes: budget.nodes, capHit: budget.capHit };
+      for (const [position, groupIndex] of component.groups.entries()) {
+        chosenByGroup[groupIndex] = resolved.chosen[position];
+      }
+      if (resolved.block) block = resolved.block;
+    }
+
+    return {
+      selection: this._composeSelection(chosenByGroup, block),
+      nodes: budget.nodes,
+      capHit: budget.capHit,
+    };
+  }
+
+  /**
+   * Assemble the success result from the per-group choices, in AUTHOR order.
+   *
+   * Author order is re-imposed here rather than inherited from the traversal, because
+   * contention components are resolved one at a time and a component's groups need not
+   * be adjacent in the set. Emitting per component would put group 2's plan entries
+   * before group 1's for a set whose components interleave — a difference no test of
+   * `success` would catch and every consumer of `plan` order would inherit.
+   *
+   * The essence block's entries come LAST, exactly where the single global DFS put them
+   * when it settled the block at its terminal after every group had claimed.
+   * @private
+   */
+  _composeSelection(chosenByGroup, block) {
+    const selectedIngredients = [];
+    const plan = [];
+    const currencySpends = [];
+    for (const choice of chosenByGroup) {
+      selectedIngredients.push(choice.option);
       if (choice.currency) {
-        acc.currencySpends.push({
+        currencySpends.push({
           unit: choice.currency.unit,
           amount: choice.currency.amount,
           ingredient: choice.option,
         });
-      } else if (choice.member) {
-        acc.essenceMembers.push(choice.member);
-      } else {
-        this._commitItemPlan(choice.plan, acc.plan, remaining);
+      } else if (!choice.member) {
+        plan.push(...choice.plan);
       }
+    }
+    if (block) plan.push(...block.plan);
 
-      if (this._searchGroup(index + 1, remaining, acc, availableItems, matcher, ctx, budget)) {
-        return true;
-      }
+    return {
+      success: true,
+      selectedIngredients,
+      plan,
+      currencySpends,
+      missingGroups: [],
+      essenceAllocation: block?.allocation ?? {},
+      essencePool: this._essencePoolFrom(block),
+    };
+  }
 
-      acc.selectedIngredients.pop();
-      if (choice.currency) {
-        acc.currencySpends.pop();
-      } else if (choice.member) {
-        acc.essenceMembers.pop();
-      } else {
-        acc.plan.length -= choice.plan.length;
+  /**
+   * Resolve ONE contention component: either the indexed fast path or a search scoped
+   * to that component's groups.
+   *
+   * The fast path applies to a component of exactly one group that does not carry the
+   * essence block. Nothing else in the set competes for that group's candidate stacks,
+   * so the FIRST choice the group yields is the one the full search would have kept:
+   * backtracking into a later choice can only ever be provoked by a downstream group
+   * that this component, by construction, does not have. It therefore costs zero search
+   * nodes, which is what "an ordinary direct-component recipe resolves without entering
+   * the DFS" has to mean to be observable in `searchStats`.
+   *
+   * The choice is still committed to the shared ledger. Nothing else reads those keys,
+   * so it changes no answer — but a ledger that stopped describing what the resolution
+   * consumed would be a trap for the next reader.
+   *
+   * That commit is DEFENCE IN DEPTH and has no test coverage BY CONSTRUCTION: deleting it
+   * leaves every suite in this repository green, because a singleton non-block component's
+   * stacks belong, by the definition of a connected component, to no other vertex. Do not
+   * read that as dead code. It is the belt that makes an UNDER-connection bug in
+   * {@link _contentionComponents} fail closed — a false "insufficient" a player reports —
+   * rather than open, with two groups silently drawing the same stack and the craft
+   * over-consuming. A guard for it cannot be written without first introducing the bug it
+   * guards against.
+   *
+   * @returns {{chosen: object[], block: object|null}|null} null when the component has
+   *   no satisfying assignment (or the node bound was reached inside it).
+   * @private
+   */
+  _resolveContentionComponent(component, frame) {
+    if (component.groups.length === 1 && !component.ownsBlock) {
+      const group = this.ingredientGroups[component.groups[0]];
+      const choice = this._firstGroupChoice(group, frame);
+      if (!choice) return null;
+      if (!choice.currency && !choice.member) {
+        this._commitItemPlan(choice.plan, [], frame.remaining);
       }
-      this._restoreRemaining(remaining, snapshot);
+      return { chosen: [choice], block: null };
+    }
+
+    const state = {
+      chosen: Array.from({ length: component.groups.length }, () => null),
+      essenceMembers: [],
+      plan: [],
+      block: null,
+    };
+    return this._searchComponentGroup(0, component, state, frame) ? state : null;
+  }
+
+  /**
+   * The first choice a group yields against the current ledger, or null when it yields
+   * none (the group cannot be satisfied at all).
+   *
+   * Laziness is what makes this free: {@link _componentTagOptionChoices} yields the
+   * greedy front-loaded pick BEFORE enumerating any alternative unit plan, and returns
+   * without enumerating when even the full matching pool is short. So neither a hit nor
+   * a miss reaches {@link _enumerateUnitPlansFrom}, and neither bumps the node budget.
+   *
+   * The generator is therefore advanced ONCE, by hand. A `for…of` that returns from its
+   * first iteration would read as a loop while being a single `next()` — the shape
+   * SonarCloud reports as `javascript:S1751` — and it would also invite the "simplify" that
+   * this docblock exists to forbid: collecting the choices into an array first would
+   * enumerate every alternative unit plan for a group whose FIRST pick is always the
+   * answer, which is the whole cost the fast path was added to avoid.
+   * @private
+   */
+  _firstGroupChoice(group, frame) {
+    const { done, value } = this._groupChoices(group, frame).next();
+    return done ? null : value;
+  }
+
+  /**
+   * Recursive DFS body for one contention component. Returns true when the component's
+   * groups from `position` on all receive a satisfying assignment against the shared
+   * ledger, recording the successful path in `state`.
+   *
+   * Traversal is in AUTHOR order within the component, so the choice sequence a group
+   * sees is byte-identical to the one the single whole-set DFS produced: the groups this
+   * component omits have candidate stacks disjoint from its own, so they cannot alter
+   * the availability any of these choices is generated from.
+   * @private
+   */
+  _searchComponentGroup(position, component, state, frame) {
+    const { budget } = frame;
+    if (budget.capHit) return false;
+    if (position >= component.groups.length) {
+      return this._searchComponentTerminal(component, state, frame);
+    }
+    if (this._chargeNode(budget)) return false;
+
+    const group = this.ingredientGroups[component.groups[position]];
+    for (const choice of this._groupChoices(group, frame)) {
+      if (budget.capHit) return false;
+      const mark = frame.journal.length;
+      state.chosen[position] = choice;
+      this._applyChoice(choice, state, frame);
+
+      if (this._searchComponentGroup(position + 1, component, state, frame)) return true;
+
+      state.chosen[position] = null;
+      this._revertChoice(choice, state, frame, mark);
     }
     return false;
+  }
+
+  /**
+   * Charge one node against the shared safeguard budget.
+   *
+   * One definition of "a node", used by the group traversal, its terminal and the unit-plan
+   * enumeration alike, so a search scoped to a contention component cannot quietly stop
+   * counting some of the work it does.
+   *
+   * @returns {boolean} true when this charge reached the bound, so the caller must stop.
+   * @private
+   */
+  _chargeNode(budget) {
+    if (++budget.nodes > INGREDIENT_SEARCH_NODE_CAP) {
+      budget.capHit = true;
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * The terminal node of one component's traversal. Only the component carrying the
+   * essence block settles it; every other component is complete once its groups are
+   * assigned.
+   * @private
+   */
+  _searchComponentTerminal(component, state, frame) {
+    if (this._chargeNode(frame.budget)) return false;
+    return component.ownsBlock ? this._settleEssenceBlock(state, frame) : true;
+  }
+
+  /**
+   * Commit one chosen choice. A currency choice draws nothing (it is free, which is
+   * exactly why it is ordered last) and an essence choice defers to the block, so only a
+   * component/tag choice touches the ledger.
+   * @private
+   */
+  _applyChoice(choice, state, frame) {
+    if (choice.member) {
+      state.essenceMembers.push(choice.member);
+    } else if (!choice.currency) {
+      this._commitItemPlan(choice.plan, state.plan, frame.remaining, frame.journal);
+    }
+  }
+
+  /**
+   * Undo {@link _applyChoice}, reverting the ledger to the caller's `mark`.
+   * @private
+   */
+  _revertChoice(choice, state, frame, mark) {
+    if (choice.member) {
+      state.essenceMembers.pop();
+    } else if (!choice.currency) {
+      state.plan.length -= choice.plan.length;
+    }
+    this._undoLedger(frame.remaining, frame.journal, mark);
   }
 
   /**
@@ -660,29 +1194,53 @@ export class IngredientSet {
    * component/tag groups left in `remaining`.
    *
    * Returning false here is the mechanism that makes the block backtrackable — the
-   * caller restores `remaining` and re-branches an earlier group, so a tag group with
+   * caller reverts `remaining` and re-branches an earlier group, so a tag group with
    * two matching stacks, only one of which carries the essence, resolves the OTHER
    * stack for the tag and leaves the carrier to the block.
    *
-   * Nothing is committed on the failing path, so a false return leaves `acc` and
-   * `remaining` exactly as the caller left them.
+   * This terminal performs NO revert of its own on the false path and deliberately
+   * relies on the caller's undo journal, exactly as it previously relied on the
+   * caller's ledger snapshot. Every ledger write it makes goes through
+   * {@link _commitItemPlan} with the SAME `journal` the calling node marked, so the
+   * caller's {@link _undoLedger} reverts them whether or not this returns true —
+   * which is what lets the commit stay unconditional-looking here.
+   *
+   * It runs at the terminal of the ONE component that carries the block. Every other
+   * component's groups have candidate stacks disjoint from the block's carriers, so the
+   * order components are resolved in cannot change what the block has to draw from.
    * @private
    */
-  _settleEssenceBlock(remaining, acc, availableItems, ctx) {
-    const block = this._resolveEssenceBlock(acc.essenceMembers, availableItems, remaining, ctx);
+  _settleEssenceBlock(state, frame) {
+    const block = this._resolveEssenceBlock(
+      state.essenceMembers,
+      frame.availableItems,
+      frame.remaining,
+      frame.ctx
+    );
     if (!block.ok) return false;
-    this._commitItemPlan(block.plan, acc.plan, remaining);
-    acc.essenceBlock = block;
+    this._commitItemPlan(block.plan, state.plan, frame.remaining, frame.journal);
+    state.block = block;
     return true;
   }
 
   /**
-   * Reset `remaining` in place to a snapshot, undoing a committed search branch.
+   * Revert `remaining` to the state it held when the caller took `mark`, by
+   * replaying the shared undo journal backwards to that mark and truncating it.
+   *
+   * Backwards is load-bearing: one node may overwrite the same ledger key more than
+   * once (two plan entries drawing on one stack), and only the EARLIEST recorded
+   * value for a key is the pre-node one. Replaying forwards would restore the
+   * intermediate value instead.
+   *
+   * Cost is O(keys this node wrote), never O(|availableItems|), which is the whole
+   * point of the journal (issue 1083).
    * @private
    */
-  _restoreRemaining(remaining, snapshot) {
-    remaining.clear();
-    for (const [key, value] of snapshot) remaining.set(key, value);
+  _undoLedger(remaining, journal, mark) {
+    for (let index = journal.length - 2; index >= mark; index -= 2) {
+      remaining.set(journal[index], journal[index + 1]);
+    }
+    journal.length = mark;
   }
 
   /**
@@ -692,9 +1250,14 @@ export class IngredientSet {
    * option (author order) contributes its item-subset candidates, then every
    * affordable currency option (author order) contributes a free currency choice.
    * Laziness keeps the greedy-first success path to ~one candidate per group.
+   *
+   * @param {object} group
+   * @param {SCAN & {ctx: object}} frame the search frame, which is also a {@link SCAN}.
    * @private
    */
-  *_groupChoices(group, options, remaining, availableItems, matcher, ctx, budget) {
+  *_groupChoices(group, frame) {
+    const { ctx } = frame;
+    const options = group.options || [];
     const override = this._resolveGroupOverride(ctx.optionOverrides, group, options);
     if (override) {
       const option = options[override.optionIndex];
@@ -703,29 +1266,13 @@ export class IngredientSet {
         if (spend) yield { option, plan: [], currency: spend };
         return;
       }
-      yield* this._optionItemChoices(
-        option,
-        availableItems,
-        remaining,
-        matcher,
-        group,
-        override.heldItemId,
-        budget
-      );
+      yield* this._optionItemChoices(option, group, override.heldItemId, frame);
       return;
     }
 
     for (const option of options) {
       if (option?.match?.type === 'currency') continue;
-      yield* this._optionItemChoices(
-        option,
-        availableItems,
-        remaining,
-        matcher,
-        group,
-        null,
-        budget
-      );
+      yield* this._optionItemChoices(option, group, null, frame);
     }
     for (const option of options) {
       if (option?.match?.type !== 'currency') continue;
@@ -742,21 +1289,28 @@ export class IngredientSet {
    * An ESSENCE option has exactly ONE candidate — a deferred block membership. It
    * enumerates no item subsets of its own, because the whole set's essence funding is
    * a joint problem settled once at the terminal node.
+   *
+   * That candidate is withheld when the pass index proves the requirement exceeds what
+   * the whole untouched ledger could ever deliver for its essence id (issue 1083). The
+   * branch is not skipped on a guess: it is a branch whose terminal is already known to
+   * fail, so choosing it could only ever cost a subtree and then backtrack. Withholding
+   * it changes no verdict — the group is reported short by the greedy pass exactly as
+   * before, with THAT option's have/need.
+   *
+   * @param {object} option
+   * @param {object} group
+   * @param {string|null} restrictItemId
+   * @param {SCAN} scan
    * @private
    */
-  *_optionItemChoices(option, availableItems, remaining, matcher, group, restrictItemId, budget) {
+  *_optionItemChoices(option, group, restrictItemId, scan) {
     if (option?.match?.type === 'essence') {
-      yield { option, plan: [], currency: null, member: this._essenceMember(group, option) };
+      const member = this._essenceMember(group, option);
+      if (!this._essenceOptionIsFeasible(member, scan.index?.essence)) return;
+      yield { option, plan: [], currency: null, member };
       return;
     }
-    yield* this._componentTagOptionChoices(
-      option,
-      availableItems,
-      remaining,
-      matcher,
-      restrictItemId,
-      budget
-    );
+    yield* this._componentTagOptionChoices(option, restrictItemId, scan);
   }
 
   /**
@@ -765,28 +1319,21 @@ export class IngredientSet {
    * unit-count assignment over the matching stacks that also meets `quantity`.
    * Yields nothing when even the full matching pool cannot meet the quantity (no
    * subset can either), which prunes the branch.
+   *
+   * @param {object} option
+   * @param {string|null} restrictItemId
+   * @param {SCAN} scan
    * @private
    */
-  *_componentTagOptionChoices(option, availableItems, remaining, matcher, restrictItemId, budget) {
-    const greedy = this._buildPlanForIngredient(
-      option,
-      availableItems,
-      remaining,
-      matcher,
-      restrictItemId
-    );
+  *_componentTagOptionChoices(option, restrictItemId, scan) {
+    const { budget } = scan;
+    const greedy = this._buildPlanForIngredient(option, restrictItemId, scan);
     if (!greedy.ok) return;
 
     yield { option, plan: greedy.plan, currency: null };
 
     const seen = new Set([this._planSignature(greedy.plan)]);
-    const matchingItems = this._matchingItemsWithAvail(
-      option,
-      availableItems,
-      remaining,
-      matcher,
-      restrictItemId
-    );
+    const matchingItems = this._matchingItemsWithAvail(option, restrictItemId, scan);
     for (const plan of this._enumerateUnitPlans(option, matchingItems, option.quantity, budget)) {
       if (budget.capHit) return;
       const signature = this._planSignature(plan);
@@ -801,18 +1348,51 @@ export class IngredientSet {
    * remaining count, in availableItems order — the domain the unit-count
    * enumeration draws from (mirrors {@link _buildPlanForIngredient}'s filter, with
    * the availability snapshotted so later `remaining` mutations do not disturb it).
+   *
+   * @param {object} option
+   * @param {string|null} restrictItemId
+   * @param {SCAN} scan
    * @private
    */
-  _matchingItemsWithAvail(option, availableItems, remaining, matcher, restrictItemId) {
+  _matchingItemsWithAvail(option, restrictItemId, scan) {
     const out = [];
-    for (const item of availableItems) {
-      if (restrictItemId && this._itemKey(item) !== restrictItemId) continue;
-      const matched = matcher ? matcher(option, item) : option.matches(item);
-      if (!matched) continue;
-      const avail = Number(remaining.get(this._itemKey(item)) || 0);
+    for (const item of this._optionCandidates(option, restrictItemId, scan)) {
+      const avail = Number(scan.remaining.get(this._itemKey(item)) || 0);
       if (avail > 0) out.push({ item, avail });
     }
     return out;
+  }
+
+  /**
+   * The stacks an option matches, in `availableItems` order.
+   *
+   * Reads the per-pass index when one is available and re-derives the filter otherwise,
+   * so a caller holding the private search seam directly still gets the same answer. The
+   * index makes this O(matching stacks) per call instead of O(|availableItems|) MATCHER
+   * INVOCATIONS per call — and this is called once per option per search node, so it was
+   * the second inventory-sized per-node term (the undo journal removed the first).
+   *
+   * `restrictItemId` (issue 552's tag-stack choice) narrows the result to one specific
+   * held stack; it is applied to the indexed pool rather than baked into it, because the
+   * index is shared by every branch and only one of them is pinned.
+   *
+   * The `??` fallback is a SILENT degradation — an index miss reinstates the per-node
+   * O(|availableItems|) matcher scan and answers identically, so no correctness test can
+   * see it. `tests/ingredient-set-solver-cost.test.js` therefore counts matcher
+   * invocations and asserts that not one of them happens after the pass index exists.
+   *
+   * @param {object} option
+   * @param {string|null} restrictItemId
+   * @param {SCAN} scan
+   * @private
+   */
+  _optionCandidates(option, restrictItemId, scan) {
+    const { index, matcher, availableItems } = scan;
+    const pool =
+      index?.optionItems.get(option) ??
+      availableItems.filter((item) => (matcher ? matcher(option, item) : option.matches(item)));
+    if (!restrictItemId) return pool;
+    return pool.filter((item) => this._itemKey(item) === restrictItemId);
   }
 
   /**
@@ -832,10 +1412,7 @@ export class IngredientSet {
    * @private
    */
   *_enumerateUnitPlansFrom(option, matchingItems, index, remainingNeed, entries, budget) {
-    if (++budget.nodes > INGREDIENT_SEARCH_NODE_CAP) {
-      budget.capHit = true;
-      return;
-    }
+    if (this._chargeNode(budget)) return;
     if (remainingNeed === 0) {
       yield entries.map((entry) => ({
         item: entry.item,
@@ -903,24 +1480,33 @@ export class IngredientSet {
    * Append a chosen option's item plan entries to the running plan and deduct their
    * quantities from the remaining pool (shared by the default and override paths so
    * the remaining-quantity bookkeeping stays identical).
+   *
+   * When a `journal` is supplied (the backtracking search always supplies one; the
+   * greedy pass never does, because it never backtracks) every overwritten key is
+   * appended to it as a `key, previousValue` pair in write order, so
+   * {@link _undoLedger} can revert exactly the keys this commit touched.
    * @private
    */
-  _commitItemPlan(candidatePlan, plan, remaining) {
+  _commitItemPlan(candidatePlan, plan, remaining, journal = null) {
     for (const entry of candidatePlan) {
       plan.push(entry);
       const key = this._itemKey(entry.item);
-      const next = (remaining.get(key) || 0) - entry.quantity;
-      remaining.set(key, Math.max(0, next));
+      const previous = remaining.get(key) || 0;
+      if (journal) journal.push(key, previous);
+      remaining.set(key, Math.max(0, previous - entry.quantity));
     }
   }
 
-  _buildPlanForIngredient(
-    ingredient,
-    availableItems,
-    remaining,
-    matcher = null,
-    restrictItemId = null
-  ) {
+  /**
+   * The greedy front-loaded item plan for one option against `scan.remaining`.
+   *
+   * @param {object} ingredient
+   * @param {string|null} restrictItemId
+   * @param {SCAN} scan
+   * @returns {{ok: boolean, plan: Array<object>, have: number}}
+   * @private
+   */
+  _buildPlanForIngredient(ingredient, restrictItemId, scan) {
     // A currency option is never item-satisfiable: short-circuit to not-satisfiable
     // so the resolver never item-matches it (currency is chosen by the affordability
     // probe in the fallback pass, not here).
@@ -932,16 +1518,14 @@ export class IngredientSet {
     const optionPlan = [];
     let totalAvailable = 0;
 
-    // `restrictItemId` (issue 552 tag-stack choice) narrows a tag option to one
-    // specific held stack the player picked, so the craft consumes THAT item.
-    const matchingItems = availableItems.filter((item) => {
-      if (restrictItemId && this._itemKey(item) !== restrictItemId) return false;
-      return matcher ? matcher(ingredient, item) : ingredient.matches(item);
-    });
+    // The matching stacks, from the per-pass index when there is one. `restrictItemId`
+    // (issue 552 tag-stack choice) narrows a tag option to one specific held stack the
+    // player picked, so the craft consumes THAT item.
+    const matchingItems = this._optionCandidates(ingredient, restrictItemId, scan);
 
     for (const item of matchingItems) {
       const key = this._itemKey(item);
-      const availableQty = Number(remaining.get(key) || 0);
+      const availableQty = Number(scan.remaining.get(key) || 0);
       if (availableQty <= 0) continue;
 
       totalAvailable += availableQty;
@@ -1025,7 +1609,13 @@ export class IngredientSet {
       };
     }
 
-    const carriers = this._essenceCarriers(members, availableItems, remaining, ctx.resolveEssences);
+    const carriers = this._essenceCarriers(
+      members,
+      availableItems,
+      remaining,
+      ctx.resolveEssences,
+      ctx.index
+    );
     const availableUnits = Object.fromEntries(
       carriers.map((carrier) => [carrier.itemKey, carrier.ownedUnits])
     );
@@ -1061,8 +1651,27 @@ export class IngredientSet {
    * game-system-specific configured path.
    * @private
    */
-  _essenceCarriers(members, availableItems, remaining, resolveEssences) {
+  _essenceCarriers(members, availableItems, remaining, resolveEssences, index = null) {
     const neededIds = new Set(members.map((member) => member.essenceId).filter(Boolean));
+    // The indexed path (issue 1083). The pass index already knows which stacks carry any
+    // of this SET's essence ids and how much per unit, so the terminal re-reads only the
+    // ledger — the one thing that legitimately changes as groups claim. Without it this
+    // walked every held document and ran a `resolveEssences` probe per document at EVERY
+    // terminal node, which is the essence half of the per-node inventory term.
+    if (index?.essence) {
+      return index.essence.carriers.flatMap((carrier) => {
+        const ownedUnits = Number(remaining.get(carrier.itemKey) || 0);
+        if (ownedUnits <= 0) return [];
+        const perUnit = {};
+        for (const essenceId of neededIds) {
+          const amount = Number(carrier.perUnit[essenceId]) || 0;
+          if (amount > 0) perUnit[essenceId] = amount;
+        }
+        if (Object.keys(perUnit).length === 0) return [];
+        return [{ itemKey: carrier.itemKey, item: carrier.item, perUnit, ownedUnits }];
+      });
+    }
+
     const carriers = [];
     const seen = new Set();
 

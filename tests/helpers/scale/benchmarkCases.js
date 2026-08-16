@@ -340,9 +340,19 @@ function richCorpusCases() {
         }
         return selections;
       },
+      // `searchNodes` is the acceptance number for #1083 and is read straight off the seam
+      // #1072 exposed (`searchStats`), never re-derived here. It is the ONLY count that can
+      // show search being avoided rather than merely made cheaper: the matcher and candidate
+      // counters fall when a node gets cheaper too, so on their own they cannot distinguish
+      // the two, and the node cap is stated in nodes.
       counts: (_state, selections) => ({
         selectionsResolved: selections.length,
         selectionsSatisfied: selections.filter((selection) => selection.success).length,
+        searchNodes: selections.reduce(
+          (total, selection) => total + (selection.searchStats?.nodes ?? 0),
+          0
+        ),
+        searchCapHits: selections.filter((selection) => selection.searchStats?.capHit).length,
       }),
     },
     {
