@@ -303,7 +303,12 @@ simple ones pays 44% for the *same* 339 bytes per record.
   one value.
   It is also an upper bound on the *fixed* term: the spike subtracted the
   unescaped value from the escaped document, which charges the value's own
-  escaping to the envelope.
+  escaping to the envelope, inflating B(1)'s modelled cost by a few bytes.
+  ADR 0001's test for a safe direction is that the error favours the option
+  being argued against, so that inflation is **not** safe for this use — it
+  biases toward the conclusion this measurement reaches.
+  It is safe for the other use the same number is put to, the budget under
+  which B(1) is kept, where over-charging B(1) can only tighten the bound.
 - **`Setting#value` is a string field, so a transmitted document escapes the JSON
   inside it.** This is modelled rather than estimated — `escapedRecordBytes` in
   `connectPayloadModel.js`, committed per case as

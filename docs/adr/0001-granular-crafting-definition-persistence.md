@@ -590,7 +590,9 @@ Neither accounting yields a size threshold, which is the finding; and the one us
 Two curves that differ by a fixed per-record term never cross; they diverge from the first record.
 B(1) costs **339 bytes per record more at connect, at every corpus size, on every record shape**.
 
-Everything else is that constant divided by something: the **absolute** penalty is 34 KB at 100 records, 339 KB at 1,000 and 3.39 MB at 10,000, independent of shape; the **relative** penalty is `339 / meanRecordBytes`, which is driven entirely by shape and is essentially flat in record count, ranging from 3.7% to 44% across the measured corpora.
+Everything else is that constant divided by something: the **absolute** penalty is 34 KB at 100 records, 339 KB at 1,000 and 3.39 MB at 10,000, independent of shape; the **relative** penalty is `339 / meanRecordBytes`, which is driven entirely by shape and is essentially flat in record count, ranging from **9.0% to 44.1% — a factor of 4.9 — across the measured corpora on this tree**.
+Read those two figures off the same tree: 9.0% is `rich-corpus` post-#1135 and 44.1% is `simple-corpus` post-#1135, both at their full corpus, as `benchmarks/README.md` § Both payload shapes tabulates them.
+The pre-#1135 rich figure of 3.7% belongs to a payload shape that no longer exists and must not be paired with a post-#1135 number to widen the range.
 A relative bound therefore cannot bound corpus size, which is why the replacement condition below is stated in absolute bytes.
 
 **Issue 1135 has since made the relative regression worse, and this decision should be read against the new number.**
@@ -598,13 +600,30 @@ It cut the serialized payload 37% (simple) and 59% (rich) while the envelope sta
 The absolute penalty is unchanged at 3.39 MB.
 If 28% was the figure this decision was taken against, it is now being asked to stand against 44%.
 
+**One caveat on that headline, stated here rather than only in the harness README.**
+`Setting#value` is a string field, so a transmitted `Setting` document escapes the JSON inside it and both layouts grow by the same absolute bytes.
+Modelled that way — `escapedRecordBytes` in `tests/helpers/scale/connectPayloadModel.js`, committed per case — `simple-corpus` reads **+38.60%** rather than +44.13%, and `rich-corpus` +7.64% rather than +8.98%.
+Escaping cannot touch the per-record penalty, which stays at 339 bytes because the same term is added to both layouts and array punctuation is not escaped, nor the absolute delta, which stays at 3.39 MB.
+**+38.6% is the conservative reading of the headline and the replacement condition below is unaffected**, which is the point of stating that condition in absolute bytes.
+
 **Replacement condition.**
 B(1) stands while the connect overhead it adds stays within a stated absolute budget:
 
 > **B(1) is sufficient while `record count × 339 bytes` remains at or below 1.41 MB — approximately 4,160 records.**
 
-That bound is derived rather than chosen by taste: 1.41 MB is issue 1088's directly measured compendium-index connect payload, and § The real index rate records the same order live.
-Past it, B(1)'s *overhead alone* exceeds the *entire* connect payload of A+, the option this ADR declined — at which point no connect-axis argument for B(1) survives, whatever one thinks of A+'s sidebar cost.
+**That bound is a chosen tolerance pegged to a measured reference, not a crossing point, and the distinction matters here more than anywhere.**
+This amendment's whole subject is a condition that read a bookkeeping artefact as a threshold, so it must not repeat the move.
+
+The reference: 1.41 MB is issue 1088's directly measured **compendium index at 10,000 records**, and it corroborates candidate **A**, whose live extrapolation § The real index rate puts at ≈1.65 MB at the same scale.
+It is not A+'s payload — § One `Setting` document costs 340 bytes of envelope records A+ at **≈1.81 MB**.
+
+There is no crossing point to find between the two.
+A+ costs ≈181 bytes per record at the 10,000-record target (1.81 MB / 10,000) against B(1)'s 339 bytes of overhead per record, so `339n > 181n` holds at **every** n and "B(1)'s overhead alone exceeds A+'s entire payload" is true from the first record.
+That comparison is size-mismatched — a *rate* against a *total fixed at one scale* — and cannot be what makes ~4,160 records special.
+
+What the bound actually asserts is a budget: **B(1)'s connect overhead at n records may not exceed what the index alternative would cost in total at this epic's 10,000-record target.**
+That is falsifiable, it is stated in the escaping-robust quantity, and the arithmetic behind the record count is plain — 1,410,000 / 339 = 4,159.
+It is a tolerance a maintainer set against a reference fixed at one scale, and it should be quoted as one rather than as a derivation.
 
 Crossing this bound supersedes the decision rather than amending it again, on the original terms: A+ is measured and waiting, and issue 1092's replacement transport returns to scope with it.
 
@@ -639,7 +658,8 @@ Issue 1080 is rewritten to B(1).
 - Issue 1073's `propagation-unhydrated` measurement gains a real subject and can be implemented.
 - The prototypes are already deleted — see **Provenance of these numbers**.
 - **Issue 1080's connect measurement amended this ADR's decision condition** — see § The kill criterion this option fired.
-  The condition as originally written is false at every corpus size; B(1) still stands, now bounded by an absolute budget of 1.41 MB of connect overhead (~4,160 records) rather than by a crossover.
+  The condition as originally written is false at every corpus size; B(1) still stands, now bounded by a chosen absolute budget of 1.41 MB of connect overhead (~4,160 records) rather than by a crossover.
+  That 1.41 MB is issue 1088's measured compendium index at 10,000 records — candidate **A**'s corroborating reference, not A+'s payload — and the budget is a maintainer tolerance pegged to it at that scale, not a derived crossing point.
   The measurement instrument is `tests/helpers/scale/connectPayloadModel.js`, and the reading is re-derived on every run rather than pinned.
 
 ---

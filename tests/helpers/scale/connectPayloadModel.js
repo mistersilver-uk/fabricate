@@ -92,9 +92,16 @@
  * - It is an **upper bound on the fixed term**. A `Setting`'s `value` is a string field holding
  *   `JSON.stringify(value)`, so the document's own serialization escapes every quote in it. The
  *   spike subtracted the UNESCAPED 51-byte value from the 391-byte document, which charges the
- *   value's escaping to the envelope. On a 51-byte value that is a few bytes; the direction of
- *   the error inflates B(1)'s modelled cost, which is the safe direction for a number being used
- *   to question B(1).
+ *   value's escaping to the envelope. On a 51-byte value that is a few bytes, and it inflates
+ *   B(1)'s modelled cost.
+ *
+ *   **Say which use that is safe for, because it is not both.** ADR 0001 states the test: an
+ *   error is in the safe direction when it favours the option being argued against. This
+ *   measurement argues against B(1), so inflating B(1) biases *toward* its conclusion — the
+ *   unsafe direction for that use, and the reason the residual is quantified above rather than
+ *   waved at. It IS the safe direction for the other use the same number is put to: setting a
+ *   conservative budget under which B(1) is KEPT, where over-charging B(1) can only tighten the
+ *   bound.
  * - It scales with the **key name**, which the spike shaped like a per-record key. A longer key
  *   prefix than the one it probed makes this an under-estimate.
  *
