@@ -1255,6 +1255,9 @@ Recipe = {
     `enabled: true` is omittable by the model and NOT by its readers: `SignatureValidator.validateSystem` scopes the alchemy signature-collision scan with a truthy `recipe?.enabled` over payloads handed to it straight from `toJSON()` by `CraftingSystemManager._assertNoAlchemySignatureCollisions` and `collectAlchemySignatureBlockers`, so omitting the default would empty that scan and silently retire the save-block.
     `allowPlayerResultReorder: true` IS omitted, and the difference is instructive: absence has been a live on-disk state for it since issue 651 declined to seed it by migration, so every reader already asks `!== false`.
     Whether a default may be omitted is therefore a property of the field's READERS, audited per field, and the omission set is a hand-maintained mirror of the constructor guarded mechanically by `tests/recipe-serialization-payload.test.js`.
+    The rule reaches the NESTED rows as well as the top-level ones (issue 1135).
+    A result group emits `checkOutcomeIds` only when it names at least one routed outcome tier, at recipe level and step level alike, through the one serializer both emitters share; `_normalizeResultGroups` rebuilds `[]` from absence and the only two arbiters that read it — `ResolutionModeService`'s routed-group filters — treat an omitted key and `[]` identically.
+    The nested ingredient rows are recorded under § IngredientSet, § IngredientGroup and § Ingredient, whose omissions are far larger than the recipe's own: on the corpus this rule was measured against, everything removable is 36.89% of a simple serialized corpus and 58.79% of a rich one, and the whole `ingredientSets` subtree is 54.66% / 93.68% of it.
 
 ### Validation Guidance
 
@@ -1427,6 +1430,18 @@ IngredientSet = {
    Ingredient-set Tool ids are active only when the owning Crafting System uses `routedByIngredients` and the set's trim-normalized name is non-empty.
    Outside that boundary the ids remain serialized for lossless round-tripping but are ignored by craftability, execution, inventory `requiredFor` projections, Recipe complexity, and admin Tool counts.
    For an active set, the applicable Tool set is the distinct union of recipe-level, active-step, and ingredient-set-level `toolIds`, resolved against the per-system Tools library; ids that miss the library are logged and dropped.
+5. `IngredientSet.toJSON()` OMITS a field whose value is the one the constructor rebuilds from absence, and omits the flat `ingredients` alias unconditionally (issue 1135).
+   This is the same rule as Recipe requirement 18, applied to the set: absence and the written default already mean the same thing on read, so the omission needs no migration, loses nothing on downgrade, and does not change what any stored set means.
+   The omitted set is `name`, `essences`, `toolIds`, `resultMapping` and `resultGroupId`; `id` and `ingredientGroups` are never omitted, being the set's identity and its authored shape.
+   `name` is the one candidate with a SEMANTIC reader and is therefore the one that proves the rule: `toolCheckBonus` treats a non-empty set name as "this set's Tool prerequisites are active" under `routedByIngredients`, exactly the `enabled`-shaped hazard requirement 18 exists for, and it survives omission only because the written default `''` is already the falsy side of that predicate — had the default been a non-empty sentinel, omitting it would have silently deactivated every set's Tools.
+   `SignatureValidator` reads `set.name || null` and falls back to the set position for absence and `''` alike.
+   Absence of `essences` is already a live on-disk state, because the 1.17.0 migration deletes the key outright once it has folded each positive entry into an essence option.
+   The omission set is a hand-maintained mirror of the constructor, guarded mechanically by `tests/ingredient-serialization-payload.test.js`.
+6. Every writer that rewrites a serialized ingredient set — the component-delete cascade, the essence-delete cascade, and the tag-vocabulary cascade — MUST resolve the flat `ingredients` alias rather than carry it through a `{ ...set }` spread or recompute it (issue 1135).
+   The rule is: DROP the alias when the source set carries `ingredientGroups`, and KEEP the filtered legacy array when it does not.
+   Both halves are load-bearing.
+   Re-emitting it puts a write-retired alias back one cascade at a time, producing a corpus that is not lossy but is mixed — most sets alias-free, cascade-touched sets carrying a stale one — which is the issue-1036 resurrection hazard in latent form.
+   Dropping it unconditionally destroys a flat-authored set's ONLY ingredient data and removes the `set.ingredients?.length` leg of the retention filter that keeps such a set alive at all.
 
 ## IngredientGroup
 
@@ -1450,6 +1465,9 @@ IngredientGroup = {
 2. A group is satisfied when any one option is satisfied.
 3. All groups in an `IngredientSet` must be satisfied.
 4. OR-group semantics are always enabled and are not controlled by a feature toggle.
+5. `IngredientGroup.toJSON()` emits exactly `{id, name, options}`, and omits none of its own keys; the payload reduction at group level comes entirely from its OPTIONS, which are filtered by the Ingredient omission table (issue 1135).
+   `checkOutcomeIds` is NOT an ingredient-group field and never has been — it lives on `ResultGroup`, and its omission is recorded under Recipe requirement 18.
+   The group's own `name` is a further omission candidate (`data.name || ''`, read only through `typeof === 'string' && trim()` guards) but is deliberately out of scope for issue 1135, whose omissions are exactly the fields its per-field reader audit covered.
 
 ## Ingredient
 
@@ -1502,6 +1520,14 @@ Ingredient = {
    An essence option matches no single inventory item (satisfaction is amount-accumulative across items and routes through the consumption planner).
    An essence option is resolved inside its ingredient set's single essence block rather than in its own author position (see §Essence-Alternative Consumption), so its funding is pooled with every other essence option in the set.
    The player selects the held **items** that fund the block through the `essenceAllocation` channel, rather than picking one option per essence requirement as they would for a component/tag group.
+9. `Ingredient.toJSON()` OMITS a field whose value is the one the constructor rebuilds from absence, and omits the `systemItemId` duplicate unconditionally (issue 1135).
+   Option-level keys are the dominant term in a serialized recipe corpus because they are paid once per option, per group, per set, per recipe: an authored component option of 68 bytes was written as 213 — a 3.1x expansion made entirely of these defaults and one exact duplicate — and ablating them is 19.66% of a simple corpus and 47.55% of a rich one.
+   The omitted set is `componentId`, `itemUuid`, `tag`, `alternatives`, `extractEffects` and `effectFilter`; `match` and `quantity` are never omitted.
+   `quantity` is omittable by the model (`data.quantity || 1`) and is deliberately excluded, because serialized options are read arithmetically by the shopping-list and consumption projections and that is a separate reader audit.
+   Absence is not a new on-disk state for any omitted key: the 1.17.0 essence migration and `IngredientSet._legacyIngredientsToGroups` have both been writing options as a bare `{quantity, match}` with all seven fields missing, so every reader has always had to cope.
+   `extractEffects` and `effectFilter` have NO readers at all — the ingredient-level effect-extraction path was removed — and are worth 7.00% of a simple corpus between them.
+   `componentId` is a canonical field omitted when `null`, which does not weaken the canonical-write policy: the top-level field is DERIVED by the constructor from `match` (`match.type === 'component' ? match.componentId : null`), the canonical component reference is `match.componentId` and is always emitted, and `null` means "this option is not a component match" — which absence says identically to every reader, each of which coerces through `componentId || systemItemId`.
+   The omission set is a hand-maintained mirror of the constructor, guarded mechanically by `tests/ingredient-serialization-payload.test.js`.
 
 ### Currency-Alternative Spend (Craft-Time)
 
@@ -1792,7 +1818,8 @@ ResultGroup = {
   // Preserved verbatim by normalization so a settings-only mode flip round-trips it.
   role?: "failure",
   // Ids of the routed-check outcome tiers that produce this group (routedByCheck +
-  // alchemy tiered). Empty for non-tiered groups.
+  // alchemy tiered). Empty for non-tiered groups, and OMITTED from the serialized
+  // payload when empty (issue 1135; see Recipe requirement 18).
   checkOutcomeIds?: string[],
   results: Result[],
 }
@@ -2911,10 +2938,9 @@ The following legacy aliases are accepted by constructors and normalization func
 The following aliases are currently emitted in `toJSON()` / normalization output alongside their canonical counterparts.
 These are transitional and will be removed in a future version once all dependent UI code paths have been updated:
 
-- `systemItemId` (emitted alongside `componentId` in Tool, Ingredient, Result)
-- `essences` (emitted by `IngredientSet.toJSON` as `essences: this.essences`, `{}` post-migration; superseded by essence ingredient options — one-release window)
+- `systemItemId` (emitted alongside `componentId` in Tool and Result; `Ingredient.toJSON` no longer emits it — see § Write-Retired Aliases)
+- `essences` (emitted by `IngredientSet.toJSON` only when the legacy map carries at least one entry, which post-migration is never; superseded by essence ingredient options — one-release window)
 - `essences` (CraftingSystem: derived id-string array equal to `essenceDefinitions.map(def => def.id)`, emitted alongside canonical `essenceDefinitions`; stripped on export by `stripTransitionalAliases` and re-derived after component deletion — not a Record, never feature-gated)
-- `ingredients` (emitted alongside `ingredientGroups` in IngredientSet)
 - `associatedSystemItemId` (emitted alongside `sourceComponentId` in EssenceDefinition and alongside `originItemUuid` in Component)
 - `tags` (emitted alongside `itemTags` in CraftingSystem normalization)
 - UI convenience aliases (`enableTags`, `enableEssences`, `enableCategories`, `enableMultiStepRecipes`, `advancedOptionsEnabled`)
@@ -2931,6 +2957,8 @@ The following aliases are **no longer emitted** by `toJSON()` / normalization ou
 | Alias                        | Write Retired By | Read Fallback                            | Why the read stays                                                                                                                                                                                                                                                                                                                                                              |
 | ---------------------------- | ---------------- | ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `results` (flat array, Recipe) | #1087 | `Recipe._normalizeResultGroups`, which wraps each flat result into a single-result group when `resultGroups` is absent or empty | It duplicated `resultGroups[].results` wholesale and was ~10% of a representative recipe payload, paid on every write and every socket replication. Worlds, exported system files and third-party content authored before the retirement carry it as their only result data and cannot all be reached by a migration, so accepting it is not a window that closes. Import reference remapping and `migrateComponentId` keep traversing it for the same reason. |
+| `ingredients` (flat array, IngredientSet) | #1135 | `IngredientSet._legacyIngredientsToGroups`, which wraps each flat ingredient into a single-option group when `ingredientGroups` is absent or empty; plus the three projections that synthesize groups from it (`RecipeManager`'s two ingredient-requirement walks and `adminRecipeRowProjection`) | It was a DERIVED first-option-per-group projection of `ingredientGroups` — never authored, and strictly lossy, since a two-option group surfaced only its first option — and it was 19.89% of a simple serialized corpus and 21.13% of a rich one. The read fallback is permanent because it is reachable only for a pre-groups payload where the flat array is the set's ONLY ingredient data: a world, an exported system file or third-party content authored before ingredient groups existed. Stripping it on import would therefore delete a recipe's entire input requirement, which is why it must never be listed under § Retired Aliases (Fully Removed). The in-memory `IngredientSet#ingredients` property is unchanged and is what every runtime reader of the alias sees. |
+| `systemItemId` (Ingredient) | #1135 | Every fallback in `models/match/matchTypes.js` — `normalizeMatch`'s bare-field read, `getComponentId`, and the ingredient-reference id extraction — each of which reads `componentId` first and falls back to `systemItemId` | On an `Ingredient` it was a byte-for-byte duplicate of `componentId` on the SAME object, so it never distinguished anything on the wire. The read fallback is permanent for the same reason as `results`: a payload written before `componentId` existed carries the alias as its only component reference, and the 1.13.0 `migrateComponentId` pass cannot reach content outside the world. `Tool.toJSON` and `Result.toJSON` still emit it and stay in § Transitional Write Aliases; only `Ingredient` retires. `src/ui/recipeIngredientGroups.js` also writes it, and is DEAD — an orphaned draft serializer with no importer anywhere in the repository — so it is not a missed retirement site. |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 
