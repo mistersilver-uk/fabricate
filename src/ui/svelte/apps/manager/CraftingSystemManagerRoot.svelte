@@ -1147,8 +1147,23 @@
     recipeCategories: selectedSystem?.categories?.length || 0,
   });
   const itemCards = $derived($viewState.itemCards || []);
+  // Reference counting for the Tags & Categories screen delegates to the pure
+  // `buildVocabularyUsage` helper (issue 689), which — unlike the pre-689 inline count —
+  // also credits a tag for every recipe tag-placeholder ingredient (`match.type === 'tags'`)
+  // that names it, so a tag only ever used as an ingredient filter no longer reads as
+  // "Unused".
+  //
+  // The recipe half of that tag count arrives PRE-COUNTED from the store (issue 1081). This
+  // derivation feeds the left nav rail's Tags & Categories badge, which is a sibling of the
+  // view switch rather than a child of one, so it is evaluated on every render of the
+  // manager in every view. Counting the placeholders here read `ingredientSets` and `steps`
+  // off each projected row, and those are detail-tier fields sharing one memoized producer
+  // — so an always-mounted badge deep-cloned the whole library before first paint. The
+  // recipe CATEGORY count below stays here because `category` is a summary-tier field.
   const tagCategoryUsage = $derived(
-    buildTagCategoryUsage(selectedSystem, $viewState.recipes || [], itemCards)
+    buildVocabularyUsage($viewState.recipes || [], itemCards, {
+      recipeTagPlaceholderCounts: $viewState.recipeTagPlaceholderCounts || {},
+    })
   );
   const categoryRows = $derived(
     buildCategoryRows(
@@ -7019,14 +7034,6 @@
       .trim()
       .toLowerCase();
     return normalized || 'general';
-  }
-
-  // Reference counting delegates to the pure `buildVocabularyUsage` helper (issue
-  // 689), which — unlike the pre-689 inline count — also credits a tag for every
-  // recipe tag-placeholder ingredient (`match.type === 'tags'`) that names it, so a
-  // tag only ever used as an ingredient filter no longer reads as "Unused".
-  function buildTagCategoryUsage(system, recipes, items) {
-    return buildVocabularyUsage(recipes, items);
   }
 
   function buildCategoryRows(categories, usage, icons) {

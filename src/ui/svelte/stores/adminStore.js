@@ -1775,6 +1775,11 @@ export function createAdminStore(services) {
     essenceCards: [],
     recipes: [],
     recipeCategories: [],
+    // The recipe half of the Tags & Categories reference count, folded by the row
+    // projection off the recipe MODELS (issue 1081). Published as data because its reader —
+    // the manager's persistent left nav badge — is a sibling of every view, so deriving it
+    // from the projected rows walked their DETAIL tier on every render, in every view.
+    recipeTagPlaceholderCounts: {},
     showVisibilitySummary: false,
     worldUsers: [],
     // EVERY world actor (not the player-character roster), each carrying its
@@ -4070,6 +4075,7 @@ export function createAdminStore(services) {
       essenceCards: prev.systems.length > 0 ? prev.essenceCards : [],
       recipes: [],
       recipeCategories: [],
+      recipeTagPlaceholderCounts: {},
       showVisibilitySummary: false,
       recipeSearchTerm: get(recipeSearch),
       itemSearchTerm: get(itemSearch),
@@ -4475,7 +4481,12 @@ export function createAdminStore(services) {
 
     let selectedSystemData = null;
     let essenceCards = [];
-    let recipeListData = { recipes: [], recipeCategories: [], showVisibilitySummary: false };
+    let recipeListData = {
+      recipes: [],
+      recipeCategories: [],
+      recipeTagPlaceholderCounts: {},
+      showVisibilitySummary: false,
+    };
 
     if (selectedSystem) {
       const managedItems = _getManagedItems(selectedSystem);
@@ -4566,6 +4577,7 @@ export function createAdminStore(services) {
       gatheringConfig: _clonePlain(_currentGatheringConfig()),
       recipes: recipeListData.recipes,
       recipeCategories: recipeListData.recipeCategories,
+      recipeTagPlaceholderCounts: recipeListData.recipeTagPlaceholderCounts,
       showVisibilitySummary: recipeListData.showVisibilitySummary,
       worldUsers,
       accessCharacters,
@@ -4657,6 +4669,7 @@ export function createAdminStore(services) {
       gatheringConfig: _clonePlain(_currentGatheringConfig()),
       recipes: recipeListData.recipes,
       recipeCategories: recipeListData.recipeCategories,
+      recipeTagPlaceholderCounts: recipeListData.recipeTagPlaceholderCounts,
       showVisibilitySummary: recipeListData.showVisibilitySummary,
       worldUsers,
       accessCharacters,

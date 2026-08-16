@@ -34,6 +34,8 @@ import {
   buildSelectedSystemViewData,
   enrichRecipeItemLibrary,
 } from '../../src/ui/svelte/stores/adminSystemInspectorProjection.js';
+import { countingCandidates } from '../helpers/scale/scaleCounters.js';
+import { recipeItemDefinitionsContaining } from '../../src/utils/recipeItemMembership.js';
 
 // --- Pinned allowlists ------------------------------------------------------
 
@@ -374,6 +376,7 @@ describe('adminRecipeRowProjection.buildRecipeList (direct, no store)', () => {
     assert.deepEqual(buildRecipeList(null, makeRecipeManager([]), null, ''), {
       recipes: [],
       recipeCategories: [],
+      recipeTagPlaceholderCounts: {},
       showVisibilitySummary: false,
     });
   });
@@ -390,11 +393,27 @@ describe('adminRecipeRowProjection.buildRecipeList (direct, no store)', () => {
  * wired, and this repository has shipped that mistake before.
  */
 describe('adminRecipeRowProjection: summary tier vs detail tier', () => {
-  /** A recipe manager whose two expensive seams count their calls. */
+  /** A recipe manager whose expensive seams count their calls. */
   function makeCountingRecipeManager(recipes, blockedIds = []) {
-    const calls = { canActivateRecipe: 0, toJSON: 0 };
+    const calls = { canActivateRecipe: 0, toJSON: 0, getRecipes: 0, previewSets: 0 };
     const instrumented = recipes.map((recipe) => ({
       ...recipe,
+      // The ALLOCATION-heavy half of the detail tier, counted where it actually happens.
+      // `toJSON` and `canActivateRecipe` are the two CHEAP seams — one clone, one verdict —
+      // and neither observes `_buildRecipeBrowserDisplay` / `_buildRequirementPreviewStep`,
+      // the per-set/per-step object graph the module header calls the expensive half. Those
+      // build by `map`ping the step's ingredient sets, while the summary tier's arithmetic
+      // fold iterates the same array with `for...of` — so a counting `map` separates them
+      // exactly, and an eagerly-built preview is visible here and nowhere else.
+      ingredientSets: countingCandidates(
+        recipe.ingredientSets,
+        {
+          bump: () => {
+            calls.previewSets += 1;
+          },
+        },
+        'previewSets'
+      ),
       toJSON: () => {
         calls.toJSON += 1;
         return recipe.toJSON();
@@ -404,7 +423,10 @@ describe('adminRecipeRowProjection: summary tier vs detail tier', () => {
       calls,
       recipes: instrumented,
       manager: {
-        getRecipes: () => instrumented,
+        getRecipes: () => {
+          calls.getRecipes += 1;
+          return instrumented;
+        },
         canActivateRecipe: (recipe) => {
           calls.canActivateRecipe += 1;
           return { valid: !blockedIds.includes(recipe.id) };
@@ -426,6 +448,12 @@ describe('adminRecipeRowProjection: summary tier vs detail tier', () => {
     assert.equal(result.recipes.length, 50, 'the whole cohort is projected');
     assert.equal(calls.toJSON, 0, 'no row body is cloned to build the cohort');
     assert.equal(calls.canActivateRecipe, 0, 'no row runs the activation gate to build the cohort');
+    assert.equal(
+      calls.previewSets,
+      0,
+      'and no requirements-preview object graph is built — the sort keys are folded ' +
+        'arithmetically over the same sets rather than derived from the preview'
+    );
   });
 
   it('POSITIVE CONTROL: reading a detail field is what performs the work', () => {
@@ -435,6 +463,12 @@ describe('adminRecipeRowProjection: summary tier vs detail tier', () => {
     // Exactly the page a default browser open renders.
     for (const row of rows.slice(0, 25)) void row.requirementsPreview;
     assert.equal(calls.toJSON, 25, 'the counters CAN go up — one clone per row read');
+    assert.equal(
+      calls.previewSets,
+      25,
+      'including the preview builder — one ingredient set mapped per row read, and it is ' +
+        'the counter that would move first if the preview went back to being eager'
+    );
 
     for (const row of rows.slice(0, 25)) void row.enableBlocked;
     assert.equal(calls.canActivateRecipe, 25, 'and one activation check per row read');
@@ -480,6 +514,89 @@ describe('adminRecipeRowProjection: summary tier vs detail tier', () => {
     );
     assert.equal(calls.canActivateRecipe, 20, 'sorting by attention answers every row');
     assert.equal(calls.toJSON, 0, 'and still materialises no detail bundle');
+  });
+
+  it('projects from the roster the caller already fetched, rather than fetching it again', () => {
+    const { calls, manager, recipes } = makeCountingRecipeManager(makeCohort(5));
+
+    const result = buildRecipeList(null, manager, makeSystem(), '', { roster: recipes });
+    assert.equal(result.recipes.length, 5, 'the supplied roster IS the cohort');
+    assert.equal(
+      calls.getRecipes,
+      0,
+      'a supplied roster is used as-is: the store already holds this array for its essence ' +
+        'cards, and re-fetching copies the whole library a second time per refresh'
+    );
+
+    // POSITIVE CONTROL, same fixture, same counter: omitting the roster fetches one.
+    buildRecipeList(null, manager, makeSystem(), '');
+    assert.equal(calls.getRecipes, 1, 'the counter CAN go up — and the fallback still works');
+  });
+
+  it('resolves book membership through ONE cohort bucket index, not a scan per recipe', () => {
+    let definitionsExamined = 0;
+    const definitions = countingCandidates(
+      Array.from({ length: 8 }, (_, index) => ({
+        id: `book-${index}`,
+        name: `Book ${index}`,
+        originItemUuid: '',
+        recipeIds: [`r-${index}`],
+      })),
+      {
+        bump: () => {
+          definitionsExamined += 1;
+        },
+      },
+      'definitionsExamined'
+    );
+    const system = makeSystem({
+      recipeItemDefinitions: definitions,
+      membershipResolvesByRecipeIds: true,
+    });
+    const { manager, recipes } = makeCountingRecipeManager(makeCohort(50));
+
+    const rows = buildRecipeList(null, manager, system, '').recipes;
+    assert.deepEqual(rows[3].recipeItemIds, ['book-3'], 'membership still resolves correctly');
+    assert.equal(
+      definitionsExamined,
+      0,
+      'the buckets are built with one pass over the definitions, so no recipe pays a scan'
+    );
+
+    // POSITIVE CONTROL, same fixture, same counter, same seam: the membership leaf's DEFAULT
+    // lookup is the `definitions.filter(...)` the index replaces, and it examines every
+    // definition for every recipe — the O(books x recipes) term this cohort index removes.
+    for (const recipe of recipes) recipeItemDefinitionsContaining(definitions, recipe, true);
+    assert.equal(
+      definitionsExamined,
+      50 * 8,
+      'the counter CAN go up, by exactly the product the bucket index turns into a Map.get'
+    );
+  });
+
+  it('credits a book that lists the same recipe twice ONCE, exactly as filter() did', () => {
+    const system = makeSystem({
+      membershipResolvesByRecipeIds: true,
+      recipeItemDefinitions: [
+        { id: 'book-dup', name: 'Duplicated', originItemUuid: '', recipeIds: ['r-0', 'r-0'] },
+        { id: 'book-other', name: 'Other', originItemUuid: '', recipeIds: ['r-0'] },
+      ],
+    });
+    const { manager } = makeCountingRecipeManager(makeCohort(1));
+    const [row] = buildRecipeList(null, manager, system, '').recipes;
+
+    // A DEFINITION contributes at most one entry; two DIFFERENT books contribute two. Both
+    // halves in one assertion, because a dedup that collapsed the second book as well would
+    // pass a test that only pinned the first.
+    assert.deepEqual(row.recipeItemIds, ['book-dup', 'book-other']);
+    assert.deepEqual(
+      row.recipeItemIds,
+      system.recipeItemDefinitions
+        .filter((definition) => definition.recipeIds.some((id) => id === 'r-0'))
+        .map((definition) => definition.id),
+      'the bucket index reproduces the filter() it replaced, duplicate ids included — ' +
+        'otherwise the row renders the same book chip twice'
+    );
   });
 
   it('materialises everything through a JSON round-trip, as the editor draft does', () => {
@@ -532,7 +649,70 @@ describe('adminComponentRowProjection.buildItemCards (direct, no store)', () => 
     const warm = await buildItemCards(makeItemsManager(COMPONENTS), system, '', options);
     await hydrateItemCards(warm);
     assert.equal(cache.size, 2, 'no new memo entries: both hydrations hit');
+
+    // THE NEW CONTRACT, stated rather than left implicit (issue 1081). A refresh no longer
+    // reuses the card OBJECT — the cheap card is rebuilt every time and only its resolved
+    // half is memoized — so "an unchanged component reuses the same card object" is simply
+    // no longer true and its removal is honest. What replaces it is this pair: fresh objects,
+    // and a re-hydration that comes back out of the memo with the same reading. The identity
+    // loss is why the selected and edited cards must be re-asked to hydrate after a refresh,
+    // so a silent return to object reuse would hide that requirement rather than satisfy it.
+    assert.ok(warm[0] !== cold[0], 'a refresh projects a FRESH card object');
     assert.deepEqual(warm[0].sourceOrigin, cold[0].sourceOrigin);
+    assert.equal(warm[0].description, cold[0].description);
+    assert.equal(warm[0].sourceMissing, cold[0].sourceMissing);
+  });
+
+  /**
+   * A REJECTED hydration must not be memoized (issue 1081).
+   *
+   * `hydrate()` memoizes its in-flight promise so a render effect calling it on every
+   * re-render costs nothing — but `_documentDescriptionCandidate` awaits Foundry's enricher,
+   * which does not catch its own throws the way the document lookup does. Caching the
+   * rejected promise turns one transient failure into a permanent one for that card, plus an
+   * unhandled rejection on every subsequent render, where the previous behaviour was a loud
+   * failure of the whole refresh that the next refresh cleared.
+   */
+  it('does not memoize a REJECTED hydration, so a later render retries', async () => {
+    const component = {
+      id: 'c-throw',
+      name: 'Thrown',
+      img: '',
+      description: '',
+      category: 'ore',
+      tags: [],
+      essences: {},
+      originItemUuid: 'Compendium.pack.Item.src',
+    };
+    const originalFromUuid = globalThis.fromUuid;
+    globalThis.fromUuid = async () => ({ system: { description: { value: 'Live prose' } } });
+    let enrichAttempts = 0;
+    try {
+      const [card] = await buildItemCards(
+        makeItemsManager([component]),
+        makeSystem({ components: [component] }),
+        '',
+        {
+          showTags: true,
+          showEssences: false,
+          essenceDefinitionById: new Map(),
+          enrichToHtml: async (raw) => {
+            enrichAttempts += 1;
+            if (enrichAttempts === 1) throw new Error('enricher blew up');
+            return raw;
+          },
+        }
+      );
+
+      await assert.rejects(() => card.hydrate(), /enricher blew up/);
+      assert.equal(card.description, '', 'the card keeps its un-hydrated reading');
+
+      await card.hydrate();
+      assert.equal(enrichAttempts, 2, 'the retry really re-ran the resolution');
+      assert.equal(card.description, 'Live prose', 'and the second attempt fills the card');
+    } finally {
+      globalThis.fromUuid = originalFromUuid;
+    }
   });
 
   it('runs uncached when no cache is injected', async () => {

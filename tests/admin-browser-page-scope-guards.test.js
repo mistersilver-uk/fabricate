@@ -47,6 +47,9 @@ const { buildItemCards, hydrateItemCards } = await import(
 );
 const { buildRecipeBrowserModel } = await import('../src/utils/recipeBrowserModel.js');
 const { buildComponentBrowserModel } = await import('../src/utils/componentBrowserModel.js');
+const { buildVocabularyUsage, countRecipeTagPlaceholderUsage } = await import(
+  '../src/utils/vocabularyUsage.js'
+);
 
 /** More than two pages, so "the page" and "the cohort" are different numbers. */
 const COHORT = 60;
@@ -198,6 +201,17 @@ describe('GM recipe browser: off-page definitions are not richly projected', () 
         0,
         'and still builds no detail bundle'
       );
+
+      // SECOND POSITIVE CONTROL, against the DETAIL counter itself. The control above moves
+      // `gateCanActivateRecipe`, which is a different counter — so on its own it leaves
+      // `recipeDetailProjections` never shown to be live within this test, and a zero that
+      // is never shown to be able to be non-zero is not evidence.
+      for (const row of browseRecipes(list.recipes).page) renderRecipeRow(row);
+      assert.equal(
+        counters.get('recipeDetailProjections'),
+        PAGE_SIZE,
+        'the DETAIL counter CAN go up in this fixture too — rendering a page is what does it'
+      );
     } finally {
       world.dispose();
     }
@@ -249,7 +263,7 @@ describe('GM recipe browser: off-page definitions are not richly projected', () 
  * empty stored description is what makes the enrichment fallback reachable — a fixture with
  * stored prose would measure the branch that never enriches and report a comfortable zero.
  */
-function makeComponentLibrary(size) {
+function makeComponentLibrary(size, essences = {}) {
   return Array.from({ length: size }, (_, index) => ({
     id: `comp-${String(index).padStart(3, '0')}`,
     name: `Component ${String(index).padStart(3, '0')}`,
@@ -257,7 +271,7 @@ function makeComponentLibrary(size) {
     description: '',
     category: 'general',
     tags: [],
-    essences: {},
+    essences,
     originItemUuid: `Compendium.pack.Item.source-${index}`,
   }));
 }
@@ -269,8 +283,11 @@ function makeComponentLibrary(size) {
  * happens once per `itemCardSignature` computation and never otherwise, so `memoGet` is the
  * number of deep record serializations performed.
  */
-async function projectComponents(counters) {
-  const components = makeComponentLibrary(COHORT);
+async function projectComponents(
+  counters,
+  { showEssences = true, essenceDefinitionById = new Map(), componentEssences = {} } = {}
+) {
+  const components = makeComponentLibrary(COHORT, componentEssences);
   const system = { ...makeCraftingSystem(), components, features: { salvage: true } };
   const cache = new Map();
 
@@ -286,8 +303,8 @@ async function projectComponents(counters) {
     '',
     {
       showTags: true,
-      showEssences: true,
-      essenceDefinitionById: new Map(),
+      showEssences,
+      essenceDefinitionById,
       enrichToHtml: async (raw) => {
         counters.bump('enrichToHtml');
         return raw;
@@ -346,6 +363,57 @@ describe('GM component browser: async fan-out and signature cost are bounded by 
     }
   });
 
+  /**
+   * The SIGNATURE, counted directly rather than through the memo.
+   *
+   * `memoGet` above counts `cache.get` calls, and the prose beside it reasons from "a cache
+   * read happens once per signature computation" to "so `memoGet` IS the signature count".
+   * That coupling is stated, not enforced: hoisting `itemCardSignature` back out of
+   * `resolve()` into the card build — a deep `_stableStringify` of every component's whole
+   * record, cohort-wide, on every refresh, which is the original defect — leaves every
+   * `cache.get` exactly where it is and every counter in this file unmoved.
+   *
+   * `itemCardSignature` reads `essenceDefinitionById.get(id)` UNCONDITIONALLY, twice per
+   * essence (name, then icon), while the cheap card build reads that map only when
+   * `showEssences` is true. So with essences DISPLAYED OFF and each component carrying one,
+   * a counting facade on that map counts signature computations and nothing else.
+   */
+  it('computes NO card signature for the cohort — the deep serialization is page-scoped', async () => {
+    const counters = createOperationCounters();
+    const world = await projectComponents(counters, {
+      showEssences: false,
+      componentEssences: { fire: 2 },
+      essenceDefinitionById: countingFacade(new Map([['fire', { name: 'Fire' }]]), counters, {
+        prefix: 'essence',
+        methods: ['get'],
+      }),
+    });
+    try {
+      assert.equal(world.cards.length, COHORT, 'the whole cohort is projected');
+      assert.equal(
+        counters.get('essenceGet'),
+        0,
+        'projecting the cohort computed NO signature: with essences off, the only reader of ' +
+          'the essence catalogue is `itemCardSignature`'
+      );
+
+      // POSITIVE CONTROL, same fixture, same counter, same seam: hydrating one page is what
+      // computes them, and it computes exactly one page's worth.
+      await hydrateItemCards(world.cards.slice(0, PAGE_SIZE));
+      assert.equal(
+        counters.get('essenceGet'),
+        PAGE_SIZE * 2,
+        'the signature counter CAN go up — 25 signatures, two catalogue reads each'
+      );
+
+      // And the tail is reachable, so the bound is page scope rather than a dropped tail.
+      await hydrateItemCards(world.cards);
+      assert.equal(counters.get('essenceGet'), COHORT * 2);
+    } finally {
+      world.restore();
+    }
+  });
+
   it('fills the card in place, so the row, the inspector and the editor cannot disagree', async () => {
     const counters = createOperationCounters();
     const world = await projectComponents(counters);
@@ -386,5 +454,119 @@ describe('GM component browser: async fan-out and signature cost are bounded by 
     } finally {
       world.restore();
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The consumers of the cohort — the guards the store-level ones do not cover
+// ---------------------------------------------------------------------------
+
+/**
+ * A `tags` placeholder ingredient set: the shape `countRecipeTagPlaceholders` exists to find.
+ *
+ * @param {string} id
+ * @param {string[]} tags
+ */
+function tagPlaceholderSet(id, tags) {
+  return {
+    id,
+    name: 'Placeholder',
+    ingredientGroups: [{ id: `${id}-g`, options: [{ match: { type: 'tags', tags }, quantity: 1 }] }],
+  };
+}
+
+describe('the Tags & Categories reference count reads the cohort without materialising it', () => {
+  /**
+   * The nav badge is a SIBLING of the view switch, so it re-derives on every render of the
+   * manager in every view — which makes it the one consumer that must never touch the detail
+   * tier. Counting a projected row's tag placeholders reads `ingredientSets` and `steps`,
+   * both detail-tier fields sharing one memoized producer, so a badge that walked the rows
+   * deep-cloned the entire library before first paint.
+   *
+   * The pure helpers were pinned by the first revision of this file; this pins the
+   * COMPOSITION that consumes them, which is where the cost actually lived.
+   */
+  it('answers the nav badge from pre-counted data, touching no detail tier', () => {
+    const counters = createOperationCounters();
+    const world = makeRecipeWorld(counters);
+    try {
+      const list = buildRecipeList(world.systemManager, world.manager, world.system, '');
+      const scoped = buildVocabularyUsage(list.recipes, [], {
+        recipeTagPlaceholderCounts: list.recipeTagPlaceholderCounts,
+      });
+
+      assert.equal(scoped.categoryReferenceCount, COHORT, 'every recipe was still counted');
+      assert.equal(
+        counters.get('recipeDetailProjections'),
+        0,
+        'the badge composition built no detail bundle'
+      );
+
+      // POSITIVE CONTROL, same fixture, same counter, same seam: the composition WITHOUT the
+      // pre-counted tags is the one this change replaced, and it materialises the cohort.
+      const walked = buildVocabularyUsage(list.recipes, []);
+      assert.equal(
+        counters.get('recipeDetailProjections'),
+        COHORT,
+        'the counter CAN go up — walking the rows for their placeholders is what does it'
+      );
+
+      // And the two answers agree, so this is a choice of WHERE the walk happens rather than
+      // a quietly different number on the screen.
+      assert.deepEqual([...scoped.tagUsage], [...walked.tagUsage]);
+      assert.deepEqual([...scoped.categoryUsage], [...walked.categoryUsage]);
+      assert.equal(scoped.tagReferenceCount, walked.tagReferenceCount);
+    } finally {
+      world.dispose();
+    }
+  });
+
+  /**
+   * The pre-counted record is folded off the recipe MODELS; the walk it replaces read the
+   * `toJSON()`-sourced projection. The two shapes are not guaranteed identical by anything
+   * other than this assertion, and a divergence would change tag counts silently rather than
+   * fail — so both branches of `matchesOf` (grouped and legacy bare `ingredients[]`) and both
+   * branches of `ingredientSetsFor` (top-level sets and per-step sets) are crossed here.
+   */
+  it('counts the same placeholders off a recipe MODEL as off its serialized projection', () => {
+    const recipes = [
+      Recipe.fromJSON({
+        id: 'top-level',
+        name: 'Top level sets',
+        craftingSystemId: 'sys-scale',
+        ingredientSets: [tagPlaceholderSet('s1', ['Herb', 'moon']), tagPlaceholderSet('s2', ['herb'])],
+        resultGroups: [{ id: 'rg', results: [{ id: 'res', itemUuid: 'Item.r', quantity: 1 }] }],
+      }),
+      Recipe.fromJSON({
+        id: 'multi-step',
+        name: 'Multi step',
+        craftingSystemId: 'sys-scale',
+        steps: [
+          { id: 'st1', name: 'One', ingredientSets: [tagPlaceholderSet('s3', ['ash'])] },
+          { id: 'st2', name: 'Two', ingredientSets: [tagPlaceholderSet('s4', ['ash', 'moon'])] },
+        ],
+      }),
+      Recipe.fromJSON({
+        id: 'legacy',
+        name: 'Legacy bare ingredients',
+        craftingSystemId: 'sys-scale',
+        // No `ingredientGroups`: the pre-groups authoring shape, which the model converts on
+        // construction and `toJSON` re-emits BOTH ways.
+        ingredientSets: [
+          { id: 's5', name: 'Legacy', ingredients: [{ match: { type: 'tags', tags: ['ROOT'] } }] },
+        ],
+      }),
+    ];
+
+    const fromModels = countRecipeTagPlaceholderUsage(recipes);
+    const fromProjections = countRecipeTagPlaceholderUsage(recipes.map((r) => r.toJSON()));
+
+    assert.deepEqual(fromModels, fromProjections);
+    assert.deepEqual(
+      fromModels,
+      { herb: 2, moon: 2, ash: 2, root: 1 },
+      'POSITIVE CONTROL: the fixture really does carry placeholders, so the agreement above ' +
+        'is not two empty maps agreeing'
+    );
   });
 });

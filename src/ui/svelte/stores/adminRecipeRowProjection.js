@@ -49,6 +49,7 @@
 import { ingredientSetToolsAreActive } from '../../../systems/toolCheckBonus.js';
 import { normalizeRecipeCategory } from '../../../utils/recipeCategories.js';
 import { recipeItemDefinitionsContaining } from '../../../utils/recipeItemMembership.js';
+import { countRecipeTagPlaceholderUsage } from '../../../utils/vocabularyUsage.js';
 
 /**
  * Build a human-readable visibility summary for a recipe row.
@@ -753,7 +754,14 @@ export function buildRecipeList(
   recipeSearchTerm,
   options = {}
 ) {
-  if (!selectedSystem) return { recipes: [], recipeCategories: [], showVisibilitySummary: false };
+  if (!selectedSystem) {
+    return {
+      recipes: [],
+      recipeCategories: [],
+      recipeTagPlaceholderCounts: {},
+      showVisibilitySummary: false,
+    };
+  }
 
   const listMode = selectedSystem.recipeVisibility?.listMode || 'global';
   const showVisibilitySummary = listMode === 'player';
@@ -777,6 +785,20 @@ export function buildRecipeList(
   return {
     recipes: recipes.map((recipe) => _createRecipeRow(recipe, context)),
     recipeCategories,
+    // The recipe half of the Tags & Categories reference count, folded here off the RECIPE
+    // MODELS (issue 1081). Its consumer is the manager's persistent left nav rail, which is
+    // a sibling of every view rather than a child of one — so it re-derived on every render
+    // of the manager, and the walk it performed reads `ingredientSets` and `steps`. Those
+    // are DETAIL-tier row fields sharing one memoized producer, so an always-mounted badge
+    // was materialising the whole library's detail tier before first paint: exactly the cost
+    // the two tiers exist to remove. Counted here instead, where the models are already in
+    // hand and the fields are ordinary properties.
+    //
+    // Over `recipes`, NOT `roster`: the count the screen renders today is over the
+    // SEARCH-FILTERED cohort, the same array the rows are projected from. Whether it should
+    // instead be roster-wide is a real question about that screen and a change to a rendered
+    // number, so it is deliberately not decided by a performance change.
+    recipeTagPlaceholderCounts: countRecipeTagPlaceholderUsage(recipes),
     showVisibilitySummary,
   };
 }
