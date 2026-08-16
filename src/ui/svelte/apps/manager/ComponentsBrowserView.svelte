@@ -135,6 +135,25 @@
     })
   );
   const filteredComponents = $derived(model.filtered);
+  // The expensive half of a component card — its linked source document, the "Missing"
+  // badge and the live description fallback — is resolved for the PAGE and nothing else
+  // (issue 1081). The store projects every card cheaply and only this view knows which of
+  // them are on screen, so the request has to originate here.
+  //
+  // `hydrate()` is idempotent and memoized per card, so re-running this effect on every
+  // re-render (including the store's own republish once the cards fill) costs nothing. The
+  // returned promise is deliberately not awaited: the card fills itself in place and the
+  // store republishes, which is what re-renders the rows.
+  //
+  // Called off the card rather than through the projection's `hydrateItemCards` helper on
+  // purpose: importing `stores/adminComponentRowProjection.js` here would pull that module
+  // (and its own imports) into the dependency closure of every mounted-component suite that
+  // renders this tree, where a module missing from the harness allowlist HANGS the suite as
+  // `# cancelled` rather than failing. A card with no `hydrate` — an isolated mount's plain
+  // fixture — is simply left as it is.
+  $effect(() => {
+    for (const card of model.page) card?.hydrate?.();
+  });
   const page = $derived({
     components: model.page,
     pageIndex: model.pageIndex,

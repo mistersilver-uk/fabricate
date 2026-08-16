@@ -2,13 +2,32 @@
  * adminComponentRowProjection — the GM component-browser card projection, as a pure
  * module (issue 1090).
  *
- * `buildItemCards` projects one card per managed component, resolving each component's
- * linked source document once and falling back to that document's description when the
- * stored one is empty. It carries the issue 148 memo with it, deliberately unchanged:
- * `itemCardSignature` still deep-stringifies the WHOLE component on every refresh, even
- * on a cache hit. That cost is issue 1081's to address against this surface — do not
- * "fix" it here, or the no-behaviour-change bar for the extraction stops meaning
- * anything.
+ * `buildItemCards` projects one card per managed component. Two tiers (issue 1081):
+ *
+ *  - **The card itself is CHEAP and synchronous.** Everything the component browser model
+ *    filters, sorts, counts and paginates on — `category`, `essences`, the whole
+ *    `salvageSummary`, the tags, the stored description — is a plain read of the stored
+ *    component.
+ *  - **`card.hydrate()` is the expensive tier and is per-card.** It resolves the linked
+ *    source document (`fromUuid`), falls back to that document's ENRICHED description when
+ *    the stored one is empty, and answers the "Missing" badge. Nothing calls it for a
+ *    component that is not on screen, so a 5,000-component library performs page-sized
+ *    async fan-out rather than 5,000 document resolutions per refresh.
+ *
+ * `itemCardSignature` — the issue 148 memo key — is computed INSIDE `hydrate()`, and that
+ * placement is the point. It used to run before the cache lookup, so every component paid a
+ * deep `_stableStringify` of its whole record on every refresh purely to discover that
+ * nothing had changed: the memo removed the `fromUuid`/`enrichHTML` cost and kept an
+ * `O(corpus x record)` one. Moving the call inside the page scope displaces that cost
+ * instead of inheriting it. The signature itself is UNCHANGED — a hand-narrowed key would
+ * serve a stale card, which is the defect the whole-record serialization exists to prevent.
+ *
+ * `hydrate()` fills the card IN PLACE and then tells its caller through `onHydrated`. That
+ * is a deliberate exception to this module's otherwise-immutable projections: the browser
+ * row, the browser inspector and the component editor all read the SAME published card
+ * object, and only the browser knows which cards are on screen. Filling in place is what
+ * keeps those three surfaces from disagreeing about one component; `onHydrated` is what
+ * lets the store re-publish so Svelte sees it.
  *
  * The memo cache is INJECTED (`options.cache`) rather than owned here, so the store keeps
  * its per-store instance and its existing system-id invalidation chokepoint, and a direct
@@ -173,10 +192,138 @@ export function itemCardSignature(item, showTags, showEssences, showSalvage, ess
   });
 }
 
-// The per-store item-card memo (a Map keyed `${systemId}:${itemId}` → `{signature, card}`)
-// lets an unchanged component skip its per-item `fromUuid` (`_resolveSourceDocumentState`)
-// and conditional `enrichHTML` on refresh, so a single-component edit no longer pays
-// O(all-components) resolution cost.
+/**
+ * Resolve the linked-source half of ONE card: the description fallback, the "Missing"
+ * verdict, and the source-origin badge.
+ *
+ * Precedence: STORED FIRST, enriched live document as the fallback (issue 800,
+ * flipping the live-first order issue 676 introduced).
+ *
+ * Issue 676 preferred the live document because the stored description was
+ * routinely empty for a compendium-linked component, so the identity strip's
+ * promise that "name, image & description follow the linked item" rendered a bare
+ * "—". Since descriptions are now RESOLVED and stored at ingestion and by the GM
+ * repair, the stored value is the authoritative one and reading the live document
+ * on every render is pure cost.
+ *
+ * The trade is honest and is read FRESHNESS: a pack-content change (a game system
+ * or module shipping new prose) now reaches the component when a GM runs Repair
+ * Item Data, where previously it landed on the next render. Item-sync covers
+ * in-world edits only.
+ *
+ * Statement form, deliberately: `(await enrichedLive) || stored` would re-introduce
+ * the per-component `enrichHTML` call this flip exists to avoid.
+ *
+ * @param {string} uuid the component's linked source uuid.
+ * @param {string} storedDescription the already plain-texted stored description.
+ * @param {Function|undefined} enrichToHtml
+ * @returns {Promise<object>} the resolved card fields.
+ */
+async function _resolveItemCardSource(uuid, storedDescription, enrichToHtml) {
+  const { doc: sourceDoc, missing: sourceMissing } = await _resolveSourceDocumentState(uuid);
+  let description = storedDescription;
+  if (!description) {
+    description = await _documentDescriptionCandidate(sourceDoc, enrichToHtml);
+  }
+  return {
+    description,
+    hasDescription: description.length > 0,
+    sourceMissing,
+    ..._sourceOriginForUuid(uuid, sourceMissing),
+  };
+}
+
+/**
+ * Project ONE component into a browser card, with its expensive half behind `hydrate()`.
+ *
+ * `hydrate` is defined NON-ENUMERABLE, so the card's key set — which
+ * `tests/stores/admin-projection-modules.test.js` pins — is exactly what it was, and object
+ * spread, `JSON.stringify` and the bulk-edit models cannot pick it up as a field.
+ *
+ * The in-flight promise is memoized in this closure, so the browser calling `hydrate()` from
+ * a render effect on every re-render performs the work once and every caller awaits the same
+ * resolution.
+ *
+ * @param {object} item the stored component.
+ * @param {string} systemId
+ * @param {object} options
+ * @returns {object} the projected card.
+ */
+function _createItemCard(item, systemId, options) {
+  const { showTags, showEssences, showSalvage, essenceDefinitionById, enrichToHtml, cache } =
+    options;
+  const registeredItemUuidDisplay = _sourceUuidForItemCard(item);
+  const storedDescription = _plainTextDescription(item.description);
+
+  const card = {
+    ...item,
+    img: item.img || 'icons/svg/item-bag.svg',
+    // The UNHYDRATED reading: the stored description, and a source origin derived from the
+    // uuid's shape alone. Both are the answer for the overwhelming majority of components —
+    // descriptions are resolved and stored at ingestion, and a link is only "Missing" when
+    // the document has been deleted out from under it — so an un-hydrated card renders
+    // correctly rather than blankly, and `hydrate()` corrects the two cases it cannot know.
+    description: storedDescription,
+    hasDescription: storedDescription.length > 0,
+    tags: showTags ? item.tags || [] : [],
+    essences: showEssences
+      ? Object.entries(item.essences || {}).map(([id, quantity]) => ({
+          id,
+          name: essenceDefinitionById.get(id)?.name || id,
+          icon: essenceDefinitionById.get(id)?.icon || 'fas fa-mortar-pestle',
+          quantity,
+        }))
+      : [],
+    registeredItemUuidDisplay,
+    hasRegisteredItemUuid: Boolean(registeredItemUuidDisplay),
+    sourceMissing: false,
+    ..._sourceOriginForUuid(registeredItemUuidDisplay, false),
+    salvageSummary: _buildSalvageSummary(item, showSalvage),
+    showTags,
+    showEssences,
+  };
+
+  let pending = null;
+  const resolve = async () => {
+    const cacheKey = `${systemId}:${item.id}`;
+    // INSIDE the page scope — see this module's header. The deep serialization is paid by
+    // the cards a GM is looking at, not by every component in the library on every refresh.
+    const signature = itemCardSignature(
+      item,
+      showTags,
+      showEssences,
+      showSalvage,
+      essenceDefinitionById
+    );
+    const cached = cache?.get(cacheKey);
+    // Hit: reuse the prior resolution, skipping `fromUuid` + `enrichHTML`.
+    let resolved = cached && cached.signature === signature ? cached.resolved : null;
+    if (!resolved) {
+      resolved = await _resolveItemCardSource(
+        registeredItemUuidDisplay,
+        storedDescription,
+        enrichToHtml
+      );
+      cache?.set(cacheKey, { signature, resolved });
+    }
+    Object.assign(card, resolved);
+    options.onHydrated?.(card);
+    return card;
+  };
+
+  Object.defineProperty(card, 'hydrate', {
+    enumerable: false,
+    configurable: true,
+    writable: true,
+    value: () => (pending ??= resolve()),
+  });
+  return card;
+}
+
+// The per-store item-card memo (a Map keyed `${systemId}:${itemId}` →
+// `{signature, resolved}`) lets an unchanged component skip its per-item `fromUuid`
+// (`_resolveSourceDocumentState`) and conditional `enrichHTML` when it comes back on
+// screen, so paging back and forth does not re-resolve what has already been resolved.
 //
 // FRESHNESS TRADE (disclosed, NOT "unchanged"): on a cache hit the memo reuses the
 // last-resolved source-document state, so `sourceMissing`/`sourceOrigin` (the "Missing"
@@ -191,73 +338,37 @@ export async function buildItemCards(
   systemManager,
   selectedSystem,
   itemSearchTerm,
-  { showTags, showEssences, essenceDefinitionById, enrichToHtml, cache }
+  { showTags, showEssences, essenceDefinitionById, enrichToHtml, cache, onHydrated } = {}
 ) {
   if (!selectedSystem) return [];
   const showSalvage = selectedSystem.features?.salvage === true;
   const items = systemManager.getItems(selectedSystem.id, itemSearchTerm);
+  const options = {
+    showTags,
+    showEssences,
+    showSalvage,
+    essenceDefinitionById,
+    enrichToHtml,
+    cache,
+    onHydrated,
+  };
+  return items.map((item) => _createItemCard(item, selectedSystem.id, options));
+}
+
+/**
+ * Hydrate a bounded set of cards — the current page, or the selected component.
+ *
+ * The whole point is that the caller decides WHICH, so this takes cards rather than a
+ * cohort and a filter. A card that has already hydrated resolves immediately from its own
+ * memo, so calling this from a render effect on every re-render is free.
+ *
+ * @param {object[]} cards
+ * @returns {Promise<object[]>} the same card objects, filled in place.
+ */
+export function hydrateItemCards(cards) {
   return Promise.all(
-    items.map(async (item) => {
-      const cacheKey = `${selectedSystem.id}:${item.id}`;
-      const signature = itemCardSignature(
-        item,
-        showTags,
-        showEssences,
-        showSalvage,
-        essenceDefinitionById
-      );
-      const cached = cache?.get(cacheKey);
-      // Hit: reuse the prior card verbatim, skipping `fromUuid` + `enrichHTML`.
-      if (cached && cached.signature === signature) return cached.card;
-      const registeredItemUuidDisplay = _sourceUuidForItemCard(item);
-      // Precedence: STORED FIRST, enriched live document as the fallback (issue 800,
-      // flipping the live-first order issue 676 introduced).
-      //
-      // Issue 676 preferred the live document because the stored description was
-      // routinely empty for a compendium-linked component, so the identity strip's
-      // promise that "name, image & description follow the linked item" rendered a bare
-      // "—". Since descriptions are now RESOLVED and stored at ingestion and by the GM
-      // repair, the stored value is the authoritative one and reading the live document
-      // on every render is pure cost.
-      //
-      // The trade is honest and is read FRESHNESS: a pack-content change (a game system
-      // or module shipping new prose) now reaches the component when a GM runs Repair
-      // Item Data, where previously it landed on the next render. Item-sync covers
-      // in-world edits only.
-      //
-      // Statement form, deliberately: `(await enrichedLive) || stored` would re-introduce
-      // the per-component `enrichHTML` call this flip exists to avoid.
-      const { doc: sourceDoc, missing: sourceMissing } =
-        await _resolveSourceDocumentState(registeredItemUuidDisplay);
-      let description = _plainTextDescription(item.description);
-      if (!description) {
-        description = await _documentDescriptionCandidate(sourceDoc, enrichToHtml);
-      }
-      const sourceOrigin = _sourceOriginForUuid(registeredItemUuidDisplay, sourceMissing);
-      const card = {
-        ...item,
-        img: item.img || 'icons/svg/item-bag.svg',
-        description,
-        hasDescription: description.length > 0,
-        tags: showTags ? item.tags || [] : [],
-        essences: showEssences
-          ? Object.entries(item.essences || {}).map(([id, quantity]) => ({
-              id,
-              name: essenceDefinitionById.get(id)?.name || id,
-              icon: essenceDefinitionById.get(id)?.icon || 'fas fa-mortar-pestle',
-              quantity,
-            }))
-          : [],
-        registeredItemUuidDisplay,
-        hasRegisteredItemUuid: Boolean(registeredItemUuidDisplay),
-        sourceMissing,
-        ...sourceOrigin,
-        salvageSummary: _buildSalvageSummary(item, showSalvage),
-        showTags,
-        showEssences,
-      };
-      cache?.set(cacheKey, { signature, card });
-      return card;
-    })
+    (Array.isArray(cards) ? cards : []).map((card) =>
+      typeof card?.hydrate === 'function' ? card.hydrate() : card
+    )
   );
 }

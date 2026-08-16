@@ -7840,7 +7840,14 @@ describe('createAdminStore', () => {
       try {
         const store = createAdminStore(services);
         await store.selectSystem('sys1');
-        return { card: get(store.viewState).itemCards[0], enrichCalls };
+        // The store projects every card CHEAPLY and the browser hydrates the page it
+        // renders (issue 1081), so the linked-source half — the live description fallback
+        // and the "Missing" verdict — resolves on `hydrate()`, not on refresh. This suite
+        // drives the store with no view, so it plays the browser's part explicitly. The
+        // card fills IN PLACE, which is why the same object is returned.
+        const card = get(store.viewState).itemCards[0];
+        await card?.hydrate?.();
+        return { card, enrichCalls };
       } finally {
         globalThis.fromUuid = originalFromUuid;
       }
@@ -8012,6 +8019,11 @@ describe('createAdminStore', () => {
      * counter, create the store, and run `body` with a `count()` reader and a
      * `reset()`. Restores `fromUuid` afterwards. Shared by the memo tests so the
      * seam swap is written once (Sonar new-code duplication).
+     *
+     * `hydrateAll()` plays the browser's part (issue 1081): the store projects every card
+     * cheaply and the view hydrates the page it renders, so a suite with no view has to say
+     * which cards it is looking at. These tests are about the MEMO — what a second look at
+     * an unchanged component costs — so they look at all of them.
      */
     async function withMemoStore(components, servicesOverrides, body) {
       const services = createMockServices(servicesOverrides);
@@ -8026,10 +8038,14 @@ describe('createAdminStore', () => {
       };
       try {
         const store = createAdminStore(services);
+        const hydrateAll = () =>
+          Promise.all(get(store.viewState).itemCards.map((card) => card?.hydrate?.()));
         await store.selectSystem('sys1');
+        await hydrateAll();
         return await body({
           store,
           sys,
+          hydrateAll,
           count: () => calls,
           reset: () => {
             calls = 0;
@@ -8049,9 +8065,9 @@ describe('createAdminStore', () => {
           description: '',
         })
       );
-      await withMemoStore(components, undefined, async ({ store, sys, count, reset }) => {
-        // Baseline: every one of the 75 components forces a source resolution.
-        assert.ok(count() >= 75, `initial selectSystem resolves all components (got ${count()})`);
+      await withMemoStore(components, undefined, async ({ store, sys, count, reset, hydrateAll }) => {
+        // Baseline: looking at all 75 components forces 75 source resolutions.
+        assert.ok(count() >= 75, `hydrating all 75 components resolves each (got ${count()})`);
 
         // Mutate exactly ONE component (new object, same id, changed name).
         reset();
@@ -8059,12 +8075,29 @@ describe('createAdminStore', () => {
           i === 0 ? makeItem({ ...item, name: 'Component 0 EDITED' }) : item
         );
         await store.refresh();
+        await hydrateAll();
         assert.equal(count(), 1, 'only the edited component re-resolves — not O(all)');
 
         // A no-op refresh (nothing changed) hits the cache for every card.
         reset();
         await store.refresh();
+        await hydrateAll();
         assert.equal(count(), 0, 'an unchanged same-system refresh resolves nothing');
+
+        // PAGE SCOPE (issue 1081): the refresh itself resolves nothing at all, so a GM who
+        // never scrolls past page 1 never pays for the other 50.
+        reset();
+        sys.components = sys.components.map((item, i) =>
+          i === 1 ? makeItem({ ...item, name: 'Component 1 EDITED' }) : item
+        );
+        await store.refresh();
+        assert.equal(count(), 0, 'a refresh with nothing on screen resolves nothing');
+        await Promise.all(
+          get(store.viewState)
+            .itemCards.slice(0, 25)
+            .map((card) => card.hydrate())
+        );
+        assert.equal(count(), 1, 'and one page of hydration resolves only what changed on it');
       });
     });
 

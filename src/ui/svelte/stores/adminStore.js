@@ -1759,6 +1759,10 @@ export function createAdminStore(services) {
   // changes deliberately do NOT invalidate.
   const itemCardCache = new Map();
   let itemCardCacheSystemId = '';
+  // Coalesces the per-card `onHydrated` callbacks of one page into ONE republish
+  // (issue 1081). A page hydrates 25 cards, each resolving on its own microtask, and 25
+  // republishes would re-run every `$derived` reading `itemCards` 25 times per page turn.
+  let itemCardRepublishScheduled = false;
 
   // --- Computed state ---
   const viewState = writable({
@@ -1851,6 +1855,28 @@ export function createAdminStore(services) {
       ...state,
       ..._currentEnvironmentViewPatch(),
     }));
+  }
+
+  /**
+   * Republish `itemCards` as a NEW array after one or more cards have filled themselves in
+   * place (issue 1081).
+   *
+   * The card objects are deliberately the SAME ones — three surfaces hold references to a
+   * given card and must not diverge — so the only thing that changes is the array identity,
+   * which is what Svelte's `$derived` compares. Coalesced onto a microtask because a page
+   * hydrates 25 cards independently and 25 republishes would re-run every reader 25 times
+   * per page turn.
+   */
+  function _scheduleItemCardRepublish() {
+    if (itemCardRepublishScheduled) return;
+    itemCardRepublishScheduled = true;
+    queueMicrotask(() => {
+      itemCardRepublishScheduled = false;
+      viewState.update((state) => ({
+        ...state,
+        itemCards: [...(state.itemCards || [])],
+      }));
+    });
   }
 
   function _currentToolsDraftViewPatch() {
@@ -4485,6 +4511,13 @@ export function createAdminStore(services) {
           associatedItemName: associatedItem?.name || null,
         };
       });
+      // THE system-recipe cohort for this refresh, fetched ONCE (issue 1081). Three
+      // consumers used to fetch it independently — the essence cards here, and the row
+      // projection's rows and category counts — so a 10,000-recipe library was copied three
+      // times per GM refresh. It is threaded into `_buildRecipeList` as its roster; that
+      // function still derives its category counts over this UNFILTERED array and its rows
+      // over the search-filtered subset, because the two cohorts are genuinely different
+      // and collapsing them would be a correctness regression rather than a cleanup.
       const systemRecipes = recipeManager.getRecipes({ craftingSystemId: selectedSystem.id }) || [];
 
       essenceCards = _buildEssenceCards(
@@ -4507,7 +4540,8 @@ export function createAdminStore(services) {
         systemManager,
         recipeManager,
         selectedSystem,
-        get(recipeSearch)
+        get(recipeSearch),
+        { roster: systemRecipes }
       );
     }
 
@@ -4554,6 +4588,12 @@ export function createAdminStore(services) {
         essenceDefinitionById,
         enrichToHtml: services?.enrichToHtml,
         cache: itemCardCache,
+        // A card fills itself IN PLACE when the browser hydrates it (issue 1081), which
+        // Svelte cannot see: `itemCards` is still the same array of the same objects. The
+        // republish below hands out a NEW array so every `$derived` reading it — the browser
+        // rows, the browser inspector and the component editor, which all read the same card
+        // object — re-runs against the filled card.
+        onHydrated: _scheduleItemCardRepublish,
       });
     }
 

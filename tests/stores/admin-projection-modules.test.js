@@ -27,6 +27,7 @@ import assert from 'node:assert/strict';
 import { buildRecipeList } from '../../src/ui/svelte/stores/adminRecipeRowProjection.js';
 import {
   buildItemCards,
+  hydrateItemCards,
   itemCardSignature,
 } from '../../src/ui/svelte/stores/adminComponentRowProjection.js';
 import {
@@ -517,10 +518,21 @@ describe('adminComponentRowProjection.buildItemCards (direct, no store)', () => 
     assert.equal(cold[0].img, 'icons/svg/item-bag.svg', 'an empty img falls back');
     assert.equal(cold[0].salvageSummary.quantityRequired, 3);
     assert.ok(!cold[1].salvageSummary, 'a component with salvage off gets no summary');
-    assert.equal(cache.size, 2, 'each card is memoized');
+    assert.equal(
+      cache.size,
+      0,
+      'projecting the cohort memoizes nothing: the memo keys the HYDRATED half (issue 1081)'
+    );
 
+    await hydrateItemCards(cold);
+    assert.equal(cache.size, 2, 'each hydrated card is memoized');
+
+    // A second projection rebuilds the cheap cards (they are cheap), and their hydration
+    // comes back out of the memo rather than off the source documents again.
     const warm = await buildItemCards(makeItemsManager(COMPONENTS), system, '', options);
-    assert.equal(warm[0], cold[0], 'an unchanged component reuses the SAME card object');
+    await hydrateItemCards(warm);
+    assert.equal(cache.size, 2, 'no new memo entries: both hydrations hit');
+    assert.deepEqual(warm[0].sourceOrigin, cold[0].sourceOrigin);
   });
 
   it('runs uncached when no cache is injected', async () => {

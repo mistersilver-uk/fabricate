@@ -728,20 +728,43 @@ function _countRecipeCategories(roster) {
  * Each returned row is TWO-TIERED — see this module's header. Every field of the allowlist is
  * present and reads identically; the detail half simply computes on first access, so a caller
  * that renders 25 of 10,000 rows performs 25 rows' worth of expensive projection.
+ *
+ * ONE cohort fetch, TWO derivations (issue 1081). This used to call `getRecipes` twice — once
+ * for the rows and once for the category counts — and the admin store called it a third time
+ * for the essence cards, so a GM refresh copied the whole recipe corpus three times.
+ * `options.roster` lets that caller supply the array it already holds. The two derivations
+ * stay DISTINCT: the counts are over the unfiltered roster (a category chip that disappeared
+ * when the GM typed in the search box would be a different feature) and the rows are over the
+ * search-filtered subset. Collapsing them into one would be a silent correctness regression,
+ * not a cleanup.
+ *
+ * @param {object} systemManager unused here; kept for call-site symmetry with the sibling
+ *   projections.
+ * @param {object} recipeManager
+ * @param {object|null} selectedSystem the RAW manager system.
+ * @param {string} recipeSearchTerm
+ * @param {{roster?: object[]}} [options] `roster` is the caller's already-materialised
+ *   system cohort; omit it and one is fetched.
  */
-export function buildRecipeList(systemManager, recipeManager, selectedSystem, recipeSearchTerm) {
+export function buildRecipeList(
+  systemManager,
+  recipeManager,
+  selectedSystem,
+  recipeSearchTerm,
+  options = {}
+) {
   if (!selectedSystem) return { recipes: [], recipeCategories: [], showVisibilitySummary: false };
 
   const listMode = selectedSystem.recipeVisibility?.listMode || 'global';
   const showVisibilitySummary = listMode === 'player';
 
-  let recipes = recipeManager.getRecipes({ craftingSystemId: selectedSystem.id });
+  const roster = Array.isArray(options.roster)
+    ? options.roster
+    : recipeManager.getRecipes({ craftingSystemId: selectedSystem.id });
 
-  // The category counts are deliberately over the UNFILTERED roster — a category chip that
-  // disappeared when the GM typed in the search box would be a different feature.
-  const recipeCategories = _countRecipeCategories(
-    recipeManager.getRecipes({ craftingSystemId: selectedSystem.id })
-  );
+  const recipeCategories = _countRecipeCategories(roster);
+
+  let recipes = roster;
   if (recipeSearchTerm) {
     const lower = recipeSearchTerm.toLowerCase();
     recipes = recipes.filter(
