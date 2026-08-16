@@ -150,6 +150,27 @@
         "listedRecipes": 100,
         "availableRecipes": 5
       }
+    },
+    "persistence.connectPayload.simpleRecipes": {
+      "description": "CONNECT PAYLOAD (#1080): 10,000 simple recipes as one whole-array `world` setting versus one `world` setting key per record (ADR 0001's B(1)), including the live-measured 340-byte `Setting` envelope. The overhead is reported at several corpus sizes because ADR 0001 conditioned its choice on corpus size, and the reading barely moves across three orders of magnitude of it. Hydrated against a FRESH id space, so the bytes depend on {profile, seed} alone rather than on how many earlier cases hydrated — which is why this number is a few thousand bytes below `recipeManager.save.serializedBytes` on `simple-corpus`.",
+      "counts": {
+        "identityCandidatesExamined": 0,
+        "identityIndexBuilds": 0,
+        "connectRecords": 10000,
+        "connectEnvelopeBytesPerRecord": 340,
+        "wholeArrayConnectBytes": 7681957,
+        "perRecordKeyConnectBytes": 11071956,
+        "connectDeltaBytes": 3389999,
+        "connectDeltaBytesPerRecord": 339,
+        "connectCrossoverRecords": 1,
+        "connectCrossoverDeltaBytesBelow": -2,
+        "connectCrossoverDeltaBytesAt": 338,
+        "wholeArrayPunctuationModelHolds": 1,
+        "connectOverheadBasisPoints@1": 4555,
+        "connectOverheadBasisPoints@100": 4517,
+        "connectOverheadBasisPoints@1000": 4464,
+        "connectOverheadBasisPoints@10000": 4413
+      }
     }
   }
 }
