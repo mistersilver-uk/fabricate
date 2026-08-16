@@ -10,6 +10,29 @@ const RECIPE_STORAGE_LAYOUT_KEY = `${FABRICATE_SETTINGS_NAMESPACE}.${SETTING_KEY
 const RECIPE_STORAGE_TARGET_KEY = `${FABRICATE_SETTINGS_NAMESPACE}.${SETTING_KEYS.RECIPE_STORAGE_TARGET}`;
 
 /**
+ * The keys whose ONE setting holds a whole corpus, for which a document DELETE must never
+ * be treated as a change to re-read.
+ *
+ * Every branch below reacts to a change by re-reading the key. That is right for a create
+ * or an update and actively destructive for a delete: the document is already out of the
+ * collection by the time the hook fires, so `ClientSettings` answers the re-read with the
+ * REGISTERED DEFAULT — `[]` — and the client patches its map empty and tells every open
+ * view the corpus is gone.
+ *
+ * Nothing deletes these keys on a world today, which is why this costs nothing now. It is
+ * here because -b wires `deleteSetting` for the first time and the Storage Layout
+ * Conversion (-c) retires `fabricate.recipes` as its final step, which is exactly this
+ * delete arriving at clients that may still be reading THROUGH the legacy arrangement. Same
+ * reasoning as the layout-flip branch below: the signal is real, and what must be refused is
+ * acting on it by re-reading an arrangement this client has already left.
+ */
+const WHOLE_CORPUS_SETTING_KEYS = new Set([
+  CRAFTING_SYSTEMS_KEY,
+  RECIPES_KEY,
+  GATHERING_ENVIRONMENTS_KEY,
+]);
+
+/**
  * The fully-qualified prefix EVERY per-record recipe key carries — `fabricate.recipe.`,
  * **including the trailing separator** (issue 1080 -b).
  *
@@ -43,18 +66,34 @@ export const RECIPE_RECORD_SETTING_KEY_PREFIX = `${FABRICATE_SETTINGS_NAMESPACE}
  * consequence of batching; both have to survive the move to granular storage, where the
  * naive wiring would emit one signal per RECORD.
  *
- * So the bracket is explicit. A writer that knows its batch boundaries — the flush, the
- * Storage Layout Conversion (-c), the compendium importer (-d) — calls `open()` before the
- * first call and `close()` after the last resolves, and exactly one signal is emitted, at
- * the close, however many records and however many legs it spanned. Brackets nest; only the
- * outermost close emits.
+ * So the bracket is explicit. Whoever knows where the batch begins and ends calls `open()`
+ * before the first change is delivered and `close()` after the last, and exactly one signal
+ * is emitted, at the close, however many records and however many legs it spanned. Brackets
+ * nest; only the outermost close emits.
  *
- * Outside a bracket the signal is deferred to a microtask instead, which is strictly the
- * best a RECEIVING client can do unaided: it observes each leg as one synchronous burst of
- * N document hooks with no marker saying which batch they belong to, so it collapses a burst
- * to one signal and cannot collapse three legs into one. That residual is recorded rather
- * than hidden — closing it needs a batch-completion signal on the wire, which is #1092's
- * transport and out of scope here.
+ * **The bracket belongs to the RECEIVING client, not to the writer.** A writer bracketing
+ * its own flush coalesces nothing: `RecipeManager.applyReplicatedRecordChange` returns
+ * `false` on the client whose map already holds the record, so the writer never signals at
+ * all. The clients with something to coalesce are the ones the documents replicate TO. That
+ * is why the live instance is published on the `fabricate` object as
+ * `game.fabricate.recipeRefresh` rather than kept private to the hook registration that
+ * creates it — a bracket nothing outside one `ready` callback can reach is a contract with
+ * no implementation.
+ *
+ * **A receiver can be told where a batch ends, today, with no new transport.** Verified in
+ * installed Foundry source on 13.351 and 14.365: document operation options propagate
+ * VERBATIM to every receiver's hook. The server deletes a fixed nine-key list — `data`,
+ * `updates`, `ids`, `parent`, `parentUuid`, `pack`, `restoreDelta`, `deleteAll`, `_result`
+ * — then `Object.assign`s the rest onto the operation, and the receiving side spreads what
+ * survives straight into the hook's `options`. So a writer that stamps its own marker on
+ * the final leg of a batch hands every receiver an unambiguous close. Stamping it is the
+ * writer's job (-c's Storage Layout Conversion, -d's importer); this module's job is to
+ * have a bracket for that marker to drive, and to be reachable from where the marker is
+ * read.
+ *
+ * Outside a bracket the signal is deferred to a microtask instead, which collapses one
+ * leg's synchronous burst of N document hooks to one signal and cannot collapse three legs
+ * into one. That residual is recorded rather than hidden.
  *
  * @param {object} [options]
  * @param {(callback: () => void) => void} [options.schedule] Defer a callback to the end of
@@ -125,10 +164,20 @@ export function createRecipeRefreshCoalescer({ schedule = queueMicrotask } = {})
  *   store caches `environments` in memory and otherwise only re-reads at startup, so
  *   without this a client's node counts silently diverge from the world.
  * @param {(hook: string, payload: any) => void} deps.callAll Bound `Hooks.callAll`.
- * @param {'create'|'update'|'delete'} [deps.operation] Which settings hook fired. Only the
- *   per-record branch reads it, and it is what distinguishes a removed record from a
- *   changed one — a `deleteSetting` document is already out of the collection, so its
- *   absence cannot be inferred by looking the key up.
+ * @param {'update'|'delete'} [deps.operation] Whether the leg DELIVERED a record or REMOVED
+ *   one. Two values, not three, and deliberately not one per settings hook: `'create'` was
+ *   declared here in an earlier revision and `src/main.js` never emitted it, which is worse
+ *   than a missing value in a seam -c and -d build on — four tests drove a path production
+ *   cannot produce.
+ *
+ *   Removal is the one fact no other leg can express, because a `deleteSetting` document is
+ *   already out of the collection and its absence cannot be inferred by looking the key up.
+ *   Create-versus-update expresses nothing either reader consumes: both legs deliver the
+ *   record inside the document, `PerRecordCraftingDefinitionRepository#readReplicatedRecord`
+ *   reads it out identically, and the whole-corpus guard above asks only whether the key
+ *   still exists. Anything that later needs provenance should widen this WITH its consumer,
+ *   and pay for the second listener that widening costs — `src/main.js` registers ONE shared
+ *   listener on `createSetting` and `updateSetting` precisely so the two cannot drift.
  * @param {object|null} [deps.document] The `Setting` document the hook delivered, passed
  *   through for the same reason.
  * @param {{signal: (emit: () => void) => void}|null} [deps.recipeRefresh] The batch
@@ -149,6 +198,10 @@ export function handleFabricateSettingChange(
     recipeRefresh = null,
   } = {}
 ) {
+  if (operation === 'delete' && WHOLE_CORPUS_SETTING_KEYS.has(settingKey)) {
+    // Handled, and deliberately inert — see {@link WHOLE_CORPUS_SETTING_KEYS}.
+    return true;
+  }
   if (settingKey === CRAFTING_SYSTEMS_KEY) {
     if (craftingSystemManager?.reload?.()) {
       callAll?.('fabricate.craftingSystemsChanged', craftingSystemManager.getSystems());
@@ -197,6 +250,17 @@ export function handleFabricateSettingChange(
     // against the new arrangement, which is the conversion's own job (-c). Deliberately no
     // `reload()` here, because a reload would re-read through the repository this client
     // built BEFORE the flip and would answer confidently from the wrong arrangement.
+    //
+    // INTERNAL, deliberately not a published hook. It is absent from `FABRICATE_HOOKS` /
+    // `game.fabricate.api.HOOKS` on purpose, alongside the sibling internal signals this
+    // same function emits, and it is flat two-segment rather than the three-segment
+    // `fabricate.<domain>.<event>` shape with a `schemaVersion` that every PUBLISHED hook
+    // carries. Two reasons it stays internal: its payload is the raw setting key and
+    // nothing else, so a subscriber must re-read the setting anyway and gains nothing over
+    // watching `updateSetting` itself; and the arrangement it announces is -c's to define,
+    // so publishing a payload shape now would freeze a contract before the concept it
+    // describes exists. Anything that promotes it owes it the three-segment name, a
+    // `schemaVersion`, an entry in `src/config/hooks.js` and a row in `DOMAIN.md`.
     callAll?.('fabricate.recipeStorageLayoutChanged', { key: settingKey });
     return true;
   }

@@ -133,6 +133,103 @@ describe('handleFabricateSettingChange', () => {
   });
 });
 
+describe('a whole-corpus setting DELETE is handled and deliberately inert (issue 1080 -b)', () => {
+  /**
+   * Every collaborator throws. A delete of one of these keys must reach none of them: the
+   * document is already out of the collection when the hook fires, so a re-read is answered
+   * with the REGISTERED DEFAULT — `[]` — and acting on it patches the client's map empty and
+   * tells every open view the corpus is gone.
+   */
+  function refusingTargets(emitted) {
+    return {
+      craftingSystemManager: {
+        reload: () => {
+          throw new Error('a deleted whole-corpus key must not be re-read');
+        },
+        getSystems: () => [],
+      },
+      recipeManager: {
+        reload: () => {
+          throw new Error('a deleted whole-corpus key must not be re-read');
+        },
+        getRecipes: () => [],
+      },
+      gatheringEnvironmentStore: {
+        load: () => {
+          throw new Error('a deleted whole-corpus key must not be re-read');
+        },
+      },
+      callAll: (hook, payload) => emitted.push([hook, payload]),
+    };
+  }
+
+  const WHOLE_CORPUS_KEYS = [
+    'fabricate.craftingSystems',
+    'fabricate.recipes',
+    'fabricate.gatheringEnvironments',
+  ];
+
+  for (const key of WHOLE_CORPUS_KEYS) {
+    it(`ignores a delete of ${key} rather than reloading it to its default`, () => {
+      // `deleteSetting` is wired for the first time by this change and is registered
+      // UNCONDITIONALLY, so this leg is live on every world today. It becomes reachable at
+      // -c's conversion step 4, which retires `fabricate.recipes` while other clients may
+      // still be reading through it.
+      const emitted = [];
+      const handled = handleFabricateSettingChange(key, {
+        ...refusingTargets(emitted),
+        operation: 'delete',
+        document: null,
+      });
+      assert.equal(handled, true, 'still a handled Fabricate key, just not an actionable one');
+      assert.deepEqual(emitted, [], 'and nothing is told the corpus emptied');
+    });
+  }
+
+  it('guards the delete leg ONLY, so a delivering leg still reloads and re-emits', () => {
+    // The guard must not become a way for a write to go unnoticed. `createSetting` and
+    // `updateSetting` both report `'update'` — the seam's question is whether a record was
+    // delivered, not which hook delivered it — so this one case covers both legs, including
+    // the FIRST-ever write issue 1024 wired `createSetting` for.
+    const emitted = [];
+    const handled = handleFabricateSettingChange('fabricate.recipes', {
+      recipeManager: { reload: () => true, getRecipes: () => [{ id: 'r1' }] },
+      callAll: (hook, payload) => emitted.push([hook, payload]),
+      operation: 'update',
+    });
+    assert.equal(handled, true);
+    assert.deepEqual(emitted, [
+      ['fabricate.recipesChanged', { action: 'external', recipes: [{ id: 'r1' }] }],
+    ]);
+  });
+
+  it('does not swallow a delete of a key outside the whole-corpus set', () => {
+    // The two storage keys and the per-record keys have their own delete semantics, and the
+    // record branch in particular DEPENDS on the delete reaching it.
+    const recipeManager = perRecordRecipeManagerDouble();
+    handleFabricateSettingChange('fabricate.recipe.r1', {
+      recipeManager,
+      callAll: () => {},
+      operation: 'delete',
+      document: { key: 'fabricate.recipe.r1' },
+    });
+    assert.deepEqual(
+      recipeManager.seen.map((change) => change.operation),
+      ['delete'],
+      'a per-record delete is the one signal the record branch cannot infer any other way'
+    );
+    const emitted = [];
+    handleFabricateSettingChange('fabricate.recipeStorageTarget', {
+      recipeManager: { getRecipes: () => [] },
+      callAll: (hook, payload) => emitted.push([hook, payload]),
+      operation: 'delete',
+    });
+    assert.deepEqual(emitted, [
+      ['fabricate.recipeStorageLayoutChanged', { key: 'fabricate.recipeStorageTarget' }],
+    ]);
+  });
+});
+
 describe('per-record recipe replication (issue 1080 -b)', () => {
   it('exposes the record prefix WITH its trailing separator', () => {
     assert.equal(RECIPE_RECORD_SETTING_KEY_PREFIX, 'fabricate.recipe.');
@@ -145,12 +242,12 @@ describe('per-record recipe replication (issue 1080 -b)', () => {
     const handled = handleFabricateSettingChange('fabricate.recipe.r1', {
       recipeManager,
       callAll: (hook, payload) => emitted.push([hook, payload]),
-      operation: 'create',
+      operation: 'update',
       document,
     });
     assert.equal(handled, true);
     assert.deepEqual(recipeManager.seen, [
-      { key: 'fabricate.recipe.r1', operation: 'create', document },
+      { key: 'fabricate.recipe.r1', operation: 'update', document },
     ]);
     assert.deepEqual(emitted, [
       ['fabricate.recipesChanged', { action: 'external', recipes: [{ id: 'r1' }] }],
@@ -392,12 +489,40 @@ describe('main.js settings hook wiring (issue 1080 -b)', () => {
     assert.match(mainSource, /operation: 'delete'/);
   });
 
-  it('creates exactly ONE batch coalescer, outside the listeners', () => {
+  it('emits only the two operations the bridge declares, and never a third', () => {
+    // The seam is `'update'|'delete'`: was a record DELIVERED, or REMOVED? The create and
+    // update legs answer that question identically, so they share one listener and one
+    // reported operation — and an earlier revision's `'create'`, which the JSDoc declared
+    // and no leg ever emitted, is gone from both sides rather than left as a path four
+    // tests could drive and production could not reach.
+    const operations = [...mainSource.matchAll(/\boperation: '([a-z]+)'/g)].map(
+      (match) => match[1]
+    );
+    assert.deepEqual(
+      [...new Set(operations)].sort(),
+      ['delete', 'update'],
+      'main.js must not emit an operation the bridge does not declare'
+    );
+  });
+
+  it('creates exactly ONE batch coalescer, hands it to the bridge, and exposes it', () => {
     // Per event it would collapse nothing: a flush spans three awaited bulk calls, so the
     // bracket has to outlive any single event to coalesce them into one refresh.
     const occurrences = mainSource.split('createRecipeRefreshCoalescer()').length - 1;
     assert.equal(occurrences, 1, 'one coalescer, created once');
     assert.match(mainSource, /const recipeRefresh = createRecipeRefreshCoalescer\(\);/);
-    assert.match(mainSource, /\brecipeRefresh\b/);
+    // Pinned as the PROPERTY the bridge is handed, not as the identifier appearing
+    // somewhere in the file. A bare `\brecipeRefresh\b` is satisfied by the comment above
+    // the declaration, so it stays green with the coalescer wired to nothing at all.
+    assert.match(
+      mainSource,
+      /const fabricateSettingChangeTargets = \(\) => \(\{[^}]*\brecipeRefresh\b[^}]*\}\);/,
+      'every leg must actually hand the coalescer to the bridge'
+    );
+    // And published, because the bracket does no work for the client that WROTE the batch —
+    // `applyReplicatedRecordChange` returns false there, so it never signals — while every
+    // client it does work for is one this `ready` closure is invisible to. Without a route
+    // to a caller, `open`/`close` is a contract with no implementation.
+    assert.match(mainSource, /fabricate\.recipeRefresh = recipeRefresh;/);
   });
 });

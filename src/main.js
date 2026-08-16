@@ -3555,10 +3555,17 @@ Hooks.once('ready', async () => {
   // rather than per event, because its whole job is to span the three awaited bulk document
   // calls one flush issues — a per-event coalescer would collapse nothing.
   const recipeRefresh = createRecipeRefreshCoalescer();
+  // Published on the live API object rather than kept private to this callback, because a
+  // bracket nothing can reach is a contract with no implementation. The bracket does no
+  // work for the client that WROTE the batch — `applyReplicatedRecordChange` returns false
+  // there, so the writer never signals — and every client it does work for is one this
+  // callback's closure is invisible to. The Storage Layout Conversion (-c) and the
+  // compendium importer (-d) open and close it as `game.fabricate.recipeRefresh`.
+  fabricate.recipeRefresh = recipeRefresh;
   // The live collaborators every leg hands the bridge. Resolved per call, because
   // `fabricate.recipeManager` is assembled during `ready` and a value captured here would be
-  // stale for the rest of the session. Shared by the update/create listener and the delete
-  // listener so the two cannot drift into passing different managers.
+  // stale for the rest of the session. Shared by all three listeners so they cannot drift
+  // into passing different managers, or into one leg losing the batch coalescer.
   const fabricateSettingChangeTargets = () => ({
     craftingSystemManager: fabricate.craftingSystemManager,
     recipeManager: fabricate.recipeManager,
@@ -3584,10 +3591,12 @@ Hooks.once('ready', async () => {
       // manager here and re-emit the local change hook so open player apps refresh.
       handleFabricateSettingChange(key, {
         ...fabricateSettingChangeTargets(),
-        // The record is present in the delivered document — a create or an update. The
-        // `deleteSetting` leg below is the one that says otherwise, and removal is the only
-        // distinction the repository seam draws: `readReplicatedRecord` reads the record out
-        // of the document on both of these legs and branches only on a delete.
+        // The record is present in the delivered document, which is the ONLY distinction
+        // the repository seam draws — `readReplicatedRecord` reads it out of the document
+        // identically on the create and update legs and branches only on a delete. The
+        // bridge's `operation` is therefore `'update'|'delete'` and not a third value this
+        // leg would have to manufacture: "was a record delivered, or removed?" is a
+        // question both hooks answer the same way, and provenance is one nothing asks.
         operation: 'update',
         document: setting
       });
@@ -3608,10 +3617,17 @@ Hooks.once('ready', async () => {
   // Under the per-record backend (#1080 -b) this stops being the edge case it was for issue
   // 1024 and becomes the DOMINANT leg: every record's first write is a create, so a Storage
   // Layout Conversion and an import both arrive here rather than at `updateSetting`. The
-  // shared handler already covers it, which is why this line is extended rather than added —
-  // and the create leg reports the same `operation` as the update leg deliberately, because
-  // a directly-registered listener may take ONE parameter (see above) and so cannot tell the
-  // two apart, while the repository seam does not ask it to.
+  // shared handler already covers it, which is why this line is extended rather than added.
+  //
+  // It reports the SAME operation as the update leg, and that is a decision rather than an
+  // accident. `deleteSetting` gets its own listener below because removal is a fact no
+  // other leg can express — the document is out of the collection before the hook fires.
+  // Create-versus-update expresses nothing the seam consumes: both deliver the record in
+  // the document, and `readReplicatedRecord` reads it the same way. So the bridge declares
+  // `'update'|'delete'` and neither side carries a value nothing produces. Splitting this
+  // into per-leg listeners to carry one would also give up the single shared listener
+  // issue 1024 established, which `player-character-actor-types.test.js` and
+  // `item-stack-quantity.test.js` both pin precisely so the legs cannot drift apart.
   Hooks.on('createSetting', handleFabricateSettingDocumentChange);
   // `deleteSetting` was never wired at all. Under the whole-corpus arrangement that was
   // survivable — nothing deletes a Fabricate setting document — but per-record REMOVAL is a
