@@ -153,7 +153,12 @@ export function recipeLostItsShape(updated) {
  *  2. filter them out of the LEGACY flat `set.ingredients` too — matched on the raw
  *     `componentId || systemItemId` pair, exactly as shipped, because that legacy row shape
  *     is not an ingredient OPTION and does not go through `getIngredientComponentId`;
- *  3. recompute the flat `ingredients` mirror from the surviving groups' first options;
+ *  3. DROP the flat `ingredients` mirror when the set has groups, and keep the filtered
+ *     legacy array when it does not (issue 1135). This step used to RECOMPUTE the mirror
+ *     from the surviving groups, which put the write-retired alias straight back into the
+ *     `updateRecipe` payload one component delete at a time. Dropping it unconditionally is
+ *     NOT the fix: for a flat-authored set the array is the set's only ingredient data, and
+ *     the retention filter's `set.ingredients?.length` leg is what keeps that set alive;
  *  4. drop a set left with no groups, no ingredients AND no essences — an essence-only set
  *     survives, which is why the essence check is part of the condition rather than an
  *     afterthought;
@@ -187,24 +192,30 @@ export function stripComponentsFromRecipeJson(recipe, componentIds) {
   // read them directly. Keep reading them directly.
   const isDeletedLegacy = (ref) => ids.has(ref?.componentId || ref?.systemItemId);
 
+  // Rewrite ONE set: filter its groups, then resolve the legacy flat alias (see step 3).
+  const stripSet = (set) => {
+    const ingredientGroups = (set?.ingredientGroups || [])
+      .map((group) => ({
+        ...group,
+        options: (group?.options || []).filter((option) => !isDeletedOption(option)),
+      }))
+      .filter((group) => (group.options || []).length > 0);
+    const next = { ...set, ingredientGroups };
+    // A set AUTHORED with groups needs no mirror: `IngredientSet` derives `ingredients`
+    // from its groups on read, so re-emitting it here would only restore the retired alias.
+    // A set authored FLAT has no groups to derive from, and its own array is the authority.
+    const surviving =
+      (set?.ingredientGroups?.length || 0) > 0
+        ? []
+        : (set?.ingredients || []).filter((ing) => !isDeletedLegacy(ing));
+    if (surviving.length > 0) next.ingredients = surviving;
+    else delete next.ingredients;
+    return next;
+  };
+
   const stripSets = (sets) =>
     (sets || [])
-      .map((set) => ({
-        ...set,
-        ingredientGroups: (set?.ingredientGroups || [])
-          .map((group) => ({
-            ...group,
-            options: (group?.options || []).filter((option) => !isDeletedOption(option)),
-          }))
-          .filter((group) => (group.options || []).length > 0),
-        ingredients: (set?.ingredients || []).filter((ing) => !isDeletedLegacy(ing)),
-      }))
-      .map((set) => ({
-        ...set,
-        ingredients: (set.ingredientGroups || [])
-          .map((group) => group.options?.[0] || null)
-          .filter(Boolean),
-      }))
+      .map(stripSet)
       .filter(
         (set) =>
           (set.ingredientGroups?.length || set.ingredients?.length || 0) > 0 ||

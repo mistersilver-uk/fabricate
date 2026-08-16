@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
+import { IngredientSet } from '../src/models/IngredientSet.js';
 import {
   describeComponentDeleteImpact,
   recipeLostItsShape,
@@ -68,10 +69,18 @@ test('stripComponentsFromRecipeJson removes every selected component in ONE pass
   assert.equal(changed, true);
   const surviving = json.ingredientSets[0].ingredientGroups[0].options.map((o) => o.componentId);
   assert.deepEqual(surviving, ['copper'], 'only the unselected option survives');
-  assert.equal(
-    json.ingredientSets[0].ingredients[0].componentId,
-    'copper',
-    'the flat mirror is recomputed from the surviving groups'
+  // Since issue 1135 the flat mirror is DROPPED for a set that has groups rather than
+  // recomputed from them: `toJSON` no longer emits the alias, so recomputing it here would
+  // put the retired alias back into the `updateRecipe` payload on every component delete.
+  // The set's own constructor is what re-derives it, which is what this now pins.
+  assert.ok(
+    !('ingredients' in json.ingredientSets[0]),
+    'the retired flat alias is not recomputed back onto the wire'
+  );
+  assert.deepEqual(
+    IngredientSet.fromJSON(json.ingredientSets[0]).ingredients.map((i) => i.componentId),
+    ['copper'],
+    'the in-memory mirror is derived from the surviving groups on read'
   );
 });
 
