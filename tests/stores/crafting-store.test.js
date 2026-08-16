@@ -1291,6 +1291,14 @@ describe('craftingStore detail hydration', () => {
     void store.selectedRecipe;
     flushSync();
 
-    assert.equal(calls.hydrateCraftingRecipe.length, 2, 'memoised per id within the pass');
+    // NOT proof of per-id memoisation (the two assertions above already pin that: one
+    // hydration per distinct fallback id). This one stays at 2 because Svelte's own
+    // `$derived` equality skips re-running when its input (the fallback row id) is
+    // unchanged by the 'bello' keystroke, so the store's memo Map is never even consulted.
+    assert.equal(
+      calls.hydrateCraftingRecipe.length,
+      2,
+      'an unchanged fallback id triggers no further hydration ($derived equality, not store memoisation)'
+    );
   });
 });
