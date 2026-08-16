@@ -44,9 +44,21 @@ export const INGREDIENT_SEARCH_NODE_CAP = 200_000;
  * A union-find (disjoint-set) forest over `size` vertices, with path compression and a
  * deterministic tie-break: a union always keeps the LOWER vertex as the root, so a
  * component's root is its lowest member and iterating roots in ascending order yields the
- * components in author order. That determinism is load-bearing — the resolver's byte-identity
- * guarantee depends on components being resolved in a fixed order, not merely on the
- * partition being correct.
+ * components in author order.
+ *
+ * The tie-break buys ORDERING, not the answer, and the distinction matters because it has
+ * been misread as a correctness guard. It makes the order components are resolved in a
+ * function of the authored set rather than of union-find internals, which keeps a debug
+ * trace — and the node count a failing resolve reports, since `_searchAssignment`'s
+ * component loop stops at the first component it cannot resolve — readable against the
+ * recipe as authored. The selection's byte-identity does NOT rest on it:
+ * `_composeSelection` re-imposes author order over the per-group choices whatever order the
+ * components were resolved in, and groups in different components have disjoint candidate
+ * stacks and so cannot alter each other's draws. Measured, not assumed: inverting this to
+ * keep the HIGHER vertex reorders the components of 273 resolves across the solver suites
+ * (interleaved partitions such as `[[0,2],[1]]` become `[[1],[0,2]]`) and still leaves
+ * every case of the frozen-oracle corpus
+ * (`tests/ingredient-set-solver-equivalence.test.js`) byte-identical.
  *
  * Module-private and dependency-free: it reads nothing from the ingredient model, and
  * `IngredientSet.js` is copied RAW into two hand-rolled mounted-component harnesses
@@ -356,12 +368,20 @@ export class IngredientSet {
     // rejected gains a newly found alternative.
     const search = this._searchAssignment(availableItems, matcher, ctx);
 
-    // The solver's own cost, surfaced rather than discarded (issue 1072). `nodes` is the
-    // ONLY deterministic measure of assignment work: the node cap bounds nodes, not work,
-    // because each node copies and restores the whole available-item ledger, so per-node
-    // cost is O(inventory) and the wall clock of a resolve is a product of two terms a
-    // timing assertion cannot separate. A regression guard asserts `nodes`; #1083's
-    // indexed fast paths are expected to lower it, and nothing else can observe that.
+    // The solver's own cost, surfaced rather than discarded (issue 1072). It is reported
+    // because a wall clock cannot report it: the elapsed time of a resolve is the PRODUCT
+    // of tree size and per-node cost, and a timing reading cannot separate the two terms,
+    // so only a deterministic operation count can bound assignment work at all.
+    // `nodes` is the tree-size term and ONLY that term — it is not a measure of work on
+    // its own, and reading it as one is what made "bounded by the node cap" an
+    // unfalsifiable claim about elapsed time before issue 1083. That issue bounded the
+    // other term instead, by removing both O(|availableItems|) per-node scans (the undo
+    // journal replayed by `_undoLedger`, and the per-pass index built by
+    // `_buildPassIndex`). The counts that express the per-node term — ledger
+    // operations, matcher invocations, essence probes, pass-index builds — are asserted in
+    // `tests/ingredient-set-solver-cost.test.js` rather than published here, because they
+    // measure the implementation and no caller has a use for them. Read `nodes` as how
+    // much of the search space was walked: contention scoping lowers it, and it MAY be 0.
     // Frozen so a consumer cannot mutate a shared statistic, and attached on BOTH exits
     // so a caller never has to branch on which one produced the result.
     const searchStats = Object.freeze({ nodes: search.nodes, capHit: search.capHit });
