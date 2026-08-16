@@ -6,9 +6,6 @@ import { createSvelteModuleCompiler } from '../helpers/compile-svelte-module.js'
 import { progressiveStageThresholds } from '../../src/utils/progressiveStageThresholds.js';
 import { resolveProgressiveAward } from '../../src/utils/progressiveAward.js';
 
-let compiler;
-let createCraftingStore;
-
 function makeServices(overrides = {}) {
   const calls = {
     listCraftingForActor: [],
@@ -96,19 +93,37 @@ function recipe(id, name, extra = {}) {
   return model;
 }
 
+/**
+ * Compiles the crafting store module with its non-mocked leaf dependencies copied in
+ * plain, and returns the loaded `createCraftingStore` factory alongside the compiler
+ * (the caller owns `compiler.cleanup()`). Shared by both describe blocks below so
+ * neither duplicates the copy list nor reaches into the other's `before`/`after`
+ * bindings — each suite gets its own compiler instance under its own tmp prefix.
+ *
+ * @param {string} prefix Unique tmp-dir prefix for this suite's compiled output.
+ * @returns {Promise<{ compiler: object, createCraftingStore: Function }>}
+ */
+async function setupCraftingStoreCompiler(prefix) {
+  const compiler = createSvelteModuleCompiler(prefix);
+  compiler.copyPlain('src/ui/svelte/util/shoppingListAggregator.js');
+  // The store reconciles the player's stored stage order through this import-free leaf
+  // (issue 651). A dependency the store imports but the compiler does not copy makes
+  // the whole suite HANG (# cancelled), never fail.
+  compiler.copyPlain('src/utils/progressiveResultOrder.js');
+  // And the threshold helper: the store recomputes thresholds after a reorder.
+  compiler.copyPlain('src/utils/progressiveStageThresholds.js');
+  // The requirement rail's slot projection (issue 917) — same rule again.
+  compiler.copyPlain('src/ui/svelte/util/requirementSlots.js');
+  const { createCraftingStore } = await compiler.load('src/ui/svelte/stores/craftingStore.svelte.js');
+  return { compiler, createCraftingStore };
+}
+
 describe('craftingStore', () => {
+  let compiler;
+  let createCraftingStore;
+
   before(async () => {
-    compiler = createSvelteModuleCompiler('fabricate-crafting-store-');
-    compiler.copyPlain('src/ui/svelte/util/shoppingListAggregator.js');
-    // The store reconciles the player's stored stage order through this import-free leaf
-    // (issue 651). A dependency the store imports but the compiler does not copy makes
-    // the whole suite HANG (# cancelled), never fail.
-    compiler.copyPlain('src/utils/progressiveResultOrder.js');
-    // And the threshold helper: the store recomputes thresholds after a reorder.
-    compiler.copyPlain('src/utils/progressiveStageThresholds.js');
-    // The requirement rail's slot projection (issue 917) — same rule again.
-    compiler.copyPlain('src/ui/svelte/util/requirementSlots.js');
-    ({ createCraftingStore } = await compiler.load('src/ui/svelte/stores/craftingStore.svelte.js'));
+    ({ compiler, createCraftingStore } = await setupCraftingStoreCompiler('fabricate-crafting-store-'));
   });
 
   after(() => {
@@ -1098,13 +1113,13 @@ describe('craftingStore', () => {
 // ---------------------------------------------------------------------------
 
 describe('craftingStore detail hydration', () => {
+  let compiler;
+  let createCraftingStore;
+
   before(async () => {
-    compiler = createSvelteModuleCompiler('fabricate-crafting-store-hydration-');
-    compiler.copyPlain('src/ui/svelte/util/shoppingListAggregator.js');
-    compiler.copyPlain('src/utils/progressiveResultOrder.js');
-    compiler.copyPlain('src/utils/progressiveStageThresholds.js');
-    compiler.copyPlain('src/ui/svelte/util/requirementSlots.js');
-    ({ createCraftingStore } = await compiler.load('src/ui/svelte/stores/craftingStore.svelte.js'));
+    ({ compiler, createCraftingStore } = await setupCraftingStoreCompiler(
+      'fabricate-crafting-store-hydration-'
+    ));
   });
 
   after(() => {
