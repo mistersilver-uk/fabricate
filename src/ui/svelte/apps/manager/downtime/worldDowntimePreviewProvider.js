@@ -1,4 +1,23 @@
-import { DOWNTIME_TAB_IDS } from '../../../../managerExtensions.js';
+import { WORLD_DOWNTIME_SURFACE_ID } from '../../../../managerExtensions.js';
+
+/**
+ * The tab ids of CORE'S OWN Downtime preview content — four marketing screens Fabricate
+ * ships, and nothing more.
+ *
+ * This is NOT the provider contract, and no part of the seam reads it. A registered
+ * companion declares its own tabs (any ids, any count, its own order) and the registry
+ * validates their SHAPE only; see `validateProvider` in `src/ui/managerExtensions.js`.
+ * The list lives here, beside the copy and the icon table it indexes, precisely so it
+ * cannot be mistaken for a requirement the seam imposes.
+ *
+ * @type {readonly string[]}
+ */
+export const CORE_DOWNTIME_PREVIEW_TAB_IDS = Object.freeze([
+  'tracking',
+  'activities',
+  'factions',
+  'settings',
+]);
 
 /**
  * One illustrated slot in the Core preview — a board row or a benefit card.
@@ -81,17 +100,33 @@ const TAB_DEFINITIONS = Object.freeze({
   }),
 });
 
+/**
+ * Core's fallback preview, expressed as ONE IMPLEMENTATION of the provider interface
+ * rather than as a special case the shell branches on. It carries no `mount`: Core renders
+ * `WorldDowntimePreview` for its own tabs, and it is never handed to the registry.
+ *
+ * Its string fields are lang KEYS, not sentences, because Core owns its copy and localizes
+ * at render time. A companion's identical fields are already-localized text. `coreFallback`
+ * is the single discriminator between the two readings — the same rule `WorldDowntimeTabs`
+ * has always applied to `label` / `accessibleName` / `tooltip`, now extended to chrome.
+ */
 export const WORLD_DOWNTIME_PREVIEW_PROVIDER = Object.freeze({
   apiVersion: 1,
-  id: 'downtime',
+  id: WORLD_DOWNTIME_SURFACE_ID,
   tabs: Object.freeze(
-    DOWNTIME_TAB_IDS.map((id) =>
+    CORE_DOWNTIME_PREVIEW_TAB_IDS.map((id) =>
       Object.freeze({
         id,
         label: `FABRICATE.Admin.Manager.World.Downtime.Tabs.${TAB_DEFINITIONS[id].key}.Label`,
         accessibleName: `FABRICATE.Admin.Manager.World.Downtime.Tabs.${TAB_DEFINITIONS[id].key}.AccessibleName`,
         tooltip: `FABRICATE.Admin.Manager.World.Downtime.Tabs.${TAB_DEFINITIONS[id].key}.Tooltip`,
         icon: TAB_DEFINITIONS[id].icon,
+        // The Downtime route titles itself after the preview on screen, not after the
+        // route: a GM switching sub-tabs must see the page name change with them.
+        title: `FABRICATE.Admin.Manager.World.Downtime.Preview.${TAB_DEFINITIONS[id].key}.Title`,
+        subtitle: `FABRICATE.Admin.Manager.World.Downtime.Preview.${TAB_DEFINITIONS[id].key}.Subtitle`,
+        breadcrumb: `FABRICATE.Admin.Manager.World.Downtime.Tabs.${TAB_DEFINITIONS[id].key}.Label`,
+        actionsLabel: 'FABRICATE.Admin.Manager.World.Downtime.Actions',
       })
     )
   ),

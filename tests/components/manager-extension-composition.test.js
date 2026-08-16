@@ -7,17 +7,24 @@ import { createServer } from 'vite';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 
-function provider() {
+// Deliberately NOT Core's four tab ids, and deliberately not four of them: the public seam
+// a companion reaches through `game.fabricate.api` must accept the tab set the companion
+// declares, and a fixture that mirrors Core's list cannot tell the two apart.
+function provider(id = 'downtime') {
   return {
     apiVersion: 1,
-    id: 'downtime',
-    tabs: ['tracking', 'activities', 'factions', 'settings'].map((id) => ({
-      id,
-      label: id,
-      accessibleName: id,
-      tooltip: id,
+    id,
+    tabs: ['board', 'ledger', 'crew'].map((tabId) => ({
+      id: tabId,
+      label: tabId,
+      accessibleName: tabId,
+      tooltip: tabId,
       icon: 'fas fa-clock',
+      title: `${tabId} title`,
+      subtitle: `${tabId} subtitle`,
+      breadcrumb: tabId,
     })),
+    actions: [{ id: 'guide', label: 'Guide', href: 'https://example.test/guide' }],
     mount() {},
   };
 }
@@ -81,6 +88,11 @@ test('the production init/ready replay preserves a provider registered through g
       /already registered/,
       'the provider registered between the actual lifecycle callbacks must survive ready'
     );
+    // A second surface is a second slot, not a conflict: the registry is keyed by surface
+    // id, so a companion claiming a Manager surface Core has never heard of is accepted.
+    const unregisterOtherSurface = readyApi.registerWorldNavProvider(provider('crew-quarters'));
+    unregisterOtherSurface();
+
     unregister();
     unregister = null;
     const unregisterAfterReady = readyApi.registerWorldNavProvider(provider());

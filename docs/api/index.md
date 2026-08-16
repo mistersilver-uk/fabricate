@@ -29,7 +29,7 @@ Hooks.on('fabricate.ready', () => {
 > Do not call Fabricate APIs before the `fabricate.ready` hook.
 > The module initialises during Foundry's `ready` hook, and services are not available until initialisation completes.
 > A companion's Manager extension registration is the exception.
-> Register it during the companion's `init` callback as described in [Manager Downtime Extension](#manager-downtime-extension).
+> Register it during the companion's `init` callback as described in [Manager Navigation Extension](#manager-navigation-extension).
 
 ---
 
@@ -502,13 +502,16 @@ Hooks.once('fabricate.ready', () => {
 });
 ```
 
-## Manager Downtime Extension
+## Manager Navigation Extension
 
-Companion modules can replace Fabricate Core's read-only **World > Downtime** preview through the stable API-v1 manager extension seam.
+Companion modules can take over a Fabricate GM Manager navigation **surface** through the API-v1 manager extension seam.
+Today Fabricate renders one such surface, `downtime`, whose default content is Core's read-only preview.
+A registered provider replaces that preview's tabs, panel content, route chrome, and header actions.
+
 Declare Fabricate as a required module dependency in the companion manifest.
 Attempt registration once from the companion's `init` callback.
 If the API is unavailable there, arm one existing Foundry `ready` fallback.
-Do not add a Fabricate hook, patch the Manager DOM, or use Foundry render hooks.
+Do not patch the Manager DOM or use Foundry render hooks.
 
 ```json
 {
@@ -523,9 +526,21 @@ It does not establish ordinary-module script priority.
 The one-shot `ready` fallback is therefore part of the load contract.
 Do not replace it with an order assumption or a render-hook or DOM-patching integration.
 
+### Worked Example
+
 ```javascript
 let unregisterDowntime = null;
 let readyFallbackArmed = false;
+
+// The provider declares its OWN tabs. These ids are the companion's, not Fabricate's:
+// any non-empty ids, at least one of them, rendered in this array's order.
+const TABS = [
+  { id: 'board', icon: 'fas fa-chart-simple', key: 'Board' },
+  { id: 'projects', icon: 'fas fa-hammer', key: 'Projects' },
+  { id: 'factions', icon: 'fas fa-flag', key: 'Factions' },
+  { id: 'rumours', icon: 'fas fa-comments', key: 'Rumours' },
+  { id: 'rules', icon: 'fas fa-sliders', key: 'Rules' },
+];
 
 function tryRegisterDowntime() {
   if (unregisterDowntime) return true;
@@ -535,21 +550,40 @@ function tryRegisterDowntime() {
   unregisterDowntime = register({
     apiVersion: 1,
     id: 'downtime',
-    tabs: [
-      ['tracking', 'Tracking', 'fa-chart-simple'],
-      ['activities', 'Activities', 'fa-list-check'],
-      ['factions', 'Factions', 'fa-flag'],
-      ['settings', 'Settings', 'fa-sliders'],
-    ].map(([id, label, icon]) => ({
+    // A default header action for any tab that declares none of its own.
+    actions: [
+      { id: 'guide', label: game.i18n.localize('MY_MODULE.Guide'), icon: 'fas fa-book',
+        href: 'https://example.com/downtime-guide' }
+    ],
+    tabs: TABS.map(({ id, icon, key }) => ({
       id,
-      label: game.i18n.localize(`MY_MODULE.Downtime.${label}`),
-      accessibleName: game.i18n.localize(`MY_MODULE.Downtime.${label}Accessible`),
-      tooltip: game.i18n.localize(`MY_MODULE.Downtime.${label}Tooltip`),
-      icon: `fas ${icon}`,
+      icon,
+      // Required, and already localized by the companion.
+      label: game.i18n.localize(`MY_MODULE.Downtime.${key}.Label`),
+      accessibleName: game.i18n.localize(`MY_MODULE.Downtime.${key}.Accessible`),
+      tooltip: game.i18n.localize(`MY_MODULE.Downtime.${key}.Tooltip`),
+      // Optional route chrome. Fabricate keeps its own string for anything omitted.
+      title: game.i18n.localize(`MY_MODULE.Downtime.${key}.Title`),
+      subtitle: game.i18n.localize(`MY_MODULE.Downtime.${key}.Subtitle`),
+      breadcrumb: game.i18n.localize(`MY_MODULE.Downtime.${key}.Crumb`),
+      actionsLabel: game.i18n.localize(`MY_MODULE.Downtime.${key}.Actions`),
+      // Optional per-tab header actions, overriding the provider-level list above.
+      actions: id === 'projects'
+        ? [{
+            id: 'new-project',
+            label: game.i18n.localize('MY_MODULE.NewProject'),
+            icon: 'fas fa-plus',
+            primary: true,
+            disabled: !game.user.isGM,
+            onSelect: (context) => openProjectDialog(context.craftingSystemId)
+          }]
+        : undefined,
     })),
     mount({ target, tabId, context }) {
       const view = mountCompanionDowntime({ target, tabId, context });
-      return () => view.destroy();
+      // Re-render this surface whenever the companion's own data changes.
+      const stop = myDowntimeStore.subscribe(() => context.requestRemount());
+      return () => { stop(); view.destroy(); };
     },
   });
   return true;
@@ -562,13 +596,108 @@ Hooks.once('init', () => {
 });
 ```
 
-The four tab ids and their order are fixed: `tracking`, `activities`, `factions`, `settings`.
-Every tab supplies localized non-empty `label`, `accessibleName`, `tooltip`, and Font Awesome `icon` strings.
+### Provider Contract
+
+`registerWorldNavProvider(provider)` returns an idempotent unregister function.
+Call it when disabling the companion; doing so restores Fabricate's own preview for that surface.
+
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
+
+| Field | Required | Meaning |
+|:------|:---------|:--------|
+| `apiVersion` | yes | Must be exactly `1`. |
+| `id` | yes | The surface id this provider claims. Any non-empty string; Fabricate's Manager renders `downtime`. One provider per surface id — registering a second for the same surface throws. |
+| `tabs` | yes | One or more tabs, rendered in array order. |
+| `actions` | no | Default header actions for any tab that declares none of its own. |
+| `mount` | yes | Synchronous mount callback. |
+
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
+
+Each entry in `tabs`:
+
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
+
+| Field | Required | Meaning |
+|:------|:---------|:--------|
+| `id` | yes | Non-empty, unique within the tab set. Fabricate never checks it against a list of its own. |
+| `label` | yes | Localized visible tab label. |
+| `accessibleName` | yes | Localized accessible tab name. |
+| `tooltip` | yes | Localized keyboard-visible tab tooltip. |
+| `icon` | yes | Font Awesome class string. |
+| `title` | no | Localized page title (the `H1`) while this tab is active. |
+| `subtitle` | no | Localized page subtitle while this tab is active. |
+| `breadcrumb` | no | Localized leaf breadcrumb crumb while this tab is active. |
+| `actionsLabel` | no | Localized accessible name of the header-action group. |
+| `actions` | no | Header actions for this tab, replacing the provider-level list. |
+
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
+
+Each action is `{ id, label, icon?, tooltip?, primary?, disabled? }` plus **exactly one** of:
+
+- `href` — an absolute `http(s)` URL.
+  Fabricate renders an anchor with `target="_blank"` and `rel="noopener noreferrer"`.
+  Any other scheme is rejected at registration.
+- `onSelect(context)` — a click handler.
+  Fabricate renders a button and calls the handler with the mount context plus `actionId`.
+  A throwing handler is caught and logged.
+
+All strings a provider supplies are used verbatim: **localize them yourself**.
+Fabricate localizes only its own fallback copy.
+
+### The Mount Context
+
 `mount({ target, tabId, context })` must be synchronous and return either one cleanup function or nothing.
-Fabricate calls that cleanup exactly once before switching tabs, replacing or unregistering the provider, leaving the route, or closing the Manager.
-A mount or cleanup error is contained and the Core preview is restored.
+`tabId` is always one of the provider's own tab ids.
+`context` is a frozen object carrying no Fabricate store, document, or component:
+
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
+
+| Field | Meaning |
+|:------|:--------|
+| `schemaVersion` | Context contract version, currently `1`. |
+| `surface` | The Fabricate application hosting the provider; currently always `'manager'`. |
+| `surfaceId` | The surface id this provider was registered under. |
+| `route` | The Manager route rendering the provider, e.g. `'world-downtime'`. |
+| `tabId` | The active tab id, identical to `mount`'s own `tabId` argument. |
+| `craftingSystemId` | The Manager's selected crafting system id, or `null`. The route is reachable with no system selected, so handle `null`. |
+| `isGM` | Whether the current Foundry user holds the GM role. This is presentation information, not authorization — gate your own writes. |
+| `revision` | Increments on every `requestRemount()` call. |
+| `requestRemount()` | Ask Fabricate to re-render this surface. It runs the current cleanup, clears the target, and calls `mount` again with a fresh context. |
+
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
+
+A new context object is created — never mutated — whenever one of its values changes, which also remounts the active tab.
+
+### Lifecycle And Failure
+
+Fabricate calls the returned cleanup exactly once before switching tabs, replacing or unregistering the provider, leaving the route, or closing the Manager, and always while the target is still connected.
+A mount or cleanup error is caught, logged, and contained: partial content is cleared and Fabricate's own preview takes the whole surface back — panel, tab strip, and rail entries alike — until the next registration.
+When a provider registers, unregisters, or re-registers with a different tab set, an active tab id the new set no longer declares falls back to that set's first tab, so the route never renders an empty panel.
 The companion owns all authorization, localization, domain data, persistence, and resources it creates; Fabricate supplies only the target and Manager shell.
-Call the retained unregister function when disabling the companion.
+
+### Manager Hooks
+
+Fabricate publishes observational hooks around these events, exposed on `game.fabricate.api.HOOKS.manager` so you do not have to hard-code the strings.
+They are notifications only: a listener's return value is ignored and nothing a listener does changes what the Manager renders.
+To *change* the Manager, register a provider.
+
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
+
+| Hook | Fires | Payload |
+|:-----|:------|:--------|
+| `fabricate.manager.navProviderRegistered` | A provider takes a surface | `{ schemaVersion, surfaceId, tabIds }` |
+| `fabricate.manager.navProviderUnregistered` | A provider releases a surface | `{ schemaVersion, surfaceId, tabIds }` |
+| `fabricate.manager.surfaceMounted` | The Manager route hosting a surface renders | `{ schemaVersion, surfaceId, route, tabId, providerId, coreFallback }` |
+| `fabricate.manager.surfaceUnmounted` | That route is torn down | `{ schemaVersion, surfaceId, route, tabId, providerId, coreFallback }` |
+| `fabricate.manager.surfaceTabChanged` | The active tab changes | `{ schemaVersion, surfaceId, route, tabId, previousTabId, providerId, coreFallback }` |
+
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
+
+```javascript
+Hooks.on(game.fabricate.api.HOOKS.manager.SURFACE_TAB_CHANGED, ({ surfaceId, tabId }) => {
+  console.log(`Fabricate manager surface ${surfaceId} moved to ${tabId}`);
+});
+```
 
 ## Data Persistence
 
@@ -613,6 +742,11 @@ Fabricate stores data in Foundry's settings and flags:
 | `fabricate.ready` | After module initialisation and guarded startup world-time processing complete | None |
 | `fabricate.gathering.attemptCompleted` | Once per terminal gathering attempt (success/failure, immediate/timed), after side effects commit | See [Subscribing To Gathering Hooks](#subscribing-to-gathering-hooks) |
 | `fabricate.gathering.eventTriggered` | Once per encounter an attempt triggers | See [Subscribing To Gathering Hooks](#subscribing-to-gathering-hooks) |
+| `fabricate.manager.navProviderRegistered` | A companion provider takes a GM Manager navigation surface | See [Manager Hooks](#manager-hooks) |
+| `fabricate.manager.navProviderUnregistered` | A companion provider releases a surface | See [Manager Hooks](#manager-hooks) |
+| `fabricate.manager.surfaceMounted` | The Manager route hosting an extension surface renders | See [Manager Hooks](#manager-hooks) |
+| `fabricate.manager.surfaceUnmounted` | That route is torn down | See [Manager Hooks](#manager-hooks) |
+| `fabricate.manager.surfaceTabChanged` | The active tab of a hosted surface changes | See [Manager Hooks](#manager-hooks) |
 
 Startup world-time processing awaits crafting, salvage, and gathering settlement before `fabricate.ready` fires.
 Later Foundry `updateWorldTime` events dispatch the same processors without blocking the hook.

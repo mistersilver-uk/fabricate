@@ -12,7 +12,7 @@
     DEFAULT_GATHERING_EVENT_IMG,
     DEFAULT_GATHERING_TASK_IMG,
   } from '../../../../gatheringImageDefaults.js';
-  import { localize, notifyInfo, notifyWarn } from '../../util/foundryBridge.js';
+  import { isGameMaster, localize, notifyInfo, notifyWarn } from '../../util/foundryBridge.js';
   import { announceAfterFocusMove } from '../../util/announceAfterFocus.js';
   import { resolveDropUuid } from '../../util/dropUtils.js';
   import { permitsFailureResults } from '../../../../utils/failureResultPolicy.js';
@@ -130,21 +130,70 @@
   import SystemsBrowserView from './SystemsBrowserView.svelte';
   import TagsCategoriesView from './TagsCategoriesView.svelte';
   import WorldDowntimeExtensionHost from './downtime/WorldDowntimeExtensionHost.svelte';
-  import { downtimePreviewDefinition } from './downtime/worldDowntimePreviewProvider.js';
-  import { DOWNTIME_TAB_IDS } from '../../../managerExtensions.js';
+  import { WORLD_DOWNTIME_PREVIEW_PROVIDER } from './downtime/worldDowntimePreviewProvider.js';
+  import { WORLD_DOWNTIME_SURFACE_ID } from '../../../managerExtensions.js';
 
   let { store, services = null, managerExtensions = null } = $props();
-  const worldDowntimeContext = Object.freeze({ surface: 'manager', route: 'world-downtime' });
   let downtimeExtensionHost = $state(null);
   const PATREON_URL = 'https://www.patreon.com/c/mistersilver';
-  // The rail's four Downtime children are the same four previews the panel's tab strip
-  // offers, read from the same definition table so a rail label and a tab label can never
-  // drift apart. Both are triggers for one navigation.
-  const downtimeNavItems = DOWNTIME_TAB_IDS.map((id) => ({
-    id,
-    key: downtimePreviewDefinition(id).key,
-    icon: downtimePreviewDefinition(id).icon,
-  }));
+  // Which provider currently holds the Downtime surface, and which one has already failed
+  // to mount. The shell owns both because the rail renders the active tab set while the
+  // host is unmounted, and a fault has to move the rail as well as the panel.
+  let downtimeProviderSnapshot = $state(null);
+  let downtimeFaultedProvider = $state(null);
+  // Bumped by `context.requestRemount()`. The host's mount effect keys on the context
+  // object, so a new identity is the whole re-render mechanism.
+  let downtimeContextRevision = $state(0);
+
+  $effect(() => {
+    if (!managerExtensions?.subscribe) return;
+    return managerExtensions.subscribe(WORLD_DOWNTIME_SURFACE_ID, (nextProvider) => {
+      // A new snapshot is a new chance: a replacement provider is never pre-blamed for the
+      // previous one's mount fault.
+      downtimeFaultedProvider = null;
+      downtimeProviderSnapshot = nextProvider;
+    });
+  });
+
+  function requestDowntimeRemount() {
+    downtimeContextRevision += 1;
+  }
+
+  // A provider whose mount threw is set aside rather than unregistered: it keeps its
+  // registration (and its unregister handle stays the companion's), Core simply renders its
+  // own surface until the next snapshot arrives.
+  function noteDowntimeProviderFault(faultedProvider) {
+    downtimeFaultedProvider = faultedProvider;
+  }
+
+  function runDowntimeHeaderAction(action) {
+    try {
+      action.onSelect(Object.freeze({ ...worldDowntimeContext, actionId: action.id }));
+    } catch (error) {
+      console.error('Fabricate | Downtime header action failed:', error);
+    }
+  }
+
+  // Core's own tab fields are lang KEYS and a companion's are already-localized text, so
+  // `downtimeCoreFallback` is the one discriminator between the two readings — the rule
+  // `WorldDowntimeTabs` has always applied to the tab strip, applied to route chrome too.
+  // The two defaults are genuinely different values, not one repeated. `coreDefault` is what
+  // Core shows when its OWN lang key is missing. `providerDefault` is what Core shows over a
+  // companion's screens when that companion declared no chrome, and it must never be Core's
+  // preview copy: a raw English marketing sentence under someone else's UI is exactly the
+  // defect this seam exists to remove.
+  function downtimeChrome(field, coreDefault, providerDefault = coreDefault) {
+    const value = activeDowntimeTab?.[field];
+    if (downtimeCoreFallback) return value ? text(value, coreDefault) : coreDefault;
+    return value || providerDefault;
+  }
+
+  // The same rule, for a named rail entry rather than the active tab's chrome.
+  function downtimeTabText(tab, field) {
+    const value = tab?.[field];
+    if (!value) return tab?.id ?? '';
+    return downtimeCoreFallback ? text(value, tab.id) : value;
+  }
 
   // The ApplicationV2 shell calls this before it unmounts the Svelte root, while a
   // companion target is still connected. `onDestroy` remains the safety net for
@@ -2106,13 +2155,51 @@
   const isWorldRoute = $derived(currentView === 'world');
   const isWorldPartiesRoute = $derived(currentView === 'world' && activeTravelTab === 'parties');
   const isWorldDowntimeRoute = $derived(currentView === 'world-downtime');
-  // Every Downtime string that names the CURRENT preview — the page title, the page
-  // subtitle and the breadcrumb leaf — reads from this one base, so the four screens
-  // differ by lang key rather than by branch.
-  const worldDowntimeKey = $derived(downtimePreviewDefinition(worldDowntimeTabId).key);
-  const worldDowntimeCopyBase = $derived(
-    `FABRICATE.Admin.Manager.World.Downtime.Preview.${worldDowntimeKey}`
+  // A registered provider holds the surface until it faults; otherwise Core's own preview
+  // does. `WORLD_DOWNTIME_PREVIEW_PROVIDER` is one implementation of the same interface,
+  // so the rail, the tab strip and the route chrome all read ONE tab list either way.
+  const downtimeProvider = $derived(
+    downtimeProviderSnapshot && downtimeProviderSnapshot !== downtimeFaultedProvider
+      ? downtimeProviderSnapshot
+      : null
   );
+  const downtimeCoreFallback = $derived(downtimeProvider === null);
+  const downtimeTabs = $derived(downtimeProvider?.tabs ?? WORLD_DOWNTIME_PREVIEW_PROVIDER.tabs);
+  const activeDowntimeTab = $derived(
+    downtimeTabs.find((tab) => tab.id === worldDowntimeTabId) ?? downtimeTabs[0]
+  );
+  // A tab a provider no longer declares must not leave the route on an empty panel. This
+  // covers registration, unregistration, and re-registration with a different tab set.
+  $effect(() => {
+    const tabs = downtimeTabs;
+    if (tabs.some((tab) => tab.id === worldDowntimeTabId)) return;
+    worldDowntimeTabId = tabs[0].id;
+  });
+  // The rail's Downtime children are the same tabs the panel's strip offers, read from the
+  // same list so a rail label and a tab label can never drift apart. Both are triggers for
+  // one navigation.
+  const downtimeNavItems = $derived(downtimeTabs);
+  // Header actions belong to the active TAB, falling back to the provider's own list; Core
+  // keeps its bespoke premium anchor rather than routing it through a public descriptor.
+  const downtimeHeaderActions = $derived(
+    downtimeCoreFallback ? [] : (activeDowntimeTab?.actions ?? downtimeProvider.actions ?? [])
+  );
+  const worldDowntimeContext = $derived.by(() => {
+    // Read the revision so `requestRemount()` yields a NEW frozen identity, which is what
+    // the host's mount effect keys on. Nothing here is a Core store, document or component.
+    const revision = downtimeContextRevision;
+    return Object.freeze({
+      schemaVersion: 1,
+      surface: 'manager',
+      surfaceId: WORLD_DOWNTIME_SURFACE_ID,
+      route: 'world-downtime',
+      tabId: worldDowntimeTabId,
+      craftingSystemId: selectedSystemId || null,
+      isGM: isGameMaster(),
+      revision,
+      requestRemount: requestDowntimeRemount,
+    });
+  });
   const isSystemTravelChildRoute = $derived(
     isSystemTravelRoute && (activeTravelTab === 'realms' || activeTravelTab === 'map')
   );
@@ -3007,9 +3094,15 @@
       );
     if (currentView === 'world')
       return text('FABRICATE.Admin.Manager.World.PartiesTitle', 'World Parties');
-    // The Downtime route titles itself after the preview on screen, not after the route:
-    // a GM switching sub-tabs must see the page name change with them.
-    if (currentView === 'world-downtime') return text(`${worldDowntimeCopyBase}.Title`, 'Downtime');
+    // The Downtime route titles itself after the tab on screen, not after the route: a GM
+    // switching sub-tabs must see the page name change with them, and a companion's screens
+    // must not wear Core's preview copy.
+    if (currentView === 'world-downtime')
+      return downtimeChrome(
+        'title',
+        'Downtime',
+        text('FABRICATE.Admin.Manager.World.Downtime.Title', 'Downtime')
+      );
     if (currentView === 'environments' && displayedGatheringTab === 'travel') {
       if (activeTravelTab === 'map')
         return text('FABRICATE.Admin.Manager.Travel.MapLinksTitle', 'Map Region Links');
@@ -3139,9 +3232,10 @@
         .replace('{total}', String(playerCharacterUuids.size));
     }
     if (currentView === 'world-downtime')
-      return text(
-        `${worldDowntimeCopyBase}.Subtitle`,
-        'Fabricate Premium · Your party-wide command board for every activity and shared project.'
+      return downtimeChrome(
+        'subtitle',
+        'Fabricate Premium · Your party-wide command board for every activity and shared project.',
+        ''
       );
     if (currentView === 'environments' && displayedGatheringTab === 'travel') {
       if (activeTravelTab === 'map')
@@ -3236,7 +3330,11 @@
     if (currentView === 'world')
       return text('FABRICATE.Admin.Manager.World.PartiesActions', 'World party actions');
     if (currentView === 'world-downtime')
-      return text('FABRICATE.Admin.Manager.World.Downtime.Actions', 'Downtime actions');
+      return downtimeChrome(
+        'actionsLabel',
+        'Downtime actions',
+        text('FABRICATE.Admin.Manager.World.Downtime.Actions', 'Downtime actions')
+      );
     if (currentView === 'environments' && displayedGatheringTab === 'travel')
       return activeTravelTab === 'map'
         ? text('FABRICATE.Admin.Manager.Travel.MapLinksActions', 'Map region link actions')
@@ -5943,7 +6041,8 @@
   // The rail child and the studio card's button are two triggers for ONE navigation, so
   // both land here: select the preview, then commit the route.
   function openWorldDowntimePreview(tabId) {
-    if (!DOWNTIME_TAB_IDS.includes(tabId)) return;
+    // The ACTIVE tab set, never a fixed list: whoever holds the surface decides what exists.
+    if (!downtimeTabs.some((tab) => tab.id === tabId)) return;
     return afterTruthyResult(confirmRouteExit('world-downtime'), () => {
       worldDowntimeTabId = tabId;
       worldDowntimeExpanded = true;
@@ -7020,10 +7119,15 @@
               <i class="fas fa-chevron-right" aria-hidden="true"></i>
               <span>{text('FABRICATE.Admin.Manager.World.Downtime.Title', 'Downtime')}</span>
               <i class="fas fa-chevron-right" aria-hidden="true"></i>
+              <!--
+                The LEAF crumb names the tab, so it belongs to whoever owns the tab. The
+                crumb above it names the Downtime ROUTE, which Core owns in the rail too.
+              -->
               <span data-breadcrumb-downtime-tab={worldDowntimeTabId}
-                >{text(
-                  `FABRICATE.Admin.Manager.World.Downtime.Tabs.${worldDowntimeKey}.Label`,
-                  worldDowntimeKey
+                >{downtimeChrome(
+                  'breadcrumb',
+                  worldDowntimeTabId,
+                  downtimeTabText(activeDowntimeTab, 'label')
                 )}</span
               >
             {/if}
@@ -7277,27 +7381,61 @@
       {#if currentView !== 'tools' && currentView !== 'tool-edit'}
         <div class="manager-header-actions" aria-label={headerActionsLabel()}>
           {#if currentView === 'world-downtime'}
-            <!--
-              The design puts this promotional pill at the top of every Downtime screen, in
-              ADDITION to the hero's Patreon CTA. It is inert in the mockup — a fixed canvas
-              has nowhere to go — but a shipped control labelled "Unlock with Premium" that
-              does nothing is dead UI, so it carries the same subscription link as the hero.
-            -->
-            <a
-              class="manager-button manager-downtime-unlock"
-              data-downtime-unlock
-              href={PATREON_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              <i class="fas fa-crown" aria-hidden="true"></i>
-              <span
-                >{text(
-                  'FABRICATE.Admin.Manager.World.Downtime.Unlock',
-                  'Unlock with Premium'
-                )}</span
+            {#if downtimeCoreFallback}
+              <!--
+                The design puts this promotional pill at the top of every Downtime screen, in
+                ADDITION to the hero's Patreon CTA. It is inert in the mockup — a fixed canvas
+                has nowhere to go — but a shipped control labelled "Unlock with Premium" that
+                does nothing is dead UI, so it carries the same subscription link as the hero.
+                It stays Core's own markup rather than a public action descriptor: its premium
+                treatment is Core copy about Core's product, not a shape to ask a companion for.
+              -->
+              <a
+                class="manager-button manager-downtime-unlock"
+                data-downtime-unlock
+                href={PATREON_URL}
+                target="_blank"
+                rel="noopener noreferrer"
               >
-            </a>
+                <i class="fas fa-crown" aria-hidden="true"></i>
+                <span
+                  >{text(
+                    'FABRICATE.Admin.Manager.World.Downtime.Unlock',
+                    'Unlock with Premium'
+                  )}</span
+                >
+              </a>
+            {:else}
+              {#each downtimeHeaderActions as action (action.id)}
+                {#if action.href}
+                  <a
+                    class="manager-button"
+                    class:is-primary={action.primary === true}
+                    data-manager-header-action={action.id}
+                    href={action.href}
+                    title={action.tooltip}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    {#if action.icon}<i class={action.icon} aria-hidden="true"></i>{/if}
+                    <span>{action.label}</span>
+                  </a>
+                {:else}
+                  <button
+                    type="button"
+                    class="manager-button"
+                    class:is-primary={action.primary === true}
+                    data-manager-header-action={action.id}
+                    title={action.tooltip}
+                    disabled={action.disabled === true}
+                    onclick={() => runDowntimeHeaderAction(action)}
+                  >
+                    {#if action.icon}<i class={action.icon} aria-hidden="true"></i>{/if}
+                    <span>{action.label}</span>
+                  </button>
+                {/if}
+              {/each}
+            {/if}
           {:else if currentView === 'recipes'}
             <button
               type="button"
@@ -8375,38 +8513,38 @@
                     class={`manager-nav-subitem manager-downtime-subitem ${isWorldDowntimeRoute && worldDowntimeTabId === item.id ? 'is-active' : ''}`}
                     id={`manager-downtime-nav-${item.id}`}
                     data-world-downtime-item={item.id}
-                    title={text(
-                      `FABRICATE.Admin.Manager.World.Downtime.Tabs.${item.key}.Tooltip`,
-                      item.key
-                    )}
+                    title={downtimeTabText(item, 'tooltip')}
                     aria-current={isWorldDowntimeRoute && worldDowntimeTabId === item.id
                       ? 'true'
                       : undefined}
                     onclick={() => openWorldDowntimePreview(item.id)}
                   >
                     <i class={item.icon} aria-hidden="true"></i>
-                    <span class="manager-nav-label">
-                      {text(
-                        `FABRICATE.Admin.Manager.World.Downtime.Tabs.${item.key}.Label`,
-                        item.key
-                      )}
-                    </span>
-                    <span class="manager-nav-lock" data-world-downtime-lock
-                      ><i class="fas fa-lock" aria-hidden="true"></i></span
-                    >
+                    <span class="manager-nav-label">{downtimeTabText(item, 'label')}</span>
+                    <!--
+                      The padlock and the premium note below advertise CORE'S preview. A
+                      companion owning the surface has nothing locked, so neither renders.
+                    -->
+                    {#if downtimeCoreFallback}
+                      <span class="manager-nav-lock" data-world-downtime-lock
+                        ><i class="fas fa-lock" aria-hidden="true"></i></span
+                      >
+                    {/if}
                   </button>
                 {/each}
               </div>
-              <p class="manager-nav-callout" data-world-downtime-callout>
-                <span class="manager-nav-callout-kicker">
-                  <i class="fas fa-lock" aria-hidden="true"></i>
-                  {text('FABRICATE.Admin.Manager.World.Downtime.RailKicker', 'PREMIUM PREVIEW')}
-                </span>
-                {text(
-                  'FABRICATE.Admin.Manager.World.Downtime.RailNote',
-                  'Open any Downtime page to preview how Fabricate Premium can help you run downtime.'
-                )}
-              </p>
+              {#if downtimeCoreFallback}
+                <p class="manager-nav-callout" data-world-downtime-callout>
+                  <span class="manager-nav-callout-kicker">
+                    <i class="fas fa-lock" aria-hidden="true"></i>
+                    {text('FABRICATE.Admin.Manager.World.Downtime.RailKicker', 'PREMIUM PREVIEW')}
+                  </span>
+                  {text(
+                    'FABRICATE.Admin.Manager.World.Downtime.RailNote',
+                    'Open any Downtime page to preview how Fabricate Premium can help you run downtime.'
+                  )}
+                </p>
+              {/if}
             {/if}
           </div>
         </section>
@@ -8421,8 +8559,11 @@
         <WorldDowntimeExtensionHost
           bind:this={downtimeExtensionHost}
           bind:activeTabId={worldDowntimeTabId}
-          {managerExtensions}
+          provider={downtimeProvider}
+          tabs={downtimeTabs}
           context={worldDowntimeContext}
+          emitHook={managerExtensions?.emitHook}
+          onProviderFault={noteDowntimeProviderFault}
         />
       </main>
     {:else if currentView === 'environments' || currentView === 'world'}

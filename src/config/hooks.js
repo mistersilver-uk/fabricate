@@ -26,11 +26,39 @@ export const GATHERING_HOOKS = Object.freeze({
 });
 
 /**
+ * GM Manager extension-surface hooks.
+ *
+ * These are purely OBSERVATIONAL: Fabricate publishes them after it has already acted,
+ * a listener's return value is ignored, and nothing a listener does changes what the
+ * Manager renders. A companion that wants to CHANGE the Manager registers a World
+ * navigation provider (`game.fabricate.api.managerExtensions.registerWorldNavProvider`)
+ * — these hooks exist so a companion can react to a surface it does not own.
+ *
+ * - `NAV_PROVIDER_REGISTERED` / `NAV_PROVIDER_UNREGISTERED` fire when a provider takes
+ *   or releases a Manager surface, with `{ schemaVersion, surfaceId, tabIds }`.
+ * - `SURFACE_MOUNTED` / `SURFACE_UNMOUNTED` fire when the Manager route hosting an
+ *   extension surface is rendered and torn down, with
+ *   `{ schemaVersion, surfaceId, route, tabId, providerId, coreFallback }`.
+ * - `SURFACE_TAB_CHANGED` fires when the active tab of a hosted surface changes, with
+ *   `{ schemaVersion, surfaceId, route, tabId, previousTabId, providerId, coreFallback }`.
+ *
+ * @type {Readonly<{NAV_PROVIDER_REGISTERED: string, NAV_PROVIDER_UNREGISTERED: string, SURFACE_MOUNTED: string, SURFACE_UNMOUNTED: string, SURFACE_TAB_CHANGED: string}>}
+ */
+export const MANAGER_HOOKS = Object.freeze({
+  NAV_PROVIDER_REGISTERED: 'fabricate.manager.navProviderRegistered',
+  NAV_PROVIDER_UNREGISTERED: 'fabricate.manager.navProviderUnregistered',
+  SURFACE_MOUNTED: 'fabricate.manager.surfaceMounted',
+  SURFACE_UNMOUNTED: 'fabricate.manager.surfaceUnmounted',
+  SURFACE_TAB_CHANGED: 'fabricate.manager.surfaceTabChanged',
+});
+
+/**
  * Aggregate of every public Fabricate hook namespace, grouped by domain. Exposed on
  * `game.fabricate.api.HOOKS`.
  *
- * @type {Readonly<{gathering: typeof GATHERING_HOOKS}>}
+ * @type {Readonly<{gathering: typeof GATHERING_HOOKS, manager: typeof MANAGER_HOOKS}>}
  */
 export const FABRICATE_HOOKS = Object.freeze({
   gathering: GATHERING_HOOKS,
+  manager: MANAGER_HOOKS,
 });

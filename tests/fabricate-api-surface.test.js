@@ -4,9 +4,33 @@ import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { FABRICATE_HOOKS, MANAGER_HOOKS } from '../src/config/hooks.js';
+
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const mainPath = resolve(__dirname, '../src/main.js');
 const mainSource = readFileSync(mainPath, 'utf8');
+
+test('every public manager hook is namespaced, reachable on the API, and documented', () => {
+  // The Jekyll API reference hand-lists these names, so it is a MIRROR of `config/hooks.js`
+  // and mirrors rot silently: a renamed constant would leave third parties subscribing to a
+  // string nothing publishes, with nothing failing until someone read the page.
+  const documented = readFileSync(resolve(__dirname, '../docs/api/index.md'), 'utf8');
+  assert.ok(
+    mainSource.includes('HOOKS: FABRICATE_HOOKS'),
+    'game.fabricate.api.HOOKS should publish the whole aggregate'
+  );
+  assert.equal(FABRICATE_HOOKS.manager, MANAGER_HOOKS, 'the manager namespace is on the aggregate');
+  const names = Object.values(MANAGER_HOOKS);
+  assert.ok(names.length > 0, 'expected at least one manager hook');
+  for (const name of names) {
+    assert.match(
+      name,
+      /^fabricate\.manager\.[a-z][A-Za-z]*$/,
+      `${name} should follow the fabricate.<domain>.<eventCamelCase> convention`
+    );
+    assert.ok(documented.includes(`\`${name}\``), `${name} should be documented in docs/api`);
+  }
+});
 
 test('Fabricate publishes the stable manager extension API through both lifecycle binds', () => {
   assert.ok(

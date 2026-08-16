@@ -3270,17 +3270,37 @@ The client-supplied `recipeId` is ignored; trusting it also allowed advancing on
 
 - The GM Manager's permanent World navigation contains both `Parties` and `Downtime`.
 - `Parties` retains its identifiers, count, availability, route-exit behavior, CRUD, membership, travel-actor validation, realm resolution, `GatheringParty` aggregate, and `fabricate.gatheringParties` persistence unchanged.
-- Core Downtime is a read-only four-tab preview with the fixed ordered ids `tracking`, `activities`, `factions`, and `settings`.
+- Core's Downtime fallback is a read-only four-tab preview whose ids are `tracking`, `activities`, `factions`, and `settings`.
+That list is Core's own preview CONTENT, not part of the extension contract, and no part of the registry reads it.
 - Core's preview and extension registry create, read, and write no downtime record, setting, flag, actor data, reward, world-time state, party role, assignment, mirror, or reference.
 - One page-session API-v1 registry is published as `game.fabricate.api.managerExtensions.registerWorldNavProvider(provider)` and survives the `init` and `ready` API rebinding.
-- A provider is `{ apiVersion: 1, id: 'downtime', tabs, mount }`; each ordered tab supplies a localized label, accessible name, keyboard-visible tooltip, and Font Awesome icon.
-- A conflicting provider, unsupported version/id, malformed tab sequence, or asynchronous mount fails with a deterministic error.
+- The registry holds at most one provider **per surface id** and rejects only a second provider for the same surface.
+It validates that `id` is a non-empty string and never enumerates the ids it accepts, so a companion may claim a Manager surface Core does not itself render.
+Core's Downtime route reads the surface id `downtime`.
+- A provider is `{ apiVersion: 1, id, tabs, actions?, mount }`.
+The provider declares its own tabs: any ids, at least one of them, rendered in array order.
+Core validates tab SHAPE — a non-empty id, unique within the set, plus a localized label, accessible name, keyboard-visible tooltip, and Font Awesome icon — and never tab membership, count, or order.
+- A tab may carry its own route chrome: `title`, `subtitle`, `breadcrumb`, and `actionsLabel`, each an optional non-empty localized string.
+Core renders the active tab's chrome as the page title, page subtitle, leaf breadcrumb crumb, and header-action group name, and falls back to its own string for any field the tab omits.
+- A tab may carry `actions`, falling back to the provider's own `actions`; each action is `{ id, label, icon?, tooltip?, primary?, disabled? }` plus exactly one of an `onSelect` function or an absolute `http(s)` `href`.
+Core renders an `href` action as an external anchor with `target="_blank"` and `rel="noopener noreferrer"`, invokes `onSelect` with the mount context plus `actionId`, and contains a throwing handler.
+Core's own `Unlock with Premium` header action belongs to Core's preview and is never rendered over a registered provider's screens.
+- A conflicting provider on the same surface, an unsupported version, an empty or duplicated tab set, malformed chrome or action, or an asynchronous mount fails with a deterministic error.
 - `mount({ target, tabId, context })` is synchronous and returns a cleanup function or nothing.
+`tabId` is always one of the provider's own tab ids.
+- `context` is frozen and carries `{ schemaVersion, surface, surfaceId, route, tabId, craftingSystemId, isGM, revision, requestRemount }` and no Core store, document, or component.
+`craftingSystemId` is `null` when no crafting system is selected, and the route stays reachable in that state.
+`requestRemount()` asks Core to run the current cleanup, clear the target, and call `mount` again with a fresh context whose `revision` has advanced.
 - Core calls cleanup exactly once while the target is connected and before a tab, provider, route, or window removes it.
-- Mount and cleanup faults are reported and contained; partial content is cleared, the Core provider becomes the fallback, and a later valid provider may mount without navigating away.
+- Mount and cleanup faults are reported and contained; partial content is cleared, the Core preview becomes the fallback for the whole surface including its rail entries, and a later registration may mount without navigating away.
+- When a provider registers, unregisters, or re-registers with a different tab set, an active tab id the new set no longer declares falls back to that set's first tab rather than leaving an empty panel.
+- The Manager rail's Downtime children and the panel's tab strip render the active provider's tabs, or Core's fallback tabs when no provider holds the surface, from one list.
+Core's premium padlocks and rail note advertise Core's preview and are not rendered when a provider holds the surface.
+- Fabricate publishes observational hooks — `fabricate.manager.navProviderRegistered`, `fabricate.manager.navProviderUnregistered`, `fabricate.manager.surfaceMounted`, `fabricate.manager.surfaceUnmounted`, and `fabricate.manager.surfaceTabChanged` — exposed on `game.fabricate.api.HOOKS.manager`.
+A listener's return value is ignored and nothing a listener does changes what the Manager renders.
 - Core owns the Manager shell, GM gate, World rail/route/focus state, target, and teardown.
 - The companion owns its content, localization, authorization, domain data, persistence, and created resources, and mounts only into the supplied target.
-- A companion does not patch Manager DOM, use render hooks, or require a new Fabricate hook.
+- A companion does not patch Manager DOM or use Foundry render hooks.
 - The tablist is labelled and uses native buttons, roving tabindex, stable tab/panel IDREFs, localized accessible names, keyboard-visible tooltips, Left/Right/Home/End focus-and-activation, and focus recovery when a provider change removes the focused panel.
 - The Patreon CTA is `https://www.patreon.com/c/mistersilver`, opens `_blank`, carries `rel="noopener noreferrer"`, uses Font Awesome-only imagery, and remains usable at narrow widths and with the Manager rail collapsed.
 - A companion declares Fabricate in `relationships.requires`, which governs dependency availability and activation rather than ordinary-module script priority.

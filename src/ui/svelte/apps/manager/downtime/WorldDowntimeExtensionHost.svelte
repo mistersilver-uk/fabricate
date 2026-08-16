@@ -1,25 +1,55 @@
 <script>
-  import { onDestroy, tick } from 'svelte';
+  import { onDestroy, onMount, tick } from 'svelte';
   import WorldDowntimePreview from './WorldDowntimePreview.svelte';
-  import WorldDowntimeTabs from './WorldDowntimeTabs.svelte';
   import { WORLD_DOWNTIME_PREVIEW_PROVIDER } from './worldDowntimePreviewProvider.js';
+  import WorldDowntimeTabs from './WorldDowntimeTabs.svelte';
+  import { MANAGER_HOOKS } from '../../../../../config/hooks.js';
+  import { emitManagerHook, WORLD_DOWNTIME_SURFACE_ID } from '../../../../managerExtensions.js';
 
   // `activeTabId` is bindable because the selected preview is no longer private to this
-  // host: the route's title, subtitle and breadcrumb leaf all name it, and the rail's four
+  // host: the route's title, subtitle and breadcrumb leaf all name it, and the rail's
   // Downtime sub-items are a second trigger for the same navigation as the tab strip. One
-  // owner, two triggers — binding keeps the host authoritative while letting the shell read
+  // owner, two triggers — binding keeps the shell authoritative while letting the host read
   // and drive it. Unbound (the direct-mount tests), it is ordinary local state.
+  //
+  // `provider` is a PROP rather than a subscription of this host's own. The rail renders the
+  // active tab set while this host is unmounted, and a mount fault has to move the rail as
+  // well as the panel, so exactly one component may own "which provider is live" — and it
+  // has to be the shell. This host owns the mount lifecycle and nothing else.
   let {
-    managerExtensions = null,
+    provider = null,
+    tabs = WORLD_DOWNTIME_PREVIEW_PROVIDER.tabs,
     context = Object.freeze({}),
     reportError = console.error,
+    emitHook = emitManagerHook,
+    surfaceId = WORLD_DOWNTIME_SURFACE_ID,
+    route = 'world-downtime',
+    onProviderFault = () => {},
     activeTabId = $bindable('tracking'),
   } = $props();
-  let provider = $state(WORLD_DOWNTIME_PREVIEW_PROVIDER);
-  let coreFallback = $state(true);
+  const coreFallback = $derived(provider == null);
   let extensionTarget = $state(null);
   let shell = $state(null);
   let activeMount = null;
+  // Plain locals, deliberately not `$state`: they record what has already been OBSERVED so
+  // an effect can tell a real change from a re-run, and making them reactive would make
+  // each effect its own dependency.
+  let observedProvider;
+  let providerObserved = false;
+  let recoverFocus = false;
+  let announcedTabId = null;
+
+  function surfacePayload(extra = {}) {
+    return Object.freeze({
+      schemaVersion: 1,
+      surfaceId,
+      route,
+      tabId: activeTabId,
+      providerId: provider?.id ?? null,
+      coreFallback,
+      ...extra,
+    });
+  }
 
   function disposeActiveMount() {
     const mountedProvider = activeMount;
@@ -44,39 +74,48 @@
     activeTabId = tabId;
   }
 
-  function adoptProvider(nextProvider) {
-    const recoverFocus = shell?.contains?.(document.activeElement) === true;
-    const adopted = nextProvider ?? WORLD_DOWNTIME_PREVIEW_PROVIDER;
-    disposeActiveMount();
-    coreFallback = nextProvider == null;
-    provider = adopted;
-    if (!adopted.tabs.some((tab) => tab.id === activeTabId)) activeTabId = 'tracking';
-    if (recoverFocus) {
-      tick().then(() => shell?.querySelector?.(`#world-downtime-tab-${activeTabId}`)?.focus?.());
-    }
-  }
+  // `$effect.pre` runs BEFORE the DOM is updated, which is the only moment at which
+  // `document.activeElement` still names the node the provider swap is about to remove.
+  $effect.pre(() => {
+    const nextProvider = provider;
+    if (providerObserved && nextProvider === observedProvider) return;
+    const hadProvider = providerObserved;
+    providerObserved = true;
+    observedProvider = nextProvider;
+    recoverFocus = hadProvider && shell?.contains?.(document.activeElement) === true;
+  });
 
   $effect(() => {
-    if (!managerExtensions?.subscribe) return;
-    let initialSnapshot = true;
-    return managerExtensions.subscribe((nextProvider) => {
-      if (initialSnapshot) {
-        initialSnapshot = false;
-        if (nextProvider == null) return;
-      }
-      queueMicrotask(() => adoptProvider(nextProvider));
-    });
+    // Track the swap this recovery belongs to.
+    void provider;
+    if (!recoverFocus) return;
+    recoverFocus = false;
+    tick().then(() => shell?.querySelector?.(`#world-downtime-tab-${activeTabId}`)?.focus?.());
+  });
+
+  $effect(() => {
+    const tabId = activeTabId;
+    if (announcedTabId === tabId) return;
+    const previousTabId = announcedTabId;
+    announcedTabId = tabId;
+    // The first observation is the route's own mount, which `SURFACE_MOUNTED` reports.
+    if (previousTabId === null) return;
+    emitHook(MANAGER_HOOKS.SURFACE_TAB_CHANGED, surfacePayload({ previousTabId }));
   });
 
   $effect(() => {
     const target = extensionTarget;
     const activeProvider = provider;
     const tabId = activeTabId;
-    if (!target || coreFallback) return;
+    const mountContext = context;
+    if (!target || !activeProvider) return;
+    // The shell normalizes `activeTabId` onto the new tab set, so for one render the id and
+    // the provider can disagree. Never ask a companion to mount a tab it does not declare.
+    if (!activeProvider.tabs.some((tab) => tab.id === tabId)) return;
 
     target.replaceChildren();
     try {
-      const result = activeProvider.mount({ target, tabId, context });
+      const result = activeProvider.mount({ target, tabId, context: mountContext });
       if (result !== undefined && typeof result !== 'function') {
         throw new TypeError(
           'World navigation provider mount must return a cleanup function or nothing'
@@ -86,15 +125,19 @@
     } catch (error) {
       target.replaceChildren();
       reportError('Fabricate | Downtime provider mount failed:', error);
-      queueMicrotask(() => {
-        if (provider === activeProvider) adoptProvider(null);
-      });
+      onProviderFault(activeProvider);
     }
 
     return disposeActiveMount;
   });
 
-  onDestroy(disposeActiveMount);
+  onMount(() => emitHook(MANAGER_HOOKS.SURFACE_MOUNTED, surfacePayload()));
+
+  onDestroy(() => {
+    const payload = surfacePayload();
+    disposeActiveMount();
+    emitHook(MANAGER_HOOKS.SURFACE_UNMOUNTED, payload);
+  });
 </script>
 
 <section
@@ -104,15 +147,15 @@
 >
   {#if coreFallback}
     <div class="downtime-preview-scroll">
-      {#each provider.tabs as tab (tab.id)}
+      {#each tabs as tab (tab.id)}
         <WorldDowntimePreview tabId={tab.id} hidden={tab.id !== activeTabId} />
       {/each}
     </div>
-    <WorldDowntimeTabs tabs={provider.tabs} {activeTabId} onSelect={selectTab} coreFallback />
+    <WorldDowntimeTabs {tabs} {activeTabId} onSelect={selectTab} coreFallback />
   {:else}
-    <WorldDowntimeTabs tabs={provider.tabs} {activeTabId} onSelect={selectTab} />
+    <WorldDowntimeTabs {tabs} {activeTabId} onSelect={selectTab} />
     <div class="downtime-extension-panels">
-      {#each provider.tabs as tab (tab.id)}
+      {#each tabs as tab (tab.id)}
         <div
           id={`world-downtime-panel-${tab.id}`}
           role="tabpanel"

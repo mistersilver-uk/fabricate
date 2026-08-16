@@ -145,6 +145,18 @@ const toolOverviewSource = readFileSync(toolOverviewPath, 'utf8');
 const toolRequirementsSource = readFileSync(toolRequirementsPath, 'utf8');
 const toolValidationSource = readFileSync(toolValidationPath, 'utf8');
 const appSource = readFileSync(appPath, 'utf8');
+const hostSource = readFileSync(
+  resolve(repoRoot, 'src/ui/svelte/apps/manager/downtime/WorldDowntimeExtensionHost.svelte'),
+  'utf8'
+);
+const managerExtensionsSource = readFileSync(
+  resolve(repoRoot, 'src/ui/managerExtensions.js'),
+  'utf8'
+);
+const previewProviderSource = readFileSync(
+  resolve(repoRoot, 'src/ui/svelte/apps/manager/downtime/worldDowntimePreviewProvider.js'),
+  'utf8'
+);
 const mainSource = readFileSync(mainPath, 'utf8');
 const lang = JSON.parse(readFileSync(langPath, 'utf8'));
 
@@ -219,6 +231,32 @@ describe('CraftingSystemManager source contract', () => {
       rootSource.includes('let { store, services = null, managerExtensions = null } = $props()')
     );
     assert.ok(rootSource.includes('<WorldDowntimeExtensionHost'));
+  });
+  it('keeps one owner of the active Downtime provider, and it is the shell', () => {
+    // The rail renders the active tab set while the host is UNMOUNTED, and a mount fault
+    // has to move the rail as well as the panel. Two subscribers to the same registry would
+    // disagree on both, so the shell subscribes and the host takes a prop.
+    assert.ok(
+      rootSource.includes('managerExtensions.subscribe(WORLD_DOWNTIME_SURFACE_ID'),
+      'the shell subscribes to the surface it renders'
+    );
+    assert.ok(
+      !hostSource.includes('.subscribe('),
+      'the Downtime host takes the live provider as a prop and subscribes to nothing'
+    );
+    assert.ok(
+      hostSource.includes('onProviderFault(activeProvider)'),
+      'a mount fault is reported UP to the shell rather than healed locally'
+    );
+    // Core's own tab id list is content, not contract: nothing on the seam may read it.
+    assert.ok(
+      !managerExtensionsSource.includes('CORE_DOWNTIME_PREVIEW_TAB_IDS'),
+      'the registry never enumerates the tab ids it will accept'
+    );
+    assert.ok(
+      previewProviderSource.includes('export const CORE_DOWNTIME_PREVIEW_TAB_IDS'),
+      "Core's preview tab ids live beside the copy and icons they index"
+    );
   });
   it('disposes a Downtime companion before ApplicationV2 closes and removes its Svelte target', () => {
     const closeStart = appSource.indexOf('async close(options) {');
