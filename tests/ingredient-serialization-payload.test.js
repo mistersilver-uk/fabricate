@@ -39,6 +39,7 @@ const { IngredientSet, INGREDIENT_SET_OMITTED_WHEN_DEFAULT } = await import(
   '../src/models/IngredientSet.js'
 );
 const { Recipe } = await import('../src/models/Recipe.js');
+const { ingredientSetToolsAreActive } = await import('../src/systems/toolCheckBonus.js');
 const { stripComponentsFromRecipeJson } = await import('../src/utils/recipeComponentReferences.js');
 const { planRecipeTagRemovals } = await import('../src/utils/vocabularyCascade.js');
 
@@ -301,15 +302,41 @@ test('1135: a nested alternative is filtered by the same table as its parent opt
   assert.ok(!('systemItemId' in alternative), 'and the duplicate is gone from the branch too');
 });
 
-test('1135: the semantic readers of set.name see the same thing for absence and ""', () => {
-  // `toolCheckBonus` treats a non-empty set name as "tools are active" — the `enabled`-shaped
-  // hazard exactly. The omission is safe only because the written default `''` is already
-  // the falsy side of that predicate; a non-empty sentinel default would have deactivated
-  // every set's tools. Pinned here so a future default change cannot pass silently.
+test('1135: the semantic reader of set.name answers the same for absence and ""', () => {
+  // `ingredientSetToolsAreActive` treats a non-empty set name as "tools are active" — the
+  // `enabled`-shaped hazard exactly. The omission is safe only because the written default
+  // `''` is already the falsy side of that predicate; a non-empty sentinel default would
+  // have deactivated every set's tools.
+  //
+  // The REAL predicate is called rather than restated here, because a restatement pins the
+  // model's default and not the reader: with `String(name ?? 'unnamed')` in
+  // `toolCheckBonus.js` an OMITTED name would read ACTIVE while a written `''` read
+  // INACTIVE, and a test asserting only `String(json.name ?? '').trim() === ''` still
+  // passes. `adminRecipeRowProjection` calls this predicate on a raw `toJSON()` set, so
+  // that drift would silently turn every unnamed set's `toolIds` into hard requirements.
+  //
+  // The system carries `routedByIngredients` so the predicate's FIRST clause cannot
+  // short-circuit the comparison into vacuity, and the named set is the positive control
+  // that proves the predicate can still answer `true` at all.
+  const routed = { resolutionMode: 'routedByIngredients' };
   const json = minimalSet().toJSON();
 
   assert.ok(!('name' in json), 'the empty name is not written');
-  assert.equal(String(json.name ?? '').trim(), '', 'and absence reads as the same empty name');
+  assert.equal(
+    ingredientSetToolsAreActive(routed, json),
+    ingredientSetToolsAreActive(routed, { ...json, name: '' }),
+    'the omitted name and an explicitly written "" reach the reader as the same answer'
+  );
+  assert.equal(
+    ingredientSetToolsAreActive(routed, json),
+    false,
+    'and that shared answer is INACTIVE, so an unnamed set tool id is never a requirement'
+  );
+  assert.equal(
+    ingredientSetToolsAreActive(routed, maximalSet().toJSON()),
+    true,
+    'while a named set still activates, so the comparison above is not vacuously false'
+  );
   assert.equal(IngredientSet.fromJSON(json).name, '', 'which is what the constructor rebuilds');
 });
 
