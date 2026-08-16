@@ -488,6 +488,42 @@ test('the corpus exercises every guarantee it claims to', () => {
   );
 });
 
+test('a substantial share of the corpus still reaches the backtracking search', () => {
+  // The generator is a hand-maintained mirror of the shapes this table claims to cover, and
+  // issue 1083 added a fast path that resolves an UNCONTENDED component without visiting a
+  // single node. A future tweak to the seed, the option mix or the inventory sizes could drift
+  // the corpus into being answered entirely by that fast path, at which point the 240-line
+  // oracle above would still be a wall of green while testing none of the search it exists to
+  // pin. `searchStats.nodes` is the only observable that can tell the two apart.
+  //
+  // What this does NOT claim is rescue DEPTH. A prune or ordering error inside the search is
+  // still masked whenever `_resolveGreedy` — which applies neither the pass index's essence
+  // prune nor contention scoping — can answer the case on its own, and only a small minority of
+  // the corpus is genuinely rescued by the search. That is why the essence-prune boundary is
+  // pinned by a named case in `tests/ingredient-set-essence-block.test.js` rather than left to
+  // this corpus.
+  let searched = 0;
+  let contended = 0;
+  for (let caseIndex = 0; caseIndex < CASE_COUNT; caseIndex += 1) {
+    const { set, items, options } = buildCase(caseIndex);
+    const { searchStats } = set.resolveIngredientSelection(items, MATCHER, options);
+    if (searchStats.nodes > 0) searched += 1;
+    if (searchStats.nodes > set.ingredientGroups.length) contended += 1;
+    assert.equal(searchStats.capHit, false, `case ${caseIndex} hit the node cap`);
+  }
+
+  assert.ok(
+    searched > CASE_COUNT * 0.25,
+    `only ${searched}/${CASE_COUNT} cases entered the search, so the oracle is mostly pinning ` +
+      'the fast path rather than the solver'
+  );
+  assert.ok(
+    contended > CASE_COUNT * 0.1,
+    `only ${contended}/${CASE_COUNT} cases cost more nodes than they have groups, so nothing ` +
+      'here branches beyond one choice per group'
+  );
+});
+
 test('the staged resolver is byte-identical to the pre-1083 solver', () => {
   const observed = fingerprintAll();
   assert.equal(
