@@ -25,17 +25,44 @@
  * - **B(1).** One `world` setting key per record: `sum(recordBytes) + n * envelope`. The records
  *   pay no array punctuation and instead pay one `Setting` document envelope each.
  *
- * Subtracting one from the other is the whole finding, and it is worth writing out:
+ * ## Accounting convention: neither layout is charged its CONTAINER's envelope
+ *
+ * **Both layouts are counted exclusive of the container `Setting` document's own envelope**,
+ * and that has to be said out loud because the baseline is one `Setting` document too. This is
+ * ADR 0001's own convention: its § What a cold client receives at connect table reads the
+ * baseline at 12,213,077 bytes and B(1) at 12,203,076 — serialized VALUES on both sides — and
+ * the sentence under it says so, that the model "omits the per-`Setting` document envelope,
+ * which one key pays once and 10,000 keys pay 10,000 times". This module adds back the
+ * 10,000-times term, because that is the term the decision turns on, and does not subtract the
+ * once term.
+ *
+ * Subtracting one layout from the other is the whole finding, and it is worth writing out:
  *
  * ```text
  * B(1) - baseline  =  n * envelope - (n + 1)  =  n * (envelope - 1) - 1
  * ```
  *
- * **That has no crossover in `n`.** The "whole-array saving" the ADR's condition weighs the
- * envelope against is the array punctuation, which is ONE byte per record, so a 340-byte
- * envelope exceeds it at the first record and the gap then grows linearly forever. The
- * `records`-shaped answer to "where is the crossover" is therefore `1`, which is a degenerate
- * answer to a question posed in the wrong units — see {@link findConnectCrossover}.
+ * Charge the baseline its one envelope as well — the symmetric model a reader is likely to
+ * apply — and every term but one is unchanged:
+ *
+ * ```text
+ * B(1) - baseline  =  n * envelope - (n + 1 + envelope)  =  n * (envelope - 1) - (envelope + 1)
+ * ```
+ *
+ * At `envelope = 340` that is `339n - 341` against this module's `339n - 1`: **the per-record
+ * penalty is 339 bytes either way**, the corpus-scale delta moves by exactly one envelope
+ * (340 bytes in 3.39 MB, 0.01%), and the only thing that really moves is the ordinal — the
+ * layouts diverge at the SECOND record rather than the first (`-2` bytes at `n = 1`, `+337` at
+ * `n = 2`). Note the direction: the convention used here reports B(1) as 340 bytes *worse* than
+ * the symmetric one does, so it errs toward the conclusion this measurement reaches rather than
+ * away from it.
+ *
+ * **Neither convention produces a size threshold, and that is the finding.** The "whole-array
+ * saving" the ADR's condition weighs the envelope against is the array punctuation, which is ONE
+ * byte per record, so a 340-byte envelope exceeds it immediately and the gap then grows linearly
+ * forever. The `records`-shaped answer to "where is the crossover" is therefore `1` here and `2`
+ * symmetrically — both degenerate answers to a question posed in the wrong units, differing by a
+ * bookkeeping choice rather than by anything about the corpus. See {@link findConnectCrossover}.
  *
  * The question that is NOT degenerate is the one {@link connectPayloadSeries} answers: how large
  * the penalty is **relative to the corpus**, which is
@@ -91,6 +118,10 @@ export function serializedRecordBytes(payloads) {
 
 /**
  * What the whole-array `world` setting costs at connect for the first `records` of a corpus.
+ *
+ * Exclusive of this setting's OWN `Setting` document envelope — see the accounting convention in
+ * the module header, and add {@link SETTING_DOCUMENT_ENVELOPE_BYTES} once to model it
+ * symmetrically.
  *
  * @param {number[]} recordBytes
  * @param {number} [records] Defaults to the whole corpus.
@@ -184,6 +215,9 @@ export function connectPayloadSeries({
  * Scanned rather than solved, so the answer stays a measurement over the real corpus and stays
  * correct for an envelope small enough never to cross. `null` means it never crosses within the
  * measured corpus, which is the only outcome that would satisfy ADR 0001's condition.
+ *
+ * **The answer is one record on this module's accounting convention and two on the symmetric
+ * one**, and neither is a corpus-size threshold — read the module header before quoting it.
  *
  * @param {object} options
  * @param {number[]} options.recordBytes

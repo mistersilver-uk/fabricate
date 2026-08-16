@@ -573,12 +573,18 @@ The paragraph above is preserved verbatim because it is what the decision was ta
 It is nonetheless **wrong**, and the numbers that show it are already in this document.
 
 The "whole-array saving" it weighs 340 bytes against is the array punctuation — and § What a cold client receives at connect, reading 1, already says what that is: *"10,001 bytes of array punctuation that 10,000 separate values no longer pay."*
-That is **one byte per record**.
-So `key count × 340 > key count × 1.0001` holds at **one record**, and the gap widens linearly forever.
+For `n` records that is `n + 1` bytes in total, so `n × 340 > n + 1` holds from the first record and the gap widens linearly forever.
 There is no corpus size below which the envelope "never accumulates", and the crossover is not a function of corpus size after all.
 
 Issue 1080 measured it and confirmed this from the corpus: crossover at n = 1 on every record shape tested, from 50 bytes to 100,000 bytes per record; −2 bytes at n = 0 (`"[]"`), +338 at n = 1.
 That harness reproduces this ADR's own arithmetic byte-for-byte at the archived tree — `sum(recordBytes)` 12,203,076, whole-array 12,213,077, B(1) 15,603,076 = +27.76% — so the correction is to the *condition*, not to the measurements.
+
+**The accounting convention behind "n = 1", because an amendment about mis-accounting must be exact about its own.**
+Both layouts are compared *exclusive* of the container `Setting` document's own envelope — the convention of the connect table above, which reads the baseline at 12,213,077 and B(1) at 12,203,076 as serialized values on both sides, and which reading 1 states explicitly.
+Issue 1080's harness adds back the term one key pays once and 10,000 keys pay 10,000 times, and does not subtract the once term.
+Charge the baseline its single envelope too and the difference is `339n − 341` rather than `339n − 1`: the per-record penalty is 339 bytes either way, the corpus-scale figures move by exactly one envelope (340 bytes in 3.39 MB, 0.01%), and the divergence lands on the **second** record instead of the first.
+Neither accounting yields a size threshold, which is the finding; and the one used here reports B(1) as 340 bytes worse than the symmetric one does, so its residual error runs toward this amendment's conclusion rather than away from it.
+`benchmarks/README.md` § The crossover is at ONE record carries the same disclosure, and `tests/persistence-connect-payload.test.js` pins both readings.
 
 **The honest decision input is a constant, not a crossover.**
 Two curves that differ by a fixed per-record term never cross; they diverge from the first record.

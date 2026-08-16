@@ -14,12 +14,22 @@
  *
  * ## Why the negative controls matter more than the positive ones here
  *
- * The headline result is that the crossover is at ONE record — B(1) is worse from the first
- * record and never stops getting worse. A search that returned `1` because it was broken would
- * look exactly like a search that returned `1` because that is the answer. So the crossover
+ * The headline result is that there is no crossover in corpus size at all: the two layouts
+ * diverge immediately and never converge again. A search that returned `1` because it was broken
+ * would look exactly like a search that returned `1` because that is the answer. So the crossover
  * finder is exercised against envelopes that must produce `null` (never crosses) and against an
  * envelope that must produce a crossover at a specific interior record count, before its answer
  * on the real constant is trusted.
+ *
+ * ## The accounting convention the ordinal depends on
+ *
+ * `1` is the answer with both layouts counted exclusive of the container `Setting` document's own
+ * envelope, which is ADR 0001's own convention (see the module header of
+ * `helpers/scale/connectPayloadModel.js`). Charge the whole-array setting its one envelope too
+ * and the difference is `339n - 341` rather than `339n - 1`, so the divergence lands on the
+ * SECOND record. The per-record penalty is 339 bytes either way and the corpus-scale figures move
+ * by 340 bytes in 3.39 MB. Both readings are pinned below, so the convention is auditable rather
+ * than implicit.
  */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -130,6 +140,10 @@ describe('the crossover search', () => {
     // against is one byte of comma per record, so there is no corpus size below which the
     // envelope has not yet accumulated. Record size does not move it — only the size of the
     // resulting penalty, which is what `connectPayloadSeries` reports.
+    //
+    // "First record" is on the model's stated accounting convention: both layouts exclusive of
+    // the container `Setting`'s own envelope, which is how ADR 0001's connect table counts. The
+    // symmetric alternative is the test below, and it moves the ordinal and nothing else.
     for (const perRecord of [50, 768, 3773, 100_000]) {
       const crossover = findConnectCrossover({
         recordBytes: Array.from({ length: 64 }, () => perRecord),
@@ -137,6 +151,29 @@ describe('the crossover search', () => {
       assert.equal(crossover.records, 1, `${perRecord}-byte records`);
       assert.equal(crossover.below.deltaBytes, -2, 'the empty corpus is two bytes of "[]"');
       assert.equal(crossover.at.deltaBytes, SETTING_DOCUMENT_ENVELOPE_BYTES - 2);
+    }
+  });
+
+  it('moves to the SECOND record, and nowhere else, if the baseline is charged an envelope too', () => {
+    // The convention is disclosed rather than defended, so the alternative is pinned rather than
+    // described. Charging the whole-array setting its own single `Setting` envelope gives
+    // `339n - 341` against the model's `339n - 1`: same per-record term, one envelope of
+    // difference in total, divergence at n = 2 instead of n = 1.
+    const envelope = SETTING_DOCUMENT_ENVELOPE_BYTES;
+    const bytes = Array.from({ length: 64 }, () => 768);
+    const symmetricDelta = (records) =>
+      perRecordKeyConnectBytes(bytes, records) - (wholeArrayConnectBytes(bytes, records) + envelope);
+
+    assert.equal(symmetricDelta(1), -2, 'one record is still cheaper under B(1), by two bytes');
+    assert.equal(symmetricDelta(2), envelope - 3, 'and two records are not');
+    for (const records of [1, 2, 7, 64]) {
+      assert.equal(symmetricDelta(records), (envelope - 1) * records - (envelope + 1));
+      // The whole point of disclosing the convention rather than re-recording the numbers: the
+      // two accountings differ by exactly one envelope at every corpus size, never by more.
+      assert.equal(
+        connectPayloadAt({ recordBytes: bytes, records }).deltaBytes - symmetricDelta(records),
+        envelope
+      );
     }
   });
 });
@@ -204,7 +241,7 @@ describe('the committed reading', () => {
     ['simple-corpus', 'persistence.connectPayload.simpleRecipes'],
     ['rich-corpus', 'persistence.connectPayload.richRecipes'],
   ]) {
-    it(`${profile} records a crossover at the first record`, () => {
+    it(`${profile} records a crossover at the first record, on the stated convention`, () => {
       const counts = readBaseline(profile).cases[caseId].counts;
       assert.equal(counts.connectEnvelopeBytesPerRecord, SETTING_DOCUMENT_ENVELOPE_BYTES);
       assert.equal(counts.wholeArrayPunctuationModelHolds, 1);

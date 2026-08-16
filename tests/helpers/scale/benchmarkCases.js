@@ -197,7 +197,10 @@ function connectPayloadCase({ id, profile, shape, sweep }) {
         connectDeltaBytesPerRecord: Math.round(corpus.deltaBytes / corpus.records),
         // `0` means B(1) never costs more than the whole array within this corpus — the ONLY
         // outcome that satisfies ADR 0001's condition. Any other value is the record count at
-        // which it first does.
+        // which it first does, on the accounting convention `connectPayloadModel.js` states in
+        // its header: both layouts exclusive of the container `Setting`'s own envelope, as
+        // ADR 0001's own connect table counts them. Charging the baseline that one envelope too
+        // reports 2 here instead of 1 and moves nothing else by more than 340 bytes.
         connectCrossoverRecords: crossover?.records ?? 0,
         connectCrossoverDeltaBytesBelow: crossover?.below.deltaBytes ?? 0,
         connectCrossoverDeltaBytesAt: crossover?.at.deltaBytes ?? 0,

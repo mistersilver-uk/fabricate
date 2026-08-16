@@ -227,13 +227,32 @@ what each adds around the *same* record payloads:
 
 <!-- markdownlint-enable MD013 markdownlint-sentences-per-line -->
 
+**Accounting convention, because the baseline is a `Setting` document too.**
+Both rows are counted *exclusive* of the container `Setting` document's own
+envelope, which is how ADR 0001's own connect table counts: it reads the baseline
+at 12,213,077 bytes and B(1) at 12,203,076 — serialized values on both sides —
+and says under it that the model "omits the per-`Setting` document envelope,
+which one key pays once and 10,000 keys pay 10,000 times".
+This measurement adds back the 10,000-times term and does not subtract the once
+term.
+Charge the baseline its one envelope as well and the difference becomes
+**`n × 339 − 341`**: the per-record penalty is 339 bytes either way, every
+corpus-scale figure below moves by exactly one envelope (340 bytes in 3.39 MB,
+0.01%), and the *only* thing that really changes is the ordinal — the layouts
+diverge at the **second** record rather than the first (−2 bytes at `n = 1`,
++337 at `n = 2`).
+Note the direction: the convention used here reports B(1) as 340 bytes worse than
+the symmetric one does, so it errs *toward* this measurement's conclusion.
+Both readings are pinned in `tests/persistence-connect-payload.test.js`.
+
 The "whole-array saving" the ADR weighs 340 bytes against is the array
 punctuation, and that is **one byte per record**.
 So a 340-byte envelope exceeds it at the *first* record: measured crossover
 `connectCrossoverRecords = 1`, with the delta going from −2 bytes at zero records
 to +338 at one, on every shape measured.
-There is no corpus size below which the envelope "has not yet accumulated", and
-the gap then grows by a flat 339 bytes per record forever.
+Neither convention gives a corpus size below which the envelope "has not yet
+accumulated" — they disagree about whether that size is zero or one, and about
+nothing else — and the gap then grows by a flat 339 bytes per record forever.
 
 **The corpus size is therefore not the variable the ADR's condition assumed it
 was.**
