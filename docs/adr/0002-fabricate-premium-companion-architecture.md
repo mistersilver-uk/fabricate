@@ -7,11 +7,11 @@ nav_order: 2
 
 # ADR 0002 — the fabricate-premium companion architecture
 
-**Status:** Proposed — one decision taken, the rest awaiting maintainer selection.
-The taken one is that **confidentiality is not a constraint**: Fabricate does not defend GM-withheld information at the transport layer, in either module.
-It removes D7's premise rather than overruling its recommendation, and it is recorded under *Confidentiality* and again under *Decision*.
-The options, the kill criteria and the evidence below are the record; the *Decision* section lists the questions the maintainer must answer and what each one turns on.
-Eleven decisions are in scope and the evidence separates most of them; where it does not, this record says so instead of picking.
+**Status:** Accepted — **D6-a, core builds the `CraftingSystem.extensions` slot now**, and **premium hosts the player-facing Downtime window in its own Foundry Application**, neither of which is the option this record recommended.
+Eight of the eleven decisions were taken as recommended; D1 is narrowed to the monorepo with the lane question left to the first real build; **D2 is demoted from a decision to a channel choice**, because the maintainer's ruling is that distribution is not an architectural constraint; and D6 and D7 diverge.
+Confidentiality is not a constraint either — Fabricate does not defend GM-withheld information at the transport layer, in either module — which removes D7's premise rather than overruling it.
+Following ADR 0001, the *Recommendation*, the kill criteria, the risk table and every measurement below record the evidence this decision was taken against, not a competing conclusion, and they have not been edited to agree with it.
+All eleven positions were settled on 2026-08-16 and are recorded under *Decision*.
 
 **Context:** issue 613 (the core plugin API and premium packaging seam, plan-reviewed at revision 3), issue 345 (economy automation), issue 1185 and PR 1186 (the GM Downtime preview and the companion seam that merged with it).
 **Depends on:** issue 1185's shipped seam, `openspec/specs/ui-integration/spec.md` §Downtime Preview and Premium Extension, `openspec/specs/gathering-and-harvesting/spec.md` §Gathering Party, `openspec/specs/integrations/spec.md` (Specification 008), and the private `fabricate-premium` repository's existing release pipeline.
@@ -49,7 +49,7 @@ Every row below was read from Foundry's own sources at `resources/app` of a loca
 | Is any module-owned storage confidential from a player? | **No.** `World#g` builds the connect payload with `Setting.dump()`, `Actor.dump()`, `ChatMessage.dump()` and friends, and `dump({sort})` in `server-document.mjs` takes **no user argument and applies no ownership filter**. `express.static(paths.data)` serves any non-denylisted file under a module directory **to any HTTP client that can reach the server** — its static handlers are installed ahead of the session middleware that populates `req.user`, so no login is required at all. `gmOnlyFields` is a write guard. | A GM-only Document is not confidential; `ownership: {PLAYER: NONE}` is not confidential; a whispered `ChatMessage` is not confidential; a JSON file in premium's own module folder is not confidential. Note the ordering of severity: a module-directory file is **strictly worse** than the connect payload, which at least requires a world login. D7 has exactly one viable mechanism, and it has costs. |
 | Is `--debug` a usable escape hatch for the `protected` dev-and-CI invisibility hazard? | **No, on any shipped build.** `resources/app/main.mjs` is unminified and reads `const isDebug = process.argv.includes("--debug") && fs.existsSync("./server")`, then passes `debug: isDebug` into `init.default(...)`. The shipped 14.365 app root has **no `server/` directory**, so `isDebug` is always `false` and `global.options.debug` can never be true. The guard is unreachable rather than merely unused. Worse, the two halves resolve against different bases — `fs.existsSync` against the process CWD, the `import` against `main.mjs`'s own URL — so launching from a CWD that happens to contain `server/` sets the flag and then crashes the import. | Issue 613's conclusion was right and this record's first revision was wrong to park it as undecided. **It constrains D9-b's T5 directly:** the two-module smoke cannot install the companion with `protected: true` and boot past the signature check with `--debug`; it must install the companion unprotected, or supply a valid `signature.json`. F-K4's mitigation rests entirely on emitting `protected` into the released manifest alone. |
 | Is module load order guaranteed? | **No.** All ordinary modules sit at one script priority — 7 for `scripts`, 8 for `esmodules` — and within-bucket order is `Data/modules/` directory-listing order. `relationships.requires` plays no part in ordering, and `testAvailability` carries a Foundry source comment admitting dependencies are not checked at all. | The exposure is *not* "the companion loaded before Fabricate existed": every module's ESM top level runs before `init` fires. It is `init`-callback ordering, which the documented `init`-then-`Hooks.once('ready')` fallback closes airtight, because core's own `ready` listener is registered at ESM-evaluation time. Three caveats travel with it and are recorded in D5. |
-| Can a `protected` module declare `relationships.requires` on a free module? | **Nothing in code prevents it.** `protected` and `relationships` are independent schema fields with no cross-validation anywhere in V14.365. Foundry's own module-development article documents the dependency shape and nowhere prohibits it. `fabricate-mythwright` already ships that exact declaration. | If this is disallowed it is marketplace policy, not code, and policy could not be verified. It is a maintainer action item, not a design risk. |
+| Can a `protected` module declare `relationships.requires` on a free module? | **Nothing in code prevents it.** `protected` and `relationships` are independent schema fields with no cross-validation anywhere in V14.365. Foundry's own module-development article documents the dependency shape and nowhere prohibits it. `fabricate-mythwright` already ships that exact declaration. | If this were disallowed it would be marketplace policy rather than code, and policy could not be verified from any retrieved source. **That gap is now closed: Foundry confirmed by email on 2026-08-16 that a `protected` package may declare `relationships.requires` on a free one.** It is an express permission rather than an absence of prohibition, and it is no longer an open item. |
 | Do core's `--fab-*` tokens and cascade layers reach a companion subtree? | **Yes.** All seven theme blocks declare on `:root` as well as `.fabricate`, and `applyFabricateTheme` stamps `documentElement`, so custom properties inherit into any subtree with no `.fabricate` class. `styles[].layer` is a free-form nullable string: `"exceptions"` is declared after `modules` in core's layer statement, and `null` emits a bare `@import`, which outranks the whole layer system. | Theme parity is free, and so is the existing trap — the tokens sit on `:root` unconditionally carrying the dark theme, so a companion surface inside light-themed core chrome reads dark tokens. |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
@@ -81,7 +81,7 @@ It is appended rather than inserted, so every other number is unchanged.
 | # | Decision | Constraints |
 |:---|:---|:---|
 | **D1** | Where the premium **code** module lives. | 1, 5 |
-| **D2** | Distribution and entitlement. | 1 |
+| **D2** | Distribution and entitlement — **a channel choice, not an architectural constraint**. | 1 |
 | **D3** | The licence boundary, including third parties. | 2 |
 | **D4** | The coupling model between the two bundles. | 3 |
 | **D5** | Version handshake and compatibility policy. | 3, 4 |
@@ -94,9 +94,16 @@ It is appended rather than inserted, so every other number is unchanged.
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 
+**D2 is in that list because this record opened it, not because the architecture turns on it.**
+The maintainer's ruling is that distribution is a **channel choice**: premium can ship direct, through Foundry premium content gated by a Patreon tier, or through the FVTT storefront, and not one of D1 or D3 to D11 changes with the answer.
+So D2 is demoted below — the Option S, F and H analysis and the kill criteria stay in full as evidence about the channels, but the record no longer treats an undisclosed fee as a blocker on anything, because there is nothing architectural for it to block.
+The channel actually chosen is recorded under *Decision*.
+
 ---
 
 ## Options considered
+
+The D2 rows compare **distribution channels**, not architectural arms, per the demotion noted above; every other row is an arm of a decision this record takes.
 
 <!-- markdownlint-disable markdownlint-sentences-per-line -->
 
@@ -226,7 +233,11 @@ The question is not "what API should core build that premium currently lacks".
 It is "which of the already-reachable internals become a supported contract, and which must premium stop touching" — a narrowing exercise with a compatibility promise attached, which is strictly harder to retrofit once a paid product depends on it.
 Under D11-a the narrowing list acquires one entry that is not optional: `getGatheringPartyStore()`, and its `getPartyStore` alias on the `game.fabricate.gathering` facade, becomes the seam through which a paid product reaches a core domain aggregate.
 
-One already-recorded defect shows the cost of no contract: `game.fabricate.exportSystem()` passes three arguments to `buildExportPayload` where the UI path passes five, so the public export path silently drops the whole gathering authoring bundle while the import path reads it.
+One defect shows the cost of no contract, and its history is the point.
+`game.fabricate.exportSystem()` passed three arguments to `buildExportPayload` where the UI path passed five, so the public export path silently dropped the whole gathering authoring bundle while the import path read it — the two were not inverses, and nothing detected that.
+It was found by the issue-613 research rather than by a test, filed as issue 642, and **has since been fixed**: both call sites now pass all five, and the guard is a source comment naming the issue.
+Verified on this record's own base rather than inherited from the July research, because D6-a makes the export path load-bearing and a stale "still broken" claim here would misdirect the first implementer.
+What the episode establishes is not a live bug but the failure mode: two call sites of one internal function drifted apart across a published API boundary, silently, and only a line-by-line read caught it.
 
 **Selecting D5-b amends a canonical specification, and that must not be discovered during implementation.**
 `openspec/specs/ui-integration/spec.md` requires that "a conflicting provider on the same surface, **an unsupported version**, an empty or duplicated tab set, malformed chrome or action, or an asynchronous mount **fails with a deterministic error**".
@@ -304,7 +315,7 @@ So as stated, a core release that breaks premium is discovered by a user, not by
 Two halves close it, and only one of them costs anything.
 
 The premium-side half is a **core-release dispatch into premium's CI** plus a premium-side matrix over core's latest, previous and `main`.
-That is the half with an owner problem, and it belongs in Decision question 7.
+That is the half with an owner problem, and D9 under *Decision* answers it by deferral: the immediate plan is a manually tested local build, so the dispatch and the matrix arrive with the automated two-module tier rather than before it, and until then the residual below is the live position.
 
 The core-side half is nearly free and should be taken regardless.
 The mounted tier already deep-equals `Object.keys(context).sort()` against the nine context key names it expects; **pin that assertion to `schemaVersion`**, so adding, removing or renaming a context key forces a `schemaVersion` bump in the same commit.
@@ -353,6 +364,10 @@ A rename is recorded under *Ubiquitous language* as a cheap follow-up, not a blo
 
 ## D6-b is the cheap arm, not the free one
 
+**This section's conclusion has since been superseded by the maintainer's selection of D6-a and is deliberately left unedited.**
+Its analysis is not superseded: the dangling-reference, durable-identity and independent-migration costs below all still apply to whatever premium keeps **outside** the core-hosted slice, which is most of its data.
+What no longer holds is the framing — that a first release pays none of D6-a's costs — and the reasoning for that is under *Decision*.
+
 The kill-criteria table prices D6-**a**'s defects — the terminal allowlist, the shallow spread, the wholesale importer replace, the phase-2 reference carry — and every one of them is real.
 But pricing only one arm's defects is how a record talks itself into an arm.
 D6-b has its own defect class and it is not zero.
@@ -381,6 +396,11 @@ Premium needs its own migration line, versioned independently, and it needs it f
 ---
 
 ## Distribution and entitlement
+
+**Read this section as an assessment of channels, not as a decision the architecture rests on.**
+D2 is demoted: distribution is a channel choice, so nothing in D1 or D3 to D11 moves with the answer and the undisclosed fee blocks nothing.
+The analysis is kept in full because it is the evidence a channel was chosen against, and because the operational facts in it — feed-level rather than artifact-level withdrawal, the licence-key invalidation hazard, the approval gate — remain true whichever channel is used.
+The channel actually chosen, and the two kill criteria the maintainer's answers have since resolved, are recorded under *Decision*.
 
 The billing *shape* is a **fee, not a revenue share**, and half of that shape is known.
 Foundry's Publisher Handbook says: "You will be billed at the end of each calendar quarter for the number of Content Keys which were activated and the amount of Patreon subscription usage during that time period", invoiced from Stripe and due within 30 days.
@@ -752,56 +772,58 @@ The residual risk sits in specific design choices rather than in the concept, ra
 ## What was NOT established, and why
 
 A record with no gaps is a record that is hiding some.
-The first three items **block a decision on D2** and are maintainer actions, not research gaps.
+This list was written at Proposed status and is pruned here rather than rewritten: the items the maintainer's answers resolved are marked resolved and struck from the open set, and what remains is genuinely open.
+
+**Resolved since this list was written, and no longer open.**
+
+- **The text of the Premium Content Agreement**, and with it **F-K2**.
+  The Agreement has been read and accepted by the maintainer, so F-K2 is resolved rather than unevaluable — the kill-criteria table's "NOT EVALUABLE" is left as written because it records the state of the evidence when that table was drawn.
+- **Whether Foundry's package policy permits a `protected` package to require a free one.**
+  Foundry confirmed by email on 2026-08-16 that it does.
+  This is now an express permission, recorded in the settled table above, not an absence of prohibition.
+- **First-approval lead time.**
+  Still no published SLA, but the maintainer plans against **2 to 4 working days** and carries it as a named risk under *Consequences* rather than as an unquantified unknown.
+- **Whether a refunded or charged-back activation is credited against a billed one.**
+  Judged non-architectural by the maintainer and dropped.
+  It is a commercial-accounting question about one channel, and D2 is a channel choice.
+- **The premium S3 bucket, which two sources disagreed about.**
+  Resolved in favour of the live enumeration: **`mistersilver-foundry-releases` does not exist and will not be used**, so `release.config.json`'s declared bucket and its `https://releases.mrsilver.io` base URL are dead configuration.
+  A bearer-path feed would need a signed download URL to serve a paid audience, and Foundry supplies that, so **Option S is not a distribution arm for the premium code module at all**; the existing S3 pipeline continues to serve the five content modules for now.
+- **The four questions needing professional legal advice.**
+  Dropped.
+  The maintainer is the author of both modules, has granted themselves commercial use of their own module, and has settled the third-party position; the remainder do not block anything.
+  What survives is housekeeping rather than a research gap — normalising the two `LICENSE` copyright lines onto one legal name, rewriting premium's clause 3, and adopting a CLA or DCO before the first outside PR to core.
+
+**Still open.**
 
 - **Foundry's premium-content fee amount, and how the Patreon half of it is metered.**
   The amount is **not publicly disclosed anywhere** — absent from the Publisher Handbook, the Content Provider Handbook, the Premium Content article, the FAQ and the Licensing Guide, and multiple targeted searches on 2026-08-16 returned nothing.
-  Separately, the billing sentence's phrase **"the amount of Patreon subscription usage" has no defined basis in any public source**: it may be a count of entitled accounts or a share of subscription revenue, and under the recommended hybrid it is the half that actually bills the code module.
-  **The maintainer must contact Foundry to obtain the current Premium Content Agreement and fee schedule, ask how Patreon usage is metered, and confirm that a `protected` package may require a free one and that a private source repository raises no issue — and D2's cost line is STALE until that lands.**
-  F-K1 cannot be evaluated before it.
-- **Whether a refunded or charged-back activation is credited against a billed one.**
-  Not disclosed.
-  It is the difference between a cash-flow liability and a real one, and it is a single question in the same email.
-- **The text of the Premium Content Agreement.**
-  Never publicly retrieved.
-  Exclusivity, IP, pricing-control and termination terms are all unknown, and F-K2 cannot be evaluated without reading it.
-- **First-approval lead time.**
-  No SLA is published anywhere.
-  Only the *first* approval is a gate — subsequent uploads are immediately available — so the risk is front-loaded and one-off rather than per-release, and no charges accrue during onboarding and development.
-  That is much better than it first appears, but an unquantified delay is still a launch-schedule risk and must not be recorded as "a few weeks".
-- **Whether Foundry's package policy permits a `protected` package to require a free one.**
-  Nothing in V14.365's code prevents it and no Foundry document prohibits it, but that is absence of prohibition rather than express permission.
-  Confirm it in the same email as the fee.
-- **V13, entirely.**
-  V13 is not installed and Foundry was never booted for this record.
-  Unverified on V13: the `@layer` declaration list and whether `exceptions` exists and follows `modules`; the script and style priority table; whether `handleCustomSocket` has the identical `{recipients}` signature and server-attested third argument; and whether the `signatureV2` and package-keyed signature payload branches are a V13-to-V14 fork.
-  **The whole redaction reading is V14-only too**, and it is the most load-bearing item in this list: `World#g`'s connect-payload construction and `ServerDocument.dump`'s absence of a user argument are what rule out D7-a, justify D6-b's storage line, and make "no core-owned test tier can ever gate premium's redaction" true.
-  Also V14-only and previously unlisted: `express.static` and its denylist and the ordering of the static handlers ahead of the session middleware; `gmOnlyFields` being a write guard rather than a read filter; `_getDocuments` running without a requesting-user filter; the `fromManifestPath` protected guard and the unreachability of `--debug`; and the `Hooks` `once`-deregisters-before-invocation and `callAll`-iterates-a-snapshot semantics behind the D5 load caveats.
-  `module.json` declares `minimum: "13"`, so this is a real coverage gap and not a technicality.
-- **The premium S3 bucket, which two sources disagree about.**
-  `release.config.json` declares `bucket: mistersilver-foundry-releases` and `baseUrl: https://releases.mrsilver.io`.
-  A prior live enumeration recorded during the release-model work found all five premium modules sitting in **core's** bucket under `modules/<slug>/`, and found that CDN host did not resolve; core's own `release.s3.config.json` names `fabricate-modules-088545273404-eu-west-2-an`.
-  **Neither was re-checked for this record, so config and observed reality remain in conflict and this is marked unverified.**
-  It bears directly on D2, because the bucket policy is the entire mechanism that makes Option S's secret-path gate work.
+  Separately, the billing sentence's phrase **"the amount of Patreon subscription usage" has no defined basis in any public source**: it may be a count of entitled accounts or a share of subscription revenue, and under the chosen channel it is the half that actually bills the code module.
+  It is a known unknown about one channel's economics and **not a blocker**, because D2 is a channel choice and no architecture depends on it; F-K1 remains unevaluable and that is now a commercial residual rather than a stale decision.
+- **V13, which is now required work rather than a flagged risk.**
+  V13 is still not installed and Foundry was never booted for this record, so every Foundry reading here is V14.365-only.
+  Unverified on V13: the `@layer` declaration list and whether `exceptions` exists and follows `modules`; the script and style priority table; whether `handleCustomSocket` has the identical `{recipients}` signature and server-attested third argument; whether the `signatureV2` and package-keyed signature payload branches are a V13-to-V14 fork; `express.static` and its denylist and the ordering of the static handlers ahead of the session middleware; `gmOnlyFields` being a write guard rather than a read filter; `_getDocuments` running without a requesting-user filter; the `fromManifestPath` protected guard and the unreachability of `--debug`; the `Hooks` `once`-deregisters-before-invocation and `callAll`-iterates-a-snapshot semantics behind the D5 load caveats; and `World#g`'s connect-payload construction with `ServerDocument.dump`'s absence of a user argument.
+  **The maintainer has confirmed V13 stays supported, so verifying these on V13 is scheduled work with an owner, recorded under *Consequences*, and is no longer merely a gap this record names.**
 - **Svelte runtime *version* skew.**
   Only two byte-identical copies of 5.56.3 were tested.
   The isolation mechanisms proven — a module-scoped `Symbol`, a module-scoped `active_effect`, a per-runtime batch queue — are version-independent by construction, so this is very likely fine and it is unmeasured.
+  The planned local premium build is the first place a real version skew can exist, so it is where this gets measured.
 - **The bundle-byte cost of the duplicated runtime, and real-browser behaviour.**
   Neither was measured; the experiment ran under happy-dom only, and no build was run from the read-only lane.
-  Measure the bytes with the real build before this record's successor quotes a number.
+  The planned local build supplies both — measure the bytes with it before this record's successor quotes a number, and drive the mounted companion in a real browser rather than in happy-dom.
+- **Whether D1-a or D1-c is right.**
+  Both keep the premium code in the existing monorepo and differ only over whether the Svelte build and its gates share the content pipeline's CI lane.
+  Nothing has been measured because no such build exists; the planned local build is what produces the number, and until it does this record does not rule either out.
 - **Every T5 claim.**
   The tier does not exist, so nothing in it could be mutated.
   No two-module Foundry boot was attempted; the harness delta is derived from reading `foundry-setup-data.mjs` and `foundry-test-run.mjs`, not from running them.
+  The automated two-module tier is now explicitly deferred behind a manually tested local build, so these claims stay unverified for longer than the recommendation assumed.
 - **socket.io behaviour for `recipients` when the target user has zero open sockets.**
   Reading the loop says the message is dropped with no error and no ack distinction, but this was not exercised.
+  It bears on no decision now that the GM relay is struck, and is kept only so a successor does not re-derive it as settled.
 - **Whether the shipping `bridge.js` survives the narrowing D5 proposes.**
   It calls four getters that a narrowed contract might not keep.
   Nobody has checked, and it ships in a released module today.
-- **Four questions needing professional legal advice, which this record frames and does not answer.**
-  Whether PolyForm NC's "permitted purpose" attaches to the *act* of running a copy while writing a paid product or to the paid *product* itself, on which no case law construing PolyForm NC was found.
-  Whether a companion sharing core's runtime instance in-process could be argued a derivative work independently of the licence text — the reading here is no, and "shares the licensor's runtime instance in-process" is precisely the fact pattern that makes the argument non-trivial, which is one more reason D4-b is preferable to D4-a.
-  Whether a subscription-contingent commercial licence is enforceable and workable as drafted, including what "new commercial use" means in the README's carve-out.
-  And whether a self-grant recorded in the repository it purports to licence is the right instrument at all, or whether the protection belongs instead in a **reservation on any future transfer** of `fabricate`.
 
 ---
 
@@ -875,44 +897,127 @@ The recommendation is therefore Option H **as a way of learning the fee cheaply*
 
 ## Decision
 
-**One taken; the rest awaiting maintainer selection.**
+**Accepted 2026-08-16.**
+Every position this record opened is taken below — ten decisions selected, D2 demoted to a channel choice, and two adjacent positions settled with them.
 
-Following the precedent set by ADR 0001: the *Recommendation* above records the evidence and must not be edited to agree with a later divergent decision.
-Where the maintainer decides differently, the reasoning is written here and the sections above stand as the evidence it was taken against.
-
-### Taken — confidentiality is not a constraint
-
-**2026-08-16.**
-Fabricate does not defend GM-withheld information at the transport layer, in either module.
-This is a general stance, not one scoped to faction data, and it is recorded in full under *Confidentiality* along with the two boundaries that keep it from being read wider than it is.
-
-It does not overrule the recommendation so much as remove its premise.
-D7-d and D7-b were recommended because confidentiality was assumed to be required; with that assumption withdrawn, **D7-a is the arm this record carries**, the GM relay is struck, and the Player Downtime app is unblocked for a first release rather than deferred behind an unbuilt mechanism.
-The *Recommendation* table's D7 row and the corresponding risk row are deliberately left as written, because they are the evidence this ruling was taken against.
-
-What survives untouched is the hosting half of D7, which never depended on confidentiality: the shipped seam is GM-only, so a player surface is premium-owned chrome unless core builds a second seam.
-Question 6 below is therefore narrowed rather than answered.
-
-### Still to answer
-
-Each of these turns on something specific.
+Following the precedent set by ADR 0001: the *Recommendation* above, the kill criteria, the risk table and every measurement record the evidence, and they must not be edited to agree with a later divergent decision.
+Two decisions diverge from what this record recommended — **D6**, and the hosting half of **D7** — and their reasoning is written here rather than backfilled into the sections they contradict.
+One further position, the premium signal, withdraws a statement made in issue 613 rather than in this record, and that withdrawal is recorded here so the repository stops carrying both.
 
 <!-- markdownlint-disable markdownlint-sentences-per-line -->
 
-| # | Question | What it turns on |
+| # | Selected | The maintainer's reason, and what it binds |
 |:---|:---|:---|
-| 1 | **Option S, F or H for D2?** | The Foundry fee schedule and the Premium Content Agreement, both undisclosed and both obtainable only by contacting Foundry — and on whether the first paid, non-tester cohort is imminent, because **S-K1 fires the moment premium is sold to a non-tester cohort, and S-K4 fires in addition only if that product is recurring-revenue rather than a one-off purchase** |
-| 2 | **Is the D3-b self-grant adopted, and are the two `LICENSE` copyright lines normalised?** | Whether core might ever be transferred, sold or handed to another maintainer, and whether outside PRs will be accepted — because a CLA or DCO must precede the first one, not follow it |
-| 3 | **Are paid third-party companions welcome, and on what terms?** | Whether an ecosystem is wanted at all, and whether a perpetual paid-up commercial licence is offered alongside the subscription-contingent tier that currently deters it. The answer belongs in the API documentation, not only here |
-| 4 | **Does core narrow the reachable internals into a published contract, and when?** | How much core work premium's first release may depend on. The internals are already reachable, so declining to narrow is a decision to let every method premium calls become de facto public with no deprecation policy |
-| 5 | **Does core build the `CraftingSystem.extensions` slot now, or on a trigger?** | Whether a premium slice must travel inside a crafting-system export in the first release. If it must, D6-a lands with all its persistence work and the changes land in `openspec/specs/data-models/spec.md` and `openspec/specs/import-export/spec.md`; if it need not, D6-c defers it — at the price of the dangling-reference, identity and independent-migration costs charged under *D6-b is the cheap arm, not the free one*, which is not quite "no cost" |
-| 6 | **Who hosts the player-facing surface?** | **Narrowed by the ruling above — only the hosting half is left.** The shipped seam is GM-only, so there is no player-side registry: either premium ships its own Foundry Application, in which case core hosts nothing, contains nothing, and D8's containment analysis does not apply to that window at all, or core builds a second player-side seam that appears in none of the eleven decisions and is unscoped. The first is much the cheaper answer and needs no core work. Redaction no longer bears on this, and no player-client test gate is required |
-| 7 | **Who owns and pays for the two-module Foundry tier, and for the core-release dispatch into premium's CI?** | Whether premium's CI may hold both artifacts, which it can and core's cannot. Core's substitute is a checked-in fake premium module with a real manifest and its own `esmodules` entry, which buys load-order and namespace coverage without the private repository. The fixture cannot be `protected: true`, because `--debug` is unreachable on a shipped build. And a contract suite pinned by git tag validates against the core version premium chose rather than the one a user runs, so without the dispatch the residual is that a core-side break is first reported by a user |
-| 8 | **Does premium adopt core's `AGENTS.md`, `.agents/skills/` and provider bindings?** | Willingness to keep two copies in step, offset by `validate:agents` turning drift into a failing check. Note the flow is two-way: premium's multi-model orchestration package has no core equivalent |
-| 9 | **D11 — one `Party` aggregate or two?** | This is now a numbered decision with a recommendation (**D11-a**), not an open question, because the canonical gathering spec already answers most of it: a downtime party that never stands on a map is an explicitly supported configuration of `GatheringParty`, the composite uniqueness invariant forbids an actor sitting in two enabled parties, `travelActorUuid` is an Actor UUID rather than the brief's map marker, and membership must not depend on a system-supplied party actor type. What is left for the maintainer is whether to accept D11-a or to overrule the invariant deliberately — and if D11-a is accepted, that `getGatheringPartyStore()` becomes a supported contract under D5 and the premium Parties tab is scoped as decorating World > Parties rather than replacing it |
-| 10 | **Is the premium signal reversal accepted as shipped, softened, or reverted?** | Whether "Core ships no advertisement for premium in v1" is withdrawn on the record. If it is not withdrawn, the shipped padlocks, badges and call to action must come out; leaving both statements standing is the one outcome that is definitely wrong |
+| **D1** | **Monorepo**, with the lane still undecided between D1-a and D1-c | D1-b is killed on its own criterion and stays killed. The choice between one CI lane and two is settled by the first real premium build, which does not exist yet, so this record leaves it open rather than picking on a prediction |
+| **D2** | **Not a decision — a channel choice.** The **code** module through **Foundry premium content gated by a Patreon tier**, initially, at the Guild Artisan tier; the existing S3 pipeline retained for the five content modules for now | Distribution is not an architectural constraint: premium can ship direct, through Foundry premium content gated by Patreon, or through the FVTT storefront, and no other decision in this record moves with the answer. The Option S, F and H analysis and the kill criteria stand as evidence about the channels rather than about the architecture. `mistersilver-foundry-releases` does not exist and will not be used, so **Option S is not a distribution arm for the code module at all** — a paid bearer feed would need a signed download URL, and Foundry supplies that |
+| **D3** | **D3-b** — the self-grant, taken | No professional advice was needed. The maintainer authored both modules and permits themselves commercial use of their own module, so the self-grant wording quoted under *The licence boundary* is adopted, and two commercial-use Patreon tiers already exist. The third-party position is settled and is a product statement, not a legal open question: a **free** third-party companion is welcome under PolyForm NC with no permission and no contact, and a **paid** one needs a commercial licence. That belongs in the API documentation as well as here, because a third party reading the API docs will not read this record |
+| **D4** | **D4-b** — the DOM handoff, as recommended | Measured rather than argued, and it is the only decision in this record that is already built and shipped |
+| **D5** | **D5-b** — narrow and version the API, **yes**, and explicitly **for other module developers** rather than only for premium | It lands **alongside** premium's first release, not before it, so the narrowing is sized against a real consumer instead of a hypothetical one. Naming third-party developers as the audience is what makes it a published contract rather than a private arrangement between two modules with the same author, and it is the same audience D3's third-party position addresses |
+| **D6** | **D6-a** — core builds `CraftingSystem.extensions` now. **Diverges from the recommendation** | Premium's data does need to travel inside a crafting-system export, which is precisely the trigger D6-c named, so deferring only moves the same work later and under more pressure. See the subsection below for what it pulls onto the critical path |
+| **D7** | **D7-a** carried, and **premium ships its own Foundry module and its own Application** for the Player Downtime window. **The hosting half diverges from the recommendation** | Confidentiality is not a constraint, which removed D7's premise; hosting is then answered by premium owning the window outright rather than by core building a second seam or deferring the surface. See the subsection below |
+| **D8** | **D8-a** — trusted same-realm code, as recommended | Isolation was measured not to hold, so the honest form of this arm is core closing its two cheap gaps and the six companion obligations being written down as obligations rather than described as enforcement |
+| **D9** | **D9-b** as the target shape, with the **immediate** step a simple build of the premium module in the `fabricate-premium` repository, tested manually and locally | The automated two-module Foundry tier is deferred behind that build. The build is also the instrument that settles D1-a versus D1-c, the Svelte version-skew gap and the real-browser gap, which is why all three are listed as open under *What was NOT established* rather than assumed |
+| **D10** | **D10-b** — premium adopts `AGENTS.md`, `.agents/skills/` and both provider binding directories, **yes** | `validate:agents` is dependency-free and derives its role list from the bindings table, so a second repository inherits the whole role system by adding four things and running one script, and drift becomes a failing check instead of a silent divergence |
+| **D11** | **D11-a** — one aggregate, premium projection | The composite uniqueness invariant in the canonical gathering specification decides it, and it needs no new core work: `getGatheringPartyStore()` is published, documented and already called by the shipping `bridge.js` |
+| **Premium signal** | **Stands as shipped** | The maintainer's reason, recorded: *"I want to promote the premium module."* This **withdraws issue 613's "Core ships no advertisement for premium in v1" on the record**, so the repository no longer carries two contradictory statements about the same behaviour. The copy-scoping mitigation is kept and is not optional: the padlock must not imply Parties was withheld, because GM party management ships free at **World > Parties** and always has |
+| **V13** | **Still supported** | Every Foundry reading in this record is V14.365-only, so V13 verification stops being a flagged risk and becomes required work with an owner, recorded under *Consequences* |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
+
+### D6 diverges: core builds the `CraftingSystem.extensions` slot now
+
+**Selected: D6-a.**
+The recommendation was **D6-c** — premium owns its own storage for a first release, and the core-hosted slice is built only when a premium slice must travel inside a crafting-system export.
+The maintainer's answer is that premium's data **does** need to travel inside a crafting-system export, so D6-c's own trigger has already fired and deferring would buy nothing.
+
+**D6-a's kill criterion fired, and this decision is taken with that in view rather than waiving it.**
+The criterion was "requiring changes to core's read, write, normalize, import and export paths before premium can ship anything at all", and the kill-criteria table records it as FIRED for a first release.
+That row stands unedited.
+What accepting it means concretely is that the persistence work below sits on the critical path to premium's first release: premium cannot ship until it lands, and each hazard the kill-criteria row names is now a task rather than an argument against the arm.
+
+**What D6-a pulls onto the critical path**, drawn from hazards this record already documents rather than newly discovered.
+
+1. **`_normalizeSystem`'s terminal allowlist runs on every read and every write.**
+   A key it does not know is dropped, so an `extensions` slice is erased by the next normalize pass unless the allowlist carries it explicitly.
+   This is the highest-risk item of the six, because the erasure is silent and happens on a *read*.
+2. **`updateSystem` shallow-spreads at the top level.**
+   A write that does not carry `extensions` forward re-defaults it, so a caller updating an unrelated field destroys the slice as a side effect.
+3. **The compendium importer's overwrite path replaces `extensions` wholesale.**
+   Import must merge or rebind the slice rather than substitute the incoming one, or re-importing a system silently discards the installed companion's data for it.
+4. **The admin store's phase-2 publish carries `extensions` across by reference.**
+   Sharing object identity with the persisted slice lets a view mutation reach storage, and the phase-2 publish needs a **new** object for a `$derived` consumer to observe the change at all — the projection allowlist must also be extended, or the slice is invisible to the view layer.
+5. **A migration forward-guard.**
+   Core's migration pass must preserve an `extensions` slice whose `schemaVersion` it does not recognise rather than normalising or dropping it, because the slice is versioned by its owner and not by `fabricate.migrationVersion`.
+6. **The import id-lifecycle rebinding must happen before persistence.**
+   Import rewrites record ids, so a slice keyed to pre-import ids has to be rebound in the same pass that rewrites them; rebinding after the write leaves the slice pointing at ids that no longer exist.
+
+**Two preconditions come with D6-a that the recommendation never had to price.**
+D6-a is written against `extensions[pluginId]`, and **that key space does not exist in core** — the seam models only `surfaceId: provider.id`, so **Companion Identity**, described under *The API is internal objects, not a contract* as a small additive change wanted for two unrelated reasons, is now a hard precondition for D6-a and needs its `DOMAIN.md` row.
+And the plugin-scoped update API that validates JSON-serializability at the write boundary joins the **D5 narrowing list** beside `getGatheringPartyStore()`, because it is core API a paid product writes through.
+
+**D6-a supersedes the conclusion of *D6-b is the cheap arm, not the free one*, and invalidates none of its analysis.**
+That section's dangling-reference and durable-identity findings apply to whatever premium keeps **outside** the slice, which is most of its data: core still cannot enumerate a companion's references, `ui-integration`'s referenced-by confirm evidence is still blind across the boundary, component ids are still not globally unique so premium must still key on durable identity rather than on a bare id, and premium still needs its own migration line for its own storage.
+Only the section's framing changes — that a first release avoids all of D6-a's defects is no longer the arm being carried.
+The slice's own contents stay versioned by the `schemaVersion` the slot shape already carries, which is a second versioning line *inside* the first rather than a replacement for premium's.
+
+**One argument elsewhere in this record is weakened by this, and is flagged here rather than rewritten.**
+*D11: one party aggregate, or two* prices D11-a partly on "Nothing in D6-a is required, and D11-c is the arm that would drag it in".
+With D6-a being built, that cost no longer separates those arms.
+D11-a still stands — on the composite uniqueness invariant, on the World > Parties versus World > Downtime > Parties rail collision, and on needing no new core work — but a reader should not treat the D6-a-avoidance line as load-bearing any longer.
+
+One asymmetry that looks like a problem and is not, recorded so nobody has to re-derive it.
+Under D11-a the system slice rides a crafting-system export and premium's party projection does not, because the projection lives in premium's own namespace keyed by `party.id`.
+That is consistent rather than broken: the canonical gathering specification makes parties **world-level** records precisely so one party can interact with multiple crafting systems, so core's own `GatheringParty` does not ride a per-system export either.
+Neither half of a party travels with a system, and a companion projection that did would be the anomaly.
+If downtime party decoration must survive some other kind of export, that is a new question about a world-level export path, not a defect in D11-a.
+
+### D7 diverges on hosting, and its premise was already removed
+
+Two separate things happened to D7 and they should not be conflated.
+
+**First, the premise was removed.**
+Confidentiality is not a constraint: Fabricate does not defend GM-withheld information at the transport layer, in either module.
+That is a general stance rather than one scoped to faction data, and it is recorded in full under *Confidentiality* along with the two boundaries that keep it from being read wider than it is — it is a statement about **transport**, not about presentation, and core's existing redaction helpers stay exactly as they are.
+D7-d and D7-b were recommended because confidentiality was assumed to be required; with that assumption withdrawn, **D7-a is the arm this record carries**, the GM relay is struck, and its four costs — an online GM, emitter election among several GMs, loss on a player reload, and `{recipients}` targeting a User rather than a tab — are avoided rather than accepted.
+
+**Second, hosting is decided, and this is where the divergence is.**
+The recommendation was D7-d for a first release: ship the GM Downtime Studio only, and defer the player surface until a mechanism existed.
+The maintainer's answer is that **premium ships its own Foundry module and its own Application** for the Player Downtime window.
+So core hosts nothing player-side, builds no second seam, and the unscoped player-side registry that made deferral attractive is not needed at all.
+
+Three consequences follow directly.
+**D8's containment analysis does not apply to that window**, because core makes no call into it and hands it no element; the six companion obligations continue to apply to the GM surface premium mounts into, and the player window is premium's own realm end to end.
+The Player Downtime app is **unblocked for a first release** rather than deferred behind unbuilt work.
+And no player-client test gate is required, because there is no redaction constraint left to gate — T5 still stands, but on the `lang` merge, the settings and socket namespace collisions, the two-stylesheet cascade and the entitlement-invisibility case.
+
+**The *Recommendation* table's D7 row and the corresponding risk row are deliberately left as written**, because they are the evidence this decision was taken against.
+
+### What this record no longer leaves open
+
+The ten-question *Still to answer* table this section used to carry is gone, because every question in it now has an answer above.
+These in particular are closed, and a successor should not reopen them as unknowns.
+
+- **Whether the architecture depends on how premium is distributed.**
+  It does not.
+  D2 is a channel choice and the undisclosed fee blocks nothing.
+- **The Premium Content Agreement, and F-K2.**
+  Read and accepted.
+- **Whether a `protected` package may require a free one.**
+  Confirmed by Foundry by email.
+- **Whether `mistersilver-foundry-releases` is the premium feed.**
+  It does not exist and will not be used.
+- **Whether the licence questions need professional advice before anything ships.**
+  They do not; the self-grant is taken and the third-party position is settled.
+- **Whether core builds `CraftingSystem.extensions`.**
+  It does, now, and premium's first release depends on it.
+- **Who hosts the player-facing Downtime window.**
+  Premium does, in its own module and its own Application.
+- **Whether core ships an advertisement for premium.**
+  It does, and issue 613's contrary line is withdrawn on the record.
+- **Whether V13 stays supported.**
+  It does, so verifying this record's V14-only readings on V13 is scheduled work rather than a standing caveat.
+
+What is genuinely still open is listed under *What was NOT established*, and the planned local premium build settles several of those items rather than leaving them to a successor.
 
 ---
 
@@ -920,10 +1025,11 @@ Each of these turns on something specific.
 
 **Issue 613** is superseded in part and confirmed in part, and neither half should be inferred from the other.
 Its Chunk A and Chunk B shared-runtime programme — the unhashed entry chunks, the exact Svelte pin, `assertSharedRuntime`, the build-artifact grep for inlined internals and the "a Svelte bump is a breaking plugin-API change" policy — is superseded by D4-b.
-Its §5 persistence work, its nine manager consult points and its admin-store slice are **deferred by D6-c, not deleted**: every hazard it documents is real and returns intact the day the trigger fires.
-Its §12 services surface survives and is reframed as a narrowing exercise rather than a build-from-nothing.
+Its §5 persistence work, its nine manager consult points and its admin-store slice are **confirmed and scheduled now, not deferred**: D6-a is selected, its trigger has fired, and every hazard §5 documents is real and lands on the critical path to premium's first release.
+Its §12 services surface survives and is reframed as a narrowing exercise rather than a build-from-nothing, and D5 adds an audience §12 did not name — other module developers, not premium alone.
 Its phrase "Foundry performs the revocation" must be corrected to future-facing withdrawal of the feed.
-Its open questions 1 to 4 remain open and are items 1 to 4 of *What was NOT established*.
+And its **"Core ships no advertisement for premium in v1" is withdrawn on the record**, on the maintainer's decision that the premium signal stands, so the issue must not be read as still governing that behaviour.
+Its open questions 1 to 4 are answered or resolved rather than carried forward; what is left of them appears under *What was NOT established*, which is now split into resolved and still-open halves.
 
 **Issue 345** stays open and is delivered through the premium module; its build-time edition gate was already superseded and nothing here revives it.
 **The issue itself must say so**, in its own body rather than only here: it is a public issue on a public backlog, and left unannotated it advertises a feature that has moved behind the paywall.
@@ -957,11 +1063,13 @@ A new `extension-seam` capability was the alternative; it was rejected because i
 **`openspec/specs/ui-integration/spec.md`** is therefore the specification D5 actually amends, and **D5-b contradicts it today**: it requires an unsupported version to fail with a deterministic error, and D5-b degrades instead.
 Selecting D5-b means amending that clause in the same change, with its own delta.
 
-**`openspec/specs/destructive-changes-and-migrations/spec.md`** is what D6-b and D6-c most affect and went unmentioned.
+**`openspec/specs/destructive-changes-and-migrations/spec.md`** is affected by D6 in both directions and went unmentioned.
 Its principle is that nothing is left dangling, and `ui-integration` requires a destructive delete to route through a confirm dialog with referenced-by evidence — evidence that cannot see premium's references.
-The accepted consequence is recorded under *D6-b is the cheap arm, not the free one*; that specification is where it must be written down.
+D6-a narrows that exposure to whatever premium keeps **outside** the slice, which is most of its data, so the accepted consequence recorded under *D6-b is the cheap arm, not the free one* still holds and that specification is still where it must be written down.
+It also gains D6-a's own obligation: core's migration pass must **forward-guard** an `extensions` slice whose `schemaVersion` it does not recognise, preserving it rather than normalising or dropping it.
 
-**`openspec/specs/data-models/spec.md`** and **`openspec/specs/import-export/spec.md`** are where D6-a lands the day its trigger fires, and Decision question 5 now names them.
+**`openspec/specs/data-models/spec.md`** and **`openspec/specs/import-export/spec.md`** are where D6-a lands, and it lands **now** rather than on a trigger.
+`data-models` gains the slot shape, the plugin-id key space and the terminal-allowlist entry that stops `_normalizeSystem` erasing it; `import-export` gains the export carry, the importer's merge-or-rebind rule in place of a wholesale replace, and the requirement that the id-lifecycle rebinding happens **before** persistence.
 
 **`openspec/specs/release-and-distribution/spec.md`** is unmentioned by a record whose D2 decides distribution, which cannot stand.
 Its Purpose already reads "closed testers, **paying patrons**, and the public", and it defines `channel`, `tester group`, `cohort` and `target` — the exact vocabulary D2 uses for Option S.
@@ -970,9 +1078,33 @@ The recommendation is that they are outside it and that the specification says s
 
 **`DOMAIN.md`** carries the canonical **Manager Navigation Surface / Provider Seam** row that D5, D6 and D11 all edit.
 That row today ends with "This seam neither extends nor uses the **Gathering Party** aggregate", which is correct about the shipped seam and is exactly what D11-a changes.
-It also gains a **Companion Identity** row if that concept is introduced, and a `slice` row only if D6-a is ever selected.
+Both of its conditional rows are now unconditional: D6-a needs an `extensions[pluginId]` key space that core does not model, so a **Companion Identity** row is required and the concept is a precondition rather than an option, and a `slice` row is required because D6-a is selected.
 
-**The `fabricate-premium` repository** gains, under the recommendation: its own code build lane, core's role system and `validate:agents`, a runtime guard on `game.modules.get('fabricate')`'s version, its own `socket: true` and `module.fabricate-premium` namespace, a disjoint localization root, its own migration line independent of `fabricate.migrationVersion`, a CI check that **fails if any dev or smoke artifact carries `protected: true`** (without which F-K4's non-firing is a capability rather than a control), and a CI check that fails if any file bearing core's PolyForm header lands in a shipped module — so the non-copying property stays true rather than merely being true today.
+**The `fabricate-premium` repository** gains: its own code build — a simple local build first, tested manually, with the lane question settled by what that build costs — plus core's role system and `validate:agents` under D10-b, a runtime guard on `game.modules.get('fabricate')`'s version, its own `socket: true` and `module.fabricate-premium` namespace, a disjoint localization root, **its own Foundry Application for the Player Downtime window** under D7, writes into core's `extensions` slice through the plugin-scoped update API under D6-a, its own migration line independent of `fabricate.migrationVersion` for everything it keeps outside that slice, a CI check that **fails if any dev or smoke artifact carries `protected: true`** (without which F-K4's non-firing is a capability rather than a control), and a CI check that fails if any file bearing core's PolyForm header lands in a shipped module — so the non-copying property stays true rather than merely being true today.
+
+**`docs/api/index.md`** gains two things D5 and D3 put there rather than here.
+The third-party position must be stated where a third party will read it: a **free** companion is welcome under PolyForm NC with no permission and no contact, and a **paid** one needs a commercial licence from the maintainer.
+And the narrowed contract is published for **other module developers**, with the core-version constant, the `supports(range)` predicate and the deprecation policy — alongside the fix this record already names, teaching the replay-safe `whenReady()` instead of the one-shot `fabricate.ready` hook that eleven worked examples currently teach.
+
+### Four named consequences with owners
+
+**V13 verification is required work, not a caveat.**
+V13 stays supported, and every Foundry reading in this record is V14.365-only, so the readings listed under *What was NOT established* must be re-derived against a V13 install before this record's claims are relied on for a V13 world.
+The maintainer owns installing V13; the verification itself is scoped work that belongs on the premium programme's critical path beside D6-a, because the `styles[].layer` behaviour, the script and style priority table, the socket signature and the signature-payload branches all bear on how premium loads at all.
+
+**The first Foundry approval is a named launch risk, planned at 2 to 4 working days.**
+No SLA is published, only the *first* upload is gated, and no charges accrue during onboarding — so the exposure is front-loaded and one-off.
+It is planned rather than unquantified, and it is the one schedule item in D2 that survives the demotion, because a channel choice still has a lead time.
+
+**Premium adopts the role system, and the adoption is verifiable rather than aspirational.**
+`AGENTS.md`, `.agents/skills/` and both provider binding directories move to `fabricate-premium`, and `npm run validate:agents` runs there unmodified because it derives its role list from the bindings table.
+Lint, format and format:check cannot be inherited by reference — core's are roughly 3,500 characters of hand-enumerated paths behind a pinned coverage test — so the second repository re-derives them with globs.
+The flow stays two-way: premium's `orchestration/` multi-model runner has no core equivalent, and `scripts/lib/zip.js` is already a port from premium.
+
+**Issue 613's advertisement line is withdrawn, and the copy-scoping mitigation is the condition on that.**
+The premium signal ships as built, so the issue's "Core ships no advertisement for premium in v1" no longer governs.
+The preview copy must be scoped to the tabs it is true of: it is true of tracking, activities, factions, settings and all of Economy, and it is **false of Parties**, because GM party management ships free at **World > Parties**.
+Under D11-a the premium Parties tab decorates that free aggregate rather than appearing to replace it, so the honest copy there is "this extends what World > Parties already does".
 
 **Two core defects were found in passing and are follow-up issues for the maintainer:** `emitManagerHook` does not guard `Hooks.callAll`, and `game.fabricate.api` is mutable so any module can overwrite core's exported classes.
 They are the **two cheap gaps** the D8 recommendation names, and they are written out beside the six companion obligations under *The eight open faults, split by owner* — this record names them and does not fix them.
@@ -992,19 +1124,19 @@ Because `integrations/spec.md` now gains an inbound-only scope statement pointin
 
 **`surface` carries four senses here.**
 `DOMAIN.md` defines it precisely as a Manager route that can be handed to a companion, named by a surface id.
-This record also uses it for the API ("the service surface"), for audience (D7's title, Decision question 6) and for advert placements ("four premium surfaces").
+This record also uses it for the API ("the service surface"), for audience (D7's title, and the hosting half of D7 under *Decision*) and for advert placements ("four premium surfaces").
 The audience sense is the dangerous one, because D7's title reads as a claim about a hosting seam that does not exist — see the hosting-precedes-redaction paragraph in *Confidentiality*.
 Only the `DOMAIN.md` sense is canonical; the other three are prose and should be rewritten out of any specification text derived from this record.
 
-**`extension`** would mean two things at once if D6-a's `extensions[pluginId]` slot is ever built: a registered UI provider, keyed by surface id, and a persisted data slice, keyed by plugin id, in two different id spaces.
-Rename the D6-a slot if that arm is taken.
+**`extension`** now means two things at once, because D6-a is selected and the `extensions[pluginId]` slot is being built: a registered UI provider, keyed by surface id, and a persisted data slice, keyed by plugin id, in two different id spaces.
+The rename that was conditional on that arm is therefore required rather than optional, and it must be settled before the slot's name reaches a canonical specification.
 
 **`GatheringParty`** is already world-level and cross-system, and its own specification calls one instance "a downtime party".
 The `Gathering` prefix now misleads, and it is the prefix that makes D11-b look reasonable.
 A rename is the cheap half of D11 and is a follow-up, not a blocker.
 
-**`slice`** is ADR-local jargon.
-That is acceptable at Proposed status; it needs a `DOMAIN.md` row only if D6-a is selected.
+**`slice`** was ADR-local jargon, acceptable at Proposed status.
+D6-a is selected and this record is Accepted, so it needs its `DOMAIN.md` row.
 
 ---
 

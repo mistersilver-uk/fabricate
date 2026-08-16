@@ -24,4 +24,4 @@ reasoning that was current at the time is the thing worth keeping.
 | Record | Status | Subject |
 |:-------|:-------|:--------|
 | [0001 — Granular crafting-definition persistence]({% link adr/0001-granular-crafting-definition-persistence.md %}) | Accepted — B(1), one `world` setting key per record | Where Fabricate stores recipes and crafting systems |
-| [0002 — Fabricate Premium companion architecture]({% link adr/0002-fabricate-premium-companion-architecture.md %}) | Proposed — one decision taken, the rest awaiting maintainer selection | How the free module and a paid companion are built, licensed, coupled, distributed and verified |
+| [0002 — Fabricate Premium companion architecture]({% link adr/0002-fabricate-premium-companion-architecture.md %}) | Accepted — D6-a and a premium-hosted player window, neither of which this record recommended | How the free module and a paid companion are built, licensed, coupled, distributed and verified |
