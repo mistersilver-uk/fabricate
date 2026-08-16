@@ -139,6 +139,26 @@ function enumerateHeldItems(actors) {
 }
 
 /**
+ * Every tag one held document counts towards, deduped.
+ *
+ * The SAME union `RecipeManager._matchesTagIngredient` evaluates a tag ingredient against:
+ * the resolved component's authored tags plus any item-level `flags.fabricate.tags`. Kept as
+ * a named helper so the two reads of "what tags does this item carry?" are visibly the same
+ * rule rather than two loops that happen to agree today.
+ *
+ * @param {object} item
+ * @param {object|null} component The component this item resolved to, or `null`.
+ * @returns {Set<string>}
+ */
+function tagsOf(item, component) {
+  const flagTags = getFabricateFlag(item, 'tags', []);
+  const componentTags = Array.isArray(component?.tags) ? component.tags : [];
+  return new Set(
+    [...(Array.isArray(flagTags) ? flagTags : []), ...componentTags].map((tag) => String(tag))
+  );
+}
+
+/**
  * A snapshot of what one actor set holds, resolved once.
  *
  * Deliberately a closure over precomputed state rather than a class: it has no lifecycle, no
@@ -251,9 +271,24 @@ export function buildInventorySnapshot({
      * draw on. Resolved once per system per snapshot: one component identity resolution per
      * held document, never one per recipe and never one per system per recipe.
      *
-     * Tag quantities are tallied from EVERY held document, not only the ones that resolve to
-     * a component, because a tags-matched ingredient option matches on the item's own
-     * `flags.fabricate.tags` and never requires the item to be a registered component.
+     * ## Tag quantities are the UNION of component tags and the item's own flag
+     *
+     * Authored tags live on the managed COMPONENT definition. Fabricate never stamps
+     * `flags.fabricate.tags` onto an inventory item (issue 857, recorded at
+     * `matchTypes.js`'s `tagsHandler.matchesItem`), so a tally that read only the item flag
+     * would be EMPTY in every real world — and an empty per-tag map makes every tag-matched
+     * ingredient option report `available: false`, which is the one direction
+     * {@link projectRecipeAvailability}'s contract forbids. A player holding four
+     * component-tagged planks would see "missing materials" on the row and "Available" in
+     * the inspector, on the same screen.
+     *
+     * So the tally mirrors `RecipeManager._matchesTagIngredient` exactly: resolve the item to
+     * its component and take the union of that component's authored `tags` and any
+     * item-level tag flag (back-compat / third-party tagging). The union is DEDUPED, because
+     * a tag carried by both would otherwise be counted twice against the same held stack.
+     *
+     * Tags are still tallied from EVERY held document, including ones that resolve to no
+     * component, so an item-flag-only tag keeps working without a component behind it.
      *
      * @param {object} system
      * @returns {{quantityByComponentId: Map<string, number>,
@@ -273,14 +308,14 @@ export function buildInventorySnapshot({
 
       for (const { item } of heldItems()) {
         const quantity = readStackQuantity(item);
+        // Resolved FIRST, because the tag tally below needs the component's authored tags.
+        // Still exactly one resolution per held document, as before.
+        const component = canResolve ? resolveComponent(item, components, system?.id) : null;
 
-        for (const tag of getFabricateFlag(item, 'tags', []) || []) {
-          const key = String(tag);
-          quantityByTag.set(key, (quantityByTag.get(key) ?? 0) + quantity);
+        for (const tag of tagsOf(item, component)) {
+          quantityByTag.set(tag, (quantityByTag.get(tag) ?? 0) + quantity);
         }
 
-        if (!canResolve) continue;
-        const component = resolveComponent(item, components, system?.id);
         const componentId = component?.id;
         if (componentId == null) continue;
         const key = String(componentId);
