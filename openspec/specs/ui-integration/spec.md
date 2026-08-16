@@ -377,8 +377,10 @@ Header hierarchy:
 - The top bar must not render redundant eyebrow/kicker labels that merely repeat the current view name, such as `Systems View` above `Crafting Systems`.
 - Section headers inside the page may use short contextual labels when they add information, such as selected object state, but they must not duplicate adjacent title text.
 - A screen renders **one** page header.
-  A view must not stack a second header of its own beneath the shell's, restating the system name the breadcrumb and the titlebar's system badge already carry.
+  A view must not stack a second header of its own beneath the shell's, restating the system name the breadcrumb and the rail's crafting-system selector already carry.
 - The page title is the manager's display type and carries the weight that buys; the page's single primary action (`Create …`) is taller than a row button.
+- The page header holds exactly two blocks — the breadcrumb/title/subtitle heading and the trailing page actions — on every route.
+  No route leads its header with a route glyph or identity tile of its own.
 
 Selected-system rail:
 
@@ -417,10 +419,20 @@ Selected-system navigation:
   The top-level `Checks` rail item — an expandable nav GROUP whose Crafting / Salvage / Gathering / Validation entries are rail CHILDREN owning the routes `CHECKS_VIEWS` declares, not tabs inside one view — and the `Tags & Categories` rail item are fully implemented and **not** experimental-gated.
   "Sub-tab" names the five SECTIONS inside an activity route and must not be reused for these children.
   When `Recipes` is the active route, its `recipe-edit` subroute is treated as part of the Recipes route for navigation, breadcrumb (`Crafting` then `Recipes` then `Edit recipe`), and left-nav active-state purposes — the same sibling-subroute relationship the Essences route has with `essence-edit`.
+- Every collapsible rail group — `Crafting`, `Checks`, `Gathering`, selected-system `Travel`, and world `Downtime` — obeys ONE disclosure rule, and no group's disclosure depends on any other group's state.
+  A group is expanded when the GM expanded it OR when the current view belongs to that group, and a group owning the current view is LOCKED open, because collapsing it would hide the screen the GM is standing on.
+  That lock is the only exception to "any group collapses in any state", and it is stated on the control rather than enforced silently: a locked disclosure renders genuinely `disabled`, carries `aria-disabled`, and carries a tooltip saying the section stays open while the GM is on one of its pages.
+  A control that accepts the click and does nothing is forbidden — that behaviour is indistinguishable from a broken chevron.
+  Membership is taken over the group's route CATEGORY, so an EDITOR DETAIL ROUTE belongs to the group whose sub-item opened it and locks that group exactly as a rendered rail entry does: `recipe-edit` and `recipe-item-edit` lock `Crafting`, and `environment-edit`, `gathering-task-edit` and `gathering-event-edit` lock `Gathering`.
+  A detail route is a sub-tab of its section, and the rule is uniform across all five groups — no group may release its disclosure the moment one of its own editors opens.
+  The Tool Studio is the one context that does NOT lock: `Tools` is a top-level rail entry rather than a `Crafting` child, so its editor is not a `Crafting` sub-tab.
+  Entering a sub-item both takes the lock and records the GM's intent, so navigating AWAY leaves a group exactly as the GM left it — expanded stays expanded, collapsed stays collapsed — and no route change may force a group closed.
+  Entering the Tool Studio opens the `Crafting` group it presents under (its breadcrumb reads `<system>` then `Crafting` then `Tools`) as intent rather than as a lock, so that disclosure stays usable there.
+  The rule reads no tab or route id belonging to one owner: the world `Downtime` group's children are the active provider's tabs, and a companion's tab set gets the same behaviour as Core's.
 - The selected-system `Crafting` rail item is an expandable nav group modelled on the Gathering group, shown whenever a crafting system is selected.
   The parent row shows an expand/collapse control and the recipe count as its badge.
-  Activating the parent item opens the Recipes browser by default and expands the submenu only when the active route is outside Crafting; when a Crafting child route is already active, activating the parent item must not navigate away from the current Crafting page, and while a Crafting child route is active the expand/collapse control is locked open — activating it keeps the submenu expanded rather than collapsing it.
-  The group collapses when the active route leaves Crafting, so its submenu does not dangle open over unrelated views.
+  Activating the parent item opens the Recipes browser by default and expands the submenu only when the active route is outside Crafting; when a Crafting child route is already active, activating the parent item must not navigate away from the current Crafting page.
+  Its disclosure follows the shared rail-group rule above: locked open while any Crafting route is current, its editor detail routes included, and otherwise collapsible and left as the GM leaves it, including after the route leaves Crafting.
   The expanded submenu (built by `buildCraftingNavItems`) always contains `Recipes` and `Settings`, plus a **mode-conditional** entry derived from the system's `visibilityMode` (via `craftingEffect`): `Access` appears only in `restricted` mode (`showAccess`), and `Books & Scrolls` appears only in `item` and `knowledge` modes (`showBooksScrolls`); `global` mode shows neither.
   The submenu also contains a `Knowledge` entry whose gate is deliberately wider than the others': it is shown when `craftingEffect` grants `Books & Scrolls` OR the system's `resolutionMode` is `alchemy`, because `learnRecipeOnCraft` writes learned recipes under every visibility mode and under `global` alchemy they are the sole reveal source.
   A system can offer more than one mode-conditional entry at once: a `restricted` system whose `resolutionMode` is `alchemy` shows `Recipes`, `Access`, `Knowledge` and `Settings`.
@@ -442,7 +454,7 @@ Selected-system navigation:
 - The selected-system Gathering rail item shows an expand/collapse control instead of an environment count.
   Activating the parent item opens the Environments browser by default and expands the submenu **only when the active route is outside Gathering**; when a Gathering child page or Gathering edit subroute is already active, activating the parent item must not navigate away from the current Gathering page.
   Activating only the expand/collapse control toggles the submenu without navigation.
-  While a Gathering child page or Gathering edit subroute is active, the expand/collapse control is locked: it only toggles (no navigation) and the submenu remains expanded and cannot be collapsed.
+  While a Gathering child page or Gathering edit subroute is active, the expand/collapse control is locked open under the shared rail-group rule above: it renders disabled and names the reason, instead of accepting the click and leaving the submenu expanded.
   The expanded submenu contains Environments, Tasks, Events, and Settings inside a soft grouped container that does not shift the parent Gathering row, icon, label, or expand/collapse control.
   The Gathering parent row remains visually neutral, and only the selected subsection uses the selected menu-item treatment.
   Gathering section navigation must not be duplicated as an in-page horizontal tab strip.
@@ -3265,6 +3277,51 @@ Nothing resolves a crafting run automatically — `CraftingRunManager.processWor
 Alchemy makes that the DEFAULT case: brewing is never gated by visibility, and discovery lands at FINISH, so an undiscovered timed brew could never reach the FINISH that would have revealed it.
 - Because a redacted model carries no `recipeId`, `Fabricate#advanceCraftingRun` resolves the recipe from the PERSISTED RUN rather than from its caller.
 The client-supplied `recipeId` is ignored; trusting it also allowed advancing one run while naming another run's recipe.
+
+### Downtime Preview and Premium Extension
+
+- The GM Manager's permanent World navigation contains both `Parties` and `Downtime`.
+- `Parties` retains its identifiers, count, availability, route-exit behavior, CRUD, membership, travel-actor validation, realm resolution, `GatheringParty` aggregate, and `fabricate.gatheringParties` persistence unchanged.
+- Core's Downtime fallback is a read-only four-tab preview whose ids are `tracking`, `activities`, `factions`, and `settings`.
+That list is Core's own preview CONTENT, not part of the extension contract, and no part of the registry reads it.
+- Core's preview and extension registry create, read, and write no downtime record, setting, flag, actor data, reward, world-time state, party role, assignment, mirror, or reference.
+- One page-session API-v1 registry is published as `game.fabricate.api.managerExtensions.registerWorldNavProvider(provider)` and survives the `init` and `ready` API rebinding.
+- The registry holds at most one provider **per surface id** and rejects only a second provider for the same surface.
+It validates that `id` is a non-empty string and never enumerates the ids it accepts, so a companion may claim a Manager surface Core does not itself render.
+Core's Downtime route reads the surface id `downtime`.
+- A provider is `{ apiVersion: 1, id, tabs, actions?, mount }`.
+The provider declares its own tabs: any ids, at least one of them, rendered in array order.
+Core validates tab SHAPE — a non-empty id, unique within the set, plus a localized label, accessible name, keyboard-visible tooltip, and Font Awesome icon — and never tab membership, count, or order.
+- A tab may carry its own route chrome: `title`, `subtitle`, `breadcrumb`, and `actionsLabel`, each an optional non-empty localized string.
+Core renders the active tab's chrome as the page title, page subtitle, leaf breadcrumb crumb, and header-action group name, and falls back to its own string for any field the tab omits.
+- A tab may carry `actions`, falling back to the provider's own `actions`; each action is `{ id, label, icon?, tooltip?, primary?, disabled? }` plus exactly one of an `onSelect` function or an absolute `http(s)` `href`.
+Core renders an `href` action as an external anchor with `target="_blank"` and `rel="noopener noreferrer"`, invokes `onSelect` with the mount context plus `actionId`, and contains a throwing handler.
+Core's own `Unlock with Premium` header action belongs to Core's preview and is never rendered over a registered provider's screens.
+- A conflicting provider on the same surface, an unsupported version, an empty or duplicated tab set, malformed chrome or action, or an asynchronous mount fails with a deterministic error.
+- `mount({ target, tabId, context })` is synchronous and returns a cleanup function or nothing.
+`tabId` is always one of the provider's own tab ids.
+- `context` is frozen and carries `{ schemaVersion, surface, surfaceId, route, tabId, craftingSystemId, isGM, revision, requestRemount }` and no Core store, document, or component.
+`craftingSystemId` is `null` when no crafting system is selected, and the route stays reachable in that state.
+`requestRemount()` asks Core to run the current cleanup, clear the target, and call `mount` again with a fresh context whose `revision` has advanced.
+- Core calls cleanup exactly once while the target is connected and before a tab, provider, route, or window removes it.
+- Mount and cleanup faults are reported and contained; partial content is cleared, the Core preview becomes the fallback for the whole surface including its rail entries, and a later registration may mount without navigating away.
+- When a provider registers, unregisters, or re-registers with a different tab set, an active tab id the new set no longer declares falls back to that set's first tab rather than leaving an empty panel.
+- The Manager rail's Downtime children and the panel's tab strip render the active provider's tabs, or Core's fallback tabs when no provider holds the surface, from one list.
+Core's premium padlocks and rail note advertise Core's preview and are not rendered when a provider holds the surface.
+- The Manager title bar carries a gold `PREMIUM` badge when, and only when, at least one provider is registered on ANY surface id.
+The signal is a claim about the companion module rather than about Core's Downtime route, so a provider claiming a surface Core does not render lights it too.
+The free module renders nothing in that slot, and the title bar names no crafting system: the rail's crafting-system selector already does.
+- The rail's Downtime `PREMIUM` chip is prominent while Core's preview holds the surface and MUTED, not removed, while a provider holds it, so the loud signal is stated once and the rail still names the premium route.
+The Downtime rail entry's tooltip states the installed condition rather than an unlock offer whenever a provider holds the surface.
+- Fabricate publishes observational hooks — `fabricate.manager.navProviderRegistered`, `fabricate.manager.navProviderUnregistered`, `fabricate.manager.surfaceMounted`, `fabricate.manager.surfaceUnmounted`, and `fabricate.manager.surfaceTabChanged` — exposed on `game.fabricate.api.HOOKS.manager`.
+A listener's return value is ignored and nothing a listener does changes what the Manager renders.
+- Core owns the Manager shell, GM gate, World rail/route/focus state, target, and teardown.
+- The companion owns its content, localization, authorization, domain data, persistence, and created resources, and mounts only into the supplied target.
+- A companion does not patch Manager DOM or use Foundry render hooks.
+- The tablist is labelled and uses native buttons, roving tabindex, stable tab/panel IDREFs, localized accessible names, keyboard-visible tooltips, Left/Right/Home/End focus-and-activation, and focus recovery when a provider change removes the focused panel.
+- The Patreon CTA is `https://www.patreon.com/c/mistersilver`, opens `_blank`, carries `rel="noopener noreferrer"`, uses Font Awesome-only imagery, and remains usable at narrow widths and with the Manager rail collapsed.
+- A companion declares Fabricate in `relationships.requires`, which governs dependency availability and activation rather than ordinary-module script priority.
+- A companion attempts registration during its own `init`, uses one idempotent `Hooks.once('ready', tryRegister)` fallback only when the API is absent, retains exactly one unregister handle, and treats `tryRegister` as a no-op after success.
 
 ## Data Storage (UI-relevant)
 

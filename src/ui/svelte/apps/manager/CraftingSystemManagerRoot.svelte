@@ -1,5 +1,6 @@
 <!-- Svelte 5 runes mode -->
 <script>
+  import { onDestroy } from 'svelte';
   import ChanceSlider from '../../components/ChanceSlider.svelte';
   import CharacterModifierBoundsRow from './environment/CharacterModifierBoundsRow.svelte';
   import GatheringRuleLimitStepper from './environment/GatheringRuleLimitStepper.svelte';
@@ -11,7 +12,7 @@
     DEFAULT_GATHERING_EVENT_IMG,
     DEFAULT_GATHERING_TASK_IMG,
   } from '../../../../gatheringImageDefaults.js';
-  import { localize, notifyInfo, notifyWarn } from '../../util/foundryBridge.js';
+  import { isGameMaster, localize, notifyInfo, notifyWarn } from '../../util/foundryBridge.js';
   import { announceAfterFocusMove } from '../../util/announceAfterFocus.js';
   import { resolveDropUuid } from '../../util/dropUtils.js';
   import { permitsFailureResults } from '../../../../utils/failureResultPolicy.js';
@@ -128,8 +129,91 @@
   import SystemEditView from './SystemEditView.svelte';
   import SystemsBrowserView from './SystemsBrowserView.svelte';
   import TagsCategoriesView from './TagsCategoriesView.svelte';
+  import WorldDowntimeExtensionHost from './downtime/WorldDowntimeExtensionHost.svelte';
+  import { WORLD_DOWNTIME_PREVIEW_PROVIDER } from './downtime/worldDowntimePreviewProvider.js';
+  import { WORLD_DOWNTIME_SURFACE_ID } from '../../../managerExtensions.js';
 
-  let { store, services = null } = $props();
+  let { store, services = null, managerExtensions = null } = $props();
+  let downtimeExtensionHost = $state(null);
+  const PATREON_URL = 'https://www.patreon.com/c/mistersilver';
+  // Which provider currently holds the Downtime surface, and which one has already failed
+  // to mount. The shell owns both because the rail renders the active tab set while the
+  // host is unmounted, and a fault has to move the rail as well as the panel.
+  let downtimeProviderSnapshot = $state(null);
+  let downtimeFaultedProvider = $state(null);
+  // Bumped by `context.requestRemount()`. The host's mount effect keys on the context
+  // object, so a new identity is the whole re-render mechanism.
+  let downtimeContextRevision = $state(0);
+  // Every surface a companion currently claims, not just Core's Downtime one. The title bar
+  // reports the MODULE, so it must not be keyed on one route: a premium module whose only
+  // surface is one Core has never heard of is still installed and still working.
+  let registeredSurfaceIds = $state([]);
+
+  $effect(() => {
+    if (!managerExtensions?.subscribe) return;
+    return managerExtensions.subscribe(WORLD_DOWNTIME_SURFACE_ID, (nextProvider) => {
+      // A new snapshot is a new chance: a replacement provider is never pre-blamed for the
+      // previous one's mount fault.
+      downtimeFaultedProvider = null;
+      downtimeProviderSnapshot = nextProvider;
+    });
+  });
+
+  $effect(() => {
+    if (!managerExtensions?.subscribeSurfaceIds) return;
+    return managerExtensions.subscribeSurfaceIds((surfaceIds) => {
+      registeredSurfaceIds = surfaceIds;
+    });
+  });
+
+  function requestDowntimeRemount() {
+    downtimeContextRevision += 1;
+  }
+
+  // A provider whose mount threw is set aside rather than unregistered: it keeps its
+  // registration (and its unregister handle stays the companion's), Core simply renders its
+  // own surface until the next snapshot arrives.
+  function noteDowntimeProviderFault(faultedProvider) {
+    downtimeFaultedProvider = faultedProvider;
+  }
+
+  function runDowntimeHeaderAction(action) {
+    try {
+      action.onSelect(Object.freeze({ ...worldDowntimeContext, actionId: action.id }));
+    } catch (error) {
+      console.error('Fabricate | Downtime header action failed:', error);
+    }
+  }
+
+  // Core's own tab fields are lang KEYS and a companion's are already-localized text, so
+  // `downtimeCoreFallback` is the one discriminator between the two readings — the rule
+  // `WorldDowntimeTabs` has always applied to the tab strip, applied to route chrome too.
+  // The two defaults are genuinely different values, not one repeated. `coreDefault` is what
+  // Core shows when its OWN lang key is missing. `providerDefault` is what Core shows over a
+  // companion's screens when that companion declared no chrome, and it must never be Core's
+  // preview copy: a raw English marketing sentence under someone else's UI is exactly the
+  // defect this seam exists to remove.
+  function downtimeChrome(field, coreDefault, providerDefault = coreDefault) {
+    const value = activeDowntimeTab?.[field];
+    if (downtimeCoreFallback) return value ? text(value, coreDefault) : coreDefault;
+    return value || providerDefault;
+  }
+
+  // The same rule, for a named rail entry rather than the active tab's chrome.
+  function downtimeTabText(tab, field) {
+    const value = tab?.[field];
+    if (!value) return tab?.id ?? '';
+    return downtimeCoreFallback ? text(value, tab.id) : value;
+  }
+
+  // The ApplicationV2 shell calls this before it unmounts the Svelte root, while a
+  // companion target is still connected. `onDestroy` remains the safety net for
+  // direct Svelte teardown paths that do not go through the application shell.
+  export function disposeDowntimeProviderBeforeRemoval() {
+    downtimeExtensionHost?.disposeBeforeRemoval?.();
+  }
+
+  onDestroy(disposeDowntimeProviderBeforeRemoval);
 
   // svelte-ignore state_referenced_locally
   const viewState = store.viewState;
@@ -246,15 +330,38 @@
   let essenceBulkDeleteArmed = $state(false);
   let activeGatheringTab = $state('environments');
   let activeTravelTab = $state('parties');
-  let gatheringMenuExpanded = $state(false);
-  let systemTravelExpanded = $state(false);
-  // Crafting nav group (issue 511): mirrors the gathering group's expand state.
-  // The group is always available as of issue 745 (v1.3 headline); only its
-  // expand/collapse state lives here.
-  // Not a writable $derived: toggleCraftingMenu writes this from a non-crafting route and the
-  // value must STICK until the route category next changes, which a $derived would clobber.
-  // eslint-disable-next-line svelte/prefer-writable-derived
-  let craftingMenuExpanded = $state(false);
+  // ── Rail group expansion: USER INTENT only (issue 1185) ──────────────────────────────
+  //
+  // The five collapsible rail groups used to hold user intent and route-derived state in
+  // ONE variable each, and the two overwrote one another in both directions. Four groups
+  // ran an effect that read its own flag to guard itself (`if (!onRoute || expanded)
+  // return; expanded = true`), so collapsing the group changed the effect's own dependency,
+  // re-ran it, passed the now-false guard and forced the group back open — a chevron that
+  // visibly did nothing. Crafting had the mirror defect: `craftingMenuExpanded =
+  // isCraftingRoute` never read its own flag, so a collapse stuck, but leaving the category
+  // force-CLOSED a group the GM had deliberately opened.
+  //
+  // The fix is to stop conflating the two. This map is intent and nothing else: only the
+  // disclosure toggle, a navigation that opens a group, and the auto-open effect below ever
+  // write it. Whether a group is DISPLAYED expanded is `railGroupExpanded`, which ORs this
+  // with `railGroupLockedOpen` — see the block beside the route predicates.
+  const RAIL_GROUP_IDS = Object.freeze([
+    'crafting',
+    'checks',
+    'gathering',
+    'systemTravel',
+    'worldDowntime',
+  ]);
+  let railGroupUserExpanded = $state({
+    crafting: false,
+    checks: false,
+    gathering: false,
+    systemTravel: false,
+    worldDowntime: false,
+  });
+  // The selected Downtime preview is owned here rather than inside the extension host
+  // because the rail, the page header and the breadcrumb all name it.
+  let worldDowntimeTabId = $state('tracking');
   // The selected recipe item on the Books & Scrolls surface (issue 511).
   let selectedRecipeItemId = $state('');
   // The recipe selected on the Access surface (visibility=restricted); drives the
@@ -494,7 +601,6 @@
   // `roll` for Triggers, deep-link to `roll` again, and the second one still lands. Without
   // it the repeat equalled the latch and was swallowed, stranding the GM on Triggers.
   let checksSectionRequestNonce = $state(0);
-  let checksMenuExpanded = $state(false);
   // The Graph surface (issue 442) is unimplemented; it stays a disabled placeholder
   // and, as of issue 745, renders only when experimental features are enabled.
   const placeholderViews = [
@@ -2076,6 +2182,58 @@
   );
   const isWorldRoute = $derived(currentView === 'world');
   const isWorldPartiesRoute = $derived(currentView === 'world' && activeTravelTab === 'parties');
+  const isWorldDowntimeRoute = $derived(currentView === 'world-downtime');
+  // A registered provider holds the surface until it faults; otherwise Core's own preview
+  // does. `WORLD_DOWNTIME_PREVIEW_PROVIDER` is one implementation of the same interface,
+  // so the rail, the tab strip and the route chrome all read ONE tab list either way.
+  const downtimeProvider = $derived(
+    downtimeProviderSnapshot && downtimeProviderSnapshot !== downtimeFaultedProvider
+      ? downtimeProviderSnapshot
+      : null
+  );
+  const downtimeCoreFallback = $derived(downtimeProvider === null);
+  // The title bar's premium signal (issue 1185). It is deliberately BROADER than
+  // `downtimeCoreFallback`: that flag answers "who owns the Downtime route", while this one
+  // answers "is a companion module registered at all", which is the claim the strip makes.
+  // Reading it off the surface SET rather than off Core's one surface id is what lets a
+  // premium module that ships some future surface light the same badge with no change here.
+  const premiumInstalled = $derived(registeredSurfaceIds.length > 0);
+  const downtimeTabs = $derived(downtimeProvider?.tabs ?? WORLD_DOWNTIME_PREVIEW_PROVIDER.tabs);
+  const activeDowntimeTab = $derived(
+    downtimeTabs.find((tab) => tab.id === worldDowntimeTabId) ?? downtimeTabs[0]
+  );
+  // A tab a provider no longer declares must not leave the route on an empty panel. This
+  // covers registration, unregistration, and re-registration with a different tab set.
+  $effect(() => {
+    const tabs = downtimeTabs;
+    if (tabs.some((tab) => tab.id === worldDowntimeTabId)) return;
+    worldDowntimeTabId = tabs[0].id;
+  });
+  // The rail's Downtime children are the same tabs the panel's strip offers, read from the
+  // same list so a rail label and a tab label can never drift apart. Both are triggers for
+  // one navigation.
+  const downtimeNavItems = $derived(downtimeTabs);
+  // Header actions belong to the active TAB, falling back to the provider's own list; Core
+  // keeps its bespoke premium anchor rather than routing it through a public descriptor.
+  const downtimeHeaderActions = $derived(
+    downtimeCoreFallback ? [] : (activeDowntimeTab?.actions ?? downtimeProvider.actions ?? [])
+  );
+  const worldDowntimeContext = $derived.by(() => {
+    // Read the revision so `requestRemount()` yields a NEW frozen identity, which is what
+    // the host's mount effect keys on. Nothing here is a Core store, document or component.
+    const revision = downtimeContextRevision;
+    return Object.freeze({
+      schemaVersion: 1,
+      surface: 'manager',
+      surfaceId: WORLD_DOWNTIME_SURFACE_ID,
+      route: 'world-downtime',
+      tabId: worldDowntimeTabId,
+      craftingSystemId: selectedSystemId || null,
+      isGM: isGameMaster(),
+      revision,
+      requestRemount: requestDowntimeRemount,
+    });
+  });
   const isSystemTravelChildRoute = $derived(
     isSystemTravelRoute && (activeTravelTab === 'realms' || activeTravelTab === 'map')
   );
@@ -2232,6 +2390,81 @@
   const checksNavCount = $derived(checksNavIssueTotal(checksNavItems));
   const isChecksRoute = $derived(isChecksView(currentView));
   const checksActiveTab = $derived(resolveActiveChecksTab(currentView) || 'crafting');
+
+  // ── Rail group expansion: the LOCK, and what the rail actually renders (issue 1185) ───
+  //
+  // One rule, stated once for all five groups: a group is expanded when the GM expanded it
+  // (`railGroupUserExpanded`) OR when collapsing it would hide the screen they are standing
+  // on (`railGroupLockedOpen`). The lock is the ONLY exception to "every group collapses in
+  // any state", and it is why the disclosure control renders genuinely `disabled` there
+  // rather than swallowing the click — a chevron that visibly does nothing is what the
+  // whole defect read as.
+  //
+  // "Locked" means "the current view BELONGS to this group", and an editor detail route
+  // belongs to the group whose sub-item opened it: `recipe-edit` is reached from Recipes and
+  // is read as part of Recipes, so the group that owns it stays open while the GM is in it.
+  // That is why the lock keys on the group's route CATEGORY (`isCraftingView` covers
+  // `CRAFTING_VIEWS`, which carries `recipe-edit` and `recipe-item-edit`) rather than on the
+  // narrower "is a rendered rail entry" test.
+  //
+  // The rule is deliberately uniform across all five groups. Gathering already behaved this
+  // way — `isActiveGatheringChildRoute` is true throughout `environment-edit`,
+  // `gathering-task-edit` and `gathering-event-edit` — and Crafting and Checks were the
+  // outliers, releasing their group the moment an editor opened.
+  // Downtime's every sub-tab IS the one `world-downtime` route (the tab is panel state, not
+  // a route), and that holds for a companion's tab set exactly as it does for Core's four —
+  // nothing here reads a tab id.
+  const railGroupLockedOpen = $derived({
+    crafting: isCraftingRoute,
+    checks: isChecksRoute,
+    gathering: isActiveGatheringChildRoute,
+    systemTravel: isSystemTravelChildRoute,
+    worldDowntime: isWorldDowntimeRoute,
+  });
+  const railGroupExpanded = $derived({
+    crafting: railGroupUserExpanded.crafting || railGroupLockedOpen.crafting,
+    checks: railGroupUserExpanded.checks || railGroupLockedOpen.checks,
+    gathering: railGroupUserExpanded.gathering || railGroupLockedOpen.gathering,
+    systemTravel: railGroupUserExpanded.systemTravel || railGroupLockedOpen.systemTravel,
+    worldDowntime: railGroupUserExpanded.worldDowntime || railGroupLockedOpen.worldDowntime,
+  });
+  // Entering a sub-tab also records the INTENT, so the group stays open when the GM later
+  // navigates away instead of snapping shut behind them.
+  //
+  // This effect reads `railGroupLockedOpen` and NEVER `railGroupUserExpanded`. That is the
+  // whole fix for the re-assert loop: a write to a state this effect does not read cannot
+  // re-trigger it, so a collapse the GM makes is final until the lock itself changes.
+  $effect(() => {
+    const locked = railGroupLockedOpen;
+    for (const group of RAIL_GROUP_IDS) {
+      if (locked[group]) railGroupUserExpanded[group] = true;
+    }
+  });
+  // The Tool Studio is a TOP-LEVEL rail entry that presents as Crafting context — its
+  // breadcrumb reads "<system> › Crafting › Tools" — so entering it opens the Crafting group,
+  // as it has since issue 784. What changed is the mechanism: it records INTENT here instead
+  // of ORing `isToolStudioRoute` into the rendered expansion. Tools is not one of Crafting's
+  // rail sub-items, so it must not LOCK the group; the old form pinned the group open and
+  // left its chevron inert, which is one of the five faces of the issue 1185 report.
+  // Reads only the route, never the flag, so a collapse from here is final.
+  $effect(() => {
+    if (isToolStudioRoute) railGroupUserExpanded.crafting = true;
+  });
+  function toggleRailGroup(group, event) {
+    event?.stopPropagation?.();
+    // Belt and braces beside the `disabled` attribute: the lock is a rule about state, not
+    // about one control, so it holds for a programmatic call too.
+    if (railGroupLockedOpen[group]) return;
+    railGroupUserExpanded[group] = !railGroupUserExpanded[group];
+  }
+  // ONE sentence for all five groups, and deliberately generic: the Downtime group's
+  // children come from whichever provider holds the surface, so this cannot name a section.
+  const railGroupLockedTitle = $derived(
+    text(
+      'FABRICATE.Admin.Manager.Nav.LockedOpen',
+      'This section stays open while you are on one of its pages.'
+    )
+  );
   // The Knowledge surface's projection is published TOP-LEVEL, never hung off
   // `selectedSystem` (issue 785): hanging it there would force a `selectedSystem`
   // reference rebuild on every knowledge publish and let a late phase-2 publish
@@ -2302,13 +2535,6 @@
         )
       : []
   );
-  // The Crafting group's expansion follows the active route: it expands on
-  // entering a crafting child route and collapses on leaving, so the submenu
-  // never dangles open over unrelated views. A manual toggle from a non-crafting
-  // route sticks until the route category next changes.
-  $effect(() => {
-    craftingMenuExpanded = isCraftingRoute;
-  });
   const selectedGatheringRules = $derived(
     $viewState.gatheringConfig?.systems?.[selectedSystemId]?.rules || {
       rewardSelectionMode: 'highestRankedDrop',
@@ -2560,7 +2786,7 @@
     gatheringEventDraftBaseline = null;
     gatheringEventSaving = false;
     gatheringEventSaveError = '';
-    gatheringMenuExpanded = isGatheringRoute;
+    railGroupUserExpanded.gathering = isGatheringRoute;
     lastGatheringSystemId = selectedSystemId;
   });
 
@@ -2571,20 +2797,6 @@
     if (currentView === 'gathering-task-edit' && canShowEnvironments) return;
     if (currentView === 'gathering-event-edit' && canShowEnvironments) return;
     activeGatheringTab = 'environments';
-  });
-
-  $effect(() => {
-    if (!isActiveGatheringChildRoute || gatheringMenuExpanded) return;
-    gatheringMenuExpanded = true;
-  });
-
-  $effect(() => {
-    if (isSystemTravelChildRoute && !systemTravelExpanded) systemTravelExpanded = true;
-  });
-
-  $effect(() => {
-    if (!isChecksRoute || checksMenuExpanded) return;
-    checksMenuExpanded = true;
   });
 
   $effect(() => {
@@ -2894,7 +3106,7 @@
     // The standalone `system-overview` route was folded into the `system-edit`
     // page's Validation tab; a stale value (no system selected) falls through to
     // the `systems` library here.
-    if (view === 'world') return 'world';
+    if (view === 'world' || view === 'world-downtime') return view;
     if (!system) return 'systems';
     if (view === 'system-overview') return 'system-edit';
     if (view === 'tool-edit' && !$viewState.toolDraft) return 'tools';
@@ -2966,6 +3178,15 @@
       );
     if (currentView === 'world')
       return text('FABRICATE.Admin.Manager.World.PartiesTitle', 'World Parties');
+    // The Downtime route titles itself after the tab on screen, not after the route: a GM
+    // switching sub-tabs must see the page name change with them, and a companion's screens
+    // must not wear Core's preview copy.
+    if (currentView === 'world-downtime')
+      return downtimeChrome(
+        'title',
+        'Downtime',
+        text('FABRICATE.Admin.Manager.World.Downtime.Title', 'Downtime')
+      );
     if (currentView === 'environments' && displayedGatheringTab === 'travel') {
       if (activeTravelTab === 'map')
         return text('FABRICATE.Admin.Manager.Travel.MapLinksTitle', 'Map Region Links');
@@ -3094,6 +3315,12 @@
         .replace('{assigned}', String(assignedCharacterCount))
         .replace('{total}', String(playerCharacterUuids.size));
     }
+    if (currentView === 'world-downtime')
+      return downtimeChrome(
+        'subtitle',
+        'Fabricate Premium · Your party-wide command board for every activity and shared project.',
+        ''
+      );
     if (currentView === 'environments' && displayedGatheringTab === 'travel') {
       if (activeTravelTab === 'map')
         return text(
@@ -3186,6 +3413,12 @@
       return text('FABRICATE.Admin.Manager.Environment.Tasks.Actions', 'Gathering task actions');
     if (currentView === 'world')
       return text('FABRICATE.Admin.Manager.World.PartiesActions', 'World party actions');
+    if (currentView === 'world-downtime')
+      return downtimeChrome(
+        'actionsLabel',
+        'Downtime actions',
+        text('FABRICATE.Admin.Manager.World.Downtime.Actions', 'Downtime actions')
+      );
     if (currentView === 'environments' && displayedGatheringTab === 'travel')
       return activeTravelTab === 'map'
         ? text('FABRICATE.Admin.Manager.Travel.MapLinksActions', 'Map region link actions')
@@ -3476,7 +3709,7 @@
   // `nextRouteId` is the identity of the SUBJECT the caller is navigating to, for the
   // routes whose view token does not change when the subject does. Only the essence guard
   // reads it today; every other caller keeps its one-argument shape.
-  function confirmRouteExit(nextView, nextRouteId = '') {
+  function confirmRouteExitGuards(nextView, nextRouteId = '') {
     const environmentConfirmed = confirmEnvironmentRouteExit(nextView);
     if (isPromise(environmentConfirmed)) {
       return environmentConfirmed.then((value) => {
@@ -3499,6 +3732,22 @@
     }
     if (essenceResult === false) return false;
     return continueRouteExitAfterEssence(nextView);
+  }
+
+  function confirmRouteExit(nextView, nextRouteId = '') {
+    const result = confirmRouteExitGuards(nextView, nextRouteId);
+    if (activeView !== 'world-downtime' || nextView === 'world-downtime') return result;
+
+    // Keep the original route-guard promise identity. `afterTruthyResult` already subscribes to
+    // it immediately; wrapping it would put route activation one microtask later and regress
+    // every existing async discard path. Reactions run in registration order, so this cleanup
+    // still happens before the caller's route activation removes the host target.
+    const disposeDowntime = (confirmed) => {
+      if (confirmed !== false) downtimeExtensionHost?.disposeBeforeRemoval?.();
+    };
+    if (isPromise(result)) result.then(disposeDowntime);
+    else disposeDowntime(result);
+    return result;
   }
 
   function continueRouteExitAfterEssence(nextView) {
@@ -3872,14 +4121,10 @@
     );
   }
 
-  function toggleChecksMenu() {
-    checksMenuExpanded = !checksMenuExpanded;
-  }
-
   // Activating the PARENT opens the group and routes to the first available child, which is
   // what makes the retained `checks` id a redirect rather than a dead route.
   function activateChecksParent() {
-    checksMenuExpanded = true;
+    railGroupUserExpanded.checks = true;
     setView(resolveChecksRedirect(checksNavArgs));
   }
 
@@ -3892,7 +4137,7 @@
   function backToEnvironmentsBrowse() {
     afterTruthyResult(confirmRouteExit('environments'), () => {
       activeView = canShowEnvironments ? 'environments' : 'systems';
-      if (canShowEnvironments) gatheringMenuExpanded = true;
+      if (canShowEnvironments) railGroupUserExpanded.gathering = true;
     });
   }
 
@@ -5306,7 +5551,7 @@
     gatheringTaskDraftBaseline = snapshot ? JSON.parse(JSON.stringify(snapshot)) : null;
     gatheringTaskSaveError = '';
     activeGatheringTab = 'tasks';
-    gatheringMenuExpanded = true;
+    railGroupUserExpanded.gathering = true;
     activeView = 'gathering-task-edit';
   }
 
@@ -5319,7 +5564,7 @@
   function backToGatheringTaskLibrary() {
     afterTruthyResult(confirmRouteExit('environments'), () => {
       activeGatheringTab = 'tasks';
-      gatheringMenuExpanded = true;
+      railGroupUserExpanded.gathering = true;
       activeView = 'environments';
     });
   }
@@ -5385,7 +5630,7 @@
     gatheringTaskDraftBaseline = null;
     gatheringTaskSaveError = '';
     activeGatheringTab = 'tasks';
-    gatheringMenuExpanded = true;
+    railGroupUserExpanded.gathering = true;
     activeView = 'environments';
   }
 
@@ -5447,7 +5692,7 @@
     gatheringEventDraftBaseline = snapshot ? JSON.parse(JSON.stringify(snapshot)) : null;
     gatheringEventSaveError = '';
     activeGatheringTab = 'encounters';
-    gatheringMenuExpanded = true;
+    railGroupUserExpanded.gathering = true;
     activeView = 'gathering-event-edit';
   }
 
@@ -5461,7 +5706,7 @@
   function backToGatheringEventLibrary() {
     afterTruthyResult(confirmRouteExit('environments'), () => {
       activeGatheringTab = 'encounters';
-      gatheringMenuExpanded = true;
+      railGroupUserExpanded.gathering = true;
       activeView = 'environments';
     });
   }
@@ -5529,7 +5774,7 @@
     if (selectedGatheringEventId === deletedId) selectedGatheringEventId = '';
     clearGatheringEventDraft();
     activeGatheringTab = 'encounters';
-    gatheringMenuExpanded = true;
+    railGroupUserExpanded.gathering = true;
     activeView = 'environments';
   }
 
@@ -5855,7 +6100,7 @@
     activeGatheringTab = visibleGatheringNavItems.some((tab) => tab.id === tabId)
       ? tabId
       : 'environments';
-    gatheringMenuExpanded = true;
+    railGroupUserExpanded.gathering = true;
   }
 
   function openWorldParties() {
@@ -5866,29 +6111,39 @@
     });
   }
 
+  function openWorldDowntime() {
+    return afterTruthyResult(confirmRouteExit('world-downtime'), () => {
+      railGroupUserExpanded.worldDowntime = true;
+      activeView = 'world-downtime';
+    });
+  }
+
+  // The rail child and the studio card's button are two triggers for ONE navigation, so
+  // both land here: select the preview, then commit the route.
+  function openWorldDowntimePreview(tabId) {
+    // The ACTIVE tab set, never a fixed list: whoever holds the surface decides what exists.
+    if (!downtimeTabs.some((tab) => tab.id === tabId)) return;
+    return afterTruthyResult(confirmRouteExit('world-downtime'), () => {
+      worldDowntimeTabId = tabId;
+      railGroupUserExpanded.worldDowntime = true;
+      activeView = 'world-downtime';
+    });
+  }
+
   function openSystemTravelDestination(destination = 'realms') {
     if (!canShowSystemTravel || !['realms', 'map'].includes(destination)) return;
     return afterTruthyResult(confirmRouteExit('environments'), () => {
       activeGatheringTab = 'travel';
       activeTravelTab = destination;
-      systemTravelExpanded = true;
+      railGroupUserExpanded.systemTravel = true;
       activeView = 'environments';
     });
   }
 
   function activateSystemTravelParent() {
-    systemTravelExpanded = true;
+    railGroupUserExpanded.systemTravel = true;
     if (isSystemTravelChildRoute) return;
     openSystemTravelDestination('realms');
-  }
-
-  function toggleSystemTravel(event) {
-    event?.stopPropagation?.();
-    if (isSystemTravelChildRoute) {
-      systemTravelExpanded = true;
-      return;
-    }
-    systemTravelExpanded = !systemTravelExpanded;
   }
 
   function openGatheringSection(tabId = 'environments') {
@@ -5898,7 +6153,7 @@
       : 'environments';
     afterTruthyResult(confirmRouteExit('environments'), () => {
       activeGatheringTab = nextTab;
-      gatheringMenuExpanded = true;
+      railGroupUserExpanded.gathering = true;
       activeView = 'environments';
     });
   }
@@ -5949,19 +6204,10 @@
 
   function activateGatheringParent() {
     if (isActiveGatheringChildRoute) {
-      gatheringMenuExpanded = true;
+      railGroupUserExpanded.gathering = true;
       return;
     }
     openGatheringSection('environments');
-  }
-
-  function toggleGatheringMenu(event) {
-    event?.stopPropagation?.();
-    if (isActiveGatheringChildRoute) {
-      gatheringMenuExpanded = true;
-      return;
-    }
-    gatheringMenuExpanded = !gatheringMenuExpanded;
   }
 
   // Crafting nav group handlers (issue 511), mirroring the gathering group. Route
@@ -5972,13 +6218,13 @@
     const nextView = item?.view || 'recipes';
     afterTruthyResult(confirmRouteExit(nextView), () => {
       activeView = nextView;
-      craftingMenuExpanded = true;
+      railGroupUserExpanded.crafting = true;
     });
   }
 
   function activateCraftingParent() {
     if (isCraftingRoute) {
-      craftingMenuExpanded = true;
+      railGroupUserExpanded.crafting = true;
       return;
     }
     openCraftingSection('recipes');
@@ -6056,7 +6302,7 @@
       recipeItemDraftBaseline = cloneRecipeItemDraft(source);
       recipeItemLinkedSourceSnapshot = recipeItemSourceSnapshot(source);
       activeView = 'recipe-item-edit';
-      craftingMenuExpanded = true;
+      railGroupUserExpanded.crafting = true;
       Promise.resolve(services?.getWorldItemOptions?.()).then((options) => {
         worldItemOptions = options || [];
       });
@@ -6160,15 +6406,6 @@
     const created = await store.addRecipeItemFromUuid?.(selectedSystemId, uuid);
     const newId = typeof created === 'string' ? created : created?.item?.id || created?.id;
     if (newId) editRecipeItem(newId);
-  }
-
-  function toggleCraftingMenu(event) {
-    event?.stopPropagation?.();
-    if (isCraftingRoute) {
-      craftingMenuExpanded = true;
-      return;
-    }
-    craftingMenuExpanded = !craftingMenuExpanded;
   }
 
   function copyComponentSource(uuid = selectedComponent?.registeredItemUuidDisplay) {
@@ -6856,9 +7093,9 @@
 >
   <!--
     The manager titlebar: a thin, always-present identity strip above the header.
-    It answers "which crafting system am I editing, and how does it resolve?" from
-    every screen, so the gold badge carries the SELECTED SYSTEM's name (user-authored
-    text — hence max-width + ellipsis + title) and never a theme or product name.
+    Its right-hand end answers "how does the selected system resolve?" from every screen.
+    Its gold badge is the PREMIUM signal, and it appears only when a companion module has
+    registered with `managerExtensions` — in the free module the slot is simply empty.
   -->
   {#if !isToolStudioRoute}
     <div
@@ -6869,19 +7106,30 @@
       <!--
       The layer-group icon and "Crafting Systems" product label used to lead this
       strip, but the Foundry window's own title bar already names the app — a second
-      copy inside the window was duplicated chrome (issue 643). The gold SYSTEM badge
-      is now the left-most element, and the resolution status stays right-aligned.
+      copy inside the window was duplicated chrome (issue 643).
+
+      The gold badge used to carry the SELECTED SYSTEM's name and no longer does (issue
+      1185): the rail's crafting-system card already names the selected system on every
+      screen, so the strip was repeating it. The slot now carries the one thing nothing
+      else in the chrome says — that a premium companion module is installed and connected
+      — and the rail's own PREMIUM chip steps down to a quiet marker in that state, so the
+      loud signal is stated exactly once.
     -->
-      {#if selectedSystem}
+      {#if premiumInstalled}
         <span
           class="manager-titlebar-badge"
-          data-manager-titlebar-system
-          title={selectedSystem.name}
+          data-manager-titlebar-premium
+          title={text(
+            'FABRICATE.Admin.Manager.Titlebar.PremiumStatus',
+            'Fabricate Premium is installed and connected'
+          )}
           aria-label={text(
-            'FABRICATE.Admin.Manager.Titlebar.SystemBadge',
-            'Selected crafting system'
-          )}>{selectedSystem.name}</span
+            'FABRICATE.Admin.Manager.Titlebar.PremiumStatus',
+            'Fabricate Premium is installed and connected'
+          )}>{text('FABRICATE.Admin.Manager.Titlebar.Premium', 'PREMIUM')}</span
         >
+      {/if}
+      {#if selectedSystem}
         <span
           class="manager-titlebar-status"
           data-manager-titlebar-status
@@ -6896,6 +7144,13 @@
   {/if}
 
   {#if !isToolStudioRoute}
+    <!--
+      Two children, always: the heading block and the trailing actions. The Downtime route
+      briefly led this header with a 42px glyph tile from the prototype, and it was removed
+      (issue 1185) because no other Manager route has one — consistency across the app beats
+      parity with one screen's mockup. It is also why `.manager-header`'s `space-between` can
+      be trusted again: a third child parked the heading in the middle of the row.
+    -->
     <header class="manager-header">
       <div class="manager-heading">
         <nav
@@ -6905,11 +7160,39 @@
           <button type="button" onclick={() => selectSystemAndShowBrowser()}
             >{text('FABRICATE.Admin.Manager.Nav.Systems', 'Crafting Systems')}</button
           >
-          {#if selectedSystem && currentView !== 'systems'}
+          {#if selectedSystem && currentView !== 'systems' && !isWorldRoute && !isWorldDowntimeRoute}
             <i class="fas fa-chevron-right" aria-hidden="true"></i>
             <button type="button" onclick={() => editSystem(selectedSystem.id)}
               >{selectedSystem.name}</button
             >
+          {/if}
+          {#if isWorldRoute || isWorldDowntimeRoute}
+            <i class="fas fa-chevron-right" aria-hidden="true"></i>
+            <!--
+              `World.Heading` is the RAIL's micro-label and is authored in caps for the
+              letter-spaced treatment there. A breadcrumb carries no `text-transform`, so
+              reusing it printed a literal "WORLD" mid-trail; this crumb has its own
+              Title Case key and the rail keeps its shout.
+            -->
+            <span data-breadcrumb-world
+              >{text('FABRICATE.Admin.Manager.World.Breadcrumb', 'World')}</span
+            >
+            {#if isWorldDowntimeRoute}
+              <i class="fas fa-chevron-right" aria-hidden="true"></i>
+              <span>{text('FABRICATE.Admin.Manager.World.Downtime.Title', 'Downtime')}</span>
+              <i class="fas fa-chevron-right" aria-hidden="true"></i>
+              <!--
+                The LEAF crumb names the tab, so it belongs to whoever owns the tab. The
+                crumb above it names the Downtime ROUTE, which Core owns in the rail too.
+              -->
+              <span data-breadcrumb-downtime-tab={worldDowntimeTabId}
+                >{downtimeChrome(
+                  'breadcrumb',
+                  worldDowntimeTabId,
+                  downtimeTabText(activeDowntimeTab, 'label')
+                )}</span
+              >
+            {/if}
           {/if}
           {#if currentView === 'recipes'}
             <i class="fas fa-chevron-right" aria-hidden="true"></i>
@@ -7159,7 +7442,63 @@
       </div>
       {#if currentView !== 'tools' && currentView !== 'tool-edit'}
         <div class="manager-header-actions" aria-label={headerActionsLabel()}>
-          {#if currentView === 'recipes'}
+          {#if currentView === 'world-downtime'}
+            {#if downtimeCoreFallback}
+              <!--
+                The design puts this promotional pill at the top of every Downtime screen, in
+                ADDITION to the hero's Patreon CTA. It is inert in the mockup — a fixed canvas
+                has nowhere to go — but a shipped control labelled "Unlock with Premium" that
+                does nothing is dead UI, so it carries the same subscription link as the hero.
+                It stays Core's own markup rather than a public action descriptor: its premium
+                treatment is Core copy about Core's product, not a shape to ask a companion for.
+              -->
+              <a
+                class="manager-button manager-downtime-unlock"
+                data-downtime-unlock
+                href={PATREON_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <i class="fas fa-crown" aria-hidden="true"></i>
+                <span
+                  >{text(
+                    'FABRICATE.Admin.Manager.World.Downtime.Unlock',
+                    'Unlock with Premium'
+                  )}</span
+                >
+              </a>
+            {:else}
+              {#each downtimeHeaderActions as action (action.id)}
+                {#if action.href}
+                  <a
+                    class="manager-button"
+                    class:is-primary={action.primary === true}
+                    data-manager-header-action={action.id}
+                    href={action.href}
+                    title={action.tooltip}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    {#if action.icon}<i class={action.icon} aria-hidden="true"></i>{/if}
+                    <span>{action.label}</span>
+                  </a>
+                {:else}
+                  <button
+                    type="button"
+                    class="manager-button"
+                    class:is-primary={action.primary === true}
+                    data-manager-header-action={action.id}
+                    title={action.tooltip}
+                    disabled={action.disabled === true}
+                    onclick={() => runDowntimeHeaderAction(action)}
+                  >
+                    {#if action.icon}<i class={action.icon} aria-hidden="true"></i>{/if}
+                    <span>{action.label}</span>
+                  </button>
+                {/if}
+              {/each}
+            {/if}
+          {:else if currentView === 'recipes'}
             <button
               type="button"
               class="manager-button is-primary"
@@ -7755,16 +8094,22 @@
               >
             {/if}
           </button>
-          <!-- Crafting group is unconditional as of issue 745 (v1.3 headline). -->
-          <div
-            class={`manager-nav-group ${craftingMenuExpanded || isToolStudioRoute ? 'is-expanded' : ''}`}
-          >
+          <!--
+            Crafting group is unconditional as of issue 745 (v1.3 headline).
+
+            The Tool Studio used to force this group open (`|| isToolStudioRoute`, issue
+            784) even though Tools is a top-level rail entry and has never been a Crafting
+            child. That pinned the group open on a screen that is not in it and left its
+            chevron inert — one of the five faces of the "refuses to minimize" report
+            (issue 1185). The rule is uniform now: only a Crafting SUB-ITEM locks it.
+          -->
+          <div class={`manager-nav-group ${railGroupExpanded.crafting ? 'is-expanded' : ''}`}>
             <button
               type="button"
               class="manager-nav-button manager-nav-parent"
               id="manager-nav-crafting"
               aria-current={isCraftingRoute ? 'page' : undefined}
-              aria-expanded={craftingMenuExpanded || isToolStudioRoute}
+              aria-expanded={railGroupExpanded.crafting}
               onclick={activateCraftingParent}
             >
               <i class="fas fa-hammer" aria-hidden="true"></i>
@@ -7773,24 +8118,31 @@
               >
               <span class="manager-nav-count">{craftingNavCount}</span>
             </button>
+            <!--
+              Locked ⇒ genuinely `disabled`, with the reason on the control. A collapse that
+              would hide the screen the GM is standing on is the ONE case the rule forbids,
+              and a chevron that silently swallowed the click is what made the old behaviour
+              read as a bug rather than a constraint.
+            -->
             <button
               type="button"
               class="manager-nav-toggle"
-              aria-label={craftingMenuExpanded || isToolStudioRoute
+              aria-label={railGroupExpanded.crafting
                 ? text('FABRICATE.Admin.Manager.Nav.CollapseCrafting', 'Collapse crafting menu')
                 : text('FABRICATE.Admin.Manager.Nav.ExpandCrafting', 'Expand crafting menu')}
               aria-controls="manager-crafting-submenu"
-              aria-expanded={craftingMenuExpanded || isToolStudioRoute}
-              onclick={toggleCraftingMenu}
+              aria-expanded={railGroupExpanded.crafting}
+              disabled={railGroupLockedOpen.crafting}
+              aria-disabled={railGroupLockedOpen.crafting}
+              title={railGroupLockedOpen.crafting ? railGroupLockedTitle : undefined}
+              onclick={(event) => toggleRailGroup('crafting', event)}
             >
               <i
-                class={craftingMenuExpanded || isToolStudioRoute
-                  ? 'fas fa-chevron-up'
-                  : 'fas fa-chevron-down'}
+                class={railGroupExpanded.crafting ? 'fas fa-chevron-up' : 'fas fa-chevron-down'}
                 aria-hidden="true"
               ></i>
             </button>
-            {#if craftingMenuExpanded || isToolStudioRoute}
+            {#if railGroupExpanded.crafting}
               <div
                 class="manager-nav-submenu"
                 id="manager-crafting-submenu"
@@ -7888,13 +8240,13 @@
             >
             <span class="manager-nav-count">{toolsNavCount}</span>
           </button>
-          <div class={`manager-nav-group ${checksMenuExpanded ? 'is-expanded' : ''}`}>
+          <div class={`manager-nav-group ${railGroupExpanded.checks ? 'is-expanded' : ''}`}>
             <button
               type="button"
               class={`manager-nav-button manager-nav-parent ${isChecksRoute ? 'is-active' : ''}`}
               id="manager-nav-checks"
               aria-current={isChecksRoute ? 'page' : undefined}
-              aria-expanded={checksMenuExpanded}
+              aria-expanded={railGroupExpanded.checks}
               onclick={activateChecksParent}
             >
               <i class="fas fa-dice-d20" aria-hidden="true"></i>
@@ -7916,19 +8268,22 @@
             <button
               type="button"
               class="manager-nav-toggle"
-              aria-label={checksMenuExpanded
+              aria-label={railGroupExpanded.checks
                 ? text('FABRICATE.Admin.Manager.Nav.CollapseChecks', 'Collapse checks menu')
                 : text('FABRICATE.Admin.Manager.Nav.ExpandChecks', 'Expand checks menu')}
               aria-controls="manager-checks-submenu"
-              aria-expanded={checksMenuExpanded}
-              onclick={toggleChecksMenu}
+              aria-expanded={railGroupExpanded.checks}
+              disabled={railGroupLockedOpen.checks}
+              aria-disabled={railGroupLockedOpen.checks}
+              title={railGroupLockedOpen.checks ? railGroupLockedTitle : undefined}
+              onclick={(event) => toggleRailGroup('checks', event)}
             >
               <i
-                class={checksMenuExpanded ? 'fas fa-chevron-up' : 'fas fa-chevron-down'}
+                class={railGroupExpanded.checks ? 'fas fa-chevron-up' : 'fas fa-chevron-down'}
                 aria-hidden="true"
               ></i>
             </button>
-            {#if checksMenuExpanded}
+            {#if railGroupExpanded.checks}
               <div
                 class="manager-nav-submenu"
                 id="manager-checks-submenu"
@@ -7978,13 +8333,13 @@
             {/if}
           </div>
           {#if canShowEnvironments}
-            <div class={`manager-nav-group ${gatheringMenuExpanded ? 'is-expanded' : ''}`}>
+            <div class={`manager-nav-group ${railGroupExpanded.gathering ? 'is-expanded' : ''}`}>
               <button
                 type="button"
                 class="manager-nav-button manager-nav-parent"
                 id="manager-nav-gathering"
                 aria-current={isGatheringRoute ? 'page' : undefined}
-                aria-expanded={gatheringMenuExpanded}
+                aria-expanded={railGroupExpanded.gathering}
                 onclick={activateGatheringParent}
               >
                 <i class="fas fa-seedling" aria-hidden="true"></i>
@@ -7996,19 +8351,22 @@
               <button
                 type="button"
                 class="manager-nav-toggle"
-                aria-label={gatheringMenuExpanded
+                aria-label={railGroupExpanded.gathering
                   ? text('FABRICATE.Admin.Manager.Nav.CollapseGathering', 'Collapse gathering menu')
                   : text('FABRICATE.Admin.Manager.Nav.ExpandGathering', 'Expand gathering menu')}
                 aria-controls="manager-gathering-submenu"
-                aria-expanded={gatheringMenuExpanded}
-                onclick={toggleGatheringMenu}
+                aria-expanded={railGroupExpanded.gathering}
+                disabled={railGroupLockedOpen.gathering}
+                aria-disabled={railGroupLockedOpen.gathering}
+                title={railGroupLockedOpen.gathering ? railGroupLockedTitle : undefined}
+                onclick={(event) => toggleRailGroup('gathering', event)}
               >
                 <i
-                  class={gatheringMenuExpanded ? 'fas fa-chevron-up' : 'fas fa-chevron-down'}
+                  class={railGroupExpanded.gathering ? 'fas fa-chevron-up' : 'fas fa-chevron-down'}
                   aria-hidden="true"
                 ></i>
               </button>
-              {#if gatheringMenuExpanded}
+              {#if railGroupExpanded.gathering}
                 <div
                   class="manager-nav-submenu"
                   id="manager-gathering-submenu"
@@ -8043,7 +8401,7 @@
           {/if}
           {#if canShowSystemTravel}
             <div
-              class={`manager-nav-group manager-system-travel-group ${systemTravelExpanded ? 'is-expanded' : ''}`}
+              class={`manager-nav-group manager-system-travel-group ${railGroupExpanded.systemTravel ? 'is-expanded' : ''}`}
               data-system-travel-section
             >
               <button
@@ -8055,7 +8413,7 @@
                   'Travel'
                 )}
                 aria-controls="manager-travel-submenu"
-                aria-expanded={systemTravelExpanded}
+                aria-expanded={railGroupExpanded.systemTravel}
                 onclick={activateSystemTravelParent}
               >
                 <i class="fas fa-route" aria-hidden="true"></i>
@@ -8068,19 +8426,24 @@
                 class="manager-nav-toggle"
                 id="manager-travel-toggle"
                 data-system-travel-toggle
-                aria-label={systemTravelExpanded
+                aria-label={railGroupExpanded.systemTravel
                   ? text('FABRICATE.Admin.Manager.World.CollapseTravel', 'Collapse Travel')
                   : text('FABRICATE.Admin.Manager.World.ExpandTravel', 'Expand Travel')}
                 aria-controls="manager-travel-submenu"
-                aria-expanded={systemTravelExpanded}
-                onclick={toggleSystemTravel}
+                aria-expanded={railGroupExpanded.systemTravel}
+                disabled={railGroupLockedOpen.systemTravel}
+                aria-disabled={railGroupLockedOpen.systemTravel}
+                title={railGroupLockedOpen.systemTravel ? railGroupLockedTitle : undefined}
+                onclick={(event) => toggleRailGroup('systemTravel', event)}
               >
                 <i
-                  class={systemTravelExpanded ? 'fas fa-chevron-up' : 'fas fa-chevron-down'}
+                  class={railGroupExpanded.systemTravel
+                    ? 'fas fa-chevron-up'
+                    : 'fas fa-chevron-down'}
                   aria-hidden="true"
                 ></i>
               </button>
-              {#if systemTravelExpanded}
+              {#if railGroupExpanded.systemTravel}
                 <div
                   class="manager-nav-submenu"
                   id="manager-travel-submenu"
@@ -8168,11 +8531,148 @@
             </span>
             <span class="manager-nav-count">{travelParties.length}</span>
           </button>
+          <!--
+            Downtime is a GROUP, not a leaf: the design nests the same four previews under it
+            that the panel's tab strip offers, each carrying a premium padlock. The structure
+            follows the shipped Travel group exactly — parent, disclosure toggle, submenu —
+            so the collapsed 56px rail hides the labels, the toggle and the whole submenu
+            without a rule of its own, and the premium badge rides `.manager-nav-count` for
+            the same reason.
+          -->
+          <div
+            class={`manager-nav-group manager-world-downtime-group ${railGroupExpanded.worldDowntime ? 'is-expanded' : ''}`}
+            data-world-downtime-section
+          >
+            <button
+              type="button"
+              class={`manager-nav-button manager-nav-parent manager-world-nav-item ${isWorldDowntimeRoute ? 'is-active' : ''}`}
+              id="manager-world-nav-downtime"
+              data-world-nav-item="downtime"
+              title={downtimeCoreFallback
+                ? text(
+                    'FABRICATE.Admin.Manager.World.Downtime.PremiumTooltip',
+                    'Unlock Downtime Studio with Fabricate Premium'
+                  )
+                : text(
+                    'FABRICATE.Admin.Manager.World.Downtime.InstalledTooltip',
+                    'Downtime Studio is unlocked by Fabricate Premium'
+                  )}
+              aria-label={text('FABRICATE.Admin.Manager.World.Downtime.Nav', 'Downtime')}
+              aria-current={isWorldDowntimeRoute ? 'page' : undefined}
+              aria-controls="manager-downtime-submenu"
+              aria-expanded={railGroupExpanded.worldDowntime}
+              onclick={openWorldDowntime}
+            >
+              <i class="fas fa-hourglass-half" aria-hidden="true"></i>
+              <span class="manager-nav-label">
+                {text('FABRICATE.Admin.Manager.World.Downtime.Nav', 'Downtime')}
+              </span>
+              <!--
+                The chip is MUTED, never removed, once a companion holds the surface (issue
+                1185): with premium installed the title bar carries the loud gold signal, and
+                two shouts of the same word is one too many — but the rail still has to say
+                which route premium provides. `is-installed` re-tones it to a quiet accent
+                marker and leaves its geometry alone.
+              -->
+              <span
+                class={`manager-nav-count manager-nav-premium ${downtimeCoreFallback ? '' : 'is-installed'}`}
+                data-world-nav-premium
+                data-world-nav-premium-state={downtimeCoreFallback ? 'preview' : 'installed'}
+                >{text('FABRICATE.Admin.Manager.World.Downtime.Premium', 'PREMIUM')}</span
+              >
+            </button>
+            <button
+              type="button"
+              class="manager-nav-toggle"
+              id="manager-downtime-toggle"
+              data-world-downtime-toggle
+              aria-label={railGroupExpanded.worldDowntime
+                ? text('FABRICATE.Admin.Manager.World.Downtime.CollapseNav', 'Collapse Downtime')
+                : text('FABRICATE.Admin.Manager.World.Downtime.ExpandNav', 'Expand Downtime')}
+              aria-controls="manager-downtime-submenu"
+              aria-expanded={railGroupExpanded.worldDowntime}
+              disabled={railGroupLockedOpen.worldDowntime}
+              aria-disabled={railGroupLockedOpen.worldDowntime}
+              title={railGroupLockedOpen.worldDowntime ? railGroupLockedTitle : undefined}
+              onclick={(event) => toggleRailGroup('worldDowntime', event)}
+            >
+              <i
+                class={railGroupExpanded.worldDowntime
+                  ? 'fas fa-chevron-up'
+                  : 'fas fa-chevron-down'}
+                aria-hidden="true"
+              ></i>
+            </button>
+            {#if railGroupExpanded.worldDowntime}
+              <div
+                class="manager-nav-submenu"
+                id="manager-downtime-submenu"
+                data-world-downtime-submenu
+                aria-label={text(
+                  'FABRICATE.Admin.Manager.World.Downtime.NavSections',
+                  'Downtime previews'
+                )}
+              >
+                {#each downtimeNavItems as item (item.id)}
+                  <button
+                    type="button"
+                    class={`manager-nav-subitem manager-downtime-subitem ${isWorldDowntimeRoute && worldDowntimeTabId === item.id ? 'is-active' : ''}`}
+                    id={`manager-downtime-nav-${item.id}`}
+                    data-world-downtime-item={item.id}
+                    title={downtimeTabText(item, 'tooltip')}
+                    aria-current={isWorldDowntimeRoute && worldDowntimeTabId === item.id
+                      ? 'true'
+                      : undefined}
+                    onclick={() => openWorldDowntimePreview(item.id)}
+                  >
+                    <i class={item.icon} aria-hidden="true"></i>
+                    <span class="manager-nav-label">{downtimeTabText(item, 'label')}</span>
+                    <!--
+                      The padlock and the premium note below advertise CORE'S preview. A
+                      companion owning the surface has nothing locked, so neither renders.
+                    -->
+                    {#if downtimeCoreFallback}
+                      <span class="manager-nav-lock" data-world-downtime-lock
+                        ><i class="fas fa-lock" aria-hidden="true"></i></span
+                      >
+                    {/if}
+                  </button>
+                {/each}
+              </div>
+              {#if downtimeCoreFallback}
+                <p class="manager-nav-callout" data-world-downtime-callout>
+                  <span class="manager-nav-callout-kicker">
+                    <i class="fas fa-lock" aria-hidden="true"></i>
+                    {text('FABRICATE.Admin.Manager.World.Downtime.RailKicker', 'PREMIUM PREVIEW')}
+                  </span>
+                  {text(
+                    'FABRICATE.Admin.Manager.World.Downtime.RailNote',
+                    'Open any Downtime page to preview how Fabricate Premium can help you run downtime.'
+                  )}
+                </p>
+              {/if}
+            {/if}
+          </div>
         </section>
       </nav>
     </aside>
 
-    {#if currentView === 'environments' || currentView === 'world'}
+    {#if currentView === 'world-downtime'}
+      <main
+        class="manager-main"
+        aria-label={text('FABRICATE.Admin.Manager.World.Downtime.Title', 'Downtime')}
+      >
+        <WorldDowntimeExtensionHost
+          bind:this={downtimeExtensionHost}
+          bind:activeTabId={worldDowntimeTabId}
+          provider={downtimeProvider}
+          tabs={downtimeTabs}
+          context={worldDowntimeContext}
+          emitHook={managerExtensions?.emitHook}
+          onProviderFault={noteDowntimeProviderFault}
+        />
+      </main>
+    {:else if currentView === 'environments' || currentView === 'world'}
       <EnvironmentsBrowserView
         environments={environmentList}
         environmentsLoading={$viewState.environmentsLoading}
@@ -8822,7 +9322,7 @@
          `knowledge` joined it in issue 785 for the opposite reason: the surface OWNS
          its third column (roster · detail), so a fourth would clip the detail pane's
          action cluster at the 1024px minimum with no scrollbar. -->
-    {#if currentView !== 'environment-edit' && !isChecksRoute && currentView !== 'system-edit' && currentView !== 'crafting-settings' && currentView !== 'recipe-item-edit' && currentView !== 'component-edit' && currentView !== 'recipe-edit' && currentView !== 'tool-edit' && currentView !== 'knowledge' && !isWorldPartiesRoute}
+    {#if currentView !== 'environment-edit' && !isChecksRoute && currentView !== 'system-edit' && currentView !== 'crafting-settings' && currentView !== 'recipe-item-edit' && currentView !== 'component-edit' && currentView !== 'recipe-edit' && currentView !== 'tool-edit' && currentView !== 'knowledge' && !isWorldPartiesRoute && !isWorldDowntimeRoute}
       <aside
         class="manager-inspector"
         aria-label={isSystemTravelRoute

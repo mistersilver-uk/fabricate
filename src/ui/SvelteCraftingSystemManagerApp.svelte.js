@@ -30,6 +30,7 @@ import { buildImportReportContent } from '../systems/importReportContent.js';
 import { matchRecipeItemDefinition } from '../utils/sourceUuid.js';
 import { getFabricateFlag } from '../config/flags.js';
 import { isPlayerCharacterActor } from '../config/playerCharacterTypes.js';
+import { managerExtensions } from './managerExtensions.js';
 import { readStackQuantity } from '../systems/itemStackQuantity.js';
 import {
   KNOWLEDGE_MESSAGES,
@@ -236,8 +237,7 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
         // Issue 1024: the GM who ticks a new player-character actor type is the one
         // GUARANTEED to be looking at stale data — the settings sidebar sits over an
         // open manager — so the Access, Knowledge and party rosters must republish.
-        const playerCharacterTypeListener = (...args) =>
-          callback('playerCharacterTypes', ...args);
+        const playerCharacterTypeListener = (...args) => callback('playerCharacterTypes', ...args);
         hooks.on('fabricate.craftingSystemsChanged', systemListener);
         hooks.on('fabricate.recipesChanged', recipeListener);
         hooks.on('fabricate.playerCharacterTypesChanged', playerCharacterTypeListener);
@@ -646,6 +646,7 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
 
     return {
       store: this._adminStore,
+      managerExtensions,
       services: {
         importSingleManagedItemFromDrop,
         pickImagePath: this._services.pickImagePath,
@@ -1441,6 +1442,9 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
     this._confirmDiscardDirtyEssenceDraft = null;
     this._confirmDiscardDirtyToolDraft = null;
     this._unregisterUserHooks();
+    // Companion UI owns its own DOM and cleanup. Dispose it before `super.close()`
+    // unmounts the Svelte root, so its mount target is still connected.
+    this._svelteComponent?.disposeDowntimeProviderBeforeRemoval?.();
     if (this._adminStore) {
       this._adminStore.destroy();
       this._adminStore = null;

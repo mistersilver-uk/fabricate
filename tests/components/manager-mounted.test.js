@@ -29,6 +29,8 @@ import { getModifierExpressionSuggestions } from '../../src/config/modifierExpre
 // bulk-selection block below waits on it rather than restating the number, so a change to the
 // rule cannot leave these tests quietly asserting the un-delayed state.
 import { ANNOUNCE_AFTER_FOCUS_MS } from '../../src/ui/svelte/util/announceAfterFocus.js';
+import { createManagerExtensionsRegistry } from '../../src/ui/managerExtensions.js';
+import { MANAGER_HOOKS } from '../../src/config/hooks.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 const sharedComponentNames = [
@@ -72,8 +74,30 @@ let CraftingSettingsViewComponent;
 let mounted;
 let target;
 
+// Lifecycle functions live on the `svelte` package; everything else a component imports
+// from `svelte` (tick, untrack, …) is only reachable from `svelte/internal/client` once the
+// component is compiled to a client module. Split each import list by that rule rather than
+// matching whole literal import lines: a hand-listed line is a mirror of the component's
+// source text, and adding one name to a component turned every mounted test into
+// `# cancelled 348` behind one "does not provide an export named 'onDestroy'" (issue 1185).
+const SVELTE_PACKAGE_EXPORTS = new Set(['onDestroy', 'onMount', 'mount', 'unmount', 'hydrate']);
+
 function rewriteClientImports(code) {
   return code
+    .replace(/import \{([^}]*)\} from 'svelte';/g, (_match, names) => {
+      const imported = names
+        .split(',')
+        .map((name) => name.trim())
+        .filter(Boolean);
+      const fromPackage = imported.filter((name) => SVELTE_PACKAGE_EXPORTS.has(name));
+      const fromClient = imported.filter((name) => !SVELTE_PACKAGE_EXPORTS.has(name));
+      const lines = [];
+      if (fromPackage.length > 0) lines.push(`import { ${fromPackage.join(', ')} } from "svelte";`);
+      if (fromClient.length > 0) {
+        lines.push(`import { ${fromClient.join(', ')} } from 'svelte/internal/client';`);
+      }
+      return lines.join('\n');
+    })
     .replace(/from 'svelte';/g, "from 'svelte/internal/client';")
     .replace(/(from\s+['"][^'"]+\.svelte)(['"])/g, '$1.js$2');
 }
@@ -216,6 +240,9 @@ function compileManagerRoot() {
   writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringEventsBrowserView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringEventEditView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringPartiesTab.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/downtime/WorldDowntimeExtensionHost.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/downtime/WorldDowntimePreview.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/downtime/WorldDowntimeTabs.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringRealmsTab.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringMapLinksTab.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/MapRegionLinkPicker.svelte');
@@ -643,6 +670,12 @@ function compileManagerRoot() {
     // too, but it lands here because the compiled Knowledge components import it
     // directly; it is a dependency-free leaf, so this single entry suffices.
     'src/ui/svelte/apps/manager/knowledge/knowledgeStudio.js',
+    'src/ui/svelte/apps/manager/downtime/worldDowntimePreviewProvider.js',
+    'src/ui/managerExtensions.js',
+    // The public hook-name constants the registry and the Downtime host publish through
+    // (issue 1185). `managerExtensions.js` imports it, so omitting it reports every mounted
+    // manager test as `# cancelled` behind one ERR_MODULE_NOT_FOUND rather than failing.
+    'src/config/hooks.js',
     // SystemEditView imports the pure modifier↔prerequisite copy-mapping helpers
     // (issue 768); omitting it HANGS every mounted manager test as `# cancelled`.
     'src/systems/characterModifierPrerequisiteCopy.js',
@@ -777,6 +810,90 @@ function worldNavItem(id) {
   return target.querySelector(`#manager-world-nav-${id}`);
 }
 
+// The mounted harness stubs `game.i18n.localize` as `(key) => key`, which makes the root's
+// `text(key, fallback)` return the FALLBACK for everything. That is fine for behaviour, and
+// useless for copy: a component reading the WRONG key and a lang value that has drifted from
+// its fallback both pass. The Downtime route is copy-shaped work, so its suites resolve
+// against the real shipped `lang/en.json` and pin what a GM will actually read.
+const SHIPPED_LANG = JSON.parse(readFileSync(resolve(repoRoot, 'lang/en.json'), 'utf8'));
+
+const identityLocalize = (key) => key;
+
+function shippedString(key) {
+  let node = SHIPPED_LANG;
+  for (const part of key.split('.')) {
+    if (node == null || typeof node !== 'object') return key;
+    node = node[part];
+  }
+  return typeof node === 'string' ? node : key;
+}
+
+// Paired with the suite's `afterEach`, which restores the identity localizer whether the
+// test passed or threw.
+function useShippedLocalization() {
+  globalThis.game.i18n.localize = shippedString;
+}
+
+// The provider declares its OWN tab set, so `ids` is a parameter rather than a copy of
+// Core's four. `tab` decorates each generated tab, which is how the chrome cases attach
+// per-tab titles, subtitles, breadcrumbs and header actions without a second factory.
+function downtimeProvider({
+  prefix = 'Companion',
+  ids = ['tracking', 'activities', 'factions', 'settings'],
+  tab = () => ({}),
+  mount: mountProvider,
+  ...overrides
+} = {}) {
+  return {
+    apiVersion: 1,
+    id: 'downtime',
+    tabs: ids.map((id, index) => ({
+      id,
+      label: `${prefix} ${id}`,
+      accessibleName: `Open ${prefix} ${id}`,
+      tooltip: `${prefix} ${id} tools`,
+      icon: 'fas fa-star',
+      ...tab(id, index),
+    })),
+    mount: mountProvider ?? (() => undefined),
+    ...overrides,
+  };
+}
+
+async function settleDowntimeProvider() {
+  await Promise.resolve();
+  await tick();
+  await tick();
+  flushSync();
+}
+
+// The three reads every Downtime seam case makes, named once. The tab strip and the rail
+// are two renderings of ONE tab list, so a case that only checked one of them would pass
+// through the exact drift the single list exists to prevent.
+function downtimeTabIds() {
+  return Array.from(target.querySelectorAll('[data-downtime-tab]')).map(
+    (tab) => tab.dataset.downtimeTab
+  );
+}
+
+function downtimeRailIds() {
+  return Array.from(target.querySelectorAll('[data-world-downtime-item]')).map(
+    (item) => item.dataset.worldDowntimeItem
+  );
+}
+
+function activeCompanionPanel() {
+  return target.querySelector('[data-downtime-extension-panel]');
+}
+
+function managerTitle() {
+  return target.querySelector('.manager-header .manager-title').textContent.trim();
+}
+
+function managerSubtitle() {
+  return target.querySelector('.manager-header .manager-subtitle').textContent.trim();
+}
+
 function systemTravelItem(id) {
   return target.querySelector(
     id === 'travel' ? '#manager-nav-travel' : `#manager-travel-nav-${id}`
@@ -826,7 +943,7 @@ async function switchScopeSystemTo(systemId) {
 // Mount the manager against a fresh store on a fresh host element. Assigns the
 // module-level `mounted`/`target` (so afterEach can clean up) and returns the target,
 // so the routing helpers below differ only in where they navigate afterwards.
-function mountManager(calls = [], storeOptions = {}, services = {}) {
+function mountManager(calls = [], storeOptions = {}, services = {}, rootProps = {}) {
   target = document.createElement('div');
   document.body.appendChild(target);
   mounted = mount(Component, {
@@ -834,6 +951,7 @@ function mountManager(calls = [], storeOptions = {}, services = {}) {
     props: {
       store: createStore(calls, storeOptions),
       services: { openCurrentAdmin: () => {}, ...services },
+      ...rootProps,
     },
   });
   flushSync();
@@ -2743,7 +2861,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     globalThis.Comment = document.createComment('').constructor;
     globalThis.game = {
       i18n: {
-        localize: (key) => key,
+        localize: identityLocalize,
         format: (key) => key,
       },
     };
@@ -2830,6 +2948,10 @@ describe('CraftingSystemManager mounted behavior', () => {
     }
     target?.remove();
     target = null;
+    // Restore the identity localizer unconditionally. A test that swaps in the shipped
+    // strings and then FAILS would otherwise leak its localizer into every later test,
+    // turning one failure into a cascade that hides its own cause.
+    globalThis.game.i18n.localize = identityLocalize;
   });
 
   after(() => {
@@ -2876,6 +2998,7 @@ describe('CraftingSystemManager mounted behavior', () => {
         'Checks',
         'Gathering',
         'Parties',
+        'Downtime',
       ]
     );
     assert.equal(
@@ -6241,7 +6364,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     const navLabels = Array.from(target.querySelectorAll('.manager-nav-label')).map((label) =>
       label.textContent.trim()
     );
-    assert.deepEqual(navLabels, ['Parties']);
+    assert.deepEqual(navLabels, ['Parties', 'Downtime']);
     assert.ok(target.textContent.includes('Crafting Systems'));
     assert.ok(target.textContent.includes('No crafting systems yet'));
     assert.ok(target.textContent.includes('Set up your first system'));
@@ -6344,6 +6467,7 @@ describe('CraftingSystemManager mounted behavior', () => {
         'Tools',
         'Checks',
         'Parties',
+        'Downtime',
       ]
     );
 
@@ -6446,6 +6570,10 @@ describe('CraftingSystemManager mounted behavior', () => {
       target.querySelector('[data-system-id="alchemy"]').getAttribute('aria-selected'),
       'true'
     );
+    // The Crafting group is still open, and that is the fix rather than a leak (issue 1185):
+    // this route was reached by opening Recipes, and navigating AWAY from a group no longer
+    // slams it shut behind the GM. `craftingMenuExpanded = isCraftingRoute` used to force it
+    // closed here, discarding a choice the GM had deliberately made.
     assert.deepEqual(
       Array.from(target.querySelectorAll('.manager-nav-label')).map((label) =>
         label.textContent.trim()
@@ -6453,6 +6581,10 @@ describe('CraftingSystemManager mounted behavior', () => {
       [
         'System Overview',
         'Crafting',
+        'Recipes',
+        'Books & Scrolls',
+        'Knowledge',
+        'Settings',
         'Components',
         'Tags & Categories',
         'Essences',
@@ -6461,6 +6593,7 @@ describe('CraftingSystemManager mounted behavior', () => {
         'Gathering',
         'Graph',
         'Parties',
+        'Downtime',
       ]
     );
     assert.ok(target.textContent.includes('System library'));
@@ -13561,9 +13694,10 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.equal(world.querySelector('#manager-world-scope').textContent.trim(), 'every system');
     assert.deepEqual(
       Array.from(world.querySelectorAll('[data-world-nav-item]')).map((item) => item.id),
-      ['manager-world-nav-parties']
+      ['manager-world-nav-parties', 'manager-world-nav-downtime']
     );
     assert.ok(worldNavItem('parties').querySelector('.fa-users'));
+    assert.ok(worldNavItem('downtime').querySelector('.fa-hourglass-half'));
     assert.ok(systemTravelItem('travel').querySelector('.fa-route'));
     assert.equal(
       worldNavItem('parties').querySelector('.manager-nav-count').textContent.trim(),
@@ -13649,6 +13783,982 @@ describe('CraftingSystemManager mounted behavior', () => {
       !target.querySelector('[id^="travel-tab-"]'),
       'the retired horizontal tabs are absent'
     );
+  });
+
+  it('opens the read-only World Downtime preview with accessible tabs and a secure CTA', async () => {
+    const calls = [];
+    const registry = createManagerExtensionsRegistry();
+    const originalLocalize = globalThis.game.i18n.localize;
+    const localized = new Map([
+      ['FABRICATE.Admin.Manager.World.Downtime.Tablist', 'Localized downtime sections'],
+      ['FABRICATE.Admin.Manager.World.Downtime.Brand', 'Localized Fabricate Premium'],
+      ['FABRICATE.Admin.Manager.World.Downtime.Tabs.Tracking.Label', 'Localized tracking'],
+      [
+        'FABRICATE.Admin.Manager.World.Downtime.Tabs.Tracking.AccessibleName',
+        'Open localized tracking preview',
+      ],
+      [
+        'FABRICATE.Admin.Manager.World.Downtime.Tabs.Tracking.Tooltip',
+        'Localized tracking tooltip',
+      ],
+    ]);
+    globalThis.game.i18n.localize = (key) => localized.get(key) ?? originalLocalize(key);
+    mountManager(calls, {}, {}, { managerExtensions: registry });
+
+    worldNavItem('downtime').click();
+    await settleRouteExit();
+
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'world-downtime');
+    // world-downtime is a two-column route: the `{#if}` that renders the inspector
+    // excludes it, and `styles/fabricate.css` releases its column to match. Those are
+    // one decision expressed twice, so drop the guard and this (empty) aside wraps to
+    // an implicit grid row under the preview — which `expectNoHorizontalOverflow` in
+    // the View Lab cases cannot see, because a stray ROW costs no horizontal width.
+    // assert.ok(!el) rather than assert.equal(el, null): on failure, assert.equal
+    // tries to build an inline diff of a happy-dom element — a circular, whole-subtree
+    // graph — and dies with an unmessaged heap OOM. Same detection, readable failure.
+    assert.ok(
+      !target.querySelector('.manager-inspector'),
+      'world-downtime renders no inspector aside — the guard and the released CSS column stay in step'
+    );
+    assert.equal(
+      target.querySelector('.manager-header .manager-subtitle').textContent.trim(),
+      'Fabricate Premium · Your party-wide command board for every activity and shared project.',
+      'the world-downtime subtitle branch survives beside the counted World Parties one'
+    );
+    assert.equal(worldNavItem('parties').getAttribute('aria-current'), null);
+    assert.equal(worldNavItem('downtime').getAttribute('aria-current'), 'page');
+    const tabs = Array.from(target.querySelectorAll('[data-downtime-tab]'));
+    assert.deepEqual(
+      tabs.map((tab) => tab.dataset.downtimeTab),
+      ['tracking', 'activities', 'factions', 'settings']
+    );
+    assert.deepEqual(
+      tabs.map((tab) => tab.getAttribute('tabindex')),
+      ['0', '-1', '-1', '-1']
+    );
+    assert.equal(tabs[0].getAttribute('aria-selected'), 'true');
+    assert.equal(tabs[0].getAttribute('aria-controls'), 'world-downtime-panel-tracking');
+    assert.equal(tabs[0].getAttribute('aria-label'), 'Open localized tracking preview');
+    assert.equal(
+      target.querySelector('[data-downtime-tablist]').getAttribute('aria-label'),
+      'Localized downtime sections'
+    );
+    assert.match(target.querySelector('.downtime-premium').textContent, /Localized Fabricate Premium/);
+    assert.equal(
+      tabs[0].getAttribute('aria-describedby'),
+      'world-downtime-tooltip-tracking'
+    );
+    assert.equal(
+      target.querySelector('#world-downtime-tooltip-tracking').textContent.trim(),
+      'Localized tracking tooltip'
+    );
+    assert.equal(
+      target.querySelectorAll('[role="tabpanel"][id^="world-downtime-panel-"]').length,
+      4,
+      'every tab owns a stable panel IDREF even while inactive'
+    );
+    assert.equal(
+      target.querySelector('[data-downtime-connected-studio]')?.nextElementSibling,
+      target.querySelector('[data-downtime-tablist]'),
+      'the fallback keeps the prototype connected-studio card immediately above its tabs'
+    );
+
+    tabs[0].dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+    await tick();
+    flushSync();
+    const activitiesTab = target.querySelector('[data-downtime-tab="activities"]');
+    assert.equal(document.activeElement, activitiesTab);
+    assert.equal(activitiesTab.getAttribute('aria-selected'), 'true');
+
+    activitiesTab.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true }));
+    await tick();
+    flushSync();
+    assert.equal(document.activeElement, tabs[0]);
+    assert.equal(tabs[0].getAttribute('aria-selected'), 'true');
+
+    tabs[0].dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true }));
+    await tick();
+    flushSync();
+    const settingsTab = target.querySelector('[data-downtime-tab="settings"]');
+    assert.equal(document.activeElement, settingsTab);
+    assert.equal(settingsTab.getAttribute('aria-selected'), 'true');
+
+    settingsTab.dispatchEvent(new KeyboardEvent('keydown', { key: 'Home', bubbles: true }));
+    await tick();
+    flushSync();
+    assert.equal(document.activeElement, tabs[0]);
+    assert.equal(tabs[0].getAttribute('aria-selected'), 'true');
+
+    tabs[0].dispatchEvent(new KeyboardEvent('keydown', { key: 'End', bubbles: true }));
+    await tick();
+    flushSync();
+    assert.equal(document.activeElement, settingsTab);
+    assert.equal(settingsTab.getAttribute('aria-selected'), 'true');
+    assert.ok(target.querySelector('[data-downtime-panel="settings"]'));
+    const cta = target.querySelector('.downtime-cta');
+    assert.equal(cta.href, 'https://www.patreon.com/c/mistersilver');
+    assert.equal(cta.target, '_blank');
+    assert.equal(cta.rel, 'noopener noreferrer');
+    assert.deepEqual(calls, [], 'the Core preview and tab interactions call no store write seam');
+    globalThis.game.i18n.localize = originalLocalize;
+  });
+
+  // The maintainer's own report was "all of the sub-tabs are missing": the design nests the
+  // same four previews under the rail's Downtime entry, each carrying a premium padlock, and
+  // Core rendered only the strip inside the panel. These assertions pin the rail treatment,
+  // and that BOTH triggers — a rail child and a studio-card button — drive one navigation.
+  it('nests four locked Downtime previews in the rail and drives one navigation from either trigger', async () => {
+    useShippedLocalization();
+    const calls = [];
+    mountManager(calls, {}, {}, { managerExtensions: createManagerExtensionsRegistry() });
+
+    assert.ok(
+      !target.querySelector('[data-world-downtime-submenu]'),
+      'the group stays collapsed until the route is entered, like the Travel group'
+    );
+    const parent = worldNavItem('downtime');
+    assert.equal(
+      parent.getAttribute('title'),
+      'Unlock Downtime Studio with Fabricate Premium',
+      'the rail entry carries the premium tooltip the design puts on it'
+    );
+    assert.equal(parent.getAttribute('aria-controls'), 'manager-downtime-submenu');
+    assert.equal(parent.getAttribute('aria-expanded'), 'false');
+    assert.equal(
+      parent.querySelector('[data-world-nav-premium]').textContent.trim(),
+      'PREMIUM',
+      'the premium mark is a WORD, not an icon a sighted reader loses'
+    );
+    assert.ok(
+      parent.querySelector('[data-world-nav-premium]').classList.contains('manager-nav-count'),
+      'the badge rides the count class so the collapsed 56px rail hides it with the rest'
+    );
+
+    parent.click();
+    await settleRouteExit();
+
+    assert.equal(parent.getAttribute('aria-expanded'), 'true');
+    const subitems = Array.from(target.querySelectorAll('[data-world-downtime-item]'));
+    assert.deepEqual(
+      subitems.map((item) => item.dataset.worldDowntimeItem),
+      ['tracking', 'activities', 'factions', 'settings']
+    );
+    assert.deepEqual(
+      subitems.map((item) => item.id),
+      [
+        'manager-downtime-nav-tracking',
+        'manager-downtime-nav-activities',
+        'manager-downtime-nav-factions',
+        'manager-downtime-nav-settings',
+      ]
+    );
+    assert.deepEqual(
+      subitems.map((item) => item.querySelector('.manager-nav-label').textContent.trim()),
+      ['Tracking', 'Activities', 'Factions', 'Settings']
+    );
+    assert.deepEqual(
+      subitems.map((item) => item.getAttribute('title')),
+      [
+        'Preview Downtime Tracking · Fabricate Premium',
+        'Preview Downtime Activities · Fabricate Premium',
+        'Preview Factions & Reputation · Fabricate Premium',
+        'Preview Downtime Settings · Fabricate Premium',
+      ]
+    );
+    assert.ok(
+      subitems.every((item) => Boolean(item.querySelector('[data-world-downtime-lock] .fa-lock'))),
+      'every child carries the premium padlock'
+    );
+    assert.ok(
+      subitems.every((item) => item.tagName === 'BUTTON' && !item.disabled),
+      'the padlock marks a premium preview on a WORKING control, never a disabled one'
+    );
+    assert.deepEqual(
+      subitems.map((item) => item.getAttribute('aria-current')),
+      ['true', null, null, null]
+    );
+    assert.equal(
+      target.querySelectorAll('[aria-current="page"]').length,
+      1,
+      'the route is current once — the children mark themselves within the set, not as pages'
+    );
+
+    const callout = target.querySelector('[data-world-downtime-callout]');
+    assert.match(callout.textContent, /PREMIUM PREVIEW/);
+    assert.match(
+      callout.textContent,
+      /Open any Downtime page to preview how Fabricate Premium can help you run downtime\./
+    );
+
+    const unlock = target.querySelector('[data-downtime-unlock]');
+    assert.equal(unlock.textContent.trim(), 'Unlock with Premium');
+    assert.equal(unlock.href, 'https://www.patreon.com/c/mistersilver');
+    assert.equal(unlock.target, '_blank');
+    assert.equal(unlock.rel, 'noopener noreferrer');
+    assert.equal(
+      target.querySelector('.manager-header-actions').getAttribute('aria-label'),
+      'Downtime actions',
+      'un-suppressing the actions block for this route is what makes that label reachable'
+    );
+
+    // Trigger one: the rail child.
+    target.querySelector('[data-world-downtime-item="factions"]').click();
+    await settleRouteExit();
+    assert.equal(
+      target.querySelector('[data-downtime-tab="factions"]').getAttribute('aria-selected'),
+      'true',
+      'the panel strip follows the rail'
+    );
+    assert.equal(
+      target.querySelector('[data-world-downtime-item="factions"]').getAttribute('aria-current'),
+      'true'
+    );
+    assert.ok(Boolean(target.querySelector('[data-downtime-panel="factions"]:not([hidden])')));
+
+    // Trigger two: the studio-card button, which must reach the same state.
+    target.querySelector('[data-downtime-tab="settings"]').click();
+    await settleRouteExit();
+    assert.equal(
+      target.querySelector('[data-world-downtime-item="settings"]').getAttribute('aria-current'),
+      'true',
+      'the rail follows the card — two triggers, one navigation'
+    );
+    assert.deepEqual(
+      Array.from(target.querySelectorAll('[data-world-downtime-item]')).map((item) =>
+        item.getAttribute('aria-current')
+      ),
+      [null, null, null, 'true']
+    );
+    assert.deepEqual(calls, [], 'the rail preview navigation calls no store write seam');
+  });
+
+  it('titles the Downtime route after the preview on screen, in the header and the breadcrumb', async () => {
+    useShippedLocalization();
+    mountManager([], {}, {}, { managerExtensions: createManagerExtensionsRegistry() });
+    worldNavItem('downtime').click();
+    await settleRouteExit();
+
+    const title = () => target.querySelector('.manager-header .manager-title').textContent.trim();
+    const subtitle = () =>
+      target.querySelector('.manager-header .manager-subtitle').textContent.trim();
+    const leafCrumb = () => target.querySelector('[data-breadcrumb-downtime-tab]');
+
+    assert.equal(
+      target.querySelector('[data-breadcrumb-world]').textContent.trim(),
+      'World',
+      'the crumb is Title Case: the rail micro-label is the string authored in caps, not this'
+    );
+    assert.equal(title(), 'Downtime tracking');
+    assert.equal(
+      subtitle(),
+      'Fabricate Premium · Your party-wide command board for every activity and shared project.'
+    );
+    assert.equal(leafCrumb().textContent.trim(), 'Tracking');
+    assert.equal(leafCrumb().dataset.breadcrumbDowntimeTab, 'tracking');
+
+    for (const [tabId, expectedTitle, expectedCrumb] of [
+      ['activities', 'Downtime activities', 'Activities'],
+      ['factions', 'Factions & reputation', 'Factions'],
+      ['settings', 'Downtime settings', 'Settings'],
+    ]) {
+      target.querySelector(`[data-world-downtime-item="${tabId}"]`).click();
+      await settleRouteExit();
+      assert.equal(title(), expectedTitle, `${tabId} retitles the page`);
+      assert.equal(leafCrumb().textContent.trim(), expectedCrumb, `${tabId} retitles the crumb`);
+      assert.equal(leafCrumb().dataset.breadcrumbDowntimeTab, tabId);
+      assert.match(subtitle(), /^Fabricate Premium · /, `${tabId} keeps the branded subtitle`);
+    }
+    assert.equal(
+      subtitle(),
+      'Fabricate Premium · Set campaign-wide rules that keep every activity consistent.'
+    );
+  });
+
+  it('renders every Downtime board row as thing, detail and reading, with its closing notes', async () => {
+    useShippedLocalization();
+    mountManager([], {}, {}, { managerExtensions: createManagerExtensionsRegistry() });
+    worldNavItem('downtime').click();
+    await settleRouteExit();
+
+    const panel = (tabId) => target.querySelector(`[data-downtime-panel="${tabId}"]`);
+    const rowsOf = (tabId) =>
+      Array.from(panel(tabId).querySelectorAll('[data-downtime-board-row]')).map((row) => [
+        row.querySelector('.downtime-board-row-primary').textContent.trim(),
+        row.querySelector('.downtime-board-row-secondary').textContent.trim(),
+        row.querySelector('.downtime-board-row-value').textContent.trim(),
+      ]);
+
+    assert.deepEqual(rowsOf('tracking'), [
+      ['Ilyra Vance', 'Master of Ravens', '60%'],
+      ['Rebuild the Blackfeather Tavern', 'Shared project · 3 contributors', '17 / 42 days'],
+      ['Player choice waiting', 'Work a Profession is ready to resolve', 'ACTION'],
+    ]);
+    assert.deepEqual(rowsOf('settings'), [
+      ['World time drives progress', 'Calendar advances credit active work', 'ON'],
+      ['Players may self-initiate', 'Assigned activities can begin in the player app', 'ON'],
+      ['Solo activities per character', 'Separate limit for group projects', '1'],
+    ]);
+    // U+2212 MINUS SIGN, not a hyphen — the design's own codepoint for a negative standing.
+    assert.equal(rowsOf('factions')[2][2], '−28');
+
+    assert.ok(
+      !panel('tracking').querySelector('[data-downtime-board-row] .fa-lock'),
+      'a row shows its reading, not a padlock — the board locks once, in its PREVIEW badge'
+    );
+    assert.equal(
+      panel('tracking').querySelectorAll('.downtime-board .fa-lock').length,
+      1,
+      'exactly one padlock on the board'
+    );
+
+    assert.equal(
+      panel('tracking').querySelector('[data-downtime-board-subtitle]').textContent.trim(),
+      'The Blackfeather Company · live campaign view'
+    );
+    assert.equal(
+      panel('activities').querySelector('[data-downtime-board-subtitle]').textContent.trim(),
+      'Reusable definitions · ready to assign',
+      'the board subtitle is per tab, not a single shared line'
+    );
+    assert.match(
+      panel('tracking').querySelector('[data-downtime-board-note]').textContent,
+      /With Premium, this view responds to your players’ actions, advances with world time, grants rewards and stays connected to the rest of Fabricate\./
+    );
+    assert.equal(
+      panel('tracking').querySelector('[data-downtime-cta-note]').textContent.trim(),
+      'Subscribe to unlock Downtime Studio for your campaign and download Fabricate Premium.'
+    );
+    assert.equal(
+      panel('tracking').querySelector('[data-downtime-benefits-note]').textContent.trim(),
+      'Unlock this workflow with Fabricate Premium'
+    );
+    assert.match(
+      panel('tracking').querySelector('.downtime-preview-note').textContent,
+      /Its campaign controls unlock with Fabricate Premium\./,
+      'the preview note keeps the sentence that says what unlocking gets you'
+    );
+    assert.equal(
+      panel('factions').querySelector('.downtime-hero-copy h2').textContent.trim(),
+      'Let downtime reshape the balance of power.'
+    );
+    assert.equal(
+      panel('tracking').querySelector('.downtime-benefits article p').textContent.trim(),
+      'See active, paused, pending and attention-needed work for every character at a glance.'
+    );
+
+    // The tint travels with the SLOT, not the glyph: `fa-house-chimney` is ember on
+    // Tracking and vitality on Activities, so a per-glyph rule would flatten one of them.
+    assert.deepEqual(
+      Array.from(panel('tracking').querySelectorAll('[data-downtime-board-row]')).map(
+        (row) => row.dataset.downtimeBoardRow
+      ),
+      ['tag', 'ember', 'warning']
+    );
+    assert.deepEqual(
+      Array.from(panel('activities').querySelectorAll('[data-downtime-board-row]')).map(
+        (row) => row.dataset.downtimeBoardRow
+      ),
+      ['ember', 'tag', 'vitality']
+    );
+    assert.ok(
+      Boolean(
+        panel('tracking').querySelector('.downtime-board-row-icon.is-tint-ember .fa-house-chimney')
+      ),
+      'the tint class rides the tile wrapper so the glyph inherits it'
+    );
+    assert.ok(
+      Boolean(
+        panel('activities').querySelector(
+          '.downtime-board-row-icon.is-tint-vitality .fa-house-chimney'
+        )
+      ),
+      'the same glyph carries a different tint on another tab'
+    );
+    assert.deepEqual(
+      Array.from(panel('settings').querySelectorAll('.downtime-feature-icon')).map((icon) =>
+        Array.from(icon.classList).find((name) => name.startsWith('is-tint-'))
+      ),
+      ['is-tint-accent', 'is-tint-info', 'is-tint-warning', 'is-tint-vitality']
+    );
+  });
+
+  it('updates an open Downtime host and cleans each companion mount exactly once', async () => {
+    const registry = createManagerExtensionsRegistry();
+    const cleanups = [];
+    mountManager([], {}, {}, { managerExtensions: registry });
+    worldNavItem('downtime').click();
+    await settleRouteExit();
+
+    const extension = downtimeProvider({
+      mount({ target: mountTarget, tabId }) {
+        mountTarget.textContent = `Mounted ${tabId}`;
+        return () => cleanups.push(tabId);
+      },
+    });
+    const unregister = registry.publicApi.registerWorldNavProvider(extension);
+    await tick();
+    await tick();
+    flushSync();
+    assert.ok(target.textContent.includes('Companion tracking'), target.innerHTML);
+    assert.match(
+      target.querySelector('[data-downtime-extension-panel]').textContent,
+      /Mounted tracking/
+    );
+    assert.ok(
+      !target.querySelector('.downtime-tab-lock'),
+      'an installed companion never inherits the Core fallback lock treatment'
+    );
+
+    target.querySelector('[data-downtime-tab="activities"]').click();
+    await tick();
+    flushSync();
+    assert.deepEqual(cleanups, ['tracking']);
+    assert.match(
+      target.querySelector('[data-downtime-extension-panel]').textContent,
+      /Mounted activities/
+    );
+
+    const mountedPanel = target.querySelector('[data-downtime-extension-panel="activities"]');
+    mountedPanel.focus();
+    assert.equal(document.activeElement, mountedPanel, 'the companion panel owns focus before removal');
+    unregister();
+    await settleDowntimeProvider();
+    assert.deepEqual(cleanups, ['tracking', 'activities']);
+    assert.ok(target.querySelector('[data-downtime-panel="activities"]'));
+    assert.equal(
+      document.activeElement,
+      target.querySelector('[data-downtime-tab="activities"]'),
+      'provider removal returns a focused companion panel to its active Core tab'
+    );
+  });
+
+  // Issue 1185 — where the premium signal LIVES. In the free module the title bar's badge
+  // slot is empty and the rail chip is the loud gold sell; once a companion registers, the
+  // loud signal moves to the title bar and the rail chip steps down to a quiet marker, so
+  // the same word is only ever shouted in one place.
+  it('moves the premium signal to the title bar when a companion registers', async () => {
+    useShippedLocalization();
+    const registry = createManagerExtensionsRegistry();
+    mountManager([], {}, {}, { managerExtensions: registry });
+
+    const titlebarPremium = () => target.querySelector('[data-manager-titlebar-premium]');
+    const railChip = () => target.querySelector('[data-world-nav-premium]');
+    const downtimeTitle = () => worldNavItem('downtime').getAttribute('title');
+
+    assert.ok(!titlebarPremium(), 'the free module carries no premium badge in the title bar');
+    assert.ok(
+      !target.querySelector('[data-manager-titlebar-system]'),
+      'and the crafting-system badge the rail already duplicates is gone from both states'
+    );
+    assert.equal(railChip().dataset.worldNavPremiumState, 'preview');
+    assert.ok(
+      !railChip().classList.contains('is-installed'),
+      'the rail chip keeps its prominent treatment while Core is previewing the surface'
+    );
+    assert.equal(downtimeTitle(), 'Unlock Downtime Studio with Fabricate Premium');
+
+    const unregister = registry.publicApi.registerWorldNavProvider(downtimeProvider());
+    await settleDowntimeProvider();
+
+    assert.equal(titlebarPremium().textContent.trim(), 'PREMIUM');
+    assert.equal(
+      titlebarPremium().getAttribute('aria-label'),
+      'Fabricate Premium is installed and connected'
+    );
+    assert.equal(
+      titlebarPremium().getAttribute('title'),
+      'Fabricate Premium is installed and connected'
+    );
+    assert.ok(
+      titlebarPremium().classList.contains('manager-titlebar-badge'),
+      'the badge reuses the shared gold treatment rather than stating a second colour pair'
+    );
+    assert.equal(railChip().dataset.worldNavPremiumState, 'installed');
+    assert.ok(railChip().classList.contains('is-installed'), 'and the rail chip mutes');
+    assert.equal(
+      railChip().textContent.trim(),
+      'PREMIUM',
+      'muted is not removed: the rail still names which route premium provides'
+    );
+    assert.equal(
+      downtimeTitle(),
+      'Downtime Studio is unlocked by Fabricate Premium',
+      'and the row stops offering to unlock what is already unlocked'
+    );
+
+    unregister();
+    await settleDowntimeProvider();
+    assert.ok(!titlebarPremium(), 'removing the companion takes the title-bar signal with it');
+    assert.equal(railChip().dataset.worldNavPremiumState, 'preview');
+    assert.equal(downtimeTitle(), 'Unlock Downtime Studio with Fabricate Premium');
+  });
+
+  // The badge is a claim about the MODULE, not about Core's Downtime route. A companion that
+  // claims a surface Core has never heard of is still installed and still working, so it must
+  // light the same badge — while Core, which still owns Downtime, keeps selling it there.
+  it('lights the title-bar premium badge for a surface Core does not host', async () => {
+    useShippedLocalization();
+    const registry = createManagerExtensionsRegistry();
+    mountManager([], {}, {}, { managerExtensions: registry });
+
+    registry.publicApi.registerWorldNavProvider(downtimeProvider({ id: 'crew-quarters' }));
+    await settleDowntimeProvider();
+
+    assert.equal(
+      target.querySelector('[data-manager-titlebar-premium]')?.textContent.trim(),
+      'PREMIUM',
+      'an unrecognised companion surface still proves the premium module is installed'
+    );
+    assert.equal(
+      target.querySelector('[data-world-nav-premium]').dataset.worldNavPremiumState,
+      'preview',
+      'but Core still holds the Downtime route, so its rail chip keeps the upgrade sell'
+    );
+    assert.equal(
+      worldNavItem('downtime').getAttribute('title'),
+      'Unlock Downtime Studio with Fabricate Premium',
+      'and the Downtime tooltip still describes the route it actually renders'
+    );
+  });
+
+  it('contains mount faults, rejects invalid cleanup returns, and recovers with replacement tabs', async () => {
+    const registry = createManagerExtensionsRegistry();
+    const errors = [];
+    const originalError = console.error;
+    console.error = (...args) => errors.push(args);
+    try {
+      mountManager([], {}, {}, { managerExtensions: registry });
+      worldNavItem('downtime').click();
+      await settleRouteExit();
+
+      const unregisterBroken = registry.publicApi.registerWorldNavProvider(
+        downtimeProvider({
+          prefix: 'Broken',
+          mount({ target: mountTarget }) {
+            mountTarget.textContent = 'partial broken content';
+            throw new Error('mount exploded');
+          },
+        })
+      );
+      await settleDowntimeProvider();
+      assert.ok(target.querySelector('[data-downtime-panel="tracking"]'));
+      assert.ok(!target.textContent.includes('Broken tracking'));
+      assert.ok(!target.textContent.includes('partial broken content'));
+
+      unregisterBroken();
+      const unregisterInvalid = registry.publicApi.registerWorldNavProvider(
+        downtimeProvider({
+          prefix: 'Invalid',
+          mount({ target: mountTarget }) {
+            mountTarget.textContent = 'partial invalid content';
+            return { dispose: true };
+          },
+        })
+      );
+      await settleDowntimeProvider();
+      assert.ok(target.querySelector('[data-downtime-panel="tracking"]'));
+      assert.ok(!target.textContent.includes('Invalid tracking'));
+      assert.ok(!target.textContent.includes('partial invalid content'));
+
+      unregisterInvalid();
+      registry.publicApi.registerWorldNavProvider(
+        downtimeProvider({
+          prefix: 'Recovered',
+          coreFallback: true,
+          mount({ target: mountTarget, tabId }) {
+            mountTarget.textContent = `Recovered ${tabId}`;
+          },
+        })
+      );
+      await settleDowntimeProvider();
+      assert.match(target.textContent, /Recovered tracking/);
+      assert.match(target.textContent, /Recovered activities/);
+      assert.ok(
+        !target.querySelector('.downtime-tab-lock'),
+        'a companion cannot opt into Core-only fallback behavior with coreFallback'
+      );
+      assert.equal(errors.length, 2);
+      assert.match(errors[0][0], /provider mount failed/);
+      assert.match(errors[1][0], /provider mount failed/);
+    } finally {
+      console.error = originalError;
+    }
+  });
+
+  it('continues to fallback after a cleanup throws and reports the fault once', async () => {
+    const registry = createManagerExtensionsRegistry();
+    const errors = [];
+    const originalError = console.error;
+    console.error = (...args) => errors.push(args);
+    try {
+      mountManager([], {}, {}, { managerExtensions: registry });
+      worldNavItem('downtime').click();
+      await settleRouteExit();
+      const unregister = registry.publicApi.registerWorldNavProvider(
+        downtimeProvider({
+          mount: () => () => {
+            throw new Error('cleanup exploded');
+          },
+        })
+      );
+      await settleDowntimeProvider();
+
+      unregister();
+      await settleDowntimeProvider();
+      assert.ok(target.querySelector('[data-downtime-panel="tracking"]'));
+      assert.equal(errors.length, 1, 'cleanup is attempted and reported exactly once');
+      assert.match(errors[0][0], /provider cleanup failed/);
+    } finally {
+      console.error = originalError;
+    }
+  });
+
+  it('runs companion cleanup while its target is connected on route exit and manager destruction', async () => {
+    const registry = createManagerExtensionsRegistry();
+    const cleanupConnections = [];
+    registry.publicApi.registerWorldNavProvider(
+      downtimeProvider({
+        mount: ({ target: mountTarget }) => () => cleanupConnections.push(mountTarget.isConnected),
+      })
+    );
+    mountManager([], {}, {}, { managerExtensions: registry });
+    worldNavItem('downtime').click();
+    await settleRouteExit();
+
+    worldNavItem('parties').click();
+    await settleRouteExit();
+    assert.deepEqual(cleanupConnections, [true], 'route exit cleans before removing the target');
+
+    worldNavItem('downtime').click();
+    await settleRouteExit();
+    mounted.disposeDowntimeProviderBeforeRemoval();
+    unmount(mounted);
+    mounted = null;
+    assert.deepEqual(
+      cleanupConnections,
+      [true, true],
+      'manager destruction cleans exactly once while the target remains connected'
+    );
+  });
+
+  it('renders a provider-declared tab set of any size in the rail and the tab strip', async () => {
+    const registry = createManagerExtensionsRegistry();
+    registry.publicApi.registerWorldNavProvider(
+      downtimeProvider({ prefix: 'Guild', ids: ['ledger', 'crew'] })
+    );
+    mountManager([], {}, {}, { managerExtensions: registry });
+    worldNavItem('downtime').click();
+    await settleRouteExit();
+
+    assert.deepEqual(
+      downtimeTabIds(),
+      ['ledger', 'crew'],
+      'the tab strip renders the provider set, in the provider order'
+    );
+    assert.deepEqual(
+      downtimeRailIds(),
+      ['ledger', 'crew'],
+      'the rail renders the same set from the same list — one navigation, two triggers'
+    );
+    assert.deepEqual(
+      Array.from(target.querySelectorAll('[data-world-downtime-item] .manager-nav-label')).map(
+        (label) => label.textContent.trim()
+      ),
+      ['Guild ledger', 'Guild crew'],
+      'a companion label is already localized and is NOT run through Core lang resolution'
+    );
+    assert.equal(
+      activeCompanionPanel().dataset.downtimeExtensionPanel,
+      'ledger',
+      'an initial tab the provider does not declare falls back to its first tab, not an empty panel'
+    );
+    assert.ok(
+      !target.querySelector('[data-world-downtime-lock]'),
+      'nothing is padlocked when a companion owns the surface'
+    );
+    assert.ok(
+      !target.querySelector('[data-world-downtime-callout]'),
+      'the premium rail note advertises CORE preview and must not sit under companion screens'
+    );
+
+    target.querySelector('#manager-downtime-nav-crew').click();
+    await settleRouteExit();
+    assert.equal(
+      activeCompanionPanel().dataset.downtimeExtensionPanel,
+      'crew',
+      'the rail child still drives the provider tab it names'
+    );
+  });
+
+  it('dresses the route in per-tab provider chrome and provider header actions', async () => {
+    const registry = createManagerExtensionsRegistry();
+    const selected = [];
+    registry.publicApi.registerWorldNavProvider(
+      downtimeProvider({
+        prefix: 'Guild',
+        ids: ['ledger', 'crew'],
+        tab: (id) => ({
+          title: `${id} title`,
+          subtitle: `${id} subtitle`,
+          breadcrumb: `${id} crumb`,
+          actionsLabel: `${id} actions`,
+          actions:
+            id === 'ledger'
+              ? [
+                  {
+                    id: 'post',
+                    label: 'Post entry',
+                    icon: 'fas fa-pen',
+                    primary: true,
+                    onSelect: (context) => selected.push(context),
+                  },
+                ]
+              : [{ id: 'guide', label: 'Guild guide', href: 'https://example.test/guide' }],
+        }),
+      })
+    );
+    mountManager([], {}, {}, { managerExtensions: registry });
+    worldNavItem('downtime').click();
+    await settleRouteExit();
+
+    assert.equal(managerTitle(), 'ledger title');
+    assert.equal(managerSubtitle(), 'ledger subtitle');
+    assert.equal(
+      target.querySelector('[data-breadcrumb-downtime-tab]').textContent.trim(),
+      'ledger crumb',
+      'the leaf crumb names the tab, so it belongs to whoever owns the tab'
+    );
+    assert.equal(
+      target.querySelector('.manager-header-actions').getAttribute('aria-label'),
+      'ledger actions'
+    );
+    assert.ok(
+      !target.querySelector('[data-downtime-unlock]'),
+      'the Unlock with Premium pill is Core copy about Core, never shown over companion screens'
+    );
+
+    const post = target.querySelector('[data-manager-header-action="post"]');
+    assert.equal(post.tagName, 'BUTTON');
+    assert.ok(post.classList.contains('is-primary'));
+    assert.ok(Boolean(post.querySelector('.fa-pen')), 'an action renders its own icon');
+    post.click();
+    assert.equal(selected.length, 1, 'onSelect runs on click');
+    assert.equal(selected[0].actionId, 'post');
+    assert.equal(selected[0].tabId, 'ledger', 'an action is told which tab invoked it');
+
+    target.querySelector('[data-downtime-tab="crew"]').click();
+    await settleDowntimeProvider();
+    assert.equal(managerTitle(), 'crew title', 'chrome is per tab, and follows the tab strip');
+    assert.equal(managerSubtitle(), 'crew subtitle');
+    const guide = target.querySelector('[data-manager-header-action="guide"]');
+    assert.equal(guide.tagName, 'A');
+    assert.equal(guide.getAttribute('href'), 'https://example.test/guide');
+    assert.equal(guide.getAttribute('target'), '_blank');
+    assert.equal(guide.getAttribute('rel'), 'noopener noreferrer');
+    assert.ok(
+      !target.querySelector('[data-manager-header-action="post"]'),
+      'the previous tab actions are replaced, not accumulated'
+    );
+  });
+
+  it('re-points the route when a provider re-registers with a different tab set', async () => {
+    useShippedLocalization();
+    const registry = createManagerExtensionsRegistry();
+    const unregisterFirst = registry.publicApi.registerWorldNavProvider(
+      downtimeProvider({ prefix: 'First', ids: ['alpha', 'beta'] })
+    );
+    mountManager([], {}, {}, { managerExtensions: registry });
+    worldNavItem('downtime').click();
+    await settleRouteExit();
+    target.querySelector('[data-downtime-tab="beta"]').click();
+    await settleDowntimeProvider();
+    assert.equal(activeCompanionPanel().dataset.downtimeExtensionPanel, 'beta');
+
+    unregisterFirst();
+    registry.publicApi.registerWorldNavProvider(
+      downtimeProvider({ prefix: 'Second', ids: ['gamma', 'delta', 'epsilon'] })
+    );
+    await settleDowntimeProvider();
+    assert.deepEqual(downtimeTabIds(), ['gamma', 'delta', 'epsilon']);
+    assert.deepEqual(downtimeRailIds(), ['gamma', 'delta', 'epsilon']);
+    assert.equal(
+      activeCompanionPanel().dataset.downtimeExtensionPanel,
+      'gamma',
+      'an active tab the new set drops falls back to the first tab rather than rendering nothing'
+    );
+    assert.equal(
+      managerTitle(),
+      shippedString('FABRICATE.Admin.Manager.World.Downtime.Title'),
+      'a replacement that declares no chrome gets Core naming the ROUTE, never the old tab'
+    );
+    assert.equal(
+      managerSubtitle(),
+      '',
+      'Core preview marketing copy never sits under a companion screen that declared none'
+    );
+  });
+
+  it('restores Core preview parity when the last provider is removed', async () => {
+    useShippedLocalization();
+    const registry = createManagerExtensionsRegistry();
+    const unregisterProvider = registry.publicApi.registerWorldNavProvider(
+      downtimeProvider({ prefix: 'Guild', ids: ['ledger', 'crew'] })
+    );
+    mountManager([], {}, {}, { managerExtensions: registry });
+    worldNavItem('downtime').click();
+    await settleRouteExit();
+    assert.deepEqual(downtimeTabIds(), ['ledger', 'crew']);
+
+    unregisterProvider();
+    await settleDowntimeProvider();
+    assert.deepEqual(downtimeTabIds(), ['tracking', 'activities', 'factions', 'settings']);
+    assert.deepEqual(downtimeRailIds(), ['tracking', 'activities', 'factions', 'settings']);
+    assert.equal(
+      target.querySelector('[data-downtime-panel]:not([hidden])').dataset.downtimePanel,
+      'tracking'
+    );
+    assert.equal(
+      managerTitle(),
+      shippedString('FABRICATE.Admin.Manager.World.Downtime.Preview.Tracking.Title')
+    );
+    assert.equal(
+      managerSubtitle(),
+      shippedString('FABRICATE.Admin.Manager.World.Downtime.Preview.Tracking.Subtitle')
+    );
+    assert.equal(
+      target.querySelector('[data-breadcrumb-downtime-tab]').textContent.trim(),
+      shippedString('FABRICATE.Admin.Manager.World.Downtime.Tabs.Tracking.Label')
+    );
+    assert.equal(
+      target.querySelector('.manager-header-actions').getAttribute('aria-label'),
+      shippedString('FABRICATE.Admin.Manager.World.Downtime.Actions')
+    );
+    assert.ok(
+      Boolean(target.querySelector('[data-downtime-unlock]')),
+      'Core reclaims its own Unlock with Premium action'
+    );
+    assert.equal(
+      target.querySelectorAll('[data-world-downtime-lock] .fa-lock').length,
+      4,
+      'every Core rail child is padlocked again'
+    );
+    assert.ok(Boolean(target.querySelector('[data-world-downtime-callout]')));
+  });
+
+  it('supplies a frozen mount context and remounts when a companion requests it', async () => {
+    const registry = createManagerExtensionsRegistry();
+    const contexts = [];
+    registry.publicApi.registerWorldNavProvider(
+      downtimeProvider({
+        ids: ['board'],
+        mount: ({ context }) => {
+          contexts.push(context);
+        },
+      })
+    );
+    globalThis.game.user = { isGM: true };
+    try {
+      mountManager([], {}, {}, { managerExtensions: registry });
+      worldNavItem('downtime').click();
+      await settleRouteExit();
+
+      assert.equal(contexts.length, 1);
+      const [context] = contexts;
+      assert.ok(Object.isFrozen(context), 'the context is frozen, so it cannot be written back');
+      assert.deepEqual(Object.keys(context).sort(), [
+        'craftingSystemId',
+        'isGM',
+        'requestRemount',
+        'revision',
+        'route',
+        'schemaVersion',
+        'surface',
+        'surfaceId',
+        'tabId',
+      ]);
+      assert.equal(context.schemaVersion, 1);
+      assert.equal(context.surface, 'manager');
+      assert.equal(context.surfaceId, 'downtime');
+      assert.equal(context.route, 'world-downtime');
+      assert.equal(context.tabId, 'board');
+      assert.equal(context.craftingSystemId, 'alchemy');
+      assert.equal(context.isGM, true);
+      assert.equal(context.revision, 0);
+
+      context.requestRemount();
+      await settleDowntimeProvider();
+      assert.equal(contexts.length, 2, 'requestRemount re-runs mount for the active tab');
+      assert.equal(contexts[1].revision, 1);
+      assert.notEqual(contexts[1], context, 'each mount receives a fresh frozen context');
+    } finally {
+      delete globalThis.game.user;
+    }
+  });
+
+  it('reports a null crafting system on the Downtime route when none is selected', async () => {
+    const registry = createManagerExtensionsRegistry();
+    const contexts = [];
+    registry.publicApi.registerWorldNavProvider(
+      downtimeProvider({
+        ids: ['board'],
+        mount: ({ context }) => {
+          contexts.push(context);
+        },
+      })
+    );
+    mountManager([], { noSystems: true }, {}, { managerExtensions: registry });
+    worldNavItem('downtime').click();
+    await settleRouteExit();
+
+    assert.equal(contexts.length, 1, 'the route stays reachable with no crafting system selected');
+    assert.equal(contexts[0].craftingSystemId, null);
+    assert.equal(contexts[0].isGM, false, 'isGM reads the live Foundry user, defaulting closed');
+  });
+
+  it('publishes observational route hooks for mount, tab change and unmount', async () => {
+    const hooks = [];
+    const registry = createManagerExtensionsRegistry({
+      emitHook: (name, payload) => hooks.push([name, payload]),
+    });
+    mountManager([], {}, {}, { managerExtensions: registry });
+    worldNavItem('downtime').click();
+    await settleRouteExit();
+
+    assert.deepEqual(hooks.map(([name]) => name), [MANAGER_HOOKS.SURFACE_MOUNTED]);
+    assert.deepEqual(hooks[0][1], {
+      schemaVersion: 1,
+      surfaceId: 'downtime',
+      route: 'world-downtime',
+      tabId: 'tracking',
+      providerId: null,
+      coreFallback: true,
+    });
+
+    target.querySelector('[data-downtime-tab="factions"]').click();
+    await settleDowntimeProvider();
+    assert.equal(hooks[1][0], MANAGER_HOOKS.SURFACE_TAB_CHANGED);
+    assert.equal(hooks[1][1].previousTabId, 'tracking');
+    assert.equal(hooks[1][1].tabId, 'factions');
+
+    const unregister = registry.publicApi.registerWorldNavProvider(
+      downtimeProvider({ ids: ['factions', 'ledger'] })
+    );
+    await settleDowntimeProvider();
+    assert.deepEqual(
+      hooks.slice(2).map(([name]) => name),
+      [MANAGER_HOOKS.NAV_PROVIDER_REGISTERED],
+      'adopting a provider that still declares the active tab moves no tab'
+    );
+
+    unregister();
+    await settleDowntimeProvider();
+    worldNavItem('parties').click();
+    await settleRouteExit();
+    const unmountEvent = hooks.find(([name]) => name === MANAGER_HOOKS.SURFACE_UNMOUNTED);
+    assert.ok(Boolean(unmountEvent), 'leaving the route publishes the unmount hook');
+    assert.equal(unmountEvent[1].tabId, 'factions');
+    assert.equal(unmountEvent[1].coreFallback, true);
   });
 
   it('places permanent World navigation after every selected-system entry, including Graph', () => {
@@ -18756,7 +19866,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     if (kind === 'task') await openDirtyGatheringTaskEditor(calls, storeOptions);
     else await openDirtyGatheringEventEditor(calls, storeOptions);
 
-    if (destination !== 'parties') {
+    if (!['parties', 'downtime'].includes(destination)) {
       target.querySelector('#manager-travel-toggle').click();
       await tick();
       flushSync();
@@ -18769,7 +19879,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     }
 
     const activateDestination = async () => {
-      (destination === 'parties'
+      (['parties', 'downtime'].includes(destination)
         ? worldNavItem(destination)
         : systemTravelItem(destination)
       ).click();
@@ -18779,8 +19889,10 @@ describe('CraftingSystemManager mounted behavior', () => {
     else await activateDestination();
 
     const expectedView = outcome.proceeds
-      ? destination === 'parties'
-        ? 'world'
+      ? ['parties', 'downtime'].includes(destination)
+        ? destination === 'downtime'
+          ? 'world-downtime'
+          : 'world'
         : 'environments'
       : `gathering-${kind}-edit`;
     assert.equal(
@@ -18789,7 +19901,7 @@ describe('CraftingSystemManager mounted behavior', () => {
       `${kind} ${outcome.name} should ${outcome.proceeds ? '' : 'not '}leave the editor; rendered: ${JSON.stringify(Array.from(target.querySelectorAll('.fabricate-manager')).map((node) => node.dataset.managerView))}; calls: ${JSON.stringify(calls)}`
     );
     assert.equal(
-      (destination === 'parties'
+      (['parties', 'downtime'].includes(destination)
         ? worldNavItem(destination)
         : systemTravelItem(destination)
       ).getAttribute('aria-current'),
@@ -18808,7 +19920,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     );
   }
 
-  it('guards dirty gathering task and event exits through World Parties and a Travel child', async () => {
+  it('guards dirty gathering task and event exits through World Parties, Downtime, and a Travel child', async () => {
     const outcomes = [
       { name: 'cancel', action: 'cancel', proceeds: false },
       { name: 'save false', action: 'save', saveResult: false, proceeds: false },
@@ -18817,7 +19929,7 @@ describe('CraftingSystemManager mounted behavior', () => {
       { name: 'discard', action: 'discard', proceeds: true },
     ];
 
-    for (const destination of ['parties', 'realms']) {
+    for (const destination of ['parties', 'downtime', 'realms']) {
       for (const kind of ['task', 'event']) {
         for (const outcome of outcomes) {
           await attemptDirtyGatheringWorldExit(kind, outcome, destination);
@@ -20339,5 +21451,309 @@ describe('CraftingSystemManager mounted behavior', () => {
         );
       });
     }
+  });
+
+  // ── Rail group expand / collapse (issue 1185) ──────────────────────────────────────────
+  //
+  // The maintainer's report was that the rail's disclosure groups "sometimes refuse to
+  // minimize". "Sometimes" was two defects wearing one face, and both are behavioural rather
+  // than visual, so every case below drives the real controls and reads the rendered rail:
+  //
+  //   * four groups ran an auto-open effect that READ ITS OWN FLAG to guard itself, so a
+  //     collapse changed the effect's own dependency, re-ran it, passed the now-false guard
+  //     and forced the group straight back open;
+  //   * Crafting had the mirror defect — `craftingMenuExpanded = isCraftingRoute` never read
+  //     its own flag, so a collapse stuck, but LEAVING the category force-closed a group the
+  //     GM had deliberately opened.
+  //
+  // The rule these pin is the maintainer's: every group collapses in any state, whatever the
+  // others are doing, EXCEPT while one of its own rail sub-items is the current view.
+  describe('rail group expansion is independent, sticky, and locked only by an active sub-tab', () => {
+    // The five groups, each with the disclosure that opens it, the submenu that proves it is
+    // open, and the navigation that lands on one of its own sub-items. Written once so a case
+    // asserts "every group", not "the four I remembered" — the Downtime group in particular is
+    // provider-driven, and nothing in the rule may key off a tab id.
+    const RAIL_GROUPS = [
+      {
+        id: 'crafting',
+        label: 'Crafting',
+        toggle: '#manager-nav-crafting + .manager-nav-toggle',
+        submenu: '#manager-crafting-submenu',
+        childView: 'recipes',
+        enterChild: () => navButton('Crafting').click(),
+      },
+      {
+        id: 'checks',
+        label: 'Checks',
+        toggle: '#manager-nav-checks + .manager-nav-toggle',
+        submenu: '#manager-checks-submenu',
+        childView: 'checks-crafting',
+        enterChild: () => navButton('Checks').click(),
+      },
+      {
+        id: 'gathering',
+        label: 'Gathering',
+        toggle: '#manager-nav-gathering + .manager-nav-toggle',
+        submenu: '#manager-gathering-submenu',
+        childView: 'environments',
+        enterChild: () => navButton('Gathering').click(),
+      },
+      {
+        id: 'systemTravel',
+        label: 'Travel',
+        toggle: '#manager-travel-toggle',
+        submenu: '#manager-travel-submenu',
+        childView: 'environments',
+        enterChild: () => systemTravelItem('travel').click(),
+      },
+      {
+        id: 'worldDowntime',
+        label: 'Downtime',
+        toggle: '#manager-downtime-toggle',
+        submenu: '#manager-downtime-submenu',
+        childView: 'world-downtime',
+        enterChild: () => worldNavItem('downtime').click(),
+      },
+    ];
+
+    // Every rail navigation here passes `confirmRouteExit`, which is promise-shaped on some
+    // branches, so a bare `tick()` would let "the group stayed open" pass for a route change
+    // that simply had not landed yet.
+    async function settleRail() {
+      for (let index = 0; index < 8; index += 1) await Promise.resolve();
+      await tick();
+      flushSync();
+    }
+
+    function railToggle(group) {
+      const toggle = target.querySelector(group.toggle);
+      assert.ok(Boolean(toggle), `the ${group.label} group should render a disclosure control`);
+      return toggle;
+    }
+
+    function isExpanded(group) {
+      return Boolean(target.querySelector(group.submenu));
+    }
+
+    function expandedGroupIds() {
+      return RAIL_GROUPS.filter(isExpanded).map((group) => group.id);
+    }
+
+    function currentManagerView() {
+      return target.querySelector('.fabricate-manager').dataset.managerView;
+    }
+
+    function mountRail(rootProps = {}) {
+      mountManager([], { gatheringRealmsEnabled: true }, {}, rootProps);
+      assert.equal(currentManagerView(), 'systems', 'the rail starts on a route inside no group');
+      assert.deepEqual(expandedGroupIds(), [], 'and with every group collapsed');
+    }
+
+    it('collapses any group while the others stay expanded, and the collapse sticks', async () => {
+      mountRail();
+
+      for (const group of RAIL_GROUPS) {
+        railToggle(group).click();
+        await settleRail();
+      }
+      assert.deepEqual(
+        expandedGroupIds(),
+        RAIL_GROUPS.map((group) => group.id),
+        'all five open together — the groups are independent, not an accordion'
+      );
+
+      for (const group of RAIL_GROUPS) {
+        railToggle(group).click();
+        await settleRail();
+        // A second settle: the re-assert loop closed and reopened the group within one flush,
+        // so an assertion taken immediately after the click could read the intermediate state.
+        await settleRail();
+        assert.deepEqual(
+          expandedGroupIds(),
+          RAIL_GROUPS.filter((other) => other !== group).map((other) => other.id),
+          `${group.label} collapses while its four expanded siblings are untouched`
+        );
+        railToggle(group).click();
+        await settleRail();
+        assert.ok(isExpanded(group), `${group.label} re-opens from the same control`);
+      }
+
+      // The Tool Studio is the case a route-derived force got wrong on a route that is not
+      // even the group's own: `|| isToolStudioRoute` pinned Crafting open on a screen the
+      // Crafting submenu does not offer, and left that chevron inert. Entering it still opens
+      // the group — its breadcrumb reads "<system> › Crafting › Tools" — but as intent, so the
+      // disclosure keeps working.
+      const crafting = RAIL_GROUPS[0];
+      railToggle(crafting).click();
+      await settleRail();
+      assert.ok(!isExpanded(crafting), 'pre-condition: Crafting is collapsed before Tools opens');
+
+      navButton('Tools').click();
+      await settleRail();
+      assert.equal(currentManagerView(), 'tools');
+      assert.ok(isExpanded(crafting), 'the Tool Studio opens the Crafting group it sits under');
+      assert.equal(
+        railToggle(crafting).disabled,
+        false,
+        'Tools is not a Crafting sub-item, so it must not lock the group'
+      );
+      railToggle(crafting).click();
+      await settleRail();
+      await settleRail();
+      assert.ok(!isExpanded(crafting), 'and the group collapses over the Tool Studio');
+    });
+
+    it('locks a group open while one of its own sub-items is the current view, and says why', async () => {
+      useShippedLocalization();
+      mountRail();
+
+      for (const group of RAIL_GROUPS) {
+        group.enterChild();
+        await settleRail();
+        assert.equal(currentManagerView(), group.childView, `${group.label} routed to its child`);
+
+        const toggle = railToggle(group);
+        assert.equal(toggle.disabled, true, `${group.label} reports its disclosure as disabled`);
+        assert.equal(toggle.getAttribute('aria-disabled'), 'true');
+        assert.equal(
+          toggle.getAttribute('title'),
+          'This section stays open while you are on one of its pages.',
+          'the control explains the constraint rather than silently swallowing the click'
+        );
+
+        toggle.click();
+        await settleRail();
+        assert.ok(isExpanded(group), `${group.label} does not collapse out from under its view`);
+
+        for (const other of RAIL_GROUPS.filter((candidate) => candidate !== group)) {
+          const otherToggle = railToggle(other);
+          assert.equal(
+            otherToggle.disabled,
+            false,
+            `${other.label} stays collapsible while ${group.label} is locked`
+          );
+          assert.equal(otherToggle.getAttribute('title'), null);
+        }
+      }
+    });
+
+    it('leaves a group exactly as the GM left it when the route moves elsewhere', async () => {
+      mountRail();
+      const checks = RAIL_GROUPS[1];
+
+      // Left EXPANDED. Entering a sub-item records the intent as well as taking the lock, so
+      // the group the GM opened by walking into it survives walking back out.
+      navButton('Checks').click();
+      await settleRail();
+      assert.equal(currentManagerView(), 'checks-crafting');
+      assert.ok(isExpanded(checks));
+
+      navButton('Components').click();
+      await settleRail();
+      assert.equal(currentManagerView(), 'components');
+      assert.ok(isExpanded(checks), 'leaving a group does not slam it shut behind the GM');
+      assert.equal(
+        railToggle(checks).disabled,
+        false,
+        'and the disclosure is live again the moment the lock releases'
+      );
+
+      // Left COLLAPSED. The same group, collapsed off-route, is still collapsed after a move —
+      // the direction `craftingMenuExpanded = isCraftingRoute` used to get right and the four
+      // re-asserting effects used to get wrong.
+      railToggle(checks).click();
+      await settleRail();
+      assert.ok(!isExpanded(checks));
+
+      navButton('Tags & Categories').click();
+      await settleRail();
+      assert.equal(currentManagerView(), 'tags');
+      assert.ok(!isExpanded(checks), 'a collapse survives navigation too');
+    });
+
+    // An editor detail route belongs to the group whose sub-item opened it: `recipe-edit` is
+    // reached from Recipes and is read as part of Recipes, so it locks Crafting exactly as a
+    // rendered rail entry does. That makes all five groups uniform — Gathering already locked
+    // throughout `environment-edit` / `gathering-task-edit` / `gathering-event-edit`, and
+    // Crafting and Checks were the outliers that released the group when an editor opened.
+    //
+    // The tail then walks the auto-open effect: leaving the editor re-enters `recipes` by
+    // assigning `activeView`, a route into the group that writes no expansion intent of its
+    // own, so without that effect the group would snap shut on the NEXT navigation away.
+    it('stays locked inside its own editor detail route, and outlives the lock on return', async () => {
+      await openRecipeEditor([]);
+      assert.equal(currentManagerView(), 'recipe-edit');
+
+      const crafting = RAIL_GROUPS[0];
+      assert.ok(isExpanded(crafting), 'the editor inherits the group opened by Recipes');
+      assert.equal(
+        railToggle(crafting).disabled,
+        true,
+        'an editor detail route is a sub-tab, so it locks its own group open'
+      );
+      railToggle(crafting).click();
+      await settleRail();
+      await settleRail();
+      assert.ok(isExpanded(crafting), 'and the locked group does not collapse over the editor');
+
+      const back = Array.from(target.querySelectorAll('.manager-header-actions button')).find(
+        (button) => button.textContent.includes('Back to recipes')
+      );
+      assert.ok(Boolean(back), 'the recipe editor offers Back to recipes');
+      back.click();
+      await settleRail();
+      assert.equal(currentManagerView(), 'recipes');
+      assert.ok(isExpanded(crafting), 'entering a sub-item keeps its group open');
+
+      navButton('Components').click();
+      await settleRail();
+      assert.equal(currentManagerView(), 'components');
+      assert.ok(
+        isExpanded(crafting),
+        'and records the intent, so the group outlives the lock releasing'
+      );
+    });
+
+    // The Downtime group's children come from whichever provider holds the surface, so its
+    // collapse behaviour must be identical for a companion's tab set and for Core's four.
+    it('gives a provider-supplied Downtime tab set the same collapse behaviour as Core', async () => {
+      const registry = createManagerExtensionsRegistry();
+      registry.publicApi.registerWorldNavProvider(
+        downtimeProvider({ prefix: 'Guild', ids: ['ledger', 'crew', 'writs'] })
+      );
+      mountRail({ managerExtensions: registry });
+      const downtime = RAIL_GROUPS[4];
+
+      railToggle(downtime).click();
+      await settleRail();
+      assert.deepEqual(
+        downtimeRailIds(),
+        ['ledger', 'crew', 'writs'],
+        'the rail renders the provider set, not Core preview tabs'
+      );
+      railToggle(downtime).click();
+      await settleRail();
+      await settleRail();
+      assert.ok(!isExpanded(downtime), 'a provider-driven group collapses like any other');
+
+      worldNavItem('downtime').click();
+      await settleRail();
+      assert.equal(currentManagerView(), 'world-downtime');
+      assert.equal(
+        railToggle(downtime).disabled,
+        true,
+        'and locks open on its own route exactly as Core does'
+      );
+
+      worldNavItem('parties').click();
+      await settleRail();
+      assert.equal(currentManagerView(), 'world');
+      assert.ok(isExpanded(downtime), 'leaving it does not close it');
+      assert.equal(railToggle(downtime).disabled, false);
+      railToggle(downtime).click();
+      await settleRail();
+      await settleRail();
+      assert.ok(!isExpanded(downtime), 'and the collapse sticks off-route');
+    });
   });
 });

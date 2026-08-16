@@ -3510,6 +3510,264 @@ export const VIEW_LAB_CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/Party/,
     ],
   }),
+  // The tooltip column is the shipped `Tabs.<Tab>.Tooltip` string verbatim (issue 1185
+  // aligned it to the design's own wording), so a lang edit that forgets these frames
+  // fails the case rather than publishing a frame whose caption no longer exists.
+  ...[
+    [
+      'tracking',
+      'Tracking',
+      'Open the Tracking preview',
+      'Preview Downtime Tracking · Fabricate Premium',
+    ],
+    [
+      'activities',
+      'Activities',
+      'Open the Activities preview',
+      'Preview Downtime Activities · Fabricate Premium',
+    ],
+    [
+      'factions',
+      'Factions',
+      'Open the Factions preview',
+      'Preview Factions & Reputation · Fabricate Premium',
+    ],
+    [
+      'settings',
+      'Settings',
+      'Open the Settings preview',
+      'Preview Downtime Settings · Fabricate Premium',
+    ],
+  ].map(([tabId, tabLabel, accessibleName, tooltip]) =>
+    managerCase({
+      id: `manager-world-downtime-${tabId}`,
+      label: `Manager — World Downtime ${tabLabel}`,
+      smokeLabels: [],
+      reaches: 'beyond',
+      query: { system: 'lab-smithing' },
+      steps: [
+        { selector: '#manager-world-nav-downtime', press: 'Enter' },
+        { selector: `[data-downtime-tab="${tabId}"]`, press: 'Enter' },
+        { selector: '.downtime-preview:not([hidden]) .downtime-cta', scroll: true },
+      ],
+      expectView: 'world-downtime',
+      expectSelector: `[data-downtime-panel="${tabId}"]`,
+      expectAttributes: [
+        { selector: `[data-downtime-tab="${tabId}"]`, name: 'aria-selected', value: 'true' },
+        {
+          selector: `[data-downtime-tab="${tabId}"]`,
+          name: 'aria-label',
+          value: accessibleName,
+        },
+        {
+          selector: `[data-downtime-tab="${tabId}"]`,
+          name: 'aria-describedby',
+          value: `world-downtime-tooltip-${tabId}`,
+        },
+        {
+          selector: '.downtime-preview:not([hidden]) .downtime-cta',
+          name: 'href',
+          value: 'https://www.patreon.com/c/mistersilver',
+        },
+        {
+          selector: '.downtime-preview:not([hidden]) .downtime-cta',
+          name: 'target',
+          value: '_blank',
+        },
+        {
+          selector: '.downtime-preview:not([hidden]) .downtime-cta',
+          name: 'rel',
+          value: 'noopener noreferrer',
+        },
+        ...['tracking', 'activities', 'factions', 'settings'].map((id) => ({
+          selector: `[data-downtime-tab="${id}"]`,
+          name: 'aria-controls',
+          value: `world-downtime-panel-${id}`,
+        })),
+        // The rail child and the studio-card button are two triggers for ONE navigation,
+        // so the frame proves the rail followed the card that drove it (issue 1185).
+        {
+          selector: `[data-world-downtime-item="${tabId}"]`,
+          name: 'aria-current',
+          value: 'true',
+        },
+      ],
+      expectVisible: `[data-downtime-tooltip="${tabId}"]:has-text("${tooltip}")`,
+      expectContained: [
+        { container: '#manager-world-nav-parties', target: '#manager-world-nav-parties > i' },
+        { container: '#manager-world-nav-downtime', target: '#manager-world-nav-downtime > i' },
+      ],
+      expectCenterHit: '.downtime-preview:not([hidden]) .downtime-cta',
+      expectClick: '.downtime-preview:not([hidden]) .downtime-cta',
+      expectNoHorizontalOverflow: ['[data-world-downtime-host]', '.manager-main', '.manager-body'],
+      expectOverflowY: '.downtime-preview-scroll',
+      expectScrollable: '.downtime-preview-scroll',
+      position: { width: 1330, height: 900 },
+      kinds: ['manager', 'world', 'downtime'],
+      sourceMatches: [
+        /^src\/ui\/svelte\/apps\/manager\/CraftingSystemManagerRoot\.svelte$/,
+        /^src\/ui\/svelte\/apps\/manager\/downtime\//,
+      ],
+    })
+  ),
+  managerCase({
+    id: 'manager-world-downtime-narrow',
+    label: 'Manager — World Downtime narrow long localization',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { system: 'lab-smithing', longDowntimeLabels: '1' },
+    steps: [
+      { selector: '#manager-world-nav-downtime', press: 'Enter' },
+      { selector: '[data-downtime-tab="tracking"]', press: 'Enter' },
+      { selector: '.downtime-preview:not([hidden]) .downtime-cta', scroll: true },
+    ],
+    expectView: 'world-downtime',
+    expectSelector: '[data-downtime-panel="tracking"]',
+    expectAttributes: [
+      {
+        selector: '[data-downtime-tab="tracking"]',
+        name: 'aria-label',
+        value: 'Open campaign-wide tracking and pending decisions',
+      },
+      {
+        selector: '[data-downtime-tab="tracking"]',
+        name: 'aria-describedby',
+        value: 'world-downtime-tooltip-tracking',
+      },
+      {
+        selector: '.downtime-preview:not([hidden]) .downtime-cta',
+        name: 'href',
+        value: 'https://www.patreon.com/c/mistersilver',
+      },
+      {
+        selector: '.downtime-preview:not([hidden]) .downtime-cta',
+        name: 'target',
+        value: '_blank',
+      },
+      {
+        selector: '.downtime-preview:not([hidden]) .downtime-cta',
+        name: 'rel',
+        value: 'noopener noreferrer',
+      },
+    ],
+    expectVisible:
+      '[data-downtime-tooltip="tracking"]:has-text("Preview campaign-wide tracking and pending decisions in Fabricate Premium")',
+    expectContained: [
+      { container: '#manager-world-nav-parties', target: '#manager-world-nav-parties > i' },
+      { container: '#manager-world-nav-downtime', target: '#manager-world-nav-downtime > i' },
+    ],
+    expectNoHorizontalOverflow: [
+      '[data-world-downtime-host]',
+      '.manager-main',
+      '.manager-body',
+      '.fabricate-manager',
+    ],
+    expectOverflowY: '.downtime-preview-scroll',
+    expectScrollable: '.downtime-preview-scroll',
+    expectCenterHit: '.downtime-preview:not([hidden]) .downtime-cta',
+    expectClick: '.downtime-preview:not([hidden]) .downtime-cta',
+    position: { width: 960, height: 900 },
+    kinds: ['manager', 'world', 'downtime', 'responsive'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/CraftingSystemManagerRoot\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/downtime\//,
+    ],
+  }),
+  managerCase({
+    id: 'manager-world-downtime-collapsed',
+    label: 'Manager — World Downtime collapsed rail',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { system: 'lab-smithing' },
+    steps: [
+      { selector: '#manager-world-nav-downtime', press: 'Enter' },
+      { selector: '[data-manager-rail-toggle]', press: 'Enter' },
+      { selector: '[data-downtime-tab="tracking"]', press: 'Enter' },
+      { selector: '.downtime-preview:not([hidden]) .downtime-cta', scroll: true },
+    ],
+    expectView: 'world-downtime',
+    expectSelector: '.manager-body.is-rail-collapsed [data-downtime-panel="tracking"]',
+    expectAttributes: [
+      {
+        selector: '.downtime-preview:not([hidden]) .downtime-cta',
+        name: 'href',
+        value: 'https://www.patreon.com/c/mistersilver',
+      },
+      {
+        selector: '.downtime-preview:not([hidden]) .downtime-cta',
+        name: 'target',
+        value: '_blank',
+      },
+      {
+        selector: '.downtime-preview:not([hidden]) .downtime-cta',
+        name: 'rel',
+        value: 'noopener noreferrer',
+      },
+    ],
+    expectVisible: '[data-downtime-tooltip="tracking"]',
+    expectContained: [
+      { container: '#manager-world-nav-parties', target: '#manager-world-nav-parties > i' },
+      { container: '#manager-world-nav-downtime', target: '#manager-world-nav-downtime > i' },
+    ],
+    expectNoHorizontalOverflow: ['[data-world-downtime-host]', '.manager-main', '.manager-body'],
+    expectOverflowY: '.downtime-preview-scroll',
+    expectScrollable: '.downtime-preview-scroll',
+    expectCenterHit: '.downtime-preview:not([hidden]) .downtime-cta',
+    expectClick: '.downtime-preview:not([hidden]) .downtime-cta',
+    position: { width: 1330, height: 900 },
+    kinds: ['manager', 'world', 'downtime', 'responsive'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/CraftingSystemManagerRoot\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/downtime\//,
+    ],
+  }),
+  // Issue 1185 — the PREMIUM-INSTALLED chrome. Every other manager case renders the free
+  // module, so without this one the title bar's gold badge, the rail's muted Downtime chip
+  // and the installed-state rail tooltip have no frame at all, and a push would publish an
+  // unrelated free-module frame as evidence for them.
+  managerCase({
+    id: 'manager-world-downtime-premium-installed',
+    label: 'Manager — World Downtime with the premium companion installed',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { system: 'lab-smithing', downtimeProvider: '1' },
+    steps: [{ selector: '#manager-world-nav-downtime', press: 'Enter' }],
+    expectView: 'world-downtime',
+    expectSelector: '[data-manager-titlebar-premium]',
+    expectAttributes: [
+      {
+        selector: '[data-manager-titlebar-premium]',
+        name: 'aria-label',
+        value: 'Fabricate Premium is installed and connected',
+      },
+      {
+        selector: '#manager-world-nav-downtime',
+        name: 'title',
+        value: 'Downtime Studio is unlocked by Fabricate Premium',
+      },
+      {
+        selector: '[data-world-nav-premium]',
+        name: 'data-world-nav-premium-state',
+        value: 'installed',
+      },
+    ],
+    // The title bar carries the loud signal and the rail chip is muted beside it; the
+    // provider's own three tabs are rendered rather than Core's four.
+    expectVisible: '[data-manager-titlebar-premium]:has-text("PREMIUM")',
+    expectContained: [
+      { container: '#manager-world-nav-parties', target: '#manager-world-nav-parties > i' },
+      { container: '#manager-world-nav-downtime', target: '#manager-world-nav-downtime > i' },
+    ],
+    expectNoHorizontalOverflow: ['[data-world-downtime-host]', '.manager-main', '.manager-body'],
+    position: { width: 1330, height: 900 },
+    kinds: ['manager', 'world', 'downtime'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/CraftingSystemManagerRoot\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/downtime\//,
+      /^src\/ui\/managerExtensions\.js$/,
+      /^styles\/fabricate\.css$/,
+    ],
+  }),
   managerCase({
     id: 'manager-system-travel-card-off',
     label: 'Manager — system Travel card off',

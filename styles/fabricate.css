@@ -252,6 +252,7 @@
   --fab-tag-butter: #E7DBB1;
   --fab-tag-aqua: #B9DDD7;
   --fab-tag-mauve: #D8BED4;
+  --fab-tag-ember: #D98B6A;
   --fab-drop-rate-guaranteed: #75C98E;
   --fab-drop-rate-common: #5EC3B0;
   --fab-drop-rate-uncommon: #6FA8E8;
@@ -374,6 +375,7 @@
   --fab-tag-butter: #E7DBB1;
   --fab-tag-aqua: #B9DDD7;
   --fab-tag-mauve: #D8BED4;
+  --fab-tag-ember: #D98B6A;
   --fab-drop-rate-guaranteed: #75C98E;
   --fab-drop-rate-common: #5EC3B0;
   --fab-drop-rate-uncommon: #6FA8E8;
@@ -496,6 +498,7 @@
   --fab-tag-butter: #D6C08E;
   --fab-tag-aqua: #B8C4CB;
   --fab-tag-mauve: #A39AA2;
+  --fab-tag-ember: #C57142;
   --fab-drop-rate-guaranteed: #75C98E;
   --fab-drop-rate-common: #5EC3B0;
   --fab-drop-rate-uncommon: #6FA8E8;
@@ -618,6 +621,7 @@
   --fab-tag-butter: #E7D8A2;
   --fab-tag-aqua: #B8C8A5;
   --fab-tag-mauve: #E7D9B8;
+  --fab-tag-ember: #D78866;
   --fab-drop-rate-guaranteed: #75C98E;
   --fab-drop-rate-common: #5EC3B0;
   --fab-drop-rate-uncommon: #6FA8E8;
@@ -740,6 +744,7 @@
   --fab-tag-butter: #E6E0C8;
   --fab-tag-aqua: #9DC9BD;
   --fab-tag-mauve: #C3C2DA;
+  --fab-tag-ember: #DB9CA0;
   --fab-drop-rate-guaranteed: #75C98E;
   --fab-drop-rate-common: #5EC3B0;
   --fab-drop-rate-uncommon: #6FA8E8;
@@ -882,6 +887,7 @@
   --fab-tag-butter: #D5C09A;
   --fab-tag-aqua: #948F90;
   --fab-tag-mauve: #706B70;
+  --fab-tag-ember: #BC642B;
   --fab-drop-rate-guaranteed: #75C98E;
   --fab-drop-rate-common: #5EC3B0;
   --fab-drop-rate-uncommon: #6FA8E8;
@@ -1004,6 +1010,7 @@
   --fab-tag-butter: #E6D08A;
   --fab-tag-aqua: #A9CFCB;
   --fab-tag-mauve: #CBB2C8;
+  --fab-tag-ember: #D48654;
   --fab-drop-rate-guaranteed: #75C98E;
   --fab-drop-rate-common: #5EC3B0;
   --fab-drop-rate-uncommon: #6FA8E8;
@@ -1667,10 +1674,13 @@
 
 /*
   The manager titlebar (issue 643) — a thin identity strip above the header, shared
-  by every manager screen. The gold badge carries the SELECTED crafting system's
-  name: user-authored text, so it is capped and ellipsised rather than allowed to
-  push the right-hand status line off the strip. Both are pure `--fab-*` tokens, so
-  the strip re-skins with every theme.
+  by every manager screen. The gold badge no longer carries the selected system's name
+  (issue 1185; the rail's crafting-system card already does): it is the PREMIUM signal,
+  and it renders only when a companion module is registered. It stays capped and
+  ellipsised anyway, because its content is a LOCALIZED product mark rather than the
+  seven English letters authored here, and a long translation must not push the
+  right-hand status line off the strip. Both are pure `--fab-*` tokens, so the strip
+  re-skins with every theme.
 */
 .fabricate-manager .manager-titlebar {
   display: flex;
@@ -1688,13 +1698,9 @@
   max-width: 220px;
   padding: var(--fab-space-2xs) var(--fab-space-2);
   border-radius: 5px;
-  color: var(--fab-on-badge-gold);
-  background: var(--fab-badge-gold);
   font-size: 0.62rem;
-  font-weight: 700;
   letter-spacing: 0.06em;
   text-overflow: ellipsis;
-  text-transform: uppercase;
   white-space: nowrap;
 }
 
@@ -1733,6 +1739,14 @@
   background: var(--fab-mv2-surface-1);
 }
 
+/*
+  `flex: 1 1 auto` lived here while the Downtime route led the header with a glyph tile
+  (issue 1185): that tile was a THIRD child, and `space-between` then parked the heading in
+  the middle of the row rather than beside it. The tile is gone — no other Manager route has
+  one — so the header is a two-child `space-between` again and the growth rule has nothing
+  left to correct. It is removed rather than kept as insurance: a `flex` value nothing needs
+  is a rule the next reader has to disprove.
+*/
 .fabricate-manager .manager-heading {
   min-width: 0;
 }
@@ -2104,7 +2118,8 @@
 }
 
 .fabricate-manager .manager-body.is-rail-collapsed .manager-nav-toggle,
-.fabricate-manager .manager-body.is-rail-collapsed .manager-nav-submenu {
+.fabricate-manager .manager-body.is-rail-collapsed .manager-nav-submenu,
+.fabricate-manager .manager-body.is-rail-collapsed .manager-nav-callout {
   display: none;
 }
 
@@ -2197,6 +2212,13 @@
 .fabricate-manager[data-manager-view="crafting-settings"] .manager-main,
 .fabricate-manager[data-manager-view="recipe-item-edit"] .manager-main,
 .fabricate-manager[data-manager-view="system-edit"] .manager-main {
+  grid-template-rows: minmax(0, 1fr);
+}
+
+/* The World Downtime host owns the one scrolling workspace row. Without this explicit
+   route layout, the shared three-row shell gives the host an auto-sized first row, so
+   narrow copy grows the Manager instead of scrolling inside its panel. */
+.fabricate-manager[data-manager-view="world-downtime"] .manager-main {
   grid-template-rows: minmax(0, 1fr);
 }
 
@@ -9081,6 +9103,10 @@
   grid-template-columns: 220px minmax(0, 1fr);
 }
 
+.fabricate-manager[data-manager-view="world-downtime"] .manager-body {
+  grid-template-columns: 220px minmax(0, 1fr);
+}
+
 .fabricate-manager[data-manager-view="environment-edit"] .manager-body.is-rail-collapsed,
 .fabricate-manager[data-manager-view^="checks"] .manager-body.is-rail-collapsed,
 .fabricate-manager[data-manager-view="component-edit"] .manager-body.is-rail-collapsed,
@@ -9088,6 +9114,10 @@
 .fabricate-manager[data-manager-view="crafting-settings"] .manager-body.is-rail-collapsed,
 .fabricate-manager[data-manager-view="recipe-item-edit"] .manager-body.is-rail-collapsed,
 .fabricate-manager[data-manager-view="system-edit"] .manager-body.is-rail-collapsed {
+  grid-template-columns: 56px minmax(0, 1fr);
+}
+
+.fabricate-manager[data-manager-view="world-downtime"] .manager-body.is-rail-collapsed {
   grid-template-columns: 56px minmax(0, 1fr);
 }
 
@@ -12230,9 +12260,15 @@
   box-shadow: inset 0 0 0 1px var(--fab-mv2-border);
 }
 
+/*
+  36px, not 40px: the toggle is 28px wide and sits at `right: 4px`, so 36px still clears it by
+  4px and returns the other 4px to the label track. The Downtime row is what made that matter —
+  it is the one parent row carrying a filled chip as well as a label, and at 40px its label had
+  no room left and broke `Downtime` across two lines mid-word.
+*/
 .fabricate-manager .manager-nav-parent {
   grid-template-columns: 24px minmax(0, 1fr) auto;
-  padding-right: 40px;
+  padding-right: 36px;
 }
 
 .fabricate-manager .manager-nav-group.is-expanded .manager-nav-parent {
@@ -12268,10 +12304,24 @@
   cursor: pointer;
 }
 
-.fabricate-manager .manager-nav-toggle:hover {
+/* `:not(:disabled)` is load-bearing rather than tidy: a group locked open by its own active
+   sub-tab renders this control genuinely disabled (issue 1185), and a hover treatment on a
+   control that cannot act is the same lie the silently-swallowed click used to tell. */
+.fabricate-manager .manager-nav-toggle:not(:disabled):hover {
   color: var(--fab-mv2-text);
   border-color: var(--fab-mv2-border);
   background: var(--fab-overlay-light-06);
+}
+
+/* The locked disclosure. It keeps `pointer-events` so the `title` explaining WHY it cannot
+   collapse still surfaces on hover — the counter-example is `.manager-scope-return.is-disabled`
+   above, which has no reason to convey and can afford `pointer-events: none`. */
+.fabricate-manager .manager-nav-toggle:disabled {
+  color: var(--fab-mv2-text-muted);
+  border-color: transparent;
+  background: transparent;
+  opacity: 0.45;
+  cursor: default;
 }
 
 .fabricate-manager .manager-nav-toggle:focus {
@@ -12355,13 +12405,163 @@
   opacity: 0.72;
 }
 
+/*
+  The header's premium unlock action (issue 1185). It is deliberately NOT `.is-primary`:
+  that variant is the green Save treatment, and a promotional unlock in Save-green would
+  read as the page's commit action. It takes the brand accent instead, and declares
+  `text-decoration` because `.manager-button` assumes a `<button>` and this one is a link.
+
+  It is selected through `.manager-header-actions` rather than on its own, and that is
+  load-bearing rather than cosmetic: `.manager-header-actions .manager-button` is (0,3,0) and
+  a bare `.manager-downtime-unlock` is (0,2,0), so the accent fill this rule exists to state
+  was losing to the ghost button's and the shipped control read as ordinary header chrome.
+*/
+.fabricate-manager .manager-header-actions .manager-downtime-unlock {
+  min-height: 34px;
+  padding: 0 14px;
+  border-color: var(--fab-accent-border);
+  border-radius: 8px;
+  color: var(--fab-on-accent);
+  background: var(--fab-accent);
+  font-size: 11.5px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+/*
+  The Downtime rail group (issue 1185).
+
+  It used to carry the prototype's own row metrics — a 32px left indent, a 10px gap, a 29px
+  floor, a 7px radius — which put its children visibly further right than the Crafting and
+  Gathering children directly above them. They are rail sub-items like any other, so the
+  indent, gap, geometry and active treatment now come from `.manager-nav-subitem` and are not
+  restated here. What survives is the one thing that is genuinely downtime-specific: the
+  children are a step LOUDER than an ordinary rail child, at weight 600, because they are the
+  premium previews rather than plain destinations.
+*/
+.fabricate-manager .manager-downtime-subitem {
+  /*
+    `height: auto` releases Foundry core's `button { height: var(--button-size) }`, which is a
+    FIXED height rather than a floor: the row stayed at core's height while a long localized
+    label wrapped to four lines inside it and overflowed onto the three rows below. `min-height`
+    alone could not fix that — it raises a floor and core had set a ceiling. This group is where
+    the ceiling shows first because its labels are provider-supplied and may be any length; the
+    rule is not group-specific in principle, only in the evidence that found it.
+  */
+  height: auto;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* The label follows the row rather than the rail's ordinary 12.5px, so the group's type reads
+   as one step louder together — see the note above. */
+.fabricate-manager .manager-downtime-subitem .manager-nav-label {
+  font-size: inherit;
+}
+
+/*
+  The padlock does NOT dim with its row. It is the premium marker on a working control, not
+  a disabled state, so it holds the accent whether or not the row is the current one — the
+  one place in this rail where a trailing mark deliberately outranks the label beside it.
+*/
+.fabricate-manager .manager-nav-lock {
+  flex: 0 0 auto;
+  margin-left: auto;
+  color: var(--fab-mv2-accent);
+  font-size: 9px;
+  line-height: 1;
+}
+
+/*
+  The premium badge on the Downtime parent row. It rides `.manager-nav-count` so the
+  collapsed 56px rail hides it with every other trailing marker — this rule declares no
+  `display`, so that hide still wins — and re-tones from a mono numeral to the gold chip the
+  design draws, whose colour pair is stated once beside `.manager-titlebar-badge` above.
+
+  It is selected through `.manager-nav-button` (0,4,0) rather than on its own, because TWO
+  later rules in this sheet re-tone a nav count at lower or equal weight — `.manager-nav-count`
+  itself (0,2,0) and `.manager-nav-button.is-active .manager-nav-count` (0,3,0), which is the
+  one the Downtime row is always in. Both won on source order against a single-class version,
+  and the chip drew in the subtle text colour at weight 600: bare tan lettering, not a badge.
+*/
+.fabricate-manager .manager-nav-button .manager-nav-count.manager-nav-premium {
+  /*
+    `2px 5px`, one pixel tighter each side than the design's `2px 6px`. The design's rail row
+    ends in an inert chevron; this one ends in a real 28px expand/collapse BUTTON, so the same
+    chip on the same 175px row leaves the label a pixel short and it breaks mid-word. A pixel
+    of chip padding at 7.5px is invisible; a hyphenated `Downtime` is not.
+  */
+  padding: 2px 5px;
+  border-radius: 4px;
+
+  /* A lettered mark, not a numeral: drop `.manager-nav-count`'s mono face. */
+  font-family: inherit;
+  font-size: 7.5px;
+  letter-spacing: 0.08em;
+  line-height: 1.5;
+}
+
+/*
+  The rail's premium-preview note: what the padlocks above it mean. It sits at the foot of
+  the group and, like the design's own, is below the fold at the rail's resting scroll —
+  the rail scrolls, and this is real copy a default screenshot will not show.
+*/
+.fabricate-manager .manager-nav-callout {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-2xs);
+  margin: 10px var(--fab-space-chip) 0;
+  padding: 9px 10px;
+  border: 1px solid var(--fab-accent-border);
+  border-radius: 8px;
+  color: var(--fab-mv2-text-muted);
+  font-size: 0.6rem;
+  line-height: 1.4;
+}
+
+.fabricate-manager .manager-nav-callout-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--fab-space-chip);
+  color: var(--fab-mv2-accent);
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+}
+
+/*
+  A rail label degrades by WRAPPING AT A SPACE, and then by ELLIPSIS — never by splitting a
+  word (issue 1185).
+
+  It used to carry `overflow-wrap: anywhere`, and that is what produced the reported
+  `Downtim` / `e`. `anywhere` differs from `break-word` in that it also lowers the element's
+  MIN-CONTENT width, so the surrounding `minmax(0, 1fr)` grid track is free to shrink below
+  the widest word and the word is then split to fit. Measured against the real Signika face
+  at the shipped 220px rail, the Downtime parent row leaves the label a 61.5px track for a
+  54.3px word — about seven pixels of slack — so anything that eats those pixels (a classic
+  rail scrollbar, a user-configured Foundry font, a longer localized `PREMIUM`, page zoom)
+  tips it over, and `anywhere` decided that the failure looked like a broken word.
+
+  The state the reporter noticed it in is NOT the cause: the chip measures 47.5px in the
+  active and the idle row alike, because `.manager-nav-button.is-active .manager-nav-count`
+  re-tones a count without resizing it and the gold chip rule pins weight 700 in both states.
+  So this is fixed as what it is — an ugly degradation on a tight track — rather than as a
+  state bug, and the fix holds for a COMPANION-supplied label, which may be any length and is
+  not ours to shorten.
+
+  `overflow: hidden` is what lets `text-overflow` apply at all; every one of these labels is a
+  grid item, so it is blockified and `text-overflow` is in scope on all of them.
+*/
 .fabricate-manager .manager-nav-label {
+  overflow: hidden;
   min-width: 0;
 
   /* Without this the label inherited Foundry's 14px app base (bleed) — a rail label
      stands 1.5px over the prototype's 12.5px. Pin it to the design (issue 643 audit). */
   font-size: 0.78rem;
-  overflow-wrap: anywhere;
+  text-overflow: ellipsis;
+  overflow-wrap: normal;
+  word-break: normal;
 }
 
 /*
@@ -12392,6 +12592,52 @@
 .fabricate-manager .manager-nav-button.is-active .manager-nav-count,
 .fabricate-manager .manager-nav-subitem.is-active .manager-nav-count {
   color: var(--fab-text-subtle);
+  font-weight: 600;
+}
+
+/*
+  THE GOLD BADGE CHIP, stated once (issue 1185).
+
+  Two marks in this Manager are the same object at two scales: the title bar's PREMIUM badge
+  and the rail's Downtime PREMIUM chip. The design draws both as a filled gold chip with dark
+  ink, and two chips that must stay the same colour must not name that colour twice — a second
+  copy is a second thing to keep in step across all seven palettes. Each chip's own rule owns
+  only its SCALE; the pair is here.
+
+  IT SITS HERE, under the count rules, because it has to beat them and it ties with one on
+  weight: `.manager-nav-button.is-active .manager-nav-count` is also four classes, and the
+  Downtime row is always the active row on its own route. Declared earlier, this block lost on
+  source order and the chip drew as subtle tan lettering at weight 600 — the reported defect.
+
+  Neither rule uppercases in CSS, and that is now a shared decision rather than a divergence:
+  both sources are the literal localized string `PREMIUM`, and uppercasing an already-uppercase
+  word is how a translation gets shouted twice.
+*/
+.fabricate-manager .manager-titlebar-badge,
+.fabricate-manager .manager-nav-button .manager-nav-count.manager-nav-premium {
+  color: var(--fab-on-badge-gold);
+  background: var(--fab-badge-gold);
+  font-weight: 700;
+}
+
+/*
+  THE SAME CHIP, MUTED — the rail's Downtime marker once a companion holds the surface
+  (issue 1185).
+
+  Gold on the rail is a SALES signal: it is selling the upgrade beside four padlocked
+  previews. With premium installed there is nothing left to sell, the title bar carries the
+  loud gold badge, and this mark's only remaining job is to say which route premium provides.
+  So it steps down — accent lettering on the accent tint, one weight lighter — rather than
+  disappearing: removing it would lose the answer to "which of these rows is the premium one".
+
+  Five classes, so it beats the four-class gold rule above on weight and does not depend on
+  staying below it. It restates ONLY the three declarations it overrides; the chip's shape,
+  scale, padding and radius still come from `.manager-nav-premium` above, which is what keeps
+  the row's label on one line in both states.
+*/
+.fabricate-manager .manager-nav-button .manager-nav-count.manager-nav-premium.is-installed {
+  color: var(--fab-mv2-accent);
+  background: var(--fab-accent-soft);
   font-weight: 600;
 }
 
@@ -16211,6 +16457,34 @@
 
   .fabricate-manager .manager-recipe-visibility-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  /* Downtime is a bounded workspace, unlike the stacked reading surfaces above.
+     Keep the permanent rail beside it and reserve the remaining row for the host's
+     own preview scroller. */
+  .fabricate-manager[data-manager-view="world-downtime"] .manager-body,
+  .fabricate-manager[data-manager-view="world-downtime"] .manager-body.is-rail-collapsed {
+    grid-template-columns: 220px minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
+    grid-auto-rows: unset;
+    overflow: hidden;
+  }
+
+  .fabricate-manager[data-manager-view="world-downtime"] .manager-body.is-rail-collapsed {
+    grid-template-columns: 56px minmax(0, 1fr);
+  }
+
+  .fabricate-manager[data-manager-view="world-downtime"] .manager-rail {
+    max-height: none;
+    overflow: hidden auto;
+    border-right: 1px solid var(--fab-mv2-border);
+    border-bottom: 0;
+  }
+
+  .fabricate-manager[data-manager-view="world-downtime"] .manager-main {
+    display: grid;
+    min-height: 0;
+    overflow: hidden;
   }
 }
 

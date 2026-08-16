@@ -64,6 +64,19 @@ function normalizeDialogOptions(options = {}) {
   return normalized;
 }
 
+/**
+ * Whether the current Foundry user is a Game Master.
+ *
+ * This is `isGM`, not `activeGM`: it answers "may this client see and drive a GM surface",
+ * a single-client question with no duplicate-execution risk, so an assistant GM must
+ * answer true. It is NOT authorization — every write still passes its own gate.
+ *
+ * @returns {boolean} True when the current user holds the GM role.
+ */
+export function isGameMaster() {
+  return globalThis.game?.user?.isGM === true;
+}
+
 export function localize(key, data) {
   const i18n = globalThis.game?.i18n;
   if (!i18n) return key;
