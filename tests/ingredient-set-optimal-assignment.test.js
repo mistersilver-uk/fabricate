@@ -280,12 +280,16 @@ test('determinism: craftability is invariant under shuffled item and group order
 });
 
 // ---------------------------------------------------------------------------
-// Stress / bound: a large authored recipe (many groups, options, stacks, and a
-// quantity>1 group) is satisfied on the greedy-first path, so the node budget used
-// stays orders of magnitude below the safeguard cap and the cap is never reached.
+// Stress / bound. Two fixtures, because they bound different things and only one of
+// them existed: an 18-group recipe whose groups mostly do NOT contend (bounded by
+// how little of it reaches the search at all), and an 8-group recipe whose groups
+// ALL contend for one shared pool (bounded by how far the search walks when it has
+// no choice but to run). Without the second, the largest contended fixture anywhere
+// in issue 1083's work was 4 groups, so nothing bounded node growth for a large
+// contended authored recipe.
 // ---------------------------------------------------------------------------
 
-test('stress: a large authored recipe stays orders of magnitude under the search cap', () => {
+test('stress: a large mostly-uncontended recipe costs about one node per group', () => {
   const groups = [];
   const items = [];
   const componentRules = new Set();
@@ -334,10 +338,18 @@ test('stress: a large authored recipe stays orders of magnitude under the search
 
   assert.equal(selection.success, true, 'the large recipe is satisfiable');
   assert.equal(selection.searchStats.capHit, false, 'the search never reaches its bound');
+  // Bounded against the recipe's OWN size rather than against the cap. Measured: 21 nodes for
+  // 18 groups here, against 19 for the pre-1083 whole-set solver — this fixture was ALREADY
+  // answered on the greedy-first path, so it never demonstrated a node-count reduction and the
+  // old `CAP/100` ceiling left ~95x of slack over a search that barely happens. What it can
+  // still say, falsifiably, is that a large authored recipe costs about one node per group;
+  // a resolver that started enumerating alternatives per group would blow through this while
+  // sitting comfortably inside the cap.
   assert.ok(
-    selection.searchStats.nodes < INGREDIENT_SEARCH_NODE_CAP / 100,
-    `nodes used (${selection.searchStats.nodes}) is orders of magnitude below the cap ` +
-      `(${INGREDIENT_SEARCH_NODE_CAP})`
+    selection.searchStats.nodes <= groups.length * 2,
+    `a large authored recipe must resolve at roughly one node per group; used ` +
+      `${selection.searchStats.nodes} for ${groups.length} groups (the ` +
+      `${INGREDIENT_SEARCH_NODE_CAP}-node cap is deliberately not what this bound leans on)`
   );
 
   // And it produces a valid, non-double-counting plan: every group is satisfied and no stack is
@@ -349,4 +361,84 @@ test('stress: a large authored recipe stays orders of magnitude under the search
   for (const [uuid, consumed] of Object.entries(consumedByUuid(selection))) {
     assert.ok(consumed <= held.get(uuid), `${uuid} consumed ${consumed} of ${held.get(uuid)}`);
   }
+});
+
+/**
+ * The fully CONTENDED counterpart of the fixture above, and the one this file was missing.
+ *
+ * Every group here shares candidate stacks with every other, so contention scoping cannot help:
+ * the whole recipe is one component and the search has to run. A broad tag group matches every
+ * held stack, six component groups each need two units of one specific stack, and a live essence
+ * block draws on a seventh — so the greedy front-load (the tag group taking `stack-0`) strands a
+ * pinned group and the solver must walk its way out.
+ *
+ * Contended fixtures are not automatically bounded: several natural constructions of this shape
+ * — N interchangeable tag groups over one shared pool — are symmetric enough to exhaust the
+ * 200,000-node cap and report a satisfiable recipe as insufficient, which is the documented
+ * pre-663 safeguard degradation rather than a regression. This fixture is the realistic
+ * asymmetric case: distinct component identities pin most of the assignment, so the branching
+ * is confined to the one broad group.
+ */
+test('stress: a fully contended recipe stays two orders of magnitude under the search cap', () => {
+  const PINNED = 6;
+  const groups = [
+    { id: 'g-broad', options: [{ quantity: 2, match: { type: 'tags', tags: ['shared'], tagMatch: 'any' } }] },
+  ];
+  const items = [];
+  for (let i = 0; i < PINNED; i += 1) {
+    items.push(item(`stack-${i}`, 2));
+    groups.push(componentGroup(`g-pin-${i}`, `cmp-stack-${i}`, 2));
+  }
+  // `spare` is the only stack no component group claims, so it is the tag group's only correct
+  // answer; `ember` funds the block.
+  items.push(item('spare', 4), item('ember', 2));
+  groups.push(essenceGroup('g-ess', 'fire', 2));
+
+  // The broad tag matches every real stack; a component option matches only the stack its id
+  // names, which is what makes the groups pin each other rather than being interchangeable.
+  const matcher = (ingredient, held) => {
+    if (ingredient?.match?.type === 'tags') return !held.uuid.startsWith('filler-');
+    if (ingredient?.match?.type === 'component') return `cmp-${held.uuid}` === ingredient.match.componentId;
+    return false;
+  };
+  const probe = essenceProbe({ ember: { fire: 1 } });
+  const set = new IngredientSet({ id: 's', ingredientGroups: groups });
+
+  const selection = set.resolveIngredientSelection(items, matcher, { resolveItemEssences: probe });
+
+  assert.equal(selection.success, true, 'the contended recipe is satisfiable');
+  assert.equal(selection.searchStats.capHit, false, 'the search never reaches its bound');
+  assert.ok(
+    selection.searchStats.nodes > groups.length,
+    `this fixture must genuinely backtrack, not resolve one choice per group; used ` +
+      `${selection.searchStats.nodes} nodes for ${groups.length} groups`
+  );
+  assert.ok(
+    selection.searchStats.nodes < INGREDIENT_SEARCH_NODE_CAP / 100,
+    `a fully contended ${groups.length}-group recipe used ${selection.searchStats.nodes} nodes, ` +
+      `which must stay two orders of magnitude under the ${INGREDIENT_SEARCH_NODE_CAP}-node cap`
+  );
+
+  // Correctness, so the bound cannot be met by a resolver that simply did less: the tag group
+  // must have taken the spare stack, leaving every pinned group and the block whole.
+  assert.equal(selection.missingGroups.length, 0);
+  assert.equal(selection.selectedIngredients.length, groups.length);
+  const consumed = consumedByUuid(selection);
+  assert.equal(consumed.spare, 2, 'the broad tag group takes the one unclaimed stack');
+  assert.equal(consumed.ember, 2, 'the block keeps its carrier');
+  for (let i = 0; i < PINNED; i += 1) assert.equal(consumed[`stack-${i}`], 2);
+
+  // And the node count is a property of the CONTENDED candidates, not of the inventory: 500
+  // stacks that match nothing must not enlarge the search by a single node.
+  const padded = [...items];
+  for (let i = 0; i < 500; i += 1) padded.push(item(`filler-${i}`, 1));
+  const withFiller = set.resolveIngredientSelection(padded, matcher, {
+    resolveItemEssences: probe,
+  });
+  assert.equal(withFiller.success, true);
+  assert.equal(
+    withFiller.searchStats.nodes,
+    selection.searchStats.nodes,
+    'non-matching held stacks must not widen a contended search'
+  );
 });
