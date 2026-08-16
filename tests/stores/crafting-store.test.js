@@ -22,8 +22,12 @@ function makeServices(overrides = {}) {
   const services = {
     listCraftingForActor: async (opts) => {
       calls.listCraftingForActor.push(opts);
-      return overrides.listing ?? { recipes: [] };
+      return overrides.listing ?? { summaries: [] };
     },
+    // The DETAIL phase seam (issue 1075). Answers from the registry every `recipe()` below
+    // writes itself into, so it serves the tests that hand `makeServices` a listing AND the
+    // ones that replace `listCraftingForActor` wholesale with a fresh literal.
+    hydrateCraftingRecipe: ({ recipeId } = {}) => HYDRATED.get(recipeId) ?? null,
     craftRecipe:
       overrides.craftRecipe ??
       (async (opts) => {
@@ -56,14 +60,28 @@ function makeServices(overrides = {}) {
   return { services, calls };
 }
 
+/**
+ * The rich models the hydration seam answers with, keyed by recipe id (issue 1075).
+ *
+ * A registry rather than a per-test wiring because several tests replace
+ * `listCraftingForActor` with their own literal, and a hydration fixture that could only see
+ * `makeServices`'s own listing would answer null for exactly those — leaving the detail-side
+ * assertions passing against nothing. Last write per id wins, and every test builds its
+ * fixture immediately before loading, so the most recently built shape is the one served.
+ */
+const HYDRATED = new Map();
+
+/** A fixture model that is BOTH the browse summary and the hydrated detail for one recipe. */
 function recipe(id, name, extra = {}) {
-  return {
+  const model = {
     id,
     name,
     ingredientSets: [{ id: `${id}-set`, craftability: {} }],
     defaultSetId: `${id}-set`,
     ...extra,
   };
+  HYDRATED.set(id, model);
+  return model;
 }
 
 describe('craftingStore', () => {
@@ -86,7 +104,7 @@ describe('craftingStore', () => {
   });
 
   it('load fetches the listing with the current actor + source ids and sets loadedOnce', async () => {
-    const listing = { recipes: [recipe('r1', 'Anvil')] };
+    const listing = { summaries: [recipe('r1', 'Anvil')] };
     const { services, calls } = makeServices({ listing, actorId: 'hero', sourceIds: ['a1', 'a2'] });
     const store = createCraftingStore({ services });
 
@@ -95,7 +113,7 @@ describe('craftingStore', () => {
 
     assert.equal(store.loadedOnce, true);
     assert.equal(store.loading, false);
-    assert.equal(store.listing.recipes.length, 1);
+    assert.equal(store.listing.summaries.length, 1);
     assert.deepEqual(calls.listCraftingForActor[0], {
       rememberedActorId: 'hero',
       componentSourceActorIds: ['a1', 'a2'],
@@ -118,7 +136,7 @@ describe('craftingStore', () => {
 
   it('filters the visible list by search (case-insensitive) and resets the page', async () => {
     const listing = {
-      recipes: [
+      summaries: [
         recipe('r1', 'Iron Sword'),
         recipe('r2', 'Bronze Shield'),
         recipe('r3', 'Iron Dagger'),
@@ -143,7 +161,7 @@ describe('craftingStore', () => {
 
   it('paginates the visible recipes by page size', async () => {
     const listing = {
-      recipes: ['Alpha', 'Bravo', 'Charlie', 'Delta', 'Echo'].map((name, idx) =>
+      summaries: ['Alpha', 'Bravo', 'Charlie', 'Delta', 'Echo'].map((name, idx) =>
         recipe(`r${idx}`, name)
       ),
     };
@@ -168,7 +186,7 @@ describe('craftingStore', () => {
 
   it('filters the visible list to favourites and resets the page', async () => {
     const listing = {
-      recipes: [recipe('r1', 'Iron Sword'), recipe('r2', 'Bronze Shield'), recipe('r3', 'Oak Bow')],
+      summaries: [recipe('r1', 'Iron Sword'), recipe('r2', 'Bronze Shield'), recipe('r3', 'Oak Bow')],
     };
     const { services } = makeServices({ listing, favourites: ['r3', 'r1'] });
     const store = createCraftingStore({ services });
@@ -189,7 +207,7 @@ describe('craftingStore', () => {
 
   it('filters the visible list to craftable (available) recipes only', async () => {
     const listing = {
-      recipes: [
+      summaries: [
         recipe('r1', 'Iron Sword', { browseStatus: 'available' }),
         recipe('r2', 'Bronze Shield', { browseStatus: 'missingMaterials' }),
         recipe('r3', 'Oak Bow', { browseStatus: 'available' }),
@@ -211,7 +229,7 @@ describe('craftingStore', () => {
 
   it('filters the visible list by crafting system and exposes the system options', async () => {
     const listing = {
-      recipes: [
+      summaries: [
         recipe('r1', 'Iron Sword', { systemId: 'sys-a', systemName: 'Smithing' }),
         recipe('r2', 'Bronze Shield', { systemId: 'sys-b', systemName: 'Armoury' }),
         recipe('r3', 'Oak Bow', { systemId: 'sys-a', systemName: 'Smithing' }),
@@ -246,7 +264,7 @@ describe('craftingStore', () => {
 
   it('filters the visible list by category and exposes de-duped, sorted category options', async () => {
     const listing = {
-      recipes: [
+      summaries: [
         recipe('r1', 'Iron Sword', { category: 'weapons', categoryLabel: 'Weapons' }),
         recipe('r2', 'Bronze Shield', { category: 'armor', categoryLabel: 'Armor' }),
         recipe('r3', 'Oak Bow', { category: 'weapons', categoryLabel: 'Weapons' }),
@@ -285,7 +303,7 @@ describe('craftingStore', () => {
 
   it('composes the category filter (AND) with active search and system filters', async () => {
     const listing = {
-      recipes: [
+      summaries: [
         recipe('r1', 'Iron Sword', {
           category: 'weapons',
           categoryLabel: 'Weapons',
@@ -323,7 +341,7 @@ describe('craftingStore', () => {
   });
 
   it('toggles a recipe favourite through the services seam and updates the id list', async () => {
-    const listing = { recipes: [recipe('r1', 'Iron Sword')] };
+    const listing = { summaries: [recipe('r1', 'Iron Sword')] };
     const { services, calls } = makeServices({ listing });
     const store = createCraftingStore({ services });
     await store.load();
@@ -339,7 +357,7 @@ describe('craftingStore', () => {
   });
 
   it('selects a recipe and resets the chosen ingredient set', async () => {
-    const listing = { recipes: [recipe('r1', 'Sword'), recipe('r2', 'Shield')] };
+    const listing = { summaries: [recipe('r1', 'Sword'), recipe('r2', 'Shield')] };
     const { services } = makeServices({ listing });
     const store = createCraftingStore({ services });
     await store.load();
@@ -492,13 +510,10 @@ describe('craftingStore', () => {
   // ── Issue 552: per-group ingredient option overrides ──────────────────────
   function optionListing() {
     return {
-      recipes: [
-        {
-          id: 'r1',
-          name: 'Potion',
+      summaries: [
+        recipe('r1', 'Potion', {
           ingredientSets: [{ id: 'r1-set', craftability: { canCraft: true, marker: 'baked' } }],
-          defaultSetId: 'r1-set',
-        },
+        }),
       ],
     };
   }
@@ -618,7 +633,7 @@ describe('craftingStore', () => {
 
   function orderListing(extra = {}) {
     return {
-      recipes: [
+      summaries: [
         recipe('r1', 'Blade', {
           progressiveStages: STAGES,
           allowPlayerResultReorder: true,
@@ -644,7 +659,7 @@ describe('craftingStore', () => {
 
   const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
   const pinnedRecipe = () => ({
-    recipes: [
+    summaries: [
       recipe('r1', 'Blade', { progressiveStages: STAGES, allowPlayerResultReorder: false }),
     ],
   });
@@ -893,7 +908,7 @@ describe('craftingStore', () => {
     const stages = bakedStages(difficulties, awardMode);
     const { services } = makeServices({});
     services.listCraftingForActor = async () => ({
-      recipes: [
+      summaries: [
         recipe('r1', 'Blade', {
           progressiveStages: stages,
           allowPlayerResultReorder: true,
@@ -991,7 +1006,7 @@ describe('craftingStore', () => {
     ];
     const { services } = makeServices({});
     services.listCraftingForActor = async () => ({
-      recipes: [
+      summaries: [
         recipe('r1', 'Blade', {
           progressiveStages: stages,
           allowPlayerResultReorder: true,
@@ -1019,7 +1034,7 @@ describe('craftingStore', () => {
     const stages = bakedStages([5, 3, 4], 'equal');
     const { services } = makeServices({});
     services.listCraftingForActor = async () => ({
-      recipes: [
+      summaries: [
         recipe('r1', 'Blade', {
           progressiveStages: stages,
           allowPlayerResultReorder: false,

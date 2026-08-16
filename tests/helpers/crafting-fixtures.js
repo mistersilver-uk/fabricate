@@ -328,13 +328,16 @@ export function steppedEssenceRecipe(overrides = {}) {
   });
 }
 
+// Since issue 1075 the listing carries cheap SUMMARY rows and the rich model is hydrated
+// per selected recipe. These fixtures are rich models, so one object serves as both facets.
 export function listing(recipes, overrides = {}) {
   return {
     selectedActorId: 'Actor.actor-1',
     actor: { id: 'actor-1', name: 'Aria' },
     componentSourceIds: ['actor-1'],
     worldTime: 0,
-    recipes,
+    summaries: recipes,
+    total: recipes.length,
     counts: { available: recipes.length, total: recipes.length },
     ...overrides
   };
@@ -374,6 +377,10 @@ export function fakeCraftingStore(overrides = {}) {
     availableCategories: overrides.availableCategories ?? [],
     visibleRecipes: recipes,
     pageItems: recipes,
+    // The hydrated rich model and the ROW it was hydrated from (issue 1075). The fake
+    // serves the same object for both, which is what the real store does once hydration
+    // has answered; `selectedSummary` is what the browser list highlights.
+    selectedSummary: selected,
     selectedRecipe: selected,
     selectedSet: selected?.ingredientSets?.[0] ?? null,
     selectedCraftability,

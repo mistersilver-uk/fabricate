@@ -173,7 +173,12 @@ function poolRecipe(overrides = {}) {
 function makeServices({ recipes = [poolRecipe()], recomputed = null } = {}) {
   const calls = { evaluateSelectedSet: [], craftRecipe: [] };
   const services = {
-    listCraftingForActor: async () => ({ recipes }),
+    // Since issue 1075 the listing carries cheap SUMMARY rows and the rich model is
+    // hydrated per selected recipe. These fixtures are rich models, so they serve as both:
+    // the store filters/paginates the summary facet and hydrates the same object for detail.
+    listCraftingForActor: async () => ({ summaries: recipes, total: recipes.length }),
+    hydrateCraftingRecipe: ({ recipeId } = {}) =>
+      recipes.find((entry) => entry?.id === recipeId) ?? null,
     evaluateSelectedSet: (options) => {
       calls.evaluateSelectedSet.push(options);
       return typeof recomputed === 'function' ? recomputed(options) : recomputed;

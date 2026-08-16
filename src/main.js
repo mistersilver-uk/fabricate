@@ -59,6 +59,9 @@ import {
   gatheringRunItemRef
 } from './gatheringResultCreation.js';
 import { resolveAlchemySubmissions } from './utils/alchemySubmissions.js';
+// The item -> managed-component resolver the crafting listing's summary phase tallies held
+// stacks with (issue 1075), shared with InventoryListingBuilder's owned-row matching.
+import { findMatchingComponent } from './utils/essenceResolver.js';
 import { progressiveOrderKey } from './utils/progressiveResultOrder.js';
 import { findStackableMatch } from './utils/sourceUuid.js';
 import { STARTUP_PHASES, createStartupMarks } from './utils/startupMarks.js';
@@ -1527,6 +1530,13 @@ class Fabricate {
       nowWorldTime: () => game.time?.worldTime ?? 0,
       resolveCheckFormula: (formula, actor, craftingModifier) =>
         resolveCheckFormulaDisplay(formula, actor, craftingModifier),
+      // How a held document resolves to a managed component, for the summary phase's
+      // per-pass inventory tallies (issue 1075). The SAME full resolver
+      // `InventoryListingBuilder` matches owned stacks with, so the crafting row's
+      // "looks makeable" and the inventory tab's owned count cannot disagree about what
+      // the player is holding. Injected rather than imported by the builder so its matcher
+      // graph stays out of the mounted-component harness.
+      resolveComponentForItem: findMatchingComponent,
     });
     return this._craftingListingBuilder;
   }
@@ -1592,6 +1602,43 @@ class Fabricate {
     this._requireReady();
     const { craftingActor, componentSourceActors } = this._resolveCraftingSources(options);
     return this._getCraftingListingBuilder().buildListing({
+      craftingActor,
+      componentSourceActors,
+      viewer: game.user,
+    });
+  }
+
+  /**
+   * DETAIL PHASE — the exact rich model for ONE recipe (issue 1075).
+   *
+   * The companion of {@link Fabricate#listCraftingForActor}, which since #1075 returns cheap
+   * summary rows. The player app calls this for the selected recipe only, so the exact
+   * per-set craftability, ingredient assignment, check resolution, outcome tiers, steps and
+   * progressive stages are computed for what is on screen rather than for the whole corpus.
+   *
+   * `recipeId` arrives from a client and is NOT trusted: the actor and component sources are
+   * re-resolved through the same ownership-gated `_resolveCraftingSources` every other player
+   * seam uses, and the builder re-evaluates visibility and the system block for the recipe
+   * itself. An id the viewer may not see answers `null`, never a model.
+   *
+   * @param {object} [options]
+   * @param {string|null} [options.recipeId] The recipe to hydrate.
+   * @param {string|null} [options.actorId] Crafting actor id; defaults to the persisted
+   *   last-crafting selection. Named as `evaluateSelectedSet`'s is, since the two are the
+   *   player app's pair of on-demand per-recipe reads.
+   * @param {string[]|null} [options.componentSourceActorIds] Additional inventory source
+   *   actor ids; defaults to the persisted component-source set.
+   * @returns {object|null} The redaction-safe `RecipeListingModel`, or null.
+   */
+  hydrateCraftingRecipe({ recipeId = null, actorId = null, componentSourceActorIds = null } = {}) {
+    this._requireReady();
+    if (!recipeId) return null;
+    const { craftingActor, componentSourceActors } = this._resolveCraftingSources({
+      rememberedActorId: actorId,
+      componentSourceActorIds,
+    });
+    return this._getCraftingListingBuilder().buildRecipeDetail({
+      recipeId,
       craftingActor,
       componentSourceActors,
       viewer: game.user,
