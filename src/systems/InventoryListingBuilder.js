@@ -217,6 +217,18 @@ export class InventoryListingBuilder {
    * @param {object|null} [options.craftingActor] - The acting character.
    * @param {object[]} [options.componentSourceActors] - Additional inventory sources.
    * @param {object|null} [options.viewer] - Foundry user; falls back to `getViewer()`.
+   * @param {Array<{recipe: object, access: object}>|null} [options.visibleRecipeEntries] - An
+   *   ALREADY-COMPUTED corpus-wide visibility pass for THESE actors and this viewer, handed
+   *   in by a caller that must also feed `CraftingListingBuilder.buildListing` in the same
+   *   read (issue 1075). Both builders otherwise run that pass independently, and it is the
+   *   single most expensive read on either path.
+   *
+   *   Explicitly a PARAMETER and never a field. A retained pass would be a cache of knowledge
+   *   results derived from live `actor.items`, and nothing mints a revision token when a
+   *   player's inventory changes — so a held pass would answer "unchanged" across the very
+   *   craft that consumed the book it describes. `inventorySnapshot`'s invalidation rule
+   *   forbids exactly that, and #1078 owns the item-side generation that would ever permit
+   *   it. Handing a value down one call chain has no such lifetime.
    * @returns {{
    *   selectedActorId: string|null,
    *   actor: object|null,
@@ -226,7 +238,12 @@ export class InventoryListingBuilder {
    *   counts: { components: number, essences: number, total: number }
    * }}
    */
-  buildListing({ craftingActor = null, componentSourceActors = [], viewer = null } = {}) {
+  buildListing({
+    craftingActor = null,
+    componentSourceActors = [],
+    viewer = null,
+    visibleRecipeEntries = null,
+  } = {}) {
     const resolvedViewer = viewer ?? this._getViewer?.() ?? null;
     const isGM = resolvedViewer?.isGM === true;
     const knowledgeSources = Array.isArray(componentSourceActors)
@@ -242,6 +259,7 @@ export class InventoryListingBuilder {
       viewer: resolvedViewer,
       craftingActor,
       knowledgeSources,
+      visibleRecipeEntries,
     });
 
     // Stable, crafting-actor-first source ordering shared by every card's cross-system
@@ -296,16 +314,32 @@ export class InventoryListingBuilder {
    * The set of recipe ids a non-GM viewer may see referenced in a used-by list —
    * every visible recipe that is NOT an undiscovered teaser. Returns null (no
    * restriction) for a GM or when no visibility service is wired.
+   *
+   * A caller-supplied `visibleRecipeEntries` REPLACES this method's own corpus-wide pass and
+   * nothing else: the teaser filter below still runs over it, so a hand-off cannot widen the
+   * allowed set. The GM short-circuit is deliberately still first — a GM has no restriction
+   * at all, so handing one in must not conjure a filter that would exclude something.
    * @private
    */
-  _resolveAllowedRecipeIds({ isGM, viewer, craftingActor, knowledgeSources }) {
-    if (isGM || typeof this.recipeVisibility?.getVisibleRecipes !== 'function') return null;
+  _resolveAllowedRecipeIds({
+    isGM,
+    viewer,
+    craftingActor,
+    knowledgeSources,
+    visibleRecipeEntries = null,
+  }) {
+    if (isGM) return null;
+    if (!visibleRecipeEntries && typeof this.recipeVisibility?.getVisibleRecipes !== 'function') {
+      return null;
+    }
     const entries =
+      visibleRecipeEntries ??
       this.recipeVisibility.getVisibleRecipes({
         viewer,
         craftingActor,
         componentSourceActors: knowledgeSources,
-      }) ?? [];
+      }) ??
+      [];
     const allowed = new Set();
     for (const entry of Array.isArray(entries) ? entries : []) {
       if (entry?.recipe?.id && entry?.access?.reason !== 'teaser') allowed.add(entry.recipe.id);
