@@ -2383,21 +2383,23 @@
   // rather than swallowing the click — a chevron that visibly does nothing is what the
   // whole defect read as.
   //
-  // "Locked" means precisely "a rail SUB-ITEM of this group is the current view", so the
-  // membership test is taken over the built nav items rather than over the group's route
-  // CATEGORY. `isCraftingView` / `isChecksView` are category-wide — `CRAFTING_VIEWS` carries
-  // the `recipe-edit` and `recipe-item-edit` editors, and `isChecksRoute` carries the bare
-  // `checks` redirect — and none of those is an entry the rail renders, so keying the lock
-  // on them would pin a group open on a screen that is not in it. The category predicates
-  // keep their other jobs (rail highlighting, breadcrumbs, the route-exit guard) untouched.
-  const isCraftingChildRoute = $derived(craftingNavItems.some((item) => item.view === currentView));
-  const isChecksChildRoute = $derived(checksNavItems.some((item) => item.view === currentView));
+  // "Locked" means "the current view BELONGS to this group", and an editor detail route
+  // belongs to the group whose sub-item opened it: `recipe-edit` is reached from Recipes and
+  // is read as part of Recipes, so the group that owns it stays open while the GM is in it.
+  // That is why the lock keys on the group's route CATEGORY (`isCraftingView` covers
+  // `CRAFTING_VIEWS`, which carries `recipe-edit` and `recipe-item-edit`) rather than on the
+  // narrower "is a rendered rail entry" test.
+  //
+  // The rule is deliberately uniform across all five groups. Gathering already behaved this
+  // way — `isActiveGatheringChildRoute` is true throughout `environment-edit`,
+  // `gathering-task-edit` and `gathering-event-edit` — and Crafting and Checks were the
+  // outliers, releasing their group the moment an editor opened.
   // Downtime's every sub-tab IS the one `world-downtime` route (the tab is panel state, not
   // a route), and that holds for a companion's tab set exactly as it does for Core's four —
   // nothing here reads a tab id.
   const railGroupLockedOpen = $derived({
-    crafting: isCraftingChildRoute,
-    checks: isChecksChildRoute,
+    crafting: isCraftingRoute,
+    checks: isChecksRoute,
     gathering: isActiveGatheringChildRoute,
     systemTravel: isSystemTravelChildRoute,
     worldDowntime: isWorldDowntimeRoute,

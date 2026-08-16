@@ -21606,13 +21606,16 @@ describe('CraftingSystemManager mounted behavior', () => {
       assert.ok(!isExpanded(checks), 'a collapse survives navigation too');
     });
 
-    // The predicate fix and the auto-open effect in one walk. `recipe-edit` is a member of
-    // `CRAFTING_VIEWS` but is NOT a rail sub-item, so the category-wide `isCraftingRoute` would
-    // pin the group open on a screen the rail does not offer. Coming back through the editor's
-    // own Back control then re-enters `recipes` by assigning `activeView` — a route into the
-    // group that writes no expansion intent of its own — which is what the auto-open effect is
-    // for: without it the group would snap shut on the NEXT navigation away.
-    it('is not locked by a category sibling that is not a rail sub-item, and re-opens on return', async () => {
+    // An editor detail route belongs to the group whose sub-item opened it: `recipe-edit` is
+    // reached from Recipes and is read as part of Recipes, so it locks Crafting exactly as a
+    // rendered rail entry does. That makes all five groups uniform — Gathering already locked
+    // throughout `environment-edit` / `gathering-task-edit` / `gathering-event-edit`, and
+    // Crafting and Checks were the outliers that released the group when an editor opened.
+    //
+    // The tail then walks the auto-open effect: leaving the editor re-enters `recipes` by
+    // assigning `activeView`, a route into the group that writes no expansion intent of its
+    // own, so without that effect the group would snap shut on the NEXT navigation away.
+    it('stays locked inside its own editor detail route, and outlives the lock on return', async () => {
       await openRecipeEditor([]);
       assert.equal(currentManagerView(), 'recipe-edit');
 
@@ -21620,13 +21623,13 @@ describe('CraftingSystemManager mounted behavior', () => {
       assert.ok(isExpanded(crafting), 'the editor inherits the group opened by Recipes');
       assert.equal(
         railToggle(crafting).disabled,
-        false,
-        'the recipe editor is not a rail sub-item, so it must not lock the Crafting group'
+        true,
+        'an editor detail route is a sub-tab, so it locks its own group open'
       );
       railToggle(crafting).click();
       await settleRail();
       await settleRail();
-      assert.ok(!isExpanded(crafting), 'and the group collapses over the editor');
+      assert.ok(isExpanded(crafting), 'and the locked group does not collapse over the editor');
 
       const back = Array.from(target.querySelectorAll('.manager-header-actions button')).find(
         (button) => button.textContent.includes('Back to recipes')
@@ -21635,7 +21638,7 @@ describe('CraftingSystemManager mounted behavior', () => {
       back.click();
       await settleRail();
       assert.equal(currentManagerView(), 'recipes');
-      assert.ok(isExpanded(crafting), 'entering a sub-item re-opens its group');
+      assert.ok(isExpanded(crafting), 'entering a sub-item keeps its group open');
 
       navButton('Components').click();
       await settleRail();
