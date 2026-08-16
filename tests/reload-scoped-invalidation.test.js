@@ -15,9 +15,20 @@
  * a freshly parsed component array fail all three by construction, on every reload, for any
  * edit anywhere in the world. Two landed optimisations did nothing for any player.
  *
- * Every test below fails on the parent commit. They are grouped by the three axes a reload
- * now decides separately — what it invalidates, what it advances, and what identity it
- * preserves — because the failure that matters is one axis silently going broad.
+ * Eighteen of the twenty-two tests below fail on the parent commit; the other four are
+ * no-regression assertions the base already satisfied, and it is worth being exact about
+ * which, because two of them pass there for a reason that flatters them. `names both systems
+ * when a recipe MOVES between them` and `does NOT reuse a system whose component changed
+ * under a CONSTANT-LENGTH array` both assert the MUST-NOT-narrow direction, which a reload
+ * that invalidates everything satisfies for free; they earn their place against a future
+ * over-narrowing, not against the defect this file was written for. The remaining two —
+ * `persists the rewritten component exactly as the whole-corpus save did` and `writes nothing
+ * and advances nothing when no component matched` — pin the persistence behaviour the two
+ * narrowed saves had to preserve byte for byte.
+ *
+ * The tests are grouped by the three axes a reload now decides separately — what it
+ * invalidates, what it advances, and what identity it preserves — because the failure that
+ * matters is one axis silently going broad.
  *
  * ## The reuse licence, stated once
  *
