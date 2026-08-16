@@ -65,9 +65,25 @@
  * Three clauses, because each closes a different hole:
  *
  * 1. **Array identity.** Every path that rebuilds a definition array — `_normalizeSystem`,
- *    `reload()`, import, and every `system.components = […]` replacement — produces a NEW
- *    array, which is a different `WeakMap` key and therefore a fresh index for free. No
- *    bookkeeping is needed for the common case.
+ *    import, and every `system.components = […]` replacement — produces a NEW array, which
+ *    is a different `WeakMap` key and therefore a fresh index for free. No bookkeeping is
+ *    needed for the common case.
+ *
+ *    `reload()` is the ONE deliberate exception, and it is worth stating plainly because
+ *    this clause used to read as a blanket safety argument. It re-parses the whole corpus
+ *    and so does hold a freshly built array for every system — but for a system its delta
+ *    proves structurally unchanged it now DISCARDS that array and keeps the retained record,
+ *    with the array the live index is already keyed on (issue 1078). Without that, a remote
+ *    client rebuilt every index on every reload and the retained index was dead code for
+ *    everyone but the writing GM.
+ *
+ *    That is safe, and only because the licence is strictly stronger than this rule needs:
+ *    reuse requires `jsonEquals` over the WHOLE record (`revisionTokens.js`), so a reused
+ *    array is byte-equivalent in every indexed field, element by element. A coarser
+ *    licence — reuse because the system id set is unchanged — would hand back a same-object,
+ *    same-length array whose elements had been replaced, which is exactly what clause 3
+ *    exists to catch and what neither clause 1 nor clause 2 can see. A system whose record
+ *    changed at all takes the freshly parsed array, so it is a new key and a fresh index.
  * 2. **Length.** A bare `push`/`pop`/`splice` on a live array changes its length, so a
  *    mutation that forgets clause 3 is still caught. This is a safety net for fixtures and
  *    external callers, not a licence to skip the revision.
