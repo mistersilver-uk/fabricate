@@ -1657,7 +1657,7 @@ describe('CraftingSystemManager source contract', () => {
       'gathering rail should expose an expand/collapse control'
     );
     assert.ok(
-      rootSource.includes("manager-nav-group ${gatheringMenuExpanded ? 'is-expanded' : ''}"),
+      rootSource.includes("manager-nav-group ${railGroupExpanded.gathering ? 'is-expanded' : ''}"),
       'expanded gathering rail should style as one submenu group'
     );
     assert.ok(

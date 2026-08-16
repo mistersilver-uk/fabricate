@@ -6577,6 +6577,10 @@ describe('CraftingSystemManager mounted behavior', () => {
       target.querySelector('[data-system-id="alchemy"]').getAttribute('aria-selected'),
       'true'
     );
+    // The Crafting group is still open, and that is the fix rather than a leak (issue 1185):
+    // this route was reached by opening Recipes, and navigating AWAY from a group no longer
+    // slams it shut behind the GM. `craftingMenuExpanded = isCraftingRoute` used to force it
+    // closed here, discarding a choice the GM had deliberately made.
     assert.deepEqual(
       Array.from(target.querySelectorAll('.manager-nav-label')).map((label) =>
         label.textContent.trim()
@@ -6584,6 +6588,10 @@ describe('CraftingSystemManager mounted behavior', () => {
       [
         'System Overview',
         'Crafting',
+        'Recipes',
+        'Books & Scrolls',
+        'Knowledge',
+        'Settings',
         'Components',
         'Tags & Categories',
         'Essences',
@@ -21378,5 +21386,306 @@ describe('CraftingSystemManager mounted behavior', () => {
         );
       });
     }
+  });
+
+  // ── Rail group expand / collapse (issue 1185) ──────────────────────────────────────────
+  //
+  // The maintainer's report was that the rail's disclosure groups "sometimes refuse to
+  // minimize". "Sometimes" was two defects wearing one face, and both are behavioural rather
+  // than visual, so every case below drives the real controls and reads the rendered rail:
+  //
+  //   * four groups ran an auto-open effect that READ ITS OWN FLAG to guard itself, so a
+  //     collapse changed the effect's own dependency, re-ran it, passed the now-false guard
+  //     and forced the group straight back open;
+  //   * Crafting had the mirror defect — `craftingMenuExpanded = isCraftingRoute` never read
+  //     its own flag, so a collapse stuck, but LEAVING the category force-closed a group the
+  //     GM had deliberately opened.
+  //
+  // The rule these pin is the maintainer's: every group collapses in any state, whatever the
+  // others are doing, EXCEPT while one of its own rail sub-items is the current view.
+  describe('rail group expansion is independent, sticky, and locked only by an active sub-tab', () => {
+    // The five groups, each with the disclosure that opens it, the submenu that proves it is
+    // open, and the navigation that lands on one of its own sub-items. Written once so a case
+    // asserts "every group", not "the four I remembered" — the Downtime group in particular is
+    // provider-driven, and nothing in the rule may key off a tab id.
+    const RAIL_GROUPS = [
+      {
+        id: 'crafting',
+        label: 'Crafting',
+        toggle: '#manager-nav-crafting + .manager-nav-toggle',
+        submenu: '#manager-crafting-submenu',
+        childView: 'recipes',
+        enterChild: () => navButton('Crafting').click(),
+      },
+      {
+        id: 'checks',
+        label: 'Checks',
+        toggle: '#manager-nav-checks + .manager-nav-toggle',
+        submenu: '#manager-checks-submenu',
+        childView: 'checks-crafting',
+        enterChild: () => navButton('Checks').click(),
+      },
+      {
+        id: 'gathering',
+        label: 'Gathering',
+        toggle: '#manager-nav-gathering + .manager-nav-toggle',
+        submenu: '#manager-gathering-submenu',
+        childView: 'environments',
+        enterChild: () => navButton('Gathering').click(),
+      },
+      {
+        id: 'systemTravel',
+        label: 'Travel',
+        toggle: '#manager-travel-toggle',
+        submenu: '#manager-travel-submenu',
+        childView: 'environments',
+        enterChild: () => systemTravelItem('travel').click(),
+      },
+      {
+        id: 'worldDowntime',
+        label: 'Downtime',
+        toggle: '#manager-downtime-toggle',
+        submenu: '#manager-downtime-submenu',
+        childView: 'world-downtime',
+        enterChild: () => worldNavItem('downtime').click(),
+      },
+    ];
+
+    // Every rail navigation here passes `confirmRouteExit`, which is promise-shaped on some
+    // branches, so a bare `tick()` would let "the group stayed open" pass for a route change
+    // that simply had not landed yet.
+    async function settleRail() {
+      for (let index = 0; index < 8; index += 1) await Promise.resolve();
+      await tick();
+      flushSync();
+    }
+
+    function railToggle(group) {
+      const toggle = target.querySelector(group.toggle);
+      assert.ok(Boolean(toggle), `the ${group.label} group should render a disclosure control`);
+      return toggle;
+    }
+
+    function isExpanded(group) {
+      return Boolean(target.querySelector(group.submenu));
+    }
+
+    function expandedGroupIds() {
+      return RAIL_GROUPS.filter(isExpanded).map((group) => group.id);
+    }
+
+    function currentManagerView() {
+      return target.querySelector('.fabricate-manager').dataset.managerView;
+    }
+
+    function mountRail(rootProps = {}) {
+      mountManager([], { gatheringRealmsEnabled: true }, {}, rootProps);
+      assert.equal(currentManagerView(), 'systems', 'the rail starts on a route inside no group');
+      assert.deepEqual(expandedGroupIds(), [], 'and with every group collapsed');
+    }
+
+    it('collapses any group while the others stay expanded, and the collapse sticks', async () => {
+      mountRail();
+
+      for (const group of RAIL_GROUPS) {
+        railToggle(group).click();
+        await settleRail();
+      }
+      assert.deepEqual(
+        expandedGroupIds(),
+        RAIL_GROUPS.map((group) => group.id),
+        'all five open together — the groups are independent, not an accordion'
+      );
+
+      for (const group of RAIL_GROUPS) {
+        railToggle(group).click();
+        await settleRail();
+        // A second settle: the re-assert loop closed and reopened the group within one flush,
+        // so an assertion taken immediately after the click could read the intermediate state.
+        await settleRail();
+        assert.deepEqual(
+          expandedGroupIds(),
+          RAIL_GROUPS.filter((other) => other !== group).map((other) => other.id),
+          `${group.label} collapses while its four expanded siblings are untouched`
+        );
+        railToggle(group).click();
+        await settleRail();
+        assert.ok(isExpanded(group), `${group.label} re-opens from the same control`);
+      }
+
+      // The Tool Studio is the case a route-derived force got wrong on a route that is not
+      // even the group's own: `|| isToolStudioRoute` pinned Crafting open on a screen the
+      // Crafting submenu does not offer, and left that chevron inert. Entering it still opens
+      // the group — its breadcrumb reads "<system> › Crafting › Tools" — but as intent, so the
+      // disclosure keeps working.
+      const crafting = RAIL_GROUPS[0];
+      railToggle(crafting).click();
+      await settleRail();
+      assert.ok(!isExpanded(crafting), 'pre-condition: Crafting is collapsed before Tools opens');
+
+      navButton('Tools').click();
+      await settleRail();
+      assert.equal(currentManagerView(), 'tools');
+      assert.ok(isExpanded(crafting), 'the Tool Studio opens the Crafting group it sits under');
+      assert.equal(
+        railToggle(crafting).disabled,
+        false,
+        'Tools is not a Crafting sub-item, so it must not lock the group'
+      );
+      railToggle(crafting).click();
+      await settleRail();
+      await settleRail();
+      assert.ok(!isExpanded(crafting), 'and the group collapses over the Tool Studio');
+    });
+
+    it('locks a group open while one of its own sub-items is the current view, and says why', async () => {
+      useShippedLocalization();
+      mountRail();
+
+      for (const group of RAIL_GROUPS) {
+        group.enterChild();
+        await settleRail();
+        assert.equal(currentManagerView(), group.childView, `${group.label} routed to its child`);
+
+        const toggle = railToggle(group);
+        assert.equal(toggle.disabled, true, `${group.label} reports its disclosure as disabled`);
+        assert.equal(toggle.getAttribute('aria-disabled'), 'true');
+        assert.equal(
+          toggle.getAttribute('title'),
+          'This section stays open while you are on one of its pages.',
+          'the control explains the constraint rather than silently swallowing the click'
+        );
+
+        toggle.click();
+        await settleRail();
+        assert.ok(isExpanded(group), `${group.label} does not collapse out from under its view`);
+
+        for (const other of RAIL_GROUPS.filter((candidate) => candidate !== group)) {
+          const otherToggle = railToggle(other);
+          assert.equal(
+            otherToggle.disabled,
+            false,
+            `${other.label} stays collapsible while ${group.label} is locked`
+          );
+          assert.equal(otherToggle.getAttribute('title'), null);
+        }
+      }
+    });
+
+    it('leaves a group exactly as the GM left it when the route moves elsewhere', async () => {
+      mountRail();
+      const checks = RAIL_GROUPS[1];
+
+      // Left EXPANDED. Entering a sub-item records the intent as well as taking the lock, so
+      // the group the GM opened by walking into it survives walking back out.
+      navButton('Checks').click();
+      await settleRail();
+      assert.equal(currentManagerView(), 'checks-crafting');
+      assert.ok(isExpanded(checks));
+
+      navButton('Components').click();
+      await settleRail();
+      assert.equal(currentManagerView(), 'components');
+      assert.ok(isExpanded(checks), 'leaving a group does not slam it shut behind the GM');
+      assert.equal(
+        railToggle(checks).disabled,
+        false,
+        'and the disclosure is live again the moment the lock releases'
+      );
+
+      // Left COLLAPSED. The same group, collapsed off-route, is still collapsed after a move —
+      // the direction `craftingMenuExpanded = isCraftingRoute` used to get right and the four
+      // re-asserting effects used to get wrong.
+      railToggle(checks).click();
+      await settleRail();
+      assert.ok(!isExpanded(checks));
+
+      navButton('Tags & Categories').click();
+      await settleRail();
+      assert.equal(currentManagerView(), 'tags');
+      assert.ok(!isExpanded(checks), 'a collapse survives navigation too');
+    });
+
+    // The predicate fix and the auto-open effect in one walk. `recipe-edit` is a member of
+    // `CRAFTING_VIEWS` but is NOT a rail sub-item, so the category-wide `isCraftingRoute` would
+    // pin the group open on a screen the rail does not offer. Coming back through the editor's
+    // own Back control then re-enters `recipes` by assigning `activeView` — a route into the
+    // group that writes no expansion intent of its own — which is what the auto-open effect is
+    // for: without it the group would snap shut on the NEXT navigation away.
+    it('is not locked by a category sibling that is not a rail sub-item, and re-opens on return', async () => {
+      await openRecipeEditor([]);
+      assert.equal(currentManagerView(), 'recipe-edit');
+
+      const crafting = RAIL_GROUPS[0];
+      assert.ok(isExpanded(crafting), 'the editor inherits the group opened by Recipes');
+      assert.equal(
+        railToggle(crafting).disabled,
+        false,
+        'the recipe editor is not a rail sub-item, so it must not lock the Crafting group'
+      );
+      railToggle(crafting).click();
+      await settleRail();
+      await settleRail();
+      assert.ok(!isExpanded(crafting), 'and the group collapses over the editor');
+
+      const back = Array.from(target.querySelectorAll('.manager-header-actions button')).find(
+        (button) => button.textContent.includes('Back to recipes')
+      );
+      assert.ok(Boolean(back), 'the recipe editor offers Back to recipes');
+      back.click();
+      await settleRail();
+      assert.equal(currentManagerView(), 'recipes');
+      assert.ok(isExpanded(crafting), 'entering a sub-item re-opens its group');
+
+      navButton('Components').click();
+      await settleRail();
+      assert.equal(currentManagerView(), 'components');
+      assert.ok(
+        isExpanded(crafting),
+        'and records the intent, so the group outlives the lock releasing'
+      );
+    });
+
+    // The Downtime group's children come from whichever provider holds the surface, so its
+    // collapse behaviour must be identical for a companion's tab set and for Core's four.
+    it('gives a provider-supplied Downtime tab set the same collapse behaviour as Core', async () => {
+      const registry = createManagerExtensionsRegistry();
+      registry.publicApi.registerWorldNavProvider(
+        downtimeProvider({ prefix: 'Guild', ids: ['ledger', 'crew', 'writs'] })
+      );
+      mountRail({ managerExtensions: registry });
+      const downtime = RAIL_GROUPS[4];
+
+      railToggle(downtime).click();
+      await settleRail();
+      assert.deepEqual(
+        downtimeRailIds(),
+        ['ledger', 'crew', 'writs'],
+        'the rail renders the provider set, not Core preview tabs'
+      );
+      railToggle(downtime).click();
+      await settleRail();
+      await settleRail();
+      assert.ok(!isExpanded(downtime), 'a provider-driven group collapses like any other');
+
+      worldNavItem('downtime').click();
+      await settleRail();
+      assert.equal(currentManagerView(), 'world-downtime');
+      assert.equal(
+        railToggle(downtime).disabled,
+        true,
+        'and locks open on its own route exactly as Core does'
+      );
+
+      worldNavItem('parties').click();
+      await settleRail();
+      assert.equal(currentManagerView(), 'world');
+      assert.ok(isExpanded(downtime), 'leaving it does not close it');
+      assert.equal(railToggle(downtime).disabled, false);
+      railToggle(downtime).click();
+      await settleRail();
+      await settleRail();
+      assert.ok(!isExpanded(downtime), 'and the collapse sticks off-route');
+    });
   });
 });

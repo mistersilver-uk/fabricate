@@ -319,20 +319,38 @@
   let essenceBulkDeleteArmed = $state(false);
   let activeGatheringTab = $state('environments');
   let activeTravelTab = $state('parties');
-  let gatheringMenuExpanded = $state(false);
-  let systemTravelExpanded = $state(false);
-  // The Downtime rail group mirrors the Travel group: expanded state lives here and the
-  // route forces it open, and the selected preview is owned here rather than inside the
-  // host because the rail, the page header and the breadcrumb all name it.
-  let worldDowntimeExpanded = $state(false);
+  // ── Rail group expansion: USER INTENT only (issue 1185) ──────────────────────────────
+  //
+  // The five collapsible rail groups used to hold user intent and route-derived state in
+  // ONE variable each, and the two overwrote one another in both directions. Four groups
+  // ran an effect that read its own flag to guard itself (`if (!onRoute || expanded)
+  // return; expanded = true`), so collapsing the group changed the effect's own dependency,
+  // re-ran it, passed the now-false guard and forced the group back open — a chevron that
+  // visibly did nothing. Crafting had the mirror defect: `craftingMenuExpanded =
+  // isCraftingRoute` never read its own flag, so a collapse stuck, but leaving the category
+  // force-CLOSED a group the GM had deliberately opened.
+  //
+  // The fix is to stop conflating the two. This map is intent and nothing else: only the
+  // disclosure toggle, a navigation that opens a group, and the auto-open effect below ever
+  // write it. Whether a group is DISPLAYED expanded is `railGroupExpanded`, which ORs this
+  // with `railGroupLockedOpen` — see the block beside the route predicates.
+  const RAIL_GROUP_IDS = Object.freeze([
+    'crafting',
+    'checks',
+    'gathering',
+    'systemTravel',
+    'worldDowntime',
+  ]);
+  let railGroupUserExpanded = $state({
+    crafting: false,
+    checks: false,
+    gathering: false,
+    systemTravel: false,
+    worldDowntime: false,
+  });
+  // The selected Downtime preview is owned here rather than inside the extension host
+  // because the rail, the page header and the breadcrumb all name it.
   let worldDowntimeTabId = $state('tracking');
-  // Crafting nav group (issue 511): mirrors the gathering group's expand state.
-  // The group is always available as of issue 745 (v1.3 headline); only its
-  // expand/collapse state lives here.
-  // Not a writable $derived: toggleCraftingMenu writes this from a non-crafting route and the
-  // value must STICK until the route category next changes, which a $derived would clobber.
-  // eslint-disable-next-line svelte/prefer-writable-derived
-  let craftingMenuExpanded = $state(false);
   // The selected recipe item on the Books & Scrolls surface (issue 511).
   let selectedRecipeItemId = $state('');
   // The recipe selected on the Access surface (visibility=restricted); drives the
@@ -572,7 +590,6 @@
   // `roll` for Triggers, deep-link to `roll` again, and the second one still lands. Without
   // it the repeat equalled the latch and was swallowed, stranding the GM on Triggers.
   let checksSectionRequestNonce = $state(0);
-  let checksMenuExpanded = $state(false);
   // The Graph surface (issue 442) is unimplemented; it stays a disabled placeholder
   // and, as of issue 745, renders only when experimental features are enabled.
   const placeholderViews = [
@@ -2356,6 +2373,79 @@
   const checksNavCount = $derived(checksNavIssueTotal(checksNavItems));
   const isChecksRoute = $derived(isChecksView(currentView));
   const checksActiveTab = $derived(resolveActiveChecksTab(currentView) || 'crafting');
+
+  // ── Rail group expansion: the LOCK, and what the rail actually renders (issue 1185) ───
+  //
+  // One rule, stated once for all five groups: a group is expanded when the GM expanded it
+  // (`railGroupUserExpanded`) OR when collapsing it would hide the screen they are standing
+  // on (`railGroupLockedOpen`). The lock is the ONLY exception to "every group collapses in
+  // any state", and it is why the disclosure control renders genuinely `disabled` there
+  // rather than swallowing the click — a chevron that visibly does nothing is what the
+  // whole defect read as.
+  //
+  // "Locked" means precisely "a rail SUB-ITEM of this group is the current view", so the
+  // membership test is taken over the built nav items rather than over the group's route
+  // CATEGORY. `isCraftingView` / `isChecksView` are category-wide — `CRAFTING_VIEWS` carries
+  // the `recipe-edit` and `recipe-item-edit` editors, and `isChecksRoute` carries the bare
+  // `checks` redirect — and none of those is an entry the rail renders, so keying the lock
+  // on them would pin a group open on a screen that is not in it. The category predicates
+  // keep their other jobs (rail highlighting, breadcrumbs, the route-exit guard) untouched.
+  const isCraftingChildRoute = $derived(craftingNavItems.some((item) => item.view === currentView));
+  const isChecksChildRoute = $derived(checksNavItems.some((item) => item.view === currentView));
+  // Downtime's every sub-tab IS the one `world-downtime` route (the tab is panel state, not
+  // a route), and that holds for a companion's tab set exactly as it does for Core's four —
+  // nothing here reads a tab id.
+  const railGroupLockedOpen = $derived({
+    crafting: isCraftingChildRoute,
+    checks: isChecksChildRoute,
+    gathering: isActiveGatheringChildRoute,
+    systemTravel: isSystemTravelChildRoute,
+    worldDowntime: isWorldDowntimeRoute,
+  });
+  const railGroupExpanded = $derived({
+    crafting: railGroupUserExpanded.crafting || railGroupLockedOpen.crafting,
+    checks: railGroupUserExpanded.checks || railGroupLockedOpen.checks,
+    gathering: railGroupUserExpanded.gathering || railGroupLockedOpen.gathering,
+    systemTravel: railGroupUserExpanded.systemTravel || railGroupLockedOpen.systemTravel,
+    worldDowntime: railGroupUserExpanded.worldDowntime || railGroupLockedOpen.worldDowntime,
+  });
+  // Entering a sub-tab also records the INTENT, so the group stays open when the GM later
+  // navigates away instead of snapping shut behind them.
+  //
+  // This effect reads `railGroupLockedOpen` and NEVER `railGroupUserExpanded`. That is the
+  // whole fix for the re-assert loop: a write to a state this effect does not read cannot
+  // re-trigger it, so a collapse the GM makes is final until the lock itself changes.
+  $effect(() => {
+    const locked = railGroupLockedOpen;
+    for (const group of RAIL_GROUP_IDS) {
+      if (locked[group]) railGroupUserExpanded[group] = true;
+    }
+  });
+  // The Tool Studio is a TOP-LEVEL rail entry that presents as Crafting context — its
+  // breadcrumb reads "<system> › Crafting › Tools" — so entering it opens the Crafting group,
+  // as it has since issue 784. What changed is the mechanism: it records INTENT here instead
+  // of ORing `isToolStudioRoute` into the rendered expansion. Tools is not one of Crafting's
+  // rail sub-items, so it must not LOCK the group; the old form pinned the group open and
+  // left its chevron inert, which is one of the five faces of the issue 1185 report.
+  // Reads only the route, never the flag, so a collapse from here is final.
+  $effect(() => {
+    if (isToolStudioRoute) railGroupUserExpanded.crafting = true;
+  });
+  function toggleRailGroup(group, event) {
+    event?.stopPropagation?.();
+    // Belt and braces beside the `disabled` attribute: the lock is a rule about state, not
+    // about one control, so it holds for a programmatic call too.
+    if (railGroupLockedOpen[group]) return;
+    railGroupUserExpanded[group] = !railGroupUserExpanded[group];
+  }
+  // ONE sentence for all five groups, and deliberately generic: the Downtime group's
+  // children come from whichever provider holds the surface, so this cannot name a section.
+  const railGroupLockedTitle = $derived(
+    text(
+      'FABRICATE.Admin.Manager.Nav.LockedOpen',
+      'This section stays open while you are on one of its pages.'
+    )
+  );
   // The Knowledge surface's projection is published TOP-LEVEL, never hung off
   // `selectedSystem` (issue 785): hanging it there would force a `selectedSystem`
   // reference rebuild on every knowledge publish and let a late phase-2 publish
@@ -2426,13 +2516,6 @@
         )
       : []
   );
-  // The Crafting group's expansion follows the active route: it expands on
-  // entering a crafting child route and collapses on leaving, so the submenu
-  // never dangles open over unrelated views. A manual toggle from a non-crafting
-  // route sticks until the route category next changes.
-  $effect(() => {
-    craftingMenuExpanded = isCraftingRoute;
-  });
   const selectedGatheringRules = $derived(
     $viewState.gatheringConfig?.systems?.[selectedSystemId]?.rules || {
       rewardSelectionMode: 'highestRankedDrop',
@@ -2684,7 +2767,7 @@
     gatheringEventDraftBaseline = null;
     gatheringEventSaving = false;
     gatheringEventSaveError = '';
-    gatheringMenuExpanded = isGatheringRoute;
+    railGroupUserExpanded.gathering = isGatheringRoute;
     lastGatheringSystemId = selectedSystemId;
   });
 
@@ -2695,24 +2778,6 @@
     if (currentView === 'gathering-task-edit' && canShowEnvironments) return;
     if (currentView === 'gathering-event-edit' && canShowEnvironments) return;
     activeGatheringTab = 'environments';
-  });
-
-  $effect(() => {
-    if (!isActiveGatheringChildRoute || gatheringMenuExpanded) return;
-    gatheringMenuExpanded = true;
-  });
-
-  $effect(() => {
-    if (isSystemTravelChildRoute && !systemTravelExpanded) systemTravelExpanded = true;
-  });
-
-  $effect(() => {
-    if (isWorldDowntimeRoute && !worldDowntimeExpanded) worldDowntimeExpanded = true;
-  });
-
-  $effect(() => {
-    if (!isChecksRoute || checksMenuExpanded) return;
-    checksMenuExpanded = true;
   });
 
   $effect(() => {
@@ -4037,14 +4102,10 @@
     );
   }
 
-  function toggleChecksMenu() {
-    checksMenuExpanded = !checksMenuExpanded;
-  }
-
   // Activating the PARENT opens the group and routes to the first available child, which is
   // what makes the retained `checks` id a redirect rather than a dead route.
   function activateChecksParent() {
-    checksMenuExpanded = true;
+    railGroupUserExpanded.checks = true;
     setView(resolveChecksRedirect(checksNavArgs));
   }
 
@@ -4057,7 +4118,7 @@
   function backToEnvironmentsBrowse() {
     afterTruthyResult(confirmRouteExit('environments'), () => {
       activeView = canShowEnvironments ? 'environments' : 'systems';
-      if (canShowEnvironments) gatheringMenuExpanded = true;
+      if (canShowEnvironments) railGroupUserExpanded.gathering = true;
     });
   }
 
@@ -5471,7 +5532,7 @@
     gatheringTaskDraftBaseline = snapshot ? JSON.parse(JSON.stringify(snapshot)) : null;
     gatheringTaskSaveError = '';
     activeGatheringTab = 'tasks';
-    gatheringMenuExpanded = true;
+    railGroupUserExpanded.gathering = true;
     activeView = 'gathering-task-edit';
   }
 
@@ -5484,7 +5545,7 @@
   function backToGatheringTaskLibrary() {
     afterTruthyResult(confirmRouteExit('environments'), () => {
       activeGatheringTab = 'tasks';
-      gatheringMenuExpanded = true;
+      railGroupUserExpanded.gathering = true;
       activeView = 'environments';
     });
   }
@@ -5550,7 +5611,7 @@
     gatheringTaskDraftBaseline = null;
     gatheringTaskSaveError = '';
     activeGatheringTab = 'tasks';
-    gatheringMenuExpanded = true;
+    railGroupUserExpanded.gathering = true;
     activeView = 'environments';
   }
 
@@ -5612,7 +5673,7 @@
     gatheringEventDraftBaseline = snapshot ? JSON.parse(JSON.stringify(snapshot)) : null;
     gatheringEventSaveError = '';
     activeGatheringTab = 'encounters';
-    gatheringMenuExpanded = true;
+    railGroupUserExpanded.gathering = true;
     activeView = 'gathering-event-edit';
   }
 
@@ -5626,7 +5687,7 @@
   function backToGatheringEventLibrary() {
     afterTruthyResult(confirmRouteExit('environments'), () => {
       activeGatheringTab = 'encounters';
-      gatheringMenuExpanded = true;
+      railGroupUserExpanded.gathering = true;
       activeView = 'environments';
     });
   }
@@ -5694,7 +5755,7 @@
     if (selectedGatheringEventId === deletedId) selectedGatheringEventId = '';
     clearGatheringEventDraft();
     activeGatheringTab = 'encounters';
-    gatheringMenuExpanded = true;
+    railGroupUserExpanded.gathering = true;
     activeView = 'environments';
   }
 
@@ -6020,7 +6081,7 @@
     activeGatheringTab = visibleGatheringNavItems.some((tab) => tab.id === tabId)
       ? tabId
       : 'environments';
-    gatheringMenuExpanded = true;
+    railGroupUserExpanded.gathering = true;
   }
 
   function openWorldParties() {
@@ -6033,7 +6094,7 @@
 
   function openWorldDowntime() {
     return afterTruthyResult(confirmRouteExit('world-downtime'), () => {
-      worldDowntimeExpanded = true;
+      railGroupUserExpanded.worldDowntime = true;
       activeView = 'world-downtime';
     });
   }
@@ -6045,18 +6106,9 @@
     if (!downtimeTabs.some((tab) => tab.id === tabId)) return;
     return afterTruthyResult(confirmRouteExit('world-downtime'), () => {
       worldDowntimeTabId = tabId;
-      worldDowntimeExpanded = true;
+      railGroupUserExpanded.worldDowntime = true;
       activeView = 'world-downtime';
     });
-  }
-
-  function toggleWorldDowntimeNav(event) {
-    event?.stopPropagation?.();
-    if (isWorldDowntimeRoute) {
-      worldDowntimeExpanded = true;
-      return;
-    }
-    worldDowntimeExpanded = !worldDowntimeExpanded;
   }
 
   function openSystemTravelDestination(destination = 'realms') {
@@ -6064,24 +6116,15 @@
     return afterTruthyResult(confirmRouteExit('environments'), () => {
       activeGatheringTab = 'travel';
       activeTravelTab = destination;
-      systemTravelExpanded = true;
+      railGroupUserExpanded.systemTravel = true;
       activeView = 'environments';
     });
   }
 
   function activateSystemTravelParent() {
-    systemTravelExpanded = true;
+    railGroupUserExpanded.systemTravel = true;
     if (isSystemTravelChildRoute) return;
     openSystemTravelDestination('realms');
-  }
-
-  function toggleSystemTravel(event) {
-    event?.stopPropagation?.();
-    if (isSystemTravelChildRoute) {
-      systemTravelExpanded = true;
-      return;
-    }
-    systemTravelExpanded = !systemTravelExpanded;
   }
 
   function openGatheringSection(tabId = 'environments') {
@@ -6091,7 +6134,7 @@
       : 'environments';
     afterTruthyResult(confirmRouteExit('environments'), () => {
       activeGatheringTab = nextTab;
-      gatheringMenuExpanded = true;
+      railGroupUserExpanded.gathering = true;
       activeView = 'environments';
     });
   }
@@ -6142,19 +6185,10 @@
 
   function activateGatheringParent() {
     if (isActiveGatheringChildRoute) {
-      gatheringMenuExpanded = true;
+      railGroupUserExpanded.gathering = true;
       return;
     }
     openGatheringSection('environments');
-  }
-
-  function toggleGatheringMenu(event) {
-    event?.stopPropagation?.();
-    if (isActiveGatheringChildRoute) {
-      gatheringMenuExpanded = true;
-      return;
-    }
-    gatheringMenuExpanded = !gatheringMenuExpanded;
   }
 
   // Crafting nav group handlers (issue 511), mirroring the gathering group. Route
@@ -6165,13 +6199,13 @@
     const nextView = item?.view || 'recipes';
     afterTruthyResult(confirmRouteExit(nextView), () => {
       activeView = nextView;
-      craftingMenuExpanded = true;
+      railGroupUserExpanded.crafting = true;
     });
   }
 
   function activateCraftingParent() {
     if (isCraftingRoute) {
-      craftingMenuExpanded = true;
+      railGroupUserExpanded.crafting = true;
       return;
     }
     openCraftingSection('recipes');
@@ -6249,7 +6283,7 @@
       recipeItemDraftBaseline = cloneRecipeItemDraft(source);
       recipeItemLinkedSourceSnapshot = recipeItemSourceSnapshot(source);
       activeView = 'recipe-item-edit';
-      craftingMenuExpanded = true;
+      railGroupUserExpanded.crafting = true;
       Promise.resolve(services?.getWorldItemOptions?.()).then((options) => {
         worldItemOptions = options || [];
       });
@@ -6353,15 +6387,6 @@
     const created = await store.addRecipeItemFromUuid?.(selectedSystemId, uuid);
     const newId = typeof created === 'string' ? created : created?.item?.id || created?.id;
     if (newId) editRecipeItem(newId);
-  }
-
-  function toggleCraftingMenu(event) {
-    event?.stopPropagation?.();
-    if (isCraftingRoute) {
-      craftingMenuExpanded = true;
-      return;
-    }
-    craftingMenuExpanded = !craftingMenuExpanded;
   }
 
   function copyComponentSource(uuid = selectedComponent?.registeredItemUuidDisplay) {
@@ -8044,16 +8069,22 @@
               >
             {/if}
           </button>
-          <!-- Crafting group is unconditional as of issue 745 (v1.3 headline). -->
-          <div
-            class={`manager-nav-group ${craftingMenuExpanded || isToolStudioRoute ? 'is-expanded' : ''}`}
-          >
+          <!--
+            Crafting group is unconditional as of issue 745 (v1.3 headline).
+
+            The Tool Studio used to force this group open (`|| isToolStudioRoute`, issue
+            784) even though Tools is a top-level rail entry and has never been a Crafting
+            child. That pinned the group open on a screen that is not in it and left its
+            chevron inert — one of the five faces of the "refuses to minimize" report
+            (issue 1185). The rule is uniform now: only a Crafting SUB-ITEM locks it.
+          -->
+          <div class={`manager-nav-group ${railGroupExpanded.crafting ? 'is-expanded' : ''}`}>
             <button
               type="button"
               class="manager-nav-button manager-nav-parent"
               id="manager-nav-crafting"
               aria-current={isCraftingRoute ? 'page' : undefined}
-              aria-expanded={craftingMenuExpanded || isToolStudioRoute}
+              aria-expanded={railGroupExpanded.crafting}
               onclick={activateCraftingParent}
             >
               <i class="fas fa-hammer" aria-hidden="true"></i>
@@ -8062,24 +8093,31 @@
               >
               <span class="manager-nav-count">{craftingNavCount}</span>
             </button>
+            <!--
+              Locked ⇒ genuinely `disabled`, with the reason on the control. A collapse that
+              would hide the screen the GM is standing on is the ONE case the rule forbids,
+              and a chevron that silently swallowed the click is what made the old behaviour
+              read as a bug rather than a constraint.
+            -->
             <button
               type="button"
               class="manager-nav-toggle"
-              aria-label={craftingMenuExpanded || isToolStudioRoute
+              aria-label={railGroupExpanded.crafting
                 ? text('FABRICATE.Admin.Manager.Nav.CollapseCrafting', 'Collapse crafting menu')
                 : text('FABRICATE.Admin.Manager.Nav.ExpandCrafting', 'Expand crafting menu')}
               aria-controls="manager-crafting-submenu"
-              aria-expanded={craftingMenuExpanded || isToolStudioRoute}
-              onclick={toggleCraftingMenu}
+              aria-expanded={railGroupExpanded.crafting}
+              disabled={railGroupLockedOpen.crafting}
+              aria-disabled={railGroupLockedOpen.crafting}
+              title={railGroupLockedOpen.crafting ? railGroupLockedTitle : undefined}
+              onclick={(event) => toggleRailGroup('crafting', event)}
             >
               <i
-                class={craftingMenuExpanded || isToolStudioRoute
-                  ? 'fas fa-chevron-up'
-                  : 'fas fa-chevron-down'}
+                class={railGroupExpanded.crafting ? 'fas fa-chevron-up' : 'fas fa-chevron-down'}
                 aria-hidden="true"
               ></i>
             </button>
-            {#if craftingMenuExpanded || isToolStudioRoute}
+            {#if railGroupExpanded.crafting}
               <div
                 class="manager-nav-submenu"
                 id="manager-crafting-submenu"
@@ -8177,13 +8215,13 @@
             >
             <span class="manager-nav-count">{toolsNavCount}</span>
           </button>
-          <div class={`manager-nav-group ${checksMenuExpanded ? 'is-expanded' : ''}`}>
+          <div class={`manager-nav-group ${railGroupExpanded.checks ? 'is-expanded' : ''}`}>
             <button
               type="button"
               class={`manager-nav-button manager-nav-parent ${isChecksRoute ? 'is-active' : ''}`}
               id="manager-nav-checks"
               aria-current={isChecksRoute ? 'page' : undefined}
-              aria-expanded={checksMenuExpanded}
+              aria-expanded={railGroupExpanded.checks}
               onclick={activateChecksParent}
             >
               <i class="fas fa-dice-d20" aria-hidden="true"></i>
@@ -8205,19 +8243,22 @@
             <button
               type="button"
               class="manager-nav-toggle"
-              aria-label={checksMenuExpanded
+              aria-label={railGroupExpanded.checks
                 ? text('FABRICATE.Admin.Manager.Nav.CollapseChecks', 'Collapse checks menu')
                 : text('FABRICATE.Admin.Manager.Nav.ExpandChecks', 'Expand checks menu')}
               aria-controls="manager-checks-submenu"
-              aria-expanded={checksMenuExpanded}
-              onclick={toggleChecksMenu}
+              aria-expanded={railGroupExpanded.checks}
+              disabled={railGroupLockedOpen.checks}
+              aria-disabled={railGroupLockedOpen.checks}
+              title={railGroupLockedOpen.checks ? railGroupLockedTitle : undefined}
+              onclick={(event) => toggleRailGroup('checks', event)}
             >
               <i
-                class={checksMenuExpanded ? 'fas fa-chevron-up' : 'fas fa-chevron-down'}
+                class={railGroupExpanded.checks ? 'fas fa-chevron-up' : 'fas fa-chevron-down'}
                 aria-hidden="true"
               ></i>
             </button>
-            {#if checksMenuExpanded}
+            {#if railGroupExpanded.checks}
               <div
                 class="manager-nav-submenu"
                 id="manager-checks-submenu"
@@ -8267,13 +8308,13 @@
             {/if}
           </div>
           {#if canShowEnvironments}
-            <div class={`manager-nav-group ${gatheringMenuExpanded ? 'is-expanded' : ''}`}>
+            <div class={`manager-nav-group ${railGroupExpanded.gathering ? 'is-expanded' : ''}`}>
               <button
                 type="button"
                 class="manager-nav-button manager-nav-parent"
                 id="manager-nav-gathering"
                 aria-current={isGatheringRoute ? 'page' : undefined}
-                aria-expanded={gatheringMenuExpanded}
+                aria-expanded={railGroupExpanded.gathering}
                 onclick={activateGatheringParent}
               >
                 <i class="fas fa-seedling" aria-hidden="true"></i>
@@ -8285,19 +8326,22 @@
               <button
                 type="button"
                 class="manager-nav-toggle"
-                aria-label={gatheringMenuExpanded
+                aria-label={railGroupExpanded.gathering
                   ? text('FABRICATE.Admin.Manager.Nav.CollapseGathering', 'Collapse gathering menu')
                   : text('FABRICATE.Admin.Manager.Nav.ExpandGathering', 'Expand gathering menu')}
                 aria-controls="manager-gathering-submenu"
-                aria-expanded={gatheringMenuExpanded}
-                onclick={toggleGatheringMenu}
+                aria-expanded={railGroupExpanded.gathering}
+                disabled={railGroupLockedOpen.gathering}
+                aria-disabled={railGroupLockedOpen.gathering}
+                title={railGroupLockedOpen.gathering ? railGroupLockedTitle : undefined}
+                onclick={(event) => toggleRailGroup('gathering', event)}
               >
                 <i
-                  class={gatheringMenuExpanded ? 'fas fa-chevron-up' : 'fas fa-chevron-down'}
+                  class={railGroupExpanded.gathering ? 'fas fa-chevron-up' : 'fas fa-chevron-down'}
                   aria-hidden="true"
                 ></i>
               </button>
-              {#if gatheringMenuExpanded}
+              {#if railGroupExpanded.gathering}
                 <div
                   class="manager-nav-submenu"
                   id="manager-gathering-submenu"
@@ -8332,7 +8376,7 @@
           {/if}
           {#if canShowSystemTravel}
             <div
-              class={`manager-nav-group manager-system-travel-group ${systemTravelExpanded ? 'is-expanded' : ''}`}
+              class={`manager-nav-group manager-system-travel-group ${railGroupExpanded.systemTravel ? 'is-expanded' : ''}`}
               data-system-travel-section
             >
               <button
@@ -8344,7 +8388,7 @@
                   'Travel'
                 )}
                 aria-controls="manager-travel-submenu"
-                aria-expanded={systemTravelExpanded}
+                aria-expanded={railGroupExpanded.systemTravel}
                 onclick={activateSystemTravelParent}
               >
                 <i class="fas fa-route" aria-hidden="true"></i>
@@ -8357,19 +8401,24 @@
                 class="manager-nav-toggle"
                 id="manager-travel-toggle"
                 data-system-travel-toggle
-                aria-label={systemTravelExpanded
+                aria-label={railGroupExpanded.systemTravel
                   ? text('FABRICATE.Admin.Manager.World.CollapseTravel', 'Collapse Travel')
                   : text('FABRICATE.Admin.Manager.World.ExpandTravel', 'Expand Travel')}
                 aria-controls="manager-travel-submenu"
-                aria-expanded={systemTravelExpanded}
-                onclick={toggleSystemTravel}
+                aria-expanded={railGroupExpanded.systemTravel}
+                disabled={railGroupLockedOpen.systemTravel}
+                aria-disabled={railGroupLockedOpen.systemTravel}
+                title={railGroupLockedOpen.systemTravel ? railGroupLockedTitle : undefined}
+                onclick={(event) => toggleRailGroup('systemTravel', event)}
               >
                 <i
-                  class={systemTravelExpanded ? 'fas fa-chevron-up' : 'fas fa-chevron-down'}
+                  class={railGroupExpanded.systemTravel
+                    ? 'fas fa-chevron-up'
+                    : 'fas fa-chevron-down'}
                   aria-hidden="true"
                 ></i>
               </button>
-              {#if systemTravelExpanded}
+              {#if railGroupExpanded.systemTravel}
                 <div
                   class="manager-nav-submenu"
                   id="manager-travel-submenu"
@@ -8466,7 +8515,7 @@
             the same reason.
           -->
           <div
-            class={`manager-nav-group manager-world-downtime-group ${worldDowntimeExpanded ? 'is-expanded' : ''}`}
+            class={`manager-nav-group manager-world-downtime-group ${railGroupExpanded.worldDowntime ? 'is-expanded' : ''}`}
             data-world-downtime-section
           >
             <button
@@ -8481,7 +8530,7 @@
               aria-label={text('FABRICATE.Admin.Manager.World.Downtime.Nav', 'Downtime')}
               aria-current={isWorldDowntimeRoute ? 'page' : undefined}
               aria-controls="manager-downtime-submenu"
-              aria-expanded={worldDowntimeExpanded}
+              aria-expanded={railGroupExpanded.worldDowntime}
               onclick={openWorldDowntime}
             >
               <i class="fas fa-hourglass-half" aria-hidden="true"></i>
@@ -8497,19 +8546,24 @@
               class="manager-nav-toggle"
               id="manager-downtime-toggle"
               data-world-downtime-toggle
-              aria-label={worldDowntimeExpanded
+              aria-label={railGroupExpanded.worldDowntime
                 ? text('FABRICATE.Admin.Manager.World.Downtime.CollapseNav', 'Collapse Downtime')
                 : text('FABRICATE.Admin.Manager.World.Downtime.ExpandNav', 'Expand Downtime')}
               aria-controls="manager-downtime-submenu"
-              aria-expanded={worldDowntimeExpanded}
-              onclick={toggleWorldDowntimeNav}
+              aria-expanded={railGroupExpanded.worldDowntime}
+              disabled={railGroupLockedOpen.worldDowntime}
+              aria-disabled={railGroupLockedOpen.worldDowntime}
+              title={railGroupLockedOpen.worldDowntime ? railGroupLockedTitle : undefined}
+              onclick={(event) => toggleRailGroup('worldDowntime', event)}
             >
               <i
-                class={worldDowntimeExpanded ? 'fas fa-chevron-up' : 'fas fa-chevron-down'}
+                class={railGroupExpanded.worldDowntime
+                  ? 'fas fa-chevron-up'
+                  : 'fas fa-chevron-down'}
                 aria-hidden="true"
               ></i>
             </button>
-            {#if worldDowntimeExpanded}
+            {#if railGroupExpanded.worldDowntime}
               <div
                 class="manager-nav-submenu"
                 id="manager-downtime-submenu"

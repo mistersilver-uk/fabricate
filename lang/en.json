@@ -1754,7 +1754,8 @@
           "Knowledge": "Knowledge",
           "SectionLabel": "GM management",
           "CollapseChecks": "Collapse checks menu",
-          "ExpandChecks": "Expand checks menu"
+          "ExpandChecks": "Expand checks menu",
+          "LockedOpen": "This section stays open while you are on one of its pages."
         },
         "Titlebar": {
           "Label": "Crafting manager",

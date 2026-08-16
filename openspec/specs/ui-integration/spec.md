@@ -379,6 +379,9 @@ Header hierarchy:
 - A screen renders **one** page header.
   A view must not stack a second header of its own beneath the shell's, restating the system name the breadcrumb and the titlebar's system badge already carry.
 - The page title is the manager's display type and carries the weight that buys; the page's single primary action (`Create …`) is taller than a row button.
+- A route that declares a page-header identity tile renders it as the header's leading element, immediately adjacent to the breadcrumb/title/subtitle block, so the tile and that block read as one left-aligned unit.
+  The trailing page actions keep the header's right edge.
+  The heading block therefore absorbs the header's free space; the tile must not be stranded at the far left with the heading pushed toward the middle.
 
 Selected-system rail:
 
@@ -417,10 +420,18 @@ Selected-system navigation:
   The top-level `Checks` rail item — an expandable nav GROUP whose Crafting / Salvage / Gathering / Validation entries are rail CHILDREN owning the routes `CHECKS_VIEWS` declares, not tabs inside one view — and the `Tags & Categories` rail item are fully implemented and **not** experimental-gated.
   "Sub-tab" names the five SECTIONS inside an activity route and must not be reused for these children.
   When `Recipes` is the active route, its `recipe-edit` subroute is treated as part of the Recipes route for navigation, breadcrumb (`Crafting` then `Recipes` then `Edit recipe`), and left-nav active-state purposes — the same sibling-subroute relationship the Essences route has with `essence-edit`.
+- Every collapsible rail group — `Crafting`, `Checks`, `Gathering`, selected-system `Travel`, and world `Downtime` — obeys ONE disclosure rule, and no group's disclosure depends on any other group's state.
+  A group is expanded when the GM expanded it OR when one of that group's own rail sub-items is the current view, and a group whose sub-item is the current view is LOCKED open, because collapsing it would hide the screen the GM is standing on.
+  That lock is the only exception to "any group collapses in any state", and it is stated on the control rather than enforced silently: a locked disclosure renders genuinely `disabled`, carries `aria-disabled`, and carries a tooltip saying the section stays open while the GM is on one of its pages.
+  A control that accepts the click and does nothing is forbidden — that behaviour is indistinguishable from a broken chevron.
+  Membership is taken over the rail sub-items the group renders, never over the route CATEGORY: `recipe-edit`, `recipe-item-edit`, the bare `checks` redirect, and the Tool Studio all sit inside a group's category or context without being entries the rail offers, so none of them locks a group open.
+  Entering a sub-item both takes the lock and records the GM's intent, so navigating AWAY leaves a group exactly as the GM left it — expanded stays expanded, collapsed stays collapsed — and no route change may force a group closed.
+  Entering the Tool Studio opens the `Crafting` group it presents under (its breadcrumb reads `<system>` then `Crafting` then `Tools`) as intent rather than as a lock, so that disclosure stays usable there.
+  The rule reads no tab or route id belonging to one owner: the world `Downtime` group's children are the active provider's tabs, and a companion's tab set gets the same behaviour as Core's.
 - The selected-system `Crafting` rail item is an expandable nav group modelled on the Gathering group, shown whenever a crafting system is selected.
   The parent row shows an expand/collapse control and the recipe count as its badge.
-  Activating the parent item opens the Recipes browser by default and expands the submenu only when the active route is outside Crafting; when a Crafting child route is already active, activating the parent item must not navigate away from the current Crafting page, and while a Crafting child route is active the expand/collapse control is locked open — activating it keeps the submenu expanded rather than collapsing it.
-  The group collapses when the active route leaves Crafting, so its submenu does not dangle open over unrelated views.
+  Activating the parent item opens the Recipes browser by default and expands the submenu only when the active route is outside Crafting; when a Crafting child route is already active, activating the parent item must not navigate away from the current Crafting page.
+  Its disclosure follows the shared rail-group rule above: locked open while a Crafting rail sub-item is the current view, and otherwise collapsible and left as the GM leaves it, including after the route leaves Crafting.
   The expanded submenu (built by `buildCraftingNavItems`) always contains `Recipes` and `Settings`, plus a **mode-conditional** entry derived from the system's `visibilityMode` (via `craftingEffect`): `Access` appears only in `restricted` mode (`showAccess`), and `Books & Scrolls` appears only in `item` and `knowledge` modes (`showBooksScrolls`); `global` mode shows neither.
   The submenu also contains a `Knowledge` entry whose gate is deliberately wider than the others': it is shown when `craftingEffect` grants `Books & Scrolls` OR the system's `resolutionMode` is `alchemy`, because `learnRecipeOnCraft` writes learned recipes under every visibility mode and under `global` alchemy they are the sole reveal source.
   A system can offer more than one mode-conditional entry at once: a `restricted` system whose `resolutionMode` is `alchemy` shows `Recipes`, `Access`, `Knowledge` and `Settings`.
@@ -442,7 +453,7 @@ Selected-system navigation:
 - The selected-system Gathering rail item shows an expand/collapse control instead of an environment count.
   Activating the parent item opens the Environments browser by default and expands the submenu **only when the active route is outside Gathering**; when a Gathering child page or Gathering edit subroute is already active, activating the parent item must not navigate away from the current Gathering page.
   Activating only the expand/collapse control toggles the submenu without navigation.
-  While a Gathering child page or Gathering edit subroute is active, the expand/collapse control is locked: it only toggles (no navigation) and the submenu remains expanded and cannot be collapsed.
+  While a Gathering child page or Gathering edit subroute is active, the expand/collapse control is locked open under the shared rail-group rule above: it renders disabled and names the reason, instead of accepting the click and leaving the submenu expanded.
   The expanded submenu contains Environments, Tasks, Events, and Settings inside a soft grouped container that does not shift the parent Gathering row, icon, label, or expand/collapse control.
   The Gathering parent row remains visually neutral, and only the selected subsection uses the selected menu-item treatment.
   Gathering section navigation must not be duplicated as an in-page horizontal tab strip.

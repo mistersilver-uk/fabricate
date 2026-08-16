@@ -1737,7 +1737,19 @@
   background: var(--fab-mv2-surface-1);
 }
 
+/*
+  The heading takes the header's free space so it sits IMMEDIATELY beside the route identity
+  tile, and the trailing actions keep their right edge (issue 1185).
+
+  `.manager-header` is `justify-content: space-between`, which reads correctly only while the
+  header holds two children. The route tile added a third, and space-between then parked the
+  heading in the middle of the row — the prototype measures the tile's right edge at 194px and
+  the title's left edge at 206px, one 12px gap apart, against several hundred px of gap here.
+  Growing the heading absorbs the free space instead, so the distribution has none left to
+  hand out and the two-child header is unchanged.
+*/
 .fabricate-manager .manager-heading {
+  flex: 1 1 auto;
   min-width: 0;
 }
 
@@ -12313,10 +12325,24 @@
   cursor: pointer;
 }
 
-.fabricate-manager .manager-nav-toggle:hover {
+/* `:not(:disabled)` is load-bearing rather than tidy: a group locked open by its own active
+   sub-tab renders this control genuinely disabled (issue 1185), and a hover treatment on a
+   control that cannot act is the same lie the silently-swallowed click used to tell. */
+.fabricate-manager .manager-nav-toggle:not(:disabled):hover {
   color: var(--fab-mv2-text);
   border-color: var(--fab-mv2-border);
   background: var(--fab-overlay-light-06);
+}
+
+/* The locked disclosure. It keeps `pointer-events` so the `title` explaining WHY it cannot
+   collapse still surfaces on hover — the counter-example is `.manager-scope-return.is-disabled`
+   above, which has no reason to convey and can afford `pointer-events: none`. */
+.fabricate-manager .manager-nav-toggle:disabled {
+  color: var(--fab-mv2-text-muted);
+  border-color: transparent;
+  background: transparent;
+  opacity: 0.45;
+  cursor: default;
 }
 
 .fabricate-manager .manager-nav-toggle:focus {
