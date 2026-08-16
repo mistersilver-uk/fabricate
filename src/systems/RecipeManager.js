@@ -394,11 +394,10 @@ export class RecipeManager {
 
     if (delta.reordered) {
       this.recipes = next;
-      // The cohort index is keyed on the map object, so a replaced map is already a miss;
-      // dropping it here keeps that explicit rather than incidental.
-      this._cohortCache = null;
       const touched = new Set();
       for (const recipe of next.values()) touched.add(recipe?.craftingSystemId);
+      // Also drops the cohort index, which is keyed on the map object and so would have
+      // missed on the replacement above regardless.
       this._advanceRecipeRevision(...touched);
       return true;
     }

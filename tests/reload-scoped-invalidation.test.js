@@ -487,6 +487,9 @@ describe('issue 1078 — identity is preserved only where the record is structur
     const { recipeManager, env, write } = twoSystemWorld();
     const staleRecipe = recipeManager.getRecipe('r-a1');
     const staleMap = recipeManager.recipes;
+    // Warm the cohort index BEFORE the reorder, so the assertion below is about an index that
+    // actually existed to go stale rather than about a cold read.
+    assert.equal(recipeManager.getRecipes({ craftingSystemId: SYS_A }).length, 2);
     const tokens = recipeTokens(recipeManager);
 
     write(null, storedRecipes(env).toReversed());
@@ -510,6 +513,21 @@ describe('issue 1078 — identity is preserved only where the record is structur
       [...recipeManager.recipes.keys()],
       ['r-b1', 'r-a2', 'r-a1'],
       'and the replacement map carries the persisted order'
+    );
+    // The cohort read, warmed above, still answers correctly after the reorder. It does NOT
+    // pin the eager `_cohortCache = null`, which is removable green: `_recipeCohorts` also
+    // re-validates on read against the map object, its size and the domain token, and a
+    // replaced map fails the first clause on its own. The assertion is here for the answer,
+    // not for the mechanism.
+    const cohort = recipeManager.getRecipes({ craftingSystemId: SYS_A });
+    assert.deepEqual(
+      cohort.map((entry) => entry.id),
+      ['r-a2', 'r-a1'],
+      'a cohort is map insertion order, so it carries the reversal too'
+    );
+    assert.ok(
+      cohort.every((entry) => entry !== staleRecipe),
+      'and it holds the fresh recipe objects, not the ones the reorder discarded'
     );
   });
 
