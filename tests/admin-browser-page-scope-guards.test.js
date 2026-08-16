@@ -55,6 +55,19 @@ const { buildVocabularyUsage, countRecipeTagPlaceholderUsage } = await import(
 const COHORT = 60;
 const PAGE_SIZE = 25;
 
+/**
+ * The tag every recipe in the cohort names in a `tags` ingredient placeholder, cycled by
+ * index so the counts are uneven and a wrong cohort produces a visibly wrong record.
+ */
+const PLACEHOLDER_TAGS = ['metal', 'herb', 'reagent'];
+/**
+ * A search term matching recipes `Recipe 000`–`Recipe 009` and nothing else, so
+ * `buildRecipeList`'s search-filtered subset is a strict, known subset of the roster. The
+ * pre-counted tag record must follow that subset, because the rows it accompanies do.
+ */
+const SEARCH_TERM = '00';
+const SEARCHED_COHORT = 10;
+
 // ---------------------------------------------------------------------------
 // The GM recipe browser
 // ---------------------------------------------------------------------------
@@ -70,7 +83,15 @@ function makeRecipeWorld(counters) {
   const system = makeCraftingSystem({ componentCount: 8, resolutionMode: 'alchemy' });
   const recipes = Array.from({ length: COHORT }, (_, index) =>
     Recipe.fromJSON({
-      ...makeSignatureRecipe({ id: `r-${String(index).padStart(3, '0')}`, componentId: `c-${index % 8}` }),
+      ...makeSignatureRecipe({
+        id: `r-${String(index).padStart(3, '0')}`,
+        componentId: `c-${index % 8}`,
+        // Every recipe carries a tag placeholder (issue 1081). Without one the whole cohort
+        // matches only on `{type: 'component'}`, and the tag-count guards below compare a
+        // pre-counted empty map against a walked empty map — an agreement that holds however
+        // broken either producer is.
+        tagPlaceholders: [PLACEHOLDER_TAGS[index % PLACEHOLDER_TAGS.length]],
+      }),
       name: `Recipe ${String(index).padStart(3, '0')}`,
       craftingSystemId: system.id,
     })
@@ -511,6 +532,17 @@ describe('the Tags & Categories reference count reads the cohort without materia
         'the counter CAN go up — walking the rows for their placeholders is what does it'
       );
 
+      // ANTI-VACUITY, before the agreement is claimed. Both sides of the comparison below
+      // are maps, and two empty maps agree — so the pre-counted side is stated as an exact,
+      // non-empty record first. Delete `countRecipeTagPlaceholderUsage` from the projection
+      // and this is what goes red; the `deepEqual` alone would not.
+      assert.deepEqual(
+        Object.fromEntries(scoped.tagUsage),
+        { metal: 20, herb: 20, reagent: 20 },
+        'the pre-counted record really carries the cohort placeholders'
+      );
+      assert.equal(scoped.tagReferenceCount, COHORT, 'one placeholder tag per recipe');
+
       // And the two answers agree, so this is a choice of WHERE the walk happens rather than
       // a quietly different number on the screen.
       assert.deepEqual([...scoped.tagUsage], [...walked.tagUsage]);
@@ -522,11 +554,125 @@ describe('the Tags & Categories reference count reads the cohort without materia
   });
 
   /**
+   * WHICH cohort the pre-count is folded over is a rendered number, not an implementation
+   * detail: `buildRecipeList` counts the SEARCH-FILTERED subset, the same array the rows are
+   * projected from, and moving it to the unfiltered roster would change what the Tags &
+   * Categories screen reports without failing anything.
+   *
+   * The empty-search case above cannot see that choice at all — filtered and roster are the
+   * same 60 recipes there — so this drives a NON-EMPTY term. It is also what makes the
+   * counting live end to end: with the term applied, the pre-counted record and the walk over
+   * the rows it accompanies must still be the same record, and either of the two ways the
+   * threading can be severed (the projection folding nothing, or the count being taken over
+   * the wrong cohort) breaks that equality.
+   */
+  it('folds the pre-count over the SAME search-filtered cohort the rows come from', () => {
+    const counters = createOperationCounters();
+    const world = makeRecipeWorld(counters);
+    try {
+      const all = buildRecipeList(world.systemManager, world.manager, world.system, '');
+      const searched = buildRecipeList(
+        world.systemManager,
+        world.manager,
+        world.system,
+        SEARCH_TERM
+      );
+
+      assert.equal(
+        searched.recipes.length,
+        SEARCHED_COHORT,
+        'PRE-CONDITION: the term selects a strict subset, so the two cohorts are different'
+      );
+      assert.notDeepEqual(
+        searched.recipeTagPlaceholderCounts,
+        all.recipeTagPlaceholderCounts,
+        'and the two cohorts really do produce different records — otherwise the equality ' +
+          'below could not tell them apart'
+      );
+
+      // `Recipe 000`–`Recipe 009`, so index % 3 gives metal 4, herb 3, reagent 3.
+      assert.deepEqual(
+        searched.recipeTagPlaceholderCounts,
+        { metal: 4, herb: 3, reagent: 3 },
+        'the record is folded over the searched cohort, not the roster'
+      );
+      assert.equal(
+        counters.get('recipeDetailProjections'),
+        0,
+        'and still built no detail bundle for either list'
+      );
+
+      // The screen-level statement: the badge composition over the searched rows agrees with
+      // the walk over those same rows.
+      const scoped = buildVocabularyUsage(searched.recipes, [], {
+        recipeTagPlaceholderCounts: searched.recipeTagPlaceholderCounts,
+      });
+      const walked = buildVocabularyUsage(searched.recipes, []);
+      assert.deepEqual([...scoped.tagUsage], [...walked.tagUsage]);
+      assert.equal(
+        counters.get('recipeDetailProjections'),
+        SEARCHED_COHORT,
+        'POSITIVE CONTROL, same fixture and same counter: walking the rows is what ' +
+          'materialises them, and it stops at the searched cohort'
+      );
+    } finally {
+      world.dispose();
+    }
+  });
+
+  /**
+   * The fallback the pre-count's JSDoc advertises — "omit it and the walk runs here as it
+   * always did" — has to be REACHABLE, and an empty record has to stay authoritative.
+   *
+   * Those two pull in opposite directions under a truthiness test, because `{}` is truthy:
+   * a caller defensively passing `counts || {}` turned "the counts were never published"
+   * into "there are none". A tag referenced only by a recipe ingredient placeholder then
+   * reads `0 references` on the Tags & Categories screen, renders the `Unused` chip, and is
+   * deletable in ONE CLICK with no confirm strip — breaking ingredient matching in every
+   * recipe whose placeholder named it.
+   */
+  it('walks when the pre-count is absent, and trusts an EMPTY pre-count as an answer', () => {
+    const counters = createOperationCounters();
+    const world = makeRecipeWorld(counters);
+    try {
+      const list = buildRecipeList(world.systemManager, world.manager, world.system, '');
+
+      const absent = buildVocabularyUsage(list.recipes, [], {
+        recipeTagPlaceholderCounts: undefined,
+      });
+      assert.equal(
+        absent.tagReferenceCount,
+        COHORT,
+        'an ABSENT pre-count falls back to the walk rather than silently reading zero'
+      );
+
+      const empty = buildVocabularyUsage(list.recipes, [], { recipeTagPlaceholderCounts: {} });
+      assert.equal(
+        empty.tagReferenceCount,
+        0,
+        'an EMPTY pre-count is a real answer — a system with no placeholders at all — and ' +
+          'must not be re-walked'
+      );
+    } finally {
+      world.dispose();
+    }
+  });
+
+  /**
    * The pre-counted record is folded off the recipe MODELS; the walk it replaces read the
    * `toJSON()`-sourced projection. The two shapes are not guaranteed identical by anything
    * other than this assertion, and a divergence would change tag counts silently rather than
-   * fail — so both branches of `matchesOf` (grouped and legacy bare `ingredients[]`) and both
-   * branches of `ingredientSetsFor` (top-level sets and per-step sets) are crossed here.
+   * fail — so both branches of `ingredientSetsFor` (top-level sets and per-step sets) are
+   * crossed here, with a recipe authored in the legacy bare-`ingredients[]` shape as a third.
+   *
+   * That third recipe does NOT reach `matchesOf`'s legacy branch, and the docstring used to
+   * claim it did. `IngredientSet._legacyIngredientsToGroups` converts the bare list at
+   * CONSTRUCTION, so the recipe carries `ingredientGroups.length === 1` on the model and on
+   * its `toJSON()` alike, and both sides return from the grouped branch. Proven: neutering
+   * the legacy branch leaves this whole file green. It carries its weight as a legacy
+   * AUTHORING-shape case — the conversion is what this asserts about it — and the branch
+   * itself is covered repo-wide by `tests/vocabulary-cascade-icons.test.js`, which does go
+   * red under that mutation.
    */
   it('counts the same placeholders off a recipe MODEL as off its serialized projection', () => {
     const recipes = [

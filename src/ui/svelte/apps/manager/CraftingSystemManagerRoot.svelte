@@ -1160,9 +1160,15 @@
   // off each projected row, and those are detail-tier fields sharing one memoized producer
   // — so an always-mounted badge deep-cloned the whole library before first paint. The
   // recipe CATEGORY count below stays here because `category` is a summary-tier field.
+  // Passed RAW, with no `|| {}` default: an empty record is a legitimate pre-count (a system
+  // with no tag placeholders at all), so `buildVocabularyUsage` has to treat `{}` as
+  // authoritative — which means a defensive `|| {}` here would make its documented
+  // "omit it and the walk runs here" fallback unreachable and turn "not published" into
+  // "there are none". A tag referenced only by a recipe ingredient placeholder would then
+  // read as unused and be offered for one-click deletion with no confirm strip.
   const tagCategoryUsage = $derived(
     buildVocabularyUsage($viewState.recipes || [], itemCards, {
-      recipeTagPlaceholderCounts: $viewState.recipeTagPlaceholderCounts || {},
+      recipeTagPlaceholderCounts: $viewState.recipeTagPlaceholderCounts,
     })
   );
   const categoryRows = $derived(

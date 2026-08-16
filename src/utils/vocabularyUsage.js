@@ -113,10 +113,18 @@ export function countRecipeTagPlaceholderUsage(recipes) {
  *
  * `recipeTagPlaceholderCounts` is the recipe half of the tag count, already rolled up by
  * {@link countRecipeTagPlaceholderUsage} somewhere the recipes are cheap to walk. Supply it
- * and the per-recipe placeholder walk is skipped entirely; omit it and the walk runs here as
- * it always did. The two produce the same counts — this is a choice of WHERE the walk
- * happens, not of what is counted — and only the recipe CATEGORY count is read off the
- * recipes either way, which is a summary-tier field on a projected browser row.
+ * and the per-recipe placeholder walk is skipped entirely; omit it — or pass `undefined` /
+ * `null` — and the walk runs here as it always did. The two produce the same counts — this
+ * is a choice of WHERE the walk happens, not of what is counted — and only the recipe
+ * CATEGORY count is read off the recipes either way, which is a summary-tier field on a
+ * projected browser row.
+ *
+ * The absent test is `== null`, NOT truthiness (issue 1081). An EMPTY record is a legitimate
+ * pre-count — it is the right answer for a system with no tag placeholders at all — so `{}`
+ * has to be authoritative. But `{}` is also truthy, so a caller that defensively passed
+ * `counts || {}` made this fallback unreachable and turned "the counts have not been
+ * published" into "there are none", which reads as a tag with no references and offers it
+ * for one-click deletion.
  *
  * @param {Array<object>} recipes plain recipe projections.
  * @param {Array<{category?: string, tags?: string[]}>} components plain component projections.
@@ -134,9 +142,10 @@ export function buildVocabularyUsage(recipes, components, options = {}) {
   const categoryUsage = new Map();
   const componentCategoryUsage = new Map();
   const tagUsage = new Map();
-  const precountedRecipeTags = options.recipeTagPlaceholderCounts;
+  const precountedRecipeTags = options?.recipeTagPlaceholderCounts ?? null;
+  const hasPrecountedRecipeTags = precountedRecipeTags !== null;
 
-  if (precountedRecipeTags) {
+  if (hasPrecountedRecipeTags) {
     for (const [tag, count] of Object.entries(precountedRecipeTags)) {
       const key = vocabularyKey(tag);
       if (key) tagUsage.set(key, (tagUsage.get(key) || 0) + (Number(count) || 0));
@@ -145,7 +154,7 @@ export function buildVocabularyUsage(recipes, components, options = {}) {
 
   for (const recipe of recipes || []) {
     increment(categoryUsage, vocabularyKey(recipe?.category));
-    if (!precountedRecipeTags) countRecipeTagPlaceholders(recipe, tagUsage);
+    if (!hasPrecountedRecipeTags) countRecipeTagPlaceholders(recipe, tagUsage);
   }
 
   for (const component of components || []) {

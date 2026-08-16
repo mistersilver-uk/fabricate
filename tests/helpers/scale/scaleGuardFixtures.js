@@ -124,10 +124,43 @@ export function makeListingRecipe({
  * `SignatureValidator` expands. Distinct `componentId`s never collide, so a fixture built
  * from distinct ids measures the FULL pairwise scan without any early exit shortening it.
  *
+ * `tagPlaceholders` adds a SECOND ingredient set matching on tags rather than on a
+ * component, and it is opt-in for a reason (issue 1081). Every recipe here matched only on
+ * `{type: 'component'}`, so a cohort built from this factory contains no tag placeholder
+ * anywhere — and a guard comparing a pre-counted tag map against a walked one was therefore
+ * comparing two EMPTY maps and would have agreed however wrong either side was. Callers that
+ * assert on tag placeholder counts pass this; the signature-collision guards, which measure
+ * the component-matching scan, deliberately do not.
+ *
  * @param {object} options
+ * @param {string[]} [options.tagPlaceholders] tag names a second, tag-matching set accepts.
  * @returns {object}
  */
-export function makeSignatureRecipe({ id, componentId, enabled = true }) {
+export function makeSignatureRecipe({ id, componentId, enabled = true, tagPlaceholders = [] }) {
+  const ingredientSets = [
+    {
+      id: `${id}-set`,
+      name: 'Set',
+      ingredientGroups: [
+        {
+          id: `${id}-group`,
+          options: [{ match: { type: 'component', componentId }, quantity: 1 }],
+        },
+      ],
+    },
+  ];
+  if (tagPlaceholders.length > 0) {
+    ingredientSets.push({
+      id: `${id}-tag-set`,
+      name: 'Tag set',
+      ingredientGroups: [
+        {
+          id: `${id}-tag-group`,
+          options: [{ match: { type: 'tags', tags: [...tagPlaceholders] }, quantity: 1 }],
+        },
+      ],
+    });
+  }
   return {
     id,
     name: `Recipe ${id}`,
@@ -139,18 +172,7 @@ export function makeSignatureRecipe({ id, componentId, enabled = true }) {
     resultGroups: [
       { id: `${id}-rg`, results: [{ id: `${id}-res`, itemUuid: 'Item.result', quantity: 1 }] },
     ],
-    ingredientSets: [
-      {
-        id: `${id}-set`,
-        name: 'Set',
-        ingredientGroups: [
-          {
-            id: `${id}-group`,
-            options: [{ match: { type: 'component', componentId }, quantity: 1 }],
-          },
-        ],
-      },
-    ],
+    ingredientSets,
   };
 }
 
