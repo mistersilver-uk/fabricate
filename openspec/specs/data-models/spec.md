@@ -2742,6 +2742,7 @@ A summary built with no access result is unredacted and reads as available, whic
 | `systemId` | shared | `Recipe.craftingSystemId` — the RECIPE's own field, never the id of whatever system object the projection was handed |
 | `systemName` | shared | The owning `CraftingSystem.name`, off the system the caller supplies. The caller resolves that system through the per-system runtime read index; the projection never looks one up |
 | `category` | shared | `Recipe.category`, normalized to the reserved `general` bucket when absent |
+| `categoryLabel` | shared | The display form of `category`, through the ONE shared recipe-category label helper: a GM-authored category is surfaced verbatim and only the reserved `general` bucket is localized. This is the single exception to "a summary carries tokens, the surface localizes", and it is admitted because it breaks neither thing that rule protects. The localization seam is OPTIONAL — omitted, the helper answers its own default — so no caller is forced to acquire i18n. And no sort keys on it: every non-`general` label IS its token, and the one surface that orders category labels pins `general` outside the comparator, so the ordering is language-independent. It is served here rather than re-derived per surface because `category` and `categoryLabel` are one field with two facets, and deriving the second facet in each consumer is exactly the divergence this contract exists to prevent |
 | `tags` | shared | `Recipe.tags`, trimmed and deduped in authored order |
 | `browseStatus` | shared | The single browse-status precedence rule below |
 | `availability` | shared | The single cheap-availability rule below, or `null` |
@@ -2819,7 +2820,7 @@ That is a property of the knowledge gate rather than an audience-dependent deriv
 | --- | --- |
 | **No exact craftability** | Building any number of summaries MUST invoke exact craftability evaluation and ingredient selection ZERO times. This is a counter-asserted invariant, not a guideline: it is the property the paging surfaces depend on, and the one most likely to erode silently behind a helpfully-named private method. |
 | **No redacted content** | A summary crossing to a player client carries no field the recipe's teaser hides, and no signal DERIVED from one. |
-| **No localized text** | Summaries carry tokens; the consuming surface localizes. A localized summary would key a row's sort on the active language. |
+| **No localized text, with ONE enumerated exception** | Summaries carry tokens; the consuming surface localizes. A localized summary would key a row's sort on the active language. The single exception is `RecipeSummary.categoryLabel`, admitted on the terms its field row above records: the localization seam is OPTIONAL, so no caller is forced to acquire i18n, and nothing sorts on it. The exception is enumerated rather than general — a surface needing a second localized field amends this row and states why the same two tests pass, and MUST NOT read `categoryLabel` as a precedent that summaries may localize. |
 | **No documents** | Only ids, plain strings, numbers, booleans and arrays of those, so a summary is serializable and cheap to hold by the page. |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->

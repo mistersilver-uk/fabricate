@@ -216,6 +216,11 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
       // gathering seams: every Foundry-facing call routes through the
       // `game.fabricate` facade so the stores stay Foundry-free.
       listCraftingForActor: (opts = {}) => game?.fabricate?.listCraftingForActor?.(opts) ?? null,
+      // The DETAIL half of that read (issue 1075): the exact rich model for ONE selected
+      // recipe. Synchronous for the same reason `evaluateSelectedSet` below is — the store's
+      // `selectedRecipe` $derived reads it without an async round-trip — and null when the
+      // facade is absent or the viewer may not see the recipe.
+      hydrateCraftingRecipe: (opts = {}) => game?.fabricate?.hydrateCraftingRecipe?.(opts) ?? null,
       // Player Inventory tab seam — owned components/essences across the shared
       // crafting source actors. Foundry-free store consumes this wrapper only.
       listInventoryForActor: (opts = {}) => game?.fabricate?.listInventoryForActor?.(opts) ?? null,

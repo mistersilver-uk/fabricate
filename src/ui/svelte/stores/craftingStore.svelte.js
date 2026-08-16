@@ -7,16 +7,37 @@
  * `SvelteFabricateApp._buildServices`), so the store stays presentational and
  * fully unit-testable.
  *
- * The store holds the redaction-safe `RecipeListingModel` listing produced by the
+ * The store holds the redaction-safe listing produced by the
  * `CraftingListingBuilder` (via `services.listCraftingForActor`) plus the local
  * browse state (search, pagination, selection, shopping list) and the
  * craft action. The selected character + component-source actors are owned by the
  * sibling stores/seams; this store reads the current ids through `services` when
  * it loads or crafts.
  *
+ * ## Two phases: cheap rows, one hydrated detail (issue 1075)
+ *
+ * `listing.summaries` is a page-cheap row per browsable recipe — identity, grouping,
+ * browse status and an OPTIMISTIC material-availability verdict, and nothing else. Search,
+ * the four filters, the A-Z sort and pagination all run against those, so browsing costs
+ * nothing per recipe beyond the row itself.
+ *
+ * The rich model the centre column renders — exact per-set craftability, ingredient
+ * choices, the essence pool, checks, outcome tiers, durations, steps and progressive
+ * stages — is hydrated for the SELECTED recipe only, through `services.hydrateCraftingRecipe`.
+ * That mirrors `selectedCraftability` below, which has always round-tripped to a service for
+ * one recipe rather than holding a corpus of pre-computed answers.
+ *
+ * Everything reading the rich model therefore reads `selectedRecipe`, which IS the hydrated
+ * object; `selectedSummary` is the row it was hydrated from and is what the browser list
+ * highlights. The two are deliberately separate values: the row is what the player picked,
+ * the detail is what the app then went and asked for, and conflating them is how a summary
+ * field ends up standing in for a detail field nobody noticed was missing.
+ *
  * @param {object} deps
  * @param {object} deps.services Injected services bag exposing
  *   `listCraftingForActor({ rememberedActorId, componentSourceActorIds })`,
+ *   `hydrateCraftingRecipe({ recipeId, actorId, componentSourceActorIds })` (the exact
+ *   rich model for ONE recipe — issue 1075),
  *   `craftRecipe({ actorId, recipeId, ingredientSetId, ingredientOptionOverrides, componentSourceActorIds })`,
  *   `evaluateSelectedSet({ recipeId, setId, optionOverrides, actorId, componentSourceActorIds })`
  *   (fresh per-set craftability for an in-session option override — issue 552),
@@ -132,7 +153,7 @@ export function createCraftingStore({ services } = {}) {
   }
 
   const visibleRecipes = $derived.by(() => {
-    const recipes = Array.isArray(listing?.recipes) ? listing.recipes : [];
+    const recipes = Array.isArray(listing?.summaries) ? listing.summaries : [];
     const query = search.trim().toLowerCase();
     const favourites = new Set(favouriteIds);
     const filtered = recipes.filter((recipe) => {
@@ -161,7 +182,7 @@ export function createCraftingStore({ services } = {}) {
   // system library) so the dropdown only offers systems the player actually has
   // recipes in. De-duped by id, sorted A→Z by name.
   const availableSystems = $derived.by(() => {
-    const recipes = Array.isArray(listing?.recipes) ? listing.recipes : [];
+    const recipes = Array.isArray(listing?.summaries) ? listing.summaries : [];
     const byId = new Map();
     for (const recipe of recipes) {
       const id = recipe?.systemId;
@@ -176,7 +197,7 @@ export function createCraftingStore({ services } = {}) {
   // has recipes in. De-duped by raw token; sorted non-`general` A→Z by label, then
   // the reserved "General" bucket pinned LAST when present (it is the catch-all).
   const availableCategories = $derived.by(() => {
-    const recipes = Array.isArray(listing?.recipes) ? listing.recipes : [];
+    const recipes = Array.isArray(listing?.summaries) ? listing.summaries : [];
     const byId = new Map();
     for (const recipe of recipes) {
       const id = recipe?.category;
@@ -202,13 +223,65 @@ export function createCraftingStore({ services } = {}) {
     return visibleRecipes.slice(start, start + size);
   });
 
-  // Find by id across the full listing; fall back to the first VISIBLE recipe so
-  // the selection respects the active search filter.
-  const selectedRecipe = $derived.by(() => {
-    const recipes = Array.isArray(listing?.recipes) ? listing.recipes : [];
+  // The selected ROW. Find by id across the full listing; fall back to the first VISIBLE
+  // recipe so the selection respects the active search filter.
+  const selectedSummary = $derived.by(() => {
+    const recipes = Array.isArray(listing?.summaries) ? listing.summaries : [];
     if (recipes.length === 0) return null;
     return recipes.find((recipe) => recipe?.id === selectedRecipeId) ?? visibleRecipes[0] ?? null;
   });
+
+  // The hydrated rich models of this LOAD PASS, keyed by recipe id.
+  //
+  // Not `$state`, and not a cache with a lifetime of its own: it is dropped wholesale the
+  // moment `listing` is replaced, and `load()` is what replaces it — on mount, on an actor
+  // change, after a craft, on a scene change, on a world-time tick and on any inventory
+  // mutation of a relevant actor. So a hydrated model can never outlive the read pass whose
+  // world it describes, which is the same invalidation rule the inventory snapshot behind it
+  // obeys, for the same reason: this model carries exact craftability derived from live
+  // `actor.items`, and a stale one would tell the player they can craft something they
+  // cannot.
+  //
+  // Within one pass it memoises, and that IS the point of holding it at all: `selectedRecipe`
+  // re-derives whenever any of its dependencies moves — a filter, the page, the search box —
+  // and re-hydrating the same recipe on each of those would put the exact-evaluation cost
+  // back on the browse path this issue exists to take it off.
+  let hydratedDetails = new Map();
+  let hydratedForListing = null;
+
+  /**
+   * The exact rich model for one recipe, asked for once per load pass.
+   *
+   * Called BOTH from `select()` — so the cost is paid on the click that caused it — and
+   * from the `selectedRecipe` derive, which is what covers the selection the player never
+   * made: with nothing selected the browser shows the first visible row, and that row
+   * changes under them whenever a filter does.
+   *
+   * A null answer is surfaced as null rather than falling back to the summary row. The two
+   * shapes are not substitutable — the summary has no `ingredientSets`, no `check` and no
+   * `defaultSetId` — so a fallback would render a detail panel that is silently missing
+   * everything, instead of an empty one that is visibly wrong.
+   */
+  function hydrateDetail(recipeId) {
+    if (!recipeId) return null;
+    if (hydratedForListing !== listing) {
+      hydratedDetails = new Map();
+      hydratedForListing = listing;
+    }
+    if (hydratedDetails.has(recipeId)) return hydratedDetails.get(recipeId);
+    const detail =
+      services?.hydrateCraftingRecipe?.({
+        recipeId,
+        actorId: currentActorId(),
+        componentSourceActorIds: currentSourceIds(),
+      }) ?? null;
+    hydratedDetails.set(recipeId, detail);
+    return detail;
+  }
+
+  // THE rich model. Every consumer of exact craftability, ingredient sets, checks, steps,
+  // durations and progressive stages reads this one.
+  const selectedRecipe = $derived.by(() => hydrateDetail(selectedSummary?.id ?? null));
 
   // The selected recipe's stages in the PLAYER'S order, with thresholds recomputed for
   // that order (issue 651).
@@ -384,6 +457,11 @@ export function createCraftingStore({ services } = {}) {
     selectedIngredientSetId = null;
     selectedIngredientOptions = {};
     resetRequirementSelection();
+    // Hydrate the exact detail HERE, on the click, rather than leaving it to the first
+    // reader (issue 1075). The derive below would fetch it anyway, so this buys no
+    // correctness — it buys attribution: the round-trip happens inside the interaction that
+    // asked for it instead of inside whichever render happened to read the model first.
+    hydrateDetail(selectedRecipeId);
   }
 
   /**
@@ -877,6 +955,15 @@ export function createCraftingStore({ services } = {}) {
     get pageItems() {
       return pageItems;
     },
+    /**
+     * The selected ROW — the cheap summary the browser list highlights, and the identity
+     * the detail was hydrated from. Read this (never `selectedRecipe`) for anything that
+     * must survive a failed or pending hydration, such as which row is marked selected.
+     */
+    get selectedSummary() {
+      return selectedSummary;
+    },
+    /** The selected recipe's exact, hydrated rich model (issue 1075). */
     get selectedRecipe() {
       return selectedRecipe;
     },

@@ -6,12 +6,10 @@ import { createSvelteModuleCompiler } from '../helpers/compile-svelte-module.js'
 import { progressiveStageThresholds } from '../../src/utils/progressiveStageThresholds.js';
 import { resolveProgressiveAward } from '../../src/utils/progressiveAward.js';
 
-let compiler;
-let createCraftingStore;
-
 function makeServices(overrides = {}) {
   const calls = {
     listCraftingForActor: [],
+    hydrateCraftingRecipe: [],
     craftRecipe: [],
     notify: [],
     toggleFavourite: [],
@@ -22,7 +20,22 @@ function makeServices(overrides = {}) {
   const services = {
     listCraftingForActor: async (opts) => {
       calls.listCraftingForActor.push(opts);
-      return overrides.listing ?? { recipes: [] };
+      return overrides.listing ?? { summaries: [] };
+    },
+    // The DETAIL phase seam (issue 1075). Answers from the registry every `recipe()` below
+    // writes itself into, so it serves the tests that hand `makeServices` a listing AND the
+    // ones that replace `listCraftingForActor` wholesale with a fresh literal.
+    //
+    // COUNTED, because the memo and its per-load wipe are behaviour no returned value can
+    // show: a store that re-hydrated on every derive, or one that never invalidated after a
+    // craft, answers the same object either way. The count is the only observation that
+    // separates them.
+    hydrateCraftingRecipe: (opts = {}) => {
+      calls.hydrateCraftingRecipe.push(opts);
+      if (typeof overrides.hydrateCraftingRecipe === 'function') {
+        return overrides.hydrateCraftingRecipe(opts);
+      }
+      return HYDRATED.get(opts.recipeId) ?? null;
     },
     craftRecipe:
       overrides.craftRecipe ??
@@ -56,29 +69,61 @@ function makeServices(overrides = {}) {
   return { services, calls };
 }
 
+/**
+ * The rich models the hydration seam answers with, keyed by recipe id (issue 1075).
+ *
+ * A registry rather than a per-test wiring because several tests replace
+ * `listCraftingForActor` with their own literal, and a hydration fixture that could only see
+ * `makeServices`'s own listing would answer null for exactly those — leaving the detail-side
+ * assertions passing against nothing. Last write per id wins, and every test builds its
+ * fixture immediately before loading, so the most recently built shape is the one served.
+ */
+const HYDRATED = new Map();
+
+/** A fixture model that is BOTH the browse summary and the hydrated detail for one recipe. */
 function recipe(id, name, extra = {}) {
-  return {
+  const model = {
     id,
     name,
     ingredientSets: [{ id: `${id}-set`, craftability: {} }],
     defaultSetId: `${id}-set`,
     ...extra,
   };
+  HYDRATED.set(id, model);
+  return model;
+}
+
+/**
+ * Compiles the crafting store module with its non-mocked leaf dependencies copied in
+ * plain, and returns the loaded `createCraftingStore` factory alongside the compiler
+ * (the caller owns `compiler.cleanup()`). Shared by both describe blocks below so
+ * neither duplicates the copy list nor reaches into the other's `before`/`after`
+ * bindings — each suite gets its own compiler instance under its own tmp prefix.
+ *
+ * @param {string} prefix Unique tmp-dir prefix for this suite's compiled output.
+ * @returns {Promise<{ compiler: object, createCraftingStore: Function }>}
+ */
+async function setupCraftingStoreCompiler(prefix) {
+  const compiler = createSvelteModuleCompiler(prefix);
+  compiler.copyPlain('src/ui/svelte/util/shoppingListAggregator.js');
+  // The store reconciles the player's stored stage order through this import-free leaf
+  // (issue 651). A dependency the store imports but the compiler does not copy makes
+  // the whole suite HANG (# cancelled), never fail.
+  compiler.copyPlain('src/utils/progressiveResultOrder.js');
+  // And the threshold helper: the store recomputes thresholds after a reorder.
+  compiler.copyPlain('src/utils/progressiveStageThresholds.js');
+  // The requirement rail's slot projection (issue 917) — same rule again.
+  compiler.copyPlain('src/ui/svelte/util/requirementSlots.js');
+  const { createCraftingStore } = await compiler.load('src/ui/svelte/stores/craftingStore.svelte.js');
+  return { compiler, createCraftingStore };
 }
 
 describe('craftingStore', () => {
+  let compiler;
+  let createCraftingStore;
+
   before(async () => {
-    compiler = createSvelteModuleCompiler('fabricate-crafting-store-');
-    compiler.copyPlain('src/ui/svelte/util/shoppingListAggregator.js');
-    // The store reconciles the player's stored stage order through this import-free leaf
-    // (issue 651). A dependency the store imports but the compiler does not copy makes
-    // the whole suite HANG (# cancelled), never fail.
-    compiler.copyPlain('src/utils/progressiveResultOrder.js');
-    // And the threshold helper: the store recomputes thresholds after a reorder.
-    compiler.copyPlain('src/utils/progressiveStageThresholds.js');
-    // The requirement rail's slot projection (issue 917) — same rule again.
-    compiler.copyPlain('src/ui/svelte/util/requirementSlots.js');
-    ({ createCraftingStore } = await compiler.load('src/ui/svelte/stores/craftingStore.svelte.js'));
+    ({ compiler, createCraftingStore } = await setupCraftingStoreCompiler('fabricate-crafting-store-'));
   });
 
   after(() => {
@@ -86,7 +131,7 @@ describe('craftingStore', () => {
   });
 
   it('load fetches the listing with the current actor + source ids and sets loadedOnce', async () => {
-    const listing = { recipes: [recipe('r1', 'Anvil')] };
+    const listing = { summaries: [recipe('r1', 'Anvil')] };
     const { services, calls } = makeServices({ listing, actorId: 'hero', sourceIds: ['a1', 'a2'] });
     const store = createCraftingStore({ services });
 
@@ -95,7 +140,7 @@ describe('craftingStore', () => {
 
     assert.equal(store.loadedOnce, true);
     assert.equal(store.loading, false);
-    assert.equal(store.listing.recipes.length, 1);
+    assert.equal(store.listing.summaries.length, 1);
     assert.deepEqual(calls.listCraftingForActor[0], {
       rememberedActorId: 'hero',
       componentSourceActorIds: ['a1', 'a2'],
@@ -118,7 +163,7 @@ describe('craftingStore', () => {
 
   it('filters the visible list by search (case-insensitive) and resets the page', async () => {
     const listing = {
-      recipes: [
+      summaries: [
         recipe('r1', 'Iron Sword'),
         recipe('r2', 'Bronze Shield'),
         recipe('r3', 'Iron Dagger'),
@@ -143,7 +188,7 @@ describe('craftingStore', () => {
 
   it('paginates the visible recipes by page size', async () => {
     const listing = {
-      recipes: ['Alpha', 'Bravo', 'Charlie', 'Delta', 'Echo'].map((name, idx) =>
+      summaries: ['Alpha', 'Bravo', 'Charlie', 'Delta', 'Echo'].map((name, idx) =>
         recipe(`r${idx}`, name)
       ),
     };
@@ -168,7 +213,7 @@ describe('craftingStore', () => {
 
   it('filters the visible list to favourites and resets the page', async () => {
     const listing = {
-      recipes: [recipe('r1', 'Iron Sword'), recipe('r2', 'Bronze Shield'), recipe('r3', 'Oak Bow')],
+      summaries: [recipe('r1', 'Iron Sword'), recipe('r2', 'Bronze Shield'), recipe('r3', 'Oak Bow')],
     };
     const { services } = makeServices({ listing, favourites: ['r3', 'r1'] });
     const store = createCraftingStore({ services });
@@ -189,7 +234,7 @@ describe('craftingStore', () => {
 
   it('filters the visible list to craftable (available) recipes only', async () => {
     const listing = {
-      recipes: [
+      summaries: [
         recipe('r1', 'Iron Sword', { browseStatus: 'available' }),
         recipe('r2', 'Bronze Shield', { browseStatus: 'missingMaterials' }),
         recipe('r3', 'Oak Bow', { browseStatus: 'available' }),
@@ -211,7 +256,7 @@ describe('craftingStore', () => {
 
   it('filters the visible list by crafting system and exposes the system options', async () => {
     const listing = {
-      recipes: [
+      summaries: [
         recipe('r1', 'Iron Sword', { systemId: 'sys-a', systemName: 'Smithing' }),
         recipe('r2', 'Bronze Shield', { systemId: 'sys-b', systemName: 'Armoury' }),
         recipe('r3', 'Oak Bow', { systemId: 'sys-a', systemName: 'Smithing' }),
@@ -246,7 +291,7 @@ describe('craftingStore', () => {
 
   it('filters the visible list by category and exposes de-duped, sorted category options', async () => {
     const listing = {
-      recipes: [
+      summaries: [
         recipe('r1', 'Iron Sword', { category: 'weapons', categoryLabel: 'Weapons' }),
         recipe('r2', 'Bronze Shield', { category: 'armor', categoryLabel: 'Armor' }),
         recipe('r3', 'Oak Bow', { category: 'weapons', categoryLabel: 'Weapons' }),
@@ -285,7 +330,7 @@ describe('craftingStore', () => {
 
   it('composes the category filter (AND) with active search and system filters', async () => {
     const listing = {
-      recipes: [
+      summaries: [
         recipe('r1', 'Iron Sword', {
           category: 'weapons',
           categoryLabel: 'Weapons',
@@ -323,7 +368,7 @@ describe('craftingStore', () => {
   });
 
   it('toggles a recipe favourite through the services seam and updates the id list', async () => {
-    const listing = { recipes: [recipe('r1', 'Iron Sword')] };
+    const listing = { summaries: [recipe('r1', 'Iron Sword')] };
     const { services, calls } = makeServices({ listing });
     const store = createCraftingStore({ services });
     await store.load();
@@ -339,7 +384,7 @@ describe('craftingStore', () => {
   });
 
   it('selects a recipe and resets the chosen ingredient set', async () => {
-    const listing = { recipes: [recipe('r1', 'Sword'), recipe('r2', 'Shield')] };
+    const listing = { summaries: [recipe('r1', 'Sword'), recipe('r2', 'Shield')] };
     const { services } = makeServices({ listing });
     const store = createCraftingStore({ services });
     await store.load();
@@ -492,13 +537,10 @@ describe('craftingStore', () => {
   // ── Issue 552: per-group ingredient option overrides ──────────────────────
   function optionListing() {
     return {
-      recipes: [
-        {
-          id: 'r1',
-          name: 'Potion',
+      summaries: [
+        recipe('r1', 'Potion', {
           ingredientSets: [{ id: 'r1-set', craftability: { canCraft: true, marker: 'baked' } }],
-          defaultSetId: 'r1-set',
-        },
+        }),
       ],
     };
   }
@@ -618,7 +660,7 @@ describe('craftingStore', () => {
 
   function orderListing(extra = {}) {
     return {
-      recipes: [
+      summaries: [
         recipe('r1', 'Blade', {
           progressiveStages: STAGES,
           allowPlayerResultReorder: true,
@@ -644,7 +686,7 @@ describe('craftingStore', () => {
 
   const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
   const pinnedRecipe = () => ({
-    recipes: [
+    summaries: [
       recipe('r1', 'Blade', { progressiveStages: STAGES, allowPlayerResultReorder: false }),
     ],
   });
@@ -893,7 +935,7 @@ describe('craftingStore', () => {
     const stages = bakedStages(difficulties, awardMode);
     const { services } = makeServices({});
     services.listCraftingForActor = async () => ({
-      recipes: [
+      summaries: [
         recipe('r1', 'Blade', {
           progressiveStages: stages,
           allowPlayerResultReorder: true,
@@ -991,7 +1033,7 @@ describe('craftingStore', () => {
     ];
     const { services } = makeServices({});
     services.listCraftingForActor = async () => ({
-      recipes: [
+      summaries: [
         recipe('r1', 'Blade', {
           progressiveStages: stages,
           allowPlayerResultReorder: true,
@@ -1019,7 +1061,7 @@ describe('craftingStore', () => {
     const stages = bakedStages([5, 3, 4], 'equal');
     const { services } = makeServices({});
     services.listCraftingForActor = async () => ({
-      recipes: [
+      summaries: [
         recipe('r1', 'Blade', {
           progressiveStages: stages,
           allowPlayerResultReorder: false,
@@ -1063,5 +1105,200 @@ describe('craftingStore', () => {
       'the moved stage is now reached first, at its own difficulty'
     );
     await store.flushProgressiveOrder();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The detail-hydration mechanism (issue 1075)
+// ---------------------------------------------------------------------------
+
+describe('craftingStore detail hydration', () => {
+  let compiler;
+  let createCraftingStore;
+
+  before(async () => {
+    ({ compiler, createCraftingStore } = await setupCraftingStoreCompiler(
+      'fabricate-crafting-store-hydration-'
+    ));
+  });
+
+  after(() => {
+    compiler.cleanup();
+  });
+
+  /** Two rows, so a filter can move which one the no-selection fallback lands on. */
+  function twoRowListing() {
+    return {
+      summaries: [recipe('r1', 'Anvil'), recipe('r2', 'Bellows')],
+    };
+  }
+
+  it('hydrates a selection ONCE however many times the model is re-derived', async () => {
+    const { services, calls } = makeServices({ listing: twoRowListing() });
+    const store = createCraftingStore({ services });
+    await store.load();
+
+    store.select('r1');
+    flushSync();
+    assert.equal(store.selectedRecipe?.id, 'r1');
+
+    // Re-derive the same selection repeatedly. `selectedRecipe` depends on the page, the
+    // search box and every filter, so without the memo each of these would pay a fresh
+    // round-trip on the browse path this issue exists to keep free.
+    store.setPage(0);
+    flushSync();
+    void store.selectedRecipe;
+    void store.selectedRecipe;
+    flushSync();
+
+    assert.deepEqual(
+      calls.hydrateCraftingRecipe.map((call) => call.recipeId),
+      ['r1'],
+      'one hydration for one selection, across every re-derive'
+    );
+  });
+
+  it('re-hydrates after a load, because the previous pass describes a stale world', async () => {
+    // The memo's invalidation. A hydrated model carries exact craftability derived from live
+    // `actor.items`, and `load()` is what runs after a craft — so serving the pre-craft model
+    // would tell the player they can craft something they have just spent the materials for.
+    const { services, calls } = makeServices({ listing: twoRowListing() });
+    const store = createCraftingStore({ services });
+    await store.load();
+
+    store.select('r1');
+    flushSync();
+    assert.equal(calls.hydrateCraftingRecipe.length, 1);
+
+    await store.load();
+    flushSync();
+    void store.selectedRecipe;
+    flushSync();
+
+    assert.equal(
+      calls.hydrateCraftingRecipe.length,
+      2,
+      'a fresh listing must drop the hydrated models of the previous pass'
+    );
+    assert.equal(calls.hydrateCraftingRecipe[1].recipeId, 'r1');
+  });
+
+  it('surfaces a null hydration as null, and still names the row it came from', async () => {
+    // The two shapes are not substitutable: a summary has no `ingredientSets`, no `check` and
+    // no `defaultSetId`, so falling back to it would render a detail panel silently missing
+    // everything instead of an empty one that is visibly wrong. `selectedSummary` is what the
+    // browser list highlights, so it must survive a failed hydration.
+    const { services } = makeServices({
+      listing: twoRowListing(),
+      hydrateCraftingRecipe: () => null,
+    });
+    const store = createCraftingStore({ services });
+    await store.load();
+
+    store.select('r1');
+    flushSync();
+
+    assert.equal(store.selectedRecipe, null, 'no summary-shaped fallback');
+    assert.equal(store.selectedSummary?.id, 'r1', 'the browser list still highlights the row');
+    assert.equal(store.selectedSummary?.name, 'Anvil');
+  });
+
+  it('exposes the summary ROW, which is not the hydrated model', async () => {
+    // Non-vacuity for the assertion above, and the reason `selectedSummary` exists as its
+    // own read: it is the row out of `listing.summaries`, not a passthrough of
+    // `selectedRecipe`. The default fixture makes the two the same object, which would let
+    // a passthrough pass — so this one deliberately hydrates a DIFFERENT object.
+    const { services } = makeServices({
+      listing: twoRowListing(),
+      hydrateCraftingRecipe: ({ recipeId }) => ({ id: recipeId, name: 'HYDRATED', check: {} }),
+    });
+    const store = createCraftingStore({ services });
+    await store.load();
+
+    store.select('r2');
+    flushSync();
+
+    assert.equal(store.selectedRecipe?.name, 'HYDRATED', 'the detail is the hydrated shape');
+    assert.equal(store.selectedSummary?.name, 'Bellows', 'the summary is the browse row');
+    // Compared against the store's OWN listing rather than the fixture literal: `listing` is
+    // `$state`, so Svelte 5 hands back a deep proxy of the object the fake returned, and the
+    // raw literal is never ===-identical to what any reader sees.
+    assert.equal(
+      store.selectedSummary,
+      store.listing.summaries[1],
+      'and it is the very row object the listing carried'
+    );
+  });
+
+  it('hydrates nothing further when a filter moves under an EXPLICIT selection', async () => {
+    // The spec's browse-phase rule: search, filters and paging are pure reads over summaries.
+    const { services, calls } = makeServices({ listing: twoRowListing() });
+    const store = createCraftingStore({ services });
+    await store.load();
+
+    store.select('r1');
+    flushSync();
+    const afterSelect = calls.hydrateCraftingRecipe.length;
+    assert.equal(afterSelect, 1);
+
+    store.setSearch('bell');
+    flushSync();
+    void store.selectedRecipe;
+    store.setSearch('');
+    flushSync();
+    void store.selectedRecipe;
+    flushSync();
+
+    assert.equal(
+      calls.hydrateCraftingRecipe.length,
+      afterSelect,
+      'an explicit selection survives a filter, so nothing is re-hydrated'
+    );
+  });
+
+  it('hydrates the NEW fallback row when a filter moves it and nothing is selected', async () => {
+    // The qualified half of the same rule, pinned so the spec text and the code cannot drift
+    // apart again: with no explicit selection the app shows the first visible row, and a
+    // filter that changes which row that is does hydrate the new one, once per distinct id,
+    // never once per keystroke.
+    const { services, calls } = makeServices({ listing: twoRowListing() });
+    const store = createCraftingStore({ services });
+    await store.load();
+    flushSync();
+    void store.selectedRecipe;
+    flushSync();
+
+    assert.deepEqual(
+      calls.hydrateCraftingRecipe.map((call) => call.recipeId),
+      ['r1'],
+      'the fallback row is the first visible one'
+    );
+
+    store.setSearch('bell');
+    flushSync();
+    void store.selectedRecipe;
+    flushSync();
+
+    assert.deepEqual(
+      calls.hydrateCraftingRecipe.map((call) => call.recipeId),
+      ['r1', 'r2'],
+      'the fallback moved, so the new row is hydrated'
+    );
+
+    // And typing on without moving the fallback again costs nothing more.
+    store.setSearch('bello');
+    flushSync();
+    void store.selectedRecipe;
+    flushSync();
+
+    // NOT proof of per-id memoisation (the two assertions above already pin that: one
+    // hydration per distinct fallback id). This one stays at 2 because Svelte's own
+    // `$derived` equality skips re-running when its input (the fallback row id) is
+    // unchanged by the 'bello' keystroke, so the store's memo Map is never even consulted.
+    assert.equal(
+      calls.hydrateCraftingRecipe.length,
+      2,
+      'an unchanged fallback id triggers no further hydration ($derived equality, not store memoisation)'
+    );
   });
 });

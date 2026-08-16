@@ -197,6 +197,22 @@ export function createBenchWorld({
     craftingSystemManager,
     localize: (key) => key,
     nowWorldTime: () => 0,
+    // The summary phase's held-quantity tallies (issue 1075) resolve item identity through
+    // the SAME full resolver `main.js` wires and `InventoryListingBuilder` already uses.
+    // Wiring it here is what keeps the benchmark honest: with no resolver the tallies stay
+    // empty, every row reports "missing materials", and the case would report a fast number
+    // for a listing that answered nothing. `availableRecipes` is the counter that would
+    // collapse, and it does not.
+    //
+    // It does NOT keep `componentCandidatesExamined` live on the crafting summary path, and
+    // the committed baselines say so: that counter is absent from every
+    // `craftingListing.buildListing` case while `inventoryListing.buildListing` still records
+    // it over the same actors and the same `components` array. The resolver evidently
+    // answers these items through an indexed/durable-identity route that never reaches the
+    // counted candidate predicate. Not a guard problem — `diffCounts` unions key sets, so an
+    // `undefined -> N` would still go red — but the comment must not claim coverage the
+    // numbers do not show.
+    resolveComponentForItem: modules.essenceResolver.findMatchingComponent,
   });
   const inventoryListing = new modules.InventoryListingBuilder({
     recipeManager,

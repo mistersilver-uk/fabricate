@@ -248,6 +248,43 @@ describe('summary shape — one documented shape per entity', () => {
     assert.equal(summary.systemName, SYSTEM.name);
   });
 
+  it('derives categoryLabel from the SAME helper both shipped surfaces already use', () => {
+    // `category` is the raw filter-match token and `categoryLabel` is its display string.
+    // The pair is served here rather than re-derived per surface because the player list row
+    // and the category filter both need both facets, and two derivations of "what is this
+    // bucket called" is exactly the divergence this contract exists to prevent.
+    const custom = projectRecipeSummary({
+      recipe: makeRecipe({ category: 'Smithing' }),
+      localize: (key) => `localized:${key}`,
+    });
+    assert.equal(custom.category, 'Smithing');
+    assert.equal(
+      custom.categoryLabel,
+      'Smithing',
+      'a CUSTOM category is surfaced verbatim — it is GM-authored text, never a key'
+    );
+
+    const general = projectRecipeSummary({
+      recipe: makeRecipe({ category: '   ' }),
+      localize: (key) => `localized:${key}`,
+    });
+    assert.equal(general.category, 'general');
+    assert.equal(
+      general.categoryLabel,
+      'localized:FABRICATE.Common.General',
+      'only the RESERVED bucket is localized, and only through the injected seam'
+    );
+  });
+
+  it('falls back to the helper’s own default label when no localize seam is supplied', () => {
+    // A caller with no i18n (the benchmark harness, a unit fixture) must still get a usable
+    // label rather than a raw key leaking into a row.
+    assert.equal(
+      projectRecipeSummary({ recipe: makeRecipe({ category: null }) }).categoryLabel,
+      'General'
+    );
+  });
+
   it('surfaces a name exactly as authored, padding included', () => {
     // Deliberately untrimmed: the summary and the editor must agree about what the name
     // IS, and a projection that quietly trimmed would make a GM's leading space invisible
@@ -737,6 +774,11 @@ describe('player-facing redaction', () => {
     assert.equal(summary.name, recipe.name);
     assert.equal(summary.img, recipe.img);
     assert.equal(summary.category, 'Smithing');
+    assert.equal(
+      summary.categoryLabel,
+      'Smithing',
+      'the display form of an unredacted field discloses nothing the field did not'
+    );
     assert.deepEqual(summary.tags, ['starter']);
   });
 

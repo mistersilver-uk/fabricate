@@ -60,9 +60,25 @@
  * - **No redacted content.** A summary crossing to a player client carries no field a
  *   teaser's `hiddenFields` covers, and no signal DERIVED from one — see the redaction
  *   rule below, which is why `availability` is withheld rather than merely blanked.
- * - **No localized text.** Summaries carry tokens (`category`, `browseStatus`); the
- *   consuming surface localizes. A summary that localized would need a `localize` seam in
- *   every caller and would key a GM row's sort on the active language.
+ * - **No localized text, with ONE enumerated exception.** Summaries carry tokens
+ *   (`category`, `browseStatus`); the consuming surface localizes. A summary that localized
+ *   wholesale would need a `localize` seam in every caller and would key a GM row's sort on
+ *   the active language.
+ *
+ *   The exception is {@link RECIPE_SUMMARY_FIELDS}' `categoryLabel`, and it is written down
+ *   here rather than left as an inconsistency to be discovered. It is admitted because it
+ *   breaks neither of the two things the rule protects. The seam is OPTIONAL — `localize`
+ *   defaults to `null` and the shared helper answers `'General'` — so no caller is forced to
+ *   acquire i18n. And no sort keys on it: `getRecipeCategoryLabel` localizes ONLY the
+ *   reserved `general` bucket, surfacing every GM-authored category verbatim, and the one
+ *   consumer that sorts category labels (`craftingStore.availableCategories`) pins `general`
+ *   LAST outside the comparator — so the ordering is over author-supplied tokens and is
+ *   language-independent by construction.
+ *
+ *   It is served here rather than re-derived per surface for the contract's own reason: the
+ *   player list row and the category filter both need the token AND its display form, and
+ *   `category`/`categoryLabel` are one field with two facets. Deriving the second facet in
+ *   each surface is the divergence this module exists to foreclose, not an exception to it.
  * - **No Foundry documents.** Only ids, plain strings, numbers, booleans and arrays of
  *   those, so a summary is serializable and cheap to hold by the page.
  *
@@ -102,7 +118,7 @@
 
 import { resolveRecipeImage } from '../ui/svelte/util/craftingImageDefaults.js';
 import { normalizeComponentCategory } from '../utils/componentCategories.js';
-import { normalizeRecipeCategory } from '../utils/recipeCategories.js';
+import { getRecipeCategoryLabel, normalizeRecipeCategory } from '../utils/recipeCategories.js';
 
 import { deriveBrowseStatus } from './craftingBrowseStatus.js';
 import { projectRecipeAvailability } from './inventorySnapshot.js';
@@ -169,6 +185,7 @@ export const RECIPE_SUMMARY_FIELDS = Object.freeze({
     'availability',
     'browseStatus',
     'category',
+    'categoryLabel',
     'id',
     'img',
     'name',
@@ -361,6 +378,13 @@ function redactionOf(audience, access) {
  * deliberately, so its identity and its grouping metadata are the part they are meant to
  * see. `CraftingListingBuilder` records that decision for `category` in as many words.
  *
+ * `categoryLabel` is NOT redacted either, and that needs no separate judgement: it is a
+ * total function of `category` and of the active language, so it can disclose nothing
+ * `category` does not already. A redacted `categoryLabel` beside an unredacted `category`
+ * would be strictly worse than useless — the row would render a blank chip for a bucket the
+ * player can still filter by. The shipped `RecipeListingModel` carries both on its redacted
+ * teaser projection for the same reason.
+ *
  * `tags` is NOT redacted either, and that is a NEW decision rather than an inherited one —
  * the shipped `RecipeListingModel` carries no `tags` field at all, so no player-facing
  * surface has disclosed recipe tags before. It is taken deliberately: a tag is GM grouping
@@ -386,6 +410,10 @@ function redactionOf(audience, access) {
  *   Ignored for the GM audience, which bypasses the knowledge gate.
  * @param {boolean} [input.favourite] Whether this viewer has favourited the recipe, from
  *   the player's stored favourites. Ignored for the GM audience.
+ * @param {Function|null} [input.localize] `(key) => string`, for `categoryLabel` alone —
+ *   the single enumerated exception to the no-localized-text rule (see the module header).
+ *   Optional: omitted, the shared helper answers its own `'General'` default, so no caller
+ *   is forced to acquire i18n to build a summary.
  * @returns {object} A summary carrying exactly {@link summaryFieldsFor}'s keys.
  */
 export function projectRecipeSummary({
@@ -396,6 +424,7 @@ export function projectRecipeSummary({
   snapshot = null,
   exhausted = false,
   favourite = false,
+  localize = null,
 } = {}) {
   const isGM = audience === SUMMARY_AUDIENCE.GM;
   const redaction = redactionOf(audience, access);
@@ -424,6 +453,10 @@ export function projectRecipeSummary({
       exhausted: !isGM && exhausted === true,
     }),
     category: normalizeRecipeCategory(recipe?.category),
+    // The display facet of `category`, through the SAME helper the shipped listing model
+    // and the GM manager already call. A second `category === 'general' ? … : …` here would
+    // be a fork of a one-line rule that has to agree with two other surfaces.
+    categoryLabel: getRecipeCategoryLabel(recipe?.category, localize),
     id: idOrNull(recipe?.id),
     // The recipe's OWN image, through the shared resolver that treats Foundry's generic
     // item-bag as the "no image" sentinel. Never the containing book's artwork: book

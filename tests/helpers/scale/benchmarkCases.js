@@ -281,8 +281,10 @@ function simpleCorpusCases() {
       id: `craftingListing.buildListing.corpusAxis@${rows}`,
       profile: 'simple-corpus',
       description:
-        `The player crafting open over ${rows} rows against a token 20-stack inventory. The ` +
-        'CORPUS axis of the same path the held-inventory profile varies by held stacks.',
+        `The player crafting SUMMARY phase over ${rows} rows against a token 20-stack ` +
+        'inventory — the corpus-wide browse half only (issue 1075). The CORPUS axis of the ' +
+        'same path the held-inventory profile varies by held stacks. Per-recipe detail ' +
+        'hydration is bounded by page size rather than by this axis and is not measured here.',
       setup: (context) => {
         const recipes = hydrateRecipes(context.modules, context.fixture.recipes.slice(0, rows));
         return worldFor(context, { recipes });
@@ -294,7 +296,7 @@ function simpleCorpusCases() {
           viewer: world.viewer,
         }),
       counts: (_world, listing) => ({
-        listedRecipes: listing.recipes.length,
+        listedRecipes: listing.summaries.length,
         availableRecipes: listing.counts.available,
       }),
     })),
@@ -676,8 +678,11 @@ function heldInventoryCases() {
         id: `craftingListing.buildListing${suffix}`,
         profile: 'held-inventory',
         description:
-          'The player crafting open at this inventory size. Corpus pinned at 20 recipes so the ' +
-          'ONLY thing varying across the series is held-stack count.',
+          'The player crafting SUMMARY phase at this inventory size — the corpus-wide browse ' +
+          'half only (issue 1075). Corpus pinned at 20 recipes so the ONLY thing varying ' +
+          'across the series is held-stack count. A real app open also hydrates ONE recipe ' +
+          'through buildRecipeDetail; that cost is bounded by page size rather than by either ' +
+          'axis here and is not measured by this case.',
         setup: (context) => {
           const recipes = hydrateRecipes(context.modules, context.fixture.recipes);
           return worldAt(context, { recipes });
@@ -689,7 +694,7 @@ function heldInventoryCases() {
             viewer: world.viewer,
           }),
         counts: (_world, listing) => ({
-          listedRecipes: listing.recipes.length,
+          listedRecipes: listing.summaries.length,
           availableRecipes: listing.counts.available,
         }),
       },

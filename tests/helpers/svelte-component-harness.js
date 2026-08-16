@@ -267,6 +267,28 @@ export const CRAFTING_APP_RAW_MODULES = Object.freeze([
   // its active-run step read with CraftingEngine through this import-free leaf, so it
   // must be copied alongside the builder.
   'src/systems/stepRecipeView.js',
+  // Same rule, issue 1075: the builder's SUMMARY phase projects each browsable recipe
+  // through #1091's canonical summary, which reads held quantities from #1077's per-pass
+  // inventory snapshot. These SEVEN entries are that projection's whole transitive closure —
+  // summaryProjection -> componentCategories + inventorySnapshot, and inventorySnapshot ->
+  // config/flags + itemStackQuantity -> stackQuantityPathPresets + objectPath. (Its other
+  // FOUR imports — craftingImageDefaults, recipeCategories, craftingBrowseStatus and
+  // stepRecipeView — are already listed above.)
+  //
+  // Omitting one is caught by `setup()`'s dependency pre-validator, which rejects with the
+  // full importer chain before any component is imported
+  // (`tests/components/svelte-component-harness.test.js`). The HANG that reports as
+  // `# cancelled` rather than `# fail` is what happens when a suite reaches a module the
+  // pre-validator cannot see — the older failure mode this enumeration was written against,
+  // and still the reason the closure is enumerated rather than trimmed to what one suite
+  // happens to reach.
+  'src/systems/summaryProjection.js',
+  'src/utils/componentCategories.js',
+  'src/systems/inventorySnapshot.js',
+  'src/config/flags.js',
+  'src/systems/itemStackQuantity.js',
+  'src/config/stackQuantityPathPresets.js',
+  'src/utils/objectPath.js',
   // CraftingListingBuilder imports these category helpers (issue 514); the builder
   // is already in the mounted graph, so this transitive dep must be copied too or
   // the mounted crafting tests hang (# cancelled). recipeCategories.js has no

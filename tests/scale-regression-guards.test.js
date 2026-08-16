@@ -103,48 +103,86 @@ function measureListing({
     nowWorldTime: () => 0,
   });
 
-  const listing = builder.buildListing({
-    craftingActor: countingActor(makeActor({ itemCount }), counters, 'actorItems'),
-    viewer: PLAYER,
-  });
+  const craftingActor = countingActor(makeActor({ itemCount }), counters, 'actorItems');
+  const listing = builder.buildListing({ craftingActor, viewer: PLAYER });
 
-  return { counters, listing };
+  return {
+    counters,
+    listing,
+    // The DETAIL phase for one row (issue 1075). Handed the recipe directly rather than by
+    // id because this fixture's manager holds no recipe map; the exact-evaluation cost the
+    // probe measures is identical either way.
+    hydrate: (index = 0) =>
+      builder.buildRecipeDetail({
+        recipe: recipes[index],
+        craftingActor,
+        viewer: PLAYER,
+      }),
+  };
 }
 
 describe('issue 1072 guard — player listing cost tracks what is VISIBLE, not the corpus', () => {
   it('never evaluates craftability for a recipe the viewer cannot see', () => {
     // The headline criterion: opening the player app must not do work proportional to the
-    // whole installed corpus. Today the bound is the VISIBLE set (page-scoping lands with
-    // #1075 and will only lower this); a regression that dropped the visibility filter and
-    // walked every stored recipe breaches it immediately.
-    const { counters, listing } = measureListing({ totalRecipes: 40, visibleRecipes: 5 });
+    // whole installed corpus. This guard's original budget was the VISIBLE set — one
+    // evaluation per set plus one per recipe — and it recorded that "page-scoping lands with
+    // #1075 and will only lower this". It did, all the way to the floor: the summary phase
+    // performs NO exact evaluation at any corpus size, because material availability comes
+    // from #1077's indexed projection instead.
+    //
+    // So the bound is now zero rather than `2 x visible`. That is a stronger guard, but only
+    // if it can still fail, which is why the non-vacuity proof moved to the detail phase
+    // rather than being dropped: it demonstrates both that the probe counts and that the
+    // cost went somewhere bounded rather than disappearing into an unmeasured path.
+    const { counters, listing, hydrate } = measureListing({ totalRecipes: 40, visibleRecipes: 5 });
 
+    assert.equal(listing.summaries.length, 5, 'fixture must project only the visible recipes');
+    assert.equal(
+      counters.get('recipeManagerEvaluateCraftability'),
+      0,
+      'the summary phase must not evaluate exact craftability for ANY row'
+    );
+
+    const detail = hydrate(0);
     const evaluations = counters.get('recipeManagerEvaluateCraftability');
-    assert.equal(listing.recipes.length, 5, 'fixture must project only the visible recipes');
-    assert.ok(evaluations > 0, 'non-vacuity: the probe must actually have counted something');
+    assert.ok(detail, 'non-vacuity: the detail phase must have produced a model');
+    assert.ok(evaluations > 0, 'non-vacuity: the probe must actually be able to count');
     assert.ok(
-      evaluations <= 5 * 2,
-      `evaluated craftability ${evaluations} times for 5 visible recipes with 1 set each ` +
-        `(budget: one per set plus one per recipe). A count near the 40-recipe corpus means ` +
-        `the listing stopped being scoped to the visible set.`
+      evaluations <= 2,
+      `hydrating ONE recipe with 1 set evaluated craftability ${evaluations} times ` +
+        `(budget: one per set plus one for the craft button). A count near the visible set ` +
+        `means detail hydration stopped being per-recipe.`
     );
   });
 
   it('costs the same regardless of how large the component library is', () => {
-    // Independence, not a bound: the listing must not be O(recipes × components). Doubling
-    // the library while holding recipes and inventory fixed must not move either counter.
+    // Independence, not a bound: the read must not be O(recipes × components). Doubling the
+    // library while holding recipes and inventory fixed must not move either counter.
     const small = measureListing({ totalRecipes: 10, visibleRecipes: 5, componentCount: 4 });
     const large = measureListing({ totalRecipes: 10, visibleRecipes: 5, componentCount: 64 });
 
-    assert.equal(
-      large.counters.get('recipeManagerEvaluateCraftability'),
-      small.counters.get('recipeManagerEvaluateCraftability'),
-      'craftability evaluations must not depend on component-library size'
-    );
+    // The inventory half, measured on the SUMMARY phase — read before hydrating, so the
+    // detail phase's own reads cannot be mistaken for a summary-phase regression.
+    const summaryScans = small.counters.get('actorItemsScanned');
+    assert.ok(summaryScans > 0, 'non-vacuity: the summary phase really did walk the inventory');
     assert.equal(
       large.counters.get('actorItemsScanned'),
-      small.counters.get('actorItemsScanned'),
+      summaryScans,
       'inventory scanning must not depend on component-library size (the items x components term)'
+    );
+
+    // The craftability half is measured on the DETAIL phase, because since #1075 the summary
+    // phase evaluates exact craftability ZERO times BY CONSTRUCTION. Comparing the two
+    // library sizes there would be `0 === 0` forever — an assertion reporting confidence it
+    // cannot earn. Exact evaluation still exists; it moved, so the guard moves with it.
+    small.hydrate(0);
+    large.hydrate(0);
+    const evaluations = small.counters.get('recipeManagerEvaluateCraftability');
+    assert.ok(evaluations > 0, 'non-vacuity: hydrating one recipe must actually evaluate');
+    assert.equal(
+      large.counters.get('recipeManagerEvaluateCraftability'),
+      evaluations,
+      'craftability evaluations must not depend on component-library size'
     );
   });
 
@@ -169,20 +207,34 @@ describe('issue 1072 guard — player listing cost tracks what is VISIBLE, not t
     assert.ok(verdict.ok, verdict.message);
   });
 
-  it('re-reads the inventory at most linearly in visible recipes', () => {
-    // The other half of the same product. Scaled independently, because a fixture that grew
-    // both axes together could not say which one a regression came from.
+  it('does not re-read the inventory per visible recipe AT ALL', () => {
+    // The other half of the same product, scaled independently so a regression can be
+    // attributed to one axis. Since #1075 this is no longer an at-most-linear bound: the
+    // summary phase reads the inventory ONCE per pass through the per-pass snapshot, so the
+    // count is CONSTANT in visible recipes. An `atMostLinear` verdict would pass for a
+    // regression back to a per-recipe rescan (4x recipes, 4x scans is exactly linear), which
+    // is the regression this guard is named for — so the assertion is an equality.
     const base = measureListing({ totalRecipes: 40, visibleRecipes: 4, itemCount: 10 });
     const scaled = measureListing({ totalRecipes: 40, visibleRecipes: 16, itemCount: 10 });
 
-    const verdict = atMostLinear({
-      baseline: base.counters.get('actorItemsScanned'),
-      scaled: scaled.counters.get('actorItemsScanned'),
-      factor: 4,
-      axis: 'visible recipes',
-      what: 'listing inventory scanning',
-    });
-    assert.ok(verdict.ok, verdict.message);
+    const baseline = base.counters.get('actorItemsScanned');
+    assert.ok(baseline > 0, 'non-vacuity: the actor probe must have counted item reads');
+    assert.equal(
+      scaled.counters.get('actorItemsScanned'),
+      baseline,
+      `quadrupling the visible recipes moved inventory scanning from ${baseline} to ` +
+        `${scaled.counters.get('actorItemsScanned')}. The summary phase must read the ` +
+        `inventory once per pass, not once per recipe.`
+    );
+
+    // Non-vacuity of the CONSTANT itself: the same counter still moves on the axis it is
+    // SUPPOSED to move on. Without this the equality above holds equally well for a probe
+    // that stopped observing anything.
+    const moreItems = measureListing({ totalRecipes: 40, visibleRecipes: 4, itemCount: 40 });
+    assert.ok(
+      moreItems.counters.get('actorItemsScanned') > baseline,
+      'non-vacuity: scanning still tracks the item axis, so the equality is a property'
+    );
   });
 });
 

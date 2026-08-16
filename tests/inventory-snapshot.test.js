@@ -450,9 +450,13 @@ describe('the retained member-book lookup honours the revision clause', () => {
 // ---------------------------------------------------------------------------
 
 describe('the availability projection is indexed and optimistic', () => {
+  // `comp-wood` carries its tags on the COMPONENT definition, which is where Fabricate
+  // authors them — nothing in production stamps `flags.fabricate.tags` onto an owned item
+  // (issue 857). A fixture that tagged only the item would pin a tally that is empty in
+  // every real world.
   const components = [
     { id: 'comp-iron', name: 'Iron', essences: { earth: 2 } },
-    { id: 'comp-wood', name: 'Wood', essences: {} },
+    { id: 'comp-wood', name: 'Wood', essences: {}, tags: ['plank'] },
   ];
 
   function talliesFor(items) {
@@ -566,9 +570,10 @@ describe('the availability projection is indexed and optimistic', () => {
   });
 
   it('bounds a tag-matched option without claiming exactness', () => {
-    const tallies = talliesFor([
-      makeItem({ uuid: 'i1', name: 'Wood', quantity: 2, tags: ['plank'] }),
-    ]);
+    // The item carries NO tag flag: its tags come from the component it resolves to, which
+    // is the only place Fabricate ever authors them. Stamping the flag here would pin a
+    // premise production never satisfies.
+    const tallies = talliesFor([makeItem({ uuid: 'i1', name: 'Wood', quantity: 2 })]);
     const withTag = (quantity, tagMatch, tags) => ({
       id: 'r',
       ingredientSets: [
@@ -586,6 +591,37 @@ describe('the availability projection is indexed and optimistic', () => {
       false,
       'the ALL bound is the rarest tag, and nothing carries "oak"'
     );
+  });
+
+  it('tallies tags from the COMPONENT definition, which is the only place they are authored', () => {
+    // The defect this pins: `flags.fabricate.tags` is never written by Fabricate, so a tally
+    // reading it alone is empty in every real world and every tag-matched option reports
+    // `available: false` — a false negative, which the projection's contract forbids
+    // outright. `RecipeManager._matchesTagIngredient` matches on the union; so does this.
+    const tagged = talliesFor([makeItem({ uuid: 'i1', name: 'Wood', quantity: 4 })]);
+    assert.equal(tagged.quantityByTag.get('plank'), 4, 'the component-authored tag is counted');
+
+    // Non-vacuity in the other direction: an item resolving to an UNTAGGED component
+    // contributes nothing, so the number above came from the tag rather than from the walk.
+    const untagged = talliesFor([makeItem({ uuid: 'i2', name: 'Iron', quantity: 4 })]);
+    assert.equal(untagged.quantityByTag.get('plank'), undefined);
+  });
+
+  it('keeps the item-level tag flag working, and counts a doubled tag once', () => {
+    // Back-compat / third-party tagging: an item carrying its own flag counts even when it
+    // resolves to no component at all.
+    const orphan = talliesFor([
+      makeItem({ uuid: 'i1', name: 'Not A Component', quantity: 3, tags: ['plank'] }),
+    ]);
+    assert.equal(orphan.quantityByTag.get('plank'), 3);
+
+    // And the union is deduped: a tag carried by BOTH the component and the item flag must
+    // not count the same held stack twice, or the upper bound would drift twice as high as
+    // the stock actually held.
+    const both = talliesFor([
+      makeItem({ uuid: 'i2', name: 'Wood', quantity: 3, tags: ['plank'] }),
+    ]);
+    assert.equal(both.quantityByTag.get('plank'), 3, 'counted once, not twice');
   });
 
   it('short-falls on essences the totals cannot cover', () => {
