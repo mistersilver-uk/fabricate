@@ -546,9 +546,16 @@ export class IngredientSet {
    * each group tries its choices lazily in the order [non-currency options in author
    * order, then currency options in author order], and for each non-currency option
    * branches over candidate item subsets with the greedy subset first. The
-   * `remaining` ledger is snapshot/restored per node, so a committed choice is
-   * cleanly undone on backtrack — the first complete assignment under this fixed
-   * traversal wins.
+   * `remaining` ledger is mutated in place and reverted through a shared undo
+   * JOURNAL, so a committed choice is cleanly undone on backtrack — the first
+   * complete assignment under this fixed traversal wins.
+   *
+   * The journal is what keeps per-node cost independent of inventory size (issue
+   * 1083). Copying the ledger per node and restoring it wholesale cost
+   * O(|availableItems|) on every branch, so the 200,000-node cap bounded the search
+   * TREE while leaving the work it implied unbounded — a 1,000-stack party inventory
+   * at the cap is on the order of 2x10^8 Map operations. A node now records only the
+   * keys it actually overwrote and reverts exactly those.
    *
    * Every essence option is taken as a DEFERRED choice: it occupies its group's
    * author position in `selectedIngredients` immediately but consumes nothing, and
@@ -573,7 +580,20 @@ export class IngredientSet {
       essenceBlock: null,
     };
     const budget = { nodes: 0, capHit: false };
-    const found = this._searchGroup(0, remaining, acc, availableItems, matcher, ctx, budget);
+    // The shared undo journal: `[key, previousValue, key, previousValue, ...]` in
+    // write order. One array for the whole search, sliced by per-node marks, so a
+    // node pays only for the ledger keys it actually overwrote.
+    const journal = [];
+    const found = this._searchGroup(
+      0,
+      remaining,
+      acc,
+      availableItems,
+      matcher,
+      ctx,
+      budget,
+      journal
+    );
     if (found) {
       return {
         selection: {
@@ -598,14 +618,14 @@ export class IngredientSet {
    * `acc` into the accumulated selection along the successful path.
    * @private
    */
-  _searchGroup(index, remaining, acc, availableItems, matcher, ctx, budget) {
+  _searchGroup(index, remaining, acc, availableItems, matcher, ctx, budget, journal) {
     if (budget.capHit) return false;
     if (index >= this.ingredientGroups.length) {
       if (++budget.nodes > INGREDIENT_SEARCH_NODE_CAP) {
         budget.capHit = true;
         return false;
       }
-      return this._settleEssenceBlock(remaining, acc, availableItems, ctx);
+      return this._settleEssenceBlock(remaining, acc, availableItems, ctx, journal);
     }
     if (++budget.nodes > INGREDIENT_SEARCH_NODE_CAP) {
       budget.capHit = true;
@@ -624,7 +644,7 @@ export class IngredientSet {
       budget
     )) {
       if (budget.capHit) return false;
-      const snapshot = new Map(remaining);
+      const mark = journal.length;
       acc.selectedIngredients.push(choice.option);
       if (choice.currency) {
         acc.currencySpends.push({
@@ -635,10 +655,12 @@ export class IngredientSet {
       } else if (choice.member) {
         acc.essenceMembers.push(choice.member);
       } else {
-        this._commitItemPlan(choice.plan, acc.plan, remaining);
+        this._commitItemPlan(choice.plan, acc.plan, remaining, journal);
       }
 
-      if (this._searchGroup(index + 1, remaining, acc, availableItems, matcher, ctx, budget)) {
+      if (
+        this._searchGroup(index + 1, remaining, acc, availableItems, matcher, ctx, budget, journal)
+      ) {
         return true;
       }
 
@@ -650,7 +672,7 @@ export class IngredientSet {
       } else {
         acc.plan.length -= choice.plan.length;
       }
-      this._restoreRemaining(remaining, snapshot);
+      this._undoLedger(remaining, journal, mark);
     }
     return false;
   }
@@ -660,29 +682,44 @@ export class IngredientSet {
    * component/tag groups left in `remaining`.
    *
    * Returning false here is the mechanism that makes the block backtrackable — the
-   * caller restores `remaining` and re-branches an earlier group, so a tag group with
+   * caller reverts `remaining` and re-branches an earlier group, so a tag group with
    * two matching stacks, only one of which carries the essence, resolves the OTHER
    * stack for the tag and leaves the carrier to the block.
    *
-   * Nothing is committed on the failing path, so a false return leaves `acc` and
-   * `remaining` exactly as the caller left them.
+   * This terminal performs NO revert of its own on the false path and deliberately
+   * relies on the caller's undo journal, exactly as it previously relied on the
+   * caller's ledger snapshot. Every ledger write it makes goes through
+   * {@link _commitItemPlan} with the SAME `journal` the calling node marked, so the
+   * caller's {@link _undoLedger} reverts them whether or not this returns true —
+   * which is what lets the commit stay unconditional-looking here.
    * @private
    */
-  _settleEssenceBlock(remaining, acc, availableItems, ctx) {
+  _settleEssenceBlock(remaining, acc, availableItems, ctx, journal) {
     const block = this._resolveEssenceBlock(acc.essenceMembers, availableItems, remaining, ctx);
     if (!block.ok) return false;
-    this._commitItemPlan(block.plan, acc.plan, remaining);
+    this._commitItemPlan(block.plan, acc.plan, remaining, journal);
     acc.essenceBlock = block;
     return true;
   }
 
   /**
-   * Reset `remaining` in place to a snapshot, undoing a committed search branch.
+   * Revert `remaining` to the state it held when the caller took `mark`, by
+   * replaying the shared undo journal backwards to that mark and truncating it.
+   *
+   * Backwards is load-bearing: one node may overwrite the same ledger key more than
+   * once (two plan entries drawing on one stack), and only the EARLIEST recorded
+   * value for a key is the pre-node one. Replaying forwards would restore the
+   * intermediate value instead.
+   *
+   * Cost is O(keys this node wrote), never O(|availableItems|), which is the whole
+   * point of the journal (issue 1083).
    * @private
    */
-  _restoreRemaining(remaining, snapshot) {
-    remaining.clear();
-    for (const [key, value] of snapshot) remaining.set(key, value);
+  _undoLedger(remaining, journal, mark) {
+    for (let index = journal.length - 2; index >= mark; index -= 2) {
+      remaining.set(journal[index], journal[index + 1]);
+    }
+    journal.length = mark;
   }
 
   /**
@@ -903,14 +940,20 @@ export class IngredientSet {
    * Append a chosen option's item plan entries to the running plan and deduct their
    * quantities from the remaining pool (shared by the default and override paths so
    * the remaining-quantity bookkeeping stays identical).
+   *
+   * When a `journal` is supplied (the backtracking search always supplies one; the
+   * greedy pass never does, because it never backtracks) every overwritten key is
+   * appended to it as a `key, previousValue` pair in write order, so
+   * {@link _undoLedger} can revert exactly the keys this commit touched.
    * @private
    */
-  _commitItemPlan(candidatePlan, plan, remaining) {
+  _commitItemPlan(candidatePlan, plan, remaining, journal = null) {
     for (const entry of candidatePlan) {
       plan.push(entry);
       const key = this._itemKey(entry.item);
-      const next = (remaining.get(key) || 0) - entry.quantity;
-      remaining.set(key, Math.max(0, next));
+      const previous = remaining.get(key) || 0;
+      if (journal) journal.push(key, previous);
+      remaining.set(key, Math.max(0, previous - entry.quantity));
     }
   }
 
