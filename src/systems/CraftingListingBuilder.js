@@ -278,10 +278,11 @@ export class CraftingListingBuilder {
    * ## Every gate the summary phase applies is re-applied, from scratch
    *
    * A caller reaching this with a recipe id has NOT proved the viewer may see it: an id is
-   * whatever the client sent. So the system block is re-tested and access is re-evaluated
-   * (or accepted from the caller only when the caller is the same pass that computed it),
-   * and an invisible recipe answers `null` rather than a redacted model. Re-deriving is the
-   * cheap half of this call; trusting the id would make the split a privilege escalation.
+   * whatever the client sent. So the system block is re-tested, the `enabled` filter the
+   * summary phase's corpus query applied is re-applied, and access is re-evaluated (or
+   * accepted from the caller only when the caller is the same pass that computed it). An
+   * invisible recipe answers `null` rather than a redacted model. Re-deriving is the cheap
+   * half of this call; trusting the id would make the split a privilege escalation.
    *
    * @param {object} options
    * @param {string|null} [options.recipeId] Resolved through `recipeManager.getRecipe`.
@@ -312,6 +313,13 @@ export class CraftingListingBuilder {
     const target = recipe ?? this.recipeManager?.getRecipe?.(recipeId) ?? null;
     if (!target) return null;
     if (!isGM && this._isSystemBlockedForRecipes(target.craftingSystemId)) return null;
+    // The `enabled` gate the summary phase gets for free. `getVisibleRecipes` sources from
+    // `getRecipes({enabled: true})`, so a disabled recipe can never be a row; `getRecipe`
+    // applies no such filter, so without this line a client-supplied id hydrates a recipe
+    // the GM has switched off. `=== false` rather than falsy: `enabled` is absent-means-ON
+    // per the model default, and reading an omitted field as "disabled" would blank the
+    // inspector for every fixture and every pre-`enabled` authored recipe.
+    if (!isGM && target.enabled === false) return null;
 
     const resolvedAccess =
       access ??
