@@ -17,6 +17,9 @@ const harness = createMountedComponentHarness({
   rawModules: [
     'src/config/flags.js',
     'src/models/Ingredient.js',
+    // Ingredient filters its payload through the shared omitted-when-default machinery
+    // (issue 1135). Same rule as every other entry here: omit it and the suite hangs.
+    'src/models/reconstructibleDefaults.js',
     'src/models/IngredientGroup.js',
     'src/models/Tool.js',
     'src/models/match/matchTypes.js',

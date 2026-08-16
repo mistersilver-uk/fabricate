@@ -170,7 +170,9 @@ export function rebindCopyComponentIds(prepared, { generateId = localId } = {}) 
     for (const group of arrayOf(set.ingredientGroups)) {
       for (const option of arrayOf(group?.options)) remapIngredientRef(option);
     }
-    // Flat `ingredients[]` alias (IngredientSet.toJSON re-emits it).
+    // Flat `ingredients[]` alias. Since issue 1135 `IngredientSet.toJSON` no longer emits it,
+    // but the read stays permanently: older exports and legacy flat-authored sets still carry
+    // it, and for those it is the set's only ingredient data. See § Write-Retired Aliases.
     for (const ingredient of arrayOf(set.ingredients)) remapIngredientRef(ingredient);
     // Legacy catalysts (defensive; site H).
     for (const catalyst of arrayOf(set.catalysts)) remapIngredientRef(catalyst);

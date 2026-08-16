@@ -95,6 +95,9 @@ export const CHECKS_TREE_RAW_MODULES = Object.freeze([
   'src/config/flags.js',
   'src/config/stackQuantityPathPresets.js',
   'src/models/Ingredient.js',
+  // Ingredient filters its payload through the shared omitted-when-default machinery
+  // (issue 1135) — mechanical, like every other entry in this block.
+  'src/models/reconstructibleDefaults.js',
   'src/models/IngredientGroup.js',
   'src/models/Tool.js',
   'src/models/match/matchTypes.js',

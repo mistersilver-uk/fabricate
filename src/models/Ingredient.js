@@ -5,6 +5,55 @@
 import { getFabricateFlag } from '../config/flags.js';
 
 import { getMatchHandler, normalizeMatch } from './match/matchTypes.js';
+import {
+  isEmptyArray,
+  isFalse,
+  isNull,
+  omitReconstructibleDefaults,
+} from './reconstructibleDefaults.js';
+
+/**
+ * Serialized ingredient-OPTION fields the `Ingredient` constructor rebuilds to EXACTLY this
+ * value when the key is absent, so emitting them is pure payload weight (issue 1135).
+ *
+ * Option-level keys are the dominant term in a serialized recipe corpus, because they are
+ * paid once per option, per group, per set, per recipe: an authored component option of 68
+ * bytes was written as 213 — a 3.1x expansion made entirely of these defaults and one exact
+ * duplicate. Ablating them is 19.66% of a simple corpus and 47.55% of a rich one.
+ *
+ * Absence is not a new on-disk state for any of them. `migrateEssencesToIngredientGroups`
+ * has shipped options as bare `{quantity, match}` since 1.17.0, and
+ * `IngredientSet._legacyIngredientsToGroups` writes the same shape, so every reader has
+ * always had to cope with all seven keys missing.
+ *
+ * `componentId` is a CANONICAL field and is omitted only when it is `null`, which does not
+ * weaken the canonical-write policy: the top-level field is DERIVED from `match` by the
+ * constructor (`match.type === 'component' ? match.componentId : null`), the canonical
+ * component reference is `match.componentId` and is always emitted, and a `null` here means
+ * "this option is not a component match" — which absence says identically to every reader,
+ * each of which coerces through `option.componentId || option.systemItemId`.
+ *
+ * **This is a hand-maintained mirror of the constructor**, guarded mechanically by
+ * `tests/ingredient-serialization-payload.test.js`: every key here must be a key `toJSON`
+ * can emit, must actually be omitted for a fully-defaulted option, and a defaulted option
+ * must round-trip deep-equal through `fromJSON(toJSON(i))`.
+ *
+ * Deliberately ABSENT from this table:
+ * - `match`, which is the option's authored requirement and its identity.
+ * - `quantity`, whose `data.quantity || 1` default is omittable by the model but is read
+ *   arithmetically off serialized options by shopping-list and consumption projections; it
+ *   is a separate reader audit and is not part of issue 1135.
+ *
+ * @type {Record<string, (value: unknown) => boolean>}
+ */
+export const INGREDIENT_OMITTED_WHEN_DEFAULT = {
+  componentId: isNull,
+  itemUuid: isNull,
+  tag: isNull,
+  alternatives: isEmptyArray,
+  extractEffects: isFalse,
+  effectFilter: isNull,
+};
 
 export class Ingredient {
   constructor(data = {}) {
@@ -143,18 +192,32 @@ export class Ingredient {
     return 'Unknown ingredient';
   }
 
+  /**
+   * Serialize this option, omitting every reconstructible default and the write-retired
+   * `systemItemId` alias (issue 1135).
+   *
+   * `systemItemId` was a byte-for-byte duplicate of `componentId` on the same object, so it
+   * never distinguished anything on the wire. It is WRITE-retired and READ permanently: the
+   * instance property stays, and every read fallback in `match/matchTypes.js` stays, because
+   * a world, an exported system file or third-party content authored before this change can
+   * still carry the alias as its only component reference.
+   *
+   * @returns {Record<string, unknown>}
+   */
   toJSON() {
-    return {
-      match: this.match,
-      componentId: this.componentId,
-      systemItemId: this.componentId,
-      itemUuid: this.itemUuid,
-      quantity: this.quantity,
-      tag: this.tag,
-      alternatives: this.alternatives.map((alt) => alt.toJSON()),
-      extractEffects: this.extractEffects,
-      effectFilter: this.effectFilter,
-    };
+    return omitReconstructibleDefaults(
+      {
+        match: this.match,
+        componentId: this.componentId,
+        itemUuid: this.itemUuid,
+        quantity: this.quantity,
+        tag: this.tag,
+        alternatives: this.alternatives.map((alt) => alt.toJSON()),
+        extractEffects: this.extractEffects,
+        effectFilter: this.effectFilter,
+      },
+      INGREDIENT_OMITTED_WHEN_DEFAULT
+    );
   }
 
   static fromJSON(data) {
