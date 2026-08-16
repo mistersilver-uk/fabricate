@@ -113,7 +113,7 @@
       }
     },
     "craftingListing.buildListing.corpusAxis@25": {
-      "description": "The player crafting open over 25 rows against a token 20-stack inventory. The CORPUS axis of the same path the held-inventory profile varies by held stacks.",
+      "description": "The player crafting SUMMARY phase over 25 rows against a token 20-stack inventory — the corpus-wide browse half only (issue 1075). The CORPUS axis of the same path the held-inventory profile varies by held stacks. Per-recipe detail hydration is bounded by page size rather than by this axis and is not measured here.",
       "counts": {
         "craftingActorItemsReads": 1,
         "craftingActorItemsScanned": 10,
@@ -126,7 +126,7 @@
       }
     },
     "craftingListing.buildListing.corpusAxis@50": {
-      "description": "The player crafting open over 50 rows against a token 20-stack inventory. The CORPUS axis of the same path the held-inventory profile varies by held stacks.",
+      "description": "The player crafting SUMMARY phase over 50 rows against a token 20-stack inventory — the corpus-wide browse half only (issue 1075). The CORPUS axis of the same path the held-inventory profile varies by held stacks. Per-recipe detail hydration is bounded by page size rather than by this axis and is not measured here.",
       "counts": {
         "craftingActorItemsReads": 1,
         "craftingActorItemsScanned": 10,
@@ -139,7 +139,7 @@
       }
     },
     "craftingListing.buildListing.corpusAxis@100": {
-      "description": "The player crafting open over 100 rows against a token 20-stack inventory. The CORPUS axis of the same path the held-inventory profile varies by held stacks.",
+      "description": "The player crafting SUMMARY phase over 100 rows against a token 20-stack inventory — the corpus-wide browse half only (issue 1075). The CORPUS axis of the same path the held-inventory profile varies by held stacks. Per-recipe detail hydration is bounded by page size rather than by this axis and is not measured here.",
       "counts": {
         "craftingActorItemsReads": 1,
         "craftingActorItemsScanned": 10,
