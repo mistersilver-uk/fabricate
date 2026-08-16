@@ -73,17 +73,38 @@ const heldItem = (id, componentId) => ({
 const matchHeldComponent = (option, item) =>
   item?.flags?.fabricate?.componentId === option?.match?.componentId;
 
+/**
+ * A CONTENDED set: every group requires the SAME component, so they compete for the same held
+ * stacks and none of them can be resolved on its own.
+ *
+ * This shape is why the node-count assertions below moved off `ingredientSet()` (issue 1083).
+ * That fixture gives every group its own dedicated stack, so no two groups can interact — and
+ * once the solver stopped searching what it can resolve directly, both its "small" and "large"
+ * cases reported zero nodes and the monotonicity assertion compared 0 with 0. That is not a
+ * broken statistic, it is the statistic reporting the optimisation working; the assertion needs
+ * a fixture whose search is real, which is this one.
+ */
+function contendedSet(groupCount) {
+  return new IngredientSet({
+    id: 'set-contended',
+    ingredientGroups: Array.from({ length: groupCount }, (_unused, index) => ({
+      id: `g-${index}`,
+      options: [{ match: { type: 'component', componentId: 'c-shared' }, quantity: 1 }],
+    })),
+  });
+}
+
+const sharedStacks = (count) =>
+  Array.from({ length: count }, (_unused, index) => heldItem(`i${index}`, 'c-shared'));
+
 describe('issue 1072 — the ingredient solver reports its own search cost', () => {
-  // `nodes` is the only deterministic measure of assignment work. The node CAP bounds
-  // nodes, not work: each node copies and restores the whole available-item ledger, so
-  // per-node cost is O(inventory) and a wall-clock reading is a product of two terms it
-  // cannot separate. Discarding this number left #1083's bounds unfalsifiable.
+  // `nodes` is the only deterministic measure of assignment work. A wall-clock reading is a
+  // product of tree size and per-node cost that it cannot separate, and #1083 moved both terms.
+  // Discarding this number left #1083's bounds unfalsifiable.
   it('surfaces searchStats on a satisfied selection', () => {
-    const set = ingredientSet(['c-0', 'c-1']);
-    const matcher = matchHeldComponent;
-    const result = set.resolveIngredientSelection(
-      [heldItem('i0', 'c-0'), heldItem('i1', 'c-1')],
-      matcher
+    const result = contendedSet(2).resolveIngredientSelection(
+      sharedStacks(2),
+      matchHeldComponent
     );
 
     assert.equal(result.success, true, 'fixture must be satisfiable');
@@ -96,13 +117,14 @@ describe('issue 1072 — the ingredient solver reports its own search cost', () 
   });
 
   it('surfaces searchStats on the greedy fallback taken when no assignment exists', () => {
-    // Nothing held matches, so the search proves unsatisfiability and falls through to the
-    // greedy pass. Both exits must carry the statistic or a caller has to branch on which
-    // one produced the result — and the UNSATISFIABLE case is the expensive one worth
-    // measuring, because it is the branch that explores the whole space before giving up.
-    const set = ingredientSet(['c-0', 'c-1']);
-    const matcher = matchHeldComponent;
-    const result = set.resolveIngredientSelection([heldItem('i0', 'c-9')], matcher);
+    // Two groups compete for ONE stack, so the search proves unsatisfiability and falls through
+    // to the greedy pass. Both exits must carry the statistic or a caller has to branch on which
+    // one produced the result — and the UNSATISFIABLE case is the expensive one worth measuring,
+    // because it is the branch that explores the whole space before giving up.
+    const result = contendedSet(2).resolveIngredientSelection(
+      sharedStacks(1),
+      matchHeldComponent
+    );
 
     assert.equal(result.success, false, 'fixture must be unsatisfiable');
     assert.ok(result.searchStats, 'the greedy fallback must report the search cost too');
@@ -113,16 +135,38 @@ describe('issue 1072 — the ingredient solver reports its own search cost', () 
   });
 
   it('reports a node count that actually tracks the size of the search', () => {
-    // Non-vacuity: a statistic that reports the same number for a one-group and a
-    // three-group set would be a constant wearing a counter's name.
-    const matcher = matchHeldComponent;
-    const items = [heldItem('i0', 'c-0'), heldItem('i1', 'c-1'), heldItem('i2', 'c-2')];
-    const small = ingredientSet(['c-0']).resolveIngredientSelection(items, matcher);
-    const large = ingredientSet(['c-0', 'c-1', 'c-2']).resolveIngredientSelection(items, matcher);
+    // Non-vacuity: a statistic that reports the same number for a two-group and a four-group
+    // contended set would be a constant wearing a counter's name.
+    const items = sharedStacks(4);
+    const small = contendedSet(2).resolveIngredientSelection(items, matchHeldComponent);
+    const large = contendedSet(4).resolveIngredientSelection(items, matchHeldComponent);
 
+    assert.equal(small.success, true);
+    assert.equal(large.success, true);
     assert.ok(
       large.searchStats.nodes > small.searchStats.nodes,
-      `a larger set must explore more nodes: ${small.searchStats.nodes} -> ${large.searchStats.nodes}`
+      `a larger search must explore more nodes: ${small.searchStats.nodes} -> ${large.searchStats.nodes}`
+    );
+  });
+
+  it('reports ZERO nodes when nothing in the set contends', () => {
+    // The other half of the same seam, and the reason the fixtures above had to change. Each
+    // group here has its own dedicated stack, so no group's choice can constrain another's and
+    // there is nothing for a backtracking search to decide. `nodes === 0` is the observable
+    // form of #1083's "ordinary direct-component recipes resolve without entering the DFS": a
+    // `>= 0` assertion would be satisfied by the old whole-set search too.
+    const items = [heldItem('i0', 'c-0'), heldItem('i1', 'c-1'), heldItem('i2', 'c-2')];
+    const result = ingredientSet(['c-0', 'c-1', 'c-2']).resolveIngredientSelection(
+      items,
+      matchHeldComponent
+    );
+
+    assert.equal(result.success, true, 'fixture must be satisfiable');
+    assert.equal(result.searchStats.capHit, false);
+    assert.equal(
+      result.searchStats.nodes,
+      0,
+      'an uncontended set must resolve without visiting a single search node'
     );
   });
 });

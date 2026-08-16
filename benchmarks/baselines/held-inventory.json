@@ -102,16 +102,17 @@
       }
     },
     "craftingListing.buildListing@100": {
-      "description": "The player crafting SUMMARY phase at this inventory size — the corpus-wide browse half only (issue 1075). Corpus pinned at 20 recipes so the ONLY thing varying across the series is held-stack count. A real app open also hydrates ONE recipe through buildRecipeDetail; that cost is bounded by page size rather than by either axis here and is not measured by this case.",
+      "description": "The player crafting open at this inventory size. Corpus pinned at 20 recipes so the ONLY thing varying across the series is held-stack count.",
       "counts": {
-        "craftingActorItemsReads": 1,
-        "craftingActorItemsScanned": 34,
-        "identityCandidatesExamined": 5030,
+        "componentCandidatesExamined": 68526,
+        "craftingActorItemsReads": 24,
+        "craftingActorItemsScanned": 816,
+        "identityCandidatesExamined": 5720,
         "identityIndexBuilds": 2,
-        "sourceActor0ItemsReads": 1,
-        "sourceActor0ItemsScanned": 33,
-        "sourceActor1ItemsReads": 1,
-        "sourceActor1ItemsScanned": 33,
+        "sourceActor0ItemsReads": 24,
+        "sourceActor0ItemsScanned": 792,
+        "sourceActor1ItemsReads": 24,
+        "sourceActor1ItemsScanned": 792,
         "listedRecipes": 6,
         "availableRecipes": 6
       }
@@ -181,16 +182,17 @@
       }
     },
     "craftingListing.buildListing@500": {
-      "description": "The player crafting SUMMARY phase at this inventory size — the corpus-wide browse half only (issue 1075). Corpus pinned at 20 recipes so the ONLY thing varying across the series is held-stack count. A real app open also hydrates ONE recipe through buildRecipeDetail; that cost is bounded by page size rather than by either axis here and is not measured by this case.",
+      "description": "The player crafting open at this inventory size. Corpus pinned at 20 recipes so the ONLY thing varying across the series is held-stack count.",
       "counts": {
-        "craftingActorItemsReads": 1,
-        "craftingActorItemsScanned": 167,
-        "identityCandidatesExamined": 5150,
+        "componentCandidatesExamined": 102126,
+        "craftingActorItemsReads": 24,
+        "craftingActorItemsScanned": 4008,
+        "identityCandidatesExamined": 8600,
         "identityIndexBuilds": 1,
-        "sourceActor0ItemsReads": 1,
-        "sourceActor0ItemsScanned": 167,
-        "sourceActor1ItemsReads": 1,
-        "sourceActor1ItemsScanned": 166,
+        "sourceActor0ItemsReads": 24,
+        "sourceActor0ItemsScanned": 4008,
+        "sourceActor1ItemsReads": 24,
+        "sourceActor1ItemsScanned": 3984,
         "listedRecipes": 6,
         "availableRecipes": 6
       }
@@ -260,16 +262,17 @@
       }
     },
     "craftingListing.buildListing@1000": {
-      "description": "The player crafting SUMMARY phase at this inventory size — the corpus-wide browse half only (issue 1075). Corpus pinned at 20 recipes so the ONLY thing varying across the series is held-stack count. A real app open also hydrates ONE recipe through buildRecipeDetail; that cost is bounded by page size rather than by either axis here and is not measured by this case.",
+      "description": "The player crafting open at this inventory size. Corpus pinned at 20 recipes so the ONLY thing varying across the series is held-stack count.",
       "counts": {
-        "craftingActorItemsReads": 1,
-        "craftingActorItemsScanned": 334,
-        "identityCandidatesExamined": 5300,
+        "componentCandidatesExamined": 136126,
+        "craftingActorItemsReads": 24,
+        "craftingActorItemsScanned": 8016,
+        "identityCandidatesExamined": 11600,
         "identityIndexBuilds": 1,
-        "sourceActor0ItemsReads": 1,
-        "sourceActor0ItemsScanned": 333,
-        "sourceActor1ItemsReads": 1,
-        "sourceActor1ItemsScanned": 333,
+        "sourceActor0ItemsReads": 24,
+        "sourceActor0ItemsScanned": 7992,
+        "sourceActor1ItemsReads": 24,
+        "sourceActor1ItemsScanned": 7992,
         "listedRecipes": 6,
         "availableRecipes": 5
       }

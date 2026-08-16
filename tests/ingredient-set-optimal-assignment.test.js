@@ -320,24 +320,33 @@ test('stress: a large authored recipe stays orders of magnitude under the search
 
   const matcher = matcherFor({ component: componentRules, tags: tagRules });
   const set = new IngredientSet({ id: 's', ingredientGroups: groups });
-  const ctx = {
-    affordCurrency: undefined,
-    optionOverrides: undefined,
-    resolveEssences: set._essenceResolver(essenceProbe(probeTable)),
-  };
 
-  const search = set._searchAssignment(items, matcher, ctx);
-
-  assert.ok(search.selection, 'the large recipe is satisfiable');
-  assert.equal(search.capHit, false, 'the search never reaches its bound');
-  assert.ok(
-    search.nodes < INGREDIENT_SEARCH_NODE_CAP / 100,
-    `nodes used (${search.nodes}) is orders of magnitude below the cap (${INGREDIENT_SEARCH_NODE_CAP})`
-  );
-
-  // The public path agrees and produces a valid, non-double-counting plan.
+  // Asserted through the PUBLIC result's `searchStats` (issue 1072's seam), not by calling
+  // `_searchAssignment` directly. The direct call was this guard's weak point: issue 1083's
+  // staged resolver routes an uncontended recipe around the backtracking search entirely, so a
+  // guard bound to the private entry point would stop describing how the fixture is actually
+  // resolved and would pass because nothing reached it — a vacuous green rather than a
+  // satisfied bound. `searchStats` is attached on BOTH exits, so this reads the real cost
+  // whichever stage produced the answer.
   const selection = set.resolveIngredientSelection(items, matcher, {
     resolveItemEssences: essenceProbe(probeTable),
   });
-  assert.equal(selection.success, true);
+
+  assert.equal(selection.success, true, 'the large recipe is satisfiable');
+  assert.equal(selection.searchStats.capHit, false, 'the search never reaches its bound');
+  assert.ok(
+    selection.searchStats.nodes < INGREDIENT_SEARCH_NODE_CAP / 100,
+    `nodes used (${selection.searchStats.nodes}) is orders of magnitude below the cap ` +
+      `(${INGREDIENT_SEARCH_NODE_CAP})`
+  );
+
+  // And it produces a valid, non-double-counting plan: every group is satisfied and no stack is
+  // drawn past what it holds. Without this the bound above could be met by a resolver that
+  // simply did less and answered wrongly.
+  assert.equal(selection.missingGroups.length, 0);
+  assert.equal(selection.selectedIngredients.length, groups.length);
+  const held = new Map(items.map((entry) => [entry.uuid, entry.system.quantity]));
+  for (const [uuid, consumed] of Object.entries(consumedByUuid(selection))) {
+    assert.ok(consumed <= held.get(uuid), `${uuid} consumed ${consumed} of ${held.get(uuid)}`);
+  }
 });
