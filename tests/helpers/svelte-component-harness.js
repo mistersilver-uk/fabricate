@@ -87,13 +87,36 @@ function validateMountedComponentDependencies({ repoRoot, rawModules, runeModule
   }
 }
 
+// Lifecycle functions live on the `svelte` package; everything else a component imports from
+// `svelte` (tick, untrack, …) is only reachable from `svelte/internal/client` once the
+// component is compiled to a client module. The split is by NAME rather than by literal import
+// line: a hand-listed line is a mirror of the component's source text, and adding one name to
+// a component turned every mounted manager test into `# cancelled 348` behind one "does not
+// provide an export named 'onDestroy'" (issue 1185).
+const SVELTE_PACKAGE_EXPORTS = new Set(['onDestroy', 'onMount', 'mount', 'unmount', 'hydrate']);
+
 /**
  * Rewrite a compiled component's imports so they resolve against the temp dir:
- * point bare `svelte` at the client runtime and append `.js` to `.svelte`
- * specifiers (the temp dir holds the compiled `.svelte.js` siblings).
+ * split a bare `svelte` import list between the package (lifecycle) and the
+ * client runtime (everything else), and append `.js` to `.svelte` specifiers
+ * (the temp dir holds the compiled `.svelte.js` siblings).
  */
 export function rewriteClientImports(code) {
   return code
+    .replace(/import \{([^}]*)\} from 'svelte';/g, (_match, names) => {
+      const imported = names
+        .split(',')
+        .map((name) => name.trim())
+        .filter(Boolean);
+      const fromPackage = imported.filter((name) => SVELTE_PACKAGE_EXPORTS.has(name));
+      const fromClient = imported.filter((name) => !SVELTE_PACKAGE_EXPORTS.has(name));
+      const lines = [];
+      if (fromPackage.length > 0) lines.push(`import { ${fromPackage.join(', ')} } from "svelte";`);
+      if (fromClient.length > 0) {
+        lines.push(`import { ${fromClient.join(', ')} } from 'svelte/internal/client';`);
+      }
+      return lines.join('\n');
+    })
     .replace(/from 'svelte';/g, "from 'svelte/internal/client';")
     .replace(/(from\s+['"][^'"]+\.svelte)(['"])/g, '$1.js$2');
 }
@@ -426,6 +449,11 @@ export function createMountedComponentHarness({ repoRoot, tmpPrefix, rawModules 
       if (mounted) { mounted.$destroy(); mounted = null; }
       if (target) { target.remove(); target = null; }
     },
-    get target() { return target; }
+    get target() { return target; },
+    // The mounted instance, so a suite can call a component's `export function` — the seam an
+    // application shell reaches for when it must act while the mount target is still
+    // connected (`disposeBeforeRemoval`). Reading it off `target` is impossible, so without
+    // this a suite proving that contract would have to re-inline the whole mount boilerplate.
+    get component() { return mounted; }
   };
 }

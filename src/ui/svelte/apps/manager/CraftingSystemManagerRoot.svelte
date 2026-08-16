@@ -133,7 +133,7 @@
   import { WORLD_DOWNTIME_PREVIEW_PROVIDER } from './downtime/worldDowntimePreviewProvider.js';
   import { WORLD_DOWNTIME_SURFACE_ID } from '../../../managerExtensions.js';
 
-  let { store, services = null, managerExtensions = null } = $props();
+  let { store, services = null, managerExtensions = null, playerExtensions = null } = $props();
   let downtimeExtensionHost = $state(null);
   const PATREON_URL = 'https://www.patreon.com/c/mistersilver';
   // Which provider currently holds the Downtime surface, and which one has already failed
@@ -147,7 +147,14 @@
   // Every surface a companion currently claims, not just Core's Downtime one. The title bar
   // reports the MODULE, so it must not be keyed on one route: a premium module whose only
   // surface is one Core has never heard of is still installed and still working.
-  let registeredSurfaceIds = $state([]);
+  //
+  // …and for the same reason it must not be keyed on one REGISTRY either (issue 1198). A
+  // companion whose only surface is a player-window one is just as installed, so each
+  // registry publishes into its own private array and the pair are unioned below. Widening
+  // the SOURCE rather than the predicate is deliberate: `premiumInstalled` already means
+  // "read the whole registered surface set", so there is nothing about the flag to change.
+  let managerRegisteredSurfaceIds = $state([]);
+  let playerRegisteredSurfaceIds = $state([]);
 
   $effect(() => {
     if (!managerExtensions?.subscribe) return;
@@ -162,7 +169,14 @@
   $effect(() => {
     if (!managerExtensions?.subscribeSurfaceIds) return;
     return managerExtensions.subscribeSurfaceIds((surfaceIds) => {
-      registeredSurfaceIds = surfaceIds;
+      managerRegisteredSurfaceIds = surfaceIds;
+    });
+  });
+
+  $effect(() => {
+    if (!playerExtensions?.subscribeSurfaceIds) return;
+    return playerExtensions.subscribeSurfaceIds((surfaceIds) => {
+      playerRegisteredSurfaceIds = surfaceIds;
     });
   });
 
@@ -2245,6 +2259,13 @@
       : null
   );
   const downtimeCoreFallback = $derived(downtimeProvider === null);
+  // The union of both registries' claimed surfaces. The two id namespaces are separate by
+  // design (one companion may claim `downtime` in both windows), so this is a concatenation
+  // and never a set: it is only ever read for its length.
+  const registeredSurfaceIds = $derived([
+    ...managerRegisteredSurfaceIds,
+    ...playerRegisteredSurfaceIds,
+  ]);
   // The title bar's premium signal (issue 1185). It is deliberately BROADER than
   // `downtimeCoreFallback`: that flag answers "who owns the Downtime route", while this one
   // answers "is a companion module registered at all", which is the claim the strip makes.
