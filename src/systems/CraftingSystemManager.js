@@ -6427,11 +6427,15 @@ export class CraftingSystemManager {
    *     set with a stale mirror RESURRECTED the deleted essence option as a fresh group.
    *
    * **Since issue 1135 the mirror is DROPPED rather than recomputed** for a set authored
-   * with groups. `toJSON` no longer emits the flat alias at all, so recomputing it here put
-   * the retired alias straight back into the `updateRecipe` payload on every essence-delete
-   * cascade — a mixed corpus, which is exactly the resurrection hazard above in its latent
-   * form. Dropping it is strictly safer than recomputing it, because `IngredientSet` derives
-   * the mirror from the stripped groups on read.
+   * with groups. `toJSON` no longer emits the flat alias at all, so recomputing it here
+   * re-created the write-retired alias in the patch this method feeds `updateRecipe` — the
+   * INTERMEDIATE object, not the file. It never reached disk either way: `updateRecipe`
+   * shallow-spreads the patch, rebuilds through `Recipe.fromJSON`, and persists
+   * `updatedRecipe.toJSON()`, which no longer emits the alias. What dropping it buys is that
+   * the patch and the merged object hydrated from it carry ONE ingredient authority, so no
+   * consumer can read a mirror that disagrees with the groups beside it — defects 1 and 2
+   * above are both consequences of a set travelling with a mirror that does. Dropping is
+   * safe because `IngredientSet` derives the mirror from the stripped groups on read.
    *
    * Dropping it UNCONDITIONALLY would not be safe: for a set authored in the LEGACY flat
    * shape the array is the set's only ingredient data and the `set.ingredients?.length` leg

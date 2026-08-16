@@ -155,10 +155,18 @@ export function recipeLostItsShape(updated) {
  *     is not an ingredient OPTION and does not go through `getIngredientComponentId`;
  *  3. DROP the flat `ingredients` mirror when the set has groups, and keep the filtered
  *     legacy array when it does not (issue 1135). This step used to RECOMPUTE the mirror
- *     from the surviving groups, which put the write-retired alias straight back into the
- *     `updateRecipe` payload one component delete at a time. Dropping it unconditionally is
- *     NOT the fix: for a flat-authored set the array is the set's only ingredient data, and
- *     the retention filter's `set.ingredients?.length` leg is what keeps that set alive;
+ *     from the surviving groups, which re-created the write-retired alias in the patch this
+ *     function returns — the INTERMEDIATE object, not the file. It never reached disk either
+ *     way: `RecipeManager.updateRecipe` shallow-spreads the patch, rebuilds through
+ *     `Recipe.fromJSON`, and persists `updatedRecipe.toJSON()`, which no longer emits the
+ *     alias. What dropping it buys is that the patch, the merged object hydrated from it,
+ *     and the in-memory map a `persist: false` batch caller mutates all carry ONE ingredient
+ *     authority, so no consumer can read a mirror that disagrees with the groups beside it —
+ *     the issue-1036 stale-mirror hazard, whose second defect is that `IngredientSet`
+ *     rebuilds its groups FROM that mirror whenever `ingredientGroups` is empty. Dropping it
+ *     unconditionally is NOT the fix: for a flat-authored set the array is the set's only
+ *     ingredient data, and the retention filter's `set.ingredients?.length` leg is what keeps
+ *     that set alive;
  *  4. drop a set left with no groups, no ingredients AND no essences — an essence-only set
  *     survives, which is why the essence check is part of the condition rather than an
  *     afterthought;
