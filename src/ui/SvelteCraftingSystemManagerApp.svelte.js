@@ -31,6 +31,11 @@ import { matchRecipeItemDefinition } from '../utils/sourceUuid.js';
 import { getFabricateFlag } from '../config/flags.js';
 import { isPlayerCharacterActor } from '../config/playerCharacterTypes.js';
 import { managerExtensions } from './managerExtensions.js';
+// The title bar's companion signal reports the MODULE, so it reads BOTH registries (issue
+// 1198). This is a second subscription to the player registry from a different application,
+// which is not the failure "one subscriber per registry" guards against: that rule exists
+// because two subscribers WITHIN ONE WINDOW can disagree about what that window renders.
+import { playerExtensions } from './playerExtensions.js';
 import { readStackQuantity } from '../systems/itemStackQuantity.js';
 import {
   KNOWLEDGE_MESSAGES,
@@ -647,6 +652,7 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
     return {
       store: this._adminStore,
       managerExtensions,
+      playerExtensions,
       services: {
         importSingleManagedItemFromDrop,
         pickImagePath: this._services.pickImagePath,

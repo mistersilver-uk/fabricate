@@ -14,9 +14,58 @@ import { notifyWarn, localize, confirmDialog } from './svelte/util/foundryBridge
 // import beyond what it itself guards), reused rather than re-authored so the
 // bulk salvage/destroy progress toast cannot drift from the compendium import's.
 import { createDefaultProgressReporter } from '../systems/CompendiumImporter.js';
+import { playerExtensions } from './playerExtensions.js';
+import {
+  buildRouteKey,
+  deriveExtensionSurfaces,
+  isCoreTabId,
+  parseRouteKey,
+  resolveActiveTab,
+} from './playerNavModel.js';
 
-const VALID_TABS = new Set(['crafting', 'alchemy', 'gathering', 'journal', 'inventory']);
+const CORE_TABS = new Set(['crafting', 'alchemy', 'gathering', 'journal', 'inventory']);
 const DEFAULT_TAB = 'crafting';
+
+/**
+ * Is `tab` a route this window can currently show?
+ *
+ * A LIVE predicate rather than a frozen set (issue 1198), because the answer changes when a
+ * companion registers or unregisters. `isCoreTabId` is structural — it answers "is this key
+ * NOT a provider route key", which is true of any non-empty string — so it is intersected
+ * with this window's own Core ids rather than trusted alone; without that intersection an
+ * unknown id such as `bogus` would become valid and the constructor, `_selectTab` and
+ * `static show` would all silently accept it.
+ *
+ * @param {*} tab Candidate tab id or `ext:<surfaceId>:<tabId>` route key.
+ * @returns {boolean} True when the tab is currently offered.
+ */
+function isOfferedTab(tab) {
+  if (typeof tab !== 'string' || tab === '') return false;
+  if (isCoreTabId(tab)) return CORE_TABS.has(tab);
+  const route = parseRouteKey(tab);
+  if (!route) return false;
+  const provider = playerExtensions.getPlayerNavProvider(route.surfaceId);
+  return Boolean(provider?.tabs?.some((providerTab) => providerTab.id === route.tabId));
+}
+
+/**
+ * Every route key the rail currently offers, in `{ routeKey }` shape for `resolveActiveTab`.
+ *
+ * Alchemy is deliberately included unconditionally: its availability is `_refreshAlchemy`'s
+ * concern and handling it in two places would let the two disagree.
+ *
+ * @param {readonly {surfaceId: string, provider: object}[]} extensionSurfaces Snapshot.
+ * @returns {{routeKey: string}[]} Offered routes.
+ */
+function offeredRoutes(extensionSurfaces) {
+  const routes = [...CORE_TABS].map((id) => ({ routeKey: id }));
+  for (const { surfaceId, provider } of extensionSurfaces) {
+    for (const tab of provider?.tabs ?? []) {
+      routes.push({ routeKey: buildRouteKey(surfaceId, tab.id) });
+    }
+  }
+  return routes;
+}
 
 /**
  * Normalize a scene-interactable ref to `{sceneId, regionId, behaviorId}` (issue
@@ -59,6 +108,10 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
   _activeTab = DEFAULT_TAB;
   _services = null;
   _hookIds = null;
+  // The player window's SOLE player-extension registry subscription (issue 1198). It lives
+  // beside the Foundry hook ids because it has the same lifetime: joined in
+  // `_registerHooks()` and released in `_removeHooks()`.
+  _playerExtensionsUnsubscribe = null;
   // Session-scoped canvas Tool. When the GM grants activation of a Tool-station
   // interactable region (the controlling player walked their token in and clicked
   // Interact), the station Tool is injected here as a virtual-present tool: a
@@ -148,7 +201,7 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
 
   constructor(options = {}) {
     super(options);
-    if (VALID_TABS.has(options.activeTab)) {
+    if (isOfferedTab(options.activeTab)) {
       this._activeTab = options.activeTab;
     }
     if (options.activeCanvasTool) {
@@ -374,13 +427,26 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
       // Session-scoped interacting actor: when a region activation is granted the
       // shell seeds this actor as the default top-bar selection (once per distinct
       // value). Null on a plain manual open.
-      scopedActorId: this._scopedActorId
+      scopedActorId: this._scopedActorId,
+      // SEEDED HERE, not merely refreshed on publication (issue 1198). `_registerHooks()`
+      // runs from `_onRender` — after this method and after Svelte has mounted — and returns
+      // early once the hook bag exists, while `show()` reuses the singleton. Without this
+      // seed a companion following the documented contract (register during your own `init`,
+      // before the window is ever opened) would have no tabs on first open and, if it
+      // registers once and never re-registers, never at all. DERIVED here rather than read
+      // off a field, because a key present in `_prepareSvelteProps` is re-assigned over the
+      // reactive props on every re-render, so a stale field would clobber a live snapshot.
+      // `showAlchemy` above is the same pattern and the precedent.
+      extensionSurfaces: deriveExtensionSurfaces(playerExtensions),
+      // The registry itself, so the mount host emits its surface hooks through the same
+      // injectable edge the registry's own hooks travel on.
+      playerExtensions
     };
   }
 
   /** Switch the active tab, reactively updating the mounted component. */
   _selectTab(tab) {
-    if (!VALID_TABS.has(tab) || tab === this._activeTab) {
+    if (!isOfferedTab(tab) || tab === this._activeTab) {
       return;
     }
     this._activeTab = tab;
@@ -401,6 +467,25 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
       this._activeTab = DEFAULT_TAB;
     }
     this.updateProps({ showAlchemy, activeTab: this._activeTab });
+  }
+
+  /**
+   * Push a fresh companion-surface snapshot to the mounted shell (issue 1198).
+   *
+   * Called on every registry publication, which `publish` broadcasts on registration,
+   * unregistration and same-surface re-registration alike. The active route falls back to
+   * the default Core tab when the new tab set no longer offers it — the identical shape
+   * `_refreshAlchemy` already uses when Alchemy disappears, and the reason an unregistered
+   * companion leaves the user on Crafting rather than on an empty panel.
+   */
+  _refreshExtensionSurfaces() {
+    const extensionSurfaces = deriveExtensionSurfaces(playerExtensions);
+    this._activeTab = resolveActiveTab(
+      this._activeTab,
+      offeredRoutes(extensionSurfaces),
+      DEFAULT_TAB
+    );
+    this.updateProps({ extensionSurfaces, activeTab: this._activeTab });
   }
 
   /**
@@ -431,9 +516,19 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
         this._refreshSelectableActors()
       )
     };
+    // EXACTLY ONE subscriber per registry, per window. `FabricateAppRoot` subscribes to
+    // nothing; it takes the snapshot as a prop, so the rail and the panel can never disagree
+    // about which surfaces exist. `subscribeSurfaceIds` suffices because `publish` broadcasts
+    // a freshly built frozen id array on every registration, unregistration and same-surface
+    // re-registration.
+    this._playerExtensionsUnsubscribe = playerExtensions.subscribeSurfaceIds(() =>
+      this._refreshExtensionSurfaces()
+    );
   }
 
   _removeHooks() {
+    this._playerExtensionsUnsubscribe?.();
+    this._playerExtensionsUnsubscribe = null;
     if (!this._hookIds) {
       return;
     }
@@ -459,6 +554,12 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
     // (issue 651). Without this a player who reorders and immediately closes,
     // refreshes, or logs out inside the debounce window loses the order silently.
     this._flushPendingOrderWrite();
+    // Companion UI owns its own DOM and cleanup. Dispose it before `super.close()` unmounts
+    // the Svelte root, so its mount target is still connected: `unmount()` destroys the root
+    // effect and `destroy_effect` removes the effect's DOM BEFORE running teardowns, so every
+    // `onDestroy` in the tree runs against an already-detached target. This is the only
+    // connected-target teardown path there is.
+    this._svelteComponent?.disposePlayerProvidersBeforeRemoval?.();
     const result = await super.close(options);
     // Fire the canvas re-prompt callback AFTER the window has fully closed (issue
     // 332) so the Interact prompt re-appears against a settled canvas. One-shot
@@ -541,7 +642,8 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
    * has no canvas tool, so it must not silently inherit a station tool from a
    * prior interactable activation. The context is also cleared on close.
    *
-   * @param {string} [tab='crafting'] One of crafting/gathering/journal/inventory.
+   * @param {string} [tab='crafting'] A Core tab id (crafting/alchemy/gathering/journal/
+   *   inventory) or a currently registered companion route key `ext:<surfaceId>:<tabId>`.
    * @param {object} [options]
    * @param {object|null} [options.activeCanvasTool] Virtual-present Tool injected
    *   by a granted Tool-station region activation: `{ componentId, systemId, toolId, label }`.
@@ -561,7 +663,7 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
    * @returns {Promise<SvelteFabricateApp>}
    */
   static async show(tab = DEFAULT_TAB, { activeCanvasTool, environmentId, taskId, actorId, interactableRef, onClose } = {}) {
-    const initialTab = VALID_TABS.has(tab) ? tab : DEFAULT_TAB;
+    const initialTab = isOfferedTab(tab) ? tab : DEFAULT_TAB;
     const nextCanvasTool = activeCanvasTool ?? null;
     const nextEnvironmentId = typeof environmentId === 'string' ? environmentId : null;
     const nextTaskId = typeof taskId === 'string' ? taskId : null;
