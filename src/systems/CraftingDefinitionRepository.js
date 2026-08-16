@@ -71,6 +71,13 @@
  * which the server refuses for a non-GM on a `world`-scoped key. No write moved to a
  * different authority, and no write became reachable by a client that could not
  * already make it.
+ *
+ * The per-record adapter (#1080 -b) writes `Setting` DOCUMENTS instead of calling
+ * `game.settings.set`, and the authority is the same gate one layer down:
+ * `BaseSetting.#canModify` -> `user.hasPermission('SETTINGS_MODIFY')` is what refuses a
+ * non-GM, and it refuses `Setting.implementation.createDocuments` exactly as it refuses
+ * `ClientSettings#set`. Moving off `ClientSettings` changed which API is called, not who
+ * may call it.
  */
 
 /**
@@ -230,7 +237,60 @@ export class CraftingDefinitionRepository {
   readReplicatedSnapshot() {
     return null;
   }
+
+  /**
+   * Whether this backend can answer a replication event for ONE record.
+   *
+   * **Optional capability, `false` by default — which IS today's behaviour.** A backend
+   * that stores the whole corpus in a single setting has nothing per-record to report: a
+   * replication event names the one key holding everything, and the only correct response
+   * is the whole-corpus {@link CraftingDefinitionRepository#readReplicatedSnapshot} the
+   * managers' `reload()` already performs. So the settings adapter inherits `false` and is
+   * completely unaffected by this member existing.
+   *
+   * A per-record backend (#1080) returns `true`, and its caller then routes each
+   * `createSetting`/`updateSetting`/`deleteSetting` event through
+   * {@link CraftingDefinitionRepository#readReplicatedRecord} instead of re-reading the
+   * corpus. That distinction cannot be inferred from `readReplicatedRecord` alone:
+   * `null` there means "not a key of mine", which a whole-corpus backend would also
+   * answer for its own key, and the two demand opposite fallbacks.
+   *
+   * @returns {boolean}
+   */
+  supportsPerRecordReplication() {
+    return false;
+  }
+
+  /**
+   * Synchronously read the ONE record a replication event has already delivered.
+   *
+   * **Optional capability, `null` by default.** Synchronous for the same reason
+   * `readReplicatedSnapshot` is: it is called from a settings hook whose result decides
+   * whether a change hook is re-emitted.
+   *
+   * @param {ReplicatedDefinitionChange} _change The replicated change, as the
+   *   `createSetting` / `updateSetting` / `deleteSetting` hooks describe it.
+   * @returns {{ id: string, record: object|null }|null} `null` when the changed key is not
+   *   one this repository stores. Otherwise the record id, with `record: null` meaning the
+   *   record was removed and must leave the caller's map.
+   */
+  readReplicatedRecord(_change) {
+    return null;
+  }
 }
+
+/**
+ * One replicated change to a single stored record.
+ *
+ * `document` is the `Setting` document the hook delivered. Passing it matters on a delete,
+ * where the document is already gone from the collection by the time a listener could look
+ * it up, and it avoids a linear lookup on a create the local index has not seen yet.
+ *
+ * @typedef {object} ReplicatedDefinitionChange
+ * @property {string} key The fully-qualified setting key that changed.
+ * @property {'create'|'update'|'delete'} operation Which hook fired.
+ * @property {object|null} [document] The `Setting` document the hook delivered.
+ */
 
 /**
  * One mutation's effect on storage, as the managers describe it.
