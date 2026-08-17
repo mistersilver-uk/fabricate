@@ -182,25 +182,42 @@ export function scaleBookUuid(index) {
 }
 
 /**
- * A book-gated ALCHEMY system: `item` visibility mode, `bookCount` authored recipe-item
- * definitions, and membership resolved the modern way (issue 511's `recipeIds[]`).
+ * A BOOK-GATED system: `bookCount` authored recipe-item definitions with membership resolved
+ * the modern way (issue 511's `recipeIds[]`), in a caller-chosen resolution and visibility
+ * mode.
  *
- * `item` mode is the only alchemy mode that consults held inventory at all — `global` and
- * `knowledge` both answer reveal from the actor's `learnedRecipes` flag and never reach the
- * candidate walk. A fixture in any other mode measures nothing on the path issue 1228 fixes,
- * which is exactly why the committed `alchemy-signatures` profile could not see the defect.
+ * Both modes are parameters because the two paths issue 1228 measures need OPPOSITE settings,
+ * and each is the only setting that reaches its path:
+ *
+ * - The alchemy workbench's reveal decision consults held inventory only in `item` mode;
+ *   `global` and `knowledge` both answer reveal from the actor's `learnedRecipes` flag and
+ *   never reach the candidate walk. That is exactly why the committed `alchemy-signatures`
+ *   profile could not see the defect.
+ *   - The crafting listing's EXHAUSTION read is the mirror image: `item` and `knowledge` modes
+ *   populate `access.knowledge`, so the exhaustion answer comes from that evidence and no
+ *   rescan happens at all. It is `global` and `restricted` — with a book reference still on
+ *   the recipes, which is the guaranteed state of a world migrated off `item` mode — that
+ *   leave `access.knowledge` null and fall through to the rescan.
  *
  * @param {object} options
  * @param {number} options.recipeCount How many recipes the books between them contain.
  * @param {number} [options.bookCount]
  * @param {number} [options.componentCount]
+ * @param {string} [options.resolutionMode]
+ * @param {string} [options.visibilityMode]
  * @returns {object}
  */
-export function makeBookGatedAlchemySystem({ recipeCount, bookCount = 2, componentCount = 8 }) {
-  const system = makeCraftingSystem({ componentCount, resolutionMode: 'alchemy' });
+export function makeBookGatedSystem({
+  recipeCount,
+  bookCount = 2,
+  componentCount = 8,
+  resolutionMode = 'alchemy',
+  visibilityMode = 'item',
+}) {
+  const system = makeCraftingSystem({ componentCount, resolutionMode });
   return {
     ...system,
-    visibilityMode: 'item',
+    visibilityMode,
     alchemy: { enabled: true, learnOnCraft: false, checkMode: 'none' },
     membershipResolvesByRecipeIds: true,
     recipeItemDefinitions: Array.from({ length: bookCount }, (_unused, bookIndex) => ({
@@ -248,12 +265,12 @@ export function makeBookHoldingActor({ id = 'actor-scale', itemCount = 10, bookU
 }
 
 /**
- * An alchemy recipe belonging to one of {@link makeBookGatedAlchemySystem}'s books.
+ * A recipe belonging to one of {@link makeBookGatedSystem}'s books.
  *
  * @param {object} options
  * @returns {object}
  */
-export function makeBookGatedAlchemyRecipe({ index, systemId = 'sys-scale', componentCount = 8 }) {
+export function makeBookGatedRecipe({ index, systemId = 'sys-scale', componentCount = 8 }) {
   const recipe = makeListingRecipe({
     id: `r-${index}`,
     systemId,

@@ -137,8 +137,11 @@ export class AlchemyListingBuilder {
     // reveal for all of them and the candidate superset must cover every legacy book link any
     // of those recipes' matchers could see.
     //
-    // Nothing here forces an inventory read: the snapshot's walk is lazy, so a `global`- or
-    // `knowledge`-mode discipline (which never consults held items) still pays nothing.
+    // Nothing here forces an INVENTORY read: the snapshot's walk is lazy, so a `global`- or
+    // `knowledge`-mode discipline, which never consults held items, adds no inventory cost.
+    // It is not literally free — the legacy book links are collected eagerly over every
+    // enabled system's cohort whatever the mode — but that is one pass over the recipes
+    // already in hand, and it is `O(recipes)` once rather than per recipe.
     const snapshot = this._passSnapshot(
       craftingActor,
       revealSources,

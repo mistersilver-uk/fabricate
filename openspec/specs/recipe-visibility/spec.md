@@ -460,8 +460,9 @@ A read pass that evaluates recipe access for MORE THAN ONE recipe evaluates them
 The candidate collection in step 3 of the Knowledge Access Algorithm MUST therefore be derivable from one walk of those actors' inventories per pass, not one walk per recipe.
 
 The requirement is stated on the PASS, not on any one surface, and that generality is load bearing rather than stylistic.
-It binds the corpus-wide visibility pass, the player crafting listing, the alchemy workbench's reveal decision (both its chooser summaries and its active panel), the run journal's per-run redaction, and any surface added later that asks the same question about a set of recipes.
-Naming only the corpus-wide pass left two of those evaluating access per recipe with no per-pass value at all, each performing a complete inventory enumeration per recipe on an `item`-visibility-mode system.
+It binds the corpus-wide visibility pass, the player crafting listing's summary projection AND its per-row exhaustion read, the alchemy workbench's reveal decision (both its chooser summaries and its active panel), the run journal's per-run redaction, and any surface added later that asks the same question about a set of recipes.
+Naming only the corpus-wide pass left three of those collecting candidates per recipe with no per-pass value, each performing a complete inventory enumeration per recipe.
+The exhaustion read is the one most easily mistaken for exempt, because the bullet below reads as though it needs no collection at all: it needs one whenever the pass did not evaluate knowledge, which is every recipe of a `global`- or `restricted`-visibility system that still carries a recipe-item reference — the settled state of any world migrated off `item` mode.
 
 Three consequences are normative:
 
@@ -473,8 +474,9 @@ Omitting the legacy leg makes the union a *subset* for un-migrated recipes and s
 A recipe's item-knowledge is exhausted when at least one matching copy is owned and every such copy has reached its own book's cap.
 Both numbers are already established by the Knowledge Access Algorithm, so a caller holding that result derives exhaustion from it.
 A result that owns no evidence — the GM bypass, which scans no inventory, or a mode that never evaluated knowledge — MUST be distinguishable from a genuine count of zero, and only the latter answers "not exhausted"; the former falls back to collecting candidates.
-- **A per-pass inventory value is ONE kind of thing, built ONE way.**
+- **A per-pass inventory value is ONE KIND of thing, built ONE way.**
 Every pass MUST build it through a single construction that supplies the recipe-item matcher, rather than each surface choosing which identity collaborators to supply.
+This constrains the KIND, not the instance count: a pass that legitimately builds more than one such value — a listing surface that both asks a visibility service for a corpus pass and builds its own — satisfies it, because the cost of an extra construction is `O(1)` in recipes and the hazard being removed is a value that answers a consumer wrongly, not a value that exists twice.
 The reason is a failure mode rather than tidiness: a value built without the matcher offers the per-recipe matcher every held document unfiltered, and because that matcher still decides each candidate the ANSWER is unchanged — the per-recipe walk is reinstated in full while every correctness test stays green and every inventory-read counter stays flat, because the unfiltered offer is served from a single memoised walk.
 A conformance guard for this section MUST therefore count the documents OFFERED to the per-recipe matcher, not the times an inventory was read; the latter cannot distinguish a correct pass from that reinstatement.
 

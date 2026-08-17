@@ -47,8 +47,8 @@ import {
 } from './helpers/scale/scaleProbes.js';
 import {
   makeActor,
-  makeBookGatedAlchemyRecipe,
-  makeBookGatedAlchemySystem,
+  makeBookGatedRecipe,
+  makeBookGatedSystem,
   makeBookHoldingActor,
   makeCraftingSystem,
   makeListingRecipe,
@@ -786,9 +786,9 @@ describe('issue 1072 guard — persistence writes are counted in bytes, not call
  */
 function measureAlchemyReveal({ recipeCount, itemCount, heldBooks = 1 }) {
   const counters = createOperationCounters();
-  const system = makeBookGatedAlchemySystem({ recipeCount });
+  const system = makeBookGatedSystem({ recipeCount });
   const recipes = Array.from({ length: recipeCount }, (_unused, index) =>
-    makeBookGatedAlchemyRecipe({ index, systemId: system.id })
+    makeBookGatedRecipe({ index, systemId: system.id })
   );
   const systemManager = makeSystemManager(system, () => recipes);
   const recipeManager = {
@@ -823,11 +823,69 @@ function measureAlchemyReveal({ recipeCount, itemCount, heldBooks = 1 }) {
   };
 }
 
+/**
+ * The same measurement on the player CRAFTING listing's exhaustion read.
+ *
+ * The system is `global`-visibility with the books still on it, and that combination is the
+ * whole fixture rather than an arbitrary one. `item` and `knowledge` modes populate
+ * `access.knowledge`, so the exhaustion answer is read from that evidence and no inventory is
+ * rescanned at all; `global` and `restricted` leave it null and fall through to the rescan.
+ * A world migrated off `item` mode is in exactly this state, and so is any GM who authored
+ * recipe items and then chose to show the whole library — so the rescan is the ORDINARY case
+ * for this path, not the "caller with nothing to offer" its contract implies.
+ *
+ * The pre-existing `measureListing` above cannot see any of this: it stubs `recipeVisibility`
+ * with `isKnowledgeItemExhausted: () => false`, so the real service is never asked.
+ */
+function measureCraftingExhaustion({ recipeCount, itemCount, heldBooks = 1 }) {
+  const counters = createOperationCounters();
+  const system = makeBookGatedSystem({
+    recipeCount,
+    resolutionMode: 'simple',
+    visibilityMode: 'global',
+  });
+  const recipes = Array.from({ length: recipeCount }, (_unused, index) =>
+    makeBookGatedRecipe({ index, systemId: system.id })
+  );
+  const systemManager = makeSystemManager(system, () => recipes);
+  const recipeManager = new RecipeManager({ getCraftingSystemManager: () => systemManager });
+  recipeManager.recipes = new Map(recipes.map((recipe) => [recipe.id, recipe]));
+  recipeManager.initialized = true;
+
+  const builder = new CraftingListingBuilder({
+    recipeManager,
+    // The REAL service, not the stub `measureListing` uses. The defect lives in the service's
+    // rescan branch, so a stubbed `isKnowledgeItemExhausted` measures nothing.
+    recipeVisibility: new RecipeVisibilityService(recipeManager, systemManager),
+    resolutionModeService: new ResolutionModeService(systemManager),
+    craftingSystemManager: systemManager,
+    localize: (key) => key,
+    nowWorldTime: () => 0,
+    resolveComponentForItem: findMatchingComponent,
+  });
+  const craftingActor = countingActor(
+    makeBookHoldingActor({
+      itemCount,
+      bookUuids: Array.from({ length: heldBooks }, (_unused, index) => scaleBookUuid(index)),
+    }),
+    counters,
+    'actorItems'
+  );
+
+  resetVisibilityCounters();
+  const listing = builder.buildListing({ craftingActor, viewer: PLAYER });
+  return {
+    listing,
+    ...readVisibilityCounters(),
+    itemsScanned: counters.get('actorItemsScanned'),
+  };
+}
+
 /** The same measurement on the Journal's redaction pass, which asks the same question per RUN. */
 function measureJournalRedaction({ runCount, itemCount, heldBooks = 1 }) {
-  const system = makeBookGatedAlchemySystem({ recipeCount: runCount });
+  const system = makeBookGatedSystem({ recipeCount: runCount });
   const recipes = Array.from({ length: runCount }, (_unused, index) =>
-    makeBookGatedAlchemyRecipe({ index, systemId: system.id })
+    makeBookGatedRecipe({ index, systemId: system.id })
   );
   const systemManager = makeSystemManager(system, () => recipes);
   const recipeManager = {
@@ -941,6 +999,42 @@ describe('issue 1228 guard — the visibility phase offers the BOOKS, not the in
       base.itemsScanned,
       `doubling the corpus moved inventory scanning from ${base.itemsScanned} to ` +
         `${moreRecipes.itemsScanned}. The workbench must read the inventory once per pass.`
+    );
+  });
+
+  it("the player crafting listing's exhaustion read is bounded the same way", () => {
+    // The MAIN player screen, and the largest of the three: it is asked once per VISIBLE ROW,
+    // and the visible set on a `global`-visibility system is the whole corpus.
+    const base = measureCraftingExhaustion({ recipeCount: RECIPES, itemCount: CONTROL_ITEMS });
+    const fat = measureCraftingExhaustion({ recipeCount: RECIPES, itemCount: SCALED_ITEMS });
+
+    assert.equal(
+      base.listing.summaries.length,
+      RECIPES,
+      'non-vacuity: a `global`-visibility system must project every recipe'
+    );
+    assert.ok(
+      base.candidateWalks > 0,
+      'non-vacuity: the exhaustion read must actually reach the candidate walk. Zero means ' +
+        'the fixture took the evidence branch instead, and the equality below is vacuous.'
+    );
+    assert.equal(
+      fat.candidateItemOffers,
+      base.candidateItemOffers,
+      `quadrupling the actor's mundane gear moved the per-row offer count from ` +
+        `${base.candidateItemOffers} to ${fat.candidateItemOffers}. The summary phase asks ` +
+        `the exhaustion question once per visible row, so an unthreaded rescan there is ` +
+        `recipes x items on the main player screen.`
+    );
+
+    // The axis it SHOULD track, so the equality above is a property rather than a dead probe.
+    const moreRecipes = measureCraftingExhaustion({
+      recipeCount: RECIPES * 2,
+      itemCount: CONTROL_ITEMS,
+    });
+    assert.ok(
+      moreRecipes.candidateItemOffers > base.candidateItemOffers,
+      'non-vacuity: doubling the corpus must still cost more offers — one per visible row'
     );
   });
 

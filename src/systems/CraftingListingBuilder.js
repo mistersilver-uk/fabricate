@@ -393,7 +393,7 @@ export class CraftingListingBuilder {
       exhausted:
         !isGM &&
         !redacted &&
-        this._isKnowledgeExhausted(access, recipe, craftingActor, knowledgeSources),
+        this._isKnowledgeExhausted(access, recipe, craftingActor, knowledgeSources, snapshot),
       favourite: false,
       localize: this.localize,
     });
@@ -420,15 +420,22 @@ export class CraftingListingBuilder {
    * it rather than branching here keeps one owner for the exhaustion rule: a listing that
    * re-derived "owned some, all spent" locally would be a second copy of a per-book cap rule
    * that has already changed once (issue 511).
+   *
+   * The pass snapshot goes with it (issue 1228), because "the visibility pass already
+   * collected this set" is only true for the modes that EVALUATE knowledge. A `global`- or
+   * `restricted`-visibility system leaves `access.knowledge` null, so a recipe of one that
+   * also carries a book reference takes the service's rescan branch — once per visible row,
+   * over the whole inventory, on the main player screen — and the snapshot is what bounds it.
    * @private
    */
-  _isKnowledgeExhausted(access, recipe, craftingActor, knowledgeSources) {
+  _isKnowledgeExhausted(access, recipe, craftingActor, knowledgeSources, snapshot = null) {
     return (
       this.recipeVisibility?.isKnowledgeItemExhausted?.({
         recipe,
         craftingActor,
         componentSourceActors: knowledgeSources,
         knowledge: access?.knowledge ?? null,
+        snapshot,
       }) === true
     );
   }

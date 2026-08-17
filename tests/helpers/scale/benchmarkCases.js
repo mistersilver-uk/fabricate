@@ -909,6 +909,56 @@ function alchemyKnowledgeCases() {
         ...world.modules.visibilityCounters.read(),
       }),
     },
+    {
+      id: 'craftingListing.buildListing.bookResidue',
+      profile: 'alchemy-knowledge',
+      description:
+        'The MAIN player crafting screen against a system that shows its whole library but ' +
+        'still carries recipe items — a world migrated off `item` visibility, or a GM who ' +
+        'authored books and then opened the library. `global` mode leaves `access.knowledge` ' +
+        'null, so the per-row EXHAUSTION read has no evidence from the visibility pass to ' +
+        'answer from, and falls through to its own candidate collection once per visible row. ' +
+        'Runs the SAME fixture as the two cases above with only the two mode fields ' +
+        'overridden, so a reader comparing the three is comparing one corpus and one ' +
+        'inventory rather than three.',
+      setup: (context) => {
+        const world = worldFor(context, {
+          fixture: {
+            ...context.fixture,
+            system: {
+              ...context.fixture.system,
+              // The ONLY two fields that differ from the profile's own system. `item` and
+              // `knowledge` modes populate `access.knowledge`, which routes the exhaustion
+              // read to the evidence branch and past the collection entirely — so a case in
+              // either mode would record zero here and prove nothing.
+              resolutionMode: 'simple',
+              visibilityMode: 'global',
+            },
+          },
+        });
+        world.modules.visibilityCounters.reset();
+        return world;
+      },
+      run: (world) =>
+        world.craftingListing.buildListing({
+          craftingActor: world.craftingActor,
+          componentSourceActors: world.sourceActors,
+          viewer: world.viewer,
+        }),
+      counts: (world, listing) => ({
+        listedRecipes: listing.summaries.length,
+        availableRecipes: listing.counts.available,
+        // The exhaustion ANSWER, committed as an answer-equality term rather than as a
+        // non-vacuity one, and it reads ZERO: this profile authors no use caps, so every
+        // held book is uncapped and no row is exhausted. That is the correct answer and the
+        // one the threading must not change. Non-vacuity of the READ is `candidateWalks`
+        // below — a corpus whose recipes carried no book reference would report the identical
+        // row counts and skip the collection entirely, and only that number shows the
+        // difference.
+        exhaustedRows: listing.summaries.filter((summary) => summary.exhausted === true).length,
+        ...world.modules.visibilityCounters.read(),
+      }),
+    },
   ];
 }
 

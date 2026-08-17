@@ -65,6 +65,24 @@
         "candidateItemOffers": 200,
         "candidateWalks": 50
       }
+    },
+    "craftingListing.buildListing.bookResidue": {
+      "description": "The MAIN player crafting screen against a system that shows its whole library but still carries recipe items — a world migrated off `item` visibility, or a GM who authored books and then opened the library. `global` mode leaves `access.knowledge` null, so the per-row EXHAUSTION read has no evidence from the visibility pass to answer from, and falls through to its own candidate collection once per visible row. Runs the SAME fixture as the two cases above with only the two mode fields overridden, so a reader comparing the three is comparing one corpus and one inventory rather than three.",
+      "counts": {
+        "craftingActorItemsReads": 1,
+        "craftingActorItemsScanned": 71,
+        "identityCandidatesExamined": 2068,
+        "identityIndexBuilds": 501,
+        "sourceActor0ItemsReads": 1,
+        "sourceActor0ItemsScanned": 67,
+        "sourceActor1ItemsReads": 1,
+        "sourceActor1ItemsScanned": 66,
+        "listedRecipes": 500,
+        "availableRecipes": 84,
+        "exhaustedRows": 0,
+        "candidateItemOffers": 2000,
+        "candidateWalks": 500
+      }
     }
   }
 }

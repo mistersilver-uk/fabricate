@@ -280,22 +280,38 @@ describe('every production pass snapshot is a complete one', () => {
     );
   });
 
-  it('cannot be built without the recipe-item matcher', async () => {
-    // The structural half of the fix: `matchesRecipeItem` is not a parameter, so no call site
-    // can supply the half that fails SILENTLY. Asserted on the module source because there is
-    // no runtime seam through which a caller could pass one.
-    const { readFileSync } = await import('node:fs');
-    const source = readFileSync(
-      new URL('../src/systems/passInventorySnapshot.js', import.meta.url),
-      'utf8'
+  it('cannot be built without the recipe-item matcher', () => {
+    // BEHAVIOURAL, not textual. An earlier draft asserted on the module source — that the
+    // matcher is passed and is not a parameter — and both halves were fragile in ways that
+    // matter in a repository with this one's history of checks that observe nothing: the
+    // first breaks on any Prettier reflow splitting the property across lines, and the second
+    // passes for an undefaulted destructured parameter (`matchesRecipeItem,`). They held only
+    // because each covered the other's gap.
+    //
+    // The discriminator below needs neither. A system that authors NO recipe-item definitions
+    // can have no book candidates, so a snapshot holding the matcher answers the empty set
+    // without walking the inventory at all; a snapshot with no matcher has nothing to filter
+    // with and falls back to offering every held document. The two answers differ on exactly
+    // the collaborator under test, over a fixture in which no item need match anything.
+    const world = makeWorld();
+    const bookless = { id: 'sys-bookless', components: COMPONENTS, recipeItemDefinitions: [] };
+
+    assert.deepEqual(
+      buildPassInventorySnapshot({
+        ...world,
+        recipes: [],
+        resolveComponent,
+      }).recipeItemCandidates(bookless),
+      [],
+      'the factory must supply the matcher itself, whatever the caller passes'
     );
-    assert.ok(
-      source.includes('matchesRecipeItem: itemMatchesRecipeItemSource'),
-      'the factory must supply the matcher itself'
-    );
-    assert.ok(
-      !/matchesRecipeItem\s*=/.test(source),
-      'the matcher must not be a parameter — that is what let two call sites disagree'
+    // The control, and the reason the assertion above is not vacuous: the SAME question, asked
+    // of a snapshot built the way this factory exists to make unrepresentable.
+    assert.equal(
+      buildInventorySnapshot({ ...world, resolveComponent }).recipeItemCandidates(bookless, [])
+        .length,
+      world.items.length,
+      'non-vacuity: with no matcher the identical question returns the whole inventory'
     );
   });
 });

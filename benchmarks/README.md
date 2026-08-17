@@ -224,7 +224,7 @@ A surplus over the library size is the signal.
 
 Five scales are deliberately below the epic's target, each for a stated reason.
 **Do not spend a day trying to run them at full scale.**
-A fifth profile, `component-library`, is also deliberately bounded, but above
+A sixth profile, `component-library`, is also deliberately bounded, but above
 rather than below the target, because its top point exists to fix a slope
 rather than to stay under a cost budget.
 See [The three axes](#the-three-axes) above.

@@ -896,6 +896,13 @@ export class RecipeVisibilityService {
    *   answer is read from it and NO inventory is rescanned — the visibility pass already
    *   collected exactly this candidate set and filtered it by the same per-book caps
    *   (issue 1077). A caller with nothing to offer omits it and gets the original rescan.
+   * @param {object|null} [args.snapshot] The caller's per-pass inventory snapshot, for the
+   *   RESCAN branch (issue 1228). The evidence branch above needs nothing, but the rescan is
+   *   reached far more often than "a caller with nothing to offer" suggests: a `global`- or
+   *   `restricted`-visibility system leaves `access.knowledge` null, so every recipe of one
+   *   that ALSO carries recipe-item definitions or a legacy `linkedRecipeItemUuid` — the
+   *   guaranteed state of any world migrated off `item` mode — lands here. Unthreaded that is
+   *   one whole inventory enumeration per visible row on the main player screen.
    * @returns {boolean}
    */
   isKnowledgeItemExhausted({
@@ -903,6 +910,7 @@ export class RecipeVisibilityService {
     craftingActor,
     componentSourceActors = [],
     knowledge = null,
+    snapshot = null,
   }) {
     const owned = knowledge?.candidateItemCount;
     if (typeof owned === 'number') {
@@ -910,7 +918,12 @@ export class RecipeVisibilityService {
       // reading the rescan below applies.
       return owned > 0 && (knowledge.matchedItems?.length ?? 0) === 0;
     }
-    const allMatches = this._collectCandidateItems(recipe, craftingActor, componentSourceActors);
+    const allMatches = this._collectCandidateItems(
+      recipe,
+      craftingActor,
+      componentSourceActors,
+      snapshot
+    );
     if (allMatches.length === 0) return false;
     const nonExhausted = this._filterNonExhausted(recipe, allMatches);
     return nonExhausted.length === 0;
