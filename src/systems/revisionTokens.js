@@ -175,7 +175,7 @@ export class RevisionRegistry {
 
   /**
    * Advance one or more scopes. Passing every affected scope in one call is the intended
-   * shape, because a mutation always affects the domain scope AND a system scope.
+   * shape, because a mutation always affects the entity scope AND a system scope.
    *
    * A nullish scope is ignored, so a caller need not guard a system id it may not have.
    *

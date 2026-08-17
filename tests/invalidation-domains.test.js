@@ -272,6 +272,27 @@ describe('field attribution fails SAFE', () => {
     }
   });
 
+  it('routes REALM prose to the gathering store rather than to narrative', () => {
+    // The one carrier of authored prose `narrative` deliberately does not cover, and the
+    // reason is routing rather than an oversight: a realm's `description` is rendered by
+    // `EnvironmentCard.svelte` and `GatheringDetail.svelte`, and the `gathering` store does not
+    // consume `narrative` — so filing it there would leave realm prose unable to reach the only
+    // store that renders it. Pinned because the exception is stated in the canonical spec and a
+    // prose-only claim rots silently.
+    const gatheringDomains = new Set(STORE_DOMAINS[INVALIDATION_STORES.GATHERING]);
+    for (const field of ['gatheringRealms', 'gatheringRealmSettings']) {
+      const domains = domainsForSystemFields([field]);
+      assert.ok(
+        !domains.includes(INVALIDATION_DOMAINS.NARRATIVE),
+        `${field} must not name narrative, which the gathering store does not consume`
+      );
+      assert.ok(
+        domains.some((domain) => gatheringDomains.has(domain)),
+        `${field} must reach the gathering store, which is the surface that renders its prose`
+      );
+    }
+  });
+
   it('resolves through an explicit mirror map when one is supplied', () => {
     assert.deepEqual(
       domainsForFields(['alias'], { host: ['labelling'] }, { alias: 'host' }),

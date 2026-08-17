@@ -51,7 +51,16 @@
 export const INVALIDATION_DOMAINS = Object.freeze({
   /** Names, images, categories, tags and sort keys. */
   LABELLING: 'labelling',
-  /** ALL authored prose — recipe, step, system, component, tool and recipe-item descriptions. */
+  /**
+   * Authored prose — recipe, step, system, component, tool and recipe-item descriptions.
+   *
+   * ONE carrier of prose is deliberately excluded, and by ROUTING rather than by oversight: a
+   * gathering realm's `description` is classified under the three domains the `gathering` store
+   * consumes (see {@link SYSTEM_FIELD_DOMAINS}`.gatheringRealms`), because `gathering` does not
+   * consume `narrative` and filing realm prose here would leave it unable to reach the only
+   * store that renders it. So `facts:narrative:<systemId>` never advances for realm prose, and
+   * this domain is "authored prose" rather than ALL of it.
+   */
   NARRATIVE: 'narrative',
   /** Ingredient sets and groups, set essences, results, steps. */
   MATERIALS_AND_YIELD: 'materials-and-yield',
@@ -222,7 +231,14 @@ export const SYSTEM_FIELD_DOMAINS = Object.freeze({
   components: Object.freeze([LABELLING, NARRATIVE, COMPONENT_DEFINITIONS]),
   tools: Object.freeze([LABELLING, NARRATIVE, COMPONENT_DEFINITIONS, RESOLUTION_CONFIG]),
   characterPrerequisites: Object.freeze([LABELLING, ACCESS_AND_KNOWLEDGE]),
-  // Gathering geography and its behaviour settings. Classified across the three domains the
+  // Gathering geography and its behaviour settings. A realm carries authored PROSE
+  // (`gatheringRealms.js` normalizes a `description`, rendered by `EnvironmentCard.svelte` and
+  // `GatheringDetail.svelte`), and it is deliberately NOT filed under `narrative`: the
+  // `gathering` store does not consume that domain, so doing so would leave realm prose unable
+  // to reach the only store that renders it. This is the one carrier of prose `narrative` does
+  // not cover — see INVALIDATION_DOMAINS.NARRATIVE.
+  //
+  // Classified across the three domains the
   // gathering store subscribes to, because the listing reads realm names, realm-gated task
   // availability and the tools a realm offers.
   gatheringRealms: Object.freeze([LABELLING, COMPONENT_DEFINITIONS, ACCESS_AND_KNOWLEDGE]),

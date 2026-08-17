@@ -2922,7 +2922,7 @@ There are seven, and the set is closed.
 | Domain | Facts it covers |
 | --- | --- |
 | `labelling` | Names, images, categories, tags and sort keys |
-| `narrative` | ALL authored prose — recipe, step, system, component, tool and recipe-item descriptions |
+| `narrative` | Authored prose — recipe, step, system, component, tool and recipe-item descriptions. NOT a gathering realm's description, which is classified under the three domains the gathering store consumes instead: that store does not consume `narrative`, so filing realm prose here would leave it unable to reach the only store that renders it |
 | `materials-and-yield` | Ingredient sets and groups, set essences, results, steps |
 | `resolution-config` | Tools, currency alternatives, checks, resolution modes, tool breakage, modifiers and requirements |
 | `component-definitions` | Component, tool and essence definitions |
@@ -2936,7 +2936,7 @@ There are seven, and the set is closed.
 | Requirement | Rule |
 | --- | --- |
 | **One authored mapping** | Which read-model stores CONSUME each domain is authored once, and the store-to-domain transpose is derived from it. Authoring both admits a drift no gate can see, and a test comparing two derivations of one table asserts nothing. |
-| **A consumer set is an UPPER BOUND** | Naming a store as a domain's consumer says that store MAY need rebuilding when that class of fact moves. It is NOT a claim that every field of every projection that store publishes reads that fact. Store-granular routing cannot express anything finer, and stating it as a dependency would contradict the summary contract above, which is normative that cheap availability consults no tool, check, knowledge or currency. |
+| **A consumer set is an UPPER BOUND** | Naming a store as a domain's consumer says that store MAY need rebuilding when that class of fact moves. It is NOT a claim that every field of every projection that store publishes reads that fact. Store-granular routing cannot express anything finer, and stating it as a dependency would contradict _Summary Projections_ below, which is normative that cheap availability consults no tool, check, knowledge or currency. |
 | **Attribution accompanies every mutation** | Every site that mutates stored definitions MUST name the domains it moved. Saying nothing is legal and means EVERY domain, so a site that forgets is over-broad rather than stale — and because that failure is silent, the sites MUST be counted by a test rather than trusted. |
 | **Replicated changes are attributed from the delta** | A client that did not write derives its domains from the corpus delta's changed FIELD names through a field-to-domain classification. The classification is complete in both directions: every field a persisted record can carry is classified, and no classified field is one no projection produces. |
 | **The batch attribution is per record** | A change naming several records MUST attribute domains per record. A flat union applies every listed domain to every listed record, which is the over-broad invalidation this contract exists to remove, at batch scale. |
