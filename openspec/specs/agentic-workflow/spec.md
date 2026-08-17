@@ -630,7 +630,7 @@ The evidence gate MUST NOT decide before the automated producer for that same he
 
 #### Scenario: the producer's own inputs change
 
-- **WHEN** a PR changes the fixture world, the mounting page, or the case registry the producer renders from
+- **WHEN** a PR changes any input the producer itself renders from — the fixture world, the mounting page, the case registry, the capture driver, or the window-chrome specification — rather than a file the product renders
 - **THEN** one case per captured SURFACE is selected by default — every application the producer renders and every route or tab reachable within it, each photographed once — because a change to a shared input can alter any frame at once, and what it has to prove is that the producer still reaches and captures every route and tab
 - **AND** the default is not every publishable case, because the detailed states of a route are evidence about the files that draw them rather than about a shared input, and a selection nobody reads is not evidence
 - **AND** a surface is a route or a tab and NOT every screen: a route's own internal tabs fold into that route's single frame, because no case declares which one it reaches, so they are deferred alongside detailed states rather than covered
