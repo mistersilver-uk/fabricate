@@ -315,27 +315,115 @@ export function subscribeInventoryChange(handler, { isRelevantActor, debounceMs 
 }
 
 /**
- * Subscribe to Fabricate crafting-data changes (a GM editing/saving a crafting system
- * or recipe) so callers can reload definition-derived views. Registers the local
- * Fabricate hooks `fabricate.craftingSystemsChanged` and `fabricate.recipesChanged`.
- * Those fire directly on the writing client; on OTHER clients they are re-emitted by
- * main.js's `updateSetting` bridge after the replicated world setting reloads the
- * in-memory managers — so this single subscription covers both same-client and
- * cross-client edits. Returns an unsubscribe function; no-ops gracefully when the
- * Foundry `Hooks` global is absent (e.g. unit tests).
+ * The unpublished scoped crafting-data signal.
  *
- * @param {Function} handler Invoked (no args) on a systems OR recipes change.
+ * A LITERAL, mirroring `CRAFTING_DATA_CHANGED_HOOK` in `src/systems/craftingDataChange.js`
+ * rather than importing it, and the reason is mechanical rather than stylistic: roughly 75
+ * mounted-component harnesses declare THIS module in their dependency allowlist, and the
+ * harness pre-validator walks the whole static import closure — so one new import here would
+ * make every one of those suites fail until each declared the new transitive module.
+ * `tests/util/foundry-bridge-subscriptions.test.js` asserts the two are equal, so they cannot
+ * drift.
+ *
+ * @type {string}
+ */
+export const CRAFTING_DATA_CHANGED_HOOK = 'fabricate.craftingDataChanged';
+
+/**
+ * How many times a change payload has been routed BROADLY because it named no domains.
+ *
+ * Exposed so a per-domain test can assert "the narrowing came from domain routing" rather than
+ * inferring it: a fixture in which the counter moved narrowed by accident, because a payload
+ * that reaches the fallback is delivered to EVERY subscriber whatever its domain set. Counted
+ * per SUBSCRIBER delivery, not per payload — each subscription classifies independently — so a
+ * fail-safe case asserts a rise of exactly the subscriber count.
+ *
+ * @type {number}
+ */
+let broadFallbackCount = 0;
+
+/**
+ * Read the broad-fallback counter.
+ *
+ * @returns {number}
+ */
+export function readCraftingDataFallbackCount() {
+  return broadFallbackCount;
+}
+
+/**
+ * Reset the broad-fallback counter, so a case can assert against a known baseline.
+ *
+ * @returns {void}
+ */
+export function resetCraftingDataFallbackCount() {
+  broadFallbackCount = 0;
+}
+
+/**
+ * The domains a change payload names, or `null` when it names none and must route broadly.
+ *
+ * Three shapes route broadly, and they are ONE rule rather than three special cases — "I cannot
+ * attribute this": a payload that is not a recognised change, a change whose `scopes` are
+ * malformed, and a change whose scopes union to nothing (a corpus reordering, which is the
+ * production-reachable producer). Over-broad invalidation is a performance bug; a stale read
+ * model is a correctness one.
+ *
+ * @param {*} payload
+ * @returns {Set<string>|null}
+ */
+function payloadDomains(payload) {
+  const scopes = payload?.scopes;
+  if (!Array.isArray(scopes)) return null;
+  const domains = new Set();
+  for (const scope of scopes) {
+    if (!Array.isArray(scope?.domains)) return null;
+    for (const domain of scope.domains) domains.add(domain);
+  }
+  return domains.size > 0 ? domains : null;
+}
+
+/**
+ * Subscribe to Fabricate crafting-data changes (a GM editing/saving a crafting system
+ * or recipe) so callers can reload definition-derived views.
+ *
+ * Registers the UNPUBLISHED `fabricate.craftingDataChanged` hook, which both managers emit
+ * beside their published change hooks and which `main.js`'s `updateSetting` bridge re-emits on
+ * every other client once the replicated setting has reloaded the in-memory managers — so this
+ * single subscription still covers both same-client and cross-client edits.
+ *
+ * It deliberately no longer binds `fabricate.craftingSystemsChanged` /
+ * `fabricate.recipesChanged` (issue 1078 part B1). Those bindings were ZERO-ARGUMENT, so the
+ * payload was discarded and no narrowing was possible however good a delta was emitted. The two
+ * hooks keep firing with their existing payloads for third-party subscribers; every publisher
+ * of one also publishes the scoped signal, so nothing this drops is a signal the shell used to
+ * receive.
+ *
+ * Returns an unsubscribe function; no-ops gracefully when the Foundry `Hooks` global is absent
+ * (e.g. unit tests).
+ *
+ * @param {Function} handler Invoked with the change payload when it names a domain this
+ *   subscriber consumes, and unconditionally when the change names none.
+ * @param {object} [options]
+ * @param {readonly string[]|null} [options.domains] The invalidation domains this subscriber
+ *   depends on — normally `STORE_DOMAINS[store]` from `src/systems/invalidationDomains.js`.
+ *   Omitted means every domain, the behaviour before issue 1078, and stays the safe default.
  * @returns {Function} Unsubscribe callback.
  */
-export function subscribeCraftingDataChange(handler) {
+export function subscribeCraftingDataChange(handler, { domains = null } = {}) {
   const hooks = globalThis.Hooks;
   if (!hooks?.on || typeof handler !== 'function') return () => {};
-  const systemsId = hooks.on('fabricate.craftingSystemsChanged', () => handler());
-  const recipesId = hooks.on('fabricate.recipesChanged', () => handler());
-  return () => {
-    hooks.off?.('fabricate.craftingSystemsChanged', systemsId);
-    hooks.off?.('fabricate.recipesChanged', recipesId);
-  };
+  const wanted = Array.isArray(domains) ? new Set(domains) : null;
+  const id = hooks.on(CRAFTING_DATA_CHANGED_HOOK, (payload) => {
+    const named = payloadDomains(payload);
+    if (named === null) {
+      broadFallbackCount += 1;
+      handler(payload);
+      return;
+    }
+    if (wanted === null || [...named].some((domain) => wanted.has(domain))) handler(payload);
+  });
+  return () => hooks.off?.(CRAFTING_DATA_CHANGED_HOOK, id);
 }
 
 /**

@@ -19,6 +19,7 @@
     subscribeCraftingDataChange,
     subscribeGatheringDataChange,
   } from '../../util/foundryBridge.js';
+  import { INVALIDATION_STORES, STORE_DOMAINS } from '../../../../systems/invalidationDomains.js';
   import { describeBlockedReasons } from './gatheringBlockedReasons.js';
   import GatheringEnvironmentList from './GatheringEnvironmentList.svelte';
   import GatheringDetail from './GatheringDetail.svelte';
@@ -292,7 +293,16 @@
   // A GM editing/saving a crafting system can change the gathering tasks, tools, or
   // drop tables surfaced here; quietly re-fetch. Cross-client via the updateSetting
   // bridge (see subscribeCraftingDataChange).
-  $effect(() => subscribeCraftingDataChange(() => load(true)));
+  //
+  // Scoped to the three invalidation domains the gathering listing actually reads —
+  // system and realm names, component/tool definitions, and access configuration (issue
+  // 1078 part B1). Taken from the DERIVED transpose rather than listed here, so this view
+  // and the player shell cannot disagree about what `gathering` consumes.
+  $effect(() =>
+    subscribeCraftingDataChange(() => load(true), {
+      domains: STORE_DOMAINS[INVALIDATION_STORES.GATHERING],
+    })
+  );
 
   // Resource-node counts live on the environment and are written by the active GM —
   // including the depletion caused by THIS player's own attempt, which lands after

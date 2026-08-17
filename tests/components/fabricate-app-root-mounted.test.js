@@ -14,6 +14,13 @@ import { tick } from '../../node_modules/svelte/src/index-client.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 import { createPlayerExtensionsRegistry } from '../../src/ui/playerExtensions.js';
 import { deriveExtensionSurfaces, resolveActiveTab } from '../../src/ui/playerNavModel.js';
+import {
+  DOMAIN_CONSUMERS,
+  INVALIDATION_DOMAIN_NAMES,
+  INVALIDATION_DOMAINS,
+  INVALIDATION_STORES,
+} from '../../src/systems/invalidationDomains.js';
+import { CRAFTING_DATA_CHANGED_HOOK } from '../../src/systems/craftingDataChange.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -33,6 +40,7 @@ const harness = createMountedComponentHarness({
     'src/systems/craftingBrowseStatus.js',
     'src/systems/foundryCalendar.js',
     'src/systems/inventorySnapshot.js',
+    'src/systems/invalidationDomains.js',
     'src/systems/itemStackQuantity.js',
     'src/systems/salvageCheckUsability.js',
     'src/systems/stepRecipeView.js',
@@ -684,6 +692,244 @@ describe('FabricateAppRoot (mounted, against a real player registry)', () => {
       'and the gutter is reserved up front, so crossing the entry count that starts the scroll '
         + 'does not reflow the whole column'
     );
+  });
+});
+
+/**
+ * The shell's invalidation-domain routing, mounted (issue 1078 part B1).
+ *
+ * ## Why this exists at all
+ *
+ * The two source-text guards it replaces sliced a 400-character window after the FIRST
+ * occurrence of a `subscribe*(` call, and that window spanned four subscription sites — so
+ * review demonstrated all five of their assertions passing against routing that was
+ * simultaneously wrong in three ways. Nothing short of driving the real hook seam can see which
+ * store a given change actually reaches.
+ *
+ * ## What makes it falsifiable
+ *
+ * The expectation is computed from the SHIPPED `DOMAIN_CONSUMERS`, so it is not a second
+ * hand-written table that could agree with a wrong one. What it compares that against is the
+ * shell's real, mounted subscription behaviour — which is exactly the assertion the derived
+ * `STORE_DOMAINS` has no other gate for.
+ *
+ * `subscribeCraftingDataChange` reads `globalThis.Hooks` at subscribe time and previously
+ * no-oped under this harness because the global was absent, which is why the routing had never
+ * been runtime-tested at all. A `Hooks` fake is all it needed.
+ */
+describe('FabricateAppRoot invalidation-domain routing (mounted)', () => {
+  /** The stores THIS component owns. `gathering` belongs to `GatheringView`. */
+  const SHELL_STORES = [
+    INVALIDATION_STORES.CRAFTING,
+    INVALIDATION_STORES.INVENTORY,
+    INVALIDATION_STORES.ALCHEMY,
+    INVALIDATION_STORES.JOURNAL,
+  ];
+
+  let hooks = null;
+
+  /** A Hooks fake with `callAll`, so the shell's subscriptions register and can be fired. */
+  function installHooks() {
+    const handlers = new Map();
+    let nextId = 0;
+    hooks = {
+      on(name, fn) {
+        if (!handlers.has(name)) handlers.set(name, new Map());
+        nextId += 1;
+        handlers.get(name).set(nextId, fn);
+        return nextId;
+      },
+      off(name, id) {
+        handlers.get(name)?.delete(id);
+      },
+      callAll(name, payload) {
+        for (const fn of [...(handlers.get(name)?.values() ?? [])]) fn(payload);
+      },
+      count: (name) => handlers.get(name)?.size ?? 0,
+    };
+    globalThis.Hooks = hooks;
+  }
+
+  /**
+   * The shared services, with every store seam the shell can reach replaced by a counter.
+   *
+   * `inventory` carries BOTH seams: `reloadOnDocumentChange` is the bulk-run guard the shell
+   * must use, and `load` is the bypass it must never call. Counting them separately is what
+   * lets one case assert routing and the absence of the bypass at the same time.
+   *
+   * @returns {{calls: object, services: object}}
+   */
+  function spyServices() {
+    const calls = {
+      craftingSources: 0,
+      crafting: 0,
+      inventory: 0,
+      inventoryBypass: 0,
+      alchemy: 0,
+      journal: 0,
+    };
+    const bump = (key) => () => {
+      calls[key] += 1;
+    };
+    return {
+      calls,
+      services: {
+        ...fakeServices(),
+        // `setCraftingActor` is not decoration: the Crafting tab is the DEFAULT route, so its
+        // view renders and pushes the shared actor selection into the sources store on mount.
+        craftingSources: { load: bump('craftingSources'), setCraftingActor: () => {} },
+        crafting: { load: bump('crafting') },
+        inventory: { reloadOnDocumentChange: bump('inventory'), load: bump('inventoryBypass') },
+        alchemy: { load: bump('alchemy') },
+        journal: { navCount: 0, loadedOnce: true, load: bump('journal') },
+        getSelectedCraftingActorId: () => 'actor-1',
+        getCraftingComponentSourceIds: () => ['actor-1'],
+      },
+    };
+  }
+
+  /** Mount the shell with counting services and a live Hooks fake. */
+  async function mountWithSpies() {
+    installHooks();
+    const registry = createPlayerExtensionsRegistry({ emitHook: () => {} });
+    const { calls, services } = spyServices();
+    await harness.mount({
+      activeTab: DEFAULT_TAB,
+      showAlchemy: false,
+      onSelectTab: () => {},
+      services,
+      extensionSurfaces: deriveExtensionSurfaces(registry),
+      playerExtensions: registry,
+    });
+    // Reset AFTER mount: the shell's own start-up reads must not be counted as routing.
+    for (const key of Object.keys(calls)) calls[key] = 0;
+    return calls;
+  }
+
+  /** The stores a change actually reached, in taxonomy order. */
+  const reached = (calls) => SHELL_STORES.filter((store) => calls[store] > 0);
+
+  /** One well-formed change naming exactly one domain. */
+  const oneDomain = (domain) => ({
+    source: 'recipes',
+    scopes: [{ systemId: 'sys-a', domains: [domain] }],
+  });
+
+  afterEach(() => {
+    delete globalThis.Hooks;
+    hooks = null;
+  });
+
+  it('subscribes once per shell store, on the unpublished scoped hook only', async () => {
+    await mountWithSpies();
+
+    assert.equal(
+      hooks.count(CRAFTING_DATA_CHANGED_HOOK),
+      SHELL_STORES.length,
+      'one subscription per store, each carrying its own derived domain set'
+    );
+    assert.equal(
+      hooks.count('fabricate.recipesChanged'),
+      0,
+      'the zero-argument legacy bindings are gone — they discarded the payload, so no ' +
+        'narrowing was possible however good a delta was emitted'
+    );
+    assert.equal(hooks.count('fabricate.craftingSystemsChanged'), 0);
+  });
+
+  // TABLE-DRIVEN, from the shipped constant. A domain added to the taxonomy without a
+  // decision about every store reddens here rather than shipping a silent broad refresh.
+  for (const domain of INVALIDATION_DOMAIN_NAMES) {
+    it(`routes a ${domain} change to exactly its consuming stores`, async () => {
+      const calls = await mountWithSpies();
+
+      hooks.callAll(CRAFTING_DATA_CHANGED_HOOK, oneDomain(domain));
+
+      assert.deepEqual(
+        reached(calls),
+        SHELL_STORES.filter((store) => DOMAIN_CONSUMERS[domain].includes(store)),
+        `the shell's actual behaviour must equal the shipped DOMAIN_CONSUMERS row for ${domain}`
+      );
+      assert.equal(
+        calls.inventoryBypass,
+        0,
+        'and the inventory listing is never rebuilt through the seam that bypasses the ' +
+          'bulk-run guard'
+      );
+    });
+  }
+
+  it('does NOT rebuild the journal for prose, measured from a warmed non-zero baseline', async () => {
+    const calls = await mountWithSpies();
+
+    // WARM. `assert.equal(journal, 0)` against a cold fixture is vacuous, so the journal is
+    // made to reload first and that baseline is asserted before the real measurement.
+    hooks.callAll(CRAFTING_DATA_CHANGED_HOOK, oneDomain(INVALIDATION_DOMAINS.LABELLING));
+    assert.ok(calls.journal > 0, 'the baseline: a labelling change DOES rebuild the journal');
+    const warmed = calls.journal;
+    calls.journal = 0;
+
+    hooks.callAll(CRAFTING_DATA_CHANGED_HOOK, oneDomain(INVALIDATION_DOMAINS.NARRATIVE));
+
+    assert.equal(
+      calls.journal,
+      0,
+      `the journal reloaded ${warmed} time(s) for a label and must reload zero times for prose`
+    );
+    assert.ok(calls.crafting > 0, 'while the stores that DO read prose still rebuild');
+    assert.ok(calls.inventory > 0);
+    assert.ok(calls.alchemy > 0);
+  });
+
+  it('reloads EVERY store when the change names no domain', async () => {
+    // The fail-safe. Asserted behaviourally rather than through the fallback counter, because
+    // the mounted shell imports the harness's temp-dir copy of `foundryBridge.js` and so
+    // increments a different module instance's counter; `tests/util/foundry-bridge-subscriptions.test.js`
+    // and `tests/invalidation-domain-signal.test.js` assert the counter itself.
+    const calls = await mountWithSpies();
+
+    hooks.callAll(CRAFTING_DATA_CHANGED_HOOK, { source: 'recipes', scopes: [] });
+
+    assert.deepEqual(reached(calls), SHELL_STORES);
+    assert.equal(calls.inventoryBypass, 0);
+  });
+
+  it('carries craftingSources with the crafting store rather than as a taxonomy store', async () => {
+    // It holds the selectable component-source ACTORS, not a definition-derived read model, so
+    // it has no fact class of its own. Pinned because dropping it would silently stop a source
+    // list refreshing on exactly the changes it refreshed on before this issue.
+    const calls = await mountWithSpies();
+
+    hooks.callAll(CRAFTING_DATA_CHANGED_HOOK, oneDomain(INVALIDATION_DOMAINS.LABELLING));
+
+    assert.equal(calls.craftingSources, calls.crafting);
+    assert.ok(calls.craftingSources > 0);
+  });
+
+  it('routes an owned-item change through the held-inventory domain', async () => {
+    // The shell's SECOND broad handler. Its consumers are now derived from the taxonomy too,
+    // which is what brought the journal into it: a run's redaction reads the owned-copy branch.
+    const calls = await mountWithSpies();
+
+    hooks.callAll('updateItem', { actor: { id: 'actor-1' } });
+    await new Promise((resolve) => setTimeout(resolve, 80));
+
+    assert.deepEqual(
+      reached(calls),
+      SHELL_STORES.filter((store) =>
+        DOMAIN_CONSUMERS[INVALIDATION_DOMAINS.HELD_INVENTORY].includes(store)
+      )
+    );
+    assert.equal(calls.inventoryBypass, 0);
+  });
+
+  it('ignores an owned-item change on an actor this window does not read', async () => {
+    const calls = await mountWithSpies();
+
+    hooks.callAll('updateItem', { actor: { id: 'someone-else' } });
+    await new Promise((resolve) => setTimeout(resolve, 80));
+
+    assert.deepEqual(reached(calls), [], 'the relevance filter still gates the item path');
   });
 });
 

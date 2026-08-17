@@ -32,6 +32,11 @@
   import ActorSelectTopBar from '../components/ActorSelectTopBar.svelte';
   import PlayerExtensionHost from './PlayerExtensionHost.svelte';
   import { buildPlayerNavTabs, parseRouteKey } from '../../playerNavModel.js';
+  import {
+    DOMAIN_CONSUMERS,
+    INVALIDATION_DOMAINS,
+    STORE_DOMAINS,
+  } from '../../../systems/invalidationDomains.js';
 
   let {
     activeTab = 'crafting',
@@ -377,11 +382,15 @@
     return Array.isArray(sources) && sources.some((id) => String(id) === String(actorId));
   }
 
-  // Shell-level inventory-change refresh: adding/removing a component or editing an
-  // item quantity on a relevant actor invalidates owned counts and recipe
-  // craftability. Quietly re-fetch the item-derived shared stores (the Crafting and
-  // Inventory views read these singletons, so both tabs update — even while closed).
-  // The Gathering tab owns its own subscription (its listing is view-local).
+  // ONE reload per shared store, addressed by the store name the invalidation-domain taxonomy
+  // uses (issue 1078 part B1). Both shell subscriptions below route through this map from the
+  // shipped `DOMAIN_CONSUMERS` / `STORE_DOMAINS` constants rather than listing stores inline,
+  // so a change to which stores consume a domain moves the shell with it.
+  //
+  // `craftingSources` rides with `crafting` and is deliberately NOT a taxonomy store: it holds
+  // the selectable component-source ACTORS rather than a definition-derived read model, so it
+  // has no fact class to subscribe to. Keeping it here reloads it on exactly the changes it
+  // reloaded on before.
   //
   // THE INVENTORY LISTING GOES THROUGH `reloadOnDocumentChange`, NEVER `load(true)`
   // (issue 859). That store method IS the bulk-run suppression: item mutations arrive
@@ -392,21 +401,46 @@
   // reload while a run is in flight; the run's own terminal `load(true)` picks it up,
   // which is what makes the drop safe. Calling `load(true)` from here is the bypass
   // that makes the guard dead code, so `fabricate-app-shell.test.js` pins its absence.
+  const storeReloads = {
+    crafting: () => {
+      services?.craftingSources?.load?.(true);
+      services?.crafting?.load?.(true);
+    },
+    inventory: () => services?.inventory?.reloadOnDocumentChange?.(),
+    alchemy: () => services?.alchemy?.load?.(true),
+    journal: () => services?.journal?.load?.(true),
+  };
+
+  /**
+   * Reload every shell-owned store that consumes at least one of the named domains.
+   *
+   * @param {readonly string[]} domains
+   * @returns {void}
+   */
+  function reloadStoresFor(domains) {
+    for (const [store, reload] of Object.entries(storeReloads)) {
+      if (domains.some((domain) => DOMAIN_CONSUMERS[domain]?.includes(store))) reload();
+    }
+  }
+
+  // Shell-level inventory-change refresh: adding/removing a component or editing an
+  // item quantity on a relevant actor invalidates owned counts and recipe
+  // craftability. An actor's held items ARE the `held-inventory` domain, so the stores
+  // that reload are exactly that domain's consumers — which is what brought the journal
+  // into this handler, since a run's redaction reads the owned-copy branch.
+  // The Gathering tab owns its own subscription (its listing is view-local).
   $effect(() =>
-    subscribeInventoryChange(
-      () => {
-        services?.crafting?.load?.(true);
-        services?.inventory?.reloadOnDocumentChange?.();
-        services?.alchemy?.load?.(true);
-      },
-      { isRelevantActor: (actorId) => isRelevantCraftingActor(actorId) }
-    )
+    subscribeInventoryChange(() => reloadStoresFor([INVALIDATION_DOMAINS.HELD_INVENTORY]), {
+      isRelevantActor: (actorId) => isRelevantCraftingActor(actorId),
+    })
   );
 
   // Shell-level crafting-data refresh: a GM editing/saving a crafting system or
   // recipe can change definitions surfaced on any tab (recipe names in Journal runs,
-  // component metadata, availability), so quietly reload every shared data store.
-  // Works cross-client via main.js's updateSetting bridge (see subscribeCraftingDataChange).
+  // component metadata, availability), so quietly reload the stores that depend on the
+  // classes of fact that actually moved — one subscription per store, each carrying its
+  // own derived domain set. Works cross-client via main.js's updateSetting bridge (see
+  // subscribeCraftingDataChange).
   //
   // The inventory listing goes through the same bulk-run guard as the item-change
   // hook above. This one is not a per-document burst, so it is not the reload the
@@ -414,15 +448,14 @@
   // exactly as wrong here, and the run's terminal reload covers the dropped refresh
   // identically. One rule for every shell-driven listing reload, no exceptions to
   // remember.
-  $effect(() =>
-    subscribeCraftingDataChange(() => {
-      services?.craftingSources?.load?.(true);
-      services?.crafting?.load?.(true);
-      services?.inventory?.reloadOnDocumentChange?.();
-      services?.alchemy?.load?.(true);
-      services?.journal?.load?.(true);
-    })
-  );
+  $effect(() => {
+    const unsubscribes = Object.entries(storeReloads).map(([store, reload]) =>
+      subscribeCraftingDataChange(reload, { domains: STORE_DOMAINS[store] })
+    );
+    return () => {
+      for (const unsubscribe of unsubscribes) unsubscribe();
+    };
+  });
 </script>
 
 <!-- `data-active-tab` publishes the route, mirroring what the manager root already does with

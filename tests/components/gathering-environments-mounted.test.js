@@ -136,6 +136,13 @@ describe('GatheringView mounted behavior', () => {
     mkdirSync(dirname(foundryCalendarDestination), { recursive: true });
     writeFileSync(foundryCalendarDestination, readFileSync(resolve(repoRoot, 'src/systems/foundryCalendar.js'), 'utf8'));
 
+    // GatheringView routes its crafting-data subscription through the invalidation-domain
+    // taxonomy (issue 1078 part B1). The module imports nothing, so this one entry closes the
+    // graph; omitting it HANGS this suite (# cancelled) rather than failing it.
+    const invalidationDomainsDestination = join(tempRoot, 'src/systems/invalidationDomains.js');
+    mkdirSync(dirname(invalidationDomainsDestination), { recursive: true });
+    writeFileSync(invalidationDomainsDestination, readFileSync(resolve(repoRoot, 'src/systems/invalidationDomains.js'), 'utf8'));
+
     // GatheringTaskDetail + GatheringView share the blocked-reason localizer.
     const blockedReasonsDestination = join(tempRoot, 'src/ui/svelte/apps/gathering/gatheringBlockedReasons.js');
     mkdirSync(dirname(blockedReasonsDestination), { recursive: true });
