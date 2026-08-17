@@ -3137,6 +3137,21 @@ class Fabricate {
 // Create global instance
 const fabricate = new Fabricate();
 
+// The per-record batch bracket (issue 1080 -b), created ONCE because its whole job is to
+// span the three awaited bulk document calls one flush issues — a per-event coalescer would
+// collapse nothing. It does no work for the client that WROTE the batch, since
+// `applyReplicatedRecordChange` returns false there; every client it does work for is a
+// receiving one.
+//
+// Created at MODULE SCOPE, and published immediately, because its two named callers run too
+// early for anything later. The Storage Layout Conversion (-c) runs inside `_runMigrations`,
+// which `initialize()` awaits — and `initialize()` is called from the `ready` handler more
+// than 150 lines BEFORE that handler reaches its own setting-hook wiring. A bracket
+// published there would still be `undefined` when the conversion opened it, `?.open()` would
+// no-op, and the only symptom would be three refresh bursts instead of one. Silent.
+fabricate.recipeRefresh = createRecipeRefreshCoalescer();
+
+
 // Register the init-time Foundry CONFIG entries for the canvas Interactable
 // foundation. Defensive + idempotent: every call no-ops when the underlying API is
 // missing or already registered, so it is safe to run from BOTH the `init` and
@@ -3551,17 +3566,9 @@ Hooks.once('ready', async () => {
   // line is not anonymous), with no clue which of the four branches below failed or
   // which setting triggered it.
   //
-  // `recipeRefresh` is the per-record batch bracket (issue 1080 -b). Created ONCE here
-  // rather than per event, because its whole job is to span the three awaited bulk document
-  // calls one flush issues — a per-event coalescer would collapse nothing.
-  const recipeRefresh = createRecipeRefreshCoalescer();
-  // Published on the live API object rather than kept private to this callback, because a
-  // bracket nothing can reach is a contract with no implementation. The bracket does no
-  // work for the client that WROTE the batch — `applyReplicatedRecordChange` returns false
-  // there, so the writer never signals — and every client it does work for is one this
-  // callback's closure is invisible to. The Storage Layout Conversion (-c) and the
-  // compendium importer (-d) open and close it as `game.fabricate.recipeRefresh`.
-  fabricate.recipeRefresh = recipeRefresh;
+  // `recipeRefresh` is the module-scope batch bracket — see its declaration for why it is
+  // created there and not here.
+  const recipeRefresh = fabricate.recipeRefresh;
   // The live collaborators every leg hands the bridge. Resolved per call, because
   // `fabricate.recipeManager` is assembled during `ready` and a value captured here would be
   // stale for the rest of the session. Shared by all three listeners so they cannot drift

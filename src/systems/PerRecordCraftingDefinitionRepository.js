@@ -606,6 +606,12 @@ export class PerRecordCraftingDefinitionRepository extends CraftingDefinitionRep
   async runBatch(work) {
     this._batchDepth += 1;
     let workError = null;
+    // Tracked separately from `workError` because a thrown value may be FALSY. Gating on the
+    // error itself would let `throw null` resolve successfully, which is worse than the
+    // no-unsafe-finally violation this restructure exists to remove: the abstract contract
+    // says a throw inside `work` propagates, and the sibling adapter's plain try/finally
+    // propagates any value.
+    let workThrew = false;
     let result;
     // The flush deliberately sits AFTER this block rather than inside its `finally`. It has
     // to run whether or not the body threw, but a `throw` inside a `finally` is
@@ -616,11 +622,13 @@ export class PerRecordCraftingDefinitionRepository extends CraftingDefinitionRep
       result = await work();
     } catch (error) {
       workError = error;
+      workThrew = true;
     } finally {
       this._batchDepth -= 1;
     }
 
     let flushError = null;
+    let flushThrew = false;
     if (this._batchDepth === 0) {
       const puts = this._pendingPuts;
       const deletes = this._pendingDeletes;
@@ -631,14 +639,15 @@ export class PerRecordCraftingDefinitionRepository extends CraftingDefinitionRep
           await this._writeLegs(this._differential(puts, deletes));
         } catch (error) {
           flushError = error;
+          flushThrew = true;
         }
       }
     }
 
-    if (workError) {
+    if (workThrew) {
       // The body's error wins. Reporting the flush failure on its own channel keeps it from
       // being silent without letting it replace the reason the caller's work aborted.
-      if (flushError) {
+      if (flushThrew) {
         console.error(
           'Fabricate | per-record definition batch flush failed after the batch body threw',
           flushError
@@ -647,7 +656,7 @@ export class PerRecordCraftingDefinitionRepository extends CraftingDefinitionRep
       throw workError;
     }
     // Nothing else went wrong, so this IS the batch's failure and the caller must see it.
-    if (flushError) throw flushError;
+    if (flushThrew) throw flushError;
     return result;
   }
 

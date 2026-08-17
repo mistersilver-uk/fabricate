@@ -510,7 +510,20 @@ describe('main.js settings hook wiring (issue 1080 -b)', () => {
     // bracket has to outlive any single event to coalesce them into one refresh.
     const occurrences = mainSource.split('createRecipeRefreshCoalescer()').length - 1;
     assert.equal(occurrences, 1, 'one coalescer, created once');
-    assert.match(mainSource, /const recipeRefresh = createRecipeRefreshCoalescer\(\);/);
+    // Created and published at MODULE SCOPE, not inside the `ready` handler. `initialize()`
+    // is awaited from that handler more than 150 lines before it reaches this wiring, and
+    // -c's Storage Layout Conversion runs inside `_runMigrations` under `initialize()`. A
+    // bracket published in the handler would still be `undefined` when the conversion opened
+    // it, `?.open()` would no-op, and the only symptom would be three refresh bursts instead
+    // of one. Pinned by ORDER so a move back into the handler reddens.
+    const creationAt = mainSource.indexOf('fabricate.recipeRefresh = createRecipeRefreshCoalescer();');
+    const readyAt = mainSource.indexOf("Hooks.once('ready'");
+    assert.ok(creationAt > -1, 'the coalescer is created and published in one statement');
+    assert.ok(readyAt > -1, 'the ready handler is still present');
+    assert.ok(
+      creationAt < readyAt,
+      'the coalescer must be published before the ready handler, because initialize() runs inside it'
+    );
     // Pinned as the PROPERTY the bridge is handed, not as the identifier appearing
     // somewhere in the file. A bare `\brecipeRefresh\b` is satisfied by the comment above
     // the declaration, so it stays green with the coalescer wired to nothing at all.
@@ -523,6 +536,6 @@ describe('main.js settings hook wiring (issue 1080 -b)', () => {
     // `applyReplicatedRecordChange` returns false there, so it never signals — while every
     // client it does work for is one this `ready` closure is invisible to. Without a route
     // to a caller, `open`/`close` is a contract with no implementation.
-    assert.match(mainSource, /fabricate\.recipeRefresh = recipeRefresh;/);
+    assert.match(mainSource, /fabricate\.recipeRefresh = createRecipeRefreshCoalescer\(\);/);
   });
 });
