@@ -40,6 +40,7 @@ import { renderDialog, viewScene, localize as bridgeLocalize, enrichToHtml, prim
 import { promptBulkCheckRoll } from './ui/svelte/apps/crafting/rollPrompt.js';
 import { RecipeVisibilityService } from './systems/RecipeVisibilityService.js';
 import { runStartupMaintenance } from './systems/startupMaintenance.js';
+import { composeStartupPassList } from './systems/startupPassComposition.js';
 import { ResolutionModeService } from './systems/ResolutionModeService.js';
 import { CraftingListingBuilder } from './systems/CraftingListingBuilder.js';
 import { activeRunStepState, buildStepRecipeView, resolveStepIngredientSet } from './systems/stepRecipeView.js';
@@ -110,7 +111,7 @@ import {
   ActorPropertyCoinSpender,
 } from './systems/CoinSpenders.js';
 import { Pf2eInventoryCoinAdapter } from './systems/Pf2eInventoryCoinAdapter.js';
-import { cleanupStalePreferences, isGatheringActorSelectableByUser } from './config/preferencesCleanup.js';
+import { isGatheringActorSelectableByUser } from './config/preferencesCleanup.js';
 import { registerFragmentDiscoveryHook } from './systems/FragmentDiscoveryHook.js';
 import { registerRecipeItemLearningHook } from './systems/RecipeItemLearningHook.js';
 import { InteractableManager } from './canvas/InteractableManager.js';
@@ -874,20 +875,6 @@ class Fabricate {
       store: this.gatheringBlindRunStore,
       relayStart: (args) => this.gatheringBlindStartWriter.start(args)
     });
-    const validRecipes = new Set(this.recipeManager.getRecipes({}).map(r => r.id));
-    const validSystems = new Set(this.craftingSystemManager.getSystems().map(s => s.id));
-    const validSalvageComponentsBySystem = new Map(
-      this.craftingSystemManager.getSystems().map(system => [
-        system.id,
-        new Set((system.components || []).map(component => component.id))
-      ])
-    );
-    // Flatten the per-system salvage component sets the run cleanup below already
-    // computed: the progressive-order map's `salvage:<componentId>` keys are not
-    // system-scoped, so the prune needs one flat id set.
-    const validComponentIds = new Set(
-      [...validSalvageComponentsBySystem.values()].flatMap(ids => [...ids])
-    );
     // Housekeeping that drops entries naming deleted content. Each pass is
     // INDEPENDENTLY guarded (issue 970): they write to actor documents, and a
     // refused or otherwise failed write must never prevent `this.ready` below —
@@ -896,28 +883,28 @@ class Fabricate {
     // Each pass is also scoped to the actors this client owns (see
     // `selectWritableActors`), so a refusal should no longer be reachable at all;
     // this guard is the belt to that braces.
+    //
+    // The pass list itself is composed by `composeStartupPassList` (issue 1224), which
+    // computes the valid-id sets AND samples the Valid Id Basis, and omits any pass whose
+    // basis is not known-complete. `getSetting` is passed as the ACCESSOR, never a value
+    // read earlier in this method: the storage conversion these passes must not run
+    // against flips its layout from inside `recipeManager.initialize()` above, so a fact
+    // sampled beside `registerSettings()` or `_runMigrations()` would record the
+    // pre-conversion value and wave through the exact state the gate exists to catch.
+    // The call therefore also has to sit BELOW both `initialize()` calls. Both properties
+    // are pinned by `tests/startup-valid-id-basis.test.js`.
     this._startupMarks.begin(STARTUP_PHASES.STARTUP_MAINTENANCE);
-    await runStartupMaintenance([
-      ['crafting runs', () =>
-        this.craftingRunManager.cleanupInvalidRuns(validRecipes, validSystems)],
-      // Prune legacy phantom crafting runs: a single-step recipe with no time
-      // requirement can never legitimately persist an active run, so any such run left
-      // in the active store predates the craft() cleanup guard and is stranded.
-      ['phantom crafting runs', () =>
-        this.craftingRunManager.pruneInstantaneousActiveRuns((id) =>
-          this.recipeManager.getRecipe(id)
-        )],
-      ['salvage runs', () =>
-        this.salvageRunManager.cleanupInvalidRuns(validSystems, validSalvageComponentsBySystem)],
-      ['learned recipes', () =>
-        this.recipeVisibilityService.cleanupLearnedRecipes(validRecipes)],
-      ['stale preferences', () =>
-        cleanupStalePreferences(validSystems, validRecipes, getSetting, setSetting, {
-          resolveGatheringActor,
-          isSelectableGatheringActor,
-          validComponentIds
-        })]
-    ]);
+    await runStartupMaintenance(composeStartupPassList({
+      recipeManager: this.recipeManager,
+      craftingSystemManager: this.craftingSystemManager,
+      craftingRunManager: this.craftingRunManager,
+      salvageRunManager: this.salvageRunManager,
+      recipeVisibilityService: this.recipeVisibilityService,
+      getSetting,
+      setSetting,
+      resolveGatheringActor,
+      isSelectableGatheringActor
+    }));
     this._startupMarks.end(STARTUP_PHASES.STARTUP_MAINTENANCE);
 
     registerFragmentDiscoveryHook(this.craftingSystemManager, this.recipeVisibilityService);
