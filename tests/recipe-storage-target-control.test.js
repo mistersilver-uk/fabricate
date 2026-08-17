@@ -41,6 +41,10 @@
  *    mirror — a stale per-record adapter after a reverse conversion — is closed too.
  * 5. **The localized strings exist**, asserted against `lang/en.json` rather than against a
  *    restatement of the keys, so the settings row cannot ship rendering raw key names.
+ * 6. **The boot reconcile runs before the backend is selected.** `src/main.js` cannot be
+ *    imported under `node --test`, so the ORDER is pinned as source the way this repo
+ *    already pins its other `initialize()` positions, and the failure that ordering prevents
+ *    is reproduced separately against the real reconciler and the real manager.
  *
  * ## What claim 2 cannot yet assert
  *
@@ -87,6 +91,7 @@ import {
   canonicalDefinitionCorpusJson,
   canonicalizeDefinitionCorpus,
 } from './helpers/canonicalizeDefinitionCorpus.js';
+import { mainMethodSource, MAIN_SOURCE } from './helpers/fabricateFacadeHarness.js';
 import { installFoundryEnv } from './helpers/foundryEnv.js';
 import { SettingHost } from './helpers/settingDocumentHost.js';
 
@@ -184,14 +189,30 @@ function recipe(id, overrides = {}) {
  * A record in the PRE-ingredient-groups shape: a flat `ingredients` array and an ingredient
  * set with no id of its own.
  *
- * In the round-trip fixture deliberately. It is the shape the reverse conversion most has to
+ * In both fixture corpora deliberately. It is the shape the reverse conversion most has to
  * survive — a world old enough to still be on the single-array layout is exactly a world
- * whose recipes were authored before ingredient groups existed — and it is the shape that
- * makes "a conversion carries stored bytes and does NOT hydrate through the model" testable.
- * `IngredientSet.js`'s PERMANENT INBOUND SHIM rewrites it on hydrate, minting an id per
- * group and one for the set, so a conversion that round-tripped records through
- * `Recipe.fromJSON`/`toJSON` would silently rewrite this record's identity; with only
- * post-groups records in the fixture, that mutation passes.
+ * whose recipes were authored before ingredient groups existed — and it is load-bearing in
+ * two distinct ways.
+ *
+ * **It is what makes these fixtures MINT at all.** `IngredientSet.js`'s PERMANENT INBOUND
+ * SHIM rewrites the flat `ingredients` array on hydrate, minting an id for the group and one
+ * for the set, from `foundry.utils.randomID()`. With only post-groups records nothing in
+ * this file mints, the degraded `provenance: 'shape'` mode is accidentally deterministic,
+ * and the non-vacuity control below goes green while demonstrating nothing.
+ *
+ * **It is this fixture's only defence against an ID-ONLY REWRITE.** A conversion that
+ * carried every field verbatim but minted the two ids this shim mints — adding no other key
+ * — is invisible to a post-groups-only corpus, whose `ingredientSets` are empty and have
+ * nothing to mint for. Confirmed by applying exactly that mutation: it reddens the round
+ * trip and the downgrade with this record present, and passes with it swapped for
+ * {@link recipe}.
+ *
+ * It is NOT what defends against the coarser mutation of round-tripping records through
+ * `Recipe.fromJSON`/`toJSON`, which an earlier revision of this comment claimed. The
+ * normalizer adds `complex`, `enabled`, `metadata`, `name`, `componentId: null` and
+ * `systemItemId` regardless of shape, so that mutation reddens on a post-groups corpus too.
+ * The distinction matters because the over-claim invites a later author to drop this record
+ * once some other test covers the round trip.
  *
  * @param {string} id
  */
@@ -668,6 +689,119 @@ describe('a client recovers from a completed conversion without reloading', () =
     assert.equal(await manager.rebuildDefinitionStorage(), false);
     assert.equal(manager._repository, injected);
     assert.equal(manager.describeDefinitionStorage().arrangement, null);
+  });
+});
+
+describe('the reconcile runs where the ordering constraint requires (src/main.js)', () => {
+  // `src/main.js` imports the global stylesheet and the Svelte UI roots at module load, so it
+  // cannot be imported under `node --test` — see `tests/helpers/fabricateFacadeHarness.js`.
+  // Position is therefore pinned as SOURCE, exactly as `tests/startup-valid-id-basis.test.js`
+  // already pins the composition site and the readiness pair. That is not a weaker choice
+  // here: position IS the property, and no runtime observation of a module that cannot be
+  // loaded could make it stronger.
+  const initialize = mainMethodSource('  async initialize() {', MAIN_SOURCE);
+  const RECONCILE = 'await this._reconcileDefinitionStorage();';
+  const SELECT_BACKEND = 'this.recipeManager = new RecipeManager({';
+
+  /**
+   * A top-level statement's own text, bounded at its two-space-indented closing line.
+   *
+   * The same bounding discipline {@link mainMethodSource} applies to a class member: an
+   * unbounded `slice(indexOf(...))` runs to the end of the file, which makes every
+   * "must NOT contain" assertion permanently red and every "must contain" one vacuous.
+   *
+   * @param {string} signature
+   * @param {string} closing
+   * @returns {string}
+   */
+  function boundedSource(signature, closing = '\n  });') {
+    const start = MAIN_SOURCE.indexOf(signature);
+    if (start < 0) throw new Error(`main.js no longer declares \`${signature}\``);
+    const end = MAIN_SOURCE.indexOf(`${closing}\n`, start);
+    if (end < 0) throw new Error(`\`${signature}\` has no bounding \`${closing}\``);
+    return MAIN_SOURCE.slice(start, end + closing.length);
+  }
+
+  it('reconciles BEFORE constructing the manager that selects the backend', () => {
+    // The constraint the issue asks to be stated AND enforced. A refactor that moved the
+    // reconcile below the construction ships green against every behavioural suite in this
+    // repo — nothing imports `src/main.js` — and produces exactly the failure this issue is
+    // written around, demonstrated in the next test.
+    const reconcile = initialize.indexOf(RECONCILE);
+    const select = initialize.indexOf(SELECT_BACKEND);
+    assert.ok(reconcile > -1, 'initialize() still runs the boot storage reconcile');
+    assert.ok(select > -1, 'initialize() still constructs the recipe manager');
+    // Ordering over a FIRST index is only a constraint while there is one of each. A second
+    // call above a moved one would otherwise satisfy `reconcile < select` while the moved one
+    // does the damage.
+    assert.equal(initialize.lastIndexOf(RECONCILE), reconcile, 'exactly one reconcile call');
+    assert.equal(initialize.lastIndexOf(SELECT_BACKEND), select, 'exactly one construction');
+    assert.ok(
+      reconcile < select,
+      'the backend is selected from the TARGET, once, in the constructor — so a reconcile ' +
+        'below it leaves the converting GM on the adapter it just dismantled'
+    );
+  });
+
+  it('is what stops the converting GM’s own world reading EMPTY on that boot', async () => {
+    // Why the line above is not a style preference. Nothing here reads `src/main.js`; it
+    // reproduces the two orderings against the real reconciler and the real manager, so the
+    // pin above has a demonstrated failure behind it rather than a remembered one.
+    const corpus = [recipe('r1'), recipe('r2')];
+    const { seams } = await world({ layout: PER_RECORD, target: SINGLE_ARRAY, records: corpus });
+
+    // Manager first — the forbidden order. `readRecipeStorageTarget()` answers `singleArray`,
+    // so this manager gets the SETTINGS adapter, and step 2 has not written the legacy key.
+    const constructedFirst = new RecipeManager();
+    await constructedFirst.initialize();
+    assert.equal(
+      constructedFirst.getRecipes().length,
+      0,
+      'silently empty: the corpus is still in the per-record documents'
+    );
+
+    await reconcileRecipeStorageLayout(seams);
+
+    const constructedAfter = new RecipeManager();
+    await constructedAfter.initialize();
+    assert.deepEqual(
+      constructedAfter.getRecipes().map((record) => record.id).sort(),
+      ['r1', 'r2'],
+      'reconciling first means the selection below it is made against settled storage'
+    );
+  });
+
+  it('runs the boot pass on the primary GM alone', () => {
+    // A Storage Layout Conversion is a world-scoped multi-write and `isGM` is true for every
+    // assistant GM too, so an `isGM` gate would let the full GM and every assistant convert
+    // the same corpus concurrently — last-writer-wins over a half-moved corpus. Same gate,
+    // same reason, as `_runMigrations` directly below it.
+    const method = mainMethodSource('  async _reconcileDefinitionStorage() {', MAIN_SOURCE);
+    const gate = method.indexOf('if (game.users?.activeGM?.id !== game.user?.id) return;');
+    assert.ok(gate > -1, 'the primary-GM gate is still the first thing the boot pass does');
+    assert.ok(
+      gate < method.indexOf('reconcileRecipeStorageLayout('),
+      'and it precedes the write, rather than reporting after one'
+    );
+  });
+
+  it('reacts to a TARGET change only, so the conversion’s own writes cannot re-enter it', () => {
+    // The bridge emits `fabricate.recipeStorageLayoutChanged` for BOTH storage keys. Only a
+    // target change is a request; the layout leg is steps 1 and 3 of the conversion coming
+    // back, and reconciling on those would re-enter the operation that produced them. That
+    // filter is what makes the mid-session path terminate.
+    const hook = boundedSource(
+      "Hooks.on('fabricate.recipeStorageLayoutChanged', ({ key } = {}) => {"
+    );
+    const filter = hook.indexOf(
+      'if (key !== `${FABRICATE_SETTINGS_NAMESPACE}.${SETTING_KEYS.RECIPE_STORAGE_TARGET}`) return;'
+    );
+    const gate = hook.indexOf('if (game.users?.activeGM?.id !== game.user?.id) return;');
+    const react = hook.indexOf('fabricate._reconcileDefinitionStorage()');
+    assert.ok(filter > -1, 'the layout leg is filtered out');
+    assert.ok(gate > -1, 'and the mid-session pass is primary-GM gated like the boot pass');
+    assert.ok(react > -1, 'the hook still drives the reconcile');
+    assert.ok(filter < react && gate < react, 'both refusals precede the reaction');
   });
 });
 

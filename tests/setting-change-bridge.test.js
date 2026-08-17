@@ -227,6 +227,9 @@ describe('a whole-corpus setting DELETE is handled and deliberately inert (issue
       'a per-record delete is the one signal the record branch cannot infer any other way'
     );
     const emitted = [];
+    // This double has no `rebuildDefinitionStorage`, which is also where the storage branch's
+    // optional-call chain is exercised: every legacy bridge fixture stubs `{reload,
+    // getRecipes}` only, so a required call there would break them all rather than degrade.
     handleFabricateSettingChange('fabricate.recipeStorageTarget', {
       recipeManager: { getRecipes: () => [] },
       callAll: (hook, payload) => emitted.push([hook, payload]),
@@ -354,9 +357,10 @@ describe('per-record recipe replication (issue 1080 -b)', () => {
   });
 
   for (const key of ['fabricate.recipeStorageLayout', 'fabricate.recipeStorageTarget']) {
-    it(`does NOT mistake ${key} for a record, and signals the flip`, () => {
+    it(`does NOT mistake ${key} for a record, and rebuilds the definition storage`, () => {
       const emitted = [];
       const seen = [];
+      const rebuilds = [];
       const handled = handleFabricateSettingChange(key, {
         recipeManager: {
           reload: () => {
@@ -367,14 +371,68 @@ describe('per-record recipe replication (issue 1080 -b)', () => {
             seen.push(change);
             return true;
           },
+          // Issue 1232. The emitted hook is an ANNOUNCEMENT; this is the reaction, and it is
+          // the whole capability the storage keys replicate for — `data-models/spec.md` puts
+          // it normatively as "a client MUST be able to recover from a layout change without
+          // reloading". Asserting only the hook proves the bridge can talk, not that anything
+          // listens: the reaction lives in this branch and has no other caller.
+          rebuildDefinitionStorage: async () => {
+            rebuilds.push(key);
+            return true;
+          },
         },
         callAll: (hook, payload) => emitted.push([hook, payload]),
       });
       assert.equal(handled, true, 'the layout keys are in the handled set');
       assert.deepEqual(seen, [], 'and are never parsed as records');
+      assert.deepEqual(rebuilds, [key], 'the client re-chooses its adapter and re-reads');
       assert.deepEqual(emitted, [['fabricate.recipeStorageLayoutChanged', { key }]]);
     });
   }
+
+  it('REPORTS a failed rebuild rather than propagating or dropping it', async () => {
+    // The deliberate decision, pinned so a later reader does not "fix" the floating
+    // `void Promise.resolve(...)` into something that propagates.
+    //
+    // The rebuild is asynchronous — a granular `loadAll()` is — and both of this bridge's
+    // call sites in `src/main.js` are SYNCHRONOUS Foundry hook callbacks
+    // (`createSetting`/`updateSetting`/`deleteSetting`), whose return value core discards.
+    // So there is nothing for a returned promise to be awaited BY, and the handler's boolean
+    // answers "was this a Fabricate data setting", never "has the reaction finished".
+    // Widening the return to a promise would also change the contract of all six other
+    // branches, five of which are synchronous.
+    //
+    // What must NOT happen is the third option: a rejection reaching no one. A per-record
+    // `loadAll()` that throws on one client would then leave that client silently reading
+    // through the arrangement the conversion dismantled, with nothing in the console to say
+    // so. Hence `.catch` — the failure is swallowed as far as the CALLER is concerned and
+    // reported as far as the operator is concerned.
+    const errors = [];
+    const restore = console.error;
+    console.error = (...args) => errors.push(args);
+    let handled;
+    try {
+      handled = handleFabricateSettingChange('fabricate.recipeStorageTarget', {
+        recipeManager: {
+          getRecipes: () => [],
+          rebuildDefinitionStorage: async () => {
+            throw new Error('the record collection is unreadable');
+          },
+        },
+        callAll: () => {},
+      });
+      // Two ticks: the already-rejected promise's `catch` reaction, then a margin.
+      await Promise.resolve();
+      await Promise.resolve();
+    } finally {
+      console.error = restore;
+    }
+    assert.equal(handled, true, 'still a handled Fabricate key');
+    assert.equal(typeof handled, 'boolean', 'and NOT a promise — the hook callbacks are sync');
+    assert.equal(errors.length, 1, 'exactly one report, and no unhandled rejection');
+    assert.match(String(errors[0][0]), /failed to rebuild recipe definition storage/);
+    assert.match(String(errors[0][1]?.message), /the record collection is unreadable/);
+  });
 
   it('leaves a prefix-shaped key with no separator unhandled', () => {
     const seen = [];
