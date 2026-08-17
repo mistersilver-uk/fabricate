@@ -33,7 +33,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { installFoundryEnv } from './helpers/foundryEnv.js';
-import { countingActor, countCalls } from './helpers/scale/scaleCounters.js';
+import { countingActor, countingCandidates, countCalls } from './helpers/scale/scaleCounters.js';
 import {
   atMostLinear,
   countingFacade,
@@ -57,6 +57,10 @@ const { SignatureValidator, readSignatureCounters, resetSignatureCounters } = aw
 );
 const { RecipeManager } = await import('../src/systems/RecipeManager.js');
 const { Recipe } = await import('../src/models/Recipe.js');
+const { readIdentityCounters, resetIdentityCounters } = await import(
+  '../src/utils/definitionIndex.js'
+);
+const { findMatchingComponent } = await import('../src/utils/essenceResolver.js');
 
 const PLAYER = { id: 'user-1', isGM: false };
 
@@ -71,6 +75,30 @@ const PLAYER = { id: 'user-1', isGM: false };
  * per-recipe inventory re-flattening (`sourceActors.flatMap(a => [...a.items])`) and the
  * actor probe sees it. A stubbed craftability would make the inventory axis unobservable,
  * which is the axis the field report behind this programme was actually about.
+ *
+ * ## Why the library is instrumented on BOTH seams, and why the resolver is wired (issue 1204)
+ *
+ * The component library reaches the summary phase through exactly one door — the per-pass
+ * inventory snapshot's `resolveComponent` — and this fixture used to leave that door shut. The
+ * consequence was measured rather than reasoned: sweeping `componentCount` from 4 to 5,000
+ * moved `actorItemsScanned` and `recipeManagerEvaluateCraftability` not at all, and
+ * `getComponentsForSystem` was called ZERO times. A guard named for library independence was
+ * therefore satisfied by a fixture in which the library was unreachable. `scaleWorld.js` states
+ * the same requirement for the benchmark half: with no resolver "the tallies stay empty, every
+ * row reports 'missing materials', and the case would report a fast number for a listing that
+ * answered nothing".
+ *
+ * With the resolver wired, a library examination can be expressed two different ways, and a
+ * regression would pick whichever one the implementation happens to use — so both are counted
+ * and {@link libraryExaminations} adds them:
+ *
+ * - `componentCandidatesExamined` — the fixture-side {@link countingCandidates} array, which
+ *   sees a scan written as `components.find(...)` / `.filter(...)`. That is the PRE-#1076
+ *   shape of the `items x components` term and it is what a hand-rolled rescan would look like.
+ * - `identityCandidatesExamined` — `definitionIndex`'s own counter, which sees the candidates
+ *   walked while an index is BUILT. Once resolution became index-backed the fixture-side array
+ *   stopped observing anything on this path (it reads 0 at every library size), so this counter
+ *   is the live half today and the other is the one that would catch a reversion.
  */
 function measureListing({
   totalRecipes,
@@ -80,7 +108,11 @@ function measureListing({
   setCount = 1,
 }) {
   const counters = createOperationCounters();
-  const system = makeCraftingSystem({ componentCount });
+  const authored = makeCraftingSystem({ componentCount });
+  const system = {
+    ...authored,
+    components: countingCandidates(authored.components, counters, 'componentCandidatesExamined'),
+  };
   const recipes = Array.from({ length: totalRecipes }, (_, index) =>
     makeListingRecipe({ id: `r-${index}`, systemId: system.id, setCount })
   );
@@ -101,14 +133,30 @@ function measureListing({
     craftingSystemManager: systemManager,
     localize: (key) => key,
     nowWorldTime: () => 0,
+    // The one seam through which the summary phase reaches the component library. `main.js`
+    // and `InventoryListingBuilder` both wire this resolver; omitting it here is what made
+    // the library-independence guard unable to fail.
+    resolveComponentForItem: findMatchingComponent,
   });
 
   const craftingActor = countingActor(makeActor({ itemCount }), counters, 'actorItems');
+  // `definitionIndex`'s counters are module-global, so they are zeroed immediately before the
+  // measured call and read immediately after. A reading taken any later would include the
+  // detail phase's own work and could not be attributed to the summary phase.
+  resetIdentityCounters();
   const listing = builder.buildListing({ craftingActor, viewer: PLAYER });
+  const summaryIdentity = readIdentityCounters();
 
   return {
     counters,
     listing,
+    summaryIdentity,
+    /**
+     * Every candidate the SUMMARY phase examined against the component library, however the
+     * examination was expressed. Read eagerly, before any `hydrate()` can add to it.
+     */
+    libraryExaminations:
+      counters.get('componentCandidatesExamined') + summaryIdentity.candidatesExamined,
     // The DETAIL phase for one row (issue 1075). Handed the recipe directly rather than by
     // id because this fixture's manager holds no recipe map; the exact-evaluation cost the
     // probe measures is identical either way.
@@ -155,9 +203,78 @@ describe('issue 1072 guard — player listing cost tracks what is VISIBLE, not t
     );
   });
 
-  it('costs the same regardless of how large the component library is', () => {
-    // Independence, not a bound: the read must not be O(recipes × components). Doubling the
-    // library while holding recipes and inventory fixed must not move either counter.
+  it('never examines the component library once per held item', () => {
+    // THE `items x components` GUARD (issue 1204), and the one this file previously only
+    // claimed to have. It is stated on the item axis rather than on the library axis, and the
+    // reason is a measurement rather than a preference: opening the app builds the identity
+    // index ONCE over the whole library, so `libraryExaminations` is exactly `components` and
+    // is NOT equal across two library sizes. An equality on the library axis would be red
+    // against correct code today.
+    //
+    // What the parent epic actually names is a PRODUCT. A product term shows up as an item
+    // axis that is not flat: `items x components` costs `4x` more examinations when the
+    // inventory quadruples, and costs proportionally more again at a larger library. So the
+    // assertion is that the item axis is flat, taken at TWO library sizes — a term that grew
+    // with the library but not with items is the one-off index build and is fine; a term that
+    // grows with items at all is the regression, whatever the library size.
+    const CONTROL_ITEMS = 10;
+    const SCALED_ITEMS = 40;
+    const SMALL_LIBRARY = 64;
+    const LARGE_LIBRARY = 256;
+    const at = (componentCount, itemCount) =>
+      measureListing({ totalRecipes: 10, visibleRecipes: 5, componentCount, itemCount });
+
+    const smallLibrary = at(SMALL_LIBRARY, CONTROL_ITEMS);
+    const smallLibraryFatInventory = at(SMALL_LIBRARY, SCALED_ITEMS);
+    const largeLibrary = at(LARGE_LIBRARY, CONTROL_ITEMS);
+    const largeLibraryFatInventory = at(LARGE_LIBRARY, SCALED_ITEMS);
+
+    // NON-VACUITY, and it is the half that was missing rather than merely weak. Every equality
+    // below holds perfectly for a fixture that never reaches the library at all — which is
+    // exactly what this fixture used to be. Growing the library on a COLD index must move the
+    // counter, or the guard is measuring nothing.
+    assert.ok(
+      largeLibrary.libraryExaminations > smallLibrary.libraryExaminations,
+      `non-vacuity: growing the library from ${SMALL_LIBRARY} to ${LARGE_LIBRARY} components ` +
+        `left library examinations at ${smallLibrary.libraryExaminations}. The listing is not ` +
+        `reaching the component library, so nothing below can fail.`
+    );
+    assert.equal(
+      smallLibraryFatInventory.libraryExaminations,
+      smallLibrary.libraryExaminations,
+      `quadrupling held items over a ${SMALL_LIBRARY}-component library moved library ` +
+        `examinations from ${smallLibrary.libraryExaminations} to ` +
+        `${smallLibraryFatInventory.libraryExaminations}. Per-item library work is the ` +
+        `items x components term.`
+    );
+    assert.equal(
+      largeLibraryFatInventory.libraryExaminations,
+      largeLibrary.libraryExaminations,
+      `the same quadrupling over a ${LARGE_LIBRARY}-component library moved library ` +
+        `examinations from ${largeLibrary.libraryExaminations} to ` +
+        `${largeLibraryFatInventory.libraryExaminations}. Asserted at two library sizes on ` +
+        `purpose: a per-item cost that is proportional to the library is the product term, and ` +
+        `it is 4x more visible here than above.`
+    );
+
+    // The same defect stated on its cause rather than on its symptom, and kept LAST so the
+    // equalities above are what a red run reports first. Every route to `items x components`
+    // through this path rebuilds the identity index per item, so a build count above one is
+    // the mechanism; a hand-rolled `components.find(...)` per item is the one route that
+    // would not trip this and it lands on `componentCandidatesExamined` instead.
+    assert.ok(
+      smallLibrary.summaryIdentity.indexBuilds <= 1,
+      `one listing pass built the identity index ` +
+        `${smallLibrary.summaryIdentity.indexBuilds} times. The O(library) walk is paid once ` +
+        `per open, not once per row and not once per held item.`
+    );
+  });
+
+  it('scans the inventory the same number of times regardless of library size', () => {
+    // The weaker, genuinely library-INDEPENDENT halves. Both counters really are flat across
+    // library sizes, so these stay as equalities — but neither can express `items x
+    // components` (one counts item reads, the other counts method calls), which is why the
+    // guard above exists alongside them rather than instead of them.
     const small = measureListing({ totalRecipes: 10, visibleRecipes: 5, componentCount: 4 });
     const large = measureListing({ totalRecipes: 10, visibleRecipes: 5, componentCount: 64 });
 
