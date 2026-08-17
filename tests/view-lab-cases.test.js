@@ -2096,6 +2096,97 @@ test('widening unions with what was already attributed, at every level it can ha
   ]);
 });
 
+test('a region-attributed input widens by union too, and so does a straddling hunk', () => {
+  // The two widening call sites the union test above does not reach. `casesFromRegionPatch` is
+  // structurally distinct — it maps region keys through `selectsRegion` BEFORE widening — and
+  // `regionsTouchedAt` is the innermost level of all, where one hunk's changed lines fall partly
+  // inside a region and partly outside it. Both dropped the attributed half before review.
+  const playerIds = publishableCases()
+    .filter((viewCase) => viewCase.app === 'fabricate-app')
+    .map((viewCase) => viewCase.id);
+  const inRegistryOrder = (ids) => caseIds.filter((id) => ids.includes(id));
+
+  // Two hunks of one labActors patch: one inside a stock fixture table, one in a shared builder.
+  const inTable = labActorsLineOf("    'sm-iron-ore': 12,");
+  const inBuilder = labActorsLineOf('export function buildLabActors(content) {');
+  assert.deepEqual(
+    selectedIds([LAB_ACTORS_PATH], labActorsPatches([inTable, inBuilder])),
+    inRegistryOrder([...new Set([...playerIds, ...LAB_SURFACE_CASE_IDS])]),
+    'a part-attributable fixture patch must keep the player frames its table feeds'
+  );
+  // The control: the table hunk alone still narrows to the player frames and nothing else, so the
+  // assertion above is about the union rather than about a narrowing that stopped working.
+  assert.deepEqual(
+    selectedIds([LAB_ACTORS_PATH], labActorsPatches([inTable])),
+    inRegistryOrder(playerIds)
+  );
+
+  // ONE hunk that STRADDLES a boundary: two adjacent changed lines, the first the closing line of
+  // a case literal and the second the array's spread of `journalBlindRunCases()` — which is a call
+  // to shared code and therefore inside no region at all. `patchAdding` merges adjacent lines into
+  // a single run, so this really is one hunk with one anchor, which is the level `regionsTouchedAt`
+  // owns. The pair is picked from the registry's own text rather than invented: the spread is the
+  // only non-inert line between two case literals.
+  const spread = registryLineOf('  ...journalBlindRunCases(),');
+  assert.equal(registrySource[spread - 2], '  }),', 'the line above the spread must close a case');
+  const closedCase = caseIdByLine().get(spread - 1);
+  assert.ok(closedCase, 'the line above the spread must be inside a parsed case region');
+
+  const straddling = selectedIds([REGISTRY_PATH], registryPatches([spread - 1, spread]));
+  assert.ok(
+    straddling.includes(closedCase),
+    `a hunk straddling a case boundary dropped "${closedCase}", the half it could attribute`
+  );
+  for (const id of LAB_SURFACE_CASE_IDS) {
+    assert.ok(straddling.includes(id), `the straddling hunk dropped coverage frame "${id}"`);
+  }
+});
+
+test('the registry counts quoted in prose match the registry', () => {
+  // These four numbers are hand-copied registry facts, and they have drifted three separate times:
+  // this change found `AGENTS.md` claiming 155 cases, `CONTRIBUTING.md` claiming 181, and
+  // `scripts/README.md` claiming 219 with a `reaches` split to match — three different wrong
+  // answers, none of which anything failed on. A contributor reads these to decide whether a
+  // capture is worth waiting for, so a stale one is not cosmetic.
+  //
+  // Matched by REGEX against the prose rather than by templating the docs, because the docs are
+  // written for humans and must stay readable; the regex is deliberately narrow enough that a
+  // rewrite of the surrounding sentence fails loudly here rather than silently skipping.
+  const reaches = (value) =>
+    publishableCases().filter((viewCase) => viewCase.reaches === value).length;
+  const total = publishableCases().length;
+  const coverage = LAB_SURFACE_CASE_IDS.length;
+
+  for (const [file, pattern, expected] of [
+    [
+      'CONTRIBUTING.md',
+      /the registry holds (\d+) cases: (\d+) `exact`, (\d+) `window`, (\d+) `beyond`/,
+      [total, reaches('exact'), reaches('window'), reaches('beyond')],
+    ],
+    ['CONTRIBUTING.md', /which is (\d+) of the (\d+) publishable cases/, [coverage, total]],
+    [
+      'scripts/README.md',
+      /There are (\d+) `exact` cases, (\d+) `window`, and (\d+) `beyond`, out of (\d+) total/,
+      [reaches('exact'), reaches('window'), reaches('beyond'), total],
+    ],
+    ['AGENTS.md', /the normal case, at (\d+) cases across both windows/, [total]],
+    ['AGENTS.md', /one frame of every route and tab the lab renders, (\d+) cases/, [coverage]],
+    [
+      '.agents/skills/fabricate-orchestrator/SKILL.md',
+      /one frame of every route and tab the lab renders, (\d+) of (\d+) cases/,
+      [coverage, total],
+    ],
+  ]) {
+    const found = readFileSync(resolve(ROOT, file), 'utf8').match(pattern);
+    assert.ok(found, `${file} no longer contains the sentence this guards: ${pattern}`);
+    assert.deepEqual(
+      found.slice(1).map(Number),
+      expected,
+      `${file} quotes stale registry counts in "${found[0]}"`
+    );
+  }
+});
+
 test('a lab-input-only change selects frames while leaving the evidence gate unarmed', () => {
   // The two answers are deliberately different, and the asymmetry looks like a bug in isolation —
   // which is why it is pinned. `hasUiChanges` decides whether `check-screenshots` ARMS, and a
@@ -2593,22 +2684,22 @@ test('the SAME edit applied to sibling cases selects exactly those siblings (iss
   );
 });
 
-test('no recurring window mixes inside-a-region with outside-every-region, so the widening short-circuit has no fixture', () => {
-  // The measurement, recorded rather than replaced by an invented fixture. The union rule keeps ONE
-  // way to widen on a multi-candidate hunk: a candidate that lands outside every region returns
-  // UNATTRIBUTABLE_REACH, and `regionsTouchedByHunk` short-circuits on it ABOVE the union, because
-  // the true edit may be that candidate and code outside a case literal can move any frame.
+test('no recurring window mixes inside-a-region with outside-every-region, so no real diff needs that path', () => {
+  // The measurement, kept for what it still measures, with its original justification retired. It
+  // used to guard an UNFIXTURED BRANCH: a multi-candidate hunk with one candidate outside every
+  // region short-circuited and threw away the regions its other candidates had landed in, and no
+  // real input could produce that shape to assert against.
   //
-  // Reaching that short-circuit needs a window occurring BOTH inside a region and outside every
-  // region. NONE of the three region-attributed inputs contains one: not this registry, not
-  // `labActors.js`, whose four fixture tables share the region machinery, and not `mount.js`,
-  // whose four marked regions share it too. So there is nothing real to assert it against, and a
-  // synthetic file would only prove the test can build one.
+  // There is no such branch now. A widening candidate contributes surface coverage and its
+  // siblings contribute their regions, and the answer is both (`regionsTouchedByHunk`), so the
+  // shape is defined rather than unfixtured — and `widening unions with what was already
+  // attributed` asserts the same rule at the levels a real diff CAN reach.
   //
-  // All three are measured rather than one, because the claim is about the short-circuit and the
-  // short-circuit serves all of them. If this ever fails, that input has grown exactly the fixture
-  // the branch is missing: name it here and assert the answer is that hunk's regions UNIONED with
-  // surface coverage, NOT the union of the regions the other occurrences sit in.
+  // What the measurement is still worth: none of the three region-attributed inputs contains a
+  // window that recurs both inside a region and outside every region, so no real diff exercises
+  // candidate-level widening at all. If this ever fails, that input has grown one — which is not a
+  // defect, just a shape worth an explicit assertion: its answer is that hunk's regions UNIONED
+  // with surface coverage.
   for (const [where, source, owner] of [
     ['the registry', registrySource, caseIdByLine()],
     [LAB_ACTORS_PATH, labActorsSource, tableNameByLine()],

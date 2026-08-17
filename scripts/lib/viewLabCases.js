@@ -55,25 +55,27 @@ const LAB_ACTORS_PATH = 'tests/view-lab/world/labActors.js';
 const LAB_MOUNT_PATH = 'tests/view-lab/mount.js';
 
 /**
- * "This change's reach cannot be attributed" as a value, so an attribution can say it without
- * building the set it resolves to.
+ * ── How this machinery says "part of this reached beyond what I can attribute" ──────────────────
  *
- * A Symbol rather than a sentinel array or `null`, because the two answers this machinery returns
- * are a SET OF IDS and I-CANNOT-TELL, and every caller has to tell them apart. `null` would make
- * "I could not parse this" and "this selects nothing" the same value — and those must never be the
- * same value here, since one has to widen and the other has to narrow to none.
+ * It carries a `{keys, unattributable}` PAIR at every level of the attribution walk — from one
+ * candidate anchor, up through a hunk's candidates, a patch's hunks, an input's patch, and a
+ * change's inputs — and each level merges both halves of its children's pairs.
  *
- * It used to resolve to every publishable case, and the name said so. It now resolves to
- * {@link LAB_SURFACE_CASES} — one frame of every surface the lab renders — which is the widest
- * answer that is still worth looking at: 34 frames a reviewer reads instead of 246 they scroll
- * past. The symbol is named for the QUESTION rather than for that answer, so the two can be
- * re-tuned independently.
+ * It used to carry a sentinel instead, `EVERY_PUBLISHABLE_CASE`, which each level returned the
+ * moment any child produced it. That was correct only because the value it stood for CONTAINED
+ * every selection it discarded on the way out. It stands for {@link LAB_SURFACE_CASES} now — 34
+ * frames a reviewer reads instead of 246 they scroll past — which contains no detailed state at
+ * all, so discarding became dropping: a change that edited one case literal and also touched
+ * shared code published coverage and no frame of the case it edited.
+ *
+ * A pair is what makes that unrepresentable rather than merely fixed. There is no value left for a
+ * level to return that means "forget what you found", so the defect cannot come back one level
+ * down — which is exactly how it came back once already, after the first three levels were fixed.
  */
-const UNATTRIBUTABLE_REACH = Symbol('reach that cannot be attributed to a case');
 
 /**
  * Signals too broad to attribute to one window. A shared primitive or a global stylesheet can
- * affect every screen, so selecting every case would make the evidence set useless noise. These map
+ * affect every window, so selecting every case would make the evidence set useless noise. These map
  * to the representative set below plus the fallback.
  */
 /**
@@ -4011,7 +4013,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     query: { system: 'lab-herbalism' },
     // The state is DRIVEN rather than seeded. The fixture world enables stamina on no system, and
     // seeding one would be a `tests/view-lab/**` change — which `LAB_INFRASTRUCTURE_PATTERN` maps
-    // to the whole 157-frame corpus, and which would put a stamina readout into the player
+    // to surface coverage, and which would put a stamina readout into the player
     // gathering frames of whichever system it was seeded on (`GatheringDetail.svelte` renders one
     // whenever `staminaEnabled`). Four GM gestures reach the same state and disturb nothing:
     // enable the Stamina limitation, give it a max expression (without one
@@ -6853,13 +6855,13 @@ function selectRenderFileCases(renderFiles) {
 // ───────────────────────────────────────────────────────────────────────────────────────────────
 // Diff-aware selection, for the lab inputs whose diff can be attributed.
 //
-// Adding two cases used to select all 157, when the honest answer is those two. The selector had
-// the diff available and did not use it. It does now — for this registry and for the actor fixture
-// — but only for a change it can PROVE is confined to one region of the file, and it proves that
-// against that file's own text.
+// Adding two cases used to select the whole corpus, when the honest answer is those two. The
+// selector had the diff available and did not use it. It does now — for this registry and for the
+// actor fixture — but only for a change it can PROVE is confined to one region of the file, and it
+// proves that against that file's own text.
 //
-// The whole design is one question: when do we widen back to surface coverage? The answer is "at the
-// first sign of anything we do not fully understand", which here means:
+// The whole design is one question: when do we widen back to surface coverage? The answer is "at
+// the first sign of anything we do not fully understand", which here means:
 //
 //   - no patch, an empty patch, or a patch that is not a unified diff;
 //   - a hunk header that does not parse, or a body line whose marker is not ` `, `+`, `-` or `\`;
@@ -7183,8 +7185,8 @@ const labActorLineRegions = memoized(() => parseLabActorTableRegions(labActorSou
  * `settle` — so keying on those functions would claim a player-only readership the file does not
  * have, and a later edit to a manager param would then select the player frames and silently
  * publish no evidence for the manager frames it moved. Marking the blocks keeps every declared
- * region's readership true, and a hunk landing outside every marker widens to surface coverage, which
- * is the fail-safe default.
+ * region's readership true, and a hunk landing outside every marker widens to surface coverage,
+ * which is the fail-safe default.
  */
 const PLAYER_MOUNT_REGIONS = Object.freeze({
   'player-extension-params': rendersInPlayerWindow,
@@ -7317,23 +7319,30 @@ function anchorOffsets(sourceLines, sequence) {
  * same region for any edit within one, and outside every region (so: everything) for a removal at
  * a region boundary.
  *
+ * A hunk can STRADDLE a region boundary — a changed line inside a case literal and another in the
+ * shared code after it — so this reports both halves rather than collapsing to the wider one. That
+ * is the same correction the three levels above it carry: the answer for a straddling hunk is the
+ * region it touched TOGETHER WITH the widening, never the widening alone.
+ *
  * @param {{marker: string, text: string}[]} hunk One hunk body.
  * @param {number} offset The 0-based source line its first new-file line sits at.
  * @param {{key: string, start: number, end: number}[]} regions The file's regions.
- * @returns {Set<string>|symbol} Region keys, or {@link UNATTRIBUTABLE_REACH}.
+ * @returns {{keys: Set<string>, unattributable: boolean}} The regions its changed lines sit in,
+ *   and whether any changed line sat outside every region.
  */
 function regionsTouchedAt(hunk, offset, regions) {
   const keys = new Set();
+  let unattributable = false;
   let cursor = offset + 1;
   for (const { marker, text } of hunk) {
     if (marker !== ' ' && !isInertSourceLine(text)) {
       const region = regions.find((entry) => cursor >= entry.start && cursor <= entry.end);
-      if (!region) return UNATTRIBUTABLE_REACH;
-      keys.add(region.key);
+      if (region) keys.add(region.key);
+      else unattributable = true;
     }
     if (marker !== '-') cursor += 1;
   }
-  return keys;
+  return { keys, unattributable };
 }
 
 /**
@@ -7372,26 +7381,29 @@ function regionsTouchedAt(hunk, offset, regions) {
  * @param {{marker: string, text: string}[]} hunk One hunk body.
  * @param {string[]} sourceLines The file that will render, by line.
  * @param {{key: string, start: number, end: number}[]} regions That file's regions.
- * @returns {Set<string>|symbol} Region keys, or {@link UNATTRIBUTABLE_REACH}.
+ * @returns {{keys: Set<string>, unattributable: boolean}} The regions its candidate locations sit
+ *   in, and whether any candidate reached beyond them.
  */
 function regionsTouchedByHunk(hunk, sourceLines, regions) {
   const sequence = hunk.filter(({ marker }) => marker !== '-').map(({ text }) => text);
-  if (sequence.length === 0) return UNATTRIBUTABLE_REACH;
+  if (sequence.length === 0) return { keys: new Set(), unattributable: true };
 
-  let union = null;
+  const keys = new Set();
+  let unattributable = false;
+  let anchored = false;
   for (const offset of anchorOffsets(sourceLines, sequence)) {
+    anchored = true;
     const touched = regionsTouchedAt(hunk, offset, regions);
-    // ONE candidate widening still settles it, and this short-circuit is what keeps the union
-    // honest. A candidate widens because it lands on a line outside every region — a shared
-    // factory, a section banner, the selection machinery itself — and the true edit may be that
-    // one. Unioning "some region" with "code that can move every frame" would answer with the
-    // region and lose the widening, so this must stay ABOVE the per-candidate union.
-    if (touched === UNATTRIBUTABLE_REACH) return UNATTRIBUTABLE_REACH;
-    union ??= new Set();
-    for (const key of touched) union.add(key);
+    // A candidate that lands outside every region — a shared factory, a section banner, the
+    // selection machinery itself — can move any frame, and the true edit may be that candidate,
+    // so it has to widen. It no longer DISCARDS its siblings to do so: a widening candidate
+    // contributes coverage while the candidates that did land in a region contribute their
+    // regions, and the answer is both.
+    unattributable ||= touched.unattributable;
+    for (const key of touched.keys) keys.add(key);
   }
   // No candidate at all: the patch describes content this checkout does not have.
-  return union ?? UNATTRIBUTABLE_REACH;
+  return { keys, unattributable: unattributable || !anchored };
 }
 
 /**
@@ -7407,7 +7419,7 @@ function regionsTouchedByHunk(hunk, sourceLines, regions) {
  * literal, one hunk in the shared factory above it, which is exactly the shape of "add a case and
  * touch the constant it uses". While the unattributable answer was the whole corpus, discarding
  * the attributed half on the way out was harmless, because the corpus contained it. Surface
- * coverage does not: it holds one frame per screen and would drop the very case the patch edited,
+ * coverage does not: it holds one frame per surface and would drop the very case the patch edited,
  * publishing a capture that shows everything except the change. So the halves are kept apart here
  * and UNIONED by the caller.
  *
@@ -7431,8 +7443,8 @@ function touchedRegionKeys(patch, readSource, readRegions) {
   let unattributable = false;
   for (const hunk of hunks) {
     const touched = regionsTouchedByHunk(hunk, sourceLines, regions);
-    if (touched === UNATTRIBUTABLE_REACH) unattributable = true;
-    else for (const key of touched) keys.add(key);
+    unattributable ||= touched.unattributable;
+    for (const key of touched.keys) keys.add(key);
   }
   return { keys, unattributable };
 }
@@ -7496,7 +7508,7 @@ function widenedByCoverage(ids, unattributable) {
  * corpus, which is what the default is for.
  *
  * Per-ACTOR selection is not offered, and that is a measured refusal rather than an omission: three
- * of 181 cases name an actor id at all, the `manager-knowledge-*` frames that click
+ * cases in the whole registry name an actor id at all, the `manager-knowledge-*` frames that click
  * `[data-knowledge-actor="…"]`. Every player frame mounts `ActorSelectTopBar` for the default
  * crafting actor, the lab's component-source set is the whole roster, and both the listing and the
  * recipe-visibility computation read every source actor's items — so a per-actor selector would be
@@ -7712,11 +7724,11 @@ export function mapChangedFilesToCases(files = [], { patches } = {}) {
     return [];
   }
 
-  // A UNION at every level, never a replacement, and that is load-bearing in three places now:
-  // here, in `selectAllLabInputCases` across co-changed lab inputs, and in `touchedRegionKeys`
-  // across the hunks of one patch. All three used to short-circuit on unattributability, which was
+  // A UNION at every level, never a replacement. Five levels carry it — one candidate anchor, a
+  // hunk's candidates, a patch's hunks, an input's patch, and a change's inputs — and this is the
+  // last of them. Every one used to short-circuit on unattributability, which was
   // safe only because the answer then was the whole corpus — a superset of every selection it
-  // discarded. Surface coverage is not a superset of anything: it holds one frame per screen, not
+  // discarded. Surface coverage is a superset of nothing: it holds one frame per surface, not
   // the detailed state a render file or a case literal selects. Widening now ADDS coverage to what
   // was attributed rather than replacing it, so a PR that edits one case and also touches shared
   // code publishes coverage AND the frame of the case it edited.

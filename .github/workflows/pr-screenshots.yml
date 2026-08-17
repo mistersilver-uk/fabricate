@@ -112,8 +112,8 @@ jobs:
           # confined to case-object literals in `viewLabCases.js` selects those cases instead of
           # surface coverage, which is the difference between a two-minute capture and a
           # four-minute one. The library never reads git itself — it is a pure function of what
-          # this step hands it — and it widens back to surface coverage (one frame of every screen
-          # the lab renders) for any patch it cannot verify, so a `patch` the API omits (it drops
+          # this step hands it — and it widens back to surface coverage (one frame of every route
+          # and tab the lab renders) for any patch it cannot verify, so a `patch` the API omits (it drops
           # them for very large diffs) costs frames, never evidence.
           gh api "repos/$PR_REPO/pulls/$PR_NUMBER/files" --paginate \
             --jq '.[] | {filename: .filename, patch: (.patch // "")} | @json' > changed-files.jsonl
