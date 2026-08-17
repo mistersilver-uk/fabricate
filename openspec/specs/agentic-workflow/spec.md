@@ -631,12 +631,16 @@ The evidence gate MUST NOT decide before the automated producer for that same he
 #### Scenario: the producer's own inputs change
 
 - **WHEN** a PR changes the fixture world, the mounting page, or the case registry the producer renders from
-- **THEN** every publishable case is selected by default, because a change to a shared fixture can alter every frame at once
+- **THEN** one case per captured SURFACE is selected by default — every application the producer renders and every screen reachable within it, each photographed once — because a change to a shared input can alter any frame at once, and what it has to prove is that the producer still reaches and captures every screen
+- **AND** the default is not every publishable case, because the detailed states of a screen are evidence about the files that draw them rather than about a shared input, and a selection nobody reads is not evidence
+- **AND** that surface set is derived from what the cases already declare about themselves — the route or tab each reaches, and the application theme it renders under — rather than enumerated, so a screen added later is covered without anyone remembering to cover it
+- **AND** each surface is represented by a frame that shows that screen rather than a variant of it, preferring the application's default window geometry and no dialog covering the screen, wherever the surface offers such a frame
 - **AND** a narrower selection is permitted only on an axis a case already declares about itself, or from a diff whose hunks are verified against the content of the file the producer will actually render
 - **AND** that verification locates each of the diff's hunks by searching the file's own content rather than by trusting the line numbers the hunk header claims, and where the content recurs it accepts the result only when every candidate location attributes the change identically
 - **AND** that distinction matters because the producer renders a merge commit while the diff describes the head it was generated against, so trusting the header's line numbers verifies against a file whose lines may have shifted, and can silently attribute a change to the wrong case where a window of the file recurs verbatim
-- **AND** an input the registry does not narrow, a diff the registry cannot parse, or a verification that finds no anchor — an empty sequence, no occurrence, or occurrences whose candidates disagree — still selects every publishable case
-- **AND** this holds even though none of the producer's own inputs is itself a render file, since selecting on render files alone would select nothing for exactly the changes most able to invalidate the whole corpus
+- **AND** an input the registry does not narrow, a diff the registry cannot parse, or a verification that finds no anchor — an empty sequence, no occurrence, or occurrences whose candidates disagree — still selects the whole surface set
+- **AND** this holds even though none of the producer's own inputs is itself a render file, since selecting on render files alone would select nothing for exactly the changes most able to invalidate the corpus
+- **AND** a shared input selected alongside render files unions the two selections rather than replacing them, since the surface set does not contain the detailed states those render files select
 
 #### Scenario: screenshot capture is blocked
 

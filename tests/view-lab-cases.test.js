@@ -21,12 +21,15 @@ import {
 import {
   ACTOR_KNOWLEDGE_RENDER_FILES,
   FALLBACK_CASE_ID,
+  LAB_SURFACE_CASES,
+  LAB_SURFACE_CASE_IDS,
   VIEW_LAB_CASES,
   caseIds,
   fallbackCase,
   getCaseById,
   hasUiChanges,
   isUiFile,
+  labSurfaceKey,
   labelForCaseId,
   mapChangedFilesToCases,
   normalizePath,
@@ -1813,8 +1816,8 @@ test('a labRunStates change selects the player windows that render runs — not 
   );
 });
 
-test('every lab input the registry cannot attribute still selects every publishable case', () => {
-  const everything = publishableCases().length;
+test('every lab input the registry cannot attribute selects surface coverage', () => {
+  const coverage = LAB_SURFACE_CASE_IDS.length;
 
   // The genuinely global inputs, plus a file nobody has ever heard of: the fail-safe is the
   // DEFAULT, so an input added under `tests/view-lab/` tomorrow is covered before anyone maps it.
@@ -1835,20 +1838,184 @@ test('every lab input the registry cannot attribute still selects every publisha
     'scripts/lib/foundryChromeSpec.js',
     'scripts/view-lab-screenshots.mjs',
   ]) {
-    assert.equal(selectedIds([file]).length, everything, `${file} must select every frame`);
+    assert.deepEqual(
+      selectedIds([file]),
+      [...LAB_SURFACE_CASE_IDS],
+      `${file} must select one frame of every surface`
+    );
   }
 
   // The regression the whole rule exists to prevent, asserted as itself.
   assert.notDeepEqual(mapChangedFilesToCases(['tests/view-lab/world/labContent.js']), []);
+  // …and the other direction, which is the point of coverage: it is a real narrowing, not the
+  // corpus wearing a new name.
+  assert.ok(coverage < publishableCases().length / 3, 'coverage must be a fraction of the corpus');
 });
 
-test('a registry change with no usable patch selects every publishable case', () => {
-  const everything = publishableCases().length;
+// ───────────────────────────────────────────────────────────────────────────────────────────────
+// Surface coverage.
+//
+// The set an unattributable change resolves to, and the reason the answer is no longer "all 243".
+// What these guard is the pair of properties that make the narrowing safe rather than merely
+// cheap: EVERY screen is still photographed (so no lab-input change can leave a window, a route or
+// a tab unproven), and each screen is photographed by a frame that actually shows it (not its
+// 680px variant, not a modal covering it).
+// ───────────────────────────────────────────────────────────────────────────────────────────────
+
+/** Each app's cases, by the surface key the registry derives for them. */
+function casesBySurface() {
+  const groups = new Map();
+  for (const viewCase of publishableCases()) {
+    const key = labSurfaceKey(viewCase);
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(viewCase);
+  }
+  return groups;
+}
+
+test('surface coverage holds exactly one publishable case per surface, and misses none', () => {
+  const groups = casesBySurface();
+
+  // A PARTITION, asserted in both directions: one representative per surface, and no surface
+  // without one. The second half is the one that matters — a screen missing from coverage is a
+  // screen a fixture change can break with nothing red, and it would arrive silently the day
+  // someone adds a route.
+  assert.deepEqual(
+    [...new Set(LAB_SURFACE_CASES.map((viewCase) => labSurfaceKey(viewCase)))].sort(),
+    [...groups.keys()].sort(),
+    'coverage must contain every surface, exactly once'
+  );
+  assert.equal(LAB_SURFACE_CASES.length, groups.size);
+  for (const viewCase of LAB_SURFACE_CASES) {
+    assert.ok(viewCase.publish, `${viewCase.id} is in coverage but does not publish`);
+    assert.ok(getCaseById(viewCase.id), `${viewCase.id} is not a registry case`);
+  }
+
+  // Both windows, and both of them by the app's own account rather than by counting ids.
+  assert.deepEqual(
+    [...new Set(LAB_SURFACE_CASES.map((viewCase) => viewCase.app))].sort(),
+    [...new Set(publishableCases().map((viewCase) => viewCase.app))].sort(),
+    'coverage must photograph every application the registry renders'
+  );
+  // Every manager route and every player tab, derived from the cases rather than listed.
+  for (const [axis, read] of [
+    ['expectView', (viewCase) => viewCase.expectView],
+    ['query.tab', (viewCase) => viewCase.query?.tab],
+  ]) {
+    const values = (cases) => [...new Set(cases.map(read).filter(Boolean))].sort();
+    assert.deepEqual(
+      values([...LAB_SURFACE_CASES]),
+      values(publishableCases()),
+      `coverage must reach every ${axis} the registry declares`
+    );
+  }
+});
+
+test('a surface is represented by a frame that shows it, not by a variant of it', () => {
+  // The app default geometry, derived here rather than imported: the modal position across an
+  // app's own cases. An independent derivation is the point — importing the constant the chooser
+  // uses would make this a restatement of the implementation instead of a check on it.
+  const modalPosition = (app) => {
+    const counts = new Map();
+    for (const viewCase of publishableCases()) {
+      if (viewCase.app !== app) continue;
+      const size = `${viewCase.position.width}x${viewCase.position.height}`;
+      counts.set(size, (counts.get(size) ?? 0) + 1);
+    }
+    return [...counts].sort((a, b) => b[1] - a[1])[0][0];
+  };
+  const defaults = new Map(
+    [...new Set(publishableCases().map((viewCase) => viewCase.app))].map((app) => [
+      app,
+      modalPosition(app),
+    ])
+  );
+  const sizeOf = (viewCase) => `${viewCase.position.width}x${viewCase.position.height}`;
+
+  for (const [key, group] of casesBySurface()) {
+    const chosen = LAB_SURFACE_CASES.find((viewCase) => labSurfaceKey(viewCase) === key);
+    assert.ok(chosen, `${key} has no representative`);
+
+    // Only where the surface HAS such a frame. A surface photographed exclusively at 680px, or
+    // exclusively behind a dialog, has no better frame to offer and must still be covered.
+    if (group.some((viewCase) => sizeOf(viewCase) === defaults.get(viewCase.app))) {
+      assert.equal(
+        sizeOf(chosen),
+        defaults.get(chosen.app),
+        `${key} is represented by ${chosen.id}, a ${sizeOf(chosen)} variant, while the surface ` +
+          'has a default-geometry frame'
+      );
+    }
+    if (group.some((viewCase) => !viewCase.query?.dialog)) {
+      assert.ok(
+        !chosen.query?.dialog,
+        `${key} is represented by ${chosen.id}, which has a dialog open over the screen it is ` +
+          'supposed to show'
+      );
+    }
+  }
+});
+
+test('an unattributable lab input does not swallow the frames its co-changed render files select', () => {
+  // The union `mapChangedFilesToCases` performs is load-bearing now in a way it was not when the
+  // lab-input answer was the whole corpus: coverage does NOT contain the detailed states a render
+  // file selects, so a PR touching the mount page and a component must get BOTH.
+  const renderFile = 'src/ui/svelte/apps/manager/recipe/RecipeToolsTab.svelte';
+  const detailed = selectedIds([renderFile]);
+  const together = selectedIds(['tests/view-lab/mount.js', renderFile]);
+
+  assert.ok(detailed.length > 0, 'the render file must select something on its own');
+  for (const id of [...detailed, ...LAB_SURFACE_CASE_IDS]) {
+    assert.ok(together.includes(id), `the union dropped "${id}"`);
+  }
+  // And it is still a union rather than a capitulation: the detailed frames of every OTHER screen
+  // stay out of it.
+  assert.ok(
+    together.length < publishableCases().length,
+    'a lab input plus one component must not select the whole corpus'
+  );
+});
+
+test('no single changed file selects the whole corpus', () => {
+  // The invariant this narrowing exists for, asserted over the real tree rather than over a
+  // handful of sampled paths: no ONE file — no component, no stylesheet, no lab input — can demand
+  // a capture of every state of every screen. A change earns the whole corpus only by touching
+  // enough of it to select the whole corpus.
+  const total = publishableCases().length;
+  const ceiling = Math.floor(total / 3);
+  const labInputs = [
+    'tests/view-lab/world/labContent.js',
+    'tests/view-lab/world/labActors.js',
+    'tests/view-lab/world/labRunStates.js',
+    'tests/view-lab/mount.js',
+    'scripts/lib/viewLabCases.js',
+    'scripts/lib/viewLabLayoutAssertion.js',
+    'scripts/lib/foundryChromeSpec.js',
+    'scripts/view-lab-screenshots.mjs',
+  ];
+
+  const worst = [...sourceFiles, ...labInputs]
+    .map((file) => [file, mapChangedFilesToCases([file]).length])
+    .sort((a, b) => b[1] - a[1]);
+
+  assert.ok(
+    worst[0][1] <= ceiling,
+    `"${worst[0][0]}" alone selects ${worst[0][1]} of ${total} frames, over the ${ceiling} ` +
+      'ceiling — some pattern has widened to a whole window'
+  );
+  // The ceiling is discriminating rather than vacuous: it is well under the corpus, and the worst
+  // real file is a real fraction of it rather than a rounding error, so this measures something.
+  assert.ok(ceiling < total, 'the ceiling must be a narrowing');
+  assert.ok(worst[0][1] > 1, 'the worst single file must select more than one frame');
+});
+
+test('a registry change with no usable patch selects surface coverage', () => {
+  const coverage = LAB_SURFACE_CASE_IDS.length;
 
   // No patch at all — including the one-argument call every other caller makes.
-  assert.equal(mapChangedFilesToCases([REGISTRY_PATH]).length, everything);
-  assert.equal(selectedIds([REGISTRY_PATH], {}).length, everything);
-  assert.equal(selectedIds([REGISTRY_PATH], { patches: {} }).length, everything);
+  assert.equal(mapChangedFilesToCases([REGISTRY_PATH]).length, coverage);
+  assert.equal(selectedIds([REGISTRY_PATH], {}).length, coverage);
+  assert.equal(selectedIds([REGISTRY_PATH], { patches: {} }).length, coverage);
 
   const idLine = registryLineOf(`    id: '${FALLBACK_CASE_ID}',`);
   const wrongRevision = registryPatch([idLine]).replace(
@@ -1882,8 +2049,8 @@ test('a registry change with no usable patch selects every publishable case', ()
   ]) {
     assert.equal(
       selectedIds([REGISTRY_PATH], { patches: { [REGISTRY_PATH]: patch } }).length,
-      everything,
-      `${why} must select every frame`
+      coverage,
+      `${why} must select one frame of every surface`
     );
   }
 });
@@ -1915,11 +2082,12 @@ test('ADDING a case to the registry selects that one case', () => {
   assert.deepEqual(selectedIds([REGISTRY_PATH], registryPatches(caseLiteralLines(id))), [id]);
 });
 
-test('a registry change OUTSIDE a case literal selects every publishable case', () => {
-  const everything = publishableCases().length;
+test('a registry change OUTSIDE a case literal selects surface coverage', () => {
+  const coverage = LAB_SURFACE_CASE_IDS.length;
 
   // A shared helper, a pattern constant, the array's own spread of a case factory, and the mapping
-  // function itself. Each can move every frame, and none is inside a case literal.
+  // function itself. Each can move any frame, and none is inside a case literal — so none can be
+  // attributed to a case, and each answers with one frame of every surface.
   for (const line of [
     'function managerCase(entry) {',
     "  'RadioCardGroup',",
@@ -1928,8 +2096,8 @@ test('a registry change OUTSIDE a case literal selects every publishable case', 
   ]) {
     assert.equal(
       selectedIds([REGISTRY_PATH], registryPatches([registryLineOf(line)])).length,
-      everything,
-      `a change to \`${line.trim()}\` must select every frame`
+      coverage,
+      `a change to \`${line.trim()}\` must select one frame of every surface`
     );
   }
 });
@@ -2272,8 +2440,8 @@ test('the SAME edit applied to sibling cases selects exactly those siblings (iss
 test('no recurring window mixes inside-a-region with outside-every-region, so the widening short-circuit has no fixture', () => {
   // The measurement, recorded rather than replaced by an invented fixture. The union rule keeps ONE
   // way to widen on a multi-candidate hunk: a candidate that lands outside every region returns
-  // EVERY_PUBLISHABLE_CASE, and `regionsTouchedByHunk` short-circuits on it ABOVE the union, because
-  // the true edit may be that candidate and code outside a case literal can move every frame.
+  // UNATTRIBUTABLE_REACH, and `regionsTouchedByHunk` short-circuits on it ABOVE the union, because
+  // the true edit may be that candidate and code outside a case literal can move any frame.
   //
   // Reaching that short-circuit needs a window occurring BOTH inside a region and outside every
   // region. NONE of the three region-attributed inputs contains one: not this registry, not
@@ -2283,8 +2451,8 @@ test('no recurring window mixes inside-a-region with outside-every-region, so th
   //
   // All three are measured rather than one, because the claim is about the short-circuit and the
   // short-circuit serves all of them. If this ever fails, that input has grown exactly the fixture
-  // the branch is missing: name it here and assert the answer is the whole corpus, NOT the union of
-  // the regions the other occurrences sit in.
+  // the branch is missing: name it here and assert the answer is that hunk's regions UNIONED with
+  // surface coverage, NOT the union of the regions the other occurrences sit in.
   for (const [where, source, owner] of [
     ['the registry', registrySource, caseIdByLine()],
     [LAB_ACTORS_PATH, labActorsSource, tableNameByLine()],
@@ -2302,8 +2470,8 @@ test('no recurring window mixes inside-a-region with outside-every-region, so th
   }
 });
 
-test('a hunk the selector cannot anchor selects every publishable case', () => {
-  const everything = publishableCases().length;
+test('a hunk the selector cannot anchor selects surface coverage', () => {
+  const coverage = LAB_SURFACE_CASE_IDS.length;
 
   // Every way a hunk can fail to name a unique place in the file that will render. The zero-context
   // hunk is the one worth stating out loud: `-U0` produces a hunk whose body is entirely removals,
@@ -2319,8 +2487,8 @@ test('a hunk the selector cannot anchor selects every publishable case', () => {
   ]) {
     assert.equal(
       selectedIds([REGISTRY_PATH], patchesFor(REGISTRY_PATH, patch)).length,
-      everything,
-      `${why} — that must select every frame`
+      coverage,
+      `${why} — that must select one frame of every surface`
     );
   }
 });
@@ -2806,8 +2974,8 @@ test('KNOWLEDGE_EXTRAS_BY_DESIGN entries are still publishable, still untagged, 
   }
 });
 
-test('a labActors change outside its fixture tables selects every publishable case', () => {
-  const everything = publishableCases().length;
+test('a labActors change outside its fixture tables selects surface coverage', () => {
+  const coverage = LAB_SURFACE_CASE_IDS.length;
 
   // `ACTOR_DEFINITIONS` is deliberately on this side. A name and a portrait are not confined to the
   // surfaces that read an actor's holdings: `ActorSelectTopBar` draws them on every player frame,
@@ -2823,14 +2991,14 @@ test('a labActors change outside its fixture tables selects every publishable ca
   ]) {
     assert.equal(
       selectedIds([LAB_ACTORS_PATH], labActorsPatches([labActorsLineOf(line)])).length,
-      everything,
-      `a change to \`${line.trim()}\` must select every frame`
+      coverage,
+      `a change to \`${line.trim()}\` must select one frame of every surface`
     );
   }
 
   // And with no patch at all, which is how every caller but the capture workflow asks.
-  assert.equal(selectedIds([LAB_ACTORS_PATH]).length, everything);
-  assert.equal(selectedIds([LAB_ACTORS_PATH], { patches: {} }).length, everything);
+  assert.equal(selectedIds([LAB_ACTORS_PATH]).length, coverage);
+  assert.equal(selectedIds([LAB_ACTORS_PATH], { patches: {} }).length, coverage);
 });
 
 test('the four labActors fixture tables the selector keys on still exist under those names', () => {
@@ -3040,8 +3208,8 @@ test('a mount.js patch confined to a player region selects every player frame an
   }
 });
 
-test('a mount.js change outside its player regions selects every publishable case', () => {
-  const everything = publishableCases().length;
+test('a mount.js change outside its player regions selects surface coverage', () => {
+  const coverage = LAB_SURFACE_CASE_IDS.length;
 
   // The first line is the proof that the marking is doing the work rather than the function
   // name: it is a query param inside the SAME `readParams()` the player block sits in, three
@@ -3053,18 +3221,18 @@ test('a mount.js change outside its player regions selects every publishable cas
     'function borrowInstance(AppClass, fields) {',
     '  const services = props.services;',
   ]) {
-    assert.equal(
-      selectedIds([LAB_MOUNT_PATH], labMountPatches([labMountLineOf(line)])).length,
-      everything,
-      `a change to \`${line.trim()}\` must select every frame`
+    assert.deepEqual(
+      selectedIds([LAB_MOUNT_PATH], labMountPatches([labMountLineOf(line)])),
+      [...LAB_SURFACE_CASE_IDS],
+      `a change to \`${line.trim()}\` must select one frame of every surface`
     );
   }
 
   // And with no patch at all, which is how every caller but the capture workflow asks — the
-  // shipped "every lab input the registry cannot attribute still selects every publishable case"
-  // list keeps this path, and this is the same claim stated where the narrowing is explained.
-  assert.equal(selectedIds([LAB_MOUNT_PATH]).length, everything);
-  assert.equal(selectedIds([LAB_MOUNT_PATH], { patches: {} }).length, everything);
+  // shipped "every lab input the registry cannot attribute selects surface coverage" list keeps
+  // this path, and this is the same claim stated where the narrowing is explained.
+  assert.equal(selectedIds([LAB_MOUNT_PATH]).length, coverage);
+  assert.equal(selectedIds([LAB_MOUNT_PATH], { patches: {} }).length, coverage);
 });
 
 test('the four mount.js regions the selector keys on are still marked in the file', () => {
@@ -3082,11 +3250,10 @@ test('the four mount.js regions the selector keys on are still marked in the fil
   );
 
   const opens = labMountSource.filter(
-    (line) => line.trim().startsWith('// view-lab-region:') && line.trim() !== '// view-lab-region:end'
+    (line) =>
+      line.trim().startsWith('// view-lab-region:') && line.trim() !== '// view-lab-region:end'
   ).length;
-  const closes = labMountSource.filter(
-    (line) => line.trim() === '// view-lab-region:end'
-  ).length;
+  const closes = labMountSource.filter((line) => line.trim() === '// view-lab-region:end').length;
   assert.equal(opens, MOUNT_REGION_ANCHORS.length, 'every marked region is a declared region');
   assert.equal(closes, opens, 'every marked region is closed');
 });
@@ -3130,7 +3297,10 @@ test('the player-only readership of the settle-stores region is still a fact abo
   const managerSource = sourceOf(MANAGER_APP_PATH);
   const open = managerSource.indexOf('    return {', managerSource.indexOf('  _buildServices() {'));
   const close = managerSource.indexOf('    };', open);
-  assert.ok(open > 0 && close > open, `${MANAGER_APP_PATH} no longer shapes _buildServices this way`);
+  assert.ok(
+    open > 0 && close > open,
+    `${MANAGER_APP_PATH} no longer shapes _buildServices this way`
+  );
   const serviceKeys = managerSource
     .slice(open + 1, close)
     .map((line) => /^ {6}([A-Za-z_$][\w$]*):/.exec(line)?.[1])
@@ -3194,7 +3364,10 @@ test('parsePlayerMountRegions refuses every shape whose spans would be a guess',
       'a marker naming a region the selector has no predicate for',
       [...wellFormed, ...mountRegionBlock('player-nothing-declares-this')],
     ],
-    ['a region left open', [...wellFormed, ...mountRegionBlock('mount-player-app', { close: false })]],
+    [
+      'a region left open',
+      [...wellFormed, ...mountRegionBlock('mount-player-app', { close: false })],
+    ],
     [
       'a nested opener, which would attribute one block under two keys',
       [
@@ -3285,10 +3458,7 @@ test('the player companion cases photograph the seam through the production regi
   // the driver's console gate. The lab swallows exactly that message, only for a case that asked
   // for a fault — pinned here because a widened prefix would start hiding real errors, and
   // because the message it excuses is the shipped host's, so it is a mirror like any other.
-  const host = readFileSync(
-    resolve(ROOT, 'src/ui/svelte/apps/PlayerExtensionHost.svelte'),
-    'utf8'
-  );
+  const host = readFileSync(resolve(ROOT, 'src/ui/svelte/apps/PlayerExtensionHost.svelte'), 'utf8');
   assert.match(
     mountSource,
     /const EXPECTED_PLAYER_FAULT_REPORT = 'Fabricate \| Player extension mount failed:';/,
@@ -3320,11 +3490,11 @@ test('the player companion cases photograph the seam through the production regi
   assert.match(mountSource, /extensionSurfaces: deriveExtensionSurfaces\(playerExtensions\)/);
 });
 
-test('the capture runner still selects every publishable case, and records that decision', () => {
-  const everything = publishableCases().length;
+test('the capture runner selects surface coverage, and records that decision', () => {
+  const coverage = LAB_SURFACE_CASE_IDS.length;
   const runnerSource = sourceOf(RUNNER_PATH);
 
-  assert.equal(selectedIds([RUNNER_PATH]).length, everything);
+  assert.equal(selectedIds([RUNNER_PATH]).length, coverage);
   // Supplying a patch must not narrow an input nobody has attributed. The patch path is the one
   // that grew, so this is the assertion that it grew only where it was meant to.
   assert.equal(
@@ -3337,14 +3507,14 @@ test('the capture runner still selects every publishable case, and records that 
         ])
       )
     ).length,
-    everything,
+    coverage,
     'the runner is not an attributed input; a patch for it must not narrow anything'
   );
 
   // The decision is a decision, not an omission — so it is written down where the next person to
   // wonder "why is this one not narrowed too?" will read it.
   assert.ok(
-    runnerSource.some((line) => line.includes('SELECTS EVERY PUBLISHABLE CASE')),
+    runnerSource.some((line) => line.includes('SELECTS SURFACE COVERAGE')),
     `${RUNNER_PATH} must record why it is not narrowed from its own diff`
   );
 });

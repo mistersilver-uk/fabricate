@@ -596,16 +596,20 @@ resolution modes, the visibility modes it does not visit, Foundry's light applic
 A `beyond` case carries an empty `smokeLabels`, because there is nothing to compare it against.
 A `window` case's shortfall is accounted for by a class-level entry in the known-gaps register in
 `scripts/README.md`, not by a per-case comment.
-As of this writing the registry holds 181 cases: 138 `exact`, 4 `window`, 39 `beyond`.
+As of this writing the registry holds 243 cases: 146 `exact`, 3 `window`, 94 `beyond`.
 
 A change to the lab's own inputs is attributed rather than treated like an ordinary render-file change.
-By default a PR touching the case registry, `labActors.js`, `labRunStates.js`, or any other file the lab depends on selects every publishable case, because a shared fixture can alter any frame at once.
-Three inputs narrow that default.
+By default a PR touching the case registry, `labActors.js`, `labRunStates.js`, or any other file the lab depends on selects **surface coverage**: one frame of every screen the lab renders — every manager route, every player tab, plus the light-theme pair — which is 33 of the 243 publishable cases.
+A shared input can alter any frame at once, so the selection has to be wide; what it has to PROVE is that the lab still boots, still mounts both windows and still reaches and photographs every screen, and that is what coverage answers.
+It deliberately does not re-photograph every state of every screen: a state is evidence about the files that draw it, those files select it themselves, and 243 frames on every lab-infrastructure PR was a twenty-five minute job producing a wall nobody read.
+Coverage is derived (`LAB_SURFACE_CASES`), never listed, so a screen added tomorrow is covered without anyone remembering; each surface is represented by a default-geometry, dialog-free, least-driven frame of it, which in practice is that screen's own `*-normal` case.
+Where a lab input ships alongside render files, the two selections are unioned — coverage does not contain the detailed frames those files select.
+Three inputs narrow below coverage.
 A patch to `scripts/lib/viewLabCases.js` selects only the case literals its hunks fall inside.
 A patch to `tests/view-lab/world/labActors.js` selects only the cases that can render what the touched fixture table feeds: player cases alone for `INVENTORIES` and `BROKEN_STACKS`, and player cases plus the manager cases whose own `sourceMatches` claim a Knowledge or Books & Scrolls render file for `RECIPE_ITEM_COPIES` and `LEARNED_RECIPES`.
 A patch to `tests/view-lab/world/labRunStates.js` selects player cases alone, and it needs no content-anchoring, since its whole output is player-only.
 The two case-registry and actor-fixture narrowings locate a hunk by searching the rendered file for its own content instead of trusting the hunk header's line numbers, and every location the content recurs at must agree on the same cases before the narrowing is used.
-A patch to anything else in `labActors.js`, such as `ACTOR_DEFINITIONS` or a shared builder function, keeps the whole-corpus default.
+A patch to anything else in `labActors.js`, such as `ACTOR_DEFINITIONS` or a shared builder function, keeps the coverage default.
 So does a patch to any lab input the registry does not attribute, or a hunk whose content cannot be anchored unambiguously.
 
 Steps are ordered and take five verbs: `{selector}` clicks, `{selector, select}` chooses a
