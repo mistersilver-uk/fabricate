@@ -53,11 +53,16 @@ export { FatalMigrationError, isFatalMigrationError } from './migrationErrors.js
 
 /**
  * Compare two semver strings numerically.
+ *
+ * Exported for issue 1224: the Valid Id Basis has to answer "is `migrationVersion` BEHIND
+ * the highest registered migration", and re-implementing this comparison beside the
+ * registry it compares against is how the two drift apart.
+ *
  * @param {string} a
  * @param {string} b
  * @returns {-1|0|1}
  */
-function compareSemver(a, b) {
+export function compareSemver(a, b) {
   const pa = String(a)
     .split('.')
     .map((n) => Number.parseInt(n, 10) || 0);
@@ -503,6 +508,27 @@ const MIGRATIONS = [
   },
   // Future migrations added here in version order
 ];
+
+/**
+ * The highest version in the registry above — the version a fully migrated world's
+ * `migrationVersion` setting holds once a migration pass has completed.
+ *
+ * Derived by comparison rather than read off the last element, so a future entry appended
+ * out of order cannot silently lower the answer. Exported for issue 1224's Valid Id Basis,
+ * which would otherwise hardcode the literal and stop being true the next time a migration
+ * is registered — a hardcoded version that has fallen behind the registry reads as
+ * "migrations current" forever, which is fail-OPEN in exactly the gate that must fail closed.
+ *
+ * @returns {string} a semver string, e.g. `'1.25.0'`.
+ */
+export function getHighestRegisteredMigrationVersion() {
+  let highest = '0.0.0';
+  for (const migration of MIGRATIONS) {
+    const version = String(migration?.version ?? '');
+    if (version !== '' && compareSemver(version, highest) > 0) highest = version;
+  }
+  return highest;
+}
 
 // ---------------------------------------------------------------------------
 // MigrationRunner class

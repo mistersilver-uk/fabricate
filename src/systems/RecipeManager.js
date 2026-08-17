@@ -170,15 +170,19 @@ function readRecipeStorageTarget() {
  *
  * @param {object} options
  * @param {() => Map<string, object>} options.corpus The manager's own recipe map.
+ * @param {string} options.arrangement The arrangement to build FOR, read once by the
+ *   caller so the value the manager records is byte-identical to the one the repository
+ *   was selected by. Reading it twice would let a cross-client flip land between the two
+ *   reads and make the recorded arrangement a lie about the repository that exists.
  * @returns {import('./CraftingDefinitionRepository.js').CraftingDefinitionRepository}
  */
-function buildDefaultRecipeRepository({ corpus }) {
+function buildDefaultRecipeRepository({ corpus, arrangement }) {
   const shared = {
     hydrate: (raw) => Recipe.fromJSON(raw),
     serialize: (recipe) => recipe.toJSON(),
     scopeOf: (recipe) => recipe?.craftingSystemId ?? null,
   };
-  if (readRecipeStorageTarget() === DEFINITION_STORAGE_TARGETS.PER_RECORD) {
+  if (arrangement === DEFINITION_STORAGE_TARGETS.PER_RECORD) {
     return new PerRecordCraftingDefinitionRepository({
       keyPrefix: RECIPE_RECORD_KEY_PREFIX,
       ...shared,
@@ -248,7 +252,38 @@ export class RecipeManager {
     // Which of the two is built is decided ONCE, here, by the recipe Definition Storage
     // Target — see `buildDefaultRecipeRepository`. It reads `singleArray` on every world
     // today, so this construction is byte-for-byte the one it replaced.
-    this._repository = repository ?? buildDefaultRecipeRepository({ corpus: () => this.recipes });
+    //
+    // Issue 1224: the arrangement that decision was made FOR is recorded alongside it,
+    // because it is the only fact about definition storage that is captured BEFORE
+    // `loadAll()` runs. Everything else the Valid Id Basis reads is a setting sampled
+    // after the corpus was already deserialized, and a setting the GM's conversion
+    // flipped in between reads as settled while this client's repository is addressing
+    // the arrangement that no longer exists.
+    //
+    // An INJECTED repository reports `null`: nothing here knows what arrangement a
+    // caller-supplied adapter was built for, and a guess would be a fail-open guess.
+    this._definitionStorageArrangement = repository ? null : readRecipeStorageTarget();
+    this._repository =
+      repository ??
+      buildDefaultRecipeRepository({
+        corpus: () => this.recipes,
+        arrangement: this._definitionStorageArrangement,
+      });
+  }
+
+  /**
+   * The **Definition Storage** arrangement this manager's repository was actually built
+   * for, captured in the constructor (issue 1224).
+   *
+   * This is not a re-read of the Definition Storage Target: it is the value THIS client
+   * committed to when it chose an adapter, which no later read can reproduce once another
+   * client has converted the world. `null` means the arrangement is unknown — an injected
+   * repository — and callers must treat unknown as "not known-complete".
+   *
+   * @returns {string|null} a member of `DEFINITION_STORAGE_TARGETS`, or `null`.
+   */
+  getDefinitionStorageArrangement() {
+    return this._definitionStorageArrangement;
   }
 
   /**
