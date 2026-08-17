@@ -87,38 +87,41 @@ function validateMountedComponentDependencies({ repoRoot, rawModules, runeModule
   }
 }
 
-// Lifecycle functions live on the `svelte` package; everything else a component imports from
-// `svelte` (tick, untrack, …) is only reachable from `svelte/internal/client` once the
-// component is compiled to a client module. The split is by NAME rather than by literal import
-// line: a hand-listed line is a mirror of the component's source text, and adding one name to
-// a component turned every mounted manager test into `# cancelled 348` behind one "does not
-// provide an export named 'onDestroy'" (issue 1185).
-const SVELTE_PACKAGE_EXPORTS = new Set(['onDestroy', 'onMount', 'mount', 'unmount', 'hydrate']);
-
 /**
- * Rewrite a compiled component's imports so they resolve against the temp dir:
- * split a bare `svelte` import list between the package (lifecycle) and the
- * client runtime (everything else), and append `.js` to `.svelte` specifiers
- * (the temp dir holds the compiled `.svelte.js` siblings).
+ * Rewrite a compiled component's imports so they resolve against the temp dir: append `.js`
+ * to `.svelte` specifiers, because the temp dir holds the compiled `.svelte.js` siblings.
+ *
+ * A bare `svelte` import is deliberately LEFT ALONE, and that is the whole of the design. Two
+ * earlier versions of this function rewrote it and both were wrong in the same way:
+ *
+ *   1. `from 'svelte'` -> `from 'svelte/internal/client'` unconditionally. `onDestroy` is not on
+ *      `svelte/internal/client`, so one component adding it took every mounted manager test to
+ *      `# cancelled 348` behind a single "does not provide an export named 'onDestroy'"
+ *      (issue 1185).
+ *   2. The same rewrite with a five-name allowlist routed back to the package. Measured against
+ *      Svelte 5.56.3 under `--conditions=browser`, `svelte` exports 21 names and
+ *      `svelte/internal/client` provides exactly TWO of them — `tick` and `untrack`, and as the
+ *      identical function objects. So `getContext`, `setContext`, `flushSync`,
+ *      `createEventDispatcher` and 14 others were all routed to a module that does not export
+ *      them: issue 1185's failure rebuilt, one import away, in a file ~40 suites share.
+ *
+ * Both failures are LINK errors, thrown while the module graph is being instantiated and before
+ * the suite's first test runs, so `node --test` reports them as `# cancelled N` with `# fail 0`.
+ * A gate reading the fail count sees green. Not rewriting the specifier at all removes the split,
+ * its allowlist and that whole failure mode together: the temp dir symlinks the repo's real
+ * `node_modules`, so bare `svelte` resolves to exactly the module instance the harness itself
+ * loaded, and the compiler already emits its own runtime import as `svelte/internal/client`
+ * directly, which this leaves untouched.
+ *
+ * `tests/components/svelte-component-harness.test.js` pins both halves: that the specifier is
+ * left intact, and — driven off the installed Svelte's own export list, so it cannot go stale —
+ * that whatever specifier a name is routed to really does provide it.
+ *
+ * @param {string} code Compiled client output from `compile()` or `compileModule()`.
+ * @returns {string} The same code with `.svelte` specifiers resolved to their compiled siblings.
  */
 export function rewriteClientImports(code) {
-  return code
-    .replace(/import \{([^}]*)\} from 'svelte';/g, (_match, names) => {
-      const imported = names
-        .split(',')
-        .map((name) => name.trim())
-        .filter(Boolean);
-      const fromPackage = imported.filter((name) => SVELTE_PACKAGE_EXPORTS.has(name));
-      const fromClient = imported.filter((name) => !SVELTE_PACKAGE_EXPORTS.has(name));
-      const lines = [];
-      if (fromPackage.length > 0) lines.push(`import { ${fromPackage.join(', ')} } from "svelte";`);
-      if (fromClient.length > 0) {
-        lines.push(`import { ${fromClient.join(', ')} } from 'svelte/internal/client';`);
-      }
-      return lines.join('\n');
-    })
-    .replace(/from 'svelte';/g, "from 'svelte/internal/client';")
-    .replace(/(from\s+['"][^'"]+\.svelte)(['"])/g, '$1.js$2');
+  return code.replace(/(from\s+['"][^'"]+\.svelte)(['"])/g, '$1.js$2');
 }
 
 /**
