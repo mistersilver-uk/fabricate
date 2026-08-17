@@ -409,6 +409,9 @@
   let railCollapsed = $state(services?.getSetting?.('managerRailCollapsed') === true);
 
   function toggleManagerRail() {
+    // Belt and braces beside the `disabled` attribute, exactly as `toggleRailGroup` does it:
+    // the rail lock (issue 1213) is a rule about state, not about one control.
+    if (railLockedOpen) return;
     railCollapsed = !railCollapsed;
     services?.setSetting?.('managerRailCollapsed', railCollapsed);
   }
@@ -2287,6 +2290,12 @@
   // same list so a rail label and a tab label can never drift apart. Both are triggers for
   // one navigation.
   const downtimeNavItems = $derived(downtimeTabs);
+  // The rail sub-item's element id, stated ONCE and used twice: the rail stamps it, and the
+  // extension host reads it for the companion panel's `aria-labelledby` (issue 1213). With no
+  // tab strip in provider mode the rail item is the only element naming the active screen, so
+  // the panel takes its name from it — and a second literal here and there would be a mirror
+  // across a component boundary with nothing to catch its drift.
+  const downtimeNavItemId = (tabId) => `manager-downtime-nav-${tabId}`;
   // Header actions belong to the active TAB, falling back to the provider's own list; Core
   // keeps its bespoke premium anchor rather than routing it through a public descriptor.
   const downtimeHeaderActions = $derived(
@@ -2538,6 +2547,48 @@
       'FABRICATE.Admin.Manager.Nav.LockedOpen',
       'This section stays open while you are on one of its pages.'
     )
+  );
+  // THE WHOLE RAIL LOCKS OPEN OVER A COMPANION'S DOWNTIME SURFACE (issue 1213).
+  //
+  // MODE-scoped, not route-scoped. Provider mode renders no tab strip, and the 56px rail hides
+  // `.manager-nav-submenu` outright — measured with the strip suppressed, the number of
+  // reachable tab switchers was ZERO. `display: none` also removes them from the accessibility
+  // tree, so a collapsed rail there is a keyboard and screen-reader dead end and not merely a
+  // pointer one. Core's fallback keeps its strip, is never stranded, and therefore keeps its
+  // collapsible rail — which is also what protects the `manager-world-downtime-collapsed`
+  // View Lab frame.
+  //
+  // The lock flips live when a provider registers or deregisters mid-session, so a GM sitting
+  // on this route with a collapsed rail sees it snap open in the same frame as the swap. That
+  // is strand-avoidance working, not a glitch.
+  const railLockedOpen = $derived(isWorldDowntimeRoute && !downtimeCoreFallback);
+  // DISPLAY-ONLY. `railCollapsed` is seeded from and written back to a `client`-scoped setting
+  // — localStorage, per device, surviving reload — so the group lock's template is the WRONG
+  // one here: `toggleRailGroup` resolves its lock by writing intent into `railGroupUserExpanded`,
+  // which is safe only because that map is in-memory. Copying it would mean merely VISITING
+  // World Downtime permanently un-collapses the GM's rail on every other route and in every
+  // future session. Derive what is DISPLAYED instead and leave the stored preference alone, so
+  // leaving the route restores it.
+  const railCollapsedDisplay = $derived(railCollapsed && !railLockedOpen);
+  // Every rail-toggle attribute reads the DISPLAY value, never the stored one. Forcing the rail
+  // open without them gives a GM who arrived collapsed an expanded rail whose control reports
+  // `aria-pressed="true"`, is labelled "Expand navigation rail", points its chevron the wrong
+  // way and does nothing when clicked — the same defect class as issue 1185, in the same widget,
+  // one route over. Stated once here because two scope-card branches render the control.
+  const railToggleLabel = $derived(
+    railCollapsedDisplay
+      ? text('FABRICATE.Admin.Manager.Nav.ExpandRail', 'Expand navigation rail')
+      : text('FABRICATE.Admin.Manager.Nav.CollapseRail', 'Collapse navigation rail')
+  );
+  // Its own string, not the group lock's: `Nav.LockedOpen` is section-worded and wrong for the
+  // whole sidebar.
+  const railToggleTitle = $derived(
+    railLockedOpen
+      ? text('FABRICATE.Admin.Manager.Nav.RailLockedOpen', 'The sidebar stays open on this page.')
+      : railToggleLabel
+  );
+  const railToggleIcon = $derived(
+    railCollapsedDisplay ? 'fas fa-angles-right' : 'fas fa-angles-left'
   );
   // The Knowledge surface's projection is published TOP-LEVEL, never hung off
   // `selectedSystem` (issue 785): hanging it there would force a `selectedSystem`
@@ -8016,7 +8067,7 @@
     </header>
   {/if}
 
-  <div class={`manager-body ${railCollapsed ? 'is-rail-collapsed' : ''}`}>
+  <div class={`manager-body ${railCollapsedDisplay ? 'is-rail-collapsed' : ''}`}>
     <aside
       class="manager-rail"
       aria-label={text('FABRICATE.Admin.Manager.Navigation', 'Crafting manager navigation')}
@@ -8051,19 +8102,14 @@
                 type="button"
                 class="manager-rail-toggle manager-scope-collapse"
                 data-manager-rail-toggle
-                aria-pressed={railCollapsed}
-                aria-label={railCollapsed
-                  ? text('FABRICATE.Admin.Manager.Nav.ExpandRail', 'Expand navigation rail')
-                  : text('FABRICATE.Admin.Manager.Nav.CollapseRail', 'Collapse navigation rail')}
-                title={railCollapsed
-                  ? text('FABRICATE.Admin.Manager.Nav.ExpandRail', 'Expand navigation rail')
-                  : text('FABRICATE.Admin.Manager.Nav.CollapseRail', 'Collapse navigation rail')}
+                aria-pressed={railCollapsedDisplay}
+                aria-label={railToggleLabel}
+                title={railToggleTitle}
+                disabled={railLockedOpen}
+                aria-disabled={railLockedOpen}
                 onclick={toggleManagerRail}
               >
-                <i
-                  class={railCollapsed ? 'fas fa-angles-right' : 'fas fa-angles-left'}
-                  aria-hidden="true"
-                ></i>
+                <i class={railToggleIcon} aria-hidden="true"></i>
               </button>
             </div>
             <select
@@ -8112,19 +8158,14 @@
                 type="button"
                 class="manager-rail-toggle manager-scope-collapse"
                 data-manager-rail-toggle
-                aria-pressed={railCollapsed}
-                aria-label={railCollapsed
-                  ? text('FABRICATE.Admin.Manager.Nav.ExpandRail', 'Expand navigation rail')
-                  : text('FABRICATE.Admin.Manager.Nav.CollapseRail', 'Collapse navigation rail')}
-                title={railCollapsed
-                  ? text('FABRICATE.Admin.Manager.Nav.ExpandRail', 'Expand navigation rail')
-                  : text('FABRICATE.Admin.Manager.Nav.CollapseRail', 'Collapse navigation rail')}
+                aria-pressed={railCollapsedDisplay}
+                aria-label={railToggleLabel}
+                title={railToggleTitle}
+                disabled={railLockedOpen}
+                aria-disabled={railLockedOpen}
                 onclick={toggleManagerRail}
               >
-                <i
-                  class={railCollapsed ? 'fas fa-angles-right' : 'fas fa-angles-left'}
-                  aria-hidden="true"
-                ></i>
+                <i class={railToggleIcon} aria-hidden="true"></i>
               </button>
             </div>
             <h2 class="manager-title">
@@ -8683,7 +8724,7 @@
                   <button
                     type="button"
                     class={`manager-nav-subitem manager-downtime-subitem ${isWorldDowntimeRoute && worldDowntimeTabId === item.id ? 'is-active' : ''}`}
-                    id={`manager-downtime-nav-${item.id}`}
+                    id={downtimeNavItemId(item.id)}
                     data-world-downtime-item={item.id}
                     title={downtimeTabText(item, 'tooltip')}
                     aria-current={isWorldDowntimeRoute && worldDowntimeTabId === item.id
@@ -8734,6 +8775,7 @@
           provider={downtimeProvider}
           tabs={downtimeTabs}
           context={worldDowntimeContext}
+          navItemId={downtimeNavItemId}
           emitHook={managerExtensions?.emitHook}
           onProviderFault={noteDowntimeProviderFault}
         />

@@ -401,10 +401,58 @@ function labDowntimeProvider() {
         icon: 'fas fa-file-signature',
       },
     ],
+    // A companion that OWNS ITS LAYOUT, because that is the state issue 1213's contract is
+    // about and the frame has to be able to show it. The old stand-in mounted a short padded
+    // div, which renders identically in a 689px target and a 528px one — so the frame could
+    // not distinguish the panel handing over its whole height from the panel not doing so.
+    //
+    // Full height, its own inset, a VISIBLE EDGE and its own scroller between a pinned header
+    // and a pinned footer: the footer sitting on the bottom edge is the part that is only
+    // reachable when the target really is the pane's whole content box.
     mount({ target: mountTarget, tabId }) {
-      const panel = mountTarget.ownerDocument.createElement('div');
-      panel.style.padding = '20px';
-      panel.textContent = `Downtime Studio — ${tabId}`;
+      const doc = mountTarget.ownerDocument;
+      const element = (tag, cssText, textContent) => {
+        const node = doc.createElement(tag);
+        node.style.cssText = cssText;
+        if (textContent !== undefined) node.textContent = textContent;
+        return node;
+      };
+
+      const panel = element(
+        'div',
+        'height:100%;min-height:0;display:flex;flex-direction:column;gap:12px;' +
+          'padding:16px;border:2px dashed var(--fab-accent);border-radius:12px;' +
+          'background:var(--fab-bg-2)'
+      );
+      panel.append(
+        element(
+          'h2',
+          'flex:0 0 auto;margin:0;font-size:14px',
+          `Downtime Studio — ${tabId}`
+        )
+      );
+      const scroller = element(
+        'div',
+        'flex:1 1 auto;min-height:0;overflow:auto;display:flex;flex-direction:column;gap:8px'
+      );
+      scroller.dataset.labCompanionScroll = '';
+      for (let row = 1; row <= 16; row += 1) {
+        scroller.append(
+          element(
+            'p',
+            'flex:0 0 auto;margin:0;padding:10px 12px;border-radius:8px;background:var(--fab-bg-1)',
+            `Standing order ${row} — the companion owns this scroller, not Core.`
+          )
+        );
+      }
+      panel.append(scroller);
+      panel.append(
+        element(
+          'p',
+          'flex:0 0 auto;margin:0;color:var(--fab-text-subtle);font-size:11px',
+          'Pinned footer — on the panel’s bottom edge only if the target is full height.'
+        )
+      );
       mountTarget.append(panel);
       return () => panel.remove();
     },

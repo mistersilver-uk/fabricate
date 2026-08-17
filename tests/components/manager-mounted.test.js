@@ -888,9 +888,16 @@ async function settleDowntimeProvider() {
   flushSync();
 }
 
-// The three reads every Downtime seam case makes, named once. The tab strip and the rail
-// are two renderings of ONE tab list, so a case that only checked one of them would pass
-// through the exact drift the single list exists to prevent.
+// The three reads every Downtime seam case makes, named once.
+//
+// `downtimeTabIds` is CORE-FALLBACK ONLY (issue 1213). It reads the preview's tab strip, and
+// provider mode no longer renders one: a companion's tabs are the rail's Downtime sub-items
+// and nothing else. The anti-drift invariant this pair was written for (issue 1185) — "two
+// renderings of ONE tab list, so a case that only checked one would pass through the exact
+// drift the single list exists to prevent" — therefore now applies to core-fallback alone.
+// In provider mode `downtimeRailIds()` is the ONLY rendering, so it is the one to assert, and
+// a provider-mode case that navigates must click `#manager-downtime-nav-<id>` rather than
+// `[data-downtime-tab="<id>"]`, which resolves to nothing there.
 function downtimeTabIds() {
   return Array.from(target.querySelectorAll('[data-downtime-tab]')).map(
     (tab) => tab.dataset.downtimeTab
@@ -14249,7 +14256,7 @@ describe('CraftingSystemManager mounted behavior', () => {
       'an installed companion never inherits the Core fallback lock treatment'
     );
 
-    target.querySelector('[data-downtime-tab="activities"]').click();
+    target.querySelector('#manager-downtime-nav-activities').click();
     await tick();
     flushSync();
     assert.deepEqual(cleanups, ['tracking']);
@@ -14270,6 +14277,115 @@ describe('CraftingSystemManager mounted behavior', () => {
       target.querySelector('[data-downtime-tab="activities"]'),
       'provider removal returns a focused companion panel to its active Core tab'
     );
+  });
+
+  // The OTHER direction, and the one issue 1213 breaks (the test above covers deregister,
+  // which still resolves because the `{#if coreFallback}` branch still renders the strip).
+  // Registering a provider removes the strip, so `#world-downtime-tab-<id>` — the id the
+  // recovery used to ask for unconditionally — resolves to nothing, optional chaining
+  // swallows it, and focus silently drops to `<body>`. The rail sub-item is not a descendant
+  // of the host's own `shell`, so no id scheme on the rail could have fixed it either.
+  it('recovers focus onto the companion panel when a provider registers under a focused Core tab', async () => {
+    const registry = createManagerExtensionsRegistry();
+    mountManager([], {}, {}, { managerExtensions: registry });
+    worldNavItem('downtime').click();
+    await settleRouteExit();
+
+    const coreTab = target.querySelector('[data-downtime-tab="tracking"]');
+    coreTab.focus();
+    assert.ok(
+      document.activeElement === coreTab,
+      'pre-condition: focus is inside the host, on the Core tab the swap is about to remove'
+    );
+
+    registry.publicApi.registerWorldNavProvider(downtimeProvider());
+    await settleDowntimeProvider();
+    await settleDowntimeProvider();
+
+    const region = target.querySelector('#world-downtime-panel-tracking');
+    assert.ok(Boolean(region), 'the companion panel region replaced the Core preview panel');
+    assert.ok(
+      document.activeElement === region,
+      'focus lands on the named region, not on the document body'
+    );
+  });
+
+  // Issue 1213, decision 3. Removing the strip strands a GM at a 56px rail: `.manager-nav-submenu`
+  // is `display: none` there, so with no strip the number of reachable tab switchers is zero —
+  // and `display: none` takes them out of the accessibility tree too, so it is a keyboard and
+  // screen-reader dead end rather than a pointer inconvenience.
+  it('locks the rail open in provider mode only, and never writes the stored collapse preference', async () => {
+    useShippedLocalization();
+    const registry = createManagerExtensionsRegistry();
+    const settingWrites = [];
+    mountManager(
+      [],
+      {},
+      {
+        getSetting: (key) => key === 'managerRailCollapsed',
+        setSetting: (key, value) => settingWrites.push([key, value]),
+      },
+      { managerExtensions: registry }
+    );
+
+    const isCollapsed = () =>
+      target.querySelector('.manager-body').classList.contains('is-rail-collapsed');
+    const railToggle = () => target.querySelector('[data-manager-rail-toggle]');
+    const railWrites = () => settingWrites.filter(([key]) => key === 'managerRailCollapsed');
+
+    assert.ok(isCollapsed(), 'pre-condition: this GM stored a collapsed rail');
+
+    // MODE-scoped, half one: a provider registered while the GM is elsewhere locks nothing.
+    const unregister = registry.publicApi.registerWorldNavProvider(downtimeProvider());
+    await settleDowntimeProvider();
+    assert.ok(isCollapsed(), 'a companion on another route leaves the rail alone');
+    assert.equal(railToggle().disabled, false);
+
+    worldNavItem('downtime').click();
+    await settleRouteExit();
+
+    assert.ok(!isCollapsed(), 'arriving on the companion surface displays the rail expanded');
+    assert.ok(
+      Boolean(target.querySelector('[data-world-downtime-submenu]')),
+      'which is the whole point — the sub-items are the only way to the other screens'
+    );
+    assert.equal(railToggle().disabled, true, 'and the collapse control is genuinely disabled');
+    assert.equal(railToggle().getAttribute('aria-disabled'), 'true');
+    assert.equal(
+      railToggle().getAttribute('aria-pressed'),
+      'false',
+      'every attribute reads the DISPLAYED state, not the stored one'
+    );
+    assert.equal(
+      railToggle().getAttribute('aria-label'),
+      shippedString('FABRICATE.Admin.Manager.Nav.CollapseRail')
+    );
+    assert.equal(
+      railToggle().getAttribute('title'),
+      shippedString('FABRICATE.Admin.Manager.Nav.RailLockedOpen'),
+      'the title explains the lock, and it is sidebar-worded rather than the section string'
+    );
+    assert.ok(
+      Boolean(railToggle().querySelector('.fa-angles-left')),
+      'the chevron points the way the control would actually move'
+    );
+
+    railToggle().click();
+    await settleDowntimeProvider();
+    assert.ok(!isCollapsed(), 'the locked control is inert rather than merely styled');
+    assert.deepEqual(railWrites(), [], 'and the lock writes no client preference at all');
+
+    // MODE-scoped, half two: Core's fallback keeps its strip, so it is never stranded and
+    // keeps its collapsible rail — on this very route.
+    unregister();
+    await settleDowntimeProvider();
+    assert.ok(isCollapsed(), 'losing the companion returns the route to the stored collapse');
+    assert.equal(railToggle().disabled, false);
+
+    worldNavItem('parties').click();
+    await settleRouteExit();
+    assert.ok(isCollapsed(), 'and the stored preference survived the whole visit');
+    assert.deepEqual(railWrites(), []);
   });
 
   // Issue 1185 — where the premium signal LIVES. In the free module the title bar's badge
@@ -14527,7 +14643,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     );
   });
 
-  it('renders a provider-declared tab set of any size in the rail and the tab strip', async () => {
+  it('renders a provider-declared tab set of any size in the rail, and renders no tab strip', async () => {
     const registry = createManagerExtensionsRegistry();
     registry.publicApi.registerWorldNavProvider(
       downtimeProvider({ prefix: 'Guild', ids: ['ledger', 'crew'] })
@@ -14537,14 +14653,32 @@ describe('CraftingSystemManager mounted behavior', () => {
     await settleRouteExit();
 
     assert.deepEqual(
-      downtimeTabIds(),
-      ['ledger', 'crew'],
-      'the tab strip renders the provider set, in the provider order'
-    );
-    assert.deepEqual(
       downtimeRailIds(),
       ['ledger', 'crew'],
-      'the rail renders the same set from the same list — one navigation, two triggers'
+      'the rail renders the provider set, in the provider order'
+    );
+    // Issue 1213 — the strip is Core's preview navigation and is not rendered over a
+    // companion's screens, so a provider's tab set is drawn EXACTLY ONCE.
+    assert.deepEqual(
+      downtimeTabIds(),
+      [],
+      'a companion navigates from the rail alone: no second rendering of its own tab list'
+    );
+    assert.ok(
+      !target.querySelector('[data-downtime-tablist]'),
+      'and no orphan tablist survives the strip'
+    );
+    const region = target.querySelector('#world-downtime-panel-ledger');
+    assert.equal(region.getAttribute('role'), 'region', 'a tabpanel with no tablist is an orphan');
+    assert.equal(
+      region.getAttribute('aria-labelledby'),
+      'manager-downtime-nav-ledger',
+      'so the panel takes its name from the rail item that navigates to it'
+    );
+    assert.equal(
+      region.getAttribute('tabindex'),
+      '-1',
+      'programmatically focusable for provider-swap recovery, but not a tab stop that scrolls nothing'
     );
     assert.deepEqual(
       Array.from(target.querySelectorAll('[data-world-downtime-item] .manager-nav-label')).map(
@@ -14632,9 +14766,9 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.equal(selected[0].actionId, 'post');
     assert.equal(selected[0].tabId, 'ledger', 'an action is told which tab invoked it');
 
-    target.querySelector('[data-downtime-tab="crew"]').click();
+    target.querySelector('#manager-downtime-nav-crew').click();
     await settleDowntimeProvider();
-    assert.equal(managerTitle(), 'crew title', 'chrome is per tab, and follows the tab strip');
+    assert.equal(managerTitle(), 'crew title', 'chrome is per tab, and follows the rail item');
     assert.equal(managerSubtitle(), 'crew subtitle');
     const guide = target.querySelector('[data-manager-header-action="guide"]');
     assert.equal(guide.tagName, 'A');
@@ -14656,7 +14790,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     mountManager([], {}, {}, { managerExtensions: registry });
     worldNavItem('downtime').click();
     await settleRouteExit();
-    target.querySelector('[data-downtime-tab="beta"]').click();
+    target.querySelector('#manager-downtime-nav-beta').click();
     await settleDowntimeProvider();
     assert.equal(activeCompanionPanel().dataset.downtimeExtensionPanel, 'beta');
 
@@ -14665,8 +14799,8 @@ describe('CraftingSystemManager mounted behavior', () => {
       downtimeProvider({ prefix: 'Second', ids: ['gamma', 'delta', 'epsilon'] })
     );
     await settleDowntimeProvider();
-    assert.deepEqual(downtimeTabIds(), ['gamma', 'delta', 'epsilon']);
     assert.deepEqual(downtimeRailIds(), ['gamma', 'delta', 'epsilon']);
+    assert.deepEqual(downtimeTabIds(), [], 'and still no second rendering of the new set');
     assert.equal(
       activeCompanionPanel().dataset.downtimeExtensionPanel,
       'gamma',
@@ -14693,7 +14827,8 @@ describe('CraftingSystemManager mounted behavior', () => {
     mountManager([], {}, {}, { managerExtensions: registry });
     worldNavItem('downtime').click();
     await settleRouteExit();
-    assert.deepEqual(downtimeTabIds(), ['ledger', 'crew']);
+    assert.deepEqual(downtimeRailIds(), ['ledger', 'crew']);
+    assert.deepEqual(downtimeTabIds(), [], 'the companion holds the surface, so Core draws no strip');
 
     unregisterProvider();
     await settleDowntimeProvider();

@@ -607,7 +607,7 @@ describe('CraftingSystemManager source contract', () => {
       'data-manager-view={currentView}',
       'class="manager-header"',
       'class="manager-breadcrumbs"',
-      "class={`manager-body ${railCollapsed ? 'is-rail-collapsed' : ''}`}",
+      "class={`manager-body ${railCollapsedDisplay ? 'is-rail-collapsed' : ''}`}",
       'class="manager-rail"',
       'class="manager-inspector"',
       'ComponentsBrowserView',
@@ -3304,17 +3304,42 @@ describe('CraftingSystemManager source contract', () => {
       rootSource.includes("services?.setSetting?.('managerRailCollapsed', railCollapsed);"),
       'toggling the rail should persist managerRailCollapsed through the setSetting seam'
     );
+    // The DISPLAY value, never the stored one (issue 1213). `railCollapsed` is the GM's
+    // persisted client preference and stays authoritative for what is written back; what the
+    // body renders is `railCollapsed && !railLockedOpen`, so the Downtime rail lock can force
+    // the sidebar open without permanently un-collapsing the rail on every other route.
     assert.ok(
-      rootSource.includes("class={`manager-body ${railCollapsed ? 'is-rail-collapsed' : ''}`}"),
-      'manager-body should bind the is-rail-collapsed modifier from rail state'
+      rootSource.includes(
+        "class={`manager-body ${railCollapsedDisplay ? 'is-rail-collapsed' : ''}`}"
+      ),
+      'manager-body should bind the is-rail-collapsed modifier from the displayed rail state'
+    );
+    assert.ok(
+      rootSource.includes(
+        'const railCollapsedDisplay = $derived(railCollapsed && !railLockedOpen);'
+      ),
+      'and the displayed state must be DERIVED, never written back over the stored preference'
     );
     assert.ok(
       rootSource.includes('class="manager-rail-toggle manager-scope-collapse"'),
       'the scope-card header should render the shared collapse/expand control'
     );
     assert.ok(
-      rootSource.includes('aria-pressed={railCollapsed}'),
-      'rail toggle should expose aria-pressed reflecting collapsed state'
+      rootSource.includes('aria-pressed={railCollapsedDisplay}'),
+      'rail toggle should expose aria-pressed reflecting the DISPLAYED collapsed state'
+    );
+    // Under the Downtime rail lock the control is genuinely disabled and early-returns, so a
+    // GM arriving with a collapsed rail cannot be shown an expanded one by a control that
+    // still reports "Expand" and does nothing (issue 1213, the issue 1185 defect class).
+    assert.ok(
+      rootSource.includes('disabled={railLockedOpen}') &&
+        rootSource.includes('aria-disabled={railLockedOpen}'),
+      'the rail toggle must be inert under the lock, not merely overridden'
+    );
+    assert.match(
+      rootSource,
+      /function toggleManagerRail\(\)\s*\{[\s\S]{0,400}?if \(railLockedOpen\) return;/,
+      'and the handler early-returns, so a programmatic call obeys the lock too'
     );
     assert.ok(
       rootSource.includes('FABRICATE.Admin.Manager.Nav.CollapseRail') &&

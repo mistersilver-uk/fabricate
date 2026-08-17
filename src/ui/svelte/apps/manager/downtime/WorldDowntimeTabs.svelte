@@ -1,9 +1,12 @@
 <script>
   import { localize } from '../../../util/foundryBridge.js';
 
-  let { tabs = [], activeTabId = 'tracking', onSelect = () => {}, coreFallback = false } = $props();
-
-  const tabText = (tab, field) => (coreFallback ? localize(tab[field]) : tab[field]);
+  // CORE-FALLBACK ONLY (issue 1213). This strip is the preview's own navigation and nothing
+  // else: a registered provider's tabs are the Manager rail's Downtime sub-items, so provider
+  // mode renders no strip at all. That is why there is no `coreFallback` prop any more, why
+  // every label goes through `localize` — Core's four are lang keys, a provider's labels are
+  // final display text this component never sees — and why the padlocks are unconditional.
+  let { tabs = [], activeTabId = 'tracking', onSelect = () => {} } = $props();
 
   function activate(tab, button) {
     onSelect(tab.id);
@@ -27,18 +30,16 @@
   }
 </script>
 
-<div class:core-fallback={coreFallback} class="downtime-tab-card">
-  {#if coreFallback}
-    <div class="downtime-connected-studio" data-downtime-connected-studio>
-      <span class="downtime-connected-icon" aria-hidden="true">
-        <i class="fas fa-diagram-project"></i>
-      </span>
-      <div>
-        <strong>{localize('FABRICATE.Admin.Manager.World.Downtime.ConnectedTitle')}</strong>
-        <p>{localize('FABRICATE.Admin.Manager.World.Downtime.ConnectedDescription')}</p>
-      </div>
+<div class="downtime-tab-card">
+  <div class="downtime-connected-studio" data-downtime-connected-studio>
+    <span class="downtime-connected-icon" aria-hidden="true">
+      <i class="fas fa-diagram-project"></i>
+    </span>
+    <div>
+      <strong>{localize('FABRICATE.Admin.Manager.World.Downtime.ConnectedTitle')}</strong>
+      <p>{localize('FABRICATE.Admin.Manager.World.Downtime.ConnectedDescription')}</p>
     </div>
-  {/if}
+  </div>
   <div
     class="downtime-tabs"
     role="tablist"
@@ -54,7 +55,7 @@
           class:is-active={activeTabId === tab.id}
           aria-selected={activeTabId === tab.id}
           aria-controls={`world-downtime-panel-${tab.id}`}
-          aria-label={tabText(tab, 'accessibleName')}
+          aria-label={localize(tab.accessibleName)}
           aria-describedby={`world-downtime-tooltip-${tab.id}`}
           tabindex={activeTabId === tab.id ? 0 : -1}
           data-downtime-tab={tab.id}
@@ -62,16 +63,14 @@
           onkeydown={(event) => onKeydown(event, index)}
         >
           <i class={tab.icon} aria-hidden="true"></i>
-          <span>{tabText(tab, 'label')}</span>
-          {#if coreFallback}
-            <i class="fas fa-lock downtime-tab-lock" aria-hidden="true"></i>
-          {/if}
+          <span>{localize(tab.label)}</span>
+          <i class="fas fa-lock downtime-tab-lock" aria-hidden="true"></i>
         </button>
         <span
           id={`world-downtime-tooltip-${tab.id}`}
           class="downtime-tab-tooltip"
           role="tooltip"
-          data-downtime-tooltip={tab.id}>{tabText(tab, 'tooltip')}</span
+          data-downtime-tooltip={tab.id}>{localize(tab.tooltip)}</span
         >
       </div>
     {/each}
@@ -79,31 +78,26 @@
 </div>
 
 <style>
-  /* The host states no inset of its own, so each of its two rows carries its own — see the
-     note in `WorldDowntimeExtensionHost`. A companion's strip is the FIRST row and needs no
-     bottom gutter; Core's connected card is the LAST and does.
+  /* The host states no inset of its own, so each of its rows carries its own — see the note
+     in `WorldDowntimeExtensionHost`. This card is the preview's LAST row and needs a bottom
+     gutter.
 
      `position: relative` makes the CARD the tooltip's containing block rather than the tab
-     it belongs to, which is what bounds a tooltip to the pane. See the tooltip note below. */
+     it belongs to, which is what bounds a tooltip to the pane. See the tooltip note below.
+
+     The connected-studio card is a ROW: identity on the left, the tab strip at the right end,
+     both centred against each other. It reads completely differently as a column — every
+     padding, radius and colour can match while the card says something else — which is why
+     the parity spec measures `display`/`flex-direction`/`align-items` here at all. */
   .downtime-tab-card {
     position: relative;
-    min-width: 0;
-    margin: 14px 20px 0;
-  }
-
-  /*
-    The connected-studio card is a ROW: identity on the left, the tab strip at the right end,
-    both centred against each other. It reads completely differently as a column — every
-    padding, radius and colour can match while the card says something else — which is why
-    the parity spec measures `display`/`flex-direction`/`align-items` here at all.
-  */
-  .downtime-tab-card.core-fallback {
     display: flex;
     container-type: inline-size;
     align-items: center;
     flex-direction: row;
     flex-wrap: wrap;
     gap: 14px;
+    min-width: 0;
     margin: 14px 20px 20px;
     padding: 13px 14px;
     border: 1px solid var(--fab-border-strong);
@@ -208,8 +202,8 @@
     overflows horizontally`. Anchoring to the card's right edge with `max-width: 100%` makes
     overflow unrepresentable rather than merely unlikely at the width somebody measured.
 
-    It sits ABOVE the card in Core's fallback, where the card is the pane's last row, and
-    BELOW it when a companion owns the surface and the strip is the first row instead.
+    It sits ABOVE the card: this strip only ever renders in Core's fallback, where the card is
+    the pane's last row.
   */
   .downtime-tab-tooltip {
     position: absolute;
@@ -228,12 +222,6 @@
     opacity: 0;
     pointer-events: none;
     translate: 0 3px;
-  }
-
-  .downtime-tab-card:not(.core-fallback) .downtime-tab-tooltip {
-    top: calc(100% + 7px);
-    bottom: auto;
-    translate: 0 -3px;
   }
 
   .downtime-tab-wrap:hover .downtime-tab-tooltip,
