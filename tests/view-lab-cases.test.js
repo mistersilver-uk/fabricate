@@ -2882,8 +2882,8 @@ test('a deletion-only hunk inside a case literal selects that case, not the fall
 // `labActors.js`, attributed by fixture table (issue 1049).
 //
 // Narrowed on the axis that IS derivable — which fixture table a diff is confined to, and which
-// cases render actor-owned data at all — and NOT per actor. Only three of 181 cases name an actor
-// id; every player frame draws the whole roster through `ComponentSourcesBar` and computes its
+// cases render actor-owned data at all — and NOT per actor. Only three cases in the whole registry
+// name an actor id; every player frame draws the whole roster through `ComponentSourcesBar` and computes its
 // listings from all three inventories, so a per-actor list would be hand-maintained work wearing
 // derived clothing, and its wrong answers would be silent.
 // ───────────────────────────────────────────────────────────────────────────────────────────────

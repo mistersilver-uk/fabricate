@@ -187,7 +187,7 @@ function fallbackCaseIdLine() {
  *
  * The `+` line carries the file's CURRENT text because case attribution anchors on the window's
  * CONTENT rather than on the hunk header's line numbers — a patch built from invented text would
- * fail to anchor and widen back to the whole corpus, which is the answer this fixture must not get.
+ * fail to anchor and widen to surface coverage, which is the answer this fixture must not get.
  *
  * @param {number} line The 1-based line to mark as added.
  * @returns {string} The patch.
@@ -298,7 +298,8 @@ function neverConcludingRun(queuedPolls) {
 }
 
 /** A body whose Screenshots section holds a drag-and-dropped GitHub attachment. */
-const HUMAN_PASTED_BODY = '## Screenshots\n\n![a screenshot](https://github.test/attachments/9f3a)\n';
+const HUMAN_PASTED_BODY =
+  '## Screenshots\n\n![a screenshot](https://github.test/attachments/9f3a)\n';
 
 /**
  * Assert a verdict failed with a given code, quoting the message when it did not.
@@ -611,10 +612,7 @@ describe('decideScreenshotGate', () => {
     });
     const published = bodyWithBlock();
     const gh = makeGhFake({
-      runs: (state) => [
-        inFlight(state.runListCalls === 0 ? 'in_progress' : 'completed'),
-        finished,
-      ],
+      runs: (state) => [inFlight(state.runListCalls === 0 ? 'in_progress' : 'completed'), finished],
       body: (state) => (state.runListCalls >= 2 ? published : ''),
     });
     const clock = makeGateClock({ start: 0, step: 1_000 });
@@ -705,7 +703,9 @@ describe('decideScreenshotGate', () => {
     const gh = makeGhFake({
       runs: (state) => {
         if (state.runListCalls < queuedFor) {
-          return [workflowRun({ status: 'queued', conclusion: null, runStartedAt: atClock(60_000) })];
+          return [
+            workflowRun({ status: 'queued', conclusion: null, runStartedAt: atClock(60_000) }),
+          ];
         }
         if (state.runListCalls === queuedFor) {
           return [
@@ -858,7 +858,8 @@ describe('decideScreenshotGate', () => {
   it('(u) does not accept an image outside a Screenshots section', async () => {
     const gh = makeGhFake({});
     const clock = makeGateClock({});
-    const body = 'A description with an inline diagram.\n\n![diagram](https://example.test/d.png)\n';
+    const body =
+      'A description with an inline diagram.\n\n![diagram](https://example.test/d.png)\n';
 
     const decision = await decide({ gh, clock, body, captureEligible: false });
 
@@ -909,7 +910,11 @@ describe('decideScreenshotGate', () => {
     });
 
     assertFailedWith(decision, GATE_CODES.NO_FRAMES_FOR_THIS_HEAD);
-    assert.match(decision.message, new RegExp(`head ${HEAD}\\b`), 'the head must be named, not empty');
+    assert.match(
+      decision.message,
+      new RegExp(`head ${HEAD}\\b`),
+      'the head must be named, not empty'
+    );
     assert.equal(gh.calls.length, 0);
   });
 
@@ -1266,8 +1271,8 @@ describe('the check command adapter', () => {
     // `--patches-file` is the only input that changes WHICH frames count as evidence, and an
     // adapter that read the file and passed `undefined` was invisible: every other case here
     // changes files whose selection is patch-independent. A registry change with a patch confined
-    // to one case selects that case; without the patch it selects the whole corpus, which
-    // accepts any frame at all.
+    // to one case selects that case; without the patch it widens to surface coverage, which shares
+    // no frame with that one case.
     const patches = { [REGISTRY_PATH]: registryPatchAddingLine(fallbackCaseIdLine()) };
     // The registry ships BESIDE a render file, because the registry alone does not arm this gate —
     // and that is the realistic shape anyway: a case is added in the same push as the view it draws.
@@ -1539,7 +1544,10 @@ describe('the check command adapter', () => {
 
 test('the published key discriminator anchors on the PR number, not on a hex-looking segment', () => {
   assert.deepEqual(
-    classifyPublishedFrameUrl('https://cdn.test/pr-screenshots/1133/deadbeef/manager-tools.png', 1133),
+    classifyPublishedFrameUrl(
+      'https://cdn.test/pr-screenshots/1133/deadbeef/manager-tools.png',
+      1133
+    ),
     { caseId: 'manager-tools', headSha: 'deadbeef' }
   );
   assert.deepEqual(

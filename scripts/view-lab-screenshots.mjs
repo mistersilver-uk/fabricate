@@ -13,9 +13,8 @@
  * renders, not one region of it — and that is a decision rather than an oversight (issue 1049).
  * Three of the lab's other inputs are narrowed from their own diff — the case registry per case
  * literal, `labActors.js` per fixture table, `mount.js` per marked region — and the obvious next
- * move is to narrow this one too, on the
- * grounds that argument parsing and the step vocabulary cannot change a pixel while the render path
- * can. That distinction is not drawable from a diff of this module. `runSteps`' verb table,
+ * move is to narrow this one too, on the grounds that argument parsing and the step vocabulary
+ * cannot change a pixel while the render path can. That distinction is not drawable from a diff of this module. `runSteps`' verb table,
  * `assertViewportFits`, the console-error gate, the readiness wait and the `frame.screenshot()`
  * call are interleaved here, and `commandApps` reads `process.argv` and drives the render in the
  * same function — so a region map over this file would have to cut through the middle of a
