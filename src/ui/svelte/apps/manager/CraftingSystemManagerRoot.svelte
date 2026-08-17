@@ -2590,6 +2590,33 @@
   const railToggleIcon = $derived(
     railCollapsedDisplay ? 'fas fa-angles-right' : 'fas fa-angles-left'
   );
+  // ...AND ON ARRIVAL THE SUB-ITEMS HAVE TO BE ON SCREEN, not merely rendered (issue 1213).
+  // The lock only fixed `display: none`; it did nothing about scroll position. `.manager-nav`
+  // is `overflow: hidden auto` and the Downtime group is the LAST row in it, so at 1330x900
+  // entering the route left `Downtime` as the last visible line with every companion screen
+  // below the rail's fold.
+  //
+  // This route is the ONLY one that is entered by clicking the group PARENT — every other
+  // group is entered by clicking a sub-item that was already on screen, which cannot land
+  // out of view. Provider mode is also the only place it matters: Core's fallback still
+  // renders the tab strip, which was the visible switcher in exactly this state.
+  //
+  // `block: 'nearest'` is a no-op once the sub-items already fit, so nothing else moves.
+  let downtimeSubmenu = $state(null);
+  // A plain local, deliberately not `$state`: it records what has already been DONE so the
+  // effect can tell an arrival from a re-run, and making it reactive would make the effect
+  // its own dependency.
+  let downtimeSubmenuRevealed = false;
+  $effect(() => {
+    const submenu = downtimeSubmenu;
+    if (!railLockedOpen || !submenu) {
+      downtimeSubmenuRevealed = false;
+      return;
+    }
+    if (downtimeSubmenuRevealed) return;
+    downtimeSubmenuRevealed = true;
+    submenu.scrollIntoView?.({ block: 'nearest' });
+  });
   // The Knowledge surface's projection is published TOP-LEVEL, never hung off
   // `selectedSystem` (issue 785): hanging it there would force a `selectedSystem`
   // reference rebuild on every knowledge publish and let a late phase-2 publish
@@ -8714,6 +8741,7 @@
               <div
                 class="manager-nav-submenu"
                 id="manager-downtime-submenu"
+                bind:this={downtimeSubmenu}
                 data-world-downtime-submenu
                 aria-label={text(
                   'FABRICATE.Admin.Manager.World.Downtime.NavSections',

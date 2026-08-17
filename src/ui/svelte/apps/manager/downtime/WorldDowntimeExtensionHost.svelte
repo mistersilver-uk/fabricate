@@ -103,16 +103,26 @@
   // order, and in core-fallback the preview panels carry that same panel id AND sit before the
   // strip, so the combined query would silently move Core's landing place off its tab button.
   // Ask which mode is live instead.
+  //
+  // The MODE is captured now and the TAB is read later, and the split is deliberate. The mode
+  // belongs to the swap this recovery is for, so snapshotting it is the point. `activeTabId`
+  // does not: the shell normalizes it onto the new provider's tab set, and for a disjoint tab
+  // set that normalization can land after this effect. Reading it inside the `tick()` keeps
+  // the id the one that will actually be rendered rather than one this effect happened to see
+  // first, which is what the pre-1213 code did and what building the whole selector up here
+  // would have quietly given away.
   $effect(() => {
     // Track the swap this recovery belongs to.
     void provider;
     const fallbackNow = coreFallback;
     if (!recoverFocus) return;
     recoverFocus = false;
-    const selector = fallbackNow
-      ? `#world-downtime-tab-${activeTabId}`
-      : `#world-downtime-panel-${activeTabId}`;
-    tick().then(() => shell?.querySelector?.(selector)?.focus?.());
+    tick().then(() => {
+      const selector = fallbackNow
+        ? `#world-downtime-tab-${activeTabId}`
+        : `#world-downtime-panel-${activeTabId}`;
+      shell?.querySelector?.(selector)?.focus?.();
+    });
   });
 
   $effect(() => {

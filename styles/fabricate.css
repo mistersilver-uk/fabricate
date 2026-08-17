@@ -2071,10 +2071,26 @@
   cursor: pointer;
 }
 
-.fabricate-manager .manager-rail-toggle:hover {
+/* `:not(:disabled)` is load-bearing rather than tidy, exactly as it is on `.manager-nav-toggle`
+   below: the whole rail is locked open over a companion's Downtime surface (issue 1213) and
+   renders this control genuinely disabled, and a hover treatment on a control that cannot act
+   is the same lie the silently-swallowed click used to tell. */
+.fabricate-manager .manager-rail-toggle:not(:disabled):hover {
   color: var(--fab-mv2-text);
   border-color: var(--fab-mv2-border-strong);
   background: var(--fab-overlay-light-06);
+}
+
+/* The locked sidebar. It keeps `pointer-events` so the `Nav.RailLockedOpen` title explaining
+   WHY it cannot collapse still surfaces on hover — the same deliberate exception the group
+   disclosure makes, and the counter-example is `.manager-scope-return.is-disabled`, which has
+   no reason to convey and can afford `pointer-events: none`. */
+.fabricate-manager .manager-rail-toggle:disabled {
+  color: var(--fab-mv2-text-muted);
+  border-color: var(--fab-mv2-border);
+  background: transparent;
+  opacity: 0.45;
+  cursor: default;
 }
 
 .fabricate-manager .manager-rail-toggle:focus-visible {
