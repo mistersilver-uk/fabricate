@@ -628,8 +628,11 @@ export class AlchemyListingBuilder {
       const option = options[0];
       if (option?.match && option.match.type !== 'component') return null;
       const componentId = this._optionComponentId(option);
-      if (!componentId || components.every((candidate) => !(candidate.id === componentId)))
-        return null;
+      // An EXISTENCE test, not a projection — but still a full library walk per group per
+      // revealed recipe (`recipes x groups x components`), and it stayed on that footing
+      // longer than its neighbours only because it is spelled `.every(c => !(c.id === id))`
+      // rather than `.find(...)` and so was invisible to the site sweep (issue 1202).
+      if (!componentId || !findById(getDefinitionIndex(components), componentId)) return null;
       const quantity = Math.max(1, Number(option?.quantity) || 1);
       multiset[componentId] = (multiset[componentId] || 0) + quantity;
     }

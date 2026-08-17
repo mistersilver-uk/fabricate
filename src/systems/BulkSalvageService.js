@@ -108,22 +108,34 @@ function firstFinite(...values) {
 /**
  * The tools that BROKE during one salvage, as plain `{ name, img }` chat entries.
  *
- * Mirrors `CraftingEngine._resolveBrokenToolChatEntries`, against the run record
- * rather than the live breakage evidence, because that evidence never leaves the
- * engine: `salvage()` returns tool information only through `salvageRun.usedTools`.
- * On the RUNLESS path (`salvageRun === null`) there is therefore no tool evidence at
- * all and this correctly yields nothing — a stated limit of the aggregate card, not a
- * silent one.
+ * Reads the run record rather than the live breakage evidence, because that evidence
+ * never leaves the engine: `salvage()` returns tool information only through
+ * `salvageRun.usedTools`. On the RUNLESS path (`salvageRun === null`) there is therefore
+ * no tool evidence at all and this correctly yields nothing — a stated limit of the
+ * aggregate card, not a silent one.
+ *
+ * ## What it shares with the per-item card, and what it does NOT
+ *
+ * It answers the same QUESTION as `CraftingEngine._resolveBrokenToolChatEntries` — which
+ * tools broke, as `{ name, img }` — from the same broken-only filter. It is not a mirror
+ * of that function and must not be described as one:
+ *
+ * - it resolves `record.componentId` only, where the engine also resolves `record.toolId`
+ *   against `system.tools` (issue 1119) so an item-sourced Tool is named rather than blank;
+ * - it does not de-duplicate, where the engine skips a repeated
+ *   `toolId || componentId || itemUuid`;
+ * - on a DUPLICATED component id the two now disagree. This one is FIRST-wins, because
+ *   that is what `findById` reproduces and what every other component lookup in the
+ *   codebase does. The engine's `new Map(...)` is last-wins by accident of construction
+ *   — it is a whole-array transform run once, correctly out of scope for issue 1202, and
+ *   deliberately left alone.
+ *
+ * ## Why the index (issue 1202)
  *
  * This ran once per bulk ROW and built its own whole-library `Map` before looking at the
  * run record at all, so an N-row run over an M-component library paid `N x M` to answer a
- * question that is almost always "no tools broke" (issue 1202). The retained index is
- * built once for the array and only consulted when there IS a broken record.
- *
- * The lookup is also now FIRST-wins on a duplicated component id rather than last-wins,
- * because that is what `findById` reproduces and what every other component lookup in the
- * codebase does; the previous `new Map(...)` was uniquely last-wins by accident of
- * construction, not by design.
+ * question that is almost always "no tools broke". The retained index is built once for
+ * the array and only consulted when there IS a broken record.
  */
 function brokenToolEntries(salvageRun, system) {
   const broken = (salvageRun?.usedTools || []).filter((record) => record?.broken === true);
