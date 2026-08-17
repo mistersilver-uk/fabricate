@@ -890,6 +890,51 @@ describe('every call verifies what came back', () => {
     assert.match(String(reported[0][1]?.message ?? ''), /create returned 0 of 1 documents/);
   });
 
+  it('propagates a FALSY thrown value from the body, identity preserved', async () => {
+    // Gating on the error VALUE rather than on whether one was thrown makes `throw null`
+    // resolve successfully — a failed batch reported as a success. That defect shipped in
+    // this PR once and was caught by review rather than by this suite, which is exactly why
+    // it needs a test: the reverted form leaves every other assertion here green.
+    const host = new SettingHost();
+    const repository = makeRepository(host);
+
+    for (const thrown of [null, undefined, 0, '', false, Number.NaN]) {
+      await assert.rejects(
+        repository.runBatch(async () => {
+          await repository.put(recipe('r1'));
+          throw thrown;
+        }),
+        (error) => Object.is(error, thrown),
+        `a body throwing ${String(thrown)} must reject with that exact value`
+      );
+    }
+  });
+
+  it('propagates a FALSY flush failure when the body succeeded', async () => {
+    // The other leg. `if (flushError) throw flushError` swallows a falsy rejection and the
+    // batch resolves with storage behind memory — the same failure the success-path test
+    // above guards, wearing a value that reads as false.
+    const host = new SettingHost();
+    const repository = makeRepository(host, {
+      documentClass: () => ({
+        ...host.documentClass,
+        // eslint-disable-next-line no-throw-literal -- the point of the test is a falsy throw
+        createDocuments: async () => {
+          throw null;
+        },
+      }),
+    });
+
+    await assert.rejects(
+      repository.runBatch(async () => {
+        await repository.put(recipe('r1'));
+        return 'the body succeeded';
+      }),
+      (error) => Object.is(error, null),
+      'a falsy flush rejection must still reject the batch'
+    );
+  });
+
   it('rejects when the body SUCCEEDS and only the mandated flush fails', async () => {
     // The other half of the pair above, and the one that had no test. While the flush lived
     // inside a `finally`, its rejection propagated as a language guarantee. Moving it out —

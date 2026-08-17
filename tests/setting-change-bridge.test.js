@@ -530,8 +530,19 @@ describe('main.js settings hook wiring (issue 1080 -b)', () => {
     // Pinned as the PROPERTY the bridge is handed, not as the identifier appearing
     // somewhere in the file. A bare `\brecipeRefresh\b` is satisfied by the comment above
     // the declaration, so it stays green with the coalescer wired to nothing at all.
+    // Scoped to the factory AND line-anchored. The two constraints fix different holes and
+    // an earlier form had one each: `[^}]*` spanned comments inside the literal, so a
+    // deleted property with a comment mentioning it stayed green; a bare line anchor over
+    // the whole file stopped proving the property is in the factory at all, so relocating
+    // it elsewhere stayed green. Slicing first, then anchoring, closes both.
+    const targetsStart = mainSource.indexOf('const fabricateSettingChangeTargets = () => ({');
+    assert.ok(targetsStart > -1, 'the targets factory is still present');
+    const targetsBody = mainSource.slice(
+      targetsStart,
+      mainSource.indexOf('});', targetsStart) + 3
+    );
     assert.match(
-      mainSource,
+      targetsBody,
       /^\s+recipeRefresh,?\s*$/m,
       'every leg must actually hand the coalescer to the bridge'
     );
