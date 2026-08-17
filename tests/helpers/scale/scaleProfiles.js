@@ -7,19 +7,21 @@
  * excluded from timed regions" enforceable rather than aspirational — the runner builds the
  * fixture, stops, and only then starts the clock.
  *
- * ## The two axes, and why they are separate profiles
+ * ## The three axes, and why they are separate profiles
  *
- * Every profile except `held-inventory` scales the CORPUS and holds inventory at a token 20
- * stacks. `held-inventory` does the exact opposite: it pins the corpus at 20 recipes and
- * varies held stacks across 100 / 500 / 1,000 against the full 5,000-component library. That
- * separation is the whole point — a profile that grew both together could not attribute a
- * regression to either, and the field failure this programme exists to fix was an
- * inventory-axis failure that every corpus-shaped criterion would have reported as green.
+ * The corpus-axis profiles scale the CORPUS and hold inventory at a token 20 stacks.
+ * `held-inventory` does the exact opposite: it pins the corpus at 20 recipes and varies held
+ * stacks across 100 / 500 / 1,000 against the full 5,000-component library. `component-library`
+ * (issue 1204) pins BOTH and varies the library across 1,000 / 5,000 / 10,000. That separation
+ * is the whole point — a profile that grew two axes together could not attribute a regression
+ * to either, and the field failure this programme exists to fix was an inventory-axis failure
+ * that every corpus-shaped criterion would have reported as green. The library axis arrived
+ * last, and {@link COMPONENT_LIBRARY_SERIES} records why.
  *
  * ## Declared measurement ceilings
  *
- * Three profiles are deliberately smaller than the epic's target scale, and each one is
- * bounded for a reason that is recorded on the profile itself so a baseline reader does not
+ * Four profiles bound an axis rather than running it at the epic's target scale, and each one
+ * is bounded for a reason that is recorded on the profile itself so a baseline reader does not
  * have to guess:
  *
  * - `alchemy-signatures` is capped at 2,000 enabled signatures, not 5,000.
@@ -36,6 +38,11 @@
  *   5,000 components it costs ~137 ms PER RECIPE, so a 10,000-recipe player open at full
  *   inventory is a ~23-minute measurement. Six rows is enough to show the series — the counts
  *   are still nine figures — and keeps the drift test's re-derivation inside `npm test`.
+ * - `component-library` pins the corpus at 6 and the inventory at 1,000 stacks for the same
+ *   reason one level across: it varies the library and must vary nothing else, and a case that
+ *   moved a second axis could not attribute a count to either. Its library goes ABOVE the
+ *   epic's 5,000 target rather than below it, because the point of the profile is the SLOPE and
+ *   a third point past the target is what fixes one.
  *
  * The corpus axis for the SAME path lives on `simple-corpus` as its own 25 / 50 / 100 row
  * series against a token 20-stack inventory. Two orthogonal series over one code path is what
@@ -69,6 +76,61 @@ export const HARNESS_VERSION = 2;
 
 /** A token inventory for the corpus-axis profiles: present, but never the thing being varied. */
 const CORPUS_AXIS_STACKS = 20;
+
+/**
+ * THE COMPONENT-LIBRARY AXIS (issue 1204): the library sizes `component-library` sweeps.
+ *
+ * The third axis, and until #1204 the one no committed case varied. `held-inventory` varies
+ * items against a pinned 5,000-component library and `simple-corpus` varies recipes against the
+ * same pinned library, so both hold `components` constant — which means the listing half of
+ * #1070's "not proportional to `items x components`" rested on a pinned equality at ONE library
+ * size rather than on a series. Two series over one path is what turns
+ * `cost = a*components + b*items` from an assertion into two readable slopes.
+ * @type {readonly number[]}
+ */
+export const COMPONENT_LIBRARY_SERIES = Object.freeze([1000, 5000, 10_000]);
+
+/** Held stacks pinned across the component-library sweep — `held-inventory`'s top series point. */
+const COMPONENT_LIBRARY_HELD_STACKS = 1000;
+
+/** Recipes pinned across the component-library sweep, matching `held-inventory`'s pinned corpus. */
+const COMPONENT_LIBRARY_RECIPES = 6;
+
+/**
+ * Assert that a library PREFIX is closed under its own component references.
+ *
+ * `buildComponentLibrary` gives every fourth component a salvage result naming
+ * `c-((index + 1) % count)`, where `count` is the size the library was BUILT at. A prefix of
+ * that library therefore dangles a salvage reference whenever its last component is
+ * salvage-enabled, and a dangling reference resolves to no component in the inventory
+ * listing's by-id library map — a per-series-point behavioural difference with nothing to do
+ * with library size, which is precisely what a controlled series must not contain.
+ *
+ * Today's series bounds cannot produce one (every bound is a multiple of 4, so every prefix
+ * ends on an index congruent to 3 and salvage is enabled only on multiples of 4). This makes
+ * that a checked property rather than an arithmetic coincidence a later edit to
+ * {@link COMPONENT_LIBRARY_SERIES} could silently break.
+ *
+ * @param {object[]} prefix
+ * @returns {object[]} `prefix`, so it can be used inline.
+ */
+function libraryPrefixClosedUnderSalvage(prefix) {
+  const present = new Set(prefix.map((entry) => entry.id));
+  for (const entry of prefix) {
+    for (const group of entry.salvage?.resultGroups ?? []) {
+      for (const result of group.results ?? []) {
+        if (present.has(result.componentId)) continue;
+        throw new Error(
+          `component-library: the ${prefix.length}-component prefix dangles salvage result ` +
+            `"${result.componentId}" from "${entry.id}". Every series point must be closed ` +
+            `under its own component references, or the points differ by more than size. ` +
+            `Choose series bounds that are multiples of 4.`
+        );
+      }
+    }
+  }
+  return prefix;
+}
 
 function baseSystem({ systemId, components, tools, overrides = {} }) {
   return {
@@ -406,6 +468,78 @@ export const SCALE_PROFILES = Object.freeze({
       };
     },
   },
+
+  'component-library': {
+    description:
+      'THE COMPONENT-LIBRARY AXIS. 1,000 / 5,000 / 10,000 components as nested prefixes of ONE ' +
+      'library, against a pinned 1,000-stack inventory (70% resolving to NO component) and a ' +
+      'pinned 6-recipe corpus.',
+    construction: 'literal payloads; the listing cases hydrate the pinned 6-recipe corpus',
+    requiresNodeModules: false,
+    ceiling:
+      'The inventory is pinned at 1,000 stacks and the corpus at 6 recipes BY DESIGN: this ' +
+      'profile varies the library and nothing else, and its counterpart axes are held-inventory ' +
+      '(items, pinned library) and simple-corpus (recipes, pinned library). Reading the three ' +
+      'together is what makes cost = a*components + b*items two independent slopes rather than ' +
+      'one aggregate number. Bounded at 10,000 components because the point is the SLOPE, and a ' +
+      'third point already fixes it.',
+    scale: {
+      // The library the series is SLICED FROM, which is the largest series point. Declared
+      // under the same key every other profile uses so `benchmark-harness.test.js`'s
+      // "honours its declared scale" check covers this profile too rather than skipping it.
+      components: COMPONENT_LIBRARY_SERIES.at(-1),
+      componentSeries: [...COMPONENT_LIBRARY_SERIES],
+      recipes: COMPONENT_LIBRARY_RECIPES,
+      heldStacks: COMPONENT_LIBRARY_HELD_STACKS,
+      unmatchedRatio: 0.7,
+      sourceActorCount: 2,
+    },
+    build(random) {
+      // ONE library, sliced into NESTED prefixes, rather than three independently generated
+      // libraries. Independent libraries would draw different essences and tags at the same
+      // index — so `c-5` would not be the same component at 1,000 and at 10,000 — and a count
+      // that moved across the series could then be blamed on content rather than on size. A
+      // prefix makes the 1,000-component world literally a sub-library of the 10,000-component
+      // one, which is the same discipline held-inventory applies to its inventory series.
+      const components = buildComponentLibrary({
+        count: COMPONENT_LIBRARY_SERIES.at(-1),
+        random,
+        systemId: BENCH_SYSTEM_ID,
+      });
+      const componentSeries = COMPONENT_LIBRARY_SERIES.map((count) =>
+        libraryPrefixClosedUnderSalvage(components.slice(0, count))
+      );
+      // Corpus and inventory are drawn against the SMALLEST prefix, so every authored
+      // ingredient and every matched stack exists — identically — at every point of the series.
+      // Drawn against the full library they would reference components the smaller points do
+      // not contain, and the series would measure recipe solvability as well as library size.
+      const smallest = componentSeries[0];
+      const recipes = buildRecipeCorpus({
+        shape: 'simple',
+        count: COMPONENT_LIBRARY_RECIPES,
+        systemId: BENCH_SYSTEM_ID,
+        components: smallest,
+        random,
+      });
+      const inventory = buildHeldInventory({
+        stacks: COMPONENT_LIBRARY_HELD_STACKS,
+        components: smallest,
+        systemId: BENCH_SYSTEM_ID,
+        random,
+        sourceActorCount: 2,
+      });
+      return {
+        system: baseSystem({ systemId: BENCH_SYSTEM_ID, components, tools: [] }),
+        components,
+        tools: [],
+        recipes,
+        inventory,
+        // The series a case selects its library from. The committed `components` checksum
+        // covers every point, because every point is a prefix of the array it is taken over.
+        componentSeries,
+      };
+    },
+  },
 });
 
 /** Every registered profile name, in a stable order. */
@@ -420,7 +554,8 @@ export const SCALE_PROFILE_NAMES = Object.freeze(Object.keys(SCALE_PROFILES));
  * @returns {{profile: string, seed: number, harnessVersion: number, description: string,
  *   construction: string, requiresNodeModules: boolean, ceiling: string|null,
  *   scale: object, system: object, components: object[], tools: object[], recipes: object[],
- *   inventory: object, inventorySeries?: object[], graphs?: object}}
+ *   inventory: object, inventorySeries?: object[], componentSeries?: object[][],
+ *   graphs?: object}}
  */
 export function buildScaleFixture({ profile, seed = DEFAULT_SEED }) {
   const definition = SCALE_PROFILES[profile];
