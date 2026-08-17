@@ -20,7 +20,7 @@
  *
  * ## Declared measurement ceilings
  *
- * Four profiles bound an axis rather than running it at the epic's target scale, and each one
+ * Five profiles bound an axis rather than running it at the epic's target scale, and each one
  * is bounded for a reason that is recorded on the profile itself so a baseline reader does not
  * have to guess:
  *
@@ -38,6 +38,11 @@
  *   5,000 components it costs ~137 ms PER RECIPE, so a 10,000-recipe player open at full
  *   inventory is a ~23-minute measurement. Six rows is enough to show the series — the counts
  *   are still nine figures — and keeps the drift test's re-derivation inside `npm test`.
+ * - `alchemy-knowledge` bounds BOTH its corpus and its inventory, at 500 recipes and 200
+ *   stacks. Every other profile bounds one axis so the other can be read as a slope; this one
+ *   deliberately does not, because the term it records is the PRODUCT of the two and a profile
+ *   that pinned either could not contain it. Its counterpart single-axis series are
+ *   `alchemy-signatures` (recipes, no held books) and `held-inventory` (items, no alchemy).
  * - `component-library` pins the corpus at 6 and the inventory at 1,000 stacks for the same
  *   reason one level across: it varies the library and must vary nothing else, and a case that
  *   moved a second axis could not attribute a count to either. Its library goes ABOVE the
@@ -364,6 +369,101 @@ export const SCALE_PROFILES = Object.freeze({
           overrides: {
             resolutionMode: 'alchemy',
             alchemy: { enabled: true, learnOnCraft: false },
+          },
+        }),
+        components,
+        tools: [],
+        recipes,
+        inventory,
+      };
+    },
+  },
+
+  'alchemy-knowledge': {
+    description:
+      'THE ALCHEMY REVEAL PATH. 500 book-gated alchemy signatures in `item` visibility mode, ' +
+      'across 8 books (half held) and a 200-stack inventory, with 100 recipes brew-discovered ' +
+      'so the workbench actually PROJECTS revealed rows.',
+    construction:
+      'literal payloads — neither case reads a `Recipe` method, and hydrating would fold ' +
+      'constructor cost into a number that is about the reveal gate',
+    requiresNodeModules: false,
+    ceiling:
+      'Bounded at 500 recipes and 200 held stacks, and the two together are the point rather ' +
+      'than a compromise: the term this profile exists to record is the PRODUCT recipes x ' +
+      'items, so both axes have to be non-trivial at once and neither may be large. Before ' +
+      'issue 1228 the workbench evaluated reveal for every recipe TWICE (chooser summary plus ' +
+      'the active panel) with no snapshot, so it walked the whole inventory 2N times; at these ' +
+      'bounds that is already six figures of offered documents, which is enough for a ' +
+      'reintroduction to move the committed count by orders of magnitude.',
+    scale: {
+      components: 500,
+      recipes: 500,
+      books: 8,
+      heldStacks: 200,
+      learnedRecipes: 100,
+      collidingRecipes: 50,
+      sourceActorCount: 2,
+    },
+    build(random) {
+      const components = buildComponentLibrary({
+        count: 500,
+        random,
+        systemId: BENCH_SYSTEM_ID,
+      });
+      const bookCount = 8;
+      const recipes = buildRecipeCorpus({
+        shape: 'alchemy',
+        count: 500,
+        systemId: BENCH_SYSTEM_ID,
+        components,
+        random,
+        shapeOptions: { collidingCount: 50 },
+      });
+      // Half the books are held and 100 recipes are brew-discovered, so BOTH reveal branches
+      // run for real. The held half is what makes the item branch reach the candidate walk;
+      // the learned slice is what makes `_projectLearnedRecipe` run at all. Issue 1217 records
+      // that `alchemy-signatures` has neither, which is why its `alchemyListing.buildListing`
+      // case projects zero rows and cannot see this path.
+      const inventory = buildHeldInventory({
+        stacks: 200,
+        components,
+        systemId: BENCH_SYSTEM_ID,
+        random,
+        sourceActorCount: 2,
+        bookUuids: Array.from({ length: bookCount / 2 }, (_unused, index) =>
+          recipeItemSourceUuid(BENCH_SYSTEM_ID, index)
+        ),
+        learnedRecipeIds: recipes.slice(0, 100).map((recipe) => recipe.id),
+      });
+      return {
+        system: baseSystem({
+          systemId: BENCH_SYSTEM_ID,
+          components,
+          tools: [],
+          overrides: {
+            resolutionMode: 'alchemy',
+            // `learnOnCraft` ON so the seeded `learnedRecipes` flag reveals its slice: a brew
+            // discovery is unioned across every mode, and with it OFF the learned recipes
+            // would be inert and the projection unmeasured again.
+            alchemy: { enabled: true, learnOnCraft: true, checkMode: 'none' },
+            // The ONE mode that consults held inventory. `global` and `knowledge` both answer
+            // reveal from the learned flag and never reach the candidate walk.
+            visibilityMode: 'item',
+            // Membership on the canonical `recipeIds[]` basis (issue 511), which needs the
+            // marker set — with it unset membership falls back to the recipe's legacy scalar,
+            // which this corpus does not carry, and every recipe would resolve to no book.
+            membershipResolvesByRecipeIds: true,
+            recipeItemDefinitions: Array.from({ length: bookCount }, (_unused, index) => ({
+              id: `${BENCH_SYSTEM_ID}-book-${index}`,
+              name: `Bench Grimoire ${index}`,
+              originItemUuid: recipeItemSourceUuid(BENCH_SYSTEM_ID, index),
+              aliasItemUuids: [],
+              caps: {},
+              recipeIds: recipes
+                .filter((_recipe, recipeIndex) => recipeIndex % bookCount === index)
+                .map((recipe) => recipe.id),
+            })),
           },
         }),
         components,

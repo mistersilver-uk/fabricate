@@ -286,6 +286,20 @@ export const CRAFTING_APP_RAW_MODULES = Object.freeze([
   'src/systems/itemStackQuantity.js',
   'src/config/stackQuantityPathPresets.js',
   'src/utils/objectPath.js',
+  // Same rule, issue 1228: the builder no longer calls `buildInventorySnapshot` directly. It
+  // builds the ONE shared pass snapshot, which owns the recipe-item matcher so that no call
+  // site can build a snapshot missing it — the collaborator whose absence is SILENT. These
+  // four entries are that factory's whole new closure: passInventorySnapshot -> sourceUuid
+  // (+ inventorySnapshot, flags and itemStackQuantity, already listed above), and sourceUuid
+  // -> definitionIndex -> sourceReferenceUnion.
+  //
+  // The component RESOLVER stays injected and is deliberately absent here: importing it would
+  // add essenceResolver + componentNameMatch on top, which is the matcher graph the builder's
+  // own constructor documentation records as the reason that half is injected.
+  'src/systems/passInventorySnapshot.js',
+  'src/utils/sourceUuid.js',
+  'src/utils/definitionIndex.js',
+  'src/utils/sourceReferenceUnion.js',
   // CraftingListingBuilder imports these category helpers (issue 514); the builder
   // is already in the mounted graph, so this transitive dep must be copied too or
   // the mounted crafting tests hang (# cancelled). recipeCategories.js has no

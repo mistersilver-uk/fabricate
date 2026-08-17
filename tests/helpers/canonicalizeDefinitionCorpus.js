@@ -74,6 +74,17 @@
  *    as if it were identity. Deciding it only where an id can be minted is what keeps the
  *    rule about identity.
  *
+ *    COLLECTION is restricted that way; SUBSTITUTION is not. A minted id is recorded only at
+ *    a {@link MINTING_KEYS} position, but once recorded it is substituted wherever the same
+ *    string recurs — which is what makes a reference resolve to its target. The rule is
+ *    therefore complete only while a minted id is always serialized at its own `id` key
+ *    ALONGSIDE the references to it: a minted-shaped value appearing ONLY at a non-`id` key
+ *    would never be collected and would be emitted verbatim, i.e. non-deterministically.
+ *    Two facts make that unreachable, and `tests/canonical-definition-corpus.test.js` pins
+ *    BOTH by scanning `src/models/`, because either one alone leaves the rule half-guarded:
+ *    every `randomID()` call site assigns to `id`, and no `*_OMITTED_WHEN_DEFAULT`
+ *    serialization table makes `id` omittable, so the defining occurrence is always emitted.
+ *
  *    Two migrations also mint `crypto.randomUUID()` values on the load path
  *    (`migrateEssencesToIngredientGroups.js` for a converted essence group,
  *    `migrateLegacyResolutionModes.js` for a rebuilt result group). Provenance covers them
@@ -90,6 +101,14 @@
  *    `metadata` block is domain data and is compared in full — a conversion that drops one
  *    still reddens.
  *
+ *    That match is corpus-GLOBAL and STRUCTURAL: the stored blocks are collected from
+ *    anywhere in `storedRecords`, so a block that was in fact stamped at hydrate is compared
+ *    in full rather than replaced whenever it happens to structurally equal a stored block on
+ *    some OTHER record. Reaching it needs a frozen clock and a `game.user.name` equal to the
+ *    stored author, so it is effectively test-only; and it fails toward comparing MORE than
+ *    the rule intends, which reddens spuriously rather than passing falsely. Narrowing the
+ *    match to the record it was read from is the fix if a real corpus ever hits it.
+ *
  *    That is the only clock- or environment-derived default in the model layer;
  *    `tests/canonical-definition-corpus.test.js` pins the set of `Date.now()` and
  *    `randomID()` hydrate defaults under `src/models/` so a new one cannot be added without
@@ -104,6 +123,28 @@
  * refused, but the returned form carries `provenance: 'shape' | 'stored'` so a form built
  * under one mode cannot be compared with a form built under the other without the JSON
  * differing loudly on the first field.
+ *
+ * ## Omitting bytes is permitted; supplying bytes that describe nothing is REFUSED
+ *
+ * Those two are not the same mistake and are deliberately not treated the same way.
+ *
+ * A caller that OMITS `storedRecords` (or passes `null`) has said it holds no bytes, and gets
+ * the degraded mode, stamped `provenance: 'shape'` so nobody can mistake it for the other
+ * one. A caller that SUPPLIES bytes has asserted those bytes are what the corpus was
+ * hydrated from, and the `'stored'` stamp attests to that. Empty or unrelated bytes break the
+ * assertion while still earning the stamp: with no stored strings, EVERY `CORE_ID_PATTERN`
+ * string at an `id` key classifies as hydrate-minted, so the whole identity graph collapses
+ * to `minted-NNNN` placeholders, rule 2's imposed order is gone (no record has an authored
+ * key), and two corpora that differ by real identity loss compare EQUAL under a reassuring
+ * `provenance: 'stored'`. That is the exact failure this form exists to prevent: deterministic
+ * because it discards everything.
+ *
+ * It is reachable by ordinary sequencing rather than by carelessness. Once a forward
+ * conversion has retired the pre-conversion setting, `ClientSettings#get` serves the
+ * registered `[]` default silently, so "read the pre-conversion bytes" run at the wrong point
+ * in an acceptance yields `storedRecords: []` and a comparison that measures nothing.
+ * {@link canonicalizeDefinitionCorpus} therefore throws in that case, in the same spirit as
+ * {@link _refuseMintedKey}: a quietly wrong form is worse than no form.
  *
  * ## Id churn: the stated position
  *
@@ -140,7 +181,8 @@
  * - **2** (issue 1233) — rule 4 becomes provenance-based and covers `foundry.utils.randomID()`
  *   minting; rule 5 (hydrate-stamped `metadata`) added; rule 2 no longer sorts on a minted
  *   record id; `provenance` added to the emitted form; a minted id used as an object KEY is
- *   now refused rather than silently non-deterministic.
+ *   now refused rather than silently non-deterministic, as are supplied `storedRecords` that
+ *   cannot describe the corpus.
  */
 
 /**
@@ -389,6 +431,39 @@ function _authoredRecordKey(record, isMinted) {
 }
 
 /**
+ * Refuse SUPPLIED `storedRecords` that cannot describe the corpus they are supplied for.
+ *
+ * The check is "no record's own id is authored" rather than "the byte set is empty", because
+ * the two failures that matter — an empty payload and a payload read from the wrong key or
+ * the wrong world — both land there, and both leave every id in the corpus classified as
+ * hydrate-minted. An empty string set is called out separately in the message only because it
+ * names a different mistake than a mismatched one.
+ *
+ * OMITTING `storedRecords` is not this case and is not refused: it selects the documented
+ * degraded `provenance: 'shape'` mode, which a hand-built literal corpus with no hydration
+ * behind it legitimately wants. An EMPTY corpus is not this case either — there is nothing
+ * for the bytes to describe, so `canonicalizeDefinitionCorpus([], {storedRecords: []})` is
+ * consistent rather than undescriptive.
+ *
+ * @param {{key: string|null}[]} entries Prepared records with their authored sort keys.
+ * @param {{strings: Set<string>}|null} storedIdentity
+ */
+function _refuseUndescriptiveStoredIdentity(entries, storedIdentity) {
+  if (!storedIdentity || entries.length === 0) return;
+  if (storedIdentity.strings.size > 0 && entries.some((entry) => entry.key !== null)) return;
+  throw new Error(
+    'canonicalizeDefinitionCorpus: storedRecords was supplied but describes none of the ' +
+      `${entries.length} record(s) in the corpus — it holds ${storedIdentity.strings.size} ` +
+      'string(s), and no record own-id appears among them. The usual cause is reading the ' +
+      'stored bytes AFTER the conversion under test has already run, at which point the ' +
+      'pre-conversion setting is gone and ClientSettings#get serves its registered [] default. ' +
+      'Canonicalizing under those bytes would classify EVERY id as hydrate-minted, so real ' +
+      'identity loss would compare equal under a provenance: "stored" stamp. Read the bytes ' +
+      'before the conversion, or omit storedRecords to select the degraded "shape" mode.'
+  );
+}
+
+/**
  * @param {{key: string|null, index: number}} left
  * @param {{key: string|null, index: number}} right
  * @returns {number}
@@ -415,13 +490,18 @@ function _byRecordOrder(left, right) {
  * @param {any} [options.storedRecords] The payload `records` was hydrated FROM, as it came
  *   out of storage and BEFORE any model constructor ran (`JSON.parse` the raw setting value
  *   if you hold bytes). This is what separates authored identity from hydrate-minted
- *   identity; omitting it selects the degraded `provenance: 'shape'` mode, which is not
- *   deterministic over a corpus the model layer mints ids or stamps `metadata` for.
+ *   identity; omitting it (or passing `null`) selects the degraded `provenance: 'shape'`
+ *   mode, which is not deterministic over a corpus the model layer mints ids or stamps
+ *   `metadata` for. SUPPLYING bytes that describe none of `records` — an empty payload, or
+ *   one read from the wrong key — is REFUSED rather than stamped `'stored'`; see
+ *   {@link _refuseUndescriptiveStoredIdentity}.
  * @param {boolean} [options.treatNullAsAbsent=false] Conflate `null` with an absent key.
  *   Off by default; see the module documentation for what turning it on hides.
  * @returns {{ version: number, provenance: string, records: object[] }} The canonical form,
  *   version- and provenance-stamped so two sides cannot be compared under different rules
  *   without noticing.
+ * @throws {Error} When `storedRecords` is supplied but cannot describe a non-empty `records`,
+ *   or when hydrate-minted identity is used as an object key.
  */
 export function canonicalizeDefinitionCorpus(records, options = {}) {
   const {
@@ -433,13 +513,12 @@ export function canonicalizeDefinitionCorpus(records, options = {}) {
   const storedIdentity = _buildStoredIdentity(storedRecords);
   const isMinted = _mintedIdentityPredicate(storedIdentity);
 
-  const ordered = [...records]
-    .map((record, index) => {
-      const prepared = normalizeRecord(record);
-      return { record: prepared, index, key: _authoredRecordKey(prepared, isMinted) };
-    })
-    .sort(_byRecordOrder)
-    .map((entry) => entry.record);
+  const prepared = [...records].map((record, index) => {
+    const normalized = normalizeRecord(record);
+    return { record: normalized, index, key: _authoredRecordKey(normalized, isMinted) };
+  });
+  _refuseUndescriptiveStoredIdentity(prepared, storedIdentity);
+  const ordered = prepared.sort(_byRecordOrder).map((entry) => entry.record);
 
   const minted = new Map();
   for (const record of ordered) _collectMintedIds(record, minted, isMinted);

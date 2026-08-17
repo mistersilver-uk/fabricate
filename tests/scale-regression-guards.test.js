@@ -47,14 +47,23 @@ import {
 } from './helpers/scale/scaleProbes.js';
 import {
   makeActor,
+  makeBookGatedRecipe,
+  makeBookGatedSystem,
+  makeBookHoldingActor,
   makeCraftingSystem,
   makeListingRecipe,
   makeSignatureRecipe,
   makeSystemManager,
+  scaleBookUuid,
 } from './helpers/scale/scaleGuardFixtures.js';
 
 installFoundryEnv();
 
+const { AlchemyListingBuilder } = await import('../src/systems/AlchemyListingBuilder.js');
+const { RunJournalBuilder } = await import('../src/systems/RunJournalBuilder.js');
+const { RecipeVisibilityService, readVisibilityCounters, resetVisibilityCounters } = await import(
+  '../src/systems/RecipeVisibilityService.js'
+);
 const { CraftingListingBuilder } = await import('../src/systems/CraftingListingBuilder.js');
 const { ResolutionModeService } = await import('../src/systems/ResolutionModeService.js');
 const { SignatureValidator, readSignatureCounters, resetSignatureCounters } = await import(
@@ -741,6 +750,312 @@ describe('issue 1072 guard — persistence writes are counted in bytes, not call
       what: 'single-record persistence',
     });
     assert.ok(verdict.ok, verdict.message);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Guard 6 — the VISIBILITY phase's per-recipe offer count (issue 1228)
+// ---------------------------------------------------------------------------
+
+/**
+ * How many held documents the per-recipe recipe-item matcher is OFFERED across one pass.
+ *
+ * ## Why an existing counter could not have caught this
+ *
+ * Every guard above measures `actorItemsScanned` — an inventory-READ count, taken on the
+ * SUMMARY phase. That counter is blind to this defect in the shape that matters most:
+ *
+ * - **No snapshot at all** (what `AlchemyListingBuilder` and `RunJournalBuilder` still did
+ *   before this issue) re-enumerates `actor.items` per recipe, so a read counter moves. Only
+ *   this half was ever observable, and only on a path something instrumented — which the
+ *   alchemy workbench and the journal were not.
+ * - **A snapshot built from the WRONG collaborator set** — which is precisely what the two
+ *   #1077 call sites' disjoint injections made possible — falls back to `heldItems()`, and
+ *   that reads each actor's inventory exactly ONCE and memoises it. So `actorItemsScanned`
+ *   stays perfectly flat while the matcher is handed every held document once per recipe, the
+ *   recipes-x-items product is fully reinstated, and every correctness assertion in the
+ *   repository stays green.
+ *
+ * The counter below is stated on the OFFER, so it sees both. It is scaled on the mundane-item
+ * axis with the held BOOKS pinned, which is the independence the fix actually buys: the offer
+ * is the books, so it must not move when the rest of the inventory quadruples.
+ *
+ * @param {object} options
+ * @returns {{listing: object, candidateItemOffers: number, candidateWalks: number,
+ *   itemsScanned: number}}
+ */
+function measureAlchemyReveal({ recipeCount, itemCount, heldBooks = 1 }) {
+  const counters = createOperationCounters();
+  const system = makeBookGatedSystem({ recipeCount });
+  const recipes = Array.from({ length: recipeCount }, (_unused, index) =>
+    makeBookGatedRecipe({ index, systemId: system.id })
+  );
+  const systemManager = makeSystemManager(system, () => recipes);
+  const recipeManager = {
+    getRecipes: () => recipes,
+    getRecipe: (id) => recipes.find((recipe) => recipe.id === id) ?? null,
+  };
+  const builder = new AlchemyListingBuilder({
+    recipeManager,
+    craftingSystemManager: systemManager,
+    recipeVisibility: new RecipeVisibilityService(recipeManager, systemManager),
+    localize: (key) => key,
+  });
+  const craftingActor = countingActor(
+    makeBookHoldingActor({
+      itemCount,
+      bookUuids: Array.from({ length: heldBooks }, (_unused, index) => scaleBookUuid(index)),
+    }),
+    counters,
+    'actorItems'
+  );
+
+  resetVisibilityCounters();
+  const listing = builder.buildListing({
+    craftingActor,
+    viewer: PLAYER,
+    craftingSystemId: system.id,
+  });
+  return {
+    listing,
+    ...readVisibilityCounters(),
+    itemsScanned: counters.get('actorItemsScanned'),
+  };
+}
+
+/**
+ * The same measurement on the player CRAFTING listing's exhaustion read.
+ *
+ * The system is `global`-visibility with the books still on it, and that combination is the
+ * whole fixture rather than an arbitrary one. `item` and `knowledge` modes populate
+ * `access.knowledge`, so the exhaustion answer is read from that evidence and no inventory is
+ * rescanned at all; `global` and `restricted` leave it null and fall through to the rescan.
+ * A world migrated off `item` mode is in exactly this state, and so is any GM who authored
+ * recipe items and then chose to show the whole library — so the rescan is the ORDINARY case
+ * for this path, not the "caller with nothing to offer" its contract implies.
+ *
+ * The pre-existing `measureListing` above cannot see any of this: it stubs `recipeVisibility`
+ * with `isKnowledgeItemExhausted: () => false`, so the real service is never asked.
+ */
+function measureCraftingExhaustion({ recipeCount, itemCount, heldBooks = 1 }) {
+  const counters = createOperationCounters();
+  const system = makeBookGatedSystem({
+    recipeCount,
+    resolutionMode: 'simple',
+    visibilityMode: 'global',
+  });
+  const recipes = Array.from({ length: recipeCount }, (_unused, index) =>
+    makeBookGatedRecipe({ index, systemId: system.id })
+  );
+  const systemManager = makeSystemManager(system, () => recipes);
+  const recipeManager = new RecipeManager({ getCraftingSystemManager: () => systemManager });
+  recipeManager.recipes = new Map(recipes.map((recipe) => [recipe.id, recipe]));
+  recipeManager.initialized = true;
+
+  const builder = new CraftingListingBuilder({
+    recipeManager,
+    // The REAL service, not the stub `measureListing` uses. The defect lives in the service's
+    // rescan branch, so a stubbed `isKnowledgeItemExhausted` measures nothing.
+    recipeVisibility: new RecipeVisibilityService(recipeManager, systemManager),
+    resolutionModeService: new ResolutionModeService(systemManager),
+    craftingSystemManager: systemManager,
+    localize: (key) => key,
+    nowWorldTime: () => 0,
+    resolveComponentForItem: findMatchingComponent,
+  });
+  const craftingActor = countingActor(
+    makeBookHoldingActor({
+      itemCount,
+      bookUuids: Array.from({ length: heldBooks }, (_unused, index) => scaleBookUuid(index)),
+    }),
+    counters,
+    'actorItems'
+  );
+
+  resetVisibilityCounters();
+  const listing = builder.buildListing({ craftingActor, viewer: PLAYER });
+  return {
+    listing,
+    ...readVisibilityCounters(),
+    itemsScanned: counters.get('actorItemsScanned'),
+  };
+}
+
+/** The same measurement on the Journal's redaction pass, which asks the same question per RUN. */
+function measureJournalRedaction({ runCount, itemCount, heldBooks = 1 }) {
+  const system = makeBookGatedSystem({ recipeCount: runCount });
+  const recipes = Array.from({ length: runCount }, (_unused, index) =>
+    makeBookGatedRecipe({ index, systemId: system.id })
+  );
+  const systemManager = makeSystemManager(system, () => recipes);
+  const recipeManager = {
+    getRecipes: () => recipes,
+    getRecipe: (id) => recipes.find((recipe) => recipe.id === id) ?? null,
+  };
+  const runs = recipes.map((recipe, index) => ({
+    id: `run-${index}`,
+    recipeId: recipe.id,
+    craftingSystemId: system.id,
+    status: 'inProgress',
+    currentStepIndex: 0,
+    startedAt: 0,
+    updatedAt: 0,
+    steps: [{ stepId: `${recipe.id}-step`, index: 0, status: 'inProgress' }],
+  }));
+  const builder = new RunJournalBuilder({
+    craftingRunManager: { getActiveRuns: () => runs, getRunHistory: () => [] },
+    recipeManager,
+    recipeVisibility: new RecipeVisibilityService(recipeManager, systemManager),
+    getSystem: (id) => systemManager.getSystem(id),
+    getViewer: () => PLAYER,
+    localize: (key) => key,
+  });
+  const actor = makeBookHoldingActor({
+    itemCount,
+    bookUuids: Array.from({ length: heldBooks }, (_unused, index) => scaleBookUuid(index)),
+  });
+
+  resetVisibilityCounters();
+  const listing = builder.buildListing({ actor, viewer: PLAYER });
+  return { listing, ...readVisibilityCounters() };
+}
+
+describe('issue 1228 guard — the visibility phase offers the BOOKS, not the inventory', () => {
+  const CONTROL_ITEMS = 10;
+  const SCALED_ITEMS = 40;
+  const RECIPES = 8;
+
+  it('offers the same documents per recipe however much mundane gear the actor carries', () => {
+    const base = measureAlchemyReveal({ recipeCount: RECIPES, itemCount: CONTROL_ITEMS });
+    const fat = measureAlchemyReveal({ recipeCount: RECIPES, itemCount: SCALED_ITEMS });
+
+    // NON-VACUITY FIRST. A pass that never reached the candidate walk — a fixture in the wrong
+    // visibility mode, a recipe with no book membership — reports zero on both counters, and
+    // `0 === 0` would read as a green independence guard forever. That is the exact failure
+    // mode the committed `alchemy-signatures` profile has on this path.
+    assert.ok(
+      base.candidateWalks > 0,
+      'non-vacuity: the fixture must actually reach the recipe-item candidate walk'
+    );
+    assert.ok(
+      base.candidateItemOffers > 0,
+      'non-vacuity: the walk must actually be offered documents'
+    );
+    assert.ok(
+      base.listing.recipes.length > 0,
+      'non-vacuity: a held book must actually reveal recipes, or reveal is answering trivially'
+    );
+
+    assert.equal(
+      fat.candidateItemOffers,
+      base.candidateItemOffers,
+      `quadrupling the actor's mundane gear moved the per-recipe offer count from ` +
+        `${base.candidateItemOffers} to ${fat.candidateItemOffers}. The workbench must offer ` +
+        `each recipe's matcher the HELD BOOKS, not the whole inventory — either the per-pass ` +
+        `snapshot stopped being threaded, or it is being built without its recipe-item matcher.`
+    );
+    assert.equal(
+      fat.candidateWalks,
+      base.candidateWalks,
+      'the number of recipes asked must not depend on inventory size'
+    );
+  });
+
+  it('still tracks the axis it SHOULD track, so the equality is a property', () => {
+    // The equality above holds equally well for a counter that stopped observing anything.
+    const base = measureAlchemyReveal({ recipeCount: RECIPES, itemCount: CONTROL_ITEMS });
+    const moreRecipes = measureAlchemyReveal({
+      recipeCount: RECIPES * 2,
+      itemCount: CONTROL_ITEMS,
+    });
+    const moreBooks = measureAlchemyReveal({
+      recipeCount: RECIPES,
+      itemCount: CONTROL_ITEMS,
+      heldBooks: 2,
+    });
+
+    assert.ok(
+      moreRecipes.candidateItemOffers > base.candidateItemOffers,
+      'non-vacuity: doubling the corpus must still cost more offers — the pass asks per recipe'
+    );
+    assert.ok(
+      moreBooks.candidateItemOffers > base.candidateItemOffers,
+      'non-vacuity: holding a second BOOK must cost more offers — that is what the offer IS'
+    );
+  });
+
+  it('reads the inventory once per pass, which is the half a read counter CAN see', () => {
+    // Kept alongside the offer counter rather than instead of it. This is the assertion the
+    // pre-existing guards would have made, and it is genuinely weaker: it goes red only for a
+    // MISSING snapshot, never for a snapshot built from the wrong collaborator set.
+    const base = measureAlchemyReveal({ recipeCount: RECIPES, itemCount: CONTROL_ITEMS });
+    const moreRecipes = measureAlchemyReveal({
+      recipeCount: RECIPES * 2,
+      itemCount: CONTROL_ITEMS,
+    });
+    assert.ok(base.itemsScanned > 0, 'non-vacuity: the actor probe must have counted item reads');
+    assert.equal(
+      moreRecipes.itemsScanned,
+      base.itemsScanned,
+      `doubling the corpus moved inventory scanning from ${base.itemsScanned} to ` +
+        `${moreRecipes.itemsScanned}. The workbench must read the inventory once per pass.`
+    );
+  });
+
+  it("the player crafting listing's exhaustion read is bounded the same way", () => {
+    // The MAIN player screen, and the largest of the three: it is asked once per VISIBLE ROW,
+    // and the visible set on a `global`-visibility system is the whole corpus.
+    const base = measureCraftingExhaustion({ recipeCount: RECIPES, itemCount: CONTROL_ITEMS });
+    const fat = measureCraftingExhaustion({ recipeCount: RECIPES, itemCount: SCALED_ITEMS });
+
+    assert.equal(
+      base.listing.summaries.length,
+      RECIPES,
+      'non-vacuity: a `global`-visibility system must project every recipe'
+    );
+    assert.ok(
+      base.candidateWalks > 0,
+      'non-vacuity: the exhaustion read must actually reach the candidate walk. Zero means ' +
+        'the fixture took the evidence branch instead, and the equality below is vacuous.'
+    );
+    assert.equal(
+      fat.candidateItemOffers,
+      base.candidateItemOffers,
+      `quadrupling the actor's mundane gear moved the per-row offer count from ` +
+        `${base.candidateItemOffers} to ${fat.candidateItemOffers}. The summary phase asks ` +
+        `the exhaustion question once per visible row, so an unthreaded rescan there is ` +
+        `recipes x items on the main player screen.`
+    );
+
+    // The axis it SHOULD track, so the equality above is a property rather than a dead probe.
+    const moreRecipes = measureCraftingExhaustion({
+      recipeCount: RECIPES * 2,
+      itemCount: CONTROL_ITEMS,
+    });
+    assert.ok(
+      moreRecipes.candidateItemOffers > base.candidateItemOffers,
+      'non-vacuity: doubling the corpus must still cost more offers — one per visible row'
+    );
+  });
+
+  it("the Journal's redaction pass is bounded the same way", () => {
+    const base = measureJournalRedaction({ runCount: 6, itemCount: CONTROL_ITEMS });
+    const fat = measureJournalRedaction({ runCount: 6, itemCount: SCALED_ITEMS });
+
+    assert.ok(base.candidateWalks > 0, 'non-vacuity: redaction must reach the candidate walk');
+    assert.equal(
+      base.listing.activeRuns.length,
+      6,
+      'non-vacuity: the pass must actually project every run'
+    );
+    assert.equal(
+      fat.candidateItemOffers,
+      base.candidateItemOffers,
+      `quadrupling the actor's mundane gear moved the per-run offer count from ` +
+        `${base.candidateItemOffers} to ${fat.candidateItemOffers}. Redaction asks the ` +
+        `visibility service once per run, and one whole inventory walk per run is what ` +
+        `issue 1228 removed.`
+    );
   });
 });
 
