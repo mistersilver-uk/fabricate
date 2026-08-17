@@ -724,7 +724,7 @@ A provider's tabs appear once, as sub-items of the Manager rail's Downtime group
 The region takes the tab's **visible `label`** as its name — it is labelled by the sub-item's label element, not by the sub-item itself, so a landmark is named after the screen rather than after the action that opens it.
 The sub-item itself carries `accessibleName` as its `aria-label` and `tooltip` as its native tooltip; see the field table above for where each one lands.
 The rail is locked expanded while a provider holds this route, so those sub-items are always reachable; the rail's collapse control renders disabled and explains itself, and the GM's stored collapse preference is left untouched and restored on leaving the route.
-Entering the route scrolls the active sub-item into view, so the switcher is visible without hunting for it.
+Entering the route scrolls the active sub-item into view, so the current screen's rail item is visible without hunting for it.
 
 **Overflow.**
 Core's panel scroller keeps working for any companion whose content overflows its root **visibly** — including one that takes the full height.
