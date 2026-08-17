@@ -2843,13 +2843,33 @@ A **Valid Id Basis** is the set of live-corpus id sets a destructive pass derive
 **A destructive pass runs only when its Valid Id Basis is known-complete.**
 A pass whose basis is incomplete does not see a live record, concludes the thing naming it is stale, and deletes durable state that was never stale.
 
-**Two inputs decide it, and either one alone makes the basis NOT known-complete:**
+**Four inputs decide it, and any one alone makes the basis NOT known-complete:**
 
 1. the entity class's storage layout is `unsettled`;
-2. `migrationVersion` is behind the highest registered migration.
+2. the entity class's storage layout does not equal its storage target;
+3. `migrationVersion` is behind the highest registered migration;
+4. the arrangement the reader's repository was actually BUILT for does not equal that layout and target.
 
-Input 2 already covers an aborted migration pass: the abort branch returns before any setting write, and the version bump is the LAST write of the writeback, so an abort implies input 2.
-"This client did not run the migration pass" MUST NOT be a third input.
+Input 2 is the state a failed conversion leaves behind.
+Compensation deletes the layout document, restoring the registered `singleArray` default, while the target — set before the conversion began — stays `perRecord`.
+Repository selection reads the target, so the granular backend is built and its whole-corpus read returns ZERO records while input 1 reads "settled".
+The authoring corpus survives in the legacy array; the durable state a destructive pass would prune against it does not.
+
+Input 4 is the only input that can close a CROSS-CLIENT race, because it compares a value captured before the corpus read against values read after it.
+A reader's repository is selected once, before the corpus is read, and the layout and target are read later still.
+A client that selected the single-array backend, and whose whole-corpus read then found nothing because another client's conversion completed and deleted the legacy document in between, reads layout and target both `perRecord` at basis time: inputs 1, 2 and 3 all hold and the corpus is empty.
+A reader that cannot state the arrangement its repository was built for MUST treat the basis as not known-complete.
+
+**An entity kind with no granular repository is known-complete by construction**, because its corpus arrives as a single whole-array read that either succeeded or threw, and no partial state exists for the inputs above to detect.
+That exemption is stated on the REPOSITORY, never on the registered layout/target pair: a build that lands a granular repository for a kind before registering its pair would otherwise be scored known-complete while its corpus is already partial.
+
+**Every input is established positively, and an absent, unreadable or unrecognised value is NOT known-complete.**
+"The layout is not `unsettled`" is true of `undefined`, `null`, `''` and of a read that threw and was swallowed, so a basis stated as a negation fails open.
+This is the opposite fail direction from repository selection, which answers an unreadable target with the legacy arrangement so that an unreadable setting can never promote a world onto the granular backend; both are correct where they sit.
+
+Input 3 already covers an aborted migration pass: the abort branch returns before any setting write, and the version bump is the LAST write of the writeback, so an abort implies input 3.
+It compares versions by ORDER, never by equality: a downgraded build sits ahead of its own highest registered migration, and reading "not equal" as "behind" would omit every destructive pass on every downgraded world permanently.
+"This client did not run the migration pass" MUST NOT be a further input.
 It is true on every non-primary client on every boot, including a fully converted and fully migrated healthy world, so it would omit the destructive passes on every player client permanently.
 The primary GM cannot cover for that, because some pruned state is `user`-scoped and only that user's own client can prune it.
 A non-primary client on a fully converted, fully migrated world therefore DOES run the destructive passes.
@@ -2857,6 +2877,21 @@ A non-primary client on a fully converted, fully migrated world therefore DOES r
 **The gate is applied by OMITTING the pass from the startup pass list, never by throwing from inside it.**
 The startup maintenance runner catches every throw into a failure label and discards return values, so by the time a throw is observable the destructive work has already landed.
 The pass list MUST therefore be constructed by a pure, exported builder that the composition site calls, so the omission is directly assertable.
+A pass that declares no basis MUST be omitted, so that a destructive pass cannot ship ungated by omitting its declaration.
+
+**The basis facts MUST be sampled where the id sets are built, after the corpus read.**
+A conversion sets its layout from inside the corpus-loading path, so a fact sampled earlier in startup — beside settings registration or the migration pass — records the pre-conversion value, and a conversion that then failed mid-flight presents a partial corpus alongside a "settled" fact.
+
+**An omission MUST be reported.**
+The startup maintenance runner returns only FAILED labels and its caller discards them, so a gate that omitted every pass is otherwise indistinguishable from a clean boot.
+The report names the omitted passes and the input that decided them.
+It MUST NOT fail the boot: a partial corpus is what this gate exists to survive, not a reason to stop.
+
+**Two destructive doors are deliberately OUTSIDE this requirement, and neither is safe.**
+This requirement is scoped to STARTUP passes.
+The same id sets are recomputed and the same prunes run from the recipe-mutation flag cleanup reachable from recipe deletion, bulk recipe deletion, orphaned-flag cleanup and system-scoped state cleanup; a GM deleting a recipe in an unsettled world reproduces the loss with no gate near it.
+Separately, the one-shot version-keyed flag auto-stamps are corpus-derived and set their done-marker unconditionally, so a partial corpus burns the one shot and leaves the world permanently under-stamped, repairable only through the manual item-data repair action.
+Both are recorded here so that the startup gate is not read as making either safe.
 
 **Distinguished from _membership basis_.**
 `ui-integration/spec.md` uses _basis_ only as a qualified noun — **membership basis** (`ui-integration/spec.md:1356`), **routing basis** (`:2110`), **disabled-action basis** (`:2960`) — and in each of those it names the RULE by which something is resolved.
