@@ -26,6 +26,7 @@ import {
 import { applyDefinitionChange } from './CraftingDefinitionRepository.js';
 import { buildCurrencyAffordProbe, getCurrencyRequirementConfig } from './currencyAffordance.js';
 import { formatCurrencyRequirement, normalizeCurrencyUnit } from './currencyProfile.js';
+import { createArrangementWriteGuard } from './definitionStorageArrangement.js';
 import { ALL_INVALIDATION_DOMAINS, domainsForRecipeFields } from './invalidationDomains.js';
 import { readStackQuantity } from './itemStackQuantity.js';
 import {
@@ -202,6 +203,15 @@ function buildDefaultRecipeRepository({ corpus, arrangement }) {
     hydrate: (raw) => Recipe.fromJSON(raw),
     serialize: (recipe) => recipe.toJSON(),
     scopeOf: (recipe) => recipe?.craftingSystemId ?? null,
+    // Issue 1232. Both adapters get it, keyed on the arrangement each was BUILT for, because
+    // the hazard is symmetric: a stale settings adapter re-creates the legacy document that a
+    // forward conversion deleted, and a stale per-record adapter re-creates the record
+    // documents a reverse conversion reclaimed. Installed here — the one place the backend is
+    // chosen — so the guard cannot be selected separately from the adapter it guards.
+    assertWritable: createArrangementWriteGuard({
+      arrangement,
+      readLayout: readRecipeStorageLayout,
+    }),
   };
   if (arrangement === DEFINITION_STORAGE_TARGETS.PER_RECORD) {
     return new PerRecordCraftingDefinitionRepository({
@@ -283,6 +293,12 @@ export class RecipeManager {
     //
     // An INJECTED repository reports `null`: nothing here knows what arrangement a
     // caller-supplied adapter was built for, and a guess would be a fail-open guess.
+    // Whether this manager CHOSE its backend, which is what decides whether it may re-choose
+    // one — see {@link RecipeManager#rebuildDefinitionStorage}. Recorded as its own fact
+    // rather than inferred from `_definitionStorageArrangement === null`, because a rebuild
+    // sets that field and the inference would silently start to hold for an injected
+    // repository after the first rebuild.
+    this._ownsRepository = !repository;
     this._definitionStorageArrangement = repository ? null : readRecipeStorageTarget();
     // The layout observed across the corpus read, set by `initialize()`. `null` until then,
     // and `null` is not known-complete — a basis sampled before anything read the corpus
@@ -328,6 +344,50 @@ export class RecipeManager {
       arrangement: this._definitionStorageArrangement,
       layoutAtCorpusRead: this._layoutAtCorpusRead,
     };
+  }
+
+  /**
+   * Re-choose this manager's backend after a completed Storage Layout Conversion, and reload
+   * the corpus through it (issue 1232).
+   *
+   * Before this existed nothing rebuilt a repository after a layout flip, so a client that
+   * was open across a conversion kept addressing an arrangement the world had left for the
+   * rest of its session. The write half of that is refused outright by the arrangement guard
+   * in `definitionStorageArrangement.js`; this is the READ half, and the one that makes the
+   * refusal recoverable without a page reload.
+   *
+   * **Only a SETTLED, agreeing pair rebuilds.** Mid-conversion the layout is `unsettled` and,
+   * on the reverse, the target has already moved while the corpus has not — so a rebuild
+   * there would swap in an adapter addressing storage the conversion has not written yet and
+   * present an empty world until the next signal. Waiting for `layout === target` means every
+   * client rebuilds exactly once, at the conversion's final flip, and holds its old adapter
+   * (with writes refused) in between.
+   *
+   * An INJECTED repository is never replaced: the caller chose it, nothing here knows what it
+   * addresses, and silently discarding it would break every fixture that counts writes
+   * through one.
+   *
+   * @returns {Promise<boolean>} whether a rebuild happened.
+   */
+  async rebuildDefinitionStorage() {
+    if (!this._ownsRepository) return false;
+    const target = readRecipeStorageTarget();
+    const layout = readRecipeStorageLayout();
+    if (layout !== target) return false;
+    if (target === this._definitionStorageArrangement) return false;
+
+    this._definitionStorageArrangement = target;
+    this._repository = buildDefaultRecipeRepository({
+      corpus: () => this.recipes,
+      arrangement: target,
+    });
+    // Re-sampled for the same reason `initialize()` samples it: the Valid Id Basis needs the
+    // layout as it stood immediately before the read that produced the corpus in hand, and
+    // the value from the previous arrangement's read attests nothing about this one.
+    this._layoutAtCorpusRead = readRecipeStorageLayout();
+    this._reloadDelta = null;
+    this._adoptCorpus(await this._repository.loadAll());
+    return true;
   }
 
   /**
@@ -574,6 +634,25 @@ export class RecipeManager {
     // stale delta can never be consumed after a later one.
     this._reloadDelta = null;
     if (!savedRecipes) return false;
+    return this._adoptCorpus(savedRecipes);
+  }
+
+  /**
+   * Replace the in-memory corpus with a freshly read one, preserving as much identity as the
+   * delta licenses.
+   *
+   * Extracted from {@link RecipeManager#reload} (issue 1232) because
+   * {@link RecipeManager#rebuildDefinitionStorage} needs exactly this work over an
+   * ASYNCHRONOUS `loadAll()` rather than a synchronous replicated snapshot. The two differ
+   * only in where the records came from, and a second copy of this body would drift from the
+   * identity-preservation rules above — the failure mode being a retained index that survives
+   * one path and not the other.
+   *
+   * @param {object[]} savedRecipes
+   * @returns {boolean} whether the corpus actually changed.
+   * @private
+   */
+  _adoptCorpus(savedRecipes) {
     const next = new Map();
     for (const recipe of savedRecipes) {
       next.set(recipe.id, recipe);
