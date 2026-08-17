@@ -2892,6 +2892,7 @@ This requirement is scoped to STARTUP passes.
 The same id sets are recomputed and the same prunes run from the recipe-mutation flag cleanup reachable from recipe deletion, bulk recipe deletion, orphaned-flag cleanup and system-scoped state cleanup; a GM deleting a recipe in an unsettled world reproduces the loss with no gate near it.
 Separately, the one-shot version-keyed flag auto-stamps are corpus-derived and set their done-marker unconditionally, so a partial corpus burns the one shot and leaves the world permanently under-stamped, repairable only through the manual item-data repair action.
 Both are recorded here so that the startup gate is not read as making either safe.
+The mutation-time door is tracked as issue 1226; the auto-stamp door is a residual of the component extraction and is tracked there.
 
 **Distinguished from _membership basis_.**
 `ui-integration/spec.md` uses _basis_ only as a qualified noun — **membership basis** (`ui-integration/spec.md:1356`), **routing basis** (`:2110`), **disabled-action basis** (`:2960`) — and in each of those it names the RULE by which something is resolved.
