@@ -69,7 +69,9 @@ globalThis.ui = { notifications: { info() {}, warn() {}, error() {} } };
 globalThis.fromUuid = async () => null;
 globalThis.game = { user: { isGM: true, name: 'Original GM' } };
 
-const { Recipe } = await import('../src/models/Recipe.js');
+const { Recipe, RECIPE_OMITTED_WHEN_DEFAULT } = await import('../src/models/Recipe.js');
+const { INGREDIENT_SET_OMITTED_WHEN_DEFAULT } = await import('../src/models/IngredientSet.js');
+const { INGREDIENT_OMITTED_WHEN_DEFAULT } = await import('../src/models/Ingredient.js');
 
 // Authored identity. Every one of these is a `foundry.utils.randomID()`-shaped 16-character
 // alphanumeric, which is the whole difficulty: the load path mints ids of this same shape.
@@ -598,6 +600,55 @@ describe('the boundaries of the provenance rule are refused rather than guessed'
     );
   });
 
+  it('refuses stored bytes that describe none of the records, rather than comparing nothing', () => {
+    // A conversion that re-minted every NESTED authored id is real identity loss, and the
+    // correct pre-conversion bytes see it. Empty bytes would not: with no stored strings,
+    // every id classifies as hydrate-minted and BOTH corpora collapse to the same
+    // `minted-NNNN` sequence — equal, under a reassuring `provenance: 'stored'` stamp. That
+    // shape is reachable by sequencing rather than carelessness: once a forward conversion
+    // has retired the pre-conversion setting, `ClientSettings#get` serves the registered `[]`
+    // default, so reading "the stored bytes" at the wrong point produces exactly `[]`.
+    const corpus = (setId, groupId) => [
+      {
+        id: RECIPE_ALPHA_ID,
+        craftingSystemId: SYSTEM_ID,
+        ingredientSets: [{ id: setId, ingredientGroups: [{ id: groupId, name: 'Group 1' }] }],
+      },
+    ];
+    const authored = corpus(SET_ALPHA_ID, GROUP_IRON_ID);
+    const reminted = corpus(mintCoreId(), mintCoreId());
+    assert.notEqual(
+      canonicalDefinitionCorpusJson(authored, { storedRecords: authored }),
+      canonicalDefinitionCorpusJson(reminted, { storedRecords: authored }),
+      'the correct stored bytes must see a conversion that re-minted every nested authored id'
+    );
+    for (const undescriptive of [[], {}]) {
+      assert.throws(
+        () => canonicalDefinitionCorpusJson(reminted, { storedRecords: undescriptive }),
+        /describes none of/,
+        'bytes that describe no record must be refused, not stamped as provenance: stored'
+      );
+    }
+  });
+
+  it('still permits the degraded mode for a caller that supplies no bytes at all', () => {
+    // Omitting and supplying-empty are different claims: omitting says "I hold no bytes" and
+    // is answered with the loudly stamped shape-only mode, while supplying says "these ARE
+    // the bytes this corpus came from" and must be true. An empty CORPUS is undescribed by
+    // nothing, so it stays permitted.
+    const literal = [{ id: RECIPE_ALPHA_ID, name: 'Alpha Ingot' }];
+    assert.equal(canonicalizeDefinitionCorpus(literal).provenance, 'shape');
+    assert.equal(
+      canonicalizeDefinitionCorpus(literal, { storedRecords: null }).provenance,
+      'shape'
+    );
+    assert.equal(canonicalizeDefinitionCorpus([], { storedRecords: [] }).provenance, 'stored');
+    assert.throws(
+      () => canonicalizeDefinitionCorpus(literal, { storedRecords: [] }),
+      /describes none of/
+    );
+  });
+
   it('leaves a 16-character FIELD NAME alone — shape is not identity', () => {
     // `craftingModifier` is sixteen alphanumerics, and so is any name of that length. A rule
     // that decided provenance for every string in the corpus would renumber both.
@@ -669,5 +720,34 @@ describe('the non-deterministic hydrate defaults the canonical form is written a
       occurrencesByFile(/randomID\(\)/g),
       'a randomID() that does not land on an `id` key needs a MINTING_KEYS entry'
     );
+  });
+
+  it('pins that no serialization table can omit an `id`', () => {
+    // The companion half of the assertion above, and the reason rule 4 may COLLECT only at
+    // `id` while SUBSTITUTING everywhere. A minted id is substituted at a reference position
+    // only because it was first collected at its own `id` key; a serialization table that
+    // dropped `id` would delete that defining occurrence, leaving the reference emitted
+    // verbatim and the form non-deterministic with the pin above still green.
+    const tables = {
+      RECIPE_OMITTED_WHEN_DEFAULT,
+      INGREDIENT_SET_OMITTED_WHEN_DEFAULT,
+      INGREDIENT_OMITTED_WHEN_DEFAULT,
+    };
+    assert.deepEqual(
+      new Set(
+        Object.values(modelSources()).flatMap((code) =>
+          [...code.matchAll(/export const (\w+_OMITTED_WHEN_DEFAULT)\b/g)].map((match) => match[1])
+        )
+      ),
+      new Set(Object.keys(tables)),
+      'a new omitted-when-default table must be checked here too, or the guard goes partial'
+    );
+    for (const [name, table] of Object.entries(tables)) {
+      assert.ok(
+        !Object.hasOwn(table, 'id'),
+        `${name} must never make an id omittable: rule 4 needs the minted id itself serialized ` +
+          'alongside every reference to it'
+      );
+    }
   });
 });
