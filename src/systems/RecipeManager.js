@@ -3151,22 +3151,41 @@ export class RecipeManager {
   }
 
   /**
-   * Validate that this recipe's ingredient signatures do not overlap with other recipes
-   * in the same crafting system. Warns GMs of ambiguous crafting scenarios.
+   * The ingredient-signature conflicts a candidate recipe would participate in, as coded,
+   * id-free `{code, params, message}` issues (issue 550).
    *
    * Evaluates the candidate as though it were already stored and enabled — see
    * {@link AlchemySignatureReport#candidateConflicts} — so a recipe that has not been
    * persisted yet is gated exactly like one that has (issue 1167).
-   * @param {Recipe} recipe
-   * @returns {{valid: boolean, errors: string[]}}
-   * @private
+   *
+   * Public because the recipe editor asks this question of a LIVE DRAFT on every keystroke
+   * (issue 1201). It used to answer itself, by copying the whole recipe corpus and running a
+   * fresh `O(n^2)` audit per mutation — 2,000 recipes cost 1,999,000 comparisons and ~233 ms
+   * — because the retained report and everything reaching it were private. A draft is one
+   * candidate, which is exactly what this seam takes: the answer comes from the report's
+   * inverted component index, so it costs `O(candidates)` and no corpus copy at all.
+   *
+   * `systemId` is separable from the candidate because a draft is editor JSON that need not
+   * carry `craftingSystemId`, while the editor always knows which system it is in.
+   *
+   * The returned array is always a fresh copy, but a conflict's `params` object is not: for a
+   * candidate whose compiled entries match its stored copy exactly, the fast path in
+   * {@link AlchemySignatureReport#candidateConflicts} returns the SAME `params` object the
+   * retained report holds internally. Treat every `params` as read-only.
+   *
+   * @param {object} recipe A recipe, or the JSON of one — anything carrying `id`, `name`,
+   *   `enabled` and `ingredientSets`. Compiled exactly as the audit would compile it.
+   * @param {{systemId?: string}} [options] `systemId` defaults to the candidate's own
+   *   `craftingSystemId`.
+   * @returns {{code: string|null, params: object, message: string}[]} conflicts in
+   *   full-audit order; empty for a non-alchemy system, an unknown system, or a candidate
+   *   that cannot participate in one. Do not mutate a conflict's `params`.
    */
-  _validateSignatures(recipe) {
-    const systemId = recipe?.craftingSystemId;
-    if (!systemId) return { valid: true, errors: [] };
+  getSignatureConflicts(recipe, { systemId = recipe?.craftingSystemId } = {}) {
+    if (!systemId) return [];
 
     const systemManager = this._systemManager();
-    if (!systemManager) return { valid: true, errors: [] };
+    if (!systemManager) return [];
 
     // Signature uniqueness only matters when the engine *infers* which recipe
     // the player is crafting from the submitted ingredients — i.e. alchemy
@@ -3176,29 +3195,44 @@ export class RecipeManager {
     // are never ambiguous. Enforcing overlap there is stricter than the runtime
     // that depends on it and rejects perfectly valid recipes.
     const system = systemManager.getSystem(systemId);
-    if (system?.resolutionMode !== 'alchemy') return { valid: true, errors: [] };
+    if (system?.resolutionMode !== 'alchemy') return [];
 
-    // The validator is enabled-scoped (issue 649). This gate runs on an ENABLE transition,
-    // but the store copy of `recipe` is still disabled (it is persisted only after this
-    // passes), so the scan has to evaluate the candidate in the store copy's place —
-    // otherwise the enabled-scoped audit excludes the still-disabled copy and misses the
-    // conflict. The retained report holds the compiled entries for every OTHER enabled
-    // recipe, and `candidateConflicts` performs exactly that substitution against them
-    // (issue 1074): the candidate's own stored entries are excluded, its sets are compared
-    // with each other, and the result is emitted in full-audit order. What it no longer
-    // does is re-audit the whole system and copy the recipe corpus once per call, which is
-    // what made preparing N GM browser rows O(N^3).
+    // The validator is enabled-scoped (issue 649). The enable gate runs on an ENABLE
+    // transition, but the store copy of `recipe` is still disabled (it is persisted only
+    // after the gate passes), so the scan has to evaluate the candidate in the store copy's
+    // place — otherwise the enabled-scoped audit excludes the still-disabled copy and misses
+    // the conflict. The editor's draft is the same shape of question one keystroke earlier.
+    // The retained report holds the compiled entries for every OTHER enabled recipe, and
+    // `candidateConflicts` performs exactly that substitution against them (issue 1074): the
+    // candidate's own stored entries are excluded, its sets are compared with each other,
+    // and the result is emitted in full-audit order. What it no longer does is re-audit the
+    // whole system and copy the recipe corpus once per call, which is what made preparing N
+    // GM browser rows O(N^3).
     const report = this._alchemySignatureReport(systemId, systemManager);
-    if (!report) return { valid: true, errors: [] };
+    if (!report) return [];
 
-    const conflicts = report.candidateConflicts(recipe);
-    const errors = conflicts.map((c) => c.message);
-    const issues = conflicts.map((c) => ({
-      code: c.code,
-      params: c.params,
-      message: c.message,
+    return report.candidateConflicts(recipe).map((conflict) => ({
+      code: conflict.code,
+      params: conflict.params,
+      message: conflict.message,
     }));
-    return { valid: errors.length === 0, errors, issues };
+  }
+
+  /**
+   * Validate that this recipe's ingredient signatures do not overlap with other recipes
+   * in the same crafting system. Warns GMs of ambiguous crafting scenarios.
+   *
+   * The enable gate's projection of {@link getSignatureConflicts} — one implementation, so
+   * the editor's prediction and the refusal it predicts can never disagree about a message
+   * or its order.
+   * @param {Recipe} recipe
+   * @returns {{valid: boolean, errors: string[],
+   *   issues: {code: string|null, params: object, message: string}[]}}
+   * @private
+   */
+  _validateSignatures(recipe) {
+    const issues = this.getSignatureConflicts(recipe);
+    return { valid: issues.length === 0, errors: issues.map((issue) => issue.message), issues };
   }
 
   /**

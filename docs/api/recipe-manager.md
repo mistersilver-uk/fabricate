@@ -308,3 +308,39 @@ A conflict has `recipeId`, `recipeName`, and one of three `reason` values.
 The import emits one aggregate success notification with the imported and skipped counts.
 It does not emit per-recipe create/update notifications.
 When there are conflicts it also emits one aggregated conflict-report warning that names each skipped recipe and its reason, so duplicate-ID skips are no longer silent.
+
+### getSignatureConflicts(recipe, options)
+
+Returns the ingredient-signature conflicts a candidate recipe would have if it were saved and enabled right now, in the same order a full audit of the system would report them.
+This is the same check the enable gate applies to `createRecipe`, `updateRecipe`, and `importRecipes`, exposed so a caller can preview it against a recipe that has not been saved.
+
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
+
+| Parameter | Type | Description |
+|:----------|:-----|:------------|
+| `recipe` | `object` | A recipe, or the JSON of one. Must carry `id`, `name`, `enabled`, and `ingredientSets`. |
+| `options.systemId` | `string` | Optional. Defaults to `recipe.craftingSystemId`. Pass this explicitly for a draft whose JSON does not carry `craftingSystemId`. |
+
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
+
+**Returns:** `{ code: string|null, params: object, message: string }[]`
+
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
+
+Empty for a non-alchemy system, an unknown crafting system, or a recipe with no conflicts.
+Only alchemy systems infer which recipe is being crafted from the submitted ingredients, so signature uniqueness is enforced there alone.
+A `recipe` that has never been saved is evaluated exactly as if it had already been saved and enabled, so a brand-new recipe whose ingredient sets collide with an already-enabled recipe is reported here, before `createRecipe` or `importRecipes` would refuse it.
+Do not treat "not yet saved" as "cannot conflict".
+
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
+
+Each conflict's `message` is default English.
+`code` and `params` let a caller localize it.
+Do not mutate a conflict's `params` object: for a recipe whose ingredient sets already match its saved copy, it may be the same object the manager retains internally.
+
+```javascript
+const rm = game.fabricate.getRecipeManager();
+const draft = { ...recipe, ingredientSets: editedSets };
+const conflicts = rm.getSignatureConflicts(draft, { systemId: recipe.craftingSystemId });
+conflicts.forEach((conflict) => console.log(conflict.message));
+```

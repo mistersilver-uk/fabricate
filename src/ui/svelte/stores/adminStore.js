@@ -104,7 +104,6 @@ import { classifyModeChange } from '../../../migration/migrateRecipeForModeChang
 import { DEFAULT_GATHERING_EVENT_IMG } from '../../../gatheringImageDefaults.js';
 import { DEFAULT_GATHERING_TASK_IMG } from '../../gatheringTaskDefaults.js';
 import { evaluateSystemValidation } from '../../../systems/systemValidation.js';
-import { SignatureValidator } from '../../../systems/SignatureValidator.js';
 import {
   localizeRecipeActivationError,
   localizeRecipePersistenceError,
@@ -357,6 +356,25 @@ function _getManagedItems(system) {
   if (Array.isArray(system?.components)) return system.components;
   if (Array.isArray(system?.items)) return system.items;
   return [];
+}
+
+/**
+ * The persisted recipe of `recipeId`, but only when it belongs to `systemId`.
+ *
+ * `RecipeManager.getRecipe` is keyed on the recipe id alone and spans every system, so a
+ * caller that means "this system's record" has to say so. Returns `null` for a recipe of
+ * another system, which is the answer a scan scoped to `systemId` gives for one it never
+ * held.
+ *
+ * @param {object} recipeManager
+ * @param {string} recipeId
+ * @param {string} systemId
+ * @returns {object|null}
+ */
+function _recipeOfSystem(recipeManager, recipeId, systemId) {
+  const recipe = recipeManager?.getRecipe?.(recipeId);
+  if (!recipe) return null;
+  return String(recipe.craftingSystemId || '') === String(systemId || '') ? recipe : null;
 }
 
 function _buildManagedItemOptions(managedItems = []) {
@@ -3525,16 +3543,23 @@ export function createAdminStore(services) {
 
   /**
    * The cross-recipe ingredient-signature conflicts touching one recipe, for the
-   * recipe editor's Validation tab (issue 549). Runs the SAME `SignatureValidator`
-   * the enable path (`RecipeManager._validateSignatures`) and the system overview
-   * (`systemValidation`) use — no duplicated overlap logic — but scoped to the one
-   * recipe, and (when a live draft is supplied) against the DRAFT's ingredient sets
-   * so the tab predicts the collision before the GM saves. Returns coded, id-free
-   * `{ code, params, message }` conflicts (issue 550) the tab localizes.
+   * recipe editor's Validation tab (issue 549). Asks the SAME question the enable
+   * path asks — `RecipeManager.getSignatureConflicts`, which the enable gate's own
+   * `_validateSignatures` is a projection of — but one keystroke earlier, against the
+   * DRAFT's ingredient sets, so the tab predicts the collision before the GM saves.
+   * Returns coded, id-free `{ code, params, message }` conflicts (issue 550) the tab
+   * localizes.
+   *
+   * The manager answers from its retained signature report (issue 1074) rather than
+   * auditing the system. This used to build a fresh `SignatureValidator` over a
+   * `toJSON` copy of the whole corpus and run a full `n(n-1)/2` audit — on EVERY
+   * draft mutation, because the caller is a `$derived` keyed on the live draft, and
+   * 2,000 recipes cost 1,999,000 comparisons and ~233 ms of it (issue 1201). The
+   * draft is one candidate, so it is now priced like one.
    *
    * Only alchemy systems infer the recipe from submitted ingredients, so signature
-   * uniqueness is enforced there alone (mirrors `_validateSignatures`); every other
-   * mode returns `[]`.
+   * uniqueness is enforced there alone (the manager re-checks this itself); every
+   * other mode returns `[]`.
    *
    * @param {string} recipeId The edited recipe's id.
    * @param {object|null} [draftRecipe] The live recipe draft JSON, substituted for
@@ -3550,30 +3575,22 @@ export function createAdminStore(services) {
     const system = systemManager.getSystem(sysId);
     if (system?.resolutionMode !== 'alchemy') return [];
 
-    const persisted = recipeManager.getRecipes({ craftingSystemId: sysId }) || [];
-    const recipesJson = persisted.map((recipe) => {
-      if (draftRecipe && String(recipe?.id) === String(recipeId)) return draftRecipe;
-      return typeof recipe?.toJSON === 'function' ? recipe.toJSON() : recipe;
-    });
-    const components = _getManagedItems(system);
+    // A draft stands in for the persisted recipe of the id it was opened on, so it is
+    // scanned under THAT id — the parameter contract, and what the substituting audit
+    // this replaced did with it. With no draft the persisted record is its own
+    // candidate, which is the answer an audit filtered to `recipeId` gave.
+    //
+    // `getRecipe` is system-agnostic while the audit it replaces was not: it scanned the
+    // SELECTED system's cohort and filtered to `recipeId`, so a record belonging to some
+    // OTHER system was never in the scan and could name no conflict. The candidate seam
+    // would instead scan it against this system's report and append it as a newcomer, so
+    // the persisted leg is re-scoped to the selected system here.
+    const candidate = draftRecipe
+      ? { ...draftRecipe, id: recipeId }
+      : _recipeOfSystem(recipeManager, recipeId, sysId);
+    if (!candidate) return [];
 
-    const validator = new SignatureValidator({
-      getSystem: (id) => (id === sysId ? system : null),
-      getRecipesForSystem: (id) => (id === sysId ? recipesJson : []),
-      getComponentsForSystem: (id) => (id === sysId ? components : []),
-    });
-    const { conflicts } = validator.validateSystem(sysId);
-    return conflicts
-      .filter(
-        (conflict) =>
-          String(conflict.recipeA?.id) === String(recipeId) ||
-          String(conflict.recipeB?.id) === String(recipeId)
-      )
-      .map((conflict) => ({
-        code: conflict.code,
-        params: conflict.params,
-        message: conflict.message,
-      }));
+    return recipeManager.getSignatureConflicts?.(candidate, { systemId: sysId }) || [];
   }
 
   function _classifyCompositionRecords({

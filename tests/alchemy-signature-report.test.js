@@ -16,7 +16,7 @@
  * wrapper can only see the instances a test constructed itself.
  */
 import assert from 'node:assert/strict';
-import { beforeEach, describe, it } from 'node:test';
+import { afterEach, beforeEach, describe, it } from 'node:test';
 
 import { installFoundryEnv } from './helpers/foundryEnv.js';
 
@@ -28,6 +28,7 @@ const { SignatureValidator, readSignatureCounters, resetSignatureCounters } = aw
   '../src/systems/SignatureValidator.js'
 );
 const { REVISION_SCOPES } = await import('../src/systems/revisionTokens.js');
+const { createAdminStore } = await import('../src/ui/svelte/stores/adminStore.js');
 
 const SYSTEM_ID = 'sys-alchemy';
 
@@ -688,5 +689,392 @@ describe('the report scans exactly the recipes the audit scans', () => {
     // Three, not four: the keyless record is invisible to the scan. A cache that had
     // "corrected" the truthy test to the model's `!== false` would report four here.
     assert.equal(manager._validateSignatures(candidate).errors.length, 3);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The recipe editor's live-draft prediction (issue 1201)
+// ---------------------------------------------------------------------------
+
+/** Every store an editor test opened, closed after it by {@link afterEach}. */
+const openedEditorStores = [];
+
+/**
+ * An admin store wired to a real `RecipeManager` and the system-manager double above.
+ *
+ * `selectedSystemId` is seeded from the `lastManagedCraftingSystem` setting at
+ * construction, and that plus the two manager services is the WHOLE of the state
+ * `getRecipeSignatureConflicts` reads — it touches no projection — so the store is held at
+ * `isFabricateReady() === false`. That is not a convenience: `createAdminStore` fires an
+ * un-awaited `refresh()`, whose whole-system projection does signature work of its own, and
+ * a projection landing on a microtask between a counter reset and its reading would make
+ * every measurement below unreadable. Held not-ready, the refresh publishes a loading state
+ * and returns.
+ *
+ * @param {object} manager
+ * @param {object} systemManager
+ * @returns {object}
+ */
+function editorStore(manager, systemManager) {
+  const store = createAdminStore({
+    getSetting: (key) => (key === 'lastManagedCraftingSystem' ? SYSTEM_ID : ''),
+    setSetting: async () => {},
+    isFabricateReady: () => false,
+    getCraftingSystemManager: () => systemManager,
+    getRecipeManager: () => manager,
+    localize: (key) => key,
+    notify: { info: () => {}, warn: () => {}, error: () => {} },
+  });
+  openedEditorStores.push(store);
+  return store;
+}
+
+/**
+ * The editor's draft shape: the recipe JSON `cloneRecipeDraft` hands the editor, which is
+ * `Recipe#toJSON` output and NOT the raw constructor payload.
+ *
+ * The distinction is load-bearing, not incidental. An ingredient option's component is
+ * carried on `match` in the serialised shape, and a raw `{componentId, quantity}` payload
+ * expands to NO component at all — so a suite that drafted raw payloads would compile every
+ * signature to an inert one, compare nothing, find nothing, and pass every counter
+ * assertion below while proving none of them.
+ *
+ * @param {string} id
+ * @param {string[][]} sets
+ * @param {{enabled?: boolean}} [options]
+ * @returns {object}
+ */
+function draftJson(id, sets, options = {}) {
+  return new Recipe(recipePayload(id, sets, options)).toJSON();
+}
+
+/**
+ * `adminStore`'s module-private `_getManagedItems`, reproduced.
+ *
+ * The component source the deleted editor audit read, and one of the two things the
+ * routing change substitutes: the retained path reaches components through
+ * `CraftingSystemManager.getComponentsForSystem` instead. An oracle that read the NEW
+ * source could not tell the two apart, so it is the OLD one that belongs here.
+ *
+ * @param {object} system
+ * @returns {object[]}
+ */
+function managedItemsOf(system) {
+  if (Array.isArray(system?.components)) return system.components;
+  if (Array.isArray(system?.items)) return system.items;
+  return [];
+}
+
+/**
+ * The editor answer the retained path REPLACED: the whole persisted corpus copied through
+ * `toJSON`, the draft substituted for the record of the edited id, a fresh
+ * `SignatureValidator` over that copy — reading components through the deleted code's own
+ * `_getManagedItems`, not the manager seam that replaced it — one full `n(n-1)/2` audit,
+ * filtered to the conflicts naming the edited recipe.
+ *
+ * Kept as the oracle rather than deleted with the code, because "identical conflicts, same
+ * order, same messages" is the entire claim of the routing change, and an oracle that
+ * shared any part of the retained path could not falsify it. Each of the three
+ * collaborators keeps the deleted code's `id === sysId` guard for the same reason: an
+ * oracle that answered for a system it was never asked about would agree with a retained
+ * path that did too.
+ *
+ * Two departures from the deleted text, neither of them a behaviour of the substitution:
+ * `sysId` — `get(selectedSystemId)`, which {@link editorStore} seeds to `SYSTEM_ID` — is
+ * inlined as that constant, and the store's early returns for a missing service, id or
+ * system are omitted because the fixture always supplies them.
+ *
+ * @param {object} manager
+ * @param {object} systemManager
+ * @param {string} recipeId
+ * @param {object|null} draftRecipe
+ * @returns {{code: string|null, params: object, message: string}[]}
+ */
+function priorEditorAudit(manager, systemManager, recipeId, draftRecipe = null) {
+  const system = systemManager.getSystem(SYSTEM_ID);
+  if (system?.resolutionMode !== 'alchemy') return [];
+  const persisted = manager.getRecipes({ craftingSystemId: SYSTEM_ID }) || [];
+  const recipesJson = persisted.map((recipe) => {
+    if (draftRecipe && String(recipe?.id) === String(recipeId)) return draftRecipe;
+    return typeof recipe?.toJSON === 'function' ? recipe.toJSON() : recipe;
+  });
+  const components = managedItemsOf(system);
+  const validator = new SignatureValidator({
+    getSystem: (id) => (id === SYSTEM_ID ? system : null),
+    getRecipesForSystem: (id) => (id === SYSTEM_ID ? recipesJson : []),
+    getComponentsForSystem: (id) => (id === SYSTEM_ID ? components : []),
+  });
+  return validator
+    .validateSystem(SYSTEM_ID)
+    .conflicts.filter(
+      (conflict) =>
+        String(conflict.recipeA?.id) === String(recipeId) ||
+        String(conflict.recipeB?.id) === String(recipeId)
+    )
+    .map((conflict) => ({ code: conflict.code, params: conflict.params, message: conflict.message }));
+}
+
+/**
+ * A corpus of `size` recipes with PAIRWISE DISTINCT signatures, one component each.
+ *
+ * Distinct on purpose: the corpus-independence claim is about the candidate's indexed
+ * cohort, and a corpus that recycles three components would give every draft a cohort of
+ * `size / 3` and grow with the corpus for a sound reason. Here a draft's cohort is one
+ * entry however large the system is, so a count that grows is the audit leaking back in.
+ *
+ * @param {number} size
+ * @returns {{recipes: object[], components: object[]}}
+ */
+function distinctCorpus(size) {
+  return {
+    recipes: Array.from({ length: size }, (_unused, index) =>
+      recipePayload(`row-${index}`, [[`c${index}`]])
+    ),
+    components: Array.from({ length: size }, (_unused, index) => component(`c${index}`)),
+  };
+}
+
+/**
+ * Cold and warm counter readings for `keystrokes` draft mutations in a `size`-recipe system.
+ *
+ * Each keystroke passes a FRESH draft object, as the editor's `$derived` does — it rebuilds
+ * `recipeDraft` by spread on every patch — so nothing can be memoised on draft identity.
+ *
+ * @param {number} size
+ * @param {number} keystrokes
+ * @returns {{cold: object, warm: object, conflicts: object[]}}
+ */
+function measureEditorKeystrokes(size, keystrokes) {
+  const { recipes, components } = distinctCorpus(size);
+  const { manager, systemManager } = makeManager({ recipes, components });
+  const store = editorStore(manager, systemManager);
+  // The GM retypes row-0's ingredient onto row-1's component: a draft that DIFFERS from its
+  // persisted copy, so the report's "unchanged candidate" fast path cannot fire and every
+  // keystroke genuinely has a question to ask.
+  const draftAt = (keystroke) => ({
+    ...draftJson('row-0', [['c1']]),
+    name: `Row 0 draft ${keystroke}`,
+  });
+
+  resetSignatureCounters();
+  const conflicts = store.getRecipeSignatureConflicts('row-0', draftAt(0));
+  const cold = readSignatureCounters();
+
+  resetSignatureCounters();
+  for (let keystroke = 1; keystroke <= keystrokes; keystroke += 1) {
+    store.getRecipeSignatureConflicts('row-0', draftAt(keystroke));
+  }
+  return { cold, warm: readSignatureCounters(), conflicts };
+}
+
+describe('the recipe editor predicts a collision without auditing the system', () => {
+  beforeEach(() => resetSignatureCounters());
+  // A live store subscribes to the world's data-change hooks and coalesces a refresh onto a
+  // microtask; closing it keeps that refresh from landing in the NEXT test's counters.
+  afterEach(() => {
+    while (openedEditorStores.length) openedEditorStores.pop().destroy?.();
+  });
+
+  it('answers a draft that DIFFERS from its persisted copy exactly as the prior audit did', () => {
+    // r-c is the corpus bystander that collides with nobody. The GM retypes its ingredient
+    // onto the shared component, which is the case the whole surface exists for.
+    const { manager, systemManager } = makeManager({ recipes: COLLIDING_CORPUS });
+    const store = editorStore(manager, systemManager);
+    const draft = draftJson('r-c', [['c1']]);
+
+    const expected = priorEditorAudit(manager, systemManager, 'r-c', draft);
+    assert.equal(expected.length, 3, 'the draft collides with r-a, r-b and r-d’s second set');
+    assert.deepEqual(store.getRecipeSignatureConflicts('r-c', draft), expected);
+  });
+
+  it('answers an UNCHANGED draft, and one carrying a second colliding set, identically', () => {
+    // Two shapes the retained path takes different routes to: an unchanged draft is answered
+    // from the report's filed conflicts, while a draft with an extra set must compare the
+    // candidate's own sets with each other as well as with the system.
+    const { manager, systemManager } = makeManager({ recipes: COLLIDING_CORPUS });
+    const store = editorStore(manager, systemManager);
+
+    for (const draft of [
+      manager.getRecipe('r-d').toJSON(),
+      draftJson('r-d', [['c3'], ['c1'], ['c1']]),
+      draftJson('r-a', [['c2']]),
+    ]) {
+      assert.deepEqual(
+        store.getRecipeSignatureConflicts(draft.id, draft),
+        priorEditorAudit(manager, systemManager, draft.id, draft),
+        `the retained path disagreed with the prior audit for a draft of ${draft.id}`
+      );
+    }
+  });
+
+  it('answers a DISABLED draft empty, as the enabled-scoped audit it replaced did', () => {
+    // The substituting audit dropped a disabled draft's entries from the scan, so it named
+    // no conflict for the edited recipe. The retained path refuses the candidate outright.
+    // Same answer, and it must stay the same answer: showing a prediction here would be a
+    // behaviour change wearing a performance fix's clothes.
+    const { manager, systemManager } = makeManager({ recipes: COLLIDING_CORPUS });
+    const store = editorStore(manager, systemManager);
+    const draft = draftJson('r-a', [['c1']], { enabled: false });
+
+    assert.deepEqual(priorEditorAudit(manager, systemManager, 'r-a', draft), []);
+    assert.deepEqual(store.getRecipeSignatureConflicts('r-a', draft), []);
+  });
+
+  it('answers with NO draft from the persisted record, as the unfiltered audit did', () => {
+    const { manager, systemManager } = makeManager({ recipes: COLLIDING_CORPUS });
+    const store = editorStore(manager, systemManager);
+
+    assert.deepEqual(
+      store.getRecipeSignatureConflicts('r-a'),
+      priorEditorAudit(manager, systemManager, 'r-a'),
+      'r-a collides with r-b and with r-d’s second set'
+    );
+    assert.equal(store.getRecipeSignatureConflicts('r-a').length, 2);
+    assert.deepEqual(store.getRecipeSignatureConflicts('r-missing'), []);
+  });
+
+  it('answers [] with no draft for a recipe of ANOTHER system, as the scoped audit did', () => {
+    // `RecipeManager.getRecipe` is keyed on the recipe id alone and spans every system,
+    // while the audit this replaced scanned the SELECTED system's cohort and filtered to
+    // `recipeId` — so a record belonging elsewhere named no conflict at all. Unscoped, the
+    // candidate seam compiles that record against THIS system's report, finds no cohort
+    // slot for it, and appends it as a newcomer: three conflicts for a recipe the tab is
+    // not looking at. The DRAFT leg is deliberately not scoped this way — a draft is
+    // scanned under the id it was opened on whether or not anything is persisted under it
+    // (issue 1167), which is the case above.
+    const foreign = {
+      ...recipePayload('r-foreign', [['c1']]),
+      craftingSystemId: 'other-system',
+    };
+    const { manager, systemManager } = makeManager({ recipes: [...COLLIDING_CORPUS, foreign] });
+    const store = editorStore(manager, systemManager);
+
+    assert.equal(
+      manager.getRecipe('r-foreign').craftingSystemId,
+      'other-system',
+      'the premise is a recipe the selected system does not hold'
+    );
+    assert.equal(
+      manager.getSignatureConflicts(new Recipe({ ...foreign, craftingSystemId: SYSTEM_ID }), {
+        systemId: SYSTEM_ID,
+      }).length,
+      3,
+      'and one whose signature would collide three ways were it in the selected system'
+    );
+
+    assert.deepEqual(
+      priorEditorAudit(manager, systemManager, 'r-foreign'),
+      [],
+      'the audit this replaced never scanned it'
+    );
+    assert.deepEqual(store.getRecipeSignatureConflicts('r-foreign'), []);
+  });
+
+  it('answers a NOT-YET-PERSISTED draft as an audit of the post-create cohort would', () => {
+    // The ONE answer this change moves, and it moves off a vacuous one. The prior audit
+    // substituted the draft for a persisted record of the same id and did nothing else, so a
+    // draft with no persisted record was dropped from the scan entirely and the editor
+    // predicted "no collision" for every new recipe — issue 1167's vacuity, on the editor
+    // surface. The retained path appends the candidate at the cohort position persisting it
+    // would give it, which is what the enable gate the tab is predicting already does.
+    const { manager, systemManager } = makeManager({ recipes: COLLIDING_CORPUS });
+    const store = editorStore(manager, systemManager);
+    const draft = draftJson('r-new', [['c1']]);
+
+    assert.deepEqual(
+      priorEditorAudit(manager, systemManager, 'r-new', draft),
+      [],
+      'the audit this replaced predicted nothing at all for an unpersisted draft'
+    );
+    const predicted = store.getRecipeSignatureConflicts('r-new', draft);
+    assert.deepEqual(
+      predicted.map((conflict) => conflict.message),
+      oracleConflicts(manager, systemManager, new Recipe(draft)).map((c) => c.message),
+      'the prediction must equal the refusal the enable gate will give the same recipe'
+    );
+    assert.deepEqual(
+      predicted,
+      manager.getSignatureConflicts(new Recipe(draft)),
+      'and must be the enable gate’s own issue list, field for field'
+    );
+    assert.equal(predicted.length, 3);
+    assert.ok(!manager.recipes.has('r-new'), 'predicting stores nothing');
+  });
+
+  it('compiles nothing and compares nothing for a non-alchemy system', () => {
+    const { recipes } = distinctCorpus(6);
+    const { manager, systemManager } = makeManager({
+      // Every recipe shares one signature: a full collision in alchemy, legal everywhere else.
+      recipes: recipes.map((payload) => ({
+        ...payload,
+        ingredientSets: recipePayload(payload.id, [['c1']]).ingredientSets,
+      })),
+      resolutionMode: 'simple',
+    });
+    const store = editorStore(manager, systemManager);
+
+    assert.deepEqual(store.getRecipeSignatureConflicts('row-0', draftJson('row-0', [['c1']])), []);
+    assert.deepEqual(store.getRecipeSignatureConflicts('row-0'), []);
+    assert.deepEqual(
+      readSignatureCounters(),
+      { reportBuilds: 0, signatureComparisons: 0 },
+      'a non-alchemy system must short-circuit BEFORE any report work'
+    );
+  });
+
+  it('builds ONE report cold, ZERO warm, and compares a corpus-INDEPENDENT number of pairs', () => {
+    // The two counters together are the claim. `reportBuilds === 0` alone does not carry it:
+    // the fresh-validator audit this replaced also read 0, precisely because it never touched
+    // the retained report. What separates a candidate lookup from an audit is the comparison
+    // count, and the way to see that is to measure it at two corpus sizes.
+    const keystrokes = 20;
+    const small = measureEditorKeystrokes(50, keystrokes);
+    const large = measureEditorKeystrokes(200, keystrokes);
+
+    assert.equal(small.cold.reportBuilds, 1, 'the first keystroke compiles the report once');
+    assert.equal(large.cold.reportBuilds, 1);
+    assert.equal(small.warm.reportBuilds, 0, `${keystrokes} further keystrokes must recompile nothing`);
+    assert.equal(large.warm.reportBuilds, 0);
+
+    // One comparison per keystroke — the draft's single indexed collider — at BOTH sizes.
+    assert.equal(small.warm.signatureComparisons, keystrokes);
+    assert.equal(
+      large.warm.signatureComparisons,
+      small.warm.signatureComparisons,
+      'a comparison count that grew with the corpus would be an audit in disguise'
+    );
+    assert.equal(small.conflicts.length, 1, 'the draft really does collide, so the count is not zero-work');
+    assert.equal(large.conflicts.length, 1);
+
+    // The premise: the two corpora genuinely differ in size, and the cold audit shows it.
+    assert.equal(small.cold.signatureComparisons, (50 * 49) / 2 + 1);
+    assert.equal(large.cold.signatureComparisons, (200 * 199) / 2 + 1);
+  });
+
+  it('copies no recipe through toJSON, however many keystrokes are typed', () => {
+    // The other half of the cost: the prior audit mapped the ENTIRE persisted corpus through
+    // `toJSON` per call, so a 2,000-recipe system allocated 2,000 recipe copies per keystroke.
+    const { recipes, components } = distinctCorpus(40);
+    const { manager, systemManager } = makeManager({ recipes, components });
+    const store = editorStore(manager, systemManager);
+
+    let copies = 0;
+    for (const recipe of manager.recipes.values()) {
+      const original = recipe.toJSON.bind(recipe);
+      recipe.toJSON = () => {
+        copies += 1;
+        return original();
+      };
+    }
+
+    store.getRecipeSignatureConflicts('row-0', draftJson('row-0', [['c1']])); // cold
+    assert.equal(copies, 0, 'even the cold report compiles the live records, copying none');
+    for (let keystroke = 0; keystroke < 25; keystroke += 1) {
+      store.getRecipeSignatureConflicts('row-0', {
+        ...draftJson('row-0', [['c1']]),
+        name: `draft ${keystroke}`,
+      });
+    }
+    assert.equal(copies, 0, '25 keystrokes must not copy the corpus 25 times');
   });
 });
