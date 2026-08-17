@@ -13,9 +13,10 @@
  * Defect 2 is driven directly here because no in-tree caller reaches it — which is precisely
  * why it needs a test rather than a reachability argument.
  */
-import { after, afterEach, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
+import { after, afterEach, before, describe, it } from 'node:test';
+
 import { flushSync, tick } from 'svelte';
 
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
@@ -42,17 +43,41 @@ after(() => harness.teardown());
 afterEach(() => harness.remount());
 
 const TABS = Object.freeze([
-  { id: 'tracking', label: 'L.tracking', accessibleName: 'A.tracking', tooltip: 'T.tracking', icon: 'fas fa-chart-line' },
-  { id: 'activities', label: 'L.activities', accessibleName: 'A.activities', tooltip: 'T.activities', icon: 'fas fa-list' },
-  { id: 'factions', label: 'L.factions', accessibleName: 'A.factions', tooltip: 'T.factions', icon: 'fas fa-flag' },
-  { id: 'settings', label: 'L.settings', accessibleName: 'A.settings', tooltip: 'T.settings', icon: 'fas fa-gear' },
+  {
+    id: 'tracking',
+    label: 'L.tracking',
+    accessibleName: 'A.tracking',
+    tooltip: 'T.tracking',
+    icon: 'fas fa-chart-line',
+  },
+  {
+    id: 'activities',
+    label: 'L.activities',
+    accessibleName: 'A.activities',
+    tooltip: 'T.activities',
+    icon: 'fas fa-list',
+  },
+  {
+    id: 'factions',
+    label: 'L.factions',
+    accessibleName: 'A.factions',
+    tooltip: 'T.factions',
+    icon: 'fas fa-flag',
+  },
+  {
+    id: 'settings',
+    label: 'L.settings',
+    accessibleName: 'A.settings',
+    tooltip: 'T.settings',
+    icon: 'fas fa-gear',
+  },
 ]);
 
 const tabStops = (root) =>
-  Array.from(root.querySelectorAll('[data-downtime-tab]')).map((tab) => tab.getAttribute('tabindex'));
+  [...root.querySelectorAll('[data-downtime-tab]')].map((tab) => tab.getAttribute('tabindex'));
 
 const selections = (root) =>
-  Array.from(root.querySelectorAll('[data-downtime-tab]')).map((tab) => tab.getAttribute('aria-selected'));
+  [...root.querySelectorAll('[data-downtime-tab]')].map((tab) => tab.getAttribute('aria-selected'));
 
 describe('the Downtime tab strip keeps its ARIA contract', () => {
   it('emits every tooltip OUTSIDE the tablist, while each button still points at its own', async () => {
@@ -71,7 +96,7 @@ describe('the Downtime tab strip keeps its ARIA contract', () => {
       'every tooltip is still rendered, as a sibling of the tablist'
     );
     assert.deepEqual(
-      Array.from(tablist.children).map((child) => child.getAttribute('role')),
+      [...tablist.children].map((child) => child.getAttribute('role')),
       TABS.map(() => 'tab'),
       'the tablist owns tab buttons DIRECTLY, with no wrapper between'
     );
@@ -107,7 +132,11 @@ describe('the Downtime tab strip keeps its ARIA contract', () => {
   });
 
   it('keeps a tab stop when there is exactly one tab', async () => {
-    const single = await harness.mount({ tabs: [TABS[0]], activeTabId: 'nonesuch', onSelect: () => {} });
+    const single = await harness.mount({
+      tabs: [TABS[0]],
+      activeTabId: 'nonesuch',
+      onSelect: () => {},
+    });
     assert.deepEqual(tabStops(single), ['0']);
   });
 
@@ -124,7 +153,7 @@ describe('the Downtime tab strip keeps its ARIA contract', () => {
   it('shows one tooltip on focus and on hover, and hides it again', async () => {
     const root = await harness.mount({ tabs: TABS, activeTabId: 'tracking', onSelect: () => {} });
     const shown = () =>
-      Array.from(root.querySelectorAll('[data-downtime-tooltip]'))
+      [...root.querySelectorAll('[data-downtime-tooltip]')]
         .filter((tip) => tip.classList.contains('is-described'))
         .map((tip) => tip.getAttribute('data-downtime-tooltip'));
 
