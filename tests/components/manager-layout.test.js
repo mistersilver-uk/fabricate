@@ -8603,3 +8603,282 @@ test('a rail label wraps at a space and ellipsises, and never splits a word', as
     await context.close();
   }
 });
+
+// -- The companion Downtime panel's layout contract (issue 1213) -------------------------
+//
+// This is the Manager counterpart of the player seam's panel contract, and every claim in it
+// is a computed-style fact that nothing else in the repository can evaluate: happy-dom cannot
+// compute a cascade, so a mounted suite can only assert that a DECLARATION exists, never that
+// it lands on a real box.
+//
+// The chain is applied WHOLE, deliberately. Two earlier probes of this same rule reached the
+// wrong conclusion by shortening it -- one set `height: 100%` on the companion root alone,
+// which reads as definite while its ancestor is auto, and one appended a tall child to a
+// `flex-direction: column` root, where `flex-shrink: 1` squashes the child so nothing ever
+// overflows. So the fixture runs `.fabricate-manager` -> `.manager-body` -> `.manager-main` ->
+// `.downtime-host` -> `.downtime-extension-panels` -> the panel region -> the mount target,
+// with the host's own compiled CSS after the global sheet, and every overflow case below
+// controls the flex factor explicitly.
+//
+// One thing is deliberately NOT asserted anywhere here: `contain`. The Manager root's
+// `container-type: inline-size` implies layout containment, but reading the `contain` property
+// returns `none`, so an assertion on it would be measuring the absence of a declaration rather
+// than the presence of the behaviour.
+const downtimeHostPath = resolve(
+  __dirname,
+  '../../src/ui/svelte/apps/manager/downtime/WorldDowntimeExtensionHost.svelte'
+);
+const downtimeHostScoped = scopedComponentCss(downtimeHostPath);
+
+// A companion root, parameterised by the ONE thing each overflow case varies.
+const companionRoot = (style, children) =>
+  `<div id="companion-root" style="height:100%;min-height:0;${style}">${children}</div>`;
+const companionRows = '<p style="height:200px;margin:0">row</p>'.repeat(12);
+const companionShort = companionRoot('', '<p style="margin:0">short</p>');
+const MANAGER_WIDTH_LADDER = [1400, 1200, 1100, 900, 700, 600];
+
+/**
+ * Render the provider-mode chain at one Manager width and read every link's box.
+ *
+ * @param {number} managerWidth width of the whole Manager window, in px
+ * @param {string} companionMarkup what the companion mounts into the target
+ * @returns {Promise<object>} client heights down the chain, plus the panel's scroll state
+ */
+async function readCompanionPanelChain(managerWidth, companionMarkup) {
+  const hash = downtimeHostScoped.hashClass;
+  const context = await sharedBrowser.newContext({
+    viewport: { width: 1920, height: 1080 },
+    deviceScaleFactor: 1,
+  });
+  const page = await context.newPage();
+  try {
+    await page.setContent(
+      `<style>${css}</style><style>${downtimeHostScoped.css}</style>` +
+        `<div style="width:${managerWidth}px;height:760px">` +
+        `<div class="fabricate-manager" data-manager-view="world-downtime">` +
+        `<div class="manager-titlebar">titlebar</div>` +
+        `<div class="manager-header">header</div>` +
+        `<div class="manager-body">` +
+        `<aside class="manager-rail">rail</aside>` +
+        `<main class="manager-main">` +
+        `<section class="downtime-host ${hash}" data-world-downtime-host>` +
+        `<div class="downtime-extension-panels ${hash}">` +
+        `<div class="downtime-extension-panel ${hash}" role="region" tabindex="-1">` +
+        `<div class="downtime-extension-target ${hash}" data-downtime-extension-panel="board">` +
+        companionMarkup +
+        `</div></div></div></section></main></div></div></div>`
+    );
+    return await page.evaluate(() => {
+      const at = (selector) => document.querySelector(selector);
+      const panels = at('.downtime-extension-panels');
+      const host = at('.downtime-host');
+      const target = at('.downtime-extension-target');
+      const targetElement = target;
+      const targetStyle = getComputedStyle(target);
+      return {
+        main: at('.manager-main').clientHeight,
+        host: host.clientHeight,
+        panels: panels.clientHeight,
+        panelsScrollHeight: panels.scrollHeight,
+        panelsOverflowY: getComputedStyle(panels).overflowY,
+        // BOTH halves, because `scrollHeight` reports overflowing content whether or not the
+        // box can scroll it: an `overflow: hidden` panel that CLIPS its companion reports the
+        // identical `scrollHeight > clientHeight` as one that scrolls it, so overflow alone
+        // reads as "the fallback works" over a panel that silently swallows the content.
+        panelScrolls:
+          /auto|scroll/.test(getComputedStyle(panels).overflowY) &&
+          panels.scrollHeight > panels.clientHeight,
+        panelsOverflows: panels.scrollHeight > panels.clientHeight,
+        region: at('.downtime-extension-panel').clientHeight,
+        target: targetElement.clientHeight,
+        targetWidth: targetElement.clientWidth,
+        targetPadding: [
+          targetStyle.paddingTop,
+          targetStyle.paddingRight,
+          targetStyle.paddingBottom,
+          targetStyle.paddingLeft,
+        ].join(' '),
+        targetOverflow: `${targetStyle.overflowX} ${targetStyle.overflowY}`,
+        targetContainerType: targetStyle.containerType,
+        // How far the mount target sits inside the host box. Core's old `12px 20px 24px` lived
+        // on the panels row rather than on the target, so reading the target's OWN padding
+        // could never have seen it — the inset has to be measured as an offset.
+        insetTop: Math.round(target.getBoundingClientRect().top - host.getBoundingClientRect().top),
+        insetLeft: Math.round(
+          target.getBoundingClientRect().left - host.getBoundingClientRect().left
+        ),
+        hostWidth: host.clientWidth,
+        companion: at('#companion-root').clientHeight,
+      };
+    });
+  } finally {
+    await context.close();
+  }
+}
+
+test('the companion Downtime panel states a height at every link, which Chromium alone cannot gate', () => {
+  // MEASUREMENT CANNOT PROVE THIS ONE, and saying so is the point of a separate test.
+  //
+  // Chromium resolves a percentage height through a chain of `height: auto` in-flow block
+  // ancestors up to the nearest definite one, so with the host grid correct the companion's
+  // own `height: 100%` lands on the pane's height whether or not the wrapper and the target
+  // state a height themselves. Verified by removing BOTH declarations and re-running the
+  // ladder below: every number was identical. A test that only measured would be green over
+  // a chain with nothing in it.
+  //
+  // The declarations are still load-bearing, because Chromium is not the only engine Foundry
+  // runs in and CSS 2.1's own rule is the opposite one — a percentage against a containing
+  // block whose height depends on content computes to `auto`. Only Chromium is installed here,
+  // so the honest gate is the declaration rather than a second engine's measurement.
+  const hash = downtimeHostScoped.hashClass;
+  for (const selector of ['.downtime-extension-panel', '.downtime-extension-target']) {
+    const rule = blockIn(downtimeHostScoped.css, `${selector}.${hash}`);
+    assert.ok(rule, `${selector} should own a rule in the host's scoped CSS`);
+    assert.match(
+      rule,
+      /height:\s*100%/,
+      `${selector} must state its own height — Chromium's propagation hides its absence`
+    );
+  }
+});
+
+test("the companion Downtime panel hands over the Manager pane's whole height, at every width", async () => {
+  // The full ladder, because the block-size guarantee is what a companion's own `height: 100%`
+  // rests on, and `styles/fabricate.css` exempts this route from the shared `.manager-body`
+  // stack inside `@container fabricate-manager (max-width: 1120px)`. That exemption is the ONLY
+  // reason the host stays a definite-height grid below 1120px instead of becoming content-sized,
+  // which would silently invert every companion's percentage height into a page-length scroll.
+  // Delete it and the three narrow rungs here are what fails.
+  for (const managerWidth of MANAGER_WIDTH_LADDER) {
+    const read = await readCompanionPanelChain(managerWidth, companionShort);
+    const at = `at ${managerWidth}px`;
+    assert.equal(
+      read.target,
+      read.panels,
+      `the target is the panel's whole content box ${at} (got ${read.target} vs ${read.panels})`
+    );
+    assert.equal(
+      read.region,
+      read.panels,
+      `the panel region fills that box too ${at} (got ${read.region} vs ${read.panels})`
+    );
+    // The link the one-track host grid buys, and the one a vacuous equality hides: with two
+    // tracks left in place the panels landed in the `auto` one and collapsed to content height,
+    // while `target === panels` went on reading true because both sides collapsed together.
+    assert.equal(
+      read.panels,
+      read.host,
+      `and the panel row is the host's whole content box ${at} (got ${read.panels} vs ${read.host})`
+    );
+    assert.equal(
+      read.host,
+      read.main,
+      `and the host fills the Manager pane ${at} (got ${read.host} vs ${read.main})`
+    );
+    assert.ok(
+      read.main > 400,
+      `the pane is a REAL height ${at}, not a collapsed one every link agrees on (${read.main})`
+    );
+    assert.equal(
+      read.companion,
+      read.target,
+      `so a companion root asking for height: 100% actually gets it ${at}`
+    );
+  }
+});
+
+test('the companion Downtime panel is a bare box whose inline size is not guaranteed', async () => {
+  const widths = [];
+  for (const managerWidth of MANAGER_WIDTH_LADDER) {
+    const read = await readCompanionPanelChain(managerWidth, companionShort);
+    widths.push(read.targetWidth);
+    assert.equal(read.targetPadding, '0px 0px 0px 0px', 'the companion supplies its own inset');
+    assert.equal(read.targetOverflow, 'visible visible', 'and its own scroller, if it wants one');
+    assert.equal(read.targetContainerType, 'normal', 'Core imposes no CSS container on it');
+    // Core's own `12px 20px 24px` is GONE. It lived on the panels row, not on the target, so
+    // the padding read above could never have seen it; the offset from the host is what can.
+    assert.equal(read.insetTop, 0, `the target starts at the top of the host at ${managerWidth}px`);
+    assert.equal(read.insetLeft, 0, `and at its left edge at ${managerWidth}px`);
+    assert.equal(
+      read.targetWidth,
+      read.hostWidth,
+      `so the companion is handed the host's whole inline box at ${managerWidth}px`
+    );
+  }
+  // Core enforces no minimum Manager size and makes no no-horizontal-overflow promise for this
+  // panel, explicitly unlike the player seam's enforced 1024x640 floor. Pin the ladder so the
+  // contract's "not guaranteed" is a measured fact rather than a caveat nobody checked.
+  assert.ok(
+    widths.every((width, index) => index === 0 || width < widths[index - 1]),
+    `the target's inline size tracks the window all the way down (${widths.join(' -> ')})`
+  );
+  assert.ok(widths.at(-1) < 400, `and reaches a genuinely narrow box (${widths.at(-1)}px)`);
+});
+
+test('Core keeps the Downtime panel scroller for a visibly overflowing companion, and only then', async () => {
+  // Every case below states `height: 100%` on the companion root, so height is held CONSTANT
+  // and the only variable is how the root treats its own content. That is the whole point:
+  // "a full-height companion kills Core's scroller" and "a definite height kills Core's
+  // scroller" are both false, and each was believed once.
+  const visible = await readCompanionPanelChain(1400, companionRoot('display:block', companionRows));
+  assert.equal(
+    visible.panelsOverflowY,
+    'auto',
+    'Core keeps a real scroller on the panel row, not a clip that swallows the overflow'
+  );
+  assert.ok(
+    visible.panelScrolls,
+    `a full-height companion overflowing VISIBLY still scrolls (${visible.panelsScrollHeight} vs ${visible.panels})`
+  );
+
+  const nonShrinking = await readCompanionPanelChain(
+    1400,
+    companionRoot(
+      'display:flex;flex-direction:column',
+      '<div style="height:2400px;flex-shrink:0">tall</div>'
+    )
+  );
+  assert.ok(
+    nonShrinking.panelScrolls,
+    'a flex column whose child cannot shrink overflows visibly too, and still scrolls'
+  );
+
+  // The confound, pinned so it cannot be reintroduced as a probe: the SAME markup with the
+  // default flex factor squashes its child instead of overflowing, and reads as "full height
+  // killed the scroller" while nothing about height changed.
+  const shrinkable = await readCompanionPanelChain(
+    1400,
+    companionRoot('display:flex;flex-direction:column', '<div style="height:2400px">tall</div>')
+  );
+  assert.equal(
+    shrinkable.panelsOverflows,
+    false,
+    'a shrinkable child is SQUASHED rather than scrolled -- this is flex-shrink, not height'
+  );
+  assert.equal(
+    shrinkable.panels,
+    shrinkable.panelsScrollHeight,
+    'nothing overflowed at all, which is why the earlier probe measured no scroll'
+  );
+
+  const ownScroller = await readCompanionPanelChain(
+    1400,
+    companionRoot('overflow:auto', companionRows)
+  );
+  assert.equal(
+    ownScroller.panelsOverflows,
+    false,
+    'and a companion absorbing its own content with a non-visible overflow makes Core inert'
+  );
+
+  // The height stays OPT-IN either way: a companion that states none renders at content height
+  // rather than being stretched, so the contract adds a reachable box and forces nothing.
+  const noHeight = await readCompanionPanelChain(
+    1400,
+    '<div id="companion-root"><p style="margin:0">no height stated</p></div>'
+  );
+  assert.ok(
+    noHeight.companion < 100 && noHeight.target > 400,
+    `a companion stating no height keeps content height in a full-height target (${noHeight.companion} in ${noHeight.target})`
+  );
+});

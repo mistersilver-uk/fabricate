@@ -709,11 +709,55 @@ Fabricate localizes only its own fallback copy.
 
 A new context object is created — never mutated — whenever one of its values changes, which also remounts the active tab.
 
+### The Panel's Layout Contract
+
+Everything in this subsection describes **provider mode only**.
+Fabricate's own read-only preview keeps its inset, its scroller, its tab strip and its collapsible rail; none of it changes.
+
+**The panel is a bare box.**
+The element handed to `mount` is a `div` at the full height of the Manager's content pane, with no padding, background, scroller or containment of its own.
+The companion supplies its own inset.
+Fabricate's `12px 20px 24px` inset is **gone** as of this contract: a companion that shipped against it must add the equivalent padding to its own root.
+
+**Your tabs are rail items, and Fabricate renders no tab strip.**
+A provider's tabs appear once, as sub-items of the Manager rail's Downtime group, and the panel below them is a named `region` labelled by the active rail item rather than a tab panel.
+The rail is locked expanded while a provider holds this route, so those sub-items are always reachable; the rail's collapse control renders disabled and explains itself, and the GM's stored collapse preference is left untouched and restored on leaving the route.
+
+**Overflow.**
+Core's panel scroller keeps working for any companion whose content overflows its root **visibly** — including one that takes the full height.
+It stops rescuing a companion the moment that companion absorbs its own content: by giving its root a non-`visible` overflow, or by letting a definite-height flex or grid root shrink its children, which squashes them rather than scrolling them.
+Height alone does not remove the fallback.
+A companion that intends to own its layout should own its scroller explicitly rather than infer one from its height.
+
+**The block size is definite at every Manager width, and the inline size is not guaranteed.**
+`height: 100%` on your own root resolves against a real height at every window size, because this route opts out of the shared narrow-width stack that turns the Manager body content-sized.
+The inline size makes no such promise: Fabricate enforces no minimum Manager window size and makes no no-horizontal-overflow guarantee for this panel — explicitly unlike the player seam, which is guaranteed at the player window's enforced 1024x640 floor.
+Measured across an ordinary width ladder the target's inline size runs from about 1178px down to about 378px.
+Responsive behaviour inside the target is yours; if you want container queries, declare `container-type` on your own root.
+
+**`position: fixed` positions against the Manager, not the viewport.**
+The Manager root carries `container-type: inline-size`, which implies layout containment and makes it the containing block for fixed-position descendants.
+Anchor your popovers to your own root instead of assuming viewport coordinates.
+
+**`isolation: isolate` caps z-index escape.**
+The Manager root creates a stacking context, so an element inside your panel at the maximum z-index still loses to a `body`-level element at `z-index: 100`.
+Content that must paint above anything outside the Manager has to be portalled outside the Manager element, which is what Fabricate's own popovers and pickers do.
+
+**Theme tokens are inherited, not stamped.**
+Foundry stamps the theme attribute on the document element and on Fabricate roots that exist when it runs; the Manager mounts lazily and carries no attribute of its own, inheriting purely by cascade.
+Read the `--fab-*` custom properties live and your surface re-skins with no remount; snapshot their values into JavaScript at mount and it will not.
+Content you render *outside* the Manager subtree, such as your own dialogs, inherits the document's tokens rather than the Manager's.
+
+**Keyboard.**
+Once you own the scrolling, the panel is no longer the nearest scrollable ancestor, so any scroll container you create must be reachable and operable from the keyboard.
+
 ### Lifecycle And Failure
 
 Fabricate calls the returned cleanup exactly once before switching tabs, replacing or unregistering the provider, leaving the route, or closing the Manager, and always while the target is still connected.
 A mount or cleanup error is caught, logged, and contained: partial content is cleared and Fabricate's own preview takes the whole surface back — panel, tab strip, and rail entries alike — until the next registration.
 When a provider registers, unregisters, or re-registers with a different tab set, an active tab id the new set no longer declares falls back to that set's first tab, so the route never renders an empty panel.
+When such a change removes the node that held focus, Fabricate moves focus to whichever element names the active screen in the mode now live — your panel region in provider mode, its own tab button in the preview — rather than dropping it to the document body.
+It does that only when focus was inside the route's panel, so ordinary rail navigation is left alone; move focus yourself from your own mount if you want it somewhere more specific.
 The companion owns all authorization, localization, domain data, persistence, and resources it creates; Fabricate supplies only the target and Manager shell.
 
 ### Manager Hooks
@@ -914,7 +958,7 @@ Each omission is deliberate, and a companion can rely on all three:
   A fixed-position element inside the target positions against the viewport.
 - **No padding or background.** The companion owns its own inset and surface.
 
-Give your own root `height: 100%; min-height: 0` too: a root sized `height: 100%` against an `auto`-height parent collapses.
+Give your own root `height: 100%; min-height: 0` too, and note what happens if you do not: a percentage height against an `auto`-height ancestor does not collapse, it silently resolves to content height, so the root renders at whatever it happens to contain rather than filling the panel.
 If you want container queries, declare `container-type` on your own root — its inline size is the target's, so you measure the same box without Fabricate imposing containment on companions that do not want it.
 
 ### Lifecycle And Failure
