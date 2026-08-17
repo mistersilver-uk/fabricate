@@ -17,7 +17,11 @@
  * 3. **The counters can actually go up, and by an amount derived from the declared scale.** A
  *    miss over an N-component library must examine at least N candidates; a durable-flag hit
  *    must examine strictly fewer. Asserting against a recorded observation instead would pass
- *    against a counter that had been silently disconnected.
+ *    against a counter that had been silently disconnected. This covers the three counter kinds
+ *    this file imports — `countingCandidates`, `countingActor`, `countCalls` — and NOT
+ *    `scaleCounters.js`'s fourth, `countingEnumerations`, whose non-vacuity is proved at its
+ *    use site by the bulk guards in `tests/runtime-definition-indexes.test.js`. Stated so the
+ *    list above is not read as a claim of exhaustiveness over the module.
  * 4. **A different seed produces a different corpus.** Otherwise "deterministic" would be
  *    indistinguishable from "ignores its inputs".
  */

@@ -30,10 +30,18 @@
  * ## Non-vacuity
  *
  * A counter that cannot go up is worse than no counter: it reports a green baseline forever.
- * `tests/benchmark-harness.test.js` therefore asserts each counter kind against a case whose
- * expected value is derived from the fixture's declared scale rather than from a recorded
- * observation — a miss over an N-component library examines at least N candidates, and a
- * durable-flag hit examines strictly fewer.
+ * `tests/benchmark-harness.test.js` therefore asserts {@link countingCandidates},
+ * {@link countingActor} and {@link countCalls} against a case whose expected value is derived
+ * from the fixture's declared scale rather than from a recorded observation — a miss over an
+ * N-component library examines at least N candidates, and a durable-flag hit examines strictly
+ * fewer.
+ *
+ * {@link countingEnumerations} is the exception, and deliberately so rather than by omission:
+ * it arrived with issue 1202 and its non-vacuity is proved where it is USED, by the two bulk
+ * guards in `tests/runtime-definition-indexes.test.js`. Those redden under a
+ * `for (const c of components)` reintroduction that leaves the predicate counter reading zero,
+ * which is a stronger demonstration than a standalone probe: it proves the wrapper sees the
+ * one shape the rest of this module cannot.
  */
 
 /**
