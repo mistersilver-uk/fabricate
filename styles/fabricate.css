@@ -1165,6 +1165,32 @@
   box-shadow: none;
 }
 
+/* Core styles the STATE class `.active` on a button exactly like `:focus` — in
+   `@layer elements.forms`:
+
+     a.button.active, button.active {
+       outline: 1px solid var(--button-focus-outline-color);   // --color-warm-2
+       box-shadow: 0 0 4px var(--button-focus-outline-color);
+     }
+
+   `.active` is Fabricate's own selected-tab marker on the nav rail, so the
+   orange ring and glow ride along with selection and are merely MASKED while
+   the button is focused by the `:focus` reset above. Click a rail button and
+   then click into the panel, and the button is still `.active` but no longer
+   focused: the mask lifts and Foundry's orange ring appears around the selected
+   tab. Normalize the state class here alongside the focus states — the selected
+   tab is already carried by `.fabricate-app-nav-item.active`'s accent
+   background, border and text colour.
+
+   Kept at single-class specificity (0,2,1) for the same reason as the focus
+   reset: a Svelte-scoped `.foo.active` (0,3,0) and any `.fabricate-app x.active`
+   rule still win, so a component that wants its own active ring can have one. */
+.fabricate-app button.active,
+.fabricate-app a.button.active {
+  outline: none;
+  box-shadow: none;
+}
+
 /* Replace Foundry core's orange focus ring with the Fabricate accent ring for
    keyboard users. The :focus rule above strips the orange on mouse click; this
    restores an intentional ring on :focus-visible (which is also the state a nav

@@ -340,6 +340,18 @@ test('Fabricate app shells suppress host click focus outlines while preserving k
   );
 });
 
+test('Fabricate app shell suppresses the host outline on the selected-tab state class', () => {
+  // Core's `button.active` carries the same orange outline + glow as `button:focus`,
+  // so the selected nav-rail button keeps a Foundry ring once focus leaves it. The
+  // :focus reset above only masks it while the button is focused.
+  const shellActiveBlock = blockFor('.fabricate-app button.active,\n.fabricate-app a.button.active');
+
+  assert.ok(
+    shellActiveBlock.includes('outline: none;') && shellActiveBlock.includes('box-shadow: none;'),
+    'selected shell buttons should clear the host active outline and glow'
+  );
+});
+
 test('manager character modifier search suggestions keep icons in row flow', () => {
   const searchIconBlock = blockFor('.fabricate-manager .manager-search > i');
   const characterModifierSuggestionBlock = blockFor(
