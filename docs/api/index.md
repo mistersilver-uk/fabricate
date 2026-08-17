@@ -564,6 +564,9 @@ It does not establish ordinary-module script priority.
 The one-shot `ready` fallback is therefore part of the load contract.
 Do not replace it with an order assumption or a render-hook or DOM-patching integration.
 
+Arm that fallback from inside your `init` callback, exactly as the example below does, and never at your module's ESM top level.
+The placement is load-bearing for the same script-ordering reason on both seams, and [Player Navigation Extension](#player-navigation-extension) sets that reason out in full.
+
 ### Worked Example
 
 ```javascript
@@ -868,6 +871,18 @@ The visible rail label truncates with an ellipsis inside its fixed-width button;
 
 `mount({ target, tabId, context })` must be synchronous and return either one cleanup function or nothing.
 `tabId` is always the provider's own **bare** tab id, never the composed route key.
+
+That composed key is `ext:<surfaceId>:<tabId>`, and Fabricate addresses every provider tab by it rather than by the bare tab id.
+That is what makes a collision with a Core tab id structurally impossible without Fabricate learning a single provider id.
+The route key is what the window's active-tab state, the rail button's selection attribute, and the window's tab query all carry, so it is also the value you pass to open one of your own tabs yourself:
+
+```javascript
+// The worked example's provider id is 'downtime' and one of its tab ids is 'projects'.
+game.fabricate.api.getFabricateAppClass().show('ext:downtime:projects');
+```
+
+The window falls back to its Crafting tab when the key names a tab no registered provider currently offers, so register before you call it.
+
 `context` is a frozen object carrying no Fabricate store, document, or component:
 
 <!-- markdownlint-disable markdownlint-sentences-per-line -->
@@ -904,23 +919,33 @@ If you want container queries, declare `container-type` on your own root — its
 
 ### Lifecycle And Failure
 
-Fabricate calls the returned cleanup exactly once — before a tab switch, a provider change, or the window closing removes the target — and always while the target is still connected.
-The player application disposes a mounted companion immediately before `ApplicationV2` closes and unmounts its Svelte root.
+Fabricate calls the returned cleanup exactly once, while the target is still connected, and before whatever ended the mount removes it.
+That holds on every path that ends a mount: a tab change within your own surface, a tab change away to a Core tab, a tab change to a different companion's surface, your provider unregistering while one of its tabs is live, and the window closing.
+It holds for a selection Fabricate makes on the user's behalf as well, such as the fallback described below.
+Fabricate reaches the disposal from outside your mounted subtree and before the state change that removes it, and the disposal is idempotent, so a second caller reaching it does not run your cleanup twice.
+On window close the player application disposes first, then unmounts its Svelte root, and only then does `ApplicationV2` remove the window element.
 
 A mount or cleanup error is caught, logged, and contained, and the containment is deliberately **legible** rather than silent:
 
 - partial content is cleared;
 - the faulted surface's rail entries **stay**, and the active tab does not move;
 - Fabricate renders its own error state in the panel, naming the provider that failed;
-- the registration survives — the provider is set aside, never unregistered — so a later snapshot may mount without the companion re-registering, on the condition spelled out below;
+- the registration survives — the provider is set aside, never unregistered — so a later mount may succeed without the companion re-registering, on the conditions spelled out below;
 - focus is recovered onto the surface's rail button rather than dropping to the document body.
 
 The fault is recorded against the whole **surface**, not against the tab that threw.
 It is keyed on the `(surfaceId, provider)` pair, so once one of your tabs fails to mount, selecting any other tab of the same provider shows the same error state and Fabricate does not attempt another mount for it.
 That is deliberate containment rather than a per-tab retry: Fabricate cannot distinguish a tab-specific failure from a broken provider, and retrying the siblings of a provider that has already thrown would just repeat the fault.
-The fault clears only when a new snapshot carries a **different provider object** for the surface, which is what "a later snapshot may mount" means above.
+Two things clear it, and neither of them is a retry Fabricate performs on its own.
+
+The first is a new snapshot carrying a **different provider object** for the surface, which is what "a later snapshot may mount" means above.
 Unregistering and re-registering is such a snapshot only when the second registration passes a different object: a companion that re-registers the same module-level singleton hands Fabricate a provider that is still `===` the recorded one, so the fault and its error state survive.
 Register a freshly built provider object when you want the surface retried.
+
+The second is the user closing and reopening the player window.
+The record of which providers have faulted belongs to that window and is discarded when the window is torn down, so the next open mounts your provider again even though it is the same object.
+That is the retry Fabricate's own error state offers the user, and it is why a fault caused by a transient condition does not strand the surface until the world reloads.
+Bringing an already-open window back to the front is not a reopen and clears nothing.
 
 When a provider registers, unregisters, or re-registers with a different tab set, an active route key the new set no longer offers falls back to Fabricate's default Crafting tab, so the window never renders an empty panel.
 

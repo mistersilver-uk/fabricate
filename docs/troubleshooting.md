@@ -615,6 +615,33 @@ Make sure Fabricate is up to date.
 
 ---
 
+## A Tab Added by Another Module Will Not Display
+
+**Symptom:** The Fabricate window shows a tab that another module added, and choosing it displays **This section could not be displayed** instead of that module's content.
+
+**Cause:**
+
+Another installed module can add its own tabs to the Fabricate window.
+Fabricate supplies the tab and the space beneath it, and the other module draws everything inside that space.
+When that module fails while drawing its content, Fabricate shows the message in place of the panel rather than leaving a blank or half-drawn section.
+The message names the section that failed.
+
+**Fix:**
+
+1. Close the Fabricate window, open it again, and choose the tab again.
+   Fabricate tries the section afresh on every new window, which is enough when the failure was a one-off.
+   Bringing an already-open window back to the front does not retry it.
+2. If the message comes back every time, report it to the author of the module that added the tab rather than to Fabricate, and quote the section name the message gives.
+3. Disabling that module removes its tabs from the Fabricate window altogether.
+   Fabricate puts nothing in their place.
+
+Fabricate's own tabs keep working throughout.
+The message covers the whole section rather than one tab of it, so every tab belonging to that section shows it until the section is retried.
+
+**See also:** [Downtime Preview]({% link downtime-preview.md %}) covers installed companion modules that replace the GM downtime preview.
+
+---
+
 ## Before filing an issue
 
 If the steps above do not resolve your problem, work through this checklist before opening a bug report:

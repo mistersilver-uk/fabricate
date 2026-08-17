@@ -62,13 +62,16 @@ export function parseRouteKey(key) {
 }
 
 /**
- * Is `id` one of Core's own tab ids rather than a provider route key?
+ * Does `id` address Core rather than a registered provider surface?
  *
- * Structural on purpose. Core must not enumerate the ids it accepts from a provider, and
- * the five Core tab ids are already declared once — in the shell's own tab table — so a
- * list here would be a second copy of that table, which is the mirror this module exists
- * to remove. A caller that needs "is this one of MY five" intersects its own table; this
- * answers the only question the seam owns, which is "does this key address a provider".
+ * Structural on purpose, and deliberately NOT a membership test: it is true of any non-empty
+ * string that is not an extension route key, `bogus` included. Core must not enumerate the
+ * ids it accepts from a provider, and its own five tab ids are already declared by each
+ * caller that owns a Core tab set — the shell's own tab table and the application host's
+ * offered-route set — so a list here would be one more copy of the table this module exists
+ * to stop mirroring. A caller that needs "is this one of MY five" intersects its own table,
+ * which is exactly what `isOfferedTab` in `SvelteFabricateApp.svelte.js` does; this answers
+ * the only question the seam owns, which is "does this key address a provider".
  *
  * @param {*} id Candidate tab id.
  * @returns {boolean} True for a non-empty string that is not an extension route key.
