@@ -42,7 +42,13 @@ describe('handleFabricateSettingChange', () => {
       callAll: (hook, payload) => emitted.push([hook, payload]),
     });
     assert.equal(handled, true);
-    assert.deepEqual(emitted, [['fabricate.craftingSystemsChanged', [{ id: 's1' }]]]);
+    assert.deepEqual(emitted, [
+      ['fabricate.craftingSystemsChanged', [{ id: 's1' }]],
+      // The scoped signal rides beside the published hook on BOTH replication branches (issue
+      // 1078 part B1). This double reports no scopes, so the payload is the unattributable one
+      // every consumer routes broadly — the safe answer for a manager that cannot name a delta.
+      ['fabricate.craftingDataChanged', { source: 'systems', scopes: [] }],
+    ]);
   });
 
   it('reloads but does NOT re-emit when systems are unchanged (writing-client no-op)', () => {
@@ -71,9 +77,10 @@ describe('handleFabricateSettingChange', () => {
       recipeManager,
       callAll: (hook, payload) => emitted.push([hook, payload]),
     });
-    assert.equal(emitted.length, 1);
+    assert.equal(emitted.length, 2);
     assert.equal(emitted[0][0], 'fabricate.recipesChanged');
     assert.deepEqual(emitted[0][1], { action: 'external', recipes: [{ id: 'r1' }] });
+    assert.deepEqual(emitted[1], ['fabricate.craftingDataChanged', { source: 'recipes', scopes: [] }]);
   });
 
   it('reloads the gathering environment store and re-emits the change hook', () => {
@@ -200,6 +207,7 @@ describe('a whole-corpus setting DELETE is handled and deliberately inert (issue
     assert.equal(handled, true);
     assert.deepEqual(emitted, [
       ['fabricate.recipesChanged', { action: 'external', recipes: [{ id: 'r1' }] }],
+      ['fabricate.craftingDataChanged', { source: 'recipes', scopes: [] }],
     ]);
   });
 
@@ -251,6 +259,28 @@ describe('per-record recipe replication (issue 1080 -b)', () => {
     ]);
     assert.deepEqual(emitted, [
       ['fabricate.recipesChanged', { action: 'external', recipes: [{ id: 'r1' }] }],
+      ['fabricate.craftingDataChanged', { source: 'recipes', scopes: [] }],
+    ]);
+  });
+
+  it('mints the scoped signal on the PER-RECORD branch, from the manager delta', () => {
+    // Issue 1078 part B1, task A6. This branch never calls `reload()`, so it is the one the
+    // whole-corpus wiring silently skips — and the moment #1211 flips the Definition Storage
+    // Target off `singleArray` it is the ONLY branch a player's client takes.
+    const emitted = [];
+    const recipeManager = {
+      ...perRecordRecipeManagerDouble([{ id: 'r1' }]),
+      consumeReplicatedChangeScopes: () => [{ systemId: 'sys-a', domains: ['narrative'] }],
+    };
+    handleFabricateSettingChange('fabricate.recipe.r1', {
+      recipeManager,
+      callAll: (hook, payload) => emitted.push([hook, payload]),
+      operation: 'update',
+      document: { key: 'fabricate.recipe.r1' },
+    });
+    assert.deepEqual(emitted[1], [
+      'fabricate.craftingDataChanged',
+      { source: 'recipes', scopes: [{ systemId: 'sys-a', domains: ['narrative'] }] },
     ]);
   });
 
@@ -405,6 +435,11 @@ describe('createRecipeRefreshCoalescer (issue 1080 -b)', () => {
     assert.equal(recipeManager.seen.length, 50, 'every record was applied to the map');
     assert.deepEqual(emitted, [
       ['fabricate.recipesChanged', { action: 'external', recipes: [{ id: 'r1' }] }],
+      // ONE scoped signal too, for the whole bracket. The double names no scopes, so the
+      // batch is unattributable and routes broadly — which is the honest answer when the
+      // manager cannot say what moved. `invalidation-domain-signal.test.js` covers the
+      // accumulating case, where every record of the bracket contributes its own scope.
+      ['fabricate.craftingDataChanged', { source: 'recipes', scopes: [] }],
     ]);
   });
 
@@ -423,7 +458,7 @@ describe('createRecipeRefreshCoalescer (issue 1080 -b)', () => {
     assert.equal(emitted.length, 0, 'deferred to the end of the synchronous burst');
     assert.equal(scheduler.depth, 1, 'and scheduled exactly once for the whole burst');
     scheduler.drain();
-    assert.deepEqual(emitted, ['fabricate.recipesChanged']);
+    assert.deepEqual(emitted, ['fabricate.recipesChanged', 'fabricate.craftingDataChanged']);
   });
 
   it('only the outermost close emits, so nested brackets do not double-signal', () => {
@@ -458,7 +493,7 @@ describe('createRecipeRefreshCoalescer (issue 1080 -b)', () => {
       recipeManager: perRecordRecipeManagerDouble([{ id: 'r1' }]),
       callAll: (hook) => emitted.push(hook),
     });
-    assert.deepEqual(emitted, ['fabricate.recipesChanged']);
+    assert.deepEqual(emitted, ['fabricate.recipesChanged', 'fabricate.craftingDataChanged']);
   });
 });
 

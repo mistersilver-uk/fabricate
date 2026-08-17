@@ -71,9 +71,16 @@ import {
   resolveMaxModifierPicks,
   resolveModifierBounds,
 } from './checkModifierResolver.js';
+import {
+  craftingDataChange,
+  domainsForRecord,
+  emitCraftingDataChanged,
+  PendingChangeDomains,
+} from './craftingDataChange.js';
 import { applyDefinitionChange } from './CraftingDefinitionRepository.js';
 import { normalizeCurrencyConfig } from './currencyProfile.js';
 import { normalizeGatheringRealmList, normalizeGatheringRealmSettings } from './gatheringRealms.js';
+import { ALL_INVALIDATION_DOMAINS, domainsForSystemFields } from './invalidationDomains.js';
 import { normalizePreviewSandbox } from './progressiveCheckSandbox.js';
 import { RecipeActivationError } from './RecipeActivationError.js';
 import { RecipePersistenceError } from './RecipePersistenceError.js';
@@ -91,6 +98,21 @@ import { SignatureValidator } from './SignatureValidator.js';
 // model and the adminStore editor without duplicating the literal lists.
 const TOOL_BREAKAGE_MODES = new Set(TOOL_BREAKAGE_MODE_LIST);
 const MISSING_SOURCE_FLAG = Symbol('missing-source-flag');
+
+// The invalidation-domain attributions every `save()` site in this manager names (issue 1078
+// part B1). Derived from the FIELD map rather than by listing domains, so a locally authored
+// mutation and the replicated copy of that same mutation — which is attributed from
+// `corpusDelta`'s changed-field list through the same map — cannot be classified differently.
+// Hoisted because a fresh `domainsForSystemFields([...])` per call site is both allocation on a
+// write path and near-identical repeated code the SonarCloud duplication gate counts.
+const COMPONENT_FACTS = domainsForSystemFields(['components']);
+const TOOL_FACTS = domainsForSystemFields(['tools']);
+const RECIPE_ITEM_FACTS = domainsForSystemFields(['recipeItemDefinitions']);
+// A component delete also rewrites the essence definitions that pointed at it, and an essence
+// delete strips the essence from every component: one attribution serves both directions.
+const ESSENCE_FACTS = domainsForSystemFields(['essenceDefinitions', 'components']);
+// `repairItemData` refreshes definition names, images and descriptions for BOTH libraries.
+const ITEM_METADATA_FACTS = domainsForSystemFields(['components', 'tools']);
 
 export class CraftingSystemManager {
   /**
@@ -123,6 +145,9 @@ export class CraftingSystemManager {
     // `consumeReloadDelta()`.
     /** @type {import('./revisionTokens.js').CorpusDelta|null} */
     this._reloadDelta = null;
+    // The invalidation domains attributed since the last announcement (issue 1078 part B1).
+    // Recorded by `save({domains})`, drained by `_notifySystemsChanged`.
+    this._pendingDomains = new PendingChangeDomains();
     // Shares THIS map rather than mirroring it, and hydrates through the manager's own
     // `_normalizeSystem`. That normalizer is a WHITELIST REBUILD — a key it does not
     // emit is dropped from storage on the next save — so the repository must call it
@@ -2393,21 +2418,101 @@ export class CraftingSystemManager {
    * it looks: it runs on the `updateItem` hook, so while it was bare, every GM item rename in
    * the world advanced every crafting system's token on every client.
    *
+   * ## `domains` (issue 1078 part B1)
+   *
+   * Every named save also says WHICH CLASSES OF FACT it moved, as members of
+   * `INVALIDATION_DOMAINS`. Omitting the key is legal and means "every domain", which is the
+   * safe direction and the reason an unannotated site cannot go stale — but it is also silent,
+   * so `tests/invalidation-domain-attribution.test.js` counts the sites rather than pinning a
+   * list of them.
+   *
+   * For a `batch`, `domains` may be **per record**: a `Map` or plain object keyed by record id.
+   * A flat array would apply every listed domain to every listed system, which is the
+   * over-broad invalidation this issue exists to remove, at batch scale.
+   *
    * @param {import('./CraftingDefinitionRepository.js').DefinitionChange} [change]
    */
   async save(change = null) {
-    // The revision-token advance point for the system domain (issue 1076). `save()` is
+    // The revision-token advance point for the systems entity scope (issue 1076). `save()` is
     // this manager's single persistence chokepoint — every mutating method ends here, and
     // it is already the seam 30 test files replace — so announcing the change once, here,
     // beats auditing every mutating method for a missing advance. A whole-corpus save
     // (`change === null`, which is what a `persist: false` batch flushes with) advances
     // every system, because it is exactly the case where the manager was not told what
     // moved.
-    if (change?.put?.id != null) this._advanceSystemRevision(change.put.id);
-    else if (change?.delete != null) this._advanceSystemRevision(change.delete);
-    else if (change?.batch) this._advanceSystemRevision(...[...change.batch].map((r) => r?.id));
-    else this._advanceSystemRevision(...this.systems.keys());
+    const touched = this._savedSystemIds(change);
+    this._advanceSystemRevision(...touched);
+    for (const systemId of touched) {
+      this._attributeChange(domainsForRecord(change, systemId), systemId);
+    }
     await applyDefinitionChange(this._repository, change, this.systems.values());
+  }
+
+  /**
+   * The system ids one {@link save} touched.
+   *
+   * @param {object|null} change
+   * @returns {string[]}
+   * @private
+   */
+  _savedSystemIds(change) {
+    if (change?.put?.id != null) return [change.put.id];
+    if (change?.delete != null) return [change.delete];
+    if (change?.batch) return [...change.batch].map((record) => record?.id);
+    return [...this.systems.keys()];
+  }
+
+  /**
+   * Advance the `facts:<domain>:<systemId>` token of every named pair (issue 1078 part B1).
+   *
+   * @param {readonly string[]} domains An omitted set means every domain and an EXPLICIT empty
+   *   one means unattributable; both advance every fact scope, because in neither case can a
+   *   fact class be ruled out.
+   * @param {...(string|null|undefined)} systemIds
+   * @returns {void}
+   * @private
+   */
+  _advanceFactScopes(domains, ...systemIds) {
+    const advanced =
+      Array.isArray(domains) && domains.length > 0 ? domains : ALL_INVALIDATION_DOMAINS;
+    for (const systemId of systemIds) {
+      if (systemId == null) continue;
+      this._revisions.advance(...advanced.map((domain) => REVISION_SCOPES.facts(domain, systemId)));
+    }
+  }
+
+  /**
+   * Attribute a LOCAL mutation: advance its fact scopes and record it for
+   * {@link _notifySystemsChanged} to drain into the change signal.
+   *
+   * @param {readonly string[]} domains
+   * @param {...(string|null|undefined)} systemIds
+   * @returns {void}
+   * @private
+   */
+  _attributeChange(domains, ...systemIds) {
+    this._advanceFactScopes(domains, ...systemIds);
+    this._pendingDomains.record(domains, ...systemIds);
+  }
+
+  /**
+   * The domains a REPLACEMENT of one stored system belongs to, read off the fields that moved.
+   *
+   * `updateSystem` is the one site whose attribution cannot be a constant — it accepts an
+   * arbitrary patch — so it derives one, through the same {@link corpusDelta} the replication
+   * path uses. Both systems are already normalized plain objects, so no projection is needed.
+   *
+   * @param {object|null} previous
+   * @param {object|null} next
+   * @returns {string[]}
+   * @private
+   */
+  _domainsForSystemEdit(previous, next) {
+    if (!previous || !next) return [...ALL_INVALIDATION_DOMAINS];
+    const delta = corpusDelta([previous], [next]);
+    if (delta.reordered) return [...ALL_INVALIDATION_DOMAINS];
+    const entry = [...delta.perRecord.values()][0];
+    return entry ? domainsForSystemFields(entry.fields) : [];
   }
 
   /**
@@ -2471,11 +2576,16 @@ export class CraftingSystemManager {
     if (delta.reordered) {
       this.systems = next;
       this._advanceSystemRevision(...next.keys());
+      // Attributable to no record, so to no fact class either (issue 1078 part B1).
+      this._advanceFactScopes([], ...next.keys());
       return true;
     }
 
     patchCorpusInPlace(this.systems, next, delta);
     this._advanceSystemRevision(...delta.perRecord.keys());
+    for (const [systemId, entry] of delta.perRecord) {
+      this._advanceFactScopes(domainsForSystemFields(entry.fields), systemId);
+    }
     return true;
   }
 
@@ -2495,6 +2605,28 @@ export class CraftingSystemManager {
     const delta = this._reloadDelta;
     this._reloadDelta = null;
     return delta;
+  }
+
+  /**
+   * The invalidation scopes of the most recent REPLICATED change, consumed from its delta
+   * (issue 1078 part B1).
+   *
+   * `consumeReloadDelta()`'s production caller on the systems side, and the systems-side
+   * sibling of {@link RecipeManager#consumeReplicatedChangeScopes}. A crafting system IS the
+   * record, so its id is the scope owner directly.
+   *
+   * A `reordered` delta yields NO scopes, which every consumer routes broadly — the contract
+   * `corpusDelta` states for an unattributable change.
+   *
+   * @returns {{systemId: string|null, domains: string[]}[]}
+   */
+  consumeReplicatedChangeScopes() {
+    const delta = this.consumeReloadDelta();
+    if (!delta?.changed || delta.reordered) return [];
+    return [...delta.perRecord].map(([systemId, entry]) => ({
+      systemId,
+      domains: domainsForSystemFields(entry.fields),
+    }));
   }
 
   /**
@@ -2774,7 +2906,7 @@ export class CraftingSystemManager {
     // player's loaded systems/recipes stay self-consistent for this session; the
     // GM's write replicates the durable fix to them via the `updateSetting` bridge.
     if (!this._isActiveGM()) return false;
-    if (systemsChanged) await this.save();
+    if (systemsChanged) await this.save({ domains: RECIPE_ITEM_FACTS });
     if (recipesChanged) await this.recipeManager.save();
     return systemsChanged || recipesChanged;
   }
@@ -2785,7 +2917,7 @@ export class CraftingSystemManager {
     this._assertValidSystemId(system.id);
     this._assertUniqueComponentSourcesForSystem(system);
     this.systems.set(system.id, system);
-    await this.save({ put: system });
+    await this.save({ put: system, domains: ALL_INVALIDATION_DOMAINS });
     this._notifySystemsChanged();
     return system;
   }
@@ -2841,7 +2973,7 @@ export class CraftingSystemManager {
       // `definitionIndex` invalidation rule can see. Advance explicitly.
       advanceDefinitionRevision(system.recipeItemDefinitions);
 
-      await this.save({ put: system });
+      await this.save({ put: system, domains: RECIPE_ITEM_FACTS });
       // A source-uuid change is a re-point: clear ONLY the durable per-system leaf off the old
       // source document so it no longer claims this definition — never the whole `roles` flag
       // nor the whole `roles[systemId]` object (that would destroy sibling componentId/toolId).
@@ -2863,7 +2995,7 @@ export class CraftingSystemManager {
     system.recipeItemDefinitions = recipeItemDefinitions;
 
     if (roleFlagKey) await this._stampSourceIdentity(source, roleFlagKey, item.id);
-    await this.save({ put: system });
+    await this.save({ put: system, domains: RECIPE_ITEM_FACTS });
     return { item, action: 'added' };
   }
 
@@ -2983,7 +3115,7 @@ export class CraftingSystemManager {
       }
     }
     try {
-      await this.save({ put: system });
+      await this.save({ put: system, domains: TOOL_FACTS });
     } catch (error) {
       errors.push(error);
     }
@@ -3063,7 +3195,7 @@ export class CraftingSystemManager {
     const previousTools = system.tools;
     system.tools = nextTools;
     try {
-      await this.save({ put: system });
+      await this.save({ put: system, domains: TOOL_FACTS });
     } catch (error) {
       system.tools = previousTools;
       throw error;
@@ -3103,7 +3235,7 @@ export class CraftingSystemManager {
     const previousTools = system.tools;
     system.tools = tools.filter((entry) => String(entry?.id) !== String(toolId));
     try {
-      await this.save({ put: system });
+      await this.save({ put: system, domains: TOOL_FACTS });
     } catch (error) {
       system.tools = previousTools;
       throw error;
@@ -3157,7 +3289,7 @@ export class CraftingSystemManager {
       recipe.linkedRecipeItemUuid = null;
     }
 
-    await this.save({ put: system });
+    await this.save({ put: system, domains: RECIPE_ITEM_FACTS });
     if (affectedRecipeObjects.length > 0 && this.recipeManager?.save) {
       await this.recipeManager.save();
     }
@@ -3220,7 +3352,7 @@ export class CraftingSystemManager {
       ]),
     });
 
-    await this.save({ put: system });
+    await this.save({ put: system, domains: RECIPE_ITEM_FACTS });
     return { item: { ...definition } };
   }
 
@@ -3437,7 +3569,7 @@ export class CraftingSystemManager {
     // mode through the in-memory `systems` map (e.g. `RecipeManager` activation and
     // routed-provider validation consult the current system).
     this.systems.set(systemId, merged);
-    await this.save({ put: merged });
+    await this.save({ put: merged, domains: this._domainsForSystemEdit(current, merged) });
 
     // Migration-first mode change: migrate recipes to fit the new mode wherever
     // possible and delete ONLY those a per-recipe structural constraint of the new
@@ -3457,7 +3589,7 @@ export class CraftingSystemManager {
     const oldMode = current.salvageResolutionMode || 'simple';
     const disabledComponents = this._disableInvalidSalvageConfigs(merged, oldMode);
     if (disabledComponents.length > 0) {
-      await this.save({ put: merged });
+      await this.save({ put: merged, domains: COMPONENT_FACTS });
       const names = disabledComponents.join(', ');
       ui?.notifications?.warn?.(
         `Fabricate | Salvage disabled for ${disabledComponents.length} component(s) incompatible with new mode: ${names}`
@@ -3733,7 +3865,7 @@ export class CraftingSystemManager {
     }
 
     this.systems.delete(systemId);
-    await this.save({ delete: systemId });
+    await this.save({ delete: systemId, domains: ALL_INVALIDATION_DOMAINS });
 
     await this._cleanupSystemScopedState(systemId);
 
@@ -3845,8 +3977,23 @@ export class CraftingSystemManager {
     }
   }
 
+  /**
+   * Announce a crafting-system change: the PUBLISHED legacy hook with its unchanged payload,
+   * then the unpublished scoped signal carrying everything attributed since the last
+   * announcement.
+   *
+   * Draining HERE rather than in `save()` is what keeps the paths that deliberately save
+   * without announcing silent — `applyBulkEditToRecipes` honours `options.notifySystems`, and
+   * `deleteItem` announces through the recipe manager instead. See {@link PendingChangeDomains}.
+   *
+   * @returns {void}
+   * @private
+   */
   _notifySystemsChanged() {
     globalThis.Hooks?.callAll?.('fabricate.craftingSystemsChanged', this.getSystems());
+    emitCraftingDataChanged(
+      craftingDataChange({ source: 'systems', scopes: this._pendingDomains.drain() })
+    );
   }
 
   async createItem(systemId, data = {}) {
@@ -3861,7 +4008,7 @@ export class CraftingSystemManager {
     this._assertUniqueComponentSources(system, item);
     system.components.push(item);
     advanceDefinitionRevision(system.components);
-    await this.save({ put: system });
+    await this.save({ put: system, domains: COMPONENT_FACTS });
     return item;
   }
 
@@ -4824,7 +4971,7 @@ export class CraftingSystemManager {
     // `pack.locked` (it reads through `fromUuid` rather than writing into packs).
     const descriptionsChanged = await this._refreshDefinitionDescriptions(summary);
     if (descriptionsChanged) {
-      await this.save();
+      await this.save({ domains: ITEM_METADATA_FACTS });
       this._notifySystemsChanged();
     }
 
@@ -4910,7 +5057,7 @@ export class CraftingSystemManager {
       // element (issue 1076).
       advanceDefinitionRevision(system.components);
 
-      if (options.persist !== false) await this.save({ put: system });
+      if (options.persist !== false) await this.save({ put: system, domains: COMPONENT_FACTS });
       return { item: existing, action: 'updated', sourceFallbacks: nextSnapshot.sourceFallbacks };
     }
 
@@ -4928,7 +5075,7 @@ export class CraftingSystemManager {
     advanceDefinitionRevision(system.components);
     const addedRoleKey = this._componentRoleFlagKey(system.id);
     if (addedRoleKey) await this._stampSourceIdentity(source, addedRoleKey, item.id);
-    if (options.persist !== false) await this.save({ put: system });
+    if (options.persist !== false) await this.save({ put: system, domains: COMPONENT_FACTS });
     return { item, action: 'added', sourceFallbacks: nextSnapshot.sourceFallbacks };
   }
 
@@ -5001,7 +5148,7 @@ export class CraftingSystemManager {
       }
       await this._stampSourceIdentity(source, replaceRoleKey, itemId);
     }
-    await this.save({ put: system });
+    await this.save({ put: system, domains: COMPONENT_FACTS });
     return { item: updatedItem, sourceFallbacks: nextSnapshot.sourceFallbacks };
   }
 
@@ -5078,7 +5225,7 @@ export class CraftingSystemManager {
       // and `addItemFromUuid` mutates that record in place, so the flush knows exactly which
       // one moved. A bare `save()` took the whole-corpus branch and advanced every system's
       // token for an import into one of them.
-      if (dirty) await this.save({ put: system });
+      if (dirty) await this.save({ put: system, domains: COMPONENT_FACTS });
     }
 
     return { added, updated, skipped, total: items.length, sourceFallbacks };
@@ -5173,7 +5320,7 @@ export class CraftingSystemManager {
     }
 
     if (updated > 0) {
-      await this.save({ batch: touched });
+      await this.save({ batch: touched, domains: COMPONENT_FACTS });
       this._notifySystemsChanged();
     }
 
@@ -5196,7 +5343,7 @@ export class CraftingSystemManager {
     }
     system.components[idx] = updatedItem;
     advanceDefinitionRevision(system.components);
-    await this.save({ put: system });
+    await this.save({ put: system, domains: COMPONENT_FACTS });
     return system.components[idx];
   }
 
@@ -5332,7 +5479,8 @@ export class CraftingSystemManager {
     }
     if (changedIds.length > 0) advanceDefinitionRevision(system.components);
 
-    if (changedIds.length > 0 && options.persist !== false) await this.save({ put: system });
+    if (changedIds.length > 0 && options.persist !== false)
+      await this.save({ put: system, domains: COMPONENT_FACTS });
     return { updated: changedIds.length, componentIds: changedIds };
   }
 
@@ -5450,7 +5598,7 @@ export class CraftingSystemManager {
     result.bookRemovals = books.removals;
     if (books.changed) {
       system.membershipResolvesByRecipeIds = true;
-      await this.save({ put: system });
+      await this.save({ put: system, domains: RECIPE_ITEM_FACTS });
     }
 
     // ---- Then recipes ------------------------------------------------------
@@ -5908,7 +6056,7 @@ export class CraftingSystemManager {
     const recipeItemsRewritten = plan.prunes.length;
     if (recipeItemsRewritten > 0) {
       try {
-        await this.save({ put: system });
+        await this.save({ put: system, domains: RECIPE_ITEM_FACTS });
       } catch (error) {
         // Put the live definitions back before rethrowing: this client must not go on
         // rendering a prune the world never received.
@@ -6100,7 +6248,7 @@ export class CraftingSystemManager {
       await this._cleanupSalvageRunsForComponent(componentId, systemId);
     }
 
-    await this.save({ put: system });
+    await this.save({ put: system, domains: ESSENCE_FACTS });
 
     return {
       deleted: removedIds.length,
@@ -6165,7 +6313,17 @@ export class CraftingSystemManager {
       // GM's own crafting window keeps offering pre-rewrite recipes until an unrelated write.
       // `deleteItem` deliberately does not call `_notifySystemsChanged()`, so it has no other
       // signal at all.
-      this.recipeManager.notifyRecipesChanged({ action: 'update' });
+      //
+      // Which is why the COMPONENT-side attribution travels with it (issue 1078 part B1). The
+      // recipes were rewritten, but so were this system's components and essence definitions,
+      // and the singular delete drains no system-side attribution of its own — so without
+      // naming them here the scoped signal would carry only the recipe domains and a GM's
+      // inventory listing would keep rendering the component they just deleted.
+      this.recipeManager.notifyRecipesChanged({
+        action: 'update',
+        domains: ESSENCE_FACTS,
+        systemIds: [systemId],
+      });
     }
     return { recipesUpdated: recipes.length, recipesDisabled };
   }
@@ -6240,7 +6398,7 @@ export class CraftingSystemManager {
       updatedRecipeCount += 1;
     }
 
-    await this.save({ put: system });
+    await this.save({ put: system, domains: ESSENCE_FACTS });
     this._notifySystemsChanged();
 
     if (updatedRecipeCount > 0) {
@@ -6394,7 +6552,7 @@ export class CraftingSystemManager {
       removedIds
     );
 
-    await this.save({ put: system });
+    await this.save({ put: system, domains: ESSENCE_FACTS });
     this._notifySystemsChanged();
 
     if (recipesUpdated > 0) {

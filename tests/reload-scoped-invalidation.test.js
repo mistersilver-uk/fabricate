@@ -42,122 +42,29 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { SETTING_KEYS } from '../src/config/settings.js';
-
 import { installFoundryEnv } from './helpers/foundryEnv.js';
+import {
+  CraftingSystemManager,
+  persistedRecipe,
+  RecipeManager,
+  remoteClient,
+  REVISION_SCOPES,
+  storedRecipes,
+  storedSystems,
+  SYS_A,
+  SYS_B,
+  twoSystemWorld,
+  withRecipe,
+  withSystem,
+} from './helpers/scopedInvalidationWorld.js';
 
-installFoundryEnv();
-
-const { CraftingSystemManager } = await import('../src/systems/CraftingSystemManager.js');
-const { RecipeManager } = await import('../src/systems/RecipeManager.js');
-const { Recipe } = await import('../src/models/Recipe.js');
-const { REVISION_SCOPES } = await import('../src/systems/revisionTokens.js');
 const { getDefinitionIndex } = await import('../src/utils/definitionIndex.js');
-const { readSignatureCounters, resetSignatureCounters } =
-  await import('../src/systems/SignatureValidator.js');
-
-const SYS_A = 'sys-a';
-const SYS_B = 'sys-b';
-
-/** One crafting system in its PERSISTED shape, with a named component library. */
-function persistedSystem(id, componentNames) {
-  return {
-    id,
-    name: `System ${id}`,
-    resolutionMode: 'alchemy',
-    items: componentNames.map((name, index) => ({
-      id: `${id}-c${index}`,
-      name,
-      registeredItemUuid: `Item.${id}-c${index}`,
-    })),
-  };
-}
-
-/** One recipe in its persisted shape, requiring the named component. */
-function persistedRecipe(id, systemId, componentId, overrides = {}) {
-  return Recipe.fromJSON({
-    id,
-    name: `Recipe ${id}`,
-    craftingSystemId: systemId,
-    enabled: true,
-    ingredientSets: [
-      {
-        id: `${id}-set`,
-        ingredientGroups: [
-          { id: `${id}-grp`, name: 'Ingredients', options: [{ componentId, quantity: 1 }] },
-        ],
-        essences: {},
-      },
-    ],
-    resultGroups: [
-      { id: `${id}-rg`, results: [{ id: `${id}-res`, itemUuid: 'Item.result', quantity: 1 }] },
-    ],
-    ...overrides,
-  }).toJSON();
-}
+const { readSignatureCounters, resetSignatureCounters } = await import(
+  '../src/systems/SignatureValidator.js'
+);
 
 /**
- * A wired manager pair over one settings-backed world, loaded from the persisted corpus
- * exactly as a REMOTE client loads: through `reload()`, from the replicated setting.
- *
- * @param {object} [world]
- * @param {object[]} [world.systems] persisted systems.
- * @param {object[]} [world.recipes] persisted recipes.
- * @returns {{env: object, recipeManager: object, systemManager: object, write: Function}}
- */
-function remoteClient({ systems = [], recipes = [] } = {}) {
-  const env = installFoundryEnv();
-  // A holder rather than two locals: the pair is mutually referential in production too —
-  // the recipe manager resolves its system-manager collaborator lazily through a thunk.
-  const pair = {};
-  pair.recipeManager = new RecipeManager({ getCraftingSystemManager: () => pair.systemManager });
-  pair.systemManager = new CraftingSystemManager(pair.recipeManager);
-
-  /** Replicate a new corpus into the world settings, as another client's save would. */
-  const write = (nextSystems, nextRecipes) => {
-    if (nextSystems) env.settings.set(SETTING_KEYS.CRAFTING_SYSTEMS, nextSystems);
-    if (nextRecipes) env.settings.set(SETTING_KEYS.RECIPES, nextRecipes);
-  };
-
-  write(systems, recipes);
-  pair.systemManager.reload();
-  pair.recipeManager.reload();
-  return { env, ...pair, write };
-}
-
-/** The default two-system, two-recipe world every guard test below reads. */
-function twoSystemWorld() {
-  return remoteClient({
-    systems: [
-      persistedSystem(SYS_A, ['Iron Ore', 'Copper Ore']),
-      persistedSystem(SYS_B, ['Tin Ore']),
-    ],
-    recipes: [
-      persistedRecipe('r-a1', SYS_A, `${SYS_A}-c0`),
-      persistedRecipe('r-a2', SYS_A, `${SYS_A}-c1`),
-      persistedRecipe('r-b1', SYS_B, `${SYS_B}-c0`),
-    ],
-  });
-}
-
-/** The persisted corpus currently in the world settings. */
-const storedSystems = (env) => env.settings.get(SETTING_KEYS.CRAFTING_SYSTEMS);
-const storedRecipes = (env) => env.settings.get(SETTING_KEYS.RECIPES);
-
-/**
- * The persisted corpus with ONE record rewritten, exactly as another client's save leaves it.
- *
- * Hoisted rather than repeated per test: every narrowing test below is "edit one record,
- * reload, assert the other one is untouched", and a copied `map`-with-a-ternary block in each
- * is both noise and new duplicated lines the SonarCloud gate counts against `tests/**`.
- */
-const withSystem = (env, systemId, rewrite) =>
-  storedSystems(env).map((system) => (system.id === systemId ? rewrite(system) : system));
-const withRecipe = (env, recipeId, rewrite) =>
-  storedRecipes(env).map((recipe) => (recipe.id === recipeId ? rewrite(recipe) : recipe));
-
-/**
- * Both narrow scopes plus the domain scope, read in one go.
+ * Both narrow scopes plus the entity scope, read in one go.
  *
  * The assertion every narrowing test makes is a COMPARISON of the two systems' tokens across
  * one reload, so capturing them singly is what the helper exists to prevent.

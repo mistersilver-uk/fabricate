@@ -1,3 +1,4 @@
+import { craftingDataChange, emitCraftingDataChanged } from '../systems/craftingDataChange.js';
 import { RECIPE_RECORD_KEY_PREFIX } from '../systems/PerRecordCraftingDefinitionRepository.js';
 
 import { FABRICATE_SETTINGS_NAMESPACE, SETTING_KEYS } from './settings.js';
@@ -99,13 +100,25 @@ export const RECIPE_RECORD_SETTING_KEY_PREFIX = `${FABRICATE_SETTINGS_NAMESPACE}
  * @param {(callback: () => void) => void} [options.schedule] Defer a callback to the end of
  *   the current synchronous burst. Injected for tests; `queueMicrotask` in production.
  * @returns {{open: () => void, close: () => void, signal: (emit: () => void) => void,
- *   isOpen: () => boolean}}
+ *   isOpen: () => boolean, collect: (scopes: object[]) => void,
+ *   takeCollected: () => object[]}}
  */
 export function createRecipeRefreshCoalescer({ schedule = queueMicrotask } = {}) {
   let depth = 0;
   let scheduled = false;
   /** @type {(() => void)|null} The most recent signal's emitter, run once at flush. */
   let pending = null;
+  /**
+   * The invalidation scopes every record of the batch contributed (issue 1078 part B1).
+   *
+   * They live HERE rather than in the emitter's closure because `signal()` keeps only the most
+   * recent emitter: a per-emitter accumulator would report the batch's last record alone, and
+   * the earlier records' domains would be silently lost — which reads as correct narrowing and
+   * is in fact a stale read model.
+   *
+   * @type {object[]}
+   */
+  let collected = [];
 
   // Deliberately re-reads nothing: the emitter closes over the manager, so the payload it
   // builds describes the corpus AT FLUSH TIME rather than at the moment of the first record.
@@ -133,8 +146,47 @@ export function createRecipeRefreshCoalescer({ schedule = queueMicrotask } = {})
       scheduled = true;
       schedule(flush);
     },
+    collect(scopes) {
+      collected.push(...scopes);
+    },
+    takeCollected() {
+      const taken = collected;
+      collected = [];
+      return taken;
+    },
     isOpen: () => depth > 0,
   };
+}
+
+/**
+ * The invalidation scopes a manager's most recent replicated change produced (issue 1078 B1).
+ *
+ * A manager fake without the method answers with NO scopes, which every consumer routes
+ * broadly — the same fail-safe an unrecognised payload gets, and the reason the many bridge
+ * fixtures that stub `{reload, getRecipes}` keep working without being taught about domains.
+ *
+ * @param {object|null|undefined} manager
+ * @returns {object[]}
+ */
+function replicatedScopes(manager) {
+  return typeof manager?.consumeReplicatedChangeScopes === 'function'
+    ? manager.consumeReplicatedChangeScopes()
+    : [];
+}
+
+/**
+ * Emit the scoped change signal for a whole-corpus replicated reload.
+ *
+ * @param {'recipes'|'systems'} source
+ * @param {object} manager
+ * @param {((hook: string, payload: object) => void)|undefined} callAll
+ * @returns {void}
+ */
+function announceScopedChange(source, manager, callAll) {
+  emitCraftingDataChanged(
+    craftingDataChange({ source, scopes: replicatedScopes(manager) }),
+    callAll
+  );
 }
 
 /**
@@ -205,6 +257,7 @@ export function handleFabricateSettingChange(
   if (settingKey === CRAFTING_SYSTEMS_KEY) {
     if (craftingSystemManager?.reload?.()) {
       callAll?.('fabricate.craftingSystemsChanged', craftingSystemManager.getSystems());
+      announceScopedChange('systems', craftingSystemManager, callAll);
     }
     return true;
   }
@@ -214,6 +267,7 @@ export function handleFabricateSettingChange(
         action: 'external',
         recipes: recipeManager.getRecipes(),
       });
+      announceScopedChange('recipes', recipeManager, callAll);
     }
     return true;
   }
@@ -229,13 +283,30 @@ export function handleFabricateSettingChange(
       recipeManager?.applyReplicatedRecordChange?.({ key: settingKey, operation, document }) ===
       true;
     if (changed) {
+      // The scopes are read NOW, not at emit time (issue 1078 part B1).
+      // `applyReplicatedRecordChange` mints one delta PER RECORD and the next record's mint
+      // replaces it, so a coalesced batch that deferred the read would report only its LAST
+      // record and every earlier one would be missed. They accumulate on the coalescer — the
+      // object that already owns the batch boundary — and the single flush emits them as one
+      // payload, which is the coalescing contract applied to the delta and not only to the
+      // hook.
+      const scopes = replicatedScopes(recipeManager);
+      recipeRefresh?.collect?.(scopes);
       // Built at EMIT time, not signal time, so a coalesced batch reports the corpus the
       // whole batch produced rather than the state after its first record.
-      const emit = () =>
+      const emit = () => {
         callAll?.('fabricate.recipesChanged', {
           action: 'external',
           recipes: recipeManager.getRecipes(),
         });
+        emitCraftingDataChanged(
+          craftingDataChange({
+            source: 'recipes',
+            scopes: recipeRefresh?.takeCollected?.() ?? scopes,
+          }),
+          callAll
+        );
+      };
       if (recipeRefresh) recipeRefresh.signal(emit);
       else emit();
     }
