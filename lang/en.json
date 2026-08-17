@@ -1228,6 +1228,17 @@
         "UnresolvedAtDefault": "None of this world's {total} items carry a stack count at Fabricate's item stack quantity field \"{path}\", which is already the field Fabricate expects for your game system. Either this world has no stackable items yet — spells, feats, classes and backgrounds hold no stack count — or this is the wrong field for your system. If your items do carry stack counts, crafting, salvage and alchemy will DELETE a whole stack instead of reducing it, and you should set the field your system really uses in Settings → Fabricate → Item Stack Quantity Field.",
         "SchemaDiscard": "Fabricate's item stack quantity field \"{path}\" can be read on {resolved} of {total} of this world's items, but it is not part of your game system's item data, so anything Fabricate writes there is discarded without an error. Crafting, salvage and alchemy will hand out free components AND delete whole stacks instead of reducing them. Your game system's usual field is \"{default}\". Change it in Settings → Fabricate → Item Stack Quantity Field."
       },
+      "RecipeStorageTarget": {
+        "Name": "Recipe Storage Arrangement",
+        "Hint": "How Fabricate arranges this world's recipes in its saved data. \"One combined record\" is the original arrangement and is what every version of Fabricate can read. \"One record per recipe\" loads large recipe collections faster, but a version of Fabricate older than the one that converted your world reads NO recipes from it. Set this back to \"One combined record\" and let the conversion finish BEFORE you downgrade Fabricate.",
+        "SingleArray": "One combined record (works with every Fabricate version)",
+        "PerRecord": "One record per recipe (faster for large collections)",
+        "Converted": "Fabricate moved {records} recipes back into the combined record. It is now safe to downgrade Fabricate on this world.",
+        "ReclaimPending": "Fabricate moved {records} recipes back into the combined record, but could not clear the leftover per-recipe records. Your recipes are safe and Fabricate will retry the clean-up the next time a GM loads this world.",
+        "Unavailable": "This version of Fabricate cannot convert your recipes to \"{requested}\", so the recipe storage arrangement has been left as \"{current}\". Nothing was changed and your recipes are untouched.",
+        "Failed": "Fabricate could not change the recipe storage arrangement, so it has been left as \"{current}\". Your recipes are untouched. See the console log for the reason.",
+        "Unsettled": "This world's recipes are part-way through a storage conversion that this version of Fabricate cannot finish, so Fabricate is not removing any stale saved data until it is resolved. Load the world with the newer version of Fabricate to complete the conversion."
+      },
       "RepairItemData": {
         "Name": "Repair Item Data",
         "Label": "Repair Item Data",

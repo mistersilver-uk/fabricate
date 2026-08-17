@@ -59,6 +59,10 @@ describe('Fabricate theme management', () => {
       // `.value` leaf and the set of real per-system paths is open-ended, so a
       // `choices` dropdown would be wrong.
       SETTING_KEYS.ITEM_STACK_QUANTITY_PATH,
+      // Issue 1232: the Definition Storage Target is the GM's pre-downgrade
+      // reverse-conversion control. Its SIBLING, the storage LAYOUT, is deliberately absent
+      // — the layout records observed state and a hand-set one presents an empty world.
+      SETTING_KEYS.RECIPE_STORAGE_TARGET,
       SETTING_KEYS.THEME
     ].sort());
 

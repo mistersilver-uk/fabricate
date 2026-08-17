@@ -2836,6 +2836,50 @@ Step 4 removes the legacy document, so an older build of the module loads zero r
 The supported mitigation is the REVERSE conversion, run while the GM is still on the new build: setting the target back to `singleArray` reverses the layout losslessly.
 A pre-conversion GM consent prompt naming the loss is the fallback, and any export it offers MUST NOT be presented as equivalent — an export carries authoring data only, and never runs, actor flags, learned-recipe knowledge or durable identity flags.
 
+**The reverse conversion is the forward one mirrored, and it MUST NOT inherit the forward compensation.**
+Its four steps are: set the layout to `unsettled`; write every per-record document's stored value into the legacy whole-array key; set the layout to `singleArray`; delete the per-record documents.
+Every clause above transfers — awaited steps, resume from the layout alone, a convergent step 2, a transaction extent ending at step 3, and step 4 as independently retryable envelope reclamation — with ONE exception, which inverts.
+Forward compensation DELETES the layout document because a never-converted world has none.
+A reverse conversion runs only on a world whose layout reads `perRecord` or `unsettled`, neither of which is the registered default, so that document provably exists and compensation restores its VALUE.
+Deleting it would fabricate a `singleArray` layout over a corpus that is still per-record, which is the silent-empty-world state the reverse exists to prevent.
+
+**A conversion MUST move records without hydrating them through the domain model.**
+It carries a record's stored value from one arrangement to the other unchanged.
+Routing records through the current model's deserializer and serializer would make the conversion's output depend on what that normalizer emits today, so a field the model has not learned to emit would be dropped by the one operation whose whole promise is that it loses nothing.
+
+**A conversion MUST refuse rather than write an empty corpus over a non-empty one.**
+If the source arrangement reads zero records while the destination key still holds some, the recorded layout does not describe this world's storage, and the write that would follow destroys the surviving corpus.
+Resolving that by inferring the true layout from which key holds data is forbidden by "the layout is read, never inferred"; refusing is the only answer that cannot lose the corpus.
+
+### The Definition Storage Target as a GM control
+
+**The target is the GM-facing control and the layout is not.**
+The target is exposed as a world setting a GM can change, because it is the supported pre-downgrade reverse-conversion switch.
+The layout MUST NOT be exposed: it records observed state, a hand-set layout is indistinguishable from a real one, and asserting `singleArray` over a per-record corpus presents an empty world exactly as asserting `perRecord` over a legacy corpus does.
+
+**A target change is a conversion request, and the target write happens FIRST.**
+Repository selection reads the target once, when a manager is constructed, so a conversion that ran before the target was written would leave the converting client on the adapter for the arrangement it was dismantling — that client's world appears empty on the boot that converted it.
+Driving the conversion from the already-written target is what makes the ordering structural, and a startup reconcile MUST run before the managers that select a backend are constructed.
+
+**Setting a target this build cannot reach MUST NOT leave the world permanently gated.**
+Valid Id Basis input 2 refuses whenever the layout does not equal the target, so a target with no available conversion would omit every destructive startup pass on that world forever — the same permanent silent omission this document forbids by name for the primacy input.
+Every outcome of a target change therefore ends with the layout equal to the target whenever the layout is SETTLED: an unreachable target is reverted to the layout and reported, and a conversion that fails compensates both keys.
+The one state that survives is an `unsettled` layout with no available resume, which is a genuinely half-converted corpus rather than an artefact of a settings write; it is reported to the GM and the gate correctly keeps refusing.
+
+**Which transitions a build can perform is a declared set.**
+It MUST NOT be derived from the target enumeration, because a build that can reach only one arrangement would otherwise start claiming to reach every value added to that enumeration.
+
+**A repository MUST NOT write through an arrangement the world has left.**
+A client selects its backend once and nothing rebuilds it when another client's conversion moves the layout, so a stale settings-backed repository writing its corpus re-creates the legacy document the conversion deleted — with a stale corpus inside it and a fresh envelope spent — and a stale per-record repository writes back the record documents a reverse conversion reclaimed.
+Both are reachable by any holder of `SETTINGS_MODIFY`, not only the primary GM.
+A repository therefore refuses a write when the layout reads back as a recognised arrangement that is not the one it addresses.
+The refusal is established POSITIVELY and an unreadable layout does not refuse: the hazard is a layout that MOVED, which is by definition readable.
+This is the write-side enforcement of "the legacy key MUST NOT be written after conversion", and it is stated for both directions because the reverse conversion makes the mirror image reachable.
+
+**A client MUST be able to recover from a layout change without reloading.**
+It re-selects its backend and re-reads the corpus through the new one when, and only when, the layout and target agree again.
+Re-reading through the repository selected BEFORE the change answers confidently from the wrong arrangement, and re-selecting mid-conversion addresses storage the conversion has not written yet — so a client rebuilds exactly once, at the conversion's final flip, and holds its refused-write repository in between.
+
 ### Valid Id Basis
 
 A **Valid Id Basis** is the set of live-corpus id sets a destructive pass derives its "still valid" answer from — the valid recipe, system, component and salvage-component id sets a startup cleanup pass builds before pruning anything that names an id outside them.

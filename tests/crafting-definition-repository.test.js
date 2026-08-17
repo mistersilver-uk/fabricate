@@ -52,6 +52,14 @@ const KEY_ACCESS_ALLOWLIST = new Set([
   // normalizers cannot yet read — and a migration that silently reads nothing is a
   // data-loss bug no test catches.
   'src/migration/MigrationRunner.js',
+  // Issue 1232 — the Storage Layout Conversion. It is the operation that MOVES the corpus
+  // between arrangements, so "go through the repository" is not available to it in either
+  // direction: the repository is chosen BY the arrangement, and asking the single-array
+  // adapter to write the legacy key is exactly what the arrangement guard now refuses. It
+  // also deliberately carries RAW stored values rather than hydrating through the model,
+  // for the same reason the migration runner does — a conversion whose output depends on
+  // today's normalizer drops any field that normalizer has not learned to emit.
+  'src/systems/definitionStorageConversion.js',
 ]);
 
 /** Modules permitted to NAME the two keys at all (a superset of the above). */

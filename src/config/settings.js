@@ -110,6 +110,23 @@ export const DEFINITION_STORAGE_TARGETS = Object.freeze({
   PER_RECORD: 'perRecord',
 });
 
+/**
+ * The localized labels the Definition Storage Target's `config: true` row offers.
+ *
+ * Written out rather than derived from {@link DEFINITION_STORAGE_TARGETS} by string
+ * manipulation, so every localization key in this file is greppable from `lang/en.json`.
+ * That makes it a hand-maintained mirror of the target enumeration, and a mirror rots
+ * silently — a `choices` map missing a stored value renders the raw key in the dropdown and
+ * offers the GM no way back to it. `tests/recipe-storage-target-control.test.js` therefore
+ * asserts that every target has a label and that every label resolves in `lang/en.json`.
+ *
+ * @type {Readonly<Record<string, string>>}
+ */
+export const RECIPE_STORAGE_TARGET_CHOICES = Object.freeze({
+  [DEFINITION_STORAGE_TARGETS.SINGLE_ARRAY]: 'FABRICATE.Settings.RecipeStorageTarget.SingleArray',
+  [DEFINITION_STORAGE_TARGETS.PER_RECORD]: 'FABRICATE.Settings.RecipeStorageTarget.PerRecord',
+});
+
 // The target version for the one-shot recipe-item flag auto-stamp. When the stored
 // `RECIPE_ITEM_FLAG_STAMP_VERSION` is below this, the primary GM runs the backfill once
 // on `ready` and writes this value back. Bumped 1 → 2 by issue 567: v1 stamped the retired
@@ -370,12 +387,13 @@ const BASE_DEFINITIONS = Object.freeze({
   // itself — see `PerRecordCraftingDefinitionRepository`. These two are O(1) and stay here
   // with every other Fabricate setting.
   //
-  // `config: false` on BOTH while the target defaults to `singleArray`. The target is
-  // GM-reachable by design (it is the supported pre-downgrade reverse-conversion control),
-  // but exposing a settings row in -b would let a GM flip a value nothing yet honours: the
-  // Storage Layout Conversion that acts on it lands in -c, together with the localized
-  // name/hint strings a `config: true` row needs. Flipping it to `config: true` is that
-  // change's job, not this one's.
+  // The LAYOUT stays `config: false` permanently, and that asymmetry is the concept, not an
+  // oversight. The layout records how storage is arranged NOW — it is observed state written
+  // by the Storage Layout Conversion, and it is that conversion's sole crash-recovery
+  // discriminator. A settings row would let a GM assert an arrangement rather than choose
+  // one, and a hand-edited layout is indistinguishable from a real one: setting it to
+  // `singleArray` over a per-record corpus presents an empty world, and setting it to
+  // `perRecord` over a legacy corpus does the same in the other direction.
   [SETTING_KEYS.RECIPE_STORAGE_LAYOUT]: {
     name: 'Recipe Definition Storage Layout',
     scope: 'world',
@@ -383,11 +401,33 @@ const BASE_DEFINITIONS = Object.freeze({
     type: String,
     default: DEFINITION_STORAGE_LAYOUTS.SINGLE_ARRAY,
   },
+  // Issue 1232: the TARGET becomes the GM-facing control, which is what -b deferred to the
+  // change that ships a conversion acting on it. It is the supported pre-downgrade
+  // reverse-conversion switch named by `data-models/spec.md` § Storage Conversion Crash
+  // Recovery: a GM about to downgrade sets it back to `singleArray` and the reverse
+  // conversion moves the corpus back into the legacy key before the older build reads it.
+  //
+  // No `onChange`, for the two reasons stated beside the settings above and one more that is
+  // specific to this key. The shared setting listener in `main.js` already routes this key
+  // through `settingChangeBridge`, so registering an `onChange` too would DOUBLE-FIRE — and
+  // here that means starting two concurrent Storage Layout Conversions on the same corpus.
+  // An `onChange` is also the one setting callback with no error containment: it runs inside
+  // `doc._onUpdate` ahead of `Hooks.callAll('updateSetting')`, so a conversion failure there
+  // would kill the setting broadcast for every client rather than being reported to the GM.
+  //
+  // Both values are offered even though this build can only perform the reverse conversion.
+  // The control has to be able to EXPRESS the arrangement a world is on — a converted world
+  // needs `perRecord` selectable to describe itself — and `reconcileRecipeStorageLayout` is
+  // the authority on what is reachable: it reverts a target no conversion can satisfy, so a
+  // GM choosing one gets it undone and explained rather than a world the Valid Id Basis gate
+  // refuses forever.
   [SETTING_KEYS.RECIPE_STORAGE_TARGET]: {
-    name: 'Recipe Definition Storage Target',
+    name: 'FABRICATE.Settings.RecipeStorageTarget.Name',
+    hint: 'FABRICATE.Settings.RecipeStorageTarget.Hint',
     scope: 'world',
-    config: false,
+    config: true,
     type: String,
+    choices: RECIPE_STORAGE_TARGET_CHOICES,
     default: DEFINITION_STORAGE_TARGETS.SINGLE_ARRAY,
   },
 });
