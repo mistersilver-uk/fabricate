@@ -3168,13 +3168,18 @@ export class RecipeManager {
    * `systemId` is separable from the candidate because a draft is editor JSON that need not
    * carry `craftingSystemId`, while the editor always knows which system it is in.
    *
+   * The returned array is always a fresh copy, but a conflict's `params` object is not: for a
+   * candidate whose compiled entries match its stored copy exactly, the fast path in
+   * {@link AlchemySignatureReport#candidateConflicts} returns the SAME `params` object the
+   * retained report holds internally. Treat every `params` as read-only.
+   *
    * @param {object} recipe A recipe, or the JSON of one — anything carrying `id`, `name`,
    *   `enabled` and `ingredientSets`. Compiled exactly as the audit would compile it.
    * @param {{systemId?: string}} [options] `systemId` defaults to the candidate's own
    *   `craftingSystemId`.
    * @returns {{code: string|null, params: object, message: string}[]} conflicts in
    *   full-audit order; empty for a non-alchemy system, an unknown system, or a candidate
-   *   that cannot participate in one.
+   *   that cannot participate in one. Do not mutate a conflict's `params`.
    */
   getSignatureConflicts(recipe, { systemId = recipe?.craftingSystemId } = {}) {
     if (!systemId) return [];
