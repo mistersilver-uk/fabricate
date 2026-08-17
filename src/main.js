@@ -2937,7 +2937,7 @@ class Fabricate {
   _resolveJournalComponent(systemId, componentId) {
     if (!systemId || !componentId) return null;
     const system = this.craftingSystemManager?.getSystem(systemId);
-    const component = (system?.components || []).find((entry) => entry?.id === componentId);
+    const component = findById(getDefinitionIndex(system?.components), componentId);
     return component ? { name: component.name ?? null, img: component.img ?? null } : null;
   }
 

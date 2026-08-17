@@ -4117,7 +4117,7 @@ export class CraftingEngine {
         : Array.isArray(system?.items)
           ? system.items
           : [];
-      const component = components.find((item) => item?.id === sourceComponentId) || null;
+      const component = findById(getDefinitionIndex(components), sourceComponentId);
       if (component?.originItemUuid || component?.registeredItemUuid) {
         return component.originItemUuid || component.registeredItemUuid;
       }
