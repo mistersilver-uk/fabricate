@@ -1090,7 +1090,6 @@ test('World Downtime publishes four tabs plus narrow/collapsed frames with gener
     assert.equal(viewCase.expectView, 'world-downtime');
     assert.ok(viewCase.expectNoHorizontalOverflow);
     assert.ok(viewCase.expectOverflowY);
-    assert.ok(viewCase.expectScrollable, `${viewCase.id} proves the panel really scrolls`);
     assert.ok(viewCase.expectVisible, `${viewCase.id} proves its keyboard tooltip is visible`);
     assert.equal(viewCase.expectContained.length, 2, `${viewCase.id} checks both World rail icons`);
     assert.equal(
@@ -1104,6 +1103,26 @@ test('World Downtime publishes four tabs plus narrow/collapsed frames with gener
       `${viewCase.id} checks the CTA accepts a real pointer click`
     );
   }
+  /*
+    `expectOverflowY` above is what every downtime case owes: the PANEL owns the vertical
+    overflow, not the shell around it. `expectScrollable` is a stronger and different claim —
+    that the pane's content actually exceeds its box at that case's window size — and it is
+    honest of exactly one of these frames.
+
+    It used to be required of all six, and the preview satisfied it by carrying a 720px
+    `min-height` that no content asked for. That floor is what the maintainer saw as a screenful
+    of empty surface below the feature cards on an ordinary window, so it is gone; at 1330x900
+    the preview simply fits. The narrow frame is the one whose window genuinely cannot hold it —
+    960px folds the feature grid to 2x2 and stacks the hero — so the real scrolling proof lives
+    there, and pinning it here stops a future change quietly removing the scroller altogether.
+  */
+  const scrolls = cases.filter((entry) => entry.expectScrollable);
+  assert.deepEqual(
+    scrolls.map((entry) => entry.id),
+    ['manager-world-downtime-narrow'],
+    'the narrow frame is the one whose window really overflows, and it proves the pane scrolls'
+  );
+  assert.equal(getCaseById('manager-world-downtime-narrow').expectScrollable, '.downtime-preview-scroll');
   const normal = cases.slice(0, 4);
   for (const viewCase of normal) {
     assert.ok(

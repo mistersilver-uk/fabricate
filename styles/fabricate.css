@@ -12369,6 +12369,17 @@
   padding-right: var(--fab-space-chip);
 }
 
+/*
+  The submenu's bottom padding closes the expanded group when nothing follows it, and every
+  group except Downtime ends there. Downtime's premium-preview callout follows, and then THREE
+  authors state one gutter — this padding, the group's own gap and the callout's margin — which
+  put the callout 22px below the last sub-item where the parent row sits 6px above the first
+  one. The group's gap states that gutter once; this stops the submenu adding a second copy.
+*/
+.fabricate-manager .manager-nav-submenu:not(:last-child) {
+  padding-bottom: 0;
+}
+
 .fabricate-manager .manager-nav-subitem {
   appearance: none;
   -webkit-appearance: none;
@@ -12536,7 +12547,11 @@
   display: flex;
   flex-direction: column;
   gap: var(--fab-space-2xs);
-  margin: 10px var(--fab-space-chip) 0;
+
+  /* Top gutter left to the group's own gap (see the submenu rule above), so the callout sits
+     the same 6px below the sub-items that the parent row sits above them. The bottom margin
+     closes the group under the box with the inset it already carries on either side. */
+  margin: 0 var(--fab-space-chip) var(--fab-space-chip);
   padding: 9px 10px;
   border: 1px solid var(--fab-accent-border);
   border-radius: 8px;
