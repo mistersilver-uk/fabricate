@@ -98,6 +98,24 @@ in class-1 `identityCandidatesExamined` counts from
 
 <!-- markdownlint-enable MD013 -->
 
+**A stray `identityIndexBuilds: 2` is a fixture artifact, not a regression.**
+`component-library` and `held-inventory` each build ONE fixture object and
+reuse it across every case in the profile.
+`system.essenceDefinitions` and `system.recipeItemDefinitions` are both empty
+arrays, and both are the same array instance for every case.
+`getDefinitionIndex` caches per array identity, so whichever case reaches it
+first pays one index build over that shared, zero-element array, and every
+later case in the profile is a cache hit.
+That build walks nothing, so `identityCandidatesExamined` is unaffected:
+`craftingListing.buildListing.library@1000` records `identityIndexBuilds: 2`
+against an unchanged `identityCandidatesExamined: 1300`, and the same pattern
+recurs at `craftingListing.buildListing@100` in
+`benchmarks/baselines/held-inventory.json`.
+Read the extra `1` as "this case executed first", not as a signal about the
+series point.
+Reordering a profile's cases, or inserting a new one ahead of the first,
+moves which case shows it.
+
 All three are still linear in their own axis, and the inventory axis is the one
 issue 1076 changed: it measured 299 / 1,476 / 2,961 ms before identity
 resolution became index-backed, against 5.8 / 11.3 / 18.9 ms after.
