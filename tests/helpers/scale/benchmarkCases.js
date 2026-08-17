@@ -20,7 +20,8 @@
  * | `CraftingListingBuilder.buildRecipeDetail()` | `craftingListing.buildRecipeDetail*`    |
  * | `RecipeVisibilityService.getVisibleRecipes()`| `recipeVisibility.getVisibleRecipes*`   |
  * | `InventoryListingBuilder.buildListing()`     | `inventoryListing.buildListing*`        |
- * | `AlchemyListingBuilder.buildListing()`       | `alchemyListing.buildListing`           |
+ * | `AlchemyListingBuilder.buildListing()`       | `alchemyListing.buildListing*`          |
+ * | `RunJournalBuilder.buildListing()`           | `runJournal.buildListing`               |
  * | Identity resolution — MISS and HIT apart     | `identity.*`                            |
  * | `CraftingEngine.findComponentItems`          | `craftingEngine.findComponentItems*`    |
  * | `SignatureValidator.validateSystem()`        | `signatureValidator.validateSystem`     |
@@ -775,6 +776,192 @@ function alchemyCases() {
   ];
 }
 
+/** Crafting runs the Journal case projects, split across its two phases. */
+const JOURNAL_ACTIVE_RUNS = 25;
+const JOURNAL_HISTORY_RUNS = 25;
+
+/**
+ * Where in the corpus the Journal's runs are drawn from, and it is not the front.
+ *
+ * `alchemy-knowledge` brew-discovers its first 100 recipes, so runs taken from the front are
+ * ALL revealed and the case's `redactedRuns` count reads zero — a non-vacuity guard that can
+ * never fire, on a pass in which the redaction gate only ever answers one way. Past the
+ * learned slice the answer is decided by book membership instead, and the actor holds half the
+ * books, so both answers occur.
+ */
+const JOURNAL_RUN_OFFSET = 200;
+
+/**
+ * One synthetic crafting run per recipe, in the shape `RunJournalBuilder` projects.
+ *
+ * Deliberately minimal and RNG-free: what this profile measures is the per-run redaction
+ * question, not step detail, and a richer run body would add cost that has nothing to do with
+ * the term under measurement.
+ *
+ * @param {object[]} recipes
+ * @param {string} systemId
+ * @param {string} phase
+ * @returns {object[]}
+ */
+function journalRuns(recipes, systemId, phase) {
+  return recipes.map((recipe, index) => ({
+    id: `${phase}-run-${index}`,
+    recipeId: recipe.id,
+    craftingSystemId: systemId,
+    status: phase === 'history' ? 'succeeded' : 'inProgress',
+    startedAt: 0,
+    updatedAt: 0,
+    finishedAt: phase === 'history' ? 0 : null,
+    currentStepIndex: 0,
+    steps: [{ stepId: `${recipe.id}-s0`, stepName: 'Brew', index: 0, status: 'inProgress' }],
+  }));
+}
+
+/**
+ * THE ALCHEMY REVEAL PATH (issue 1228).
+ *
+ * Both cases here measure the same term on two surfaces: how many held documents the
+ * per-recipe recipe-item matcher is OFFERED. That number is what #1077 set out to bound and
+ * what these two builders still carried unbounded, and it is committed here rather than left
+ * to a wall clock because it is the only reading that can distinguish "the snapshot is
+ * threaded" from "the snapshot is present but built without its matcher" — the two states are
+ * identical on every inventory-READ counter and on every correctness assertion.
+ *
+ * `visibilityCounters` is module-global, so it is zeroed between `setup` and the single
+ * counted `run` rather than read as a delta — the same discipline the signature cases apply.
+ */
+function alchemyKnowledgeCases() {
+  return [
+    {
+      id: 'alchemyListing.buildListing.itemMode',
+      profile: 'alchemy-knowledge',
+      description:
+        'The alchemy workbench open on an `item`-visibility-mode discipline: 500 book-gated ' +
+        'signatures, 4 of 8 books held, 200 held stacks. Reveal is evaluated TWICE per recipe ' +
+        '(the chooser summary and the active panel), and before issue 1228 each of those ' +
+        're-enumerated every source actor\'s whole inventory. `candidateItemOffers` is the ' +
+        'committed criterion; `knownRecipes` is the non-vacuity guard beside it, because a ' +
+        'workbench that revealed nothing would report a fast number for a listing that ' +
+        'answered nothing (issue 1217 records exactly that state on `alchemy-signatures`).',
+      setup: (context) => {
+        const world = worldFor(context);
+        world.modules.visibilityCounters.reset();
+        return world;
+      },
+      run: (world) =>
+        world.alchemyListing.buildListing({
+          craftingActor: world.craftingActor,
+          componentSourceActors: world.sourceActors,
+          viewer: world.viewer,
+          craftingSystemId: world.system.id,
+        }),
+      counts: (world, listing) => ({
+        knownRecipes: listing.recipes.length,
+        undiscoveredRecipes: listing.undiscoveredCount,
+        chooserSystems: listing.systems.length,
+        ownedComponentRows: listing.components.length,
+        ...world.modules.visibilityCounters.read(),
+      }),
+    },
+    {
+      id: 'runJournal.buildListing',
+      profile: 'alchemy-knowledge',
+      description:
+        `The player Journal open with ${JOURNAL_ACTIVE_RUNS} active and ` +
+        `${JOURNAL_HISTORY_RUNS} historical crafting runs of book-gated alchemy recipes. ` +
+        'Redaction asks the visibility service whether the viewer may see each run\'s recipe, ' +
+        'which is the same per-recipe candidate walk the workbench makes — one whole inventory ' +
+        'enumeration per run before issue 1228.',
+      setup: (context) => {
+        const world = worldFor(context);
+        const systemId = world.system.id;
+        const corpus = context.fixture.recipes;
+        const split = JOURNAL_RUN_OFFSET + JOURNAL_ACTIVE_RUNS;
+        const active = journalRuns(corpus.slice(JOURNAL_RUN_OFFSET, split), systemId, 'active');
+        const history = journalRuns(
+          corpus.slice(split, split + JOURNAL_HISTORY_RUNS),
+          systemId,
+          'history'
+        );
+        const journal = new world.modules.RunJournalBuilder({
+          craftingRunManager: { getActiveRuns: () => active, getRunHistory: () => history },
+          recipeManager: world.recipeManager,
+          recipeVisibility: world.recipeVisibility,
+          resolutionModeService: world.resolutionModeService,
+          getSystem: (id) => world.craftingSystemManager.getSystem(id),
+          getViewer: () => world.viewer,
+          localize: (key) => key,
+          nowWorldTime: () => 0,
+          resolveComponentForItem: world.modules.essenceResolver.findMatchingComponent,
+        });
+        world.modules.visibilityCounters.reset();
+        return { world, journal };
+      },
+      run: ({ world, journal }) => journal.buildListing({ actor: world.craftingActor }),
+      counts: ({ world }, listing) => ({
+        activeRuns: listing.activeRuns.length,
+        historyRuns: listing.history.length,
+        // Non-vacuity of the redaction question itself: a pass in which every run were
+        // redacted (or none were) would still report the right run counts, and only this
+        // split shows the gate answering both ways over the corpus.
+        redactedRuns: [...listing.activeRuns, ...listing.history].filter((run) => run.redacted)
+          .length,
+        ...world.modules.visibilityCounters.read(),
+      }),
+    },
+    {
+      id: 'craftingListing.buildListing.bookResidue',
+      profile: 'alchemy-knowledge',
+      description:
+        'The MAIN player crafting screen against a system that shows its whole library but ' +
+        'still carries recipe items — a world migrated off `item` visibility, or a GM who ' +
+        'authored books and then opened the library. `global` mode leaves `access.knowledge` ' +
+        'null, so the per-row EXHAUSTION read has no evidence from the visibility pass to ' +
+        'answer from, and falls through to its own candidate collection once per visible row. ' +
+        'Runs the SAME fixture as the two cases above with only the two mode fields ' +
+        'overridden, so a reader comparing the three is comparing one corpus and one ' +
+        'inventory rather than three.',
+      setup: (context) => {
+        const world = worldFor(context, {
+          fixture: {
+            ...context.fixture,
+            system: {
+              ...context.fixture.system,
+              // The ONLY two fields that differ from the profile's own system. `item` and
+              // `knowledge` modes populate `access.knowledge`, which routes the exhaustion
+              // read to the evidence branch and past the collection entirely — so a case in
+              // either mode would record zero here and prove nothing.
+              resolutionMode: 'simple',
+              visibilityMode: 'global',
+            },
+          },
+        });
+        world.modules.visibilityCounters.reset();
+        return world;
+      },
+      run: (world) =>
+        world.craftingListing.buildListing({
+          craftingActor: world.craftingActor,
+          componentSourceActors: world.sourceActors,
+          viewer: world.viewer,
+        }),
+      counts: (world, listing) => ({
+        listedRecipes: listing.summaries.length,
+        availableRecipes: listing.counts.available,
+        // The exhaustion ANSWER, committed as an answer-equality term rather than as a
+        // non-vacuity one, and it reads ZERO: this profile authors no use caps, so every
+        // held book is uncapped and no row is exhausted. That is the correct answer and the
+        // one the threading must not change. Non-vacuity of the READ is `candidateWalks`
+        // below — a corpus whose recipes carried no book reference would report the identical
+        // row counts and skip the collection entirely, and only that number shows the
+        // difference.
+        exhaustedRows: listing.summaries.filter((summary) => summary.exhausted === true).length,
+        ...world.modules.visibilityCounters.read(),
+      }),
+    },
+  ];
+}
+
 /**
  * The dependency-graph cases.
  *
@@ -1211,6 +1398,7 @@ export const BENCHMARK_CASES = Object.freeze([
   ...richCorpusCases(),
   ...knowledgeCorpusCases(),
   ...alchemyCases(),
+  ...alchemyKnowledgeCases(),
   ...graphCases(),
   ...heldInventoryCases(),
   ...componentLibraryCases(),

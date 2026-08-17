@@ -176,6 +176,111 @@ export function makeSignatureRecipe({ id, componentId, enabled = true, tagPlaceh
   };
 }
 
+/** The source uuid of book `index` in a book-gated fixture. */
+export function scaleBookUuid(index) {
+  return `Compendium.fabricate-scale.books.Item.book-${index}`;
+}
+
+/**
+ * A BOOK-GATED system: `bookCount` authored recipe-item definitions with membership resolved
+ * the modern way (issue 511's `recipeIds[]`), in a caller-chosen resolution and visibility
+ * mode.
+ *
+ * Both modes are parameters because the two paths issue 1228 measures need OPPOSITE settings,
+ * and each is the only setting that reaches its path:
+ *
+ * - The alchemy workbench's reveal decision consults held inventory only in `item` mode;
+ *   `global` and `knowledge` both answer reveal from the actor's `learnedRecipes` flag and
+ *   never reach the candidate walk. That is exactly why the committed `alchemy-signatures`
+ *   profile could not see the defect.
+ *   - The crafting listing's EXHAUSTION read is the mirror image: `item` and `knowledge` modes
+ *   populate `access.knowledge`, so the exhaustion answer comes from that evidence and no
+ *   rescan happens at all. It is `global` and `restricted` — with a book reference still on
+ *   the recipes, which is the guaranteed state of a world migrated off `item` mode — that
+ *   leave `access.knowledge` null and fall through to the rescan.
+ *
+ * @param {object} options
+ * @param {number} options.recipeCount How many recipes the books between them contain.
+ * @param {number} [options.bookCount]
+ * @param {number} [options.componentCount]
+ * @param {string} [options.resolutionMode]
+ * @param {string} [options.visibilityMode]
+ * @returns {object}
+ */
+export function makeBookGatedSystem({
+  recipeCount,
+  bookCount = 2,
+  componentCount = 8,
+  resolutionMode = 'alchemy',
+  visibilityMode = 'item',
+}) {
+  const system = makeCraftingSystem({ componentCount, resolutionMode });
+  return {
+    ...system,
+    visibilityMode,
+    alchemy: { enabled: true, learnOnCraft: false, checkMode: 'none' },
+    membershipResolvesByRecipeIds: true,
+    recipeItemDefinitions: Array.from({ length: bookCount }, (_unused, bookIndex) => ({
+      id: `book-${bookIndex}`,
+      name: `Scale Tome ${bookIndex}`,
+      originItemUuid: scaleBookUuid(bookIndex),
+      aliasItemUuids: [],
+      caps: {},
+      recipeIds: Array.from({ length: recipeCount }, (_ignored, recipeIndex) => `r-${recipeIndex}`)
+        .filter((_id, recipeIndex) => recipeIndex % bookCount === bookIndex),
+    })),
+  };
+}
+
+/**
+ * An actor holding `itemCount` stacks that resolve to nothing, PLUS one document per uuid in
+ * `bookUuids`.
+ *
+ * The mundane majority is the axis the visibility guards scale. A book count held constant
+ * while the mundane count quadruples is what turns "the matcher is offered the books" into a
+ * falsifiable equality: without the per-pass snapshot the offer count follows `itemCount`, and
+ * with a snapshot built from the wrong collaborator set it follows it too — while the
+ * inventory-READ counters stay perfectly flat in the second case.
+ *
+ * @param {object} [options]
+ * @returns {{id: string, name: string, items: object[]}}
+ */
+export function makeBookHoldingActor({ id = 'actor-scale', itemCount = 10, bookUuids = [] } = {}) {
+  const actor = makeActor({ id, itemCount });
+  return {
+    ...actor,
+    items: [
+      ...actor.items,
+      ...bookUuids.map((uuid, index) => ({
+        id: `book-item-${index}`,
+        uuid,
+        name: `Scale Tome ${index}`,
+        img: 'icons/svg/book.svg',
+        type: 'loot',
+        flags: {},
+        system: { quantity: 1 },
+      })),
+    ],
+  };
+}
+
+/**
+ * A recipe belonging to one of {@link makeBookGatedSystem}'s books.
+ *
+ * @param {object} options
+ * @returns {object}
+ */
+export function makeBookGatedRecipe({ index, systemId = 'sys-scale', componentCount = 8 }) {
+  const recipe = makeListingRecipe({
+    id: `r-${index}`,
+    systemId,
+    componentId: `c-${index % componentCount}`,
+  });
+  // No `linkedRecipeItemUuid`: membership is the modern `recipeIds[]` basis, so the legacy
+  // synthetic-definition leg stays out of what these guards measure.
+  return { ...recipe, recipeItemId: null };
+}
+
 /**
  * An actor holding `itemCount` stacks that resolve to NO managed component.
  *
