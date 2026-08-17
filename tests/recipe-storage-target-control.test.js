@@ -16,9 +16,26 @@
  *    (`tests/helpers/canonicalizeDefinitionCorpus.js`, `CANONICAL_FORM_VERSION`), which is
  *    ADR 0001's domain-level equivalence criterion. See the caveat below for what that does
  *    and does not establish.
- * 3. **A downgrade after a reverse conversion loads the corpus normally**, demonstrated by
- *    reading it back through an UNGUARDED settings adapter — which is what an older build
- *    is: it has no arrangement guard, no layout awareness, and reads the legacy key.
+ * 3. **A downgrade after a reverse conversion loads the corpus normally**, demonstrated
+ *    twice: reading the bytes back through an UNGUARDED settings adapter — which is what an
+ *    older build is, with no arrangement guard, no layout awareness and only the legacy key
+ *    — and then HYDRATING them through the real model, which is what that build actually
+ *    does with them.
+ *
+ * ## Every canonical comparison passes `storedRecords`
+ *
+ * The canonical form (issue 1233) decides authored-versus-hydrate-minted identity by
+ * PROVENANCE: an authored id is in the stored bytes and a minted one is not, and the two
+ * share a shape so nothing else can tell them apart. Omitting `storedRecords` selects the
+ * degraded `provenance: 'shape'` mode, which is v1's rule set and is NOT deterministic over
+ * a corpus the load path mints for. Every comparison here therefore passes the bytes, one
+ * asserts the `'stored'` stamp so a silent drop back to shape mode cannot pass, and a
+ * non-vacuity control shows the two modes really do differ for this fixture.
+ *
+ * That control is only meaningful because the round-trip corpus carries a deliberately
+ * LEGACY-SHAPED record ({@link legacyShapedRecipe}). Without it nothing in this file minted
+ * at all and shape mode was accidentally deterministic — the fixture would have been
+ * avoiding the one shape the reverse conversion most has to survive.
  * 4. **The re-creation escape is closed.** A client holding a stale settings adapter after a
  *    forward conversion cannot write `fabricate.recipes` back into existence, and the
  *    mirror — a stale per-record adapter after a reverse conversion — is closed too.
@@ -66,12 +83,42 @@ import {
 import { SettingsCraftingDefinitionRepository } from '../src/systems/SettingsCraftingDefinitionRepository.js';
 import { readValidIdBasis } from '../src/systems/validIdBasis.js';
 
-import { canonicalDefinitionCorpusJson } from './helpers/canonicalizeDefinitionCorpus.js';
+import {
+  canonicalDefinitionCorpusJson,
+  canonicalizeDefinitionCorpus,
+} from './helpers/canonicalizeDefinitionCorpus.js';
 import { installFoundryEnv } from './helpers/foundryEnv.js';
 import { SettingHost } from './helpers/settingDocumentHost.js';
 
 const env = installFoundryEnv();
+
+/** `foundry.utils.randomID()`'s alphabet (base 36) and length. */
+const ID_ALPHABET = 'abcdefghijklmnopqrstuvwxyz0123456789';
+
+/**
+ * A faithful stand-in for `foundry.utils.randomID()` — 16 characters of the same alphabet,
+ * unpredictable per call — installed OVER `installFoundryEnv`'s sequential `rid-N` stub.
+ *
+ * The shared stub is looser than the thing it stands for in the two ways that matter here:
+ * `rid-N` is not `CORE_ID_PATTERN`-shaped, so the canonical form's provenance rule would
+ * never classify it as hydrate-minted, and it is sequential per process, so two hydrates of
+ * the SAME stored bytes differ in a way no real world does. Either one alone would make the
+ * hydrating downgrade assertion below pass or fail for a reason that has nothing to do with
+ * this change. `tests/canonical-definition-corpus.test.js` refuses the same stub for the
+ * same reason; drawing from the platform CSPRNG rather than `Math.random()` is SonarCloud
+ * S2245.
+ *
+ * @returns {string}
+ */
+function mintCoreId() {
+  const bytes = globalThis.crypto.getRandomValues(new Uint8Array(16));
+  return Array.from(bytes, (byte) => ID_ALPHABET[byte % ID_ALPHABET.length]).join('');
+}
+
+globalThis.foundry.utils.randomID = mintCoreId;
+
 const { RecipeManager } = await import('../src/systems/RecipeManager.js');
+const { Recipe } = await import('../src/models/Recipe.js');
 
 const { SINGLE_ARRAY, PER_RECORD, UNSETTLED } = DEFINITION_STORAGE_LAYOUTS;
 const LAYOUT_KEY = SETTING_KEYS.RECIPE_STORAGE_LAYOUT;
@@ -130,6 +177,33 @@ function recipe(id, overrides = {}) {
     ingredientSets: [],
     resultGroups: [{ id: `rg-${id}`, results: [{ id: `res-${id}`, itemUuid: 'Item.x', quantity: 1 }] }],
     ...overrides,
+  };
+}
+
+/**
+ * A record in the PRE-ingredient-groups shape: a flat `ingredients` array and an ingredient
+ * set with no id of its own.
+ *
+ * In the round-trip fixture deliberately. It is the shape the reverse conversion most has to
+ * survive — a world old enough to still be on the single-array layout is exactly a world
+ * whose recipes were authored before ingredient groups existed — and it is the shape that
+ * makes "a conversion carries stored bytes and does NOT hydrate through the model" testable.
+ * `IngredientSet.js`'s PERMANENT INBOUND SHIM rewrites it on hydrate, minting an id per
+ * group and one for the set, so a conversion that round-tripped records through
+ * `Recipe.fromJSON`/`toJSON` would silently rewrite this record's identity; with only
+ * post-groups records in the fixture, that mutation passes.
+ *
+ * @param {string} id
+ */
+function legacyShapedRecipe(id) {
+  return {
+    id,
+    name: `Legacy ${id}`,
+    craftingSystemId: 'sys-1',
+    ingredientSets: [{ ingredients: [{ componentId: 'componentIron001', quantity: 2 }] }],
+    resultGroups: [
+      { id: `rg-${id}`, results: [{ id: `res-${id}`, componentId: 'componentSteel01', quantity: 1 }] },
+    ],
   };
 }
 
@@ -257,7 +331,12 @@ describe('a target no conversion can satisfy never leaves the world permanently 
 });
 
 describe('the reverse conversion moves the corpus back into the legacy key', () => {
-  const corpus = [recipe('r2'), recipe('r1'), recipe('r3', { craftingSystemId: 'sys-2' })];
+  const corpus = [
+    recipe('r2'),
+    recipe('r1'),
+    recipe('r3', { craftingSystemId: 'sys-2' }),
+    legacyShapedRecipe('r4'),
+  ];
 
   it('round-trips the corpus under the committed canonical form', async () => {
     const { seams } = await world({ layout: PER_RECORD, target: SINGLE_ARRAY, records: corpus });
@@ -266,9 +345,21 @@ describe('the reverse conversion moves the corpus back into the legacy key', () 
 
     assert.equal(report.action, 'converted');
     assert.equal(report.records, corpus.length);
+    // `storedRecords` is what selects the DETERMINISTIC form. Without it the comparison runs
+    // in the degraded `provenance: 'shape'` mode, which is v1's rule set and is not
+    // deterministic over a corpus the load path mints ids for — see #1233. Both sides are
+    // handed the same stored bytes because that is what they are: the conversion carries
+    // record values verbatim between arrangements, so any string NOT in `corpus` appearing on
+    // either side is an id the conversion invented, and it is renumbered on one side only.
+    const form = { storedRecords: corpus };
     assert.equal(
-      canonicalDefinitionCorpusJson(env.settings.get(SETTING_KEYS.RECIPES)),
-      canonicalDefinitionCorpusJson(corpus),
+      canonicalizeDefinitionCorpus(env.settings.get(SETTING_KEYS.RECIPES), form).provenance,
+      'stored',
+      'the stamp is the first JSON field precisely so a silent drop to shape mode cannot pass'
+    );
+    assert.equal(
+      canonicalDefinitionCorpusJson(env.settings.get(SETTING_KEYS.RECIPES), form),
+      canonicalDefinitionCorpusJson(corpus, form),
       'domain-level equivalence under CANONICAL_FORM_VERSION, ADR 0001’s criterion'
     );
   });
@@ -300,7 +391,11 @@ describe('the reverse conversion moves the corpus back into the legacy key', () 
 
     assert.deepEqual(
       env.writes.map((write) => `${write.key}=${Array.isArray(write.value) ? write.value.length : write.value}`),
-      [`${LAYOUT_KEY}=unsettled`, `${SETTING_KEYS.RECIPES}=3`, `${LAYOUT_KEY}=singleArray`],
+      [
+        `${LAYOUT_KEY}=unsettled`,
+        `${SETTING_KEYS.RECIPES}=${corpus.length}`,
+        `${LAYOUT_KEY}=singleArray`,
+      ],
       'layout unsettled, then the array, then the layout — the document delete comes after'
     );
     assert.deepEqual(host.legs, ['delete'], 'step 4 is the only document operation');
@@ -360,23 +455,82 @@ describe('the reverse conversion moves the corpus back into the legacy key', () 
 });
 
 describe('a downgrade after a reverse conversion loads the corpus normally', () => {
+  const corpus = [recipe('r1'), recipe('r2'), legacyShapedRecipe('r3')];
+
+  /**
+   * What an older build IS: a settings adapter with no arrangement guard, no layout read, and
+   * no knowledge that the per-record backend ever existed.
+   *
+   * @param {(raw: object) => object} [hydrate]
+   */
+  function olderBuildRepository(hydrate = (raw) => raw) {
+    return new SettingsCraftingDefinitionRepository({
+      settingKey: SETTING_KEYS.RECIPES,
+      corpus: () => new Map(),
+      hydrate,
+      getSetting: (key) => env.settings.get(key) ?? [],
+      setSetting: async () => {},
+    });
+  }
+
   it('is read in full by a build with no layout awareness at all', async () => {
-    const corpus = [recipe('r1'), recipe('r2')];
     const { seams } = await world({ layout: PER_RECORD, target: SINGLE_ARRAY, records: corpus });
     await reconcileRecipeStorageLayout(seams);
 
-    // What an older build IS: a settings adapter with no arrangement guard, no layout read,
-    // and no knowledge that the per-record backend ever existed.
-    const older = new SettingsCraftingDefinitionRepository({
-      settingKey: SETTING_KEYS.RECIPES,
-      corpus: () => new Map(),
-      getSetting: (key) => env.settings.get(key),
-      setSetting: async () => {},
-    });
-
-    const loaded = await older.loadAll();
+    const loaded = await olderBuildRepository().loadAll();
     assert.equal(loaded.length, corpus.length);
-    assert.equal(canonicalDefinitionCorpusJson(loaded), canonicalDefinitionCorpusJson(corpus));
+    assert.equal(
+      canonicalDefinitionCorpusJson(loaded, { storedRecords: corpus }),
+      canonicalDefinitionCorpusJson(corpus, { storedRecords: corpus })
+    );
+  });
+
+  it('hydrates through the model to the same corpus the per-record bytes hydrate to', async () => {
+    // The claim above compares STORED BYTES, which is only half of "loads normally": a real
+    // older build runs `Recipe.fromJSON` over them. That matters because the legacy-shaped
+    // record in this corpus MINTS on hydrate — `IngredientSet.js`'s permanent inbound shim
+    // gives the flat `ingredients` array a group id and the set an id, from
+    // `foundry.utils.randomID()` — so the two sides below carry DIFFERENT random values at
+    // the same structural positions and are equal only under the provenance rule.
+    const { host, seams } = await world({ layout: PER_RECORD, target: SINGLE_ARRAY, records: corpus });
+    const beforeConversion = [...host.collection.documents.values()]
+      .map((document) => Recipe.fromJSON(document.value).toJSON())
+      .sort((left, right) => (left.id < right.id ? -1 : 1));
+
+    await reconcileRecipeStorageLayout(seams);
+
+    const afterDowngrade = (await olderBuildRepository((raw) => Recipe.fromJSON(raw)).loadAll())
+      .map((record) => record.toJSON())
+      .sort((left, right) => (left.id < right.id ? -1 : 1));
+
+    const form = { storedRecords: corpus };
+    assert.equal(
+      canonicalDefinitionCorpusJson(afterDowngrade, form),
+      canonicalDefinitionCorpusJson(beforeConversion, form),
+      'the same domain corpus, hydrated from the two arrangements'
+    );
+  });
+
+  it('would compare two random values without the stored bytes, so the form is load-bearing', async () => {
+    // The non-vacuity control for the assertion above. In the degraded `provenance: 'shape'`
+    // mode a hydrate-minted `randomID()` is indistinguishable from an authored id, so the two
+    // loads differ on ids no world ever persisted. This is what threading `storedRecords`
+    // buys, demonstrated rather than asserted.
+    const { host } = await world({ layout: PER_RECORD, target: SINGLE_ARRAY, records: corpus });
+    const stored = [...host.collection.documents.values()].map((document) => document.value);
+    const first = stored.map((raw) => Recipe.fromJSON(raw).toJSON());
+    const second = stored.map((raw) => Recipe.fromJSON(raw).toJSON());
+
+    assert.notEqual(
+      canonicalDefinitionCorpusJson(first),
+      canonicalDefinitionCorpusJson(second),
+      'shape mode is NOT deterministic over this corpus; the fixture really does mint'
+    );
+    assert.equal(
+      canonicalDefinitionCorpusJson(first, { storedRecords: corpus }),
+      canonicalDefinitionCorpusJson(second, { storedRecords: corpus }),
+      'provenance mode is'
+    );
   });
 
   it('is what the pre-reverse world would NOT have given it', async () => {
