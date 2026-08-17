@@ -65,7 +65,7 @@ const LAB_MOUNT_PATH = 'tests/view-lab/mount.js';
  *
  * It used to resolve to every publishable case, and the name said so. It now resolves to
  * {@link LAB_SURFACE_CASES} — one frame of every surface the lab renders — which is the widest
- * answer that is still worth looking at: 33 frames a reviewer reads instead of 243 they scroll
+ * answer that is still worth looking at: 34 frames a reviewer reads instead of 246 they scroll
  * past. The symbol is named for the QUESTION rather than for that answer, so the two can be
  * re-tuned independently.
  */
@@ -6695,25 +6695,35 @@ export function fallbackCase() {
 //
 // The old answer was every publishable case, and it was the wrong shape of honest. A change to the
 // fixture world or the capture driver genuinely can move any frame, so the selection had to be
-// wide; but 243 frames is not evidence a person reads, it is a directory they scroll. In practice
+// wide; but 246 frames is not evidence a person reads, it is a directory they scroll. In practice
 // it bought nothing and cost twenty-five minutes, and its real effect was to make the whole
 // per-PR capture feel expensive enough to want switched off.
 //
 // What such a change actually has to prove is that the LAB still works: that it boots, mounts both
-// applications, and still navigates to and photographs every screen. It does not have to re-answer
-// "does the Recipe Studio's blocked bulk-edit banner still look right" — nothing in that frame is
-// under test, and the frame that would show a regression in it is selected by the files that draw
-// it. So the widening target is one frame per SURFACE, and the states of a surface are captured
-// when the files governing their behaviour or presentation change.
+// applications, and still navigates to and photographs every ROUTE AND TAB. It does not have to
+// re-answer "does the Recipe Studio's blocked bulk-edit banner still look right" — nothing in that
+// frame is under test, and the frame that would show a regression in it is selected by the files
+// that draw it. So the widening target is one frame per SURFACE, and the states of a surface are
+// captured when the files governing their behaviour or presentation change.
 //
-// The exposure this accepts, stated plainly: a fixture edit that changes only a DETAILED state —
-// one recipe's tools, one actor's broken stack — moves a frame nobody photographs on that PR, and
-// the change lands unphotographed. That is the same bargain every other narrowing here already
-// makes (a `sourceMatches` change selects its own cases, not the corpus), and the frame is not
-// lost, only deferred to the next PR that touches the surface it belongs to. What is NOT accepted
-// is silence: every surface is still photographed, so a fixture edit that breaks the lab, breaks a
-// window, or breaks a screen's ability to render at all still reds this PR rather than the next
-// one.
+// SURFACE MEANS ROUTE-OR-TAB, AND THAT IS NARROWER THAN "SCREEN". Say it exactly, because the
+// looser word is the one a future reader will lean on. A route's own internal tabs are NOT
+// separately covered: the Recipe editor's Results tab, the Tool editor's Requirements tab and the
+// Tags studio's second tab all fold into their route's single frame, because nothing a case
+// declares distinguishes them — reaching them is a `steps` click, and `steps` is the axis this
+// key deliberately collapses. Adding a sub-tab axis would mean adding a field to ~250 cases and
+// is not done here.
+//
+// The exposure this accepts, stated plainly, is therefore two things. A fixture edit that changes
+// only a DETAILED state — one recipe's tools, one actor's broken stack — moves a frame nobody
+// photographs on that PR. So does one that breaks a sub-tab WITHIN a covered route. Both land
+// unphotographed until the next PR touching the surface they belong to. That is the same bargain
+// every other narrowing here already makes (a `sourceMatches` change selects its own cases, not
+// the corpus).
+//
+// What is NOT accepted is silence at the route level: every route and every tab is still
+// photographed, so a fixture edit that breaks the lab, breaks a window, or stops a ROUTE rendering
+// at all still reds this PR rather than the next one.
 // ───────────────────────────────────────────────────────────────────────────────────────────────
 
 /**
@@ -6848,7 +6858,7 @@ function selectRenderFileCases(renderFiles) {
 // — but only for a change it can PROVE is confined to one region of the file, and it proves that
 // against that file's own text.
 //
-// The whole design is one question: when do we widen back to everything? The answer is "at the
+// The whole design is one question: when do we widen back to surface coverage? The answer is "at the
 // first sign of anything we do not fully understand", which here means:
 //
 //   - no patch, an empty patch, or a patch that is not a unified diff;
@@ -6871,7 +6881,7 @@ function selectRenderFileCases(renderFiles) {
 // revision — and in CI they systematically are not. `pr-screenshots.yml` runs on `pull_request`, so
 // the workspace is the MERGE commit while GitHub's `patch` field describes the PR HEAD; any PR
 // whose base moved the file it patches verifies against shifted lines, fails at the first
-// comparison, and silently pays the whole-corpus capture. Worse, a shifted patch that happens to
+// comparison, and silently pays the full coverage capture. Worse, a shifted patch that happens to
 // land on a verbatim twin of its own content verifies against the WRONG occurrence and attributes
 // the change to a case it does not touch — publishing a frame under a name it does not show, which
 // is strictly worse than over-capturing. The header must still PARSE, because that is the signal
@@ -7173,7 +7183,7 @@ const labActorLineRegions = memoized(() => parseLabActorTableRegions(labActorSou
  * `settle` — so keying on those functions would claim a player-only readership the file does not
  * have, and a later edit to a manager param would then select the player frames and silently
  * publish no evidence for the manager frames it moved. Marking the blocks keeps every declared
- * region's readership true, and a hunk landing outside every marker widens to the corpus, which
+ * region's readership true, and a hunk landing outside every marker widens to surface coverage, which
  * is the fail-safe default.
  */
 const PLAYER_MOUNT_REGIONS = Object.freeze({
@@ -7347,7 +7357,7 @@ function regionsTouchedAt(hunk, offset, regions) {
  * must EXIST in the file that will render, so wherever the edit actually landed, that place is one
  * of the matched offsets — and a set containing every candidate therefore contains the true one.
  * It is exact when the anchor is unique and a superset when it is not, which is the same direction
- * of error the whole-corpus answer made, at a fraction of the cost. Taking the FIRST candidate
+ * of error the widened answer makes, at a fraction of the cost. Taking the FIRST candidate
  * instead would attribute a change to whichever twin came earlier in the file; that is the silent
  * misattribution this rule still makes unreachable (issue 1127).
  *
@@ -7375,7 +7385,7 @@ function regionsTouchedByHunk(hunk, sourceLines, regions) {
     // honest. A candidate widens because it lands on a line outside every region — a shared
     // factory, a section banner, the selection machinery itself — and the true edit may be that
     // one. Unioning "some region" with "code that can move every frame" would answer with the
-    // region and lose the corpus, so this must stay ABOVE the union.
+    // region and lose the widening, so this must stay ABOVE the per-candidate union.
     if (touched === UNATTRIBUTABLE_REACH) return UNATTRIBUTABLE_REACH;
     union ??= new Set();
     for (const key of touched) union.add(key);
@@ -7392,34 +7402,63 @@ function regionsTouchedByHunk(hunk, sourceLines, regions) {
  * `sonar.cpd.exclusions`, so a second copy of the walk would fail the gate as well as being a
  * second place for the anchoring rule to drift.
  *
+ * REPORTS unattributability rather than RETURNING it, and that distinction is the whole reason
+ * this returns a pair. A patch can be part attributable and part not — one hunk inside a case
+ * literal, one hunk in the shared factory above it, which is exactly the shape of "add a case and
+ * touch the constant it uses". While the unattributable answer was the whole corpus, discarding
+ * the attributed half on the way out was harmless, because the corpus contained it. Surface
+ * coverage does not: it holds one frame per screen and would drop the very case the patch edited,
+ * publishing a capture that shows everything except the change. So the halves are kept apart here
+ * and UNIONED by the caller.
+ *
  * @param {string|undefined} patch The unified diff for that file, if the caller supplied one.
  * @param {Function} readSource The file that will render, read lazily.
  * @param {Function} readRegions Its regions, parsed lazily.
- * @returns {Set<string>|symbol} Region keys, or {@link UNATTRIBUTABLE_REACH}.
+ * @returns {{keys: Set<string>, unattributable: boolean}} The regions located, and whether any
+ *   part of the patch reached beyond them.
  */
 function touchedRegionKeys(patch, readSource, readRegions) {
-  if (typeof patch !== 'string' || patch.trim() === '') return UNATTRIBUTABLE_REACH;
+  const nothingLocated = { keys: new Set(), unattributable: true };
+  if (typeof patch !== 'string' || patch.trim() === '') return nothingLocated;
 
   const hunks = parseHunks(patch);
-  if (!hunks) return UNATTRIBUTABLE_REACH;
+  if (!hunks) return nothingLocated;
   const regions = readRegions();
-  if (!regions) return UNATTRIBUTABLE_REACH;
+  if (!regions) return nothingLocated;
 
   const sourceLines = readSource();
   const keys = new Set();
+  let unattributable = false;
   for (const hunk of hunks) {
     const touched = regionsTouchedByHunk(hunk, sourceLines, regions);
-    if (touched === UNATTRIBUTABLE_REACH) return UNATTRIBUTABLE_REACH;
-    for (const key of touched) keys.add(key);
+    if (touched === UNATTRIBUTABLE_REACH) unattributable = true;
+    else for (const key of touched) keys.add(key);
   }
-  return keys;
+  return { keys, unattributable };
 }
 
 /**
- * Lab inputs whose blast radius is narrower than the whole corpus, with the predicate — over a
+ * Widen a located selection by surface coverage when part of the change could not be attributed.
+ *
+ * The union, in one place, so every attribution path widens the same way: what WAS located is
+ * kept, and coverage is added for the part that was not. Replacing rather than unioning is the
+ * defect this function exists to prevent — see {@link touchedRegionKeys}.
+ *
+ * @param {Set<string>} ids The case ids that were attributed.
+ * @param {boolean} unattributable Whether any part of the change reached beyond them.
+ * @returns {Set<string>} The selection.
+ */
+function widenedByCoverage(ids, unattributable) {
+  if (!unattributable) return ids;
+  for (const id of LAB_SURFACE_CASE_IDS) ids.add(id);
+  return ids;
+}
+
+/**
+ * Lab inputs whose blast radius is narrower than surface coverage, with the predicate — over a
  * case's OWN declared fields — that decides which frames can render them.
  *
- * The default for a lab input is still EVERYTHING (see {@link mapChangedFilesToCases}); this table
+ * The default for a lab input is surface coverage (see {@link mapChangedFilesToCases}); this table
  * is the exception list, and an entry earns its place only when the narrowing can be DERIVED. A
  * hand-maintained list of case ids would drift the moment a case is added, and would drift silently
  * — the failure being a PR that renders no evidence for the frames it moved.
@@ -7446,7 +7485,7 @@ function touchedRegionKeys(patch, readSource, readRegions) {
  * ({@link LAB_ACTOR_FIXTURE_TABLES}); everything else in it — `ACTOR_DEFINITIONS`, `ownedItem`,
  * `recipeItemCopy`, `installToObject`, `installDeleteSemantics`, `buildLabActors`,
  * `buildDocumentIndex` and any symbol added later — sits outside every region and keeps the
- * whole-corpus default. `buildDocumentIndex` is the clearest reason that has to be so: it builds
+ * coverage default. `buildDocumentIndex` is the clearest reason that has to be so: it builds
  * the uuid table `fromUuid` resolves against, and the manager resolves through it everywhere
  * (`BooksScrollsView`, `ItemPageInspector`, `SystemEditView`, `EnvironmentSummaryInspector`,
  * `GatheringEventEditView`, `RecipeBooksScrollsTab`, `SimpleCraftingCheckEditor`, the knowledge
@@ -7481,7 +7520,7 @@ function touchedRegionKeys(patch, readSource, readRegions) {
  * blocks inside functions BOTH windows run. See {@link PLAYER_MOUNT_REGIONS}. Everything else in
  * the file — the determinism styles, the chrome-font gate, the lab-induced-clipping measurement,
  * `boot`, `borrowInstance`, `mountManagerApp`, the shared half of `readParams` and the shared half
- * of `settle` — sits outside every region and keeps the whole-corpus default, which is right: a
+ * of `settle` — sits outside every region and keeps the coverage default, which is right: a
  * frame of either window renders through all of it.
  */
 const ATTRIBUTED_LAB_INPUTS = Object.freeze([
@@ -7526,10 +7565,11 @@ function casesSelecting(selects) {
  * confined to one selects exactly that case.
  *
  * @param {string|undefined} patch The unified diff for this file, if the caller supplied one.
- * @returns {Set<string>|symbol} Selected ids, or {@link UNATTRIBUTABLE_REACH}.
+ * @returns {Set<string>} Selected ids.
  */
 function casesFromRegistryPatch(patch) {
-  return touchedRegionKeys(patch, registrySourceLines, caseLineRegions);
+  const { keys, unattributable } = touchedRegionKeys(patch, registrySourceLines, caseLineRegions);
+  return widenedByCoverage(keys, unattributable);
 }
 
 /**
@@ -7537,17 +7577,20 @@ function casesFromRegistryPatch(patch) {
  *
  * @param {string|undefined} patch The unified diff for that input, if the caller supplied one.
  * @param {object} attribution Its {@link ATTRIBUTED_LAB_INPUTS} entry.
- * @returns {Set<string>|symbol} Selected ids, or {@link UNATTRIBUTABLE_REACH}.
+ * @returns {Set<string>} Selected ids.
  */
 function casesFromRegionPatch(patch, attribution) {
-  const keys = touchedRegionKeys(patch, attribution.sourceLines, attribution.regions);
-  if (keys === UNATTRIBUTABLE_REACH) return UNATTRIBUTABLE_REACH;
+  const { keys, unattributable } = touchedRegionKeys(
+    patch,
+    attribution.sourceLines,
+    attribution.regions
+  );
 
   const ids = new Set();
   for (const key of keys) {
     for (const id of casesSelecting(attribution.selectsRegion(key))) ids.add(id);
   }
-  return ids;
+  return widenedByCoverage(ids, unattributable);
 }
 
 /**
@@ -7555,16 +7598,16 @@ function casesFromRegionPatch(patch, attribution) {
  *
  * @param {string} file A normalized path matching {@link LAB_INFRASTRUCTURE_PATTERN}.
  * @param {Map<string, string>} patchByPath Patches by path.
- * @returns {Set<string>|symbol} Selected ids, or {@link UNATTRIBUTABLE_REACH}.
+ * @returns {Set<string>} Selected ids.
  */
 function selectLabInputCases(file, patchByPath) {
   if (file === REGISTRY_PATH) return casesFromRegistryPatch(patchByPath.get(file));
   const attribution = ATTRIBUTED_LAB_INPUTS.find((entry) => entry.path === file);
   // The DEFAULT, and the fail-safe: an input nobody has attributed — a new file under
-  // `tests/view-lab/`, the mount page, the fixture assembler, the Foundry shim — reaches further
-  // than this registry can say, and resolves to surface coverage. See
-  // {@link mapChangedFilesToCases} for why that has to be the default.
-  if (!attribution) return UNATTRIBUTABLE_REACH;
+  // `tests/view-lab/`, the fixture assembler, the Foundry shim — reaches further than this
+  // registry can say, and resolves to surface coverage. See {@link mapChangedFilesToCases} for
+  // why that has to be the default.
+  if (!attribution) return new Set(LAB_SURFACE_CASE_IDS);
   if (attribution.regions) return casesFromRegionPatch(patchByPath.get(file), attribution);
   return casesSelecting(attribution.selects);
 }
@@ -7572,16 +7615,21 @@ function selectLabInputCases(file, patchByPath) {
 /**
  * The union of what every lab input in a changed set selects.
  *
+ * A plain union, with no early exit. It used to bail out with the unattributable sentinel the
+ * moment one input produced it, which discarded whatever the inputs before it had attributed —
+ * harmless only while that sentinel meant the whole corpus, which contained them. It resolves to
+ * surface coverage now, which does not, so bailing out would drop a co-changed case's own frame:
+ * a PR editing one case literal AND the mount page would publish coverage and no frame of the
+ * case it edited.
+ *
  * @param {string[]} labInputs Normalized lab-input paths.
  * @param {Map<string, string>} patchByPath Patches by path.
- * @returns {Set<string>|symbol} Selected ids, or {@link UNATTRIBUTABLE_REACH}.
+ * @returns {Set<string>} Selected ids.
  */
 function selectAllLabInputCases(labInputs, patchByPath) {
   const selected = new Set();
   for (const file of labInputs) {
-    const ids = selectLabInputCases(file, patchByPath);
-    if (ids === UNATTRIBUTABLE_REACH) return UNATTRIBUTABLE_REACH;
-    for (const id of ids) selected.add(id);
+    for (const id of selectLabInputCases(file, patchByPath)) selected.add(id);
   }
   return selected;
 }
@@ -7600,8 +7648,8 @@ function normalizePatches(patches) {
  * Map a changed-file set onto the cases that should be captured.
  *
  * A change to the lab's own inputs — the fixture world, the page that mounts it, the Foundry shim,
- * this registry — selects SURFACE COVERAGE ({@link LAB_SURFACE_CASES}: one frame of every screen
- * the lab renders) unless it is one of the few inputs whose reach can be derived (see
+ * this registry — selects SURFACE COVERAGE ({@link LAB_SURFACE_CASES}: one frame of every route
+ * and tab the lab renders) unless it is one of the few inputs whose reach can be derived (see
  * {@link ATTRIBUTED_LAB_INPUTS} and {@link casesFromRegistryPatch}).
  *
  * That default is the rule that stops the harness lying about its riskiest change. Every frame
@@ -7612,7 +7660,7 @@ function normalizePatches(patches) {
  *   mapChangedFilesToCases(['tests/view-lab/world/labContent.js']) -> []
  *
  * The coverage set is what that rule costs now. It used to be the whole corpus, and it stopped
- * being worth its price: 243 frames is not evidence anyone reads, and a twenty-five minute job on
+ * being worth its price: 246 frames is not evidence anyone reads, and a twenty-five minute job on
  * every lab-infrastructure PR is the thing that makes per-PR capture look optional. Coverage keeps
  * the property that matters — no lab-input change can select NOTHING, and none can leave a screen
  * unphotographed — while leaving each surface's detailed states to the files that draw them.
@@ -7622,6 +7670,18 @@ function normalizePatches(patches) {
  * diff it has checked against the file that will render. Everything unmapped or unparseable
  * resolves to coverage; a diff whose content is AMBIGUOUS selects the union of the places it could
  * be, which is a superset of the truth rather than a guess at it.
+ *
+ * ONE PROPERTY IS GONE, and it is worth recording rather than discovering. This function answers
+ * for BOTH the producer (`pr-screenshots.yml`) and the gate (`check-screenshots` in `ci.yml`), from
+ * the same `pulls/{n}/files` payload — but from two independently-computed merge commits, so a
+ * `main` that moves between them can leave one side able to anchor a hunk and the other not. While
+ * the widened answer was the whole corpus, any such disagreement resolved to a SUPERSET of whatever
+ * the other side chose, and the gate's overlap test could not fail for that reason. Coverage is not
+ * a superset, so the two can now disagree disjointly in principle. In practice the gate only arms
+ * when a render file changed, and a render file's selection is patch-independent and therefore
+ * common to both sides — so reaching the hole needs an armed gate whose render files select no case
+ * at all, on top of an anchoring disagreement. Unioning rather than replacing (above) narrows it
+ * further. Accepted, not overlooked.
  *
  * @param {string[]} files Changed paths.
  * @param {object} [options] Selection inputs beyond the file list.
@@ -7652,17 +7712,16 @@ export function mapChangedFilesToCases(files = [], { patches } = {}) {
     return [];
   }
 
-  const labSelection = selectAllLabInputCases(labInputs, normalizePatches(patches));
-
-  // A UNION, not an early return, and that is now load-bearing in a second way. It was introduced
-  // because the lab-input branch used to answer for the whole changed set and never consulted the
-  // render files shipping alongside it — invisible while its answer was "everything", which
-  // contains them. Surface coverage does NOT contain them: it holds one frame per screen, not the
-  // detailed state a co-changed render file selects. So an unattributable lab input resolves to
-  // coverage HERE, inside the union, rather than short-circuiting the function.
+  // A UNION at every level, never a replacement, and that is load-bearing in three places now:
+  // here, in `selectAllLabInputCases` across co-changed lab inputs, and in `touchedRegionKeys`
+  // across the hunks of one patch. All three used to short-circuit on unattributability, which was
+  // safe only because the answer then was the whole corpus — a superset of every selection it
+  // discarded. Surface coverage is not a superset of anything: it holds one frame per screen, not
+  // the detailed state a render file or a case literal selects. Widening now ADDS coverage to what
+  // was attributed rather than replacing it, so a PR that edits one case and also touches shared
+  // code publishes coverage AND the frame of the case it edited.
   const selected = selectRenderFileCases(renderFiles);
-  const labIds = labSelection === UNATTRIBUTABLE_REACH ? LAB_SURFACE_CASE_IDS : labSelection;
-  for (const id of labIds) selected.add(id);
+  for (const id of selectAllLabInputCases(labInputs, normalizePatches(patches))) selected.add(id);
   if (selected.size === 0) selected.add(FALLBACK_CASE_ID);
 
   return VIEW_LAB_CASES.filter((viewCase) => selected.has(viewCase.id) && viewCase.publish);

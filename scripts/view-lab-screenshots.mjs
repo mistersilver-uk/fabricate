@@ -26,7 +26,7 @@
  * Coverage rather than the whole corpus is the OTHER half of that decision (`LAB_SURFACE_CASES` in
  * `scripts/lib/viewLabCases.js`). What a change to this driver has to prove is that the driver
  * still drives: that both windows still mount, every screen is still reachable, and every frame is
- * still written. Re-photographing all 243 states to establish that bought a twenty-five minute job
+ * still written. Re-photographing all 246 states to establish that bought a twenty-five minute job
  * and a wall of frames nobody read.
  *
  * Commands:
