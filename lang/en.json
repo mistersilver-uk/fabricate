@@ -405,7 +405,12 @@
         "Alchemy": "Alchemy",
         "Gathering": "Gathering",
         "Journal": "Journal",
-        "Inventory": "Inventory"
+        "Inventory": "Inventory",
+        "Tablist": "Fabricate sections"
+      },
+      "Extension": {
+        "FaultTitle": "This section could not be displayed",
+        "FaultDescription": "The module providing \"{providerId}\" failed to render its content. Check the console for details, or reopen this window to try again."
       },
       "Inventory": {
         "Loading": "Loading your inventory…",

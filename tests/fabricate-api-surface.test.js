@@ -4,48 +4,79 @@ import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { FABRICATE_HOOKS, MANAGER_HOOKS } from '../src/config/hooks.js';
+import { FABRICATE_HOOKS, MANAGER_HOOKS, PLAYER_HOOKS } from '../src/config/hooks.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const mainPath = resolve(__dirname, '../src/main.js');
 const mainSource = readFileSync(mainPath, 'utf8');
 
-test('every public manager hook is namespaced, reachable on the API, and documented', () => {
-  // The Jekyll API reference hand-lists these names, so it is a MIRROR of `config/hooks.js`
-  // and mirrors rot silently: a renamed constant would leave third parties subscribing to a
-  // string nothing publishes, with nothing failing until someone read the page.
+/**
+ * Assert one public hook namespace is on the aggregate, correctly named, and documented.
+ *
+ * Shared by the two namespaces rather than copied per namespace: the Jekyll API reference
+ * hand-lists these names, so it is a MIRROR of `config/hooks.js` and mirrors rot silently — a
+ * renamed constant would leave third parties subscribing to a string nothing publishes, with
+ * nothing failing until someone read the page.
+ *
+ * @param {string} domain Hook domain segment (`manager`, `player`).
+ * @param {Readonly<Record<string, string>>} namespace The exported constant bag.
+ */
+function assertHookNamespace(domain, namespace) {
   const documented = readFileSync(resolve(__dirname, '../docs/api/index.md'), 'utf8');
   assert.ok(
     mainSource.includes('HOOKS: FABRICATE_HOOKS'),
     'game.fabricate.api.HOOKS should publish the whole aggregate'
   );
-  assert.equal(FABRICATE_HOOKS.manager, MANAGER_HOOKS, 'the manager namespace is on the aggregate');
-  const names = Object.values(MANAGER_HOOKS);
-  assert.ok(names.length > 0, 'expected at least one manager hook');
+  assert.equal(FABRICATE_HOOKS[domain], namespace, `the ${domain} namespace is on the aggregate`);
+  const names = Object.values(namespace);
+  assert.ok(names.length > 0, `expected at least one ${domain} hook`);
+  const convention = new RegExp(`^fabricate\\.${domain}\\.[a-z][A-Za-z]*$`);
   for (const name of names) {
     assert.match(
       name,
-      /^fabricate\.manager\.[a-z][A-Za-z]*$/,
+      convention,
       `${name} should follow the fabricate.<domain>.<eventCamelCase> convention`
     );
     assert.ok(documented.includes(`\`${name}\``), `${name} should be documented in docs/api`);
   }
-});
+}
 
-test('Fabricate publishes the stable manager extension API through both lifecycle binds', () => {
+/**
+ * Assert one page-session extension registry is imported once and bound to the public API.
+ *
+ * @param {string} name Registry export name.
+ * @param {string} modulePath Module specifier as `main.js` writes it.
+ */
+function assertRegistryBind(name, modulePath) {
   assert.ok(
-    mainSource.includes("import { managerExtensions } from './ui/managerExtensions.js';"),
-    'main.js should import the page-session registry singleton'
+    mainSource.includes(`import { ${name} } from '${modulePath}';`),
+    `main.js should import the ${name} page-session registry singleton`
   );
   assert.ok(
-    mainSource.includes('managerExtensions.bindPublicApi(game.fabricate.api);'),
-    'game.fabricate.api should receive the stable public registration object from the registry'
+    mainSource.includes(`${name}.bindPublicApi(game.fabricate.api);`),
+    `game.fabricate.api should receive the stable public registration object from ${name}`
   );
   assert.equal(
-    (mainSource.match(/const managerExtensions/g) || []).length,
+    (mainSource.match(new RegExp(`const ${name}`, 'g')) || []).length,
     0,
     'bindFabricateGlobal must not recreate the registry during init/ready replay'
   );
+}
+
+test('every public manager hook is namespaced, reachable on the API, and documented', () => {
+  assertHookNamespace('manager', MANAGER_HOOKS);
+});
+
+test('every public player hook is namespaced, reachable on the API, and documented', () => {
+  assertHookNamespace('player', PLAYER_HOOKS);
+});
+
+test('Fabricate publishes the stable manager extension API through both lifecycle binds', () => {
+  assertRegistryBind('managerExtensions', './ui/managerExtensions.js');
+});
+
+test('Fabricate publishes the stable player extension API through both lifecycle binds', () => {
+  assertRegistryBind('playerExtensions', './ui/playerExtensions.js');
 });
 
 test('Fabricate exposes deleteRecipe on the main Foundry API object', () => {

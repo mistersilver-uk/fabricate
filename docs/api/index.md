@@ -16,7 +16,7 @@ Fabricate exposes its API through two Foundry globals:
 - **`game.fabricate.api`**.
   Constructor references for all public classes, plus public constants (`HOOKS` — the published hook names).
 
-All APIs except manager-extension registration are available after the `fabricate.ready` hook fires:
+All APIs except the two extension-registration seams are available after the `fabricate.ready` hook fires:
 
 ```javascript
 Hooks.on('fabricate.ready', () => {
@@ -28,8 +28,8 @@ Hooks.on('fabricate.ready', () => {
 {: .warning }
 > Do not call Fabricate APIs before the `fabricate.ready` hook.
 > The module initialises during Foundry's `ready` hook, and services are not available until initialisation completes.
-> A companion's Manager extension registration is the exception.
-> Register it during the companion's `init` callback as described in [Manager Navigation Extension](#manager-navigation-extension).
+> A companion's extension registrations are the exceptions, and there are two of them.
+> Register each during the companion's `init` callback, as described in [Manager Navigation Extension](#manager-navigation-extension) and [Player Navigation Extension](#player-navigation-extension).
 
 ---
 
@@ -564,6 +564,9 @@ It does not establish ordinary-module script priority.
 The one-shot `ready` fallback is therefore part of the load contract.
 Do not replace it with an order assumption or a render-hook or DOM-patching integration.
 
+Arm that fallback from inside your `init` callback, exactly as the example below does, and never at your module's ESM top level.
+The placement is load-bearing for the same script-ordering reason on both seams, and [Player Navigation Extension](#player-navigation-extension) sets that reason out in full.
+
 ### Worked Example
 
 ```javascript
@@ -737,6 +740,244 @@ Hooks.on(game.fabricate.api.HOOKS.manager.SURFACE_TAB_CHANGED, ({ surfaceId, tab
 });
 ```
 
+## Player Navigation Extension
+
+Companion modules can add their own top-level tabs to Fabricate's **player** window through the API-v1 player extension seam.
+The seam is general and keyed by surface id; it is not a downtime feature, and Downtime is only its first consumer.
+
+The two seams differ in what they do, and the difference is structural rather than cosmetic.
+A **Manager** provider *replaces* one Core route's content.
+A **player** provider *adds* N tabs to the player window's navigation rail, alongside Crafting, Alchemy, Gathering, Journal and Inventory.
+Fabricate renders every registered player surface, so no surface id is privileged and Core never checks an id against a list of its own.
+
+A player surface id **is** the registering provider's own `id`.
+Fabricate's player window has no route of its own to name a surface independently, so `surfaceId` and `providerId` are always equal — in the mount context and in every hook payload.
+Both are carried anyway, so a player payload is shape-identical to a Manager one and a listener can read either seam's events with one handler.
+
+Declare Fabricate as a required module dependency in the companion manifest, exactly as for the Manager seam.
+
+```json
+{
+  "relationships": {
+    "requires": [{ "id": "fabricate", "type": "module" }]
+  }
+}
+```
+
+### The Load Contract, And Why The Fallback Is Armed Inside `init`
+
+Attempt registration once from the companion's own `init` callback.
+If the API is not there yet, arm **one** idempotent `Hooks.once('ready', …)` fallback — and arm it **from inside `init`**, never at the module's ESM top level.
+
+That placement is load-bearing and the reason is Foundry's script ordering.
+Module `esmodules` are sorted by priority, and **library-flagged modules evaluate before ordinary ones**.
+A library-flagged companion therefore evaluates before Fabricate does, so a `Hooks.once('ready', …)` armed at its ESM top level is registered *ahead* of Fabricate's own `ready` listener and fires before the API exists — defeating the one scenario the fallback is there for.
+Arming it from inside `init` puts it after Fabricate's, because by then every module's `init` has been dispatched in priority order.
+
+`relationships.requires` governs dependency availability and activation.
+It does not establish ordinary-module script priority.
+The one-shot `ready` fallback is therefore part of the load contract for both seams.
+Do not replace it with an order assumption, a render hook, or DOM patching.
+
+### Worked Example
+
+```javascript
+let unregisterPlayerDowntime = null;
+let playerReadyFallbackArmed = false;
+
+// The provider declares its OWN tabs. These ids are the companion's, not Fabricate's, and they
+// can never collide with a Core tab id: Fabricate addresses a provider tab by a namespaced
+// route key composed from the surface id and the tab id.
+const PLAYER_TABS = [
+  { id: 'board', icon: 'fas fa-chart-simple', key: 'Board' },
+  { id: 'projects', icon: 'fas fa-list-check', key: 'Projects' },
+  { id: 'ledger', icon: 'fas fa-scroll', key: 'Ledger' },
+];
+
+function tryRegisterPlayerDowntime() {
+  if (unregisterPlayerDowntime) return true;
+  const register = game.fabricate?.api?.playerExtensions?.registerPlayerNavProvider;
+  if (typeof register !== 'function') return false;
+
+  unregisterPlayerDowntime = register({
+    apiVersion: 1,
+    id: 'downtime',
+    tabs: PLAYER_TABS.map(({ id, icon, key }) => ({
+      id,
+      // The WHOLE Font Awesome class list, rendered verbatim.
+      icon,
+      // Final display text, already localized by the companion.
+      label: game.i18n.localize(`MY_MODULE.Downtime.${key}.Label`),
+      // Optional. It REPLACES the button's accessible name, so it must contain the visible label.
+      accessibleName: game.i18n.localize(`MY_MODULE.Downtime.${key}.Accessible`),
+      // Optional. Exposed through `aria-describedby`.
+      tooltip: game.i18n.localize(`MY_MODULE.Downtime.${key}.Tooltip`),
+    })),
+    mount({ target, tabId, context }) {
+      const view = mountCompanionPlayerDowntime({ target, tabId, actorId: context.actorId });
+      // Re-render this surface whenever the companion's own data changes.
+      const stop = myDowntimeStore.subscribe(() => context.requestRemount());
+      return () => { stop(); view.destroy(); };
+    },
+  });
+  return true;
+}
+
+Hooks.once('init', () => {
+  if (tryRegisterPlayerDowntime() || playerReadyFallbackArmed) return;
+  playerReadyFallbackArmed = true;
+  // Armed HERE, inside `init` — not at this file's top level. See the load contract above.
+  Hooks.once('ready', tryRegisterPlayerDowntime);
+});
+```
+
+### Provider Contract
+
+`registerPlayerNavProvider(provider)` returns an idempotent unregister function.
+Call it when disabling the companion; its tabs leave the rail, and Fabricate renders no placeholder in their place.
+
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
+
+| Field | Required | Meaning |
+|:------|:---------|:--------|
+| `apiVersion` | yes | Must be exactly `1`. |
+| `id` | yes | The surface id this provider claims, and the surface id Fabricate keys on. Lowercase letters, digits and hyphens, 1–64 characters, starting with a letter or digit. One provider per surface id — registering a second for the same surface throws. |
+| `tabs` | yes | One or more tabs, rendered in array order after Fabricate's own five. |
+| `mount` | yes | Synchronous mount callback. |
+
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
+
+The player seam recognises **no** route chrome and **no** header actions.
+The player window has no route header, breadcrumb trail or header-action group, so `title`, `subtitle`, `breadcrumb`, `actionsLabel` and `actions` are not validated and not read.
+Fabricate reads only the documented tab fields below: any other field on a tab is ignored, including a `count` — a nav count badge is Core's own and is not offered to a provider.
+
+Each entry in `tabs`:
+
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
+
+| Field | Required | Meaning |
+|:------|:---------|:--------|
+| `id` | yes | Unique within the tab set, and the same charset as the provider `id`. Fabricate never checks it against a list of its own, and it can never collide with a Core tab id. |
+| `label` | yes | Final visible tab label, rendered verbatim. Localize it yourself: Fabricate localizes only its own five labels. |
+| `icon` | yes | The full Font Awesome class list, for example `fas fa-scroll`, rendered verbatim. Fabricate prefixes the family only for its own tabs, so do not omit it. |
+| `accessibleName` | no | Accessible name for the rail button. It REPLACES the visible label as the accessible name, so it must contain the label's text. |
+| `tooltip` | no | Description exposed through `aria-describedby`. |
+
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
+
+The visible rail label truncates with an ellipsis inside its fixed-width button; the untruncated wording is what `accessibleName` and `tooltip` are for.
+
+### The Player Mount Context
+
+`mount({ target, tabId, context })` must be synchronous and return either one cleanup function or nothing.
+`tabId` is always the provider's own **bare** tab id, never the composed route key.
+
+That composed key is `ext:<surfaceId>:<tabId>`, and Fabricate addresses every provider tab by it rather than by the bare tab id.
+That is what makes a collision with a Core tab id structurally impossible without Fabricate learning a single provider id.
+The route key is what the window's active-tab state, the rail button's selection attribute, and the window's tab query all carry, so it is also the value you pass to open one of your own tabs yourself:
+
+```javascript
+// The worked example's provider id is 'downtime' and one of its tab ids is 'projects'.
+game.fabricate.api.getFabricateAppClass().show('ext:downtime:projects');
+```
+
+The window falls back to its Crafting tab when the key names a tab no registered provider currently offers, so register before you call it.
+
+`context` is a frozen object carrying no Fabricate store, document, or component:
+
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
+
+| Field | Meaning |
+|:------|:--------|
+| `schemaVersion` | Context contract version, currently `1`. |
+| `surface` | The Fabricate application hosting the provider; always `'player'`. |
+| `surfaceId` | The surface id this provider was registered under, which is the provider's own `id`. |
+| `tabId` | The active bare tab id, identical to `mount`'s own `tabId` argument. |
+| `actorId` | The player window's shared Actor selection, or `null` when nothing is selected. A change of actor produces a new context and therefore a remount. |
+| `isGM` | Whether the current Foundry user holds a GM role. This is presentation information, not authorization — it is also true for assistant GMs, and this window has no role gate at all, so gate your own writes. |
+| `revision` | Increments on every `requestRemount()` call. |
+| `requestRemount()` | Ask Fabricate to re-render this surface. It runs the current cleanup, clears the target, and calls `mount` again with a fresh context. |
+
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
+
+A new context object is created — never mutated — whenever one of its values changes, which also remounts the active tab.
+The converse holds too, and you can rely on it: while none of the values above changes, the context keeps its identity and your surface is **not** remounted.
+So opening the window, another companion registering or unregistering, and any other republication that leaves your surface's values alone all leave your mounted content in place, with its scroll position, focus, and in-flight state intact.
+
+### The Panel's Layout Contract
+
+The element handed to `mount` is a bare `div` inside the player window's content area, and it declares exactly `height: 100%; min-height: 0` and nothing else.
+Each omission is deliberate, and a companion can rely on all three:
+
+- **No scroller.** The player window's content area already scrolls, and a second scroller inside it produces a nested double scroll.
+- **No CSS container.** `container-type` implies `contain: layout`, which would make the target a containing block for fixed-position descendants and silently mis-position a companion's popovers.
+  A fixed-position element inside the target positions against the viewport.
+- **No padding or background.** The companion owns its own inset and surface.
+
+Give your own root `height: 100%; min-height: 0` too: a root sized `height: 100%` against an `auto`-height parent collapses.
+If you want container queries, declare `container-type` on your own root — its inline size is the target's, so you measure the same box without Fabricate imposing containment on companions that do not want it.
+
+### Lifecycle And Failure
+
+Fabricate calls the returned cleanup exactly once, while the target is still connected, and before whatever ended the mount removes it.
+That holds on every path that ends a mount: a tab change within your own surface, a tab change away to a Core tab, a tab change to a different companion's surface, your provider unregistering while one of its tabs is live, and the window closing.
+It holds for a selection Fabricate makes on the user's behalf as well, such as the fallback described below.
+Fabricate reaches the disposal from outside your mounted subtree and before the state change that removes it, and the disposal is idempotent, so a second caller reaching it does not run your cleanup twice.
+On window close the player application disposes first, then unmounts its Svelte root, and only then does `ApplicationV2` remove the window element.
+
+A mount or cleanup error is caught, logged, and contained, and the containment is deliberately **legible** rather than silent:
+
+- partial content is cleared;
+- the faulted surface's rail entries **stay**, and the active tab does not move;
+- Fabricate renders its own error state in the panel, naming the provider that failed;
+- the registration survives — the provider is set aside, never unregistered — so a later mount may succeed without the companion re-registering, on the conditions spelled out below;
+- focus is recovered onto the surface's rail button rather than dropping to the document body.
+
+The fault is recorded against the whole **surface**, not against the tab that threw.
+It is keyed on the `(surfaceId, provider)` pair, so once one of your tabs fails to mount, selecting any other tab of the same provider shows the same error state and Fabricate does not attempt another mount for it.
+That is deliberate containment rather than a per-tab retry: Fabricate cannot distinguish a tab-specific failure from a broken provider, and retrying the siblings of a provider that has already thrown would just repeat the fault.
+Two things clear it, and neither of them is a retry Fabricate performs on its own.
+
+The first is a new snapshot carrying a **different provider object** for the surface, which is what "a later snapshot may mount" means above.
+Unregistering and re-registering is such a snapshot only when the second registration passes a different object: a companion that re-registers the same module-level singleton hands Fabricate a provider that is still `===` the recorded one, so the fault and its error state survive.
+Register a freshly built provider object when you want the surface retried.
+
+The second is the user closing and reopening the player window.
+The record of which providers have faulted belongs to that window and is discarded when the window is torn down, so the next open mounts your provider again even though it is the same object.
+That is the retry Fabricate's own error state offers the user, and it is why a fault caused by a transient condition does not strand the surface until the world reloads.
+Bringing an already-open window back to the front is not a reopen and clears nothing.
+
+When a provider registers, unregisters, or re-registers with a different tab set, an active route key the new set no longer offers falls back to Fabricate's default Crafting tab, so the window never renders an empty panel.
+
+The companion owns all authorization, localization, domain data, persistence, and resources it creates; Fabricate supplies only the target and the window shell.
+Note that the player window applies **no** visibility or permission gate to a provider tab: unlike the Manager, it has no GM gate, so every user who can open the window sees every registered provider's tabs.
+
+### Player Hooks
+
+Fabricate publishes observational hooks around these events, exposed on `game.fabricate.api.HOOKS.player` so you do not have to hard-code the strings.
+They are notifications only: a listener's return value is ignored and nothing a listener does changes what the player window renders.
+
+`surfaceId` and `providerId` are always equal in these payloads, for the reason given above.
+There is no `coreFallback` field: Fabricate renders no content in a provider's place on this surface, so a tab exists only while its provider does.
+
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
+
+| Hook | Fires | Payload |
+|:-----|:------|:--------|
+| `fabricate.player.navProviderRegistered` | A provider claims a player surface | `{ schemaVersion, surfaceId, tabIds }` |
+| `fabricate.player.navProviderUnregistered` | A provider releases a surface | `{ schemaVersion, surfaceId, tabIds }` |
+| `fabricate.player.surfaceMounted` | The player window mounts a surface | `{ schemaVersion, surface, surfaceId, tabId, providerId }` |
+| `fabricate.player.surfaceUnmounted` | That surface is torn down | `{ schemaVersion, surface, surfaceId, tabId, providerId }` |
+| `fabricate.player.surfaceTabChanged` | The active tab of a mounted surface changes | `{ schemaVersion, surface, surfaceId, tabId, previousTabId, providerId }` |
+
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
+
+```javascript
+Hooks.on(game.fabricate.api.HOOKS.player.SURFACE_TAB_CHANGED, ({ surfaceId, tabId }) => {
+  console.log(`Fabricate player surface ${surfaceId} moved to ${tabId}`);
+});
+```
+
 ## Data Persistence
 
 Fabricate stores data in Foundry's settings and flags:
@@ -785,6 +1026,11 @@ Fabricate stores data in Foundry's settings and flags:
 | `fabricate.manager.surfaceMounted` | The Manager route hosting an extension surface renders | See [Manager Hooks](#manager-hooks) |
 | `fabricate.manager.surfaceUnmounted` | That route is torn down | See [Manager Hooks](#manager-hooks) |
 | `fabricate.manager.surfaceTabChanged` | The active tab of a hosted surface changes | See [Manager Hooks](#manager-hooks) |
+| `fabricate.player.navProviderRegistered` | A companion provider claims a player-window navigation surface | See [Player Hooks](#player-hooks) |
+| `fabricate.player.navProviderUnregistered` | A companion provider releases a player surface | See [Player Hooks](#player-hooks) |
+| `fabricate.player.surfaceMounted` | The player window mounts an extension surface | See [Player Hooks](#player-hooks) |
+| `fabricate.player.surfaceUnmounted` | That surface is torn down | See [Player Hooks](#player-hooks) |
+| `fabricate.player.surfaceTabChanged` | The active tab of a mounted player surface changes | See [Player Hooks](#player-hooks) |
 
 Startup world-time processing awaits crafting, salvage, and gathering settlement before `fabricate.ready` fires.
 Later Foundry `updateWorldTime` events dispatch the same processors without blocking the hook.

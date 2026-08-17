@@ -228,7 +228,9 @@ describe('CraftingSystemManager source contract', () => {
     assert.ok(appSource.includes("import { managerExtensions } from './managerExtensions.js';"));
     assert.ok(appSource.includes('managerExtensions,'));
     assert.ok(
-      rootSource.includes('let { store, services = null, managerExtensions = null } = $props()')
+      rootSource.includes(
+        'let { store, services = null, managerExtensions = null, playerExtensions = null } = $props()'
+      )
     );
     assert.ok(rootSource.includes('<WorldDowntimeExtensionHost'));
   });
