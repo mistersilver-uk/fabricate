@@ -6079,10 +6079,12 @@
 
 /* The two check-LESS states are not the same fact and must not look alike. */
 
-/* `progressive` and `ingredients` are working configurations that simply do not roll:
-   a progressive craft advances by stages, and a routedByIngredients craft resolves off
-   the ingredient set that was used. Neutral. */
+/* `progressive`, `ingredients` and `checkOff` are working configurations that simply do
+   not roll: a progressive craft advances by stages, a routedByIngredients craft resolves
+   off the ingredient set that was used, and a checkOff system had its check switched off
+   on purpose. Neutral. */
 .fabricate-manager .manager-recipe-check.is-progressive,
+.fabricate-manager .manager-recipe-check.is-checkOff,
 .fabricate-manager .manager-recipe-check.is-ingredients {
   border-color: var(--fab-border);
   color: var(--fab-text-subtle);

@@ -3541,9 +3541,51 @@ describe('CraftingSystemManager mounted behavior', () => {
     return calls;
   }
 
-  it('Checks: alchemy checkMode=none renders the check-mode selector at the top and the read-only "resolves without a check" notice below, no Active toggle (issue 554)', async () => {
+  it('Checks: alchemy checkMode=none is the OFF state — the turn-on empty state and a live Active toggle, not a read-only notice', async () => {
     await mountChecksWithAlchemyCheckMode('none');
-    // The none/simple/tiered selector renders at the top of the Crafting sub-tab.
+    // `none` is no longer a MODE the studio offers; it is what the Active switch writes when
+    // the GM turns the check off. So the route takes the shared off-state empty state, with
+    // the way back on inside it, exactly as an optional crafting or salvage check does.
+    assert.ok(
+      target.querySelector('[data-checks-panel="crafting"][data-checks-off]'),
+      'the crafting route renders the shared off-state panel'
+    );
+    assert.ok(
+      target.querySelector('[data-checks-turn-on]'),
+      'and offers the turn-this-check-on button'
+    );
+    assert.equal(
+      target.querySelector('[data-alchemy-none-readonly]'),
+      null,
+      'the retired read-only notice is gone — it named a mode the selector no longer offers'
+    );
+    // The switch is LIVE and reads off, which is the whole point: a check that is off needs
+    // the control that turns it back on, not a note explaining that it cannot be turned off.
+    const toggle = target.querySelector('[data-checks-active-toggle]');
+    assert.ok(toggle, 'the Active toggle renders and is operable');
+    assert.equal(
+      target.querySelector('[data-checks-active-required]'),
+      null,
+      'and carries no "cannot be turned off" hint'
+    );
+
+    // Turning it back on stages `simple` and the authoring surface returns — the round trip
+    // an alchemy GM had no way to make at all before.
+    target.querySelector('[data-checks-turn-on]').click();
+    await tick();
+    flushSync();
+    assert.ok(
+      target.querySelector('[data-checks-panel="crafting"] [data-crafting-alchemy-checkmode]'),
+      'the check-mode selector comes back'
+    );
+    assert.ok(
+      target.querySelector('[data-checks-panel="crafting"] [data-simple-check-editor]'),
+      'and the simple pass/fail editor with it'
+    );
+  });
+
+  it('Checks: the alchemy check-mode selector offers Simple and Tiered only — "No check" is not a mode', async () => {
+    await mountChecksWithAlchemyCheckMode('simple');
     const selector = target.querySelector(
       '[data-checks-panel="crafting"] [data-crafting-alchemy-checkmode]'
     );
@@ -3551,26 +3593,14 @@ describe('CraftingSystemManager mounted behavior', () => {
     const selectorOptions = Array.from(
       selector.querySelectorAll('[data-crafting-alchemy-checkmode-option]')
     ).map((option) => option.getAttribute('data-crafting-alchemy-checkmode-option'));
-    for (const mode of ['none', 'simple', 'tiered']) {
-      assert.ok(selectorOptions.includes(mode), `check-mode option "${mode}" is offered`);
-    }
-    assert.ok(
-      target.querySelector('[data-checks-panel="crafting"] [data-alchemy-none-readonly]'),
-      'None mode renders the read-only crafting notice below the selector'
-    );
-    assert.equal(
-      target.querySelector('[data-checks-panel="crafting"] [data-simple-check-editor]'),
-      null,
-      'no editor in None mode'
-    );
-    assert.equal(
-      target.querySelector('[data-checks-active-toggle]'),
-      null,
-      'None mode does not offer an Active toggle'
+    assert.deepEqual(
+      selectorOptions,
+      ['simple', 'tiered'],
+      'the selector answers only what SHAPE the check is; on/off is the Active switch'
     );
   });
 
-  it('Checks: alchemy checkMode=simple renders the selector above the simple editor and cannot be disabled (issue 554)', async () => {
+  it('Checks: alchemy checkMode=simple renders the selector above the simple editor and CAN be disabled', async () => {
     await mountChecksWithAlchemyCheckMode('simple');
     assert.ok(
       target.querySelector('[data-checks-panel="crafting"] [data-crafting-alchemy-checkmode]'),
@@ -3580,14 +3610,14 @@ describe('CraftingSystemManager mounted behavior', () => {
       target.querySelector('[data-checks-panel="crafting"] [data-simple-check-editor]'),
       'Simple mode renders the simple pass/fail editor below the selector'
     );
-    assert.equal(
-      target.querySelector('[data-checks-active-toggle]'),
-      null,
-      'Simple mode is mandatory — no Active toggle'
-    );
     assert.ok(
+      target.querySelector('[data-checks-active-toggle]'),
+      'Simple mode is OPTIONAL — it offers a live Active toggle'
+    );
+    assert.equal(
       target.querySelector('[data-checks-active-required]'),
-      'Simple mode shows the cannot-be-disabled required hint'
+      null,
+      'and no longer claims the mode requires the check'
     );
   });
 
@@ -3604,7 +3634,14 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.equal(
       target.querySelector('[data-checks-active-toggle]'),
       null,
-      'Tiered mode is mandatory — no Active toggle'
+      'Tiered mode is mandatory — no operable Active toggle'
+    );
+    const locked = target.querySelector('[data-checks-active-locked]');
+    assert.ok(locked, 'it shows the locked always-on indicator instead');
+    assert.equal(
+      locked.getAttribute('data-checks-active-locked'),
+      'on',
+      'and that indicator reads ON — tiered always rolls'
     );
     assert.ok(
       target.querySelector('[data-checks-active-required]'),
@@ -3612,8 +3649,11 @@ describe('CraftingSystemManager mounted behavior', () => {
     );
   });
 
-  it('Checks: selecting a check-mode option persists live via setAlchemyCheckMode (issue 554)', async () => {
-    const calls = await mountChecksWithAlchemyCheckMode('none');
+  it('Checks: selecting a check-mode option STAGES it — no store write until Save checks', async () => {
+    // The lifecycle is the point. This used to call `store.setAlchemyCheckMode` straight from
+    // the radio's change handler, so the mode landed on click: no Unsaved chip, nothing for
+    // the route-exit guard to guard, and Discard could not put it back.
+    const calls = await mountChecksWithAlchemyCheckMode('simple');
     const tieredRadio = target.querySelector(
       '[data-checks-panel="crafting"] [data-crafting-alchemy-checkmode-option="tiered"] input'
     );
@@ -3623,8 +3663,57 @@ describe('CraftingSystemManager mounted behavior', () => {
     flushSync();
     assert.deepEqual(
       calls.filter((call) => call[0] === 'setAlchemyCheckMode'),
+      [],
+      'choosing a mode writes NOTHING on its own'
+    );
+    // …and the studio now reports work in hand, which is what makes Save reachable.
+    const save = target.querySelector('[data-checks-save]');
+    assert.ok(save && !save.disabled, 'Save checks is enabled by the staged mode change');
+
+    save.click();
+    await tick();
+    flushSync();
+    assert.deepEqual(
+      calls.filter((call) => call[0] === 'setAlchemyCheckMode'),
       [['setAlchemyCheckMode', 'tiered']],
-      'choosing a mode routes through the store setAlchemyCheckMode action'
+      'and Save checks is what applies it, through the same store action as before'
+    );
+  });
+
+  it('Checks: the alchemy Active toggle stages the check OFF as checkMode none, applied by Save checks', async () => {
+    // The off state is the MODE, not `craftingCheck.enabled` — the engine ignores that flag
+    // for alchemy and dispatches on `alchemy.checkMode` alone, so writing it would have moved
+    // a switch the engine never reads.
+    const calls = await mountChecksWithAlchemyCheckMode('simple');
+    const toggle = target.querySelector('[data-checks-active-toggle]');
+    assert.ok(toggle, 'the Active toggle renders for alchemy simple');
+    toggle.click();
+    await tick();
+    flushSync();
+    assert.deepEqual(
+      calls.filter((call) => call[0] === 'saveCraftingCheckActive'),
+      [],
+      'it never writes the generic craftingCheck.enabled flag'
+    );
+    assert.ok(
+      target.querySelector('[data-checks-panel="crafting"][data-checks-off]'),
+      'the route immediately previews the off state from the draft'
+    );
+
+    const save = target.querySelector('[data-checks-save]');
+    assert.ok(save && !save.disabled, 'Save checks is enabled by the staged toggle');
+    save.click();
+    await tick();
+    flushSync();
+    assert.deepEqual(
+      calls.filter((call) => call[0] === 'setAlchemyCheckMode'),
+      [['setAlchemyCheckMode', 'none']],
+      'and Save applies it as checkMode none'
+    );
+    assert.deepEqual(
+      calls.filter((call) => call[0] === 'saveCraftingCheckSimple'),
+      [],
+      'and writes no untouched slot draft alongside it — the per-slot dirty guards'
     );
   });
 
@@ -4447,11 +4536,25 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.equal(target.querySelector('[data-checks-active-required]'), null);
     assert.equal(target.querySelector('[data-crafting-check-editor]'), null);
 
+    // IT STAGES rather than persisting on click. Every Active switch in the studio now goes
+    // through the shared stage → `Save checks` → applied lifecycle, so one affordance does not
+    // mean two different things depending on which route the GM is standing on.
     toggle.click();
     await tick();
     flushSync();
+    assert.deepEqual(
+      calls.filter((call) => call[0] === 'saveCraftingCheckActive'),
+      [],
+      'the click alone writes nothing'
+    );
+
+    const save = target.querySelector('[data-checks-save]');
+    assert.ok(save && !save.disabled, 'Save checks is enabled by the staged switch');
+    save.click();
+    await tick();
+    flushSync();
     const toggled = calls.find((call) => call[0] === 'saveCraftingCheckActive');
-    assert.ok(toggled, 'toggling Active persists through the store');
+    assert.ok(toggled, 'and Save checks is what persists it');
     assert.equal(toggled[1], true, 'enabling the check sends true');
   });
 
@@ -5421,10 +5524,12 @@ describe('CraftingSystemManager mounted behavior', () => {
         values: ['equal', 'partial', 'exceed'],
       },
       {
-        props: { resolutionMode: 'alchemy', alchemyCheckMode: 'none' },
+        // `simple`, not `none`: `routeIsOff` answers from `alchemyCheckMode` directly, so a
+        // `none` fixture renders the turn-on panel and finds no options at all here.
+        props: { resolutionMode: 'alchemy', alchemyCheckMode: 'simple' },
         attr: 'data-crafting-alchemy-checkmode-option',
         section: 'roll',
-        values: ['none', 'simple', 'tiered'],
+        values: ['simple', 'tiered'],
       },
     ];
     for (const group of groups) {
@@ -5702,17 +5807,12 @@ describe('CraftingSystemManager mounted behavior', () => {
     // Every case below carries a non-empty catalogue: the notice is gated on one, so an
     // empty catalogue would make all the assertions read the same silent card.
     const catalogue = [{ id: 'med', label: 'Medicine', expression: '@abilities.med.mod' }];
+    // ALCHEMY `none` NO LONGER APPEARS HERE. It used to be this test's `noCheck` case — the
+    // one crafting configuration that reached it — but it is now the OFF state of an optional
+    // check, so its route collapses to the shared turn-on panel and renders no Modifiers
+    // section to carry a notice. That is asserted below rather than dropped silently, because
+    // "the notice moved" and "the notice stopped rendering" are different facts.
     for (const { props, cause } of [
-      // Alchemy at checkMode `none` rolls no crafting check at all. The pre-1055 local
-      // rollFormula ternary had no case for it and reported the simple slot's formula.
-      {
-        props: {
-          resolutionMode: 'alchemy',
-          alchemyCheckMode: 'none',
-          craftingCheckSimple: { rollFormula: '1d20 + 4' },
-        },
-        cause: 'noCheck',
-      },
       {
         props: { resolutionMode: 'simple', craftingCheckSimple: { rollFormula: '  ' } },
         cause: 'noFormula',
@@ -5739,6 +5839,29 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(
       !target.querySelector('[data-crafting-modifier-inert]'),
       'an authored formula is never inert: the modifiers are appended to it'
+    );
+    unmount(mounted);
+    mounted = null;
+    target.remove();
+
+    // The alchemy OFF route: no Modifiers section at all, so no inert notice — the same
+    // treatment any other optional check that has been switched off already gets.
+    mountChecksView(
+      {
+        resolutionMode: 'alchemy',
+        alchemyCheckMode: 'none',
+        craftingCheckSimple: { rollFormula: '1d20 + 4' },
+        modifiers: catalogue,
+      },
+      'roll'
+    );
+    assert.ok(
+      target.querySelector('[data-checks-panel="crafting"][data-checks-off]'),
+      'a switched-off alchemy check collapses to the turn-on panel'
+    );
+    assert.ok(
+      !target.querySelector('[data-crafting-modifier-inert]'),
+      'and carries no inert-modifier notice, because it renders no Modifiers section'
     );
   });
 
@@ -20742,7 +20865,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     );
     await openChecksActivity('crafting');
     assert.ok(
-      target.querySelector('[data-alchemy-none-readonly]'),
+      target.querySelector('[data-checks-panel="crafting"][data-checks-off]'),
       'and the route says so, with no formula field to clear a badge with'
     );
     assert.ok(
@@ -21221,6 +21344,145 @@ describe('CraftingSystemManager mounted behavior', () => {
       target.querySelector('.fabricate-manager').dataset.managerView,
       'components',
       'discard lets navigation proceed'
+    );
+  });
+
+  it('saves a staged alchemy check-ON together with the formula authored beside it', async () => {
+    // THE LOAD-BEARING CLAIM of the staged check mode. `craftingCheckMode` resolves the slot
+    // from the DRAFT alchemy mode; resolving it from the persisted one instead made this
+    // exact visit lose work. Turning the check on leaves the persisted mode at `none`, which
+    // resolves to slot `null`, so the simple draft never read dirty and Save wrote the mode
+    // while silently dropping the formula the GM had just typed.
+    const calls = [];
+    await mountChecks(calls, {
+      alchemyResolutionMode: 'alchemy',
+      alchemyConfig: { checkMode: 'none', learnOnCraft: true, consumeOnFail: true },
+      craftingCheck: { enabled: true, simple: { rollFormula: '', dc: 12 } },
+    });
+    await openChecksActivity('crafting');
+
+    target.querySelector('[data-checks-turn-on]').click();
+    await tick();
+    flushSync();
+    setInputValue(target.querySelector('[data-check-roll-formula]'), '1d20 + 5');
+    await tick();
+    flushSync();
+
+    target.querySelector('[data-checks-save]').click();
+    await settleRouteExit();
+    assert.deepEqual(
+      calls.filter((call) => call[0] === 'setAlchemyCheckMode'),
+      [['setAlchemyCheckMode', 'simple']],
+      'the staged mode lands'
+    );
+    const simple = calls.find((call) => call[0] === 'saveCraftingCheckSimple');
+    assert.ok(simple, 'and so does the formula staged in the same visit');
+    assert.equal(simple[1].rollFormula, '1d20 + 5');
+  });
+
+  it('discards a staged alchemy check-mode change along with the other drafts', async () => {
+    // The other defect the staging fixes: the mode persisted on click, so the Discard branch
+    // of the exit prompt reset every OTHER draft and left this one applied.
+    const calls = [];
+    await mountChecks(calls, {
+      alchemyResolutionMode: 'alchemy',
+      alchemyConfig: { checkMode: 'simple', learnOnCraft: true, consumeOnFail: true },
+      craftingCheck: { enabled: true, simple: { rollFormula: '1d20', dc: 12 } },
+    });
+    await openChecksActivity('crafting');
+
+    target.querySelector('[data-checks-active-toggle]').click();
+    await tick();
+    flushSync();
+    assert.ok(
+      target.querySelector('[data-checks-panel="crafting"][data-checks-off]'),
+      'the route previews the staged OFF state'
+    );
+
+    navButton('Components').click();
+    await settleRouteExit();
+    const prompt = calls.find((call) => call[0] === 'confirmDiscardDirtyChecksDraft');
+    assert.ok(prompt, 'a staged mode change is dirty enough to prompt on the way out');
+    assert.deepEqual(prompt[1], ['crafting'], 'and names crafting as the dirty activity');
+    assert.deepEqual(
+      calls.filter((call) => call[0] === 'setAlchemyCheckMode'),
+      [],
+      'discarding writes NOTHING — the whole point of staging it'
+    );
+
+    navButton('Checks').click();
+    await tick();
+    flushSync();
+    await openChecksActivity('crafting');
+    assert.ok(
+      target.querySelector('[data-checks-panel="crafting"] [data-simple-check-editor]'),
+      'and the check is back ON when the studio is reopened'
+    );
+  });
+
+  it('stages the SALVAGE Active switch too, and Discard puts it back', async () => {
+    // The follow-up half of the staging work. Alchemy's switch staged first because its off
+    // state is a check mode; that left one affordance on two lifecycles — staged on an alchemy
+    // crafting route, write-through everywhere else. A GM flipping Active on Salvage got no
+    // Unsaved chip, a disabled Save, and a Discard that could not undo it.
+    const calls = [];
+    await mountChecks(calls, {
+      salvageResolutionMode: 'simple',
+      salvageCraftingCheck: { enabled: true, simple: { rollFormula: '1d20', dc: 12 } },
+    });
+    await openChecksActivity('salvage');
+
+    const toggle = target.querySelector(
+      '[data-checks-active="salvage"] [data-checks-active-toggle]'
+    );
+    assert.ok(toggle, 'the salvage Active switch renders in simple mode');
+    toggle.click();
+    await tick();
+    flushSync();
+    assert.deepEqual(
+      calls.filter((call) => call[0] === 'saveSalvageCheckActive'),
+      [],
+      'flipping it writes nothing on its own'
+    );
+    assert.ok(
+      target.querySelector('[data-checks-panel="salvage"][data-checks-off]'),
+      'the route previews the staged OFF state'
+    );
+
+    navButton('Components').click();
+    await settleRouteExit();
+    const prompt = calls.find((call) => call[0] === 'confirmDiscardDirtyChecksDraft');
+    assert.ok(prompt, 'and it is dirty enough to prompt on the way out');
+    assert.deepEqual(prompt[1], ['salvage'], 'naming salvage as the dirty activity');
+    assert.deepEqual(
+      calls.filter((call) => call[0] === 'saveSalvageCheckActive'),
+      [],
+      'discarding writes nothing'
+    );
+  });
+
+  it('applies a staged salvage Active switch through Save checks, without rewriting its formula', async () => {
+    const calls = [];
+    await mountChecks(calls, {
+      salvageResolutionMode: 'simple',
+      salvageCraftingCheck: { enabled: true, simple: { rollFormula: '1d20', dc: 12 } },
+    });
+    await openChecksActivity('salvage');
+    target.querySelector('[data-checks-active="salvage"] [data-checks-active-toggle]').click();
+    await tick();
+    flushSync();
+
+    target.querySelector('[data-checks-save]').click();
+    await settleRouteExit();
+    assert.deepEqual(
+      calls.filter((call) => call[0] === 'saveSalvageCheckActive'),
+      [['saveSalvageCheckActive', false]],
+      'Save applies the staged switch'
+    );
+    assert.deepEqual(
+      calls.filter((call) => call[0] === 'saveSalvageCheckSimple'),
+      [],
+      'and the per-slot dirty guard keeps it from rewriting an untouched formula block'
     );
   });
 

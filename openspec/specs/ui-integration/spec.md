@@ -633,11 +633,18 @@ Modifiers renders in every mode too, INCLUDING the two that roll nothing — gat
 Any section that cannot apply renders the shared `EmptyState` naming the mode, preserving the shipped d100 explanation rather than blanking the route.
 
 A check that is switched off — the route has a LIVE Active toggle and it is not on — collapses the strip to a single section and renders the shared `EmptyState` with a "Turn this check on" action; its right rail keeps the documentation/quickstart pair, the activation card and an `OFF` digest.
-"Switched off" is not `optional && !enabled`: `optional` does not mean the same thing per activity (on gathering it is `mode === 'd100'`, the one mode with no toggle at all), so the predicate is stated per activity and alchemy `none` and gathering `d100` are INERT rather than off.
+"Switched off" is not `optional && !enabled`: `optional` does not mean the same thing per activity (on gathering it is `mode === 'd100'`, the one mode with no toggle at all), so the predicate is stated per activity and gathering `d100` is INERT rather than off.
+Alchemy `checkMode: "none"` is the opposite case and is OFF, not inert: it is what the Active switch writes when the GM turns an alchemy check off, so it takes this same collapsed panel and its "Turn this check on" action.
 
 The right rail is an INDEPENDENTLY SCROLLABLE container in the SIDE-COLUMN STATE ONLY, never a pinned column that clips.
 On an activity route it carries, in order: the documentation/quickstart pair, the activation control, a "Preview as" panel, an outcome-preview simulator, a per-outcome odds histogram, and a "This check" digest whose status chip reads `OK` / `OFF` / a count pill.
 Where the resolution mode denies the GM the choice, the activation control renders a LOCKED READING of the switch — the same track and knob, a padlock and the hint — not the hint alone: removing the control removed the state with it, and "this mode requires the check" does not say which way the switch is set.
+The locked reading is always ON, because every mode that hides the switch rolls its check.
+
+**Every Active switch STAGES.** Flipping one marks its activity dirty, enables the shared `Save checks`, is guarded by the route-exit prompt, and is restored by Discard; nothing is written on the click itself.
+This holds for all four activities, so one affordance does not mean two different things depending on the route in view.
+Crafting (non-alchemy), salvage and gathering stage their check's `enabled` flag; an ALCHEMY crafting check stages `alchemy.checkMode` instead (`simple` on, `none` off), because that is the value its engine path dispatches on and `craftingCheck.enabled` is ignored for alchemy.
+Each activity's save writes its Active flag before its slot draft and ANDs both answers, and each slot write is guarded on that slot's own dirty flag so a switch-only save does not rewrite an untouched formula block.
 The reading is derived from the MODE rather than from the persisted `enabled` flag, since a mandatory check runs whatever that flag says; it reads on for every locked mode except alchemy `none`, which rolls nothing.
 The Preview-as panel carries an ACTOR selector and a RECORD selector, and both are real controls with a simulator behind them.
 "Preview as" offers UNFILTERED `game.actors` — the Studio is GM-only and a GM's `Document#isOwner` is true for every actor, so the player-side "assigned character OR owner" union would hide actors a GM can legitimately preview against — plus an explicit "No actor" option, under which every `@` key resolves to `0` and the panel renders the unresolved warning rather than a total.
@@ -2124,8 +2131,12 @@ The routing basis is the system **mode**, not a per-recipe provider: the recipe 
 
 ### Alchemy check-mode selector (issue 554)
 
-- At the **top of the `checks-crafting` route's The roll section**, shown only when `resolutionMode === "alchemy"`: a native check-editor radio group (`manager-checks-type-options`) for `alchemy.checkMode` (`none` / `simple` / `tiered`), rendered ABOVE the per-mode editor and persisted live via `store.setAlchemyCheckMode` (which spreads the nested `alchemy` block so `learnOnCraft`/`consumeOnFail`/`showAttemptHistoryToPlayers` are preserved).
-  Selecting a mode swaps the editor below it live.
+- At the **top of the `checks-crafting` route's The roll section**, shown only when `resolutionMode === "alchemy"`: a native check-editor radio group (`manager-checks-type-options`) for `alchemy.checkMode`, rendered ABOVE the per-mode editor.
+  It offers `simple` and `tiered` ONLY.
+  `none` remains a persisted value — it is what the rail's Active switch writes when the GM turns the check off — but it is not a mode the selector offers, because the on/off decision belongs to the Active switch and the selector answers only what SHAPE the check is.
+- Selecting a mode STAGES it on the studio's draft rather than persisting on click: it swaps the editor below immediately, marks Crafting dirty, and is applied by the shared `Save checks` (through `store.setAlchemyCheckMode`, which spreads the nested `alchemy` block so `learnOnCraft`/`consumeOnFail`/`showAttemptHistoryToPlayers` are preserved).
+  Discarding the studio's drafts restores it.
+  The staged mode and the check formula staged beside it are saved together, so turning the check on and authoring its formula in one visit persists both.
 - The selector is NOT rendered on the Crafting Settings page; that page keeps only the Recipe resolution, Recipe visibility, and (when salvage is on) Salvage resolution cards.
 - The three behaviour flags the selector preserves (`learnOnCraft`, `consumeOnFail`, `showAttemptHistoryToPlayers`) are themselves authored by the **Alchemy behaviour-flag controls**, which since issue 1096 live on a DIFFERENT SECTION of the same route (**On failure**) and are never on screen with the selector; see that requirement for the sanctioned authoring path.
 
@@ -2140,13 +2151,16 @@ The routing basis is the system **mode**, not a per-recipe provider: the recipe 
 ### Checks studio per-mode behaviour (issue 554)
 
 Which of the five sections renders in each mode.
-Crafting: `simple` and `routedByIngredients` render all five with Outcomes as the two-outcome statement; `routedByCheck` renders all five with the band strip and the tier rows; `progressive` renders all five with Outcomes as the `awardMode` selector; `alchemy` follows its `checkMode`, and `none` keeps the read-only "resolves without a check" notice with no editor and no Active card.
+Crafting: `simple` and `routedByIngredients` render all five with Outcomes as the two-outcome statement; `routedByCheck` renders all five with the band strip and the tier rows; `progressive` renders all five with Outcomes as the `awardMode` selector; `alchemy` follows its `checkMode`, and `none` takes the shared switched-off panel.
 Salvage follows the same three-mode pattern.
 Gathering: `progressive` and `routed` render all five; `d100` renders Modifiers with the `noModifierSupport` inert notice, the check-modifier and character-modifier disambiguation copy and the dormancy notice, and renders the remaining inapplicable sections as `EmptyState`s naming the mode.
 
-- alchemy + `simple` → the simple pass/fail editor rendered below the selector; alchemy + `tiered` → the routed editor below the selector; BOTH cannot be disabled (the Active card shows the requiredHint, ungated by `checksEnabled`).
-- alchemy + `none` → a read-only "resolves without a check" notice below the selector (no editor, no Active card, a distinct "no check" hint that points back to the selector above — NOT the requiredHint).
-- The Crafting checks help copy describes none/simple/tiered.
+- alchemy + `simple` → the simple pass/fail editor rendered below the selector, with a LIVE Active switch: simple is OPTIONAL, and turning it off stages `checkMode: "none"`.
+- alchemy + `tiered` → the routed editor below the selector, with the LOCKED always-on reading of the switch and the requiredHint (ungated by `checksEnabled`).
+  Tiered cannot be disabled because it routes result groups by outcome tier and so cannot resolve without a roll.
+- alchemy + `none` → the shared switched-off panel with its "Turn this check on" action, and a live Active switch reading off.
+  Turning it back on stages `checkMode: "simple"`.
+- The Crafting checks help copy describes simple/tiered and the off state.
 
 ### Alchemy Recipe UI (GM Editor)
 

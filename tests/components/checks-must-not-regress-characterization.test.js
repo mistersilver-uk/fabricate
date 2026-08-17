@@ -175,19 +175,24 @@ describe('1093 must-not-regress — the states the prototype never depicts', () 
 
   // ── alchemy: a selector and three behaviour flags the prototype has no frame for ──
   //
-  // PROVEN CAPABLE OF FAILING: deleting any one of the three `ALCHEMY_CHECK_MODE_OPTIONS`
-  // entries reds the first assertion (the list length AND the missing value), and deleting
-  // any one `ToggleCard` in the behaviour card reds the second (its `data-field` hook
-  // disappears). Both were verified by removing the control and observing the failure.
-  it('renders the alchemy check-mode selector with all THREE modes', async () => {
-    const target = await mountChecks({ resolutionMode: 'alchemy', alchemyCheckMode: 'none' });
+  // PROVEN CAPABLE OF FAILING: deleting either `ALCHEMY_CHECK_MODE_OPTIONS` entry reds the
+  // first assertion (the list length AND the missing value), and deleting any one
+  // `ToggleCard` in the behaviour card reds the second (its `data-field` hook disappears).
+  // Both were verified by removing the control and observing the failure.
+  //
+  // TWO MODES, NOT THREE. `none` stopped being a mode the selector offers: it is the OFF
+  // state of an optional simple check, written by the rail's Active switch, so the fixture
+  // mounts `simple` — a `none` fixture renders the switched-off panel and finds no selector
+  // at all.
+  it('renders the alchemy check-mode selector with both SHAPE modes', async () => {
+    const target = await mountChecks({ resolutionMode: 'alchemy', alchemyCheckMode: 'simple' });
     const options = [...target.querySelectorAll('[data-crafting-alchemy-checkmode-option]')].map(
       (option) => option.getAttribute('data-crafting-alchemy-checkmode-option')
     );
     assert.deepEqual(
       options,
-      ['none', 'simple', 'tiered'],
-      'all three alchemy check modes are offered; the prototype depicts none of them'
+      ['simple', 'tiered'],
+      'both alchemy check shapes are offered; the prototype depicts neither'
     );
     harness.remount();
   });

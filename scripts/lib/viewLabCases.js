@@ -6369,6 +6369,33 @@ export const VIEW_LAB_CASES = Object.freeze([
     sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/checks\/CraftingCheckEditor\.svelte$/],
   }),
   managerCase({
+    id: 'manager-checks-crafting-alchemy-off',
+    label: 'Manager — Checks crafting alchemy check switched off',
+    // BEYOND the smoke. The walk never opens a switched-off crafting check, so the state has no
+    // counterpart frame.
+    reaches: 'beyond',
+    smokeLabels: [],
+    // THE STATE THE OFF SWITCH EXISTS FOR. Alchemy `checkMode: 'none'` used to render a
+    // read-only "resolves without a check" notice and NO Active card at all — the studio said
+    // the mode required the check and offered no way to change that. It is now the OFF state of
+    // an optional check: the shared switched-off panel with its `Turn this check on` action, and
+    // a live Active switch in the rail reading off.
+    //
+    // `lab-tidewrack` rather than `lab-alchemy`, and PERSISTED rather than clicked. Tidewrack is
+    // the world's `checkMode: 'none'` alchemy system, so this is its resting state — clicking
+    // `lab-alchemy`'s toggle would reach the same panel but photograph it wearing an `Unsaved`
+    // chip, which is a picture of the staging lifecycle rather than of the off state.
+    query: { system: 'lab-tidewrack' },
+    steps: ['Checks', { selector: '#manager-checks-nav-crafting' }],
+    expectView: 'checks-crafting',
+    // The turn-on action INSIDE the off panel, as one selector: the panel alone would pass on a
+    // dead end with no way back, which is precisely the failure this state used to be.
+    expectSelector:
+      '.fabricate-manager [data-checks-panel="crafting"][data-checks-off] [data-checks-turn-on]',
+    kinds: ['manager', 'checks'],
+    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/checks\/ChecksView\.svelte$/],
+  }),
+  managerCase({
     id: 'manager-checks-crafting-alchemy-behaviour',
     label: 'Manager — Checks crafting alchemy behaviour card',
     // BEYOND the smoke. The walk never opens an alchemy system's On failure section, so there is

@@ -243,22 +243,19 @@
 
   // The system-level alchemy check-mode selector (issue 554). For an alchemy
   // system this renders at the TOP of the crafting route's roll section, above the
-  // per-mode editor: none (no check → the read-only "resolves without a check" notice),
-  // simple (the pass/fail editor), or tiered (the routed outcome-tier editor).
-  // Selecting a mode persists live via `onSetAlchemyCheckMode` (spread + refresh
-  // in the store), swapping the editor below. Labels/copy reuse the shared
-  // SystemSettings.Alchemy.CheckMode* strings. The icons read as "no roll at all",
-  // "one roll" and "a staircase of outcome tiers".
+  // per-mode editor: simple (the pass/fail editor) or tiered (the routed outcome-tier
+  // editor). Selecting a mode STAGES it on the root's draft — `Save checks` applies it —
+  // and swaps the editor below. Labels/copy reuse the shared
+  // SystemSettings.Alchemy.CheckMode* strings. The icons read as "one roll" and "a
+  // staircase of outcome tiers".
+  //
+  // "NO CHECK" IS NOT A MODE HERE ANY MORE. The persisted enum still carries `none` — it is
+  // what the engine dispatches on, and it is what the rail's Active switch writes when the
+  // GM turns the check off — but offering it as a third radio made the on/off decision and
+  // the shape decision one control, so the studio had to answer "can this be turned off?"
+  // with "no, pick a different mode". Off is now the switch, and this selector answers only
+  // the question a mode should: what shape is the check.
   const ALCHEMY_CHECK_MODE_OPTIONS = [
-    {
-      value: 'none',
-      icon: 'fas fa-ban',
-      labelKey: 'FABRICATE.Admin.SystemSettings.Alchemy.CheckModeNone',
-      fallback: 'No check',
-      descKey: 'FABRICATE.Admin.SystemSettings.Alchemy.CheckModeNoneDesc',
-      descFallback:
-        'A matched brew always succeeds and produces its single result set. No crafting check.',
-    },
     {
       value: 'simple',
       icon: 'fas fa-dice-d20',
@@ -266,7 +263,7 @@
       fallback: 'Simple check',
       descKey: 'FABRICATE.Admin.SystemSettings.Alchemy.CheckModeSimpleDesc',
       descFallback:
-        'A mandatory pass/fail check. On a pass the success result set is produced; on a fail the reserved failure result set is.',
+        'A pass/fail check you can switch off. On a pass the success result set is produced; on a fail the reserved failure result set is.',
     },
     {
       value: 'tiered',
@@ -312,7 +309,6 @@
       (craftingAlchemy && alchemyCheckMode === 'simple')
   );
   const craftingProgressive = $derived(resolutionMode === 'progressive');
-  const alchemyNone = $derived(craftingAlchemy && alchemyCheckMode === 'none');
 
   // Which crafting check this system's resolution mode actually rolls, and whether it
   // carries an authored formula. Resolved through the shared five-mode selector rather
@@ -623,25 +619,37 @@
       (activity === 'salvage' && salvageRouted) ||
       (activity === 'gathering' && gatheringRouted)
   );
-  const routeIsInert = $derived(
-    (activity === 'crafting' && alchemyNone) || (activity === 'gathering' && gatheringD100)
-  );
+  // GATHERING `d100` IS THE ONLY INERT ROUTE LEFT. Alchemy `none` used to join it here, on
+  // the reading that a mode rolling nothing has nothing to author. It is now the OFF state
+  // of an optional check rather than a mode of its own, so it belongs to `routeIsOff` below
+  // — which offers the way back — and counting it inert would have suppressed the trigger
+  // count for a check the GM can switch on from this very panel.
+  const routeIsInert = $derived(activity === 'gathering' && gatheringD100);
   // The check-OFF state: a check the GM has switched off. Distinct from INERT — inert is
   // what the MODE does and cannot be undone here, off is what the GM chose and the panel's
   // whole job is to offer the way back.
   //
   // The predicate is "this route has a LIVE Active toggle and it is not on", and it is the
-  // same three-way rule the rail's own toggle is gated by, restated here rather than
-  // inferred from `optional` alone. `optional` does not mean the same thing per activity: on
-  // gathering it is `mode === 'd100'`, which is the mode with NO toggle at all — so an
+  // same rule the rail's own toggle is gated by, restated here rather than inferred from
+  // `optional` alone. `optional` does not mean the same thing per activity: on gathering it
+  // is `mode === 'd100'`, which is the mode with NO toggle at all — so an
   // `optional && !enabled` reading collapsed the d100 route to the "turn this check on"
   // empty state and took the shipped d100 explanation off the screen, for a check nobody can
-  // turn on. Alchemy `none` is the mirror case on crafting.
+  // turn on. On crafting, alchemy at `checkMode: 'none'` is precisely the state this SHOULD
+  // catch: `optional` is true and `enabled` is false, so it lands on the turn-on empty state.
   const routeIsOff = $derived.by(() => {
+    // ALCHEMY ANSWERS FROM ITS OWN MODE, BEFORE THE ACTIVATION BAG. Off-ness for alchemy is
+    // fully derivable from `alchemyCheckMode`, which this component already has, so tying it
+    // to an optional prop is a seam that breaks the day a caller omits or staleness that bag:
+    // `activation` defaults to `{}`, and with no crafting state the checks below return false
+    // — which dropped an alchemy `none` mount into the mode branch, rendering the selector
+    // with NO option selected and (there being no `{:else}` on the editor chain) no editor at
+    // all. The retired `alchemyNone` branch used to absorb that; nothing else would.
+    if (activity === 'crafting' && craftingAlchemy && alchemyCheckMode === 'none') return true;
     const state = activation?.[activity];
     if (!state || state.enabled === true) return false;
     if (activity === 'gathering') return state.mode !== 'd100';
-    return state.optional === true && state.none !== true;
+    return state.optional === true;
   });
 
   const outcomeCount = $derived.by(() => {
@@ -1632,7 +1640,7 @@
               <p class="manager-muted">
                 {text(
                   'FABRICATE.Admin.SystemSettings.Alchemy.CheckModeIntro',
-                  'Choose how a matched brew is resolved: with no check, a simple pass/fail check, or a tiered routed check.'
+                  'Choose the shape of the check a matched brew rolls: a simple pass/fail check, or a tiered routed check. Use the Active switch to resolve brews without a check at all.'
                 )}
               </p>
               <RadioCardGroup
@@ -1735,23 +1743,14 @@
             </section>
           {/if}
 
-          {#if alchemyNone && ['roll', 'outcomes', 'triggers'].includes(activeSection)}
-            <section class="manager-inspector-card" data-alchemy-none-readonly>
-              <p class="manager-kicker">{pageKicker}</p>
-              <h2 class="manager-checks-card-title">
-                {text(
-                  'FABRICATE.Admin.Manager.Checks.Crafting.AlchemyNoneTitle',
-                  'Resolves without a check'
-                )}
-              </h2>
-              <p class="manager-muted">
-                {text(
-                  'FABRICATE.Admin.Manager.Checks.Crafting.AlchemyNoneLead',
-                  'This alchemy system is set to “No check”, so a matched brew always succeeds and produces its single result set. There is nothing to configure here. Choose Simple or Tiered on The roll section to author a crafting check.'
-                )}
-              </p>
-            </section>
-          {:else if craftingRouted}
+          <!-- There is no alchemy `none` branch here. An alchemy system whose check is off
+               is an OFF check, not an inert mode, so it takes the shared `routeIsOff` empty
+               state above — the one with the "Turn this check on" button — exactly as an
+               optional crafting or salvage check does. The read-only "Resolves without a
+               check" card that used to sit here told the GM to pick a mode that no longer
+               exists in the selector, and it was unreachable the moment `none` started
+               reporting `optional: true`. -->
+          {#if craftingRouted}
             <CraftingCheckEditor
               {appliedModifiers}
               modifierPolicy={appliedModifierPolicy}

@@ -14,6 +14,31 @@
  * entry names a pair the product can reach. A mode with no entry would render its raw token to
  * a GM, and an entry for a mode nothing can select is copy nobody will ever see.
  *
+ * ## Alchemy has TWO entries, not three, and its Simple check is OPTIONAL
+ *
+ * There is no `crafting:none`. Alchemy at `checkMode: 'none'` is the OFF state of an optional
+ * check rather than a mode of its own, so its route renders the shared switched-off panel and
+ * the roll section — this callout with it — never renders. An entry for it would be copy
+ * nobody can reach, which is what the exhaustiveness gate exists to prevent; `checkModeKey`
+ * returns `''` for it and the caller renders nothing, the safe direction documented below.
+ *
+ * `crafting:alchemySimple` states `check:optional`, unlike its tiered sibling. The engine can
+ * only reach the reserved failure result set through this check, so a system that wants one
+ * has to roll it — but a system that does not is served by switching the check off, which is
+ * what the rail's Active switch writes. `Required` was the fact that sent a GM looking for an
+ * off switch the studio would not show them. Tiered stays required: it routes result groups by
+ * outcome tier and cannot resolve without a roll.
+ *
+ * ## THE `MODES` TABLE IS ONE COPY-PASTE BLOCK, so keep edits inside it SMALL
+ *
+ * Thirteen entries of the same `{ icon, title, body, facts }` shape read as duplication to
+ * SonarCloud's CPD, and the whole table sits inside the flagged region. New-code duplication
+ * density is measured over the lines a PR touches, so ANY edit here — a reworded sentence, an
+ * explanatory comment — lands at 100% duplicated and can fail the quality gate on its own.
+ * That is why the rationale above lives in this header rather than beside the entry it
+ * explains: the header is outside the block. Restructuring the table to satisfy CPD would cost
+ * the declarative shape that makes it checkable, which is a worse trade.
+ *
  * ## Gathering's routed and progressive modes are DORMANT, not configurable
  *
  * They are rendered disabled in the GM UI pending issue 683, so no gathering configuration a
@@ -82,7 +107,6 @@ function fact(id, value) {
 /** `Check ·` values, shared across modes so two modes never spell one state differently. */
 const REQUIRED = ['StateRequired', 'Required'];
 const OPTIONAL = ['StateOptional', 'Optional'];
-const NOT_ROLLED = ['StateNotRolled', 'Not rolled'];
 const FIXED_D100 = ['StateFixedD100', 'Fixed d100'];
 
 /**
@@ -134,25 +158,15 @@ const MODES = Object.freeze({
     ],
     facts: ['check:required', 'outcomes:ordered', 'results:spent'],
   },
-  'crafting:none': {
-    icon: 'fas fa-ban',
-    title: ['AlchemyNone', 'No check'],
-    body: [
-      'AlchemyNoneBody',
-      'A matched brew always succeeds and produces its single result set. Nothing on this ' +
-        'screen is rolled.',
-    ],
-    facts: ['check:notRolled', 'outcomes:none', 'results:single'],
-  },
   'crafting:alchemySimple': {
     icon: 'fas fa-dice-d20',
     title: ['AlchemySimple', 'Simple check'],
     body: [
       'AlchemySimpleBody',
-      'A mandatory pass/fail check. On a pass the success result set is produced; on a fail ' +
-        'the reserved failure result set is.',
+      'A pass/fail check you can switch off. On a pass the success result set is produced; ' +
+        'on a fail the reserved failure result set is.',
     ],
-    facts: ['check:required', 'outcomes:passFail', 'results:successFailure'],
+    facts: ['check:optional', 'outcomes:passFail', 'results:successFailure'],
   },
   'crafting:alchemyTiered': {
     icon: 'fas fa-stairs',
@@ -224,13 +238,11 @@ const MODES = Object.freeze({
 const FACT_VALUES = Object.freeze({
   'check:required': REQUIRED,
   'check:optional': OPTIONAL,
-  'check:notRolled': NOT_ROLLED,
   'check:fixedD100': FIXED_D100,
   'check:dormant': GATHERING_DORMANT_STATE,
   'outcomes:tiers': ['OutcomesTiers', '{count} tiers'],
   'outcomes:passFail': ['OutcomesPassFail', 'Pass or fail'],
   'outcomes:ordered': ['OutcomesOrdered', 'An ordered list'],
-  'outcomes:none': ['OutcomesNone', 'None'],
   'outcomes:perDrop': ['OutcomesPerDrop', 'One per drop'],
   'results:tiers': ['ResultsTiers', 'Bound to tiers'],
   'results:ingredients': ['ResultsIngredients', 'Chosen by ingredients'],
@@ -259,7 +271,10 @@ export function checkModeKey({ activity, mode, alchemyCheckMode = '' } = {}) {
   if (activity === 'crafting' && mode === 'alchemy') {
     if (alchemyCheckMode === 'simple') return 'crafting:alchemySimple';
     if (alchemyCheckMode === 'tiered') return 'crafting:alchemyTiered';
-    return 'crafting:none';
+    // `none` is the OFF state, whose route renders no roll section at all — so there is no
+    // callout to key, and `''` makes the caller render nothing rather than a description of
+    // a mode the GM did not choose.
+    return '';
   }
   const key = `${activity}:${mode}`;
   return Object.hasOwn(MODES, key) ? key : '';

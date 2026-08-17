@@ -340,10 +340,18 @@ function _recipeCheckContext(system) {
   const mode = system?.resolutionMode || 'simple';
   const constantOf = (kind) => ({ constant: Object.freeze({ kind, dc: null }) });
 
-  // Alchemy's own check mode is system-level and independent of the crafting
-  // check; `none` means the recipe resolves with no check at all.
+  // Alchemy's own check mode is system-level and independent of the crafting check;
+  // `none` means the recipe resolves with no check at all.
+  //
+  // IT IS `checkOff`, NOT `none`, and the distinction is the difference between a
+  // configuration and a fault. `none` renders the WARNING pill — "this system has no usable
+  // crafting check" — which was a fair reading while `none` was an obscure mode. It is now
+  // the state the Checks Studio's Active switch writes when a GM deliberately turns an
+  // alchemy check off, so reporting it as a warning puts a triangle on every recipe in the
+  // library, for a supported choice, with no per-recipe repair. A deliberate no-roll
+  // configuration reads neutral, exactly as `progressive` and `ingredients` do.
   if (mode === 'alchemy' && (system?.alchemy?.checkMode || 'none') === 'none') {
-    return constantOf('none');
+    return constantOf('checkOff');
   }
 
   const config = _recipeCheckConfig(system);
