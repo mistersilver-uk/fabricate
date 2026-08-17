@@ -36,6 +36,7 @@
 
 import { getFabricateFlag } from '../config/flags.js';
 import { resolveAlchemySubmissionComponent } from '../utils/alchemySubmissions.js';
+import { findById, getDefinitionIndex } from '../utils/definitionIndex.js';
 import { routedSuccessTierOptions } from '../utils/routedOutcomeKeywords.js';
 
 import { readStackQuantity } from './itemStackQuantity.js';
@@ -457,9 +458,7 @@ export class AlchemyListingBuilder {
   _projectGroup(group, components, system = null) {
     const options = (Array.isArray(group?.options) ? group.options : []).map((option) => {
       const componentId = this._optionComponentId(option);
-      const component = componentId
-        ? components.find((candidate) => candidate.id === componentId)
-        : null;
+      const component = componentId ? findById(getDefinitionIndex(components), componentId) : null;
       // An essence-type ingredient option (componentId is null) resolves to the
       // essence's NAME + ICON from the system's essence definitions, and its
       // display quantity is the required essence AMOUNT (`match.amount`), NOT the
@@ -599,7 +598,7 @@ export class AlchemyListingBuilder {
     const first = results[0];
     if (!first) return null;
     const component = first.componentId
-      ? components.find((candidate) => candidate.id === first.componentId)
+      ? findById(getDefinitionIndex(components), first.componentId)
       : null;
     return {
       componentId: stringOrNull(first.componentId),

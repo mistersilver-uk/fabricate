@@ -34,6 +34,7 @@
  */
 
 import { hasPlainD20 } from '../utils/craftingCheckExpression.js';
+import { findById, getDefinitionIndex } from '../utils/definitionIndex.js';
 
 import { buildBulkSalvageChatContent, sumChatEntriesByName } from './BulkSalvageChatCard.js';
 import { awardedQuantityOf } from './componentStacking.js';
@@ -113,18 +114,25 @@ function firstFinite(...values) {
  * On the RUNLESS path (`salvageRun === null`) there is therefore no tool evidence at
  * all and this correctly yields nothing — a stated limit of the aggregate card, not a
  * silent one.
+ *
+ * This ran once per bulk ROW and built its own whole-library `Map` before looking at the
+ * run record at all, so an N-row run over an M-component library paid `N x M` to answer a
+ * question that is almost always "no tools broke" (issue 1202). The retained index is
+ * built once for the array and only consulted when there IS a broken record.
+ *
+ * The lookup is also now FIRST-wins on a duplicated component id rather than last-wins,
+ * because that is what `findById` reproduces and what every other component lookup in the
+ * codebase does; the previous `new Map(...)` was uniquely last-wins by accident of
+ * construction, not by design.
  */
 function brokenToolEntries(salvageRun, system) {
-  const componentById = new Map(
-    (system?.components || []).map((component) => [component?.id, component])
-  );
-  const entries = [];
-  for (const record of salvageRun?.usedTools || []) {
-    if (record?.broken !== true) continue;
-    const component = record.componentId ? componentById.get(record.componentId) : null;
-    entries.push({ name: component?.name || '', img: component?.img || '' });
-  }
-  return entries;
+  const broken = (salvageRun?.usedTools || []).filter((record) => record?.broken === true);
+  if (broken.length === 0) return [];
+  const index = getDefinitionIndex(system?.components);
+  return broken.map((record) => {
+    const component = record.componentId ? findById(index, record.componentId) : null;
+    return { name: component?.name || '', img: component?.img || '' };
+  });
 }
 
 /**
@@ -484,7 +492,7 @@ export class BulkSalvageService {
 
 /** Resolve a component id against a system's managed components. */
 function findComponent(system, componentId) {
-  return (system?.components || []).find((component) => component?.id === componentId) || null;
+  return findById(getDefinitionIndex(system?.components), componentId);
 }
 
 /** The plain, document-free report row for one target. */

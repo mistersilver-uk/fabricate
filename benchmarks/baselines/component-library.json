@@ -69,10 +69,10 @@
     "craftingListing.buildRecipeDetail.library@1000": {
       "description": "Detail hydration for ONE recipe against this library size. `held-inventory` explicitly excludes this phase as \"bounded by page size rather than by either axis\", which left a real app open half-measured: the inspector opens on the same click as the listing. Measured here because a per-recipe library term would be invisible to both listing cases.",
       "counts": {
-        "componentCandidatesExamined": 6006,
+        "componentCandidatesExamined": 2000,
         "craftingActorItemsReads": 4,
         "craftingActorItemsScanned": 1336,
-        "identityCandidatesExamined": 2200,
+        "identityCandidatesExamined": 6206,
         "identityIndexBuilds": 1,
         "sourceActor0ItemsReads": 4,
         "sourceActor0ItemsScanned": 1332,
@@ -117,10 +117,10 @@
     "craftingListing.buildRecipeDetail.library@5000": {
       "description": "Detail hydration for ONE recipe against this library size. `held-inventory` explicitly excludes this phase as \"bounded by page size rather than by either axis\", which left a real app open half-measured: the inspector opens on the same click as the listing. Measured here because a per-recipe library term would be invisible to both listing cases.",
       "counts": {
-        "componentCandidatesExamined": 14006,
+        "componentCandidatesExamined": 10000,
         "craftingActorItemsReads": 4,
         "craftingActorItemsScanned": 1336,
-        "identityCandidatesExamined": 6200,
+        "identityCandidatesExamined": 10206,
         "identityIndexBuilds": 1,
         "sourceActor0ItemsReads": 4,
         "sourceActor0ItemsScanned": 1332,
@@ -165,10 +165,10 @@
     "craftingListing.buildRecipeDetail.library@10000": {
       "description": "Detail hydration for ONE recipe against this library size. `held-inventory` explicitly excludes this phase as \"bounded by page size rather than by either axis\", which left a real app open half-measured: the inspector opens on the same click as the listing. Measured here because a per-recipe library term would be invisible to both listing cases.",
       "counts": {
-        "componentCandidatesExamined": 24006,
+        "componentCandidatesExamined": 20000,
         "craftingActorItemsReads": 4,
         "craftingActorItemsScanned": 1336,
-        "identityCandidatesExamined": 11200,
+        "identityCandidatesExamined": 15206,
         "identityIndexBuilds": 1,
         "sourceActor0ItemsReads": 4,
         "sourceActor0ItemsScanned": 1332,

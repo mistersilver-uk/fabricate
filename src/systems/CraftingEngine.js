@@ -21,6 +21,7 @@ import { canonicalSignatureKey } from '../utils/alchemySignatureKey.js';
 import { resolveAlchemySubmissionComponent } from '../utils/alchemySubmissions.js';
 import { matchComponentByName } from '../utils/componentNameMatch.js';
 import { stripRetiredModifierPlaceholder } from '../utils/craftingCheckExpression.js';
+import { findById, getDefinitionIndex } from '../utils/definitionIndex.js';
 import {
   accumulateSubmissionEssences,
   findMatchingComponent,
@@ -2711,7 +2712,7 @@ export class CraftingEngine {
     const qty = Math.max(0, Math.trunc(Number(quantity) || 0));
     if (qty <= 0) return null;
 
-    const component = (system?.components || []).find((entry) => entry.id === componentId) || null;
+    const component = findById(getDefinitionIndex(system?.components), componentId);
     let sourceItem = null;
     if (component?.registeredItemUuid) {
       try {
@@ -3442,8 +3443,7 @@ export class CraftingEngine {
     return createToolReplacementCreator({
       system,
       resolveComponentSource: async ({ componentId }) => {
-        const component =
-          (system?.components || []).find((entry) => entry.id === componentId) || null;
+        const component = findById(getDefinitionIndex(system?.components), componentId);
         if (!component?.registeredItemUuid) return component;
         const source = await this.resolveItemUuid(component.registeredItemUuid);
         return source?.documentName === 'Item' ? source : null;
@@ -3551,9 +3551,10 @@ export class CraftingEngine {
       ? (systemManager?.getSystem(recipe.craftingSystemId) ?? null)
       : null;
     if ((result.componentId || result.systemItemId) && recipe.craftingSystemId) {
-      const managedItems = system?.components || [];
-      managedItem =
-        managedItems.find((i) => i.id === (result.componentId || result.systemItemId)) || null;
+      managedItem = findById(
+        getDefinitionIndex(system?.components),
+        result.componentId || result.systemItemId
+      );
       if (managedItem?.registeredItemUuid) {
         sourceItem = await fromUuid(managedItem.registeredItemUuid);
       }
@@ -5496,7 +5497,7 @@ export class CraftingEngine {
     }
 
     const managedItems = system.components || [];
-    const component = managedItems.find((c) => c.id === componentId) || null;
+    const component = findById(getDefinitionIndex(managedItems), componentId);
     if (!component) {
       return {
         success: false,
@@ -6186,15 +6187,15 @@ export class CraftingEngine {
           ? authored
           : applyPlayerResultOrder(authored, salvageRun?.resultOrder ?? null);
 
-      const managedItems = system?.components || [];
+      // Resolved ONCE for the whole award rather than per result: `costFor` is called for
+      // every result in the group, and every bulk row calls this method, so a scan here was
+      // a `rows x results x components` term.
+      const managedItemIndex = getDefinitionIndex(system?.components);
       const { awarded } = resolveProgressiveAward({
         results,
         initialRemaining: Number(checkResult?.value || 0),
         costFor: (result) =>
-          Number(
-            managedItems.find((e) => e.id === (result.componentId || result.systemItemId))
-              ?.difficulty
-          ),
+          Number(findById(managedItemIndex, result.componentId || result.systemItemId)?.difficulty),
         awardMode: system?.salvageCraftingCheck?.progressive?.awardMode || 'equal',
         invalidCost: 'skip',
         zeroRemainingOnPartial: false,
