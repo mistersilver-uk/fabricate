@@ -257,7 +257,16 @@ describe('PlayerExtensionHost (mounted)', () => {
 
     harness.remount();
 
-    assert.equal(calls.cleanups.length, 1, 'the onDestroy net still runs the cleanup');
+    assert.deepEqual(
+      calls.cleanups,
+      [{ tabId: 'board', connected: false }],
+      'the onDestroy net still runs the cleanup exactly once, but NECESSARILY against a '
+        + 'detached target: destroy_effect removes the effect DOM before running teardowns and '
+        + 'onDestroy is itself a teardown. Pinned rather than left as a bare count because that '
+        + 'is what makes this a leak net rather than a second connected-target path — the '
+        + 'connected paths are disposeBeforeRemoval and the shell pre-effect that calls it '
+        + 'before a tab switch, a surface swap or an unregistration removes this component.'
+    );
     assert.deepEqual(
       hooks.map(([name]) => name),
       ['fabricate.player.surfaceMounted', 'fabricate.player.surfaceUnmounted']

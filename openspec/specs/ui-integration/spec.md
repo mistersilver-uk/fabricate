@@ -3412,6 +3412,7 @@ It carries no route chrome and no header actions, because the player window has 
 `tabId` is always the provider's own bare tab id, never the route key.
 - `context` is frozen, replaced rather than mutated, and carries `{ schemaVersion, surface: 'player', surfaceId, tabId, actorId, isGM, revision, requestRemount }` and no Core store, document or component.
 `actorId` is the shared Actor selection top bar's current selection or `null`; `isGM` is presentation and never an authorization gate, **and it is true for assistant GMs as well as GMs**; `requestRemount()` asks Core to run the current cleanup, clear the target, and call `mount` again with a fresh context whose `revision` has advanced.
+**A new context identity is produced when and only when one of those values changes**, so a republication that leaves a surface's values unchanged — opening the window, or any other companion registering, unregistering or re-registering — does not remount a live companion.
 - **Core applies no visibility or permission gate to a provider tab.**
 Unlike the Manager seam the player window has no GM gate, so every user who can open the window sees every registered provider's tabs.
 Any GM-only, owner-only or entitlement-scoped presentation happens inside the companion's own mount, and Core renders no per-user gating hook in v1.
@@ -3425,6 +3426,10 @@ The player application invokes the disposal before `ApplicationV2` closes and un
 Partial content is cleared, **the faulted surface's tabs remain in the rail**, the active tab does not move, and Core renders its own error state in the panel naming the provider.
 The provider keeps its registration so a later snapshot may mount without the companion re-registering.
 Focus is recovered onto the surface's rail button rather than being lost to the document body.
+- **A fault is recorded against the whole surface, not against the tab that threw.**
+Core keys it on the `(surfaceId, provider)` pair, so after one tab's mount fails every other tab of that same provider also renders the Core error state and Core attempts no further mount for it.
+Containment is deliberately at the provider's granularity: Core cannot tell a tab-specific failure apart from a broken provider, and retrying the sibling tabs of a provider that has already thrown would simply repeat the fault.
+A new snapshot carrying a different provider object for the surface clears it, which is what "a later snapshot may mount" means.
 - When a provider registers, unregisters, or re-registers with a different tab set, an active route key the new set no longer offers falls back to the default Core tab rather than leaving an empty panel.
 - **The rail button is a native button with a tab role inside a vertically-oriented tablist.**
 Its accessible name is its visible label; a supplied `accessibleName` replaces that name and must therefore contain the visible label text, and a supplied `tooltip` is exposed through `aria-describedby`.
