@@ -3863,6 +3863,12 @@ export const VIEW_LAB_CASES = Object.freeze([
     expectContained: [
       { container: '#manager-world-nav-parties', target: '#manager-world-nav-parties > i' },
       { container: '#manager-world-nav-downtime', target: '#manager-world-nav-downtime > i' },
+      // ON SCREEN, not merely rendered (issue 1213). `.manager-nav` is `overflow: hidden auto`
+      // and the Downtime group is its last row, so entering the route left `Downtime` as the
+      // last visible line with every companion screen below the fold — a rail lock that fixed
+      // `display: none` and nothing else. The LAST sub-item is the one to bound: it is the one
+      // the fold cut off, and a container check on it fails the moment the reveal regresses.
+      { container: '.manager-nav', target: '#manager-downtime-nav-writs' },
     ],
     expectNoHorizontalOverflow: ['[data-world-downtime-host]', '.manager-main', '.manager-body'],
     // The companion owns the scrolling, which is only true if Core handed it the whole height.

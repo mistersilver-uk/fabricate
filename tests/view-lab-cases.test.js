@@ -1236,6 +1236,18 @@ test('World Downtime publishes four tabs plus narrow/collapsed frames with gener
     lang.FABRICATE.Admin.Manager.Nav.RailLockedOpen,
     'and the locked control explains itself with the sidebar string, not the section one'
   );
+  // Issue 1213 again, and the half the lock alone did NOT fix: `.manager-nav` scrolls and the
+  // Downtime group is its last row, so entering the route left every companion screen below
+  // the rail's fold. This bounds the LAST sub-item inside the rail's own scroll box, which is
+  // the one the fold cut off — a `display: none` guard could never have seen it, because the
+  // sub-items were rendered and visible, just not on screen.
+  assert.ok(
+    premium.expectContained.some(
+      (entry) =>
+        entry.container === '.manager-nav' && entry.target === '#manager-downtime-nav-writs'
+    ),
+    "the premium frame proves the companion's LAST rail screen is inside the rail's viewport"
+  );
 
   const mountSource = readFileSync(resolve(ROOT, 'tests/view-lab/mount.js'), 'utf8');
   assert.match(mountSource, /applyLongDowntimeLocalization\(world\)/);

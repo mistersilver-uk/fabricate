@@ -8882,3 +8882,78 @@ test('Core keeps the Downtime panel scroller for a visibly overflowing companion
     `a companion stating no height keeps content height in a full-height target (${noHeight.companion} in ${noHeight.target})`
   );
 });
+
+test('the rail toggle locked open over a companion offers no hover affordance', async () => {
+  // The lock's VISUAL half (issue 1213), and nothing else in the repository can see it. The
+  // mounted suites assert `disabled` and `aria-disabled` on the control, which stayed true of
+  // a button rendering at full contrast with `cursor: pointer` that lit up under the pointer
+  // while doing nothing — the same false affordance the group disclosure fixed one route over,
+  // whose comment calls a hover treatment on a control that cannot act "the same lie the
+  // silently-swallowed click used to tell".
+  //
+  // Measured, not read: a source-text check for `:not(:disabled)` would pass over a rule the
+  // cascade never applies, and `:hover` cannot be evaluated outside a browser at all.
+  const context = await sharedBrowser.newContext({ viewport: { width: 400, height: 200 } });
+  const page = await context.newPage();
+  try {
+    await page.setContent(
+      `<style>${css}</style><div class="fabricate-manager"><div class="manager-body">` +
+        `<button type="button" class="manager-rail-toggle manager-scope-collapse" id="live" ` +
+        `aria-label="Collapse navigation rail"><i class="fas fa-angles-left"></i></button>` +
+        `<button type="button" class="manager-rail-toggle manager-scope-collapse" id="locked" ` +
+        `disabled aria-disabled="true" title="The sidebar stays open on this page.">` +
+        `<i class="fas fa-angles-left"></i></button>` +
+        `</div></div>`
+    );
+    const toggleStyle = (id) =>
+      page.evaluate((selector) => {
+        const style = getComputedStyle(document.querySelector(selector));
+        return {
+          paint: `${style.color}|${style.borderColor}|${style.backgroundColor}`,
+          opacity: Number(style.opacity),
+          cursor: style.cursor,
+          pointerEvents: style.pointerEvents,
+        };
+      }, `#${id}`);
+
+    const liveResting = await toggleStyle('live');
+    const lockedResting = await toggleStyle('locked');
+    await page.hover('#live');
+    const liveHovered = await toggleStyle('live');
+    await page.hover('#locked');
+    const lockedHovered = await toggleStyle('locked');
+
+    // The positive control: the real toggle DOES respond, so the negative below means something.
+    assert.notEqual(
+      liveHovered.paint,
+      liveResting.paint,
+      'an actionable rail toggle still lifts under the pointer'
+    );
+    assert.equal(
+      lockedHovered.paint,
+      lockedResting.paint,
+      'the locked one does not, so the pointer never promises an action it cannot perform'
+    );
+
+    // At rest it also has to READ as unavailable, which is the half a hover guard alone leaves
+    // undone: a full-contrast button with a pointer cursor is an offer whether or not it lights.
+    assert.ok(
+      lockedResting.opacity < liveResting.opacity,
+      `the locked control is faded (${lockedResting.opacity} against ${liveResting.opacity})`
+    );
+    assert.equal(liveResting.cursor, 'pointer');
+    assert.equal(lockedResting.cursor, 'default', 'and the cursor stops offering a press');
+
+    // Deliberately NOT `pointer-events: none`: the control has a reason to convey, and the
+    // `Nav.RailLockedOpen` title is how a pointer user reads it. This is the same exception
+    // the rail group disclosure makes, and the reason the hover measurements above are even
+    // reachable — a `pointer-events: none` control would have made them vacuously equal.
+    assert.equal(
+      lockedResting.pointerEvents,
+      'auto',
+      'the locked control still takes the pointer, so its explanatory title surfaces'
+    );
+  } finally {
+    await context.close();
+  }
+});

@@ -14251,8 +14251,13 @@ describe('CraftingSystemManager mounted behavior', () => {
       target.querySelector('[data-downtime-extension-panel]').textContent,
       /Mounted tracking/
     );
+    // THE RAIL PADLOCK, not the strip's. `.downtime-tab-lock` lives in `WorldDowntimeTabs`,
+    // which provider mode no longer renders at all (issue 1213), so asserting its absence
+    // here would be true of a component that had been deleted. The rail sub-item's padlock is
+    // the surviving expression of the same rule — it advertises CORE's preview, and a
+    // companion owning the surface has nothing locked.
     assert.ok(
-      !target.querySelector('.downtime-tab-lock'),
+      !target.querySelector('[data-world-downtime-lock]'),
       'an installed companion never inherits the Core fallback lock treatment'
     );
 
@@ -14265,16 +14270,32 @@ describe('CraftingSystemManager mounted behavior', () => {
       /Mounted activities/
     );
 
-    const mountedPanel = target.querySelector('[data-downtime-extension-panel="activities"]');
+    // ARM IT ON A GENUINELY FOCUSABLE NODE. This used to focus `.downtime-extension-target`,
+    // a bare `<div>` with no `tabindex`, which a real browser refuses to focus — the arming
+    // worked only because happy-dom focuses anything, and this case is the sole guard on one
+    // arm of the mode-aware recovery selector. The panel REGION is what carries `tabindex="-1"`
+    // for exactly this purpose, so it is the node a browser would actually be sitting on.
+    const mountedPanel = target.querySelector('#world-downtime-panel-activities');
+    assert.equal(
+      mountedPanel.getAttribute('tabindex'),
+      '-1',
+      'pre-condition: the node being focused is one a real browser would accept'
+    );
     mountedPanel.focus();
-    assert.equal(document.activeElement, mountedPanel, 'the companion panel owns focus before removal');
+    // `assert.ok(a === b)` rather than `assert.equal`: on failure `node:assert` serialises a
+    // mounted happy-dom element to build its diff and walks its circular tree until the heap
+    // dies, so a two-second assertion failure surfaces as `Array buffer allocation failed`
+    // with no message instead of a diff.
+    assert.ok(
+      document.activeElement === mountedPanel,
+      'the companion panel owns focus before removal'
+    );
     unregister();
     await settleDowntimeProvider();
     assert.deepEqual(cleanups, ['tracking', 'activities']);
     assert.ok(target.querySelector('[data-downtime-panel="activities"]'));
-    assert.equal(
-      document.activeElement,
-      target.querySelector('[data-downtime-tab="activities"]'),
+    assert.ok(
+      document.activeElement === target.querySelector('[data-downtime-tab="activities"]'),
       'provider removal returns a focused companion panel to its active Core tab'
     );
   });
@@ -14341,13 +14362,38 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(isCollapsed(), 'a companion on another route leaves the rail alone');
     assert.equal(railToggle().disabled, false);
 
-    worldNavItem('downtime').click();
-    await settleRouteExit();
+    // Every `scrollIntoView` the arrival makes, because the lock only fixed `display: none`
+    // and the sub-items also have to be ON SCREEN. `.manager-nav` is `overflow: hidden auto`
+    // and the Downtime group is its last row, so at 1330x900 entering the route left
+    // `Downtime` as the last visible line with every companion screen below the fold.
+    const revealed = [];
+    const railElement = globalThis.window.Element;
+    const originalScrollIntoView = railElement.prototype.scrollIntoView;
+    railElement.prototype.scrollIntoView = function recordReveal(options) {
+      revealed.push([this, options]);
+    };
+    try {
+      worldNavItem('downtime').click();
+      await settleRouteExit();
+    } finally {
+      railElement.prototype.scrollIntoView = originalScrollIntoView;
+    }
 
     assert.ok(!isCollapsed(), 'arriving on the companion surface displays the rail expanded');
+    // NOT a presence assertion on `[data-world-downtime-submenu]`: that element is in the DOM
+    // whether the rail displays collapsed or expanded, because the collapse is CSS-only and
+    // happy-dom computes no cascade — so its presence is true in the stranded state too and
+    // the `!isCollapsed()` line above is what carries the reachability claim. A SCROLL is not
+    // a cascade, so this is the part of the sub-items' reachability this file can prove.
+    assert.equal(revealed.length, 1, 'arrival reveals once, not on every re-render');
     assert.ok(
-      Boolean(target.querySelector('[data-world-downtime-submenu]')),
-      'which is the whole point — the sub-items are the only way to the other screens'
+      revealed[0][0] === target.querySelector('[data-world-downtime-submenu]'),
+      'and what it brings into view is the submenu holding the companion screens'
+    );
+    assert.deepEqual(
+      revealed[0][1],
+      { block: 'nearest' },
+      "'nearest' is a no-op once they already fit, so no other rail position moves"
     );
     assert.equal(railToggle().disabled, true, 'and the collapse control is genuinely disabled');
     assert.equal(railToggle().getAttribute('aria-disabled'), 'true');
@@ -14370,10 +14416,13 @@ describe('CraftingSystemManager mounted behavior', () => {
       'the chevron points the way the control would actually move'
     );
 
-    railToggle().click();
-    await settleDowntimeProvider();
-    assert.ok(!isCollapsed(), 'the locked control is inert rather than merely styled');
-    assert.deepEqual(railWrites(), [], 'and the lock writes no client preference at all');
+    // NO CLICK HERE, and the omission is deliberate. happy-dom refuses to dispatch a click on
+    // a disabled button — through `.click()` AND through an explicit `dispatchEvent`, which is
+    // stricter than the platform — so a click-then-assert-nothing-happened here could only
+    // restate `disabled === true` above while reading as a proof of inertness. The handler's
+    // own `if (railLockedOpen) return;` guard is pinned where it can actually be read, in
+    // `manager-contract.test.js`.
+    assert.deepEqual(railWrites(), [], 'and reaching the locked route writes no preference');
 
     // MODE-scoped, half two: Core's fallback keeps its strip, so it is never stranded and
     // keeps its collapsible rail — on this very route.
@@ -14386,6 +14435,56 @@ describe('CraftingSystemManager mounted behavior', () => {
     await settleRouteExit();
     assert.ok(isCollapsed(), 'and the stored preference survived the whole visit');
     assert.deepEqual(railWrites(), []);
+  });
+
+  // THE OTHER SCOPE CARD (issue 1213). `[data-manager-rail-toggle]` is rendered by TWO
+  // branches — one per arm of the rail's `{#if selectedSystem}` — and every mounted case in
+  // this file arrives with a system selected, so the `{:else}` card a GM sees before picking
+  // one was reached by nothing. Proved: stripping `disabled`/`aria-disabled` from that arm
+  // alone left the whole mounted suite green, because the branch never rendered.
+  it("locks the no-system scope card's rail toggle on the same terms", async () => {
+    useShippedLocalization();
+    const registry = createManagerExtensionsRegistry();
+    const settingWrites = [];
+    mountManager(
+      [],
+      { selected: false },
+      {
+        getSetting: (key) => key === 'managerRailCollapsed',
+        setSetting: (key, value) => settingWrites.push([key, value]),
+      },
+      { managerExtensions: registry }
+    );
+
+    const railToggle = () => target.querySelector('[data-manager-rail-toggle]');
+    assert.ok(
+      !target.querySelector('[data-manager-scope-select]'),
+      'pre-condition: no system is selected, so this is the OTHER scope card'
+    );
+    assert.equal(railToggle().disabled, false, 'and it is a live control off the route');
+
+    registry.publicApi.registerWorldNavProvider(downtimeProvider());
+    await settleDowntimeProvider();
+    worldNavItem('downtime').click();
+    await settleRouteExit();
+
+    assert.equal(railToggle().disabled, true, 'the lock is a rule about state, not about a card');
+    assert.equal(railToggle().getAttribute('aria-disabled'), 'true');
+    assert.equal(
+      railToggle().getAttribute('aria-pressed'),
+      'false',
+      'and this card reads the displayed state too'
+    );
+    assert.equal(
+      railToggle().getAttribute('title'),
+      shippedString('FABRICATE.Admin.Manager.Nav.RailLockedOpen'),
+      'with the same sidebar-worded explanation'
+    );
+    assert.deepEqual(
+      settingWrites.filter(([key]) => key === 'managerRailCollapsed'),
+      [],
+      'and no client preference written from this arm either'
+    );
   });
 
   // Issue 1185 — where the premium signal LIVES. In the free module the title bar's badge
@@ -14575,8 +14674,10 @@ describe('CraftingSystemManager mounted behavior', () => {
       await settleDowntimeProvider();
       assert.match(target.textContent, /Recovered tracking/);
       assert.match(target.textContent, /Recovered activities/);
+      // The rail padlock again, for the same reason as above: the strip's lock cannot exist in
+      // provider mode, so its absence would be true of a deleted component.
       assert.ok(
-        !target.querySelector('.downtime-tab-lock'),
+        !target.querySelector('[data-world-downtime-lock]'),
         'a companion cannot opt into Core-only fallback behavior with coreFallback'
       );
       assert.equal(errors.length, 2);
@@ -14674,6 +14775,20 @@ describe('CraftingSystemManager mounted behavior', () => {
       region.getAttribute('aria-labelledby'),
       'manager-downtime-nav-ledger',
       'so the panel takes its name from the rail item that navigates to it'
+    );
+    // AND IT RESOLVES. The literal above is a mirror of an id stamped in another component,
+    // and Root threads the very function that stamps it into this host — but the host's prop
+    // DEFAULTS to the identical literal, so deleting the handoff changes nothing until the two
+    // drift. This is the assertion that fails the moment they do, and the only one here that
+    // would notice a name pointing at no element at all.
+    const namingItem = target.querySelector(`#${region.getAttribute('aria-labelledby')}`);
+    assert.ok(
+      Boolean(namingItem),
+      'the accessible name resolves to a real element, not a dangling id'
+    );
+    assert.ok(
+      namingItem === target.querySelector('[data-world-downtime-item="ledger"]'),
+      'and that element is the rail sub-item, whose visible label IS the region name'
     );
     assert.equal(
       region.getAttribute('tabindex'),

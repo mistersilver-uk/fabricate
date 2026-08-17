@@ -182,6 +182,30 @@ test('registerWorldNavProvider rejects malformed providers deterministically', (
   );
 });
 
+// STILL REQUIRED, THOUGH NOW RENDERED IN ONE MODE ONLY (issue 1213). Provider mode renders
+// no tab strip, and the strip was the only thing that ever rendered `accessibleName` (as the
+// tab button's `aria-label`) or `tooltip` (as a keyboard-visible `role="tooltip"` span). Both
+// stay REQUIRED at registration, which is what `docs/api/index.md` and the canonical spec now
+// say out loud — so the mismatch is documented rather than silently resolved in either
+// direction. Dropping the requirement to "fix" it is a breaking change to a shipped seam and
+// has to fail here first.
+test('accessibleName and tooltip stay required on a Manager tab', () => {
+  for (const field of ['label', 'accessibleName', 'tooltip', 'icon']) {
+    for (const value of ['', '   ', null, undefined, 7]) {
+      const broken = provider({ ids: ['board'] });
+      broken.tabs[0][field] = value;
+      assert.throws(
+        () =>
+          createManagerExtensionsRegistry({
+            emitHook: () => {},
+          }).publicApi.registerWorldNavProvider(broken),
+        new RegExp(`tab "board" requires a non-empty ${field}`),
+        `${field}=${JSON.stringify(value)} should be rejected at registration`
+      );
+    }
+  }
+});
+
 test('route chrome and header actions are validated as shape, not as content', () => {
   const registry = createManagerExtensionsRegistry({ emitHook: () => {} });
   const chromed = provider({ ids: ['board'] });

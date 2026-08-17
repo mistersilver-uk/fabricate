@@ -259,6 +259,30 @@ describe('CraftingSystemManager source contract', () => {
       previewProviderSource.includes('export const CORE_DOWNTIME_PREVIEW_TAB_IDS'),
       "Core's preview tab ids live beside the copy and icons they index"
     );
+    // ONE OWNER OF THE RAIL SUB-ITEM'S ID, and it is Root (issue 1213). In provider mode the
+    // panel is a `role="region"` named by the rail item, which makes the id a cross-component
+    // handoff: Root stamps it and the host consumes it for `aria-labelledby`. The threading
+    // needs pinning HERE because the host's prop DEFAULT is the same literal, so deleting the
+    // prop from the call site changes no rendered attribute until the two literals diverge —
+    // which is exactly the silent drift this pin exists to catch.
+    assert.ok(
+      rootSource.includes(
+        'const downtimeNavItemId = (tabId) => `manager-downtime-nav-${tabId}`;'
+      ),
+      'Root states the rail sub-item id once'
+    );
+    assert.ok(
+      rootSource.includes('id={downtimeNavItemId(item.id)}'),
+      'and the rail stamps it from that one statement'
+    );
+    assert.ok(
+      rootSource.includes('navItemId={downtimeNavItemId}'),
+      'and threads the very same function to the host rather than letting it re-derive one'
+    );
+    assert.ok(
+      hostSource.includes('aria-labelledby={navItemId(tab.id)}'),
+      'the host names its region from the threaded id, never from a literal of its own'
+    );
   });
   it('disposes a Downtime companion before ApplicationV2 closes and removes its Svelte target', () => {
     const closeStart = appSource.indexOf('async close(options) {');
@@ -3331,11 +3355,26 @@ describe('CraftingSystemManager source contract', () => {
     // Under the Downtime rail lock the control is genuinely disabled and early-returns, so a
     // GM arriving with a collapsed rail cannot be shown an expanded one by a control that
     // still reports "Expand" and does nothing (issue 1213, the issue 1185 defect class).
-    assert.ok(
-      rootSource.includes('disabled={railLockedOpen}') &&
-        rootSource.includes('aria-disabled={railLockedOpen}'),
-      'the rail toggle must be inert under the lock, not merely overridden'
+    //
+    // COUNTED, not `includes`d. Two branches of the rail's `{#if selectedSystem}` render this
+    // control, and one occurrence satisfies a substring check for both — measured: stripping
+    // the pair from the `{:else}` card alone left this assertion and the mounted suite green.
+    const countOf = (pattern) => rootSource.match(pattern)?.length ?? 0;
+    assert.equal(
+      countOf(/data-manager-rail-toggle/g),
+      2,
+      'both scope-card branches render the rail toggle; adjust the counts below if that changes'
     );
+    // The negative lookbehind is load-bearing: without it `aria-disabled={railLockedOpen}`
+    // matches the plain-`disabled` pattern too and every count reads double.
+    assert.equal(
+      countOf(/(?<!aria-)disabled=\{railLockedOpen\}/g),
+      2,
+      'and BOTH are inert under the lock, not merely the branch a mounted test happens to reach'
+    );
+    assert.equal(countOf(/aria-disabled=\{railLockedOpen\}/g), 2);
+    assert.equal(countOf(/title=\{railToggleTitle\}/g), 2);
+    assert.equal(countOf(/aria-pressed=\{railCollapsedDisplay\}/g), 2);
     assert.match(
       rootSource,
       /function toggleManagerRail\(\)\s*\{[\s\S]{0,400}?if \(railLockedOpen\) return;/,
