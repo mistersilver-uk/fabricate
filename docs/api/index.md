@@ -871,6 +871,18 @@ The visible rail label truncates with an ellipsis inside its fixed-width button;
 
 `mount({ target, tabId, context })` must be synchronous and return either one cleanup function or nothing.
 `tabId` is always the provider's own **bare** tab id, never the composed route key.
+
+That composed key is `ext:<surfaceId>:<tabId>`, and Fabricate addresses every provider tab by it rather than by the bare tab id.
+That is what makes a collision with a Core tab id structurally impossible without Fabricate learning a single provider id.
+The route key is what the window's active-tab state, the rail button's selection attribute, and the window's tab query all carry, so it is also the value you pass to open one of your own tabs yourself:
+
+```javascript
+// The worked example's provider id is 'downtime' and one of its tab ids is 'projects'.
+game.fabricate.api.getFabricateAppClass().show('ext:downtime:projects');
+```
+
+The window falls back to its Crafting tab when the key names a tab no registered provider currently offers, so register before you call it.
+
 `context` is a frozen object carrying no Fabricate store, document, or component:
 
 <!-- markdownlint-disable markdownlint-sentences-per-line -->
@@ -907,8 +919,11 @@ If you want container queries, declare `container-type` on your own root — its
 
 ### Lifecycle And Failure
 
-Fabricate calls the returned cleanup exactly once — before a tab switch, a provider change, or the window closing removes the target — and always while the target is still connected.
-The player application disposes a mounted companion immediately before `ApplicationV2` closes and unmounts its Svelte root.
+Fabricate calls the returned cleanup exactly once, while the target is still connected, and before whatever ended the mount removes it.
+That holds on every path that ends a mount: a tab change within your own surface, a tab change away to a Core tab, a tab change to a different companion's surface, your provider unregistering while one of its tabs is live, and the window closing.
+It holds for a selection Fabricate makes on the user's behalf as well, such as the fallback described below.
+Fabricate reaches the disposal from outside your mounted subtree and before the state change that removes it, and the disposal is idempotent, so a second caller reaching it does not run your cleanup twice.
+On window close the player application disposes first, then unmounts its Svelte root, and only then does `ApplicationV2` remove the window element.
 
 A mount or cleanup error is caught, logged, and contained, and the containment is deliberately **legible** rather than silent:
 
