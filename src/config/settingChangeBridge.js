@@ -209,7 +209,8 @@ function announceScopedChange(source, manager, callAll) {
  * @param {string} settingKey Fully-qualified `namespace.key` of the changed setting.
  * @param {object} deps
  * @param {{ reload: () => boolean, getSystems: () => any[] }} [deps.craftingSystemManager]
- * @param {{ reload: () => boolean, getRecipes: () => any[] }} [deps.recipeManager]
+ * @param {{ reload: () => boolean, getRecipes: () => any[],
+ *   rebuildDefinitionStorage?: () => Promise<boolean> }} [deps.recipeManager]
  * @param {{ load: () => any[] }} [deps.gatheringEnvironmentStore] Gathering environment
  *   store, reloaded so replicated `nodeRuntime` changes (a GM-applied gather
  *   depletion, a restock, a world-time respawn) are visible on every client. The
@@ -317,10 +318,17 @@ export function handleFabricateSettingChange(
     // and without this a remote client gets NO signal when it flips — it would keep reading
     // whichever arrangement it resolved at construction until the session ended.
     //
-    // The signal is all -b owes: acting on it means rebuilding the manager's repository
-    // against the new arrangement, which is the conversion's own job (-c). Deliberately no
-    // `reload()` here, because a reload would re-read through the repository this client
-    // built BEFORE the flip and would answer confidently from the wrong arrangement.
+    // Issue 1232 acts on the signal, which is what -b deferred. Still NOT a `reload()`: a
+    // reload re-reads through the repository this client built BEFORE the flip and would
+    // answer confidently from the wrong arrangement. `rebuildDefinitionStorage()` re-chooses
+    // the adapter first and reads through the new one, and it declines unless the layout and
+    // target agree — so a client rebuilds exactly once, when the conversion finishes, and
+    // never against a corpus mid-move. It is asynchronous because a granular `loadAll()` is,
+    // and this handler's boolean means "was this a Fabricate data setting", never "has the
+    // reaction finished"; a rejection is reported rather than left unhandled.
+    void Promise.resolve(recipeManager?.rebuildDefinitionStorage?.()).catch((error) => {
+      console.error('Fabricate | failed to rebuild recipe definition storage', error);
+    });
     //
     // INTERNAL, deliberately not a published hook. It is absent from `FABRICATE_HOOKS` /
     // `game.fabricate.api.HOOKS` on purpose, alongside the sibling internal signals this

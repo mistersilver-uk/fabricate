@@ -359,6 +359,12 @@ export class PerRecordCraftingDefinitionRepository extends CraftingDefinitionRep
    *   document class carrying `createDocuments`/`updateDocuments`/`deleteDocuments`.
    * @param {() => Iterable<any>|null} [options.collection] Injected for tests; resolves the
    *   world `Setting` collection this adapter indexes.
+   * @param {() => void} [options.assertWritable] Throws when this repository addresses an
+   *   arrangement the world has already left (issue 1232) — the mirror of the settings
+   *   adapter's guard, and reachable for the first time now that a REVERSE conversion
+   *   exists: a client holding this adapter afterwards would write record documents back
+   *   into existence and re-spend the envelopes the reverse reclaimed. Defaults to a no-op,
+   *   so a directly-constructed adapter (including the conversion's own) is unguarded.
    */
   constructor({
     keyPrefix,
@@ -370,6 +376,7 @@ export class PerRecordCraftingDefinitionRepository extends CraftingDefinitionRep
     summarize = null,
     documentClass = defaultSettingDocumentClass,
     collection = defaultWorldSettingCollection,
+    assertWritable = () => {},
   }) {
     super();
     if (!keyPrefix || !keyPrefix.endsWith('.')) {
@@ -394,6 +401,7 @@ export class PerRecordCraftingDefinitionRepository extends CraftingDefinitionRep
       }));
     this._documentClass = documentClass;
     this._collection = collection;
+    this._assertWritable = assertWritable;
     /** @type {Map<string, any>|null} key -> `Setting` document. Built once. */
     this._index = null;
     this._batchDepth = 0;
@@ -715,11 +723,17 @@ export class PerRecordCraftingDefinitionRepository extends CraftingDefinitionRep
    *
    * Empty legs cost nothing, so a batch of 50 creates is exactly one round trip.
    *
+   * The arrangement guard (issue 1232) sits here, at the single point every leg passes
+   * through, for the same reason its sibling sits in the settings adapter's `_write`: a
+   * mutation method added later inherits it rather than having to remember it.
+   *
    * @param {{creates: object[], updates: object[], deletes: string[]}} legs
    * @returns {Promise<void>}
    * @private
    */
   async _writeLegs({ creates, updates, deletes }) {
+    if (creates.length === 0 && updates.length === 0 && deletes.length === 0) return;
+    this._assertWritable();
     if (creates.length > 0) await this._createDocuments(creates);
     if (updates.length > 0) await this._updateDocuments(updates);
     if (deletes.length > 0) await this._deleteDocuments(deletes);

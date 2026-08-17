@@ -71,6 +71,11 @@ export class SettingsCraftingDefinitionRepository extends CraftingDefinitionRepo
    * @param {(key: string, value: any) => Promise<any>} [options.setSetting] Injected
    *   for tests. Left as the real accessor in production so a non-GM write is still
    *   refused by the server exactly as before.
+   * @param {() => void} [options.assertWritable] Throws when this repository addresses an
+   *   arrangement the world has already left (issue 1232). Defaults to a no-op, which is
+   *   what every corpus with no Definition Storage pair gets — crafting systems and
+   *   gathering environments have one arrangement and cannot be stale. See
+   *   `definitionStorageArrangement.js` for the door this closes.
    */
   constructor({
     settingKey,
@@ -82,6 +87,7 @@ export class SettingsCraftingDefinitionRepository extends CraftingDefinitionRepo
     summarize = null,
     getSetting = defaultGetSetting,
     setSetting = defaultSetSetting,
+    assertWritable = () => {},
   }) {
     super();
     if (!settingKey) throw new Error('SettingsCraftingDefinitionRepository needs a settingKey');
@@ -103,6 +109,7 @@ export class SettingsCraftingDefinitionRepository extends CraftingDefinitionRepo
       }));
     this._getSetting = getSetting;
     this._setSetting = setSetting;
+    this._assertWritable = assertWritable;
     this._batchDepth = 0;
     this._flushPending = false;
   }
@@ -199,10 +206,21 @@ export class SettingsCraftingDefinitionRepository extends CraftingDefinitionRepo
   /**
    * The single point at which this module touches `game.settings`.
    *
+   * The arrangement guard sits HERE, at that single point, rather than at each of `put`,
+   * `delete`, `putAll` and `runBatch`. That placement is what makes the refusal complete: a
+   * write reaches storage only through this method, so no caller can route around it, and a
+   * later mutation method added without remembering the guard inherits it.
+   *
    * @param {object[]} records
    * @private
    */
   async _write(records) {
+    // Issue 1232. Once a forward Storage Layout Conversion has deleted the legacy document,
+    // `ClientSettings#setWorld` finds `current?._id` falsy and takes its CREATE branch — so
+    // this call would silently re-create the legacy key holding a stale pre-conversion
+    // corpus. Refusing is the whole of `data-models/spec.md`'s "the legacy key MUST NOT be
+    // written after conversion".
+    this._assertWritable();
     await this._setSetting(
       this.settingKey,
       records.map((record) => this._serialize(record))

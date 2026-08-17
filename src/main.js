@@ -41,6 +41,7 @@ import { promptBulkCheckRoll } from './ui/svelte/apps/crafting/rollPrompt.js';
 import { RecipeVisibilityService } from './systems/RecipeVisibilityService.js';
 import { runStartupMaintenance } from './systems/startupMaintenance.js';
 import { composeStartupPassList } from './systems/startupPassComposition.js';
+import { reconcileRecipeStorageLayout } from './systems/definitionStorageConversion.js';
 import { ResolutionModeService } from './systems/ResolutionModeService.js';
 import { CraftingListingBuilder } from './systems/CraftingListingBuilder.js';
 import { activeRunStepState, buildStepRecipeView, resolveStepIngredientSet } from './systems/stepRecipeView.js';
@@ -93,7 +94,7 @@ import { playerExtensions } from './ui/playerExtensions.js';
 import { applyCurrentFabricateTheme } from './ui/theme.js';
 import { findItemsDirectoryActionsContainer, syncGatheringDirectoryButton } from './ui/itemsDirectoryButtons.js';
 import { buildCompendiumImportContextOption, promptSelectCraftingSystem } from './ui/compendiumDirectoryContext.js';
-import { registerFabricateSettings, getSetting, setSetting, SETTING_KEYS, FABRICATE_SETTINGS_NAMESPACE, RECIPE_ITEM_FLAG_STAMP_TARGET, COMPONENT_FLAG_STAMP_TARGET, TOOL_FLAG_STAMP_TARGET, OWNED_ITEM_COMPONENT_STAMP_TARGET } from './config/settings.js';
+import { registerFabricateSettings, getSetting, setSetting, SETTING_KEYS, FABRICATE_SETTINGS_NAMESPACE, RECIPE_ITEM_FLAG_STAMP_TARGET, COMPONENT_FLAG_STAMP_TARGET, TOOL_FLAG_STAMP_TARGET, OWNED_ITEM_COMPONENT_STAMP_TARGET, RECIPE_STORAGE_TARGET_CHOICES } from './config/settings.js';
 import { notifyUnresolvedItemDescriptions } from './config/repairItemData.js';
 import { setFabricateFlag } from './config/flags.js';
 import { isPlayerCharacterActor } from './config/playerCharacterTypes.js';
@@ -597,6 +598,15 @@ class Fabricate {
     this._startupMarks.begin(STARTUP_PHASES.MIGRATIONS);
     await this._runMigrations();
     this._startupMarks.end(STARTUP_PHASES.MIGRATIONS);
+    // Bring the recipe Definition Storage Layout into agreement with its Target (issue 1232)
+    // BEFORE any manager is constructed. That placement is the ordering constraint made
+    // structural: `buildDefaultRecipeRepository` selects the recipe backend from the TARGET,
+    // once, in `new RecipeManager()` on the very next statement — so a conversion that ran
+    // afterwards would leave the converting GM's own manager holding the adapter for the
+    // arrangement the conversion had just dismantled, and their world would appear EMPTY on
+    // the boot that converted it. Reconciling first means the selection below is made against
+    // storage that has already settled.
+    await this._reconcileDefinitionStorage();
     // Create managers
     // Both seams are lazy closures because `craftingSystemManager` is constructed on the
     // next statement — it needs `recipeManager` in ITS constructor, so one of the two has
@@ -927,6 +937,65 @@ class Fabricate {
     this.ready = true;
     this._resolveReady?.();
     console.log('Fabricate | Ready');
+  }
+
+  /**
+   * Reconcile the recipe Definition Storage Layout with its Target (issue 1232).
+   *
+   * Primary-GM only, for the same reason `_runMigrations` is: a Storage Layout Conversion is
+   * a world-scoped multi-write, `isGM` is true for assistant GMs too, and two clients
+   * converting the same corpus concurrently is last-writer-wins over a half-moved corpus.
+   *
+   * Never throws. `reconcileRecipeStorageLayout` reports its outcome instead, because this
+   * runs before the managers exist and a rejection here would take the module down on a
+   * world whose only fault is a half-finished storage change.
+   */
+  async _reconcileDefinitionStorage() {
+    if (game.users?.activeGM?.id !== game.user?.id) return;
+    const report = await reconcileRecipeStorageLayout({
+      getSetting: (key) => getSetting(key),
+      setSetting: (key, value) => setSetting(key, value)
+    });
+    this._announceDefinitionStorageOutcome(report);
+  }
+
+  /**
+   * Tell the GM what the storage reconcile did, in the terms the settings row is written in.
+   *
+   * The labels are the CHOICE labels from the settings row rather than the raw
+   * `singleArray`/`perRecord` values, so a GM reads the message against the dropdown they
+   * just used instead of against an internal enumeration.
+   *
+   * @param {{action: string, layout: string|null, target: string|null, records?: number,
+   *   reclaimFailure?: Error|null, error?: Error}} report
+   */
+  _announceDefinitionStorageOutcome(report) {
+    const label = (value) => {
+      const key = RECIPE_STORAGE_TARGET_CHOICES[value];
+      return key ? game.i18n?.localize?.(key) ?? key : String(value);
+    };
+    const format = (key, data) => game.i18n?.format?.(key, data) ?? key;
+    switch (report?.action) {
+      case 'converted':
+        if (report.reclaimFailure) {
+          ui.notifications?.warn?.(format('FABRICATE.Settings.RecipeStorageTarget.ReclaimPending', { records: report.records }), { permanent: true });
+        } else {
+          ui.notifications?.info?.(format('FABRICATE.Settings.RecipeStorageTarget.Converted', { records: report.records }));
+        }
+        break;
+      case 'target-reverted':
+        ui.notifications?.warn?.(format('FABRICATE.Settings.RecipeStorageTarget.Unavailable', { requested: label(report.target), current: label(report.layout) }), { permanent: true });
+        break;
+      case 'unsettled-unresolvable':
+        ui.notifications?.error?.(game.i18n?.localize?.('FABRICATE.Settings.RecipeStorageTarget.Unsettled') ?? '', { permanent: true });
+        break;
+      case 'failed':
+        console.error('Fabricate | recipe storage layout conversion failed', report.error);
+        ui.notifications?.error?.(format('FABRICATE.Settings.RecipeStorageTarget.Failed', { current: label(report.layout) }), { permanent: true });
+        break;
+      default:
+        break;
+    }
   }
 
   /**
@@ -3667,6 +3736,23 @@ Hooks.once('ready', async () => {
     }
   };
   Hooks.on('deleteSetting', handleFabricateSettingDocumentDelete);
+  // A GM changing the recipe storage arrangement mid-session (issue 1232). The bridge above
+  // emits this internal signal for BOTH storage keys; only a TARGET change is a request, and
+  // the layout leg is the conversion's own writes coming back — reconciling on those would
+  // re-enter the operation that produced them.
+  //
+  // Primary-GM gated, exactly as the boot pass is: the settings row is writable by any holder
+  // of SETTINGS_MODIFY, which includes every assistant GM, and two clients converting one
+  // corpus concurrently is last-writer-wins over a half-moved corpus. It terminates: the only
+  // write this can make against a target is restoring it to the layout, after which the next
+  // pass reads `layout === target` and does nothing.
+  Hooks.on('fabricate.recipeStorageLayoutChanged', ({ key } = {}) => {
+    if (key !== `${FABRICATE_SETTINGS_NAMESPACE}.${SETTING_KEYS.RECIPE_STORAGE_TARGET}`) return;
+    if (game.users?.activeGM?.id !== game.user?.id) return;
+    void fabricate._reconcileDefinitionStorage().catch(error => {
+      console.error('Fabricate | Failed to reconcile recipe definition storage', error);
+    });
+  });
   Hooks.on('canvasReady', () => {
     void runInteractableMarkerSync();
   });
