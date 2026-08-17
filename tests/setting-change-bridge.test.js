@@ -511,7 +511,7 @@ describe('main.js settings hook wiring (issue 1080 -b)', () => {
     const occurrences = mainSource.split('createRecipeRefreshCoalescer()').length - 1;
     assert.equal(occurrences, 1, 'one coalescer, created once');
     // Created and published at MODULE SCOPE, not inside the `ready` handler. `initialize()`
-    // is awaited from that handler more than 150 lines before it reaches this wiring, and
+    // is awaited from that handler well before it reaches this wiring, and
     // -c's Storage Layout Conversion runs inside `_runMigrations` under `initialize()`. A
     // bracket published in the handler would still be `undefined` when the conversion opened
     // it, `?.open()` would no-op, and the only symptom would be three refresh bursts instead
@@ -524,12 +524,6 @@ describe('main.js settings hook wiring (issue 1080 -b)', () => {
       creationAt < readyAt,
       'the coalescer must be published before the ready handler, because initialize() runs inside it'
     );
-    // Pinned as a LINE holding just the property. `[^}]*` spanned comments inside the object
-    // literal, so the earlier form stayed green with the property deleted and a comment
-    // mentioning it left behind - the exact defect this pin exists to catch.
-    // Pinned as the PROPERTY the bridge is handed, not as the identifier appearing
-    // somewhere in the file. A bare `\brecipeRefresh\b` is satisfied by the comment above
-    // the declaration, so it stays green with the coalescer wired to nothing at all.
     // Scoped to the factory AND line-anchored. The two constraints fix different holes and
     // an earlier form had one each: `[^}]*` spanned comments inside the literal, so a
     // deleted property with a comment mentioning it stayed green; a bare line anchor over
@@ -537,14 +531,31 @@ describe('main.js settings hook wiring (issue 1080 -b)', () => {
     // it elsewhere stayed green. Slicing first, then anchoring, closes both.
     const targetsStart = mainSource.indexOf('const fabricateSettingChangeTargets = () => ({');
     assert.ok(targetsStart > -1, 'the targets factory is still present');
+    // Anchored on the closing LINE (newline + the two-space indent), not on a bare `});`.
+    // A comment inside the factory containing `});` would otherwise truncate the slice and
+    // redden this test with the property untouched - a spurious red rather than a hole, but
+    // still a test that fails for the wrong reason.
     const targetsBody = mainSource.slice(
       targetsStart,
-      mainSource.indexOf('});', targetsStart) + 3
+      mainSource.indexOf('\n  });', targetsStart) + 6
     );
     assert.match(
       targetsBody,
       /^\s+recipeRefresh,?\s*$/m,
-      'every leg must actually hand the coalescer to the bridge'
+      'the coalescer is a property of the targets factory'
+    );
+    // And every leg actually SPREADS that factory. The pin above proves only where the
+    // property lives; it says nothing about whether a leg uses it. Deleting the spread from
+    // the delete leg strips it of `craftingSystemManager`, `recipeManager`,
+    // `gatheringEnvironmentStore`, `callAll` AND `recipeRefresh` at once, and left this
+    // suite fully green — the failure the sibling case at the top of this file describes as
+    // "a removed recipe stays visible on every other client until reload, silently". The
+    // bridge's own behavioural tests build their targets locally, so nothing else can see a
+    // wiring regression here.
+    assert.equal(
+      mainSource.split('...fabricateSettingChangeTargets(),').length - 1,
+      2,
+      'both the shared listener and the delete leg must spread the targets factory'
     );
     // And published, because the bracket does no work for the client that WROTE the batch —
     // `applyReplicatedRecordChange` returns false there, so it never signals — while every
@@ -552,5 +563,10 @@ describe('main.js settings hook wiring (issue 1080 -b)', () => {
     // to a caller, `open`/`close` is a contract with no implementation.
     // Anchored for the same reason: unanchored, a commented-out publish line still matches.
     assert.match(mainSource, /^fabricate\.recipeRefresh = createRecipeRefreshCoalescer\(\);$/m);
+    // The middle link. The pins above prove the coalescer is created and published, and that
+    // the factory carries the property - but nothing tied the local binding to the published
+    // bracket, so `const recipeRefresh = null;` left every leg receiving null and shipped
+    // green.
+    assert.match(mainSource, /^\s+const recipeRefresh = fabricate\.recipeRefresh;$/m);
   });
 });

@@ -918,7 +918,6 @@ describe('every call verifies what came back', () => {
     const repository = makeRepository(host, {
       documentClass: () => ({
         ...host.documentClass,
-        // eslint-disable-next-line no-throw-literal -- the point of the test is a falsy throw
         createDocuments: async () => {
           throw null;
         },
