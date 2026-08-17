@@ -2608,9 +2608,17 @@
   // it is the one real cost of deleting the strip, and one scroll removes it.
   //
   // `nearest` so a switcher already in view does not move the rail at all. Provider mode only:
-  // core-fallback keeps its strip at the top of the panel and needs no help. Guarded by the
-  // last id scrolled to, because the rail re-renders on far more than a route change and a
-  // repeat would yank the pane back under a GM who had scrolled it deliberately.
+  // core-fallback keeps its strip at the top of the panel and needs no help.
+  //
+  // `revealedDowntimeNavId` is DEFENSIVE, not load-bearing, and the distinction was measured
+  // rather than assumed. An earlier version of this comment said the rail "re-renders on far
+  // more than a route change and a repeat would yank the pane back", which misstates Svelte 5:
+  // the effect re-runs on DEPENDENCY change, not on re-render, and every path that changes a
+  // dependency either changes `worldDowntimeTabId` (re-scroll wanted) or resets this to null
+  // (re-scroll wanted). The keyed each-block keeps `bind:this` node identity stable, so
+  // `downtimeNavNodes[tabId]` does not churn either. No re-entry it prevents could be
+  // constructed, and deleting it broke no test — so it stays as cheap insurance against a
+  // future dependency being added, and nothing claims to gate it.
   const downtimeNavNodes = $state({});
   let revealedDowntimeNavId = null;
   $effect(() => {

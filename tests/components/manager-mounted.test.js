@@ -14516,9 +14516,11 @@ describe('CraftingSystemManager mounted behavior', () => {
         ['manager-downtime-nav-crew', { block: 'nearest' }],
         'and switching screen follows the switcher'
       );
-      const count = scrolled.length;
-      await settleDowntimeProvider();
-      assert.equal(scrolled.length, count, 'but a re-render does not yank a scrolled rail back');
+      // There was an assertion here that a further settle does not re-scroll, claiming to gate
+      // the `revealedDowntimeNavId` guard in the effect. It could not fail: deleting that guard
+      // left this suite at 374/374. Removed rather than left standing, on the same principle
+      // that removed a surviving grid-track assertion in the layout suite — an assertion that
+      // cannot fail reads as coverage and is not. The guard is defensive; see its comment.
     } finally {
       globalThis.Element.prototype.scrollIntoView = original;
     }
