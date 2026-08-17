@@ -266,8 +266,11 @@ describe('FabricateAppRoot shell', () => {
       rootSource.includes('aria-labelledby={activeNavTab'),
       'and the panel is labelled by the active button'
     );
+    // The tab stop falls back to the first entry when the active tab names no rendered entry,
+    // so it is bound to focusableTab rather than activeTab; aria-selected stays on activeTab.
+    // The behavioural pin for the fallback lives in fabricate-app-root-mounted.test.js.
     assert.ok(
-      rootSource.includes("activeTab === tab.routeKey ? 0 : -1"),
+      rootSource.includes('tab.routeKey === focusableTab?.routeKey ? 0 : -1'),
       'the rail uses a roving tabindex'
     );
     for (const key of ['ArrowDown', 'ArrowUp', 'Home', 'End']) {
