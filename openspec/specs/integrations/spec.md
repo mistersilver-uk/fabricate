@@ -5,6 +5,9 @@
 Define the requirements for Fabricate integrations with third-party Foundry modules.
 Integrations must be automated, transparent, and require zero user-authored macros or scripts.
 
+This specification governs **inbound** integrations only — Fabricate consuming another module's data or services.
+The **outbound** companion-extension contract, by which another module contributes navigation and content into Fabricate's own windows, lives in `ui-integration/spec.md` §Downtime Preview and Premium Extension and §Player Navigation Extension.
+
 ## Principles
 
 1. **Automated, not scripted.** An integration means Fabricate detects a companion module, reads its data through its API, and wires behaviour automatically.

@@ -87,6 +87,7 @@ import {
 } from './ui/appFactory.js';
 import { addInteractableSceneControl } from './ui/interactableSceneControl.js';
 import { managerExtensions } from './ui/managerExtensions.js';
+import { playerExtensions } from './ui/playerExtensions.js';
 import { applyCurrentFabricateTheme } from './ui/theme.js';
 import { findItemsDirectoryActionsContainer, syncGatheringDirectoryButton } from './ui/itemsDirectoryButtons.js';
 import { buildCompendiumImportContextOption, promptSelectCraftingSystem } from './ui/compendiumDirectoryContext.js';
@@ -3264,6 +3265,10 @@ function bindFabricateGlobal() {
     HOOKS: FABRICATE_HOOKS
   };
   managerExtensions.bindPublicApi(game.fabricate.api);
+  // Both registries are page-session singletons imported at module scope, so the init and
+  // ready replays of this function re-publish the SAME registry rather than recreating it:
+  // a companion provider registered during its own `init` survives the ready rebind.
+  playerExtensions.bindPublicApi(game.fabricate.api);
 
   game.fabricate.importFromPack = (packData, options) =>
     fabricate.compendiumImporter?.importFromPackData(packData, options);

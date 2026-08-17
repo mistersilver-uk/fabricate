@@ -7,7 +7,8 @@ import {
   CRAFTING_APP_COMPILED_MODULES,
   CRAFTING_APP_RAW_MODULES,
   assertClientSvelteReactivity,
-  createMountedComponentHarness
+  createMountedComponentHarness,
+  rewriteClientImports
 } from '../helpers/svelte-component-harness.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
@@ -62,6 +63,86 @@ describe('createMountedComponentHarness dependency validation', () => {
     );
 
     harness.teardown();
+  });
+});
+
+/**
+ * `rewriteClientImports` decides which specifier every `svelte` import in a compiled component
+ * is resolved against, for every suite built on this harness. Getting it wrong is not a test
+ * failure: an ES module that does not provide a named export fails to LINK, before the suite's
+ * first test runs, so `node --test` reports `# cancelled N` with `# fail 0` and a gate reading
+ * the fail count sees green. That is what issue 1185 was, and what a five-name allowlist routing
+ * everything else to `svelte/internal/client` had rebuilt one import away from happening again.
+ *
+ * So the routing is asserted SEMANTICALLY — the specifier a name is routed to must really export
+ * it — with the input derived from the installed Svelte rather than listed here, so a Svelte
+ * release that adds an export is covered the day it lands instead of the day someone remembers.
+ */
+describe('rewriteClientImports', () => {
+  it('routes every `svelte` export to a specifier that actually provides it', async () => {
+    // Under the wrong condition set `svelte` is the SERVER build, whose export list is a
+    // different set; this test would then be asserting about a module no mounted suite loads.
+    assertClientSvelteReactivity();
+
+    const exportedNames = Object.keys(await import('svelte')).filter((name) => name !== 'default');
+    assert.ok(
+      exportedNames.length > 5,
+      `the installed Svelte reports only ${exportedNames.length} exports, which is fewer than the `
+        + 'five-name allowlist this test replaced — read that as a broken probe, not a small API'
+    );
+
+    const rewritten = rewriteClientImports(`import { ${exportedNames.join(', ')} } from 'svelte';`);
+    const routes = [...rewritten.matchAll(/import \{([^}]*)\} from ['"]([^'"]+)['"];/g)].flatMap(
+      ([, names, specifier]) => names
+        .split(',')
+        .map((name) => name.trim())
+        .filter(Boolean)
+        .map((name) => [name, specifier])
+    );
+
+    assert.deepEqual(
+      routes.map(([name]) => name).sort(),
+      [...exportedNames].sort(),
+      'the rewrite must carry every imported name through exactly once, dropping and inventing none'
+    );
+
+    const loaded = new Map();
+    for (const [name, specifier] of routes) {
+      if (!loaded.has(specifier)) loaded.set(specifier, await import(specifier));
+      assert.ok(
+        loaded.get(specifier)[name] !== undefined,
+        `rewriteClientImports routes '${name}' to '${specifier}', which does not export it. A `
+          + `component importing '${name}' from 'svelte' would report every suite sharing this `
+          + "harness as '# cancelled', never '# fail' — issue 1185's symptom, rebuilt."
+      );
+    }
+  });
+
+  it('appends `.js` to `.svelte` specifiers and rewrites nothing else', () => {
+    // The compiler's own runtime import already names `svelte/internal/client`, and the bare
+    // `svelte` line is the component's own. Pinned as whole text because the defect this guards
+    // is a rewrite that fires where it should not.
+    const compiled = [
+      "import 'svelte/internal/disclose-version';",
+      "import * as $ from 'svelte/internal/client';",
+      "import { getContext, onDestroy, tick, untrack } from 'svelte';",
+      "import Child from './Child.svelte';",
+      'import Sibling from "../nested/Sibling.svelte";',
+      "import { helper } from '../util/helper.js';"
+    ].join('\n');
+
+    assert.equal(
+      rewriteClientImports(compiled),
+      [
+        "import 'svelte/internal/disclose-version';",
+        "import * as $ from 'svelte/internal/client';",
+        "import { getContext, onDestroy, tick, untrack } from 'svelte';",
+        "import Child from './Child.svelte.js';",
+        'import Sibling from "../nested/Sibling.svelte.js";',
+        "import { helper } from '../util/helper.js';"
+      ].join('\n'),
+      'only `.svelte` specifiers move; the bare `svelte` import must survive intact and unsplit'
+    );
   });
 });
 

@@ -21,6 +21,12 @@ import {
 import { dispatchDrop, dispatchRejectedDrops } from '../helpers/dropPayloads.js';
 import { get, writable } from 'svelte/store';
 import { setupDOM, teardownDOM } from '../helpers/svelte-dom.js';
+// The ONE compiled-import rewrite every mounted suite resolves its temp tree against. This
+// suite predates `createMountedComponentHarness` and still drives its own compile/mount, but a
+// second copy of the rewrite is a second place to get the `svelte` specifier wrong — and
+// getting it wrong reports as `# cancelled`, never `# fail` (issue 1185). It is also the exact
+// near-identical `tests/**` block SonarCloud's new-code duplication gate counts.
+import { rewriteClientImports } from '../helpers/svelte-component-harness.js';
 // The capture registry, so the two cases pinned below assert their OWN selectors rather
 // than a copy of them that is free to drift from the case it claims to guard.
 import { VIEW_LAB_CASES } from '../../scripts/lib/viewLabCases.js';
@@ -30,6 +36,7 @@ import { getModifierExpressionSuggestions } from '../../src/config/modifierExpre
 // rule cannot leave these tests quietly asserting the un-delayed state.
 import { ANNOUNCE_AFTER_FOCUS_MS } from '../../src/ui/svelte/util/announceAfterFocus.js';
 import { createManagerExtensionsRegistry } from '../../src/ui/managerExtensions.js';
+import { createPlayerExtensionsRegistry } from '../../src/ui/playerExtensions.js';
 import { MANAGER_HOOKS } from '../../src/config/hooks.js';
 // The shipped array transform the store publishes hydrated cards through (issue 1081). The
 // DOM guards below drive the REAL one rather than restating it, so a revert to re-wrapping
@@ -80,14 +87,6 @@ let CraftingSettingsViewComponent;
 let mounted;
 let target;
 
-// Lifecycle functions live on the `svelte` package; everything else a component imports
-// from `svelte` (tick, untrack, …) is only reachable from `svelte/internal/client` once the
-// component is compiled to a client module. Split each import list by that rule rather than
-// matching whole literal import lines: a hand-listed line is a mirror of the component's
-// source text, and adding one name to a component turned every mounted test into
-// `# cancelled 348` behind one "does not provide an export named 'onDestroy'" (issue 1185).
-const SVELTE_PACKAGE_EXPORTS = new Set(['onDestroy', 'onMount', 'mount', 'unmount', 'hydrate']);
-
 /**
  * A copy of `card` carrying the projection's non-enumerable `hydrate()` seam, recording its
  * own id in `requests` when a view asks for it (issue 1081).
@@ -110,26 +109,6 @@ function withHydrateSpy(card, requests) {
     },
   });
   return copy;
-}
-
-function rewriteClientImports(code) {
-  return code
-    .replace(/import \{([^}]*)\} from 'svelte';/g, (_match, names) => {
-      const imported = names
-        .split(',')
-        .map((name) => name.trim())
-        .filter(Boolean);
-      const fromPackage = imported.filter((name) => SVELTE_PACKAGE_EXPORTS.has(name));
-      const fromClient = imported.filter((name) => !SVELTE_PACKAGE_EXPORTS.has(name));
-      const lines = [];
-      if (fromPackage.length > 0) lines.push(`import { ${fromPackage.join(', ')} } from "svelte";`);
-      if (fromClient.length > 0) {
-        lines.push(`import { ${fromClient.join(', ')} } from 'svelte/internal/client';`);
-      }
-      return lines.join('\n');
-    })
-    .replace(/from 'svelte';/g, "from 'svelte/internal/client';")
-    .replace(/(from\s+['"][^'"]+\.svelte)(['"])/g, '$1.js$2');
 }
 
 function compileManagerRoot() {
@@ -706,6 +685,14 @@ function compileManagerRoot() {
     'src/ui/svelte/apps/manager/knowledge/knowledgeStudio.js',
     'src/ui/svelte/apps/manager/downtime/worldDowntimePreviewProvider.js',
     'src/ui/managerExtensions.js',
+    // The shared registry factory both extension registries are built from (issue 1198).
+    // `managerExtensions.js` imports it statically, so omitting it reports every mounted
+    // manager test as `# cancelled` behind one ERR_MODULE_NOT_FOUND rather than failing.
+    'src/ui/extensionRegistry.js',
+    // The player registry the title bar's PREMIUM badge also reads (issue 1198), plus the
+    // shared derivation leaf the player window composes its rail from. Both arrive through
+    // this suite because the A2 case registers a player-only provider.
+    'src/ui/playerExtensions.js',
     // The public hook-name constants the registry and the Downtime host publish through
     // (issue 1185). `managerExtensions.js` imports it, so omitting it reports every mounted
     // manager test as `# cancelled` behind one ERR_MODULE_NOT_FOUND rather than failing.
@@ -14371,6 +14358,52 @@ describe('CraftingSystemManager mounted behavior', () => {
       worldNavItem('downtime').getAttribute('title'),
       'Unlock Downtime Studio with Fabricate Premium',
       'and the Downtime tooltip still describes the route it actually renders'
+    );
+  });
+
+  // Issue 1198, maintainer decision A2. The badge reports the MODULE, so it must not be keyed
+  // on one REGISTRY either: a companion whose only surface is a PLAYER-window one is just as
+  // installed and just as working. This is the case that would silently pass if `T7` widened
+  // nothing, because the manager registry alone already lights the badge in every other case.
+  it('lights the title-bar premium badge for a companion registered ONLY in the player registry', async () => {
+    useShippedLocalization();
+    const playerExtensions = createPlayerExtensionsRegistry({ emitHook: () => {} });
+    mountManager(
+      [],
+      {},
+      {},
+      { managerExtensions: createManagerExtensionsRegistry(), playerExtensions }
+    );
+
+    assert.ok(
+      !target.querySelector('[data-manager-titlebar-premium]'),
+      'the free module still carries no badge'
+    );
+
+    const unregister = playerExtensions.publicApi.registerPlayerNavProvider({
+      apiVersion: 1,
+      id: 'downtime',
+      tabs: [{ id: 'board', label: 'Downtime board', icon: 'fas fa-clock' }],
+      mount: () => undefined,
+    });
+    await settleDowntimeProvider();
+
+    assert.equal(
+      target.querySelector('[data-manager-titlebar-premium]')?.textContent.trim(),
+      'PREMIUM',
+      'a player-window-only companion still proves the premium module is installed'
+    );
+    assert.equal(
+      target.querySelector('[data-world-nav-premium]').dataset.worldNavPremiumState,
+      'preview',
+      'but Core still holds the Downtime route, so its rail chip keeps the upgrade sell'
+    );
+
+    unregister();
+    await settleDowntimeProvider();
+    assert.ok(
+      !target.querySelector('[data-manager-titlebar-premium]'),
+      'and removing the only companion takes the badge with it'
     );
   });
 

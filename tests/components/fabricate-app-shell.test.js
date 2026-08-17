@@ -17,6 +17,14 @@ const gatheringSource = readFileSync(
   resolve(__dirname, '../../src/ui/svelte/apps/gathering/GatheringView.svelte'),
   'utf8'
 );
+const navModelSource = readFileSync(
+  resolve(__dirname, '../../src/ui/playerNavModel.js'),
+  'utf8'
+);
+const extensionHostSource = readFileSync(
+  resolve(__dirname, '../../src/ui/svelte/apps/PlayerExtensionHost.svelte'),
+  'utf8'
+);
 
 describe('FabricateAppRoot shell', () => {
   it('renders the planned navigation tabs', () => {
@@ -41,7 +49,14 @@ describe('FabricateAppRoot shell', () => {
       'the alchemy tab should be marked conditional'
     );
     assert.ok(
-      rootSource.includes("tab.requires !== 'alchemy' || showAlchemy"),
+      rootSource.includes('showAlchemy,') && rootSource.includes('buildPlayerNavTabs({'),
+      'the shell should hand showAlchemy to the one shared rail derivation'
+    );
+    // The gate itself moved into the UI-free leaf (issue 1198) so the shell, the application
+    // host and the View Lab read ONE answer instead of three hand-maintained mirrors. Assert
+    // it where it now lives, or this case silently stops covering anything.
+    assert.ok(
+      navModelSource.includes("tab.requires !== 'alchemy' || showAlchemy"),
       'the alchemy tab should only render when showAlchemy is true'
     );
   });
@@ -51,8 +66,10 @@ describe('FabricateAppRoot shell', () => {
       rootSource.includes("import AlchemyView from './alchemy/AlchemyView.svelte'"),
       'the shell should import AlchemyView'
     );
+    // `tab.tabId`, not `tab.id`: a rail entry is now addressed by its ROUTE KEY and carries the
+    // bare tab id separately, so a Core branch must read the bare id.
     assert.ok(
-      /\{:else if tab\.id === 'alchemy'\}[\s\S]*<AlchemyView \{services\} \/>/.test(rootSource),
+      /\{:else if tab\.tabId === 'alchemy'\}[\s\S]*<AlchemyView \{services\} \/>/.test(rootSource),
       'the alchemy tab should render AlchemyView'
     );
     assert.ok(
@@ -67,9 +84,71 @@ describe('FabricateAppRoot shell', () => {
       'the shell should import InventoryView'
     );
     assert.ok(
-      /\{:else if tab\.id === 'inventory'\}\s*<InventoryView \{services\} \/>/.test(rootSource),
+      /\{:else if tab\.tabId === 'inventory'\}\s*<InventoryView \{services\} \/>/.test(rootSource),
       'the inventory tab should render InventoryView'
     );
+  });
+
+  // Issue 1198. The rendered behaviour is proved in `fabricate-app-root-mounted.test.js`
+  // against a real registry; these are the structural claims a mount cannot see.
+  describe('companion navigation surfaces', () => {
+    it('renders the extension branch through PlayerExtensionHost', () => {
+      assert.ok(
+        rootSource.includes("import PlayerExtensionHost from './PlayerExtensionHost.svelte'"),
+        'the shell should import the mount host'
+      );
+      assert.ok(rootSource.includes('<PlayerExtensionHost'), 'and render it for a companion route');
+      assert.ok(
+        rootSource.includes('data-player-extension-fault'),
+        'a faulted surface gets a Core error state in the panel'
+      );
+      assert.ok(
+        rootSource.includes('data-player-nav-tab'),
+        'every rail button carries a stable per-tab selector'
+      );
+    });
+
+    it('subscribes to nothing: the snapshot arrives as a prop', () => {
+      // Two subscribers within one window disagree about what that window renders, so the
+      // application host is the player window's single subscriber and this shell is a pure
+      // projection of what it pushes down.
+      assert.ok(
+        rootSource.includes('extensionSurfaces = []'),
+        'the shell takes the frozen snapshot as a prop'
+      );
+      assert.ok(
+        !rootSource.includes('.subscribeSurfaceIds('),
+        'the shell must never subscribe to the registry itself'
+      );
+      assert.ok(
+        !extensionHostSource.includes('.subscribeSurfaceIds('),
+        'nor may the mount host'
+      );
+    });
+  });
+
+  // AC12 / maintainer decision A1. Scope prose expires when an issue closes; this does not.
+  // The player window carries NO companion-product signal in any state — no badge, no
+  // padlocked entry, no teaser tab, no upgrade offer, no subscription call to action.
+  it('carries no premium signal of any kind, in either player-side component', () => {
+    const forbidden = [
+      'premiumInstalled',
+      'registeredSurfaceIds',
+      'manager-titlebar-badge',
+      'patreon.com',
+      'PREMIUM',
+    ];
+    for (const [name, source] of [
+      ['FabricateAppRoot.svelte', rootSource],
+      ['PlayerExtensionHost.svelte', extensionHostSource],
+    ]) {
+      for (const token of forbidden) {
+        assert.ok(
+          !source.includes(token),
+          `${name} must not contain "${token}" — the player window advertises nothing, in any state`
+        );
+      }
+    }
   });
 
   it('threads the active canvas tool into the shared header bar instead of a chip bar above the content', () => {
@@ -172,12 +251,42 @@ describe('FabricateAppRoot shell', () => {
   it('exposes an accessible tablist driven by host state', () => {
     assert.ok(rootSource.includes('role="tablist"'), 'left nav should be a tablist');
     assert.ok(
-      rootSource.includes('activeTab === tab.id'),
+      rootSource.includes('activeTab === tab.routeKey'),
       'active state should derive from the activeTab prop'
     );
     assert.ok(
-      rootSource.includes('onSelectTab?.(tab.id)'),
+      rootSource.includes('onSelectTab?.(tab.routeKey)'),
       'clicks should delegate selection to the host'
+    );
+    // The rail-button accessibility contract (issue 1198). It predates this change and is
+    // closed by it, because this change is what puts third-party content inside the panel and
+    // grows the tablist.
+    assert.ok(rootSource.includes('aria-controls="player-nav-panel"'), 'buttons control the panel');
+    assert.ok(
+      rootSource.includes('aria-labelledby={activeNavTab'),
+      'and the panel is labelled by the active button'
+    );
+    // The tab stop falls back to the first entry when the active tab names no rendered entry,
+    // so it is bound to focusableTab rather than activeTab; aria-selected stays on activeTab.
+    // The behavioural pin for the fallback lives in fabricate-app-root-mounted.test.js.
+    assert.ok(
+      rootSource.includes('tab.routeKey === focusableTab?.routeKey ? 0 : -1'),
+      'the rail uses a roving tabindex'
+    );
+    for (const key of ['ArrowDown', 'ArrowUp', 'Home', 'End']) {
+      assert.ok(rootSource.includes(`'${key}'`), `the vertical rail should handle ${key}`);
+    }
+    assert.ok(
+      !rootSource.includes("'ArrowLeft'") && !rootSource.includes("'ArrowRight'"),
+      'the rail is aria-orientation="vertical", so the horizontal pair would be wrong'
+    );
+    // A third-party label is unbounded and the rail column is 84px wide with a fixed 64px
+    // button, so the label must truncate rather than put a horizontal scrollbar in the rail.
+    assert.ok(
+      /\.fabricate-app-nav-label \{[^}]*overflow: hidden;[^}]*text-overflow: ellipsis;/s.test(
+        rootSource
+      ),
+      'the rail label should truncate with an ellipsis'
     );
   });
 });
@@ -368,15 +477,106 @@ describe('SvelteFabricateApp shell window', () => {
     });
   });
 
-  it('only accepts the known tabs', () => {
+  it('only accepts a Core tab or a currently registered companion route key', () => {
     assert.ok(
       appSource.includes("['crafting', 'alchemy', 'gathering', 'journal', 'inventory']"),
-      'valid tabs should be constrained to the known nav tabs'
+      'the Core tab set should still be the known nav tabs'
+    );
+    // The WHOLE guard expression, not the bare `isOfferedTab(tab)` this used to look for:
+    // `static show`'s own site matches that substring too, so dropping the predicate out of
+    // `_selectTab` left this case green under the name of the thing it had stopped covering.
+    assert.ok(
+      appSource.includes('if (!isOfferedTab(tab) || tab === this._activeTab) {'),
+      '_selectTab should guard against tabs nothing offers'
+    );
+    // `isCoreTabId` is STRUCTURAL — it answers "this is not a provider route key", which is
+    // true of any non-empty string — so the predicate must intersect it with this window's own
+    // Core ids. Without the intersection `isOfferedTab('bogus')` is true and the constructor,
+    // `_selectTab` and `static show` all silently accept it, which is looser than the shipped
+    // `VALID_TABS` set this replaced.
+    assert.ok(
+      /if \(isCoreTabId\(tab\)\) return CORE_TABS\.has\(tab\);/.test(appSource),
+      'a Core-shaped id must still be checked against the Core set'
     );
     assert.ok(
-      appSource.includes('VALID_TABS.has(tab)'),
-      '_selectTab should guard against unknown tabs'
+      appSource.includes('playerExtensions.getPlayerNavProvider(route.surfaceId)'),
+      'and a route key must be checked against the LIVE registry, not a frozen set'
     );
+    for (const site of [
+      'if (isOfferedTab(options.activeTab))',
+      'if (!isOfferedTab(tab) || tab === this._activeTab) {',
+      'const initialTab = isOfferedTab(tab) ? tab : DEFAULT_TAB;',
+    ]) {
+      assert.ok(appSource.includes(site), `the predicate should also guard: ${site}`);
+    }
+  });
+
+  // Issue 1198. Every claim here is one a mounted test cannot make, because the class extends
+  // ApplicationV2 and cannot be instantiated headless.
+  describe('companion navigation surfaces', () => {
+    it('SEEDS the snapshot in _prepareSvelteProps, derived rather than read off a field', () => {
+      const start = appSource.indexOf('_prepareSvelteProps() {');
+      const body = appSource.slice(start, appSource.indexOf('_selectTab(tab) {'));
+      assert.ok(start >= 0, '_prepareSvelteProps exists');
+      // `_registerHooks()` runs from `_onRender` — AFTER this method — and returns early once
+      // the hook bag exists, so without the seed a companion registering during its own init
+      // has no tabs on first open and, if it never re-registers, never at all.
+      assert.ok(
+        body.includes('extensionSurfaces: deriveExtensionSurfaces(playerExtensions)'),
+        'the first frame props must DERIVE the snapshot'
+      );
+      assert.ok(
+        !body.includes('extensionSurfaces: this._'),
+        'never off a field: a key present here is re-assigned over the reactive props on every ' +
+          're-render, so a stale field would clobber a live snapshot'
+      );
+      assert.ok(body.includes('playerExtensions'), 'and the registry is threaded down');
+    });
+
+    it('subscribes exactly once, in _registerHooks, and releases it in _removeHooks', () => {
+      assert.ok(
+        appSource.includes('playerExtensions.subscribeSurfaceIds(() =>'),
+        'the application host is the player window sole subscriber'
+      );
+      assert.equal(
+        (appSource.match(/subscribeSurfaceIds\(/g) || []).length,
+        1,
+        'exactly one subscription: two subscribers within one window disagree'
+      );
+      const removeIdx = appSource.indexOf('_removeHooks() {');
+      const removeBody = appSource.slice(removeIdx, removeIdx + 400);
+      assert.ok(
+        removeBody.includes('this._playerExtensionsUnsubscribe?.();'),
+        'and it is released with the Foundry hooks it lives beside'
+      );
+    });
+
+    it('falls the active route back through resolveActiveTab on every publication', () => {
+      const start = appSource.indexOf('_refreshExtensionSurfaces() {');
+      assert.ok(start >= 0, '_refreshExtensionSurfaces exists');
+      const body = appSource.slice(start, start + 600);
+      assert.ok(body.includes('deriveExtensionSurfaces(playerExtensions)'), 'fresh snapshot');
+      assert.ok(body.includes('resolveActiveTab('), 'and the shared fallback rule');
+      assert.ok(body.includes('this.updateProps({ extensionSurfaces'), 'pushed down reactively');
+    });
+
+    it('disposes a mounted companion immediately before AWAITING super.close(options)', () => {
+      const closeIdx = appSource.indexOf('async close(options)');
+      const onCloseIdx = appSource.indexOf('_onClose(options)');
+      const closeBody = appSource.slice(closeIdx, onCloseIdx);
+      const dispose = closeBody.indexOf(
+        'this._svelteComponent?.disposePlayerProvidersBeforeRemoval?.();'
+      );
+      const superClose = closeBody.indexOf('const result = await super.close(options);');
+      assert.ok(dispose >= 0, 'close() disposes the companion');
+      assert.ok(superClose >= 0, 'and awaits super.close');
+      // Targeted at the AWAITED call, not at a returned expression: unlike the manager, this
+      // class assigns the result and returns it afterwards.
+      assert.ok(
+        dispose < superClose,
+        'the companion must tear down while its mount target is still connected'
+      );
+    });
   });
 
   it('wires the player Inventory tab seam, store, and cross-tab navigation', () => {

@@ -30,7 +30,9 @@ function resolveLangKey(key) {
 describe('FabricateAppRoot Journal wiring', () => {
   it('renders JournalView on the journal tab (every tab now routes to a real view)', () => {
     assert.ok(rootSource.includes("import JournalView from './journal/JournalView.svelte'"), 'imports JournalView');
-    assert.ok(rootSource.includes("tab.id === 'journal'"), 'branches on the journal tab');
+    // `tab.tabId`, not `tab.id`: a rail entry is addressed by its ROUTE KEY since issue 1198
+    // and carries the bare tab id separately, so a Core branch reads the bare id.
+    assert.ok(rootSource.includes("tab.tabId === 'journal'"), 'branches on the journal tab');
     assert.ok(rootSource.includes('<JournalView {services} />'), 'renders JournalView with services');
     assert.ok(!rootSource.includes('fabricate-app-placeholder'), 'the coming-soon placeholder is gone now the alchemy tab is implemented');
   });
