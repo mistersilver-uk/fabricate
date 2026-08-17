@@ -43,11 +43,22 @@ const PROVIDER = 'Fabricate World navigation provider';
  * array order. Core validates shape only and never membership, so adding, removing,
  * reordering or renaming a tab is a companion decision.
  *
+ * WHERE EACH FIELD LANDS FOR A PROVIDER (issue 1213). A provider's tabs render once, as the
+ * Manager rail's Downtime sub-items; Core's preview tab strip is core-fallback only. So
+ * `label` is the sub-item's visible text and also names the panel region below it;
+ * `accessibleName` is the sub-item's `aria-label`, which REPLACES that visible text as the
+ * button's accessible name and must therefore contain it; and `tooltip` is the sub-item's
+ * native `title`, which is pointer-visible rather than keyboard-visible. Both fields stay
+ * required: Core's preview strip consumes them too, as an accessible name and a
+ * keyboard-visible `role="tooltip"`.
+ *
  * @typedef {object} WorldNavProviderTab
  * @property {string} id Non-empty tab id, unique within the provider's tab set.
- * @property {string} label Localized visible tab label.
- * @property {string} accessibleName Localized accessible tab name.
- * @property {string} tooltip Localized keyboard-visible tab tooltip.
+ * @property {string} label Localized visible tab label; also the panel region's name.
+ * @property {string} accessibleName Localized accessible name of the rail sub-item (and of
+ *   Core's preview tab button). Replaces the visible label, so it must contain it.
+ * @property {string} tooltip Localized tab tooltip — the rail sub-item's native tooltip for
+ *   a provider, and keyboard-visible only on Core's own preview strip.
  * @property {string} icon Font Awesome icon class string.
  * @property {string} [title] Localized route title (the page `H1`) for this tab.
  * @property {string} [subtitle] Localized route subtitle for this tab.

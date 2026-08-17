@@ -3804,9 +3804,22 @@ export const VIEW_LAB_CASES = Object.freeze([
     smokeLabels: [],
     reaches: 'beyond',
     query: { system: 'lab-smithing', downtimeProvider: '1' },
-    steps: [{ selector: '#manager-world-nav-downtime', press: 'Enter' }],
+    // COLLAPSE THE RAIL FIRST, and the order is the whole point (issue 1213). The lab world
+    // seeds `managerRailCollapsed: false` and cases cannot override a lab setting, so a frame
+    // that never touches the toggle is pixel-identical whether the rail lock ships or not and
+    // proves nothing about it. Pressing it here, one route BEFORE Downtime, reaches a genuinely
+    // stored collapsed rail — and it has to happen here rather than on the route, where the
+    // control is `disabled` and Playwright's actionability check would refuse to press it.
+    steps: [
+      { selector: '[data-manager-rail-toggle]', press: 'Enter' },
+      { selector: '#manager-world-nav-downtime', press: 'Enter' },
+    ],
     expectView: 'world-downtime',
-    expectSelector: '[data-manager-titlebar-premium]',
+    // One selector for the whole lock: the body is NOT collapsed although the GM's stored
+    // preference says it is, and the control that would collapse it is genuinely disabled and
+    // reports the displayed state rather than the stored one.
+    expectSelector:
+      '.manager-body:not(.is-rail-collapsed) [data-manager-rail-toggle][disabled][aria-pressed="false"]',
     expectAttributes: [
       {
         selector: '[data-manager-titlebar-premium]',
@@ -3823,6 +3836,34 @@ export const VIEW_LAB_CASES = Object.freeze([
         name: 'data-world-nav-premium-state',
         value: 'installed',
       },
+      // The lock explains itself in sidebar wording, not the section-scoped string the rail
+      // GROUPS use.
+      {
+        selector: '[data-manager-rail-toggle]',
+        name: 'title',
+        value: 'The sidebar stays open on this page.',
+      },
+      // No tab strip over a companion's screens: its tabs are the rail sub-items, and the
+      // panel is a region named by the one that is current.
+      {
+        selector: '[data-downtime-extension-panel]',
+        name: 'data-downtime-extension-panel',
+        value: 'ledger',
+      },
+      // Named by the sub-item's LABEL, not by the sub-item: the button carries the tab's
+      // `accessibleName` as its own name, which is an instruction, and a landmark takes the
+      // name of the screen.
+      {
+        selector: '#world-downtime-panel-ledger',
+        name: 'aria-labelledby',
+        value: 'manager-downtime-nav-label-ledger',
+      },
+      { selector: '#world-downtime-panel-ledger', name: 'role', value: 'region' },
+      {
+        selector: '#manager-downtime-nav-ledger',
+        name: 'aria-label',
+        value: 'Open the downtime ledger',
+      },
     ],
     // The title bar carries the loud signal and the rail chip is muted beside it; the
     // provider's own three tabs are rendered rather than Core's four.
@@ -3832,6 +3873,9 @@ export const VIEW_LAB_CASES = Object.freeze([
       { container: '#manager-world-nav-downtime', target: '#manager-world-nav-downtime > i' },
     ],
     expectNoHorizontalOverflow: ['[data-world-downtime-host]', '.manager-main', '.manager-body'],
+    // The companion owns the scrolling, which is only true if Core handed it the whole height.
+    expectOverflowY: '[data-lab-companion-scroll]',
+    expectScrollable: '[data-lab-companion-scroll]',
     position: { width: 1330, height: 900 },
     kinds: ['manager', 'world', 'downtime'],
     sourceMatches: [

@@ -3373,7 +3373,8 @@ Core's own `Unlock with Premium` header action belongs to Core's preview and is 
 - Core calls cleanup exactly once while the target is connected and before a tab, provider, route, or window removes it.
 - Mount and cleanup faults are reported and contained; partial content is cleared, the Core preview becomes the fallback for the whole surface including its rail entries, and a later registration may mount without navigating away.
 - When a provider registers, unregisters, or re-registers with a different tab set, an active tab id the new set no longer declares falls back to that set's first tab rather than leaving an empty panel.
-- The Manager rail's Downtime children and the panel's tab strip render the active provider's tabs, or Core's fallback tabs when no provider holds the surface, from one list.
+- The Manager rail's Downtime children render the active tab set — the provider's tabs, or Core's fallback tabs when no provider holds the surface — from one list.
+**Core's panel tab strip belongs to Core's preview and is rendered in core-fallback mode only**, so in provider mode a tab set is rendered exactly once, as rail sub-items.
 Core's premium padlocks and rail note advertise Core's preview and are not rendered when a provider holds the surface.
 - The Manager title bar carries a gold `PREMIUM` badge when, and only when, at least one provider is registered on any surface id, **in either registry**.
 - The signal is a claim about the companion module rather than about Core's Downtime route, so a provider claiming a surface Core does not render lights it too, and **a companion that registers only a player-window surface lights it as well**.
@@ -3385,7 +3386,41 @@ A listener's return value is ignored and nothing a listener does changes what th
 - Core owns the Manager shell, GM gate, World rail/route/focus state, target, and teardown.
 - The companion owns its content, localization, authorization, domain data, persistence, and created resources, and mounts only into the supplied target.
 - A companion does not patch Manager DOM or use Foundry render hooks.
-- The tablist is labelled and uses native buttons, roving tabindex, stable tab/panel IDREFs, localized accessible names, keyboard-visible tooltips, Left/Right/Home/End focus-and-activation, and focus recovery when a provider change removes the focused panel.
+- **Core's preview tablist**, which exists in core-fallback mode only, is labelled and uses native buttons, roving tabindex, stable tab/panel IDREFs, localized accessible names, keyboard-visible tooltips, and Left/Right/Home/End focus-and-activation.
+- **The rail's Downtime children are not a tablist in either mode.**
+They stay native `button` elements carrying `aria-current`, and they do not take `role="tab"`, `aria-selected` or `aria-controls`: the group stays rendered after the GM navigates away, so those attributes would dangle and would announce a route-changing control as an unselected tab; activation routes through the unsaved-draft route-exit confirmation, which an automatic-activation tablist would fire on every arrow keypress; a horizontal strip's key model cannot be preserved on a vertical rail in any case; and Downtime's children are visually and structurally identical to those of the other rail groups, which are plain buttons.
+- **In provider mode the companion panel is a `region`**, and carries `tabindex="-1"` rather than `tabindex="0"`: the focus stop existed to scroll the panel, and a companion that owns its layout owns that scrolling, so what remains is programmatic focusability.
+**The region takes the active tab's visible `label` as its name**, by pointing `aria-labelledby` at the label element inside the rail sub-item rather than at the sub-item itself, because a landmark inherits the whole accessible name of what it points at and the sub-item's name is an action rather than a screen.
+That label element exists only while the Downtime rail group is expanded, so the panel's accessible name depends on the rail lock below staying in force; removing the lock without also repointing this labelling breaks the region's name, not merely its keyboard reach.
+- **A provider's `label`, `accessibleName` and `tooltip` all land on the rail sub-item**, which in provider mode is the only control naming the active screen: `label` is its visible text, `accessibleName` is its `aria-label` and therefore replaces that text as its accessible name, and `tooltip` is its native tooltip, pointer-visible rather than keyboard-visible.
+`accessibleName` and `tooltip` remain required, because Core's preview strip consumes the same two fields as an accessible name and a keyboard-visible tooltip.
+- **Entering the route in provider mode scrolls the active Downtime sub-item into view**, so the route's first visible state shows the current screen's rail item rather than none of the group; it scrolls by the smallest amount that reveals it, and repeats only when the active tab changes.
+- **Focus recovery on a provider change is mode-aware.**
+When a registration, deregistration or contained fault removes the node that held focus, and focus was inside the route's panel, Core focuses whichever element names the active tab in the mode now live: the panel region in provider mode, and Core's own tab button in core-fallback.
+It is not a tab-switch behaviour and does not fire on one.
+- **The rail is locked expanded on the Downtime route in provider mode, and the lock is display-only.**
+The predicate is the route AND provider mode together, never the route alone: core-fallback keeps its tab strip, is never stranded, and keeps its collapsible rail.
+The lock exists because the 56px rail hides the navigation submenu outright, which with no tab strip leaves zero reachable tab switchers and removes them from the accessibility tree as well as from the pointer.
+It flips live when a provider registers or deregisters mid-session.
+**It never writes the GM's stored `managerRailCollapsed` client preference**; Core derives the displayed collapse state instead and restores the stored state on leaving the route.
+Under the lock both rail-collapse controls render `disabled` and `aria-disabled` with an explanatory title of their own — a sidebar-wide string, not the section-scoped one the rail groups use — and every one of their state attributes reads the displayed value rather than the stored one.
+- **The companion panel is a bare box in provider mode**, and this is the Manager counterpart of the player seam's panel contract.
+It is full height, with no padding, background, scroller or containment of its own; the companion supplies its own inset, and Core's preview inset is not applied over a provider's screens.
+Core states the height at every link between the route's definite-height host and the mount target, so `height: 100%` on a companion's own root resolves against a real height rather than silently becoming content height.
+The height is reachable, not forced: a companion that states no height renders at content height with Core's panel scroller behind it.
+- Core's panel scroller keeps working for any companion whose content overflows its root **visibly** — including one that takes the full height.
+It stops rescuing a companion the moment that companion absorbs its own content: by giving its root a non-`visible` overflow, or by letting a definite-height flex or grid root shrink its children, which squashes them rather than scrolling them.
+Height alone does not remove the fallback.
+A companion that intends to own its layout should own its scroller explicitly rather than infer one from its height.
+- **The panel's block size is definite at every Manager width; its inline size is not guaranteed.**
+The World Downtime route is exempt from the shared narrow-width `.manager-body` stack, and that exemption is what keeps the host a definite-height grid rather than a content-sized one, so a later responsive change must preserve it.
+Core enforces no minimum Manager window size and makes no no-horizontal-overflow promise for this panel — explicitly unlike the player seam, whose equivalent guarantee is stated at the player window's enforced 1024x640 floor.
+Responsive behaviour inside the target is the companion's, and a companion wanting container queries declares its own container on its own root.
+- **The Manager root is a containing block and a stacking context, and both reach into the panel.**
+`container-type: inline-size` on the Manager root means a `position: fixed` descendant of the target positions against the Manager rather than the viewport, and `isolation: isolate` means an element inside the target at the maximum z-index still loses to a `body`-level element above the Manager.
+Content that must paint above anything outside the Manager is portalled outside the Manager element.
+- **Theme tokens reach the panel by inheritance rather than by a stamped attribute**, because the Manager mounts lazily and carries no theme attribute of its own, so a companion reading the custom properties live re-skins with no remount and one snapshotting them into JavaScript at mount does not; content a companion renders outside the Manager subtree inherits the document's tokens instead.
+- **Once a companion owns the scrolling, any scroll container it creates is its own keyboard responsibility**, because the panel is no longer the nearest scrollable ancestor and its focus stop no longer scrolls anything.
 - The Patreon CTA is `https://www.patreon.com/c/mistersilver`, opens `_blank`, carries `rel="noopener noreferrer"`, uses Font Awesome-only imagery, and remains usable at narrow widths and with the Manager rail collapsed.
 - A companion declares Fabricate in `relationships.requires`, which governs dependency availability and activation rather than ordinary-module script priority.
 - A companion attempts registration during its own `init`, uses one idempotent `Hooks.once('ready', tryRegister)` fallback only when the API is absent, retains exactly one unregister handle, and treats `tryRegister` as a no-op after success.
