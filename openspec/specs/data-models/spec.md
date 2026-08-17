@@ -557,6 +557,8 @@ CraftingSystem = {
     A dot would be nested by `expandObject` on write and silently missed by the `roles[systemId]` reader, degrading matching to the raw-reference path.
     `CraftingSystemManager` therefore rejects an unsafe id LOUDLY at the creation/import entry point and NEVER rewrites an id (recipes, tools, and gathering config reference the system by id); `foundry.utils.randomID()` always satisfies the pattern.
     A pre-existing world already carrying an unsafe (e.g. dotted) id is not thrown at match time: its components resolve only by raw source references, the per-system `roles` identity tier is inert for it, and it warns once — such a system should be recreated or re-imported with a valid id.
+    An unsafe id has one further consequence: it blocks component extraction corpus-wide until it is repaired (see `### Granular Definition Storage`, which owns extraction eligibility and states the rule normatively).
+    That is a consequence of this requirement, not a change to it — the identity-matching posture above is unchanged, and the block is scoped to extraction alone.
 
 29. **`craftingCheck.mode` has a single valid value, `passFail`.** It is a legacy discriminator that predates the resolution-mode model.
     Normalization emits `mode: "passFail"` unconditionally, defaulting to `passFail` and collapsing any other value — including the removed `tiered` and `namedOutcomes` tokens — to `passFail`.
@@ -1029,6 +1031,11 @@ Represent one curated item entry available to recipes and salvage operations.
     A run that changes nothing in the corpus — every item already present and no mapping to apply — must write nothing at all.
     An item that fails part-way through a run must still surface its error to the caller, and the items imported before it must be carried by the run's single write rather than lost.
     A single-item import is its own batch of one and must persist immediately.
+    The bound is on the number of PERSISTENCE OPERATIONS a run issues, not on the identity of the key it writes, and it therefore survives the storage layout changing underneath it.
+    While components are nested it is satisfied by the single `craftingSystems` write named above.
+    Once components are extracted into per-record documents (see `### Granular Definition Storage`) the same run persists as AT MOST THREE bulk document operations for the whole batch — creates, then updates, then deletes last — still independent of the number of imported items and of the number of mapped folders, and still with exactly one change signal at completion.
+    Extraction also makes such a run span TWO storage classes: the component documents, and the `craftingSystems` write that still carries essences, tools, item tags and categories.
+    That is the trigger condition of `## Foundry Multi-Write Invariants`, so the per-folder category/tag set-apply this bound already covers becomes a multi-write and must declare its forward-write order ACROSS the two classes, not only within each.
 13. `Component.category` defaults to `general`.
     Every component normalizes to at least the reserved `general` bucket; there is no "uncategorized" state.
     A custom token is free text surfaced verbatim; only `general` is localized.
@@ -2700,6 +2707,160 @@ Tests MUST cover a same-primary-value call that repairs an unsatisfied ancillary
 
 This requirement applies only when the application composes separate sequential API calls into one invariant.
 A single Foundry atomic or batched document operation does not require application-level compensation merely because its one API call writes several documents or fields.
+
+### Scoped variance — compensation is best-effort when the failure is a lost connection
+
+One named variance is granted, and it is scoped narrowly on purpose.
+
+**The grant.**
+For a **granular definition store** (see `### Granular Definition Storage`), and **only** when a forward write failed because the connection to the server was lost, compensation is best-effort rather than mandatory.
+A Foundry socket write neither times out nor rejects on disconnect: under five seconds the socket flushes and the call resolves late, and at five seconds or more Foundry force-reloads the client.
+So a compensating call issued after a connection loss hangs on the same socket that just failed.
+No compensating transaction survives that, and **forward resume is the only real guarantee** on this path.
+
+**Two clauses the variance MUST carry.**
+
+The first is a reporting clause, because a hung compensation produces no failure to report and the clause above (report the original failure and every compensation failure "rather than presenting a successful rollback") would otherwise be satisfied vacuously.
+An operation taking this variance MUST surface a **pending** state and MUST NOT report completion.
+"Best-effort" that reports success is fire-and-forget wearing a rollback's clothes.
+
+The second is a scope clause, because the REASON generalizes and the GRANT does not.
+Every Foundry multi-write compensates over the same socket it just failed on, so the reasoning above would excuse every one of them.
+The grant is therefore limited to connection-loss failures of a granular definition store and to nothing else.
+Every other failure mode — validation, authorization, a `preCreateSetting` veto — throws with the socket alive, where compensation is fully deliverable and remains mandatory.
+
+**Reverse-compensating a delete cannot restore document identity.**
+Value and key presence are restorable; a document's `_id` and its `_stats` are not.
+`_stats.systemId` and `_stats.systemVersion` are captured at creation, and the granular-storage budget is stated as a band against exactly those fields, so a compensated delete-then-recreate can move a world within that band even when the restored value is byte-identical.
+
+## Definition Storage
+
+Crafting definitions are persisted in `world` settings.
+This section governs how those records are ARRANGED inside that storage; it constrains no record's contents.
+
+### Granular Definition Storage
+
+**Layout and target are separate keys, and there is one pair per entity class.**
+An entity class whose records may be stored granularly carries two `world`-scoped keys: a **Definition Storage Layout**, recording how its records are arranged NOW, and a **Definition Storage Target**, recording how they are MEANT to be arranged.
+Layout values are `singleArray`, `unsettled` and `perRecord`.
+Target values are `singleArray` and `perRecord` only, because a target is a destination and `unsettled` is not one.
+Recipes and components carry INDEPENDENT pairs (`recipeStorageLayout` / `recipeStorageTarget`, `componentStorageLayout` / `componentStorageTarget`).
+One shared pair MUST NOT be used: converting one class would then appear to un-settle the other, and would re-gate destructive passes for a corpus already converted.
+
+**The layout is read, never inferred.**
+A reader deciding whether a class's records live in one array or in per-record documents MUST read that class's layout key.
+It MUST NOT be inferred from any data key's presence, absence or emptiness — an empty corpus and an unwritten corpus are indistinguishable that way, and the inference fails in both directions.
+The layout is the sole discriminator OF THE CONVERSION and of nothing else: outside the conversion, and in particular during a migration writeback, the layout is already `perRecord` and the discriminator is the migration version.
+
+**Key scheme.**
+Under `perRecord`, one `world` setting document holds exactly one record.
+A recipe key is `<namespace>.recipe.<id>`; a component key is `<namespace>.component.<systemId>.<id>`.
+Each prefix ends in its separator, and that separator is normative rather than cosmetic: without it `recipe` also prefix-matches `recipeStorageLayout` and `recipeStorageTarget`, and `component` matches the component pair.
+A component key parses as strip-prefix, then split on the FIRST dot, which is sound because requirement 28 already constrains `CraftingSystem.id` to `/^[A-Za-z0-9_-]+$/`; a recipe id needs no constraint at all.
+
+**No two documents may share a key.**
+A Foundry `Setting` has NO key uniqueness at any layer: `_id` is the primary key and `key` is a plain string field with no unique index.
+An unconditional create therefore mints a second document carrying the same key, which the settings reader never returns and whose envelope is spent permanently against the budget below.
+A record's document id MUST be derived deterministically from its key, so that a duplicate key is **unrepresentable** rather than detected afterwards.
+The derivation MUST produce a valid Foundry document id and MUST be a hash of the key, never a truncation of it, and a collision between two distinct keys destroys a record, so the derivation MUST be covered by a collision test over the fixture corpora.
+Duplicates MUST NOT be reaped at read time: "the first document for a key" is a per-client fact rather than a global one, so two clients can nominate different keepers and, each deleting the other's, leave the key holding **zero** documents.
+
+**The budget is a band, and it counts documents in existence.**
+Every `world` setting replicates in full to every client at connect, so each per-record document costs its own document envelope in every client's connect payload.
+The number of granular definition documents a world may hold is bounded by a recorded connect-overhead budget divided by the per-record penalty.
+That bound is a **band**, not a single number, because the envelope carries `_stats.systemId` and `_stats.systemVersion` and therefore varies by game system; it does NOT vary by Foundry core version within one measurement.
+The bound is stated against **documents in existence**, never against live records.
+The budget, the measured rate and the key-scheme term are recorded in `benchmarks/baselines/setting-envelope-budget.json` and argued in ADR 0001; re-measuring is a committed diff there.
+
+**Removal MUST delete the document.**
+Writing a null or empty value in place of a record leaves its document, and with it its envelope, in existence forever.
+A world that created and deleted enough records over its life would reach the ceiling holding zero live records.
+Removal therefore goes through a document delete.
+
+**Flush order is creates, then updates, then deletes LAST, and the order is normative.**
+A tear before the delete leg leaves records that should be gone still present — stale, but convergent on the next flush.
+A tear after a delete leg would leave referents destroyed while their referrers were never updated: silent referential corruption on a world that looks fully converted at the next boot, with no detector.
+The declared order is what makes that state unreachable, so it satisfies the declared-forward-write-order clause of `## Foundry Multi-Write Invariants` rather than merely being an implementation detail.
+
+**Every bulk leg verifies what came back.**
+A create can resolve with FEWER documents than requested — a `preCreateSetting` hook returning `false` drops that one and lets the rest commit — so each leg MUST compare the returned document count against the requested set and treat a shortfall as a failure.
+
+**The legacy key MUST NOT be written after conversion.**
+Once a class's layout is `perRecord`, any write to its former whole-array key silently re-creates that document, restoring both its envelope and a stale whole corpus that later readers may pick up.
+Every writer of the legacy key is therefore either routed through the repository or removed, and this is covered by a test rather than by convention.
+
+**Corpus order is not semantic.**
+No consumer may depend on the order records are returned in.
+A granular backend's whole-corpus read returns records in ascending record-id order so that the read is deterministic; that order is a determinism guarantee and carries no domain meaning.
+
+**Which record classes are stored granularly.**
+A record class whose serialized form is routinely SMALLER than the per-document envelope MUST stay nested in its container: extracting it would spend more connect payload than the granular write saves.
+Components are extracted from `system.components` into records of their own; tools, essences, item tags, component categories and recipe-item definitions stay nested in `craftingSystems`.
+**Extraction eligibility.**
+A crafting system carrying an unsafe (dotted) id under requirement 28 blocks component extraction **corpus-wide** until it is repaired, and the block MUST be reported to the GM with the repair action.
+A per-system carve-out is refused deliberately: it would leave that system's components nested permanently, with no completion criterion and a dual-basis read forever, which is a worse permanent cost than a blocked upgrade with a named fix.
+The block is scoped to component extraction, so a blocked world still receives the recipe half.
+
+### Storage Conversion Crash Recovery
+
+A **Storage Layout Conversion** is the one-time operation that moves an entity class from one layout to another.
+
+**The forward conversion is four steps, in order, each awaited:**
+
+1. set the layout to `unsettled`;
+2. write every record differentially — create the missing, update the differing — against a freshly refreshed index;
+3. set the layout to the target value;
+4. delete the legacy whole-array document.
+
+**Every step MUST be awaited.**
+Ordering and durability both depend on it, and an unawaited step turns a recoverable window into an unordered one.
+
+**Resume is from the layout value alone.**
+On the next boot the conversion MUST decide what to do from the layout key and nothing else.
+It MUST NOT infer progress from a data key's presence or emptiness, and it MUST NOT infer it from a record count.
+
+**Every write MUST be convergent from a partially applied state.**
+Step 2 is differential on the first pass and on resume alike, so a replay of a completed write is a no-op rather than a duplicate.
+A resume that starts from step 1 on a partly written corpus MUST reach the same result as an uninterrupted run.
+
+**The transaction extent ends at step 3.**
+The invariant this conversion establishes is "the layout value matches where the records actually are", and step 3 is what establishes it.
+**Step 4 is a separate, independently retryable envelope-reclamation operation OUTSIDE the transaction**, so a failure at step 4 completes forward: the layout is already correct, and the legacy document is debris to reclaim rather than a reason to compensate.
+
+**Compensation MUST restore key presence, not only value.**
+On a world that has never converted, the layout key has NO document — its registered default is served without one — and step 1 creates it.
+Compensation therefore DELETES that document rather than resetting its value, which is the "restore prior key presence" clause of `## Foundry Multi-Write Invariants` applied literally.
+
+**The conversion is downgrade-lossy and MUST say so before it runs.**
+Step 4 removes the legacy document, so an older build of the module loads zero records.
+The supported mitigation is the REVERSE conversion, run while the GM is still on the new build: setting the target back to `singleArray` reverses the layout losslessly.
+A pre-conversion GM consent prompt naming the loss is the fallback, and any export it offers MUST NOT be presented as equivalent — an export carries authoring data only, and never runs, actor flags, learned-recipe knowledge or durable identity flags.
+
+### Valid Id Basis
+
+A **Valid Id Basis** is the set of live-corpus id sets a destructive pass derives its "still valid" answer from — the valid recipe, system, component and salvage-component id sets a startup cleanup pass builds before pruning anything that names an id outside them.
+
+**A destructive pass runs only when its Valid Id Basis is known-complete.**
+A pass whose basis is incomplete does not see a live record, concludes the thing naming it is stale, and deletes durable state that was never stale.
+
+**Two inputs decide it, and either one alone makes the basis NOT known-complete:**
+
+1. the entity class's storage layout is `unsettled`;
+2. `migrationVersion` is behind the highest registered migration.
+
+Input 2 already covers an aborted migration pass: the abort branch returns before any setting write, and the version bump is the LAST write of the writeback, so an abort implies input 2.
+"This client did not run the migration pass" MUST NOT be a third input.
+It is true on every non-primary client on every boot, including a fully converted and fully migrated healthy world, so it would omit the destructive passes on every player client permanently.
+The primary GM cannot cover for that, because some pruned state is `user`-scoped and only that user's own client can prune it.
+A non-primary client on a fully converted, fully migrated world therefore DOES run the destructive passes.
+
+**The gate is applied by OMITTING the pass from the startup pass list, never by throwing from inside it.**
+The startup maintenance runner catches every throw into a failure label and discards return values, so by the time a throw is observable the destructive work has already landed.
+The pass list MUST therefore be constructed by a pure, exported builder that the composition site calls, so the omission is directly assertable.
+
+**Distinguished from _membership basis_.**
+`ui-integration/spec.md` uses _basis_ only as a qualified noun — **membership basis** (`ui-integration/spec.md:1356`), **routing basis** (`:2110`), **disabled-action basis** (`:2960`) — and in each of those it names the RULE by which something is resolved.
+_Valid Id Basis_ names the DATA a decision rests on, which is a different sense of the same noun, so the qualifier is mandatory here too and the bare noun is never used for this concept.
 
 ## Runtime Read Indexes and Revision Tokens
 

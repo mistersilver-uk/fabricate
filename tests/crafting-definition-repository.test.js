@@ -317,6 +317,23 @@ describe('the settings adapter', () => {
       TypeError
     );
   });
+
+  it('is untouched by #1080’s per-record replication capability', async () => {
+    // -b adds an OPTIONAL capability to the seam and this adapter opts out of it by
+    // inheriting the defaults, so `reload()` keeps re-reading the whole corpus exactly as
+    // it does today. A whole-corpus backend cannot answer per-record: a replication event
+    // names the one key holding everything.
+    const { repository } = makeAdapter();
+    await repository.put({ id: 'a', name: 'A' });
+
+    assert.equal(repository.supportsPerRecordReplication(), false);
+    assert.equal(
+      repository.readReplicatedRecord({ key: 'fabricate.recipes', operation: 'update' }),
+      null,
+      'the settings adapter must fall its caller back to the whole-corpus snapshot'
+    );
+    assert.deepEqual(repository.readReplicatedSnapshot(), [{ id: 'a', name: 'A' }]);
+  });
 });
 
 describe('the interface is expressible by a document-backed backend', () => {
@@ -385,6 +402,15 @@ describe('the abstract contract', () => {
 
   it('treats readReplicatedSnapshot as optional, defaulting to unsupported', () => {
     assert.equal(new CraftingDefinitionRepository().readReplicatedSnapshot(), null);
+  });
+
+  it('treats per-record replication as optional, defaulting to today’s whole-corpus behaviour', () => {
+    // #1080 -b. Both members exist so a per-record backend can report ONE changed record
+    // instead of forcing a whole-corpus re-read; every backend that cannot simply inherits
+    // these, which is what makes the addition behaviour-neutral.
+    const bare = new CraftingDefinitionRepository();
+    assert.equal(bare.supportsPerRecordReplication(), false);
+    assert.equal(bare.readReplicatedRecord({ key: 'fabricate.recipes', operation: 'update' }), null);
   });
 
   it('falls back to a whole-corpus write only when the caller does not say what changed', async () => {

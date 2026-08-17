@@ -73,6 +73,41 @@ export const SETTING_KEYS = Object.freeze({
   // per-crafting-system path would make a single document's stack count AMBIGUOUS
   // rather than configurable.
   ITEM_STACK_QUANTITY_PATH: 'itemStackQuantityPath',
+  // Issue 1080 (-b): the observed and intended arrangement of recipe definition storage.
+  // See DEFINITION_STORAGE_LAYOUTS / DEFINITION_STORAGE_TARGETS below for the values, and
+  // `PerRecordCraftingDefinitionRepository` for why these are the ONLY two keys the
+  // per-record backend registers.
+  RECIPE_STORAGE_LAYOUT: 'recipeStorageLayout',
+  RECIPE_STORAGE_TARGET: 'recipeStorageTarget',
+});
+
+/**
+ * **Definition Storage Layout** — how definition storage is arranged *now*, observed.
+ *
+ * `unsettled` is a layout, not a lifecycle state: it says the corpus is currently spread
+ * across both arrangements and neither can be read alone. It is the sole discriminator a
+ * crashed Storage Layout Conversion resumes from, which is why the layout MUST NOT be
+ * inferred from any data key's presence or emptiness.
+ *
+ * @type {Readonly<Record<string, string>>}
+ */
+export const DEFINITION_STORAGE_LAYOUTS = Object.freeze({
+  SINGLE_ARRAY: 'singleArray',
+  UNSETTLED: 'unsettled',
+  PER_RECORD: 'perRecord',
+});
+
+/**
+ * **Definition Storage Target** — how definition storage is *meant* to be arranged, config.
+ *
+ * Deliberately narrower than the layout: `unsettled` is something storage can BE and never
+ * something an operator can ask for.
+ *
+ * @type {Readonly<Record<string, string>>}
+ */
+export const DEFINITION_STORAGE_TARGETS = Object.freeze({
+  SINGLE_ARRAY: 'singleArray',
+  PER_RECORD: 'perRecord',
 });
 
 // The target version for the one-shot recipe-item flag auto-stamp. When the stored
@@ -327,6 +362,33 @@ const BASE_DEFINITIONS = Object.freeze({
     config: true,
     type: String,
     default: DEFAULT_ITEM_STACK_QUANTITY_PATH,
+  },
+  // Issue 1080 (-b). TWO keys, and exactly two: `WorldSettings#getSetting` is a linear
+  // `find` with no key index and `ClientSettings.register` calls it, so registering one
+  // key per record would be O(N²) before a single recipe is read. The per-record backend
+  // therefore registers NOTHING per record and indexes the world `Setting` collection
+  // itself — see `PerRecordCraftingDefinitionRepository`. These two are O(1) and stay here
+  // with every other Fabricate setting.
+  //
+  // `config: false` on BOTH while the target defaults to `singleArray`. The target is
+  // GM-reachable by design (it is the supported pre-downgrade reverse-conversion control),
+  // but exposing a settings row in -b would let a GM flip a value nothing yet honours: the
+  // Storage Layout Conversion that acts on it lands in -c, together with the localized
+  // name/hint strings a `config: true` row needs. Flipping it to `config: true` is that
+  // change's job, not this one's.
+  [SETTING_KEYS.RECIPE_STORAGE_LAYOUT]: {
+    name: 'Recipe Definition Storage Layout',
+    scope: 'world',
+    config: false,
+    type: String,
+    default: DEFINITION_STORAGE_LAYOUTS.SINGLE_ARRAY,
+  },
+  [SETTING_KEYS.RECIPE_STORAGE_TARGET]: {
+    name: 'Recipe Definition Storage Target',
+    scope: 'world',
+    config: false,
+    type: String,
+    default: DEFINITION_STORAGE_TARGETS.SINGLE_ARRAY,
   },
 });
 

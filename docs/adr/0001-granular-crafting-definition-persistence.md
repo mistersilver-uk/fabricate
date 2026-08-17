@@ -632,6 +632,59 @@ The module collects no telemetry, and the only field datum in this issue tree is
 "Real worlds sit far below 10,000 records" is still an **assumption of this ADR, not a finding**.
 Issue 1080's harness spans 1 to 10,000 so the penalty can be read at whatever corpus size is believed in, but nothing here establishes which size that is.
 
+#### AMENDED (second) by issue 1080's implementation — B(1) CAN coalesce a bulk write
+
+Appended on the same terms as the amendment above, and for the same reason: the round-trip figures below are what the decision was taken against, so they are preserved verbatim and wrong rather than edited into agreement with this correction.
+
+**The claim being corrected.**
+§ Bulk import of 50 records states: *"`game.settings` has **no bulk write API at all**, so B(1) cannot coalesce: fifty records cost fifty `game.settings.set` calls however they are wrapped, where a compendium's `Document.updateDocuments` costs one."*
+
+**The first clause is true; the second does not follow from it.**
+`Setting` is an ordinary primary Document, so `Setting.implementation.createDocuments`, `updateDocuments` and `deleteDocuments` are available on **both 13.351 and 14.365** — one socket round trip and one server-side atomic batch per call.
+Verified in core source on both builds during issue 1080's plan review.
+The missing bulk API is a property of `ClientSettings`, the convenience wrapper the ADR reached for, and not of the storage underneath it.
+**A 50-record bulk import is therefore one round trip per leg, not fifty**: at most three calls for the whole batch — creates, then updates, then deletes — independent of corpus size.
+
+**Where the wrong number appears.**
+Three places, none of them edited:
+
+- **§ Bulk import of 50 records.**
+  The `B(1)` row reads **50** server round trips, and the prose under it adds that B(1) "would reintroduce per-record round trips on that exact path" against issue 1086's bound.
+  Read that row as **1 per leg, at most 3 for the batch**, and issue 1086's bound as preserved rather than undone.
+- **§ The kill criterion this option fired, recorded rather than waived.**
+  *"It also costs **50 server round trips** for a 50-record bulk import where every other granular arm costs 1[…]"*
+  That clause is withdrawn.
+  The partial-failure clause that continues the same sentence is not withdrawn: partial application is still reachable, in the narrower form described under the failure model below.
+- **§ Recommendation, point 3.**
+  *"B(1) needs one server round trip per record because `game.settings` has no bulk API; A+ needs one per batch."*
+  Both arms cost one per batch, so point 3 does not separate them and no longer supports the runner-up ordering it was written to support.
+
+§ Kill criteria's own `B(1)` row needs no correction: it never quoted a round-trip figure, and the criterion it records as fired is the connect one, which stands.
+
+**This does not rescue the budget.**
+The ≈4,160-document ceiling is **unchanged**, because the connect payload is a function of how many `Setting` documents **exist**, not of how they were written.
+Fifty records written in one call are still fifty documents paying fifty envelopes.
+Every figure in the first amendment stands exactly as recorded — 339 bytes per record, 3.39 MB at 10,000 records, and the 1.41 MB budget the ~4,160-document bound is read off.
+So does what that amendment says the bound *is*: **a tolerance a maintainer set against issue 1088's directly measured compendium index at 10,000 records, not a derived crossing point.**
+Nothing here makes it one.
+
+**What the correction does change is the failure model, and it is smaller than it sounds.**
+An N-way fan-out with N chances to tear was an artefact of the wrong API rather than a property of per-record storage.
+It is replaced by a three-call flush with two interior windows, not by an atomic write: the legs are separately awaited, so a tear between them is still reachable and is bounded by ordering the deletes last rather than by a transaction.
+
+**The generalizable lesson, which is why this is an amendment and not a footnote.**
+The ADR conflated *"`game.settings` has no bulk write API"* with *"`Setting` has no bulk write API"*.
+The first is a fact about a convenience wrapper; only the second would have supported the conclusion drawn from it, and it is false.
+The comparison matrix is the artefact the next reader opens when the A+ question reopens at the ceiling, so a wrong round-trip column left standing there would be re-quoted as evidence for a decision it cannot support.
+
+**One caveat, stated precisely so the correction is not over-claimed: `foundry.documents.modifyBatch` is not the transaction its JSDoc describes, and it is V14-only.**
+It has **zero matches anywhere in 13.351**, so nothing built on it spans the module's supported range; the three-call path above is what runs on both versions.
+Its JSDoc says *"either all must succeed, or all must fail"*, and that sentence describes a **dry-run pre-pass**, not the commit.
+The server dry-runs every operation and then runs a **second sequential loop that breaks on the first error, keeping everything already committed**.
+The client handler is worse for a caller than a plain write: it **swallows per-operation errors into a toast and resolves — it never rejects** — where a single `modifyDocument` does reject, so any in-session compensation keyed on a rejected call would silently never fire.
+The pre-pass is not worthless, and its limit is the part worth stating exactly: it **does** hold for deterministic failures a dry run can see — validation, permission, a `_preCreate` veto — and fails for state-dependent or racy ones, which are precisely what a batch write is exposed to.
+`modifyBatch` is therefore out of scope for issue 1080, and this correction rests on `createDocuments` / `updateDocuments` / `deleteDocuments` alone.
+
 ### Scope: components as well as recipes
 
 **The change extends to components, and that is a different shape of work from recipes.**
@@ -661,6 +714,9 @@ Issue 1080 is rewritten to B(1).
   The condition as originally written is false at every corpus size; B(1) still stands, now bounded by a chosen absolute budget of 1.41 MB of connect overhead (~4,160 records) rather than by a crossover.
   That 1.41 MB is issue 1088's measured compendium index at 10,000 records — candidate **A**'s corroborating reference, not A+'s payload — and the budget is a maintainer tolerance pegged to it at that scale, not a derived crossing point.
   The measurement instrument is `tests/helpers/scale/connectPayloadModel.js`, and the reading is re-derived on every run rather than pinned.
+- **Issue 1080's implementation amended this ADR a second time, on bulk writes** — see § The kill criterion this option fired.
+  `Setting` is an ordinary primary Document with `createDocuments` / `updateDocuments` / `deleteDocuments` on both 13.351 and 14.365, so B(1)'s bulk import costs one round trip per leg rather than one per record, and issue 1086's single-write bound is preserved rather than undone.
+  The ceiling is untouched by it: connect payload counts documents that exist, not the calls that made them.
 
 ---
 

@@ -1,0 +1,60 @@
+{
+  "artifact": "setting-envelope-budget",
+  "issue": 1080,
+  "harnessVersion": 1,
+  "description": "The per-game-system `Setting` document envelope rate ADR 0001's connect budget is stated against, plus the key-scheme term that spends it. Not a scale profile: it has no fixture, no seed and no case counts, and the profile loops in tests/benchmark-baseline-drift.test.js never see it.",
+  "construction": "The envelope rate is a LIVE Foundry measurement quoted from ADR 0001; every other number here is arithmetic over it, re-derived by the drift test.",
+  "gates": {
+    "reDerivedInProcess": [
+      "keyScheme.recipe.qualifiedPrefix and its length, from FABRICATE_SETTINGS_NAMESPACE and RECIPE_RECORD_KEY_PREFIX through the adapter's own keyFor()",
+      "envelope.measured[].envelopeBytes against settingDocumentBytes - storedValueBytes",
+      "envelope.measured[].systemIdentityChars against gameSystem and gameSystemVersion",
+      "budget.deltaBytesPerRecord, budget.budgetDocuments and budget.headroomDocumentsPerAddedPrefixChar, recomputed from envelopeBytes and connectOverheadBudgetBytes",
+      "the recorded rate against SETTING_DOCUMENT_ENVELOPE_BYTES in tests/helpers/scale/connectPayloadModel.js, so a re-measurement that edits one file and not the other is red"
+    ],
+    "notReDerived": [
+      "the envelope byte measurement itself. It is a live-Foundry reading CI cannot take, so for that term this artifact degrades to the self-comparison the drift test's own header warns against. A Foundry CORE version that changes the Setting document shape moves the real envelope and NOTHING here goes red; only the live harness catches that."
+    ]
+  },
+  "envelope": {
+    "instrument": "the `persistence-experiments` scenario of `npm run test:foundry:perf`, which registered a per-record-shaped key inside a real Foundry and read the resulting `Setting` document back out of `game.settings.storage` (ADR 0001, issue 1079)",
+    "bandBytesPerSystemIdentityChar": 1,
+    "bandNote": "`_stats.systemId` and `_stats.systemVersion` are captured at document creation, so the envelope is a BAND across game systems rather than one number. Both are plain JSON strings over an unescaped character set, so one added character is one added byte. The band does not vary by Foundry core version; a core version change moves the whole band and is not modelled here.",
+    "measured": [
+      {
+        "gameSystem": "dnd5e",
+        "gameSystemVersion": "5.3.3",
+        "foundryCoreVersion": "14.365",
+        "settingDocumentBytes": 391,
+        "storedValueBytes": 51,
+        "envelopeBytes": 340,
+        "systemIdentityChars": 10
+      }
+    ],
+    "unmeasuredInputs": [
+      "The probe key's own length was not recorded, so the 340 bytes cannot be adjusted onto the shipped `fabricate.recipe.` prefix. The residual runs in the conservative direction for the use this budget is put to: an under-stated key term under-states the envelope, which can only widen the recorded headroom, never narrow it.",
+      "No second game system has been measured. A pf2e reading is NOT derived and NOT recorded here; the band rule above is how one slots in."
+    ]
+  },
+  "keyScheme": {
+    "recipe": {
+      "namespace": "fabricate",
+      "prefix": "recipe.",
+      "qualifiedPrefix": "fabricate.recipe.",
+      "qualifiedPrefixChars": 17,
+      "note": "The trailing separator is load-bearing: without it `recipe` also prefix-matches `recipeStorageLayout` and `recipeStorageTarget`."
+    },
+    "pending": "The component key scheme (`component.<systemId>.<id>`) lands with the component extraction in -d. It is deliberately absent: there is no shipped constant to re-derive it from, and a recorded number nothing re-derives is the vacuity this artifact exists to avoid."
+  },
+  "budget": {
+    "connectOverheadBudgetBytes": 1410000,
+    "budgetProvenance": "A maintainer-set tolerance, NOT a derived crossing point. It is pegged to issue 1088's directly measured compendium index at 10,000 records (1.41 MB), which corroborates candidate A. Two curves differing by a fixed per-record term never cross, which is exactly what ADR 0001's first amendment corrected.",
+    "deltaBytesPerRecord": 339,
+    "deltaProvenance": "envelopeBytes - 1: the whole-array layout pays one byte of array punctuation per record, so the per-record penalty is the envelope less that byte.",
+    "budgetDocuments": 4159,
+    "budgetDocumentsNote": "floor(connectOverheadBudgetBytes / deltaBytesPerRecord). ADR 0001 quotes the same bound as 'approximately 4,160 records'; 4,159 is its exact floor and the two are the same tolerance.",
+    "headroomDocumentsPerAddedPrefixChar": 12,
+    "headroomNote": "budgetDocuments minus the budget at an envelope one byte larger. Each character added to the key prefix costs about twelve documents of headroom.",
+    "countedUnit": "documents in existence, never live records. ClientSettings has no delete, so removal goes through deleteDocuments or the envelope is spent forever."
+  }
+}
