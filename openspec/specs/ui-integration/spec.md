@@ -3439,8 +3439,11 @@ Focus is recovered onto the surface's rail button rather than being lost to the 
 - **A fault is recorded against the whole surface, not against the tab that threw.**
 Core keys it on the `(surfaceId, provider)` pair, so after one tab's mount fails every other tab of that same provider also renders the Core error state and Core attempts no further mount for it.
 Containment is deliberately at the provider's granularity: Core cannot tell a tab-specific failure apart from a broken provider, and retrying the sibling tabs of a provider that has already thrown would simply repeat the fault.
-A new snapshot carrying a **different provider object** for the surface clears it, which is what "a later snapshot may mount" means.
-Re-registering the identical object does not, so a companion recovering from a fault registers a fresh provider object rather than the one that threw.
+- **A recorded fault clears on exactly two paths, and re-registering the identical provider object is neither of them.**
+A new snapshot carrying a **different provider object** for the surface clears it, which is what "a later snapshot may mount" means, so a companion recovering from a fault registers a fresh provider object rather than the one that threw.
+**Closing and reopening the player window clears it too**: the record lives on the window's shell, closing discards the shell, and the next open therefore mounts the same provider object with nothing recorded against it.
+That second path is the recovery Core's own error state promises the user in words, so it is a requirement rather than an artefact of where the record happens to sit.
+Bringing an already-open window to the front is not a reopen — the shell and its record both survive it — and clears nothing.
 - When a provider registers, unregisters, or re-registers with a different tab set, an active route key the new set no longer offers falls back to the default Core tab rather than leaving an empty panel.
 - **The rail button is a native button with a tab role inside a vertically-oriented tablist.**
 Its accessible name is its visible label; a supplied `accessibleName` replaces that name and must therefore contain the visible label text, and a supplied `tooltip` is exposed through `aria-describedby`.
