@@ -9,6 +9,7 @@ import {
   resolveToolDisplayImage,
   resolveToolDisplayName,
 } from './models/toolDisplay.js';
+import { findById, getDefinitionIndex } from './utils/definitionIndex.js';
 import { RecipeManager } from './systems/RecipeManager.js';
 import { CompendiumImporter } from './systems/CompendiumImporter.js';
 import { CraftingEngine } from './systems/CraftingEngine.js';
@@ -2037,8 +2038,7 @@ class Fabricate {
    */
   _buildNotPermittedRow(target) {
     const system = this.craftingSystemManager?.getSystem?.(target?.systemId) ?? null;
-    const component =
-      (system?.components || []).find((entry) => entry?.id === target?.componentId) ?? null;
+    const component = findById(getDefinitionIndex(system?.components), target?.componentId);
     return {
       actorId: target?.actorId ?? null,
       actorName: '',
@@ -2937,7 +2937,7 @@ class Fabricate {
   _resolveJournalComponent(systemId, componentId) {
     if (!systemId || !componentId) return null;
     const system = this.craftingSystemManager?.getSystem(systemId);
-    const component = (system?.components || []).find((entry) => entry?.id === componentId);
+    const component = findById(getDefinitionIndex(system?.components), componentId);
     return component ? { name: component.name ?? null, img: component.img ?? null } : null;
   }
 

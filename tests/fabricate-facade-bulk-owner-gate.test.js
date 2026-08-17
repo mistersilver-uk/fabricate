@@ -47,6 +47,7 @@ import {
   recordingSalvage,
 } from './helpers/bulkSalvageFixtures.js';
 import {
+  HARNESS_SOURCE,
   MAIN_SOURCE,
   createFabricateFacadeHarness,
   mainMethodSource,
@@ -635,5 +636,73 @@ describe('destroyComponents: the same gate, the same refusal', () => {
       /not initialized/
     );
     assert.deepEqual(owned.deletedIds, []);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The indexed component lookup (issue 1202)
+// ---------------------------------------------------------------------------
+
+/**
+ * `src/main.js` methods whose component lookup must stay index-backed, with the exact
+ * signature `mainMethodSource` slices from. Both are on multiplied paths and NEITHER is
+ * covered by the bulk scale guard in `tests/runtime-definition-indexes.test.js`, which
+ * was measured rather than assumed: with both reverted to `.find()` scans that guard
+ * stays 35/35 green and `benchmark:performance --check` reports every profile clean.
+ * These pins are the only thing standing between either site and a silent reversion.
+ */
+const INDEXED_LOOKUPS = [
+  ['_buildNotPermittedRow(target) {', 'once per bulk row, before the service is entered'],
+  [
+    '_resolveJournalComponent(systemId, componentId) {',
+    "wired as RunJournalBuilder's getComponent, called per result / requirement / " +
+      'consumed ingredient / salvage identity inside a .map() over journal rows',
+  ],
+];
+
+describe('issue 1202 — the multiplied component lookups stay index-backed', () => {
+  for (const [signature, multiplier] of INDEXED_LOOKUPS) {
+    it(`${signature.slice(0, signature.indexOf('('))} resolves through the retained index`, () => {
+      const body = mainMethodSource(signature);
+      assert.ok(
+        body.includes('findById(getDefinitionIndex('),
+        `${signature} must resolve its component id through the retained index — it runs ` +
+          `${multiplier}, so a scan here is an additive rows x components term.`
+      );
+      assert.equal(
+        body.includes('.find('),
+        false,
+        `${signature} still contains a raw .find( scan over a definition array. The bounded ` +
+          `slice is this method only, so this cannot be a neighbour's legitimate use.`
+      );
+    });
+  }
+
+  it('holds the harness mirror to the same contract as the method it copies', () => {
+    // `_buildNotPermittedRow` is reproduced in `fabricateFacadeHarness.js` under a comment
+    // claiming it is a faithful copy. Every other source-contract guard in this file pins
+    // the PRODUCTION text only, so the copy could drift and no test would notice — and in
+    // issue 1202 it did exactly that, staying on a `.find(` scan after production moved to
+    // the index. Behaviourally identical for unique ids, which is what made it invisible.
+    const production = mainMethodSource('_buildNotPermittedRow(target) {');
+    const mirror = mainMethodSource('_buildNotPermittedRow(target) {', HARNESS_SOURCE);
+
+    assert.ok(mirror.length > 100, `non-vacuity: the mirror sliced to ${mirror.length} characters`);
+    assert.notEqual(
+      mirror,
+      production,
+      'sanity: the two are NOT byte-identical (the copy carries its own comments), so ' +
+        'this guard has to compare the claim rather than the whole text'
+    );
+    for (const [label, body] of [
+      ['production', production],
+      ['the harness mirror', mirror],
+    ]) {
+      assert.ok(
+        body.includes('findById(getDefinitionIndex(system?.components), target?.componentId)'),
+        `${label} must resolve the component through the retained index, or "faithful copy" ` +
+          `is a claim the tree does not support.`
+      );
+    }
   });
 });

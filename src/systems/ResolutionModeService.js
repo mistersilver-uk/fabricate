@@ -1,3 +1,4 @@
+import { findById, getDefinitionIndex } from '../utils/definitionIndex.js';
 import { activityPermitsFailureResults } from '../utils/failureResultPolicy.js';
 import { resolveProgressiveAward } from '../utils/progressiveAward.js';
 import { applyPlayerResultOrder } from '../utils/progressiveResultOrder.js';
@@ -856,8 +857,7 @@ export class ResolutionModeService {
 
   _getDifficulty(system, componentId) {
     if (!componentId) return null;
-    const managedItems = system?.components || [];
-    const item = managedItems.find((entry) => entry.id === componentId);
+    const item = findById(getDefinitionIndex(system?.components), componentId);
     const difficulty = Number(item?.difficulty);
     return Number.isFinite(difficulty) ? difficulty : null;
   }

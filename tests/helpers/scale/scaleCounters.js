@@ -30,10 +30,18 @@
  * ## Non-vacuity
  *
  * A counter that cannot go up is worse than no counter: it reports a green baseline forever.
- * `tests/benchmark-harness.test.js` therefore asserts each counter kind against a case whose
- * expected value is derived from the fixture's declared scale rather than from a recorded
- * observation — a miss over an N-component library examines at least N candidates, and a
- * durable-flag hit examines strictly fewer.
+ * `tests/benchmark-harness.test.js` therefore asserts {@link countingCandidates},
+ * {@link countingActor} and {@link countCalls} against a case whose expected value is derived
+ * from the fixture's declared scale rather than from a recorded observation — a miss over an
+ * N-component library examines at least N candidates, and a durable-flag hit examines strictly
+ * fewer.
+ *
+ * {@link countingEnumerations} is the exception, and deliberately so rather than by omission:
+ * it arrived with issue 1202 and its non-vacuity is proved where it is USED, by the two bulk
+ * guards in `tests/runtime-definition-indexes.test.js`. Those redden under a
+ * `for (const c of components)` reintroduction that leaves the predicate counter reading zero,
+ * which is a stronger demonstration than a standalone probe: it proves the wrapper sees the
+ * one shape the rest of this module cannot.
  */
 
 /**
@@ -97,6 +105,115 @@ export function countingCandidates(values, counters, key) {
       },
     });
   }
+  return array;
+}
+
+/**
+ * The array methods that reach every element through a per-element CALLBACK, and that
+ * {@link countingCandidates}' `PREDICATE_METHODS` list does not carry.
+ *
+ * `findLastIndex` is in here rather than being a `PREDICATE_METHODS` omission worth fixing in
+ * place: widening the predicate list moves every committed benchmark count that walks a
+ * component array and needs a `--record` pass, which is a separate change from making a guard
+ * able to fail.
+ */
+const CALLBACK_ENUMERATORS = ['forEach', 'reduce', 'reduceRight', 'flatMap', 'findLastIndex'];
+
+/**
+ * The iterator-returning methods that reach every element WITHOUT a callback and that do not
+ * collide with `definitionIndex`'s own instrumentation. `entries` is deliberately absent — see
+ * {@link countingEnumerations}.
+ */
+const ITERATOR_ENUMERATORS = ['keys', 'values'];
+
+/**
+ * Layer "every ENUMERATION of this array is counted" on top of {@link countingCandidates}'
+ * "every PREDICATE invocation is counted" (issue 1204, second pass; shared for issue 1202).
+ *
+ * {@link countingCandidates} counts only the predicate-taking subset (`find` / `filter` /
+ * `some` / `every` / `map` / …), which means the single most common way to walk an array in
+ * this repository — a plain `for (const candidate of components)` — bumps NOTHING. Production
+ * already uses exactly that idiom on exactly this array (`src/utils/essenceResolver.js`,
+ * `src/utils/definitionIndex.js`, `src/systems/inventorySnapshot.js`,
+ * `src/utils/sourceUuid.js`), so an `items x components` product term could be re-landed in
+ * its most natural form with a `.find()`-only guard still green.
+ *
+ * This is a SEPARATE wrapper rather than a widening of {@link countingCandidates}, and
+ * deliberately so: `countingCandidates` is what `createBenchWorld` hands the benchmark cases,
+ * and widening it would move every committed class-1 baseline that walks a component array.
+ * A caller that wants both opts in by composing them, which is why this mutates the array it
+ * is handed IN PLACE and returns it — `definitionIndex` keys its retained index on array
+ * IDENTITY, so a second copy here would hand the code under measurement a different array
+ * from the one a test warmed.
+ *
+ * `entries` is routed to a SEPARATE key because it is the one enumerator that overlaps
+ * `definitionIndex`'s own counter: `buildIndex` reaches its elements through
+ * `definitions.entries()`, so counting that walk on both seams would count the one-off index
+ * build twice. `Symbol.iterator` does NOT overlap — a `for...of` over the array-iterator
+ * `entries()` returns invokes the ITERATOR's `Symbol.iterator`, never the array's — and
+ * measurement agrees: with this layer installed and no per-item scan present,
+ * `Symbol.iterator`, `keys` and `values` all read 0 while `entries` reads exactly
+ * `componentCount`.
+ *
+ * ## What an own-property override still cannot see
+ *
+ * A read that never goes through a method: indexed access (`components[i]`, `.at(i)`, a
+ * `for (let i = 0; i < components.length; i++)` loop), the callback-free O(n) methods
+ * (`indexOf`, `includes`, `lastIndexOf`, `join`, a default-comparator `sort`), and any caller
+ * reaching the prototype directly (`Array.prototype.find.call(components, …)`). Closing those
+ * needs a Proxy instead of own properties, which is a larger change than these guards need.
+ * The gap is recorded here rather than papered over with a claim of exhaustiveness, because
+ * the defect this wrapper was written for was precisely a property asserted more broadly than
+ * it was checked.
+ *
+ * @template T
+ * @param {T[]} array The array {@link countingCandidates} already wrapped; mutated in place.
+ * @param {{bump: (key: string, amount?: number) => void}} counters
+ * @param {{key: string, entriesKey: string}} keys
+ * @returns {T[]} `array`, so it can be used inline.
+ */
+export function countingEnumerations(array, counters, { key, entriesKey }) {
+  const define = (name, value) =>
+    Object.defineProperty(array, name, {
+      configurable: true,
+      enumerable: false,
+      writable: true,
+      value,
+    });
+  const countedIterator = (walk, counterKey) =>
+    function* counted() {
+      for (const value of walk(this)) {
+        counters.bump(counterKey);
+        yield value;
+      }
+    };
+
+  for (const method of CALLBACK_ENUMERATORS) {
+    define(method, function counted(callback, ...rest) {
+      return Array.prototype[method].call(
+        this,
+        function countedCallback(...args) {
+          counters.bump(key);
+          return callback.apply(this, args);
+        },
+        ...rest
+      );
+    });
+  }
+  for (const method of ITERATOR_ENUMERATORS) {
+    define(
+      method,
+      countedIterator((self) => Array.prototype[method].call(self), key)
+    );
+  }
+  define(
+    Symbol.iterator,
+    countedIterator((self) => Array.prototype[Symbol.iterator].call(self), key)
+  );
+  define(
+    'entries',
+    countedIterator((self) => Array.prototype.entries.call(self), entriesKey)
+  );
   return array;
 }
 

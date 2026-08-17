@@ -187,6 +187,36 @@ matched stack exists identically at every point of the series.
 Anyone extending this axis with a fourth point must keep drawing from the same
 prefix chain, not a fresh library, or the series stops isolating library size.
 
+That pinning has a consequence the bulk-run case has to work around.
+Every component the actor holds sits at a fixed low position at every series
+point, because the inventory is drawn against the smallest prefix.
+A per-row scan over one of those terminates after the same handful of
+comparisons at 1,000 as at 10,000, so it reports a flat series and proves
+nothing.
+`bulkDestroy.resolveRows.library@<n>` (issue 1202) therefore takes its rows
+from the **end** of each point's own library, so a surviving scan pays its full
+length and a reintroduced product shows up as a slope.
+The actor holds none of those components, so every row is correctly classified
+`depleted` — but `_destroyOne` resolves the component and runs the full matcher
+pass over the pinned 1,000 stacks before it can say so, which is the term being
+bounded.
+`depletedRows` is the count that proves it: a row whose id failed to resolve is
+classified `unknownComponent` instead and never reaches the matcher.
+The matched-row half of the same run is measured on the other axis, by
+`craftingEngine.findComponentItems.bulk@<n>` in `held-inventory`.
+
+That case is also the one place a benchmark carries **both** counting layers.
+`createBenchWorld` wraps every profile's library in `countingCandidates`, which
+sees a scan written as `components.find(...)` and is blind to
+`for (const c of components)`.
+Widening the shared wrapper would move every committed count that walks a
+component array, so the enumeration layer is applied to this one case's array
+instead, under its own `componentEnumerationsWalked` and
+`componentEntriesWalked` keys.
+`componentEntriesWalked` reads exactly the library size at each point: that is
+`buildIndex` walking `definitions.entries()` for its one cold build.
+A surplus over the library size is the signal.
+
 ## Declared measurement ceilings
 
 Four scales are deliberately below the epic's target, each for a stated reason.

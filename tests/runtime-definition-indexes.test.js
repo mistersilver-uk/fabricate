@@ -26,11 +26,17 @@ import assert from 'node:assert/strict';
 
 import { roleItem } from './helpers/componentIdentityFixtures.js';
 import { installFoundryEnv } from './helpers/foundryEnv.js';
-import { countingCandidates, createOperationCounters } from './helpers/scale/scaleCounters.js';
+import {
+  countingCandidates,
+  countingEnumerations,
+  createOperationCounters,
+} from './helpers/scale/scaleCounters.js';
 import { makeActor, makeComponentLibrary } from './helpers/scale/scaleGuardFixtures.js';
 
 installFoundryEnv();
 
+const { BulkDestroyService } = await import('../src/systems/BulkDestroyService.js');
+const { BulkSalvageService } = await import('../src/systems/BulkSalvageService.js');
 const { CraftingEngine } = await import('../src/systems/CraftingEngine.js');
 const { CraftingSystemManager } = await import('../src/systems/CraftingSystemManager.js');
 const { RecipeManager } = await import('../src/systems/RecipeManager.js');
@@ -301,30 +307,6 @@ describe('issue 1076 bound — findComponentItems is independent of component-li
     assert.equal(small.scanned, 0, 'and zero at 50 components too');
   });
 
-  it('charges a bulk run per ROW only, never per row x library', () => {
-    // Bulk salvage and `BulkDestroyService` call the matcher once per row, which made a bulk
-    // run O(rows x items x components). Five rows against a warm index must cost five times
-    // one row and nothing more.
-    const world = craftWorld();
-    const rows = [7, 8, 9, 10, 11].map((position) => world.components.at(position));
-    world.engine.findComponentItems(world.actor, rows[0], world.system);
-
-    warm(world.components);
-    world.engine.findComponentItems(world.actor, rows[0], world.system);
-    const oneRow = examined();
-
-    warm(world.components);
-    for (const row of rows) world.engine.findComponentItems(world.actor, row, world.system);
-    const fiveRows = examined();
-
-    assert.ok(oneRow > 0, 'non-vacuity: one row must cost something');
-    assert.ok(
-      fiveRows <= oneRow * rows.length,
-      `five bulk rows examined ${fiveRows} candidates against ${oneRow} for one row; the budget ` +
-        `is linear in rows. A super-linear result means the library re-entered the per-row cost.`
-    );
-  });
-
   it('resolves against LIVE actor documents, not a cached inventory', () => {
     // The correctness boundary the issue draws around this path: the component-side index is
     // derived from system definitions, and the ITEM side must stay live, so a stack removed
@@ -339,6 +321,347 @@ describe('issue 1076 bound — findComponentItems is independent of component-li
       world.engine.findComponentItems(world.actor, component, world.system).length,
       0,
       'a live document read must see the removed stacks'
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The bulk services — the paths the per-row scans actually live on
+// ---------------------------------------------------------------------------
+
+/**
+ * How many bulk rows one measurement runs. CONSTANT across library sizes, because the
+ * relation under test is "cost is independent of the library", and a fixture that scaled
+ * both axes at once could not attribute a movement to either.
+ */
+const BULK_ROWS = 5;
+
+/** Units per owned stack: enough for salvage to take one and destroy to take the rest. */
+const STACK_QUANTITY = 4;
+
+/**
+ * An owned Item document stand-in carrying the durable per-system role claim for
+ * `componentId`, plus the mutating surface the salvage and destroy pipelines actually use
+ * (`delete`, `update`, `toObject`).
+ *
+ * @param {string} componentId
+ * @param {number} index
+ * @returns {object}
+ */
+function ownedStack(componentId, index) {
+  const id = `owned-${componentId}-${index}`;
+  return {
+    ...durableItem(componentId),
+    id,
+    uuid: `Actor.actor-bulk.Item.${id}`,
+    name: `Owned ${componentId}`,
+    img: 'icons/svg/item-bag.svg',
+    type: 'loot',
+    system: { quantity: STACK_QUANTITY },
+    effects: [],
+    deleted: false,
+    async delete() {
+      this.deleted = true;
+    },
+    async update(payload) {
+      if (payload['system.quantity'] !== undefined) this.system.quantity = payload['system.quantity'];
+    },
+    toObject() {
+      return { name: this.name, type: this.type, system: { quantity: this.system.quantity } };
+    },
+  };
+}
+
+/**
+ * A world wired for a REAL bulk run: a library, a salvage-capable system, an actor holding
+ * one stack per bulk row, and the engine both services delegate to.
+ *
+ * ## The targets sit at the END of the library, and that is the fixture's whole point
+ *
+ * The guard this replaces put its five targets at positions 7–11, so every `.find()` it was
+ * supposed to catch terminated after eleven comparisons — 50 scans at 5,000 components rather
+ * than the 24,990 the defect actually costs — and the bound it asserted was satisfied by the
+ * unfixed code. Anchoring the targets (and the salvage OUTPUT component, which
+ * `_createSingleResult` resolves separately) at the end makes every surviving scan pay its
+ * full length, so the difference between a warm-index lookup and a scan is the difference
+ * between a constant and `rows x components`.
+ *
+ * @param {object} [options]
+ * @returns {object}
+ */
+function bulkWorld({ componentCount = LIBRARY, itemCount = HELD_ITEMS } = {}) {
+  const counters = createOperationCounters();
+  const authored = library(componentCount);
+  // Targets last, their salvage OUTPUTS immediately before them. Distinct outputs per row,
+  // because `_createSingleResult` merges a second award of the SAME component into the
+  // existing stack — one shared output would make four of the five rows create nothing and
+  // the non-vacuity check would be measuring one row, not five.
+  const outputs = authored.slice(-2 * BULK_ROWS, -BULK_ROWS);
+  const targets = authored.slice(-BULK_ROWS);
+  for (const [index, component] of targets.entries()) {
+    component.salvage = {
+      enabled: true,
+      ingredientQuantity: 1,
+      toolIds: [],
+      resultGroups: [
+        {
+          id: `${component.id}-rg`,
+          name: 'Scraps',
+          results: [{ id: `${component.id}-res`, componentId: outputs[index].id, quantity: 1 }],
+        },
+      ],
+    };
+  }
+
+  // BOTH counting layers, because they see different reintroductions and each alone is
+  // satisfiable by the shape the other catches. `countingCandidates` sees
+  // `components.find((c) => c.id === id)`; `countingEnumerations` sees
+  // `for (const c of components) { if (c.id === id) ... }`, which is the idiom this
+  // repository actually writes and the one a `.find()`-only guard is blind to.
+  const components = countingEnumerations(
+    countingCandidates(authored, counters, 'componentPredicates'),
+    counters,
+    { key: 'componentEnumerations', entriesKey: 'componentEntries' }
+  );
+  const system = {
+    id: SYSTEM_ID,
+    name: 'Index System',
+    components,
+    // `chatOutput` stays off so the run posts nothing; `salvage` must be on or every row is
+    // refused by `BulkSalvageService`'s pre-flight before the engine is ever reached.
+    features: { salvage: true, chatOutput: false },
+    salvageResolutionMode: 'simple',
+    salvageCraftingCheck: {
+      enabled: false,
+      outcomes: [],
+      progressive: null,
+      consumption: { consumeComponentOnFail: true, breakToolsOnFail: false },
+    },
+    tools: [],
+    craftingCheck: {},
+  };
+
+  const created = [];
+  const actor = {
+    id: 'actor-bulk',
+    uuid: 'Actor.actor-bulk',
+    name: 'Bulk Actor',
+    system: {},
+    flags: {},
+    items: [...makeActor({ itemCount }).items, ...targets.map((c, index) => ownedStack(c.id, index))],
+    async createEmbeddedDocuments(_type, payloads) {
+      return payloads.map((payload) => {
+        const item = {
+          id: `created-${created.length}`,
+          uuid: `Actor.actor-bulk.Item.created-${created.length}`,
+          name: payload?.name || 'Created',
+          img: payload?.img || 'icons/svg/item-bag.svg',
+          type: payload?.type || 'loot',
+          flags: payload?.flags || {},
+          system: { quantity: payload?.system?.quantity ?? 1 },
+          effects: [],
+          getFlag: () => null,
+          async update() {},
+          async delete() {},
+        };
+        created.push(item);
+        this.items.push(item);
+        return item;
+      });
+    },
+  };
+
+  return {
+    components,
+    system,
+    actor,
+    counters,
+    created,
+    targets,
+    engine: new CraftingEngine(new RecipeManager({})),
+  };
+}
+
+/**
+ * Install the globals a real salvage needs, returning a restore function.
+ *
+ * `installFoundryEnv()` owns `globalThis.game` for the whole file, so this snapshots and
+ * restores rather than overwriting: the staleness and revision-token suites below build their
+ * own environment and must not inherit this one.
+ *
+ * @param {object} world
+ * @returns {() => void}
+ */
+function installBulkGame(world) {
+  const previous = { game: globalThis.game, fromUuid: globalThis.fromUuid };
+  globalThis.game = {
+    ...previous.game,
+    time: { worldTime: 0 },
+    user: { id: 'user-bulk', isGM: false },
+    fabricate: {
+      getCraftingSystemManager: () => ({
+        getSystem: (id) => (id === world.system.id ? world.system : null),
+      }),
+      getResolutionModeService: () => null,
+    },
+  };
+  globalThis.fromUuid = async (uuid) => {
+    if (uuid === world.actor.uuid) return world.actor;
+    // Every library entry carries `registeredItemUuid`, which `_createSingleResult` resolves
+    // for the salvage OUTPUT. Answering it keeps the fixture on the ordinary source-item
+    // branch rather than the "could not be resolved" fallback.
+    if (typeof uuid === 'string' && uuid.startsWith('Compendium.pack.Item.')) {
+      const name = `Source ${uuid.slice('Compendium.pack.Item.'.length)}`;
+      return {
+        documentName: 'Item',
+        name,
+        effects: [],
+        toObject: () => ({ name, type: 'loot', system: { quantity: 1 } }),
+      };
+    }
+    return null;
+  };
+  return () => {
+    globalThis.game = previous.game;
+    globalThis.fromUuid = previous.fromUuid;
+  };
+}
+
+/**
+ * Run ONE bulk salvage and ONE bulk destroy over the same `BULK_ROWS` targets against a
+ * library of `componentCount`, and report every way the library could have been walked.
+ *
+ * Salvage runs first and destroy second, so both do real work on the same stacks: salvage
+ * consumes one unit of each and destroy removes what is left. A destroy-first order would
+ * leave salvage with nothing to find and would measure the cheap `depleted` branch.
+ *
+ * @param {number} componentCount
+ * @returns {Promise<object>}
+ */
+async function measureBulkRun(componentCount) {
+  const world = bulkWorld({ componentCount });
+  const restore = installBulkGame(world);
+  try {
+    const getCraftingSystem = (id) => (id === world.system.id ? world.system : null);
+    const salvageService = new BulkSalvageService({
+      salvage: (actorUuid, systemId, componentId, options) =>
+        world.engine.salvage(actorUuid, systemId, componentId, options),
+      getCraftingSystem,
+    });
+    const destroyService = new BulkDestroyService({
+      getCraftingSystem,
+      findComponentItems: (actor, component, system) =>
+        world.engine.findComponentItems(actor, component, system),
+      deleteItems: async (actor, ids) => {
+        const removed = actor.items.filter((item) => ids.includes(item.id));
+        actor.items = actor.items.filter((item) => !ids.includes(item.id));
+        return removed;
+      },
+    });
+    const targets = world.targets.map((component) => ({
+      actor: world.actor,
+      actorUuid: world.actor.uuid,
+      actorId: world.actor.id,
+      actorName: world.actor.name,
+      systemId: world.system.id,
+      componentId: component.id,
+    }));
+
+    // WARM, then zero both counter sets. Every bound here is about the warm path; measuring
+    // the one-off `O(components)` build would report a bound nobody could meet, and the
+    // cold-build control above already proves the counter can move.
+    warm(world.components);
+    world.counters.reset();
+
+    const salvaged = await salvageService.run({ targets, interactive: false });
+    const destroyed = await destroyService.run({ targets });
+    const identity = readIdentityCounters();
+
+    return {
+      predicates: world.counters.get('componentPredicates'),
+      enumerations: world.counters.get('componentEnumerations'),
+      // Net of the index build's own `definitions.entries()` walk, which `definitionIndex`
+      // already counts on its own seam. Clamped at zero so a build of some OTHER array can
+      // only under-report a surplus, never invent one.
+      entries: Math.max(0, world.counters.get('componentEntries') - identity.indexBuilds * componentCount),
+      identity: identity.candidatesExamined,
+      salvagedRows: salvaged.items.filter((item) => item.outcome === 'succeeded').length,
+      destroyedRows: destroyed.items.filter((item) => item.outcome === 'succeeded').length,
+      unitsDeleted: destroyed.unitsDeleted,
+      createdResults: world.created.length,
+    };
+  } finally {
+    restore();
+  }
+}
+
+/** Every way the library could have been walked, added up. */
+function libraryExaminations(measured) {
+  return measured.predicates + measured.enumerations + measured.entries + measured.identity;
+}
+
+describe('issue 1202 bound — a bulk run is independent of component-library size', () => {
+  it('charges a bulk salvage and a bulk destroy per ROW only, never per row x library', async () => {
+    // This is the guard the issue exists for, and the shape of its predecessor is the reason.
+    // That one was titled for bulk runs but called `findComponentItems` five times in a loop,
+    // so it entered NO bulk service and could not reach a single one of the per-row scans it
+    // was named for — including `CraftingEngine.salvage`'s own, which only a FULL salvage row
+    // reaches (a pre-flight-only test misses it by construction).
+    const small = await measureBulkRun(50);
+    const large = await measureBulkRun(LIBRARY);
+
+    assert.equal(small.salvagedRows, BULK_ROWS, 'every salvage row must genuinely succeed');
+    assert.equal(large.salvagedRows, BULK_ROWS, 'and at the large library too');
+    assert.equal(small.createdResults, BULK_ROWS, 'each salvage row must award its result');
+    assert.equal(large.createdResults, BULK_ROWS, 'and at the large library too');
+    assert.equal(small.destroyedRows, BULK_ROWS, 'every destroy row must genuinely destroy');
+    assert.equal(large.destroyedRows, BULK_ROWS, 'and at the large library too');
+    assert.equal(
+      small.unitsDeleted,
+      BULK_ROWS * (STACK_QUANTITY - 1),
+      'destroy must remove what salvage left, or the run is measuring an empty pack'
+    );
+    assert.equal(large.unitsDeleted, small.unitsDeleted, 'and the same units at either size');
+
+    assert.ok(libraryExaminations(small) > 0, 'non-vacuity: the counters must have moved at all');
+    assert.equal(
+      libraryExaminations(large),
+      libraryExaminations(small),
+      `a ${BULK_ROWS}-row bulk run examined ${libraryExaminations(small)} candidates against a ` +
+        `50-component library and ${libraryExaminations(large)} against a ${LIBRARY}-component ` +
+        `one. Any difference is the rows x components term this issue exists to remove.\n` +
+        `  50:    ${JSON.stringify(small)}\n  ${LIBRARY}: ${JSON.stringify(large)}`
+    );
+  });
+
+  it('runs NO array scan over the library, in EITHER reintroduction shape', async () => {
+    // The two counters are separated on purpose. `componentPredicates` sees a scan written as
+    // `components.find((c) => c.id === id)`; `componentEnumerations` sees one written as
+    // `for (const c of components) { if (c.id === id) return c; }` — and only the second is
+    // the idiom this repository reaches for by default. A guard carrying only the first would
+    // be falsifiable against the shape being fixed and blind to the shape most likely to
+    // reintroduce it.
+    const large = await measureBulkRun(LIBRARY);
+
+    assert.equal(
+      large.predicates,
+      0,
+      `a ${BULK_ROWS}-row bulk run ran a per-element PREDICATE over the ${LIBRARY}-component ` +
+        `library ${large.predicates} times; the budget is zero. Every id lookup must go ` +
+        `through findById(getDefinitionIndex(system.components), id).`
+    );
+    assert.equal(
+      large.enumerations,
+      0,
+      `a ${BULK_ROWS}-row bulk run ENUMERATED the ${LIBRARY}-component library ` +
+        `${large.enumerations} times (for...of / forEach / reduce / keys / values); the budget ` +
+        `is zero.`
+    );
+    assert.equal(
+      large.entries,
+      0,
+      `a ${BULK_ROWS}-row bulk run walked components.entries() ${large.entries} times beyond the ` +
+        `index build; the budget is zero.`
     );
   });
 });

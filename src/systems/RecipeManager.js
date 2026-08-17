@@ -4,6 +4,7 @@ import { matchGatheringTools, classifyGatheringToolStates } from '../gatheringTo
 import { getIngredientComponentId, getMatchHandler } from '../models/match/matchTypes.js';
 import { DEFAULT_RECIPE_IMAGE, Recipe } from '../models/Recipe.js';
 import { matchComponentByName } from '../utils/componentNameMatch.js';
+import { findById, getDefinitionIndex } from '../utils/definitionIndex.js';
 import {
   accumulateItemEssences,
   findMatchingComponent,
@@ -2758,7 +2759,7 @@ export class RecipeManager {
     const systemManager = this._systemManager();
     const system = systemManager?.getSystem(systemId);
     if (!system) return null;
-    return (system.components || []).find((item) => item.id === componentId) || null;
+    return findById(getDefinitionIndex(system.components), componentId);
   }
 
   /**

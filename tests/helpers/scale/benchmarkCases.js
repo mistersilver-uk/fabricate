@@ -40,6 +40,7 @@ import {
   findConnectCrossover,
   serializedRecordBytes,
 } from './connectPayloadModel.js';
+import { countingEnumerations } from './scaleCounters.js';
 import { INVENTORY_SERIES } from './scaleInventory.js';
 import { COMPONENT_LIBRARY_SERIES } from './scaleProfiles.js';
 import {
@@ -1118,6 +1119,87 @@ function componentLibraryCases() {
             ),
           };
         },
+      },
+      // APPENDED after the three cases above, never inserted ahead of them: a profile's FIRST
+      // case absorbs a one-off index build over the fixture's shared empty
+      // `essenceDefinitions` array, so `identityIndexBuilds` reads `1 + (first case ? 1 : 0)`
+      // and `craftingListing.buildListing.library@1000` carries the committed `2`
+      // (`benchmarks/README.md`). Inserting ahead of it would move a committed number for a
+      // reason unrelated to this change.
+      {
+        id: `bulkDestroy.resolveRows${suffix}`,
+        profile: 'component-library',
+        description:
+          `A real ${BULK_ROWS}-row BulkDestroyService.run() against this library size — the ` +
+          'per-row `system.components` lookup plus the per-row matcher pass, which together ' +
+          'were an additive `rows x components` term (issue 1202). Recorded on this axis ' +
+          'because the term is invisible on any axis that pins the library.',
+        setup: (context) => {
+          const world = hydratedWorldAt(context);
+          // Rows are taken from the END of THIS series point's library, and that choice is
+          // the whole point of the case. The fixture draws its held stacks against the
+          // SMALLEST prefix, so every component the actor holds sits at a fixed low position
+          // at every series point — a reintroduced `.find()` over one of those would
+          // terminate after the same handful of comparisons at 1,000 and at 10,000, report a
+          // flat series, and prove nothing. End-of-library ids make a surviving scan cost its
+          // full length, so the reintroduced product shows up as a SLOPE.
+          //
+          // The actor therefore holds none of them and every row is correctly classified
+          // `depleted`. That is not a collapsed fixture: `_destroyOne` resolves the component
+          // and runs the FULL matcher pass over the pinned 1,000-stack inventory before it
+          // can say so, which is exactly the `rows x items x components` core. The
+          // matched-row half of the same run is measured on the other axis, by
+          // `craftingEngine.findComponentItems.bulk@N` in `held-inventory`.
+          // BOTH counting layers on this ONE case's library. `createBenchWorld` wraps every
+          // profile's array in `countingCandidates`, which sees a scan written as
+          // `components.find(...)` and is blind to `for (const c of components)` — the idiom
+          // this repository actually reaches for. Layering the enumeration counter here
+          // rather than widening the shared wrapper keeps every other committed baseline
+          // untouched (it mutates in place, so `definitionIndex`'s identity-keyed cache still
+          // sees one array) while making THIS case falsifiable against both shapes.
+          //
+          // `componentEntriesWalked` reads exactly the library size at each point: that is
+          // `buildIndex` walking `definitions.entries()` for its one cold build, which
+          // `identityCandidatesExamined` already carries. A SURPLUS over the library size is
+          // the signal — a per-row `for (const [i, c] of components.entries())`.
+          countingEnumerations(world.components, context.counters, {
+            key: 'componentEnumerationsWalked',
+            entriesKey: 'componentEntriesWalked',
+          });
+          const deletes = [];
+          const service = new context.modules.BulkDestroyService({
+            getCraftingSystem: (id) => world.craftingSystemManager.getSystem(id),
+            findComponentItems: (actor, component, system) =>
+              world.craftingEngine.findComponentItems(actor, component, system),
+            // Never reached, and `deleteCalls` below is the proof. A `depleted` row returns
+            // before any delete is attempted, which is what makes this case IDEMPOTENT — the
+            // harness calls `run` once for the counted pass and `reps` more times against the
+            // SAME state, so a mutating case would time an emptied pack.
+            deleteItems: async (_actor, ids) => {
+              deletes.push(ids);
+              return [];
+            },
+          });
+          const targets = world.components.slice(-BULK_ROWS).map((component) => ({
+            actor: world.craftingActor,
+            actorId: world.craftingActor.id,
+            actorName: world.craftingActor.name,
+            systemId: world.system.id,
+            componentId: component.id,
+          }));
+          return { service, targets, deletes };
+        },
+        run: ({ service, targets }) => service.run({ targets }),
+        counts: ({ deletes }, report) => ({
+          rows: report.items.length,
+          // Every row must have RESOLVED its component and then found no stacks. A row whose
+          // id did not resolve is classified `unknownComponent` instead and never reaches the
+          // matcher, so this single count is what stops the case reporting a fast number for
+          // a run that looked nothing up.
+          depletedRows: report.items.filter((item) => item.skipReason === 'depleted').length,
+          deleteCalls: deletes.length,
+          unitsDeleted: report.unitsDeleted,
+        }),
       },
     ];
   });

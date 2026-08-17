@@ -69,10 +69,10 @@
     "craftingListing.buildRecipeDetail.library@1000": {
       "description": "Detail hydration for ONE recipe against this library size. `held-inventory` explicitly excludes this phase as \"bounded by page size rather than by either axis\", which left a real app open half-measured: the inspector opens on the same click as the listing. Measured here because a per-recipe library term would be invisible to both listing cases.",
       "counts": {
-        "componentCandidatesExamined": 6006,
+        "componentCandidatesExamined": 2000,
         "craftingActorItemsReads": 4,
         "craftingActorItemsScanned": 1336,
-        "identityCandidatesExamined": 2200,
+        "identityCandidatesExamined": 6206,
         "identityIndexBuilds": 1,
         "sourceActor0ItemsReads": 4,
         "sourceActor0ItemsScanned": 1332,
@@ -81,6 +81,20 @@
         "hydratedSets": 1,
         "craftableSets": 1,
         "resolvedIngredientStates": 1
+      }
+    },
+    "bulkDestroy.resolveRows.library@1000": {
+      "description": "A real 5-row BulkDestroyService.run() against this library size — the per-row `system.components` lookup plus the per-row matcher pass, which together were an additive `rows x components` term (issue 1202). Recorded on this axis because the term is invisible on any axis that pins the library.",
+      "counts": {
+        "componentEntriesWalked": 1000,
+        "craftingActorItemsReads": 5,
+        "craftingActorItemsScanned": 1670,
+        "identityCandidatesExamined": 1500,
+        "identityIndexBuilds": 1,
+        "rows": 5,
+        "depletedRows": 5,
+        "deleteCalls": 0,
+        "unitsDeleted": 0
       }
     },
     "craftingListing.buildListing.library@5000": {
@@ -117,10 +131,10 @@
     "craftingListing.buildRecipeDetail.library@5000": {
       "description": "Detail hydration for ONE recipe against this library size. `held-inventory` explicitly excludes this phase as \"bounded by page size rather than by either axis\", which left a real app open half-measured: the inspector opens on the same click as the listing. Measured here because a per-recipe library term would be invisible to both listing cases.",
       "counts": {
-        "componentCandidatesExamined": 14006,
+        "componentCandidatesExamined": 10000,
         "craftingActorItemsReads": 4,
         "craftingActorItemsScanned": 1336,
-        "identityCandidatesExamined": 6200,
+        "identityCandidatesExamined": 10206,
         "identityIndexBuilds": 1,
         "sourceActor0ItemsReads": 4,
         "sourceActor0ItemsScanned": 1332,
@@ -129,6 +143,20 @@
         "hydratedSets": 1,
         "craftableSets": 1,
         "resolvedIngredientStates": 1
+      }
+    },
+    "bulkDestroy.resolveRows.library@5000": {
+      "description": "A real 5-row BulkDestroyService.run() against this library size — the per-row `system.components` lookup plus the per-row matcher pass, which together were an additive `rows x components` term (issue 1202). Recorded on this axis because the term is invisible on any axis that pins the library.",
+      "counts": {
+        "componentEntriesWalked": 5000,
+        "craftingActorItemsReads": 5,
+        "craftingActorItemsScanned": 1670,
+        "identityCandidatesExamined": 5500,
+        "identityIndexBuilds": 1,
+        "rows": 5,
+        "depletedRows": 5,
+        "deleteCalls": 0,
+        "unitsDeleted": 0
       }
     },
     "craftingListing.buildListing.library@10000": {
@@ -165,10 +193,10 @@
     "craftingListing.buildRecipeDetail.library@10000": {
       "description": "Detail hydration for ONE recipe against this library size. `held-inventory` explicitly excludes this phase as \"bounded by page size rather than by either axis\", which left a real app open half-measured: the inspector opens on the same click as the listing. Measured here because a per-recipe library term would be invisible to both listing cases.",
       "counts": {
-        "componentCandidatesExamined": 24006,
+        "componentCandidatesExamined": 20000,
         "craftingActorItemsReads": 4,
         "craftingActorItemsScanned": 1336,
-        "identityCandidatesExamined": 11200,
+        "identityCandidatesExamined": 15206,
         "identityIndexBuilds": 1,
         "sourceActor0ItemsReads": 4,
         "sourceActor0ItemsScanned": 1332,
@@ -177,6 +205,20 @@
         "hydratedSets": 1,
         "craftableSets": 1,
         "resolvedIngredientStates": 1
+      }
+    },
+    "bulkDestroy.resolveRows.library@10000": {
+      "description": "A real 5-row BulkDestroyService.run() against this library size — the per-row `system.components` lookup plus the per-row matcher pass, which together were an additive `rows x components` term (issue 1202). Recorded on this axis because the term is invisible on any axis that pins the library.",
+      "counts": {
+        "componentEntriesWalked": 10000,
+        "craftingActorItemsReads": 5,
+        "craftingActorItemsScanned": 1670,
+        "identityCandidatesExamined": 10500,
+        "identityIndexBuilds": 1,
+        "rows": 5,
+        "depletedRows": 5,
+        "deleteCalls": 0,
+        "unitsDeleted": 0
       }
     }
   }
