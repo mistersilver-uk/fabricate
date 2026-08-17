@@ -70,6 +70,9 @@ library.
 `component-library` (issue 1204) pins both: the corpus at 6 recipes and the
 inventory at 1,000 held stacks, and instead varies the **library** itself
 across 1,000 / 5,000 / 10,000 components.
+`alchemy-knowledge` (issue 1228) is the one profile that varies neither, and
+says so: it bounds both axes at once because the term it records is their
+**product**, and a profile that pinned either could not contain one.
 
 That separation is the point.
 The failure that started this programme was an **inventory**-axis failure — a
@@ -219,7 +222,7 @@ A surplus over the library size is the signal.
 
 ## Declared measurement ceilings
 
-Four scales are deliberately below the epic's target, each for a stated reason.
+Five scales are deliberately below the epic's target, each for a stated reason.
 **Do not spend a day trying to run them at full scale.**
 A fifth profile, `component-library`, is also deliberately bounded, but above
 rather than below the target, because its top point exists to fix a slope
@@ -236,6 +239,40 @@ N-audits-per-N-rows behaviour issue 1074 targets extrapolates to roughly
 **8.5 hours** for one GM manager open.
 The "before" number at full scale cannot be obtained and does not need to be —
 prove the fix with the `signatureComparisons` counter, never with a clock.
+
+### `alchemy-knowledge` bounds BOTH its corpus and its inventory
+
+500 book-gated alchemy signatures against 200 held stacks, and neither number
+may grow.
+The alchemy workbench evaluates reveal **twice per recipe** — once for the
+chooser summary and once for the active panel — so before issue 1228 it walked
+the whole inventory `2N` times.
+At these bounds that is already **204,000** documents offered to the per-recipe
+recipe-item matcher for one workbench open, against **4,000** after the fix.
+Raising either axis buys no extra signal and costs the drift test, which
+re-derives every count inside `npm test`.
+
+Two committed counts on this profile are the criterion, and they are counted on
+the OFFER rather than on an inventory read for a reason that is measured rather
+than argued:
+
+- `candidateItemOffers` — how many held documents the per-recipe matcher was
+  handed across the pass, and the number that moves.
+- `candidateWalks` — how many recipes were asked, which distinguishes a real
+  optimisation from a corpus filter that silently dropped rows.
+
+An inventory-**read** counter cannot serve here.
+With the pass snapshot missing its recipe-item matcher,
+`craftingActorItemsScanned` reads exactly the same 213 it reads for correct code
+— the unfiltered offer is served from one memoised walk — while
+`candidateItemOffers` reads 204,000 instead of 4,000.
+
+`knownRecipes` and `redactedRuns` sit beside them as non-vacuity guards.
+Issue 1217 records that `alchemy-signatures` projects **zero** revealed rows,
+so its alchemy case reports a fast number for a listing that answered nothing;
+this profile therefore holds half the books AND brew-discovers 100 recipes, and
+draws the journal's runs from past the learned slice so redaction answers both
+ways.
 
 ### `recipe-graph` bounds both depth and fan-out
 

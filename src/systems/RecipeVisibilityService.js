@@ -4,7 +4,7 @@ import { recipeItemDefinitionsContaining } from '../utils/recipeItemMembership.j
 import { itemMatchesRecipeItemSource, matchRecipeItemDefinition } from '../utils/sourceUuid.js';
 
 import { evaluatePrerequisites } from './characterPrerequisites.js';
-import { buildInventorySnapshot } from './inventorySnapshot.js';
+import { buildPassInventorySnapshot } from './passInventorySnapshot.js';
 import { createDefaultPartyLearnPool } from './recipeItemPartyLearnPool.js';
 import {
   buildFlagMapFromEntries,
@@ -52,17 +52,86 @@ const APPLY_USE_OUTCOME = Object.freeze({
 const VISIBILITY_MODES = ['global', 'restricted', 'item', 'knowledge'];
 
 /**
+ * The VISIBILITY-phase counters (issue 1228).
+ *
+ * `candidateItemOffers` is the number of held documents the per-recipe recipe-item matcher was
+ * OFFERED across a pass — summed over every `_collectCandidateItems` call that reached the
+ * walk. It exists because the existing scale guard could not see the defect this issue fixes,
+ * and could not have seen the one #1077 fixed either: `tests/scale-regression-guards.test.js`
+ * measures the SUMMARY phase's `actorItemsScanned`, which is an inventory-READ count.
+ *
+ * The distinction is the whole point, and it is not a nuance:
+ *
+ * - Without a snapshot the per-recipe walk re-enumerates `actor.items`, so an item-read
+ *   counter moves and an offer counter moves with it.
+ * - With a snapshot built from the WRONG collaborator set, `recipeItemCandidates` falls back
+ *   to `heldItems()` — which reads each actor's inventory exactly ONCE and memoises it — so
+ *   the item-read counter stays perfectly flat while the matcher is handed every held document
+ *   once per recipe. That is the silent reinstatement `passInventorySnapshot`'s header
+ *   describes, and only this counter can see it.
+ *
+ * `candidateWalks` is its companion: a pass that answered fewer recipes (a corpus filter that
+ * silently dropped rows) would lower the offer count without any optimisation, and only the
+ * walk count distinguishes those.
+ *
+ * Module-level and process-global, matching `SignatureValidator`'s signature counters and
+ * `definitionIndex`'s identity counters: the visibility service is constructed in several
+ * places a probe cannot reach, so a per-instance wrapper would see only the instances the
+ * probe itself built.
+ */
+const _counters = {
+  candidateItemOffers: 0,
+  candidateWalks: 0,
+};
+
+/**
+ * A snapshot of the visibility counters.
+ *
+ * @returns {{candidateItemOffers: number, candidateWalks: number}}
+ */
+export function readVisibilityCounters() {
+  return { ..._counters };
+}
+
+/**
+ * Zero the visibility counters. Call before a measured region; they are process-global and
+ * monotonic otherwise.
+ *
+ * @returns {void}
+ */
+export function resetVisibilityCounters() {
+  _counters.candidateItemOffers = 0;
+  _counters.candidateWalks = 0;
+}
+
+/**
  * Visibility, knowledge access, and learn-state service.
  */
 export class RecipeVisibilityService {
+  /**
+   * @param {object} recipeManager
+   * @param {object} craftingSystemManager
+   * @param {object} [partyLearnPool]
+   * @param {((item: object, components: object[], systemId: string) => (object|null))|null}
+   *   [resolveComponentForItem] How a held document resolves to a managed component, for the
+   *   per-pass inventory snapshot this service builds (issue 1228). The service itself never
+   *   calls it: it is a SNAPSHOT collaborator, and it is supplied here so the snapshot this
+   *   service hands down is the same complete value `CraftingListingBuilder` builds rather
+   *   than a half of one that would answer `available: false` for every recipe if a later
+   *   consumer in the same pass read its tallies. Injected rather than imported for the same
+   *   reason `CraftingListingBuilder` injects it — see `passInventorySnapshot`'s header.
+   */
   constructor(
     recipeManager,
     craftingSystemManager,
-    partyLearnPool = createDefaultPartyLearnPool()
+    partyLearnPool = createDefaultPartyLearnPool(),
+    resolveComponentForItem = null
   ) {
     this.recipeManager = recipeManager;
     this.craftingSystemManager = craftingSystemManager;
     this._partyLearnPool = partyLearnPool;
+    this._resolveComponentForItem =
+      typeof resolveComponentForItem === 'function' ? resolveComponentForItem : null;
     // Retained recipe -> member-book lookups (issue 1077). Null until first use; validity is
     // the source array's identity + length + `definitionIndex` revision, so nothing here has
     // to be cleared by a mutator. See `_memoRecipeItemDefinitions`.
@@ -654,13 +723,20 @@ export class RecipeVisibilityService {
     // at all, which is the common configuration (issue 1077).
     if (!this._hasRecipeItemReference(recipe)) return [];
 
-    const matched = [];
-    for (const entry of this._candidateItemEntries(
+    const offered = this._candidateItemEntries(
       craftingActor,
       componentSourceActors,
       snapshot,
       recipe
-    )) {
+    );
+    // Counted HERE rather than inside `_candidateItemEntries`, because the number that matters
+    // is how many documents the per-recipe matcher below is handed — not how many the snapshot
+    // holds. See `_counters` for why an inventory-read counter cannot see this.
+    _counters.candidateWalks += 1;
+    _counters.candidateItemOffers += offered.length;
+
+    const matched = [];
+    for (const entry of offered) {
       if (!this._isMatchingRecipeItem(recipe, entry.item)) continue;
       matched.push({ ...entry, timesUsed: this._getRecipeItemUsage(entry.item) });
     }
@@ -1207,11 +1283,10 @@ export class RecipeVisibilityService {
   /**
    * The per-pass inventory snapshot a corpus-wide walk shares.
    *
-   * Every legacy `linkedRecipeItemUuid` in the pass is collected up front and handed to the
-   * snapshot, because `_recipeItemMatchDefinitions` adds a synthetic definition for one and
-   * the snapshot's candidate superset must contain every definition any recipe's matcher
-   * could see. Miss those and an un-migrated recipe's book would be filtered out — the one
-   * way this optimisation could change an answer, so it is done here rather than assumed.
+   * Delegates to the shared {@link buildPassInventorySnapshot}, which owns the legacy
+   * `linkedRecipeItemUuid` collection and the recipe-item matcher so no call site can build a
+   * snapshot missing either (issue 1228). This used to assemble both itself, which is how the
+   * two production snapshots came to inject disjoint collaborator sets.
    *
    * @param {object[]} recipes
    * @param {object|null} craftingActor
@@ -1220,25 +1295,12 @@ export class RecipeVisibilityService {
    * @private
    */
   _passSnapshot(recipes, craftingActor, componentSourceActors) {
-    const legacyBySystem = new Map();
-    for (const recipe of recipes) {
-      const legacyUuid = String(recipe?.linkedRecipeItemUuid || '').trim();
-      if (!legacyUuid) continue;
-      const systemId = recipe?.craftingSystemId;
-      const bucket = legacyBySystem.get(systemId);
-      if (bucket) bucket.add(legacyUuid);
-      else legacyBySystem.set(systemId, new Set([legacyUuid]));
-    }
-
-    const snapshot = buildInventorySnapshot({
+    return buildPassInventorySnapshot({
       craftingActor,
       componentSourceActors,
-      matchesRecipeItem: itemMatchesRecipeItemSource,
+      recipes,
+      resolveComponent: this._resolveComponentForItem,
     });
-    return {
-      recipeItemCandidates: (system) =>
-        snapshot.recipeItemCandidates(system, legacyBySystem.get(system?.id) ?? []),
-    };
   }
 
   // The System-Validity Gate's two facts for one system (spec §System-Validity

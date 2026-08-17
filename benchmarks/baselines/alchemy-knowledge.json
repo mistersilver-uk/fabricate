@@ -1,0 +1,70 @@
+{
+  "profile": "alchemy-knowledge",
+  "harnessVersion": 2,
+  "seed": 1071,
+  "description": "THE ALCHEMY REVEAL PATH. 500 book-gated alchemy signatures in `item` visibility mode, across 8 books (half held) and a 200-stack inventory, with 100 recipes brew-discovered so the workbench actually PROJECTS revealed rows.",
+  "construction": "literal payloads — neither case reads a `Recipe` method, and hydrating would fold constructor cost into a number that is about the reveal gate",
+  "requiresNodeModules": false,
+  "ceiling": "Bounded at 500 recipes and 200 held stacks, and the two together are the point rather than a compromise: the term this profile exists to record is the PRODUCT recipes x items, so both axes have to be non-trivial at once and neither may be large. Before issue 1228 the workbench evaluated reveal for every recipe TWICE (chooser summary plus the active panel) with no snapshot, so it walked the whole inventory 2N times; at these bounds that is already six figures of offered documents, which is enough for a reintroduction to move the committed count by orders of magnitude.",
+  "scale": {
+    "components": 500,
+    "recipes": 500,
+    "books": 8,
+    "heldStacks": 200,
+    "learnedRecipes": 100,
+    "collidingRecipes": 50,
+    "sourceActorCount": 2
+  },
+  "inventoryMix": [
+    {
+      "stacks": 200,
+      "unmatched": 140,
+      "durable": 40,
+      "sourceRef": 20,
+      "books": 4,
+      "unmatchedRatio": 0.7,
+      "sourceActorCount": 2
+    }
+  ],
+  "checksums": {
+    "corpus": "23e2d90a4e5153e9",
+    "components": "9b8f1efaee4d5fdf",
+    "inventory": "e98c5b662d816af8"
+  },
+  "cases": {
+    "alchemyListing.buildListing.itemMode": {
+      "description": "The alchemy workbench open on an `item`-visibility-mode discipline: 500 book-gated signatures, 4 of 8 books held, 200 held stacks. Reveal is evaluated TWICE per recipe (the chooser summary and the active panel), and before issue 1228 each of those re-enumerated every source actor's whole inventory. `candidateItemOffers` is the committed criterion; `knownRecipes` is the non-vacuity guard beside it, because a workbench that revealed nothing would report a fast number for a listing that answered nothing (issue 1217 records exactly that state on `alchemy-signatures`).",
+      "counts": {
+        "componentCandidatesExamined": 72000,
+        "craftingActorItemsReads": 3,
+        "craftingActorItemsScanned": 213,
+        "identityCandidatesExamined": 4080,
+        "identityIndexBuilds": 502,
+        "sourceActor0ItemsReads": 3,
+        "sourceActor0ItemsScanned": 201,
+        "sourceActor1ItemsReads": 3,
+        "sourceActor1ItemsScanned": 198,
+        "knownRecipes": 300,
+        "undiscoveredRecipes": 200,
+        "chooserSystems": 1,
+        "ownedComponentRows": 60,
+        "candidateItemOffers": 4000,
+        "candidateWalks": 1000
+      }
+    },
+    "runJournal.buildListing": {
+      "description": "The player Journal open with 25 active and 25 historical crafting runs of book-gated alchemy recipes. Redaction asks the visibility service whether the viewer may see each run's recipe, which is the same per-recipe candidate walk the workbench makes — one whole inventory enumeration per run before issue 1228.",
+      "counts": {
+        "craftingActorItemsReads": 1,
+        "craftingActorItemsScanned": 71,
+        "identityCandidatesExamined": 156,
+        "identityIndexBuilds": 50,
+        "activeRuns": 25,
+        "historyRuns": 25,
+        "redactedRuns": 24,
+        "candidateItemOffers": 200,
+        "candidateWalks": 50
+      }
+    }
+  }
+}

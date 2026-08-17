@@ -50,7 +50,7 @@ import { normalizeRecipeCategory, getRecipeCategoryLabel } from '../utils/recipe
 
 import { buildCheckModifierContext } from './checkModifierResolver.js';
 import { CRAFTING_BROWSE_STATUS, deriveBrowseStatus } from './craftingBrowseStatus.js';
-import { buildInventorySnapshot } from './inventorySnapshot.js';
+import { buildPassInventorySnapshot } from './passInventorySnapshot.js';
 import { activeRunStepState, buildStepRecipeView } from './stepRecipeView.js';
 import { SUMMARY_AUDIENCE, projectRecipeSummary } from './summaryProjection.js';
 
@@ -220,7 +220,16 @@ export class CraftingListingBuilder {
     // ONE snapshot for the whole pass, discarded when this returns. Its per-system tallies
     // are memoised inside it, so N summaries of one system walk the inventory once — the
     // whole reason a summary may consult held quantities per row at all.
-    const snapshot = this._passSnapshot(craftingActor, knowledgeSources);
+    //
+    // The visible recipes are handed to it so the snapshot can carry their legacy book links
+    // (issue 1228). This pass never asks it for book candidates today, but it is now a
+    // COMPLETE pass snapshot rather than a tallies-only half of one, and a half would answer
+    // the visibility path with every held document unfiltered — silently.
+    const snapshot = this._passSnapshot(
+      craftingActor,
+      knowledgeSources,
+      visibleEntries.map((entry) => entry?.recipe)
+    );
 
     const summaries = [];
     for (const entry of visibleEntries) {
@@ -344,12 +353,17 @@ export class CraftingListingBuilder {
    * token when a player's `actor.items` changes and a stale inventory read would feed the
    * craftability and knowledge gates. #1078 owns the item-side generation that would ever
    * permit retention.
+   *
+   * Built through the shared {@link buildPassInventorySnapshot} since issue 1228, so this
+   * builder and `RecipeVisibilityService` produce the SAME kind of value rather than two
+   * half-snapshots with disjoint collaborators.
    * @private
    */
-  _passSnapshot(craftingActor, componentSourceActors) {
-    return buildInventorySnapshot({
+  _passSnapshot(craftingActor, componentSourceActors, recipes = []) {
+    return buildPassInventorySnapshot({
       craftingActor,
       componentSourceActors,
+      recipes,
       resolveComponent: this._resolveComponentForItem,
     });
   }

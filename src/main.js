@@ -628,7 +628,15 @@ class Fabricate {
     this.gatheringGateAndCheckEvaluator = new GatheringGateAndCheckEvaluator({
       evaluateExpression: evaluateGatheringExpression
     });
-    this.recipeVisibilityService = new RecipeVisibilityService(this.recipeManager, this.craftingSystemManager);
+    this.recipeVisibilityService = new RecipeVisibilityService(
+      this.recipeManager,
+      this.craftingSystemManager,
+      undefined,
+      // A per-pass INVENTORY SNAPSHOT collaborator, not a visibility one (issue 1228). Every
+      // production snapshot is built with the same identity pair, so the one this service
+      // hands down is interchangeable with the crafting listing's rather than a half of one.
+      findMatchingComponent
+    );
     this.resolutionModeService = new ResolutionModeService(this.craftingSystemManager, {
       getPlayerResultOrder: entry => this._readPlayerResultOrder(entry)
     });
@@ -2255,6 +2263,10 @@ class Fabricate {
         data !== undefined
           ? (game.i18n?.format?.(key, data) ?? key)
           : (game.i18n?.localize?.(key) ?? key),
+      // The per-pass inventory snapshot's component resolver (issue 1228). The workbench
+      // never reads component tallies itself; this is here so its snapshot is the same
+      // complete value every other pass builds.
+      resolveComponentForItem: findMatchingComponent,
     });
     return this._alchemyListingBuilder;
   }
@@ -2850,6 +2862,10 @@ class Fabricate {
         getViewer: () => game.user,
         localize: (key, data) => localizeGathering(key, data),
         nowWorldTime: () => this.getWorldTime(),
+        // The per-pass inventory snapshot's component resolver (issue 1228). The Journal
+        // never reads component tallies itself; this is here so its snapshot is the same
+        // complete value every other pass builds.
+        resolveComponentForItem: findMatchingComponent,
       });
     }
     return this._runJournalBuilder;

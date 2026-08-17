@@ -47,6 +47,7 @@ export async function loadBenchmarkModules() {
     craftingListingModule,
     inventoryListingModule,
     alchemyListingModule,
+    runJournalModule,
     visibilityModule,
     resolutionModeModule,
     signatureValidatorModule,
@@ -69,6 +70,7 @@ export async function loadBenchmarkModules() {
     import('../../../src/systems/CraftingListingBuilder.js'),
     import('../../../src/systems/InventoryListingBuilder.js'),
     import('../../../src/systems/AlchemyListingBuilder.js'),
+    import('../../../src/systems/RunJournalBuilder.js'),
     import('../../../src/systems/RecipeVisibilityService.js'),
     import('../../../src/systems/ResolutionModeService.js'),
     import('../../../src/systems/SignatureValidator.js'),
@@ -94,6 +96,9 @@ export async function loadBenchmarkModules() {
     CraftingListingBuilder: craftingListingModule.CraftingListingBuilder,
     InventoryListingBuilder: inventoryListingModule.InventoryListingBuilder,
     AlchemyListingBuilder: alchemyListingModule.AlchemyListingBuilder,
+    // Constructed per case rather than in `createBenchWorld` (like `BulkDestroyService`): its
+    // three run managers are case-specific, and only one profile measures it.
+    RunJournalBuilder: runJournalModule.RunJournalBuilder,
     RecipeVisibilityService: visibilityModule.RecipeVisibilityService,
     ResolutionModeService: resolutionModeModule.ResolutionModeService,
     SignatureValidator: signatureValidatorModule.SignatureValidator,
@@ -118,6 +123,14 @@ export async function loadBenchmarkModules() {
     signatureCounters: {
       read: signatureValidatorModule.readSignatureCounters,
       reset: signatureValidatorModule.resetSignatureCounters,
+    },
+    // The VISIBILITY-phase counters (issue 1228): how many held documents the per-recipe
+    // recipe-item matcher was offered across a pass. Module-level and process-global for the
+    // same reason the signature counters are, so a case resets them in `setup` and reads them
+    // in `counts` rather than wrapping an instance.
+    visibilityCounters: {
+      read: visibilityModule.readVisibilityCounters,
+      reset: visibilityModule.resetVisibilityCounters,
     },
   };
   return cachedModules;
@@ -191,7 +204,13 @@ export function createBenchWorld({
 
   const recipeVisibility = new modules.RecipeVisibilityService(
     recipeManager,
-    craftingSystemManager
+    craftingSystemManager,
+    undefined,
+    // The per-pass inventory snapshot's component resolver (issue 1228), wired exactly as
+    // `main.js` wires it. The visibility service never calls it — it is a SNAPSHOT
+    // collaborator — so this moves no count here; it is present so the benchmark builds the
+    // same complete pass snapshot production builds rather than a half of one.
+    modules.essenceResolver.findMatchingComponent
   );
   const resolutionModeService = new modules.ResolutionModeService(craftingSystemManager);
   const signatureValidator = new modules.SignatureValidator(craftingSystemManager);
@@ -233,6 +252,8 @@ export function createBenchWorld({
     signatureValidator,
     recipeVisibility,
     localize: (key) => key,
+    // Same as above (issue 1228): a snapshot collaborator the workbench never calls itself.
+    resolveComponentForItem: modules.essenceResolver.findMatchingComponent,
   });
   const craftingEngine = new modules.CraftingEngine(recipeManager);
 
