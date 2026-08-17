@@ -2185,6 +2185,22 @@ Gathering: `progressive` and `routed` render all five; `d100` renders Modifiers 
 
 ## Crafting App (Player)
 
+### Shared-store refresh routing
+
+The unified window holds five shared read-model stores — `crafting`, `inventory`, `alchemy`, `journal` and `gathering` — and a crafting-data change refreshes them SELECTIVELY.
+
+- Each store subscribes to the set of **invalidation domains** (`data-models/spec.md` § Invalidation Domains) it consumes, and refreshes only when a change names one of them.
+  A subscription set is DERIVED from the one authored domain-to-consumer mapping; a surface MUST NOT restate it inline, because a second copy is exactly the drift the derivation exists to remove.
+- The five stores' consumers are: `crafting`, `inventory` and `alchemy` consume all seven domains; `journal` consumes six and NOT `narrative`; `gathering` consumes `labelling`, `component-definitions` and `access-and-knowledge` only.
+- A change that names no domain refreshes every store.
+- A change to an actor's held items belongs to the `held-inventory` domain and refreshes exactly that domain's consumers, filtered to actors this window reads from.
+- The shell reloads the inventory listing through the store's bulk-run guard and MUST NOT call the store's direct load seam, on any of these paths.
+- The selectable component-source ACTOR list is refreshed alongside the `crafting` store.
+  It holds actors rather than a definition-derived read model, so it has no fact class of its own and is not a taxonomy store.
+
+Which store a given change reaches is a claim about rendered behaviour, so it MUST be proved by MOUNTING the shell and driving one single-domain change per domain, with the expectation computed from the shipped domain-to-consumer mapping rather than restated as a second table.
+A source-text guard cannot see it: the subscription sites sit within a few hundred characters of one another, so a windowed text match is satisfied by any of them.
+
 ### Actor and Sources
 
 - A persistent app header appears above the tab content and replaces separate
@@ -3024,6 +3040,8 @@ It is opened from the `Gathering` header action in the Items directory and must 
 
 ### App Availability
 
+- The gathering listing refreshes on a crafting-data change only when that change names `labelling`, `component-definitions` or `access-and-knowledge` — the three invalidation domains it consumes, per _Shared-store refresh routing_ above.
+  The set is read from the derived transpose, never restated here.
 - The app is available only when at least one crafting system has `features.gathering === true`.
 - If no crafting system exposes gathering, the Items directory must not show the `Gathering` action.
 
@@ -3286,6 +3304,8 @@ It is a tab in the unified Fabricate window (`Crafting`, `Alchemy`, `Gathering`,
 
 Scope:
 
+- The Journal does NOT consume the `narrative` invalidation domain: it reads no authored description anywhere, and its flavour fields are empty by construction.
+  An edit that changes only prose therefore MUST NOT rebuild it — see _Shared-store refresh routing_ above and `data-models/spec.md` § Invalidation Domains.
 - The Journal **monitors** active and historical runs and, for crafting only, **advances** them.
 - It never CREATES runs; run creation stays in the Crafting, Alchemy, and Gathering flows.
 - It is the unified player home for the per-activity run views described elsewhere in this spec — the Crafting tab _Run Summary_, the Alchemy tab _Active Runs and History_, and the Gathering App _Active Runs_ / _History_.
