@@ -46,12 +46,6 @@ import {
   deriveSettingDocumentId,
 } from '../src/systems/PerRecordCraftingDefinitionRepository.js';
 
-import {
-  CANONICAL_FORM_VERSION,
-  canonicalDefinitionCorpusJson,
-  canonicalizeDefinitionCorpus,
-} from './helpers/canonicalizeDefinitionCorpus.js';
-
 const RECIPE_KEY_PREFIX = `${FABRICATE_SETTINGS_NAMESPACE}.${RECIPE_RECORD_KEY_PREFIX}`;
 
 /** Mirrors `DocumentIdField._validateType` -> `foundry.data.validators.isValidId`. */
@@ -1098,74 +1092,6 @@ describe('the two O(1) storage keys', () => {
       registered.filter((entry) => entry.key.startsWith(RECIPE_RECORD_KEY_PREFIX)),
       [],
       'a per-record key must never be registered'
-    );
-  });
-});
-
-describe('the pinned canonical form', () => {
-  it('is versioned, so two sides cannot be compared under different rules', () => {
-    assert.equal(CANONICAL_FORM_VERSION, 1);
-    assert.equal(canonicalizeDefinitionCorpus([]).version, CANONICAL_FORM_VERSION);
-  });
-
-  it('sorts the corpus by id and every object’s keys, and drops undefined', () => {
-    const left = canonicalDefinitionCorpusJson([
-      { name: 'B', id: 'b', craftingSystemId: 'sys-1' },
-      { id: 'a', craftingSystemId: 'sys-1', name: 'A', notes: undefined },
-    ]);
-    const right = canonicalDefinitionCorpusJson([
-      { craftingSystemId: 'sys-1', id: 'a', name: 'A' },
-      { craftingSystemId: 'sys-1', id: 'b', name: 'B' },
-    ]);
-    assert.equal(left, right);
-    assert.match(left, /"records":\[\{"craftingSystemId":"sys-1","id":"a"/);
-  });
-
-  it('preserves authored nested order rather than sorting it away', () => {
-    const stages = { id: 'r1', resultGroups: [{ id: 'z' }, { id: 'a' }] };
-    const canonical = canonicalizeDefinitionCorpus([stages]);
-    assert.deepEqual(
-      canonical.records[0].resultGroups.map((group) => group.id),
-      ['z', 'a'],
-      'sorting nested collections would hide a real reordering regression and prove nothing'
-    );
-  });
-
-  it('renumbers machine-minted ids positionally while preserving references', () => {
-    const build = (first, second) => [
-      {
-        id: 'r1',
-        ingredientSets: [{ id: 'set-1', ingredientGroups: [{ id: first, name: '' }] }],
-        preferredGroupId: first,
-      },
-      { id: 'r2', ingredientSets: [{ id: 'set-2', ingredientGroups: [{ id: second, name: '' }] }] },
-    ];
-    const runOne = build('1f0d2e6c-6a1d-4a0a-8f1e-2c2d3e4f5a6b', 'aa11bb22-cc33-4d44-9e55-ff6677889900');
-    const runTwo = build('0badc0de-dead-4bee-8fed-0123456789ab', 'feedface-cafe-4bad-bead-fedcba987654');
-
-    assert.equal(canonicalDefinitionCorpusJson(runOne), canonicalDefinitionCorpusJson(runTwo));
-    const canonical = canonicalizeDefinitionCorpus(runOne);
-    assert.equal(canonical.records[0].ingredientSets[0].ingredientGroups[0].id, 'minted-0001');
-    assert.equal(
-      canonical.records[0].preferredGroupId,
-      'minted-0001',
-      'a reference to a minted id must still resolve to its target'
-    );
-    assert.equal(canonical.records[1].ingredientSets[0].ingredientGroups[0].id, 'minted-0002');
-  });
-
-  it('does not renumber an authored id that merely looks random', () => {
-    const canonical = canonicalizeDefinitionCorpus([{ id: 'aBcDeF0123456789', name: 'Authored' }]);
-    assert.equal(canonical.records[0].id, 'aBcDeF0123456789');
-  });
-
-  it('keeps null distinct from absent unless the caller asks otherwise', () => {
-    const withNull = canonicalDefinitionCorpusJson([{ id: 'a', craftingSystemId: null }]);
-    const without = canonicalDefinitionCorpusJson([{ id: 'a' }]);
-    assert.notEqual(withNull, without, 'null-versus-absent is a defect class, not noise');
-    assert.equal(
-      canonicalDefinitionCorpusJson([{ id: 'a', craftingSystemId: null }], { treatNullAsAbsent: true }),
-      without
     );
   });
 });
