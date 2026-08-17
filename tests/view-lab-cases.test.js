@@ -31,6 +31,7 @@ import {
   mapChangedFilesToCases,
   normalizePath,
   parseLabActorTableRegions,
+  parsePlayerMountRegions,
   publishableCases,
   WORLD_PARTIES_SEARCH_TERM,
 } from '../scripts/lib/viewLabCases.js';
@@ -1634,10 +1635,12 @@ test('every case records the smoke labels it corresponds to', () => {
 
 const REGISTRY_PATH = 'scripts/lib/viewLabCases.js';
 const LAB_ACTORS_PATH = 'tests/view-lab/world/labActors.js';
+const LAB_MOUNT_PATH = 'tests/view-lab/mount.js';
 const RUNNER_PATH = 'scripts/view-lab-screenshots.mjs';
 const sourceOf = (path) => readFileSync(resolve(ROOT, path), 'utf8').split('\n');
 const registrySource = sourceOf(REGISTRY_PATH);
 const labActorsSource = sourceOf(LAB_ACTORS_PATH);
+const labMountSource = sourceOf(LAB_MOUNT_PATH);
 
 /** @returns {string[]} The ids a changed set selects, in registry order. */
 const selectedIds = (files, options) =>
@@ -2088,6 +2091,22 @@ function tableNameByLine() {
   return byLine;
 }
 
+/**
+ * The marked region each `mount.js` line sits in, derived the way the selector derives it — by
+ * calling the selector's own parser rather than re-walking the markers here.
+ *
+ * @returns {Map<number, string>} Line number -> region key, for lines inside a marked region.
+ */
+function mountRegionNameByLine() {
+  const regions = parsePlayerMountRegions(labMountSource);
+  assert.ok(regions, `${LAB_MOUNT_PATH} no longer parses into its marked regions`);
+  const byLine = new Map();
+  for (const { key, start, end } of regions) {
+    for (let line = start; line <= end; line += 1) byLine.set(line, key);
+  }
+  return byLine;
+}
+
 /** One `size`-line window index per file, so a five-thousand-line scan happens once, not per query. */
 const windowIndexes = new Map();
 
@@ -2254,17 +2273,19 @@ test('no recurring window mixes inside-a-region with outside-every-region, so th
   // the true edit may be that candidate and code outside a case literal can move every frame.
   //
   // Reaching that short-circuit needs a window occurring BOTH inside a region and outside every
-  // region. NEITHER attributed input contains one: not this registry, and not `labActors.js`, whose
-  // four fixture tables share the region machinery. So there is nothing real to assert it against,
-  // and a synthetic file would only prove the test can build one.
+  // region. NONE of the three region-attributed inputs contains one: not this registry, not
+  // `labActors.js`, whose four fixture tables share the region machinery, and not `mount.js`,
+  // whose four marked regions share it too. So there is nothing real to assert it against, and a
+  // synthetic file would only prove the test can build one.
   //
-  // Both inputs are measured rather than one, because the claim is about the short-circuit and the
-  // short-circuit serves both. If this ever fails, that input has grown exactly the fixture the
-  // branch is missing: name it here and assert the answer is the whole corpus, NOT the union of the
-  // regions the other occurrences sit in.
+  // All three are measured rather than one, because the claim is about the short-circuit and the
+  // short-circuit serves all of them. If this ever fails, that input has grown exactly the fixture
+  // the branch is missing: name it here and assert the answer is the whole corpus, NOT the union of
+  // the regions the other occurrences sit in.
   for (const [where, source, owner] of [
     ['the registry', registrySource, caseIdByLine()],
     [LAB_ACTORS_PATH, labActorsSource, tableNameByLine()],
+    [LAB_MOUNT_PATH, labMountSource, mountRegionNameByLine()],
   ]) {
     const mixed = recurringWindows(source, owner, 7).filter(
       (window) => window.ids.some(Boolean) && window.ids.some((id) => !id)
@@ -2937,6 +2958,303 @@ test('parseLabActorTableRegions refuses tables whose spans overlap', () => {
     parseLabActorTableRegions([...tableBlock('INVENTORIES'), ...tail]),
     'the control fixture must parse'
   );
+});
+
+// ───────────────────────────────────────────────────────────────────────────────────────────────
+// `mount.js`, attributed by MARKED region (issue 1198).
+//
+// The page that mounts every frame was an unattributed lab input, so any edit to it selected the
+// whole corpus — which is what the PR introducing the player companion seam would have done to
+// itself. Four of its blocks only the PLAYER window can render, and each is marked in the file
+// rather than found by column, because two of them sit inside functions the Manager window runs
+// too (`readParams` and `settle`). Keying on those FUNCTIONS would claim a readership the file
+// does not have: a later edit to a manager query param would then select the player frames and
+// publish no evidence for the manager frames it moved — a silent wrong narrowing, which is the
+// one outcome this whole table exists to make unreachable.
+// ───────────────────────────────────────────────────────────────────────────────────────────────
+
+const labMountLineOf = (text) => lineOf(labMountSource, text, LAB_MOUNT_PATH);
+
+/** @returns {object} The `patches` option carrying one patch for the lab's mount page. */
+const labMountPatches = (lineNumbers) =>
+  patchesFor(LAB_MOUNT_PATH, patchAdding(labMountSource, lineNumbers));
+
+/**
+ * One anchor line inside each declared region, so every key is pinned rather than sampled.
+ *
+ * A multi-key region entry requires ALL its keys to parse or it widens, so a region left
+ * unpinned here is a region whose spelling can drift back to a twenty-minute capture unnoticed.
+ */
+const MOUNT_REGION_ANCHORS = [
+  ['player-extension-params', "    playerProvider: params.get('playerProvider') === '1',"],
+  [
+    'lab-player-provider',
+    "      tab('board', 'Board', 'Downtime board and pending decisions', 'fas fa-chart-simple'),",
+  ],
+  ['mount-player-app', '    extensionSurfaces: deriveExtensionSurfaces(playerExtensions),'],
+  ['player-settle-stores', '      if (pending.length === 0) break;'],
+];
+
+test('a mount.js patch confined to a player region selects every player frame and only those', () => {
+  const players = playerCaseIds();
+  for (const [region, text] of MOUNT_REGION_ANCHORS) {
+    const patches = labMountPatches([labMountLineOf(text)]);
+    assert.deepEqual(
+      selectedIds([LAB_MOUNT_PATH], patches),
+      players,
+      `a change inside the "${region}" region must select every player frame and no manager frame`
+    );
+    // Derived, not listed, and shift-proof for the same reason every other input is: a merge
+    // commit moves the header's numbers and moves nothing the hunk is anchored by.
+    assert.deepEqual(
+      selectedIds(
+        [LAB_MOUNT_PATH],
+        patchesFor(LAB_MOUNT_PATH, shiftHunkHeaders(patches.patches[LAB_MOUNT_PATH], 200))
+      ),
+      players,
+      `a shifted "${region}" patch must select the same frames`
+    );
+  }
+
+  // The removal shape too, on the region a real PR is most likely to EDIT rather than append to:
+  // a param default is rewritten in place, not added beside itself. Asserted against the
+  // addition's own answer so the two cannot drift apart.
+  const line = labMountLineOf(MOUNT_REGION_ANCHORS[0][1]);
+  assert.equal(
+    windowOccurrences(labMountSource, line),
+    1,
+    'this line no longer anchors uniquely, so it cannot assert a single selection'
+  );
+  for (const [shape, patch] of [
+    ['a one-line edit', patchEditing(labMountSource, { line })],
+    ['a deletion-only hunk', patchEditing(labMountSource, { line, removed: 3, replaced: false })],
+  ]) {
+    assert.deepEqual(
+      selectedIds([LAB_MOUNT_PATH], patchesFor(LAB_MOUNT_PATH, patch)),
+      players,
+      `${shape} in the query-param region must select every player frame and only those`
+    );
+  }
+});
+
+test('a mount.js change outside its player regions selects every publishable case', () => {
+  const everything = publishableCases().length;
+
+  // The first line is the proof that the marking is doing the work rather than the function
+  // name: it is a query param inside the SAME `readParams()` the player block sits in, three
+  // lines away from it and outside the markers, and it must widen. The rest are the shared
+  // machinery every frame of both windows renders through.
+  for (const line of [
+    "    colorScheme: params.get('colorScheme') === 'light' ? 'light' : 'dark',",
+    '  const determinismStyle = installDeterminismStyles();',
+    'function borrowInstance(AppClass, fields) {',
+    '  const services = props.services;',
+  ]) {
+    assert.equal(
+      selectedIds([LAB_MOUNT_PATH], labMountPatches([labMountLineOf(line)])).length,
+      everything,
+      `a change to \`${line.trim()}\` must select every frame`
+    );
+  }
+
+  // And with no patch at all, which is how every caller but the capture workflow asks — the
+  // shipped "every lab input the registry cannot attribute still selects every publishable case"
+  // list keeps this path, and this is the same claim stated where the narrowing is explained.
+  assert.equal(selectedIds([LAB_MOUNT_PATH]).length, everything);
+  assert.equal(selectedIds([LAB_MOUNT_PATH], { patches: {} }).length, everything);
+});
+
+test('the four mount.js regions the selector keys on are still marked in the file', () => {
+  // A missing or re-worded marker fails SAFE — the parse returns null and the whole corpus is
+  // selected — which is correct and invisible: the only symptom would be a capture job quietly
+  // back at twenty minutes. So it has to fail LOUDLY here too.
+  const missing = MOUNT_REGION_ANCHORS.map(([region]) => region).filter(
+    (region) => !labMountSource.some((line) => line.trim() === `// view-lab-region:${region}`)
+  );
+  assert.deepEqual(
+    missing,
+    [],
+    'these regions are no longer marked in the mount page, so `parsePlayerMountRegions` refuses ' +
+      `the file and every mount.js change captures the whole corpus again:\n  ${missing.join('\n  ')}`
+  );
+
+  const opens = labMountSource.filter(
+    (line) => line.trim().startsWith('// view-lab-region:') && line.trim() !== '// view-lab-region:end'
+  ).length;
+  const closes = labMountSource.filter(
+    (line) => line.trim() === '// view-lab-region:end'
+  ).length;
+  assert.equal(opens, MOUNT_REGION_ANCHORS.length, 'every marked region is a declared region');
+  assert.equal(closes, opens, 'every marked region is closed');
+});
+
+// ───────────────────────────────────────────────────────────────────────────────────────────────
+// `parsePlayerMountRegions`, driven directly.
+//
+// The tests above reach it only through `mapChangedFilesToCases`, over the file this repo ships —
+// which is well-formed, so every one of its refusals is unreachable from there. It is a pure
+// function of an injected `string[]`, so a synthetic fixture needs no file and no path injection.
+// ───────────────────────────────────────────────────────────────────────────────────────────────
+
+/** The marked regions, authored the way the mount page authors them. */
+const mountRegionBlock = (key, { close = true } = {}) => [
+  `  // view-lab-region:${key}`,
+  `  ${key}: params.get('${key}') === '1',`,
+  ...(close ? ['  // view-lab-region:end'] : []),
+];
+
+/** Every declared key, in the order the file marks them. */
+const DECLARED_MOUNT_REGIONS = MOUNT_REGION_ANCHORS.map(([region]) => region);
+
+const wellFormedMountSource = () => DECLARED_MOUNT_REGIONS.flatMap((key) => mountRegionBlock(key));
+
+test('parsePlayerMountRegions maps each marked region to its own span', () => {
+  const regions = parsePlayerMountRegions(wellFormedMountSource());
+  assert.ok(regions, 'a well-formed file must parse');
+  assert.deepEqual(
+    regions,
+    DECLARED_MOUNT_REGIONS.map((key, index) => ({
+      key,
+      start: index * 3 + 1,
+      end: index * 3 + 3,
+    })),
+    'each region must span exactly its own marked block, so the spans are disjoint and every ' +
+      "line inside one belongs to no other — which is what makes `regionsTouchedAt`'s first-match " +
+      'lookup an attribution rather than a guess'
+  );
+});
+
+test('parsePlayerMountRegions refuses every shape whose spans would be a guess', () => {
+  const wellFormed = wellFormedMountSource();
+  for (const [why, source] of [
+    [
+      'a marker naming a region the selector has no predicate for',
+      [...wellFormed, ...mountRegionBlock('player-nothing-declares-this')],
+    ],
+    ['a region left open', [...wellFormed, ...mountRegionBlock('mount-player-app', { close: false })]],
+    [
+      'a nested opener, which would attribute one block under two keys',
+      [
+        '  // view-lab-region:mount-player-app',
+        '  // view-lab-region:lab-player-provider',
+        '  // view-lab-region:end',
+        '  // view-lab-region:end',
+      ],
+    ],
+    ['a close with nothing open', ['  // view-lab-region:end', ...wellFormed]],
+    ['a declared region nothing marks', wellFormed.slice(3)],
+    [
+      'the same region marked twice, whose two spans cannot both be it',
+      [...wellFormed, ...mountRegionBlock(DECLARED_MOUNT_REGIONS[0])],
+    ],
+  ]) {
+    assert.equal(
+      parsePlayerMountRegions(source),
+      null,
+      `${why} must refuse the file, so the selection widens to the corpus rather than narrowing wrongly`
+    );
+  }
+
+  // The control, so the six refusals above are about the shapes and not about the fixture.
+  assert.ok(parsePlayerMountRegions(wellFormed), 'the control fixture must parse');
+});
+
+test('the player companion cases photograph the seam through the production registry', () => {
+  const surface = getCaseById('player-extension-surface');
+  const narrow = getCaseById('player-extension-surface-narrow');
+  const fault = getCaseById('player-extension-fault');
+  const mountSource = readFileSync(resolve(ROOT, LAB_MOUNT_PATH), 'utf8');
+  const lang = JSON.parse(readFileSync(resolve(ROOT, 'lang/en.json'), 'utf8'));
+
+  for (const viewCase of [surface, narrow, fault]) {
+    assert.equal(viewCase.app, 'fabricate-app');
+    assert.equal(viewCase.reaches, 'beyond');
+    // An empty ARRAY, never an omitted field: `beyond` and a claimed smoke label are the pair the
+    // honesty contract forbids, and an omission would read as an unanswered question.
+    assert.deepEqual(viewCase.smokeLabels, []);
+    assert.equal(viewCase.query.tab, 'ext:downtime:projects');
+    assert.equal(viewCase.query.playerProvider, '1');
+    // Every one of the five files a Core frame of this seam can show, so a change to any of them
+    // selects these frames rather than an unrelated one.
+    for (const file of [
+      'src/ui/svelte/apps/PlayerExtensionHost.svelte',
+      'src/ui/svelte/apps/FabricateAppRoot.svelte',
+      'src/ui/playerExtensions.js',
+      'src/ui/playerNavModel.js',
+      'src/ui/extensionRegistry.js',
+    ]) {
+      assert.ok(
+        viewCase.sourceMatches.some((pattern) => pattern.test(file)),
+        `${viewCase.id} must claim ${file}`
+      );
+    }
+  }
+
+  // The narrow frame photographs BOTH gaps: the enforced minimum window size, rendered rather
+  // than asserted about a larger frame, and the rail label's worst case.
+  assert.deepEqual(narrow.position, { width: 1024, height: 640 });
+  assert.ok(narrow.kinds.includes('responsive'));
+  assert.equal(narrow.query.longPlayerLabels, '1');
+  assert.ok(
+    narrow.expectNoHorizontalOverflow.includes('.fabricate-app-nav'),
+    'the rail is the point of the long-label frame: an untruncated label spills into its column'
+  );
+  assert.equal(fault.query.playerProviderFault, '1');
+
+  // The `aria-label` values are hand-copied from the stand-in provider, so the registry is a
+  // MIRROR of `mount.js` and mirrors rot silently — a relabelled stand-in would leave the capture
+  // asserting an attribute value nothing renders, and that fails the job WHOLE.
+  const railLabel = (viewCase) =>
+    viewCase.expectAttributes.find((entry) => entry.name === 'aria-label')?.value;
+  const [, short, long] =
+    /tab\('projects', '([^']+)', '([^']+)'/.exec(mountSource)?.slice(0) ??
+    assert.fail('the stand-in provider no longer declares a `projects` tab');
+  assert.equal(railLabel(surface), `Open ${short}`);
+  assert.equal(railLabel(narrow), `Open ${long}`);
+
+  // And the fault frame's caption is the shipped Core string, not a paraphrase of it.
+  assert.ok(
+    fault.expectVisible.includes(lang.FABRICATE.App.Extension.FaultTitle),
+    'the fault frame expects Core’s own diagnostic copy verbatim'
+  );
+
+  // Containment is REPORTED by design, so the one frame whose subject is that report would fail
+  // the driver's console gate. The lab swallows exactly that message, only for a case that asked
+  // for a fault — pinned here because a widened prefix would start hiding real errors, and
+  // because the message it excuses is the shipped host's, so it is a mirror like any other.
+  const host = readFileSync(
+    resolve(ROOT, 'src/ui/svelte/apps/PlayerExtensionHost.svelte'),
+    'utf8'
+  );
+  assert.match(
+    mountSource,
+    /const EXPECTED_PLAYER_FAULT_REPORT = 'Fabricate \| Player extension mount failed:';/,
+    'the lab must excuse a message it names in full, never a prefix or a category'
+  );
+  assert.ok(
+    host.includes("'Fabricate | Player extension mount failed:'"),
+    'and that message must still be the one the shipped host reports'
+  );
+  assert.match(
+    mountSource,
+    /if \(params\.playerProviderFault\) \{[\s\S]{0,400}console\.error = /,
+    'the swallow is gated on the fault case, so every other frame still fails on any error'
+  );
+  // And it stands in for no assertion: the fault frame's own `expectSelector` names Core's fault
+  // stamp, which the shell renders only from its faulted-provider branch.
+  assert.match(fault.expectSelector, /data-player-extension-fault/);
+
+  // The lab registers through the PRODUCTION page-session registry and derives the snapshot with
+  // the same function the application host calls. Passing the registry alone would render an
+  // empty rail: the shell subscribes to nothing by design, and this file never runs
+  // `_registerHooks()`, so nothing else would compute `extensionSurfaces`.
+  assert.match(mountSource, /playerProvider: params\.get\('playerProvider'\) === '1'/);
+  assert.match(
+    mountSource,
+    /params\.playerProvider[\s\S]{0,400}registerPlayerNavProvider/,
+    'the companion frames register through the production registry'
+  );
+  assert.match(mountSource, /extensionSurfaces: deriveExtensionSurfaces\(playerExtensions\)/);
 });
 
 test('the capture runner still selects every publishable case, and records that decision', () => {

@@ -7,7 +7,8 @@ nav_order: 2
 
 # ADR 0002 — the fabricate-premium companion architecture
 
-**Status:** Accepted — **D6-a, core builds the `CraftingSystem.extensions` slot now**, and **premium hosts the player-facing Downtime window in its own Foundry Application**, neither of which is the option this record recommended.
+**Status:** Accepted — **D6-a, core builds the `CraftingSystem.extensions` slot now**, and, **as revised on 2026-08-17, core builds a general player navigation extension seam and premium's player-facing Downtime mounts into Fabricate's own player window**, neither of which is the option this record recommended.
+The hosting half of D7 as accepted on 2026-08-16 — premium hosting that window in its own Foundry Application — is **reversed**; see the revision entry under *Decision*.
 Eight of the eleven decisions were taken as recommended; D1 is narrowed to the monorepo with the lane question left to the first real build; **D2 is demoted from a decision to a channel choice**, because the maintainer's ruling is that distribution is not an architectural constraint; and D6 and D7 diverge.
 Confidentiality is not a constraint either — Fabricate does not defend GM-withheld information at the transport layer, in either module — which removes D7's premise rather than overruling it.
 Following ADR 0001, the *Recommendation*, the kill criteria, the risk table and every measurement below record the evidence this decision was taken against, not a competing conclusion, and they have not been edited to agree with it.
@@ -914,7 +915,7 @@ One further position, the premium signal, withdraws a statement made in issue 61
 | **D4** | **D4-b** — the DOM handoff, as recommended | Measured rather than argued, and it is the only decision in this record that is already built and shipped |
 | **D5** | **D5-b** — narrow and version the API, **yes**, and explicitly **for other module developers** rather than only for premium | It lands **alongside** premium's first release, not before it, so the narrowing is sized against a real consumer instead of a hypothetical one. Naming third-party developers as the audience is what makes it a published contract rather than a private arrangement between two modules with the same author, and it is the same audience D3's third-party position addresses |
 | **D6** | **D6-a** — core builds `CraftingSystem.extensions` now. **Diverges from the recommendation** | Premium's data does need to travel inside a crafting-system export, which is precisely the trigger D6-c named, so deferring only moves the same work later and under more pressure. See the subsection below for what it pulls onto the critical path |
-| **D7** | **D7-a** carried, and **premium ships its own Foundry module and its own Application** for the Player Downtime window. **The hosting half diverges from the recommendation** | Confidentiality is not a constraint, which removed D7's premise; hosting is then answered by premium owning the window outright rather than by core building a second seam or deferring the surface. See the subsection below |
+| **D7** | **D7-a** carried, and — **as revised on 2026-08-17** — **premium ships its own Foundry module and mounts its player-facing Downtime into Fabricate's own player window** through a general, surface-keyed player navigation extension seam core builds. **The hosting half diverges from the recommendation** | Confidentiality is not a constraint, which removed D7's premise. Hosting was first answered by premium owning the window outright; the maintainer has since reversed that half, so core builds the player-side seam after all. The 2026-08-16 wording of this row — premium's own Application — no longer holds. See the D7 subsection and the revision entry below |
 | **D8** | **D8-a** — trusted same-realm code, as recommended | Isolation was measured not to hold, so the honest form of this arm is core closing its two cheap gaps and the six companion obligations being written down as obligations rather than described as enforcement |
 | **D9** | **D9-b** as the target shape, with the **immediate** step a simple build of the premium module in the `fabricate-premium` repository, tested manually and locally | The automated two-module Foundry tier is deferred behind that build. The build is also the instrument that settles D1-a versus D1-c, the Svelte version-skew gap and the real-browser gap, which is why all three are listed as open under *What was NOT established* rather than assumed |
 | **D10** | **D10-b** — premium adopts `AGENTS.md`, `.agents/skills/` and both provider binding directories, **yes** | `validate:agents` is dependency-free and derives its role list from the bindings table, so a second repository inherits the whole role system by adding four things and running one script, and drift becomes a failing check instead of a silent divergence |
@@ -973,6 +974,10 @@ If downtime party decoration must survive some other kind of export, that is a n
 
 ### D7 diverges on hosting, and its premise was already removed
 
+**Read this subsection with the 2026-08-17 revision entry below.**
+Its account of the premise is unchanged and still governs, but its hosting answer — premium's own Foundry Application — has been reversed: core builds a general player navigation extension seam and premium's Downtime mounts into Fabricate's player window.
+The 2026-08-16 reasoning is left standing below rather than rewritten, because it is what the revision reverses.
+
 Two separate things happened to D7 and they should not be conflated.
 
 **First, the premise was removed.**
@@ -1018,6 +1023,38 @@ These in particular are closed, and a successor should not reopen them as unknow
   It does, so verifying this record's V14-only readings on V13 is scheduled work rather than a standing caveat.
 
 What is genuinely still open is listed under *What was NOT established*, and the planned local premium build settles several of those items rather than leaving them to a successor.
+
+### Revision 2026-08-17 — the hosting half of D7 is reversed, and core builds the player seam
+
+**Revised 2026-08-17 (issue 1198).**
+The maintainer has reversed the **hosting half** of D7.
+Premium's player-facing Downtime does **not** ship as premium's own Foundry Application; it mounts into Fabricate's existing player window through a **general, surface-keyed player navigation extension seam that core builds**, mirroring the shipped Manager seam's registration, lifecycle, fault containment and hook contract.
+Everything else D7 settled stands: **D7-a is unchanged**, the GM relay is still struck, and the confidentiality position that removed D7's premise is untouched.
+
+The reversal is recorded here rather than backfilled into the sections it contradicts, exactly as the two 2026-08-16 divergences were.
+It falsifies **seven** statements in this record.
+Four of them sit in places a successor is instructed not to reopen, so they are named here and left standing:
+
+- the D7 subsection's claim that **D8's containment analysis does not apply to that window**, "because core makes no call into it and hands it no element".
+  Under this change core does both: it owns the window, hands the companion a target and calls its `mount`.
+  D8's containment analysis and the six companion obligations therefore now govern the player window as well as the GM surface.
+- *What this record no longer leaves open* → "**Who hosts the player-facing Downtime window.** Premium does, in its own module and its own Application".
+  Premium still ships its own module; it no longer hosts that window.
+- the D7 subsection's claim that **the unscoped player-side registry that made deferral attractive is not needed at all**.
+  A player-side seam is needed and is built — but the built seam is **surface-keyed**, not the unscoped registry that was rejected, so this is not a reversal of that rejection's reasoning.
+- *What this record no longer leaves open* → "**Whether core ships an advertisement for premium.** It does".
+  Still true of the GM Manager, and now explicitly **bounded**: the player window carries **no premium signal in any state** — no badge, no padlocked entry, no teaser tab, no upgrade offer, no call to action, whether or not a companion is installed.
+  The Manager title bar's `PREMIUM` badge is widened by the same change to light for a registration in **either** registry, and it stays Manager chrome.
+
+Three further statements assert premium's own Application, and none of them sits in a protected artifact, so they are **corrected in place** rather than merely named — a revision entry buried here would otherwise leave the most-read lines of the document asserting the opposite:
+
+- the record's **Status line**;
+- the *Decision* table's **D7 row**, and the **opening of the D7 subsection**;
+- the *Consequences* entry granting the `fabricate-premium` repository **its own Foundry Application for the Player Downtime window**.
+
+Deliberately left unedited, because they record the evidence this record was decided against and ADR 0001's precedent protects four artifacts rather than three: **D7-a**, the **confidentiality** position, and every *Recommendation*, **kill criterion**, **risk table row** and measurement — including the *Recommendation* table's D7 row and its corresponding risk row, which the 2026-08-16 D7 subsection already declares are left as written.
+
+The seam itself is specified in `openspec/specs/ui-integration/spec.md` §Player Navigation Extension, documented for third parties in `docs/api/index.md`, and carries its own `DOMAIN.md` row beside the Manager one.
 
 ---
 
@@ -1080,7 +1117,7 @@ The recommendation is that they are outside it and that the specification says s
 That row today ends with "This seam neither extends nor uses the **Gathering Party** aggregate", which is correct about the shipped seam and is exactly what D11-a changes.
 Both of its conditional rows are now unconditional: D6-a needs an `extensions[pluginId]` key space that core does not model, so a **Companion Identity** row is required and the concept is a precondition rather than an option, and a `slice` row is required because D6-a is selected.
 
-**The `fabricate-premium` repository** gains: its own code build — a simple local build first, tested manually, with the lane question settled by what that build costs — plus core's role system and `validate:agents` under D10-b, a runtime guard on `game.modules.get('fabricate')`'s version, its own `socket: true` and `module.fabricate-premium` namespace, a disjoint localization root, **its own Foundry Application for the Player Downtime window** under D7, writes into core's `extensions` slice through the plugin-scoped update API under D6-a, its own migration line independent of `fabricate.migrationVersion` for everything it keeps outside that slice, a CI check that **fails if any dev or smoke artifact carries `protected: true`** (without which F-K4's non-firing is a capability rather than a control), and a CI check that fails if any file bearing core's PolyForm header lands in a shipped module — so the non-copying property stays true rather than merely being true today.
+**The `fabricate-premium` repository** gains: its own code build — a simple local build first, tested manually, with the lane question settled by what that build costs — plus core's role system and `validate:agents` under D10-b, a runtime guard on `game.modules.get('fabricate')`'s version, its own `socket: true` and `module.fabricate-premium` namespace, a disjoint localization root, **a registered player navigation provider mounting its Player Downtime into Fabricate's own player window** under D7 as revised on 2026-08-17 (it gains no Foundry Application of its own for that window), writes into core's `extensions` slice through the plugin-scoped update API under D6-a, its own migration line independent of `fabricate.migrationVersion` for everything it keeps outside that slice, a CI check that **fails if any dev or smoke artifact carries `protected: true`** (without which F-K4's non-firing is a capability rather than a control), and a CI check that fails if any file bearing core's PolyForm header lands in a shipped module — so the non-copying property stays true rather than merely being true today.
 
 **`docs/api/index.md`** gains two things D5 and D3 put there rather than here.
 The third-party position must be stated where a third party will read it: a **free** companion is welcome under PolyForm NC with no permission and no contact, and a **paid** one needs a commercial licence from the maintainer.

@@ -2424,15 +2424,11 @@ The prompt is not shown at all when no selected item has a usable check, and dis
 ### Top-Level Tabs
 
 The player app is a single shared window with a full-height left navigation rail.
-It carries five tabs, in this order:
 
-- **Crafting tab**: always present
-- **Alchemy tab**: conditional — shown when >= 1 crafting system has `resolutionMode === "alchemy"`
-- **Gathering tab**
-- **Journal tab**
-- **Inventory tab**
-
-Alchemy is the only conditional entry; the others are always present.
+- The player app carries five **Core** tabs, in this order: Crafting (always present), Alchemy (conditional — shown when at least one crafting system uses the alchemy resolution mode, `resolutionMode === "alchemy"`), Gathering, Journal, Inventory.
+- Alchemy is the only conditional Core entry.
+- Any tabs contributed by registered **player navigation providers** are appended after the Core tabs, grouped by surface in registration order and within a surface in the provider's own array order (see §Player Navigation Extension).
+- A provider tab is rendered through the same rail control as a Core tab and is addressed by a namespaced route key, so a provider tab id can never collide with a Core tab id and Core never enumerates the ids it accepts.
 
 - The one-tab rule governs the **Crafting / Alchemy pair only**, not the rail as a whole: if only one of those two tab types exists, show that one without a tab bar for the pair.
 - If both exist, show the tab bar and default to last-used or Crafting.
@@ -3351,8 +3347,9 @@ The client-supplied `recipeId` is ignored; trusting it also allowed advancing on
 - Core's Downtime fallback is a read-only four-tab preview whose ids are `tracking`, `activities`, `factions`, and `settings`.
 That list is Core's own preview CONTENT, not part of the extension contract, and no part of the registry reads it.
 - Core's preview and extension registry create, read, and write no downtime record, setting, flag, actor data, reward, world-time state, party role, assignment, mirror, or reference.
-- One page-session API-v1 registry is published as `game.fabricate.api.managerExtensions.registerWorldNavProvider(provider)` and survives the `init` and `ready` API rebinding.
-- The registry holds at most one provider **per surface id** and rejects only a second provider for the same surface.
+- Fabricate publishes **two** page-session API-v1 provider registries, each surviving the `init` and `ready` API rebinding: `game.fabricate.api.managerExtensions.registerWorldNavProvider(provider)` for GM Manager surfaces, and `game.fabricate.api.playerExtensions.registerPlayerNavProvider(provider)` for player-window surfaces (see §Player Navigation Extension).
+- The two registries hold separate surface-id namespaces, so one companion may claim the same surface id in both windows.
+- **The Manager registry** holds at most one provider **per surface id** and rejects only a second provider for the same surface.
 It validates that `id` is a non-empty string and never enumerates the ids it accepts, so a companion may claim a Manager surface Core does not itself render.
 Core's Downtime route reads the surface id `downtime`.
 - A provider is `{ apiVersion: 1, id, tabs, actions?, mount }`.
@@ -3374,8 +3371,8 @@ Core's own `Unlock with Premium` header action belongs to Core's preview and is 
 - When a provider registers, unregisters, or re-registers with a different tab set, an active tab id the new set no longer declares falls back to that set's first tab rather than leaving an empty panel.
 - The Manager rail's Downtime children and the panel's tab strip render the active provider's tabs, or Core's fallback tabs when no provider holds the surface, from one list.
 Core's premium padlocks and rail note advertise Core's preview and are not rendered when a provider holds the surface.
-- The Manager title bar carries a gold `PREMIUM` badge when, and only when, at least one provider is registered on ANY surface id.
-The signal is a claim about the companion module rather than about Core's Downtime route, so a provider claiming a surface Core does not render lights it too.
+- The Manager title bar carries a gold `PREMIUM` badge when, and only when, at least one provider is registered on any surface id, **in either registry**.
+- The signal is a claim about the companion module rather than about Core's Downtime route, so a provider claiming a surface Core does not render lights it too, and **a companion that registers only a player-window surface lights it as well**.
 The free module renders nothing in that slot, and the title bar names no crafting system: the rail's crafting-system selector already does.
 - The rail's Downtime `PREMIUM` chip is prominent while Core's preview holds the surface and MUTED, not removed, while a provider holds it, so the loud signal is stated once and the rail still names the premium route.
 The Downtime rail entry's tooltip states the installed condition rather than an unlock offer whenever a provider holds the surface.
@@ -3388,6 +3385,63 @@ A listener's return value is ignored and nothing a listener does changes what th
 - The Patreon CTA is `https://www.patreon.com/c/mistersilver`, opens `_blank`, carries `rel="noopener noreferrer"`, uses Font Awesome-only imagery, and remains usable at narrow widths and with the Manager rail collapsed.
 - A companion declares Fabricate in `relationships.requires`, which governs dependency availability and activation rather than ordinary-module script priority.
 - A companion attempts registration during its own `init`, uses one idempotent `Hooks.once('ready', tryRegister)` fallback only when the API is absent, retains exactly one unregister handle, and treats `tryRegister` as a no-op after success.
+
+## Player Navigation Extension
+
+- The seam is general and keyed by surface id.
+It is not a downtime feature; Downtime is its first consumer.
+- One page-session API-v1 registry is published as `game.fabricate.api.playerExtensions.registerPlayerNavProvider(provider)` and survives the `init` and `ready` API rebinding.
+- The registry holds at most one provider per surface id, rejects only a second provider for the same surface, and never enumerates the ids it accepts.
+Core renders every registered surface, so no surface id is privileged.
+- **A player surface id is the registering provider's own `id`.**
+The registry keys on it, Core has no player route of its own to name a surface independently, and the two are therefore always equal — including in the hook payloads, which carry both `surfaceId` and `providerId` so the payload shape matches the Manager seam's.
+- A provider is `{ apiVersion: 1, id, tabs, mount }`.
+It declares its own tabs: any ids, at least one of them, rendered in array order.
+- Core validates tab shape only — a non-empty id unique within the set, a `label`, a Font Awesome `icon`, and optional non-empty `accessibleName` and `tooltip` — and never tab membership, count or order.
+The provider id and every tab id match a lowercase alphanumeric-and-hyphen charset bounded in length, because the composed route key is rendered into an HTML `id`, an IDREF token list, a `data-` attribute value and a query parameter.
+This constrains the shape of an id, not the set of ids Core accepts.
+- **`label` is final display text.**
+Core renders a provider's `label` verbatim and localizes only its own tab labels, exactly as the Manager seam does.
+**`icon` is a full Font Awesome class list**, rendered verbatim, and Core prefixes the family only for its own tabs.
+- **Core reads only the documented tab fields.**
+Any other field on a provider tab is ignored, so a field Core does not validate can never reach the rendered rail.
+- A player provider **adds** tabs and never replaces Core content.
+It carries no route chrome and no header actions, because the player window has no route header, breadcrumb trail or header-action group.
+- A conflicting provider on the same surface, an unsupported version, an empty or duplicated tab set, a malformed tab, an id outside the permitted shape, or an asynchronous mount fails with a deterministic error.
+- `mount({ target, tabId, context })` is synchronous and returns a cleanup function or nothing.
+`tabId` is always the provider's own bare tab id, never the route key.
+- `context` is frozen, replaced rather than mutated, and carries `{ schemaVersion, surface: 'player', surfaceId, tabId, actorId, isGM, revision, requestRemount }` and no Core store, document or component.
+`actorId` is the shared Actor selection top bar's current selection or `null`; `isGM` is presentation and never an authorization gate, **and it is true for assistant GMs as well as GMs**; `requestRemount()` asks Core to run the current cleanup, clear the target, and call `mount` again with a fresh context whose `revision` has advanced.
+- **Core applies no visibility or permission gate to a provider tab.**
+Unlike the Manager seam the player window has no GM gate, so every user who can open the window sees every registered provider's tabs.
+Any GM-only, owner-only or entitlement-scoped presentation happens inside the companion's own mount, and Core renders no per-user gating hook in v1.
+- **The player window carries no premium signal in any state.**
+No badge, no padlocked entry, no teaser tab, no upgrade offer and no subscription call to action, whether or not a companion is installed.
+A companion tab exists only while its provider is registered; Core renders no placeholder for an absent companion, so a user without the companion installed sees no indication that the surface exists.
+A Core error state for a faulted surface is diagnostic, not promotional, and names no product.
+- Core calls cleanup exactly once while the target is still connected and before a tab switch, provider change, or window close removes it.
+The player application invokes the disposal before `ApplicationV2` closes and unmounts the Svelte root.
+- Mount and cleanup faults are reported and contained.
+Partial content is cleared, **the faulted surface's tabs remain in the rail**, the active tab does not move, and Core renders its own error state in the panel naming the provider.
+The provider keeps its registration so a later snapshot may mount without the companion re-registering.
+Focus is recovered onto the surface's rail button rather than being lost to the document body.
+- When a provider registers, unregisters, or re-registers with a different tab set, an active route key the new set no longer offers falls back to the default Core tab rather than leaving an empty panel.
+- **The rail button is a native button with a tab role inside a vertically-oriented tablist.**
+Its accessible name is its visible label; a supplied `accessibleName` replaces that name and must therefore contain the visible label text, and a supplied `tooltip` is exposed through `aria-describedby`.
+Rail buttons carry stable per-tab identity, `aria-controls` referencing the content panel, roving `tabindex`, and Up/Down/Home/End focus-and-activation; the content panel is labelled by the active rail button.
+The visible rail label truncates with an ellipsis rather than overflowing its button, and the untruncated text is what `accessibleName` and `tooltip` are for.
+- **Core guarantees the rail, the panel's geometry and no horizontal overflow at the minimum window size.**
+The extension panel is full-height with no padding, background, scroller or containment of its own: `.fabricate-app-content` owns the scroll, and Core establishes no CSS container so a companion's fixed-position content positions against the viewport.
+Responsive behaviour of content _inside_ the target is the companion's, and a companion that wants container queries declares its own container on its own root, whose inline size is the panel's.
+- Core owns the player window shell, nav rail, active-tab state, target and teardown, and exactly one **subscriber** per window reads each registry.
+- The companion owns its content, localization, authorization, domain data, persistence and created resources, and mounts only into the supplied target.
+It does not patch player-window DOM or use Foundry render hooks.
+- Fabricate publishes observational hooks — `fabricate.player.navProviderRegistered`, `fabricate.player.navProviderUnregistered`, `fabricate.player.surfaceMounted`, `fabricate.player.surfaceUnmounted`, and `fabricate.player.surfaceTabChanged` — exposed on `game.fabricate.api.HOOKS.player`.
+A listener's return value is ignored and nothing a listener does changes what the player window renders.
+- A companion declares Fabricate in `relationships.requires`, attempts registration during its own `init`, uses one idempotent ready fallback **armed from inside `init` rather than at ESM top level**, retains exactly one unregister handle, and treats its registration attempt as a no-op after success.
+- **A provider tab is not a system feature and is not crafting-system-scoped**, so the rule that Core hides controls for disabled features does not read onto this seam.
+- The seam creates, reads and writes no record, setting, flag, actor data or world state of its own.
+It adds no entry to the Data Storage lists below.
 
 ## Data Storage (UI-relevant)
 
