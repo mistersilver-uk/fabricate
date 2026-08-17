@@ -886,6 +886,8 @@ The visible rail label truncates with an ellipsis inside its fixed-width button;
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 
 A new context object is created — never mutated — whenever one of its values changes, which also remounts the active tab.
+The converse holds too, and you can rely on it: while none of the values above changes, the context keeps its identity and your surface is **not** remounted.
+So opening the window, another companion registering or unregistering, and any other republication that leaves your surface's values alone all leave your mounted content in place, with its scroll position, focus, and in-flight state intact.
 
 ### The Panel's Layout Contract
 
@@ -912,6 +914,11 @@ A mount or cleanup error is caught, logged, and contained, and the containment i
 - Fabricate renders its own error state in the panel, naming the provider that failed;
 - the registration survives, so a later snapshot may mount without the companion re-registering;
 - focus is recovered onto the surface's rail button rather than dropping to the document body.
+
+The fault is recorded against the whole **surface**, not against the tab that threw.
+It is keyed on the `(surfaceId, provider)` pair, so once one of your tabs fails to mount, selecting any other tab of the same provider shows the same error state and Fabricate does not attempt another mount for it.
+That is deliberate containment rather than a per-tab retry: Fabricate cannot distinguish a tab-specific failure from a broken provider, and retrying the siblings of a provider that has already thrown would just repeat the fault.
+Unregistering and re-registering gives Fabricate a new provider object for the surface, which clears the fault.
 
 When a provider registers, unregisters, or re-registers with a different tab set, an active route key the new set no longer offers falls back to Fabricate's default Crafting tab, so the window never renders an empty panel.
 

@@ -186,7 +186,10 @@ const DEFAULT_TAB = 'crafting';
  * @returns {object} `{ provider, calls }`.
  */
 function makeProvider({ id = 'downtime', throwOnMount = false } = {}) {
-  const calls = { mounts: [] };
+  // `cleanups` records `connected` because that is the whole guarantee: the shell must run a
+  // companion's cleanup while its target is still in the document, and a count alone cannot
+  // tell a connected teardown apart from one running against an already-detached tree.
+  const calls = { mounts: [], cleanups: [] };
   const provider = {
     apiVersion: 1,
     id,
@@ -209,7 +212,9 @@ function makeProvider({ id = 'downtime', throwOnMount = false } = {}) {
       node.dataset.companionControl = tabId;
       target.append(node);
       if (throwOnMount) throw new Error('companion exploded');
-      return () => {};
+      return () => {
+        calls.cleanups.push({ tabId, connected: target.isConnected });
+      };
     },
   };
   return { provider, calls };
@@ -277,6 +282,51 @@ function railKeys(root) {
 
 function railButton(root, routeKey) {
   return root.querySelector(`[data-player-nav-tab="${routeKey}"]`);
+}
+
+function focusedNavTab(root) {
+  return root.ownerDocument.activeElement?.dataset?.playerNavTab ?? null;
+}
+
+/**
+ * Register one provider into a fresh real registry and mount the shell on one of its tabs.
+ *
+ * Hoisted because eleven cases need exactly this three-line opening, and a fresh copy of it
+ * per case is the near-identical block SonarCloud's new-code duplication gate counts.
+ *
+ * @param {object} [options] Scenario inputs.
+ * @returns {Promise<object>} `{ registry, provider, calls, host, root, unregister }`.
+ */
+async function mountOnCompanionTab({ id = 'downtime', tabId = 'board', emitHook = () => {} } = {}) {
+  const registry = createPlayerExtensionsRegistry({ emitHook });
+  const { provider, calls } = makeProvider({ id });
+  const unregister = registry.publicApi.registerPlayerNavProvider(provider);
+  const host = makeHost(registry, `ext:${id}:${tabId}`);
+  const root = await harness.mount(host.props());
+  return { registry, provider, calls, host, root, unregister };
+}
+
+/**
+ * The shell's own compiled stylesheet, as injected into the mounted document, with comments
+ * STRIPPED.
+ *
+ * Stripping is what stops an assertion being satisfied by the prose *about* a declaration
+ * instead of the declaration itself — the rail's width rule is explained in a comment that
+ * quotes it verbatim, so an unstripped substring match could never fail.
+ *
+ * @param {HTMLElement} root Mounted root.
+ * @returns {string} Declaration text.
+ */
+function shellStyleSheet(root) {
+  const css = Array.from(root.ownerDocument.querySelectorAll('style'))
+    .map((node) => node.textContent ?? '')
+    .find((text) => text.includes('.fabricate-app-nav-item'));
+  assert.ok(Boolean(css), "the shell's compiled stylesheet is injected into the mounted document");
+  return css.replaceAll(/\/\*[\s\S]*?\*\//g, '');
+}
+
+function ruleBody(css, className) {
+  return new RegExp(`\\.${className}(?![\\w-])[^{}]*\\{([^{}]*)\\}`).exec(css)?.[1] ?? '';
 }
 
 before(() => harness.setup());
@@ -514,13 +564,255 @@ describe('FabricateAppRoot (mounted, against a real player registry)', () => {
       );
     };
 
+    // FOCUS IS PINNED ALONGSIDE SELECTION, and it is the half that matters: the handler
+    // schedules `railButton(next).focus()` on `tick()`, and selection without focus leaves the
+    // user parked on a button that has just become `tabindex="-1"` — reachable by neither Tab
+    // nor a further arrow press. Two ticks because the handler's own `tick().then` is what
+    // moves focus, so the first only settles the flush that resolved it.
+    const settle = async () => {
+      await tick();
+      await tick();
+    };
+
     press('crafting', 'ArrowUp');
     assert.equal(host.activeTab, 'ext:downtime:ledger', 'Up from the first entry wraps to the last');
+    await settle();
+    assert.equal(focusedNavTab(root), 'ext:downtime:ledger', 'and focus wraps with it');
     press('crafting', 'End');
     assert.equal(host.activeTab, 'ext:downtime:ledger');
+    await settle();
+    assert.equal(focusedNavTab(root), 'ext:downtime:ledger');
     press('crafting', 'ArrowDown');
     assert.equal(host.activeTab, 'gathering');
+    await settle();
+    assert.equal(focusedNavTab(root), 'gathering');
     press('crafting', 'Home');
     assert.equal(host.activeTab, 'crafting');
+    await settle();
+    assert.equal(focusedNavTab(root), 'crafting');
+  });
+
+  it('keeps one rail tab stop when the active tab names no rendered entry', async () => {
+    const registry = createPlayerExtensionsRegistry({ emitHook: () => {} });
+    // `CORE_TABS` admits `alchemy` unconditionally while `showAlchemy` is computed
+    // independently, so this pair is reachable: an open on `alchemy` while Alchemy is
+    // unavailable renders a rail no entry of which matches the active tab.
+    const root = await harness.mount({
+      activeTab: 'alchemy',
+      showAlchemy: false,
+      onSelectTab: () => {},
+      services: fakeServices(),
+      extensionSurfaces: deriveExtensionSurfaces(registry),
+      playerExtensions: registry,
+    });
+
+    assert.deepEqual(railKeys(root), ['crafting', 'gathering', 'journal', 'inventory']);
+    assert.deepEqual(
+      railButtons(root).map((button) => button.getAttribute('tabindex')),
+      ['0', '-1', '-1', '-1'],
+      'the tab stop falls back to the first entry rather than leaving every button at -1, '
+        + 'which would take the whole rail out of the Tab order'
+    );
+    assert.deepEqual(
+      railButtons(root).map((button) => button.getAttribute('aria-selected')),
+      ['false', 'false', 'false', 'false'],
+      'only the tab STOP falls back; aria-selected stays bound to the active tab, so nothing '
+        + 'claims a selection the panel is not showing'
+    );
+  });
+
+  it('emits the tooltip nodes outside the tablist, whose owned children are all tabs', async () => {
+    const { root } = await mountOnCompanionTab();
+
+    const tablist = root.querySelector('[role="tablist"]');
+    assert.deepEqual(
+      Array.from(tablist.children).map((child) => child.getAttribute('role')),
+      ['tab', 'tab', 'tab', 'tab', 'tab', 'tab'],
+      "a tablist's only permitted owned role is tab, so a tooltip child is unallowed content "
+        + "axe-core's aria-required-children reports"
+    );
+    // Selected by ATTRIBUTE, never by id: an id selector containing a colon is invalid CSS.
+    const tooltip = root.querySelector('[id="player-nav-tooltip-ext:downtime:board"]');
+    assert.equal(tooltip?.getAttribute('role'), 'tooltip', 'the tooltip node still exists');
+    assert.ok(!tablist.contains(tooltip), 'and it is no longer owned by the tablist');
+    assert.ok(
+      Boolean(tooltip.closest('.fabricate-app-shell')),
+      'it stays inside the shell, and an IDREF resolves document-wide, so the association the '
+        + 'rail button declares is unchanged'
+    );
+    assert.equal(
+      railButton(root, 'ext:downtime:board').getAttribute('aria-describedby'),
+      'player-nav-tooltip-ext:downtime:board'
+    );
+  });
+
+  it('lets the rail button yield the scrollbar gutter rather than overflowing the 84px column', async () => {
+    // ASSERTED AS A DECLARATION, not as measured overflow, and deliberately so. The View Lab's
+    // `expectNoHorizontalOverflow` compares scrollWidth against clientWidth, and headless
+    // Chromium renders OVERLAY scrollbars that consume no layout width at all — so a green
+    // capture proves no CONTENT overflow and can say nothing about a reserved gutter. happy-dom
+    // computes no cascade either. The compiled, injected stylesheet is the honest target.
+    const { root } = await mountOnCompanionTab();
+    const css = shellStyleSheet(root);
+
+    assert.match(
+      ruleBody(css, 'fabricate-app-nav-item'),
+      /width:\s*min\(64px,\s*100%\)/,
+      'a non-shrinkable 64px button inside a 68px content box puts a VISIBLE horizontal '
+        + 'scrollbar in the rail once a thin classic scrollbar takes its ~12px'
+    );
+    assert.match(
+      ruleBody(css, 'fabricate-app-nav'),
+      /scrollbar-gutter:\s*stable/,
+      'and the gutter is reserved up front, so crossing the entry count that starts the scroll '
+        + 'does not reflow the whole column'
+    );
+  });
+});
+
+describe('FabricateAppRoot companion disposal (mounted)', () => {
+  it('disposes the companion while its target is connected when the tab leaves for a Core tab', async () => {
+    const { calls, host, root } = await mountOnCompanionTab();
+    assert.equal(calls.mounts.length, 1);
+
+    railButton(root, 'crafting').click();
+    await harness.setProps(host.props());
+
+    assert.equal(host.activeTab, 'crafting');
+    assert.deepEqual(
+      calls.cleanups,
+      [{ tabId: 'board', connected: true }],
+      'the {#if activeRoute} branch destroys the host, and destroy_effect removes its DOM '
+        + 'BEFORE running teardowns, so without the shell disposing first this ran detached'
+    );
+    assert.ok(!root.querySelector('[data-player-extension-mounted]'), 'and the target is gone');
+  });
+
+  it('disposes the outgoing companion while connected when the tab moves to another surface', async () => {
+    const { registry, calls, host, root } = await mountOnCompanionTab();
+    const { provider: second, calls: secondCalls } = makeProvider({ id: 'crewquarters' });
+    registry.publicApi.registerPlayerNavProvider(second);
+    await harness.setProps(host.props());
+
+    railButton(root, 'ext:crewquarters:board').click();
+    await harness.setProps(host.props());
+
+    assert.deepEqual(
+      calls.cleanups,
+      [{ tabId: 'board', connected: true }],
+      'the {#key activeSurface.surfaceId} block recreates the host on a cross-surface swap'
+    );
+    assert.equal(secondCalls.mounts.length, 1, 'and the incoming surface is mounted');
+  });
+
+  it('disposes the companion while connected when its provider unregisters under the live tab', async () => {
+    const { calls, host, unregister } = await mountOnCompanionTab();
+
+    unregister();
+    // The publication path: `_refreshExtensionSurfaces` pushes the new snapshot, the
+    // {:else if activeSurface} branch flips, and the host is destroyed outright.
+    await harness.setProps(host.props());
+
+    assert.deepEqual(calls.cleanups, [{ tabId: 'board', connected: true }]);
+  });
+
+  it('runs the companion cleanup against a connected target when the application disposes the shell', async () => {
+    const { calls } = await mountOnCompanionTab();
+
+    // The seam `SvelteFabricateApp.close()` reaches immediately before `super.close()`. The
+    // close-ordering fixture proves the application calls the SHELL; this is the other half —
+    // that the shell reaches the HOST, and does so while the target is still in the document.
+    harness.component.disposePlayerProvidersBeforeRemoval();
+
+    assert.deepEqual(calls.cleanups, [{ tabId: 'board', connected: true }]);
+  });
+
+  it('remounts the surface with a fresh context when the companion calls requestRemount', async () => {
+    const { calls } = await mountOnCompanionTab();
+
+    // The documented public context method, invoked exactly as a companion would.
+    calls.mounts[0].context.requestRemount();
+    await tick();
+
+    assert.equal(calls.mounts.length, 2, 'the shell produces a NEW context identity');
+    assert.notEqual(calls.mounts[0].context, calls.mounts[1].context, 'replaced, never mutated');
+    assert.equal(calls.mounts[1].context.revision, 1, 'and the revision advanced');
+    assert.deepEqual(calls.cleanups, [{ tabId: 'board', connected: true }]);
+  });
+
+  it('emits the surface hooks through the registry edge the shell threads down', async () => {
+    const hooks = [];
+    const { host, root } = await mountOnCompanionTab({
+      emitHook: (name, payload) => hooks.push([name, payload]),
+    });
+    const surfaceHooks = () =>
+      hooks.map(([name]) => name).filter((name) => name.startsWith('fabricate.player.surface'));
+
+    assert.deepEqual(
+      surfaceHooks(),
+      ['fabricate.player.surfaceMounted'],
+      'the shell passes the registry own emitHook down, so the host hooks travel the same edge'
+    );
+
+    railButton(root, 'ext:downtime:ledger').click();
+    await harness.setProps(host.props());
+
+    assert.deepEqual(surfaceHooks(), [
+      'fabricate.player.surfaceMounted',
+      'fabricate.player.surfaceTabChanged',
+    ]);
+    const tabChanged = hooks.find(([name]) => name === 'fabricate.player.surfaceTabChanged');
+    assert.equal(tabChanged[1].previousTabId, 'board');
+    assert.equal(tabChanged[1].tabId, 'ledger');
+  });
+});
+
+describe('FabricateAppRoot companion context stability (mounted)', () => {
+  it('does not remount a live companion when a value-identical snapshot is republished', async () => {
+    const { calls, host } = await mountOnCompanionTab();
+    assert.equal(calls.mounts.length, 1);
+
+    // `deriveExtensionSurfaces` allocates a FRESH frozen `{ surfaceId, provider }` wrapper on
+    // every call, so each of these re-seeds is a new `activeSurface` identity carrying
+    // identical values — which is precisely what a republication looks like in production.
+    await harness.setProps(host.props());
+    await harness.setProps(host.props());
+
+    assert.equal(calls.mounts.length, 1, 'identical values must not produce a new context');
+    assert.deepEqual(calls.cleanups, [], 'so nothing was torn down and rebuilt');
+  });
+
+  it('does not remount a live companion when an unrelated provider registers', async () => {
+    const { registry, calls, host, root } = await mountOnCompanionTab();
+
+    registry.publicApi.registerPlayerNavProvider(makeProvider({ id: 'crewquarters' }).provider);
+    await harness.setProps(host.props());
+
+    assert.equal(railKeys(root).length, 8, 'the second companion really did reach the rail');
+    assert.equal(
+      calls.mounts.length,
+      1,
+      "another companion registering must not churn an unrelated live panel's scroll position, "
+        + 'focus and in-flight state'
+    );
+    assert.deepEqual(calls.cleanups, []);
+  });
+
+  it('mounts exactly once across the open path: the seeded snapshot and the registry replay', async () => {
+    // `_prepareSvelteProps` seeds snapshot #1, then `_onRender` -> `_registerHooks()` joins the
+    // registry — and `subscribeSurfaceIds` replays the current value SYNCHRONOUSLY before it
+    // returns the unsubscribe, producing snapshot #2 inside the same open. Both steps are the
+    // real ones here: the real registry replay and the real derivation.
+    const { registry, calls, host } = await mountOnCompanionTab();
+    const pushes = [];
+    const unsubscribe = registry.subscribeSurfaceIds(() =>
+      pushes.push(harness.setProps(host.props()))
+    );
+    await Promise.all(pushes);
+    unsubscribe();
+
+    assert.equal(pushes.length, 1, 'the replay really did push a second snapshot');
+    assert.equal(calls.mounts.length, 1, 'opening the window calls the companion mount ONCE');
+    assert.deepEqual(calls.cleanups, [], 'and never tore it down and rebuilt it mid-open');
   });
 });

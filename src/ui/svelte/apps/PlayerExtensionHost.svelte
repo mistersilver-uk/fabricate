@@ -102,11 +102,20 @@
   /**
    * Run the active mount's cleanup while this host's target is still connected.
    *
-   * `SvelteFabricateApp.close()` calls the shell's exported disposal, which reaches this,
-   * immediately before awaiting `super.close(options)`. That ordering is not a preference:
-   * `unmount()` destroys the root effect and `destroy_effect` removes the effect's DOM
-   * BEFORE running teardowns, so every `onDestroy` below runs against an already-detached
-   * tree. The `onDestroy` net is a leak net, never a second connected-target path.
+   * TWO callers, one per family of removal. `SvelteFabricateApp.close()` calls the shell's
+   * exported disposal, which reaches this, immediately before awaiting `super.close(options)`.
+   * `FabricateAppRoot`'s surface `$effect.pre` calls it directly when the live surface id is
+   * about to change or clear — which is the tab leaving a companion route, the tab moving to a
+   * different companion surface, and the active provider unregistering under its own live tab.
+   *
+   * The ordering is not a preference in either case: `unmount()` destroys the root effect,
+   * `destroy_effect` removes the effect's DOM BEFORE running teardowns, and `onDestroy` is
+   * itself a teardown, so every `onDestroy` below runs against an already-detached tree. The
+   * `onDestroy` net is a leak net, never a connected-target path — `tests/components/
+   * player-extension-host-mounted.test.js` pins that it reports `connected: false`.
+   *
+   * Idempotent, so a caller reaching this before the host's own teardown does not change the
+   * "exactly once" count.
    */
   export function disposeBeforeRemoval() {
     disposeActiveMount();

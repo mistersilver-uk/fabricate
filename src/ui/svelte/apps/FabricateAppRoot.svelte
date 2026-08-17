@@ -96,6 +96,16 @@
     })
   );
   const activeNavTab = $derived(tabs.find((tab) => tab.routeKey === activeTab) ?? null);
+  // The roving `tabindex` needs a tab stop that always EXISTS. `activeTab` can name no rendered
+  // entry — `SvelteFabricateApp`'s `CORE_TABS` admits `alchemy` unconditionally while
+  // `showAlchemy` is computed independently, so an open on `alchemy` while Alchemy is
+  // unavailable lands exactly there — and binding the stop to `activeTab` alone then makes
+  // EVERY rail button `tabindex="-1"` and takes the whole navigation out of the Tab order.
+  // Before this rail was a tablist the buttons were all default-`0`, so that is a new failure
+  // mode rather than a pre-existing one. `aria-selected` deliberately STAYS bound to
+  // `activeTab`: the APG's fallback is about which button is the tab stop, never about which
+  // tab is selected, and reporting a selection the panel does not show would be worse.
+  const focusableTab = $derived(activeNavTab ?? tabs[0] ?? null);
 
   // ---------------------------------------------------------------------------------------
   // Companion surfaces (issue 1198)
@@ -107,6 +117,17 @@
       ? (extensionSurfaces.find((surface) => surface.surfaceId === activeRoute.surfaceId) ?? null)
       : null
   );
+  // THE HOST IS FED THESE, never `activeSurface.surface{Id}`/`.provider` directly, and that is
+  // load-bearing rather than tidiness. `deriveExtensionSurfaces` allocates a FRESH frozen
+  // `{ surfaceId, provider }` wrapper on every call, so a value-identical republication gives
+  // `activeSurface` a new identity. A prop is a getter, so a child effect reading
+  // `activeSurface.provider` depends on the `activeSurface` SIGNAL rather than on the value it
+  // yields, and Svelte re-runs that effect whenever the signal's value changes — remounting a
+  // live companion for a snapshot that said nothing new. Projecting through `$derived`, which
+  // compares with `===`, republishes the same string and the same provider object and so
+  // propagates nothing. This is the shape `worldDowntimeContext` has on the Manager side.
+  const activeSurfaceId = $derived(activeSurface?.surfaceId ?? null);
+  const activeProvider = $derived(activeSurface?.provider ?? null);
   // A provider whose mount threw is set ASIDE, never unregistered: its registration (and its
   // unregister handle) stays the companion's, its rail entries stay in the rail, and the
   // active tab does not move. The faulted PROVIDER identity is recorded rather than the
@@ -135,7 +156,7 @@
   // The Manager host is handed a stable named function for the same reason.
   function noteProviderFault(provider) {
     untrack(() => {
-      const surfaceId = activeSurface?.surfaceId ?? null;
+      const surfaceId = activeSurfaceId;
       if (!surfaceId) return;
       faultedProviders = [
         ...faultedProviders.filter((entry) => entry.surfaceId !== surfaceId),
@@ -151,14 +172,41 @@
     contextRevision += 1;
   }
 
+  // The context's VARYING keys, in the order the contract lists them. `schemaVersion` and
+  // `surface` are constants and `requestRemount` is a stable function identity, so none of the
+  // three can differ between two recomputes and comparing them would only add noise. Named
+  // once because a key the projection below sets but this list omits would be a value change
+  // the memoization silently swallowed.
+  const CONTEXT_VALUE_KEYS = ['surfaceId', 'tabId', 'actorId', 'isGM', 'revision'];
+
+  // A plain local, deliberately not `$state`: it records what was last PUBLISHED, so making
+  // it reactive would make the derivation below its own dependency.
+  let publishedContext = null;
+
+  // THE CONTEXT IS MEMOIZED ON ITS VALUES, and that is load-bearing rather than an
+  // optimisation. This object is the host's remount key (`PlayerExtensionHost.svelte`'s mount
+  // effect reads it), `$derived` compares with strict `===`, and `deriveExtensionSurfaces`
+  // allocates a FRESH `{ surfaceId, provider }` wrapper on every call — so without this a
+  // value-identical republication produced a new `activeSurface`, a new frozen context and a
+  // full tear-down/re-mount of a live companion. Two real paths hit that: opening the window
+  // (`_prepareSvelteProps` seeds one snapshot, `_registerHooks`'s synchronous replay produces
+  // a second) mounted, cleaned up and re-mounted in a single open, and ANY other companion
+  // registering or re-registering churned an unrelated live panel, losing its scroll
+  // position, focus and in-flight state. It also makes the documented promise true —
+  // "a new context object is created whenever one of its VALUES changes". The Manager's
+  // `worldDowntimeContext` never needed this because it reads only primitives and the stable
+  // provider object; this side derives through a freshly allocated wrapper, so it does.
   const playerExtensionContext = $derived.by(() => {
     // Read the revision so `requestRemount()` yields a NEW frozen identity.
     const revision = contextRevision;
-    if (!activeSurface || !activeRoute) return null;
-    return Object.freeze({
+    if (!activeSurface || !activeRoute) {
+      publishedContext = null;
+      return null;
+    }
+    const next = Object.freeze({
       schemaVersion: 1,
       surface: 'player',
-      surfaceId: activeSurface.surfaceId,
+      surfaceId: activeSurfaceId,
       // The provider's own BARE tab id, never the composed route key.
       tabId: activeRoute.tabId,
       // A LOGICAL-OR, not a nullish-coalesce: `createActorBarStore` initialises and clears
@@ -175,19 +223,58 @@
       revision,
       requestRemount,
     });
+    const unchanged =
+      publishedContext !== null &&
+      CONTEXT_VALUE_KEYS.every((key) => publishedContext[key] === next[key]);
+    if (unchanged) return publishedContext;
+    publishedContext = next;
+    return next;
   });
 
   let shell = $state(null);
   let extensionHost = $state(null);
 
   // The ApplicationV2 shell calls this before it unmounts the Svelte root, while a companion
-  // target is still connected. `onDestroy` remains the safety net for direct Svelte teardown
-  // paths, which necessarily run against an already-detached tree.
+  // target is still connected. It covers WINDOW CLOSE only; the surface `$effect.pre` below
+  // covers the three paths on which the template destroys the host instead. `onDestroy`
+  // remains the safety net for direct Svelte teardown paths, which necessarily run against an
+  // already-detached tree.
   export function disposePlayerProvidersBeforeRemoval() {
     extensionHost?.disposeBeforeRemoval?.();
   }
 
   onDestroy(disposePlayerProvidersBeforeRemoval);
+
+  // Plain locals, deliberately not `$state`: they record what has already been OBSERVED, so
+  // making them reactive would make the effect below its own dependency.
+  let observedSurfaceId;
+  let surfaceIdObserved = false;
+
+  // CLOSING THE OTHER THREE REMOVAL PATHS. Window close is the only one that reaches the
+  // export above; the template destroys the host outright when the active tab leaves a
+  // companion route (`{#if activeRoute}` flips), when it moves to a DIFFERENT companion
+  // surface (`{#key activeSurfaceId}` re-creates), and when the active provider
+  // unregisters while its tab is live (`{:else if activeSurface}` flips). Svelte's
+  // `destroy_effect` removes the effect's DOM BEFORE running its teardowns, and `onDestroy`
+  // is itself a teardown, so every one of those three ran the companion's cleanup against an
+  // ALREADY-DETACHED target — a companion unbinding a listener, flushing a draft or reading a
+  // measurement on the way out saw a node with no document.
+  //
+  // `$effect.pre` runs before the DOM is updated, which is the same ordering the focus
+  // recovery below relies on and the same guarantee the Manager seam gets from
+  // `WorldDowntimeExtensionHost.selectTab()` disposing before it assigns `activeTabId`. So
+  // when the live surface id is about to become a different id or `null`, dispose first.
+  // `disposeActiveMount` is idempotent, so the host's own teardown running afterwards is a
+  // no-op and the "exactly once" count is unaffected. `untrack` because this must not take a
+  // dependency on the `bind:this` handle it is reaching through.
+  $effect.pre(() => {
+    const nextSurfaceId = activeSurfaceId;
+    if (surfaceIdObserved && nextSurfaceId === observedSurfaceId) return;
+    const hadSurface = surfaceIdObserved && observedSurfaceId !== null;
+    surfaceIdObserved = true;
+    observedSurfaceId = nextSurfaceId;
+    if (hadSurface) untrack(() => extensionHost?.disposeBeforeRemoval?.());
+  });
 
   function railButton(routeKey) {
     // Selection is by ATTRIBUTE, never by id: a route key contains colons, and an id selector
@@ -371,7 +458,7 @@
         aria-controls="player-nav-panel"
         aria-label={tab.accessibleName}
         aria-describedby={tab.tooltip ? `player-nav-tooltip-${tab.routeKey}` : undefined}
-        tabindex={activeTab === tab.routeKey ? 0 : -1}
+        tabindex={tab.routeKey === focusableTab?.routeKey ? 0 : -1}
         onclick={() => onSelectTab?.(tab.routeKey)}
         onkeydown={(event) => onNavKeydown(event, index)}
       >
@@ -381,15 +468,24 @@
           <span class="fabricate-app-nav-count" data-nav-count={tab.routeKey}>{tab.count}</span>
         {/if}
       </button>
-      {#if tab.tooltip}
-        <span
-          id={`player-nav-tooltip-${tab.routeKey}`}
-          class="fabricate-app-nav-tooltip"
-          role="tooltip">{tab.tooltip}</span
-        >
-      {/if}
     {/each}
   </div>
+
+  <!-- The `aria-describedby` targets, emitted as SIBLINGS of the tablist rather than inside
+       it. A `tablist`'s only permitted owned role is `tab`, so a `tooltip` child is unallowed
+       content that axe-core's `aria-required-children` reports, and a screen reader deriving
+       "tab N of M" from the owned children can count the extra nodes. Nothing is lost by
+       moving them: an IDREF is resolved document-wide, not within the referring element's
+       subtree, so the association each rail button declares is unchanged. -->
+  {#each tabs as tab (tab.routeKey)}
+    {#if tab.tooltip}
+      <span
+        id={`player-nav-tooltip-${tab.routeKey}`}
+        class="fabricate-app-nav-tooltip"
+        role="tooltip">{tab.tooltip}</span
+      >
+    {/if}
+  {/each}
 
   <div class="fabricate-app-main">
     <!-- The active station-tool chip rides in the shared header bar's right-side
@@ -431,11 +527,11 @@
             </div>
           </div>
         {:else if activeSurface}
-          {#key activeSurface.surfaceId}
+          {#key activeSurfaceId}
             <PlayerExtensionHost
               bind:this={extensionHost}
-              provider={activeSurface.provider}
-              surfaceId={activeSurface.surfaceId}
+              provider={activeProvider}
+              surfaceId={activeSurfaceId}
               tabId={activeRoute.tabId}
               context={playerExtensionContext}
               emitHook={playerExtensions?.emitHook}
@@ -479,6 +575,10 @@
     background: var(--fab-surface);
   }
 
+  /* `scrollbar-gutter: stable` reserves the gutter whether or not the rail is currently
+     scrolling, so crossing the entry count that starts the scroll does not reflow the column
+     and shift every button sideways. See `.fabricate-app-nav-item`'s width for the other half
+     of this. */
   .fabricate-app-nav {
     display: flex;
     flex-direction: column;
@@ -489,8 +589,26 @@
     border-right: 1px solid var(--fab-border);
     background: var(--fab-surface-soft);
     overflow-y: auto;
+    scrollbar-gutter: stable;
   }
 
+  /* `width: min(64px, 100%)`, NOT a bare `64px`. The rail is a fixed 84px column with 8px of
+     padding, so its content box is 68px — and Foundry's reset applies `* { scrollbar-width:
+     thin }`, which on a classic (non-overlay) scrollbar platform takes ~11-12px of layout
+     width the moment the rail scrolls. A non-shrinkable 64px button against a ~56px content
+     box overflows, and because `overflow-y: auto` forces `overflow-x` to compute to `auto`
+     that is a VISIBLE horizontal scrollbar inside an 84px column rather than a silent clip.
+     It is reachable: at the 1024x640 window floor the rail fits exactly 8 entries, and 9 —
+     Core's 5 tabs plus a 4-tab companion — scrolls. Yielding the gutter keeps the promise the
+     seam's spec makes about no horizontal overflow at the minimum window size.
+     `.fabricate-app-nav-label`'s `max-width: 100%` follows the button down, so the ellipsis
+     rule below still holds at the narrower width.
+
+     THE VIEW LAB CANNOT CATCH THIS. Its `expectNoHorizontalOverflow` compares `scrollWidth`
+     against `clientWidth`, and headless Chromium renders OVERLAY scrollbars, which consume no
+     layout width at all — a green capture proves no CONTENT overflow and says nothing about a
+     scrollbar gutter. The guard is the declaration assertion in
+     `tests/components/fabricate-app-root-mounted.test.js`. */
   .fabricate-app-nav-item {
     position: relative;
     box-sizing: border-box;
@@ -501,7 +619,7 @@
     justify-content: center;
     gap: 6px;
     padding: 6px;
-    width: 64px;
+    width: min(64px, 100%);
     height: 64px;
     text-align: center;
     border: 1px solid transparent;
@@ -536,7 +654,9 @@
      64px button grid, so a visible tooltip is the same overhang that failed the Manager
      strip's horizontal-overflow assertion, and the seam's contract is that a supplied
      tooltip is EXPOSED through `aria-describedby`, not that Core paints it. No pixels move
-     for the five shipped Core buttons, which supply no tooltip and render no such node. */
+     for the five shipped Core buttons, which supply no tooltip and render no such node.
+     Being out of flow and clipped to 1x1 is also why these nodes could be lifted out of the
+     tablist (where a `tooltip` child is unallowed owned content) without moving a pixel. */
   .fabricate-app-nav-tooltip {
     position: absolute;
     width: 1px;
@@ -582,11 +702,26 @@
 
   /* Core's own diagnostic for a companion whose mount threw. It is DIAGNOSTIC, not
      promotional: it names the provider that failed and says nothing about products,
-     offers or subscriptions. */
+     offers or subscriptions.
+
+     WHY THIS IS NOT `manager/Callout.svelte`. That component owns this meaning — a leading
+     semantic glyph plus prose in a bordered, rounded strip — it declares itself area-agnostic
+     and names `.fabricate-app` among its supported hosts, and it even defaults to the same
+     `fas fa-triangle-exclamation` glyph, so the mismatch has to be written down rather than
+     left for the next author to rediscover. Three things make it unusable here. Its root is a
+     `<p>`, which cannot legally contain the `<strong>` title plus `<p>` description this state
+     needs. Its tones are `info` and `warning` only, so a failure could not be coloured as one.
+     And it is a standing-statement strip, whereas this is a `role="alert"` error state
+     announced when it replaces the companion's panel. Extend one of these two rather than
+     writing a third.
+
+     `max-width` because the copy is ~650px of text: full-bleed across the ~1140px panel at the
+     default window size it reads as a sparse band with a long empty tail. */
   .fabricate-app-extension-fault {
     display: flex;
     align-items: flex-start;
     gap: 12px;
+    max-width: 560px;
     margin: 20px;
     padding: 14px 16px;
     border: 1px solid var(--fab-border-strong);
