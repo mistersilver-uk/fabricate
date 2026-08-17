@@ -18,9 +18,15 @@ import {
 } from '../utils/sourceUuid.js';
 
 import { evaluatePrerequisite } from './characterPrerequisites.js';
+import {
+  craftingDataChange,
+  emitCraftingDataChanged,
+  PendingChangeDomains,
+} from './craftingDataChange.js';
 import { applyDefinitionChange } from './CraftingDefinitionRepository.js';
 import { buildCurrencyAffordProbe, getCurrencyRequirementConfig } from './currencyAffordance.js';
 import { formatCurrencyRequirement, normalizeCurrencyUnit } from './currencyProfile.js';
+import { ALL_INVALIDATION_DOMAINS, domainsForRecipeFields } from './invalidationDomains.js';
 import { readStackQuantity } from './itemStackQuantity.js';
 import {
   PerRecordCraftingDefinitionRepository,
@@ -226,6 +232,9 @@ export class RecipeManager {
     // `consumeReloadDelta()`.
     /** @type {import('./revisionTokens.js').CorpusDelta|null} */
     this._reloadDelta = null;
+    // The invalidation domains attributed since the last announcement (issue 1078 part B1).
+    // Recorded at every mutation site, drained by `_notifyRecipesChanged`.
+    this._pendingDomains = new PendingChangeDomains();
     this.getCraftingSystem = typeof getCraftingSystem === 'function' ? getCraftingSystem : null;
     this._getCraftingSystemManager =
       typeof getCraftingSystemManager === 'function' ? getCraftingSystemManager : null;
@@ -491,16 +500,24 @@ export class RecipeManager {
       const touched = new Set();
       for (const recipe of next.values()) touched.add(recipe?.craftingSystemId);
       // Also drops the cohort index, which is keyed on the map object and so would have
-      // missed on the replacement above regardless.
+      // missed on the replacement above regardless. A reordering is attributable to no
+      // record, so no fact class can be ruled out either (issue 1078 part B1); the delta the
+      // bridge consumes reports `reordered` and routes BROADLY.
       this._advanceRecipeRevision(...touched);
+      this._advanceFactScopes([], ...touched);
       return true;
     }
 
     const touched = new Set();
     for (const entry of delta.perRecord.values()) {
       // A recipe MOVED between systems names both, exactly as `updateRecipe` does.
-      if (entry.before) touched.add(entry.before.craftingSystemId);
-      if (entry.after) touched.add(entry.after.craftingSystemId);
+      const owners = [entry.before?.craftingSystemId, entry.after?.craftingSystemId].filter(
+        (systemId) => systemId != null
+      );
+      for (const systemId of owners) touched.add(systemId);
+      // The replicated half of the attribution: the delta already names the top-level keys
+      // that moved, so a remote client narrows on exactly what the writer narrowed on.
+      this._advanceFactScopes(domainsForRecipeFields(entry.fields), ...owners);
     }
     patchCorpusInPlace(this.recipes, next, delta);
     // Also drops the cohort index, whose token clause this advance would fail anyway.
@@ -534,6 +551,9 @@ export class RecipeManager {
    * @returns {boolean} `true` only when this manager's map actually moved.
    */
   applyReplicatedRecordChange(change) {
+    // Every application replaces the pending delta, including one that applies nothing, so a
+    // stale delta can never be consumed after a later replication — exactly as `reload()` does.
+    this._reloadDelta = null;
     if (this._repository.supportsPerRecordReplication?.() !== true) return false;
     const applied = this._repository.readReplicatedRecord?.(change);
     if (!applied) return false;
@@ -544,19 +564,85 @@ export class RecipeManager {
       // A delete for an id this client never held is not a change; it is a replay.
       if (!previous) return false;
       this.recipes.delete(id);
+      this._mintReplicatedDelta(previous, null);
       this._advanceRecipeRevision(previous.craftingSystemId);
+      this._advanceFactScopes(ALL_INVALIDATION_DOMAINS, previous.craftingSystemId);
       return true;
     }
 
     if (previous && !corpusChanged([previous], [record], projectRecipe)) return false;
     this.recipes.set(id, record);
+    // MINTED HERE, and this is what stops the whole of issue 1078 turning itself off the
+    // moment #1211 flips the Definition Storage Target off `singleArray`: this branch never
+    // calls `reload()`, so without a delta of its own `consumeReloadDelta()` would answer
+    // `null` on every remote client and every replicated edit would route through the broad
+    // fallback — the player-side narrowing this issue exists to deliver, silently disabled.
+    const delta = this._mintReplicatedDelta(previous, record);
     // A replicated edit that MOVED a recipe names both systems, exactly as `updateRecipe`
     // and `reload()` do.
     this._advanceRecipeRevision(previous?.craftingSystemId, record.craftingSystemId);
+    const entry = [...delta.perRecord.values()][0];
+    this._advanceFactScopes(
+      domainsForRecipeFields(entry?.fields),
+      previous?.craftingSystemId,
+      record.craftingSystemId
+    );
     // A client whose first sight of the corpus is a replicated record is initialized by it,
     // mirroring `reload()`.
     this.initialized = true;
     return true;
+  }
+
+  /**
+   * Record ONE replicated record's transition as a {@link corpusDelta}, so
+   * {@link consumeReloadDelta} answers the per-record branch exactly as it answers a reload.
+   *
+   * Built with the same function and the same projection the whole-corpus path uses, so the two
+   * branches cannot disagree about which fields moved.
+   *
+   * @param {object|null} previous
+   * @param {object|null} record
+   * @returns {import('./revisionTokens.js').CorpusDelta}
+   * @private
+   */
+  _mintReplicatedDelta(previous, record) {
+    const delta = corpusDelta(previous ? [previous] : [], record ? [record] : [], {
+      project: projectRecipe,
+    });
+    this._reloadDelta = delta;
+    return delta;
+  }
+
+  /**
+   * The invalidation scopes of the most recent REPLICATED change, consumed from its delta
+   * (issue 1078 part B1).
+   *
+   * This is `consumeReloadDelta()`'s production caller. Part A shipped that method with none —
+   * its only other references in the tree are its two definitions and one test — so without
+   * this the delta a remote client already computes is discarded and every replicated edit
+   * routes broadly.
+   *
+   * A `reordered` delta yields NO scopes, which the signal represents as an empty scope set and
+   * every consumer routes broadly. That is the contract `corpusDelta` states: "a consumer MUST
+   * route a `reordered` delta broadly, whatever `perRecord` holds."
+   *
+   * @returns {{systemId: string|null, domains: string[]}[]}
+   */
+  consumeReplicatedChangeScopes() {
+    const delta = this.consumeReloadDelta();
+    if (!delta?.changed || delta.reordered) return [];
+    const scopes = [];
+    for (const entry of delta.perRecord.values()) {
+      const domains = domainsForRecipeFields(entry.fields);
+      const owners = new Set(
+        [entry.before?.craftingSystemId, entry.after?.craftingSystemId].filter(
+          (systemId) => systemId != null
+        )
+      );
+      if (owners.size === 0) owners.add(null);
+      for (const systemId of owners) scopes.push({ systemId, domains });
+    }
+    return scopes;
   }
 
   /**
@@ -577,15 +663,45 @@ export class RecipeManager {
     return delta;
   }
 
+  /**
+   * Announce a recipe change: the PUBLISHED legacy hook with its unchanged payload, then the
+   * unpublished scoped signal carrying everything attributed since the last announcement.
+   *
+   * The two are emitted from one place so a mutation path cannot acquire one without the
+   * other. Draining here rather than at `save()` is what keeps the paths that deliberately
+   * save WITHOUT announcing silent — see {@link PendingChangeDomains}.
+   *
+   * @param {string} action
+   * @param {object} [details]
+   * @returns {void}
+   * @private
+   */
   _notifyRecipesChanged(action, details = {}) {
     globalThis.Hooks?.callAll?.('fabricate.recipesChanged', {
       action,
       recipes: this.getRecipes(),
       ...details,
     });
+    emitCraftingDataChanged(
+      craftingDataChange({ source: 'recipes', scopes: this._pendingDomains.drain() })
+    );
   }
 
-  notifyRecipesChanged(details = {}) {
+  /**
+   * The public announcement seam, for a batch caller that suppressed the per-record hooks.
+   *
+   * `domains` and `systemIds` are consumed here rather than forwarded into the legacy payload:
+   * a caller that mutated something OUTSIDE this manager (the component-deletion cascade owns
+   * the crafting-system record, and announces through here because it deliberately does not
+   * call `_notifySystemsChanged`) attributes it so the scoped signal still names it.
+   *
+   * @param {object} [details]
+   * @param {readonly string[]} [details.domains] Extra domains to attribute before announcing.
+   * @param {readonly string[]} [details.systemIds] The systems those domains belong to.
+   * @returns {void}
+   */
+  notifyRecipesChanged({ domains = null, systemIds = [], ...details } = {}) {
+    if (domains) this._attributeChange(domains, ...systemIds);
     this._notifyRecipesChanged(details.action || 'external', details);
   }
 
@@ -634,7 +750,8 @@ export class RecipeManager {
     }
 
     this.recipes.set(recipe.id, recipe);
-    this._advanceRecipeRevision(recipe.craftingSystemId);
+    // A whole record arrived, so every fact class it can express is new.
+    this._recordChange(ALL_INVALIDATION_DOMAINS, recipe.craftingSystemId);
     if (options.persist !== false) {
       await this.save({ put: recipe });
     }
@@ -699,10 +816,14 @@ export class RecipeManager {
       }
     }
 
+    // Attributed BEFORE the map write, while `recipe` is still the stored copy: the domains
+    // come from the fields that actually moved, which is what makes a description-only edit
+    // narrow to `narrative` and leave the journal alone (issue 1078 acceptance criterion 3).
+    const editedDomains = this._domainsForRecipeEdit(recipe, updatedRecipe);
     this.recipes.set(recipeId, updatedRecipe);
     // Both systems, because an edit that MOVES a recipe must also invalidate a consumer
     // watching the system it left (issue 1076).
-    this._advanceRecipeRevision(recipe.craftingSystemId, updatedRecipe.craftingSystemId);
+    this._recordChange(editedDomains, recipe.craftingSystemId, updatedRecipe.craftingSystemId);
     if (options.persist !== false) {
       await this.save({ put: updatedRecipe });
     }
@@ -802,7 +923,8 @@ export class RecipeManager {
     }
 
     this.recipes.delete(recipeId);
-    this._advanceRecipeRevision(recipe.craftingSystemId);
+    // A whole record left, so every fact class it expressed is gone with it.
+    this._recordChange(ALL_INVALIDATION_DOMAINS, recipe.craftingSystemId);
     if (options.persist !== false) {
       await this.save({ delete: recipeId });
     }
@@ -862,6 +984,13 @@ export class RecipeManager {
     const removedIds = removed.map((recipe) => String(recipe.id));
     const restorePoint = new Map(this.recipes);
     for (const id of removedIds) this.recipes.delete(id);
+    // Whole records left, so every fact class they expressed is gone. This is also the only
+    // entity-revision advance on this path — the batch delete never had one, so before issue
+    // 1078 a bulk delete left every recipe-scoped token stale.
+    this._recordChange(
+      ALL_INVALIDATION_DOMAINS,
+      ...new Set(removed.map((recipe) => recipe.craftingSystemId))
+    );
 
     try {
       await this.save();
@@ -941,6 +1070,90 @@ export class RecipeManager {
       .filter((systemId) => systemId != null)
       .map((systemId) => REVISION_SCOPES.recipesOfSystem(systemId));
     this._revisions.advance(REVISION_SCOPES.recipes, ...scopes);
+  }
+
+  /**
+   * Advance the `facts:<domain>:<systemId>` token of every named pair (issue 1078 part B1).
+   *
+   * The third granularity of the revision contract: a consumer that depends on SOME of a
+   * system's fact classes and not others holds one of these, and survives an edit to a class it
+   * does not read. Advanced on every path that changes stored recipes, local or replicated,
+   * because a token is only ever wrong when a manager failed to advance it.
+   *
+   * @param {readonly string[]} domains An omitted set means every domain and an EXPLICIT empty
+   *   one means unattributable. Both advance EVERY fact scope of every named system, because in
+   *   both cases no fact class can be ruled out.
+   * @param {...(string|null|undefined)} systemIds
+   * @returns {void}
+   * @private
+   */
+  _advanceFactScopes(domains, ...systemIds) {
+    const advanced =
+      Array.isArray(domains) && domains.length > 0 ? domains : ALL_INVALIDATION_DOMAINS;
+    for (const systemId of systemIds) {
+      if (systemId == null) continue;
+      this._revisions.advance(...advanced.map((domain) => REVISION_SCOPES.facts(domain, systemId)));
+    }
+  }
+
+  /**
+   * Attribute a LOCAL mutation: advance its fact scopes and record it for the next
+   * announcement to drain into the change signal.
+   *
+   * Replicated changes deliberately do NOT come through here. They advance fact scopes but are
+   * announced by `src/config/settingChangeBridge.js` from the reload delta
+   * ({@link consumeReplicatedChangeScopes}), so recording them as pending would leave an
+   * undrained attribution to widen the next LOCAL announcement.
+   *
+   * @param {readonly string[]} domains See {@link PendingChangeDomains#record}.
+   * @param {...(string|null|undefined)} systemIds
+   * @returns {void}
+   * @private
+   */
+  _attributeChange(domains, ...systemIds) {
+    this._advanceFactScopes(domains, ...systemIds);
+    this._pendingDomains.record(domains, ...systemIds);
+  }
+
+  /**
+   * The ONE mutation-site call: advance the entity revisions AND attribute the change.
+   *
+   * Every site in this manager that mutates `this.recipes` for a reason a consumer must see
+   * calls this rather than {@link _advanceRecipeRevision} directly, which is what makes "did
+   * this mutation say what it changed?" a mechanical question — `_advanceRecipeRevision` has
+   * exactly two callers, this method and `initialize()`, and the second is a LOAD rather than a
+   * change. `tests/invalidation-domain-attribution.test.js` counts them.
+   *
+   * @param {readonly string[]} domains
+   * @param {...(string|null|undefined)} systemIds
+   * @returns {void}
+   * @private
+   */
+  _recordChange(domains, ...systemIds) {
+    this._advanceRecipeRevision(...systemIds);
+    this._attributeChange(domains, ...systemIds);
+  }
+
+  /**
+   * The domains a REPLACEMENT of one stored recipe belongs to, read off the fields that
+   * actually moved.
+   *
+   * Uses {@link corpusDelta} — the same comparison `reload()` runs over a whole corpus — so a
+   * locally authored edit and the replicated copy of that same edit cannot be attributed
+   * differently. A pair the delta reports nothing for is a no-op edit and is attributed to
+   * nothing.
+   *
+   * @param {object|null} previous
+   * @param {object|null} next
+   * @returns {string[]}
+   * @private
+   */
+  _domainsForRecipeEdit(previous, next) {
+    if (!previous || !next) return [...ALL_INVALIDATION_DOMAINS];
+    const delta = corpusDelta([previous], [next], { project: projectRecipe });
+    if (delta.reordered) return [...ALL_INVALIDATION_DOMAINS];
+    const entry = [...delta.perRecord.values()][0];
+    return entry ? domainsForRecipeFields(entry.fields) : [];
   }
 
   /**
@@ -3011,7 +3224,8 @@ export class RecipeManager {
       }
 
       this.recipes.set(recipe.id, recipe);
-      this._advanceRecipeRevision(recipe.craftingSystemId);
+      // An imported recipe is a whole record, exactly as a create is.
+      this._recordChange(ALL_INVALIDATION_DOMAINS, recipe.craftingSystemId);
       imported++;
     }
 
@@ -3277,7 +3491,9 @@ export class RecipeManager {
       // clause would catch it too; advancing here is the correct fix rather than the
       // backstop, because a token is only ever wrong when a manager failed to advance it
       // (see `module:revisionTokens`).
-      this._advanceRecipeRevision(systemId);
+      // `enabled` and nothing else moved, so the attribution is read off the same field map
+      // the replication path uses rather than restated here.
+      this._recordChange(domainsForRecipeFields(['enabled']), systemId);
       // The repository's bulk boundary, on a real multi-record mutation: each disabled
       // recipe announces itself, and the batch coalesces them into exactly one write —
       // the same single write the whole-corpus `save()` issued here before. Naming the

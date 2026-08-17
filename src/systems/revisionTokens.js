@@ -18,7 +18,7 @@
  *
  * ## Granularity: both, deliberately
  *
- * Every mutation advances TWO scopes — the domain scope and the affected crafting system's
+ * Every mutation advances TWO scopes — the ENTITY scope and the affected crafting system's
  * scope:
  *
  * | Scope                     | Advanced by                                                   |
@@ -30,10 +30,26 @@
  *
  * A consumer that caches per system (#1074's signature report, #1077's snapshots) watches
  * the narrow scope and is untouched by an edit in a different system. A consumer that
- * cannot attribute its cache to one system watches the domain scope. Publishing only the
+ * cannot attribute its cache to one system watches the entity scope. Publishing only the
  * narrow scope would force every such consumer to enumerate systems; publishing only the
- * domain scope would make one edit invalidate every system's cache, which is the
+ * entity scope would make one edit invalidate every system's cache, which is the
  * over-broad invalidation #1078 exists to remove. Both cost one integer.
+ *
+ * "Entity scope", not "domain scope", and the rename is not cosmetic. #1078's part B names a
+ * seven-member **invalidation-domain taxonomy** (`invalidationDomains.js`) whose members are
+ * classes of FACT — `labelling`, `narrative`, `held-inventory` and four more — and composes
+ * them into this same frozen constant through {@link REVISION_SCOPES}`.facts`. Two opposite
+ * meanings of "domain" inside one constant, in a module whose header used the other one four
+ * times, is exactly the ambiguity a consumer would resolve wrongly and silently.
+ *
+ * ## The third granularity: a fact class within one system
+ *
+ * `facts:<factClass>:<systemId>` is what a consumer watches when it depends on SOME of a
+ * system's facts and not others — the journal, which reads no authored prose, is the worked
+ * example. A description-only edit advances `facts:narrative:<id>` and leaves
+ * `facts:labelling:<id>` alone, so a consumer holding the latter keeps its cache. The two
+ * coarser scopes still advance, so a consumer that watches them is never made stale by the
+ * existence of the finer one.
  *
  * A recipe MOVED between systems advances the scopes of BOTH the system it left and the
  * system it joined, because a consumer watching the old system must also stop trusting its
@@ -117,6 +133,20 @@ export const REVISION_SCOPES = Object.freeze({
    * @returns {string}
    */
   system: (systemId) => `system:${systemId ?? ''}`,
+  /**
+   * One INVALIDATION DOMAIN's facts within one crafting system (issue 1078 part B1).
+   *
+   * Deliberately NOT called `domain`: `recipes` / `systems` above are the ENTITY scopes, and
+   * this module's header used to call those "the domain scope". `factClass` is a member of
+   * `INVALIDATION_DOMAINS` in `invalidationDomains.js`; nothing here validates it, because a
+   * scope string is compared with `===` and a typo is a scope nobody advances rather than a
+   * wrong answer.
+   *
+   * @param {string|null|undefined} factClass
+   * @param {string|null|undefined} systemId
+   * @returns {string}
+   */
+  facts: (factClass, systemId) => `facts:${factClass ?? ''}:${systemId ?? ''}`,
 });
 
 /**
@@ -145,7 +175,7 @@ export class RevisionRegistry {
 
   /**
    * Advance one or more scopes. Passing every affected scope in one call is the intended
-   * shape, because a mutation always affects the domain scope AND a system scope.
+   * shape, because a mutation always affects the entity scope AND a system scope.
    *
    * A nullish scope is ignored, so a caller need not guard a system id it may not have.
    *

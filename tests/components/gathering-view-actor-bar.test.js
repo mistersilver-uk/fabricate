@@ -133,6 +133,9 @@ describe('GatheringView ↔ actor bar wiring', () => {
     // formatter, which imports the foundryCalendar helpers.
     copyModule('src/ui/svelte/util/formatDuration.js');
     copyModule('src/systems/foundryCalendar.js');
+    // GatheringView routes its crafting-data subscription through the invalidation-domain
+    // taxonomy (issue 1078 part B1); omitting it HANGS this suite (# cancelled).
+    copyModule('src/systems/invalidationDomains.js');
     writeCompiledModule('src/ui/svelte/stores/actorBarStore.svelte.js');
 
     writeCompiledSvelte('src/ui/svelte/components/Pagination.svelte');
