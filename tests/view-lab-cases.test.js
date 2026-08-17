@@ -1190,7 +1190,26 @@ test('World Downtime publishes four tabs plus narrow/collapsed frames with gener
   // because the values are hand-copied from `lang/en.json` and rot silently otherwise.
   assert.equal(premium.expectView, 'world-downtime');
   assert.equal(premium.query.downtimeProvider, '1', 'the premium frame registers a companion');
-  assert.equal(premium.expectSelector, '[data-manager-titlebar-premium]');
+  // Issue 1213 — the rail lock. The frame has to REACH the locked state or it proves nothing:
+  // the lab world seeds an expanded rail and cases cannot override a lab setting, so a run that
+  // never presses the toggle is pixel-identical with and without the lock. The press must also
+  // come BEFORE the route, because on the route the control is disabled and Playwright would
+  // refuse to press it.
+  assert.deepEqual(
+    premium.steps.map((step) => step.selector),
+    ['[data-manager-rail-toggle]', '#manager-world-nav-downtime'],
+    'the premium frame collapses the rail first, then enters the route the lock applies to'
+  );
+  assert.equal(
+    premium.expectSelector,
+    '.manager-body:not(.is-rail-collapsed) [data-manager-rail-toggle][disabled][aria-pressed="false"]',
+    'and asserts the rail displayed expanded under a disabled control reading the display state'
+  );
+  assert.equal(
+    premium.expectScrollable,
+    '[data-lab-companion-scroll]',
+    'the companion owns the scrolling, which is only reachable at the full panel height'
+  );
   assert.ok(
     premium.expectVisible.includes(lang.FABRICATE.Admin.Manager.Titlebar.Premium),
     'the badge caption is the shipped titlebar premium mark'
@@ -1212,8 +1231,38 @@ test('World Downtime publishes four tabs plus narrow/collapsed frames with gener
     'installed',
     'the frame proves the rail chip is the muted variant'
   );
+  assert.equal(
+    premiumAttribute('[data-manager-rail-toggle]', 'title'),
+    lang.FABRICATE.Admin.Manager.Nav.RailLockedOpen,
+    'and the locked control explains itself with the sidebar string, not the section one'
+  );
 
   const mountSource = readFileSync(resolve(ROOT, 'tests/view-lab/mount.js'), 'utf8');
+  // WHERE THE TAB FIELDS LAND, read back out of the lab provider that supplies them, because
+  // this frame is the only place the two are rendered side by side. `accessibleName` names the
+  // rail BUTTON, and the region is named by that button's LABEL element — different values on
+  // purpose, because a landmark announced as "Open the downtime ledger, region" is the wrong
+  // shape. Hand-copying either into this file would be the mirror the expectation exists to
+  // catch, so both come from the fixture's own source.
+  const labLedger = mountSource.match(
+    /id: 'ledger',\s*\n\s*label: '([^']+)',\s*\n\s*accessibleName: '([^']+)',/
+  );
+  assert.ok(labLedger, "the lab companion still declares a 'ledger' tab with both name fields");
+  assert.notEqual(
+    labLedger[2],
+    labLedger[1],
+    'which proves anything only while the fixture keeps the two genuinely different'
+  );
+  assert.equal(
+    premiumAttribute('#manager-downtime-nav-ledger', 'aria-label'),
+    labLedger[2],
+    "the rail sub-item consumes the provider tab's accessibleName"
+  );
+  assert.equal(
+    premiumAttribute('#world-downtime-panel-ledger', 'aria-labelledby'),
+    'manager-downtime-nav-label-ledger',
+    'and the region is named by the rail LABEL element, whose text is the visible tab label'
+  );
   assert.match(mountSource, /applyLongDowntimeLocalization\(world\)/);
   assert.match(
     mountSource,

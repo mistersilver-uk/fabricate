@@ -106,9 +106,11 @@ const TAB_DEFINITIONS = Object.freeze({
  * `WorldDowntimePreview` for its own tabs, and it is never handed to the registry.
  *
  * Its string fields are lang KEYS, not sentences, because Core owns its copy and localizes
- * at render time. A companion's identical fields are already-localized text. `coreFallback`
- * is the single discriminator between the two readings — the same rule `WorldDowntimeTabs`
- * has always applied to `label` / `accessibleName` / `tooltip`, now extended to chrome.
+ * at render time. A companion's identical fields are already-localized text. Which mode holds
+ * the surface is the single discriminator between the two readings, and every consumer applies
+ * it: the rail's Downtime sub-items for `label`, `accessibleName` and `tooltip`, the route
+ * chrome for `title`, `subtitle` and `breadcrumb`, and Core's own preview strip — which renders
+ * in core-fallback alone and therefore localizes unconditionally.
  */
 export const WORLD_DOWNTIME_PREVIEW_PROVIDER = Object.freeze({
   apiVersion: 1,

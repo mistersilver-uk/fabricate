@@ -260,6 +260,48 @@ describe('CraftingSystemManager source contract', () => {
       "Core's preview tab ids live beside the copy and icons they index"
     );
   });
+  // The cross-component handoff that names the companion panel (issue 1213). Root owns the id
+  // and threads it down; the host consumes it. Every claim here was ungated at review, and the
+  // host's DEFAULT was itself the hand-maintained mirror its own comment forbids — a second
+  // copy of Root's literal, agreeing today and undetectable the day it stops. Deleting the
+  // thread-through at the call site survived the entire suite.
+  it('threads the rail label id into the Downtime host rather than mirroring the literal', () => {
+    assert.ok(
+      rootSource.includes(
+        'const downtimeNavLabelId = (tabId) => `manager-downtime-nav-label-${tabId}`;'
+      ),
+      'Root owns the rail label id, stated once'
+    );
+    assert.ok(
+      rootSource.includes('navLabelId={downtimeNavLabelId}'),
+      'and passes it to the host — without this the panel region has no name at all'
+    );
+    assert.ok(
+      hostSource.includes('aria-labelledby={navLabelId(tab.id)}'),
+      'the host names its region from the prop and derives no id of its own'
+    );
+    // REQUIRED, with no default. The host must not be able to answer the question itself.
+    assert.match(
+      hostSource,
+      /^\s{4}navLabelId,\s*$/m,
+      'navLabelId is declared with no fallback, so an unthreaded host fails loudly'
+    );
+    assert.ok(
+      !hostSource.includes('manager-downtime-nav'),
+      'and the host carries no copy of Root literal in any form'
+    );
+    // The region takes the SCREEN name, so the id points at the label span rather than at the
+    // button — whose accessible name is the tab's `accessibleName`, an instruction.
+    assert.ok(
+      rootSource.includes('<span class="manager-nav-label" id={downtimeNavLabelId(item.id)}'),
+      'the id lands on the visible label element'
+    );
+    assert.match(
+      rootSource,
+      /aria-label=\{downtimeCoreFallback\s*\?\s*undefined\s*:\s*downtimeTabText\(item, 'accessibleName'\)\}/,
+      'and the sub-item consumes accessibleName in provider mode, so the seam does not require a field it discards'
+    );
+  });
   it('disposes a Downtime companion before ApplicationV2 closes and removes its Svelte target', () => {
     const closeStart = appSource.indexOf('async close(options) {');
     const closeEnd = appSource.indexOf('  static show()', closeStart);
@@ -607,7 +649,7 @@ describe('CraftingSystemManager source contract', () => {
       'data-manager-view={currentView}',
       'class="manager-header"',
       'class="manager-breadcrumbs"',
-      "class={`manager-body ${railCollapsed ? 'is-rail-collapsed' : ''}`}",
+      "class={`manager-body ${railCollapsedDisplay ? 'is-rail-collapsed' : ''}`}",
       'class="manager-rail"',
       'class="manager-inspector"',
       'ComponentsBrowserView',
@@ -3304,17 +3346,54 @@ describe('CraftingSystemManager source contract', () => {
       rootSource.includes("services?.setSetting?.('managerRailCollapsed', railCollapsed);"),
       'toggling the rail should persist managerRailCollapsed through the setSetting seam'
     );
+    // The DISPLAY value, never the stored one (issue 1213). `railCollapsed` is the GM's
+    // persisted client preference and stays authoritative for what is written back; what the
+    // body renders is `railCollapsed && !railLockedOpen`, so the Downtime rail lock can force
+    // the sidebar open without permanently un-collapsing the rail on every other route.
     assert.ok(
-      rootSource.includes("class={`manager-body ${railCollapsed ? 'is-rail-collapsed' : ''}`}"),
-      'manager-body should bind the is-rail-collapsed modifier from rail state'
+      rootSource.includes(
+        "class={`manager-body ${railCollapsedDisplay ? 'is-rail-collapsed' : ''}`}"
+      ),
+      'manager-body should bind the is-rail-collapsed modifier from the displayed rail state'
+    );
+    assert.ok(
+      rootSource.includes(
+        'const railCollapsedDisplay = $derived(railCollapsed && !railLockedOpen);'
+      ),
+      'and the displayed state must be DERIVED, never written back over the stored preference'
     );
     assert.ok(
       rootSource.includes('class="manager-rail-toggle manager-scope-collapse"'),
       'the scope-card header should render the shared collapse/expand control'
     );
-    assert.ok(
-      rootSource.includes('aria-pressed={railCollapsed}'),
-      'rail toggle should expose aria-pressed reflecting collapsed state'
+    // COUNTED, not merely present (issue 1213 review). The control is written TWICE, once per
+    // `{#if selectedSystem}` scope-card branch, and an `includes` check is satisfied by either
+    // one alone — which is how deleting the lock attributes from the no-system branch survived
+    // the whole suite. Both sites read the DISPLAYED state and both are inert under the lock.
+    // `(?<![-\w])` because `aria-disabled={railLockedOpen}` CONTAINS `disabled={railLockedOpen}`,
+    // so a plain substring count reports four sites for two and reads as a pass.
+    const occurrences = (attribute) =>
+      rootSource.match(new RegExp(`(?<![-\\w])${attribute.replace(/[{}]/g, '\\$&')}`, 'g'))
+        ?.length ?? 0;
+    const railToggleSites = occurrences('data-manager-rail-toggle');
+    assert.equal(railToggleSites, 2, 'the scope card renders the rail toggle once per branch');
+    for (const attribute of [
+      'aria-pressed={railCollapsedDisplay}',
+      'aria-label={railToggleLabel}',
+      'title={railToggleTitle}',
+      'disabled={railLockedOpen}',
+      'aria-disabled={railLockedOpen}',
+    ]) {
+      assert.equal(
+        occurrences(attribute),
+        railToggleSites,
+        `every rail-toggle site must carry ${attribute}, not just the one a mounted case renders`
+      );
+    }
+    assert.match(
+      rootSource,
+      /function toggleManagerRail\(\)\s*\{[\s\S]{0,400}?if \(railLockedOpen\) return;/,
+      'and the handler early-returns, so a programmatic call obeys the lock too'
     );
     assert.ok(
       rootSource.includes('FABRICATE.Admin.Manager.Nav.CollapseRail') &&
