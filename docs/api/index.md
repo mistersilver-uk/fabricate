@@ -661,9 +661,9 @@ Each entry in `tabs`:
 | Field | Required | Meaning |
 |:------|:---------|:--------|
 | `id` | yes | Non-empty, unique within the tab set. Fabricate never checks it against a list of its own. |
-| `label` | yes | Localized visible tab label. |
-| `accessibleName` | yes | Localized accessible tab name. |
-| `tooltip` | yes | Localized keyboard-visible tab tooltip. |
+| `label` | yes | Localized visible tab label. It is the rail sub-item's visible text, and the accessible name of the panel region below it. |
+| `accessibleName` | yes | Localized accessible name of the rail sub-item, and of Fabricate's own preview tab button. It REPLACES the visible label as that control's accessible name, so it must contain the label's text. |
+| `tooltip` | yes | Localized tab tooltip. Over your screens it is the rail sub-item's native tooltip, so it is pointer-visible rather than keyboard-visible; on Fabricate's own preview strip it is a keyboard-visible `role="tooltip"`. |
 | `icon` | yes | Font Awesome class string. |
 | `title` | no | Localized page title (the `H1`) while this tab is active. |
 | `subtitle` | no | Localized page subtitle while this tab is active. |
@@ -720,8 +720,11 @@ The companion supplies its own inset.
 Fabricate's `12px 20px 24px` inset is **gone** as of this contract: a companion that shipped against it must add the equivalent padding to its own root.
 
 **Your tabs are rail items, and Fabricate renders no tab strip.**
-A provider's tabs appear once, as sub-items of the Manager rail's Downtime group, and the panel below them is a named `region` labelled by the active rail item rather than a tab panel.
+A provider's tabs appear once, as sub-items of the Manager rail's Downtime group, and the panel below them is a named `region` rather than a tab panel.
+The region takes the tab's **visible `label`** as its name — it is labelled by the sub-item's label element, not by the sub-item itself, so a landmark is named after the screen rather than after the action that opens it.
+The sub-item itself carries `accessibleName` as its `aria-label` and `tooltip` as its native tooltip; see the field table above for where each one lands.
 The rail is locked expanded while a provider holds this route, so those sub-items are always reachable; the rail's collapse control renders disabled and explains itself, and the GM's stored collapse preference is left untouched and restored on leaving the route.
+Entering the route scrolls the active sub-item into view, so the switcher is visible without hunting for it.
 
 **Overflow.**
 Core's panel scroller keeps working for any companion whose content overflows its root **visibly** — including one that takes the full height.

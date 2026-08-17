@@ -914,6 +914,79 @@ function activeCompanionPanel() {
   return target.querySelector('[data-downtime-extension-panel]');
 }
 
+const railBodyCollapsed = () =>
+  target.querySelector('.manager-body').classList.contains('is-rail-collapsed');
+const railToggleControl = () => target.querySelector('[data-manager-rail-toggle]');
+
+/**
+ * Every claim the Downtime rail lock makes about the collapse control, in one place.
+ *
+ * Named once because TWO render sites carry `[data-manager-rail-toggle]` — one per
+ * `{#if selectedSystem}` scope-card branch — and only one of them was reachable from the
+ * mounted suite before issue 1213's review. Deleting `disabled={railLockedOpen}` from the
+ * unreachable branch survived the whole suite; a shared assertion is what lets a second case
+ * mount the other branch without copying the block (which the duplication gate would fail).
+ *
+ * @param {() => Array<Array<unknown>>} railWrites reads the `managerRailCollapsed` writes so far.
+ */
+function assertRailLockedOpen(railWrites) {
+  const toggle = railToggleControl();
+  assert.ok(!railBodyCollapsed(), 'arriving on the companion surface displays the rail expanded');
+  assert.ok(
+    Boolean(target.querySelector('[data-world-downtime-submenu]')),
+    'which is the whole point — the sub-items are the only way to the other screens'
+  );
+  assert.equal(toggle.disabled, true, 'and the collapse control is genuinely disabled');
+  assert.equal(toggle.getAttribute('aria-disabled'), 'true');
+  assert.equal(
+    toggle.getAttribute('aria-pressed'),
+    'false',
+    'every attribute reads the DISPLAYED state, not the stored one'
+  );
+  assert.equal(
+    toggle.getAttribute('aria-label'),
+    shippedString('FABRICATE.Admin.Manager.Nav.CollapseRail')
+  );
+  assert.equal(
+    toggle.getAttribute('title'),
+    shippedString('FABRICATE.Admin.Manager.Nav.RailLockedOpen'),
+    'the title explains the lock, and it is sidebar-worded rather than the section string'
+  );
+  assert.ok(
+    Boolean(toggle.querySelector('.fa-angles-left')),
+    'the chevron points the way the control would actually move'
+  );
+  assert.deepEqual(railWrites(), [], 'and nothing about the lock writes a client preference');
+}
+
+/**
+ * Prove the lock is a rule about STATE rather than one control's attribute.
+ *
+ * The first press only proves the attribute: happy-dom suppresses handlers on a `disabled`
+ * button, so `toggleManagerRail`'s own `if (railLockedOpen) return;` is never reached. The
+ * second press strips the attribute first, which is the only path in this environment that
+ * reaches past the belt to the braces — delete the early return and this is what fails.
+ *
+ * @param {() => Array<Array<unknown>>} railWrites reads the `managerRailCollapsed` writes so far.
+ */
+async function assertRailLockSurvivesPresses(railWrites) {
+  railToggleControl().click();
+  await tick();
+  flushSync();
+  assert.ok(!railBodyCollapsed(), 'the disabled control does not collapse the rail');
+
+  const toggle = railToggleControl();
+  toggle.removeAttribute('disabled');
+  toggle.click();
+  await tick();
+  flushSync();
+  assert.ok(
+    !railBodyCollapsed(),
+    'and the handler refuses too, so the lock is inert rather than merely styled'
+  );
+  assert.deepEqual(railWrites(), [], 'neither press writes the stored collapse preference');
+}
+
 function managerTitle() {
   return target.querySelector('.manager-header .manager-title').textContent.trim();
 }
@@ -14016,6 +14089,15 @@ describe('CraftingSystemManager mounted behavior', () => {
       subitems.every((item) => Boolean(item.querySelector('[data-world-downtime-lock] .fa-lock'))),
       'every child carries the premium padlock'
     );
+    // CORE-FALLBACK IS UNTOUCHED by the provider-mode naming (issue 1213). Core's preview keeps
+    // its tab strip, which is where its accessible names and keyboard-visible tooltips already
+    // live, so the rail sub-item states no `aria-label` here and keeps its visible label as its
+    // accessible name.
+    assert.deepEqual(
+      subitems.map((item) => item.getAttribute('aria-label')),
+      [null, null, null, null],
+      'no aria-label overrides the visible label in Core preview mode'
+    );
     assert.ok(
       subitems.every((item) => item.tagName === 'BUTTON' && !item.disabled),
       'the padlock marks a premium preview on a WORKING control, never a disabled one'
@@ -14251,8 +14333,12 @@ describe('CraftingSystemManager mounted behavior', () => {
       target.querySelector('[data-downtime-extension-panel]').textContent,
       /Mounted tracking/
     );
+    // `[data-world-downtime-lock]` on the RAIL, not `.downtime-tab-lock` on the strip: with no
+    // strip in provider mode the strip padlock cannot exist, so asserting its absence could
+    // not fail (issue 1213). The rail padlock is rendered in both modes' markup and gated on
+    // `downtimeCoreFallback`, so its absence is a real claim about this mode.
     assert.ok(
-      !target.querySelector('.downtime-tab-lock'),
+      !target.querySelector('[data-world-downtime-lock]'),
       'an installed companion never inherits the Core fallback lock treatment'
     );
 
@@ -14328,64 +14414,132 @@ describe('CraftingSystemManager mounted behavior', () => {
       { managerExtensions: registry }
     );
 
-    const isCollapsed = () =>
-      target.querySelector('.manager-body').classList.contains('is-rail-collapsed');
-    const railToggle = () => target.querySelector('[data-manager-rail-toggle]');
     const railWrites = () => settingWrites.filter(([key]) => key === 'managerRailCollapsed');
 
-    assert.ok(isCollapsed(), 'pre-condition: this GM stored a collapsed rail');
+    assert.ok(railBodyCollapsed(), 'pre-condition: this GM stored a collapsed rail');
 
     // MODE-scoped, half one: a provider registered while the GM is elsewhere locks nothing.
     const unregister = registry.publicApi.registerWorldNavProvider(downtimeProvider());
     await settleDowntimeProvider();
-    assert.ok(isCollapsed(), 'a companion on another route leaves the rail alone');
-    assert.equal(railToggle().disabled, false);
+    assert.ok(railBodyCollapsed(), 'a companion on another route leaves the rail alone');
+    assert.equal(railToggleControl().disabled, false);
 
     worldNavItem('downtime').click();
     await settleRouteExit();
 
-    assert.ok(!isCollapsed(), 'arriving on the companion surface displays the rail expanded');
-    assert.ok(
-      Boolean(target.querySelector('[data-world-downtime-submenu]')),
-      'which is the whole point — the sub-items are the only way to the other screens'
-    );
-    assert.equal(railToggle().disabled, true, 'and the collapse control is genuinely disabled');
-    assert.equal(railToggle().getAttribute('aria-disabled'), 'true');
-    assert.equal(
-      railToggle().getAttribute('aria-pressed'),
-      'false',
-      'every attribute reads the DISPLAYED state, not the stored one'
-    );
-    assert.equal(
-      railToggle().getAttribute('aria-label'),
-      shippedString('FABRICATE.Admin.Manager.Nav.CollapseRail')
-    );
-    assert.equal(
-      railToggle().getAttribute('title'),
-      shippedString('FABRICATE.Admin.Manager.Nav.RailLockedOpen'),
-      'the title explains the lock, and it is sidebar-worded rather than the section string'
-    );
-    assert.ok(
-      Boolean(railToggle().querySelector('.fa-angles-left')),
-      'the chevron points the way the control would actually move'
-    );
-
-    railToggle().click();
-    await settleDowntimeProvider();
-    assert.ok(!isCollapsed(), 'the locked control is inert rather than merely styled');
-    assert.deepEqual(railWrites(), [], 'and the lock writes no client preference at all');
+    assertRailLockedOpen(railWrites);
+    await assertRailLockSurvivesPresses(railWrites);
 
     // MODE-scoped, half two: Core's fallback keeps its strip, so it is never stranded and
     // keeps its collapsible rail — on this very route.
     unregister();
     await settleDowntimeProvider();
-    assert.ok(isCollapsed(), 'losing the companion returns the route to the stored collapse');
-    assert.equal(railToggle().disabled, false);
+    assert.ok(railBodyCollapsed(), 'losing the companion returns the route to the stored collapse');
+    assert.equal(railToggleControl().disabled, false);
 
     worldNavItem('parties').click();
     await settleRouteExit();
-    assert.ok(isCollapsed(), 'and the stored preference survived the whole visit');
+    assert.ok(railBodyCollapsed(), 'and the stored preference survived the whole visit');
     assert.deepEqual(railWrites(), []);
+  });
+
+  // THE SECOND RENDER SITE (issue 1213 review). `[data-manager-rail-toggle]` is written twice,
+  // once per `{#if selectedSystem}` scope-card branch, and every mounted case above renders the
+  // first: the store fixture always carries a selected system. Deleting the lock attributes
+  // from the `{:else}` branch therefore survived the whole suite, leaving the same dead control
+  // issue 1185 was about, one branch over — on a state this route explicitly supports and has
+  // its own test for. `noSystems: true` is what renders that branch.
+  it('locks the rail open on the companion route with no crafting system selected', async () => {
+    useShippedLocalization();
+    const registry = createManagerExtensionsRegistry();
+    const settingWrites = [];
+    registry.publicApi.registerWorldNavProvider(downtimeProvider({ ids: ['board'] }));
+    mountManager(
+      [],
+      { noSystems: true },
+      {
+        getSetting: (key) => key === 'managerRailCollapsed',
+        setSetting: (key, value) => settingWrites.push([key, value]),
+      },
+      { managerExtensions: registry }
+    );
+    const railWrites = () => settingWrites.filter(([key]) => key === 'managerRailCollapsed');
+
+    assert.ok(
+      Boolean(target.querySelector('.manager-scope-card .manager-title')),
+      'pre-condition: this is the no-system scope card, the branch the other cases never render'
+    );
+    assert.ok(railBodyCollapsed(), 'pre-condition: this GM stored a collapsed rail');
+
+    worldNavItem('downtime').click();
+    await settleRouteExit();
+
+    assertRailLockedOpen(railWrites);
+    await assertRailLockSurvivesPresses(railWrites);
+
+    worldNavItem('parties').click();
+    await settleRouteExit();
+    assert.ok(railBodyCollapsed(), 'and leaving the route restores the stored collapse here too');
+    assert.deepEqual(railWrites(), []);
+  });
+
+  // Issue 1213 — the one real cost of deleting the tab strip. Measured at a 1330x900 Manager the
+  // Downtime sub-items render below the nav scrollport, so the route's first visible state
+  // offered no visible screen switcher at all. They stay reachable by scrolling, so this is not
+  // stranding; it is one scroll, and Core does it.
+  it('scrolls the active Downtime sub-item into view on entering the companion route', async () => {
+    const scrolled = [];
+    const original = globalThis.Element.prototype.scrollIntoView;
+    globalThis.Element.prototype.scrollIntoView = function record(options) {
+      scrolled.push([this.id, options]);
+    };
+    try {
+      const registry = createManagerExtensionsRegistry();
+      registry.publicApi.registerWorldNavProvider(
+        downtimeProvider({ prefix: 'Guild', ids: ['ledger', 'crew'] })
+      );
+      mountManager([], {}, {}, { managerExtensions: registry });
+      assert.deepEqual(scrolled, [], 'nothing is revealed while the GM is on another route');
+
+      worldNavItem('downtime').click();
+      await settleRouteExit();
+      assert.deepEqual(
+        scrolled,
+        [['manager-downtime-nav-ledger', { block: 'nearest' }]],
+        'entering the route reveals the active sub-item, by the smallest scroll that does it'
+      );
+
+      target.querySelector('#manager-downtime-nav-crew').click();
+      await settleRouteExit();
+      assert.deepEqual(
+        scrolled.at(-1),
+        ['manager-downtime-nav-crew', { block: 'nearest' }],
+        'and switching screen follows the switcher'
+      );
+      const count = scrolled.length;
+      await settleDowntimeProvider();
+      assert.equal(scrolled.length, count, 'but a re-render does not yank a scrolled rail back');
+    } finally {
+      globalThis.Element.prototype.scrollIntoView = original;
+    }
+  });
+
+  // Core's preview owns the top of its own panel, so it needs no reveal — and doing it anyway
+  // would move the rail on a route where nothing was ever out of reach.
+  it('does not scroll the rail on the Core preview route', async () => {
+    const scrolled = [];
+    const original = globalThis.Element.prototype.scrollIntoView;
+    globalThis.Element.prototype.scrollIntoView = function record() {
+      scrolled.push(this.id);
+    };
+    try {
+      mountManager([]);
+      worldNavItem('downtime').click();
+      await settleRouteExit();
+      assert.deepEqual(scrolled, [], 'core-fallback keeps its strip at the top of the panel');
+    } finally {
+      globalThis.Element.prototype.scrollIntoView = original;
+    }
   });
 
   // Issue 1185 — where the premium signal LIVES. In the free module the title bar's badge
@@ -14575,8 +14729,10 @@ describe('CraftingSystemManager mounted behavior', () => {
       await settleDowntimeProvider();
       assert.match(target.textContent, /Recovered tracking/);
       assert.match(target.textContent, /Recovered activities/);
+      // Again the RAIL padlock: the strip one is unrenderable in provider mode, so its absence
+      // would prove nothing about whether a `coreFallback` field on a provider was honoured.
       assert.ok(
-        !target.querySelector('.downtime-tab-lock'),
+        !target.querySelector('[data-world-downtime-lock]'),
         'a companion cannot opt into Core-only fallback behavior with coreFallback'
       );
       assert.equal(errors.length, 2);
@@ -14671,14 +14827,44 @@ describe('CraftingSystemManager mounted behavior', () => {
     const region = target.querySelector('#world-downtime-panel-ledger');
     assert.equal(region.getAttribute('role'), 'region', 'a tabpanel with no tablist is an orphan');
     assert.equal(
-      region.getAttribute('aria-labelledby'),
-      'manager-downtime-nav-ledger',
-      'so the panel takes its name from the rail item that navigates to it'
-    );
-    assert.equal(
       region.getAttribute('tabindex'),
       '-1',
       'programmatically focusable for provider-swap recovery, but not a tab stop that scrolls nothing'
+    );
+    // WHERE EACH REQUIRED TAB FIELD LANDS, and the two are deliberately DIFFERENT elements
+    // (issue 1213). With no strip the rail sub-item is the only control naming the screen, so
+    // it consumes `accessibleName` and `tooltip` — otherwise Core would validate both, throw
+    // if a provider omitted either, and then discard them.
+    const railItem = target.querySelector('#manager-downtime-nav-ledger');
+    assert.equal(
+      railItem.getAttribute('aria-label'),
+      'Open Guild ledger',
+      'accessibleName names the rail sub-item, replacing its visible label'
+    );
+    assert.equal(
+      railItem.getAttribute('title'),
+      'Guild ledger tools',
+      'and tooltip is that sub-item native tooltip'
+    );
+    // The REGION is named by the screen, not by the action that opens it. Pointing this at the
+    // button would make the landmark inherit the button's whole accessible name and announce
+    // "Open Guild ledger, region"; it points at the label span, which holds "Guild ledger".
+    const labelSpan = railItem.querySelector('.manager-nav-label');
+    assert.equal(labelSpan.id, 'manager-downtime-nav-label-ledger');
+    assert.equal(
+      region.getAttribute('aria-labelledby'),
+      labelSpan.id,
+      'the panel takes its name from the rail label, not from the rail button'
+    );
+    assert.notEqual(
+      region.getAttribute('aria-labelledby'),
+      railItem.id,
+      'because the button name is an instruction and a landmark name is a screen'
+    );
+    assert.equal(
+      labelSpan.textContent.trim(),
+      'Guild ledger',
+      'so the region resolves to the visible screen name'
     );
     assert.deepEqual(
       Array.from(target.querySelectorAll('[data-world-downtime-item] .manager-nav-label')).map(

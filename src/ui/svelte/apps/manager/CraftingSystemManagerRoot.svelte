@@ -200,8 +200,8 @@
   }
 
   // Core's own tab fields are lang KEYS and a companion's are already-localized text, so
-  // `downtimeCoreFallback` is the one discriminator between the two readings — the rule
-  // `WorldDowntimeTabs` has always applied to the tab strip, applied to route chrome too.
+  // `downtimeCoreFallback` is the one discriminator between the two readings — the rule the
+  // rail's Downtime sub-items already apply to `label` / `tooltip`, applied to route chrome too.
   // The two defaults are genuinely different values, not one repeated. `coreDefault` is what
   // Core shows when its OWN lang key is missing. `providerDefault` is what Core shows over a
   // companion's screens when that companion declared no chrome, and it must never be Core's
@@ -2254,8 +2254,9 @@
   const isWorldPartiesRoute = $derived(currentView === 'world' && activeTravelTab === 'parties');
   const isWorldDowntimeRoute = $derived(currentView === 'world-downtime');
   // A registered provider holds the surface until it faults; otherwise Core's own preview
-  // does. `WORLD_DOWNTIME_PREVIEW_PROVIDER` is one implementation of the same interface,
-  // so the rail, the tab strip and the route chrome all read ONE tab list either way.
+  // does. `WORLD_DOWNTIME_PREVIEW_PROVIDER` is one implementation of the same interface, so
+  // the rail, the route chrome and — in core-fallback only — the preview's tab strip all read
+  // ONE tab list either way.
   const downtimeProvider = $derived(
     downtimeProviderSnapshot && downtimeProviderSnapshot !== downtimeFaultedProvider
       ? downtimeProviderSnapshot
@@ -2286,16 +2287,26 @@
     if (tabs.some((tab) => tab.id === worldDowntimeTabId)) return;
     worldDowntimeTabId = tabs[0].id;
   });
-  // The rail's Downtime children are the same tabs the panel's strip offers, read from the
-  // same list so a rail label and a tab label can never drift apart. Both are triggers for
-  // one navigation.
+  // The rail's Downtime children render the active tab set. In core-fallback they are one of
+  // TWO renderings of it — the preview's own tab strip is the other — and in provider mode
+  // they are the only one, because a companion's screens carry no strip (issue 1213). Either
+  // way they read the same list, so a rail label and a tab label can never drift apart.
   const downtimeNavItems = $derived(downtimeTabs);
-  // The rail sub-item's element id, stated ONCE and used twice: the rail stamps it, and the
-  // extension host reads it for the companion panel's `aria-labelledby` (issue 1213). With no
-  // tab strip in provider mode the rail item is the only element naming the active screen, so
-  // the panel takes its name from it — and a second literal here and there would be a mirror
-  // across a component boundary with nothing to catch its drift.
+  // The rail sub-item BUTTON's element id. It is the click target the mounted suite drives and
+  // the anchor the group's markup is keyed on.
   const downtimeNavItemId = (tabId) => `manager-downtime-nav-${tabId}`;
+  // The id of the element carrying the sub-item's VISIBLE LABEL, stated once and used twice:
+  // the rail stamps it, and the extension host reads it for the companion panel's
+  // `aria-labelledby` (issue 1213). A second literal here and there would be a mirror across a
+  // component boundary with nothing to catch its drift.
+  //
+  // It names the LABEL SPAN rather than the button deliberately. The button carries the fuller
+  // `aria-label` — the tab's `accessibleName`, which reads as an instruction ("Open the
+  // downtime ledger") because it names an action — and a landmark inherits the whole accessible
+  // name of whatever it points at, so pointing at the button would announce the region as
+  // "Open the downtime ledger, region". A landmark takes the name of the SCREEN, so it points
+  // at the span that holds exactly that: "Ledger".
+  const downtimeNavLabelId = (tabId) => `manager-downtime-nav-label-${tabId}`;
   // Header actions belong to the active TAB, falling back to the provider's own list; Core
   // keeps its bespoke premium anchor rather than routing it through a public descriptor.
   const downtimeHeaderActions = $derived(
@@ -2590,6 +2601,31 @@
   const railToggleIcon = $derived(
     railCollapsedDisplay ? 'fas fa-angles-right' : 'fas fa-angles-left'
   );
+  // REVEAL THE SWITCHER ON ROUTE ENTRY (issue 1213). Measured at a 1330x900 Manager, the nav
+  // scrollport ends at y=977 while the three Downtime sub-items render at 983-1083: with the
+  // strip gone, the route's FIRST VISIBLE STATE offered no visible way to change screen. They
+  // are reachable by scrolling, so this is not the stranding the rail lock exists to prevent —
+  // it is the one real cost of deleting the strip, and one scroll removes it.
+  //
+  // `nearest` so a switcher already in view does not move the rail at all. Provider mode only:
+  // core-fallback keeps its strip at the top of the panel and needs no help. Guarded by the
+  // last id scrolled to, because the rail re-renders on far more than a route change and a
+  // repeat would yank the pane back under a GM who had scrolled it deliberately.
+  const downtimeNavNodes = $state({});
+  let revealedDowntimeNavId = null;
+  $effect(() => {
+    if (!railLockedOpen || !railGroupExpanded.worldDowntime) {
+      revealedDowntimeNavId = null;
+      return;
+    }
+    const tabId = worldDowntimeTabId;
+    if (revealedDowntimeNavId === tabId) return;
+    const node = downtimeNavNodes[tabId];
+    if (!node) return;
+    revealedDowntimeNavId = tabId;
+    // happy-dom does not implement it, hence the optional call.
+    node.scrollIntoView?.({ block: 'nearest' });
+  });
   // The Knowledge surface's projection is published TOP-LEVEL, never hung off
   // `selectedSystem` (issue 785): hanging it there would force a `selectedSystem`
   // reference rebuild on every knowledge publish and let a late phase-2 publish
@@ -8640,7 +8676,7 @@
           </button>
           <!--
             Downtime is a GROUP, not a leaf: the design nests the same four previews under it
-            that the panel's tab strip offers, each carrying a premium padlock. The structure
+            that Core's own tab strip offers, each carrying a premium padlock. The structure
             follows the shipped Travel group exactly — parent, disclosure toggle, submenu —
             so the collapsed 56px rail hides the labels, the toggle and the whole submenu
             without a rule of its own, and the premium badge rides `.manager-nav-count` for
@@ -8721,19 +8757,37 @@
                 )}
               >
                 {#each downtimeNavItems as item (item.id)}
+                  <!--
+                    `accessibleName` and `tooltip` LAND HERE in provider mode (issue 1213).
+                    With no tab strip over a companion's screens this button is the only
+                    control naming the active screen, so the two fields the seam requires have
+                    to be consumed by it or Core would validate them and throw them away.
+                    `aria-label` REPLACES the visible label as the button's accessible name —
+                    the same contract the player seam's rail button already ships — so a
+                    provider's `accessibleName` must contain the label's text. In core-fallback
+                    it stays `undefined`: Core's preview keeps its strip, which is where Core's
+                    own accessible names and keyboard-visible tooltips already live, and this
+                    change touches nothing in that mode.
+                  -->
                   <button
                     type="button"
                     class={`manager-nav-subitem manager-downtime-subitem ${isWorldDowntimeRoute && worldDowntimeTabId === item.id ? 'is-active' : ''}`}
                     id={downtimeNavItemId(item.id)}
+                    bind:this={downtimeNavNodes[item.id]}
                     data-world-downtime-item={item.id}
                     title={downtimeTabText(item, 'tooltip')}
+                    aria-label={downtimeCoreFallback
+                      ? undefined
+                      : downtimeTabText(item, 'accessibleName')}
                     aria-current={isWorldDowntimeRoute && worldDowntimeTabId === item.id
                       ? 'true'
                       : undefined}
                     onclick={() => openWorldDowntimePreview(item.id)}
                   >
                     <i class={item.icon} aria-hidden="true"></i>
-                    <span class="manager-nav-label">{downtimeTabText(item, 'label')}</span>
+                    <span class="manager-nav-label" id={downtimeNavLabelId(item.id)}
+                      >{downtimeTabText(item, 'label')}</span
+                    >
                     <!--
                       The padlock and the premium note below advertise CORE'S preview. A
                       companion owning the surface has nothing locked, so neither renders.
@@ -8775,7 +8829,7 @@
           provider={downtimeProvider}
           tabs={downtimeTabs}
           context={worldDowntimeContext}
-          navItemId={downtimeNavItemId}
+          navLabelId={downtimeNavLabelId}
           emitHook={managerExtensions?.emitHook}
           onProviderFault={noteDowntimeProviderFault}
         />

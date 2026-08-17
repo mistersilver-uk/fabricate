@@ -3850,12 +3850,20 @@ export const VIEW_LAB_CASES = Object.freeze([
         name: 'data-downtime-extension-panel',
         value: 'ledger',
       },
+      // Named by the sub-item's LABEL, not by the sub-item: the button carries the tab's
+      // `accessibleName` as its own name, which is an instruction, and a landmark takes the
+      // name of the screen.
       {
         selector: '#world-downtime-panel-ledger',
         name: 'aria-labelledby',
-        value: 'manager-downtime-nav-ledger',
+        value: 'manager-downtime-nav-label-ledger',
       },
       { selector: '#world-downtime-panel-ledger', name: 'role', value: 'region' },
+      {
+        selector: '#manager-downtime-nav-ledger',
+        name: 'aria-label',
+        value: 'Open the downtime ledger',
+      },
     ],
     // The title bar carries the loud signal and the rail chip is muted beside it; the
     // provider's own three tabs are rendered rather than Core's four.

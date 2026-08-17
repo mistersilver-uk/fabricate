@@ -8,9 +8,10 @@
 
   // `activeTabId` is bindable because the selected preview is no longer private to this
   // host: the route's title, subtitle and breadcrumb leaf all name it, and the rail's
-  // Downtime sub-items are a second trigger for the same navigation as the tab strip. One
-  // owner, two triggers — binding keeps the shell authoritative while letting the host read
-  // and drive it. Unbound (the direct-mount tests), it is ordinary local state.
+  // Downtime sub-items drive the same navigation from outside this component — as does
+  // Core's own tab strip, in core-fallback mode. One owner, several triggers — binding keeps
+  // the shell authoritative while letting the host read and drive it. Unbound (the
+  // direct-mount tests), it is ordinary local state.
   //
   // `provider` is a PROP rather than a subscription of this host's own. The rail renders the
   // active tab set while this host is unmounted, and a mount fault has to move the rail as
@@ -25,15 +26,20 @@
     surfaceId = WORLD_DOWNTIME_SURFACE_ID,
     route = 'world-downtime',
     onProviderFault = () => {},
-    // The rail sub-item that NAMES each companion screen (issue 1213). In provider mode the
-    // panel is a `role="region"` labelled by its rail item, and Root owns that id — so Root
-    // passes the very function it stamps the rail with rather than this host re-deriving the
-    // string, which would be a hand-maintained mirror of an id in another component.
+    // The element that NAMES each companion screen (issue 1213): the visible label inside the
+    // rail's Downtime sub-item. In provider mode the panel is a `role="region"` labelled by it,
+    // and Root owns that id — so Root passes the very function it stamps the rail with rather
+    // than this host re-deriving the string.
     //
-    // Two dependencies of that name, both invisible and neither gated: `manager-downtime-nav-<id>`
+    // REQUIRED, with no default on purpose. A default would BE the hand-maintained mirror this
+    // prop exists to avoid: a second copy of a literal another component owns, agreeing with it
+    // today and undetectable the day it stops. Undeclared, provider mode throws at render, which
+    // is exactly what a missing cross-component handoff should do.
+    //
+    // Two dependencies of that name, both invisible and neither gated on its own: the label id
     // only exists inside `{#if railGroupExpanded.worldDowntime}`, so the name depends on the
     // group lock; and the rail lock is what keeps the sub-items reachable at all.
-    navItemId = (tabId) => `manager-downtime-nav-${tabId}`,
+    navLabelId,
     activeTabId = $bindable('tracking'),
   } = $props();
   const coreFallback = $derived(provider == null);
@@ -180,7 +186,11 @@
       sub-items and nothing else, so a strip would render the same list twice and cost the
       companion 44px of its board. Those sub-items stay plain `button.manager-nav-subitem`
       with `aria-current` — they are not a tablist, and with no tablist a `role="tabpanel"`
-      would be an orphan, so each panel is a NAMED REGION labelled by the rail item instead.
+      would be an orphan, so each panel is a NAMED REGION instead, labelled by the VISIBLE
+      LABEL inside its rail item. Not by the item itself: that button carries the tab's
+      `accessibleName` as its own accessible name, which names an ACTION ("Open the downtime
+      ledger"), and a landmark inherits the whole name of whatever it points at. A region is
+      named after the screen, so it points at the span holding exactly that — "Ledger".
 
       `tabindex="-1"`, deliberately not `0`: the focus stop existed to scroll this panel, and
       the panel no longer owns the scrolling for a companion that takes its own. What is left
@@ -193,7 +203,7 @@
           class="downtime-extension-panel"
           role="region"
           tabindex="-1"
-          aria-labelledby={navItemId(tab.id)}
+          aria-labelledby={navLabelId(tab.id)}
           hidden={tab.id !== activeTabId}
         >
           {#if tab.id === activeTabId}

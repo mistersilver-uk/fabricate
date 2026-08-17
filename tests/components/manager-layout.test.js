@@ -8638,14 +8638,19 @@ const companionShort = companionRoot('', '<p style="margin:0">short</p>');
 const MANAGER_WIDTH_LADDER = [1400, 1200, 1100, 900, 700, 600];
 
 /**
- * Render the provider-mode chain at one Manager width and read every link's box.
+ * Render the Downtime route at one Manager width and read it with `readInPage`.
+ *
+ * The Manager chrome around the host is what makes the block size definite, so it is stated
+ * once here and every case below shares it — the two modes differ only in the host's own
+ * class and children.
  *
  * @param {number} managerWidth width of the whole Manager window, in px
- * @param {string} companionMarkup what the companion mounts into the target
- * @returns {Promise<object>} client heights down the chain, plus the panel's scroll state
+ * @param {string} hostClasses extra classes on `.downtime-host`
+ * @param {string} hostChildren the host's own markup
+ * @param {Function} readInPage evaluated in the page; returns the measurements
+ * @returns {Promise<object>} whatever `readInPage` returned
  */
-async function readCompanionPanelChain(managerWidth, companionMarkup) {
-  const hash = downtimeHostScoped.hashClass;
+async function readDowntimeRoute(managerWidth, hostClasses, hostChildren, readInPage) {
   const context = await sharedBrowser.newContext({
     viewport: { width: 1920, height: 1080 },
     deviceScaleFactor: 1,
@@ -8661,14 +8666,34 @@ async function readCompanionPanelChain(managerWidth, companionMarkup) {
         `<div class="manager-body">` +
         `<aside class="manager-rail">rail</aside>` +
         `<main class="manager-main">` +
-        `<section class="downtime-host ${hash}" data-world-downtime-host>` +
-        `<div class="downtime-extension-panels ${hash}">` +
-        `<div class="downtime-extension-panel ${hash}" role="region" tabindex="-1">` +
-        `<div class="downtime-extension-target ${hash}" data-downtime-extension-panel="board">` +
-        companionMarkup +
-        `</div></div></div></section></main></div></div></div>`
+        `<section class="downtime-host ${hostClasses}" data-world-downtime-host>` +
+        hostChildren +
+        `</section></main></div></div></div>`
     );
-    return await page.evaluate(() => {
+    return await page.evaluate(readInPage);
+  } finally {
+    await context.close();
+  }
+}
+
+/**
+ * Render the provider-mode chain at one Manager width and read every link's box.
+ *
+ * @param {number} managerWidth width of the whole Manager window, in px
+ * @param {string} companionMarkup what the companion mounts into the target
+ * @returns {Promise<object>} client heights down the chain, plus the panel's scroll state
+ */
+async function readCompanionPanelChain(managerWidth, companionMarkup) {
+  const hash = downtimeHostScoped.hashClass;
+  return readDowntimeRoute(
+    managerWidth,
+    hash,
+    `<div class="downtime-extension-panels ${hash}">` +
+      `<div class="downtime-extension-panel ${hash}" role="region" tabindex="-1">` +
+      `<div class="downtime-extension-target ${hash}" data-downtime-extension-panel="board">` +
+      companionMarkup +
+      `</div></div></div>`,
+    () => {
       const at = (selector) => document.querySelector(selector);
       const panels = at('.downtime-extension-panels');
       const host = at('.downtime-host');
@@ -8710,10 +8735,42 @@ async function readCompanionPanelChain(managerWidth, companionMarkup) {
         hostWidth: host.clientWidth,
         companion: at('#companion-root').clientHeight,
       };
-    });
-  } finally {
-    await context.close();
-  }
+    }
+  );
+}
+
+/**
+ * Read the CORE-FALLBACK host, which keeps two grid tracks and its own preview scroller.
+ *
+ * @param {number} managerWidth width of the whole Manager window, in px
+ * @returns {Promise<object>} the two rows' boxes and the host's resolved track list
+ */
+async function readCoreFallbackHostRows(managerWidth) {
+  const hash = downtimeHostScoped.hashClass;
+  return readDowntimeRoute(
+    managerWidth,
+    `core-fallback ${hash}`,
+    `<div class="downtime-preview-scroll ${hash}">` +
+      '<p style="height:200px;margin:0">row</p>'.repeat(12) +
+      `</div><div class="downtime-tab-card-stand-in" style="height:44px">strip</div>`,
+    () => {
+      const at = (selector) => document.querySelector(selector);
+      const host = at('.downtime-host');
+      const scroll = at('.downtime-preview-scroll');
+      const strip = at('.downtime-tab-card-stand-in');
+      return {
+        host: host.clientHeight,
+        scroll: scroll.clientHeight,
+        scrollScrolls:
+          /auto|scroll/.test(getComputedStyle(scroll).overflowY) &&
+          scroll.scrollHeight > scroll.clientHeight,
+        strip: strip.clientHeight,
+        stripBottomGap: Math.round(
+          host.getBoundingClientRect().bottom - strip.getBoundingClientRect().bottom
+        ),
+      };
+    }
+  );
 }
 
 test('the companion Downtime panel states a height at every link, which Chromium alone cannot gate', () => {
@@ -8722,21 +8779,30 @@ test('the companion Downtime panel states a height at every link, which Chromium
   // Chromium resolves a percentage height through a chain of `height: auto` in-flow block
   // ancestors up to the nearest definite one, so with the host grid correct the companion's
   // own `height: 100%` lands on the pane's height whether or not the wrapper and the target
-  // state a height themselves. Verified by removing BOTH declarations and re-running the
-  // ladder below: every number was identical. A test that only measured would be green over
-  // a chain with nothing in it.
+  // state a height themselves.
   //
-  // The declarations are still load-bearing, because Chromium is not the only engine Foundry
-  // runs in and CSS 2.1's own rule is the opposite one — a percentage against a containing
-  // block whose height depends on content computes to `auto`. Only Chromium is installed here,
-  // so the honest gate is the declaration rather than a second engine's measurement.
+  // MEASURED, and an earlier note here overstated it. Removing BOTH declarations leaves every
+  // number in the width ladder below identical — that test stays green — but it is not true
+  // that nothing changes: the last case of the overflow test does move, because a companion
+  // that states NO height of its own has nothing left to propagate through and its target
+  // collapses to content height (18px against the pane's 685). So one measuring test is blind
+  // to this and one is not, which is exactly why the declaration is asserted here as well.
+  //
+  // The declarations are load-bearing beyond that, because Chromium is not the only engine
+  // Foundry runs in and CSS 2.1's own rule is the opposite one — a percentage against a
+  // containing block whose height depends on content computes to `auto`. Only Chromium is
+  // installed here, so the honest gate is the declaration rather than a second engine's
+  // measurement.
   const hash = downtimeHostScoped.hashClass;
   for (const selector of ['.downtime-extension-panel', '.downtime-extension-target']) {
     const rule = blockIn(downtimeHostScoped.css, `${selector}.${hash}`);
     assert.ok(rule, `${selector} should own a rule in the host's scoped CSS`);
+    // ANCHORED. `/height:\s*100%/` is also satisfied by `min-height: 100%`, and swapping the
+    // one for the other is precisely the regression this test exists to catch: it left the
+    // declaration looking present while the box stopped being sized by it.
     assert.match(
       rule,
-      /height:\s*100%/,
+      /(^|[;{\s])height:\s*100%/,
       `${selector} must state its own height — Chromium's propagation hides its absence`
     );
   }
@@ -8881,4 +8947,32 @@ test('Core keeps the Downtime panel scroller for a visibly overflowing companion
     noHeight.companion < 100 && noHeight.target > 400,
     `a companion stating no height keeps content height in a full-height target (${noHeight.companion} in ${noHeight.target})`
   );
+});
+
+test("Core's preview keeps its own two-track host, with the tab strip on the bottom edge", async () => {
+  // CORE-FALLBACK HAD NO `npm test` LAYOUT GATE AT ALL (issue 1213 review) — its two-row host
+  // was exercised only by Playwright frames — so this rung states what a free user actually
+  // gets: the strip on the bottom edge and the preview scroller taking everything above it.
+  //
+  // ONE CORRECTION, measured rather than reasoned. The finding this rung answers claimed that
+  // losing `.downtime-host.core-fallback { grid-template-rows: minmax(0,1fr) auto }` would
+  // stack both children in one cell now that the base rule is the single provider track. It
+  // would not, in Chromium: with one explicit track and two children the second child lands in
+  // an IMPLICIT row, `grid-auto-rows` defaults to `auto`, and the resolved tracks are
+  // "638px 44px" either way — byte-identical geometry with the override deleted. So the
+  // override is an explicit statement of intent rather than the thing producing this layout,
+  // and a test asserting its presence by measurement could not fail.
+  //
+  // What this rung DOES catch is the failure that has actually happened here twice: the tracks
+  // in the wrong ORDER. Inverting them to `auto minmax(0,1fr)` puts the strip 44px above the
+  // host's bottom edge and fails below.
+  const read = await readCoreFallbackHostRows(1400);
+  assert.equal(read.strip, 44, 'the strip takes its own content height in the `auto` track');
+  assert.equal(read.stripBottomGap, 0, 'and sits on the bottom edge of the host');
+  assert.equal(
+    read.scroll,
+    read.host - read.strip,
+    `the preview scroller takes the rest (${read.scroll} of ${read.host} beside a ${read.strip} strip)`
+  );
+  assert.ok(read.scrollScrolls, 'and it still scrolls its own overflowing preview content');
 });

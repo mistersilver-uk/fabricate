@@ -1238,6 +1238,31 @@ test('World Downtime publishes four tabs plus narrow/collapsed frames with gener
   );
 
   const mountSource = readFileSync(resolve(ROOT, 'tests/view-lab/mount.js'), 'utf8');
+  // WHERE THE TAB FIELDS LAND, read back out of the lab provider that supplies them, because
+  // this frame is the only place the two are rendered side by side. `accessibleName` names the
+  // rail BUTTON, and the region is named by that button's LABEL element — different values on
+  // purpose, because a landmark announced as "Open the downtime ledger, region" is the wrong
+  // shape. Hand-copying either into this file would be the mirror the expectation exists to
+  // catch, so both come from the fixture's own source.
+  const labLedger = mountSource.match(
+    /id: 'ledger',\s*\n\s*label: '([^']+)',\s*\n\s*accessibleName: '([^']+)',/
+  );
+  assert.ok(labLedger, "the lab companion still declares a 'ledger' tab with both name fields");
+  assert.notEqual(
+    labLedger[2],
+    labLedger[1],
+    'which proves anything only while the fixture keeps the two genuinely different'
+  );
+  assert.equal(
+    premiumAttribute('#manager-downtime-nav-ledger', 'aria-label'),
+    labLedger[2],
+    "the rail sub-item consumes the provider tab's accessibleName"
+  );
+  assert.equal(
+    premiumAttribute('#world-downtime-panel-ledger', 'aria-labelledby'),
+    'manager-downtime-nav-label-ledger',
+    'and the region is named by the rail LABEL element, whose text is the visible tab label'
+  );
   assert.match(mountSource, /applyLongDowntimeLocalization\(world\)/);
   assert.match(
     mountSource,
