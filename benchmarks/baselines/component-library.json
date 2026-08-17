@@ -83,6 +83,20 @@
         "resolvedIngredientStates": 1
       }
     },
+    "bulkDestroy.resolveRows.library@1000": {
+      "description": "A real 5-row BulkDestroyService.run() against this library size — the per-row `system.components` lookup plus the per-row matcher pass, which together were an additive `rows x components` term (issue 1202). Recorded on this axis because the term is invisible on any axis that pins the library.",
+      "counts": {
+        "componentEntriesWalked": 1000,
+        "craftingActorItemsReads": 5,
+        "craftingActorItemsScanned": 1670,
+        "identityCandidatesExamined": 1500,
+        "identityIndexBuilds": 1,
+        "rows": 5,
+        "depletedRows": 5,
+        "deleteCalls": 0,
+        "unitsDeleted": 0
+      }
+    },
     "craftingListing.buildListing.library@5000": {
       "description": "The player crafting SUMMARY phase against this library size — the corpus-wide browse half (issue 1075) with inventory and corpus pinned, so the ONLY thing varying across the series is component count.",
       "counts": {
@@ -131,6 +145,20 @@
         "resolvedIngredientStates": 1
       }
     },
+    "bulkDestroy.resolveRows.library@5000": {
+      "description": "A real 5-row BulkDestroyService.run() against this library size — the per-row `system.components` lookup plus the per-row matcher pass, which together were an additive `rows x components` term (issue 1202). Recorded on this axis because the term is invisible on any axis that pins the library.",
+      "counts": {
+        "componentEntriesWalked": 5000,
+        "craftingActorItemsReads": 5,
+        "craftingActorItemsScanned": 1670,
+        "identityCandidatesExamined": 5500,
+        "identityIndexBuilds": 1,
+        "rows": 5,
+        "depletedRows": 5,
+        "deleteCalls": 0,
+        "unitsDeleted": 0
+      }
+    },
     "craftingListing.buildListing.library@10000": {
       "description": "The player crafting SUMMARY phase against this library size — the corpus-wide browse half (issue 1075) with inventory and corpus pinned, so the ONLY thing varying across the series is component count.",
       "counts": {
@@ -177,6 +205,20 @@
         "hydratedSets": 1,
         "craftableSets": 1,
         "resolvedIngredientStates": 1
+      }
+    },
+    "bulkDestroy.resolveRows.library@10000": {
+      "description": "A real 5-row BulkDestroyService.run() against this library size — the per-row `system.components` lookup plus the per-row matcher pass, which together were an additive `rows x components` term (issue 1202). Recorded on this axis because the term is invisible on any axis that pins the library.",
+      "counts": {
+        "componentEntriesWalked": 10000,
+        "craftingActorItemsReads": 5,
+        "craftingActorItemsScanned": 1670,
+        "identityCandidatesExamined": 10500,
+        "identityIndexBuilds": 1,
+        "rows": 5,
+        "depletedRows": 5,
+        "deleteCalls": 0,
+        "unitsDeleted": 0
       }
     }
   }

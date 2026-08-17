@@ -51,6 +51,7 @@ export async function loadBenchmarkModules() {
     resolutionModeModule,
     signatureValidatorModule,
     craftingEngineModule,
+    bulkDestroyModule,
     recipeModule,
     ingredientSetModule,
     sourceUuidModule,
@@ -72,6 +73,7 @@ export async function loadBenchmarkModules() {
     import('../../../src/systems/ResolutionModeService.js'),
     import('../../../src/systems/SignatureValidator.js'),
     import('../../../src/systems/CraftingEngine.js'),
+    import('../../../src/systems/BulkDestroyService.js'),
     import('../../../src/models/Recipe.js'),
     import('../../../src/models/IngredientSet.js'),
     import('../../../src/utils/sourceUuid.js'),
@@ -96,6 +98,10 @@ export async function loadBenchmarkModules() {
     ResolutionModeService: resolutionModeModule.ResolutionModeService,
     SignatureValidator: signatureValidatorModule.SignatureValidator,
     CraftingEngine: craftingEngineModule.CraftingEngine,
+    // The bulk destroy service, for the component-library axis's bulk-run case (issue 1202).
+    // Constructed per case rather than in `createBenchWorld`, because only one profile
+    // measures it and its `deleteItems` seam is case-specific.
+    BulkDestroyService: bulkDestroyModule.BulkDestroyService,
     Recipe: recipeModule.Recipe,
     IngredientSet: ingredientSetModule.IngredientSet,
     sourceUuid: sourceUuidModule,
