@@ -102,7 +102,7 @@
       }
     },
     "craftingListing.buildListing@100": {
-      "description": "The player crafting SUMMARY phase at this inventory size — the corpus-wide browse half only (issue 1075). Corpus pinned at 20 recipes so the ONLY thing varying across the series is held-stack count. A real app open also hydrates ONE recipe through buildRecipeDetail; that cost is bounded by page size rather than by either axis here and is not measured by this case.",
+      "description": "The player crafting SUMMARY phase at this inventory size — the corpus-wide browse half only (issue 1075). Corpus pinned at 20 recipes so the ONLY thing varying across the series is held-stack count. The detail phase a real app open also runs is measured on the component-library axis instead (issue 1204).",
       "counts": {
         "craftingActorItemsReads": 1,
         "craftingActorItemsScanned": 34,
@@ -181,7 +181,7 @@
       }
     },
     "craftingListing.buildListing@500": {
-      "description": "The player crafting SUMMARY phase at this inventory size — the corpus-wide browse half only (issue 1075). Corpus pinned at 20 recipes so the ONLY thing varying across the series is held-stack count. A real app open also hydrates ONE recipe through buildRecipeDetail; that cost is bounded by page size rather than by either axis here and is not measured by this case.",
+      "description": "The player crafting SUMMARY phase at this inventory size — the corpus-wide browse half only (issue 1075). Corpus pinned at 20 recipes so the ONLY thing varying across the series is held-stack count. The detail phase a real app open also runs is measured on the component-library axis instead (issue 1204).",
       "counts": {
         "craftingActorItemsReads": 1,
         "craftingActorItemsScanned": 167,
@@ -260,7 +260,7 @@
       }
     },
     "craftingListing.buildListing@1000": {
-      "description": "The player crafting SUMMARY phase at this inventory size — the corpus-wide browse half only (issue 1075). Corpus pinned at 20 recipes so the ONLY thing varying across the series is held-stack count. A real app open also hydrates ONE recipe through buildRecipeDetail; that cost is bounded by page size rather than by either axis here and is not measured by this case.",
+      "description": "The player crafting SUMMARY phase at this inventory size — the corpus-wide browse half only (issue 1075). Corpus pinned at 20 recipes so the ONLY thing varying across the series is held-stack count. The detail phase a real app open also runs is measured on the component-library axis instead (issue 1204).",
       "counts": {
         "craftingActorItemsReads": 1,
         "craftingActorItemsScanned": 334,

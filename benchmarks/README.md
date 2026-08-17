@@ -61,22 +61,32 @@ The class-2 medians quoted below do, and were measured on:
 
 <!-- markdownlint-enable MD013 -->
 
-## The two axes
+## The three axes
 
 Five profiles scale the **corpus** and hold inventory at a token 20 stacks.
 `held-inventory` does the exact opposite: it pins the corpus at 6 recipes and
 varies held stacks across 100 / 500 / 1,000 against the full 5,000-component
 library.
+`component-library` (issue 1204) pins both: the corpus at 6 recipes and the
+inventory at 1,000 held stacks, and instead varies the **library** itself
+across 1,000 / 5,000 / 10,000 components.
 
 That separation is the point.
 The failure that started this programme was an **inventory**-axis failure — a
 user with 1,080 components reported a 7.5 s crafting-menu open and traced it to
 one character carrying hundreds of salvageable materials — while the epic's
 target scale was written almost entirely in corpus terms.
-A profile that grew both together could not attribute a regression to either.
+A profile that grew two axes together could not attribute a regression to
+either.
 
-`CraftingListingBuilder.buildListing` is therefore measured along **both**
-series:
+`CraftingListingBuilder.buildListing` is therefore measured along **all
+three** series.
+The corpus and inventory rows below are class-2 wall-clock medians from the
+reference hardware above.
+The library row has no committed wall-clock baseline, so it is quoted instead
+in class-1 `identityCandidatesExamined` counts from
+`craftingListing.buildListing.library@<n>` in
+`benchmarks/baselines/component-library.json`:
 
 <!-- markdownlint-disable MD013 -->
 
@@ -84,12 +94,31 @@ series:
 |---|---|---|---|
 | Corpus axis (rows, 20 held stacks) | 25 rows → 17.8 ms | 50 rows → 36.0 ms | 100 rows → 81.0 ms |
 | Inventory axis (held stacks, 6 rows) | 100 stacks → 5.8 ms | 500 stacks → 11.3 ms | 1,000 stacks → 18.9 ms |
+| Library axis (components, 6 rows, 1,000 held stacks) | 1,000 → 1,300 examined | 5,000 → 5,300 examined | 10,000 → 10,300 examined |
 
 <!-- markdownlint-enable MD013 -->
 
-Both are still linear in their own axis, and the inventory axis is the one issue
-1076 changed: it measured 299 / 1,476 / 2,961 ms before identity resolution
-became index-backed, against 5.8 / 11.3 / 18.9 ms after.
+**A stray `identityIndexBuilds: 2` is a fixture artifact, not a regression.**
+`component-library` and `held-inventory` each build ONE fixture object and
+reuse it across every case in the profile.
+`system.essenceDefinitions` and `system.recipeItemDefinitions` are both empty
+arrays, and both are the same array instance for every case.
+`getDefinitionIndex` caches per array identity, so whichever case reaches it
+first pays one index build over that shared, zero-element array, and every
+later case in the profile is a cache hit.
+That build walks nothing, so `identityCandidatesExamined` is unaffected:
+`craftingListing.buildListing.library@1000` records `identityIndexBuilds: 2`
+against an unchanged `identityCandidatesExamined: 1300`, and the same pattern
+recurs at `craftingListing.buildListing@100` in
+`benchmarks/baselines/held-inventory.json`.
+Read the extra `1` as "this case executed first", not as a signal about the
+series point.
+Reordering a profile's cases, or inserting a new one ahead of the first,
+moves which case shows it.
+
+All three are still linear in their own axis, and the inventory axis is the one
+issue 1076 changed: it measured 299 / 1,476 / 2,961 ms before identity
+resolution became index-backed, against 5.8 / 11.3 / 18.9 ms after.
 What survives is the `recipes × items` half `evaluateCraftability` pays — it
 re-flattens `sourceActors.flatMap((actor) => [...actor.items])` once per
 recipe — and what went is the `× components` factor.
@@ -140,10 +169,32 @@ A 100%-component benchmark inventory hides the miss path entirely.
 `tests/benchmark-harness.test.js` asserts the majority-unmatched property so a
 future edit cannot quietly turn it into the misleading case.
 
+### `component-library` slices ONE generated library, not three independent draws
+
+Each series point is a nested **prefix** of a single 10,000-component library,
+not three separately generated libraries.
+An independent draw at each size would give `c-5` a different essence and tag
+pick at 1,000 components than at 10,000, so a count that moved across the
+series could be misread as a change in component *content* rather than in
+component *count*.
+A prefix makes the 1,000-component world literally a sub-library of the
+10,000-component one, the same discipline `held-inventory` applies to its own
+inventory series.
+
+The pinned recipe corpus and the pinned inventory are both built against the
+smallest (1,000-component) prefix, so every authored ingredient and every
+matched stack exists identically at every point of the series.
+Anyone extending this axis with a fourth point must keep drawing from the same
+prefix chain, not a fresh library, or the series stops isolating library size.
+
 ## Declared measurement ceilings
 
 Four scales are deliberately below the epic's target, each for a stated reason.
 **Do not spend a day trying to run them at full scale.**
+A fifth profile, `component-library`, is also deliberately bounded, but above
+rather than below the target, because its top point exists to fix a slope
+rather than to stay under a cost budget.
+See [The three axes](#the-three-axes) above.
 
 ### `alchemy-signatures` is capped at 2,000 signatures, not 5,000
 

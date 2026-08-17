@@ -17,6 +17,7 @@
  * |----------------------------------------------|-----------------------------------------|
  * | `RecipeManager.getRecipes()`                 | `recipeManager.getRecipes.*`            |
  * | `CraftingListingBuilder.buildListing()`      | `craftingListing.buildListing*`         |
+ * | `CraftingListingBuilder.buildRecipeDetail()` | `craftingListing.buildRecipeDetail*`    |
  * | `RecipeVisibilityService.getVisibleRecipes()`| `recipeVisibility.getVisibleRecipes*`   |
  * | `InventoryListingBuilder.buildListing()`     | `inventoryListing.buildListing*`        |
  * | `AlchemyListingBuilder.buildListing()`       | `alchemyListing.buildListing`           |
@@ -40,6 +41,7 @@ import {
   serializedRecordBytes,
 } from './connectPayloadModel.js';
 import { INVENTORY_SERIES } from './scaleInventory.js';
+import { COMPONENT_LIBRARY_SERIES } from './scaleProfiles.js';
 import {
   createBenchWorld,
   hydrateRecipes,
@@ -957,48 +959,165 @@ function heldInventoryCases() {
           matchedItems: matches.reduce((total, items) => total + items.length, 0),
         }),
       },
-      {
-        id: `craftingListing.buildListing${suffix}`,
+      ...playerAppListingCases({
         profile: 'held-inventory',
-        description:
+        suffix,
+        hydratedWorld: (context) =>
+          worldAt(context, { recipes: hydrateRecipes(context.modules, context.fixture.recipes) }),
+        craftingDescription:
           'The player crafting SUMMARY phase at this inventory size — the corpus-wide browse ' +
           'half only (issue 1075). Corpus pinned at 20 recipes so the ONLY thing varying ' +
-          'across the series is held-stack count. A real app open also hydrates ONE recipe ' +
-          'through buildRecipeDetail; that cost is bounded by page size rather than by either ' +
-          'axis here and is not measured by this case.',
-        setup: (context) => {
-          const recipes = hydrateRecipes(context.modules, context.fixture.recipes);
-          return worldAt(context, { recipes });
+          'across the series is held-stack count. The detail phase a real app open also runs ' +
+          'is measured on the component-library axis instead (issue 1204).',
+        inventoryDescription:
+          'The Inventory tab open at this inventory size, same pinned 20-row corpus.',
+      }),
+    ];
+  });
+}
+
+/**
+ * The two whole-app listing cases every inventory-bearing axis reports, parameterised by the
+ * axis rather than restated per profile.
+ *
+ * Extracted when the component-library axis landed (issue 1204) and gained the same pair. The
+ * two copies would have been near-identical, and SonarCloud counts `tests/**` duplication
+ * exactly like `src/` — but the stronger reason is that these two cases are the SAME
+ * measurement taken along two axes, and a reader comparing the series has to be able to see
+ * that they were not measured slightly differently.
+ *
+ * `hydratedWorld` is the only real parameter. Both builders read `getExecutionSteps()`, which a
+ * literal payload does not carry, so every caller hydrates its corpus first.
+ *
+ * @param {object} options
+ * @param {string} options.profile
+ * @param {string} options.suffix The series-point suffix, e.g. `@1000` or `.library@5000`.
+ * @param {(context: object) => object} options.hydratedWorld
+ * @param {string} options.craftingDescription
+ * @param {string} options.inventoryDescription
+ * @returns {object[]}
+ */
+function playerAppListingCases({
+  profile,
+  suffix,
+  hydratedWorld,
+  craftingDescription,
+  inventoryDescription,
+}) {
+  const openedBy = (world) => ({
+    craftingActor: world.craftingActor,
+    componentSourceActors: world.sourceActors,
+    viewer: world.viewer,
+  });
+  return [
+    {
+      id: `craftingListing.buildListing${suffix}`,
+      profile,
+      description: craftingDescription,
+      setup: hydratedWorld,
+      run: (world) => world.craftingListing.buildListing(openedBy(world)),
+      counts: (_world, listing) => ({
+        listedRecipes: listing.summaries.length,
+        availableRecipes: listing.counts.available,
+      }),
+    },
+    {
+      id: `inventoryListing.buildListing${suffix}`,
+      profile,
+      description: inventoryDescription,
+      setup: hydratedWorld,
+      run: (world) => world.inventoryListing.buildListing(openedBy(world)),
+      counts: (_world, listing) => ({
+        rows: listing.rows.length,
+        componentRows: listing.counts.components,
+      }),
+    },
+  ];
+}
+
+/**
+ * The COMPONENT-LIBRARY axis cases (issue 1204) — the other half of the same series.
+ *
+ * `heldInventoryCases` above varies items against a pinned library; these vary the library
+ * against a pinned 1,000-stack inventory and a pinned 6-recipe corpus. The two together are
+ * what make `cost = a*components + b*items` readable as two independent slopes, which is what
+ * "not proportional to `items x components`" actually asserts: an additive model produces two
+ * straight lines, and a product term makes each series' slope depend on where the OTHER axis
+ * was pinned. Neither series alone can distinguish those.
+ *
+ * All three cases run against `context.fixture` with `components` swapped for the series
+ * point's prefix. `createBenchWorld` derives its system from `fixture.system` and wraps
+ * `fixture.components` in `countingCandidates`, so overriding that one field is the whole of
+ * what varies — the corpus, the inventory, the actors and the managers are rebuilt identically
+ * at every point.
+ */
+function componentLibraryCases() {
+  return COMPONENT_LIBRARY_SERIES.flatMap((componentCount, seriesIndex) => {
+    const suffix = `.library@${componentCount}`;
+    // Every case on this axis wants the same world: this series point's library, the pinned
+    // corpus hydrated (all three read `getExecutionSteps`, which a literal payload lacks) and
+    // the pinned inventory.
+    const hydratedWorldAt = (context) =>
+      createBenchWorld({
+        modules: context.modules,
+        counters: context.counters,
+        fixture: {
+          ...context.fixture,
+          components: context.fixture.componentSeries[seriesIndex],
         },
-        run: (world) =>
-          world.craftingListing.buildListing({
-            craftingActor: world.craftingActor,
-            componentSourceActors: world.sourceActors,
-            viewer: world.viewer,
-          }),
-        counts: (_world, listing) => ({
-          listedRecipes: listing.summaries.length,
-          availableRecipes: listing.counts.available,
-        }),
-      },
+        recipes: hydrateRecipes(context.modules, context.fixture.recipes),
+      });
+
+    return [
+      ...playerAppListingCases({
+        profile: 'component-library',
+        suffix,
+        hydratedWorld: hydratedWorldAt,
+        craftingDescription:
+          'The player crafting SUMMARY phase against this library size — the corpus-wide ' +
+          'browse half (issue 1075) with inventory and corpus pinned, so the ONLY thing ' +
+          'varying across the series is component count.',
+        inventoryDescription:
+          'The Inventory tab open against this library size, same pinned inventory.',
+      }),
       {
-        id: `inventoryListing.buildListing${suffix}`,
-        profile: 'held-inventory',
-        description: 'The Inventory tab open at this inventory size, same pinned 20-row corpus.',
+        id: `craftingListing.buildRecipeDetail${suffix}`,
+        profile: 'component-library',
+        description:
+          'Detail hydration for ONE recipe against this library size. `held-inventory` ' +
+          'explicitly excludes this phase as "bounded by page size rather than by either ' +
+          'axis", which left a real app open half-measured: the inspector opens on the same ' +
+          'click as the listing. Measured here because a per-recipe library term would be ' +
+          'invisible to both listing cases.',
         setup: (context) => {
-          const recipes = hydrateRecipes(context.modules, context.fixture.recipes);
-          return worldAt(context, { recipes });
+          const world = hydratedWorldAt(context);
+          // Handed the recipe rather than an id: the summary phase the player app runs first
+          // already holds it, and the exact-evaluation cost is identical either way.
+          return { world, recipe: world.recipeManager.recipes.values().next().value };
         },
-        run: (world) =>
-          world.inventoryListing.buildListing({
+        run: ({ world, recipe }) =>
+          world.craftingListing.buildRecipeDetail({
+            recipe,
             craftingActor: world.craftingActor,
             componentSourceActors: world.sourceActors,
             viewer: world.viewer,
           }),
-        counts: (_world, listing) => ({
-          rows: listing.rows.length,
-          componentRows: listing.counts.components,
-        }),
+        // Non-vacuity of the case itself, and the fields are the ones the model actually
+        // carries rather than the ones it reads as though it should. A `null` model (an
+        // invisible recipe, a blocked system) reports zero on all three, and so does a model
+        // that hydrated but answered "missing materials" for every set — which is exactly the
+        // fast-number-for-nothing failure `scaleWorld.js` warns about on this path.
+        counts: (_state, model) => {
+          const sets = model?.ingredientSets ?? [];
+          return {
+            hydratedSets: sets.length,
+            craftableSets: sets.filter((set) => set.craftability?.canCraft === true).length,
+            resolvedIngredientStates: sets.reduce(
+              (total, set) => total + (set.craftability?.ingredientStates?.length ?? 0),
+              0
+            ),
+          };
+        },
       },
     ];
   });
@@ -1012,6 +1131,7 @@ export const BENCHMARK_CASES = Object.freeze([
   ...alchemyCases(),
   ...graphCases(),
   ...heldInventoryCases(),
+  ...componentLibraryCases(),
 ]);
 
 /**
