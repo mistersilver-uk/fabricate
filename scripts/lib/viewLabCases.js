@@ -43,6 +43,9 @@ const LAYOUT_ASSERTION_PATH = 'scripts/lib/viewLabLayoutAssertion.js';
 /** The lab's actor fixture, as a diff names it. Attributed by fixture table — see below. */
 const LAB_ACTORS_PATH = 'tests/view-lab/world/labActors.js';
 
+/** The page that mounts every frame, as a diff names it. Attributed by marked region — see below. */
+const LAB_MOUNT_PATH = 'tests/view-lab/mount.js';
+
 /**
  * "Every publishable case" as a value, so an attribution can say it without building the set.
  *
@@ -433,6 +436,34 @@ function journalBlindRunCases() {
     }),
   ];
 }
+
+/**
+ * The player companion surface (issue 1198): the route key its frames address, the rail control
+ * that addresses it, and the render files those frames are evidence about.
+ *
+ * The route key is `ext:<surfaceId>:<tabId>` and it is what `activeTab`, `data-active-tab` and
+ * `data-player-nav-tab` all carry, so the same string is the `?tab=` query, the tab the capture
+ * driver's derived `expectTab` gate checks, and the rail selector. Written once for that reason.
+ *
+ * Selection is by ATTRIBUTE and never by id: the key contains colons, and an id selector
+ * containing a colon is invalid CSS — it throws `SyntaxError` rather than returning null. The
+ * matching `id` exists only as an IDREF target, where no CSS parse happens.
+ *
+ * `sourceMatches` is shared rather than restated three times: fifteen identical lines is what a
+ * duplication detector counts, and `scripts/**` is analysed by SonarCloud's Automatic Analysis.
+ * The five files are the whole seam a Core frame can show — the mount host, the shell that
+ * composes the rail, the registry the shell reads, its shared factory, and the pure derivation
+ * all three call — so a change to any of them selects these frames rather than an unrelated one.
+ */
+const PLAYER_EXTENSION_ROUTE = 'ext:downtime:projects';
+const PLAYER_EXTENSION_RAIL_BUTTON = `[data-player-nav-tab="${PLAYER_EXTENSION_ROUTE}"]`;
+const PLAYER_EXTENSION_SOURCES = Object.freeze([
+  /^src\/ui\/svelte\/apps\/PlayerExtensionHost\.svelte$/,
+  /^src\/ui\/svelte\/apps\/FabricateAppRoot\.svelte$/,
+  /^src\/ui\/playerExtensions\.js$/,
+  /^src\/ui\/playerNavModel\.js$/,
+  /^src\/ui\/extensionRegistry\.js$/,
+]);
 
 export const VIEW_LAB_CASES = Object.freeze([
   managerCase({
@@ -6470,6 +6501,94 @@ export const VIEW_LAB_CASES = Object.freeze([
     kinds: ['player', 'crafting', 'settings'],
     sourceMatches: [CRAFTING_SHARED],
   }),
+  // Issue 1198 — the player companion surface. What a Core frame can show here is bounded and
+  // worth stating: the rail entry (icon, verbatim provider label, active state, ordering AFTER
+  // Core's own tabs), the panel's geometry, no horizontal overflow, the pointer hit-test on the
+  // new rail control, and Core's own fault state. Everything inside a healthy panel is the
+  // companion's, which Core neither authors nor can photograph in production.
+  //
+  // `reaches: 'beyond'` with no smoke labels, for the reason the honesty contract wants stated:
+  // the live smoke walk has no companion installed and no player-extension screen at all, so
+  // there is no counterpart these frames could fall short of.
+  playerCase({
+    id: 'player-extension-surface',
+    label: 'Player app — companion navigation surface',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: PLAYER_EXTENSION_ROUTE, playerProvider: '1' },
+    steps: [],
+    // The MOUNTED STAMP, not the panel element. The stamp is written imperatively on a
+    // successful mount and cleared the moment the mount is disposed, so a companion that failed
+    // to mount fails the capture here instead of publishing an empty panel that looks fine.
+    expectSelector: '[data-player-extension-mounted="downtime"]',
+    expectAttributes: [
+      // A provider tab's `accessibleName` REPLACES the visible label as the control's accessible
+      // name, so the value is the stand-in's own composed string, verbatim and unlocalized.
+      { selector: PLAYER_EXTENSION_RAIL_BUTTON, name: 'aria-label', value: 'Open Projects' },
+      // The IDREF wiring the rail gained with this seam: every rail button points at the one
+      // content panel, and the panel is labelled back by the active button.
+      { selector: PLAYER_EXTENSION_RAIL_BUTTON, name: 'aria-controls', value: 'player-nav-panel' },
+    ],
+    // The seam adds a control to an existing fixed grid, so the pointer contract is photographed
+    // rather than assumed. `expectClick` establishes hit-testability ONLY: the lab stubs the
+    // tab-select callback and the app's render, so a click changes nothing in the frame.
+    expectCenterHit: PLAYER_EXTENSION_RAIL_BUTTON,
+    expectClick: PLAYER_EXTENSION_RAIL_BUTTON,
+    expectNoHorizontalOverflow: ['.fabricate-app-content', '.fabricate-app-nav'],
+    kinds: ['player', 'extension'],
+    sourceMatches: PLAYER_EXTENSION_SOURCES,
+  }),
+  playerCase({
+    id: 'player-extension-surface-narrow',
+    label: 'Player app — companion navigation surface, narrow with long labels',
+    smokeLabels: [],
+    reaches: 'beyond',
+    // Both gaps in one frame: the enforced minimum window size, rendered directly rather than
+    // asserted about a larger frame, and the rail label's worst case against the truncation rule
+    // that admits a third-party label at all.
+    query: { tab: PLAYER_EXTENSION_ROUTE, playerProvider: '1', longPlayerLabels: '1' },
+    steps: [],
+    expectSelector: '[data-player-extension-mounted="downtime"]',
+    expectAttributes: [
+      {
+        selector: PLAYER_EXTENSION_RAIL_BUTTON,
+        name: 'aria-label',
+        value: 'Open Commissions, projects and standing orders',
+      },
+    ],
+    expectCenterHit: PLAYER_EXTENSION_RAIL_BUTTON,
+    expectClick: PLAYER_EXTENSION_RAIL_BUTTON,
+    // The rail is the point of this frame: `.fabricate-app-nav` is `overflow-y: auto`, so its
+    // `overflow-x` computes to `auto` and an untruncated label would put a horizontal scrollbar
+    // in the 84px column. The shell is included so a spill cannot hide one level up.
+    expectNoHorizontalOverflow: [
+      '.fabricate-app-content',
+      '.fabricate-app-nav',
+      '.fabricate-app-shell',
+    ],
+    position: { width: 1024, height: 640 },
+    kinds: ['player', 'extension', 'responsive'],
+    sourceMatches: PLAYER_EXTENSION_SOURCES,
+  }),
+  playerCase({
+    id: 'player-extension-fault',
+    label: 'Player app — companion surface fault state',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: PLAYER_EXTENSION_ROUTE, playerProvider: '1', playerProviderFault: '1' },
+    steps: [],
+    // The whole decision in one selector: the faulted surface's rail entry SURVIVES, the active
+    // tab does not move, and Core renders its own error state in the panel. Dropping the entry
+    // and teleporting the user to Crafting is the behaviour this frame exists to disprove.
+    expectSelector: `.fabricate-app-shell:has(${PLAYER_EXTENSION_RAIL_BUTTON}[aria-selected="true"]) [data-player-extension-fault="downtime"]`,
+    // Core's own diagnostic copy, rendered rather than merely present in the DOM. It names the
+    // provider that failed and nothing else: no product name, no offer, no call to action.
+    expectVisible:
+      '[data-player-extension-fault="downtime"]:has-text("This section could not be displayed")',
+    expectNoHorizontalOverflow: ['.fabricate-app-content', '.fabricate-app-nav'],
+    kinds: ['player', 'extension'],
+    sourceMatches: PLAYER_EXTENSION_SOURCES,
+  }),
 ]);
 
 /**
@@ -6658,6 +6777,9 @@ const registrySourceLines = memoized(() => readSourceLines(import.meta.url));
 const labActorSourceLines = memoized(() =>
   readSourceLines(new URL(`../../${LAB_ACTORS_PATH}`, import.meta.url))
 );
+const mountSourceLines = memoized(() =>
+  readSourceLines(new URL(`../../${LAB_MOUNT_PATH}`, import.meta.url))
+);
 
 /**
  * The `VIEW_LAB_CASES` array's body, with the file line number its first line has.
@@ -6719,6 +6841,14 @@ const caseLineRegions = memoized(() => parseCaseLineRegions(registrySourceLines(
  * @returns {boolean} True when it can render a component stack an actor holds.
  */
 function rendersOwnedComponents(viewCase) {
+  return viewCase.app === PLAYER;
+}
+
+/**
+ * @param {object} viewCase A case.
+ * @returns {boolean} True when it photographs the player window rather than the Manager.
+ */
+function rendersInPlayerWindow(viewCase) {
   return viewCase.app === PLAYER;
 }
 
@@ -6860,6 +6990,88 @@ export function parseLabActorTableRegions(sourceLines) {
 }
 
 const labActorLineRegions = memoized(() => parseLabActorTableRegions(labActorSourceLines()));
+
+/**
+ * The four regions of `tests/view-lab/mount.js` that only the PLAYER window can render, each with
+ * the predicate deciding which frames read what it produces (issue 1198).
+ *
+ * All four are `app === PLAYER`, and each is a derivation rather than a convenience:
+ *
+ *   - `player-extension-params` — the three companion query params. Nothing but `mountPlayerApp`
+ *     reads them, and only a player frame carries a nav rail to put a provider tab in.
+ *   - `lab-player-provider` — the stand-in companion provider. It is registered with the PLAYER
+ *     registry, whose surface-id namespace is disjoint from the Manager's.
+ *   - `player-settle-stores` — the store-quiescence wait. It watches six names the player service
+ *     bag declares and the Manager's `_buildServices()` does not declare at all, so `watched` is
+ *     empty on every manager frame and the block cannot move one.
+ *   - `mount-player-app` — the player window's whole mount path.
+ *
+ * They are MARKED regions rather than whole functions on purpose. Two of the four edits this
+ * attribution exists for land inside functions the manager window also runs — `readParams` and
+ * `settle` — so keying on those functions would claim a player-only readership the file does not
+ * have, and a later edit to a manager param would then select the player frames and silently
+ * publish no evidence for the manager frames it moved. Marking the blocks keeps every declared
+ * region's readership true, and a hunk landing outside every marker widens to the corpus, which
+ * is the fail-safe default.
+ */
+const PLAYER_MOUNT_REGIONS = Object.freeze({
+  'player-extension-params': rendersInPlayerWindow,
+  'lab-player-provider': rendersInPlayerWindow,
+  'player-settle-stores': rendersInPlayerWindow,
+  'mount-player-app': rendersInPlayerWindow,
+});
+
+/** The line opening a marked region: `// view-lab-region:<key>`, at any indent. */
+const MOUNT_REGION_OPEN_PREFIX = '// view-lab-region:';
+
+/** The line closing one: `// view-lab-region:end`. */
+const MOUNT_REGION_CLOSE = `${MOUNT_REGION_OPEN_PREFIX}end`;
+
+/**
+ * The 1-based, inclusive span of each marked region in `tests/view-lab/mount.js`.
+ *
+ * Marker-anchored rather than column-anchored, unlike {@link parseCaseLineRegions} and
+ * {@link parseLabActorTableRegions}, because two of the four regions are BLOCKS INSIDE a function
+ * the other window runs too — see {@link PLAYER_MOUNT_REGIONS} for why that has to be so. A marker
+ * is a comment, so `isInertSourceLine` skips it: moving or re-wording one can never itself be the
+ * change a hunk is attributed on.
+ *
+ * Self-checked the way its two siblings are, and for the same reason — a plausible authoring must
+ * not produce a plausible-looking wrong answer. Every declared key must be opened exactly once and
+ * closed; a marker naming a key this table does not declare, a nested or unclosed region, or a
+ * close with nothing open, is not a parse. A non-parse widens to everything, so every refusal
+ * fails safe, and `tests/view-lab-cases.test.js` drives each of them from synthetic line arrays.
+ *
+ * @param {string[]} sourceLines That file, by line.
+ * @returns {{key: string, start: number, end: number}[]|null} Regions, or null when unparseable.
+ */
+export function parsePlayerMountRegions(sourceLines) {
+  const regions = [];
+  let open = null;
+  for (const [offset, line] of sourceLines.entries()) {
+    const text = line.trim();
+    if (!text.startsWith(MOUNT_REGION_OPEN_PREFIX)) continue;
+    if (text === MOUNT_REGION_CLOSE) {
+      if (!open) return null;
+      regions.push({ ...open, end: offset + 1 });
+      open = null;
+      continue;
+    }
+    // A nested opener, or a key nothing in the table knows how to answer for.
+    if (open) return null;
+    const key = text.slice(MOUNT_REGION_OPEN_PREFIX.length);
+    if (!Object.hasOwn(PLAYER_MOUNT_REGIONS, key)) return null;
+    open = { key, start: offset + 1 };
+  }
+
+  if (open) return null;
+  const keys = regions.map((region) => region.key);
+  if (keys.length !== new Set(keys).size) return null;
+  if (Object.keys(PLAYER_MOUNT_REGIONS).some((key) => !keys.includes(key))) return null;
+  return regions;
+}
+
+const mountLineRegions = memoized(() => parsePlayerMountRegions(mountSourceLines()));
 
 /**
  * @param {string} text A source line.
@@ -7101,6 +7313,14 @@ function touchedRegionKeys(patch, readSource, readRegions) {
  *
  * `viewLabLayoutAssertion.js` also qualifies whole-file. Every path through the helper validates
  * only cases carrying `expectLayout`, so that case-owned field derives its complete readership.
+ *
+ * `mount.js` qualifies per REGION for the same reason `labActors.js` does — it is several things
+ * at once — but its regions are MARKED rather than found by column, because two of the four are
+ * blocks inside functions BOTH windows run. See {@link PLAYER_MOUNT_REGIONS}. Everything else in
+ * the file — the determinism styles, the chrome-font gate, the lab-induced-clipping measurement,
+ * `boot`, `borrowInstance`, `mountManagerApp`, the shared half of `readParams` and the shared half
+ * of `settle` — sits outside every region and keeps the whole-corpus default, which is right: a
+ * frame of either window renders through all of it.
  */
 const ATTRIBUTED_LAB_INPUTS = Object.freeze([
   Object.freeze({
@@ -7116,6 +7336,12 @@ const ATTRIBUTED_LAB_INPUTS = Object.freeze([
     sourceLines: labActorSourceLines,
     regions: labActorLineRegions,
     selectsRegion: (table) => LAB_ACTOR_FIXTURE_TABLES[table],
+  }),
+  Object.freeze({
+    path: LAB_MOUNT_PATH,
+    sourceLines: mountSourceLines,
+    regions: mountLineRegions,
+    selectsRegion: (region) => PLAYER_MOUNT_REGIONS[region],
   }),
 ]);
 

@@ -149,6 +149,23 @@ function readParams() {
     // rail's muted Downtime chip. Nothing shipped changes — the provider lives here, and the
     // registry it registers with is the production one the manager app hands to the root.
     downtimeProvider: params.get('downtimeProvider') === '1',
+    // view-lab-region:player-extension-params
+    // Register a stand-in companion PLAYER navigation provider before the player app mounts, so
+    // the frames can photograph a companion tab in the nav rail and its panel beneath the Actor
+    // selection top bar (issue 1198). Nothing shipped changes: the provider lives in this file
+    // and registers with the production page-session registry the player app itself reads.
+    //
+    // These three params are their own attributed REGION. Only the player window can render what
+    // they produce, and `scripts/lib/viewLabCases.js` keys `ATTRIBUTED_LAB_INPUTS` on that fact —
+    // so a hunk confined to this block selects the player frames instead of the whole corpus.
+    playerProvider: params.get('playerProvider') === '1',
+    // Make that provider's mount throw, for Core's own fault state.
+    playerProviderFault: params.get('playerProviderFault') === '1',
+    // Evidence-only label stress for the rail's truncation rule. A provider's `label` is FINAL
+    // display text rendered verbatim, so the stress belongs on the provider rather than on the
+    // localizer Core's own five tab labels read.
+    longPlayerLabels: params.get('longPlayerLabels') === '1',
+    // view-lab-region:end
     // The Graph rail placeholder is advertised only behind the experimental toggle, so a case that
     // reproduces the smoke's experimental-off frame has to turn it back off.
     experimental: params.get('experimental') !== '0',
@@ -193,13 +210,116 @@ function borrowInstance(AppClass, fields) {
   return Object.assign(Object.create(AppClass.prototype), fields);
 }
 
+// view-lab-region:lab-player-provider
+/**
+ * The exact report Core makes when it contains a player companion's mount fault.
+ *
+ * Written once and matched by PREFIX, because the shipped host appends the thrown error. See
+ * `mountPlayerApp` for why the fault frame swallows this one message and nothing else.
+ */
+const EXPECTED_PLAYER_FAULT_REPORT = 'Fabricate | Player extension mount failed:';
+
+/**
+ * A stand-in companion PLAYER navigation provider, for the companion-surface frames.
+ *
+ * It declares its OWN tab ids on purpose, and never a copy of Core's five: the seam's whole
+ * claim is that a provider tab id can never collide with a Core one, so a lab provider that
+ * borrowed `crafting` or `journal` would photograph the one case that proves least.
+ *
+ * `label` is final display text — Core renders a provider's label verbatim and localizes only
+ * its own — so the long-label variant stresses the rail's truncation rule from here rather
+ * than through the localizer.
+ *
+ * @param {object} [options] Which variant to build.
+ * @param {boolean} [options.fault] Throw from `mount`, for Core's fault state.
+ * @param {boolean} [options.longLabels] Use the worst-case labels the rail must truncate.
+ * @returns {object} An API-v1 player navigation provider.
+ */
+function labPlayerProvider({ fault = false, longLabels = false } = {}) {
+  const tab = (id, short, long, icon) => {
+    const label = longLabels ? long : short;
+    return {
+      id,
+      label,
+      // An `aria-label` REPLACES the accessible name, so it must contain the visible label text
+      // or Label-in-Name breaks for speech-input users. Composed from the label for that reason.
+      accessibleName: `Open ${label}`,
+      tooltip: `${label} · Downtime Studio`,
+      icon,
+    };
+  };
+
+  return {
+    apiVersion: 1,
+    id: 'downtime',
+    tabs: [
+      tab('board', 'Board', 'Downtime board and pending decisions', 'fas fa-chart-simple'),
+      tab('projects', 'Projects', 'Commissions, projects and standing orders', 'fas fa-list-check'),
+      tab('ledger', 'Ledger', 'Ledger of every character’s downtime', 'fas fa-scroll'),
+    ],
+    mount({ target: mountTarget, tabId, context }) {
+      if (fault) throw new Error('view lab: the stand-in player companion failed to mount');
+      const panel = mountTarget.ownerDocument.createElement('div');
+      panel.style.padding = '20px';
+      const heading = mountTarget.ownerDocument.createElement('h2');
+      heading.textContent = `Downtime Studio — ${tabId}`;
+      const body = mountTarget.ownerDocument.createElement('p');
+      // Drawn from the frozen mount context, so the frame shows that the context reached the
+      // companion rather than merely that something mounted.
+      body.textContent = `Companion content for actor ${context.actorId ?? 'none selected'}.`;
+      panel.append(heading, body);
+      mountTarget.append(panel);
+      return () => panel.remove();
+    },
+  };
+}
+// view-lab-region:end
+
+// view-lab-region:mount-player-app
 async function mountPlayerApp(content, params) {
-  const [{ SvelteFabricateApp }, { default: FabricateAppRoot }, { isAlchemyTabAvailable }] =
-    await Promise.all([
-      import('../../src/ui/SvelteFabricateApp.svelte.js'),
-      import('../../src/ui/svelte/apps/FabricateAppRoot.svelte'),
-      import('../../src/ui/svelte/util/alchemyTabAvailability.js'),
-    ]);
+  const [
+    { SvelteFabricateApp },
+    { default: FabricateAppRoot },
+    { isAlchemyTabAvailable },
+    { playerExtensions },
+    { deriveExtensionSurfaces },
+  ] = await Promise.all([
+    import('../../src/ui/SvelteFabricateApp.svelte.js'),
+    import('../../src/ui/svelte/apps/FabricateAppRoot.svelte'),
+    import('../../src/ui/svelte/util/alchemyTabAvailability.js'),
+    import('../../src/ui/playerExtensions.js'),
+    import('../../src/ui/playerNavModel.js'),
+  ]);
+
+  // Core CONTAINS a companion mount fault by REPORTING it, so the fault frame's own subject
+  // produces a `console.error` — and the capture driver fails any frame that logs one. The
+  // narrowest honest answer is here rather than in that gate: this page swallows exactly the one
+  // message the frame is evidence FOR, only when a case asked for a fault, and forwards every
+  // other report untouched, so any second or unrelated error still fails the render. Widening the
+  // driver's gate instead would relax it for every frame in the corpus — and editing the driver
+  // at all would select every frame in the corpus for capture, which is the cost this file's own
+  // region attribution exists to avoid.
+  //
+  // Nothing here stands in for the assertion: the case's `expectSelector` names Core's fault
+  // stamp, which is rendered only from the shell's faulted-provider branch, so a frame whose
+  // fault never fired fails the capture rather than publishing a healthy panel under its name.
+  if (params.playerProviderFault) {
+    const reportedError = console.error.bind(console);
+    console.error = (...args) => {
+      if (typeof args[0] === 'string' && args[0].startsWith(EXPECTED_PLAYER_FAULT_REPORT)) return;
+      reportedError(...args);
+    };
+  }
+
+  // Registered BEFORE the props bag is built, because the snapshot below is derived once and
+  // this borrowed instance has no subscription to refresh it. The registry is the production
+  // page-session singleton — the same module instance `SvelteFabricateApp` imports — so this is
+  // the real registration path and not a lab-shaped imitation of one.
+  if (params.playerProvider) {
+    playerExtensions.publicApi.registerPlayerNavProvider(
+      labPlayerProvider({ fault: params.playerProviderFault, longLabels: params.longPlayerLabels })
+    );
+  }
 
   const activeTab = params.tab ?? 'crafting';
   const app = borrowInstance(SvelteFabricateApp, {
@@ -225,10 +345,22 @@ async function mountPlayerApp(content, params) {
     scopedEnvironmentId: null,
     scopedTaskId: null,
     scopedActorId: null,
+    // DERIVED, and not `playerExtensions` alone. The player window's single subscriber is the
+    // APPLICATION (`SvelteFabricateApp._prepareSvelteProps` seeds this and `_registerHooks`
+    // refreshes it), and this file borrows the instance from the prototype and hand-writes the
+    // props bag — so nothing here runs `_registerHooks()` and nothing else would compute the
+    // snapshot. Handing over the registry and expecting the shell to derive its own would render
+    // an empty rail, because the shell subscribes to nothing by design. `deriveExtensionSurfaces`
+    // is the one function production calls too, so the lab cannot drift from it.
+    extensionSurfaces: deriveExtensionSurfaces(playerExtensions),
+    // The registry itself, carried only so the mount host emits its surface hooks through the
+    // same injectable edge the registry's own hooks travel on.
+    playerExtensions,
   };
   const instance = mount(FabricateAppRoot, { target: content, props });
   return { instance, services, props };
 }
+// view-lab-region:end
 
 /**
  * A stand-in companion Downtime provider, for the premium-installed frames.
@@ -326,10 +458,23 @@ async function settle(roots, services = null) {
     await new Promise((resolve) => setTimeout(resolve, 40));
   }
 
+  // view-lab-region:player-settle-stores
   // Wait for the STORES, not just the DOM. A store that is still loading renders its empty state,
   // which is quiet in exactly the same way a finished render is — so DOM stillness alone let the
   // journal capture "No active runs" while three were on their way in. Each player store exposes
   // `loading`, and most also `loadedOnce`; a store that has neither is skipped rather than waited on.
+  //
+  // RE-DERIVED against a companion-surface frame (issue 1198) and it verifiably needs no new
+  // entry. A companion panel is mounted SYNCHRONOUSLY from `PlayerExtensionHost`'s mount effect —
+  // an asynchronous `mount` is rejected at registration — so it is fully drawn before this pass
+  // begins, and it introduces no store of its own: the seam creates, reads and writes no record,
+  // setting or flag. The six names below still matter on such a frame because `ActorSelectTopBar`
+  // renders above EVERY tab and the shell keeps the Journal badge fresh while its tab is closed.
+  //
+  // This block is also its own attributed REGION, and player-only readership is a fact rather
+  // than an assumption: it waits on six names (`journal`, `crafting`, `inventory`, `alchemy`,
+  // `craftingSources`, `actorBar`) that the player service bag declares and the Manager's
+  // `_buildServices()` does not declare at all, so `watched` is empty for every manager frame.
   if (services) {
     const watched = ['journal', 'crafting', 'inventory', 'alchemy', 'craftingSources', 'actorBar']
       .map((name) => services[name])
@@ -345,6 +490,7 @@ async function settle(roots, services = null) {
     }
     flushSync();
   }
+  // view-lab-region:end
 
   await new Promise((resolve) => {
     let quietTimer = null;
