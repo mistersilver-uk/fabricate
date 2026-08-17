@@ -108,5 +108,11 @@ test('runStartupMaintenance never rejects, so it can never block readiness', asy
 });
 
 test('runStartupMaintenance tolerates an absent pass list', async () => {
+  // NOT a health signal, and it is worth being explicit about that. The runner returns only
+  // FAILED labels, so `[]` is what a boot that ran nothing at all returns too — this
+  // assertion is green against a Valid Id Basis gate that omits every pass. What the gate
+  // actually emitted is asserted in `tests/startup-valid-id-basis.test.js`, and the
+  // composition site warns when it omits, precisely because this return value cannot tell
+  // the two apart (issue 1224).
   assert.deepEqual(await runStartupMaintenance(undefined), []);
 });

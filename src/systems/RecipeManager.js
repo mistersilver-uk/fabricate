@@ -154,6 +154,27 @@ function readRecipeStorageTarget() {
 }
 
 /**
+ * The **Definition Storage Layout** for recipes, read defensively (issue 1224).
+ *
+ * The OPPOSITE fail direction from {@link readRecipeStorageTarget} above, and the contrast
+ * is the point. That reader answers an unreadable setting with today's arrangement so an
+ * unreadable target can never promote a world onto the granular backend. This one feeds the
+ * Valid Id Basis, where a defaulted value is a claim that the corpus about to be read is
+ * whole — so an unreadable layout is `null`, which no basis clause recognises and which
+ * therefore refuses to run a destructive pass.
+ *
+ * @returns {string|null} a member of `DEFINITION_STORAGE_LAYOUTS`, or `null` when the
+ *   setting could not be read at all.
+ */
+function readRecipeStorageLayout() {
+  try {
+    return getSetting(SETTING_KEYS.RECIPE_STORAGE_LAYOUT) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * The repository the manager builds when the caller injects none — the ONE place the
  * recipe backend is chosen (issue 1080 -b).
  *
@@ -170,15 +191,19 @@ function readRecipeStorageTarget() {
  *
  * @param {object} options
  * @param {() => Map<string, object>} options.corpus The manager's own recipe map.
+ * @param {string} options.arrangement The arrangement to build FOR, read once by the
+ *   caller so the value the manager records is byte-identical to the one the repository
+ *   was selected by. Reading it twice would let a cross-client flip land between the two
+ *   reads and make the recorded arrangement a lie about the repository that exists.
  * @returns {import('./CraftingDefinitionRepository.js').CraftingDefinitionRepository}
  */
-function buildDefaultRecipeRepository({ corpus }) {
+function buildDefaultRecipeRepository({ corpus, arrangement }) {
   const shared = {
     hydrate: (raw) => Recipe.fromJSON(raw),
     serialize: (recipe) => recipe.toJSON(),
     scopeOf: (recipe) => recipe?.craftingSystemId ?? null,
   };
-  if (readRecipeStorageTarget() === DEFINITION_STORAGE_TARGETS.PER_RECORD) {
+  if (arrangement === DEFINITION_STORAGE_TARGETS.PER_RECORD) {
     return new PerRecordCraftingDefinitionRepository({
       keyPrefix: RECIPE_RECORD_KEY_PREFIX,
       ...shared,
@@ -248,7 +273,61 @@ export class RecipeManager {
     // Which of the two is built is decided ONCE, here, by the recipe Definition Storage
     // Target — see `buildDefaultRecipeRepository`. It reads `singleArray` on every world
     // today, so this construction is byte-for-byte the one it replaced.
-    this._repository = repository ?? buildDefaultRecipeRepository({ corpus: () => this.recipes });
+    //
+    // Issue 1224: the arrangement that decision was made FOR is recorded alongside it,
+    // because it is the only fact about definition storage that is captured BEFORE
+    // `loadAll()` runs. Everything else the Valid Id Basis reads is a setting sampled
+    // after the corpus was already deserialized, and a setting the GM's conversion
+    // flipped in between reads as settled while this client's repository is addressing
+    // the arrangement that no longer exists.
+    //
+    // An INJECTED repository reports `null`: nothing here knows what arrangement a
+    // caller-supplied adapter was built for, and a guess would be a fail-open guess.
+    this._definitionStorageArrangement = repository ? null : readRecipeStorageTarget();
+    // The layout observed across the corpus read, set by `initialize()`. `null` until then,
+    // and `null` is not known-complete — a basis sampled before anything read the corpus
+    // has nothing to attest.
+    /** @type {string|null} */
+    this._layoutAtCorpusRead = null;
+    this._repository =
+      repository ??
+      buildDefaultRecipeRepository({
+        corpus: () => this.recipes,
+        arrangement: this._definitionStorageArrangement,
+      });
+  }
+
+  /**
+   * What this manager can attest about its own **Definition Storage**, for the Valid Id
+   * Basis gate (issue 1224).
+   *
+   * All three facts are captured BEFORE or DURING the corpus read, which is the only thing
+   * that makes them useful: every other input the gate has is a setting sampled afterwards,
+   * and a setting another client's conversion moved in between reads as settled while this
+   * client is holding a corpus that arrangement no longer describes.
+   *
+   * - `granular` — whether the repository that was actually BUILT addresses one record at a
+   *   time, asked of the object rather than inferred from its class, so neither a second
+   *   granular class nor a repository injected through the `repository` seam can evade it.
+   * - `arrangement` — the arrangement this client committed to when it chose an adapter.
+   *   `null` for an injected repository: nothing here knows what a caller-supplied adapter
+   *   was built for, and a guess would be a fail-open guess.
+   * - `layoutAtCorpusRead` — the layout as it stood immediately before `loadAll()`. This is
+   *   the decisive one, and the arrangement cannot stand in for it: the arrangement derives
+   *   from the TARGET, which is set before a conversion starts and does not move until it
+   *   is over, so it is constant across the whole conversion window. A conversion sets
+   *   `unsettled` first and clears it last, so a reader whose corpus read overlapped a
+   *   conversion saw `unsettled` here — always — even if the conversion had finished by the
+   *   time the basis was sampled.
+   *
+   * @returns {{granular: boolean, arrangement: string|null, layoutAtCorpusRead: string|null}}
+   */
+  describeDefinitionStorage() {
+    return {
+      granular: this._repository?.storesRecordsGranularly?.() === true,
+      arrangement: this._definitionStorageArrangement,
+      layoutAtCorpusRead: this._layoutAtCorpusRead,
+    };
   }
 
   /**
@@ -367,6 +446,15 @@ export class RecipeManager {
    */
   async initialize() {
     if (this.initialized) return;
+
+    // Issue 1224: sample the layout IMMEDIATELY before the read, so the basis can later
+    // ask the one question no post-read setting answers — "was the layout settled at the
+    // moment I read the corpus?". A conversion that started before this line reads
+    // `unsettled` here; one that started after it, and finished before the basis is
+    // sampled, leaves a layout that no longer equals this value. Either way the corpus in
+    // hand is partial and the comparison catches it, where every settings clause reports
+    // a fully converted, fully settled world.
+    this._layoutAtCorpusRead = readRecipeStorageLayout();
 
     // Load recipes through the definition repository (issue 1089)
     for (const recipe of await this._repository.loadAll()) {
