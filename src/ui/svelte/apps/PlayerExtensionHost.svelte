@@ -184,7 +184,9 @@
   /*
     Exactly this and nothing else — see the component docblock. `height: 100%` because a bare
     div has auto height and every Core view root uses `height: 100%; min-height: 0`, so a
-    companion root copying that pattern would resolve against `auto` and collapse.
+    companion root copying that pattern would resolve against `auto` and silently fall back to
+    CONTENT height. That is not a collapse — the root still renders whatever it contains — but
+    it is not the full-height box the companion asked for either, and nothing reports it.
   */
   .player-extension-target {
     height: 100%;

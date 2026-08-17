@@ -169,7 +169,7 @@ describe('FabricateAppRoot shell', () => {
     );
   });
 
-  it('refreshes item-derived stores when a relevant actor inventory changes', () => {
+  it('filters the inventory-change refresh to actors this app reads from', () => {
     assert.ok(
       rootSource.includes('subscribeInventoryChange'),
       'the shell should subscribe to owned-item changes'
@@ -185,52 +185,29 @@ describe('FabricateAppRoot shell', () => {
         rootSource.includes('getCraftingComponentSourceIds'),
       'relevance should be computed from the selected + source actor seams'
     );
-    const effectIdx = rootSource.indexOf('subscribeInventoryChange(');
-    const effectBody = rootSource.slice(effectIdx, effectIdx + 400);
-    assert.ok(
-      effectBody.includes('services?.crafting?.load?.(true)') &&
-        effectBody.includes('services?.inventory?.reloadOnDocumentChange?.()'),
-      'inventory change should quietly reload the crafting store and refresh the inventory listing through its bulk-run guard'
-    );
   });
 
-  it('refreshes every data store when a crafting system or recipe changes', () => {
-    assert.ok(
-      rootSource.includes('subscribeCraftingDataChange'),
-      'the shell should subscribe to crafting-data changes'
-    );
-    const effectIdx = rootSource.indexOf('subscribeCraftingDataChange(');
-    const effectBody = rootSource.slice(effectIdx, effectIdx + 400);
-    // `inventory` is deliberately absent from this list: its listing refresh is the
-    // guarded one asserted by the bulk-run-guard case below, not a bare `load(true)`.
-    for (const store of ['craftingSources', 'crafting', 'journal']) {
-      assert.ok(
-        effectBody.includes(`services?.${store}?.load?.(true)`),
-        `data change should quietly reload the ${store} store`
-      );
-    }
-  });
-
-  it('routes EVERY shell-driven inventory reload through the store bulk-run guard', () => {
-    // `inventoryStore.reloadOnDocumentChange` drops a hook-driven listing reload while a
-    // bulk salvage/destroy run is in flight (issue 859), leaving the run's own terminal
-    // reload to pick it up. It is worth nothing unless the SHELL actually calls it: the
-    // store's own suite drives the guard directly, so it stays green while every real
-    // caller bypasses it. This is that missing half of the pin.
+  // WHICH STORES EACH SUBSCRIPTION REACHES IS PROVED BY MOUNTING, NOT BY READING THE SOURCE.
+  //
+  // Two source-text guards used to live here, each slicing a 400-character window after the
+  // FIRST occurrence of a `subscribe*(` call and asserting the store seams it named. Both were
+  // provably vacuous: that window spans four subscription sites, so review demonstrated all
+  // five of their assertions passing against routing that was simultaneously wrong in three
+  // ways — the journal subscribed to `narrative`, every store was handed every domain, and
+  // every domain token was misspelled. They are replaced by the table-driven mounted case in
+  // `fabricate-app-root-mounted.test.js`, which drives one single-domain payload per domain
+  // through the real `Hooks` seam and asserts the exact set of store seams invoked.
+  it('never calls the inventory store load seam directly, anywhere in the shell', () => {
+    // The one claim of the deleted pair a mount cannot make cheaply, because it is about the
+    // WHOLE file rather than about one code path. `inventoryStore.reloadOnDocumentChange`
+    // drops a hook-driven listing reload while a bulk salvage/destroy run is in flight (issue
+    // 859), leaving the run's own terminal reload to pick it up; a direct `load(true)` from
+    // the shell rebuilds the listing under the open bulk panel roughly once per queued row
+    // and makes the guard dead code.
     assert.ok(
       !/services\?\.inventory\?\.load\?\.\(/.test(rootSource),
-      'the shell must never call the inventory store load seam directly — a direct load rebuilds the listing under an open bulk panel roughly once per queued row'
+      'the shell must never call the inventory store load seam directly'
     );
-    for (const hook of ['subscribeInventoryChange(', 'subscribeCraftingDataChange(']) {
-      const start = rootSource.indexOf(hook);
-      assert.ok(start >= 0, `the shell should subscribe via ${hook}`);
-      assert.ok(
-        rootSource
-          .slice(start, start + 400)
-          .includes('services?.inventory?.reloadOnDocumentChange?.()'),
-        `${hook.slice(0, -1)} should refresh the inventory listing through the guard`
-      );
-    }
   });
 
   it('wires the Gathering view to refresh on inventory and crafting-data changes', () => {
@@ -245,6 +222,30 @@ describe('FabricateAppRoot shell', () => {
     assert.ok(
       gatheringSource.includes('store.selectedActorId'),
       'gathering inventory relevance should be gated on the selected gathering actor'
+    );
+  });
+
+  it('scopes the Gathering view to the DERIVED domain set rather than a restated list', () => {
+    // The gathering store's ROUTING behaviour is proved end to end by
+    // `tests/invalidation-domain-signal.test.js`, which subscribes through the shipped
+    // `STORE_DOMAINS[GATHERING]` and asserts which changes reach it. What that cannot see is
+    // whether THIS view uses the same set, because this view's subscription is not what it
+    // drives. Pinned at the source, and the guard is not vacuous — mutating the derived set to
+    // an inline list reddens it.
+    //
+    // A mounted proof is genuinely available and was weighed rather than assumed away:
+    // `GatheringView` is already mounted by three suites, all of which now carry
+    // `invalidationDomains.js` in their allowlists, so what is missing is a `Hooks` fake and a
+    // `load` counter rather than a harness. It is worth adding when one of those suites next
+    // needs a `Hooks` fake for its own reasons; standing one up for this single line is not.
+    assert.match(
+      gatheringSource,
+      /subscribeCraftingDataChange\([\s\S]{0,120}domains: STORE_DOMAINS\[INVALIDATION_STORES\.GATHERING\]/,
+      'GatheringView must take its domain set from the derived transpose'
+    );
+    assert.ok(
+      !/domains: \[/.test(gatheringSource),
+      'and never restate one inline — a second copy is exactly the drift the derivation removes'
     );
   });
 

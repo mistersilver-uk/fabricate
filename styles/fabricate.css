@@ -12490,6 +12490,18 @@
   height: auto;
   font-size: 12px;
   font-weight: 600;
+
+  /*
+    Entering the route reveals the active sub-item with `scrollIntoView({ block: 'nearest' })`,
+    which by itself lands the item flush against the scrollport's bottom edge and leaves the
+    rest of the group hidden — measured at a 1330x900 Manager, the revealed item sat at
+    947-977 against a port ending at 977. This margin makes the browser scroll 8px further, so
+    a sliver of the next sibling shows and the group reads as "there is more below" rather than
+    "the list is cut off". It keeps `nearest`'s minimal-scroll property; targeting the submenu
+    container instead would degrade to `start` when the group is taller than the port and can
+    scroll the active item back out of view.
+  */
+  scroll-margin-block-end: 8px;
 }
 
 /* The label follows the row rather than the rail's ordinary 12.5px, so the group's type reads

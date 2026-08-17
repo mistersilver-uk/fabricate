@@ -2899,13 +2899,62 @@ It is per-client and per-process: it is never persisted, never replicated, and c
 | Requirement | Rule |
 | --- | --- |
 | **Managers mint, consumers read** | Only the recipe and crafting-system managers advance a token. A consumer holds a token and compares it; it never advances one. |
-| **Two granularities, both published** | Every mutation advances the DOMAIN scope and the affected crafting system's scope. A consumer that can attribute its cache to one system watches the narrow scope and is untouched by an edit elsewhere; a consumer that cannot watches the domain scope. |
+| **Three granularities, all published** | Every mutation advances the ENTITY scope (`recipes`, `systems`), the affected crafting system's scope, and the `facts:<invalidation domain>:<systemId>` scope of every fact class it moved. A consumer that can attribute its cache to one system watches the narrow scope and is untouched by an edit elsewhere; a consumer that cannot watches the entity scope; a consumer that depends on SOME of a system's fact classes and not others watches the fact scope. The noun is **entity scope**, never "domain scope": _domain_ names an invalidation domain below, and one constant carrying both senses is an ambiguity a consumer resolves silently and wrongly. |
 | **A move advances both systems** | A recipe moved between crafting systems advances the scopes of the system it left AND the system it joined, because a consumer watching the former must also stop trusting its cache. |
 | **Comparable without serializing the corpus** | Change detection MUST NOT serialize the whole collection. A reload that finds no change MUST advance no token, and MUST answer that question by short-circuiting record-wise comparison rather than by hashing or stringifying the corpus. |
 | **Remote edits arrive as local reloads** | A remote edit reaches a client as a replicated setting change; the client's `reload()` detects it and advances the LOCAL token, which is what a local consumer needs. |
 | **A reload advances only what moved** | A reload MUST advance only the scopes of the records its corpus delta reports changed, pairing records by ID rather than by position — index pairing reports every record after an insertion as changed, which is the over-broad invalidation this contract exists to remove, on the one path that runs on every connected client. A change the delta cannot attribute to individual records — a reordering, which is a change because order is significant — MUST advance every system rather than none. |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
+
+### Invalidation Domains
+
+An **invalidation domain** is a CLASS OF FACT a crafting-data change can belong to.
+It exists for exactly one purpose: to decide which derived read models a change obliges a client to rebuild.
+
+It is not the DDD bounded context `DOMAIN.md` calls the domain, and it is not the entity scope of a revision token.
+It is also deliberately not called `presentation`: that noun already names a LAYER across this repository, and the fact class covering names, images and categories is `labelling`.
+
+There are seven, and the set is closed.
+
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
+
+| Domain | Facts it covers |
+| --- | --- |
+| `labelling` | Names, images, categories, tags and sort keys |
+| `narrative` | All authored prose CARRIED ON THE CRAFTING-DATA CHANNEL — recipe, step, system, component, tool and recipe-item descriptions. The qualifier is load-bearing and the unqualified reading is a trap. Gathering realm and task prose are outside it: a realm description is classified under domains the gathering store DOES consume, task prose travels on the gathering-environments channel instead, and that store consumes no `narrative` — so filing either here would leave it unable to reach the only surface that renders it. Teaser prose is outside it too: the whole teaser object is gate configuration and is classified `access-and-knowledge`, prose included, so that one fact has one answer |
+| `materials-and-yield` | Ingredient sets and groups, set essences, results, steps |
+| `resolution-config` | Tools, currency alternatives, checks, resolution modes, tool breakage, modifiers and requirements |
+| `component-definitions` | Component, tool and essence definitions |
+| `access-and-knowledge` | Teasers in whole (their prose included), recipe-item definitions, and the authored configuration gating learning and discovery — visibility mode, recipe visibility, character prerequisites, per-recipe grants and locks. A viewer's own learned and discovered state is NOT here: it lives in actor flags rather than in a definition record, and the field classification covers top-level keys of a persisted record only |
+| `held-inventory` | Actor-held items |
+
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
+
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
+
+| Requirement | Rule |
+| --- | --- |
+| **One authored mapping** | Which read-model stores CONSUME each domain is authored once, and the store-to-domain transpose is derived from it. Authoring both admits a drift no gate can see, and a test comparing two derivations of one table asserts nothing. |
+| **A consumer set is an UPPER BOUND** | Naming a store as a domain's consumer says that store MAY need rebuilding when that class of fact moves. It is NOT a claim that every field of every projection that store publishes reads that fact. Store-granular routing cannot express anything finer, and stating it as a dependency would contradict _Summary Projections_ below, which is normative that cheap availability consults no tool, check, knowledge or currency. |
+| **Attribution accompanies every mutation** | Every site that mutates stored definitions MUST name the domains it moved. Saying nothing is legal and means EVERY domain, so a site that forgets is over-broad rather than stale — and because that failure is silent, the sites MUST be counted by a test rather than trusted. |
+| **Replicated changes are attributed from the delta** | A client that did not write derives its domains from the corpus delta's changed FIELD names through a field-to-domain classification. The classification is complete in both directions: every field a persisted record can carry is classified, and no classified field is one no projection produces. |
+| **The batch attribution is per record** | A change naming several records MUST attribute domains per record. A flat union applies every listed domain to every listed record, which is the over-broad invalidation this contract exists to remove, at batch scale. |
+| **Unattributable means EVERYTHING** | A change no domain can be attributed to — a corpus reordering, an unrecognised payload, a field the classification does not name — MUST invalidate every consumer. Over-broad invalidation is a performance defect; a stale read model is a correctness one. |
+| **Coalesced per batch** | A batch or import MUST produce ONE invalidation boundary carrying every record's attribution, not one per record and not one per storage leg. |
+| **A consumer set is CLOSED OVER DERIVED GATES** | A store that consumes a derived gate consumes every domain feeding that gate's INPUTS, not merely the domains of the gate's output. A consumer column derived from direct fact reads cannot see a gate, because the store reads the gate's boolean and never reads the facts behind it — and the resulting under-consumption produces a well-formed, correctly attributed change that no fail-safe can catch. Every store's set MUST therefore be closed over the system-validity gate, the recipe-access evaluation, the cheap-availability projection and the browse-status derivation. |
+
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
+
+Closing the five stores over those four gates moves exactly one of them.
+`crafting`, `inventory` and `alchemy` consume all seven domains already, so no closure can widen them.
+`journal` already consumes every domain feeding all four gates — the recipe-access evaluation it reads for redaction is `access-and-knowledge` plus `held-inventory` for the owned-copy branch, both of which it consumes.
+`gathering` gains `resolution-config` and `materials-and-yield` from the system-validity gate, taking it from three domains to five.
+
+`journal`'s exclusion from `narrative` survives the closure, and is structurally robust rather than incidental: the run journal's redaction reads a single boolean off the access result, and the builder has NO prose-bearing output field at all — its three flavour fields are hardcoded empty literals and every other value it emits is a name, an image, a structural count or a boolean, so prose returned by a collaborator would have nowhere to land.
+
+The single routing decision this taxonomy exists to make observable is that the run journal does NOT consume `narrative`: it reads no authored description anywhere.
+A description-only edit therefore MUST NOT rebuild it, and that assertion MUST be made from a WARMED counter — a "did not rebuild" assertion against a cold fixture compares zero with zero and observes nothing.
 
 ## Summary Projections
 
