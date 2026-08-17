@@ -4456,11 +4456,25 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.equal(target.querySelector('[data-checks-active-required]'), null);
     assert.equal(target.querySelector('[data-crafting-check-editor]'), null);
 
+    // IT STAGES rather than persisting on click. Every Active switch in the studio now goes
+    // through the shared stage → `Save checks` → applied lifecycle, so one affordance does not
+    // mean two different things depending on which route the GM is standing on.
     toggle.click();
     await tick();
     flushSync();
+    assert.deepEqual(
+      calls.filter((call) => call[0] === 'saveCraftingCheckActive'),
+      [],
+      'the click alone writes nothing'
+    );
+
+    const save = target.querySelector('[data-checks-save]');
+    assert.ok(save && !save.disabled, 'Save checks is enabled by the staged switch');
+    save.click();
+    await tick();
+    flushSync();
     const toggled = calls.find((call) => call[0] === 'saveCraftingCheckActive');
-    assert.ok(toggled, 'toggling Active persists through the store');
+    assert.ok(toggled, 'and Save checks is what persists it');
     assert.equal(toggled[1], true, 'enabling the check sends true');
   });
 
@@ -21080,6 +21094,72 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(
       target.querySelector('[data-checks-panel="crafting"] [data-simple-check-editor]'),
       'and the check is back ON when the studio is reopened'
+    );
+  });
+
+  it('stages the SALVAGE Active switch too, and Discard puts it back', async () => {
+    // The follow-up half of the staging work. Alchemy's switch staged first because its off
+    // state is a check mode; that left one affordance on two lifecycles — staged on an alchemy
+    // crafting route, write-through everywhere else. A GM flipping Active on Salvage got no
+    // Unsaved chip, a disabled Save, and a Discard that could not undo it.
+    const calls = [];
+    await mountChecks(calls, {
+      salvageResolutionMode: 'simple',
+      salvageCraftingCheck: { enabled: true, simple: { rollFormula: '1d20', dc: 12 } },
+    });
+    await openChecksActivity('salvage');
+
+    const toggle = target.querySelector(
+      '[data-checks-active="salvage"] [data-checks-active-toggle]'
+    );
+    assert.ok(toggle, 'the salvage Active switch renders in simple mode');
+    toggle.click();
+    await tick();
+    flushSync();
+    assert.deepEqual(
+      calls.filter((call) => call[0] === 'saveSalvageCheckActive'),
+      [],
+      'flipping it writes nothing on its own'
+    );
+    assert.ok(
+      target.querySelector('[data-checks-panel="salvage"][data-checks-off]'),
+      'the route previews the staged OFF state'
+    );
+
+    navButton('Components').click();
+    await settleRouteExit();
+    const prompt = calls.find((call) => call[0] === 'confirmDiscardDirtyChecksDraft');
+    assert.ok(prompt, 'and it is dirty enough to prompt on the way out');
+    assert.deepEqual(prompt[1], ['salvage'], 'naming salvage as the dirty activity');
+    assert.deepEqual(
+      calls.filter((call) => call[0] === 'saveSalvageCheckActive'),
+      [],
+      'discarding writes nothing'
+    );
+  });
+
+  it('applies a staged salvage Active switch through Save checks, without rewriting its formula', async () => {
+    const calls = [];
+    await mountChecks(calls, {
+      salvageResolutionMode: 'simple',
+      salvageCraftingCheck: { enabled: true, simple: { rollFormula: '1d20', dc: 12 } },
+    });
+    await openChecksActivity('salvage');
+    target.querySelector('[data-checks-active="salvage"] [data-checks-active-toggle]').click();
+    await tick();
+    flushSync();
+
+    target.querySelector('[data-checks-save]').click();
+    await settleRouteExit();
+    assert.deepEqual(
+      calls.filter((call) => call[0] === 'saveSalvageCheckActive'),
+      [['saveSalvageCheckActive', false]],
+      'Save applies the staged switch'
+    );
+    assert.deepEqual(
+      calls.filter((call) => call[0] === 'saveSalvageCheckSimple'),
+      [],
+      'and the per-slot dirty guard keeps it from rewriting an untouched formula block'
     );
   });
 

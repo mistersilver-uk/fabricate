@@ -554,6 +554,49 @@
   let alchemyCheckModeSaving = $state(false);
   const alchemyCheckModeDirty = $derived(alchemyCheckModeDraft !== alchemyCheckModeBaseline);
 
+  // THE OTHER THREE ACTIVE SWITCHES STAGE TOO — the `enabled` flag of each activity's check.
+  //
+  // The alchemy switch above was staged first because its off state IS a check mode. That
+  // left the studio with ONE CONTROL ON TWO LIFECYCLES: the same switch, on the same screen,
+  // staged on an alchemy crafting route and wrote through on click everywhere else. A GM who
+  // flipped Active on Salvage got no Unsaved chip, a disabled `Save checks`, nothing for the
+  // route-exit guard to guard, and a Discard that could not put it back — while the identical
+  // control one route over behaved correctly. Two contracts behind one affordance is worse
+  // than either contract, so all four now stage.
+  //
+  // CRAFTING'S IS THE NON-ALCHEMY ONE. An alchemy system's switch never touches this draft
+  // (`onToggleCheckActive` returns before it), so the flag stays at its baseline and is never
+  // written for a system whose engine ignores it.
+  function readCheckActive(config) {
+    return config?.enabled === true;
+  }
+  let craftingCheckActiveDraft = $state(readCheckActive($viewState.selectedSystem?.craftingCheck));
+  let craftingCheckActiveBaseline = $state(
+    readCheckActive($viewState.selectedSystem?.craftingCheck)
+  );
+  let craftingCheckActiveSaving = $state(false);
+  const craftingCheckActiveDirty = $derived(
+    craftingCheckActiveDraft !== craftingCheckActiveBaseline
+  );
+  let salvageCheckActiveDraft = $state(
+    readCheckActive($viewState.selectedSystem?.salvageCraftingCheck)
+  );
+  let salvageCheckActiveBaseline = $state(
+    readCheckActive($viewState.selectedSystem?.salvageCraftingCheck)
+  );
+  let salvageCheckActiveSaving = $state(false);
+  const salvageCheckActiveDirty = $derived(salvageCheckActiveDraft !== salvageCheckActiveBaseline);
+  let gatheringCheckActiveDraft = $state(
+    readCheckActive($viewState.selectedSystem?.gatheringCraftingCheck)
+  );
+  let gatheringCheckActiveBaseline = $state(
+    readCheckActive($viewState.selectedSystem?.gatheringCraftingCheck)
+  );
+  let gatheringCheckActiveSaving = $state(false);
+  const gatheringCheckActiveDirty = $derived(
+    gatheringCheckActiveDraft !== gatheringCheckActiveBaseline
+  );
+
   // Progressive crafting check draft — same staged pattern, used for progressive
   // resolution mode. Only the roll formula and crit table are edited here; the
   // award setting (awardMode) is carried through untouched so a save never drops it.
@@ -742,12 +785,12 @@
       enabled:
         selectedSystem?.resolutionMode === 'alchemy'
           ? alchemyCheckModeDraft !== 'none'
-          : selectedSystem?.craftingCheck?.enabled === true,
+          : craftingCheckActiveDraft,
     },
     salvage: {
       mode: selectedSystem?.salvageResolutionMode || 'simple',
       optional: (selectedSystem?.salvageResolutionMode || 'simple') === 'simple',
-      enabled: selectedSystem?.salvageCraftingCheck?.enabled === true,
+      enabled: salvageCheckActiveDraft,
     },
     // The system-level gathering check's shape is the gathering economy's
     // resolution mode. d100 is the fixed roll (optional/no enable toggle);
@@ -755,7 +798,7 @@
     gathering: {
       mode: gatheringResolutionMode,
       optional: gatheringResolutionMode === 'd100',
-      enabled: selectedSystem?.gatheringCraftingCheck?.enabled === true,
+      enabled: gatheringCheckActiveDraft,
     },
   });
 
@@ -804,32 +847,44 @@
   );
   const craftingCheckDirty = $derived(
     alchemyCheckModeDirty ||
+      craftingCheckActiveDirty ||
       (craftingCheckMode === 'routed' && checkRoutedDirty) ||
       (craftingCheckMode === 'simple' && checkSimpleDirty) ||
       (craftingCheckMode === 'progressive' && checkProgressiveDirty)
   );
   const craftingCheckSaving = $derived(
-    checkRoutedSaving || checkSimpleSaving || checkProgressiveSaving || alchemyCheckModeSaving
+    checkRoutedSaving ||
+      checkSimpleSaving ||
+      checkProgressiveSaving ||
+      alchemyCheckModeSaving ||
+      craftingCheckActiveSaving
   );
 
   // The salvage check editor shown is selected by the salvage resolution mode.
   const salvageResolutionMode = $derived(selectedSystem?.salvageResolutionMode || 'simple');
   const salvageCheckDirty = $derived(
-    (salvageResolutionMode === 'routed' && salvageRoutedDirty) ||
+    salvageCheckActiveDirty ||
+      (salvageResolutionMode === 'routed' && salvageRoutedDirty) ||
       (salvageResolutionMode === 'progressive' && salvageProgressiveDirty) ||
       (salvageResolutionMode === 'simple' && salvageSimpleDirty)
   );
   const salvageCheckSaving = $derived(
-    salvageSimpleSaving || salvageRoutedSaving || salvageProgressiveSaving
+    salvageSimpleSaving ||
+      salvageRoutedSaving ||
+      salvageProgressiveSaving ||
+      salvageCheckActiveSaving
   );
 
   // The gathering check editor shown is selected by the gathering economy's
   // resolution mode; d100 has no editable draft, so it is never dirty/saving.
   const gatheringCheckDirty = $derived(
-    (gatheringResolutionMode === 'routed' && gatheringRoutedDirty) ||
+    gatheringCheckActiveDirty ||
+      (gatheringResolutionMode === 'routed' && gatheringRoutedDirty) ||
       (gatheringResolutionMode === 'progressive' && gatheringProgressiveDirty)
   );
-  const gatheringCheckSaving = $derived(gatheringProgressiveSaving || gatheringRoutedSaving);
+  const gatheringCheckSaving = $derived(
+    gatheringProgressiveSaving || gatheringRoutedSaving || gatheringCheckActiveSaving
+  );
 
   // THE DRAFT MODEL LIVES ABOVE THE ROUTE (issue 1096).
   //
@@ -990,11 +1045,15 @@
     // exactly as much as the formulas do.
     alchemyCheckModeDraft = selectedSystem?.alchemy?.checkMode || 'none';
     alchemyCheckModeBaseline = selectedSystem?.alchemy?.checkMode || 'none';
+    craftingCheckActiveDraft = readCheckActive(selectedSystem?.craftingCheck);
+    craftingCheckActiveBaseline = readCheckActive(selectedSystem?.craftingCheck);
     // A same-system resolution-mode change never touches the salvage/gathering
     // checks; only reseed those on a genuine system switch so an open salvage/
     // gathering draft is not clobbered by a crafting-mode change.
     if (!systemChanged) return;
     const nextSalvage = selectedSystem?.salvageCraftingCheck;
+    salvageCheckActiveDraft = readCheckActive(nextSalvage);
+    salvageCheckActiveBaseline = readCheckActive(nextSalvage);
     salvageSimpleDraft = cloneSimpleCheck(nextSalvage?.simple);
     salvageSimpleBaseline = cloneSimpleCheck(nextSalvage?.simple);
     salvageRoutedDraft = cloneRoutedCheck(nextSalvage?.routed);
@@ -1002,6 +1061,8 @@
     salvageProgressiveDraft = cloneProgressiveCheck(nextSalvage?.progressive);
     salvageProgressiveBaseline = cloneProgressiveCheck(nextSalvage?.progressive);
     const nextGathering = selectedSystem?.gatheringCraftingCheck;
+    gatheringCheckActiveDraft = readCheckActive(nextGathering);
+    gatheringCheckActiveBaseline = readCheckActive(nextGathering);
     gatheringProgressiveDraft = cloneProgressiveCheck(nextGathering?.progressive);
     gatheringProgressiveBaseline = cloneProgressiveCheck(nextGathering?.progressive);
     gatheringRoutedDraft = cloneRoutedCheck(nextGathering?.routed);
@@ -1107,12 +1168,42 @@
     });
   }
 
+  /**
+   * Persist one activity's staged Active flag.
+   *
+   * The three share a shape, so they share a function: `enabled` is one boolean per activity
+   * and the only thing that differs is which store action writes it.
+   *
+   * THE CALLER GUARDS ON DIRTY, and that is a timing contract rather than a style choice. Each
+   * activity's save runs its flag before its slot draft, so an UNCONDITIONAL `await` here
+   * would push every ordinary formula save one microtask later — enough to break the shipped
+   * mounted tests that click Save and assert the store call on the next tick. Guarding at the
+   * call site means a save with a clean switch awaits nothing extra at all.
+   */
+  async function persistCheckActive({ save, rebaseline, setSaving }) {
+    return persistCheckDraft({ save, rebaseline, setSaving });
+  }
+
+  async function saveCraftingCheckActive() {
+    return persistCheckActive({
+      save: () => store?.saveCraftingCheckActive?.(craftingCheckActiveDraft),
+      rebaseline: () => {
+        craftingCheckActiveBaseline = craftingCheckActiveDraft;
+      },
+      setSaving: (on) => {
+        craftingCheckActiveSaving = on;
+      },
+    });
+  }
+
   async function saveCraftingCheck() {
     if (!selectedSystemId || craftingCheckSaving || !craftingCheckDirty) return true;
     // The mode and its slot draft are one save. `&&` is deliberate over an early return:
     // a failed mode write must not skip the formula the GM staged beside it, exactly as
     // `saveChecks` attempts every dirty activity rather than stopping at the first failure.
-    const modeSaved = await saveAlchemyCheckMode();
+    let modeSaved = true;
+    if (alchemyCheckModeDirty) modeSaved = await saveAlchemyCheckMode();
+    if (craftingCheckActiveDirty) modeSaved = (await saveCraftingCheckActive()) && modeSaved;
     // EACH SLOT IS GUARDED ON ITS OWN DIRTY FLAG. The outer guard used to be enough, because
     // `craftingCheckDirty` meant "the active slot draft moved" and nothing else. It now also
     // reports a moved MODE, so an unguarded branch would write an untouched formula block —
@@ -1164,65 +1255,106 @@
 
   async function saveSalvageCheck() {
     if (!selectedSystemId || salvageCheckSaving || !salvageCheckDirty) return true;
-    if (salvageResolutionMode === 'routed') {
-      return persistCheckDraft({
-        save: () => store?.saveSalvageCheckRouted?.(salvageRoutedDraft),
+    // The Active flag first, then the slot draft — and each slot guarded on its OWN dirty
+    // flag, because `salvageCheckDirty` now also reports a moved switch. Without the guard a
+    // GM who only flipped Active would rewrite an untouched formula block and pay a second
+    // store refresh for it.
+    let activeSaved = true;
+    if (salvageCheckActiveDirty) {
+      activeSaved = await persistCheckActive({
+        save: () => store?.saveSalvageCheckActive?.(salvageCheckActiveDraft),
         rebaseline: () => {
-          salvageRoutedBaseline = cloneRoutedCheck(salvageRoutedDraft);
+          salvageCheckActiveBaseline = salvageCheckActiveDraft;
         },
         setSaving: (on) => {
-          salvageRoutedSaving = on;
+          salvageCheckActiveSaving = on;
         },
       });
     }
-    if (salvageResolutionMode === 'progressive') {
-      return persistCheckDraft({
-        save: () => store?.saveSalvageCheckProgressive?.(salvageProgressiveDraft),
-        rebaseline: () => {
-          salvageProgressiveBaseline = cloneProgressiveCheck(salvageProgressiveDraft);
-        },
-        setSaving: (on) => {
-          salvageProgressiveSaving = on;
-        },
-      });
+    if (salvageResolutionMode === 'routed' && salvageRoutedDirty) {
+      return (
+        (await persistCheckDraft({
+          save: () => store?.saveSalvageCheckRouted?.(salvageRoutedDraft),
+          rebaseline: () => {
+            salvageRoutedBaseline = cloneRoutedCheck(salvageRoutedDraft);
+          },
+          setSaving: (on) => {
+            salvageRoutedSaving = on;
+          },
+        })) && activeSaved
+      );
     }
-    return persistCheckDraft({
-      save: () => store?.saveSalvageCheckSimple?.(salvageSimpleDraft),
-      rebaseline: () => {
-        salvageSimpleBaseline = cloneSimpleCheck(salvageSimpleDraft);
-      },
-      setSaving: (on) => {
-        salvageSimpleSaving = on;
-      },
-    });
+    if (salvageResolutionMode === 'progressive' && salvageProgressiveDirty) {
+      return (
+        (await persistCheckDraft({
+          save: () => store?.saveSalvageCheckProgressive?.(salvageProgressiveDraft),
+          rebaseline: () => {
+            salvageProgressiveBaseline = cloneProgressiveCheck(salvageProgressiveDraft);
+          },
+          setSaving: (on) => {
+            salvageProgressiveSaving = on;
+          },
+        })) && activeSaved
+      );
+    }
+    if (salvageResolutionMode === 'simple' && salvageSimpleDirty) {
+      return (
+        (await persistCheckDraft({
+          save: () => store?.saveSalvageCheckSimple?.(salvageSimpleDraft),
+          rebaseline: () => {
+            salvageSimpleBaseline = cloneSimpleCheck(salvageSimpleDraft);
+          },
+          setSaving: (on) => {
+            salvageSimpleSaving = on;
+          },
+        })) && activeSaved
+      );
+    }
+    return activeSaved;
   }
 
   async function saveGatheringCheck() {
     if (!selectedSystemId || gatheringCheckSaving || !gatheringCheckDirty) return true;
-    if (gatheringResolutionMode === 'routed') {
-      return persistCheckDraft({
-        save: () => store?.saveGatheringCheckRouted?.(gatheringRoutedDraft),
+    let activeSaved = true;
+    if (gatheringCheckActiveDirty) {
+      activeSaved = await persistCheckActive({
+        save: () => store?.saveGatheringCheckActive?.(gatheringCheckActiveDraft),
         rebaseline: () => {
-          gatheringRoutedBaseline = cloneRoutedCheck(gatheringRoutedDraft);
+          gatheringCheckActiveBaseline = gatheringCheckActiveDraft;
         },
         setSaving: (on) => {
-          gatheringRoutedSaving = on;
+          gatheringCheckActiveSaving = on;
         },
       });
     }
-    if (gatheringResolutionMode === 'progressive') {
-      return persistCheckDraft({
-        save: () => store?.saveGatheringCheckProgressive?.(gatheringProgressiveDraft),
-        rebaseline: () => {
-          gatheringProgressiveBaseline = cloneProgressiveCheck(gatheringProgressiveDraft);
-        },
-        setSaving: (on) => {
-          gatheringProgressiveSaving = on;
-        },
-      });
+    if (gatheringResolutionMode === 'routed' && gatheringRoutedDirty) {
+      return (
+        (await persistCheckDraft({
+          save: () => store?.saveGatheringCheckRouted?.(gatheringRoutedDraft),
+          rebaseline: () => {
+            gatheringRoutedBaseline = cloneRoutedCheck(gatheringRoutedDraft);
+          },
+          setSaving: (on) => {
+            gatheringRoutedSaving = on;
+          },
+        })) && activeSaved
+      );
     }
-    // d100 mode has no editable config — nothing to persist.
-    return true;
+    if (gatheringResolutionMode === 'progressive' && gatheringProgressiveDirty) {
+      return (
+        (await persistCheckDraft({
+          save: () => store?.saveGatheringCheckProgressive?.(gatheringProgressiveDraft),
+          rebaseline: () => {
+            gatheringProgressiveBaseline = cloneProgressiveCheck(gatheringProgressiveDraft);
+          },
+          setSaving: (on) => {
+            gatheringProgressiveSaving = on;
+          },
+        })) && activeSaved
+      );
+    }
+    // d100 has no editable slot draft — its Active flag above is the only thing to persist.
+    return activeSaved;
   }
 
   // The shared Checks header Save persists EVERY dirty activity (issue 1096), not just the
@@ -1244,25 +1376,25 @@
   }
 
   /**
-   * The rail's Active switch.
+   * The rail's Active switch, for all four activities. EVERY ONE STAGES — flip it and the
+   * studio reports Unsaved, `Save checks` lights up, and Discard puts it back.
    *
-   * ALCHEMY STAGES; the other three still live-persist. Alchemy's on/off IS its check mode,
-   * so it goes through the same draft as the mode radio it sits beside — flip the switch and
-   * the studio reports Unsaved, `Save checks` lights up, and Discard puts it back. Routing it
-   * to `saveCraftingCheckActive` would have written the generic `craftingCheck.enabled` flag
-   * instead, which the engine does not read for alchemy: the switch would have moved and the
-   * brew would have rolled anyway.
+   * ALCHEMY WRITES A CHECK MODE, not the `enabled` flag. Its on/off IS `alchemy.checkMode`,
+   * which is what the engine dispatches on; the generic `craftingCheck.enabled` flag is
+   * ignored for alchemy, so routing this switch there would have moved a control the engine
+   * never consults while the brew rolled anyway.
    */
   function onToggleCheckActive(kind, enabled) {
+    const on = enabled === true;
     if (kind === 'crafting' && selectedSystem?.resolutionMode === 'alchemy') {
       // `simple` is the only mode "on" can mean here. Tiered reports `optional: false`, so it
       // renders the locked indicator and never reaches this handler.
-      alchemyCheckModeDraft = enabled === true ? 'simple' : 'none';
+      alchemyCheckModeDraft = on ? 'simple' : 'none';
       return;
     }
-    if (kind === 'crafting') store?.saveCraftingCheckActive?.(enabled);
-    else if (kind === 'salvage') store?.saveSalvageCheckActive?.(enabled);
-    else if (kind === 'gathering') store?.saveGatheringCheckActive?.(enabled);
+    if (kind === 'crafting') craftingCheckActiveDraft = on;
+    else if (kind === 'salvage') salvageCheckActiveDraft = on;
+    else if (kind === 'gathering') gatheringCheckActiveDraft = on;
   }
   const selectedCounts = $derived({
     components: selectedSystem?.managedItemOptions?.length || 0,
@@ -4043,6 +4175,9 @@
   /** Reset every check draft to its last saved baseline. */
   function discardChecksDrafts() {
     alchemyCheckModeDraft = alchemyCheckModeBaseline;
+    craftingCheckActiveDraft = craftingCheckActiveBaseline;
+    salvageCheckActiveDraft = salvageCheckActiveBaseline;
+    gatheringCheckActiveDraft = gatheringCheckActiveBaseline;
     checkRoutedDraft = cloneRoutedCheck(checkRoutedBaseline);
     checkSimpleDraft = cloneSimpleCheck(checkSimpleBaseline);
     checkProgressiveDraft = cloneProgressiveCheck(checkProgressiveBaseline);

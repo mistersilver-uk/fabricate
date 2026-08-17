@@ -639,6 +639,12 @@ Alchemy `checkMode: "none"` is the opposite case and is OFF, not inert: it is wh
 The right rail is an INDEPENDENTLY SCROLLABLE container in the SIDE-COLUMN STATE ONLY, never a pinned column that clips.
 On an activity route it carries, in order: the documentation/quickstart pair, the activation control, a "Preview as" panel, an outcome-preview simulator, a per-outcome odds histogram, and a "This check" digest whose status chip reads `OK` / `OFF` / a count pill.
 Where the resolution mode denies the GM the choice, the activation control renders a LOCKED READING of the switch — the same track and knob, a padlock and the hint — not the hint alone: removing the control removed the state with it, and "this mode requires the check" does not say which way the switch is set.
+The locked reading is always ON, because every mode that hides the switch rolls its check.
+
+**Every Active switch STAGES.** Flipping one marks its activity dirty, enables the shared `Save checks`, is guarded by the route-exit prompt, and is restored by Discard; nothing is written on the click itself.
+This holds for all four activities, so one affordance does not mean two different things depending on the route in view.
+Crafting (non-alchemy), salvage and gathering stage their check's `enabled` flag; an ALCHEMY crafting check stages `alchemy.checkMode` instead (`simple` on, `none` off), because that is the value its engine path dispatches on and `craftingCheck.enabled` is ignored for alchemy.
+Each activity's save writes its Active flag before its slot draft and ANDs both answers, and each slot write is guarded on that slot's own dirty flag so a switch-only save does not rewrite an untouched formula block.
 The reading is derived from the MODE rather than from the persisted `enabled` flag, since a mandatory check runs whatever that flag says; it reads on for every locked mode except alchemy `none`, which rolls nothing.
 The Preview-as panel carries an ACTOR selector and a RECORD selector, and both are real controls with a simulator behind them.
 "Preview as" offers UNFILTERED `game.actors` — the Studio is GM-only and a GM's `Document#isOwner` is true for every actor, so the player-side "assigned character OR owner" union would hide actors a GM can legitimately preview against — plus an explicit "No actor" option, under which every `@` key resolves to `0` and the panel renders the unresolved warning rather than a total.
