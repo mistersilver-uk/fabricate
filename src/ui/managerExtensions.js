@@ -45,9 +45,13 @@ const PROVIDER = 'Fabricate World navigation provider';
  *
  * @typedef {object} WorldNavProviderTab
  * @property {string} id Non-empty tab id, unique within the provider's tab set.
- * @property {string} label Localized visible tab label.
- * @property {string} accessibleName Localized accessible tab name.
- * @property {string} tooltip Localized keyboard-visible tab tooltip.
+ * @property {string} label Localized visible tab label. In provider mode this is also the
+ *   Manager rail sub-item's accessible name and the companion panel's region name.
+ * @property {string} accessibleName Localized accessible tab name. Always validated, but
+ *   rendered only by Fabricate's own preview tab strip (core-fallback mode).
+ * @property {string} tooltip Localized tab tooltip. The preview strip renders it as a
+ *   keyboard-visible tooltip; in provider mode it becomes the rail sub-item's native
+ *   `title`, which is pointer-only.
  * @property {string} icon Font Awesome icon class string.
  * @property {string} [title] Localized route title (the page `H1`) for this tab.
  * @property {string} [subtitle] Localized route subtitle for this tab.
