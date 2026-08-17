@@ -8,6 +8,29 @@
   // final display text this component never sees — and why the padlocks are unconditional.
   let { tabs = [], activeTabId = 'tracking', onSelect = () => {} } = $props();
 
+  // The roving `tabindex` needs a tab stop that always EXISTS. Binding it to `activeTabId`
+  // alone makes EVERY button `-1` whenever that id names no rendered tab, which takes the
+  // whole strip out of the Tab order. `aria-selected` deliberately STAYS bound to
+  // `activeTabId`: the APG's fallback governs which button is the tab stop, never which tab
+  // reports as selected, and announcing a selection the panel does not show would be worse.
+  const focusableTabId = $derived(
+    tabs.some((tab) => tab.id === activeTabId) ? activeTabId : (tabs[0]?.id ?? null)
+  );
+
+  // Which tab's tooltip is showing. The tooltips are emitted OUTSIDE the tablist (see the
+  // note there), so `:focus-within` on a shared wrapper can no longer drive them and the
+  // association is carried explicitly. Unlike the player rail's sr-only tooltips, these are
+  // visible on hover and focus, so the parenting fix could not be markup-only here.
+  let describedTabId = $state(null);
+
+  function describe(tabId) {
+    describedTabId = tabId;
+  }
+
+  function undescribe(tabId) {
+    if (describedTabId === tabId) describedTabId = null;
+  }
+
   function activate(tab, button) {
     onSelect(tab.id);
     button?.focus?.();
@@ -47,34 +70,52 @@
     data-downtime-tablist
   >
     {#each tabs as tab, index (tab.id)}
-      <div class="downtime-tab-wrap">
-        <button
-          type="button"
-          role="tab"
-          id={`world-downtime-tab-${tab.id}`}
-          class:is-active={activeTabId === tab.id}
-          aria-selected={activeTabId === tab.id}
-          aria-controls={`world-downtime-panel-${tab.id}`}
-          aria-label={localize(tab.accessibleName)}
-          aria-describedby={`world-downtime-tooltip-${tab.id}`}
-          tabindex={activeTabId === tab.id ? 0 : -1}
-          data-downtime-tab={tab.id}
-          onclick={(event) => activate(tab, event.currentTarget)}
-          onkeydown={(event) => onKeydown(event, index)}
-        >
-          <i class={tab.icon} aria-hidden="true"></i>
-          <span>{localize(tab.label)}</span>
-          <i class="fas fa-lock downtime-tab-lock" aria-hidden="true"></i>
-        </button>
-        <span
-          id={`world-downtime-tooltip-${tab.id}`}
-          class="downtime-tab-tooltip"
-          role="tooltip"
-          data-downtime-tooltip={tab.id}>{localize(tab.tooltip)}</span
-        >
-      </div>
+      <button
+        type="button"
+        role="tab"
+        id={`world-downtime-tab-${tab.id}`}
+        class:is-active={activeTabId === tab.id}
+        aria-selected={activeTabId === tab.id}
+        aria-controls={`world-downtime-panel-${tab.id}`}
+        aria-label={localize(tab.accessibleName)}
+        aria-describedby={`world-downtime-tooltip-${tab.id}`}
+        tabindex={tab.id === focusableTabId ? 0 : -1}
+        data-downtime-tab={tab.id}
+        onclick={(event) => activate(tab, event.currentTarget)}
+        onkeydown={(event) => onKeydown(event, index)}
+        onmouseenter={() => describe(tab.id)}
+        onmouseleave={() => undescribe(tab.id)}
+        onfocus={() => describe(tab.id)}
+        onblur={() => undescribe(tab.id)}
+      >
+        <i class={tab.icon} aria-hidden="true"></i>
+        <span>{localize(tab.label)}</span>
+        <i class="fas fa-lock downtime-tab-lock" aria-hidden="true"></i>
+      </button>
     {/each}
   </div>
+
+  <!-- The `aria-describedby` targets, emitted as SIBLINGS of the tablist rather than inside
+       it. A `tablist`'s only permitted owned role is `tab`, so a `tooltip` child is unallowed
+       content that axe-core's `aria-required-children` reports, and a screen reader deriving
+       "tab N of M" from the owned children can count the extra nodes. Nothing is lost by
+       moving them: an IDREF resolves document-wide, not within the referring element's
+       subtree, so each button's declared association is unchanged.
+
+       Position is unchanged too — these were ALREADY laid out against the card, which is the
+       `position: relative` ancestor, not against the tab they belong to. What the move does
+       break is `:focus-within` on the old per-tab wrapper, because these tooltips are VISIBLE
+       on hover and focus rather than sr-only like the player rail's. That association is now
+       carried explicitly by `describedTabId`. -->
+  {#each tabs as tab (tab.id)}
+    <span
+      id={`world-downtime-tooltip-${tab.id}`}
+      class="downtime-tab-tooltip"
+      class:is-described={describedTabId === tab.id}
+      role="tooltip"
+      data-downtime-tooltip={tab.id}>{localize(tab.tooltip)}</span
+    >
+  {/each}
 </div>
 
 <style>
@@ -224,8 +265,7 @@
     translate: 0 3px;
   }
 
-  .downtime-tab-wrap:hover .downtime-tab-tooltip,
-  .downtime-tab-wrap:focus-within .downtime-tab-tooltip {
+  .downtime-tab-tooltip.is-described {
     opacity: 1;
     translate: 0 0;
   }
