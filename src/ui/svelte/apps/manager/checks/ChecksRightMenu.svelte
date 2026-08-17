@@ -131,19 +131,21 @@
   // generic `optional` flag: d100 is the fixed roll (read-only note, no toggle),
   // while progressive/routed are editable checks that expose an Active toggle.
   const gatheringD100 = $derived(activeTab === 'gathering' && activation?.mode === 'd100');
-  // Alchemy "No check" mode: the crafting check does not run at all. Distinct from a
-  // MANDATORY check — hide the toggle AND show a "no check" hint, not the requiredHint.
-  const craftingNone = $derived(activeTab === 'crafting' && activation?.none === true);
   const showActiveToggle = $derived(
-    activeTab === 'gathering' ? !gatheringD100 : !craftingNone && activation?.optional === true
+    activeTab === 'gathering' ? !gatheringD100 : activation?.optional === true
   );
-  // What the LOCKED toggle reads. Every mode that hides the switch runs its check — routed
-  // and progressive require one, and gathering `d100` IS the roll — with exactly one
-  // exception: alchemy `checkMode: 'none'`, which rolls nothing at all. Deriving the reading
-  // from that one exception rather than from `activation.enabled` is deliberate: a mandatory
-  // check runs whatever the persisted `enabled` flag happens to say, and showing a locked OFF
-  // beside a check the engine rolls would be a worse lie than showing no state at all.
-  const lockedOn = $derived(!craftingNone);
+  // THE LOCKED TOGGLE ALWAYS READS ON, and there is no longer an exception. Every mode that
+  // hides the switch runs its check: routed and progressive require one, gathering `d100` IS
+  // the roll, and alchemy `tiered` routes result groups by outcome tier so it cannot resolve
+  // without one. Alchemy `checkMode: 'none'` was the one mode that hid the switch while
+  // rolling nothing; it now reports `optional: true` with `enabled: false`, so it renders the
+  // LIVE switch in its off position instead — which is the whole point, because a GM looking
+  // at a check that is off needs the control that turns it back on, not a note about it.
+  //
+  // Reading this from the mode rather than from `activation.enabled` stays deliberate: a
+  // mandatory check runs whatever the persisted `enabled` flag happens to say, and showing a
+  // locked OFF beside a check the engine rolls would be a worse lie than showing no state.
+  const lockedOn = true;
   // ONE VOCABULARY, and it is the PROTOTYPE's (issue 1096, maintainer inspector comparison).
   // The reading was `On` / `Off` in both slots, which is the manager's own switch vocabulary
   // and not what the card it now lives in says; the prototype's card reads `Check is on`, so
@@ -155,20 +157,15 @@
     `${lockedReading} — ${text('FABRICATE.Admin.Manager.Checks.Active.LockedSuffix', 'locked by the resolution mode')}`
   );
   const requiredHint = $derived(
-    craftingNone
+    activeTab === 'gathering'
       ? text(
-          'FABRICATE.Admin.Manager.Checks.Active.AlchemyNoneHint',
-          'This alchemy system resolves without a crafting check. Switch the alchemy check mode to Simple or Tiered under Recipe resolution to author one.'
+          'FABRICATE.Admin.Manager.Checks.Active.GatheringHint',
+          'In d100 mode the gathering check is the fixed d100 roll and cannot be turned off here.'
         )
-      : activeTab === 'gathering'
-        ? text(
-            'FABRICATE.Admin.Manager.Checks.Active.GatheringHint',
-            'In d100 mode the gathering check is the fixed d100 roll and cannot be turned off here.'
-          )
-        : text(
-            'FABRICATE.Admin.Manager.Checks.Active.RequiredHint',
-            'The current resolution mode requires this check, so it cannot be turned off here.'
-          )
+      : text(
+          'FABRICATE.Admin.Manager.Checks.Active.RequiredHint',
+          'The current resolution mode requires this check, so it cannot be turned off here.'
+        )
   );
 
   // ── The "Preview as" option list ────────────────────────────────────────────────────

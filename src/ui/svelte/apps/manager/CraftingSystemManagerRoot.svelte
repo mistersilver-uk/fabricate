@@ -527,6 +527,33 @@
     JSON.stringify(checkSimpleDraft) !== JSON.stringify(checkSimpleBaseline)
   );
 
+  // THE ALCHEMY CHECK MODE IS A STAGED DRAFT, not a live write.
+  //
+  // It is a Checks Studio control like every other one on The roll, so it belongs to the
+  // same stage → Unsaved → `Save checks` → applied lifecycle. It used to call
+  // `store.setAlchemyCheckMode` straight from the radio's `onChange`, which persisted on
+  // click: the studio showed no Unsaved chip, the route-exit guard had nothing to guard,
+  // and `Save checks` stayed disabled over a change that had already landed. Worse, it
+  // could not be undone — the Discard branch of the exit prompt reset every OTHER draft
+  // and left this one applied.
+  //
+  // `none` IS THE OFF STATE, and that is the whole reason this is one value rather than a
+  // mode plus a flag. The persisted enum stays `none | simple | tiered` (the engine's own
+  // vocabulary, unchanged), but the studio presents it as a two-option mode — Simple or
+  // Tiered — plus the rail's Active toggle, which writes `simple` on and `none` off. A
+  // separate `enabled` flag beside the mode would be a second spelling of a state the enum
+  // already has, and the two would drift the first time one was written without the other.
+  //
+  // NOT `craftingCheck.enabled`. That flag is the generic `checksEnabled` master toggle,
+  // and the engine deliberately does NOT read it for alchemy — alchemy dispatches on
+  // `alchemy.checkMode` alone (`CraftingEngine.js`, the `mode === 'alchemy'` branch of
+  // `_runCraftingCheck`). Wiring the Active toggle to `enabled` here would have moved a
+  // switch the engine never consults.
+  let alchemyCheckModeDraft = $state($viewState.selectedSystem?.alchemy?.checkMode || 'none');
+  let alchemyCheckModeBaseline = $state($viewState.selectedSystem?.alchemy?.checkMode || 'none');
+  let alchemyCheckModeSaving = $state(false);
+  const alchemyCheckModeDirty = $derived(alchemyCheckModeDraft !== alchemyCheckModeBaseline);
+
   // Progressive crafting check draft — same staged pattern, used for progressive
   // resolution mode. Only the roll formula and crit table are edited here; the
   // award setting (awardMode) is carried through untouched so a save never drops it.
@@ -694,19 +721,28 @@
       mode: selectedSystem?.resolutionMode || 'simple',
       // The crafting check is optional in simple and routedByIngredients (it runs
       // only when a roll formula is authored and checks are enabled); routedByCheck
-      // and progressive REQUIRE it. Alchemy is driven by alchemy.checkMode: simple
-      // and tiered are MANDATORY (cannot be disabled → requiredHint), while none has
-      // NO check (the `none` flag suppresses the Active TOGGLE and shows a distinct
-      // "resolves without a check" hint in place of the requiredHint — the Active
-      // card itself stays as a read-only note).
+      // and progressive REQUIRE it.
+      //
+      // ALCHEMY IS OPTIONAL AT `simple` AND REQUIRED AT `tiered`, read from the DRAFT
+      // check mode so the rail's switch reflects what the GM has staged rather than what
+      // was last saved. Alchemy used to report `optional: false` for all three modes,
+      // which is what put the "cannot be turned off here" hint on a Simple check that has
+      // a perfectly good off state — `checkMode: 'none'` — and left the GM no way to reach
+      // it once "No check" stopped being a mode you pick. Tiered keeps the locked
+      // always-on indicator: it routes result groups by outcome tier, so it cannot resolve
+      // without a roll (see `_isCheckOutcomeSatisfied`).
+      //
+      // `enabled` IS THE MODE, not `craftingCheck.enabled`. The engine ignores that flag
+      // for alchemy and dispatches on `alchemy.checkMode` alone, so reading it here would
+      // have shown a switch position the engine never honours.
       optional:
         (selectedSystem?.resolutionMode || 'simple') === 'alchemy'
-          ? false
+          ? alchemyCheckModeDraft !== 'tiered'
           : ['simple', 'routedByIngredients'].includes(selectedSystem?.resolutionMode || 'simple'),
-      none:
-        selectedSystem?.resolutionMode === 'alchemy' &&
-        (selectedSystem?.alchemy?.checkMode || 'none') === 'none',
-      enabled: selectedSystem?.craftingCheck?.enabled === true,
+      enabled:
+        selectedSystem?.resolutionMode === 'alchemy'
+          ? alchemyCheckModeDraft !== 'none'
+          : selectedSystem?.craftingCheck?.enabled === true,
     },
     salvage: {
       mode: selectedSystem?.salvageResolutionMode || 'simple',
@@ -747,14 +783,33 @@
   // one ingredient/result set, and `recipeRoutingProvider` picks the routing basis ('check'
   // for routedByCheck, 'ingredientSet' for routedByIngredients). Both routed modes stay
   // covered there.
-  const craftingCheckMode = $derived(resolveActiveCraftingCheckFormula(selectedSystem).slot);
+  // RESOLVED AGAINST THE DRAFT ALCHEMY MODE, not the persisted one, and only alchemy's
+  // input is substituted (every other mode reads the same system it always did).
+  //
+  // The slot decides which draft is dirty-tracked and which one `Save checks` writes, so
+  // resolving it from persisted state stranded the draft it was staged beside. Turn the
+  // alchemy check ON and author a formula in one visit: the persisted mode is still `none`,
+  // which resolves to slot `null`, so `craftingCheckDirty` read false for the simple draft
+  // and Save wrote the mode but dropped the formula the GM had just typed. The two have to
+  // be resolved from the same value to be saved together.
+  const craftingCheckMode = $derived(
+    resolveActiveCraftingCheckFormula(
+      selectedSystem?.resolutionMode === 'alchemy'
+        ? {
+            ...selectedSystem,
+            alchemy: { ...(selectedSystem?.alchemy || {}), checkMode: alchemyCheckModeDraft },
+          }
+        : selectedSystem
+    ).slot
+  );
   const craftingCheckDirty = $derived(
-    (craftingCheckMode === 'routed' && checkRoutedDirty) ||
+    alchemyCheckModeDirty ||
+      (craftingCheckMode === 'routed' && checkRoutedDirty) ||
       (craftingCheckMode === 'simple' && checkSimpleDirty) ||
       (craftingCheckMode === 'progressive' && checkProgressiveDirty)
   );
   const craftingCheckSaving = $derived(
-    checkRoutedSaving || checkSimpleSaving || checkProgressiveSaving
+    checkRoutedSaving || checkSimpleSaving || checkProgressiveSaving || alchemyCheckModeSaving
   );
 
   // The salvage check editor shown is selected by the salvage resolution mode.
@@ -929,6 +984,12 @@
     checkSimpleBaseline = cloneSimpleCheck(selectedSystem?.craftingCheck?.simple);
     checkProgressiveDraft = cloneProgressiveCheck(selectedSystem?.craftingCheck?.progressive);
     checkProgressiveBaseline = cloneProgressiveCheck(selectedSystem?.craftingCheck?.progressive);
+    // Reseeded on a system switch alongside the three slot drafts. NOT on every refresh:
+    // the guard above is what keeps a `Save checks` — which refreshes the store — from
+    // clobbering a draft the GM is still editing, and this value needs that protection
+    // exactly as much as the formulas do.
+    alchemyCheckModeDraft = selectedSystem?.alchemy?.checkMode || 'none';
+    alchemyCheckModeBaseline = selectedSystem?.alchemy?.checkMode || 'none';
     // A same-system resolution-mode change never touches the salvage/gathering
     // checks; only reseed those on a genuine system switch so an open salvage/
     // gathering draft is not clobbered by a crafting-mode change.
@@ -1026,43 +1087,79 @@
     }
   }
 
+  /**
+   * Persist the staged alchemy check mode, if it moved.
+   *
+   * Runs BEFORE the slot draft below, and the order matters: the slot write reseeds the
+   * store, and a mode that had not landed yet would be re-read as its old value. Both are
+   * awaited inside one `saveCraftingCheck` so the pair lands under a single `Save checks`.
+   */
+  async function saveAlchemyCheckMode() {
+    if (!alchemyCheckModeDirty) return true;
+    return persistCheckDraft({
+      save: () => store?.setAlchemyCheckMode?.(alchemyCheckModeDraft),
+      rebaseline: () => {
+        alchemyCheckModeBaseline = alchemyCheckModeDraft;
+      },
+      setSaving: (on) => {
+        alchemyCheckModeSaving = on;
+      },
+    });
+  }
+
   async function saveCraftingCheck() {
     if (!selectedSystemId || craftingCheckSaving || !craftingCheckDirty) return true;
-    if (craftingCheckMode === 'routed') {
-      return persistCheckDraft({
-        save: () => store?.saveCraftingCheckRouted?.(checkRoutedDraft),
-        rebaseline: () => {
-          checkRoutedBaseline = cloneRoutedCheck(checkRoutedDraft);
-        },
-        setSaving: (on) => {
-          checkRoutedSaving = on;
-        },
-      });
+    // The mode and its slot draft are one save. `&&` is deliberate over an early return:
+    // a failed mode write must not skip the formula the GM staged beside it, exactly as
+    // `saveChecks` attempts every dirty activity rather than stopping at the first failure.
+    const modeSaved = await saveAlchemyCheckMode();
+    // EACH SLOT IS GUARDED ON ITS OWN DIRTY FLAG. The outer guard used to be enough, because
+    // `craftingCheckDirty` meant "the active slot draft moved" and nothing else. It now also
+    // reports a moved MODE, so an unguarded branch would write an untouched formula block —
+    // one redundant `updateSystem` plus its store refresh — every time the GM only flipped
+    // the Active switch.
+    if (craftingCheckMode === 'routed' && checkRoutedDirty) {
+      return (
+        (await persistCheckDraft({
+          save: () => store?.saveCraftingCheckRouted?.(checkRoutedDraft),
+          rebaseline: () => {
+            checkRoutedBaseline = cloneRoutedCheck(checkRoutedDraft);
+          },
+          setSaving: (on) => {
+            checkRoutedSaving = on;
+          },
+        })) && modeSaved
+      );
     }
-    if (craftingCheckMode === 'simple') {
-      return persistCheckDraft({
-        save: () => store?.saveCraftingCheckSimple?.(checkSimpleDraft),
-        rebaseline: () => {
-          checkSimpleBaseline = cloneSimpleCheck(checkSimpleDraft);
-        },
-        setSaving: (on) => {
-          checkSimpleSaving = on;
-        },
-      });
+    if (craftingCheckMode === 'simple' && checkSimpleDirty) {
+      return (
+        (await persistCheckDraft({
+          save: () => store?.saveCraftingCheckSimple?.(checkSimpleDraft),
+          rebaseline: () => {
+            checkSimpleBaseline = cloneSimpleCheck(checkSimpleDraft);
+          },
+          setSaving: (on) => {
+            checkSimpleSaving = on;
+          },
+        })) && modeSaved
+      );
     }
-    if (craftingCheckMode === 'progressive') {
-      return persistCheckDraft({
-        save: () => store?.saveCraftingCheckProgressive?.(checkProgressiveDraft),
-        rebaseline: () => {
-          checkProgressiveBaseline = cloneProgressiveCheck(checkProgressiveDraft);
-        },
-        setSaving: (on) => {
-          checkProgressiveSaving = on;
-        },
-      });
+    if (craftingCheckMode === 'progressive' && checkProgressiveDirty) {
+      return (
+        (await persistCheckDraft({
+          save: () => store?.saveCraftingCheckProgressive?.(checkProgressiveDraft),
+          rebaseline: () => {
+            checkProgressiveBaseline = cloneProgressiveCheck(checkProgressiveDraft);
+          },
+          setSaving: (on) => {
+            checkProgressiveSaving = on;
+          },
+        })) && modeSaved
+      );
     }
-    // No slot: this resolution mode rolls no crafting check, so there is nothing to persist.
-    return true;
+    // No dirty slot draft: either this resolution mode rolls no crafting check, or the only
+    // thing that moved was the alchemy check mode, which `saveAlchemyCheckMode` has answered.
+    return modeSaved;
   }
 
   async function saveSalvageCheck() {
@@ -1146,7 +1243,23 @@
     return saved;
   }
 
+  /**
+   * The rail's Active switch.
+   *
+   * ALCHEMY STAGES; the other three still live-persist. Alchemy's on/off IS its check mode,
+   * so it goes through the same draft as the mode radio it sits beside — flip the switch and
+   * the studio reports Unsaved, `Save checks` lights up, and Discard puts it back. Routing it
+   * to `saveCraftingCheckActive` would have written the generic `craftingCheck.enabled` flag
+   * instead, which the engine does not read for alchemy: the switch would have moved and the
+   * brew would have rolled anyway.
+   */
   function onToggleCheckActive(kind, enabled) {
+    if (kind === 'crafting' && selectedSystem?.resolutionMode === 'alchemy') {
+      // `simple` is the only mode "on" can mean here. Tiered reports `optional: false`, so it
+      // renders the locked indicator and never reaches this handler.
+      alchemyCheckModeDraft = enabled === true ? 'simple' : 'none';
+      return;
+    }
     if (kind === 'crafting') store?.saveCraftingCheckActive?.(enabled);
     else if (kind === 'salvage') store?.saveSalvageCheckActive?.(enabled);
     else if (kind === 'gathering') store?.saveGatheringCheckActive?.(enabled);
@@ -3907,6 +4020,7 @@
 
   /** Reset every check draft to its last saved baseline. */
   function discardChecksDrafts() {
+    alchemyCheckModeDraft = alchemyCheckModeBaseline;
     checkRoutedDraft = cloneRoutedCheck(checkRoutedBaseline);
     checkSimpleDraft = cloneSimpleCheck(checkSimpleBaseline);
     checkProgressiveDraft = cloneProgressiveCheck(checkProgressiveBaseline);
@@ -8877,7 +8991,7 @@
           <ChecksView
             {foundrySystemId}
             resolutionMode={selectedSystem?.resolutionMode || 'simple'}
-            alchemyCheckMode={selectedSystem?.alchemy?.checkMode || 'none'}
+            alchemyCheckMode={alchemyCheckModeDraft}
             craftingCheck={checkRoutedDraft}
             craftingCheckSimple={checkSimpleDraft}
             craftingCheckProgressive={checkProgressiveDraft}
@@ -8932,7 +9046,9 @@
             {onUpdateSalvageCheckProgressive}
             {onUpdateGatheringCheckProgressive}
             {onUpdateGatheringCheckRouted}
-            onSetAlchemyCheckMode={(m) => store.setAlchemyCheckMode?.(m)}
+            onSetAlchemyCheckMode={(m) => {
+              alchemyCheckModeDraft = m;
+            }}
             onUpdateCraftingConsumption={(patch) => store.saveCraftingCheckConsumption?.(patch)}
             onUpdateSalvageConsumption={(patch) => store.saveSalvageCheckConsumption?.(patch)}
             onUpdateCraftingFailureResultPolicy={(policy) =>

@@ -144,15 +144,21 @@ const MODES = Object.freeze({
     ],
     facts: ['check:notRolled', 'outcomes:none', 'results:single'],
   },
+  // OPTIONAL, unlike its tiered sibling. The engine can only reach the reserved failure
+  // result set through this check, so a system that wants one has to roll it — but a system
+  // that does not is served by switching the check off (`checkMode: 'none'`), which is what
+  // the rail's Active switch writes. `Required` here was the fact that sent a GM looking for
+  // an off switch the studio would not show them.
   'crafting:alchemySimple': {
     icon: 'fas fa-dice-d20',
     title: ['AlchemySimple', 'Simple check'],
     body: [
       'AlchemySimpleBody',
-      'A mandatory pass/fail check. On a pass the success result set is produced; on a fail ' +
-        'the reserved failure result set is.',
+      'A pass/fail check. On a pass the success result set is produced; on a fail the ' +
+        'reserved failure result set is. Switch the check off to resolve every matched brew ' +
+        'as a success instead.',
     ],
-    facts: ['check:required', 'outcomes:passFail', 'results:successFailure'],
+    facts: ['check:optional', 'outcomes:passFail', 'results:successFailure'],
   },
   'crafting:alchemyTiered': {
     icon: 'fas fa-stairs',
