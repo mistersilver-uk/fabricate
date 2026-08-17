@@ -225,6 +225,24 @@ describe('FabricateAppRoot shell', () => {
     );
   });
 
+  it('scopes the Gathering view to the DERIVED domain set rather than a restated list', () => {
+    // The gathering store's ROUTING behaviour is proved end to end by
+    // `tests/invalidation-domain-signal.test.js`, which subscribes through the shipped
+    // `STORE_DOMAINS[GATHERING]` and asserts which changes reach it. What that cannot see is
+    // whether THIS view uses the same set, because this view's subscription is not what it
+    // drives. Pinned at the source for the same reason `main.js`'s hook registrations are:
+    // the alternative is a second mounted harness whose only claim would be this one line.
+    assert.match(
+      gatheringSource,
+      /subscribeCraftingDataChange\([\s\S]{0,120}domains: STORE_DOMAINS\[INVALIDATION_STORES\.GATHERING\]/,
+      'GatheringView must take its domain set from the derived transpose'
+    );
+    assert.ok(
+      !/domains: \[/.test(gatheringSource),
+      'and never restate one inline — a second copy is exactly the drift the derivation removes'
+    );
+  });
+
   it('exposes an accessible tablist driven by host state', () => {
     assert.ok(rootSource.includes('role="tablist"'), 'left nav should be a tablist');
     assert.ok(
