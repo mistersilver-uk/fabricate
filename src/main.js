@@ -3145,8 +3145,8 @@ const fabricate = new Fabricate();
 //
 // Created at MODULE SCOPE, and published immediately, because its two named callers run too
 // early for anything later. The Storage Layout Conversion (-c) runs inside `_runMigrations`,
-// which `initialize()` awaits — and `initialize()` is called from the `ready` handler more
-// than 150 lines BEFORE that handler reaches its own setting-hook wiring. A bracket
+// which `initialize()` awaits — and `initialize()` is called from the `ready` handler well
+// before that handler reaches its own setting-hook wiring. A bracket
 // published there would still be `undefined` when the conversion opened it, `?.open()` would
 // no-op, and the only symptom would be three refresh bursts instead of one. Silent.
 fabricate.recipeRefresh = createRecipeRefreshCoalescer();
