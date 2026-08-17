@@ -757,6 +757,14 @@ describe('FabricateAppRoot invalidation-domain routing (mounted)', () => {
    * must use, and `load` is the bypass it must never call. Counting them separately is what
    * lets one case assert routing and the absence of the bypass at the same time.
    *
+   * WHAT THE INVENTORY COUNTER COUNTS IS THE SEAM CALL, NOT THE LISTING BUILD, and for this
+   * subject the two diverge: the real `inventoryStore.reloadOnDocumentChange()` returns without
+   * loading while `bulkRunning || bulkDestroying`, so a build-counting guard would read zero in
+   * BOTH directions if a fixture left either flag set. The question here is whether the shell
+   * ROUTED the change to the inventory store at all, so the seam call is the right thing to
+   * count — and because these are plain counters rather than a real store, no bulk run can be
+   * in flight to suppress one.
+   *
    * @returns {{calls: object, services: object}}
    */
   function spyServices() {
