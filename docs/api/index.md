@@ -961,7 +961,8 @@ Each omission is deliberate, and a companion can rely on all three:
   A fixed-position element inside the target positions against the viewport.
 - **No padding or background.** The companion owns its own inset and surface.
 
-Give your own root `height: 100%; min-height: 0` too, and note what happens if you do not: a percentage height against an `auto`-height ancestor does not collapse, it silently resolves to content height, so the root renders at whatever it happens to contain rather than filling the panel.
+Give your own root `height: 100%; min-height: 0` too.
+Skip it and your root resolves against `auto` and falls back to content height rather than filling the panel, and nothing reports it.
 If you want container queries, declare `container-type` on your own root — its inline size is the target's, so you measure the same box without Fabricate imposing containment on companions that do not want it.
 
 ### Lifecycle And Failure
