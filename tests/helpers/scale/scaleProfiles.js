@@ -97,7 +97,42 @@ const COMPONENT_LIBRARY_HELD_STACKS = 1000;
 const COMPONENT_LIBRARY_RECIPES = 6;
 
 /**
- * Assert that a library PREFIX is closed under its own component references.
+ * Every component id one component's SALVAGE block references, which is the only kind of
+ * component-to-component reference `buildComponentLibrary` can emit.
+ *
+ * Both legs are taken from the repository's own enumeration of the salvage sites —
+ * `src/systems/importReferenceResolver.js` § "Component salvage result refs + legacy salvage
+ * catalysts" remaps `salvage.resultGroups[].results[]` AND `salvage.catalysts[]`, reading a
+ * component id from either the bare `componentId` field or a nested `match.componentId`. The
+ * catalyst leg cannot fire today because the generator emits no catalysts; it is here so that
+ * teaching the generator to emit them cannot silently escape the closure check below, which is
+ * the failure mode a hand-maintained mirror of a builder always has.
+ *
+ * @param {object} entry A generated component.
+ * @returns {string[]} The component ids it names, in walk order.
+ */
+function salvageComponentRefs(entry) {
+  const refs = [];
+  for (const group of entry?.salvage?.resultGroups ?? []) {
+    for (const result of group?.results ?? []) {
+      if (result?.componentId != null) refs.push(result.componentId);
+    }
+  }
+  for (const catalyst of entry?.salvage?.catalysts ?? []) {
+    const id = catalyst?.componentId ?? catalyst?.match?.componentId;
+    if (id != null) refs.push(id);
+  }
+  return refs;
+}
+
+/**
+ * Assert that a library PREFIX is closed under its own SALVAGE references.
+ *
+ * Salvage rather than "component references" in general, and the narrower claim is the honest
+ * one: {@link salvageComponentRefs} is what this checks, and the other component-to-component
+ * reference kinds the same resolver remaps (a tool's `componentId`, an essence definition's
+ * `sourceComponentId`) are not emitted by `buildComponentLibrary` at all and are not this
+ * function's subject.
  *
  * `buildComponentLibrary` gives every fourth component a salvage result naming
  * `c-((index + 1) % count)`, where `count` is the size the library was BUILT at. A prefix of
@@ -117,16 +152,14 @@ const COMPONENT_LIBRARY_RECIPES = 6;
 function libraryPrefixClosedUnderSalvage(prefix) {
   const present = new Set(prefix.map((entry) => entry.id));
   for (const entry of prefix) {
-    for (const group of entry.salvage?.resultGroups ?? []) {
-      for (const result of group.results ?? []) {
-        if (present.has(result.componentId)) continue;
-        throw new Error(
-          `component-library: the ${prefix.length}-component prefix dangles salvage result ` +
-            `"${result.componentId}" from "${entry.id}". Every series point must be closed ` +
-            `under its own component references, or the points differ by more than size. ` +
-            `Choose series bounds that are multiples of 4.`
-        );
-      }
+    for (const referenced of salvageComponentRefs(entry)) {
+      if (present.has(referenced)) continue;
+      throw new Error(
+        `component-library: the ${prefix.length}-component prefix dangles salvage reference ` +
+          `"${referenced}" from "${entry.id}". Every series point must be closed under its own ` +
+          `salvage references, or the points differ by more than size. Choose series bounds ` +
+          `that are multiples of 4.`
+      );
     }
   }
   return prefix;

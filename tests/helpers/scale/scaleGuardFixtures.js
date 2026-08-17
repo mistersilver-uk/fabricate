@@ -185,6 +185,15 @@ export function makeSignatureRecipe({ id, componentId, enabled = true, tagPlaceh
  * of the component library before returning null. A fixture of neatly-matching items would
  * exercise the cheap early-exit path and measure the wrong branch.
  *
+ * It is also load bearing for the `items x components` guard in
+ * `tests/scale-regression-guards.test.js`. A resolved item costs one `candidatesExamined` bump
+ * on the index HIT, so making this actor hold a PROPORTION of matching stacks — the obvious
+ * "make the fixture more realistic" edit — makes that guard's library-examination count grow
+ * with the item count and turns it red against entirely correct `O(1)` index lookups, under a
+ * message blaming the `items x components` product term. A CONSTANT number of matching stacks
+ * would be safe (the same fixed cost at every item count); a proportional one is not. Change
+ * the guard and this fixture together, or not at all.
+ *
  * @param {object} [options]
  * @returns {{id: string, name: string, items: object[]}}
  */

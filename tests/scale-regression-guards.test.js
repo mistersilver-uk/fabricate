@@ -69,6 +69,110 @@ const PLAYER = { id: 'user-1', isGM: false };
 // ---------------------------------------------------------------------------
 
 /**
+ * The array methods that reach every element through a per-element CALLBACK, and that
+ * {@link countingCandidates}' shared `PREDICATE_METHODS` list does not carry.
+ *
+ * `findLastIndex` is in here rather than being a shared-list omission worth fixing in place:
+ * widening the shared list moves every committed benchmark count that walks a component array
+ * and needs a `--record` pass, which is a separate change from making THIS guard able to fail.
+ */
+const CALLBACK_ENUMERATORS = ['forEach', 'reduce', 'reduceRight', 'flatMap', 'findLastIndex'];
+
+/**
+ * The iterator-returning methods that reach every element WITHOUT a callback and that do not
+ * collide with `definitionIndex`'s own instrumentation. `entries` is deliberately absent — see
+ * {@link countingEnumerations}.
+ */
+const ITERATOR_ENUMERATORS = ['keys', 'values'];
+
+/**
+ * Layer "every ENUMERATION of this array is counted" on top of {@link countingCandidates}'
+ * "every PREDICATE invocation is counted" (issue 1204, second pass).
+ *
+ * The shared wrapper counts only the predicate-taking subset (`find` / `filter` / `some` /
+ * `every` / `map` / …), which means the single most common way to walk an array in this
+ * repository — a plain `for (const candidate of components)` — bumped NOTHING. Production
+ * already uses exactly that idiom on exactly this array (`src/utils/essenceResolver.js`,
+ * `src/utils/definitionIndex.js`, `src/systems/inventorySnapshot.js`,
+ * `src/utils/sourceUuid.js`), so the `items x components` product term could have been
+ * re-landed in its most natural form with every assertion in this file still green.
+ *
+ * This layer is deliberately LOCAL to the guard fixture rather than folded into
+ * `scaleCounters.js`: the shared wrapper is what `createBenchWorld` hands the benchmark cases,
+ * and widening it would move every committed class-1 baseline that walks a component array.
+ *
+ * `entries` is routed to a SEPARATE key because it is the one enumerator that overlaps
+ * `definitionIndex`'s own counter: `buildIndex` reaches its elements through
+ * `definitions.entries()`, so counting that walk on both seams would count the one-off index
+ * build twice. `Symbol.iterator` does NOT overlap — a `for...of` over the array-iterator
+ * `entries()` returns invokes the ITERATOR's `Symbol.iterator`, never the array's — and
+ * measurement agrees: with this layer installed and no per-item scan present,
+ * `Symbol.iterator`, `keys` and `values` all read 0 while `entries` reads exactly
+ * `componentCount`.
+ *
+ * ## What an own-property override still cannot see
+ *
+ * A read that never goes through a method: indexed access (`components[i]`, `.at(i)`, a
+ * `for (let i = 0; i < components.length; i++)` loop), the callback-free O(n) methods
+ * (`indexOf`, `includes`, `lastIndexOf`, `join`, a default-comparator `sort`), and any caller
+ * reaching the prototype directly (`Array.prototype.find.call(components, …)`). Closing those
+ * needs a Proxy instead of own properties, which is a larger change than this guard needs. The
+ * gap is recorded here rather than papered over with a claim of exhaustiveness, because the
+ * defect this file was repaired for was precisely a property asserted more broadly than it was
+ * checked.
+ *
+ * @template T
+ * @param {T[]} array The array {@link countingCandidates} already wrapped; mutated in place.
+ * @param {{bump: (key: string, amount?: number) => void}} counters
+ * @param {{key: string, entriesKey: string}} keys
+ * @returns {T[]} `array`, so it can be used inline.
+ */
+function countingEnumerations(array, counters, { key, entriesKey }) {
+  const define = (name, value) =>
+    Object.defineProperty(array, name, {
+      configurable: true,
+      enumerable: false,
+      writable: true,
+      value,
+    });
+  const countedIterator = (walk, counterKey) =>
+    function* counted() {
+      for (const value of walk(this)) {
+        counters.bump(counterKey);
+        yield value;
+      }
+    };
+
+  for (const method of CALLBACK_ENUMERATORS) {
+    define(method, function counted(callback, ...rest) {
+      return Array.prototype[method].call(
+        this,
+        function countedCallback(...args) {
+          counters.bump(key);
+          return callback.apply(this, args);
+        },
+        ...rest
+      );
+    });
+  }
+  for (const method of ITERATOR_ENUMERATORS) {
+    define(
+      method,
+      countedIterator((self) => Array.prototype[method].call(self), key)
+    );
+  }
+  define(
+    Symbol.iterator,
+    countedIterator((self) => Array.prototype[Symbol.iterator].call(self), key)
+  );
+  define(
+    'entries',
+    countedIterator((self) => Array.prototype.entries.call(self), entriesKey)
+  );
+  return array;
+}
+
+/**
  * Build and measure one player Crafting listing.
  *
  * The recipe manager is the REAL one, so `evaluateCraftability` performs its real
@@ -88,17 +192,38 @@ const PLAYER = { id: 'user-1', isGM: false };
  * row reports 'missing materials', and the case would report a fast number for a listing that
  * answered nothing".
  *
- * With the resolver wired, a library examination can be expressed two different ways, and a
- * regression would pick whichever one the implementation happens to use — so both are counted
- * and {@link libraryExaminations} adds them:
+ * With the resolver wired, a library examination can be expressed several ways and a regression
+ * would pick whichever one the implementation happens to use, so {@link libraryExaminations}
+ * adds up three counters that between them see every ENUMERATION of the array rather than only
+ * its predicate-taking subset:
  *
  * - `componentCandidatesExamined` — the fixture-side {@link countingCandidates} array, which
- *   sees a scan written as `components.find(...)` / `.filter(...)`. That is the PRE-#1076
- *   shape of the `items x components` term and it is what a hand-rolled rescan would look like.
+ *   sees a scan written as `components.find(...)` / `.filter(...)`, PLUS the local
+ *   {@link countingEnumerations} layer, which sees one written as
+ *   `for (const candidate of components)`, `.forEach`, `.reduce`, `.flatMap`, `.findLastIndex`,
+ *   `.keys()` or `.values()`. Both shapes are the `items x components` term; the plain
+ *   `for...of` is the shape this repository actually writes, and it is the one the pre-#1204
+ *   pairing could not see at all.
+ * - `componentEntriesWalked` — `components.entries()`, on its own key because it is the one
+ *   enumerator `definitionIndex` itself already counts. The `indexBuilds x componentCount`
+ *   steps that belong to the one-off index build are subtracted below rather than left to
+ *   double the headline number; only a SURPLUS entries walk (a per-item
+ *   `for (const [i, c] of components.entries())`) survives into
+ *   {@link libraryExaminations}.
  * - `identityCandidatesExamined` — `definitionIndex`'s own counter, which sees the candidates
- *   walked while an index is BUILT. Once resolution became index-backed the fixture-side array
- *   stopped observing anything on this path (it reads 0 at every library size), so this counter
- *   is the live half today and the other is the one that would catch a reversion.
+ *   walked while an index is BUILT and one candidate per index HIT. Once resolution became
+ *   index-backed the fixture-side predicate counter stopped observing anything on this path
+ *   (it reads 0 at every library size), so this counter is the live half today and the others
+ *   are the ones that would catch a reversion.
+ *
+ * ## The per-item seam is also counted directly
+ *
+ * `componentResolutions` counts calls to the injected resolver itself, which is the ONE seam
+ * the per-item path must cross. Every counter above is a LIBRARY-side quantity and can be
+ * moved by item-independent work — an index build is `O(components)` and `O(1)` in items — so
+ * on its own none of them can distinguish "the per-item path is live and cheap" from "the
+ * per-item path is not there at all". Counting the seam does: it is stated on the item axis,
+ * and no amount of library-side work can fake it.
  */
 function measureListing({
   totalRecipes,
@@ -111,13 +236,22 @@ function measureListing({
   const authored = makeCraftingSystem({ componentCount });
   const system = {
     ...authored,
-    components: countingCandidates(authored.components, counters, 'componentCandidatesExamined'),
+    components: countingEnumerations(
+      countingCandidates(authored.components, counters, 'componentCandidatesExamined'),
+      counters,
+      { key: 'componentCandidatesExamined', entriesKey: 'componentEntriesWalked' }
+    ),
   };
   const recipes = Array.from({ length: totalRecipes }, (_, index) =>
     makeListingRecipe({ id: `r-${index}`, systemId: system.id, setCount })
   );
   const systemManager = makeSystemManager(system, () => recipes);
   const recipeManager = new RecipeManager({ getCraftingSystemManager: () => systemManager });
+
+  // The per-item seam, counted on the seam itself. `countCalls` replaces the property with a
+  // counting wrapper in place, so the builder below is handed the wrapper and not the original.
+  const resolver = { resolveComponentForItem: findMatchingComponent };
+  countCalls(resolver, 'resolveComponentForItem', counters, 'componentResolutions');
 
   const builder = new CraftingListingBuilder({
     recipeManager: countingFacade(recipeManager, counters, {
@@ -136,7 +270,7 @@ function measureListing({
     // The one seam through which the summary phase reaches the component library. `main.js`
     // and `InventoryListingBuilder` both wire this resolver; omitting it here is what made
     // the library-independence guard unable to fail.
-    resolveComponentForItem: findMatchingComponent,
+    resolveComponentForItem: resolver.resolveComponentForItem,
   });
 
   const craftingActor = countingActor(makeActor({ itemCount }), counters, 'actorItems');
@@ -154,9 +288,27 @@ function measureListing({
     /**
      * Every candidate the SUMMARY phase examined against the component library, however the
      * examination was expressed. Read eagerly, before any `hydrate()` can add to it.
+     *
+     * The `entries()` term is net of the index build's own walk: `buildIndex` iterates
+     * `definitions.entries()` and bumps `identityCandidatesExamined` for each element, so
+     * `indexBuilds x componentCount` of the entries walk is the SAME work counted on the other
+     * seam. Subtracting exactly that keeps this number equal to what it was before the
+     * enumeration layer was added (one build over an N-component library reads N), so a reader
+     * comparing runs is not looking at a doubled constant. Clamped at zero so an index build of
+     * some OTHER array can only ever under-report the surplus, never invent one.
      */
     libraryExaminations:
-      counters.get('componentCandidatesExamined') + summaryIdentity.candidatesExamined,
+      counters.get('componentCandidatesExamined') +
+      Math.max(
+        0,
+        counters.get('componentEntriesWalked') - summaryIdentity.indexBuilds * componentCount
+      ) +
+      summaryIdentity.candidatesExamined,
+    /**
+     * How many times the SUMMARY phase crossed the per-item component-resolution seam. Read
+     * eagerly for the same reason as {@link libraryExaminations}.
+     */
+    componentResolutions: counters.get('componentResolutions'),
     // The DETAIL phase for one row (issue 1075). Handed the recipe directly rather than by
     // id because this fixture's manager holds no recipe map; the exact-evaluation cost the
     // probe measures is identical either way.
@@ -229,16 +381,54 @@ describe('issue 1072 guard — player listing cost tracks what is VISIBLE, not t
     const largeLibrary = at(LARGE_LIBRARY, CONTROL_ITEMS);
     const largeLibraryFatInventory = at(LARGE_LIBRARY, SCALED_ITEMS);
 
-    // NON-VACUITY, and it is the half that was missing rather than merely weak. Every equality
-    // below holds perfectly for a fixture that never reaches the library at all — which is
-    // exactly what this fixture used to be. Growing the library on a COLD index must move the
-    // counter, or the guard is measuring nothing.
+    // NON-VACUITY, stated on the ITEM axis, which is the axis the equalities below are stated
+    // on. It has to be: every counter in `libraryExaminations` is a LIBRARY-side quantity, so
+    // any item-independent work over the library moves it. The counter-example is concrete —
+    // delete the resolver wiring above (the pre-#1204 fixture defect) AND add one unrelated
+    // `getDefinitionIndex(components)` to the per-pass snapshot, and a library-axis control
+    // reading `largeLibrary.libraryExaminations > smallLibrary.libraryExaminations` passes on
+    // `256 > 64` while all three equalities below are `0 per-item === 0 per-item`. The guard
+    // would report confidence about a path that is not running.
+    //
+    // Counting the SEAM cannot be faked that way. `resolveComponentForItem` is the single door
+    // between the per-item walk and the component library, it is crossed exactly once per held
+    // document, and it is stated in items — so this is simultaneously the proof that the path
+    // is live and the per-item budget (one resolution per item, never one per recipe per item).
+    assert.equal(
+      smallLibrary.componentResolutions,
+      CONTROL_ITEMS,
+      `a ${CONTROL_ITEMS}-item inventory crossed the component-resolution seam ` +
+        `${smallLibrary.componentResolutions} times. Zero means the summary phase never reaches ` +
+        `the component library and every equality below is vacuous; more than one per held ` +
+        `document means the resolution stopped being once-per-item.`
+    );
+    assert.equal(
+      smallLibraryFatInventory.componentResolutions,
+      SCALED_ITEMS,
+      `a ${SCALED_ITEMS}-item inventory crossed the component-resolution seam ` +
+        `${smallLibraryFatInventory.componentResolutions} times; the budget is one per held ` +
+        `document. Asserted at both item counts so the seam is proven live on the axis the ` +
+        `equalities below hold it flat on.`
+    );
+    // The library axis, kept because it is cheap and still true — a growing library must cost
+    // more to index — but NOT relied on for non-vacuity, for the reason above.
     assert.ok(
       largeLibrary.libraryExaminations > smallLibrary.libraryExaminations,
-      `non-vacuity: growing the library from ${SMALL_LIBRARY} to ${LARGE_LIBRARY} components ` +
-        `left library examinations at ${smallLibrary.libraryExaminations}. The listing is not ` +
-        `reaching the component library, so nothing below can fail.`
+      `growing the library from ${SMALL_LIBRARY} to ${LARGE_LIBRARY} components left library ` +
+        `examinations at ${smallLibrary.libraryExaminations}. The one-off identity index is ` +
+        `O(library), so this number must track library size.`
     );
+
+    // TRAP, for whoever edits `makeActor` next. A resolved item costs a `candidatesExamined`
+    // bump on the index HIT, so `libraryExaminations` becomes item-dependent the moment held
+    // items actually resolve. `makeActor` holds items that match NOTHING, which is why the
+    // three equalities below are properties rather than luck. Give it a PROPORTION of matching
+    // stacks — the obvious "make the fixture more realistic" edit — and this guard goes red on
+    // entirely correct `O(1)` index lookups, reporting "Per-item library work is the items x
+    // components term" and inviting exactly the wrong fix. A CONSTANT number of matching stacks
+    // is safe (it adds the same fixed cost at both item counts); a proportional one is not.
+    // The `componentResolutions` assertions above are immune either way: they count seam
+    // crossings, which are one per held document whatever the item resolves to.
     assert.equal(
       smallLibraryFatInventory.libraryExaminations,
       smallLibrary.libraryExaminations,
@@ -258,10 +448,12 @@ describe('issue 1072 guard — player listing cost tracks what is VISIBLE, not t
     );
 
     // The same defect stated on its cause rather than on its symptom, and kept LAST so the
-    // equalities above are what a red run reports first. Every route to `items x components`
-    // through this path rebuilds the identity index per item, so a build count above one is
-    // the mechanism; a hand-rolled `components.find(...)` per item is the one route that
-    // would not trip this and it lands on `componentCandidatesExamined` instead.
+    // equalities above are what a red run reports first. The INDEX-BACKED route to
+    // `items x components` rebuilds the identity index per item, so a build count above one is
+    // that mechanism. The HAND-ROLLED routes never touch the index at all — a per-item
+    // `components.find(...)`, `for (const candidate of components)`, `.forEach`, `.reduce` or
+    // `components.entries()` rescan — and they land on the fixture-side counters folded into
+    // `libraryExaminations` above instead.
     assert.ok(
       smallLibrary.summaryIdentity.indexBuilds <= 1,
       `one listing pass built the identity index ` +
@@ -438,10 +630,14 @@ describe('issue 1072 guard — the alchemy signature audit stays enabled-scoped'
     ];
     const manager = new RecipeManager({
       getCraftingSystemManager: () =>
-        countingFacade(makeSystemManager(system, () => stored), counters, {
-          prefix: 'audit',
-          methods: ['getComponentsForSystem'],
-        }),
+        countingFacade(
+          makeSystemManager(system, () => stored),
+          counters,
+          {
+            prefix: 'audit',
+            methods: ['getComponentsForSystem'],
+          }
+        ),
     });
     for (const recipe of stored) manager.recipes.set(recipe.id, recipe);
 
@@ -466,10 +662,14 @@ describe('issue 1072 guard — the alchemy signature audit stays enabled-scoped'
     // upper bound would hold for the worst possible reason.
     const counters = createOperationCounters();
     const system = makeCraftingSystem({ componentCount: 8, resolutionMode: 'alchemy' });
-    const probed = countingFacade(makeSystemManager(system, () => []), counters, {
-      prefix: 'audit',
-      methods: ['getComponentsForSystem'],
-    });
+    const probed = countingFacade(
+      makeSystemManager(system, () => []),
+      counters,
+      {
+        prefix: 'audit',
+        methods: ['getComponentsForSystem'],
+      }
+    );
     new SignatureValidator(probed).validateSystem(system.id);
     assert.equal(counters.get('auditGetComponentsForSystem'), 1);
   });
