@@ -1636,6 +1636,9 @@ test('every case records the smoke labels it corresponds to', () => {
 const REGISTRY_PATH = 'scripts/lib/viewLabCases.js';
 const LAB_ACTORS_PATH = 'tests/view-lab/world/labActors.js';
 const LAB_MOUNT_PATH = 'tests/view-lab/mount.js';
+// The Manager application, read for ONE claim: that the stores the lab's settle pass waits on
+// are names its service bag does not declare, which is what makes that pass player-only.
+const MANAGER_APP_PATH = 'src/ui/SvelteCraftingSystemManagerApp.svelte.js';
 const RUNNER_PATH = 'scripts/view-lab-screenshots.mjs';
 const sourceOf = (path) => readFileSync(resolve(ROOT, path), 'utf8').split('\n');
 const registrySource = sourceOf(REGISTRY_PATH);
@@ -3086,6 +3089,66 @@ test('the four mount.js regions the selector keys on are still marked in the fil
   ).length;
   assert.equal(opens, MOUNT_REGION_ANCHORS.length, 'every marked region is a declared region');
   assert.equal(closes, opens, 'every marked region is closed');
+});
+
+test('the player-only readership of the settle-stores region is still a fact about the Manager', () => {
+  // Three of the four regions are player-only STRUCTURALLY — they are the player mount path, the
+  // player provider and the player query params, and no manager frame reaches them. The fourth
+  // is not: `settle()` runs for BOTH windows, and this block's player-only readership rests
+  // entirely on a claim about a different file — that the six store names it waits on are names
+  // the Manager's `_buildServices()` does not declare, so `watched` is empty on every manager
+  // frame and an edit here cannot move one.
+  //
+  // Every other refusal in `parsePlayerMountRegions` fails SAFE: it widens to the whole corpus.
+  // This one fails UNSAFE. The day the Manager gains a `journal` or an `inventory` seam, an edit
+  // inside these markers narrows to player frames only and publishes NO evidence for the manager
+  // frames it moved — the silent wrong narrowing the whole table exists to make unreachable, and
+  // nothing else in the repo would notice. Asserted in prose in two files before this; asserted
+  // here.
+  //
+  // Both halves are DERIVED rather than restated: the names come out of the region itself, and
+  // the keys out of the manager's own services literal, so neither can drift from what it
+  // describes without failing.
+  const region = parsePlayerMountRegions(labMountSource)?.find(
+    (candidate) => candidate.key === 'player-settle-stores'
+  );
+  assert.ok(region, 'the settle-stores region must still parse for this claim to be about it');
+
+  const watchedList = /const watched = \[([^\]]*)\]/.exec(
+    labMountSource.slice(region.start - 1, region.end).join('\n')
+  );
+  assert.ok(
+    watchedList,
+    `${LAB_MOUNT_PATH} no longer declares a \`const watched = [...]\` inside its settle-stores ` +
+      'region, so this test would be asserting about an empty list — re-derive the readership'
+  );
+  const watched = [...watchedList[1].matchAll(/'([^']+)'/g)].map((match) => match[1]);
+  assert.ok(watched.length > 0, 'the watch list must be non-empty or the claim is vacuous');
+
+  // Column-anchored on the ONE services literal, exactly as `parseCaseLineRegions` anchors its
+  // own spans: `_buildServices()` returns a single object and its own keys sit at one indent.
+  const managerSource = sourceOf(MANAGER_APP_PATH);
+  const open = managerSource.indexOf('    return {', managerSource.indexOf('  _buildServices() {'));
+  const close = managerSource.indexOf('    };', open);
+  assert.ok(open > 0 && close > open, `${MANAGER_APP_PATH} no longer shapes _buildServices this way`);
+  const serviceKeys = managerSource
+    .slice(open + 1, close)
+    .map((line) => /^ {6}([A-Za-z_$][\w$]*):/.exec(line)?.[1])
+    .filter(Boolean);
+  assert.ok(
+    serviceKeys.length > 20,
+    `only ${serviceKeys.length} manager service keys parsed, which is too few to be the real bag ` +
+      '— read that as a broken slice, not a shrunken Manager'
+  );
+
+  assert.deepEqual(
+    watched.filter((name) => serviceKeys.includes(name)),
+    [],
+    'the Manager now declares one of the stores the settle-stores region waits on, so that ' +
+      'region is no longer player-only: an edit inside its markers would narrow the capture to ' +
+      'player frames and publish nothing for the manager frames it moved. Either move the block ' +
+      'outside the markers or drop it from PLAYER_MOUNT_REGIONS — do not just update this test.'
+  );
 });
 
 // ───────────────────────────────────────────────────────────────────────────────────────────────

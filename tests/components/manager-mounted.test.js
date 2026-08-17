@@ -21,6 +21,12 @@ import {
 import { dispatchDrop, dispatchRejectedDrops } from '../helpers/dropPayloads.js';
 import { get, writable } from 'svelte/store';
 import { setupDOM, teardownDOM } from '../helpers/svelte-dom.js';
+// The ONE compiled-import rewrite every mounted suite resolves its temp tree against. This
+// suite predates `createMountedComponentHarness` and still drives its own compile/mount, but a
+// second copy of the rewrite is a second place to get the `svelte` specifier wrong — and
+// getting it wrong reports as `# cancelled`, never `# fail` (issue 1185). It is also the exact
+// near-identical `tests/**` block SonarCloud's new-code duplication gate counts.
+import { rewriteClientImports } from '../helpers/svelte-component-harness.js';
 // The capture registry, so the two cases pinned below assert their OWN selectors rather
 // than a copy of them that is free to drift from the case it claims to guard.
 import { VIEW_LAB_CASES } from '../../scripts/lib/viewLabCases.js';
@@ -81,14 +87,6 @@ let CraftingSettingsViewComponent;
 let mounted;
 let target;
 
-// Lifecycle functions live on the `svelte` package; everything else a component imports
-// from `svelte` (tick, untrack, …) is only reachable from `svelte/internal/client` once the
-// component is compiled to a client module. Split each import list by that rule rather than
-// matching whole literal import lines: a hand-listed line is a mirror of the component's
-// source text, and adding one name to a component turned every mounted test into
-// `# cancelled 348` behind one "does not provide an export named 'onDestroy'" (issue 1185).
-const SVELTE_PACKAGE_EXPORTS = new Set(['onDestroy', 'onMount', 'mount', 'unmount', 'hydrate']);
-
 /**
  * A copy of `card` carrying the projection's non-enumerable `hydrate()` seam, recording its
  * own id in `requests` when a view asks for it (issue 1081).
@@ -111,26 +109,6 @@ function withHydrateSpy(card, requests) {
     },
   });
   return copy;
-}
-
-function rewriteClientImports(code) {
-  return code
-    .replace(/import \{([^}]*)\} from 'svelte';/g, (_match, names) => {
-      const imported = names
-        .split(',')
-        .map((name) => name.trim())
-        .filter(Boolean);
-      const fromPackage = imported.filter((name) => SVELTE_PACKAGE_EXPORTS.has(name));
-      const fromClient = imported.filter((name) => !SVELTE_PACKAGE_EXPORTS.has(name));
-      const lines = [];
-      if (fromPackage.length > 0) lines.push(`import { ${fromPackage.join(', ')} } from "svelte";`);
-      if (fromClient.length > 0) {
-        lines.push(`import { ${fromClient.join(', ')} } from 'svelte/internal/client';`);
-      }
-      return lines.join('\n');
-    })
-    .replace(/from 'svelte';/g, "from 'svelte/internal/client';")
-    .replace(/(from\s+['"][^'"]+\.svelte)(['"])/g, '$1.js$2');
 }
 
 function compileManagerRoot() {

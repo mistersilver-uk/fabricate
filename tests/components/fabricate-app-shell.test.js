@@ -479,8 +479,11 @@ describe('SvelteFabricateApp shell window', () => {
       appSource.includes("['crafting', 'alchemy', 'gathering', 'journal', 'inventory']"),
       'the Core tab set should still be the known nav tabs'
     );
+    // The WHOLE guard expression, not the bare `isOfferedTab(tab)` this used to look for:
+    // `static show`'s own site matches that substring too, so dropping the predicate out of
+    // `_selectTab` left this case green under the name of the thing it had stopped covering.
     assert.ok(
-      appSource.includes('isOfferedTab(tab)'),
+      appSource.includes('if (!isOfferedTab(tab) || tab === this._activeTab) {'),
       '_selectTab should guard against tabs nothing offers'
     );
     // `isCoreTabId` is STRUCTURAL — it answers "this is not a provider route key", which is
@@ -498,6 +501,7 @@ describe('SvelteFabricateApp shell window', () => {
     );
     for (const site of [
       'if (isOfferedTab(options.activeTab))',
+      'if (!isOfferedTab(tab) || tab === this._activeTab) {',
       'const initialTab = isOfferedTab(tab) ? tab : DEFAULT_TAB;',
     ]) {
       assert.ok(appSource.includes(site), `the predicate should also guard: ${site}`);
