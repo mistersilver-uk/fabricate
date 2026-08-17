@@ -204,10 +204,14 @@ export function createExtensionRegistry({
   /**
    * Subscribe to the set of surface ids a companion currently claims.
    *
-   * Deliberately NOT keyed on a surface id: the question it answers is "is any companion
-   * module registered", which is what the Manager's title bar reports. Keying it on one
-   * Core route would make that report a claim about that route rather than about the
-   * companion module, and a future companion-only surface would never light it.
+   * Deliberately NOT keyed on a surface id, and it serves two different questions rather
+   * than one. The Manager's title bar asks "is any companion module registered at all":
+   * keying that report on one Core route would make it a claim about the route rather than
+   * about the companion module, and a companion-only surface would never light it. The
+   * player window asks "which surfaces are claimed right now", because this is that
+   * window's SOLE subscription and it re-derives its whole rail snapshot from each
+   * publication (issue 1198). Both are served by the same broadcast, so neither consumer
+   * needs a second listener set.
    *
    * @param {(surfaceIds: readonly string[]) => void} listener Receives the current ids
    *   immediately and again on every registration and unregistration.
