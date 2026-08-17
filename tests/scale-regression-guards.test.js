@@ -33,7 +33,12 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { installFoundryEnv } from './helpers/foundryEnv.js';
-import { countingActor, countingCandidates, countCalls } from './helpers/scale/scaleCounters.js';
+import {
+  countingActor,
+  countingCandidates,
+  countingEnumerations,
+  countCalls,
+} from './helpers/scale/scaleCounters.js';
 import {
   atMostLinear,
   countingFacade,
@@ -67,110 +72,6 @@ const PLAYER = { id: 'user-1', isGM: false };
 // ---------------------------------------------------------------------------
 // Guard 1 & 2 — the player listing path
 // ---------------------------------------------------------------------------
-
-/**
- * The array methods that reach every element through a per-element CALLBACK, and that
- * {@link countingCandidates}' shared `PREDICATE_METHODS` list does not carry.
- *
- * `findLastIndex` is in here rather than being a shared-list omission worth fixing in place:
- * widening the shared list moves every committed benchmark count that walks a component array
- * and needs a `--record` pass, which is a separate change from making THIS guard able to fail.
- */
-const CALLBACK_ENUMERATORS = ['forEach', 'reduce', 'reduceRight', 'flatMap', 'findLastIndex'];
-
-/**
- * The iterator-returning methods that reach every element WITHOUT a callback and that do not
- * collide with `definitionIndex`'s own instrumentation. `entries` is deliberately absent — see
- * {@link countingEnumerations}.
- */
-const ITERATOR_ENUMERATORS = ['keys', 'values'];
-
-/**
- * Layer "every ENUMERATION of this array is counted" on top of {@link countingCandidates}'
- * "every PREDICATE invocation is counted" (issue 1204, second pass).
- *
- * The shared wrapper counts only the predicate-taking subset (`find` / `filter` / `some` /
- * `every` / `map` / …), which means the single most common way to walk an array in this
- * repository — a plain `for (const candidate of components)` — bumped NOTHING. Production
- * already uses exactly that idiom on exactly this array (`src/utils/essenceResolver.js`,
- * `src/utils/definitionIndex.js`, `src/systems/inventorySnapshot.js`,
- * `src/utils/sourceUuid.js`), so the `items x components` product term could have been
- * re-landed in its most natural form with every assertion in this file still green.
- *
- * This layer is deliberately LOCAL to the guard fixture rather than folded into
- * `scaleCounters.js`: the shared wrapper is what `createBenchWorld` hands the benchmark cases,
- * and widening it would move every committed class-1 baseline that walks a component array.
- *
- * `entries` is routed to a SEPARATE key because it is the one enumerator that overlaps
- * `definitionIndex`'s own counter: `buildIndex` reaches its elements through
- * `definitions.entries()`, so counting that walk on both seams would count the one-off index
- * build twice. `Symbol.iterator` does NOT overlap — a `for...of` over the array-iterator
- * `entries()` returns invokes the ITERATOR's `Symbol.iterator`, never the array's — and
- * measurement agrees: with this layer installed and no per-item scan present,
- * `Symbol.iterator`, `keys` and `values` all read 0 while `entries` reads exactly
- * `componentCount`.
- *
- * ## What an own-property override still cannot see
- *
- * A read that never goes through a method: indexed access (`components[i]`, `.at(i)`, a
- * `for (let i = 0; i < components.length; i++)` loop), the callback-free O(n) methods
- * (`indexOf`, `includes`, `lastIndexOf`, `join`, a default-comparator `sort`), and any caller
- * reaching the prototype directly (`Array.prototype.find.call(components, …)`). Closing those
- * needs a Proxy instead of own properties, which is a larger change than this guard needs. The
- * gap is recorded here rather than papered over with a claim of exhaustiveness, because the
- * defect this file was repaired for was precisely a property asserted more broadly than it was
- * checked.
- *
- * @template T
- * @param {T[]} array The array {@link countingCandidates} already wrapped; mutated in place.
- * @param {{bump: (key: string, amount?: number) => void}} counters
- * @param {{key: string, entriesKey: string}} keys
- * @returns {T[]} `array`, so it can be used inline.
- */
-function countingEnumerations(array, counters, { key, entriesKey }) {
-  const define = (name, value) =>
-    Object.defineProperty(array, name, {
-      configurable: true,
-      enumerable: false,
-      writable: true,
-      value,
-    });
-  const countedIterator = (walk, counterKey) =>
-    function* counted() {
-      for (const value of walk(this)) {
-        counters.bump(counterKey);
-        yield value;
-      }
-    };
-
-  for (const method of CALLBACK_ENUMERATORS) {
-    define(method, function counted(callback, ...rest) {
-      return Array.prototype[method].call(
-        this,
-        function countedCallback(...args) {
-          counters.bump(key);
-          return callback.apply(this, args);
-        },
-        ...rest
-      );
-    });
-  }
-  for (const method of ITERATOR_ENUMERATORS) {
-    define(
-      method,
-      countedIterator((self) => Array.prototype[method].call(self), key)
-    );
-  }
-  define(
-    Symbol.iterator,
-    countedIterator((self) => Array.prototype[Symbol.iterator].call(self), key)
-  );
-  define(
-    'entries',
-    countedIterator((self) => Array.prototype.entries.call(self), entriesKey)
-  );
-  return array;
-}
 
 /**
  * Build and measure one player Crafting listing.
