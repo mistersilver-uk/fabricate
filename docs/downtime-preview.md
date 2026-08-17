@@ -26,3 +26,6 @@ The preview remains usable when the Manager window is narrow or its navigation r
 An installed companion module can replace the Core preview with its own downtime workspace.
 When that happens, the companion owns the available actions and data.
 Consult that companion's documentation for its setup and use.
+
+While a companion workspace is active, the navigation rail stays expanded on this page so its sections stay reachable, and its collapse button is disabled with an explanation.
+Your usual collapse preference is left untouched and returns as soon as you leave the page.
