@@ -6,15 +6,13 @@ import { dirname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { compileModule } from 'svelte/compiler';
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
+import { rewriteClientImports } from '../helpers/rewriteClientImports.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
 let tempRoot;
 let createActorBarStore;
 
-function rewriteClientImports(code) {
-  return code.replace(/from 'svelte';/g, "from 'svelte/internal/client';");
-}
 
 function writeCompiledModule(sourcePath) {
   const source = readFileSync(resolve(repoRoot, sourcePath), 'utf8');

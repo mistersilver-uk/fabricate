@@ -7,6 +7,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { setupDOM, teardownDOM } from '../helpers/svelte-dom.js';
+import { rewriteClientImports } from '../helpers/rewriteClientImports.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -15,11 +16,6 @@ let Component;
 let mounted;
 let target;
 
-function rewriteClientImports(code) {
-  return code
-    .replace(/from 'svelte';/g, "from 'svelte/internal/client';")
-    .replace(/(from\s+['"][^'"]+\.svelte)(['"])/g, '$1.js$2');
-}
 
 function writeCompiledSvelte(sourcePath) {
   const source = readFileSync(resolve(repoRoot, sourcePath), 'utf8');
