@@ -277,13 +277,19 @@ describe('adminStore recipe check-pill projection', () => {
     assert.deepEqual(row.checkSummary, { kind: 'dc', dc: 14 });
   });
 
-  it('shows no check for an alchemy system whose alchemy check mode is none', async () => {
+  it('shows a switched-OFF check, not a warning, for an alchemy system at checkMode none', async () => {
+    // `checkOff` rather than `none`, and the difference is configuration versus fault. `none`
+    // draws the WARNING pill ("this system has no usable crafting check"), which was fair
+    // while `none` was an obscure mode — it is now what the Checks Studio's Active switch
+    // writes when a GM deliberately turns the alchemy check off, and putting a warning
+    // triangle on every recipe in the library for a supported choice, with no per-recipe
+    // repair, is the report being wrong rather than the library being informative.
     const row = await projectWith({
       resolutionMode: 'alchemy',
       alchemy: { checkMode: 'none' },
       craftingCheck: { simple: USABLE_SIMPLE_CHECK },
     });
-    assert.deepEqual(row.checkSummary, { kind: 'none', dc: null });
+    assert.deepEqual(row.checkSummary, { kind: 'checkOff', dc: null });
   });
 });
 

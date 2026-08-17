@@ -31,7 +31,10 @@ const REACHABLE = [
   ['crafting', 'routedByIngredients', ''],
   ['crafting', 'routedByCheck', ''],
   ['crafting', 'progressive', ''],
-  ['crafting', 'alchemy', 'none'],
+  // No `['crafting', 'alchemy', 'none']`. That is the OFF state of an optional check, not a
+  // mode: its route renders the shared switched-off panel, so the roll section — and this
+  // callout with it — never renders. Leaving it listed would have made the "nothing can
+  // select this" gate below pass over an entry nothing can select.
   ['crafting', 'alchemy', 'simple'],
   ['crafting', 'alchemy', 'tiered'],
   ['salvage', 'simple', ''],
@@ -82,6 +85,45 @@ test('an unrenderable pair describes nothing rather than describing the wrong mo
   assert.equal(describeCheckMode({ activity: 'gathering', mode: 'routedByCheck' }), null);
   assert.equal(describeCheckMode({ activity: 'crafting', mode: 'd100' }), null);
   assert.equal(describeCheckMode({}), null);
+});
+
+test('the two alchemy check shapes state OPPOSITE check facts', () => {
+  // Pinned because the `Check ·` fact is exactly what sent a GM looking for an off switch:
+  // alchemy simple read `Required` while carrying a perfectly good off state. Nothing else
+  // asserts fact VALUES, so a revert to `check:required` would otherwise pass every gate.
+  const simple = describeCheckMode({
+    activity: 'crafting',
+    mode: 'alchemy',
+    alchemyCheckMode: 'simple',
+  });
+  const tiered = describeCheckMode({
+    activity: 'crafting',
+    mode: 'alchemy',
+    alchemyCheckMode: 'tiered',
+  });
+  assert.equal(
+    simple.facts.find((entry) => entry.id === 'check').value.fallback,
+    'Optional',
+    'alchemy simple can be switched off, so its callout must not claim the mode requires it'
+  );
+  assert.equal(
+    tiered.facts.find((entry) => entry.id === 'check').value.fallback,
+    'Required',
+    'alchemy tiered routes result groups by outcome tier and cannot resolve without a roll'
+  );
+  assert.doesNotMatch(
+    simple.body.fallback,
+    /mandator/i,
+    'and its explanation must not either'
+  );
+});
+
+test('the alchemy OFF state is not a callout at all', () => {
+  assert.equal(
+    describeCheckMode({ activity: 'crafting', mode: 'alchemy', alchemyCheckMode: 'none' }),
+    null,
+    'its route renders the shared switched-off panel, which has no roll section to open'
+  );
 });
 
 test('the outcome-tier fact carries the authored count, not a literal placeholder', () => {

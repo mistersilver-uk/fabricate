@@ -147,7 +147,7 @@ Those gaps are reported in the System Overview instead, and they hide recipes fr
 See [System Overview](#system-overview).
 
 When the new mode is Alchemy, a recipe that has more than one ingredient set is kept and collapsed to its first set, because an alchemy recipe has a single ingredient set.
-The system's Alchemy check starts at No check, and you can change it under Recipe resolution afterwards.
+The system's Alchemy check starts switched off, and you can turn it on and choose Simple or Tiered on the Checks screen afterwards.
 Fabricate also re-checks recipe ingredient signatures so any overlap that would make alchemy attempts ambiguous is surfaced rather than silently broken.
 
 After the change, Fabricate shows a summary of how many recipes were migrated, and a separate warning listing any recipes it had to delete.

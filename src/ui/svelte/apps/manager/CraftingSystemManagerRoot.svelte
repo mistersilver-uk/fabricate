@@ -2536,7 +2536,29 @@
   function draftForSlot(slot, drafts) {
     return slot ? (drafts[slot] ?? null) : null;
   }
+  /**
+   * A SWITCHED-OFF check reports NO issues, and this is the same predicate the route renders
+   * by (`ChecksView`'s `routeIsOff`), restated here because the badge is drawn by the rail
+   * rather than by the route.
+   *
+   * Without it the two disagree, and the disagreement is unresolvable from the screen: an off
+   * check's route collapses to the single "Turn this check on" panel with no sections, no
+   * dots and no Modifiers card — while the rail child still badged the issues that panel no
+   * longer renders anywhere. The reachable case is an alchemy system with an authored
+   * check-modifier selection: switching the check off raised `modifiersInertNoCheck`, badged
+   * "1", and left the GM no control anywhere on the route that could clear it.
+   *
+   * It is right on the merits too, not just for agreement: readiness answers "will this check
+   * work when it runs", and a check that has been turned off does not run.
+   */
+  function checksActivityIsOff(activity) {
+    const state = checkActivation?.[activity];
+    if (!state || state.enabled === true) return false;
+    if (activity === 'gathering') return state.mode !== 'd100';
+    return state.optional === true;
+  }
   function checksIssueCount(activity, slot, drafts) {
+    if (checksActivityIsOff(activity)) return 0;
     return evaluateCheckReadiness(draftForSlot(slot, drafts) || {}, {
       mode: readinessModeForSlot(slot),
       modifierContext: buildCheckModifierContext(checksDraftSystem, activity, null),

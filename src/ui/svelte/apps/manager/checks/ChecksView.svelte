@@ -638,6 +638,14 @@
   // turn on. On crafting, alchemy at `checkMode: 'none'` is precisely the state this SHOULD
   // catch: `optional` is true and `enabled` is false, so it lands on the turn-on empty state.
   const routeIsOff = $derived.by(() => {
+    // ALCHEMY ANSWERS FROM ITS OWN MODE, BEFORE THE ACTIVATION BAG. Off-ness for alchemy is
+    // fully derivable from `alchemyCheckMode`, which this component already has, so tying it
+    // to an optional prop is a seam that breaks the day a caller omits or staleness that bag:
+    // `activation` defaults to `{}`, and with no crafting state the checks below return false
+    // — which dropped an alchemy `none` mount into the mode branch, rendering the selector
+    // with NO option selected and (there being no `{:else}` on the editor chain) no editor at
+    // all. The retired `alchemyNone` branch used to absorb that; nothing else would.
+    if (activity === 'crafting' && craftingAlchemy && alchemyCheckMode === 'none') return true;
     const state = activation?.[activity];
     if (!state || state.enabled === true) return false;
     if (activity === 'gathering') return state.mode !== 'd100';

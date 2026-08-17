@@ -145,16 +145,20 @@
   // Reading this from the mode rather than from `activation.enabled` stays deliberate: a
   // mandatory check runs whatever the persisted `enabled` flag happens to say, and showing a
   // locked OFF beside a check the engine rolls would be a worse lie than showing no state.
-  const lockedOn = true;
+  //
+  // So there is NO `lockedOn` FLAG any more, and no off branch behind it. A `const lockedOn =
+  // true` fed into a ternary is a condition with one reachable arm — dead `is-off` styling, a
+  // `data-checks-active-locked="off"` nothing can emit, and a constant-condition smell the
+  // SonarCloud gate flags even though `npm run lint` does not.
+  //
   // ONE VOCABULARY, and it is the PROTOTYPE's (issue 1096, maintainer inspector comparison).
   // The reading was `On` / `Off` in both slots, which is the manager's own switch vocabulary
   // and not what the card it now lives in says; the prototype's card reads `Check is on`, so
   // both the live switch and the locked indicator read that. The point the earlier ruling
-  // settled survives unchanged — the two slots must not speak differently — and `onLabel` /
-  // `offLabel` are still the single source both read.
-  const lockedReading = $derived(lockedOn ? onLabel : offLabel);
+  // settled survives unchanged — the two slots must not speak differently — and `onLabel` is
+  // still the single source both read.
   const lockedLabel = $derived(
-    `${lockedReading} — ${text('FABRICATE.Admin.Manager.Checks.Active.LockedSuffix', 'locked by the resolution mode')}`
+    `${onLabel} — ${text('FABRICATE.Admin.Manager.Checks.Active.LockedSuffix', 'locked by the resolution mode')}`
   );
   const requiredHint = $derived(
     activeTab === 'gathering'
@@ -494,7 +498,7 @@
       <!-- NO KICKER. The card IS the section: the switch, the reading, and the sentence that
            says which mode locks it. See the header note. -->
       <section
-        class={`manager-inspector-card manager-checks-active-card ${(showActiveToggle ? activeOn : lockedOn) ? 'is-on' : 'is-off'}`}
+        class={`manager-inspector-card manager-checks-active-card ${showActiveToggle && !activeOn ? 'is-off' : 'is-on'}`}
         data-checks-active={activeTab}
       >
         {#if showActiveToggle}
@@ -521,15 +525,15 @@
                actionable, so it is announced as one labelled image rather than as a button a
                GM might keep trying to press. -->
           <span
-            class={`manager-status-toggle is-locked ${lockedOn ? 'is-on' : 'is-off'}`}
-            data-checks-active-locked={lockedOn ? 'on' : 'off'}
+            class="manager-status-toggle is-locked is-on"
+            data-checks-active-locked="on"
             role="img"
             aria-label={lockedLabel}
           >
             <span class="manager-status-toggle-track" aria-hidden="true"
               ><span class="manager-status-toggle-knob"></span></span
             >
-            <span class="manager-status-toggle-label">{lockedReading}</span>
+            <span class="manager-status-toggle-label">{onLabel}</span>
             <i class="fas fa-lock manager-checks-active-lock" aria-hidden="true"></i>
           </span>
           <p class="manager-muted" data-checks-active-required>{requiredHint}</p>

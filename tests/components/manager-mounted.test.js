@@ -3520,7 +3520,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     );
   });
 
-  it('Checks: alchemy checkMode=simple renders the selector above the simple editor and cannot be disabled (issue 554)', async () => {
+  it('Checks: alchemy checkMode=simple renders the selector above the simple editor and CAN be disabled', async () => {
     await mountChecksWithAlchemyCheckMode('simple');
     assert.ok(
       target.querySelector('[data-checks-panel="crafting"] [data-crafting-alchemy-checkmode]'),
@@ -3556,10 +3556,12 @@ describe('CraftingSystemManager mounted behavior', () => {
       null,
       'Tiered mode is mandatory — no operable Active toggle'
     );
+    const locked = target.querySelector('[data-checks-active-locked]');
+    assert.ok(locked, 'it shows the locked always-on indicator instead');
     assert.equal(
-      target.querySelector('[data-checks-active-locked]').getAttribute('data-checks-active-locked'),
+      locked.getAttribute('data-checks-active-locked'),
       'on',
-      'it shows the locked always-on indicator instead'
+      'and that indicator reads ON — tiered always rolls'
     );
     assert.ok(
       target.querySelector('[data-checks-active-required]'),
@@ -3627,6 +3629,11 @@ describe('CraftingSystemManager mounted behavior', () => {
       calls.filter((call) => call[0] === 'setAlchemyCheckMode'),
       [['setAlchemyCheckMode', 'none']],
       'and Save applies it as checkMode none'
+    );
+    assert.deepEqual(
+      calls.filter((call) => call[0] === 'saveCraftingCheckSimple'),
+      [],
+      'and writes no untouched slot draft alongside it — the per-slot dirty guards'
     );
   });
 
@@ -5423,8 +5430,8 @@ describe('CraftingSystemManager mounted behavior', () => {
         values: ['equal', 'partial', 'exceed'],
       },
       {
-        // `simple`, not `none`: the off state renders the turn-on empty state rather than the
-        // selector, so a `none` fixture would find no options at all here.
+        // `simple`, not `none`: `routeIsOff` answers from `alchemyCheckMode` directly, so a
+        // `none` fixture renders the turn-on panel and finds no options at all here.
         props: { resolutionMode: 'alchemy', alchemyCheckMode: 'simple' },
         attr: 'data-crafting-alchemy-checkmode-option',
         section: 'roll',
@@ -5706,17 +5713,12 @@ describe('CraftingSystemManager mounted behavior', () => {
     // Every case below carries a non-empty catalogue: the notice is gated on one, so an
     // empty catalogue would make all the assertions read the same silent card.
     const catalogue = [{ id: 'med', label: 'Medicine', expression: '@abilities.med.mod' }];
+    // ALCHEMY `none` NO LONGER APPEARS HERE. It used to be this test's `noCheck` case — the
+    // one crafting configuration that reached it — but it is now the OFF state of an optional
+    // check, so its route collapses to the shared turn-on panel and renders no Modifiers
+    // section to carry a notice. That is asserted below rather than dropped silently, because
+    // "the notice moved" and "the notice stopped rendering" are different facts.
     for (const { props, cause } of [
-      // Alchemy at checkMode `none` rolls no crafting check at all. The pre-1055 local
-      // rollFormula ternary had no case for it and reported the simple slot's formula.
-      {
-        props: {
-          resolutionMode: 'alchemy',
-          alchemyCheckMode: 'none',
-          craftingCheckSimple: { rollFormula: '1d20 + 4' },
-        },
-        cause: 'noCheck',
-      },
       {
         props: { resolutionMode: 'simple', craftingCheckSimple: { rollFormula: '  ' } },
         cause: 'noFormula',
@@ -5743,6 +5745,29 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(
       !target.querySelector('[data-crafting-modifier-inert]'),
       'an authored formula is never inert: the modifiers are appended to it'
+    );
+    unmount(mounted);
+    mounted = null;
+    target.remove();
+
+    // The alchemy OFF route: no Modifiers section at all, so no inert notice — the same
+    // treatment any other optional check that has been switched off already gets.
+    mountChecksView(
+      {
+        resolutionMode: 'alchemy',
+        alchemyCheckMode: 'none',
+        craftingCheckSimple: { rollFormula: '1d20 + 4' },
+        modifiers: catalogue,
+      },
+      'roll'
+    );
+    assert.ok(
+      target.querySelector('[data-checks-panel="crafting"][data-checks-off]'),
+      'a switched-off alchemy check collapses to the turn-on panel'
+    );
+    assert.ok(
+      !target.querySelector('[data-crafting-modifier-inert]'),
+      'and carries no inert-modifier notice, because it renders no Modifiers section'
     );
   });
 
@@ -20982,6 +21007,79 @@ describe('CraftingSystemManager mounted behavior', () => {
       target.querySelector('.fabricate-manager').dataset.managerView,
       'components',
       'discard lets navigation proceed'
+    );
+  });
+
+  it('saves a staged alchemy check-ON together with the formula authored beside it', async () => {
+    // THE LOAD-BEARING CLAIM of the staged check mode. `craftingCheckMode` resolves the slot
+    // from the DRAFT alchemy mode; resolving it from the persisted one instead made this
+    // exact visit lose work. Turning the check on leaves the persisted mode at `none`, which
+    // resolves to slot `null`, so the simple draft never read dirty and Save wrote the mode
+    // while silently dropping the formula the GM had just typed.
+    const calls = [];
+    await mountChecks(calls, {
+      alchemyResolutionMode: 'alchemy',
+      alchemyConfig: { checkMode: 'none', learnOnCraft: true, consumeOnFail: true },
+      craftingCheck: { enabled: true, simple: { rollFormula: '', dc: 12 } },
+    });
+    await openChecksActivity('crafting');
+
+    target.querySelector('[data-checks-turn-on]').click();
+    await tick();
+    flushSync();
+    setInputValue(target.querySelector('[data-check-roll-formula]'), '1d20 + 5');
+    await tick();
+    flushSync();
+
+    target.querySelector('[data-checks-save]').click();
+    await settleRouteExit();
+    assert.deepEqual(
+      calls.filter((call) => call[0] === 'setAlchemyCheckMode'),
+      [['setAlchemyCheckMode', 'simple']],
+      'the staged mode lands'
+    );
+    const simple = calls.find((call) => call[0] === 'saveCraftingCheckSimple');
+    assert.ok(simple, 'and so does the formula staged in the same visit');
+    assert.equal(simple[1].rollFormula, '1d20 + 5');
+  });
+
+  it('discards a staged alchemy check-mode change along with the other drafts', async () => {
+    // The other defect the staging fixes: the mode persisted on click, so the Discard branch
+    // of the exit prompt reset every OTHER draft and left this one applied.
+    const calls = [];
+    await mountChecks(calls, {
+      alchemyResolutionMode: 'alchemy',
+      alchemyConfig: { checkMode: 'simple', learnOnCraft: true, consumeOnFail: true },
+      craftingCheck: { enabled: true, simple: { rollFormula: '1d20', dc: 12 } },
+    });
+    await openChecksActivity('crafting');
+
+    target.querySelector('[data-checks-active-toggle]').click();
+    await tick();
+    flushSync();
+    assert.ok(
+      target.querySelector('[data-checks-panel="crafting"][data-checks-off]'),
+      'the route previews the staged OFF state'
+    );
+
+    navButton('Components').click();
+    await settleRouteExit();
+    const prompt = calls.find((call) => call[0] === 'confirmDiscardDirtyChecksDraft');
+    assert.ok(prompt, 'a staged mode change is dirty enough to prompt on the way out');
+    assert.deepEqual(prompt[1], ['crafting'], 'and names crafting as the dirty activity');
+    assert.deepEqual(
+      calls.filter((call) => call[0] === 'setAlchemyCheckMode'),
+      [],
+      'discarding writes NOTHING — the whole point of staging it'
+    );
+
+    navButton('Checks').click();
+    await tick();
+    flushSync();
+    await openChecksActivity('crafting');
+    assert.ok(
+      target.querySelector('[data-checks-panel="crafting"] [data-simple-check-editor]'),
+      'and the check is back ON when the studio is reopened'
     );
   });
 

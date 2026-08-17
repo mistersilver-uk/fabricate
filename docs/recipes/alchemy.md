@@ -65,14 +65,15 @@ Fabricate finds a recipe match by comparing the submitted items against the ingr
 ## The Alchemy check
 
 The **Alchemy check** setting decides how a matched brew is resolved.
-It is a system-wide setting, chosen once under **Recipe resolution** on the system's **Settings** page, and it applies to every recipe in the alchemy system.
-There are three choices.
+It is a system-wide setting, chosen once on **The roll** section of the **Checks** screen, and it applies to every recipe in the alchemy system.
+The selector chooses the check's shape — Simple or Tiered — and the **Active** switch beside it turns the check off entirely.
+That gives three states.
 
 <!-- markdownlint-disable markdownlint-sentences-per-line -->
 
 | Alchemy check | What happens on a match |
 |:--------------|:-------------------------------------------------------------------------------------------------|
-| No check | A matched brew always succeeds and produces its single result set. There is no roll. |
+| Off | A matched brew always succeeds and produces its single result set. There is no roll. |
 | Simple check | A matched brew rolls a pass or fail check. A pass produces the success result set. A fail produces a separate failure result set. |
 | Tiered check | A matched brew rolls a check with named outcome tiers. The tier that the roll lands on selects which result set is produced. |
 
@@ -81,7 +82,7 @@ There are three choices.
 The check applies only to a combination that matches a recipe.
 A combination that matches nothing still fizzles without a roll, whatever the Alchemy check setting is.
 
-With **No check**, each alchemy recipe has one result set, and a match always produces it.
+With the check switched **off**, each alchemy recipe has one result set, and a match always produces it.
 
 With a **Simple check**, each recipe has two result sets, shown in the recipe editor as **On success** and **On a failed check**.
 A passed roll produces the success set.

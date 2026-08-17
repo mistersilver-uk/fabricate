@@ -390,6 +390,9 @@
       'By ingredients',
       'fas fa-code-branch',
     ],
+    // A check the GM SWITCHED OFF, distinct from one the system cannot roll. Same neutral
+    // treatment as `progressive`/`ingredients`: it is a working configuration, not a fault.
+    checkOff: ['FABRICATE.Admin.Manager.Recipe.CheckOff', 'Check off', 'fas fa-power-off'],
     none: ['FABRICATE.Admin.Manager.Recipe.CheckNone', 'No check', 'fas fa-triangle-exclamation'],
   };
 
@@ -397,6 +400,10 @@
     ingredients: [
       'FABRICATE.Admin.Manager.Recipe.CheckByIngredientsTooltip',
       'This system routes results by the ingredient set used, with no crafting check.',
+    ],
+    checkOff: [
+      'FABRICATE.Admin.Manager.Recipe.CheckOffTooltip',
+      'This system’s crafting check is switched off, so every matched attempt resolves as a success.',
     ],
     none: [
       'FABRICATE.Admin.Manager.Recipe.CheckNoneTooltip',
