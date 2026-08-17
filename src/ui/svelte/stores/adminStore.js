@@ -358,6 +358,25 @@ function _getManagedItems(system) {
   return [];
 }
 
+/**
+ * The persisted recipe of `recipeId`, but only when it belongs to `systemId`.
+ *
+ * `RecipeManager.getRecipe` is keyed on the recipe id alone and spans every system, so a
+ * caller that means "this system's record" has to say so. Returns `null` for a recipe of
+ * another system, which is the answer a scan scoped to `systemId` gives for one it never
+ * held.
+ *
+ * @param {object} recipeManager
+ * @param {string} recipeId
+ * @param {string} systemId
+ * @returns {object|null}
+ */
+function _recipeOfSystem(recipeManager, recipeId, systemId) {
+  const recipe = recipeManager?.getRecipe?.(recipeId);
+  if (!recipe) return null;
+  return String(recipe.craftingSystemId || '') === String(systemId || '') ? recipe : null;
+}
+
 function _buildManagedItemOptions(managedItems = []) {
   return managedItems.map((item) => ({
     id: item.id,
@@ -3560,9 +3579,15 @@ export function createAdminStore(services) {
     // scanned under THAT id — the parameter contract, and what the substituting audit
     // this replaced did with it. With no draft the persisted record is its own
     // candidate, which is the answer an audit filtered to `recipeId` gave.
+    //
+    // `getRecipe` is system-agnostic while the audit it replaces was not: it scanned the
+    // SELECTED system's cohort and filtered to `recipeId`, so a record belonging to some
+    // OTHER system was never in the scan and could name no conflict. The candidate seam
+    // would instead scan it against this system's report and append it as a newcomer, so
+    // the persisted leg is re-scoped to the selected system here.
     const candidate = draftRecipe
       ? { ...draftRecipe, id: recipeId }
-      : recipeManager.getRecipe?.(recipeId);
+      : _recipeOfSystem(recipeManager, recipeId, sysId);
     if (!candidate) return [];
 
     return recipeManager.getSignatureConflicts?.(candidate, { systemId: sysId }) || [];

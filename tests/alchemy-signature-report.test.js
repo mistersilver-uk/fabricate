@@ -749,14 +749,40 @@ function draftJson(id, sets, options = {}) {
 }
 
 /**
- * The editor answer the retained path REPLACED, reproduced verbatim: the whole persisted
- * corpus copied through `toJSON`, the draft substituted for the record of the edited id, a
- * fresh `SignatureValidator` over that copy, one full `n(n-1)/2` audit, filtered to the
- * conflicts naming the edited recipe.
+ * `adminStore`'s module-private `_getManagedItems`, reproduced.
+ *
+ * The component source the deleted editor audit read, and one of the two things the
+ * routing change substitutes: the retained path reaches components through
+ * `CraftingSystemManager.getComponentsForSystem` instead. An oracle that read the NEW
+ * source could not tell the two apart, so it is the OLD one that belongs here.
+ *
+ * @param {object} system
+ * @returns {object[]}
+ */
+function managedItemsOf(system) {
+  if (Array.isArray(system?.components)) return system.components;
+  if (Array.isArray(system?.items)) return system.items;
+  return [];
+}
+
+/**
+ * The editor answer the retained path REPLACED: the whole persisted corpus copied through
+ * `toJSON`, the draft substituted for the record of the edited id, a fresh
+ * `SignatureValidator` over that copy — reading components through the deleted code's own
+ * `_getManagedItems`, not the manager seam that replaced it — one full `n(n-1)/2` audit,
+ * filtered to the conflicts naming the edited recipe.
  *
  * Kept as the oracle rather than deleted with the code, because "identical conflicts, same
  * order, same messages" is the entire claim of the routing change, and an oracle that
- * shared the retained report could not falsify it.
+ * shared any part of the retained path could not falsify it. Each of the three
+ * collaborators keeps the deleted code's `id === sysId` guard for the same reason: an
+ * oracle that answered for a system it was never asked about would agree with a retained
+ * path that did too.
+ *
+ * Two departures from the deleted text, neither of them a behaviour of the substitution:
+ * `sysId` — `get(selectedSystemId)`, which {@link editorStore} seeds to `SYSTEM_ID` — is
+ * inlined as that constant, and the store's early returns for a missing service, id or
+ * system are omitted because the fixture always supplies them.
  *
  * @param {object} manager
  * @param {object} systemManager
@@ -772,10 +798,11 @@ function priorEditorAudit(manager, systemManager, recipeId, draftRecipe = null) 
     if (draftRecipe && String(recipe?.id) === String(recipeId)) return draftRecipe;
     return typeof recipe?.toJSON === 'function' ? recipe.toJSON() : recipe;
   });
+  const components = managedItemsOf(system);
   const validator = new SignatureValidator({
     getSystem: (id) => (id === SYSTEM_ID ? system : null),
     getRecipesForSystem: (id) => (id === SYSTEM_ID ? recipesJson : []),
-    getComponentsForSystem: (id) => systemManager.getComponentsForSystem(id),
+    getComponentsForSystem: (id) => (id === SYSTEM_ID ? components : []),
   });
   return validator
     .validateSystem(SYSTEM_ID)
@@ -904,6 +931,43 @@ describe('the recipe editor predicts a collision without auditing the system', (
     );
     assert.equal(store.getRecipeSignatureConflicts('r-a').length, 2);
     assert.deepEqual(store.getRecipeSignatureConflicts('r-missing'), []);
+  });
+
+  it('answers [] with no draft for a recipe of ANOTHER system, as the scoped audit did', () => {
+    // `RecipeManager.getRecipe` is keyed on the recipe id alone and spans every system,
+    // while the audit this replaced scanned the SELECTED system's cohort and filtered to
+    // `recipeId` — so a record belonging elsewhere named no conflict at all. Unscoped, the
+    // candidate seam compiles that record against THIS system's report, finds no cohort
+    // slot for it, and appends it as a newcomer: three conflicts for a recipe the tab is
+    // not looking at. The DRAFT leg is deliberately not scoped this way — a draft is
+    // scanned under the id it was opened on whether or not anything is persisted under it
+    // (issue 1167), which is the case above.
+    const foreign = {
+      ...recipePayload('r-foreign', [['c1']]),
+      craftingSystemId: 'other-system',
+    };
+    const { manager, systemManager } = makeManager({ recipes: [...COLLIDING_CORPUS, foreign] });
+    const store = editorStore(manager, systemManager);
+
+    assert.equal(
+      manager.getRecipe('r-foreign').craftingSystemId,
+      'other-system',
+      'the premise is a recipe the selected system does not hold'
+    );
+    assert.equal(
+      manager.getSignatureConflicts(new Recipe({ ...foreign, craftingSystemId: SYSTEM_ID }), {
+        systemId: SYSTEM_ID,
+      }).length,
+      3,
+      'and one whose signature would collide three ways were it in the selected system'
+    );
+
+    assert.deepEqual(
+      priorEditorAudit(manager, systemManager, 'r-foreign'),
+      [],
+      'the audit this replaced never scanned it'
+    );
+    assert.deepEqual(store.getRecipeSignatureConflicts('r-foreign'), []);
   });
 
   it('answers a NOT-YET-PERSISTED draft as an audit of the post-create cohort would', () => {
