@@ -109,11 +109,12 @@ jobs:
           # lines and 406s beyond it, which under `bash -e` kills the step before selection runs.
           #
           # Each entry's `patch` comes along for the ride, because the selector uses it: a change
-          # confined to case-object literals in `viewLabCases.js` selects those cases instead of all
-          # of them, which is the difference between a two-minute capture and a twenty-minute one.
-          # The library never reads git itself — it is a pure function of what this step hands it —
-          # and it widens back to the full corpus for any patch it cannot verify, so a `patch` the
-          # API omits (it drops them for very large diffs) costs frames, never evidence.
+          # confined to case-object literals in `viewLabCases.js` selects those cases instead of
+          # surface coverage, which is the difference between a two-minute capture and a
+          # four-minute one. The library never reads git itself — it is a pure function of what
+          # this step hands it — and it widens back to surface coverage (one frame of every route
+          # and tab the lab renders) for any patch it cannot verify, so a `patch` the API omits (it drops
+          # them for very large diffs) costs frames, never evidence.
           gh api "repos/$PR_REPO/pulls/$PR_NUMBER/files" --paginate \
             --jq '.[] | {filename: .filename, patch: (.patch // "")} | @json' > changed-files.jsonl
           SELECTION=$(node -e '
@@ -140,8 +141,8 @@ jobs:
           fi
           # `check-screenshots` arms on exactly the same predicate (`isUiFile` over the changed
           # set). When it is unarmed there is no gate for these frames to satisfy, so rendering and
-          # publishing them is pure cost — ~20 minutes on a lab-infrastructure PR that changes no
-          # render file at all, this one included.
+          # publishing them is pure cost — a surface-coverage capture on a lab-infrastructure PR
+          # that changes no render file at all, this one included.
           #
           # The saving is deliberately taken on the RENDER and PUBLISH steps only, not by zeroing
           # `ids`. Everything before them still runs: the chrome harvest, the committed-provenance

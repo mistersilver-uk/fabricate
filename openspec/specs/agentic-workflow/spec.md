@@ -630,13 +630,19 @@ The evidence gate MUST NOT decide before the automated producer for that same he
 
 #### Scenario: the producer's own inputs change
 
-- **WHEN** a PR changes the fixture world, the mounting page, or the case registry the producer renders from
-- **THEN** every publishable case is selected by default, because a change to a shared fixture can alter every frame at once
+- **WHEN** a PR changes any input the producer itself renders from — the fixture world, the mounting page, the case registry, the capture driver, or the window-chrome specification — rather than a file the product renders
+- **THEN** one case per captured SURFACE is selected by default — every application the producer renders and every route or tab reachable within it, each photographed once — because a change to a shared input can alter any frame at once, and what it has to prove is that the producer still reaches and captures every route and tab
+- **AND** the default is not every publishable case, because the detailed states of a route are evidence about the files that draw them rather than about a shared input, and a selection nobody reads is not evidence
+- **AND** a surface is a route or a tab and NOT every screen: a route's own internal tabs fold into that route's single frame, because no case declares which one it reaches, so they are deferred alongside detailed states rather than covered
+- **AND** that surface set is derived from what the cases already declare about themselves — the route or tab each reaches, and the application theme it renders under — rather than enumerated, so a route added later is covered without anyone remembering to cover it
+- **AND** each surface is represented by a frame that shows that route or tab rather than a variant of it — preferring, in order, the application's default window geometry, no dialog covering the screen, and the least-driven state of it — wherever the surface offers such a frame
 - **AND** a narrower selection is permitted only on an axis a case already declares about itself, or from a diff whose hunks are verified against the content of the file the producer will actually render
-- **AND** that verification locates each of the diff's hunks by searching the file's own content rather than by trusting the line numbers the hunk header claims, and where the content recurs it accepts the result only when every candidate location attributes the change identically
+- **AND** that verification locates each of the diff's hunks by searching the file's own content rather than by trusting the line numbers the hunk header claims, and where the content recurs it attributes the hunk at every location it could be and answers with their union, which contains the true one
 - **AND** that distinction matters because the producer renders a merge commit while the diff describes the head it was generated against, so trusting the header's line numbers verifies against a file whose lines may have shifted, and can silently attribute a change to the wrong case where a window of the file recurs verbatim
-- **AND** an input the registry does not narrow, a diff the registry cannot parse, or a verification that finds no anchor — an empty sequence, no occurrence, or occurrences whose candidates disagree — still selects every publishable case
-- **AND** this holds even though none of the producer's own inputs is itself a render file, since selecting on render files alone would select nothing for exactly the changes most able to invalidate the whole corpus
+- **AND** widening happens on an input the registry does not narrow, a diff it cannot parse, a hunk with no anchor or an empty sequence to anchor by, or a changed line landing outside every attributed region — and not merely because a recurring anchor's candidate locations disagree, since disagreement is answered by their union
+- **AND** this holds even though none of the producer's own inputs is itself a render file, since selecting on render files alone would select nothing for exactly the changes most able to invalidate the corpus
+- **AND** widening is a UNION at every level and never a replacement: a change whose reach is partly attributable and partly not selects what was attributed TOGETHER WITH the surface set, whether the unattributable part is another hunk of the same patch, another shared input in the same change, or a co-changed render file
+- **AND** the reason that has to hold at every level is that the surface set contains no detailed state, so replacing an attributed selection with it would publish a capture of everything except the thing the change altered
 
 #### Scenario: screenshot capture is blocked
 

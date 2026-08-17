@@ -596,17 +596,25 @@ resolution modes, the visibility modes it does not visit, Foundry's light applic
 A `beyond` case carries an empty `smokeLabels`, because there is nothing to compare it against.
 A `window` case's shortfall is accounted for by a class-level entry in the known-gaps register in
 `scripts/README.md`, not by a per-case comment.
-As of this writing the registry holds 181 cases: 138 `exact`, 4 `window`, 39 `beyond`.
+As of this writing the registry holds 246 cases: 146 `exact`, 3 `window`, 97 `beyond`.
 
 A change to the lab's own inputs is attributed rather than treated like an ordinary render-file change.
-By default a PR touching the case registry, `labActors.js`, `labRunStates.js`, or any other file the lab depends on selects every publishable case, because a shared fixture can alter any frame at once.
-Three inputs narrow that default.
+By default a PR touching the case registry, `labActors.js`, `labRunStates.js`, or any other file the lab depends on selects **surface coverage**: one frame of every route and tab the lab renders — every manager route, every player tab, plus the light-theme pair — which is 34 of the 246 publishable cases.
+A shared input can alter any frame at once, so the selection has to be wide; what it has to PROVE is that the lab still boots, still mounts both windows and still reaches and photographs every route and tab, and that is what coverage answers.
+It deliberately does not re-photograph every state of every screen: a state is evidence about the files that draw it, those files select it themselves, and 246 frames on every lab-infrastructure PR was a twenty-five minute job producing a wall nobody read.
+A route's own internal tabs — the Recipe editor's Results tab, the Tool editor's Requirements tab — fold into their route's single frame, so they are deferred alongside detailed states rather than covered.
+Coverage is derived (`LAB_SURFACE_CASES`), never listed, so a route added tomorrow is covered without anyone remembering; each surface is represented by a default-geometry, dialog-free, least-driven frame of it, which in practice is that screen's own `*-normal` case.
+Where a lab input ships alongside render files, the two selections are unioned — coverage does not contain the detailed frames those files select.
+Five inputs narrow below coverage.
 A patch to `scripts/lib/viewLabCases.js` selects only the case literals its hunks fall inside.
+A patch to `tests/view-lab/mount.js` selects only the cases the marked regions it falls inside can render — the four player-only blocks are marked in the file rather than found by column, because two of them sit inside functions the manager window runs too.
+A change to `scripts/lib/viewLabLayoutAssertion.js` selects only the cases declaring `expectLayout`, whole-file, since every path through that helper validates those and no others.
 A patch to `tests/view-lab/world/labActors.js` selects only the cases that can render what the touched fixture table feeds: player cases alone for `INVENTORIES` and `BROKEN_STACKS`, and player cases plus the manager cases whose own `sourceMatches` claim a Knowledge or Books & Scrolls render file for `RECIPE_ITEM_COPIES` and `LEARNED_RECIPES`.
 A patch to `tests/view-lab/world/labRunStates.js` selects player cases alone, and it needs no content-anchoring, since its whole output is player-only.
-The two case-registry and actor-fixture narrowings locate a hunk by searching the rendered file for its own content instead of trusting the hunk header's line numbers, and every location the content recurs at must agree on the same cases before the narrowing is used.
-A patch to anything else in `labActors.js`, such as `ACTOR_DEFINITIONS` or a shared builder function, keeps the whole-corpus default.
-So does a patch to any lab input the registry does not attribute, or a hunk whose content cannot be anchored unambiguously.
+The three patch-narrowed inputs — the case registry, the actor fixture and the mount page — locate a hunk by searching the rendered file for its own content instead of trusting the hunk header's line numbers; where that content recurs, the hunk is attributed at every location it could be and the answer is their union, which contains wherever the edit really landed.
+A patch to anything else in `labActors.js`, such as `ACTOR_DEFINITIONS` or a shared builder function, keeps the coverage default.
+So does a patch to any lab input the registry does not attribute, or a hunk whose content cannot be anchored at all.
+Widening is always a UNION with whatever the change did attribute, never a replacement of it: a PR that edits one case literal and also touches shared code gets coverage AND that case's own frame.
 
 Steps are ordered and take five verbs: `{selector}` clicks, `{selector, select}` chooses a
 `<select>` option, `{selector, fill}` types (the only route to a dirty form), `{selector, scroll:
