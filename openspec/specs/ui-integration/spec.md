@@ -3358,7 +3358,10 @@ It validates that `id` is a non-empty string and never enumerates the ids it acc
 Core's Downtime route reads the surface id `downtime`.
 - A provider is `{ apiVersion: 1, id, tabs, actions?, mount }`.
 The provider declares its own tabs: any ids, at least one of them, rendered in array order.
-Core validates tab SHAPE — a non-empty id, unique within the set, plus a localized label, accessible name, keyboard-visible tooltip, and Font Awesome icon — and never tab membership, count, or order.
+Core validates tab SHAPE — a non-empty id, unique within the set, plus a localized `label`, `accessibleName`, `tooltip`, and Font Awesome `icon` — and never tab membership, count, or order.
+`accessibleName` and `tooltip` remain REQUIRED by that validation, and in provider mode Core renders neither: the keyboard-visible `role="tooltip"` span reached through `aria-describedby`, and the `aria-label` that replaces a tab's visible name, both belong to Core's preview tab strip, which exists in core-fallback mode only.
+In provider mode a tab is rendered as a rail sub-item whose accessible name is its visible `label`, with `tooltip` on the sub-item's native `title`, and the panel region is named by that sub-item.
+A companion should therefore treat `accessibleName` and `tooltip` as content Core may render in its preview rather than as a guaranteed surface on its own screens.
 - A tab may carry its own route chrome: `title`, `subtitle`, `breadcrumb`, and `actionsLabel`, each an optional non-empty localized string.
 Core renders the active tab's chrome as the page title, page subtitle, leaf breadcrumb crumb, and header-action group name, and falls back to its own string for any field the tab omits.
 - A tab may carry `actions`, falling back to the provider's own `actions`; each action is `{ id, label, icon?, tooltip?, primary?, disabled? }` plus exactly one of an `onSelect` function or an absolute `http(s)` `href`.
@@ -3390,6 +3393,10 @@ A listener's return value is ignored and nothing a listener does changes what th
 - **The rail's Downtime children are not a tablist in either mode.**
 They stay native `button` elements carrying `aria-current`, and they do not take `role="tab"`, `aria-selected` or `aria-controls`: the group stays rendered after the GM navigates away, so those attributes would dangle and would announce a route-changing control as an unselected tab; activation routes through the unsaved-draft route-exit confirmation, which an automatic-activation tablist would fire on every arrow keypress; a horizontal strip's key model cannot be preserved on a vertical rail in any case; and Downtime's children are visually and structurally identical to those of the other rail groups, which are plain buttons.
 - **In provider mode the companion panel is a `region`**, labelled by the rail sub-item naming the active tab, and carrying `tabindex="-1"` rather than `tabindex="0"`: the focus stop existed to scroll the panel, and a companion that owns its layout owns that scrolling, so what remains is programmatic focusability.
+The region's name is therefore the rail sub-item's visible label, and Core states the sub-item's element id once and threads it to the panel rather than mirroring the literal across the two components.
+- **Entering the route in provider mode brings the rail's Downtime sub-items into view.**
+The navigation rail scrolls, the Downtime group is its last entry, and this is the only route entered by activating a group PARENT rather than an already-visible sub-item, so the group can expand below the rail's fold; Core scrolls the submenu into view on arrival, and the scroll is a no-op when the sub-items already fit.
+Core-fallback is excluded: its tab strip is a second, always-visible switcher in that state.
 - **Focus recovery on a provider change is mode-aware.**
 When a registration, deregistration or contained fault removes the node that held focus, and focus was inside the route's panel, Core focuses whichever element names the active tab in the mode now live: the panel region in provider mode, and Core's own tab button in core-fallback.
 It is not a tab-switch behaviour and does not fire on one.
@@ -3399,6 +3406,8 @@ The lock exists because the 56px rail hides the navigation submenu outright, whi
 It flips live when a provider registers or deregisters mid-session.
 **It never writes the GM's stored `managerRailCollapsed` client preference**; Core derives the displayed collapse state instead and restores the stored state on leaving the route.
 Under the lock both rail-collapse controls render `disabled` and `aria-disabled` with an explanatory title of their own — a sidebar-wide string, not the section-scoped one the rail groups use — and every one of their state attributes reads the displayed value rather than the stored one.
+They also take the same disabled TREATMENT the rail group disclosures take: faded, a default cursor, and no hover response, because a hover treatment on a control that cannot act tells the same lie a silently swallowed click does.
+Pointer events stay on, so the title explaining the lock still surfaces.
 - **The companion panel is a bare box in provider mode**, and this is the Manager counterpart of the player seam's panel contract.
 It is full height, with no padding, background, scroller or containment of its own; the companion supplies its own inset, and Core's preview inset is not applied over a provider's screens.
 Core states the height at every link between the route's definite-height host and the mount target, so `height: 100%` on a companion's own root resolves against a real height rather than silently becoming content height.

@@ -661,9 +661,9 @@ Each entry in `tabs`:
 | Field | Required | Meaning |
 |:------|:---------|:--------|
 | `id` | yes | Non-empty, unique within the tab set. Fabricate never checks it against a list of its own. |
-| `label` | yes | Localized visible tab label. |
-| `accessibleName` | yes | Localized accessible tab name. |
-| `tooltip` | yes | Localized keyboard-visible tab tooltip. |
+| `label` | yes | Localized visible tab label. In provider mode this is the rail sub-item's text AND its accessible name, and it names the panel region too. |
+| `accessibleName` | yes | Localized accessible tab name. Still required by validation, but rendered by Fabricate's own preview tab strip only — see the note below. |
+| `tooltip` | yes | Localized tab tooltip. Rendered as a keyboard-visible `role="tooltip"` span by the preview strip; in provider mode it becomes the rail sub-item's native `title`. |
 | `icon` | yes | Font Awesome class string. |
 | `title` | no | Localized page title (the `H1`) while this tab is active. |
 | `subtitle` | no | Localized page subtitle while this tab is active. |
@@ -684,6 +684,22 @@ Each action is `{ id, label, icon?, tooltip?, primary?, disabled? }` plus **exac
 
 All strings a provider supplies are used verbatim: **localize them yourself**.
 Fabricate localizes only its own fallback copy.
+
+#### Where a tab's names are actually rendered
+
+Fabricate's Downtime **tab strip** is its own preview navigation and is rendered in core-fallback mode only.
+Once your provider holds the surface, your tabs are rendered exactly once, as the Manager rail's Downtime sub-items, and there is no strip.
+
+That changes where two of the required fields land, so it is worth stating plainly:
+
+- The rail sub-item's accessible name is its **visible `label`**.
+  Nothing overrides it, so `label` is the wording a screen reader announces for the control that switches your screens.
+- `accessibleName` is still **required** at registration and is validated exactly as before, but only the preview strip renders it.
+  In provider mode Fabricate validates it and renders nothing from it.
+- `tooltip` is still **required**, and it degrades: the preview strip renders it as a keyboard-visible `role="tooltip"` span wired through `aria-describedby`, while the rail sub-item carries it as a native `title`, which is pointer-only.
+- The companion **panel** is a `region` named by the rail sub-item for the active tab, so the panel's accessible name is that tab's visible `label` as well.
+
+Write `label` so it stands alone, and treat `accessibleName` and `tooltip` as copy Fabricate may render in its preview rather than as a guaranteed surface over your own screens.
 
 ### The Mount Context
 
@@ -722,6 +738,8 @@ Fabricate's `12px 20px 24px` inset is **gone** as of this contract: a companion 
 **Your tabs are rail items, and Fabricate renders no tab strip.**
 A provider's tabs appear once, as sub-items of the Manager rail's Downtime group, and the panel below them is a named `region` labelled by the active rail item rather than a tab panel.
 The rail is locked expanded while a provider holds this route, so those sub-items are always reachable; the rail's collapse control renders disabled and explains itself, and the GM's stored collapse preference is left untouched and restored on leaving the route.
+Arriving on the route also scrolls the group's sub-items into view, because this is the one route entered by activating a rail group's parent rather than a sub-item that was already on screen.
+Their accessible names are their visible `label`s, and the panel region takes its name from whichever one is current — see [Where a tab's names are actually rendered](#where-a-tabs-names-are-actually-rendered).
 
 **Overflow.**
 Core's panel scroller keeps working for any companion whose content overflows its root **visibly** — including one that takes the full height.
