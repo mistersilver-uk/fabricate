@@ -2843,12 +2843,13 @@ A **Valid Id Basis** is the set of live-corpus id sets a destructive pass derive
 **A destructive pass runs only when its Valid Id Basis is known-complete.**
 A pass whose basis is incomplete does not see a live record, concludes the thing naming it is stale, and deletes durable state that was never stale.
 
-**Four inputs decide it, and any one alone makes the basis NOT known-complete:**
+**Five inputs decide it, and any one alone makes the basis NOT known-complete:**
 
 1. the entity class's storage layout is `unsettled`;
 2. the entity class's storage layout does not equal its storage target;
 3. `migrationVersion` is behind the highest registered migration;
-4. the arrangement the reader's repository was actually BUILT for does not equal that layout and target.
+4. the arrangement the reader's repository was actually BUILT for does not equal that layout and target;
+5. the layout OBSERVED ACROSS THE CORPUS READ was `unsettled`, is unknown, or no longer equals the layout at basis time.
 
 Input 2 is the state a failed conversion leaves behind.
 Compensation deletes the layout document, restoring the registered `singleArray` default, while the target — set before the conversion began — stays `perRecord`.
@@ -2860,8 +2861,18 @@ A reader's repository is selected once, before the corpus is read, and the layou
 A client that selected the single-array backend, and whose whole-corpus read then found nothing because another client's conversion completed and deleted the legacy document in between, reads layout and target both `perRecord` at basis time: inputs 1, 2 and 3 all hold and the corpus is empty.
 A reader that cannot state the arrangement its repository was built for MUST treat the basis as not known-complete.
 
-**An entity kind with no granular repository is known-complete by construction**, because its corpus arrives as a single whole-array read that either succeeded or threw, and no partial state exists for the inputs above to detect.
-That exemption is stated on the REPOSITORY, never on the registered layout/target pair: a build that lands a granular repository for a kind before registering its pair would otherwise be scored known-complete while its corpus is already partial.
+Input 5 is necessary because input 4 is not sufficient, and its window is far wider.
+The arrangement input 4 compares is derived from the TARGET, which is set before a conversion starts and does not move until it is over — so it is constant across the entire conversion and can witness nothing that happened inside it.
+Input 4's race requires the whole conversion to land between the repository's selection and the corpus read; input 5's requires only the conversion's TAIL to land between the corpus read and the basis sample, a span that ordinarily contains other managers' initialization and every remaining collaborator construction.
+A reader that selected the granular backend correctly, read a half-written corpus, and then saw the conversion finish before it sampled the basis satisfies inputs 1 to 4 in full while holding a partial corpus.
+The observation is decisive because a conversion sets `unsettled` FIRST and clears it LAST: a read that overlapped a conversion saw `unsettled`, without exception.
+A reader MUST therefore sample the layout immediately before its corpus read and retain it, and MUST treat an unknown observation — including one from a reader that has not read a corpus at all — as not known-complete.
+
+**An entity kind with no granular repository is known-complete by construction**, because its corpus arrives as a single whole-array read rather than a set of records that can be half-written, and none of the partial states the inputs above detect exists for it.
+This is a statement about the ARRANGEMENT of that corpus and not a claim that the read is infallible: a whole-array reader that answers a malformed stored value with an empty corpus rather than an error is outside what this exemption reasons about, and a class that acquires such a reader alongside a granular one is no longer exempt.
+Two rules keep the exemption from becoming the hole it protects.
+It is keyed on the entity KIND as this build declares it, never on a flag carried in the sampled data — so a declared-granular kind whose facts are missing or malformed is not known-complete, rather than exempt.
+And it is refused for any kind whose repository REPORTS itself granular, asked of the repository object that was actually built rather than inferred from its class or its registered layout/target pair: a build that lands a granular repository for a kind before registering its pair, injects one through a manager's repository seam, or adds a second granular class would otherwise be scored known-complete while its corpus is already partial.
 
 **Every input is established positively, and an absent, unreadable or unrecognised value is NOT known-complete.**
 "The layout is not `unsettled`" is true of `undefined`, `null`, `''` and of a read that threw and was swallowed, so a basis stated as a negation fails open.
@@ -2879,8 +2890,10 @@ The startup maintenance runner catches every throw into a failure label and disc
 The pass list MUST therefore be constructed by a pure, exported builder that the composition site calls, so the omission is directly assertable.
 A pass that declares no basis MUST be omitted, so that a destructive pass cannot ship ungated by omitting its declaration.
 
-**The basis facts MUST be sampled where the id sets are built, after the corpus read.**
+**The basis facts MUST be sampled where the id sets are built, after the corpus read — and that is necessary rather than sufficient.**
 A conversion sets its layout from inside the corpus-loading path, so a fact sampled earlier in startup — beside settings registration or the migration pass — records the pre-conversion value, and a conversion that then failed mid-flight presents a partial corpus alongside a "settled" fact.
+Sampling late does not on its own establish anything, because a conversion can also COMPLETE in the span between the corpus read and the sample, leaving every late-sampled fact reporting a settled, converged world.
+That span is what input 5 covers, and the two requirements are complementary: sample the settings as late as possible, and carry the layout observed at the corpus read forward to be compared against them.
 
 **An omission MUST be reported.**
 The startup maintenance runner returns only FAILED labels and its caller discards them, so a gate that omitted every pass is otherwise indistinguishable from a clean boot.

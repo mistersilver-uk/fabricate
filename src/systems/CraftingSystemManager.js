@@ -174,6 +174,28 @@ export class CraftingSystemManager {
       (() => globalThis.game?.users?.activeGM?.id === globalThis.game?.user?.id);
   }
 
+  /**
+   * What this manager can attest about its own **Definition Storage**, for the Valid Id
+   * Basis gate (issue 1224). Mirrors `RecipeManager#describeDefinitionStorage`.
+   *
+   * Crafting systems have no layout/target pair and no granular backend today, so the
+   * whole corpus arrives in one read and there is no partial state for the gate to detect.
+   * The point of reporting anyway is that it is asked of the repository OBJECT: a granular
+   * repository injected here, or landed as this manager's default before its settings pair
+   * is registered, reports `granular: true` and the gate refuses to prune against it —
+   * which is the direction component extraction (#1212) trips, and the one a class-name
+   * check in a test cannot see.
+   *
+   * @returns {{granular: boolean, arrangement: string|null, layoutAtCorpusRead: string|null}}
+   */
+  describeDefinitionStorage() {
+    return {
+      granular: this._repository?.storesRecordsGranularly?.() === true,
+      arrangement: null,
+      layoutAtCorpusRead: null,
+    };
+  }
+
   async initialize() {
     if (this.initialized) return;
     // Hydration runs inside the repository (issue 1089), so `loadAll()` returns

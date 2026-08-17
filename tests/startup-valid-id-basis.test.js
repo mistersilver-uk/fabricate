@@ -27,10 +27,7 @@
  */
 
 import assert from 'node:assert/strict';
-import { readdirSync, readFileSync, statSync } from 'node:fs';
-import { dirname, join, relative, resolve } from 'node:path';
 import test from 'node:test';
-import { fileURLToPath } from 'node:url';
 
 import {
   DEFINITION_STORAGE_LAYOUTS,
@@ -38,6 +35,8 @@ import {
   SETTING_KEYS,
 } from '../src/config/settings.js';
 import { getHighestRegisteredMigrationVersion } from '../src/migration/MigrationRunner.js';
+import { CraftingDefinitionRepository } from '../src/systems/CraftingDefinitionRepository.js';
+import { CraftingSystemManager } from '../src/systems/CraftingSystemManager.js';
 import { RecipeManager } from '../src/systems/RecipeManager.js';
 import {
   buildStartupPassList,
@@ -45,6 +44,7 @@ import {
 } from '../src/systems/startupMaintenance.js';
 import { composeStartupPassList } from '../src/systems/startupPassComposition.js';
 import {
+  basisFromInputs,
   DEFINITION_STORAGE_KEY_PAIRS,
   GRANULAR_DEFINITION_REPOSITORY_KINDS,
   readValidIdBasis,
@@ -52,9 +52,6 @@ import {
 } from '../src/systems/validIdBasis.js';
 
 import { mainMethodSource, MAIN_SOURCE } from './helpers/fabricateFacadeHarness.js';
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const SRC_ROOT = resolve(__dirname, '../src');
 
 /** The highest version the real registry holds, so no fixture hardcodes `'1.25.0'`. */
 const HIGHEST_MIGRATION = getHighestRegisteredMigrationVersion();
@@ -96,6 +93,9 @@ const labelsOf = (passes) => passes.map(([label]) => label);
 function makeComposition({
   settings: settingOverrides = {},
   arrangement = DEFINITION_STORAGE_TARGETS.SINGLE_ARRAY,
+  layoutAtCorpusRead = DEFINITION_STORAGE_LAYOUTS.SINGLE_ARRAY,
+  granular = false,
+  systemsGranular = false,
   recipes = [{ id: 'r1' }],
   systems = [{ id: 's1', components: [{ id: 'c1' }] }],
   onInitialize = null,
@@ -112,6 +112,10 @@ function makeComposition({
 
   const calls = [];
   const warnings = [];
+  // What the recipe manager captured before and during its own corpus read. Mutable,
+  // because `initialize()` is what sets `layoutAtCorpusRead` in production and a fixture
+  // that could not move it could not model a conversion at all.
+  const storage = { granular, arrangement, layoutAtCorpusRead };
   const record =
     (name) =>
     (...args) => {
@@ -123,12 +127,19 @@ function makeComposition({
     recipeManager: {
       getRecipes: () => recipes,
       getRecipe: (id) => recipes.find((recipe) => recipe.id === id) ?? null,
-      getDefinitionStorageArrangement: () => arrangement,
+      describeDefinitionStorage: () => ({ ...storage }),
       // Mirrors #1211's conversion: the layout flips from INSIDE `initialize()`, which is
       // why a basis fact sampled before this point describes a corpus that no longer exists.
-      initialize: async () => onInitialize?.(settings),
+      initialize: async () => onInitialize?.(settings, storage),
     },
-    craftingSystemManager: { getSystems: () => systems },
+    craftingSystemManager: {
+      getSystems: () => systems,
+      describeDefinitionStorage: () => ({
+        granular: systemsGranular,
+        arrangement: null,
+        layoutAtCorpusRead: null,
+      }),
+    },
     craftingRunManager: {
       cleanupInvalidRuns: record('craftingRunManager.cleanupInvalidRuns'),
       pruneInstantaneousActiveRuns: record('craftingRunManager.pruneInstantaneousActiveRuns'),
@@ -146,7 +157,7 @@ function makeComposition({
     isSelectableGatheringActor: () => false,
     warn: (message, detail) => warnings.push({ message, detail }),
   };
-  return { options, calls, settings, warnings };
+  return { options, calls, settings, warnings, storage };
 }
 
 /** @param {object} [overrides] @returns {string[]} the emitted labels. */
@@ -160,6 +171,28 @@ test('the composition site emits every declared pass on a known-complete basis',
   // The positive control. Without it, "omitted" is satisfied by a builder that emits
   // nothing at all — which is how the first acceptance set went 9/9 green.
   assert.deepEqual(composedLabels(), ALL_PASSES);
+});
+
+test('a fully CONVERTED world is known-complete — the gate must not fail closed forever', () => {
+  // The second positive control, and it is a different world from the one above: every
+  // other emission case here is a `singleArray` world, so a gate that recognised
+  // "known-complete" as "everything reads singleArray" would pass all of them. This is the
+  // state #1211 is BUILT to produce, and getting it wrong means the four destructive passes
+  // never run again on any client — with a warning every boot claiming the corpus is not
+  // known-complete when it is. Exactly the permanent silent omission the `=== highest`
+  // version bug would cause, arrived at from the other direction.
+  assert.deepEqual(
+    composedLabels({
+      granular: true,
+      arrangement: DEFINITION_STORAGE_TARGETS.PER_RECORD,
+      layoutAtCorpusRead: DEFINITION_STORAGE_LAYOUTS.PER_RECORD,
+      settings: {
+        [SETTING_KEYS.RECIPE_STORAGE_LAYOUT]: DEFINITION_STORAGE_LAYOUTS.PER_RECORD,
+        [SETTING_KEYS.RECIPE_STORAGE_TARGET]: DEFINITION_STORAGE_TARGETS.PER_RECORD,
+      },
+    }),
+    ALL_PASSES
+  );
 });
 
 test('composition-site input 1 — the LAYOUT decides it', () => {
@@ -196,6 +229,53 @@ test('composition-site input 4 — the migration VERSION decides it', () => {
   );
 });
 
+test('composition-site input 5 — the layout OBSERVED ACROSS THE CORPUS READ decides it', () => {
+  // The widest window of the five, and the only one a settled, converged, fully migrated
+  // world can still be inside. This client built the granular adapter correctly, read a
+  // half-written corpus while the layout said `unsettled`, and the conversion's tail landed
+  // during the ordinary construction work between that read and this sample. Every other
+  // input now reports a fully converted world.
+  assert.deepEqual(
+    composedLabels({
+      granular: true,
+      arrangement: DEFINITION_STORAGE_TARGETS.PER_RECORD,
+      layoutAtCorpusRead: DEFINITION_STORAGE_LAYOUTS.UNSETTLED,
+      recipes: [],
+      settings: {
+        [SETTING_KEYS.RECIPE_STORAGE_LAYOUT]: DEFINITION_STORAGE_LAYOUTS.PER_RECORD,
+        [SETTING_KEYS.RECIPE_STORAGE_TARGET]: DEFINITION_STORAGE_TARGETS.PER_RECORD,
+      },
+    }),
+    RECIPES_INCOMPLETE
+  );
+});
+
+test('input 5 also omits when the layout MOVED between the corpus read and the basis', () => {
+  // The other half of the same clause: the read happened under a settled `singleArray`
+  // layout, and by the time the basis was sampled the world had converted. The corpus in
+  // hand describes an arrangement that no longer exists, and nothing else can see it —
+  // clause 4's arrangement is derived from the target, which never moved.
+  assert.deepEqual(
+    composedLabels({
+      granular: true,
+      arrangement: DEFINITION_STORAGE_TARGETS.PER_RECORD,
+      layoutAtCorpusRead: DEFINITION_STORAGE_LAYOUTS.SINGLE_ARRAY,
+      settings: {
+        [SETTING_KEYS.RECIPE_STORAGE_LAYOUT]: DEFINITION_STORAGE_LAYOUTS.PER_RECORD,
+        [SETTING_KEYS.RECIPE_STORAGE_TARGET]: DEFINITION_STORAGE_TARGETS.PER_RECORD,
+      },
+    }),
+    RECIPES_INCOMPLETE
+  );
+});
+
+test('nothing observed the corpus read at all omits — the accessor is not optional', () => {
+  assert.deepEqual(composedLabels({ layoutAtCorpusRead: null }), RECIPES_INCOMPLETE);
+  const { options } = makeComposition();
+  delete options.recipeManager.describeDefinitionStorage;
+  assert.deepEqual(labelsOf(composeStartupPassList(options)), RECIPES_INCOMPLETE);
+});
+
 // ---------------------------------------------------------------------------
 // WHEN the facts are sampled
 // ---------------------------------------------------------------------------
@@ -204,8 +284,10 @@ test('the basis is sampled AFTER initialize(), against a layout that changes whe
   // #1211's crash window, and it needs no destructive fixture. A static fixture returns the
   // same value at both candidate read points, so it cannot tell a site that samples beside
   // `registerSettings()` from one that samples beside the id sets.
-  const flipToUnsettled = (settings) =>
+  const flipToUnsettled = (settings, storage) => {
     settings.set(SETTING_KEYS.RECIPE_STORAGE_LAYOUT, DEFINITION_STORAGE_LAYOUTS.UNSETTLED);
+    storage.layoutAtCorpusRead = DEFINITION_STORAGE_LAYOUTS.UNSETTLED;
+  };
 
   const early = makeComposition({ onInitialize: flipToUnsettled });
   assert.deepEqual(
@@ -228,9 +310,13 @@ test('an arrangement mismatch omits — the cross-client race no settings-only f
   // completed in full, including deleting the legacy document, before this client read its
   // corpus. Layout and target now agree, are not `unsettled`, and the version is current:
   // all three settings clauses hold and the corpus is empty.
+  // `layoutAtCorpusRead` is `perRecord` here, deliberately: the conversion was already OVER
+  // when this client read, so clause 5 is satisfied and the arrangement is the sole
+  // disagreement. That is what makes this a clause-4 case rather than a clause-5 one.
   assert.deepEqual(
     composedLabels({
       arrangement: DEFINITION_STORAGE_TARGETS.SINGLE_ARRAY,
+      layoutAtCorpusRead: DEFINITION_STORAGE_LAYOUTS.PER_RECORD,
       recipes: [],
       settings: {
         [SETTING_KEYS.RECIPE_STORAGE_LAYOUT]: DEFINITION_STORAGE_LAYOUTS.PER_RECORD,
@@ -252,7 +338,9 @@ test('clause: the compensated-failure state omits (layout singleArray, target pe
   // records — with the layout reading "settled".
   assert.deepEqual(
     composedLabels({
+      granular: true,
       arrangement: DEFINITION_STORAGE_TARGETS.PER_RECORD,
+      layoutAtCorpusRead: DEFINITION_STORAGE_LAYOUTS.SINGLE_ARRAY,
       recipes: [],
       settings: { [SETTING_KEYS.RECIPE_STORAGE_TARGET]: DEFINITION_STORAGE_TARGETS.PER_RECORD },
     }),
@@ -260,14 +348,20 @@ test('clause: the compensated-failure state omits (layout singleArray, target pe
   );
 });
 
-test('clause 1 isolated: layout AND target both `unsettled` omits', () => {
-  // For any registered pair clause 1 is otherwise SUBSUMED by clause 2 — a target is
-  // constrained to singleArray/perRecord, so `unsettled` forces layout !== target. This
-  // out-of-domain fixture is the only shape where clauses 2 and 4 hold and clause 1 must
-  // still omit; without it clause 1 reads as dead code with every other test green.
+test('an `unsettled` layout omits — stated, though no fixture can isolate it', () => {
+  // Read this as pinning the REQUIREMENT, not as coverage of a line. Clause 1 is subsumed:
+  // clause 5 rejects an `unsettled` read-time layout, and no coherent world has a settled
+  // read-time layout equal to an `unsettled` current one — the two cannot both be arranged
+  // to leave clause 1 as the sole decider. Clause 2 subsumes it too for any real pair, since
+  // a target is constrained to singleArray/perRecord. Deleting clause 1 from the
+  // implementation leaves this suite green; it is kept as defence in depth against a future
+  // relaxation of clause 4 or 5, and this comment exists so a later reader does not mistake
+  // this case for live coverage of it. The fixture is out of domain (a target may never be
+  // `unsettled`) and is the closest reachable shape.
   assert.deepEqual(
     composedLabels({
       arrangement: DEFINITION_STORAGE_LAYOUTS.UNSETTLED,
+      layoutAtCorpusRead: DEFINITION_STORAGE_LAYOUTS.UNSETTLED,
       settings: {
         [SETTING_KEYS.RECIPE_STORAGE_LAYOUT]: DEFINITION_STORAGE_LAYOUTS.UNSETTLED,
         [SETTING_KEYS.RECIPE_STORAGE_TARGET]: DEFINITION_STORAGE_LAYOUTS.UNSETTLED,
@@ -331,7 +425,7 @@ test('the basis carries EXACTLY the declared entity kinds', () => {
   const basis = readValidIdBasis({
     getSetting: () => null,
     getHighestRegisteredMigrationVersion,
-    arrangements: {},
+    storage: {},
   });
   assert.deepEqual(Object.keys(basis), [...VALID_ID_BASIS_ENTITY_KINDS]);
   assert.deepEqual(Object.keys(basis), ['recipes', 'systems', 'components']);
@@ -341,10 +435,38 @@ test('a kind with no granular repository is known-complete by construction', () 
   const basis = readValidIdBasis({
     getSetting: () => null,
     getHighestRegisteredMigrationVersion,
-    arrangements: {},
+    storage: {},
   });
   assert.deepEqual(basis, { recipes: false, systems: true, components: true });
   assert.deepEqual([...GRANULAR_DEFINITION_REPOSITORY_KINDS], ['recipes']);
+});
+
+test('the exemption is keyed on the KIND, not on a flag carried in the sampled data', () => {
+  // `basisFromInputs` is exported and is the gate's reduce step, so a caller that samples
+  // its own inputs — or catches a sampling error and passes `{}` — must not be told to run
+  // every pass. A data-keyed exemption answers both of these "everything complete".
+  assert.deepEqual(basisFromInputs({}), { recipes: false, systems: true, components: true });
+  assert.deepEqual(basisFromInputs(undefined), {
+    recipes: false,
+    systems: true,
+    components: true,
+  });
+  assert.deepEqual(
+    basisFromInputs({ recipes: { declaredGranular: true, repositoryGranular: false } }),
+    { recipes: false, systems: true, components: true },
+    'and a declared-granular kind cannot exempt itself by reporting a non-granular repository'
+  );
+});
+
+test('a granular repository for an UNDECLARED kind fails closed at runtime', () => {
+  // The #1212 direction, asked of the repository OBJECT rather than of a class name — so a
+  // second granular class, or one injected through a manager's `repository` seam, is caught
+  // the same way. Components have no registered layout/target pair, so a granular backend
+  // for them cannot be established at all and both salvage kinds go incomplete.
+  assert.deepEqual(composedLabels({ systemsGranular: true }), [
+    'phantom crafting runs',
+    'learned recipes',
+  ]);
 });
 
 test('a healthy NON-PRIMARY client runs every pass — primacy is not an input', () => {
@@ -532,30 +654,63 @@ test('every registered storage layout/target key has a mapping, and vice versa',
   assert.deepEqual(registered, mapped);
 });
 
-test('every granular repository belongs to a kind with a registered pair', () => {
-  // The direction component extraction trips: landing a granular repository for a kind
-  // BEFORE registering its settings pair would otherwise score that kind known-complete
-  // while its corpus is already partial — fail-open in the release that arms the hazard.
-  const files = [];
-  const walk = (directory) => {
-    for (const entry of readdirSync(directory)) {
-      const path = join(directory, entry);
-      if (statSync(path).isDirectory()) walk(path);
-      else if (path.endsWith('.js')) files.push(path);
+test('granularity is asked of the repository that was BUILT, not of a class name', () => {
+  // Not a source grep. A grep for `new PerRecordCraftingDefinitionRepository(` misses both
+  // evasions the seam anticipates: a SECOND granular class (the interface is explicitly
+  // designed around a document-backed adapter arriving later) and a granular repository
+  // INJECTED through a manager's `repository` seam, which both managers accept.
+  const previous = globalThis.game;
+  try {
+    globalThis.game = undefined;
+    const recipeManager = new RecipeManager();
+    assert.equal(
+      recipeManager.describeDefinitionStorage().granular,
+      false,
+      'today the settings adapter is built, and it stores no record granularly'
+    );
+    assert.equal(
+      new CraftingSystemManager(recipeManager).describeDefinitionStorage().granular,
+      false,
+      'crafting systems and components have no granular backend'
+    );
+    // The evasion a class-name grep cannot see, and asserting only the `false` above cannot
+    // either: a report hardcoded to `false` satisfies every other case in this suite.
+    class DocumentBackedRepository extends CraftingDefinitionRepository {
+      async loadAll() {
+        return [];
+      }
+      storesRecordsGranularly() {
+        return true;
+      }
     }
-  };
-  walk(SRC_ROOT);
-  const constructors = files
-    .filter((path) => readFileSync(path, 'utf8').includes('new PerRecordCraftingDefinitionRepository('))
-    .map((path) => relative(SRC_ROOT, path).replaceAll('\\', '/'))
-    .sort((a, b) => a.localeCompare(b));
+    assert.equal(
+      new CraftingSystemManager(recipeManager, {
+        repository: new DocumentBackedRepository(),
+      }).describeDefinitionStorage().granular,
+      true,
+      'an injected granular repository is reported, whatever its class'
+    );
 
-  // Declared here so a NEW granular repository fails this test and forces its author to
-  // register a pair and declare the kind, instead of inheriting "known-complete".
-  const declared = { 'systems/RecipeManager.js': 'recipes' };
-  assert.deepEqual(constructors, Object.keys(declared));
-  for (const kind of Object.values(declared)) {
-    assert.ok(GRANULAR_DEFINITION_REPOSITORY_KINDS.includes(kind), `${kind} is declared granular`);
+    globalThis.game = {
+      settings: {
+        get: (_namespace, key) =>
+          key === SETTING_KEYS.RECIPE_STORAGE_TARGET
+            ? DEFINITION_STORAGE_TARGETS.PER_RECORD
+            : undefined,
+      },
+    };
+    assert.equal(
+      new RecipeManager().describeDefinitionStorage().granular,
+      true,
+      'and the per-record adapter reports itself, through the interface'
+    );
+  } finally {
+    globalThis.game = previous;
+  }
+
+  // Every kind whose repository can report granular must have somewhere to establish a
+  // basis FROM. This is the direction component extraction (#1212) trips.
+  for (const kind of GRANULAR_DEFINITION_REPOSITORY_KINDS) {
     assert.ok(DEFINITION_STORAGE_KEY_PAIRS[kind], `${kind} has a registered layout/target pair`);
   }
 });
@@ -587,8 +742,8 @@ test('main.js composes the pass list AFTER both managers initialize, from the ac
     );
   }
   assert.ok(
-    !before.includes('getDefinitionStorageArrangement'),
-    'nor capture the repository arrangement early'
+    !before.includes('describeDefinitionStorage'),
+    'nor capture either manager’s storage report early'
   );
   assert.match(
     body.slice(compose),
@@ -602,7 +757,7 @@ test('main.js composes the pass list AFTER both managers initialize, from the ac
 });
 
 // ---------------------------------------------------------------------------
-// The fourth clause's source: the arrangement the repository was BUILT for
+// Clauses 4 and 5's source: what the manager captured before and during the read
 // ---------------------------------------------------------------------------
 
 test('RecipeManager records the arrangement its repository was built for', () => {
@@ -617,20 +772,69 @@ test('RecipeManager records the arrangement its repository was built for', () =>
       },
     };
     assert.equal(
-      new RecipeManager().getDefinitionStorageArrangement(),
+      new RecipeManager().describeDefinitionStorage().arrangement,
       DEFINITION_STORAGE_TARGETS.PER_RECORD
     );
     globalThis.game = undefined;
     assert.equal(
-      new RecipeManager().getDefinitionStorageArrangement(),
+      new RecipeManager().describeDefinitionStorage().arrangement,
       DEFINITION_STORAGE_TARGETS.SINGLE_ARRAY,
       'an unreadable target still builds the settings adapter, and reports THAT'
     );
     assert.equal(
-      new RecipeManager({ repository: { loadAll: async () => [] } }).getDefinitionStorageArrangement(),
+      new RecipeManager({ repository: { loadAll: async () => [] } }).describeDefinitionStorage()
+        .arrangement,
       null,
       'an injected repository reports unknown, and unknown is not known-complete'
     );
+  } finally {
+    globalThis.game = previous;
+  }
+});
+
+test('RecipeManager samples the layout ACROSS the corpus read, not before or after it', async () => {
+  const previous = globalThis.game;
+  try {
+    const stored = new Map([
+      [SETTING_KEYS.RECIPE_STORAGE_LAYOUT, DEFINITION_STORAGE_LAYOUTS.UNSETTLED],
+    ]);
+    globalThis.game = { settings: { get: (_namespace, key) => stored.get(key) } };
+    const manager = new RecipeManager({
+      repository: {
+        // The conversion's tail lands DURING the read, which is the whole window clause 5
+        // exists for: by the time anything could sample the layout again it reads settled.
+        loadAll: async () => {
+          stored.set(SETTING_KEYS.RECIPE_STORAGE_LAYOUT, DEFINITION_STORAGE_LAYOUTS.PER_RECORD);
+          return [];
+        },
+      },
+    });
+    assert.equal(
+      manager.describeDefinitionStorage().layoutAtCorpusRead,
+      null,
+      'nothing is attested before initialize() runs'
+    );
+    await manager.initialize();
+    assert.equal(
+      manager.describeDefinitionStorage().layoutAtCorpusRead,
+      DEFINITION_STORAGE_LAYOUTS.UNSETTLED,
+      'and afterwards it reports what the layout was WHEN the corpus was read'
+    );
+  } finally {
+    globalThis.game = previous;
+  }
+});
+
+test('an unreadable layout at corpus-read time is null, not a defaulted arrangement', async () => {
+  // The opposite fail direction from `readRecipeStorageTarget`, which answers an unreadable
+  // target with `singleArray` so it can never promote a world onto the granular backend.
+  // A default here would be a claim that the corpus about to be read is whole.
+  const previous = globalThis.game;
+  globalThis.game = undefined;
+  try {
+    const manager = new RecipeManager({ repository: { loadAll: async () => [] } });
+    await manager.initialize();
+    assert.equal(manager.describeDefinitionStorage().layoutAtCorpusRead, null);
   } finally {
     globalThis.game = previous;
   }

@@ -93,11 +93,20 @@ export function composeStartupPassList({
   // Sampled HERE, in the same statement group as the id sets above and after both
   // managers' `initialize()` — see this module's header for why the position is
   // load-bearing rather than stylistic.
+  //
+  // The settings are read now; the storage reports are what each manager captured before
+  // and during its own corpus read, which is the half no read at this point can reproduce.
+  // `components` is answered by the crafting-system manager because components ride inside
+  // `system.components` and therefore share that manager's repository — so a granular
+  // repository landing there covers both kinds at once.
+  const systemStorage = craftingSystemManager.describeDefinitionStorage?.() ?? null;
   const basisInputs = readValidIdBasisInputs({
     getSetting,
     getHighestRegisteredMigrationVersion,
-    arrangements: {
-      recipes: recipeManager.getDefinitionStorageArrangement?.() ?? null,
+    storage: {
+      recipes: recipeManager.describeDefinitionStorage?.() ?? null,
+      systems: systemStorage,
+      components: systemStorage,
     },
   });
   const basis = basisFromInputs(basisInputs);

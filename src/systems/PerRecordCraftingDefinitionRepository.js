@@ -849,6 +849,17 @@ export class PerRecordCraftingDefinitionRepository extends CraftingDefinitionRep
   /**
    * @inheritdoc
    *
+   * One `world` setting document per record, so a whole-corpus read returns exactly the
+   * records that have been written — which is precisely the partial state the Valid Id
+   * Basis gate exists to refuse to prune against.
+   */
+  storesRecordsGranularly() {
+    return true;
+  }
+
+  /**
+   * @inheritdoc
+   *
    * The index is updated as a side effect, so a remote create/update/delete leaves this
    * client's map consistent without a rescan.
    */

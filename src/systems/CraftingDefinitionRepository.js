@@ -270,6 +270,29 @@ export class CraftingDefinitionRepository {
   }
 
   /**
+   * Whether this backend stores each record as its own addressable unit.
+   *
+   * **Optional capability, `false` by default — which IS today's behaviour.** Distinct
+   * from {@link CraftingDefinitionRepository#supportsPerRecordReplication}, which is about
+   * how a CHANGE arrives: a backend could in principle store granularly and still have no
+   * per-record replication signal (a pack-backed adapter is exactly that, per #1088), and
+   * the two demand different answers.
+   *
+   * It exists for the Valid Id Basis gate (issue 1224). A granular backend's whole-corpus
+   * read can return PART of the corpus — a conversion that has written some records and
+   * not others — and a destructive pass run against a partial corpus deletes durable state
+   * that was never stale. The gate has to know which entity kinds can be in that state, and
+   * asking the repository that was actually built is the only answer that cannot be evaded:
+   * a class-name check misses both a second granular class and a granular repository
+   * injected through a manager's `repository` seam.
+   *
+   * @returns {boolean}
+   */
+  storesRecordsGranularly() {
+    return false;
+  }
+
+  /**
    * Synchronously read the ONE record a replication event has already delivered.
    *
    * **Optional capability, `null` by default.** Synchronous for the same reason
