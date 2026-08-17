@@ -253,6 +253,27 @@
   --fab-tag-aqua: #B9DDD7;
   --fab-tag-mauve: #D8BED4;
   --fab-tag-ember: #D98B6A;
+
+  /* The tag family is WIDER than the set a GM can pick from. `ember` and the four
+     below are decorative tints Core uses at fixed sites and companion modules
+     reference by token; the pickable eight are enumerated in
+     src/ui/svelte/util/managerColorTokens.js. Adding one here does not add it to a
+     picker.
+
+     Each name makes a hue promise, so the per-theme values carry that theme's
+     saturation and lightness character but keep the hue: a derivation that rotated
+     hue from a same-family anchor instead turned `azure` TAN in ironblood-forge and
+     foundry-native, whose `mist` is a warm grey.
+
+     `azure` and --fab-drop-rate-uncommon below are byte-identical here and in
+     mythwright, and are still two tokens: the drop-rate scale is theme-invariant
+     semantic rarity, these tints are theme-varying decoration, and they diverge in
+     the other five themes. Collapsing them would bind a decorative tint to a rarity
+     scale. */
+  --fab-tag-verdant: #9AB89C;
+  --fab-tag-azure: #6FA8E8;
+  --fab-tag-bone: #E8E0D2;
+  --fab-tag-slate: #8A97A3;
   --fab-drop-rate-guaranteed: #75C98E;
   --fab-drop-rate-common: #5EC3B0;
   --fab-drop-rate-uncommon: #6FA8E8;
@@ -376,6 +397,10 @@
   --fab-tag-aqua: #B9DDD7;
   --fab-tag-mauve: #D8BED4;
   --fab-tag-ember: #D98B6A;
+  --fab-tag-verdant: #9AB89C;
+  --fab-tag-azure: #6FA8E8;
+  --fab-tag-bone: #E8E0D2;
+  --fab-tag-slate: #8A97A3;
   --fab-drop-rate-guaranteed: #75C98E;
   --fab-drop-rate-common: #5EC3B0;
   --fab-drop-rate-uncommon: #6FA8E8;
@@ -499,6 +524,10 @@
   --fab-tag-aqua: #B8C4CB;
   --fab-tag-mauve: #A39AA2;
   --fab-tag-ember: #C57142;
+  --fab-tag-verdant: #899D85;
+  --fab-tag-azure: #64A5C3;
+  --fab-tag-bone: #D0C3BA;
+  --fab-tag-slate: #758388;
   --fab-drop-rate-guaranteed: #75C98E;
   --fab-drop-rate-common: #5EC3B0;
   --fab-drop-rate-uncommon: #6FA8E8;
@@ -622,6 +651,10 @@
   --fab-tag-aqua: #B8C8A5;
   --fab-tag-mauve: #E7D9B8;
   --fab-tag-ember: #D78866;
+  --fab-tag-verdant: #97B698;
+  --fab-tag-azure: #6BACE7;
+  --fab-tag-bone: #E6DCCF;
+  --fab-tag-slate: #8796A1;
   --fab-drop-rate-guaranteed: #75C98E;
   --fab-drop-rate-common: #5EC3B0;
   --fab-drop-rate-uncommon: #6FA8E8;
@@ -745,6 +778,10 @@
   --fab-tag-aqua: #9DC9BD;
   --fab-tag-mauve: #C3C2DA;
   --fab-tag-ember: #DB9CA0;
+  --fab-tag-verdant: #A4BEA1;
+  --fab-tag-azure: #78C2EC;
+  --fab-tag-bone: #EDE3DA;
+  --fab-tag-slate: #91A2A9;
   --fab-drop-rate-guaranteed: #75C98E;
   --fab-drop-rate-common: #5EC3B0;
   --fab-drop-rate-uncommon: #6FA8E8;
@@ -888,6 +925,10 @@
   --fab-tag-aqua: #948F90;
   --fab-tag-mauve: #706B70;
   --fab-tag-ember: #BC642B;
+  --fab-tag-verdant: #738E75;
+  --fab-tag-azure: #4C7DBA;
+  --fab-tag-bone: #C3B9A6;
+  --fab-tag-slate: #666E76;
   --fab-drop-rate-guaranteed: #75C98E;
   --fab-drop-rate-common: #5EC3B0;
   --fab-drop-rate-uncommon: #6FA8E8;
@@ -1011,6 +1052,10 @@
   --fab-tag-aqua: #A9CFCB;
   --fab-tag-mauve: #CBB2C8;
   --fab-tag-ember: #D48654;
+  --fab-tag-verdant: #8DAE91;
+  --fab-tag-azure: #5D94E2;
+  --fab-tag-bone: #DFD7C3;
+  --fab-tag-slate: #7D8A98;
   --fab-drop-rate-guaranteed: #75C98E;
   --fab-drop-rate-common: #5EC3B0;
   --fab-drop-rate-uncommon: #6FA8E8;

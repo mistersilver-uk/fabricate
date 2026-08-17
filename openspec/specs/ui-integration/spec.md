@@ -3459,6 +3459,10 @@ Responsive behaviour inside the target is the companion's, and a companion wanti
 `container-type: inline-size` on the Manager root means a `position: fixed` descendant of the target positions against the Manager rather than the viewport, and `isolation: isolate` means an element inside the target at the maximum z-index still loses to a `body`-level element above the Manager.
 Content that must paint above anything outside the Manager is portalled outside the Manager element.
 - **Theme tokens reach the panel by inheritance rather than by a stamped attribute**, because the Manager mounts lazily and carries no theme attribute of its own, so a companion reading the custom properties live re-skins with no remount and one snapshotting them into JavaScript at mount does not; content a companion renders outside the Manager subtree inherits the document's tokens instead.
+- **The `--fab-tag-*` tint family is available to a companion, and it is wider than the set Core offers a GM.**
+Every theme defines the whole family, so a companion tinting its own content references a token rather than a hex and re-skins with the theme under the inheritance rule above.
+Core's colour pickers offer only the keys enumerated in `src/ui/svelte/util/managerColorTokens.js`; the remainder are decorative tints Core uses at fixed sites and never presents as a choice.
+Adding a tint to the stylesheet therefore does not add it to any picker, and a token's presence in the family is not a claim that a GM can select it.
 - **Once a companion owns the scrolling, any scroll container it creates is its own keyboard responsibility**, because the panel is no longer the nearest scrollable ancestor and its focus stop no longer scrolls anything.
 - The Patreon CTA is `https://www.patreon.com/c/mistersilver`, opens `_blank`, carries `rel="noopener noreferrer"`, uses Font Awesome-only imagery, and remains usable at narrow widths and with the Manager rail collapsed.
 - A companion declares Fabricate in `relationships.requires`, which governs dependency availability and activation rather than ordinary-module script priority.
