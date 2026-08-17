@@ -21,6 +21,10 @@
  *   listeners. `GatheringView.svelte` registers inside `$effect`, whose teardown unsubscribes.
  * - **Per-listener isolation.** Each listener is wrapped in `try/catch` and throws are routed to
  *   `Hooks.onError`, so one store throwing cannot starve the other five.
+ *
+ * Both verified in installed Foundry source and byte-identical in 13.351 and 14.365 — the only
+ * difference anywhere in `client/helpers/hooks.mjs` between the two is `onError`'s
+ * `instanceof Error` becoming `Error.isError`, which is not on this path.
  * - **The test seam.** `globalThis.Hooks` is read at CALL time and is replaced by ~20 test
  *   files, which is how a simulated two-client fixture gives each client its own bus.
  *
@@ -88,7 +92,12 @@ export function craftingDataChange({ source, scopes = [] }) {
   const bySystem = new Map();
   for (const scope of scopes) {
     const domains = Array.isArray(scope?.domains) ? scope.domains : [];
-    if (domains.length === 0) continue;
+    // UNATTRIBUTABLE POISONS THE WHOLE PAYLOAD, exactly as {@link PendingChangeDomains#record}
+    // treats the identical input. Dropping only the offending scope would let a MIXED payload
+    // route narrowly on its other legs' domains while the unattributable one vanished — a
+    // stale read model, and the one failure direction this taxonomy must never produce. The
+    // two agree deliberately: they are the two places an empty domain set can arrive.
+    if (domains.length === 0) return Object.freeze({ source, scopes: Object.freeze([]) });
     const systemId = scope?.systemId ?? null;
     const held = bySystem.get(systemId) ?? new Set();
     for (const domain of domains) held.add(domain);
@@ -126,6 +135,15 @@ export function emitCraftingDataChanged(change, callAll = null) {
  * object keyed by record id. The per-record form is the reason this function exists: a batch
  * that rewrote system A's components and system B's name must not apply both domain sets to
  * both systems, which is the over-broad invalidation issue 1078 exists to remove at batch scale.
+ *
+ * **Both of today's `save({batch})` callers are genuinely uniform**, so the per-record branch has
+ * no production caller yet, and that is stated rather than left to be discovered — this
+ * repository has been bitten by a seam value production could not produce (see
+ * `settingChangeBridge.js`'s note on the retired `'create'` operation). It is kept rather than
+ * deferred because the two callers that need it are named and imminent: #1211's Storage Layout
+ * Conversion rewrites many records in one batch, and #1092 replicates a batch delta whose
+ * per-record field lists differ by construction. Whichever lands first owes this branch its
+ * first real caller; if neither does, delete it rather than leaving it tested and unreachable.
  *
  * @param {object|null|undefined} change
  * @param {string|null|undefined} recordId

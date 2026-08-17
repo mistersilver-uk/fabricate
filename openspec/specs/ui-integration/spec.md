@@ -2191,7 +2191,11 @@ The unified window holds five shared read-model stores — `crafting`, `inventor
 
 - Each store subscribes to the set of **invalidation domains** (`data-models/spec.md` § Invalidation Domains) it consumes, and refreshes only when a change names one of them.
   A subscription set is DERIVED from the one authored domain-to-consumer mapping; a surface MUST NOT restate it inline, because a second copy is exactly the drift the derivation exists to remove.
-- The five stores' consumers are: `crafting`, `inventory` and `alchemy` consume all seven domains; `journal` consumes six and NOT `narrative`; `gathering` consumes `labelling`, `component-definitions` and `access-and-knowledge` only.
+- The five stores' consumers are: `crafting`, `inventory` and `alchemy` consume all seven domains; `journal` consumes six and NOT `narrative`; `gathering` consumes five, excluding only `narrative` and `held-inventory`.
+- `gathering`'s set is closed over the SYSTEM-VALIDITY GATE, and that is why it consumes two domains whose facts it renders nowhere.
+  The gathering listing drops every environment of a system the validity gate reports blocked, for non-GM viewers only, and those blockers are produced from check configuration (`resolution-config`) and alchemy signature collisions (`materials-and-yield`).
+  Omitting them leaves a GM authoring the missing formula while every player's tab keeps hiding the system — with a well-formed, correctly attributed change, so no fail-safe can catch it.
+  `held-inventory` stays out because the gathering view owns an item subscription scoped to the selected actor, which is narrower.
 - A change that names no domain refreshes every store.
 - A change to an actor's held items belongs to the `held-inventory` domain and refreshes exactly that domain's consumers, filtered to actors this window reads from.
 - The shell reloads the inventory listing through the store's bulk-run guard and MUST NOT call the store's direct load seam, on any of these paths.
@@ -3040,7 +3044,8 @@ It is opened from the `Gathering` header action in the Items directory and must 
 
 ### App Availability
 
-- The gathering listing refreshes on a crafting-data change only when that change names `labelling`, `component-definitions` or `access-and-knowledge` — the three invalidation domains it consumes, per _Shared-store refresh routing_ above.
+- The gathering listing refreshes on a crafting-data change only when that change names one of the five invalidation domains it consumes, per _Shared-store refresh routing_ above.
+  Two of the five — `resolution-config` and `materials-and-yield` — are consumed for the system-validity gate rather than for anything the listing renders.
   The set is read from the derived transpose, never restated here.
 - The app is available only when at least one crafting system has `features.gathering === true`.
 - If no crafting system exposes gathering, the Items directory must not show the `Gathering` action.

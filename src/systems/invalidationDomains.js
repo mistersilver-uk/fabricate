@@ -34,9 +34,15 @@
  *
  * A field this file does not classify resolves to EVERY domain, and an unattributable change
  * routes to every store. Over-broad invalidation is a performance bug; a stale read model is a
- * correctness one. Every widening here is therefore silent and safe, and every NARROWING has
- * to be authored — which is what the completeness gate in
- * `tests/invalidation-domains.test.js` exists to keep honest in both directions.
+ * correctness one, so every widening here is silent and safe and every NARROWING has to be
+ * authored.
+ *
+ * `tests/invalidation-domains.test.js` enforces that in two separate ways, and the distinction
+ * matters because the first alone is not enough. The **completeness gate** is presence-only: it
+ * asserts every produced key is classified and no row is a phantom, in both directions, and it
+ * cannot see a row whose VALUE is wrong. The **restated tables** — one per field map, plus
+ * `APPROVED_STORE_DOMAINS` for the consumer column — are what pin the values, literally, so a
+ * reclassification is a diff a reviewer sees rather than a silent narrowing.
  */
 
 /**
@@ -52,14 +58,26 @@ export const INVALIDATION_DOMAINS = Object.freeze({
   /** Names, images, categories, tags and sort keys. */
   LABELLING: 'labelling',
   /**
-   * Authored prose — recipe, step, system, component, tool and recipe-item descriptions.
+   * All authored prose CARRIED ON THE CRAFTING-DATA CHANNEL — recipe, step, system, component,
+   * tool and recipe-item descriptions.
    *
-   * ONE carrier of prose is deliberately excluded, and by ROUTING rather than by oversight: a
-   * gathering realm's `description` is classified under the three domains the `gathering` store
-   * consumes (see {@link SYSTEM_FIELD_DOMAINS}`.gatheringRealms`), because `gathering` does not
-   * consume `narrative` and filing realm prose here would leave it unable to reach the only
-   * store that renders it. So `facts:narrative:<systemId>` never advances for realm prose, and
-   * this domain is "authored prose" rather than ALL of it.
+   * The qualifier is load-bearing and the unqualified reading is a TRAP, because an implementer
+   * classifying a gathering fact under "all authored prose" would file a realm description here
+   * and silently break `gathering`'s exclusion — the exact failure this domain's own routing
+   * exists to prevent. Two classes of prose are outside it:
+   *
+   * - **Gathering realm and task prose.** A realm's `description` is classified under domains
+   *   `gathering` DOES consume (see {@link SYSTEM_FIELD_DOMAINS}`.gatheringRealms`), and task
+   *   prose does not travel on this channel at all — it rides
+   *   `fabricate.gatheringEnvironmentsChanged`, which the gathering view subscribes to
+   *   separately. `gathering` is not a `narrative` consumer, so filing either here would leave
+   *   it unable to reach the only store that renders it.
+   * - **Teaser prose.** `teaser.teaserDescription` is authored prose, and the whole `teaser`
+   *   object is nevertheless classified `access-and-knowledge`: it is gate CONFIGURATION whose
+   *   only consumers are the visibility path. One fact gets one answer, and this one is the
+   *   gate's.
+   *
+   * So `facts:narrative:<systemId>` never advances for realm, task or teaser prose.
    */
   NARRATIVE: 'narrative',
   /** Ingredient sets and groups, set essences, results, steps. */
@@ -68,7 +86,15 @@ export const INVALIDATION_DOMAINS = Object.freeze({
   RESOLUTION_CONFIG: 'resolution-config',
   /** Component, tool and essence definitions. */
   COMPONENT_DEFINITIONS: 'component-definitions',
-  /** Teasers, recipe-item definitions, learned and discovery state. */
+  /**
+   * Teasers, recipe-item definitions, and the authored configuration that gates learning and
+   * discovery — visibility mode, recipe visibility, character prerequisites, per-recipe access
+   * grants and locks.
+   *
+   * A player's OWN learned and discovered state is not here and is not in the field maps: it
+   * lives in actor flags rather than in a definition record, and those maps classify top-level
+   * keys of a persisted record and nothing else.
+   */
   ACCESS_AND_KNOWLEDGE: 'access-and-knowledge',
   /** Actor-held items. */
   HELD_INVENTORY: 'held-inventory',
@@ -121,17 +147,37 @@ const { CRAFTING, INVENTORY, ALCHEMY, JOURNAL, GATHERING } = INVALIDATION_STORES
  * make observable — `RunJournalBuilder` reads no description anywhere and its three `flavor`
  * fields are hardcoded empty literals — and it is acceptance criterion 3 of issue 1078.
  *
- * `gathering` consumes only three domains because the gathering listing reads a system's name,
- * its tool and component definitions, and its access configuration, and nothing else this
- * taxonomy classifies.
+ * `gathering` consumes FIVE of the seven, excluding only `narrative` and `held-inventory`.
+ * The two obvious ones are its own content — a system's name, and its tool and component
+ * definitions — but `materials-and-yield` and `resolution-config` are there for a reason that
+ * is not visible from the gathering surfaces at all: the listing runs the SYSTEM-VALIDITY GATE.
+ * `GatheringEngine._playerCandidateEnvironments` drops every environment of a system whose
+ * `computeSystemVisibility` reports `blocksSystem`, for non-GM viewers only, and those
+ * blockers are produced from facts this taxonomy files under both — `routedCheckNoFormula`,
+ * `progressiveNoCheck`, `alchemyCheckNoFormula` and `multiStepInAlchemy` are
+ * `resolution-config`, and `alchemySignatureCollision` is `materials-and-yield`. Omitting
+ * either leaves a GM authoring the missing formula while every player's Gathering tab keeps
+ * hiding the system, with a well-formed and correctly attributed payload — so no fail-safe can
+ * catch it and only this table can be wrong. Worse, the GM is the one person who CANNOT see the
+ * stale tab: `_playerCandidateEnvironments` bypasses the gate for GMs.
+ *
+ * Two adjacent facts, because both are easy to get wrong from a reading of the blocker code:
+ * the sixth `blocks: 'system'` site, `progressiveNoDifficulty`, reads `components[].difficulty`
+ * and so needs `component-definitions`, which `gathering` already had. And `labelling` is NOT
+ * credited with this gate even though every blocker interpolates `system?.name` into its
+ * `entityName`: that is a display label on the issue object, never a gating input —
+ * `blocksSystem` is a boolean over blocker PRESENCE.
+ *
+ * `held-inventory` is genuinely absent rather than an oversight: the gathering view owns its
+ * own `subscribeInventoryChange`, so the item channel reaches it without this one.
  *
  * @type {Readonly<Record<string, readonly string[]>>}
  */
 export const DOMAIN_CONSUMERS = Object.freeze({
   [LABELLING]: Object.freeze([CRAFTING, INVENTORY, ALCHEMY, JOURNAL, GATHERING]),
   [NARRATIVE]: Object.freeze([CRAFTING, INVENTORY, ALCHEMY]),
-  [MATERIALS_AND_YIELD]: Object.freeze([CRAFTING, INVENTORY, ALCHEMY, JOURNAL]),
-  [RESOLUTION_CONFIG]: Object.freeze([CRAFTING, INVENTORY, ALCHEMY, JOURNAL]),
+  [MATERIALS_AND_YIELD]: Object.freeze([CRAFTING, INVENTORY, ALCHEMY, JOURNAL, GATHERING]),
+  [RESOLUTION_CONFIG]: Object.freeze([CRAFTING, INVENTORY, ALCHEMY, JOURNAL, GATHERING]),
   [COMPONENT_DEFINITIONS]: Object.freeze([CRAFTING, INVENTORY, ALCHEMY, JOURNAL, GATHERING]),
   [ACCESS_AND_KNOWLEDGE]: Object.freeze([CRAFTING, INVENTORY, ALCHEMY, JOURNAL, GATHERING]),
   [HELD_INVENTORY]: Object.freeze([CRAFTING, INVENTORY, ALCHEMY, JOURNAL]),
@@ -225,7 +271,10 @@ export const SYSTEM_FIELD_DOMAINS = Object.freeze({
   salvageResolutionMode: Object.freeze([RESOLUTION_CONFIG]),
   toolBreakage: Object.freeze([RESOLUTION_CONFIG]),
   alchemy: Object.freeze([RESOLUTION_CONFIG]),
-  teaserConfig: Object.freeze([NARRATIVE, ACCESS_AND_KNOWLEDGE]),
+  // Gate CONFIGURATION, prose included — see INVALIDATION_DOMAINS.NARRATIVE. Routing is
+  // identical either way, because every `narrative` consumer is also an `access-and-knowledge`
+  // consumer; what changes is that one fact now gets one answer.
+  teaserConfig: Object.freeze([ACCESS_AND_KNOWLEDGE]),
   // A component's name is labelling and its prose narrative, but the ARRAY cannot say which
   // moved, so a component rewrite carries all three of the classes a component can express.
   components: Object.freeze([LABELLING, NARRATIVE, COMPONENT_DEFINITIONS]),
@@ -238,7 +287,7 @@ export const SYSTEM_FIELD_DOMAINS = Object.freeze({
   // to reach the only store that renders it. This is the one carrier of prose `narrative` does
   // not cover — see INVALIDATION_DOMAINS.NARRATIVE.
   //
-  // Classified across the three domains the
+  // Classified across domains the
   // gathering store subscribes to, because the listing reads realm names, realm-gated task
   // availability and the tools a realm offers.
   gatheringRealms: Object.freeze([LABELLING, COMPONENT_DEFINITIONS, ACCESS_AND_KNOWLEDGE]),
@@ -287,7 +336,10 @@ export const RECIPE_FIELD_DOMAINS = Object.freeze({
   access: Object.freeze([ACCESS_AND_KNOWLEDGE]),
   recipeItemId: Object.freeze([ACCESS_AND_KNOWLEDGE]),
   linkedRecipeItemUuid: Object.freeze([ACCESS_AND_KNOWLEDGE]),
-  teaser: Object.freeze([NARRATIVE, ACCESS_AND_KNOWLEDGE]),
+  // `teaser.teaserDescription` is prose (`RecipeVisibilityService` surfaces it in
+  // `teaserState`), and the teaser is classified WHOLE as gate configuration anyway — see
+  // INVALIDATION_DOMAINS.NARRATIVE and the `teaserConfig` row.
+  teaser: Object.freeze([ACCESS_AND_KNOWLEDGE]),
 });
 
 /**

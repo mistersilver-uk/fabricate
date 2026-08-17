@@ -890,10 +890,15 @@ describe('FabricateAppRoot invalidation-domain routing (mounted)', () => {
   });
 
   it('reloads EVERY store when the change names no domain', async () => {
-    // The fail-safe. Asserted behaviourally rather than through the fallback counter, because
-    // the mounted shell imports the harness's temp-dir copy of `foundryBridge.js` and so
-    // increments a different module instance's counter; `tests/util/foundry-bridge-subscriptions.test.js`
-    // and `tests/invalidation-domain-signal.test.js` assert the counter itself.
+    // The fail-safe, asserted BEHAVIOURALLY rather than through the fallback counter.
+    //
+    // Not because the counter is unreachable — it is: the harness copies `foundryBridge.js`
+    // into its temp tree and the mounted component imports that copy, so this file's import of
+    // the repo path reads a DIFFERENT module instance, but the temp copy has zero imports and
+    // could be loaded from the temp tree if a case wanted it. It is simply not what this case
+    // is for: the claim here is which stores an unattributable change reaches, and the counter
+    // itself is asserted directly in `tests/util/foundry-bridge-subscriptions.test.js` and
+    // `tests/invalidation-domain-signal.test.js`.
     const calls = await mountWithSpies();
 
     hooks.callAll(CRAFTING_DATA_CHANGED_HOOK, { source: 'recipes', scopes: [] });

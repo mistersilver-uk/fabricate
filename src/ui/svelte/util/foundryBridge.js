@@ -361,13 +361,43 @@ export function resetCraftingDataFallbackCount() {
 }
 
 /**
- * The domains a change payload names, or `null` when it names none and must route broadly.
+ * Every invalidation domain this build knows, mirroring `INVALIDATION_DOMAIN_NAMES` in
+ * `src/systems/invalidationDomains.js`.
  *
- * Three shapes route broadly, and they are ONE rule rather than three special cases — "I cannot
+ * A LITERAL for the same mechanical reason `CRAFTING_DATA_CHANGED_HOOK` above is one, and pinned
+ * against the real constant by `tests/util/foundry-bridge-subscriptions.test.js` so it cannot
+ * drift.
+ *
+ * @type {ReadonlySet<string>}
+ */
+const KNOWN_INVALIDATION_DOMAINS = new Set([
+  'labelling',
+  'narrative',
+  'materials-and-yield',
+  'resolution-config',
+  'component-definitions',
+  'access-and-knowledge',
+  'held-inventory',
+]);
+
+/**
+ * The domains a change payload names, or `null` when it names none this build understands and
+ * must therefore route broadly.
+ *
+ * Four shapes route broadly, and they are ONE rule rather than four special cases — "I cannot
  * attribute this": a payload that is not a recognised change, a change whose `scopes` are
- * malformed, and a change whose scopes union to nothing (a corpus reordering, which is the
- * production-reachable producer). Over-broad invalidation is a performance bug; a stale read
- * model is a correctness one.
+ * malformed, a change whose scopes union to nothing (a corpus reordering, which is the
+ * production-reachable producer), and a change every one of whose domains is a name this build
+ * does not know.
+ *
+ * That last clause is the one that is easy to leave out and is the only input class that would
+ * otherwise route NARROW when it must route broad: an unknown name yields a non-empty set that
+ * intersects no subscriber's wanted set, so nothing refreshes and the fallback counter does not
+ * move — a stale read model wearing the appearance of correct narrowing. Unreachable from
+ * today's producers, and reachable the moment issue 1092 replicates a payload between clients
+ * running different module versions.
+ *
+ * Over-broad invalidation is a performance bug; a stale read model is a correctness one.
  *
  * @param {*} payload
  * @returns {Set<string>|null}
@@ -378,7 +408,9 @@ function payloadDomains(payload) {
   const domains = new Set();
   for (const scope of scopes) {
     if (!Array.isArray(scope?.domains)) return null;
-    for (const domain of scope.domains) domains.add(domain);
+    for (const domain of scope.domains) {
+      if (KNOWN_INVALIDATION_DOMAINS.has(domain)) domains.add(domain);
+    }
   }
   return domains.size > 0 ? domains : null;
 }

@@ -85,7 +85,102 @@ const APPROVED_STORE_DOMAINS = {
     'access-and-knowledge',
     'held-inventory',
   ],
-  gathering: ['labelling', 'component-definitions', 'access-and-knowledge'],
+  // FIVE of seven. `materials-and-yield` and `resolution-config` are not there for anything the
+  // gathering surfaces render: the listing runs the system-validity gate, which hides a whole
+  // system's environments from non-GM viewers on a missing routed/progressive/alchemy check
+  // formula or an alchemy signature collision. Excluding them left a GM authoring the fix while
+  // every player's Gathering tab kept hiding the system — with a well-formed, correctly
+  // attributed payload, so no fail-safe could catch it.
+  gathering: [
+    'labelling',
+    'materials-and-yield',
+    'resolution-config',
+    'component-definitions',
+    'access-and-knowledge',
+  ],
+};
+
+/**
+ * The APPROVED field classifications, restated field by field.
+ *
+ * These exist because the completeness gate below is PRESENCE-ONLY — it asserts that every
+ * produced key is classified, that no row is a phantom, and that each row is a non-empty subset
+ * of the seven. None of that looks at the VALUES, and the hole is not theoretical: rewriting
+ * every row that is exactly `[RESOLUTION_CONFIG]` to `[NARRATIVE]` — 17 substitutions — left the
+ * whole suite green, including the mounted shell, while a GM changing a crafting check silently
+ * stopped rebuilding the run journal on every client. That is the correctness direction, and it
+ * is the same defect class as a wrong row in the store table one layer up.
+ *
+ * So the values are restated here, literally, exactly as `APPROVED_STORE_DOMAINS` is. Deriving
+ * the expectation from the shipped constant would make this assertion unfailable; the cost of a
+ * literal is that a deliberate reclassification is a diff in two places, which is the point.
+ */
+const APPROVED_SYSTEM_FIELD_DOMAINS = {
+  id: [...ALL_INVALIDATION_DOMAINS],
+  name: ['labelling'],
+  description: ['narrative'],
+  enabled: ['access-and-knowledge'],
+  resolutionMode: ['resolution-config'],
+  features: ['materials-and-yield', 'resolution-config', 'access-and-knowledge'],
+  itemTags: ['labelling'],
+  tags: ['labelling'],
+  categories: ['labelling'],
+  componentCategories: ['labelling'],
+  categoryIcons: ['labelling'],
+  componentCategoryIcons: ['labelling'],
+  visibilityMode: ['access-and-knowledge'],
+  recipeVisibility: ['access-and-knowledge'],
+  requirements: ['resolution-config'],
+  essenceDefinitions: ['labelling', 'materials-and-yield', 'component-definitions'],
+  recipeItemDefinitions: ['labelling', 'narrative', 'access-and-knowledge'],
+  membershipResolvesByRecipeIds: ['access-and-knowledge'],
+  modifiers: ['resolution-config'],
+  craftingCheck: ['resolution-config'],
+  salvageCraftingCheck: ['resolution-config'],
+  gatheringCraftingCheck: ['resolution-config'],
+  salvageResolutionMode: ['resolution-config'],
+  toolBreakage: ['resolution-config'],
+  alchemy: ['resolution-config'],
+  teaserConfig: ['access-and-knowledge'],
+  components: ['labelling', 'narrative', 'component-definitions'],
+  tools: ['labelling', 'narrative', 'component-definitions', 'resolution-config'],
+  characterPrerequisites: ['labelling', 'access-and-knowledge'],
+  gatheringRealms: ['labelling', 'component-definitions', 'access-and-knowledge'],
+  gatheringRealmSettings: ['labelling', 'component-definitions', 'access-and-knowledge'],
+};
+const APPROVED_RECIPE_FIELD_DOMAINS = {
+  id: [...ALL_INVALIDATION_DOMAINS],
+  craftingSystemId: [...ALL_INVALIDATION_DOMAINS],
+  name: ['labelling'],
+  img: ['labelling'],
+  category: ['labelling'],
+  tags: ['labelling'],
+  system: ['labelling'],
+  metadata: ['labelling'],
+  importSource: ['labelling'],
+  description: ['narrative'],
+  enabled: ['materials-and-yield', 'access-and-knowledge'],
+  complex: ['materials-and-yield'],
+  steps: ['materials-and-yield'],
+  ingredientSets: ['materials-and-yield'],
+  resultGroups: ['materials-and-yield'],
+  resultSelection: ['materials-and-yield'],
+  isVariable: ['materials-and-yield'],
+  outcomeRouting: ['materials-and-yield', 'resolution-config'],
+  toolIds: ['resolution-config'],
+  timeRequirement: ['resolution-config'],
+  transferEffects: ['resolution-config'],
+  checkTierId: ['resolution-config'],
+  minSuccessOutcomeId: ['resolution-config'],
+  craftingModifier: ['resolution-config'],
+  currencyCost: ['resolution-config'],
+  allowPlayerResultReorder: ['resolution-config'],
+  locked: ['access-and-knowledge'],
+  visibility: ['access-and-knowledge'],
+  access: ['access-and-knowledge'],
+  recipeItemId: ['access-and-knowledge'],
+  linkedRecipeItemUuid: ['access-and-knowledge'],
+  teaser: ['access-and-knowledge'],
 };
 
 /** Every top-level key `_normalizeSystem` actually emits. */
@@ -198,6 +293,24 @@ describe('the field -> domain completeness gate, in both directions', () => {
         .sort(),
       [],
       'and no classified recipe key is a phantom'
+    );
+  });
+
+  it('classifies every SYSTEM field to exactly the approved domains', () => {
+    assert.deepEqual(
+      Object.fromEntries(
+        Object.entries(SYSTEM_FIELD_DOMAINS).map(([field, domains]) => [field, [...domains]])
+      ),
+      APPROVED_SYSTEM_FIELD_DOMAINS
+    );
+  });
+
+  it('classifies every RECIPE field to exactly the approved domains', () => {
+    assert.deepEqual(
+      Object.fromEntries(
+        Object.entries(RECIPE_FIELD_DOMAINS).map(([field, domains]) => [field, [...domains]])
+      ),
+      APPROVED_RECIPE_FIELD_DOMAINS
     );
   });
 

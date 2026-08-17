@@ -2,6 +2,7 @@ import { describe, it, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { CRAFTING_DATA_CHANGED_HOOK as PRODUCER_HOOK } from '../../src/systems/craftingDataChange.js';
+import { INVALIDATION_DOMAIN_NAMES } from '../../src/systems/invalidationDomains.js';
 import {
   subscribeInventoryChange,
   subscribeCraftingDataChange,
@@ -171,6 +172,51 @@ describe('subscribeCraftingDataChange', () => {
     assert.equal(hooks.count('fabricate.recipesChanged'), 0);
     unsubscribe();
     assert.equal(hooks.count(CRAFTING_DATA_CHANGED_HOOK), 0);
+  });
+
+  it('mirrors the producer-side DOMAIN NAMES exactly', () => {
+    // The routing predicate holds the seven names as a literal for the same reason it holds the
+    // hook name as one — no new import may enter this module. This is what stops the mirror
+    // drifting, and an eighth domain added to the taxonomy without updating the mirror would
+    // route every change naming it BROADLY, which is safe but is the narrowing silently lost.
+    const seen = [];
+    subscribeCraftingDataChange((payload) => seen.push(payload.scopes[0].domains[0]));
+    for (const domain of INVALIDATION_DOMAIN_NAMES) {
+      hooks.fire(CRAFTING_DATA_CHANGED_HOOK, change(domain));
+    }
+    assert.deepEqual(seen, [...INVALIDATION_DOMAIN_NAMES]);
+    assert.equal(
+      readCraftingDataFallbackCount(),
+      0,
+      'every shipped domain name must be one this module recognises; a name it does not know ' +
+        'falls to the broad fallback and would move this counter'
+    );
+  });
+
+  it('routes broadly when EVERY domain a change names is unrecognised', () => {
+    // The one input class that would otherwise route NARROW when it must route broad: an
+    // unknown name yields a non-empty set intersecting no subscriber's wanted set, so nothing
+    // refreshes and the counter does not move — a stale read model wearing the appearance of
+    // correct narrowing. Unreachable from today's producers, and reachable the moment #1092
+    // replicates a payload between clients on different module versions.
+    let calls = 0;
+    subscribeCraftingDataChange(() => (calls += 1), { domains: ['labelling'] });
+
+    hooks.fire(CRAFTING_DATA_CHANGED_HOOK, change('a-domain-from-a-newer-build'));
+
+    assert.equal(calls, 1, 'an unrecognised classification is not a licence to skip the store');
+    assert.equal(readCraftingDataFallbackCount(), 1, 'and it is counted as the fallback it is');
+  });
+
+  it('narrows on the RECOGNISED names when a change mixes known and unknown', () => {
+    const seen = [];
+    subscribeCraftingDataChange(() => seen.push('labelling-subscriber'), { domains: ['labelling'] });
+    subscribeCraftingDataChange(() => seen.push('narrative-subscriber'), { domains: ['narrative'] });
+
+    hooks.fire(CRAFTING_DATA_CHANGED_HOOK, change('labelling', 'a-domain-from-a-newer-build'));
+
+    assert.deepEqual(seen, ['labelling-subscriber'], 'the known half still narrows');
+    assert.equal(readCraftingDataFallbackCount(), 0);
   });
 
   it('mirrors the producer-side hook name exactly', () => {

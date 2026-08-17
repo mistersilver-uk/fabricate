@@ -2922,11 +2922,11 @@ There are seven, and the set is closed.
 | Domain | Facts it covers |
 | --- | --- |
 | `labelling` | Names, images, categories, tags and sort keys |
-| `narrative` | Authored prose — recipe, step, system, component, tool and recipe-item descriptions. NOT a gathering realm's description, which is classified under the three domains the gathering store consumes instead: that store does not consume `narrative`, so filing realm prose here would leave it unable to reach the only store that renders it |
+| `narrative` | All authored prose CARRIED ON THE CRAFTING-DATA CHANNEL — recipe, step, system, component, tool and recipe-item descriptions. The qualifier is load-bearing and the unqualified reading is a trap. Gathering realm and task prose are outside it: a realm description is classified under domains the gathering store DOES consume, task prose travels on the gathering-environments channel instead, and that store consumes no `narrative` — so filing either here would leave it unable to reach the only surface that renders it. Teaser prose is outside it too: the whole teaser object is gate configuration and is classified `access-and-knowledge`, prose included, so that one fact has one answer |
 | `materials-and-yield` | Ingredient sets and groups, set essences, results, steps |
 | `resolution-config` | Tools, currency alternatives, checks, resolution modes, tool breakage, modifiers and requirements |
 | `component-definitions` | Component, tool and essence definitions |
-| `access-and-knowledge` | Teasers, recipe-item definitions, learned and discovery state |
+| `access-and-knowledge` | Teasers in whole (their prose included), recipe-item definitions, and the authored configuration gating learning and discovery — visibility mode, recipe visibility, character prerequisites, per-recipe grants and locks. A viewer's own learned and discovered state is NOT here: it lives in actor flags rather than in a definition record, and the field classification covers top-level keys of a persisted record only |
 | `held-inventory` | Actor-held items |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
@@ -2942,8 +2942,16 @@ There are seven, and the set is closed.
 | **The batch attribution is per record** | A change naming several records MUST attribute domains per record. A flat union applies every listed domain to every listed record, which is the over-broad invalidation this contract exists to remove, at batch scale. |
 | **Unattributable means EVERYTHING** | A change no domain can be attributed to — a corpus reordering, an unrecognised payload, a field the classification does not name — MUST invalidate every consumer. Over-broad invalidation is a performance defect; a stale read model is a correctness one. |
 | **Coalesced per batch** | A batch or import MUST produce ONE invalidation boundary carrying every record's attribution, not one per record and not one per storage leg. |
+| **A consumer set is CLOSED OVER DERIVED GATES** | A store that consumes a derived gate consumes every domain feeding that gate's INPUTS, not merely the domains of the gate's output. A consumer column derived from direct fact reads cannot see a gate, because the store reads the gate's boolean and never reads the facts behind it — and the resulting under-consumption produces a well-formed, correctly attributed change that no fail-safe can catch. Every store's set MUST therefore be closed over the system-validity gate, the recipe-access evaluation, the cheap-availability projection and the browse-status derivation. |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
+
+Closing the five stores over those four gates moves exactly one of them.
+`crafting`, `inventory` and `alchemy` consume all seven domains already, so no closure can widen them.
+`journal` already consumes every domain feeding all four gates — the recipe-access evaluation it reads for redaction is `access-and-knowledge` plus `held-inventory` for the owned-copy branch, both of which it consumes.
+`gathering` gains `resolution-config` and `materials-and-yield` from the system-validity gate, taking it from three domains to five.
+
+`journal`'s exclusion from `narrative` survives the closure, and is structurally robust rather than incidental: the run journal's redaction reads a single boolean off the access result, and the builder has NO prose-bearing output field at all — its three flavour fields are hardcoded empty literals and every other value it emits is a name, an image, a structural count or a boolean, so prose returned by a collaborator would have nowhere to land.
 
 The single routing decision this taxonomy exists to make observable is that the run journal does NOT consume `narrative`: it reads no authored description anywhere.
 A description-only edit therefore MUST NOT rebuild it, and that assertion MUST be made from a WARMED counter — a "did not rebuild" assertion against a cold fixture compares zero with zero and observes nothing.

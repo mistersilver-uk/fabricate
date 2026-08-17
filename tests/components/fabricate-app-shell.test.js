@@ -230,8 +230,14 @@ describe('FabricateAppRoot shell', () => {
     // `tests/invalidation-domain-signal.test.js`, which subscribes through the shipped
     // `STORE_DOMAINS[GATHERING]` and asserts which changes reach it. What that cannot see is
     // whether THIS view uses the same set, because this view's subscription is not what it
-    // drives. Pinned at the source for the same reason `main.js`'s hook registrations are:
-    // the alternative is a second mounted harness whose only claim would be this one line.
+    // drives. Pinned at the source, and the guard is not vacuous — mutating the derived set to
+    // an inline list reddens it.
+    //
+    // A mounted proof is genuinely available and was weighed rather than assumed away:
+    // `GatheringView` is already mounted by three suites, all of which now carry
+    // `invalidationDomains.js` in their allowlists, so what is missing is a `Hooks` fake and a
+    // `load` counter rather than a harness. It is worth adding when one of those suites next
+    // needs a `Hooks` fake for its own reasons; standing one up for this single line is not.
     assert.match(
       gatheringSource,
       /subscribeCraftingDataChange\([\s\S]{0,120}domains: STORE_DOMAINS\[INVALIDATION_STORES\.GATHERING\]/,
