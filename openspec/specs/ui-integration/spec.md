@@ -3396,6 +3396,8 @@ They stay native `button` elements carrying `aria-current`, and they do not take
 The region's name is therefore the rail sub-item's visible label, and Core states the sub-item's element id once and threads it to the panel rather than mirroring the literal across the two components.
 - **Entering the route in provider mode brings the rail's Downtime sub-items into view.**
 The navigation rail scrolls, the Downtime group is its last entry, and this is the only route entered by activating a group PARENT rather than an already-visible sub-item, so the group can expand below the rail's fold; Core scrolls the submenu into view on arrival, and the scroll is a no-op when the sub-items already fit.
+The guarantee holds when the submenu fits within the rail's scroll box.
+A provider declaring more tabs than the rail can show at once still scrolls to the submenu's start, leaving its later sub-items reachable by scrolling rather than on screen — degraded, not stranded, because the rail lock is what prevents them being hidden outright.
 Core-fallback is excluded: its tab strip is a second, always-visible switcher in that state.
 - **Focus recovery on a provider change is mode-aware.**
 When a registration, deregistration or contained fault removes the node that held focus, and focus was inside the route's panel, Core focuses whichever element names the active tab in the mode now live: the panel region in provider mode, and Core's own tab button in core-fallback.
