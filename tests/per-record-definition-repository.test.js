@@ -433,8 +433,12 @@ describe('call counts are the acceptance criterion, not an optimisation', () => 
   // record as a no-op" above.
 
   it('a delete later in the batch cancels the pending put, so nothing is rewritten first', async () => {
+    // Seeded EMPTY on purpose, and the id is UNINDEXED. With `r1` already stored, the
+    // surviving-keys assertion below reads `[]` whether or not the delete cancels the put, so
+    // only the leg assertion would discriminate. Starting empty makes both halves
+    // load-bearing: without the cancellation this batch CREATES `r1` and leaves it in
+    // storage — a batch that ended by saying "delete r1" having brought it into existence.
     const host = new SettingHost();
-    seed(host, [recipe('r1')]);
     const repository = makeRepository(host);
 
     await repository.runBatch(async () => {
@@ -444,10 +448,14 @@ describe('call counts are the acceptance criterion, not an optimisation', () => 
 
     assert.deepEqual(
       host.legs,
-      ['delete'],
+      [],
       'an uncancelled put would write a record the same batch already said to remove'
     );
-    assert.deepEqual(host.collection.keys(), []);
+    assert.deepEqual(
+      host.collection.keys(),
+      [],
+      'and nothing was brought into existence by a batch that ended by removing it'
+    );
   });
 
   it('serves every read from the index, with no further collection scan and no linear find', async () => {
@@ -880,6 +888,31 @@ describe('every call verifies what came back', () => {
     assert.equal(reported.length, 1, 'and its failure was reported rather than swallowed');
     assert.match(String(reported[0][0]), /batch flush failed/);
     assert.match(String(reported[0][1]?.message ?? ''), /create returned 0 of 1 documents/);
+  });
+
+  it('rejects when the body SUCCEEDS and only the mandated flush fails', async () => {
+    // The other half of the pair above, and the one that had no test. While the flush lived
+    // inside a `finally`, its rejection propagated as a language guarantee. Moving it out —
+    // required, because a `throw` in a `finally` is `no-unsafe-finally` and abandons any
+    // in-flight completion — turned that guarantee into an ordinary statement that can be
+    // deleted. Without this, removing the rethrow leaves the whole suite green while a batch
+    // whose write failed resolves as success, and the manager's in-memory corpus sits ahead
+    // of storage with nothing raised and nothing logged: the `console.error` channel only
+    // fires on the body-threw path.
+    const host = new SettingHost();
+    host.vetoedKeys.add(`${RECIPE_KEY_PREFIX}r1`);
+    const repository = makeRepository(host);
+
+    await assert.rejects(
+      repository.runBatch(async () => {
+        await repository.put(recipe('r1'));
+        return 'the body succeeded';
+      }),
+      /create returned 0 of 1 documents/
+    );
+
+    assert.deepEqual(host.legs, ['create'], 'the flush was attempted');
+    assert.deepEqual(host.collection.keys(), [], 'and nothing landed, so storage is behind memory');
   });
 });
 

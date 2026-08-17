@@ -524,18 +524,22 @@ describe('main.js settings hook wiring (issue 1080 -b)', () => {
       creationAt < readyAt,
       'the coalescer must be published before the ready handler, because initialize() runs inside it'
     );
+    // Pinned as a LINE holding just the property. `[^}]*` spanned comments inside the object
+    // literal, so the earlier form stayed green with the property deleted and a comment
+    // mentioning it left behind - the exact defect this pin exists to catch.
     // Pinned as the PROPERTY the bridge is handed, not as the identifier appearing
     // somewhere in the file. A bare `\brecipeRefresh\b` is satisfied by the comment above
     // the declaration, so it stays green with the coalescer wired to nothing at all.
     assert.match(
       mainSource,
-      /const fabricateSettingChangeTargets = \(\) => \(\{[^}]*\brecipeRefresh\b[^}]*\}\);/,
+      /^\s+recipeRefresh,?\s*$/m,
       'every leg must actually hand the coalescer to the bridge'
     );
     // And published, because the bracket does no work for the client that WROTE the batch —
     // `applyReplicatedRecordChange` returns false there, so it never signals — while every
     // client it does work for is one this `ready` closure is invisible to. Without a route
     // to a caller, `open`/`close` is a contract with no implementation.
-    assert.match(mainSource, /fabricate\.recipeRefresh = createRecipeRefreshCoalescer\(\);/);
+    // Anchored for the same reason: unanchored, a commented-out publish line still matches.
+    assert.match(mainSource, /^fabricate\.recipeRefresh = createRecipeRefreshCoalescer\(\);$/m);
   });
 });

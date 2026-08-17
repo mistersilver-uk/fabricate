@@ -206,6 +206,14 @@ export class CraftingDefinitionRepository {
    * into a single flush when the outermost batch completes.
    *
    * Nested batches join the outer one. A throw inside `work` propagates and the
+   *
+   * **Which error wins when BOTH the body and the mandated flush fail is adapter-specific,
+   * and deliberately unspecified here.** The settings adapter flushes inside a `finally`, so
+   * the flush's rejection replaces the body's. The per-record adapter reconciles them
+   * explicitly and lets the BODY's error win, reporting the flush failure on its own
+   * channel — it cannot use a `finally`, because a `throw` there is `no-unsafe-finally` and
+   * abandons any in-flight completion. Both satisfy this contract; a caller that needs one
+   * or the other must not assume, and a future adapter should say which it does.
    * pending flush is still issued, because the in-memory maps have already been
    * mutated by the calls that succeeded — dropping the write would leave storage
    * behind memory, which is the worse of the two failures.

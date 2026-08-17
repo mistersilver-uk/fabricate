@@ -124,8 +124,33 @@ class ReplicatingRepository extends GranularRecordingRepository {
   }
 }
 
+/**
+ * `metadata` is FIXED rather than omitted, and that is load-bearing rather than tidy.
+ *
+ * `Recipe`'s constructor stamps `{created: Date.now(), modified: Date.now(), ...}` whenever
+ * the data omits it, and `projectRecipe` includes `metadata`. So a held Recipe and a wire
+ * Recipe built from the same literal are structurally UNEQUAL whenever a millisecond
+ * boundary falls between their two constructions — which made
+ * `reports NO change for an identical record` flaky at roughly 1 run in 200. Pinning the
+ * value removes the clock from the comparison without weakening it: every other field still
+ * participates, and a real change in any of them still reports changed.
+ */
+const FIXED_METADATA = Object.freeze({
+  created: 1_700_000_000_000,
+  modified: 1_700_000_000_000,
+  author: 'Fixture',
+  version: '1.0.0',
+});
+
 function recipeData(id, overrides = {}) {
-  return { id, name: `Recipe ${id}`, craftingSystemId: 'sys-1', enabled: true, ...overrides };
+  return {
+    id,
+    name: `Recipe ${id}`,
+    craftingSystemId: 'sys-1',
+    enabled: true,
+    metadata: { ...FIXED_METADATA },
+    ...overrides,
+  };
 }
 
 /**
