@@ -220,10 +220,21 @@ function makeProvider({ id = 'downtime', throwOnMount = false } = {}) {
   return { provider, calls };
 }
 
-function fakeServices() {
+/**
+ * The shared player services the shell reads.
+ *
+ * `selectedActorId` defaults to the EMPTY STRING rather than to `null`, because that is what
+ * `createActorBarStore` initialises and clears its selection to — and the context contract
+ * normalises it to `null`. A case that wants a real selection passes one; nothing else changes.
+ *
+ * @param {object} [options] Selection state the actor bar holds.
+ * @param {string} [options.selectedActorId] The bar's raw selection.
+ * @returns {object} The services object the shell is given.
+ */
+function fakeServices({ selectedActorId = '' } = {}) {
   return {
     actorBar: {
-      selectedActorId: '',
+      selectedActorId,
       selectableActors: [],
       loaded: true,
       conditions: null,
@@ -246,9 +257,15 @@ function fakeServices() {
  */
 function makeHost(registry, initialTab = DEFAULT_TAB) {
   let activeTab = initialTab;
+  let selectedActorId = '';
   return {
     get activeTab() {
       return activeTab;
+    },
+    // The window-wide Actor selection, changed as `ActorSelectTopBar` would change it: the next
+    // `props()` carries the new value, exactly as the application host re-reads the store.
+    selectActor(actorId) {
+      selectedActorId = actorId;
     },
     props() {
       return {
@@ -257,7 +274,7 @@ function makeHost(registry, initialTab = DEFAULT_TAB) {
         onSelectTab: (tab) => {
           activeTab = tab;
         },
-        services: fakeServices(),
+        services: fakeServices({ selectedActorId }),
         extensionSurfaces: deriveExtensionSurfaces(registry),
         playerExtensions: registry,
       };
@@ -814,5 +831,53 @@ describe('FabricateAppRoot companion context stability (mounted)', () => {
     assert.equal(pushes.length, 1, 'the replay really did push a second snapshot');
     assert.equal(calls.mounts.length, 1, 'opening the window calls the companion mount ONCE');
     assert.deepEqual(calls.cleanups, [], 'and never tore it down and rebuilt it mid-open');
+  });
+
+  // THE OTHER DIRECTION, and the one with teeth. `FabricateAppRoot`'s `CONTEXT_VALUE_KEYS` is a
+  // hand-maintained mirror of the frozen context literal it compares, and it is what the
+  // memoization proved above keys on — so a key MISSING from that list fails silently rather than
+  // loudly: the shell republishes the STALE context and the companion keeps a value the window no
+  // longer holds. `surfaceId`, `tabId` and `revision` are covered by the cross-surface swap, the
+  // tab-change hook case and `requestRemount` respectively; these two cover the remaining pair.
+  it('remounts with a fresh context when the shared actor selection changes', async () => {
+    const { calls, host } = await mountOnCompanionTab();
+    assert.equal(calls.mounts[0].context.actorId, null, 'nothing is selected to begin with');
+
+    host.selectActor('actor-7');
+    await harness.setProps(host.props());
+
+    assert.equal(calls.mounts.length, 2, 'a change of actor produces a new context and a remount');
+    assert.equal(
+      calls.mounts[1].context.actorId,
+      'actor-7',
+      'and the companion is handed the NEW selection rather than a memoized stale one'
+    );
+    assert.deepEqual(
+      calls.cleanups,
+      [{ tabId: 'board', connected: true }],
+      'the outgoing mount was cleaned up first, while its target was still connected'
+    );
+  });
+
+  it('remounts with a fresh context when the GM role behind isGM changes', async () => {
+    const { calls, host } = await mountOnCompanionTab();
+    assert.equal(calls.mounts[0].context.isGM, false, 'the fixture user is not a GM to begin with');
+
+    // `isGameMaster()` reads the Foundry global at derivation time and subscribes to nothing, so
+    // a republication is what recomputes it. Restored in `finally` so a failed assertion cannot
+    // leak a GM user into the cases that follow.
+    globalThis.game.user = { isGM: true };
+    try {
+      await harness.setProps(host.props());
+    } finally {
+      delete globalThis.game.user;
+    }
+
+    assert.equal(calls.mounts.length, 2, 'the changed value produces a new context and a remount');
+    assert.equal(
+      calls.mounts[1].context.isGM,
+      true,
+      'and the companion sees the promotion rather than the context it was first given'
+    );
   });
 });

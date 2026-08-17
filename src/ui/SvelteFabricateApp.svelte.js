@@ -557,8 +557,11 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
     // Companion UI owns its own DOM and cleanup. Dispose it before `super.close()` unmounts
     // the Svelte root, so its mount target is still connected: `unmount()` destroys the root
     // effect and `destroy_effect` removes the effect's DOM BEFORE running teardowns, so every
-    // `onDestroy` in the tree runs against an already-detached target. This is the only
-    // connected-target teardown path there is.
+    // `onDestroy` in the tree runs against an already-detached target. This is the WINDOW-CLOSE
+    // half of the connected-target teardown, not the whole of it: `FabricateAppRoot`'s surface
+    // `$effect.pre` is the other caller, disposing while connected when the tab leaves a
+    // companion route, moves to a different companion surface, or the active provider
+    // unregisters under its own live tab.
     this._svelteComponent?.disposePlayerProvidersBeforeRemoval?.();
     const result = await super.close(options);
     // Fire the canvas re-prompt callback AFTER the window has fully closed (issue
