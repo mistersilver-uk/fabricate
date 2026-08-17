@@ -126,11 +126,15 @@
 </div>
 
 <style>
+  /*
+    NO `min-height` here. The panel's scroller is `.downtime-preview-scroll` in the host, which
+    takes the host grid's `minmax(0, 1fr)` row and already scrolls whenever the preview outgrows
+    it — the connected tab card sits in the `auto` row below and stays reachable either way. A
+    720px floor did not add that behaviour; it only padded the panel out past its own content, so
+    at ordinary window heights the route scrolled a screenful of empty surface.
+  */
   .downtime-preview {
     container-type: inline-size;
-    /* Keep the preview workspace independently scrollable at the Manager's supported
-       short and narrow window sizes; the connected tab card stays reachable below it. */
-    min-height: 720px;
     min-width: 0;
     padding: 18px 20px 24px;
     color: var(--fab-text);

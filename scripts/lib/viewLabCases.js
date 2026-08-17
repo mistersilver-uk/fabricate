@@ -3669,8 +3669,11 @@ export const VIEW_LAB_CASES = Object.freeze([
       expectCenterHit: '.downtime-preview:not([hidden]) .downtime-cta',
       expectClick: '.downtime-preview:not([hidden]) .downtime-cta',
       expectNoHorizontalOverflow: ['[data-world-downtime-host]', '.manager-main', '.manager-body'],
+      // The pane OWNS the vertical overflow at every size, which is what `expectOverflowY`
+      // states. It does not overflow at 1330x900 — the preview fits — so no `expectScrollable`
+      // here; `manager-world-downtime-narrow` is the frame whose window really cannot hold it
+      // and is where that proof lives. See the note in `tests/view-lab-cases.test.js`.
       expectOverflowY: '.downtime-preview-scroll',
-      expectScrollable: '.downtime-preview-scroll',
       position: { width: 1330, height: 900 },
       kinds: ['manager', 'world', 'downtime'],
       sourceMatches: [
@@ -3779,8 +3782,9 @@ export const VIEW_LAB_CASES = Object.freeze([
       { container: '#manager-world-nav-downtime', target: '#manager-world-nav-downtime > i' },
     ],
     expectNoHorizontalOverflow: ['[data-world-downtime-host]', '.manager-main', '.manager-body'],
+    // Collapsing the rail WIDENS the pane, so this frame overflows even less than the tab
+    // frames above — same reasoning, same owner for the scrolling proof.
     expectOverflowY: '.downtime-preview-scroll',
-    expectScrollable: '.downtime-preview-scroll',
     expectCenterHit: '.downtime-preview:not([hidden]) .downtime-cta',
     expectClick: '.downtime-preview:not([hidden]) .downtime-cta',
     position: { width: 1330, height: 900 },
