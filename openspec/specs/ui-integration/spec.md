@@ -322,7 +322,8 @@ Responsive layout rules for application bodies must therefore be keyed to the ap
 - The player `Gathering` view's three columns (environments list, centre detail, right inspector) all carry the same non-zero minimum width so the centre column cannot collapse to nothing ahead of the side columns; the three columns scale down together proportionally as the window narrows.
   Below the combined three-column minimum the columns reflow into a single vertical stack so the view stays usable instead of clipping or overflowing.
 - The player `Crafting` view's requirement rail responds to its own app container width: slot tiles wrap onto further rows rather than shrinking below their minimum tile size, and the essence pool's carrier and requirement bars reflow rather than crushing when a set carries three or more essence requirements.
-- The unified Fabricate window enforces a minimum window width and height, derived from the gathering view's column minimums plus the navigation rail and chrome, so a resize can never shrink the window below the size where the columns would be clipped.
+- The unified Fabricate window enforces a 1024x640 minimum window size, derived from the gathering view's column minimums plus the navigation rail and chrome, so a resize can never shrink the window below the size where the columns would be clipped.
+  §Player Navigation Extension states its no-horizontal-overflow guarantee at that floor.
 - These responsive rules are presentation-only.
   They must not change crafting, gathering, inventory, alchemy, journal, validation, task visibility, attemptability, or persistence behaviour.
 
@@ -3340,7 +3341,10 @@ Alchemy makes that the DEFAULT case: brewing is never gated by visibility, and d
 - Because a redacted model carries no `recipeId`, `Fabricate#advanceCraftingRun` resolves the recipe from the PERSISTED RUN rather than from its caller.
 The client-supplied `recipeId` is ignored; trusting it also allowed advancing one run while naming another run's recipe.
 
-### Downtime Preview and Premium Extension
+## Downtime Preview and Premium Extension
+
+This section is GM Manager scope throughout.
+Every premium signal it requires — the title-bar badge, the rail chip, the padlocks and the Patreon call to action — belongs to the Manager window and to no other; §Player Navigation Extension forbids all of them in the player window.
 
 - The GM Manager's permanent World navigation contains both `Parties` and `Downtime`.
 - `Parties` retains its identifiers, count, availability, route-exit behavior, CRUD, membership, travel-actor validation, realm resolution, `GatheringParty` aggregate, and `fabricate.gatheringParties` persistence unchanged.
@@ -3393,12 +3397,16 @@ It is not a downtime feature; Downtime is its first consumer.
 - One page-session API-v1 registry is published as `game.fabricate.api.playerExtensions.registerPlayerNavProvider(provider)` and survives the `init` and `ready` API rebinding.
 - The registry holds at most one provider per surface id, rejects only a second provider for the same surface, and never enumerates the ids it accepts.
 Core renders every registered surface, so no surface id is privileged.
+- **A surface snapshot is the frozen `{ surfaceId, provider }` set Core derives from the registry**, in the registry's own registration order, re-derived on every registration, unregistration and re-registration.
+The snapshot rather than the registry is what the player window renders, and it is the unit the fallback and fault rules below are written against.
 - **A player surface id is the registering provider's own `id`.**
 The registry keys on it, Core has no player route of its own to name a surface independently, and the two are therefore always equal — including in the hook payloads, which carry both `surfaceId` and `providerId` so the payload shape matches the Manager seam's.
 - A provider is `{ apiVersion: 1, id, tabs, mount }`.
 It declares its own tabs: any ids, at least one of them, rendered in array order.
 - Core validates tab shape only — a non-empty id unique within the set, a `label`, a Font Awesome `icon`, and optional non-empty `accessibleName` and `tooltip` — and never tab membership, count or order.
-The provider id and every tab id match a lowercase alphanumeric-and-hyphen charset bounded in length, because the composed route key is rendered into an HTML `id`, an IDREF token list, a `data-` attribute value and a query parameter.
+- **Core addresses a provider tab by a composed route key `ext:<surfaceId>:<tabId>`** rather than by its bare tab id, which is what makes a collision with a Core tab id structurally impossible without Core learning a single provider id.
+The route key is what the active-tab state, the rail button's selection attribute and the window's tab query all carry.
+The provider id and every tab id match a lowercase alphanumeric-and-hyphen charset bounded in length, because that composed key is rendered into an HTML `id`, an IDREF token list, a `data-` attribute value and a query parameter.
 This constrains the shape of an id, not the set of ids Core accepts.
 - **`label` is final display text.**
 Core renders a provider's `label` verbatim and localizes only its own tab labels, exactly as the Manager seam does.
@@ -3421,7 +3429,9 @@ No badge, no padlocked entry, no teaser tab, no upgrade offer and no subscriptio
 A companion tab exists only while its provider is registered; Core renders no placeholder for an absent companion, so a user without the companion installed sees no indication that the surface exists.
 A Core error state for a faulted surface is diagnostic, not promotional, and names no product.
 - Core calls cleanup exactly once while the target is still connected and before a tab switch, provider change, or window close removes it.
-The player application invokes the disposal before `ApplicationV2` closes and unmounts the Svelte root.
+That holds on **every** path that ends a mount — a tab change within the same surface, a tab change away to a Core tab, a tab change to a different surface, the active provider unregistering under its own live tab, and window close — including a programmatic selection Core makes on the user's behalf.
+Core reaches the disposal from outside the mounted subtree, before the state change that removes it, and the disposal is idempotent, so a second caller reaching it does not change the exactly-once count.
+A teardown that runs as part of the subtree's own destruction is a leak net and never a connected-target path, because the subtree's DOM is removed before its teardowns run; on window close the player application therefore disposes before the Svelte root is unmounted and `ApplicationV2` removes the window element.
 - Mount and cleanup faults are reported and contained.
 Partial content is cleared, **the faulted surface's tabs remain in the rail**, the active tab does not move, and Core renders its own error state in the panel naming the provider.
 The provider keeps its registration so a later snapshot may mount without the companion re-registering.
@@ -3429,13 +3439,18 @@ Focus is recovered onto the surface's rail button rather than being lost to the 
 - **A fault is recorded against the whole surface, not against the tab that threw.**
 Core keys it on the `(surfaceId, provider)` pair, so after one tab's mount fails every other tab of that same provider also renders the Core error state and Core attempts no further mount for it.
 Containment is deliberately at the provider's granularity: Core cannot tell a tab-specific failure apart from a broken provider, and retrying the sibling tabs of a provider that has already thrown would simply repeat the fault.
-A new snapshot carrying a different provider object for the surface clears it, which is what "a later snapshot may mount" means.
+- **A recorded fault clears on exactly two paths, and re-registering the identical provider object is neither of them.**
+A new snapshot carrying a **different provider object** for the surface clears it, which is what "a later snapshot may mount" means, so a companion recovering from a fault registers a fresh provider object rather than the one that threw.
+**Closing and reopening the player window clears it too**: the record lives on the window's shell, closing discards the shell, and the next open therefore mounts the same provider object with nothing recorded against it.
+That second path is the recovery Core's own error state promises the user in words, so it is a requirement rather than an artefact of where the record happens to sit.
+Bringing an already-open window to the front is not a reopen — the shell and its record both survive it — and clears nothing.
 - When a provider registers, unregisters, or re-registers with a different tab set, an active route key the new set no longer offers falls back to the default Core tab rather than leaving an empty panel.
 - **The rail button is a native button with a tab role inside a vertically-oriented tablist.**
 Its accessible name is its visible label; a supplied `accessibleName` replaces that name and must therefore contain the visible label text, and a supplied `tooltip` is exposed through `aria-describedby`.
 Rail buttons carry stable per-tab identity, `aria-controls` referencing the content panel, roving `tabindex`, and Up/Down/Home/End focus-and-activation; the content panel is labelled by the active rail button.
 The visible rail label truncates with an ellipsis rather than overflowing its button, and the untruncated text is what `accessibleName` and `tooltip` are for.
-- **Core guarantees the rail, the panel's geometry and no horizontal overflow at the minimum window size.**
+- **Core guarantees the rail and the extension panel's geometry, and that neither the rail nor the panel overflows horizontally at the player window's enforced 1024x640 minimum size** (§Responsive Product UI).
+The rail-label truncation above is what makes that hold for a provider label of any length.
 The extension panel is full-height with no padding, background, scroller or containment of its own: `.fabricate-app-content` owns the scroll, and Core establishes no CSS container so a companion's fixed-position content positions against the viewport.
 Responsive behaviour of content _inside_ the target is the companion's, and a companion that wants container queries declares its own container on its own root, whose inline size is the panel's.
 - Core owns the player window shell, nav rail, active-tab state, target and teardown, and exactly one **subscriber** per window reads each registry.
