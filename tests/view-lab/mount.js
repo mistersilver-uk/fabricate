@@ -444,7 +444,10 @@ function labDowntimeProvider() {
           subtitle: 'Crew member · two projects in flight',
           breadcrumb: 'Marn',
           actionsLabel: 'Crew member actions',
-          image: 'icons/commodities/treasure/token-gold-gem.webp',
+          // An asset the LAB serves. A Foundry core path resolves in a real world and 404s
+          // here, and the harness treats a console error during render as a failure -- so a
+          // core icon would fail the capture rather than merely render a broken medallion.
+          image: 'assets/img/fabricate-logo.jpg',
           status: { label: 'Unsaved' },
           actions: [
             {
@@ -462,11 +465,16 @@ function labDowntimeProvider() {
               onSelect: () => {},
             },
             {
+              // NOT `closeEditor`. The case asserts this control accepts a real click, and the
+              // harness does that by clicking it and then re-reading the element it clicked. A
+              // handler that tears down the chrome takes the button with it, so the re-read
+              // waits for a locator that will never resolve again. Saving should not pop the
+              // route anyway -- only Back does.
               id: 'lab-save',
               label: 'Save crew member',
               tone: 'primary',
               icon: 'fas fa-save',
-              onSelect: closeEditor,
+              onSelect: () => {},
             },
           ],
         });
@@ -482,11 +490,7 @@ function labDowntimeProvider() {
           'background:var(--fab-bg-2)'
       );
       panel.append(
-        element(
-          'h2',
-          'flex:0 0 auto;margin:0;font-size:14px',
-          `Downtime Studio — ${tabId}`
-        )
+        element('h2', 'flex:0 0 auto;margin:0;font-size:14px', `Downtime Studio — ${tabId}`)
       );
       panel.append(openEditor);
       const scroller = element(
