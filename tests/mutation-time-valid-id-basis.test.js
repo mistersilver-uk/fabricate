@@ -29,6 +29,7 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 import { installFoundryEnv } from './helpers/foundryEnv.js';
+import { stripComments } from './helpers/sourceScan.js';
 import { seedKnownCompleteValidIdBasis } from './helpers/validIdBasis.js';
 
 const { DEFINITION_STORAGE_LAYOUTS, DEFINITION_STORAGE_TARGETS, SETTING_KEYS } = await import(
@@ -707,15 +708,21 @@ test('every corpus-derived prune in the mutation paths is reached through the ga
     'src/systems/RecipeManager.js',
     'src/systems/CraftingSystemManager.js',
   ]) {
-    const lines = readSource(relative).split('\n');
+    // Comment text is BLANKED before the scan, never filtered after it. The `sweep:`
+    // exemption is tested against the whole line, so a TRAILING comment carrying that token
+    // waives a live ungated call: `cleanupInvalidRuns(new Set(), new Set()); // sweep: n/a`
+    // was proven to pass this guard while pruning player-owned run data. A leading-marker
+    // filter cannot see it, because the line does not begin with a marker. Same shape as
+    // `tests/actor-type-literal-gate.test.js`, which is why `stripComments` is shared.
+    const lines = stripComments(readSource(relative)).split('\n');
     const ungated = lines
       .map((line, index) => ({ line, number: index + 1 }))
       .filter(({ line }) => DESTRUCTIVE.test(line))
-      .filter(({ line }) => !/^\s*(\*|\/\/)/.test(line))
       .filter(({ line, number }) => {
         // The call may sit on the `sweep:` line itself or be wrapped onto the next one.
+        // `async` is admitted: a legitimate `sweep: async () =>` wrap is not an ungated call.
         const previous = lines[number - 2] ?? '';
-        return !/sweep:/.test(line) && !/sweep:\s*\(\)\s*=>\s*$/.test(previous);
+        return !/sweep:/.test(line) && !/sweep:\s*(?:async\s*)?\(\)\s*=>\s*$/.test(previous);
       });
     assert.deepEqual(
       ungated.map(({ number, line }) => `${relative}:${number} ${line.trim()}`),
