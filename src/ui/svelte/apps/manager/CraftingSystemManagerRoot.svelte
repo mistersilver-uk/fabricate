@@ -4215,8 +4215,10 @@
   }
 
   // `nextRouteId` is the identity of the SUBJECT the caller is navigating to, for the
-  // routes whose view token does not change when the subject does. Only the essence guard
-  // reads it today; every other caller keeps its one-argument shape.
+  // routes whose view token does not change when the subject does. Inside this cascade only
+  // the essence guard reads it; `confirmRouteExit` also reads it for the Downtime tab a
+  // companion's navigation guard is being asked about. Every other caller keeps its
+  // one-argument shape.
   function confirmRouteExitGuards(nextView, nextRouteId = '') {
     const environmentConfirmed = confirmEnvironmentRouteExit(nextView);
     if (isPromise(environmentConfirmed)) {
