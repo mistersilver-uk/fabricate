@@ -1036,6 +1036,10 @@ Represent one curated item entry available to recipes and salvage operations.
     Once components are extracted into per-record documents (see `### Granular Definition Storage`) the same run persists as AT MOST THREE bulk document operations for the whole batch — creates, then updates, then deletes last — still independent of the number of imported items and of the number of mapped folders, and still with exactly one change signal at completion.
     Extraction also makes such a run span TWO storage classes: the component documents, and the `craftingSystems` write that still carries essences, tools, item tags and categories.
     That is the trigger condition of `## Foundry Multi-Write Invariants`, so the per-folder category/tag set-apply this bound already covers becomes a multi-write and must declare its forward-write order ACROSS the two classes, not only within each.
+    The bound gains a DIFFERENTIAL-COST half, which an operation count does not imply: a run that NAMES the systems it touched must not diff another system's records.
+    A bare whole-corpus flush is explicitly NOT a violation of that half.
+    A run that names nothing is telling the repository it does not know what moved, which is exactly what a deferred-persistence batch flushes with, and narrowing it would drop the in-place mutations such a batch relies on being flushed.
+    What the whole-corpus flush costs is a COMPARISON rather than a write: it diffs every system's extracted records against the index, emitting no extra write and no extra replication.
 13. `Component.category` defaults to `general`.
     Every component normalizes to at least the reserved `general` bucket; there is no "uncategorized" state.
     A custom token is free text surfaced verbatim; only `general` is localized.
@@ -2783,6 +2787,19 @@ A tear before the delete leg leaves records that should be gone still present �
 A tear after a delete leg would leave referents destroyed while their referrers were never updated: silent referential corruption on a world that looks fully converted at the next boot, with no detector.
 The declared order is what makes that state unreachable, so it satisfies the declared-forward-write-order clause of `## Foundry Multi-Write Invariants` rather than merely being an implementation detail.
 
+**The flush order is normative ACROSS storage classes, not only within one.**
+When one operation writes an extracted class and its container, the declared forward order is: the extracted class's creates and updates; then the container's single write; then the extracted class's deletes.
+Two independent arguments require it and both MUST hold.
+The extracted class's leg is the only one that can PARTIALLY commit, so issuing it first minimises the cross-class states a tear can produce.
+And a container carries REFERENCES INTO the extracted class, so deleting extracted records before the container write leaves referents destroyed while their referrers were never updated — the state the intra-class rule already forbids, reappearing at the class boundary.
+The destructive leg is therefore last GLOBALLY rather than last within its own class.
+A third argument makes the choice durable independently of the two above: reverse-compensating a delete cannot restore document identity, so a delete-free first phase is the only phase that is compensable without identity loss.
+
+**An extraction makes a previously single-key operation a compensating transaction.**
+An operation that mutates both an extracted class and its container composes separate sequential API calls into one invariant and is therefore in scope of `## Foundry Multi-Write Invariants`, whatever it was before extraction.
+It MUST snapshot the pre-state of both classes, MUST use the declared cross-class order above, and MUST compensate in reverse.
+The connection-loss variance that section states applies to the extracted class's leg alone.
+
 **Every bulk leg verifies what came back.**
 A create can resolve with FEWER documents than requested — a `preCreateSetting` hook returning `false` drops that one and lets the rest commit — so each leg MUST compare the returned document count against the requested set and treat a shortfall as a failure.
 
@@ -2793,6 +2810,43 @@ That clause is scoped to the post-conversion state it describes: on a `singleArr
 The prohibition binds every arrangement-aware corpus accessor rather than only repositories.
 Any component that reads or writes a granularly-stored class's corpus directly MUST do so through an accessor that selects on that class's layout, and MUST NOT read or write the legacy key directly.
 The **read** is the more damaging half: it returns the registered empty default, indistinguishable from an empty world, and a corpus-global reduction over an empty remainder produces a confidently wrong result rather than a skipped one.
+
+**The read prohibition does NOT reach an extracted class's CONTAINER.**
+"The legacy key MUST NOT be written after conversion, and MUST NOT be read either" is scoped to a class's former WHOLE-ARRAY key.
+An extracted class has no such key: its former home is a SUB-KEY of a container that must still be read for every other field it carries — essences, tools, item tags, categories, checks, realms and prerequisites.
+A reader applying that sentence literally to the container would conclude it may not be read at all.
+The prohibition is therefore narrowed: for an extracted class it binds the former nested KEY as a source of records, and never the container document, and the requirement below states what replaces it.
+
+**The container record is the source of truth for the container, NEVER for the extracted class.**
+Once a class's layout is `perRecord`, a reader MUST take that class's records from the granular index and MUST ignore any residual nested key in the container record, and a writeback MUST derive its removal set from the reader's own hydrated state and NEVER from the container record's nested key.
+This is not a tidiness rule.
+A build older than the extraction has no layout awareness: it reads the container, finds the nested key absent, normalizes it to an EMPTY array, and its first ordinary save writes that empty array back.
+A reader or a writeback that trusted that key would then hold zero records and derive every granular document as a removal, destroying the whole corpus with no error and no notice.
+
+**A residual nested key is not a legacy document, and it has THREE dispositions.**
+A leftover whole-array DOCUMENT on a settled granular world is detected by document PRESENCE, because a deleted registered setting reads back as its registered default and presence is the only signal that distinguishes them.
+An extracted class has no such document: its former container survives by design and always exists, so presence carries no information and EMPTINESS takes its place as the "absent" signal.
+The dispositions are therefore three, not two.
+An ABSENT nested key is the normal post-conversion state and requires nothing.
+A PRESENT but EMPTY nested key is retried silently — the conversion's final step runs again for that record and NO report is emitted.
+The justification MUST NOT be that nothing was lost, because that is false on a reachable path: if step 3 completed and step 4 did not, the container still carries the records, a downgraded build SHOWS them, a GM may delete them all, the old build writes an empty array, and the upgrade silently reverts a deliberate deletion.
+That state is BYTE-IDENTICAL to the ordinary post-conversion downgrade-and-restore, so the two are not discriminable and no detector can separate them.
+The silent arm is therefore a deliberate choice favouring the common case, and it is safe because the container-is-not-the-source-of-truth rule above keeps the granular corpus authoritative either way — the residual harm is a re-doable deletion, never data loss.
+Canonical text records the indistinguishability and the choice rather than asserting an absence of loss, because a later reader would otherwise build a detector on a premise that does not hold.
+A PRESENT and NON-EMPTY nested key MAY carry records authored while downgraded: it is compared as a set of stored values against that container's granular records, byte-equality means the final step simply did not complete and is retried, and ANY difference is reported to the GM with both counts, left alone, and MUST NOT reach the removal derivation.
+Inheriting the two-arm rule from the document case emits a permanent alarming report on every downgraded-and-restored world, for a state that is usually harmless and, where it is not, is byte-identical to the harmless one.
+
+**The residual container size after an extraction MUST be measured.**
+An extraction's headline claim is that a single-record mutation stops re-serializing and re-replicating the whole container.
+That claim MUST be backed by a committed machine-invariant counter recording the container record's serialized size after extraction and the number of documents one single-record mutation touches, measured on a world converted THROUGH the shipped conversion rather than by hand-setting the layout.
+The document count is the load-bearing half: it is what distinguishes "wrote one record" from "wrote the corpus one record at a time".
+A projection from the pre-extraction per-record average is not a measurement.
+
+**A bulk or cascade write emits ONE change signal to a receiving client.**
+A write that touches many granular records MUST NOT make a receiving client re-read the corpus once per record or once per leg.
+The writer stamps a batch-close marker on the document operations of one logical write and marks the final leg; document operation options propagate verbatim to every receiver's hook, so the marker needs no new transport.
+The receiving client brackets its refresh on that marker and emits exactly one change signal for the whole operation, however many records and however many legs it spanned.
+The bracket belongs to the RECEIVER: a writer bracketing its own flush coalesces nothing, because its map already holds the records and it never signals.
 
 **An arrangement-aware accessor MUST refuse an unsettled corpus.**
 When the layout reads `unsettled`, the corpus is spread across both arrangements and neither can be read alone, so a whole-corpus consumer MUST refuse rather than choose an arm.
@@ -2829,6 +2883,11 @@ Components are extracted from `system.components` into records of their own; too
 A crafting system carrying an unsafe (dotted) id under requirement 28 blocks component extraction **corpus-wide** until it is repaired, and the block MUST be reported to the GM with the repair action.
 A per-system carve-out is refused deliberately: it would leave that system's components nested permanently, with no completion criterion and a dual-basis read forever, which is a worse permanent cost than a blocked upgrade with a named fix.
 The block is scoped to component extraction, so a blocked world still receives the recipe half.
+The block MUST be evaluated over the STORED container corpus BEFORE the conversion's first write, so that a refusal has written nothing.
+The stored corpus is the subject rather than any manager's map, because the conversion runs before the managers that would hold one are constructed.
+Its disposition is already governed by the refusal clause in `### The Definition Storage Target as a GM control`: both keys are left exactly as found, the world is reported, and the gate correctly keeps refusing.
+The report MUST name the offending crafting system IDS rather than a count, because the repair is per system, and MUST name the repair action requirement 28 already states.
+The block's scope MUST be covered by a test that a world carrying an ineligible system still receives the recipe conversion: a refusal raised in shared reconciliation rather than in the component conversion's own gate silently violates the sentence above.
 
 ### Storage Conversion Crash Recovery
 
@@ -2839,7 +2898,7 @@ A **Storage Layout Conversion** is the one-time operation that moves an entity c
 1. set the layout to `unsettled`;
 2. write every record differentially — create the missing, update the differing — against a freshly refreshed index;
 3. set the layout to the target value;
-4. delete the legacy whole-array document.
+4. remove the migrated records from the source — DELETE the legacy document for a whole-key conversion, or REWRITE the container without the extracted keys for an extraction.
 
 **Step 2 MUST create the missing and update the differing, and MUST NOT delete.**
 A whole-corpus reconciler that derives its removals from the supplied set MUST NOT be used, because a resume whose source key has already been reclaimed supplies an EMPTY set: the reconciler then deletes the entire converted corpus while every return-count check reports success and the operation reports that it converted.
@@ -2864,7 +2923,16 @@ A resume that starts from step 1 on a partly written corpus MUST reach the same 
 
 **The transaction extent ends at step 3.**
 The invariant this conversion establishes is "the layout value matches where the records actually are", and step 3 is what establishes it.
-**Step 4 is a separate, independently retryable envelope-reclamation operation OUTSIDE the transaction**, so a failure at step 4 completes forward: the layout is already correct, and the legacy document is debris to reclaim rather than a reason to compensate.
+**Step 4 is a separate, independently retryable operation OUTSIDE the transaction**, so a failure at step 4 completes forward.
+The reason stands on the transaction extent rather than on the form step 4 takes: the invariant step 3 establishes is already true, so what step 4 leaves behind is a stale duplicate of the corpus rather than the corpus, and rolling back would undo a correct layout to match it.
+For a whole-key conversion step 4 IS envelope reclamation and the leftover document is debris; for an extraction it is a container rewrite and what it leaves behind may not be debris at all, which the residual-nested-key requirement governs.
+
+**An extraction conversion's step 4 is a REWRITE of a surviving container, not a delete.**
+Where a whole-key conversion's step 4 deletes the legacy document, an EXTRACTION's step 4 rewrites the container without the extracted class's nested keys, because the container still carries every other field of the record.
+It is still outside the transaction, is still independently retryable, and its failure MUST still complete forward.
+It MUST NOT be described as envelope reclamation and MUST NOT inherit reclamation's debris-by-definition reasoning: it frees no envelope, and the state it leaves behind is the residual-nested-key state, whose whole point is that it may not be debris.
+Every other clause of this section transfers unchanged — awaited steps, resume from the layout alone, a convergent step 2, verification by id containment before the layout is advanced, a transaction extent ending at step 3, and compensation restoring key PRESENCE and belonging to the conversion itself.
+The rewrite MUST omit the extracted key rather than writing it empty: an absent key and an empty array are the two facts the residual detector discriminates on.
 
 **Compensation MUST restore key presence, not only value.**
 On a world that has never converted, the layout key has NO document — its registered default is served without one — and step 1 creates it.
@@ -2877,10 +2945,14 @@ The forward conversion MUST therefore record whether the layout document existed
 **Compensation is bounded by what the conversion actually wrote.**
 It is available only while steps 1 to 3 are in flight, and only for writes that were issued.
 A conversion that REFUSED before its first write MUST NOT be compensated at all: there is no prior state to restore, and writing one asserts a layout the conversion has just established it cannot describe.
-Once step 4 has begun there is nothing to compensate to — restoring the layout over a reclaimed source document is itself the loss — so a step-4 failure MUST be handled inside the conversion, MUST complete forward, and MUST NOT reach a caller that compensates.
+Once step 4 has begun there is nothing to compensate to, so a step-4 failure MUST be handled inside the conversion, MUST complete forward, and MUST NOT reach a caller that compensates.
+For a whole-key conversion the reason is that restoring the layout over a reclaimed source document is itself the loss.
+For an extraction there is no reclaimed source document at all — the container survives carrying every other field — and the reason is the same one stated for the transaction extent: the layout already describes where the records are, and reverting it would assert an arrangement the world has left.
 
 **The conversion is downgrade-lossy and MUST say so before it runs.**
-Step 4 removes the legacy document, so an older build of the module loads zero records.
+Step 4 removes the migrated records from the source, so an older build of the module cannot read them.
+For a whole-key conversion it loads ZERO records of that class.
+For an extraction the loss is quieter rather than louder: the container still loads, every other field of it still works, and the extracted class simply appears EMPTY — with no error, and indistinguishable from a world whose GM authored none of them.
 The supported mitigation is the REVERSE conversion, run while the GM is still on the new build: setting the target back to `singleArray` reverses the layout losslessly.
 A pre-conversion GM consent prompt naming the loss is the fallback, and any export it offers MUST NOT be presented as equivalent — an export carries authoring data only, and never runs, actor flags, learned-recipe knowledge or durable identity flags.
 
@@ -2918,6 +2990,12 @@ A conversion MUST therefore NOT run in a boot whose migration pass persisted any
 The converted corpus then ceases to be a function of any settled pre-conversion state, which is what every equivalence assertion compares against.
 The requirement is stated for REPRODUCIBILITY and not for referential integrity: every cross-key reference the current registry writes is derived deterministically, and no dangling reference has been demonstrated.
 Deferring the conversion by one boot is the required behaviour, and the deferral MUST be reported to the GM.
+
+**Independent classes convert independently, and their consents do not compose.**
+Two extracted classes with independent layout/target pairs may both convert in one boot.
+Each MUST obtain its own point-of-action consent, each MUST report its own outcome, and a decline of one MUST NOT decline, defer or revert the other.
+A shared consent decision is forbidden: the two are separate one-way doors with separate mitigations, and a GM who declines one has said nothing about the other.
+Both MAY share the boot's single migration-write deferral, which is conservative in the safe direction and costs at most one additional boot.
 
 **A legacy SURVIVOR is not an ORPHAN, and the two MUST NOT share a disposition.**
 Envelope reclamation deletes leftover granular documents on a settled whole-array world; the detector above is its mirror, a leftover whole-array document on a settled granular world.
@@ -3009,6 +3087,13 @@ This is a statement about the ARRANGEMENT of that corpus and not a claim that th
 Two rules keep the exemption from becoming the hole it protects.
 It is keyed on the entity KIND as this build declares it, never on a flag carried in the sampled data — so a declared-granular kind whose facts are missing or malformed is not known-complete, rather than exempt.
 And it is refused for any kind whose repository REPORTS itself granular, asked of the repository object that was actually built rather than inferred from its class or its registered layout/target pair: a build that lands a granular repository for a kind before registering its pair, injects one through a manager's repository seam, or adds a second granular class would otherwise be scored known-complete while its corpus is already partial.
+
+**An extracted class reports its OWN storage.**
+An entity kind extracted into its own records MUST register its own layout/target pair and MUST be declared granular, and its basis input MUST come from the repository that stores IT rather than from the repository that stores its former container.
+Omitting the pair makes the kind's basis permanently false and silently withholds every destructive pass that reads it.
+Omitting the declaration makes it known-complete by construction and runs every such pass against a half-written corpus.
+The two omissions fail in OPPOSITE directions, so both MUST be covered.
+A container repository and the repository for a class extracted out of it now DIVERGE — the container is never granular and the extracted class is whenever its layout says so — so answering the extracted class's basis from the container's report is the same failure as omitting the declaration.
 
 **Every input is established positively, and an absent, unreadable or unrecognised value is NOT known-complete.**
 "The layout is not `unsettled`" is true of `undefined`, `null`, `''` and of a read that threw and was swallowed, so a basis stated as a negation fails open.

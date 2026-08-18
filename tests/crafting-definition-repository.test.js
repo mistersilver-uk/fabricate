@@ -68,6 +68,16 @@ const KEY_ACCESS_ALLOWLIST = new Set([
   // conversion do. Adding a module here is a deliberate act: the point of this list is that
   // every legacy-key reader is enumerated and justified rather than merely permitted.
   'src/systems/recipeCorpus.js',
+  // Issue 1212 — the COMPONENT Storage Layout Conversion. Same standing as the recipe one,
+  // with one difference that is the whole subject of that change: its step 4 REWRITES
+  // `craftingSystems` without the extracted keys rather than deleting a document, so it
+  // touches the container key by construction and carries raw stored values for it.
+  'src/systems/componentStorageConversion.js',
+  // Issue 1212 — the arrangement-aware CRAFTING-SYSTEM corpus accessor for the startup
+  // migration pass. Same standing as `recipeCorpus.js`: it is the module that SELECTS between
+  // the nested key and the per-record component store, and on a `singleArray` world the
+  // container access IS the correct access.
+  'src/systems/craftingSystemCorpus.js',
 ]);
 
 /** Modules permitted to NAME the two keys at all (a superset of the above). */
@@ -80,6 +90,9 @@ const KEY_MENTION_ALLOWLIST = new Set([
   // Name a key only to construct their repository.
   'src/systems/RecipeManager.js',
   'src/systems/CraftingSystemManager.js',
+  // Issue 1212: IS the crafting-system adapter. It names `CRAFTING_SYSTEMS` to construct the
+  // container half of itself and reaches the key through no other route.
+  'src/systems/CompositeCraftingSystemRepository.js',
 ]);
 
 function recipeData(overrides = {}) {

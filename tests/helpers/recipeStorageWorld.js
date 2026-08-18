@@ -59,6 +59,11 @@ const REGISTERED_DEFAULTS = Object.freeze({
   [LAYOUT_KEY]: DEFINITION_STORAGE_LAYOUTS.SINGLE_ARRAY,
   [TARGET_KEY]: DEFINITION_STORAGE_TARGETS.SINGLE_ARRAY,
   [SETTING_KEYS.RECIPES]: [],
+  // Issue 1212 registered a second, INDEPENDENT pair. Modelled here for the same reason the
+  // recipe pair is: a registered key always reads its default, and a suite that left these
+  // absent would have the Valid Id Basis refuse for a reason unrelated to what it is testing.
+  [SETTING_KEYS.COMPONENT_STORAGE_LAYOUT]: DEFINITION_STORAGE_LAYOUTS.SINGLE_ARRAY,
+  [SETTING_KEYS.COMPONENT_STORAGE_TARGET]: DEFINITION_STORAGE_TARGETS.SINGLE_ARRAY,
 });
 
 /**
@@ -134,6 +139,14 @@ async function buildWorld(
   env.settings.set(LAYOUT_KEY, layout);
   env.settings.set(TARGET_KEY, target);
   env.settings.set(SETTING_KEYS.RECIPES, legacy);
+  env.settings.set(
+    SETTING_KEYS.COMPONENT_STORAGE_LAYOUT,
+    REGISTERED_DEFAULTS[SETTING_KEYS.COMPONENT_STORAGE_LAYOUT]
+  );
+  env.settings.set(
+    SETTING_KEYS.COMPONENT_STORAGE_TARGET,
+    REGISTERED_DEFAULTS[SETTING_KEYS.COMPONENT_STORAGE_TARGET]
+  );
   // Seeded so the Valid Id Basis assertions turn on the STORAGE clauses. Left unset it reads
   // `null`, clause 3 refuses, and every basis assertion is true for an unrelated reason.
   env.settings.set(SETTING_KEYS.MIGRATION_VERSION, '1.0.0');

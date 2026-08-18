@@ -96,17 +96,21 @@ export function composeStartupPassList({
   //
   // The settings are read now; the storage reports are what each manager captured before
   // and during its own corpus read, which is the half no read at this point can reproduce.
-  // `components` is answered by the crafting-system manager because components ride inside
-  // `system.components` and therefore share that manager's repository — so a granular
-  // repository landing there covers both kinds at once.
-  const systemStorage = craftingSystemManager.describeDefinitionStorage?.() ?? null;
+  //
+  // `components` used to be answered by the SYSTEM repository's report, because components
+  // rode inside `system.components` and therefore shared that repository. Issue 1212 extracted
+  // them, so the two reports now DIVERGE: the crafting-system container is never granular and
+  // the component class is, whenever its layout says so. Answering `components` from the
+  // system report would make the component basis known-complete by construction on exactly the
+  // world where it is half-written.
+  const storage = craftingSystemManager.describeDefinitionStorage?.() ?? null;
   const basisInputs = readValidIdBasisInputs({
     getSetting,
     getHighestRegisteredMigrationVersion,
     storage: {
       recipes: recipeManager.describeDefinitionStorage?.() ?? null,
-      systems: systemStorage,
-      components: systemStorage,
+      systems: storage?.systems ?? storage,
+      components: storage?.components ?? storage,
     },
   });
   const basis = basisFromInputs(basisInputs);

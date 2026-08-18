@@ -63,6 +63,9 @@ describe('Fabricate theme management', () => {
       // reverse-conversion control. Its SIBLING, the storage LAYOUT, is deliberately absent
       // — the layout records observed state and a hand-set one presents an empty world.
       SETTING_KEYS.RECIPE_STORAGE_TARGET,
+      // Issue 1212: the COMPONENT storage target, an independent pair with its own labels
+      // and its own hint. Its layout sibling is absent for the same reason the recipe one is.
+      SETTING_KEYS.COMPONENT_STORAGE_TARGET,
       SETTING_KEYS.THEME
     ].sort());
 

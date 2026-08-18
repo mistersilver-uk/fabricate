@@ -102,6 +102,36 @@
         "serializedBytes": 1973024
       }
     },
+    "craftingSystemManager.singleComponentEdit.singleArray": {
+      "description": "MEASUREMENT (issue 1212): one component edit under the NESTED arrangement. The control for the extraction claim — a single-record mutation re-serializes and re-replicates the whole 5,000-component container.",
+      "counts": {
+        "identityCandidatesExamined": 0,
+        "identityIndexBuilds": 0,
+        "componentDocumentCalls": 0,
+        "componentDocumentsTouched": 0,
+        "serializedBytes": 2744946
+      }
+    },
+    "craftingSystemManager.singleComponentEdit.perRecord": {
+      "description": "MEASUREMENT (issue 1212): the SAME one-component edit on a world converted THROUGH the shipped forward conversion. The load-bearing counter is the DOCUMENT COUNT, which is what distinguishes \"wrote one record\" from \"wrote the corpus one record at a time\"; the byte count is the replicated payload beside it.",
+      "counts": {
+        "identityCandidatesExamined": 0,
+        "identityIndexBuilds": 0,
+        "componentDocumentCalls": 1,
+        "componentDocumentsTouched": 1,
+        "serializedBytes": 3114
+      }
+    },
+    "craftingSystemManager.save.perRecord": {
+      "description": "MEASUREMENT (issue 1212): the RESIDUAL container record after extraction. This is the same whole-corpus save as `craftingSystemManager.save`, on a converted world, so its `serializedBytes` is directly comparable with that case`s committed number.",
+      "counts": {
+        "identityCandidatesExamined": 0,
+        "identityIndexBuilds": 0,
+        "componentDocumentCalls": 0,
+        "componentDocumentsTouched": 0,
+        "serializedBytes": 3114
+      }
+    },
     "craftingSystemManager.normalizeImport": {
       "description": "The normalization/import path #1076 targets: initialize() reads the persisted setting and runs _normalizeSystem over the whole 5,000-component library.",
       "counts": {

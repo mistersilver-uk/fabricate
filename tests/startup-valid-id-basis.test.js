@@ -73,6 +73,18 @@ const ALL_PASSES = [
  */
 const RECIPES_INCOMPLETE = ['salvage runs'];
 
+/**
+ * The passes that survive when the migration VERSION alone is incomplete (issue 1212).
+ *
+ * The version is a SHARED input: it is stamped onto every granular kind's basis, so a
+ * version behind the highest registered migration takes recipes AND components down at once
+ * — and `salvage runs` declares components. Before component extraction the version could
+ * only ever reach recipes, which is why {@link RECIPES_INCOMPLETE} used to cover this case
+ * too. Spelled out separately so the difference is the assertion rather than an edit to the
+ * constant every other case reads.
+ */
+const VERSION_INCOMPLETE = [];
+
 /** Sentinel for "this setting has no value at all", distinct from a stored `undefined`. */
 const ABSENT = Symbol('absent');
 
@@ -96,6 +108,9 @@ function makeComposition({
   layoutAtCorpusRead = DEFINITION_STORAGE_LAYOUTS.SINGLE_ARRAY,
   granular = false,
   systemsGranular = false,
+  componentsGranular = false,
+  componentArrangement = DEFINITION_STORAGE_TARGETS.SINGLE_ARRAY,
+  componentLayoutAtCorpusRead = DEFINITION_STORAGE_LAYOUTS.SINGLE_ARRAY,
   recipes = [{ id: 'r1' }],
   systems = [{ id: 's1', components: [{ id: 'c1' }] }],
   onInitialize = null,
@@ -103,6 +118,11 @@ function makeComposition({
   const settings = new Map([
     [SETTING_KEYS.RECIPE_STORAGE_LAYOUT, DEFINITION_STORAGE_LAYOUTS.SINGLE_ARRAY],
     [SETTING_KEYS.RECIPE_STORAGE_TARGET, DEFINITION_STORAGE_TARGETS.SINGLE_ARRAY],
+    // Issue 1212: components are a DECLARED granular kind now, so an un-modelled component
+    // pair is "unknown" and fails closed on every case in this file. Seeded at the shipped
+    // default arrangement, which is what every world reads until a GM converts.
+    [SETTING_KEYS.COMPONENT_STORAGE_LAYOUT, DEFINITION_STORAGE_LAYOUTS.SINGLE_ARRAY],
+    [SETTING_KEYS.COMPONENT_STORAGE_TARGET, DEFINITION_STORAGE_TARGETS.SINGLE_ARRAY],
     [SETTING_KEYS.MIGRATION_VERSION, HIGHEST_MIGRATION],
   ]);
   for (const [key, value] of Object.entries(settingOverrides)) {
@@ -134,10 +154,19 @@ function makeComposition({
     },
     craftingSystemManager: {
       getSystems: () => systems,
+      // Issue 1212: the composite repository reports the CONTAINER and the extracted
+      // component class separately, because the two now diverge — the container is never
+      // granular and the component class is whenever its layout says so.
       describeDefinitionStorage: () => ({
         granular: systemsGranular,
         arrangement: null,
         layoutAtCorpusRead: null,
+        systems: { granular: systemsGranular, arrangement: null, layoutAtCorpusRead: null },
+        components: {
+          granular: componentsGranular,
+          arrangement: componentArrangement,
+          layoutAtCorpusRead: componentLayoutAtCorpusRead,
+        },
       }),
     },
     craftingRunManager: {
@@ -225,7 +254,7 @@ test('composition-site input 3 — the repository ARRANGEMENT decides it', () =>
 test('composition-site input 4 — the migration VERSION decides it', () => {
   assert.deepEqual(
     composedLabels({ settings: { [SETTING_KEYS.MIGRATION_VERSION]: '0.9.0' } }),
-    RECIPES_INCOMPLETE
+    VERSION_INCOMPLETE
   );
 });
 
@@ -387,7 +416,7 @@ test('a missing, unreadable or unrecognised basis fact omits — the fail-OPEN a
   assert.deepEqual(composedLabels({ arrangement: null }), RECIPES_INCOMPLETE, 'unknown arrangement');
   assert.deepEqual(
     composedLabels({ settings: { [SETTING_KEYS.MIGRATION_VERSION]: ABSENT } }),
-    RECIPES_INCOMPLETE,
+    VERSION_INCOMPLETE,
     'absent migration version'
   );
 });
@@ -396,6 +425,7 @@ test('a setting read that THROWS omits rather than passing the !== unsettled tes
   const { options } = makeComposition();
   options.getSetting = (key) => {
     if (key === SETTING_KEYS.RECIPE_STORAGE_LAYOUT) throw new Error('not a registered setting');
+    if (key === SETTING_KEYS.MIGRATION_VERSION) return HIGHEST_MIGRATION;
     return DEFINITION_STORAGE_TARGETS.SINGLE_ARRAY;
   };
   assert.deepEqual(labelsOf(composeStartupPassList(options)), RECIPES_INCOMPLETE);
@@ -404,7 +434,7 @@ test('a setting read that THROWS omits rather than passing the !== unsettled tes
 test('a version BEHIND the highest registered migration omits; a version AHEAD emits', () => {
   assert.deepEqual(
     composedLabels({ settings: { [SETTING_KEYS.MIGRATION_VERSION]: '0.0.0' } }),
-    RECIPES_INCOMPLETE,
+    VERSION_INCOMPLETE,
     'behind'
   );
   // `compareSemver(stored, highest) >= 0`, never `=== highest`: a DOWNGRADED build sits
@@ -437,23 +467,26 @@ test('a kind with no granular repository is known-complete by construction', () 
     getHighestRegisteredMigrationVersion,
     storage: {},
   });
-  assert.deepEqual(basis, { recipes: false, systems: true, components: true });
-  assert.deepEqual([...GRANULAR_DEFINITION_REPOSITORY_KINDS], ['recipes']);
+  // Crafting SYSTEMS are the surviving by-construction kind: their container arrives in one
+  // whole-array read. Recipes and components are both declared granular (issues 1211, 1212)
+  // and therefore fail closed with nothing sampled.
+  assert.deepEqual(basis, { recipes: false, systems: true, components: false });
+  assert.deepEqual([...GRANULAR_DEFINITION_REPOSITORY_KINDS], ['recipes', 'components']);
 });
 
 test('the exemption is keyed on the KIND, not on a flag carried in the sampled data', () => {
   // `basisFromInputs` is exported and is the gate's reduce step, so a caller that samples
   // its own inputs — or catches a sampling error and passes `{}` — must not be told to run
   // every pass. A data-keyed exemption answers both of these "everything complete".
-  assert.deepEqual(basisFromInputs({}), { recipes: false, systems: true, components: true });
+  assert.deepEqual(basisFromInputs({}), { recipes: false, systems: true, components: false });
   assert.deepEqual(basisFromInputs(undefined), {
     recipes: false,
     systems: true,
-    components: true,
+    components: false,
   });
   assert.deepEqual(
     basisFromInputs({ recipes: { declaredGranular: true, repositoryGranular: false } }),
-    { recipes: false, systems: true, components: true },
+    { recipes: false, systems: true, components: false },
     'and a declared-granular kind cannot exempt itself by reporting a non-granular repository'
   );
 });
