@@ -90,10 +90,27 @@ The next time you reload your world, it will try again.
 That gives you a chance to fix the underlying problem first, if it's with your world data, or me a chance to fix it if it's an error in the module.
 
 When a migration aborts, Fabricate shows you a recovery dialog.
-It tells you plainly that your existing data was kept unchanged.
-It recommends a Fabricate version you can roll back to so you can keep using your data without any manual cleanup.
+It tells you plainly that this pass saved nothing, and that your stored data is exactly as it was before the load.
+It asks you to reload afterwards, because the half-migrated copy the module was working on lives only in that session and a reload throws it away.
 When the problem comes down to specific recipes or systems, it lists them with the reason each one failed and what to do about it.
 The dialog defaults to keeping your existing data, so the safe choice is the one already selected.
+
+The dialog's rollback advice depends on how this world stores its recipes.
+Under the original **One combined record** arrangement it simply names a Fabricate version you can roll back to and keep working.
+Under **One record per recipe** it tells you _not_ to roll back yet: an older Fabricate cannot read that arrangement at all, and would start writing over it.
+In that case the dialog asks you to set **Settings → Fabricate → Recipe Storage Arrangement** back to "One combined record", reload, and let the conversion finish first — that conversion only exists in the newer build, so once you have rolled back there is nothing left to run it with.
+
+### When migrations do not run at all
+
+There are three situations where Fabricate deliberately skips the whole migration pass rather than guessing.
+
+If your recipes are part-way through a storage change, no single place holds all of them, so Fabricate refuses to read a partial collection and decide anything from it.
+If it cannot read your recipes at all, it refuses too — an unreadable collection and an empty one look identical, and treating one as the other is exactly how a migration would confidently write the wrong answer.
+And if a migration ran but its results could not be saved, Fabricate abandons the remaining writes rather than saving some of them.
+
+In all three cases nothing is written, the world is not marked as migrated, and the migrations simply run again next time.
+Fabricate tells you which of the three happened.
+Only the third asks you to reload straight away: in that one the migrations have already transformed the copy held in this session, so continuing to work from it would save migrated data into a world still recorded as un-migrated.
 
 {: .warning }
 > This is a safe-abort and recovery design, not a full backup of your world.

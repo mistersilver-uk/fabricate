@@ -94,18 +94,42 @@ const RECOGNISED_TARGETS = Object.freeze(Object.values(DEFINITION_STORAGE_TARGET
  * cannot disagree about which keys are records, how a duplicate key is resolved, or how a
  * short bulk return is treated.
  *
+ * Exported for the startup migration seam (issue 1242), which needs exactly this store and
+ * would otherwise re-implement it — and two raw recipe stores drift. The two optional
+ * passthroughs below both default to what the conversion already relies on, so the
+ * conversion's own store is byte-identical to the one this factory produced before it was
+ * shared.
+ *
  * @param {object} options
  * @param {(() => any)} [options.documentClass]
  * @param {(() => Iterable<any>|null)} [options.collection]
+ * @param {((raw: object) => object)} [options.hydrate] Defaults to identity — the
+ *   conversion's semantics. The migration seam overrides it with a DETACHING clone, because
+ *   identity hydration returns the stored document's own initialized value: an in-place
+ *   transformation then mutates the very object the differential later compares against, so
+ *   every record compares equal to itself and a create/update-only writeback issues nothing
+ *   while the version records success. Identity is necessary for rawness and is NOT
+ *   sufficient for safety. The clone is not moved into the repository because the manager's
+ *   hot path already detaches through `Recipe.fromJSON`, where a second copy is pure cost.
+ * @param {(() => void)} [options.assertWritable] Defaults to the no-op. The conversion MUST
+ *   stay unguarded: it runs while the layout reads `unsettled`, which is precisely the state
+ *   the stale-arrangement guard exists to refuse.
  * @returns {PerRecordCraftingDefinitionRepository}
  */
-function perRecordRecipeStore({ documentClass, collection }) {
+export function perRecordRecipeStore({
+  documentClass,
+  collection,
+  hydrate = (raw) => raw,
+  assertWritable = () => {},
+}) {
   return new PerRecordCraftingDefinitionRepository({
     keyPrefix: RECIPE_RECORD_KEY_PREFIX,
     // `undefined` selects the adapter's own production accessors; a caller that injects
     // neither gets exactly the repository a live world would build.
     documentClass,
     collection,
+    hydrate,
+    assertWritable,
   });
 }
 

@@ -73,7 +73,11 @@ test('content surfaces downgradeTo and the aborted migration label', () => {
 
   assert.match(config.content, /1\.2\.0/, 'downgrade target present');
   assert.match(config.content, /Rename gathering Region concept to Realm/, 'aborted label present');
-  assert.match(config.content, /kept unchanged/i, 'existing-data-kept reassurance present');
+  assert.match(
+    config.content,
+    /This pass saved nothing: your stored data is exactly as it was before this startup\./i,
+    'the assurance is scoped to the pass that aborted (issue 1242)'
+  );
 });
 
 test('content surfaces per-document remediation from the abort context', () => {
@@ -115,7 +119,7 @@ test('uses an injected localizer when provided', () => {
   );
   assert.equal(keepButton.label, 'KEEP_LOCALIZED');
   // Keys that echo back fall through to the English fallback.
-  assert.match(config.content, /kept unchanged/i);
+  assert.match(config.content, /This pass saved nothing/i);
 });
 
 test('falls back to "unknown" when downgradeTo is missing', () => {

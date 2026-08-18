@@ -60,6 +60,14 @@ const KEY_ACCESS_ALLOWLIST = new Set([
   // for the same reason the migration runner does — a conversion whose output depends on
   // today's normalizer drops any field that normalizer has not learned to emit.
   'src/systems/definitionStorageConversion.js',
+  // Issue 1242 — the arrangement-aware recipe corpus accessor for the startup migration
+  // pass. It is the module that SELECTS between the legacy key and the per-record store, so
+  // "go through the repository" is not available to it either: on a `singleArray` world the
+  // legacy-key access IS the correct access, and on a `perRecord` world it delegates to the
+  // per-record adapter. It carries raw stored values for the same reason the runner and the
+  // conversion do. Adding a module here is a deliberate act: the point of this list is that
+  // every legacy-key reader is enumerated and justified rather than merely permitted.
+  'src/systems/recipeCorpus.js',
 ]);
 
 /** Modules permitted to NAME the two keys at all (a superset of the above). */

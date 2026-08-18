@@ -26,13 +26,21 @@
         "Untouched": "{count} formula(s) were left exactly as authored because the placeholder sat where it could not be removed safely; those checks will not roll until you rewrite them."
       },
       "Aborted": {
-        "Notice": "Fabricate migration aborted. Your existing data has been kept unchanged. See the console (F12) for per-document recovery guidance."
+        "Notice": "Fabricate migration aborted. This pass saved nothing: your stored data is exactly as it was before this startup. Reload Foundry to discard this session's partly-migrated copy, then see the console (F12) for per-document recovery guidance."
+      },
+      "Deferred": {
+        "MidConversion": "Fabricate did not run its data migrations, because this world's recipes are part-way through a storage change and cannot be read as a whole. Nothing was changed and nothing was saved. Fabricate will finish the change now, and the migrations will run the next time a GM loads this world.",
+        "CorpusUnreadable": "Fabricate did not run its data migrations, because it could not read this world's recipes. Nothing was changed and nothing was saved. See the console (F12) for the reason; once it is fixed, the migrations will run the next time a GM loads this world.",
+        "WritebackFailed": "Fabricate ran its data migrations but could not save them, so it saved nothing at all and this world is still marked as un-migrated. Reload Foundry now, before you make any further changes: this session is holding a half-migrated copy of your data, and saving from it would record migrated data under an un-migrated world. See the console (F12) for the reason."
       },
       "Recovery": {
         "Title": "Fabricate migration aborted",
-        "Intro": "A Fabricate data migration could not complete. Your existing data has been kept unchanged.",
+        "Intro": "A Fabricate data migration could not complete. This pass saved nothing: your stored data is exactly as it was before this startup. Reload Foundry to discard this session's partly-migrated copy.",
         "AbortedDuring": "Aborted during: {label}",
         "Downgrade": "Recommended: downgrade Fabricate to version {version} to keep using your existing data without manual remediation.",
+        "DowngradeGranular": "Do not downgrade yet. This world stores each recipe in its own record, and an older Fabricate — including version {version} — reads no recipes from it and will start writing over them. Open Settings → Fabricate → Recipe Storage Arrangement, set it back to \"One combined record\", reload Foundry, and let the conversion finish first — it can only be run on this version, because after a downgrade there is no code left to run it with.",
+        "DowngradeMidConversion": "Do not downgrade yet. This world's recipes are part-way through a storage change, so they are not all in one place. Open Settings → Fabricate → Recipe Storage Arrangement, set it to \"One combined record\", reload Foundry, and let the conversion finish before downgrading to Fabricate version {version} — it can only be run on this version, because after a downgrade there is no code left to run it with.",
+        "DowngradeCheckArrangement": "Before downgrading to Fabricate version {version}, check Settings → Fabricate → Recipe Storage Arrangement. If it is not \"One combined record\", set it back, reload Foundry, and let the conversion finish first — an older Fabricate cannot read the other arrangement and will start writing over it, and the conversion can only be run on this version, because after a downgrade there is no code left to run it with.",
         "DocumentsHeader": "{count} document(s) require manual remediation:",
         "DocumentLine": "{type} {identity}{name}: {error}",
         "DocumentFix": "Fix: {fix}",

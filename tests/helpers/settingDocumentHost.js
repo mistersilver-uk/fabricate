@@ -48,12 +48,32 @@ export function mintDocumentId() {
 /**
  * One `Setting` document. `value` is a `JSONField`: stringified on cast, parsed on
  * initialize.
+ *
+ * **`value` is parsed ONCE and then answered from the memo** (issue 1242), because that is
+ * what the platform does and the difference is load-bearing rather than cosmetic.
+ * `DataModel#_initialize` computes `field.initialize(...)` once and assigns the result as a
+ * plain own data property — not a getter — `JSONField#initialize` is `JSON.parse`, and
+ * `Setting#_castType`'s primitive branch returns that parsed value unwrapped and uncloned.
+ * Verified in source on 13.351 and 14.365. So `game.settings.get` and every other read hand
+ * back the SAME object for as long as the document exists.
+ *
+ * A double that re-parsed on every read would be strictly more forgiving than Foundry, and
+ * that forgiveness hides one specific defect completely: a reader hydrating records with an
+ * identity `hydrate` hands a caller the document's OWN value, an in-place transformation
+ * mutates it, and a differential writeback that compares the serialized record against the
+ * stored value then compares the object with itself, finds no change, and issues nothing —
+ * while a re-parsing double reports the write correctly. The memo is what makes that
+ * representable at all.
+ *
+ * The memo is invalidated in {@link SettingDouble#applyChanges}, mirroring the re-initialize
+ * an update performs.
  */
 export class SettingDouble {
   constructor({ _id, key, value }) {
     this._id = _id;
     this.key = key;
     this._raw = typeof value === 'string' ? value : JSON.stringify(value);
+    this._initialized = null;
   }
 
   get id() {
@@ -61,13 +81,15 @@ export class SettingDouble {
   }
 
   get value() {
-    return JSON.parse(this._raw);
+    this._initialized ??= { parsed: JSON.parse(this._raw) };
+    return this._initialized.parsed;
   }
 
   applyChanges(changes) {
     if ('value' in changes) {
       this._raw =
         typeof changes.value === 'string' ? changes.value : JSON.stringify(changes.value);
+      this._initialized = null;
     }
   }
 }
@@ -105,6 +127,24 @@ export class WorldSettingsDouble {
   }
 }
 
+/**
+ * Deep-copy what a write leg was ASKED to persist, at call time (issue 1242).
+ *
+ * A tear assertion that reads the collection afterwards lies: the migrations in this repo
+ * transform their input in place, so the fake store's array already carries the migrated
+ * field even in a run whose write threw. And a payload held by reference is mutated by
+ * whatever the caller does next. Snapshotting here is the only reading of "what was sent"
+ * that survives both.
+ *
+ * @param {object[]} data
+ * @returns {object[]}
+ */
+function snapshotSent(data) {
+  return (Array.isArray(data) ? data : []).map((entry) =>
+    typeof entry === 'string' ? entry : structuredClone(entry)
+  );
+}
+
 /** A `Setting` document class plus the collection it writes into. */
 export class SettingHost {
   constructor() {
@@ -136,7 +176,7 @@ export class SettingHost {
   }
 
   _create(data, options) {
-    this.calls.push({ leg: 'create', count: data.length, options });
+    this.calls.push({ leg: 'create', count: data.length, options, sent: snapshotSent(data) });
     for (const entry of data) {
       if (entry._id != null && !CORE_ID_PATTERN.test(entry._id)) {
         throw new Error(`${entry._id} is not a valid Document ID string`);
@@ -170,7 +210,7 @@ export class SettingHost {
   }
 
   _update(data) {
-    this.calls.push({ leg: 'update', count: data.length });
+    this.calls.push({ leg: 'update', count: data.length, sent: snapshotSent(data) });
     const updated = [];
     for (const change of data) {
       const document = this.collection.documents.get(change._id);
@@ -182,7 +222,7 @@ export class SettingHost {
   }
 
   _delete(ids) {
-    this.calls.push({ leg: 'delete', count: ids.length });
+    this.calls.push({ leg: 'delete', count: ids.length, sent: snapshotSent(ids) });
     const deleted = [];
     for (const id of ids) {
       const document = this.collection.documents.get(id);
