@@ -41,7 +41,9 @@ import {
   findConnectCrossover,
   serializedRecordBytes,
 } from './connectPayloadModel.js';
+import { FABRICATE_SETTINGS_NAMESPACE } from '../../../src/config/settings.js';
 import { runForwardComponentStorageConversion } from '../../../src/systems/componentStorageConversion.js';
+import { runForwardRecipeStorageConversion } from '../../../src/systems/definitionStorageConversion.js';
 import { SettingHost } from '../settingDocumentHost.js';
 
 import { countingEnumerations } from './scaleCounters.js';
@@ -135,6 +137,76 @@ function settingBytes(settings, key) {
 }
 
 /**
+ * Install a `Setting` DOCUMENT host over the ambient Foundry globals, for the two storage
+ * arrangements that address records one document at a time (issues 1212 and 1247).
+ *
+ * Shared by both storage cases rather than restated in each: the three lines are the whole
+ * of what makes `PerRecordCraftingDefinitionRepository`'s production accessors resolvable
+ * (`Setting.implementation` and `game.settings.storage.get('world')`), and a second copy is
+ * counted by the SonarCloud new-code duplication gate, which counts `tests/**` exactly like
+ * `src/`. The caller restores the globals through {@link restoreSingleArrayStorage}.
+ *
+ * @returns {SettingHost}
+ */
+function installSettingDocumentHost() {
+  const host = new SettingHost();
+  globalThis.Setting = { implementation: host.documentClass };
+  globalThis.game.settings.storage = { get: () => host.collection };
+  return host;
+}
+
+/**
+ * Put the AMBIENT world back, so the cases after a storage case measure what they think they
+ * do (issues 1212 and 1247).
+ *
+ * The harness shares one settings map and one set of Foundry globals across every case in a
+ * profile. Leaving a target on `perRecord` sends every later case's manager down the granular
+ * arm, where it hydrates records from this case's document index — and the damage surfaces as
+ * an unrelated case's counter quietly reporting zero.
+ *
+ * @param {object} world
+ * @param {object} keys
+ * @param {string} keys.layoutKey
+ * @param {string} keys.targetKey
+ * @param {string} keys.dataKey The legacy whole-array/container key this case seeded.
+ * @returns {void}
+ */
+function restoreSingleArrayStorage(world, { layoutKey, targetKey, dataKey }) {
+  world.settings.set(layoutKey, 'singleArray');
+  world.settings.set(targetKey, 'singleArray');
+  world.settings.delete(dataKey);
+  delete globalThis.Setting;
+  delete globalThis.game.settings.storage;
+}
+
+/**
+ * The bytes a run's `Setting` document operations actually SENT (issue 1247).
+ *
+ * Read off each leg's snapshotted payload rather than off the collection afterwards, so it
+ * reports what the write replicated rather than what the world happens to hold. Legs that
+ * carry no value — the bulk delete leg and the single-document delete — contribute nothing,
+ * which is correct: a removal replicates an id, not a record.
+ *
+ * @param {SettingHost} host
+ * @returns {number}
+ */
+function documentPayloadBytes(host) {
+  return host.calls.reduce(
+    (total, call) =>
+      total +
+      call.sent.reduce(
+        (legTotal, entry) =>
+          legTotal +
+          (entry && typeof entry === 'object' && 'value' in entry
+            ? JSON.stringify(entry.value).length
+            : 0),
+        0
+      ),
+    0
+  );
+}
+
+/**
  * A crafting-system world whose component storage arrangement can be measured on both arms
  * (issue 1212).
  *
@@ -154,9 +226,7 @@ function settingBytes(settings, key) {
  */
 async function componentStorageWorld(context, { convert }) {
   const world = worldFor(context);
-  const host = new SettingHost();
-  globalThis.Setting = { implementation: host.documentClass };
-  globalThis.game.settings.storage = { get: () => host.collection };
+  const host = installSettingDocumentHost();
   world.settings.set('componentStorageLayout', 'singleArray');
   world.settings.set('componentStorageTarget', convert ? 'perRecord' : 'singleArray');
   world.settings.set('craftingSystems', [world.system]);
@@ -202,20 +272,151 @@ async function componentStorageWorld(context, { convert }) {
         serializedBytes: settingBytes(world.settings, 'craftingSystems'),
       };
     },
-    /**
-     * Put the AMBIENT world back, so the cases after this one measure what they think they do.
-     *
-     * The harness shares one settings map and one set of Foundry globals across every case in a
-     * profile. Leaving `componentStorageTarget` on `perRecord` sends every later case's manager
-     * down the granular arm, where it hydrates components from this case's document index — and
-     * the damage surfaces as an unrelated case's candidate counter quietly reporting zero.
-     */
+    /** @see restoreSingleArrayStorage — the ambient world every later case measures against. */
     teardown() {
-      world.settings.set('componentStorageLayout', 'singleArray');
-      world.settings.set('componentStorageTarget', 'singleArray');
-      world.settings.delete('craftingSystems');
-      delete globalThis.Setting;
-      delete globalThis.game.settings.storage;
+      restoreSingleArrayStorage(world, {
+        layoutKey: 'componentStorageLayout',
+        targetKey: 'componentStorageTarget',
+        dataKey: 'craftingSystems',
+      });
+    },
+  };
+}
+
+/**
+ * The fully-qualified legacy whole-array recipe key, as a `Setting` DOCUMENT carries it.
+ *
+ * The namespace is imported rather than restated, because the forward conversion's step 4
+ * resolves the document by this exact string and a hand-written copy that drifted would make
+ * the reclaim a silent no-op — which is precisely the state this case exists to distinguish.
+ */
+const QUALIFIED_RECIPES_KEY = `${FABRICATE_SETTINGS_NAMESPACE}.recipes`;
+
+/**
+ * A recipe world whose Definition Storage arrangement can be measured on both arms
+ * (issue 1247) — the recipe analogue of {@link componentStorageWorld}, deliberately built in
+ * the same shape and reporting the same counters so the two classes sit in one baseline and
+ * the ratio is legible across both.
+ *
+ * `#1070` criterion 9 — "single-record mutations no longer serialize and replicate the
+ * complete recipe/system corpus" — is the criterion the whole performance programme exists
+ * for, and until this case existed it was the only major claim with no instrument. The
+ * committed `recipeManager.save` counter reads `settingBytes(world.settings, 'recipes')`, the
+ * LEGACY whole-array key specifically, so a regression that routed a converted world's writes
+ * back through the whole-array path moved no committed number anywhere in the repository.
+ *
+ * Four things this fixture does deliberately, each of which a looser one would get wrong:
+ *
+ * - **The converted arm is converted THROUGH the shipped forward conversion**, never by
+ *   hand-setting `recipeStorageLayout`. A fixture that asserts its own idea of the layout
+ *   measures the fixture, and stops measuring the moment the conversion's output changes.
+ * - **The legacy key is seeded as a DOCUMENT as well as a value**, so the conversion's step 4
+ *   has something to reclaim and `onDocumentDeleted` can leave the registered `[]` default
+ *   readable — which is what `ClientSettings#get` serves once a setting's document is gone.
+ *   Without it `serializedBytes` would keep reporting the stale seeded array on the converted
+ *   arm: a number that moves for no reason and never moves for the real one.
+ * - **The corpus is serialized under a FRESH id space.** `Recipe.fromJSON` mints ids for
+ *   sub-records through a process-lifetime counter, so bytes taken after other hydrations are
+ *   wider than the same bytes taken first (see {@link withFreshRecordIds}). Seeding from
+ *   already-serialized payloads makes every later hydration in this case mint NOTHING, so the
+ *   committed counts depend on `{profile, seed}` alone. Verified: identical after 250,000
+ *   ambient ids were burned.
+ * - **Both arms SETTLE before measuring.** The first save after a load legitimately reconciles
+ *   the seeded bytes with the manager's own serialization; measuring it would measure a one-off
+ *   catch-up rather than the steady-state single-record edit this case exists to report.
+ *
+ * Every counter it returns is class-1: document call counts, document entry counts and byte
+ * counts. No wall clock, which `tests/benchmark-baseline-drift.test.js` refuses in a committed
+ * baseline anyway.
+ *
+ * @param {object} context
+ * @param {object} options
+ * @param {boolean} options.convert whether to run the shipped forward recipe conversion first.
+ * @returns {Promise<object>} the bench handle.
+ */
+async function recipeStorageWorld(context, { convert }) {
+  const world = worldFor(context);
+  const host = installSettingDocumentHost();
+  host.onDocumentDeleted = (qualifiedKey) => {
+    if (qualifiedKey === QUALIFIED_RECIPES_KEY) world.settings.set('recipes', []);
+  };
+  const payloads = withFreshRecordIds(() =>
+    hydrateRecipes(world.modules, context.fixture.recipes).map((recipe) => recipe.toJSON())
+  );
+  world.settings.set('recipeStorageLayout', 'singleArray');
+  world.settings.set('recipeStorageTarget', convert ? 'perRecord' : 'singleArray');
+  world.settings.set('recipes', payloads);
+  host.seed({ key: QUALIFIED_RECIPES_KEY, value: payloads });
+
+  if (convert) {
+    await runForwardRecipeStorageConversion({
+      getSetting: (key) => world.settings.get(key),
+      setSetting: async (key, value) => {
+        world.settings.set(key, value);
+        return value;
+      },
+      documentClass: () => host.documentClass,
+      collection: () => host.collection,
+    });
+  }
+
+  // Built AFTER the conversion, because the manager chooses its backend once, in its
+  // constructor, from the Definition Storage Target. `world.recipeManager` was built before it
+  // and holds the settings adapter, which is exactly the stale-arrangement state the shipped
+  // write guard refuses — so this case must never measure through it.
+  const manager = new world.modules.RecipeManager();
+  await manager.initialize();
+  await manager.save();
+  const writes = world.modules.env.writes;
+  // Truncated rather than sliced, exactly as `host.calls` is: both accumulate for the whole
+  // process, and the measured region is everything recorded from here.
+  host.calls.length = 0;
+  writes.length = 0;
+
+  return {
+    world,
+    host,
+    manager,
+    async editOneRecipe() {
+      const [first] = manager.recipes.values();
+      const edited = world.modules.Recipe.fromJSON({
+        ...first.toJSON(),
+        name: `${first.name} (edited)`,
+      });
+      manager.recipes.set(edited.id, edited);
+      // The NAMED single-record change every single-recipe call site issues
+      // (`RecipeManager#updateRecipe`), taken at the persistence seam rather than through the
+      // manager method, so the measured region is the write and not the validation,
+      // notification and signature work `updateRecipe` also does.
+      await manager.save({ put: edited });
+    },
+    async saveWholeCorpus() {
+      await manager.save();
+    },
+    counts() {
+      return {
+        recipeDocumentCalls: host.calls.length,
+        recipeDocumentsTouched: host.calls.reduce((total, call) => total + call.count, 0),
+        // The whole-array key, the same derivation the committed `recipeManager.save` case
+        // uses, so the two are directly comparable. On the converted arm it reads `[]` — the
+        // registered default served once step 4 reclaimed the document — and THAT is the
+        // headline: the corpus is no longer replicated as one blob at all.
+        serializedBytes: settingBytes(world.settings, 'recipes'),
+        // What this mutation actually sent to storage, counted the same way on both arms:
+        // whole-array setting writes plus per-record document payloads. `serializedBytes`
+        // says what the corpus costs as a blob; this says what the EDIT cost.
+        writtenBytes:
+          writes.reduce((total, write) => total + JSON.stringify(write.value).length, 0) +
+          documentPayloadBytes(host),
+      };
+    },
+    /** @see restoreSingleArrayStorage — the ambient world every later case measures against. */
+    teardown() {
+      restoreSingleArrayStorage(world, {
+        layoutKey: 'recipeStorageLayout',
+        targetKey: 'recipeStorageTarget',
+        dataKey: 'recipes',
+      });
     },
   };
 }
@@ -545,6 +746,74 @@ function simpleCorpusCases() {
         'the same whole-corpus save as `craftingSystemManager.save`, on a converted world, ' +
         'so its `serializedBytes` is directly comparable with that case`s committed number.',
       setup: async (context) => componentStorageWorld(context, { convert: true }),
+      run: async (bench) => {
+        await bench.saveWholeCorpus();
+        return bench;
+      },
+      counts: (bench) => bench.counts(),
+      teardown: (bench) => bench.teardown(),
+    },
+    {
+      id: 'recipeManager.singleRecipeEdit.singleArray',
+      profile: 'simple-corpus',
+      description:
+        'MEASUREMENT (issue 1247): one recipe edit under the WHOLE-ARRAY arrangement. The ' +
+        'control for #1070 criterion 9 — a single-record mutation re-serializes and ' +
+        're-replicates the entire 10,000-recipe corpus, and touches no document at all. ' +
+        'Built from the same fixture as its `perRecord` twin, so the ratio between the two ' +
+        'is read off one baseline rather than inferred across differently-built worlds.',
+      setup: async (context) => recipeStorageWorld(context, { convert: false }),
+      run: async (bench) => {
+        await bench.editOneRecipe();
+        return bench;
+      },
+      counts: (bench) => bench.counts(),
+      teardown: (bench) => bench.teardown(),
+    },
+    {
+      id: 'recipeManager.singleRecipeEdit.perRecord',
+      profile: 'simple-corpus',
+      description:
+        'MEASUREMENT (issue 1247): the SAME one-recipe edit on a world converted THROUGH the ' +
+        'shipped forward recipe Storage Layout Conversion. The load-bearing counter is the ' +
+        'DOCUMENT COUNT, which is what distinguishes "wrote one record" from "wrote the ' +
+        'corpus one record at a time"; `writtenBytes` is what the edit replicated, and ' +
+        '`serializedBytes` reads the reclaimed whole-array key, which now holds nothing.',
+      setup: async (context) => recipeStorageWorld(context, { convert: true }),
+      run: async (bench) => {
+        await bench.editOneRecipe();
+        return bench;
+      },
+      counts: (bench) => bench.counts(),
+      teardown: (bench) => bench.teardown(),
+    },
+    {
+      id: 'recipeManager.save.singleArray',
+      profile: 'simple-corpus',
+      description:
+        'MEASUREMENT (issue 1247): the whole-corpus `RecipeManager.save()` an import or bulk ' +
+        'edit still flushes through, under the WHOLE-ARRAY arrangement. Distinct from the ' +
+        '`recipeManager.save` case, which measures the same call on a world built the legacy ' +
+        'way against the AMBIENT id counter; this one is the same-fixture control for ' +
+        '`recipeManager.save.perRecord` and is the number that pairs with it.',
+      setup: async (context) => recipeStorageWorld(context, { convert: false }),
+      run: async (bench) => {
+        await bench.saveWholeCorpus();
+        return bench;
+      },
+      counts: (bench) => bench.counts(),
+      teardown: (bench) => bench.teardown(),
+    },
+    {
+      id: 'recipeManager.save.perRecord',
+      profile: 'simple-corpus',
+      description:
+        'MEASUREMENT (issue 1247): the same whole-corpus save on a converted world. It is ' +
+        'DIFFERENTIAL, so a flush over a settled corpus issues no document operation and ' +
+        'replicates nothing, where the whole-array arm unconditionally re-replicates every ' +
+        'byte. A regression that made the differential rewrite the corpus one record at a ' +
+        'time moves `recipeDocumentsTouched` from 0 to the corpus size.',
+      setup: async (context) => recipeStorageWorld(context, { convert: true }),
       run: async (bench) => {
         await bench.saveWholeCorpus();
         return bench;

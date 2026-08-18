@@ -2842,6 +2842,14 @@ That claim MUST be backed by a committed machine-invariant counter recording the
 The document count is the load-bearing half: it is what distinguishes "wrote one record" from "wrote the corpus one record at a time".
 A projection from the pre-extraction per-record average is not a measurement.
 
+**A conversion's single-record write cost MUST be measured on BOTH arrangements.**
+The extraction clause above states the requirement for a class extracted out of a container.
+The same obligation binds a class converted from its own whole-array key, and it binds the CONTROL as well as the converted arm.
+A committed machine-invariant counter MUST record, for one single-record mutation, the number of `Setting` documents the write touched and the bytes it replicated, on a `perRecord` world and on a `singleArray` one built from the SAME fixture.
+Both arms are required because the claim is a RATIO, and a ratio inferred across two differently-built worlds is not a measurement of either.
+The whole-corpus flush an import or bulk edit still issues MUST be measured on both arrangements too, because it stays reachable after conversion and its cost there is a differential rather than an unconditional rewrite.
+The converted arm MUST be converted THROUGH the shipped conversion; a fixture that hand-sets the layout measures the fixture.
+
 **A bulk or cascade write emits ONE change signal to a receiving client.**
 A write that touches many granular records MUST NOT make a receiving client re-read the corpus once per record or once per leg.
 The writer stamps a batch-close marker on the document operations of one logical write and marks the final leg; document operation options propagate verbatim to every receiver's hook, so the marker needs no new transport.
