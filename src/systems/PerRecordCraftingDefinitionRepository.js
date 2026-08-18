@@ -102,6 +102,29 @@ export const FOUNDRY_DOCUMENT_ID_PATTERN = /^[a-zA-Z0-9]{16}$/;
 export const RECIPE_RECORD_KEY_PREFIX = 'recipe.';
 
 /**
+ * The per-record key prefix for components: `fabricate.component.<systemId>.<id>` (issue 1212).
+ *
+ * **The trailing separator is load-bearing and is the same trap the recipe prefix carries.**
+ * Two other live keys begin `fabricate.component`:
+ *
+ * - `fabricate.componentStorageLayout` — the component Definition Storage Layout;
+ * - `fabricate.componentStorageTarget` — the component Definition Storage Target.
+ *
+ * Without the dot both prefix-match, and the adapter would index them as records with the
+ * ids `StorageLayout` and `StorageTarget` — then derive them as removals on the first
+ * whole-corpus write and DELETE the layout document, which is the conversion's sole
+ * crash-recovery discriminator. `settingChangeBridge.js` anticipated exactly this when the
+ * recipe prefix landed.
+ *
+ * The RECORD key is composite — `<systemId>.<id>` — which is a caller convention this class
+ * needs no knowledge of: `keyFor` concatenates and `idFromKey` slices the prefix off, so both
+ * round-trip a composite id unchanged. `data-models/spec.md` makes the parse sound by
+ * constraining `CraftingSystem.id` to `/^[A-Za-z0-9_-]+$/`, so splitting on the FIRST dot
+ * always recovers the owning system.
+ */
+export const COMPONENT_RECORD_KEY_PREFIX = 'component.';
+
+/**
  * Seed for {@link deriveSettingDocumentId}. Changing it re-derives every id, which on a
  * converted world means every record is re-created under a new document and every old
  * document is orphaned. It is a constant for that reason, not a tunable.
@@ -366,6 +389,16 @@ export class PerRecordCraftingDefinitionRepository extends CraftingDefinitionRep
    *   document class carrying `createDocuments`/`updateDocuments`/`deleteDocuments`.
    * @param {() => Iterable<any>|null} [options.collection] Injected for tests; resolves the
    *   world `Setting` collection this adapter indexes.
+   * @param {((context: {leg: string, final: boolean}) => object|null)} [options.operationOptions]
+   *   Document-operation options to stamp on each leg of one logical write (issue 1212).
+   *   Called once per NON-EMPTY leg with the leg name and whether it is the last leg the
+   *   OPERATION will issue — which the repository cannot know on its own, because a
+   *   cross-class operation issues its creates/updates and its deletes in two separate calls
+   *   with a container write between them. Its whole purpose is the batch-close marker:
+   *   document operation options propagate VERBATIM to every receiver's hook after the
+   *   server strips a fixed list, so a receiving client can bracket its refresh on the final
+   *   leg and emit ONE change signal for a write that spanned three legs. Defaults to
+   *   stamping nothing, which is byte-for-byte the shipped behaviour.
    * @param {() => void} [options.assertWritable] Throws when this repository addresses an
    *   arrangement the world has already left (issue 1232) — the mirror of the settings
    *   adapter's guard, and reachable for the first time now that a REVERSE conversion
@@ -384,6 +417,7 @@ export class PerRecordCraftingDefinitionRepository extends CraftingDefinitionRep
     documentClass = defaultSettingDocumentClass,
     collection = defaultWorldSettingCollection,
     assertWritable = () => {},
+    operationOptions = null,
   }) {
     super();
     if (!keyPrefix || !keyPrefix.endsWith('.')) {
@@ -409,6 +443,7 @@ export class PerRecordCraftingDefinitionRepository extends CraftingDefinitionRep
     this._documentClass = documentClass;
     this._collection = collection;
     this._assertWritable = assertWritable;
+    this._operationOptions = typeof operationOptions === 'function' ? operationOptions : null;
     /** @type {Map<string, any>|null} key -> `Setting` document. Built once. */
     this._index = null;
     this._batchDepth = 0;
@@ -436,6 +471,33 @@ export class PerRecordCraftingDefinitionRepository extends CraftingDefinitionRep
    */
   idFromKey(key) {
     return String(key).slice(this.qualifiedPrefix.length);
+  }
+
+  /**
+   * Every RECORD id this adapter currently holds a document for, in index order.
+   *
+   * Public because a composite owner has to derive its own removal set and its own scoped
+   * reads from the index, and reaching into `_index` from outside would couple it to a
+   * private field (issue 1212).
+   *
+   * @returns {string[]}
+   */
+  recordIds() {
+    return [...this._ensureIndex().keys()].map((key) => this.idFromKey(key));
+  }
+
+  /**
+   * The STORED value of one record, or `null` when no document holds that id.
+   *
+   * Raw stored bytes, never routed through `hydrate`: a caller snapshotting a pre-state for
+   * a compensation needs what is persisted, not an interpretation of it.
+   *
+   * @param {string} id
+   * @returns {object|null}
+   */
+  storedValueFor(id) {
+    const setting = this._ensureIndex().get(this.keyFor(id));
+    return setting ? this._readValue(setting) : null;
   }
 
   /**
@@ -783,9 +845,33 @@ export class PerRecordCraftingDefinitionRepository extends CraftingDefinitionRep
   async _writeLegs({ creates, updates, deletes }) {
     if (creates.length === 0 && updates.length === 0 && deletes.length === 0) return;
     this._assertWritable();
-    if (creates.length > 0) await this._createDocuments(creates);
-    if (updates.length > 0) await this._updateDocuments(updates);
-    if (deletes.length > 0) await this._deleteDocuments(deletes);
+    // The non-empty legs, IN THE PINNED ORDER, so the batch-close marker can name the last
+    // one this call issues without the caller having to guess which legs the differential
+    // produced (issue 1212).
+    const legs = [
+      ['create', creates],
+      ['update', updates],
+      ['delete', deletes],
+    ].filter(([, items]) => items.length > 0);
+    for (const [index, [name, items]] of legs.entries()) {
+      const options = this._legOptions(name, index === legs.length - 1);
+      if (name === 'create') await this._createDocuments(items, options);
+      else if (name === 'update') await this._updateDocuments(items, options);
+      else await this._deleteDocuments(items, options);
+    }
+  }
+
+  /**
+   * The document-operation options one leg carries.
+   *
+   * @param {string} leg
+   * @param {boolean} lastOfCall whether this is the last leg THIS call issues.
+   * @returns {object}
+   * @private
+   */
+  _legOptions(leg, lastOfCall) {
+    if (!this._operationOptions) return {};
+    return this._operationOptions({ leg, final: lastOfCall }) ?? {};
   }
 
   /**
@@ -806,14 +892,15 @@ export class PerRecordCraftingDefinitionRepository extends CraftingDefinitionRep
    * @param {object[]} data
    * @private
    */
-  async _createDocuments(data) {
+  async _createDocuments(data, options = {}) {
     for (const entry of data) {
       if (!FOUNDRY_DOCUMENT_ID_PATTERN.test(entry._id)) {
         throw new Error(`Fabricate | derived document id "${entry._id}" is not a valid Foundry id`);
       }
     }
     const created =
-      (await this._requireDocumentClass().createDocuments(data, { keepId: true })) ?? [];
+      (await this._requireDocumentClass().createDocuments(data, { ...options, keepId: true })) ??
+      [];
     for (const document of created) this._indexDocument(document);
     this._verifyReturned('create', data.length, created.length);
   }
@@ -822,8 +909,8 @@ export class PerRecordCraftingDefinitionRepository extends CraftingDefinitionRep
    * @param {object[]} data
    * @private
    */
-  async _updateDocuments(data) {
-    const updated = (await this._requireDocumentClass().updateDocuments(data)) ?? [];
+  async _updateDocuments(data, options = {}) {
+    const updated = (await this._requireDocumentClass().updateDocuments(data, options)) ?? [];
     for (const document of updated) this._indexDocument(document);
     this._verifyReturned('update', data.length, updated.length);
   }
@@ -846,13 +933,13 @@ export class PerRecordCraftingDefinitionRepository extends CraftingDefinitionRep
    * @param {string[]} ids
    * @private
    */
-  async _deleteDocuments(ids) {
+  async _deleteDocuments(ids, options = {}) {
     const index = this._ensureIndex();
     // Captured BEFORE the await: these ids were derived from this index, and the await is
     // exactly the window in which a replicated change could rewrite it.
     const keyByDocumentId = new Map();
     for (const [key, setting] of index) keyByDocumentId.set(_documentId(setting), key);
-    const deleted = (await this._requireDocumentClass().deleteDocuments(ids)) ?? [];
+    const deleted = (await this._requireDocumentClass().deleteDocuments(ids, options)) ?? [];
     for (const id of ids) {
       const key = keyByDocumentId.get(String(id));
       if (key !== undefined) index.delete(key);

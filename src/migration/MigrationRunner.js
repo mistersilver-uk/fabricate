@@ -616,6 +616,7 @@ export class MigrationRunner {
     moduleVersion,
     promptRecovery,
     recipeCorpus,
+    craftingSystemCorpus,
     migrations,
   } = {}) {
     this._getSetting = getSetting;
@@ -628,6 +629,23 @@ export class MigrationRunner {
       loadAll: async () => this._getSetting(SETTING_KEYS.RECIPES) ?? [],
       createOrUpdateAll: async (records) => {
         await this._setSetting(SETTING_KEYS.RECIPES, records);
+      },
+    };
+    // Issue 1212: the CRAFTING-SYSTEM corpus is read and written through its own
+    // arrangement-aware seam, because components have been extracted out of `system.components`
+    // and six registry migrations consume that key. Its DEFAULT is the raw whole-array
+    // accessor below, byte-for-byte the read and write this runner performed before the seam
+    // existed, so the several dozen fixtures that construct a runner keep working untouched.
+    //
+    // It DELIBERATELY declares NO `layout` accessor, so `this._craftingSystemCorpus.layout?.()`
+    // answers `undefined` rather than `null`. The difference is load-bearing for the downgrade
+    // advice: `null` means "sampled and unreadable", which is a class it must warn about, and
+    // `undefined` means "this runner never sampled the class at all". A fixture that injects no
+    // crafting-system corpus is the second, not the first.
+    this._craftingSystemCorpus = craftingSystemCorpus ?? {
+      loadAll: async () => this._getSetting(SETTING_KEYS.CRAFTING_SYSTEMS) ?? [],
+      createOrUpdateAll: async (systems) => {
+        await this._setSetting(SETTING_KEYS.CRAFTING_SYSTEMS, systems);
       },
     };
   }
@@ -676,6 +694,24 @@ export class MigrationRunner {
       });
     }
 
+    // Issue 1212: the COMPONENT class has its own layout and its own `unsettled` refusal. It
+    // is read here rather than beside the recipe one so an up-to-date world still performs
+    // zero layout reads, and it is compared against `undefined` nowhere — only the positive
+    // `unsettled` value refuses.
+    const componentStorageLayout = this._craftingSystemCorpus.layout?.();
+    if (componentStorageLayout === DEFINITION_STORAGE_LAYOUTS.UNSETTLED) {
+      console.error(
+        'Fabricate | Migrations deferred: this world is part-way through a component storage conversion, so the crafting system corpus cannot be read whole. Nothing was migrated and nothing was saved.'
+      );
+      return emptyPassSummary({
+        deferred: true,
+        deferredReason: MIGRATION_DEFERRAL_REASONS.UNSETTLED_STORAGE,
+        deferredError: null,
+        storageLayout,
+        componentStorageLayout,
+      });
+    }
+
     let rawRecipes;
     try {
       // Contained, because the granular arm adds throw sites a whole-array setting read does
@@ -697,7 +733,24 @@ export class MigrationRunner {
         storageLayout,
       });
     }
-    const rawSystems = this._getSetting(SETTING_KEYS.CRAFTING_SYSTEMS) ?? [];
+    let rawSystems;
+    try {
+      // Contained for the same reason the recipe read is: the granular arm adds throw sites a
+      // whole-array setting read does not have, and an escaping rejection out of the module's
+      // async `ready` callback fires no error hook and leaves the module with no managers.
+      rawSystems = await this._craftingSystemCorpus.loadAll();
+    } catch (error) {
+      console.error(
+        'Fabricate | Migrations deferred: the crafting system corpus could not be read, so no migration ran and nothing was saved.',
+        error
+      );
+      return emptyPassSummary({
+        deferred: true,
+        deferredReason: MIGRATION_DEFERRAL_REASONS.CORPUS_READ_FAILED,
+        deferredError: error,
+        storageLayout,
+      });
+    }
     const rawGatheringConfig = this._getSetting(SETTING_KEYS.GATHERING_CONFIG) ?? {};
     const rawEnvironments = this._getSetting(SETTING_KEYS.GATHERING_ENVIRONMENTS) ?? [];
     const rawGatheringParties = this._getSetting(SETTING_KEYS.GATHERING_PARTIES) ?? [];
@@ -757,7 +810,10 @@ export class MigrationRunner {
           // The layout the pass RESOLVED, not a fresh read. The GM's message has to describe
           // the pass that just failed, and a re-read at guidance time can report a layout a
           // remote conversion moved mid-pass.
-          this._emitMigrationRecoveryGuidance(migration, error, downgradeTo, storageLayout);
+          this._emitMigrationRecoveryGuidance(migration, error, downgradeTo, {
+            recipes: storageLayout,
+            components: componentStorageLayout,
+          });
 
           // Optional GM decision-prompt seam (defaults to "Keep existing data").
           this._promptRecovery?.({
@@ -765,6 +821,7 @@ export class MigrationRunner {
             documents: failures,
             label: migration.label,
             storageLayout,
+            componentStorageLayout,
           });
 
           return emptyPassSummary({
@@ -895,7 +952,7 @@ export class MigrationRunner {
     }
     try {
       if (systemsChanged) {
-        await this._setSetting(SETTING_KEYS.CRAFTING_SYSTEMS, data.systems);
+        await this._craftingSystemCorpus.createOrUpdateAll(data.systems);
       }
       if (gatheringConfigChanged) {
         await this._setSetting(SETTING_KEYS.GATHERING_CONFIG, data.gatheringConfig);
@@ -970,11 +1027,15 @@ export class MigrationRunner {
    * @param {{ label: string }} migration
    * @param {{ message?: string, documents?: object[] }} error
    * @param {string|null} downgradeTo
-   * @param {string|null} [storageLayout] The recipe Definition Storage Layout this pass ran
-   *   against, resolved once by `run()`. It selects the downgrade advice, because
+   * @param {{recipes: string|null, components: string|null|undefined}} [storageLayouts] Every
+   *   granular class's Definition Storage Layout as this pass ran against it, resolved once by
+   *   `run()`. They select the downgrade advice TOGETHER (issue 1212): on a world where both
+   *   classes are converted, advice naming only one leaves the GM reversing recipes,
+   *   downgrading, and losing sight of their whole component library. It selects the advice,
+   *   because
    *   "downgrade to keep using your existing data" is FALSE on a granularly-stored world.
    */
-  _emitMigrationRecoveryGuidance(migration, error, downgradeTo, storageLayout = null) {
+  _emitMigrationRecoveryGuidance(migration, error, downgradeTo, storageLayouts = null) {
     // Scoped to THIS PASS. It is not a claim that a failed migration leaves data unchanged: a
     // non-fatal migration error is logged and the pass continues, advancing the version past
     // the failed migration and writing. And it is a claim about STORED data — the migrations
@@ -991,7 +1052,7 @@ export class MigrationRunner {
     // One complete sentence per layout, from the single table the GM dialog also selects from,
     // and never a sentence with a layout token interpolated into it.
     console.error(
-      `Fabricate | Recommended action: ${selectDowngradeAdvice(storageLayout).consoleSentence(downgradeTarget)}`
+      `Fabricate | Recommended action: ${selectDowngradeAdvice(storageLayouts).consoleSentence(downgradeTarget)}`
     );
 
     const documents = Array.isArray(error?.documents) ? error.documents : [];

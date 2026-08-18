@@ -1,5 +1,9 @@
+import { DEFINITION_BATCH_MARKER_KEY } from '../systems/CompositeCraftingSystemRepository.js';
 import { craftingDataChange, emitCraftingDataChanged } from '../systems/craftingDataChange.js';
-import { RECIPE_RECORD_KEY_PREFIX } from '../systems/PerRecordCraftingDefinitionRepository.js';
+import {
+  COMPONENT_RECORD_KEY_PREFIX,
+  RECIPE_RECORD_KEY_PREFIX,
+} from '../systems/PerRecordCraftingDefinitionRepository.js';
 
 import { FABRICATE_SETTINGS_NAMESPACE, SETTING_KEYS } from './settings.js';
 
@@ -9,6 +13,19 @@ const GATHERING_ENVIRONMENTS_KEY = `${FABRICATE_SETTINGS_NAMESPACE}.${SETTING_KE
 const PLAYER_CHARACTER_TYPES_KEY = `${FABRICATE_SETTINGS_NAMESPACE}.${SETTING_KEYS.ADDITIONAL_PLAYER_CHARACTER_ACTOR_TYPES}`;
 const RECIPE_STORAGE_LAYOUT_KEY = `${FABRICATE_SETTINGS_NAMESPACE}.${SETTING_KEYS.RECIPE_STORAGE_LAYOUT}`;
 const RECIPE_STORAGE_TARGET_KEY = `${FABRICATE_SETTINGS_NAMESPACE}.${SETTING_KEYS.RECIPE_STORAGE_TARGET}`;
+const COMPONENT_STORAGE_LAYOUT_KEY = `${FABRICATE_SETTINGS_NAMESPACE}.${SETTING_KEYS.COMPONENT_STORAGE_LAYOUT}`;
+const COMPONENT_STORAGE_TARGET_KEY = `${FABRICATE_SETTINGS_NAMESPACE}.${SETTING_KEYS.COMPONENT_STORAGE_TARGET}`;
+
+/**
+ * Every Definition Storage layout/target key, whose change is a SIGNAL rather than a corpus
+ * read (issues 1232, 1212).
+ */
+const DEFINITION_STORAGE_PAIR_KEYS = new Set([
+  RECIPE_STORAGE_LAYOUT_KEY,
+  RECIPE_STORAGE_TARGET_KEY,
+  COMPONENT_STORAGE_LAYOUT_KEY,
+  COMPONENT_STORAGE_TARGET_KEY,
+]);
 
 /**
  * The keys whose ONE setting holds a whole corpus, for which a document DELETE must never
@@ -55,6 +72,45 @@ const WHOLE_CORPUS_SETTING_KEYS = new Set([
  * cannot disagree about which keys are records.
  */
 export const RECIPE_RECORD_SETTING_KEY_PREFIX = `${FABRICATE_SETTINGS_NAMESPACE}.${RECIPE_RECORD_KEY_PREFIX}`;
+
+/**
+ * The fully-qualified prefix EVERY per-record component key carries —
+ * `fabricate.component.`, **including the trailing separator** (issue 1212).
+ *
+ * The hazard the recipe prefix's comment anticipated, now live: two other keys begin
+ * `fabricate.component` — `componentStorageLayout` and `componentStorageTarget` — and
+ * without the separator both would be routed as records with the ids `StorageLayout` and
+ * `StorageTarget`.
+ *
+ * Derived from the adapter's own prefix rather than restated, so the bridge and the store
+ * cannot disagree about which keys are records.
+ */
+export const COMPONENT_RECORD_SETTING_KEY_PREFIX = `${FABRICATE_SETTINGS_NAMESPACE}.${COMPONENT_RECORD_KEY_PREFIX}`;
+
+/**
+ * Drive a receiving client's refresh bracket from a writer's batch-close marker
+ * (issue 1212).
+ *
+ * The writer stamps `{id, final}` on EVERY leg of one logical operation, so a receiver can
+ * open the bracket on the first leg it sees and close it on the marked last one. Opening on
+ * the first leg is what makes the collapse real: the microtask fallback already collapses
+ * ONE leg's synchronous burst, so a bracket that only closed would still emit one signal per
+ * leg for a mixed create-plus-update-plus-delete write.
+ *
+ * The bracket belongs to the RECEIVER. A writer bracketing its own flush coalesces nothing:
+ * its map already holds the records, so its applier returns `false` and it never signals.
+ *
+ * @param {{open: Function, close: Function, isOpen: Function}|null|undefined} coalescer
+ * @param {object|null|undefined} options the document-operation options the hook delivered.
+ * @returns {{closes: boolean}} whether this leg CLOSES the batch, so the caller can close
+ *   the bracket AFTER delivering the record rather than before.
+ */
+export function openDefinitionBatchBracket(coalescer, options) {
+  const marker = options?.[DEFINITION_BATCH_MARKER_KEY];
+  if (!coalescer || !marker) return { closes: false };
+  if (!coalescer.isOpen?.()) coalescer.open();
+  return { closes: marker.final === true };
+}
 
 /**
  * Coalesce many replicated per-record refreshes into ONE `fabricate.recipesChanged`.
@@ -241,6 +297,8 @@ function announceScopedChange(source, manager, callAll) {
  *   listener on `createSetting` and `updateSetting` precisely so the two cannot drift.
  * @param {object|null} [deps.document] The `Setting` document the hook delivered, passed
  *   through for the same reason.
+ * @param {object|null} [deps.options] The document-operation options the hook delivered,
+   carrying the writer's batch-close marker when one was stamped (issue 1212).
  * @param {{signal: (emit: () => void) => void}|null} [deps.recipeRefresh] The batch
  *   coalescer from {@link createRecipeRefreshCoalescer}. Omitted, each handled per-record
  *   change emits immediately, which is correct for a genuine single-record edit and is what
@@ -256,6 +314,7 @@ export function handleFabricateSettingChange(
     callAll,
     operation = 'update',
     document = null,
+    options = null,
     recipeRefresh = null,
   } = {}
 ) {
@@ -321,7 +380,44 @@ export function handleFabricateSettingChange(
     }
     return true;
   }
-  if (settingKey === RECIPE_STORAGE_LAYOUT_KEY || settingKey === RECIPE_STORAGE_TARGET_KEY) {
+  if (String(settingKey).startsWith(COMPONENT_RECORD_SETTING_KEY_PREFIX)) {
+    // One replicated COMPONENT record (issue 1212). Reached only under the per-record
+    // component arrangement, so on every world today this branch is unreachable: no key of
+    // this shape exists while the Component Storage Target is `singleArray`.
+    //
+    // The bracket is opened from the writer's marker BEFORE the record is applied and closed
+    // after the marked final leg, so a bulk or cascade write that spanned three legs reaches
+    // this client as exactly ONE change signal.
+    const bracket = openDefinitionBatchBracket(recipeRefresh, options);
+    const changed =
+      craftingSystemManager?.applyReplicatedRecordChange?.({
+        key: settingKey,
+        operation,
+        document,
+      }) === true;
+    if (changed) {
+      // Read NOW, not at emit time: the applier mints one delta PER RECORD and the next
+      // record's mint replaces it, so a coalesced batch that deferred the read would report
+      // only its LAST record.
+      const scopes = replicatedScopes(craftingSystemManager);
+      recipeRefresh?.collect?.(scopes);
+      const emit = () => {
+        callAll?.('fabricate.craftingSystemsChanged', craftingSystemManager.getSystems());
+        emitCraftingDataChanged(
+          craftingDataChange({
+            source: 'systems',
+            scopes: recipeRefresh?.takeCollected?.() ?? scopes,
+          }),
+          callAll
+        );
+      };
+      if (recipeRefresh) recipeRefresh.signal(emit);
+      else emit();
+    }
+    if (bracket.closes) recipeRefresh?.close?.();
+    return true;
+  }
+  if (DEFINITION_STORAGE_PAIR_KEYS.has(settingKey)) {
     // The Definition Storage Layout is the Storage Layout Conversion's sole discriminator,
     // and without this a remote client gets NO signal when it flips — it would keep reading
     // whichever arrangement it resolved at construction until the session ended.
@@ -334,8 +430,19 @@ export function handleFabricateSettingChange(
     // never against a corpus mid-move. It is asynchronous because a granular `loadAll()` is,
     // and this handler's boolean means "was this a Fabricate data setting", never "has the
     // reaction finished"; a rejection is reported rather than left unhandled.
-    void Promise.resolve(recipeManager?.rebuildDefinitionStorage?.()).catch((error) => {
-      console.error('Fabricate | failed to rebuild recipe definition storage', error);
+    // Issue 1212: the COMPONENT pair drives the crafting-system manager's own rebuild, which
+    // did not exist before this change — the manager selected its arm once, in its
+    // constructor, and nothing rebuilt it. Without this a GM flipping the arrangement
+    // mid-session converts the corpus while every later component write is refused by the
+    // arrangement guard, with no notice, until reload.
+    const componentPair =
+      settingKey === COMPONENT_STORAGE_LAYOUT_KEY || settingKey === COMPONENT_STORAGE_TARGET_KEY;
+    const rebuild = componentPair
+      ? craftingSystemManager?.rebuildDefinitionStorage?.()
+      : recipeManager?.rebuildDefinitionStorage?.();
+    const entity = componentPair ? 'component' : 'recipe';
+    void Promise.resolve(rebuild).catch((error) => {
+      console.error(`Fabricate | failed to rebuild ${entity} definition storage`, error);
     });
     //
     // INTERNAL, deliberately not a published hook. It is absent from `FABRICATE_HOOKS` /

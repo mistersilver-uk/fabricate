@@ -107,15 +107,23 @@ export const DEFINITION_STORAGE_KEY_PAIRS = Object.freeze({
     layout: SETTING_KEYS.RECIPE_STORAGE_LAYOUT,
     target: SETTING_KEYS.RECIPE_STORAGE_TARGET,
   }),
+  // Issue 1212. WITHOUT this entry `input.pairRegistered !== true` and the component basis is
+  // `false` FOREVER on every world, silently omitting the `salvage runs` and `stale
+  // preferences` passes permanently — the OPPOSITE failure direction from omitting the kind
+  // below, which is why both halves carry their own acceptance item.
+  components: Object.freeze({
+    layout: SETTING_KEYS.COMPONENT_STORAGE_LAYOUT,
+    target: SETTING_KEYS.COMPONENT_STORAGE_TARGET,
+  }),
 });
 
 /**
  * The entity kinds for which a GRANULAR definition repository exists in this build.
  *
  * This — not {@link DEFINITION_STORAGE_KEY_PAIRS} — is what decides whether a kind's basis
- * has to be established at all, for the reason given in this module's header. Recipes are
- * the only kind whose records CAN be read one document at a time today; crafting systems
- * and components come back from a single whole-array read.
+ * has to be established at all, for the reason given in this module's header. Recipes and
+ * components are the kinds whose records CAN be read one document at a time; crafting
+ * systems themselves still come back from a single whole-array read.
  *
  * Note "can", not "did". A world on `singleArray` builds the settings adapter for recipes,
  * and the recipe basis is still established in full — because a settings adapter can also
@@ -123,9 +131,14 @@ export const DEFINITION_STORAGE_KEY_PAIRS = Object.freeze({
  * client that built the settings adapter afterwards reads nothing at all). Membership here
  * means the kind's storage can be in flux; it is not a claim about this boot's backend.
  *
+ * Issue 1212 added `components`. WITHOUT it {@link isKindKnownComplete} answers `true` BY
+ * CONSTRUCTION whenever the repository does not report itself granular, so a mid-conversion
+ * world runs every destructive pass against a half-written component corpus — the OPPOSITE
+ * failure direction from omitting the key pair above.
+ *
  * @type {readonly string[]}
  */
-export const GRANULAR_DEFINITION_REPOSITORY_KINDS = Object.freeze(['recipes']);
+export const GRANULAR_DEFINITION_REPOSITORY_KINDS = Object.freeze(['recipes', 'components']);
 
 /** Every value a Definition Storage LAYOUT may legitimately hold. */
 const RECOGNISED_ARRANGEMENTS = Object.freeze(Object.values(DEFINITION_STORAGE_LAYOUTS));
