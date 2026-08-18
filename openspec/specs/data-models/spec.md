@@ -2842,9 +2842,9 @@ That claim MUST be backed by a committed machine-invariant counter recording the
 The document count is the load-bearing half: it is what distinguishes "wrote one record" from "wrote the corpus one record at a time".
 A projection from the pre-extraction per-record average is not a measurement.
 
-**A conversion's single-record write cost MUST be measured on BOTH arrangements.**
-The extraction clause above states the requirement for a class extracted out of a container.
-The same obligation binds a class converted from its own whole-array key, and it binds the CONTROL as well as the converted arm.
+**A WHOLE-ARRAY class's single-record write cost MUST be measured on BOTH arrangements.**
+This is a SEPARATE and stronger obligation than the extraction clause above, not a restatement of it: that clause requires the residual container size and the document count on the CONVERTED arm only, and says nothing about a control.
+For a class converted from its own whole-array key the control is required too, because after conversion its former key is reclaimed and serves its registered default — so the converted arm alone carries no witness of what the mutation used to cost, where an extraction's surviving container still does.
 A committed machine-invariant counter MUST record, for one single-record mutation, the number of `Setting` documents the write touched and the bytes it replicated, on a `perRecord` world and on a `singleArray` one built from the SAME fixture.
 Both arms are required because the claim is a RATIO, and a ratio inferred across two differently-built worlds is not a measurement of either.
 The whole-corpus flush an import or bulk edit still issues MUST be measured on both arrangements too, because it stays reachable after conversion and its cost there is a differential rather than an unconditional rewrite.
