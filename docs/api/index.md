@@ -673,7 +673,7 @@ Each entry in `tabs`:
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 
-Each action is `{ id, label, icon?, tooltip?, primary?, disabled? }` plus **exactly one** of:
+Each action is `{ id, label, icon?, tooltip?, primary?, tone?, disabled? }` plus **exactly one** of:
 
 - `href` — an absolute `http(s)` URL.
   Fabricate renders an anchor with `target="_blank"` and `rel="noopener noreferrer"`.
@@ -684,6 +684,10 @@ Each action is `{ id, label, icon?, tooltip?, primary?, disabled? }` plus **exac
 
 All strings a provider supplies are used verbatim: **localize them yourself**.
 Fabricate localizes only its own fallback copy.
+
+`tone` selects the action's button treatment: `primary`, `ghost`, `danger`, or `neutral`, the default, which is the plain Manager button with no added styling.
+`primary: true` is the older, still-supported spelling of `tone: 'primary'`.
+An action that declares both `primary` and `tone` is refused at registration.
 
 ### The Mount Context
 
@@ -704,10 +708,110 @@ Fabricate localizes only its own fallback copy.
 | `isGM` | Whether the current Foundry user holds the GM role. This is presentation information, not authorization — gate your own writes. |
 | `revision` | Increments on every `requestRemount()` call. |
 | `requestRemount()` | Ask Fabricate to re-render this surface. It runs the current cleanup, clears the target, and calls `mount` again with a fresh context. |
+| `setRouteChrome(chrome)` | Restate this mount's route chrome at any time, with no remount. See [Runtime Route Chrome](#runtime-route-chrome). |
+| `onRouteReselect(handler)` | Register a handler for the GM re-activating the rail sub-item this mount is already showing. See [Runtime Route Chrome](#runtime-route-chrome). |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 
 A new context object is created — never mutated — whenever one of its values changes, which also remounts the active tab.
+`setRouteChrome` and `onRouteReselect` are the two exceptions: they are functions carried on that same frozen context, and calling them never changes the context's own identity, so neither one triggers the remount a new context would.
+
+### Runtime Route Chrome
+
+A tab's `title`, `subtitle`, `breadcrumb`, `actionsLabel` and `actions` are read once, at registration.
+That is enough for a companion whose tab is a single screen.
+It is not enough for a tab that is a list drilling into an editor.
+The editor needs its own title, its own artwork, an "Unsaved" chip, and Back, Delete and Save actions in the same header, without losing the mounted editor state underneath.
+
+`context.setRouteChrome(chrome)` restates this mount's chrome at any time, with no remount.
+It accepts the same fields a tab may register, plus `icon` and `image` for a header medallion, and `status` for a chip:
+
+```javascript
+mount({ target, tabId, context }) {
+  const view = mountCompanionDowntime({ target, tabId, context });
+
+  view.onOpenProject((project) => {
+    context.setRouteChrome({
+      title: project.name,
+      subtitle: game.i18n.localize('MY_MODULE.Downtime.Projects.EditingSubtitle'),
+      status: view.isDirty()
+        ? { label: game.i18n.localize('MY_MODULE.Unsaved') }
+        : undefined,
+      actions: [
+        { id: 'back', label: game.i18n.localize('MY_MODULE.Back'), icon: 'fas fa-arrow-left',
+          tone: 'ghost', onSelect: () => view.closeProject() },
+        { id: 'delete', label: game.i18n.localize('MY_MODULE.Delete'), icon: 'fas fa-trash',
+          tone: 'danger', onSelect: () => view.deleteProject(project.id) },
+        { id: 'save', label: game.i18n.localize('MY_MODULE.Save'), icon: 'fas fa-check',
+          tone: 'primary', onSelect: () => view.saveProject() },
+      ],
+    });
+  });
+
+  // Back to the list: drop the runtime layer and let the tab's own registered
+  // chrome show through again.
+  view.onCloseProject(() => context.setRouteChrome(null));
+
+  const stop = myDowntimeStore.subscribe(() => context.requestRemount());
+  return () => { stop(); view.destroy(); };
+},
+```
+
+Resolution runs three layers deep, in one fixed order: the live mount's runtime chrome, then the active tab's registered chrome, then Fabricate's own string.
+A companion that never calls `setRouteChrome` reads exactly as it did before this channel existed.
+An omitted field falls through to the next layer down.
+It does not clear that field.
+
+**A call replaces, it never merges.**
+Each call states the whole chrome, so an omitted field falls back to the layer below and there is no partial update.
+Pass `null` (or `{}`) to drop the runtime layer entirely and restore the tab's own registered chrome, as the worked example does on close.
+
+**`actions` resolves with `??`, not `||`.**
+An empty array means "this screen has no actions" and stays empty rather than falling through to the tab's own list.
+A truthiness check would erase exactly the distinction an editor's Back, Delete and Save need from its list screen's actions.
+
+**Unknown keys are refused, not ignored.**
+A registered tab silently ignores a field it does not read, but a runtime update throws a `TypeError` on any key outside the documented set, including a misspelling such as `subtitel`.
+Nothing applies until validation passes, so a refused update leaves the header showing whatever it already showed.
+
+**Artwork is opt-in and off by default.**
+`icon` and `image` have no registration-time counterpart, so the route's header carries no medallion until a companion sets one.
+`icon` is a Font Awesome class string and `image` is an image path.
+The two are mutually exclusive, and declaring both throws.
+
+**`status` renders Fabricate's own unsaved-style chip.**
+It is `{ label, tone?, tooltip? }`.
+`tone` defaults to `warning`, Fabricate's own staged-changes tone, and also accepts `info`, `positive`, `active`, `neutral`, `danger`, `negative` and `disabled`.
+
+**Localization stays your responsibility.**
+As at registration, Fabricate renders every string a runtime update carries exactly as supplied.
+
+**A stale mount cannot repaint the screen.**
+`setRouteChrome` returns `false`, and changes nothing, once its mount has ended: a tab switch, an unregister, or the GM leaving the route all end it.
+A companion holding a context from a late-resolving promise or a stray listener cannot dress a screen the GM has since moved on from.
+
+**Updating chrome never remounts.**
+This is the property the whole channel exists to preserve.
+The mount context's identity, which is what a remount is keyed on, never changes when `setRouteChrome` is called, so your editor's own state, scroll position and focus are untouched.
+
+`context.onRouteReselect(handler)` registers a handler for the GM clicking the rail sub-item of the tab your mount already shows.
+Before this channel existed, that click did nothing, because Fabricate had no lower level to navigate to.
+Now it is offered to your mount, so a list-then-editor companion can treat it as "pop back to the list":
+
+```javascript
+mount({ target, tabId, context }) {
+  const view = mountCompanionDowntime({ target, tabId, context });
+  const stop = context.onRouteReselect(() => view.closeProject());
+  return () => { stop(); view.destroy(); };
+},
+```
+
+The call returns an idempotent unsubscribe function, and Fabricate also drops the handler itself when the mount ends, so an unstopped subscription is not a leak.
+A throwing handler is caught and logged, and never breaks the rail click for anyone else.
+
+`onRouteReselect` is deliberately **not** routed through Fabricate's own route-exit confirmation.
+No Manager route is being exited by this click, so there is nothing for that confirmation to guard.
+Whether your companion's own unsaved editor state should block the pop is your question to answer inside the handler.
 
 ### The Panel's Layout Contract
 
