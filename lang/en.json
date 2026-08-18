@@ -1245,7 +1245,21 @@
         "ReclaimPending": "Fabricate moved {records} recipes back into the combined record, but could not clear the leftover per-recipe records. Your recipes are safe and Fabricate will retry the clean-up the next time a GM loads this world.",
         "Unavailable": "This version of Fabricate cannot convert your recipes to \"{requested}\", so the recipe storage arrangement has been left as \"{current}\". Nothing was changed and your recipes are untouched.",
         "Failed": "Fabricate could not change the recipe storage arrangement, so it has been left as \"{current}\". Your recipes are untouched. See the console log for the reason.",
-        "Unsettled": "This world's recipes are part-way through a storage conversion that this version of Fabricate cannot finish, so Fabricate is not removing any stale saved data until it is resolved. Load the world with the newer version of Fabricate to complete the conversion."
+        "Unsettled": "This world's recipes are part-way through a storage conversion that this version of Fabricate cannot finish, so Fabricate is not removing any stale saved data until it is resolved. Load the world with the newer version of Fabricate to complete the conversion.",
+        "UnknownArrangement": "an arrangement Fabricate does not recognise",
+        "ConvertedToPerRecord": "Fabricate moved {records} recipes into one record each. This world can no longer be opened with an older version of Fabricate, which reads no recipes from this arrangement. To undo it, set Recipe Storage Arrangement back to \"One combined record\" and reload Foundry.",
+        "ConvertedLegacySurvives": "Fabricate moved {records} recipes into one record each, but could not clear the old combined record. Do not open this world with an older version of Fabricate: it reads the old combined record, and anything you change there is discarded the next time you open the world with this version. Fabricate will retry the clean-up the next time a GM loads this world.",
+        "Deferred": "Fabricate updated this world's saved data on this load, so it has postponed the recipe storage change. Your recipes are untouched. Fabricate will make the change the next time a GM loads this world.",
+        "Declined": "Fabricate has left this world's recipes in one combined record. Nothing was changed.",
+        "Refused": "Fabricate cannot tell where this world's recipes are stored, so it has changed nothing and will not remove any saved data until it is resolved. {records} recipes are in the combined record and there are {kept} per-recipe records. See the console log for the details.",
+        "ReclaimRefused": "Fabricate found {kept} per-recipe records that this world's combined record of {records} recipes does not describe, so it has left them alone rather than deleting recipes it cannot account for. Nothing was removed. See the console log for the details.",
+        "LegacySurvivorDiverged": "This world's recipes are stored one record each, but an old combined record of {legacyRecords} recipes has survived alongside the {granularRecords} Fabricate is using, and the two do not match. Fabricate has left the old record alone rather than deleting work you may have done in an older version. Nothing was removed.",
+        "ConsentTitle": "Change how Fabricate stores recipes?",
+        "ConsentLoss": "Fabricate is about to move every recipe in this world into its own record. Once it has, an older version of Fabricate cannot read them: it finds no recipes at all, reports no error, and starts writing over them.",
+        "ConsentMitigation": "This can be undone, but only from this version. Set Recipe Storage Arrangement back to \"One combined record\" and reload Foundry, and Fabricate moves them back before you downgrade.",
+        "ConsentQuestion": "Move the recipes now?",
+        "ConsentCancelButton": "Keep recipes in one combined record",
+        "ConsentConvertButton": "Move each recipe into its own record"
       },
       "RepairItemData": {
         "Name": "Repair Item Data",

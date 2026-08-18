@@ -2810,6 +2810,14 @@ Such a reader MUST return records detached from their stored documents.
 A writer that issues no delete leg cannot express removal, so a record dropped by the transformation would survive, be read back on the next pass, and have its removal silently undone.
 Such a writer's caller MUST verify that every record id it read is present in the set it is about to write, by id-set containment rather than by count, and MUST refuse otherwise.
 
+**Envelope reclamation MUST NOT delete a record the settled corpus does not describe.**
+A reclamation pass that deletes leftover granular documents on a settled whole-array world MUST first confirm that the whole-array corpus describes every document it is about to delete, by record-id containment.
+A document the settled corpus does not name is the only shape that can hold a record the settled corpus LACKS, so deleting it is unrecoverable corpus loss rather than envelope reclamation.
+The rule is exact rather than conservative, because every legitimate reclamation target is described by construction: documents left by a failed forward conversion were created FROM the whole-array corpus, and documents left by a failed reverse conversion were written INTO it before the reverse advanced its layout.
+The rule is applied PER DOCUMENT, so an undescribed document does not make its described neighbours un-reclaimable.
+On refusal the pass MUST reclaim nothing for that document and MUST report to the GM.
+Note that the shrink clause above does NOT defend this: it requires that every record id READ is present in the set about to be written, and on a reclaimed source the read is the empty set, which is trivially contained — so the clause is vacuous exactly where the hazard lives.
+
 **Corpus order is not semantic.**
 No consumer may depend on the order records are returned in.
 A granular backend's whole-corpus read returns records in ascending record-id order so that the read is deterministic; that order is a determinism guarantee and carries no domain meaning.
@@ -2833,6 +2841,16 @@ A **Storage Layout Conversion** is the one-time operation that moves an entity c
 3. set the layout to the target value;
 4. delete the legacy whole-array document.
 
+**Step 2 MUST create the missing and update the differing, and MUST NOT delete.**
+A whole-corpus reconciler that derives its removals from the supplied set MUST NOT be used, because a resume whose source key has already been reclaimed supplies an EMPTY set: the reconciler then deletes the entire converted corpus while every return-count check reports success and the operation reports that it converted.
+The writer step 2 uses therefore issues creates and updates only, and computes no removal at any point.
+
+**The destination MUST be verified before the layout is advanced, not before the source is reclaimed.**
+Before step 3 a conversion MUST re-read the destination index and confirm it holds a record for every record the source supplied, by id containment rather than by count.
+On any mismatch it MUST NOT advance the layout, MUST leave the source intact, and MUST report.
+Verifying between steps 3 and 4 is insufficient by construction: step 3 is the write that asserts the layout describes where the records are, so a corpus that failed verification must never reach it.
+With the verification before step 3 a shortfall leaves the layout `unsettled` and the legacy document intact, which is the recoverable state; with it after, the world claims the target arrangement over a corpus missing records and only step 4 stands between it and total loss.
+
 **Every step MUST be awaited.**
 Ordering and durability both depend on it, and an unawaited step turns a recoverable window into an unordered one.
 
@@ -2852,10 +2870,31 @@ The invariant this conversion establishes is "the layout value matches where the
 On a world that has never converted, the layout key has NO document — its registered default is served without one — and step 1 creates it.
 Compensation therefore DELETES that document rather than resetting its value, which is the "restore prior key presence" clause of `## Foundry Multi-Write Invariants` applied literally.
 
+**That key-presence clause binds the forward conversion ITSELF, not a shared caller.**
+A conversion that delegates compensation to a caller written for the reverse direction violates it: the reverse restores a VALUE, and on a never-converted world a value-restoring compensation leaves a layout document that was not there before — and spends a `Setting` envelope — on a world the GM is being told is untouched.
+The forward conversion MUST therefore record whether the layout document existed before step 1, MUST compensate by deleting it when it did not and by restoring its value when it did, and MUST signal that it has already compensated so that no caller compensates a second time.
+
+**Compensation is bounded by what the conversion actually wrote.**
+It is available only while steps 1 to 3 are in flight, and only for writes that were issued.
+A conversion that REFUSED before its first write MUST NOT be compensated at all: there is no prior state to restore, and writing one asserts a layout the conversion has just established it cannot describe.
+Once step 4 has begun there is nothing to compensate to — restoring the layout over a reclaimed source document is itself the loss — so a step-4 failure MUST be handled inside the conversion, MUST complete forward, and MUST NOT reach a caller that compensates.
+
 **The conversion is downgrade-lossy and MUST say so before it runs.**
 Step 4 removes the legacy document, so an older build of the module loads zero records.
 The supported mitigation is the REVERSE conversion, run while the GM is still on the new build: setting the target back to `singleArray` reverses the layout losslessly.
 A pre-conversion GM consent prompt naming the loss is the fallback, and any export it offers MUST NOT be presented as equivalent — an export carries authoring data only, and never runs, actor flags, learned-recipe knowledge or durable identity flags.
+
+**The disclosure is discharged at the point of ACTION, and a standing setting hint is not it.**
+A hint on the setting row discloses the CHOICE: nothing enforces that it was read, and it does not run.
+A GM confirmation naming the loss and naming the reverse-conversion mitigation MUST therefore be obtained before ANY forward conversion begins, with the non-destructive choice pre-selected and a dismissal treated as a decline that leaves the world exactly as it was.
+The requirement MUST NOT be scoped to a GM-INITIATED conversion.
+The target is an assistant-writable world setting while the conversion runs only on the primary GM's client, so an assistant can request a conversion that a GM-initiated-only prompt would never cover: the handler returns early on every client, no prompt is shown to anyone, and the later boot converts having obtained no consent at all.
+Where a conversion cannot run in the boot that reads the consent, the deferral MUST be reported instead.
+
+**The downgrade-lossy clause covers the QUIET case, where step 3 completed and step 4 did not.**
+The source document then survives intact beside a layout that reads the granular arrangement.
+An older build has no layout awareness at all: it reads and edits that document normally, and the next upgrade reads the per-record corpus and discards those edits with no error and no notice.
+A build MUST detect a surviving source document on a settled granular boot, MUST NOT reclaim it while its contents differ from the granular corpus, and MUST report the divergence to the GM with both record counts.
 
 **The reverse conversion is the forward one mirrored, and it MUST NOT inherit the forward compensation.**
 Its four steps are: set the layout to `unsettled`; write every per-record document's stored value into the legacy whole-array key; set the layout to `singleArray`; delete the per-record documents.
@@ -2872,6 +2911,21 @@ Routing records through the current model's deserializer and serializer would ma
 If the source arrangement reads zero records while the destination key still holds some, the recorded layout does not describe this world's storage, and the write that would follow destroys the surviving corpus.
 Resolving that by inferring the true layout from which key holds data is forbidden by "the layout is read, never inferred"; refusing is the only answer that cannot lose the corpus.
 
+**A conversion MUST be a pure function of settled stored bytes.**
+Repository selection is elected by a designation rather than a lock, so two clients can each believe they are the primary GM for the duration of one unresolved activity round trip.
+A conversion whose input is byte-identical on both is convergent by construction, because record document ids are derived from record keys and a replayed create is an upsert.
+A conversion MUST therefore NOT run in a boot whose migration pass persisted any corpus key: two clients' passes mint independent record-internal identity over the same source, so their corpora are byte-divergent, and a conversion whose source read interleaves with the other client's migration write converts a state no single pass produced.
+The converted corpus then ceases to be a function of any settled pre-conversion state, which is what every equivalence assertion compares against.
+The requirement is stated for REPRODUCIBILITY and not for referential integrity: every cross-key reference the current registry writes is derived deterministically, and no dangling reference has been demonstrated.
+Deferring the conversion by one boot is the required behaviour, and the deferral MUST be reported to the GM.
+
+**A legacy SURVIVOR is not an ORPHAN, and the two MUST NOT share a disposition.**
+Envelope reclamation deletes leftover granular documents on a settled whole-array world; the detector above is its mirror, a leftover whole-array document on a settled granular world.
+The two look symmetric and are not.
+An orphan is debris BY DEFINITION, because the settled corpus provably lives in the other arrangement and every legitimate orphan was written from it.
+A legacy survivor MAY carry newer authored data from a downgrade round trip, which is the entire reason it must not be reclaimed unconditionally.
+The detector MUST NOT be named a reclaimer — reclaiming is one of its two dispositions rather than its purpose — and "orphan" MUST NOT be reused for it, because that word asserts debris-ness and encodes the precise assumption that makes the quiet downgrade-lossy case destructive.
+
 ### The Definition Storage Target as a GM control
 
 **The target is the GM-facing control and the layout is not.**
@@ -2884,8 +2938,13 @@ Driving the conversion from the already-written target is what makes the orderin
 
 **Setting a target this build cannot reach MUST NOT leave the world permanently gated.**
 Valid Id Basis input 2 refuses whenever the layout does not equal the target, so a target with no available conversion would omit every destructive startup pass on that world forever — the same permanent silent omission this document forbids by name for the primacy input.
-Every outcome of a target change therefore ends with the layout equal to the target whenever the layout is SETTLED: an unreachable target is reverted to the layout and reported, and a conversion that fails compensates both keys.
-The one state that survives is an `unsettled` layout with no available resume, which is a genuinely half-converted corpus rather than an artefact of a settings write; it is reported to the GM and the gate correctly keeps refusing.
+Every outcome of a target change therefore ends with the layout equal to the target whenever the layout is SETTLED: an unreachable target is reverted to the layout and reported, and a conversion that fails AFTER WRITING compensates both keys.
+The first state that survives is an `unsettled` layout with no available resume, which is a genuinely half-converted corpus rather than an artefact of a settings write; it is reported to the GM and the gate correctly keeps refusing.
+
+**A conversion that REFUSED is a second state that legitimately survives with the layout unequal to the target.**
+A refusal establishes that the recorded layout does not describe this world's storage, so both keys MUST be left exactly as found, the world MUST be reported to the GM, and the gate correctly keeps refusing.
+Reverting the target there would assert a layout already established to be wrong.
+Worse, where the reverted value is the whole-array arrangement it makes both keys agree on it, which is the precondition envelope reclamation is gated on — so the refusal that protected the corpus arms its destruction on the very next boot.
 
 **Which transitions a build can perform is a declared set.**
 It MUST NOT be derived from the target enumeration, because a build that can reach only one arrangement would otherwise start claiming to reach every value added to that enumeration.
@@ -2900,6 +2959,18 @@ This is the write-side enforcement of "the legacy key MUST NOT be written after 
 **A client MUST be able to recover from a layout change without reloading.**
 It re-selects its backend and re-reads the corpus through the new one when, and only when, the layout and target agree again.
 Re-reading through the repository selected BEFORE the change answers confidently from the wrong arrangement, and re-selecting mid-conversion addresses storage the conversion has not written yet — so a client rebuilds exactly once, at the conversion's final flip, and holds its refused-write repository in between.
+
+**A client MUST adopt granular records that replicated before its own change listeners were registered.**
+The platform replays its buffered socket events before the readiness hook, and a module's setting listeners are registered inside that hook, so a record document arriving in between is correct in the client's setting storage and missing from its in-memory corpus for the whole session.
+The adoption read MUST run on EVERY client and inside no GM gate: the client at risk is any OTHER booting client, because the writer never misses its own writes and a non-GM client never reaches the storage reconcile at all.
+It MUST run AFTER the listeners are registered, because a read placed before them reopens the window it closes.
+It MUST NOT re-sample the layout observed at the corpus read: it adopts records after the fact, which does not make the original read whole, and re-sampling would let a client claim a known-complete Valid Id Basis over a partial read plus a patch.
+
+**Every GM-facing storage-arrangement notice is a COMPLETE localized sentence.**
+The no-interpolation rule stated for downgrade advice in `destructive-changes-and-migrations/spec.md` does not bind these notices, so it is restated for them.
+A notice about the definition storage arrangement MUST select a complete localized sentence per outcome and MUST NOT interpolate a layout or target token into any GM-facing string.
+A value-to-label helper MUST NOT fall back to rendering the raw value: the layout enumeration carries a member (`unsettled`) the operator-facing choices map has no label for and never will.
+The helper MUST still yield a readable phrase for every value it can be handed, because notices that name the current arrangement interpolate it — forbidding the raw token says what the helper must not do, not what it must produce.
 
 ### Valid Id Basis
 

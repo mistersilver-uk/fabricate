@@ -88,9 +88,17 @@ export const RECIPE_RECORD_SETTING_KEY_PREFIX = `${FABRICATE_SETTINGS_NAMESPACE}
  * — then `Object.assign`s the rest onto the operation, and the receiving side spreads what
  * survives straight into the hook's `options`. So a writer that stamps its own marker on
  * the final leg of a batch hands every receiver an unambiguous close. Stamping it is the
- * writer's job (-c's Storage Layout Conversion, -d's importer); this module's job is to
- * have a bracket for that marker to drive, and to be reachable from where the marker is
- * read.
+ * writer's job; this module's job is to have a bracket for that marker to drive, and to be
+ * reachable from where the marker is read.
+ *
+ * **No writer stamps it yet, and -c's Storage Layout Conversion deliberately does not**
+ * (issue 1211). Its residual was measured rather than assumed: the forward conversion's
+ * step 2 is create/update-only and issues no delete leg, so it emits at most TWO signals
+ * whatever the corpus size. Its receivers are rare and already refused — a pre-conversion
+ * client's repository does not support per-record replication and drops the signals
+ * entirely, and a client that booted mid-conversion is refused by Valid Id Basis clause 5
+ * regardless. The stamper belongs with -d's importer, which is the caller that emits a long
+ * burst to live receivers.
  *
  * Outside a bracket the signal is deferred to a microtask instead, which collapses one
  * leg's synchronous burst of N document hooks to one signal and cannot collapse three legs

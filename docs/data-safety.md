@@ -112,6 +112,31 @@ In all three cases nothing is written, the world is not marked as migrated, and 
 Fabricate tells you which of the three happened.
 Only the third asks you to reload straight away: in that one the migrations have already transformed the copy held in this session, so continuing to work from it would save migrated data into a world still recorded as un-migrated.
 
+### Changing how recipes are stored
+
+**Settings → Fabricate → Recipe Storage Arrangement** decides whether your world keeps every recipe in one combined record or gives each recipe a record of its own.
+The second option loads large recipe collections much faster, and it is a one-way door for any older Fabricate: an older version reads no recipes at all from it, reports no error, and starts writing over them.
+
+So Fabricate asks before it makes that change.
+The confirmation names the loss and names the way back — set the arrangement to "One combined record" and reload, and Fabricate moves your recipes back before you roll anything back.
+The safe choice is the one already selected, and closing the dialog without choosing counts as declining.
+Nothing is changed until you say so.
+
+The prompt appears on the GM client that will perform the change, which is the first GM connected to the world.
+If an assistant GM changes the setting while no full GM is connected, the change is simply held until a GM loads the world and confirms it.
+
+A few things Fabricate does around that change, so nothing goes missing:
+
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
+- **It waits a load if it updated your data on the same load.** When a Fabricate update changes your stored data on start-up, the storage change is postponed to the next time a GM loads the world, and Fabricate tells you so. Two GMs loading at once can produce slightly different updated data, and the storage change has to work from one settled starting point.
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
+- **It moves your recipes exactly as they are.** Nothing is re-read or re-interpreted on the way across, so a field a newer Fabricate has not learned about yet still arrives intact.
+- **It checks every recipe arrived before it records the change.** If any recipe did not land, Fabricate leaves your world exactly as it found it and reports the problem, rather than recording a change it did not finish.
+- **It never deletes a leftover recipe record it cannot account for.** If Fabricate finds a per-recipe record that the combined record does not describe, it leaves it alone and tells you, because that record is the only place a recipe could be hiding.
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
+- **It tells you if the old combined record survived.** That can happen if the last step of the change did not complete. If the leftover copy matches, Fabricate clears it up; if it does not — which is what a round trip through an older version looks like — Fabricate leaves it alone and reports both counts rather than discarding work you may have done.
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
+
 {: .warning }
 > This is a safe-abort and recovery design, not a full backup of your world.
 > Fabricate protects the data it manages and refuses to corrupt it, but it cannot restore data it never stored.

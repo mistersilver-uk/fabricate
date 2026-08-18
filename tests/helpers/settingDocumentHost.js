@@ -69,11 +69,29 @@ export function mintDocumentId() {
  * an update performs.
  */
 export class SettingDouble {
-  constructor({ _id, key, value }) {
+  constructor({ _id, key, value, host = null }) {
     this._id = _id;
     this.key = key;
     this._raw = typeof value === 'string' ? value : JSON.stringify(value);
     this._initialized = null;
+    /** The host that owns this document, so `delete()` can remove it (issue 1211). */
+    this._host = host;
+  }
+
+  /**
+   * `Document#delete()` — the ONLY route to removing a whole registered setting.
+   *
+   * `ClientSettings` has no delete at all, and `set(key, null)` would leave the envelope in
+   * existence forever, so a caller that needs a setting key to stop EXISTING resolves the
+   * document from the world collection and deletes it. Modelled here because issue 1211's
+   * forward compensation is exactly that operation: it must restore key PRESENCE, and on a
+   * never-converted world the layout key had no document before step 1 created one.
+   *
+   * @returns {Promise<SettingDouble>} the deleted document, as core's does.
+   */
+  async delete() {
+    this._host?._deleteDocument(this);
+    return this;
   }
 
   get id() {
@@ -155,6 +173,18 @@ export class SettingHost {
     this.vetoedKeys = new Set();
     /** When true, creates are buffered on a "socket" and land only on {@link release}. */
     this.holdCreates = false;
+    /**
+     * Called with a key after {@link SettingDouble#delete} removes its document.
+     *
+     * A fixture wires this to reset its settings map to the REGISTERED DEFAULT, which is what
+     * `ClientSettings#get` does once the document is gone — `WorldSettings#getSetting` finds
+     * nothing and core synthesises `new Setting({value: setting.default})`. A fixture that
+     * left the old value readable would make a deleted key indistinguishable from a surviving
+     * one, which is the exact distinction issue 1211's compensation turns on.
+     *
+     * @type {((key: string) => void)|null}
+     */
+    this.onDocumentDeleted = null;
     this._held = [];
     const host = this;
     this.documentClass = {
@@ -173,6 +203,35 @@ export class SettingHost {
     const held = this._held;
     this._held = [];
     for (const land of held) land();
+  }
+
+  /**
+   * Seed a document with no write leg recorded — fixture setup, not an operation under test.
+   *
+   * @param {{key: string, value: unknown, _id?: string}} entry
+   * @returns {SettingDouble}
+   */
+  seed({ key, value, _id }) {
+    const id = _id ?? mintDocumentId();
+    const document = new SettingDouble({ _id: id, key, value, host: this });
+    this.collection.documents.set(id, document);
+    return document;
+  }
+
+  /**
+   * Remove one document, recording the call. Invoked by {@link SettingDouble#delete}.
+   *
+   * Its own leg name rather than `delete`, which is the BULK `deleteDocuments` leg: the two
+   * are different operations on different collections, and merging them would make an
+   * assertion about the bulk flush order silently true for a single-document removal.
+   *
+   * @param {SettingDouble} document
+   * @private
+   */
+  _deleteDocument(document) {
+    this.calls.push({ leg: 'documentDelete', count: 1, sent: [document.key] });
+    this.collection.documents.delete(document._id);
+    this.onDocumentDeleted?.(document.key);
   }
 
   _create(data, options) {
@@ -197,7 +256,7 @@ export class SettingHost {
         // `_id` and an existing key mints a second document for that key.
         this.collection.documents.set(
           id,
-          new SettingDouble({ _id: id, key: entry.key, value: entry.value })
+          new SettingDouble({ _id: id, key: entry.key, value: entry.value, host: this })
         );
         created.push(this.collection.documents.get(id));
       }

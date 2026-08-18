@@ -251,3 +251,45 @@ export function createRecipeCorpus({ getSetting, setSetting, documentClass, coll
     createOrUpdateAll: (records) => selectArm().createOrUpdateAll(records),
   };
 }
+
+/**
+ * Adopt any per-record recipe document that replicated into this client BEFORE Fabricate's
+ * setting hooks were registered (issue 1211).
+ *
+ * Core replays its socket buffer in `Game.#applyBufferedSocketEvents()`, inside
+ * `activateSocketListeners()` and therefore BEFORE `Hooks.callAll("ready")`. Fabricate
+ * registers its `createSetting` / `updateSetting` / `deleteSetting` listeners inside the
+ * `ready` callback, after `await fabricate.initialize()`. A record document that arrives in
+ * that window is correct in `game.settings.storage` and MISSING from `RecipeManager.recipes`
+ * for the whole session. The gap is pre-existing; a Storage Layout Conversion is the first
+ * thing that emits a burst into it.
+ *
+ * **Unconditional, on every client.** The writer is the primary GM, who never misses its own
+ * writes; the client at risk is any OTHER booting client, and a non-GM client never reaches
+ * the storage reconcile at all. So this must sit outside every GM gate — and AFTER the hook
+ * registrations, because a read placed before them reopens the window it closes.
+ *
+ * **It MUST NOT re-sample `_layoutAtCorpusRead`.** `RecipeManager#rebuildDefinitionStorage`
+ * does re-sample it and is right to, because it re-reads the whole corpus. This does not: it
+ * adopts records after the fact, which does not make the ORIGINAL read whole. Re-sampling
+ * would let a client claim a known-complete Valid Id Basis over a partial read plus a patch.
+ * `reload()` is used precisely because it leaves that sample alone.
+ *
+ * A no-op unless the manager's repository reports itself granular, which is the honest
+ * condition: the settings adapter has no per-record index to refresh and its whole corpus is
+ * one replicated document the shared listener already covers.
+ *
+ * @param {{describeDefinitionStorage?: Function, reload?: Function}} recipeManager
+ * @returns {boolean} whether the manager's corpus actually moved.
+ */
+export function resyncGranularRecipeRecords(recipeManager) {
+  try {
+    if (recipeManager?.describeDefinitionStorage?.()?.granular !== true) return false;
+    return recipeManager.reload?.() === true;
+  } catch (error) {
+    // Defensive for the same reason every other `ready`-callback edge is: this runs inside
+    // the hook registration block, and a throw there takes down every listener below it.
+    console.error('Fabricate | failed to resync replicated per-record recipe documents', error);
+    return false;
+  }
+}
