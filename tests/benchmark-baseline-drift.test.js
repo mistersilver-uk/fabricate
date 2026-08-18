@@ -21,8 +21,11 @@
  * also what keeps the fixture generators honest: a generator that silently produced the wrong
  * scale would move every count in the file.
  *
- * The pass costs a measured 3.3 seconds in total (three runs, median, at the commit that added
- * the connect cases), which is the reason `held-inventory` pins its recipe corpus at 6 rows and
+ * The pass costs a measured 4.6 seconds in total (three runs, median, at the commit that added
+ * the recipe storage-arrangement cases of issue 1247; 3.5 s on the same machine immediately
+ * before them, and 3.3 s at the commit that added the connect cases). Those four cases each
+ * convert or seed a 10,000-recipe corpus in an UNTIMED setup, which is where the second spent
+ * went. That budget is the reason `held-inventory` pins its recipe corpus at 6 rows and
  * `rich-corpus` bounds its solver case at 12 — see the ceilings recorded on each profile. That
  * figure is measured rather than estimated, so a case added later has a real budget to reason
  * against; the previous "roughly ten seconds" was an estimate and was already 4x high. Those bounds buy a guard that runs in the normal suite instead of a
