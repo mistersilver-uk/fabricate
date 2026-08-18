@@ -1,11 +1,19 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 
 import { MANAGER_HOOKS } from '../src/config/hooks.js';
 import {
+  ACTION_TONES,
+  ROUTE_CHROME_STATUS_TONES,
   WORLD_DOWNTIME_SURFACE_ID,
   createManagerExtensionsRegistry,
+  managerHeaderActionClass,
+  normalizeRouteChrome,
 } from '../src/ui/managerExtensions.js';
+
+const repoRoot = resolve(import.meta.dirname, '..');
 
 // The registry validates SHAPE, never membership, so a fixture must be free to declare
 // any ids it likes. `ids` is the whole tab set; nothing here mirrors a Core list.
@@ -262,6 +270,171 @@ test('route chrome and header actions are validated as shape, not as content', (
         ),
       expected,
       `expected ${expected}`
+    );
+  }
+});
+
+// A companion's header must be INDISTINGUISHABLE from a Core one, which means it needs the
+// treatments Core's own editors use — a ghost Back, a danger Delete, a primary Save — not just
+// `primary`. The class strings are the contract: these are the very classes
+// `CraftingSystemManagerRoot` writes for its own recipe-editor controls.
+test('an action tone renders the Manager button class Core uses for its own controls', () => {
+  assert.equal(managerHeaderActionClass({ tone: 'primary' }), 'manager-button is-primary');
+  assert.equal(managerHeaderActionClass({ tone: 'ghost' }), 'manager-button is-ghost');
+  assert.equal(managerHeaderActionClass({ tone: 'danger' }), 'manager-button is-danger');
+  assert.equal(managerHeaderActionClass({ tone: 'neutral' }), 'manager-button');
+  assert.equal(
+    managerHeaderActionClass({ primary: true }),
+    'manager-button is-primary',
+    'the shipped `primary` spelling keeps its shipped rendering'
+  );
+  assert.equal(managerHeaderActionClass({}), 'manager-button');
+  assert.equal(managerHeaderActionClass(undefined), 'manager-button');
+
+  // The teeth: EVERY declared tone must map to something. A tone added to the list without a
+  // class would otherwise render as a bare button and read as a stylesheet oversight.
+  for (const tone of ACTION_TONES) {
+    const rendered = managerHeaderActionClass({ tone });
+    assert.ok(
+      rendered.startsWith('manager-button'),
+      `${tone} must render through the Manager's own button`
+    );
+    assert.ok(
+      tone === 'neutral' || rendered !== 'manager-button',
+      `${tone} declares a treatment, so it must add a modifier class`
+    );
+  }
+});
+
+test('a header action treatment is validated like every other provider field', () => {
+  const cases = [
+    [{ tone: 'destructive' }, /tone must be one of primary, ghost, danger, neutral/],
+    [{ tone: '' }, /tone must be one of/],
+    [{ tone: 'primary', primary: true }, /must not declare both primary and tone/],
+    [{ tone: 'ghost', primary: false }, /must not declare both primary and tone/],
+    [{ primary: 'yes' }, /primary must be a boolean/],
+    [{ disabled: 1 }, /disabled must be a boolean/],
+  ];
+  for (const [overrides, expected] of cases) {
+    const candidate = provider({ ids: ['board'] });
+    candidate.tabs[0].actions = [
+      { id: 'save', label: 'Save', onSelect: () => {}, ...overrides },
+    ];
+    assert.throws(
+      () =>
+        createManagerExtensionsRegistry({ emitHook: () => {} }).publicApi.registerWorldNavProvider(
+          candidate
+        ),
+      expected,
+      `expected ${expected}`
+    );
+  }
+
+  const accepted = provider({ ids: ['board'] });
+  accepted.tabs[0].actions = [
+    { id: 'back', label: 'Back', tone: 'ghost', icon: 'fas fa-arrow-left', onSelect: () => {} },
+    { id: 'delete', label: 'Delete', tone: 'danger', disabled: true, onSelect: () => {} },
+    { id: 'save', label: 'Save', tone: 'primary', onSelect: () => {} },
+  ];
+  assert.doesNotThrow(() =>
+    createManagerExtensionsRegistry({ emitHook: () => {} }).publicApi.registerWorldNavProvider(
+      accepted
+    )
+  );
+});
+
+// The runtime channel's shape contract. It is validated by the same module that validates a
+// provider, and to the same standard: a malformed update is refused with a message rather than
+// rendering broken chrome.
+test('a runtime chrome update normalizes to exactly what a companion stated', () => {
+  assert.equal(normalizeRouteChrome(null), null);
+  assert.equal(normalizeRouteChrome(undefined), null);
+  assert.equal(
+    normalizeRouteChrome({}),
+    null,
+    'an empty update means the same as no update: fall back to the tab’s own chrome'
+  );
+
+  const onSelect = () => {};
+  const chrome = normalizeRouteChrome({
+    title: 'Crew of the Wandering Star',
+    subtitle: 'Downtime project · 3 of 8 progress',
+    breadcrumb: 'Crew',
+    actionsLabel: 'Crew editor actions',
+    image: 'icons/commodities/treasure/token-gold-gem.webp',
+    status: { label: 'Unsaved' },
+    actions: [{ id: 'save', label: 'Save', tone: 'primary', onSelect }],
+  });
+  assert.ok(Object.isFrozen(chrome), 'Core renders from a frozen value');
+  assert.equal(chrome.title, 'Crew of the Wandering Star');
+  assert.equal(chrome.breadcrumb, 'Crew');
+  assert.equal(chrome.image, 'icons/commodities/treasure/token-gold-gem.webp');
+  assert.equal(chrome.icon, undefined, 'an omitted field is genuinely absent, not empty-string');
+  assert.deepEqual(
+    chrome.status,
+    { label: 'Unsaved', tone: 'warning', tooltip: undefined },
+    'an omitted tone resolves to the warning tone every Core editor already uses'
+  );
+  assert.ok(Object.isFrozen(chrome.status));
+  assert.equal(chrome.actions[0].onSelect, onSelect, 'the descriptor stays the companion’s');
+  assert.ok(Object.isFrozen(chrome.actions), 'the list Core renders is not one a companion may splice');
+
+  const empty = normalizeRouteChrome({ actions: [] });
+  assert.deepEqual(empty.actions, [], 'an EMPTY action list is a statement, not an omission');
+});
+
+test('a malformed runtime chrome update is refused with a message naming the fault', () => {
+  const cases = [
+    [7, /must be an object, or null to restore the tab's chrome/],
+    [[], /must be an object, or null to restore the tab's chrome/],
+    [{ title: '   ' }, /requires a non-empty title/],
+    [{ subtitle: 4 }, /requires a non-empty subtitle/],
+    [{ breadcrumb: '' }, /requires a non-empty breadcrumb/],
+    [{ actionsLabel: null }, /requires a non-empty actionsLabel/],
+    [{ icon: '' }, /requires a non-empty icon/],
+    [{ image: 12 }, /requires a non-empty image/],
+    [
+      { icon: 'fas fa-scroll', image: 'icons/svg/book.svg' },
+      /declares both icon and image, which are exclusive/,
+    ],
+    // A typo has to be LOUD here. A chrome update happens on a drill-down click, where a
+    // silently ignored key leaves the previous header on screen with nothing to say why.
+    [{ titel: 'Crew' }, /does not accept "titel"/],
+    [{ tabId: 'crew' }, /does not accept "tabId"/],
+    [{ status: 'Unsaved' }, /status must be an object/],
+    [{ status: {} }, /status requires a non-empty label/],
+    [{ status: { label: 'Unsaved', tone: 'urgent' } }, /status tone must be one of/],
+    [{ status: { label: 'Unsaved', tooltip: '' } }, /status requires a non-empty tooltip/],
+    [{ status: { label: 'Unsaved', text: 'x' } }, /status does not accept "text"/],
+    [{ actions: 'save' }, /actions must be an array/],
+    [{ actions: [{ id: 'save', label: 'Save' }] }, /must declare exactly one of href, onSelect/],
+    [
+      { actions: [{ id: 'guide', label: 'Guide', href: 'javascript:alert(1)' }] },
+      /href must be an absolute http\(s\) URL/,
+    ],
+  ];
+  for (const [candidate, expected] of cases) {
+    assert.throws(() => normalizeRouteChrome(candidate), expected, `expected ${expected}`);
+  }
+});
+
+// A hand-maintained mirror across a component boundary, with a guard so it cannot rot: the
+// seam names the tones it offers, and `Chip.svelte` is what paints them. A tone offered here
+// that the primitive drops would render as the default chip and look like a CSS bug.
+test('every status tone the seam offers is a tone the Chip primitive actually paints', () => {
+  const chipSource = readFileSync(
+    resolve(repoRoot, 'src/ui/svelte/apps/manager/Chip.svelte'),
+    'utf8'
+  );
+  const declared = chipSource.slice(
+    chipSource.indexOf('const TONES = new Set(['),
+    chipSource.indexOf('const classes = $derived(')
+  );
+  assert.ok(declared.includes("'active'"), 'the Chip tone set was found, so this guard has teeth');
+  for (const tone of ROUTE_CHROME_STATUS_TONES) {
+    assert.ok(
+      declared.includes(`'${tone}'`),
+      `Chip must paint "${tone}", or the seam is offering a tone that renders as the default`
     );
   }
 });

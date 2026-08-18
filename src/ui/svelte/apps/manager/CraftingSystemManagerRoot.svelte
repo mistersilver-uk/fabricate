@@ -131,7 +131,11 @@
   import TagsCategoriesView from './TagsCategoriesView.svelte';
   import WorldDowntimeExtensionHost from './downtime/WorldDowntimeExtensionHost.svelte';
   import { WORLD_DOWNTIME_PREVIEW_PROVIDER } from './downtime/worldDowntimePreviewProvider.js';
-  import { WORLD_DOWNTIME_SURFACE_ID } from '../../../managerExtensions.js';
+  import { createRouteChromeChannel } from './downtime/routeChromeChannel.js';
+  import {
+    managerHeaderActionClass,
+    WORLD_DOWNTIME_SURFACE_ID,
+  } from '../../../managerExtensions.js';
 
   let { store, services = null, managerExtensions = null, playerExtensions = null } = $props();
   let downtimeExtensionHost = $state(null);
@@ -144,6 +148,20 @@
   // Bumped by `context.requestRemount()`. The host's mount effect keys on the context
   // object, so a new identity is the whole re-render mechanism.
   let downtimeContextRevision = $state(0);
+  // The chrome the live companion mount has asked Core to render, or null for "use what the
+  // active tab declared at registration". Assigned ONLY by the channel below.
+  //
+  // This is the whole no-remount mechanism, and it is a mechanism of OMISSION: nothing in
+  // `worldDowntimeContext` reads this state, so writing it re-renders the header and moves
+  // neither the context identity nor the host's mount effect. A reader added to the context
+  // derivation would silently turn every chrome update into a remount, which is precisely the
+  // failure the runtime channel exists to avoid — so keep chrome out of the context.
+  let downtimeRouteChrome = $state(null);
+  const downtimeChromeChannel = createRouteChromeChannel({
+    onChange: (chrome) => {
+      downtimeRouteChrome = chrome;
+    },
+  });
   // Every surface a companion currently claims, not just Core's Downtime one. The title bar
   // reports the MODULE, so it must not be keyed on one route: a premium module whose only
   // surface is one Core has never heard of is still installed and still working.
@@ -207,7 +225,15 @@
   // companion's screens when that companion declared no chrome, and it must never be Core's
   // preview copy: a raw English marketing sentence under someone else's UI is exactly the
   // defect this seam exists to remove.
+  //
+  // THREE LAYERS, in one order, everywhere: the live mount's runtime chrome, then the active
+  // tab's registered chrome, then Core's own string. Unsetting is therefore not a separate
+  // path — a runtime update that omits a field simply does not shadow the layer below it, so a
+  // companion that never calls `setRouteChrome` reads exactly as it did before the channel
+  // existed and one that clears it lands back on its registered chrome with no further work.
   function downtimeChrome(field, coreDefault, providerDefault = coreDefault) {
+    const runtime = downtimeRuntimeChrome?.[field];
+    if (runtime) return runtime;
     const value = activeDowntimeTab?.[field];
     if (downtimeCoreFallback) return value ? text(value, coreDefault) : coreDefault;
     return value || providerDefault;
@@ -2552,16 +2578,46 @@
   // "Open the downtime ledger, region". A landmark takes the name of the SCREEN, so it points
   // at the span that holds exactly that: "Ledger".
   const downtimeNavLabelId = (tabId) => `manager-downtime-nav-label-${tabId}`;
-  // Header actions belong to the active TAB, falling back to the provider's own list; Core
-  // keeps its bespoke premium anchor rather than routing it through a public descriptor.
+  // Gated on provider mode rather than merely on the channel being empty. The channel already
+  // releases itself on every path that ends a mount, so this is belt and braces — but Core's
+  // preview is CORE's screen, and no reachable ordering may ever let a companion's copy,
+  // artwork or Save button land on it.
+  const downtimeRuntimeChrome = $derived(downtimeCoreFallback ? null : downtimeRouteChrome);
+  // Header actions belong to the live mount, then to the active TAB, then to the provider's
+  // own list; Core keeps its bespoke premium anchor rather than routing it through a public
+  // descriptor. `??` and not `||`: an EMPTY runtime array means "this screen has no actions",
+  // which a truthiness test would read as "say nothing" and answer with the tab's own list —
+  // leaving a companion's editor wearing its list screen's buttons.
   const downtimeHeaderActions = $derived(
-    downtimeCoreFallback ? [] : (activeDowntimeTab?.actions ?? downtimeProvider.actions ?? [])
+    downtimeCoreFallback
+      ? []
+      : (downtimeRuntimeChrome?.actions ??
+          activeDowntimeTab?.actions ??
+          downtimeProvider.actions ??
+          [])
+  );
+  // The staged-changes indicator, and a runtime-only channel by design: it reports what the
+  // mount is DOING right now, which nothing stated at registration can know.
+  const downtimeHeaderStatus = $derived(downtimeRuntimeChrome?.status ?? null);
+  // Header artwork, opt-in per update. Absent it, this route's header keeps the plain heading
+  // it has carried since issue 1185 removed the prototype's glyph tile from it; present, it
+  // renders the identity block Fabricate's own recipe and component editors use, which is what
+  // makes a companion's drill-down look like a drill-down.
+  const downtimeHeaderArtwork = $derived(
+    downtimeRuntimeChrome?.icon || downtimeRuntimeChrome?.image ? downtimeRuntimeChrome : null
   );
   const worldDowntimeContext = $derived.by(() => {
     // Read the revision so `requestRemount()` yields a NEW frozen identity, which is what
     // the host's mount effect keys on. Nothing here is a Core store, document or component.
     const revision = downtimeContextRevision;
-    return Object.freeze({
+    // The context object is its own mount's identity token, which is why the two channel
+    // functions close over a holder rather than being stated once outside this derivation.
+    // A stable function has no way to say WHICH mount called it, so a companion holding a
+    // retired context could repaint the screen the GM moved on to; bound this way, a call
+    // from a dead mount is simply refused. The holder is written once, immediately below,
+    // and never again — this derivation stays pure.
+    const self = { context: null };
+    const context = Object.freeze({
       schemaVersion: 1,
       surface: 'manager',
       surfaceId: WORLD_DOWNTIME_SURFACE_ID,
@@ -2571,7 +2627,11 @@
       isGM: isGameMaster(),
       revision,
       requestRemount: requestDowntimeRemount,
+      setRouteChrome: (chrome) => downtimeChromeChannel.setChrome(self.context, chrome),
+      onRouteReselect: (handler) => downtimeChromeChannel.onReselect(self.context, handler),
     });
+    self.context = context;
+    return context;
   });
   const isSystemTravelChildRoute = $derived(
     isSystemTravelRoute && (activeTravelTab === 'realms' || activeTravelTab === 'map')
@@ -6563,6 +6623,26 @@
   function openWorldDowntimePreview(tabId) {
     // The ACTIVE tab set, never a fixed list: whoever holds the surface decides what exists.
     if (!downtimeTabs.some((tab) => tab.id === tabId)) return;
+    // RE-ACTIVATION, not navigation. Clicking the sub-item for the tab already on screen used
+    // to do nothing at all, because Core had nothing to navigate to — but a companion whose
+    // tab is a list that drills into an editor does: the GM asking for a screen they are
+    // notionally already on means "take me back up to it".
+    //
+    // Core cannot act on that itself. The drill-down is inside the companion's own target and
+    // Core neither knows the level nor could restore it, so the click is OFFERED to the mount
+    // through a handler it registered, and Core's own behaviour is unchanged when no companion
+    // took it. That handler is what makes this DISTINGUISHABLE from a first mount, which is
+    // the property the seam needs: a re-activation pops one level, a mount initialises, and a
+    // signal a companion had to disambiguate by remembering whether it had mounted before
+    // would be wrong the first time a remount followed a drill-down.
+    //
+    // Deliberately NOT routed through `confirmRouteExit`: no route is being exited and no
+    // Core draft is at risk. Whether the companion's own unsaved work should stop it is the
+    // companion's question to ask, inside its handler.
+    if (isWorldDowntimeRoute && worldDowntimeTabId === tabId) {
+      downtimeChromeChannel.reselect();
+      return;
+    }
     return afterTruthyResult(confirmRouteExit('world-downtime'), () => {
       worldDowntimeTabId = tabId;
       railGroupUserExpanded.worldDowntime = true;
@@ -7842,6 +7922,29 @@
               <p class="manager-subtitle" data-component-edit-subline>{viewSubtitle()}</p>
             </div>
           </div>
+        {:else if isWorldDowntimeRoute && downtimeHeaderArtwork}
+          <!-- A companion's drill-down identity, rendered in CORE'S header rather than inside
+             the companion's panel. It reuses the recipe editor's heading block wholesale —
+             same classes, same `Medallion`, same 44px — because the point is that a
+             companion's editor is indistinguishable from one of Fabricate's own, and a
+             parallel block would be a second implementation of the identity header that
+             agreed with the first only until one of them changed.
+
+             `image` and `icon` are validated as mutually exclusive, so `Medallion` never has
+             to choose: with `image` set it renders the picture, and with only `icon` set `src`
+             is empty and it falls back to the glyph. The default glyph is the Downtime
+             route's own, so a companion that names neither still cannot reach this branch. -->
+          <div class="manager-recipe-edit-heading" data-downtime-chrome-heading>
+            <Medallion
+              src={downtimeHeaderArtwork.image ?? ''}
+              icon={downtimeHeaderArtwork.icon ?? 'fas fa-hourglass-half'}
+              size={44}
+            />
+            <div class="manager-recipe-edit-heading-copy">
+              <h1 class="manager-title" title={viewTitle()}>{viewTitle()}</h1>
+              <p class="manager-subtitle" data-downtime-chrome-subline>{viewSubtitle()}</p>
+            </div>
+          </div>
         {:else if currentView !== 'tool-edit'}
           <h1 class="manager-title">{viewTitle()}</h1>
           <p class="manager-subtitle">{viewSubtitle()}</p>
@@ -7900,11 +8003,26 @@
                 >
               </a>
             {:else}
+              <!--
+                The status chip leads the group, exactly where every Core editor puts its own
+                "Unsaved" chip, and renders through the SAME `Chip` primitive with the same
+                `truncate` — a companion's staged-changes indicator has to be the manager's
+                one chip, not a lookalike. Its text is already localized: Core renders the
+                strings a companion gives it, as it does for `title` and `subtitle`.
+              -->
+              {#if downtimeHeaderStatus}
+                <Chip
+                  tone={downtimeHeaderStatus.tone}
+                  truncate
+                  data-downtime-chrome-status
+                  title={downtimeHeaderStatus.tooltip ?? downtimeHeaderStatus.label}
+                  >{downtimeHeaderStatus.label}</Chip
+                >
+              {/if}
               {#each downtimeHeaderActions as action (action.id)}
                 {#if action.href}
                   <a
-                    class="manager-button"
-                    class:is-primary={action.primary === true}
+                    class={managerHeaderActionClass(action)}
                     data-manager-header-action={action.id}
                     href={action.href}
                     title={action.tooltip}
@@ -7917,8 +8035,7 @@
                 {:else}
                   <button
                     type="button"
-                    class="manager-button"
-                    class:is-primary={action.primary === true}
+                    class={managerHeaderActionClass(action)}
                     data-manager-header-action={action.id}
                     title={action.tooltip}
                     disabled={action.disabled === true}
@@ -9110,6 +9227,7 @@
           context={worldDowntimeContext}
           navLabelId={downtimeNavLabelId}
           emitHook={managerExtensions?.emitHook}
+          chromeChannel={downtimeChromeChannel}
           onProviderFault={noteDowntimeProviderFault}
         />
       </main>

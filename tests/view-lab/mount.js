@@ -409,7 +409,7 @@ function labDowntimeProvider() {
     // Full height, its own inset, a VISIBLE EDGE and its own scroller between a pinned header
     // and a pinned footer: the footer sitting on the bottom edge is the part that is only
     // reachable when the target really is the pane's whole content box.
-    mount({ target: mountTarget, tabId }) {
+    mount({ target: mountTarget, tabId, context }) {
       const doc = mountTarget.ownerDocument;
       const element = (tag, cssText, textContent) => {
         const node = doc.createElement(tag);
@@ -417,6 +417,63 @@ function labDowntimeProvider() {
         if (textContent !== undefined) node.textContent = textContent;
         return node;
       };
+
+      // THE DRILL-DOWN, and the only reason this stand-in has an interactive control at all.
+      // A companion that owns its layout was already photographable; a companion driving
+      // CORE'S header was not, and a frame of the resting list screen cannot distinguish a
+      // seam that carries runtime chrome from one that does not. So the lab reaches the state:
+      // pressing this restates the whole route chrome — artwork, title, subtitle, leaf crumb,
+      // the staged-changes chip and Core's own ghost/danger/primary trio — with no remount,
+      // and registers the re-activation handler that pops back out of it.
+      const openEditor = element(
+        'button',
+        'flex:0 0 auto;align-self:flex-start;padding:6px 10px;border-radius:6px;' +
+          'border:1px solid var(--fab-border);background:var(--fab-bg-3);color:var(--fab-text)',
+        'Open Marn the Quartermaster'
+      );
+      openEditor.type = 'button';
+      // `setAttribute` with the literal hook, not `dataset.labCompanionDrilldown`: the case
+      // registry's selector guard greps the source for the hook a selector names, and a
+      // camel-cased `dataset` write leaves that literal nowhere in the file — so the guard
+      // could never fail on a rename of the very hook a capture step depends on.
+      openEditor.setAttribute('data-lab-companion-drilldown', '');
+      const closeEditor = () => context?.setRouteChrome?.(null);
+      openEditor.addEventListener('click', () => {
+        context?.setRouteChrome?.({
+          title: 'Marn the Quartermaster',
+          subtitle: 'Crew member · two projects in flight',
+          breadcrumb: 'Marn',
+          actionsLabel: 'Crew member actions',
+          image: 'icons/commodities/treasure/token-gold-gem.webp',
+          status: { label: 'Unsaved' },
+          actions: [
+            {
+              id: 'lab-back',
+              label: 'Back to crew',
+              tone: 'ghost',
+              icon: 'fas fa-arrow-left',
+              onSelect: closeEditor,
+            },
+            {
+              id: 'lab-delete',
+              label: 'Delete',
+              tone: 'danger',
+              icon: 'fas fa-trash',
+              onSelect: () => {},
+            },
+            {
+              id: 'lab-save',
+              label: 'Save crew member',
+              tone: 'primary',
+              icon: 'fas fa-save',
+              onSelect: closeEditor,
+            },
+          ],
+        });
+        // Item 1: the rail sub-item for the tab already on screen pops one level rather than
+        // doing nothing, which is a behaviour only a live mount can supply.
+        context?.onRouteReselect?.(closeEditor);
+      });
 
       const panel = element(
         'div',
@@ -431,6 +488,7 @@ function labDowntimeProvider() {
           `Downtime Studio — ${tabId}`
         )
       );
+      panel.append(openEditor);
       const scroller = element(
         'div',
         'flex:1 1 auto;min-height:0;overflow:auto;display:flex;flex-direction:column;gap:8px'

@@ -13,10 +13,92 @@ const REQUIRED_TAB_FIELDS = Object.freeze(['label', 'accessibleName', 'tooltip',
 // Route chrome. Every one is optional; Core keeps its own string when a tab omits it.
 const OPTIONAL_TAB_FIELDS = Object.freeze(['title', 'subtitle', 'breadcrumb', 'actionsLabel']);
 const OPTIONAL_ACTION_FIELDS = Object.freeze(['icon', 'tooltip']);
+// Boolean-only action fields. They were the two provider fields nothing validated: a
+// `primary: 'yes'` reached the renderer and quietly painted an ordinary button, which is the
+// class of failure every other field on this seam already refuses at the boundary.
+const BOOLEAN_ACTION_FIELDS = Object.freeze(['primary', 'disabled']);
+/**
+ * The four button treatments Core's own Manager header paints, named after the treatment
+ * rather than after a colour so a theme may repaint one without renaming the contract.
+ *
+ * They exist because a companion header has to be INDISTINGUISHABLE from a Core one:
+ * Fabricate's own editors put a ghost `Back`, a danger `Delete` and a primary `Save` in the
+ * page header, and a seam that could only say `primary` forced a companion to either
+ * hand-roll those two treatments inside its panel or ship a header that reads as foreign.
+ * `neutral` is the default Manager button and adds no modifier class at all.
+ */
+export const ACTION_TONES = Object.freeze(['primary', 'ghost', 'danger', 'neutral']);
+/**
+ * The Manager button modifier each tone paints, declared beside the tones themselves.
+ *
+ * It lives with the contract rather than in the renderer because a copy in the component
+ * would be a hand-maintained mirror of this list across a file boundary — agreeing today,
+ * undetectable the day a tone is added and the renderer is not updated. Here, adding a tone
+ * without its class is a syntactically visible omission and `managerHeaderActionClass` is
+ * unit-testable without mounting anything.
+ *
+ * `neutral` maps to no modifier at all: the unadorned `.manager-button` IS the neutral
+ * treatment, and emitting an `is-neutral` class the stylesheet does not define would look
+ * like a rule someone forgot to write.
+ */
+const ACTION_TONE_CLASSES = Object.freeze({
+  primary: 'is-primary',
+  ghost: 'is-ghost',
+  danger: 'is-danger',
+  neutral: '',
+});
 // A header action may link out, but only over http(s): Core renders the value into an
 // `href`, so a `javascript:` or `data:` URL would be script injection through the seam.
 const EXTERNAL_ACTION_HREF = /^https?:\/\//i;
 const PROVIDER = 'Fabricate World navigation provider';
+const ROUTE_CHROME = 'Fabricate World navigation route chrome';
+
+/**
+ * The string-valued fields of a runtime chrome update.
+ *
+ * The first four are exactly `OPTIONAL_TAB_FIELDS`, deliberately: a runtime update states the
+ * same chrome a tab may declare at registration, so a companion learns one vocabulary rather
+ * than two. `icon` and `image` are the two that have no registration counterpart, because the
+ * Downtime route deliberately carries no header artwork by default (issue 1185) — artwork is
+ * how a companion's DRILL-DOWN says it is a drill-down, exactly as Fabricate's own recipe and
+ * component editors do, and a tab that declared it at registration could never turn it off.
+ */
+const ROUTE_CHROME_TEXT_FIELDS = Object.freeze([
+  ...OPTIONAL_TAB_FIELDS,
+  // Font Awesome class string, rendered as the header medallion's glyph.
+  'icon',
+  // Image path, rendered as the header medallion's picture. Mutually exclusive with `icon`.
+  'image',
+]);
+const ROUTE_CHROME_FIELDS = Object.freeze([...ROUTE_CHROME_TEXT_FIELDS, 'status', 'actions']);
+const ROUTE_CHROME_STATUS_FIELDS = Object.freeze(['label', 'tone', 'tooltip']);
+/**
+ * The chip tones Core offers the status indicator.
+ *
+ * This is a SUBSET of the tones the `Chip` primitive paints, and the subset is the point: a
+ * tone Core does not name here is refused with a message rather than dropped silently by the
+ * primitive, which is the difference between a companion learning it made a typo and a
+ * companion watching its chip render in the wrong colour. `tests/manager-extensions.test.js`
+ * pins every entry against `Chip.svelte`'s own tone set so the two cannot drift.
+ */
+export const ROUTE_CHROME_STATUS_TONES = Object.freeze([
+  'warning',
+  'info',
+  'positive',
+  'active',
+  'neutral',
+  'danger',
+  'negative',
+  'disabled',
+]);
+/**
+ * The tone an omitted `status.tone` resolves to.
+ *
+ * `warning` because the named use case IS Fabricate's own staged-changes chip: every Core
+ * editor renders `<Chip tone="warning" truncate>` with its localized "Unsaved" text, so
+ * `status: { label: t('Unsaved') }` has to be the one-field call that reproduces it exactly.
+ */
+const DEFAULT_STATUS_TONE = 'warning';
 
 /**
  * A header action a provider may contribute to the Manager's route header.
@@ -30,10 +112,50 @@ const PROVIDER = 'Fabricate World navigation provider';
  * @property {string} label Localized visible label.
  * @property {string} [icon] Font Awesome icon class string.
  * @property {string} [tooltip] Localized native tooltip.
+ * @property {'primary'|'ghost'|'danger'|'neutral'} [tone] Manager button treatment. Mutually
+ *   exclusive with `primary`, which is the shipped spelling of `tone: 'primary'`.
  * @property {boolean} [primary] Renders the action with the Manager's primary treatment.
  * @property {boolean} [disabled] Renders a non-`href` action disabled.
  * @property {string} [href] Absolute `http(s)` URL, opened in a new tab.
  * @property {(context: WorldNavActionContext) => void} [onSelect] Click handler.
+ */
+
+/**
+ * The status indicator Core renders at the head of the route's header action group.
+ *
+ * It is its OWN channel rather than another action, because it is not a control: Fabricate's
+ * editors render staged-changes state as a `Chip`, and an action descriptor carrying a
+ * disabled button would be a different component wearing the same words.
+ *
+ * @typedef {object} WorldNavRouteChromeStatus
+ * @property {string} label Localized visible chip text. Core renders it verbatim.
+ * @property {'warning'|'info'|'positive'|'active'|'neutral'|'danger'|'negative'|'disabled'} [tone]
+ *   Chip colour family; defaults to `warning`, which is Core's own staged-changes tone.
+ * @property {string} [tooltip] Localized native tooltip on the chip.
+ */
+
+/**
+ * A runtime route-chrome update, supplied through `context.setRouteChrome()`.
+ *
+ * REPLACE, NEVER MERGE. Each call states the whole chrome, so a field is unset by omitting
+ * it and the entire runtime layer is unset with `null` (or `{}`). A merging channel would
+ * have no expressible way to remove one field, and "the chrome is exactly what I last passed"
+ * is the only reading a companion never has to hold history to predict.
+ *
+ * Every field is optional and every omitted field falls back to what the ACTIVE TAB declared
+ * at registration, then to Core's own string — so a companion that never calls this behaves
+ * exactly as it did before the channel existed.
+ *
+ * @typedef {object} WorldNavRouteChrome
+ * @property {string} [title] Localized route title (the page `H1`).
+ * @property {string} [subtitle] Localized route subtitle.
+ * @property {string} [breadcrumb] Localized leaf breadcrumb crumb.
+ * @property {string} [actionsLabel] Localized accessible name of the header action group.
+ * @property {string} [icon] Font Awesome class string for the header medallion's glyph.
+ * @property {string} [image] Image path for the header medallion. Excludes `icon`.
+ * @property {WorldNavRouteChromeStatus} [status] Status chip shown before the actions.
+ * @property {WorldNavProviderAction[]} [actions] Header actions, in render order. An EMPTY
+ *   array means "no actions" and does not fall back to the tab's own list.
  */
 
 /**
@@ -88,6 +210,13 @@ const PROVIDER = 'Fabricate World navigation provider';
  * @property {() => void} requestRemount Ask Core to re-render this surface: Core runs the
  *   current mount's cleanup, clears the target, and calls `mount` again with a fresh
  *   context. Safe to call from a companion's own data listeners.
+ * @property {(chrome: WorldNavRouteChrome|null) => boolean} setRouteChrome Restate this
+ *   mount's route chrome — title, subtitle, artwork, status chip and header actions — at any
+ *   time, WITHOUT a remount. Throws a `TypeError` on a malformed update and changes nothing.
+ *   Returns `false`, harmlessly, when called from a context whose mount is no longer live.
+ * @property {(handler: () => void) => (() => void)} onRouteReselect Register this mount's
+ *   handler for the GM activating the rail sub-item of the tab already on screen. Returns an
+ *   idempotent unsubscribe; Core drops the handler when the mount ends.
  */
 
 /**
@@ -144,6 +273,38 @@ function validateActionTarget(action, label) {
   }
 }
 
+/**
+ * Validate an action's visual treatment: its two booleans and its tone.
+ *
+ * Split out of `validateAction` rather than added to it because that function is already at
+ * the edge of the cognitive-complexity budget the SonarCloud gate applies to a CHANGED
+ * function, and one more branch there would re-flag the whole of it.
+ *
+ * `primary` and `tone` are refused TOGETHER rather than silently resolved. `primary: true` is
+ * exactly `tone: 'primary'`, so a descriptor carrying both is either redundant or
+ * contradictory, and a seam that quietly picked a winner would make the contradictory case
+ * render one thing while its author read the other.
+ *
+ * @param {object} action Candidate action.
+ * @param {string} label Error-message prefix naming the owner of the action list.
+ */
+function validateActionTreatment(action, label) {
+  for (const field of BOOLEAN_ACTION_FIELDS) {
+    if (action[field] !== undefined && typeof action[field] !== 'boolean') {
+      throw new TypeError(`${label} action "${action.id}" ${field} must be a boolean`);
+    }
+  }
+  if (action.tone === undefined) return;
+  if (!ACTION_TONES.includes(action.tone)) {
+    throw new TypeError(
+      `${label} action "${action.id}" tone must be one of ${ACTION_TONES.join(', ')}`
+    );
+  }
+  if (action.primary !== undefined) {
+    throw new TypeError(`${label} action "${action.id}" must not declare both primary and tone`);
+  }
+}
+
 function validateAction(action, index, seenIds, label) {
   if (!action || typeof action !== 'object') {
     throw new TypeError(`${label} action ${index} must be an object`);
@@ -161,6 +322,7 @@ function validateAction(action, index, seenIds, label) {
       `${label} action "${action.id}" requires a non-empty ${field}`
     );
   }
+  validateActionTreatment(action, label);
   validateActionTarget(action, label);
 }
 
@@ -169,6 +331,110 @@ function validateActions(actions, label) {
   if (!Array.isArray(actions)) throw new TypeError(`${label} actions must be an array`);
   const seenIds = new Set();
   actions.forEach((action, index) => validateAction(action, index, seenIds, label));
+}
+
+/**
+ * The class list Core renders one header action's control with.
+ *
+ * A companion's action must be INDISTINGUISHABLE from a Core one, so this returns the very
+ * classes `CraftingSystemManagerRoot` writes for its own Back, Delete and Save controls
+ * rather than a parallel companion-only treatment.
+ *
+ * `primary: true` is the shipped spelling of `tone: 'primary'` and keeps working; the
+ * validator refuses a descriptor that states both, so this never has to pick a winner.
+ *
+ * @param {WorldNavProviderAction} action Validated action descriptor.
+ * @returns {string} Space-separated class list, always beginning `manager-button`.
+ */
+export function managerHeaderActionClass(action) {
+  const tone = action?.tone ?? (action?.primary === true ? 'primary' : 'neutral');
+  const modifier = ACTION_TONE_CLASSES[tone] ?? '';
+  return modifier ? `manager-button ${modifier}` : 'manager-button';
+}
+
+/**
+ * Refuse any key the chrome contract does not name.
+ *
+ * DELIBERATELY STRICTER than the tab contract, which ignores what it does not read. A tab is
+ * validated once, at registration, where a companion is watching; a chrome update happens on
+ * a drill-down click, where a mistyped `subtile` would simply leave the previous subtitle on
+ * screen with nothing anywhere to say why. This is a new surface with no shipped caller, so
+ * strictness costs no compatibility and buys the failure being visible at the call site.
+ *
+ * @param {object} value Candidate object.
+ * @param {readonly string[]} allowed Accepted keys.
+ * @param {string} label Error-message prefix.
+ */
+function refuseUnknownKeys(value, allowed, label) {
+  for (const key of Object.keys(value)) {
+    if (allowed.includes(key)) continue;
+    throw new TypeError(`${label} does not accept "${key}"`);
+  }
+}
+
+function normalizeStatus(status) {
+  if (!status || typeof status !== 'object' || Array.isArray(status)) {
+    throw new TypeError(`${ROUTE_CHROME} status must be an object`);
+  }
+  refuseUnknownKeys(status, ROUTE_CHROME_STATUS_FIELDS, `${ROUTE_CHROME} status`);
+  requireNonEmptyString(status.label, `${ROUTE_CHROME} status requires a non-empty label`);
+  if (status.tooltip !== undefined) {
+    requireNonEmptyString(status.tooltip, `${ROUTE_CHROME} status requires a non-empty tooltip`);
+  }
+  if (status.tone !== undefined && !ROUTE_CHROME_STATUS_TONES.includes(status.tone)) {
+    throw new TypeError(
+      `${ROUTE_CHROME} status tone must be one of ${ROUTE_CHROME_STATUS_TONES.join(', ')}`
+    );
+  }
+  return Object.freeze({
+    label: status.label,
+    tone: status.tone ?? DEFAULT_STATUS_TONE,
+    tooltip: status.tooltip,
+  });
+}
+
+/**
+ * Validate one runtime chrome update and return the frozen value Core renders.
+ *
+ * Exported because the runtime channel is a plain leaf that owns no contract of its own: the
+ * shape a companion may state is this module's business, exactly as the provider shape is,
+ * and `tests/manager-extensions.test.js` therefore pins both in one place.
+ *
+ * Validation happens BEFORE anything is stored, so a refused update leaves the header showing
+ * whatever it showed already rather than a half-applied one.
+ *
+ * @param {WorldNavRouteChrome|null|undefined} chrome Candidate update.
+ * @returns {Readonly<WorldNavRouteChrome>|null} Frozen chrome, or `null` for "use the tab's".
+ * @throws {TypeError} When the update is malformed.
+ */
+export function normalizeRouteChrome(chrome) {
+  if (chrome === null || chrome === undefined) return null;
+  if (typeof chrome !== 'object' || Array.isArray(chrome)) {
+    throw new TypeError(`${ROUTE_CHROME} must be an object, or null to restore the tab's chrome`);
+  }
+  refuseUnknownKeys(chrome, ROUTE_CHROME_FIELDS, ROUTE_CHROME);
+  const normalized = {};
+  for (const field of ROUTE_CHROME_TEXT_FIELDS) {
+    if (chrome[field] === undefined) continue;
+    requireNonEmptyString(chrome[field], `${ROUTE_CHROME} requires a non-empty ${field}`);
+    normalized[field] = chrome[field];
+  }
+  // A header carries ONE piece of artwork. `Medallion` renders its glyph only when `src` is
+  // falsy, so a descriptor declaring both would silently discard the icon rather than fail.
+  if (normalized.icon !== undefined && normalized.image !== undefined) {
+    throw new TypeError(`${ROUTE_CHROME} declares both icon and image, which are exclusive`);
+  }
+  if (chrome.status !== undefined) normalized.status = normalizeStatus(chrome.status);
+  if (chrome.actions !== undefined) {
+    validateActions(chrome.actions, ROUTE_CHROME);
+    // Copied and frozen: the array Core renders from must not be one a companion can still
+    // splice, and the descriptors stay the companion's own objects because they carry its
+    // `onSelect` closures.
+    normalized.actions = Object.freeze([...chrome.actions]);
+  }
+  // `{}` and `null` mean the same thing — there is no chrome to state — so they resolve to
+  // one value rather than to a truthy empty layer the fallback chain would have to special-case.
+  return Object.keys(normalized).length === 0 ? null : Object.freeze(normalized);
 }
 
 function validateTab(tab, index, seenIds) {
