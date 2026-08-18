@@ -409,7 +409,7 @@ function labDowntimeProvider() {
     // Full height, its own inset, a VISIBLE EDGE and its own scroller between a pinned header
     // and a pinned footer: the footer sitting on the bottom edge is the part that is only
     // reachable when the target really is the pane's whole content box.
-    mount({ target: mountTarget, tabId }) {
+    mount({ target: mountTarget, tabId, context }) {
       const doc = mountTarget.ownerDocument;
       const element = (tag, cssText, textContent) => {
         const node = doc.createElement(tag);
@@ -418,6 +418,71 @@ function labDowntimeProvider() {
         return node;
       };
 
+      // THE DRILL-DOWN, and the only reason this stand-in has an interactive control at all.
+      // A companion that owns its layout was already photographable; a companion driving
+      // CORE'S header was not, and a frame of the resting list screen cannot distinguish a
+      // seam that carries runtime chrome from one that does not. So the lab reaches the state:
+      // pressing this restates the whole route chrome — artwork, title, subtitle, leaf crumb,
+      // the staged-changes chip and Core's own ghost/danger/primary trio — with no remount,
+      // and registers the re-activation handler that pops back out of it.
+      const openEditor = element(
+        'button',
+        'flex:0 0 auto;align-self:flex-start;padding:6px 10px;border-radius:6px;' +
+          'border:1px solid var(--fab-border);background:var(--fab-bg-3);color:var(--fab-text)',
+        'Open Marn the Quartermaster'
+      );
+      openEditor.type = 'button';
+      // `setAttribute` with the literal hook, not `dataset.labCompanionDrilldown`: the case
+      // registry's selector guard greps the source for the hook a selector names, and a
+      // camel-cased `dataset` write leaves that literal nowhere in the file — so the guard
+      // could never fail on a rename of the very hook a capture step depends on.
+      openEditor.setAttribute('data-lab-companion-drilldown', '');
+      const closeEditor = () => context?.setRouteChrome?.(null);
+      openEditor.addEventListener('click', () => {
+        context?.setRouteChrome?.({
+          title: 'Marn the Quartermaster',
+          subtitle: 'Crew member · two projects in flight',
+          breadcrumb: 'Marn',
+          actionsLabel: 'Crew member actions',
+          // An asset the LAB serves. A Foundry core path resolves in a real world and 404s
+          // here, and the harness treats a console error during render as a failure -- so a
+          // core icon would fail the capture rather than merely render a broken medallion.
+          image: 'assets/img/fabricate-logo.jpg',
+          status: { label: 'Unsaved' },
+          actions: [
+            {
+              id: 'lab-back',
+              label: 'Back to crew',
+              tone: 'ghost',
+              icon: 'fas fa-arrow-left',
+              onSelect: closeEditor,
+            },
+            {
+              id: 'lab-delete',
+              label: 'Delete',
+              tone: 'danger',
+              icon: 'fas fa-trash',
+              onSelect: () => {},
+            },
+            {
+              // NOT `closeEditor`. The case asserts this control accepts a real click, and the
+              // harness does that by clicking it and then re-reading the element it clicked. A
+              // handler that tears down the chrome takes the button with it, so the re-read
+              // waits for a locator that will never resolve again. Saving should not pop the
+              // route anyway -- only Back does.
+              id: 'lab-save',
+              label: 'Save crew member',
+              tone: 'primary',
+              icon: 'fas fa-save',
+              onSelect: () => {},
+            },
+          ],
+        });
+        // Item 1: the rail sub-item for the tab already on screen pops one level rather than
+        // doing nothing, which is a behaviour only a live mount can supply.
+        context?.onRouteReselect?.(closeEditor);
+      });
+
       const panel = element(
         'div',
         'height:100%;min-height:0;display:flex;flex-direction:column;gap:12px;' +
@@ -425,12 +490,9 @@ function labDowntimeProvider() {
           'background:var(--fab-bg-2)'
       );
       panel.append(
-        element(
-          'h2',
-          'flex:0 0 auto;margin:0;font-size:14px',
-          `Downtime Studio — ${tabId}`
-        )
+        element('h2', 'flex:0 0 auto;margin:0;font-size:14px', `Downtime Studio — ${tabId}`)
       );
+      panel.append(openEditor);
       const scroller = element(
         'div',
         'flex:1 1 auto;min-height:0;overflow:auto;display:flex;flex-direction:column;gap:8px'

@@ -684,6 +684,10 @@ function compileManagerRoot() {
     // directly; it is a dependency-free leaf, so this single entry suffices.
     'src/ui/svelte/apps/manager/knowledge/knowledgeStudio.js',
     'src/ui/svelte/apps/manager/downtime/worldDowntimePreviewProvider.js',
+    // The runtime route-chrome channel the Manager root owns for its Downtime surface. It is
+    // a plain leaf, but the root imports it statically, so omitting it reports every mounted
+    // manager test as `# cancelled` behind one ERR_MODULE_NOT_FOUND rather than failing.
+    'src/ui/svelte/apps/manager/downtime/routeChromeChannel.js',
     'src/ui/managerExtensions.js',
     // The shared registry factory both extension registries are built from (issue 1198).
     // `managerExtensions.js` imports it statically, so omitting it reports every mounted
@@ -15092,6 +15096,275 @@ describe('CraftingSystemManager mounted behavior', () => {
     );
   });
 
+  // The chrome fixture every runtime-channel case below drills into, named once. It is one
+  // object rather than a per-test literal because it is the shape the seam promises — a
+  // companion editor's identity, its staged-changes chip and Core's own Back/Delete/Save trio
+  // — and three near-identical copies of it is exactly what the duplication gate counts.
+  const COMPANION_EDITOR_CHROME = Object.freeze({
+    title: 'Marn the Quartermaster',
+    subtitle: 'Crew member · two projects in flight',
+    breadcrumb: 'Marn',
+    actionsLabel: 'Crew member actions',
+    image: 'icons/commodities/treasure/token-gold-gem.webp',
+    status: { label: 'Unsaved' },
+    actions: Object.freeze([
+      {
+        id: 'back',
+        label: 'Back to crew',
+        tone: 'ghost',
+        icon: 'fas fa-arrow-left',
+        onSelect: () => {},
+      },
+      { id: 'delete', label: 'Delete', tone: 'danger', icon: 'fas fa-trash', onSelect: () => {} },
+      { id: 'save', label: 'Save', tone: 'primary', disabled: true, onSelect: () => {} },
+    ]),
+  });
+
+  // The provider every runtime-channel case registers: two tabs, both fully dressed at
+  // registration, recording each mount context so a case can drive the channel and — more
+  // importantly — count the mounts.
+  function chromeChannelProvider(mounts) {
+    return downtimeProvider({
+      prefix: 'Guild',
+      ids: ['ledger', 'crew'],
+      tab: (id) => ({
+        title: `${id} title`,
+        subtitle: `${id} subtitle`,
+        breadcrumb: `${id} crumb`,
+        actionsLabel: `${id} actions`,
+        actions: [{ id: 'new', label: 'New entry', primary: true, onSelect: () => {} }],
+      }),
+      mount: ({ context }) => {
+        mounts.push(context);
+      },
+    });
+  }
+
+  const headerAction = (id) => target.querySelector(`[data-manager-header-action="${id}"]`);
+
+  it('dresses the route from a live companion, through Core’s own header primitives', async () => {
+    const registry = createManagerExtensionsRegistry();
+    const mounts = [];
+    registry.publicApi.registerWorldNavProvider(chromeChannelProvider(mounts));
+    mountManager([], {}, {}, { managerExtensions: registry });
+    worldNavItem('downtime').click();
+    await settleRouteExit();
+    assert.equal(mounts.length, 1);
+    assert.equal(managerTitle(), 'ledger title', 'the registered chrome still lands first');
+    assert.ok(
+      !target.querySelector('[data-downtime-chrome-heading]'),
+      'and a route with no runtime artwork keeps the plain heading it has always had'
+    );
+
+    // The companion drills into its own editor and dresses CORE'S header for it.
+    assert.equal(mounts[0].setRouteChrome(COMPANION_EDITOR_CHROME), true);
+    await settleDowntimeProvider();
+
+    assert.equal(
+      mounts.length,
+      1,
+      'THE WHOLE POINT: new chrome, same mount — the editor state the header describes survives'
+    );
+    assert.equal(managerTitle(), 'Marn the Quartermaster');
+    assert.equal(managerSubtitle(), 'Crew member · two projects in flight');
+    assert.equal(
+      target.querySelector('[data-breadcrumb-downtime-tab]').textContent.trim(),
+      'Marn',
+      'the leaf crumb follows the drill-down, not the tab it started on'
+    );
+    assert.equal(
+      target.querySelector('.manager-header-actions').getAttribute('aria-label'),
+      'Crew member actions'
+    );
+
+    // ARTWORK, through the recipe editor's own identity block rather than a companion-only one.
+    const heading = target.querySelector('[data-downtime-chrome-heading]');
+    assert.ok(Boolean(heading), 'a drill-down renders the identity heading Core editors render');
+    assert.ok(
+      heading.classList.contains('manager-recipe-edit-heading'),
+      'and reuses the shipped class, so it cannot drift away from the editors it matches'
+    );
+    const medallion = heading.querySelector('[data-medallion]');
+    assert.equal(medallion.dataset.medallion, 'image');
+    assert.equal(
+      medallion.querySelector('img').getAttribute('src'),
+      'icons/commodities/treasure/token-gold-gem.webp'
+    );
+
+    // The staged-changes chip is the manager's ONE chip, in the tone every Core editor uses.
+    const status = target.querySelector('[data-downtime-chrome-status]');
+    assert.ok(status.classList.contains('manager-chip'), 'a lookalike would be a second chip');
+    assert.ok(status.classList.contains('is-warning'));
+    assert.ok(status.classList.contains('is-truncated'), 'and truncates like Core’s own');
+    assert.equal(status.textContent.trim(), 'Unsaved');
+    assert.equal(
+      status.getAttribute('title'),
+      'Unsaved',
+      'Core renders the string it is given — localization stays the companion’s'
+    );
+
+    // Core's own Back / Delete / Save treatments, reachable through the seam at last.
+    assert.ok(headerAction('back').classList.contains('is-ghost'));
+    assert.ok(Boolean(headerAction('back').querySelector('.fa-arrow-left')));
+    assert.ok(headerAction('delete').classList.contains('is-danger'));
+    assert.ok(Boolean(headerAction('delete').querySelector('.fa-trash')));
+    assert.ok(headerAction('save').classList.contains('is-primary'));
+    assert.equal(headerAction('save').disabled, true, 'a Save that cannot save renders disabled');
+    assert.ok(
+      !headerAction('new'),
+      'the tab’s registered actions are replaced by the drill-down’s, never accumulated'
+    );
+
+    // UNSETTING falls back to what the tab registered, with no second call and no remount.
+    assert.equal(mounts[0].setRouteChrome(null), true);
+    await settleDowntimeProvider();
+    assert.equal(managerTitle(), 'ledger title');
+    assert.equal(managerSubtitle(), 'ledger subtitle');
+    assert.equal(
+      target.querySelector('[data-breadcrumb-downtime-tab]').textContent.trim(),
+      'ledger crumb'
+    );
+    assert.ok(!target.querySelector('[data-downtime-chrome-heading]'), 'the artwork goes with it');
+    assert.ok(!target.querySelector('[data-downtime-chrome-status]'));
+    assert.ok(Boolean(headerAction('new')), 'and the tab’s own actions come back');
+    assert.equal(mounts.length, 1, 'unsetting is not a remount either');
+  });
+
+  it('scopes runtime chrome to the mount that stated it, and refuses a malformed update', async () => {
+    useShippedLocalization();
+    const registry = createManagerExtensionsRegistry();
+    const mounts = [];
+    registry.publicApi.registerWorldNavProvider(chromeChannelProvider(mounts));
+    mountManager([], {}, {}, { managerExtensions: registry });
+    worldNavItem('downtime').click();
+    await settleRouteExit();
+    mounts[0].setRouteChrome(COMPANION_EDITOR_CHROME);
+    await settleDowntimeProvider();
+    assert.equal(managerTitle(), 'Marn the Quartermaster');
+
+    // A tab switch ends the mount, so the chrome describing its editor ends with it. Arriving
+    // on `crew` still wearing `Marn` would describe state the remount has already discarded.
+    target.querySelector('#manager-downtime-nav-crew').click();
+    await settleRouteExit();
+    assert.equal(mounts.length, 2);
+    assert.equal(managerTitle(), 'crew title');
+    assert.ok(!target.querySelector('[data-downtime-chrome-heading]'));
+
+    // …and the retired mount cannot repaint the screen the GM has moved on to.
+    assert.equal(mounts[0].setRouteChrome({ title: 'Back from the dead' }), false);
+    await settleDowntimeProvider();
+    assert.equal(managerTitle(), 'crew title');
+
+    // A malformed update is refused at the seam, with a message, changing nothing — and the
+    // Manager stays entirely on its feet, which a thrown error escaping into Core would not.
+    assert.throws(
+      () => mounts[1].setRouteChrome({ title: 'Crew', subtitel: 'oops' }),
+      /does not accept "subtitel"/
+    );
+    assert.throws(
+      () => mounts[1].setRouteChrome({ status: { label: 'Unsaved', tone: 'urgent' } }),
+      /status tone must be one of/
+    );
+    await settleDowntimeProvider();
+    assert.equal(managerTitle(), 'crew title', 'a refused update leaves the header as it was');
+    assert.ok(!target.querySelector('[data-downtime-chrome-status]'));
+    assert.equal(
+      activeCompanionPanel().dataset.downtimeExtensionPanel,
+      'crew',
+      'and the surface is still mounted rather than faulted back to Core’s preview'
+    );
+
+    // Leaving the route ends the mount too, so Core's own preview never wears companion copy.
+    mounts[1].setRouteChrome(COMPANION_EDITOR_CHROME);
+    await settleDowntimeProvider();
+    worldNavItem('parties').click();
+    await settleRouteExit();
+    // Asserted as the REFUSAL rather than as a header reading, because a route the GM has left
+    // renders no Downtime header to read: with the mount left open, this context would still be
+    // accepted and would repaint the route the moment the GM came back to it.
+    assert.equal(
+      mounts[1].setRouteChrome({ title: 'Still here' }),
+      false,
+      'leaving the route ends the mount, so its context can no longer write chrome at all'
+    );
+    worldNavItem('downtime').click();
+    await settleRouteExit();
+    assert.equal(managerTitle(), 'crew title', 'returning to the route starts from the tab again');
+    assert.ok(!target.querySelector('[data-downtime-chrome-status]'));
+  });
+
+  it('offers the rail sub-item of the tab already on screen to the companion', async () => {
+    const registry = createManagerExtensionsRegistry();
+    const mounts = [];
+    const events = [];
+    registry.publicApi.registerWorldNavProvider(chromeChannelProvider(mounts));
+    mountManager([], {}, {}, { managerExtensions: registry });
+    worldNavItem('downtime').click();
+    await settleRouteExit();
+    assert.equal(mounts.length, 1);
+    const stop = mounts[0].onRouteReselect(() => events.push('pop'));
+
+    // The click that used to do nothing at all. It is DISTINGUISHABLE from a first mount: the
+    // mount count does not move, so a companion pops one level rather than re-initialising.
+    target.querySelector('#manager-downtime-nav-ledger').click();
+    await settleRouteExit();
+    assert.deepEqual(events, ['pop'], 'the rail click reaches the companion');
+    assert.equal(mounts.length, 1, 'and is a re-activation, not a remount');
+    assert.equal(activeCompanionPanel().dataset.downtimeExtensionPanel, 'ledger');
+
+    target.querySelector('#manager-downtime-nav-ledger').click();
+    await settleRouteExit();
+    assert.deepEqual(events, ['pop', 'pop'], 'it keeps working — this is not a one-shot');
+
+    // A DIFFERENT sub-item is still a navigation, and must not be reported as a re-activation.
+    target.querySelector('#manager-downtime-nav-crew').click();
+    await settleRouteExit();
+    assert.deepEqual(events, ['pop', 'pop'], 'navigating away is not a re-activation');
+    assert.equal(mounts.length, 2, 'it is a mount, which is the other half of the distinction');
+
+    // The handler died with its mount, so the new one hears nothing it did not ask for.
+    target.querySelector('#manager-downtime-nav-crew').click();
+    await settleRouteExit();
+    assert.deepEqual(events, ['pop', 'pop'], 'a new mount inherits no listeners');
+
+    stop();
+    stop();
+    const laterMount = mounts[1];
+    laterMount.onRouteReselect(() => events.push('crew'));
+    target.querySelector('#manager-downtime-nav-crew').click();
+    await settleRouteExit();
+    assert.deepEqual(events, ['pop', 'pop', 'crew']);
+  });
+
+  it('contains a throwing re-activation handler and keeps Core’s own click behaviour', async () => {
+    const registry = createManagerExtensionsRegistry();
+    const mounts = [];
+    registry.publicApi.registerWorldNavProvider(chromeChannelProvider(mounts));
+    mountManager([], {}, {}, { managerExtensions: registry });
+    worldNavItem('downtime').click();
+    await settleRouteExit();
+    mounts[0].onRouteReselect(() => {
+      throw new Error('companion exploded');
+    });
+
+    const errors = [];
+    const originalError = console.error;
+    console.error = (...args) => errors.push(args);
+    try {
+      assert.doesNotThrow(() => target.querySelector('#manager-downtime-nav-ledger').click());
+      await settleRouteExit();
+    } finally {
+      console.error = originalError;
+    }
+    assert.equal(errors.length, 1);
+    assert.match(errors[0][0], /Downtime route re-activation handler failed/);
+    assert.equal(
+      activeCompanionPanel().dataset.downtimeExtensionPanel,
+      'ledger',
+      'the rail still works and the surface is still the companion’s'
+    );
+  });
+
   it('re-points the route when a provider re-registers with a different tab set', async () => {
     useShippedLocalization();
     const registry = createManagerExtensionsRegistry();
@@ -15200,14 +15473,21 @@ describe('CraftingSystemManager mounted behavior', () => {
       assert.deepEqual(Object.keys(context).sort(), [
         'craftingSystemId',
         'isGM',
+        // The runtime route-chrome channel is FUNCTIONS on the frozen context, never mutable
+        // fields: the context stays frozen and its identity — which is what the host keys a
+        // remount on — never moves when a companion restates its chrome.
+        'onRouteReselect',
         'requestRemount',
         'revision',
         'route',
         'schemaVersion',
+        'setRouteChrome',
         'surface',
         'surfaceId',
         'tabId',
       ]);
+      assert.equal(typeof context.setRouteChrome, 'function');
+      assert.equal(typeof context.onRouteReselect, 'function');
       assert.equal(context.schemaVersion, 1);
       assert.equal(context.surface, 'manager');
       assert.equal(context.surfaceId, 'downtime');

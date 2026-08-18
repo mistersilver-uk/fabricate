@@ -3885,6 +3885,76 @@ export const VIEW_LAB_CASES = Object.freeze([
       /^styles\/fabricate\.css$/,
     ],
   }),
+  // The companion driving CORE'S header. Every other Downtime frame photographs a resting
+  // list screen, which renders identically whether or not the runtime route-chrome channel
+  // exists — so without this case a change to that channel would publish a frame that cannot
+  // show it, which is precisely the mis-evidence this registry exists to prevent.
+  //
+  // The state is only reachable through the companion: the lab provider's drill-down button
+  // calls `context.setRouteChrome(...)`, and Core repaints its own header without remounting.
+  // The frame is the proof that a companion's editor is INDISTINGUISHABLE from one of
+  // Fabricate's own — same medallion identity block, same `Unsaved` chip, same ghost/danger/
+  // primary trio — which is a claim about pixels that no assertion here can make on its own.
+  managerCase({
+    id: 'manager-world-downtime-companion-chrome',
+    label: 'Manager — World Downtime with a companion driving the route header',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { system: 'lab-smithing', downtimeProvider: '1' },
+    steps: [
+      { selector: '#manager-world-nav-downtime', press: 'Enter' },
+      { selector: '[data-lab-companion-drilldown]' },
+    ],
+    expectView: 'world-downtime',
+    // The identity block Core's recipe and component editors render, now over a companion's
+    // screen — and its medallion carrying a real image rather than the glyph fallback.
+    expectSelector: '[data-downtime-chrome-heading] [data-medallion="image"] img',
+    expectAttributes: [
+      // The leaf crumb follows the drill-down rather than the tab it started on.
+      {
+        selector: '[data-breadcrumb-downtime-tab]',
+        name: 'data-breadcrumb-downtime-tab',
+        value: 'ledger',
+      },
+      { selector: '.manager-header-actions', name: 'aria-label', value: 'Crew member actions' },
+      // Core's own three treatments, reached through the seam's `tone`.
+      {
+        selector: '[data-manager-header-action="lab-back"]',
+        name: 'class',
+        value: 'manager-button is-ghost',
+      },
+      {
+        selector: '[data-manager-header-action="lab-delete"]',
+        name: 'class',
+        value: 'manager-button is-danger',
+      },
+      {
+        selector: '[data-manager-header-action="lab-save"]',
+        name: 'class',
+        value: 'manager-button is-primary',
+      },
+      // The companion's screen is still mounted: the header changed, the mount did not.
+      {
+        selector: '[data-downtime-extension-panel]',
+        name: 'data-downtime-extension-panel',
+        value: 'ledger',
+      },
+    ],
+    expectVisible: '[data-downtime-chrome-status]:has-text("Unsaved")',
+    expectNoHorizontalOverflow: ['.manager-header', '[data-world-downtime-host]', '.manager-body'],
+    expectCenterHit: '[data-manager-header-action="lab-save"]',
+    expectClick: '[data-manager-header-action="lab-save"]',
+    position: { width: 1330, height: 900 },
+    kinds: ['manager', 'world', 'downtime'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/CraftingSystemManagerRoot\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/downtime\//,
+      /^src\/ui\/managerExtensions\.js$/,
+      /^src\/ui\/svelte\/apps\/manager\/Chip\.svelte$/,
+      /^src\/ui\/svelte\/components\/Medallion\.svelte$/,
+      /^styles\/fabricate\.css$/,
+    ],
+  }),
   managerCase({
     id: 'manager-system-travel-card-off',
     label: 'Manager — system Travel card off',

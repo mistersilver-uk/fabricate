@@ -264,6 +264,21 @@ test('every sourceMatches pattern resolves to at least one source file', () => {
 const FOUNDRY_CHROME_HOOKS = new Set(['dialog-content']);
 
 /**
+ * Hooks the LAB HARNESS renders rather than `src/`, matched by their reserved `lab-` prefix.
+ *
+ * The lab's companion stand-in is the one renderer in this corpus that is deliberately NOT
+ * Core: it stands in for a premium module, so Core does not own its markup and never will.
+ * A case that drives that stand-in — pressing its drill-down to reach the runtime route-chrome
+ * state, for instance — therefore names hooks no `src/` file can contain.
+ *
+ * This is a redirection and not an exemption: the token still has to exist, it is just looked
+ * for in the file that actually renders it. Renaming the harness's hook without updating the
+ * case still fails here rather than twenty minutes into a capture run.
+ */
+const LAB_HOOK = /^(?:data-)?lab-/;
+const labHarnessSource = readFileSync(resolve(ROOT, 'tests/view-lab/mount.js'), 'utf8');
+
+/**
  * A selector with every `:not(…)` group removed, brackets balanced.
  *
  * `String#replaceAll` with a regex cannot do this: a `:not(:has([data-x]))` carries nested
@@ -410,8 +425,12 @@ function collectSelectorHookFailures(viewCase, selector, sources, haystack, miss
     // deliberate act.
     if (FOUNDRY_CHROME_HOOKS.has(token)) continue;
     const bounded = new RegExp(String.raw`(?<![\w-])${escapeForRegExp(token)}(?![\w-])`);
-    if (bounded.test(haystack)) continue;
-    missing.push(`${viewCase.id}: selector "${selector}" (nothing in src matches "${token}")`);
+    // A `lab-` hook is rendered by the harness's companion stand-in, so that is where it has
+    // to be found; everything else is Core's and is looked for in `src/`.
+    const owner = LAB_HOOK.test(token) ? labHarnessSource : haystack;
+    if (bounded.test(owner)) continue;
+    const where = LAB_HOOK.test(token) ? 'the view-lab harness' : 'src';
+    missing.push(`${viewCase.id}: selector "${selector}" (nothing in ${where} matches "${token}")`);
   }
 }
 
@@ -1078,14 +1097,23 @@ test('World Downtime publishes four tabs plus narrow/collapsed frames with gener
       'manager-world-downtime-narrow',
       'manager-world-downtime-collapsed',
       'manager-world-downtime-premium-installed',
+      // The companion driving Core's own route header. It is the only frame in the corpus
+      // that can photograph the runtime route-chrome channel: every other Downtime case rests
+      // on a list screen, which renders identically whether or not that channel exists.
+      'manager-world-downtime-companion-chrome',
     ]
   );
   // The Core-preview frames and the premium-installed frame prove DIFFERENT things and cannot
   // share one assertion loop: Core's `Unlock with Premium` CTA and its scrolling preview pane
   // are Core's own content, and the spec says neither is rendered over a companion's screens
   // — so requiring the CTA of every downtime case would pin exactly the defect it forbids.
+  // Both PROVIDER-MODE frames are excluded from the Core-preview loop, and for the one reason:
+  // over a companion's screens Core renders no preview pane and no CTA at all, so every
+  // assertion below is about markup the spec forbids there.
   const premium = allCases.find((entry) => entry.id.endsWith('-premium-installed'));
-  const cases = allCases.filter((entry) => entry !== premium);
+  const companionChrome = allCases.find((entry) => entry.id.endsWith('-companion-chrome'));
+  assert.ok(Boolean(companionChrome), 'the runtime route-chrome frame is still registered');
+  const cases = allCases.filter((entry) => entry !== premium && entry !== companionChrome);
   for (const viewCase of cases) {
     assert.equal(viewCase.expectView, 'world-downtime');
     assert.ok(viewCase.expectNoHorizontalOverflow);

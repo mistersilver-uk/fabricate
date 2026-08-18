@@ -26,6 +26,14 @@
     surfaceId = WORLD_DOWNTIME_SURFACE_ID,
     route = 'world-downtime',
     onProviderFault = () => {},
+    // The runtime route-chrome channel the shell renders its header from. This host owns the
+    // MOUNT LIFECYCLE and nothing else, and a mount boundary is exactly what scopes a chrome
+    // update — so the two calls that bracket `provider.mount` are made here rather than in
+    // the shell, which has no way to observe a mount beginning or ending.
+    //
+    // Optional, like `emitHook`: the direct-mount host tests drive this component without a
+    // shell, and a channel is a shell concern rather than a precondition for rendering.
+    chromeChannel = null,
     // The element that NAMES each companion screen (issue 1213): the visible label inside the
     // rail's Downtime sub-item. In provider mode the panel is a `role="region"` labelled by it,
     // and Root owns that id — so Root passes the very function it stamps the rail with rather
@@ -70,6 +78,9 @@
     const mountedProvider = activeMount;
     if (!mountedProvider) return;
     activeMount = null;
+    // BEFORE the companion's own cleanup runs, so a cleanup that calls `setRouteChrome` on
+    // its way out writes nothing: the mount whose chrome it would be describing is over.
+    chromeChannel?.endMount(mountedProvider.context);
     try {
       mountedProvider.cleanup?.();
     } catch (error) {
@@ -142,6 +153,10 @@
     if (!activeProvider.tabs.some((tab) => tab.id === tabId)) return;
 
     target.replaceChildren();
+    // Adopted BEFORE `mount` is called, because a companion is expected to state its chrome
+    // from inside its own mount — a channel opened afterwards would refuse that first call as
+    // coming from a context it had never heard of.
+    chromeChannel?.beginMount(mountContext);
     try {
       const result = activeProvider.mount({ target, tabId, context: mountContext });
       if (result !== undefined && typeof result !== 'function') {
@@ -149,9 +164,13 @@
           'World navigation provider mount must return a cleanup function or nothing'
         );
       }
-      activeMount = { target, cleanup: result ?? null };
+      activeMount = { target, cleanup: result ?? null, context: mountContext };
     } catch (error) {
       target.replaceChildren();
+      // `activeMount` was never set, so `disposeActiveMount` will not release the channel for
+      // this attempt. Release it here or a faulted mount's chrome would outlive it and dress
+      // Core's own preview — which is what the surface falls back to — in companion copy.
+      chromeChannel?.endMount(mountContext);
       reportError('Fabricate | Downtime provider mount failed:', error);
       onProviderFault(activeProvider);
     }
