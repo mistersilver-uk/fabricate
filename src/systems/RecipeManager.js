@@ -29,6 +29,7 @@ import { formatCurrencyRequirement, normalizeCurrencyUnit } from './currencyProf
 import { createArrangementWriteGuard } from './definitionStorageArrangement.js';
 import { ALL_INVALIDATION_DOMAINS, domainsForRecipeFields } from './invalidationDomains.js';
 import { readStackQuantity } from './itemStackQuantity.js';
+import { runGatedMutationCleanup } from './mutationCleanupComposition.js';
 import {
   PerRecordCraftingDefinitionRepository,
   RECIPE_RECORD_KEY_PREFIX,
@@ -1076,7 +1077,7 @@ export class RecipeManager {
       await this.save({ delete: recipeId });
     }
     if (options.cleanupFlags !== false) {
-      await this._cleanupFlagsAfterRecipeMutation();
+      await this._cleanupFlagsAfterRecipeMutation({ removedRecipeIds: [recipeId] });
     }
     if (options.notify !== false) {
       ui.notifications.info(`Recipe "${recipe.name}" deleted`);
@@ -1147,7 +1148,7 @@ export class RecipeManager {
     }
 
     if (options.cleanupFlags !== false) {
-      await this._cleanupFlagsAfterRecipeMutation();
+      await this._cleanupFlagsAfterRecipeMutation({ removedRecipeIds: removedIds });
     }
     if (options.notify !== false) {
       ui.notifications.info(
@@ -1170,9 +1171,19 @@ export class RecipeManager {
    * fan-out, then calls this once so invalid-run and learned-recipe flags reconcile
    * against the post-deletion map in a single O(affected actors) pass rather than
    * O(pruned × actors). Public thin wrapper over `_cleanupFlagsAfterRecipeMutation`.
+   *
+   * **A batch caller MUST name what it removed** (issue 1226). The corpus-derived sweep
+   * behind this is gated on the **Valid Id Basis**, and the ids passed here are what the
+   * gate falls back to pruning when the corpus cannot be attested complete. A caller that
+   * omits them still gets the sweep on a healthy world and gets NOTHING on a partial one —
+   * which is safe, but leaves the flags its own deletions orphaned until the next
+   * known-complete boot.
+   *
+   * @param {object} [options]
+   * @param {Iterable<string>} [options.removedRecipeIds]
    */
-  async cleanupOrphanedRecipeFlags() {
-    await this._cleanupFlagsAfterRecipeMutation();
+  async cleanupOrphanedRecipeFlags({ removedRecipeIds = [] } = {}) {
+    await this._cleanupFlagsAfterRecipeMutation({ removedRecipeIds });
   }
 
   /**
@@ -3377,6 +3388,10 @@ export class RecipeManager {
     }
 
     await this.save();
+    // No `removedRecipeIds`: an import only ADDS or REPLACES records, so there is nothing
+    // this mutation orphaned and nothing for the gate to fall back to (issue 1226). The
+    // sweep here is a pure orphan hunt, and skipping it on a partial corpus removes and
+    // leaks nothing.
     await this._cleanupFlagsAfterRecipeMutation();
     // Spec item 3: one aggregated conflict report naming each skipped recipe and its
     // reason (duplicate-id skips are no longer silent).
@@ -3926,19 +3941,63 @@ export class RecipeManager {
     };
   }
 
-  async _cleanupFlagsAfterRecipeMutation() {
+  /**
+   * Reconcile the actor flags a recipe mutation orphaned, gated on the **Valid Id Basis**
+   * (issue 1226, `data-models/spec.md` § Valid Id Basis).
+   *
+   * Before the gate this recomputed `validRecipes`/`validSystems` from the live managers
+   * and handed them straight to the same destructive collaborators the startup passes call
+   * — with nothing anywhere near it asking whether the corpus those sets were derived from
+   * was whole. A GM deleting a recipe while a Storage Layout Conversion was half-done, had
+   * failed, or had finished during this client's own corpus read therefore pruned every
+   * active run and learned-recipe entry naming a record that had not been read, and
+   * finishing the conversion afterwards restored none of it.
+   *
+   * The corpus-derived sweeps are now gated. What replaces them on an unattestable corpus
+   * is a SUBJECT-TARGETED prune of exactly the ids this mutation removed, which needs no
+   * basis at all — so refusing the sweep costs only the hunt for orphans of unknown origin,
+   * which the next known-complete boot reconciles. See `mutationCleanupComposition.js`.
+   *
+   * @param {object} [options]
+   * @param {Iterable<string>} [options.removedRecipeIds] The recipes this mutation actually
+   *   removed. Absent for a mutation that removed nothing (an import), in which case an
+   *   omitted sweep removes nothing and leaks nothing.
+   */
+  async _cleanupFlagsAfterRecipeMutation({ removedRecipeIds = [] } = {}) {
     const runManager = game.fabricate?.getCraftingRunManager?.();
     const visibilityService = game.fabricate?.getRecipeVisibilityService?.();
     const systemManager = this._systemManager();
     if (!runManager && !visibilityService) return;
 
+    const removed = [...(removedRecipeIds || [])]
+      .map((id) => String(id ?? '').trim())
+      .filter(Boolean);
     const validRecipes = new Set(this.getRecipes({}).map((r) => r.id));
     const validSystems = new Set((systemManager?.getSystems?.() || []).map((s) => s.id));
+
+    const passes = [];
     if (runManager) {
-      await runManager.cleanupInvalidRuns(validRecipes, validSystems);
+      passes.push({
+        label: 'orphaned crafting runs',
+        sweep: () => runManager.cleanupInvalidRuns(validRecipes, validSystems),
+        targeted: removed.length > 0 ? () => runManager.removeRunsForRecipes?.(removed) : null,
+      });
     }
     if (visibilityService) {
-      await visibilityService.cleanupLearnedRecipes(validRecipes);
+      passes.push({
+        label: 'orphaned learned recipes',
+        sweep: () => visibilityService.cleanupLearnedRecipes(validRecipes),
+        targeted:
+          removed.length > 0 ? () => visibilityService.forgetDeletedRecipes?.(removed) : null,
+      });
     }
+
+    return runGatedMutationCleanup({
+      passes,
+      recipeManager: this,
+      craftingSystemManager: systemManager,
+      getSetting,
+      subject: 'a recipe change',
+    });
   }
 }

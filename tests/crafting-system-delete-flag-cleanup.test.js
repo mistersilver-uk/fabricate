@@ -10,7 +10,9 @@ import {
   fakeSalvageRunManager,
   fakeRichStateService,
   fakeRecipeVisibilityService,
+  knownCompleteBasisSettings,
 } from './helpers/craftingSystemDeleteHarness.js';
+import { seedKnownCompleteValidIdBasis } from './helpers/validIdBasis.js';
 
 // Three recipes belong to the system being deleted; one belongs to a system that
 // is kept, so the post-deletion valid-id set is exactly ['recipe-keep'].
@@ -50,7 +52,7 @@ test('deleteSystem bulk-cleans learned-recipe flags in a single pass across all 
   globalThis.game = {
     user: { isGM: true },
     actors: [actorA, actorB],
-    settings: { get: () => '', set: async () => {} },
+    settings: knownCompleteBasisSettings().accessors,
     fabricate: {
       getGatheringEnvironmentStore: () => fakeEnvironmentStore(calls),
       getGatheringRunManager: () => fakeGatheringRunManager(calls),
@@ -68,6 +70,10 @@ test('deleteSystem bulk-cleans learned-recipe flags in a single pass across all 
   manager.initialized = true;
   manager.save = async () => {};
   manager.systems.set('sys-delete', manager._normalizeSystem({ id: 'sys-delete', name: 'Bulk' }));
+  // This fixture seeds `systems` directly instead of running the corpus read that stamps
+  // the layout observed across it, so state what that read would have seen. Without it the
+  // component basis is unknown, and the OPEN direction this test asserts is unreachable.
+  seedKnownCompleteValidIdBasis(new Map(), { craftingSystemManager: manager });
 
   await manager.deleteSystem('sys-delete');
 
@@ -120,7 +126,7 @@ test('deleteSystem survives a throwing learned-recipe cleanup and still tears do
     globalThis.game = {
       user: { isGM: true },
       actors: [{ id: 'actor-a', learned: { 'recipe-a': true } }],
-      settings: { get: () => '', set: async () => {} },
+      settings: knownCompleteBasisSettings().accessors,
       fabricate: {
         getGatheringEnvironmentStore: () => fakeEnvironmentStore(calls),
         getGatheringRunManager: () => fakeGatheringRunManager(calls),
@@ -140,6 +146,7 @@ test('deleteSystem survives a throwing learned-recipe cleanup and still tears do
       'sys-delete',
       manager._normalizeSystem({ id: 'sys-delete', name: 'Resilient' })
     );
+    seedKnownCompleteValidIdBasis(new Map(), { craftingSystemManager: manager });
 
     await manager.deleteSystem('sys-delete');
 

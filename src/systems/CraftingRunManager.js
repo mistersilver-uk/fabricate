@@ -480,35 +480,35 @@ export class CraftingRunManager extends RunContainerManagerBase {
   }
 
   /**
-   * Startup maintenance: drop active runs and history entries naming a deleted
-   * recipe or crafting system.
+   * Walk the runs this client may write and drop the ones a caller's predicates reject.
    *
-   * Scoped to the actors THIS client may write (issue 970). It runs on every client
-   * at `initialize()`, and a player owns only their own characters, so an
-   * un-filtered walk made a single stale entry on someone else's character reject
-   * the whole startup sequence.
+   * The shared body of the two prunes below, which differ only in what they consider
+   * droppable. Kept as one walk because the walk itself carries three easily-lost
+   * properties — the writable-actor scoping, the "persist only when dirty" rule, and the
+   * separate active/history treatment — and a second hand-written copy is where those
+   * diverge.
+   *
+   * Scoped to the actors THIS client may write (issue 970). `cleanupInvalidRuns` runs on
+   * every client at `initialize()`, and a player owns only their own characters, so an
+   * un-filtered walk made a single stale entry on someone else's character reject the whole
+   * startup sequence.
+   *
+   * @param {object} predicates
+   * @param {(run: object) => boolean} predicates.dropActiveRun
+   * @param {(run: object) => boolean} predicates.keepHistoryEntry
    */
-  async cleanupInvalidRuns(validRecipeIds = new Set(), validSystemIds = new Set()) {
+  async _pruneRunsAcrossWritableActors({ dropActiveRun, keepHistoryEntry }) {
     for (const actor of selectWritableActors(game.actors)) {
       const container = this._getContainer(actor);
       let dirty = false;
 
       for (const [runId, run] of Object.entries(container.active || {})) {
-        const recipeValid = run?.recipeId && validRecipeIds.has(run.recipeId);
-        const systemValid = run?.craftingSystemId && validSystemIds.has(run.craftingSystemId);
-        if (recipeValid && systemValid) continue;
+        if (!dropActiveRun(run)) continue;
         delete container.active[runId];
         dirty = true;
       }
 
-      const nextHistory = (container.history || []).filter((run) => {
-        const systemValid = run?.craftingSystemId && validSystemIds.has(run.craftingSystemId);
-        // A no-signature fizzle is recipe-less by design; keep it while its system
-        // is valid rather than pruning it as an unknown-recipe run.
-        if (run?.isFizzle) return systemValid;
-        const recipeValid = run?.recipeId && validRecipeIds.has(run.recipeId);
-        return recipeValid && systemValid;
-      });
+      const nextHistory = (container.history || []).filter((run) => keepHistoryEntry(run));
       if (nextHistory.length !== (container.history || []).length) {
         container.history = nextHistory;
         dirty = true;
@@ -518,6 +518,55 @@ export class CraftingRunManager extends RunContainerManagerBase {
         await this._persist(actor, container);
       }
     }
+  }
+
+  /**
+   * The CORPUS-DERIVED prune: drop active runs and history entries naming a recipe or
+   * crafting system that is not in the live corpus.
+   *
+   * It infers a deletion from an ABSENCE, so it is only safe against a known-complete
+   * **Valid Id Basis** (`data-models/spec.md` § Valid Id Basis). Both of its callers gate
+   * it — `startupPassComposition.js` at boot and `mutationCleanupComposition.js` after a
+   * GM's delete — and neither should be bypassed by calling this directly.
+   */
+  async cleanupInvalidRuns(validRecipeIds = new Set(), validSystemIds = new Set()) {
+    const systemValid = (run) =>
+      Boolean(run?.craftingSystemId) && validSystemIds.has(run.craftingSystemId);
+    const recipeValid = (run) => Boolean(run?.recipeId) && validRecipeIds.has(run.recipeId);
+    await this._pruneRunsAcrossWritableActors({
+      dropActiveRun: (run) => !(recipeValid(run) && systemValid(run)),
+      // A no-signature fizzle is recipe-less by design; keep it while its system
+      // is valid rather than pruning it as an unknown-recipe run.
+      keepHistoryEntry: (run) =>
+        run?.isFizzle ? systemValid(run) : recipeValid(run) && systemValid(run),
+    });
+  }
+
+  /**
+   * The SUBJECT-TARGETED prune: drop active runs and history entries naming one of the
+   * recipes the caller has just deleted (issue 1226).
+   *
+   * The recipe-shaped sibling of {@link removeRunsForSystem}, and the fallback the
+   * mutation-time gate runs in `cleanupInvalidRuns`'s place when the corpus cannot be
+   * attested complete. It needs no Valid Id Basis: the ids are positively known to be gone
+   * because the caller removed them, and a corpus missing records cannot make a deleted id
+   * valid again. A record that was never read is simply not named here and survives, which
+   * is the whole difference from the sweep above.
+   *
+   * A recipe-less fizzle names nothing and is therefore never matched.
+   *
+   * @param {Iterable<string>} recipeIds
+   */
+  async removeRunsForRecipes(recipeIds) {
+    const targets = new Set(
+      [...(recipeIds || [])].map((id) => String(id ?? '').trim()).filter(Boolean)
+    );
+    if (targets.size === 0) return;
+    const namesDeletedRecipe = (run) => Boolean(run?.recipeId) && targets.has(String(run.recipeId));
+    await this._pruneRunsAcrossWritableActors({
+      dropActiveRun: namesDeletedRecipe,
+      keepHistoryEntry: (run) => !namesDeletedRecipe(run),
+    });
   }
 
   /**

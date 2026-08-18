@@ -36,6 +36,7 @@
 import { cleanupStalePreferences } from '../config/preferencesCleanup.js';
 import { getHighestRegisteredMigrationVersion } from '../migration/MigrationRunner.js';
 
+import { describeCorpusStorage } from './corpusStorageReports.js';
 import { buildStartupPassList } from './startupMaintenance.js';
 import { basisFromInputs, readValidIdBasisInputs } from './validIdBasis.js';
 
@@ -97,21 +98,14 @@ export function composeStartupPassList({
   // The settings are read now; the storage reports are what each manager captured before
   // and during its own corpus read, which is the half no read at this point can reproduce.
   //
-  // `components` used to be answered by the SYSTEM repository's report, because components
-  // rode inside `system.components` and therefore shared that repository. Issue 1212 extracted
-  // them, so the two reports now DIVERGE: the crafting-system container is never granular and
-  // the component class is, whenever its layout says so. Answering `components` from the
-  // system report would make the component basis known-complete by construction on exactly the
-  // world where it is half-written.
-  const storage = craftingSystemManager.describeDefinitionStorage?.() ?? null;
+  // The per-kind mapping itself lives in `corpusStorageReports.js`, shared with the
+  // mutation-time composition site (issue 1226): it has already drifted once — `components`
+  // used to be answered by the SYSTEM repository's report — and a second hand-written copy
+  // is that regression waiting to happen.
   const basisInputs = readValidIdBasisInputs({
     getSetting,
     getHighestRegisteredMigrationVersion,
-    storage: {
-      recipes: recipeManager.describeDefinitionStorage?.() ?? null,
-      systems: storage?.systems ?? storage,
-      components: storage?.components ?? storage,
-    },
+    storage: describeCorpusStorage({ recipeManager, craftingSystemManager }),
   });
   const basis = basisFromInputs(basisInputs);
 
