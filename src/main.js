@@ -41,8 +41,9 @@ import { promptBulkCheckRoll } from './ui/svelte/apps/crafting/rollPrompt.js';
 import { RecipeVisibilityService } from './systems/RecipeVisibilityService.js';
 import { runStartupMaintenance } from './systems/startupMaintenance.js';
 import { composeStartupPassList } from './systems/startupPassComposition.js';
-import { reconcileRecipeStorageLayout } from './systems/definitionStorageConversion.js';
-import { createRecipeCorpus } from './systems/recipeCorpus.js';
+import { RECIPE_STORAGE_CONVERSION_DIRECTIONS, reconcileRecipeStorageLayout } from './systems/definitionStorageConversion.js';
+import { createRecipeCorpus, resyncGranularRecipeRecords } from './systems/recipeCorpus.js';
+import { buildRecipeStorageConversionConsentPrompt, isRecipeStorageConversionConsented } from './systems/recipeStorageConsentPrompt.js';
 import { ResolutionModeService } from './systems/ResolutionModeService.js';
 import { CraftingListingBuilder } from './systems/CraftingListingBuilder.js';
 import { activeRunStepState, buildStepRecipeView, resolveStepIngredientSet } from './systems/stepRecipeView.js';
@@ -95,7 +96,7 @@ import { playerExtensions } from './ui/playerExtensions.js';
 import { applyCurrentFabricateTheme } from './ui/theme.js';
 import { findItemsDirectoryActionsContainer, syncGatheringDirectoryButton } from './ui/itemsDirectoryButtons.js';
 import { buildCompendiumImportContextOption, promptSelectCraftingSystem } from './ui/compendiumDirectoryContext.js';
-import { registerFabricateSettings, getSetting, setSetting, SETTING_KEYS, FABRICATE_SETTINGS_NAMESPACE, RECIPE_ITEM_FLAG_STAMP_TARGET, COMPONENT_FLAG_STAMP_TARGET, TOOL_FLAG_STAMP_TARGET, OWNED_ITEM_COMPONENT_STAMP_TARGET, RECIPE_STORAGE_TARGET_CHOICES } from './config/settings.js';
+import { registerFabricateSettings, getSetting, setSetting, SETTING_KEYS, FABRICATE_SETTINGS_NAMESPACE, RECIPE_ITEM_FLAG_STAMP_TARGET, COMPONENT_FLAG_STAMP_TARGET, TOOL_FLAG_STAMP_TARGET, OWNED_ITEM_COMPONENT_STAMP_TARGET, DEFINITION_STORAGE_LAYOUTS, DEFINITION_STORAGE_TARGETS, recipeStorageArrangementLabelKey } from './config/settings.js';
 import { notifyUnresolvedItemDescriptions } from './config/repairItemData.js';
 import { setFabricateFlag } from './config/flags.js';
 import { isPlayerCharacterActor } from './config/playerCharacterTypes.js';
@@ -608,7 +609,7 @@ class Fabricate {
     applyItemStackQuantityPathSetting();
     // Run data migrations before managers load persisted data
     this._startupMarks.begin(STARTUP_PHASES.MIGRATIONS);
-    await this._runMigrations();
+    const migrationPassPersistedCorpusKey = await this._runMigrations();
     this._startupMarks.end(STARTUP_PHASES.MIGRATIONS);
     // Bring the recipe Definition Storage Layout into agreement with its Target (issue 1232)
     // BEFORE any manager is constructed. That placement is the ordering constraint made
@@ -618,7 +619,13 @@ class Fabricate {
     // arrangement the conversion had just dismantled, and their world would appear EMPTY on
     // the boot that converted it. Reconciling first means the selection below is made against
     // storage that has already settled.
-    await this._reconcileDefinitionStorage();
+    // The pass's own report of whether it wrote a corpus key is threaded in (issue 1211): a
+    // conversion must not run in a boot whose migration pass persisted one, because two
+    // clients' passes are not byte-reproducible over the same source, so a conversion whose
+    // source read interleaves with the other client's write converts a state no single pass
+    // produced. The parameter defaults to "it did not", so a wiring regression fails OPEN —
+    // which is why the threading is pinned by a source scan rather than left to behaviour.
+    await this._reconcileDefinitionStorage(migrationPassPersistedCorpusKey);
     // Create managers
     // Both seams are lazy closures because `craftingSystemManager` is constructed on the
     // next statement — it needs `recipeManager` in ITS constructor, so one of the two has
@@ -917,10 +924,12 @@ class Fabricate {
     // The pass list itself is composed by `composeStartupPassList` (issue 1224), which
     // computes the valid-id sets AND samples the Valid Id Basis, and omits any pass whose
     // basis is not known-complete. `getSetting` is passed as the ACCESSOR, never a value
-    // read earlier in this method: the storage conversion these passes must not run
-    // against flips its layout from inside `recipeManager.initialize()` above, so a fact
-    // sampled beside `registerSettings()` or `_runMigrations()` would record the
-    // pre-conversion value and wave through the exact state the gate exists to catch.
+    // read earlier in this method: a REMOTE client's Storage Layout Conversion can flip this
+    // world's layout at any moment, including during `recipeManager.initialize()` above, so
+    // a fact sampled beside `registerSettings()` or `_runMigrations()` would record the
+    // pre-conversion value and wave through the exact state the gate exists to catch. (This
+    // client's OWN conversion runs above, in `_reconcileDefinitionStorage()`, before either
+    // manager exists — the remote one is what the late sampling defends against.)
     // The call therefore also has to sit BELOW both `initialize()` calls. Both properties
     // are pinned by `tests/startup-valid-id-basis.test.js`.
     this._startupMarks.begin(STARTUP_PHASES.STARTUP_MAINTENANCE);
@@ -962,13 +971,110 @@ class Fabricate {
    * runs before the managers exist and a rejection here would take the module down on a
    * world whose only fault is a half-finished storage change.
    */
-  async _reconcileDefinitionStorage() {
+  async _reconcileDefinitionStorage(migrationPassPersistedCorpusKey = false) {
     if (game.users?.activeGM?.id !== game.user?.id) return;
+    // The consent gate sits INSIDE the primary-GM gate, immediately below it, and it is the
+    // only prompt site (issue 1211). Placing it here rather than duplicating it in the
+    // mid-session hook is what makes "inside the gate" structural: this method is the single
+    // entry point BOTH the boot pass and the target-change hook reach the conversion
+    // through, so a prompt here is shown exactly once, on the client that will perform the
+    // conversion, and never on a player's client. The handler fires on EVERY client — the
+    // bridge broadcasts the setting change everywhere — so a prompt above the gate would
+    // open a dialog for every connected user, each of whose declines writes the target back.
+    if (!await this._consentToForwardRecipeStorageConversion()) {
+      await this._revertDeclinedRecipeStorageTarget();
+      return;
+    }
     const report = await reconcileRecipeStorageLayout({
       getSetting: (key) => getSetting(key),
-      setSetting: (key, value) => setSetting(key, value)
+      setSetting: (key, value) => setSetting(key, value),
+      migrationPassPersistedCorpusKey
     });
     this._announceDefinitionStorageOutcome(report);
+  }
+
+  /**
+   * Obtain the GM's consent for a FORWARD recipe storage conversion, or report that none is
+   * needed (issue 1211).
+   *
+   * Discharges the shipped MUST at `data-models/spec.md` § Storage Conversion Crash Recovery:
+   * *"The conversion is downgrade-lossy and MUST say so before it runs."* The settings hint
+   * states the loss at the point of SELECTION, which is a disclosure of the choice; this is
+   * the disclosure of the ACTION, and it is the one that is enforceable.
+   *
+   * Required when and only when the requested target is the granular arrangement and the
+   * layout is not already there — so a reverse conversion, a settled world and a resume
+   * toward the combined record all proceed silently, as they always have.
+   *
+   * Defensive in the AFFIRMATIVE direction only where consent is not required: a client with
+   * no `DialogV2` cannot ask, and a conversion nobody consented to is the failure this
+   * exists to prevent, so an unavailable dialog DECLINES. An unanswered prompt declines too.
+   *
+   * @returns {Promise<boolean>} whether the reconcile may proceed.
+   */
+  async _consentToForwardRecipeStorageConversion() {
+    if (!this._forwardRecipeStorageConversionPending()) return true;
+    try {
+      const DialogV2 = globalThis.foundry?.applications?.api?.DialogV2;
+      if (!DialogV2?.wait) return false;
+      const localize = (key, data) =>
+        data ? game.i18n?.format?.(key, data) ?? key : game.i18n?.localize?.(key) ?? key;
+      const config = buildRecipeStorageConversionConsentPrompt(localize);
+      // `wait` with explicit buttons, never `confirm`: its built-in labels differ by build
+      // (V13 literal "Yes"/"No", V14 "COMMON.Yes"/"COMMON.No") and neither names the action.
+      // `rejectClose: false` is the default and is stated so the dismissal path is visible —
+      // a dismissal RESOLVES `null`, which `isRecipeStorageConversionConsented` reads as a
+      // decline because it tests positively for the affirmative action.
+      const result = await DialogV2.wait({
+        window: { title: config.title },
+        content: config.content,
+        buttons: config.buttons.map(button => ({
+          action: button.action,
+          label: button.label,
+          default: button.default
+        })),
+        default: config.default,
+        rejectClose: false
+      });
+      return isRecipeStorageConversionConsented(result);
+    } catch (error) {
+      console.error('Fabricate | failed to present the recipe storage conversion prompt', error);
+      return false;
+    }
+  }
+
+  /**
+   * Whether the world is asking for a forward recipe storage conversion right now.
+   *
+   * @returns {boolean}
+   */
+  _forwardRecipeStorageConversionPending() {
+    const layout = getSetting(SETTING_KEYS.RECIPE_STORAGE_LAYOUT);
+    const target = getSetting(SETTING_KEYS.RECIPE_STORAGE_TARGET);
+    return target === DEFINITION_STORAGE_TARGETS.PER_RECORD
+      && layout !== DEFINITION_STORAGE_LAYOUTS.PER_RECORD;
+  }
+
+  /**
+   * Leave the world exactly as it was after a declined conversion, and say so.
+   *
+   * The target is written back to the observed layout so `layout === target` holds and the
+   * Valid Id Basis gate stays satisfied — the same repair the `target-reverted` path makes,
+   * and it terminates for the same reason: the next pass reads `layout === target` and does
+   * nothing.
+   *
+   * The write is SKIPPED when the layout is not itself a legal target. `unsettled` is a real
+   * layout and is not a choice, so writing it into the target key would launder an illegal
+   * value into the world — the exact thing `reconcileRecipeStorageLayout` refuses to do.
+   *
+   * @returns {Promise<void>}
+   */
+  async _revertDeclinedRecipeStorageTarget() {
+    const layout = getSetting(SETTING_KEYS.RECIPE_STORAGE_LAYOUT);
+    if (Object.values(DEFINITION_STORAGE_TARGETS).includes(layout)) {
+      await setSetting(SETTING_KEYS.RECIPE_STORAGE_TARGET, layout);
+    }
+    this._announceDefinitionStorageOutcome({ action: 'consent-declined' });
   }
 
   /**
@@ -982,18 +1088,39 @@ class Fabricate {
    *   reclaimFailure?: Error|null, error?: Error}} report
    */
   _announceDefinitionStorageOutcome(report) {
+    // The miss arm is a localization KEY, never the raw value stringified (issue 1211). This
+    // helper is handed a LAYOUT as often as a target, and that enumeration carries `unsettled`,
+    // which the operator-facing choices map has no label for and never will — so the shipped
+    // fallback rendered the raw internal token into the `Unavailable` and `Failed` sentences,
+    // and every string added to the switch below would have inherited that. Hardened at the
+    // source rather than routed around by moving the new strings elsewhere.
     const label = (value) => {
-      const key = RECIPE_STORAGE_TARGET_CHOICES[value];
-      return key ? game.i18n?.localize?.(key) ?? key : String(value);
+      const key = recipeStorageArrangementLabelKey(value);
+      return game.i18n?.localize?.(key) ?? key;
     };
     const format = (key, data) => game.i18n?.format?.(key, data) ?? key;
     switch (report?.action) {
       case 'converted':
-        if (report.reclaimFailure) {
-          ui.notifications?.warn?.(format('FABRICATE.Settings.RecipeStorageTarget.ReclaimPending', { records: report.records }), { permanent: true });
-        } else {
-          ui.notifications?.info?.(format('FABRICATE.Settings.RecipeStorageTarget.Converted', { records: report.records }));
-        }
+        this._announceCompletedStorageConversion(report, format);
+        break;
+      case 'deferred':
+        // The ordinary reachable path: the GM sets the arrangement, reloads, the migration
+        // pass writes, and the conversion defers by one boot. Without this the setting reads
+        // "One record per recipe" while the layout has not moved and nothing says why.
+        ui.notifications?.info?.(game.i18n?.localize?.('FABRICATE.Settings.RecipeStorageTarget.Deferred') ?? '', { permanent: true });
+        break;
+      case 'consent-declined':
+        ui.notifications?.info?.(game.i18n?.localize?.('FABRICATE.Settings.RecipeStorageTarget.Declined') ?? '');
+        break;
+      case 'refused':
+        console.error('Fabricate | recipe storage layout conversion refused', report.error);
+        ui.notifications?.error?.(format('FABRICATE.Settings.RecipeStorageTarget.Refused', { records: report.records ?? 0, kept: report.kept ?? 0 }), { permanent: true });
+        break;
+      case 'reclaim-refused':
+        ui.notifications?.warn?.(format('FABRICATE.Settings.RecipeStorageTarget.ReclaimRefused', { kept: report.kept, records: report.records }), { permanent: true });
+        break;
+      case 'legacy-survivor-diverged':
+        ui.notifications?.warn?.(format('FABRICATE.Settings.RecipeStorageTarget.LegacySurvivorDiverged', { legacyRecords: report.legacyRecords, granularRecords: report.granularRecords }), { permanent: true });
         break;
       case 'target-reverted':
         ui.notifications?.warn?.(format('FABRICATE.Settings.RecipeStorageTarget.Unavailable', { requested: label(report.target), current: label(report.layout) }), { permanent: true });
@@ -1011,7 +1138,47 @@ class Fabricate {
   }
 
   /**
+   * Tell the GM a conversion completed, in terms of the direction it went.
+   *
+   * The two directions must say OPPOSITE things and the forward one MUST NOT reuse
+   * `RST.Converted`, which reads "It is now safe to downgrade Fabricate on this world" — the
+   * reverse conversion's message, and the exact inverse of what just happened. So the
+   * direction is reported by the conversion rather than inferred here.
+   *
+   * A forward conversion whose step 4 did not complete is the QUIET downgrade-lossy state:
+   * the layout says granular and the old combined record survives, so an older build reads
+   * and edits it normally and the next upgrade discards those edits with no error. It gets
+   * its own warning rather than the reverse direction's reclaim-pending reassurance.
+   *
+   * @param {{direction?: string, records?: number, reclaimFailure?: Error|null}} report
+   * @param {(key: string, data?: object) => string} format
+   */
+  _announceCompletedStorageConversion(report, format) {
+    const data = { records: report.records };
+    if (report.direction === RECIPE_STORAGE_CONVERSION_DIRECTIONS.FORWARD) {
+      const key = report.reclaimFailure
+        ? 'FABRICATE.Settings.RecipeStorageTarget.ConvertedLegacySurvives'
+        : 'FABRICATE.Settings.RecipeStorageTarget.ConvertedToPerRecord';
+      const notify = report.reclaimFailure ? ui.notifications?.warn : ui.notifications?.info;
+      notify?.call(ui.notifications, format(key, data), { permanent: true });
+      return;
+    }
+    if (report.reclaimFailure) {
+      ui.notifications?.warn?.(format('FABRICATE.Settings.RecipeStorageTarget.ReclaimPending', data), { permanent: true });
+      return;
+    }
+    ui.notifications?.info?.(format('FABRICATE.Settings.RecipeStorageTarget.Converted', data));
+  }
+
+  /**
    * Run versioned startup data migrations via MigrationRunner.
+   *
+   * @returns {Promise<boolean>} whether this pass ISSUED a write to any corpus key (issue
+   *   1211). `_reconcileDefinitionStorage` consumes it: a Storage Layout Conversion must not
+   *   run in a boot whose migration pass persisted a corpus key, because two clients' passes
+   *   are not byte-reproducible over the same source. It is FALSE on every path that returns
+   *   before this pass reaches its writeback — a non-primary GM, an up-to-date world, a
+   *   deferral that refused before running, and an abort.
    */
   async _runMigrations() {
     // Primary-GM only, so exactly one client runs the migration pass in a multi-GM
@@ -1020,7 +1187,7 @@ class Fabricate {
     // let the full GM AND every assistant transform-and-write concurrently
     // (last-writer-wins); `activeGM` fires on exactly one client. Mirrors the
     // primary-GM startup writers below (runRecipeItemFlagAutoStamp et al.).
-    if (game.users?.activeGM?.id !== game.user?.id) return;
+    if (game.users?.activeGM?.id !== game.user?.id) return false;
     const runner = new MigrationRunner({
       getSetting,
       setSetting,
@@ -1045,6 +1212,11 @@ class Fabricate {
       recipeCorpus: createRecipeCorpus({ getSetting, setSetting })
     });
     const summary = await runner.run();
+    // Read from the pass's own report of the writes it ISSUED, never from `ran`, which counts
+    // migrations executed rather than writes issued and is wrong on both sides: a pass can
+    // run migrations that transform nothing, and a pass that failed DURING the writeback ran
+    // migrations AND may have partially committed the granular recipe leg.
+    const persistedCorpusKey = summary?.persistedCorpusKey === true;
 
     // Deferred pass (issue 1242): the recipe corpus could not be read whole, or a writeback
     // leg failed, so the pass persisted nothing and left `migrationVersion` where it found it.
@@ -1063,7 +1235,7 @@ class Fabricate {
         const message = game.i18n?.localize?.(key) || key;
         ui.notifications?.error?.(message, { permanent: true });
       }
-      return;
+      return persistedCorpusKey;
     }
 
     // Aborted pass: a fatal migration error rolled the in-memory data back and
@@ -1076,7 +1248,7 @@ class Fabricate {
           || "Fabricate migration aborted. This pass saved nothing: your stored data is exactly as it was before this startup. Reload Foundry to discard this session's partly-migrated copy, then see the console (F12) for per-document recovery guidance.";
         ui.notifications?.error?.(message);
       }
-      return;
+      return persistedCorpusKey;
     }
 
     // One-time GM-facing notice: when the 0.6.0 migration actually converted catalysts into
@@ -1181,6 +1353,7 @@ class Fabricate {
       }) || `Fabricate merged each system's check modifiers and gathering character modifiers into one Modifiers library. ${total} gathering modifier(s) in ${systemList} shared an id with a check modifier and were renamed with a "-gathering" suffix; every reference to them was updated. Review them under System settings › Modifiers.`;
       ui.notifications?.warn?.(message, { permanent: true });
     }
+    return persistedCorpusKey;
   }
 
   /**
@@ -3777,6 +3950,24 @@ Hooks.once('ready', async () => {
     }
   };
   Hooks.on('deleteSetting', handleFabricateSettingDocumentDelete);
+  // Adopt any per-record recipe document that replicated in BEFORE the three listeners above
+  // were registered (issue 1211). Core replays its socket buffer inside
+  // `activateSocketListeners()`, one line before `Hooks.callAll("ready")`, and these
+  // registrations run inside the `ready` callback after `await fabricate.initialize()` — so a
+  // document arriving in that window is correct in `game.settings.storage` and missing from
+  // the manager's map for the whole session.
+  //
+  // Its POSITION is load-bearing twice over. It must sit AFTER the registrations, because a
+  // read placed before them reopens the very window it closes. And it must sit inside NO GM
+  // gate: the client that misses its own writes is the writer, which never does, so the
+  // client at risk is any OTHER booting client — and a non-GM client never reaches
+  // `_reconcileDefinitionStorage()` at all.
+  if (resyncGranularRecipeRecords(fabricate.recipeManager)) {
+    Hooks.callAll('fabricate.recipesChanged', {
+      action: 'external',
+      recipes: fabricate.recipeManager.getRecipes()
+    });
+  }
   // A GM changing the recipe storage arrangement mid-session (issue 1232). The bridge above
   // emits this internal signal for BOTH storage keys; only a TARGET change is a request, and
   // the layout leg is the conversion's own writes coming back — reconciling on those would

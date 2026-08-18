@@ -127,6 +127,34 @@ export const RECIPE_STORAGE_TARGET_CHOICES = Object.freeze({
   [DEFINITION_STORAGE_TARGETS.PER_RECORD]: 'FABRICATE.Settings.RecipeStorageTarget.PerRecord',
 });
 
+/**
+ * The label for an arrangement {@link RECIPE_STORAGE_TARGET_CHOICES} has no entry for.
+ *
+ * It exists because the LAYOUT enumeration carries a member the operator-facing choices map
+ * has no label for and never will: `unsettled` is a real observed state and not a choice a
+ * GM can make. Anything that labels a value it may be handed a layout for therefore needs a
+ * miss arm, and `String(value)` is not one — it renders the raw internal token into a
+ * GM-facing sentence.
+ */
+export const RECIPE_STORAGE_ARRANGEMENT_UNKNOWN_LABEL_KEY =
+  'FABRICATE.Settings.RecipeStorageTarget.UnknownArrangement';
+
+/**
+ * The localization key naming one recipe storage arrangement, for a GM-facing sentence.
+ *
+ * A TOTAL function, deliberately: `data-models/spec.md` forbids a value-to-label helper from
+ * falling back to rendering the raw value, and forbidding the leak says what the helper must
+ * not do rather than what it must produce. The shipped `Unavailable` and `Failed` notices
+ * interpolate this label, so it must still yield a readable phrase for every value — which
+ * is why the miss arm is a localization key and not an empty string.
+ *
+ * @param {*} value a Definition Storage TARGET, a LAYOUT, or anything unreadable.
+ * @returns {string} a localization key that always resolves.
+ */
+export function recipeStorageArrangementLabelKey(value) {
+  return RECIPE_STORAGE_TARGET_CHOICES[value] ?? RECIPE_STORAGE_ARRANGEMENT_UNKNOWN_LABEL_KEY;
+}
+
 // The target version for the one-shot recipe-item flag auto-stamp. When the stored
 // `RECIPE_ITEM_FLAG_STAMP_VERSION` is below this, the primary GM runs the backfill once
 // on `ready` and writes this value back. Bumped 1 → 2 by issue 567: v1 stamped the retired

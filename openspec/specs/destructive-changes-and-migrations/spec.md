@@ -262,6 +262,15 @@ When one of the five migrated settings is stored granularly its writeback is mor
 The ordering exists to minimise the set of cross-setting states a tear can produce, not to protect the version: the version bump is unconditionally last in every ordering.
 A tear in the granular leg MUST abandon the remaining writes rather than continue, because a sibling setting written against records that did not land is a dangling reference the re-run cannot reconstruct, its source fields having already been consumed.
 
+**The pass MUST report whether it persisted any corpus key.**
+A later step of the same boot decides its own legality from that fact: a storage conversion MUST NOT run in a boot whose migration pass persisted a corpus key, because two clients' passes are not byte-reproducible over the same source (see `data-models/spec.md` § Storage Conversion Crash Recovery).
+The pass therefore reports, as part of its summary, whether any of the five write-on-change legs was ISSUED.
+The report is about writes ISSUED, not about the pass completing.
+A pass that aborted before the writeback, refused an unsettled corpus, or could not read the corpus reports that it persisted nothing, because none of those reaches the writeback.
+A pass that failed DURING the writeback reports that it PERSISTED a corpus key whenever a leg was issued, because the granular leg can partially commit and a partially written corpus is exactly the byte-divergent input a conversion must not consume.
+The report MUST NOT be derived from the count of migrations that ran, which is a different fact: a pass can execute migrations that transform nothing and issue no write at all.
+Without this report the conversion asserts a precondition no specification promises to supply — and with the naive wording it asserts the opposite of the truth on the one path that matters.
+
 **The corpus read and writeback MUST be error-contained.**
 A granular corpus read or write can fail for reasons a whole-array setting write cannot: an unparseable record document, an unavailable document class, a hook vetoing one document in a bulk leg, or a stale index.
 The pass MUST contain those failures, persist nothing further, leave `fabricate.migrationVersion` un-advanced, and report to the GM.

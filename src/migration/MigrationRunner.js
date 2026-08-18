@@ -565,6 +565,10 @@ function emptyPassSummary(overrides = {}) {
   return {
     ran: 0,
     aborted: false,
+    // Issue 1211. Defaults to "this pass persisted nothing", which is correct for the early
+    // return, the abort and the two deferrals that never reach the writeback. The writeback's
+    // own deferral overrides it, because the granular leg can partially commit.
+    persistedCorpusKey: false,
     migratedCatalystCount: 0,
     unifiedRegionSystems: [],
     removedResultSelectionProviders: {
@@ -633,7 +637,7 @@ export class MigrationRunner {
    * Only persists data when changes are detected.
    * Updates migrationVersion to the highest migration version that ran.
    *
-   * @returns {Promise<{ ran: number, aborted: boolean, migratedCatalystCount: number, unifiedRegionSystems: string[], removedResultSelectionProviders: { droppedRollTableRecipes: object[], strippedGatheringTasks: object[] }, abortedMigration?: string, downgradeTo?: string|null, failures?: object[] }>}
+   * @returns {Promise<{ ran: number, aborted: boolean, persistedCorpusKey: boolean, migratedCatalystCount: number, unifiedRegionSystems: string[], removedResultSelectionProviders: { droppedRollTableRecipes: object[], strippedGatheringTasks: object[] }, abortedMigration?: string, downgradeTo?: string|null, failures?: object[] }>}
    *   a summary of the run so the caller can fire one-time edge effects (e.g. the
    *   GM catalyst-migration and region-unification notices) or surface an aborted pass.
    */
@@ -849,6 +853,24 @@ export class MigrationRunner {
     const gatheringPartiesChanged =
       JSON.stringify(data.gatheringParties) !== originalGatheringPartiesJson;
 
+    // Issue 1211: whether this pass ISSUED a write to any corpus key. A later step of the
+    // same boot decides its own legality from it — a Storage Layout Conversion must not run
+    // in a boot whose migration pass persisted a corpus key, because two clients' passes are
+    // not byte-reproducible over the same source, so a conversion whose source read
+    // interleaves with the other client's write converts a state no single pass produced.
+    //
+    // It reports writes ISSUED, not the pass completing, and that distinction is the whole
+    // value: a leg that was issued and then threw may have PARTIALLY committed under the
+    // granular arrangement, which is exactly the byte-divergent input the conversion must not
+    // consume. Deriving it from `ran` instead would report the migrations executed rather than
+    // the writes issued, and would be wrong on every pass that transformed nothing.
+    const persistedCorpusKey =
+      recipesChanged ||
+      systemsChanged ||
+      gatheringConfigChanged ||
+      environmentsChanged ||
+      gatheringPartiesChanged;
+
     // ---------------------------------------------------------------------------
     // Writeback. The recipe corpus goes FIRST, and the order is pinned rather than
     // incidental (`destructive-changes-and-migrations/spec.md` § Startup Migration Flow).
@@ -868,7 +890,7 @@ export class MigrationRunner {
       try {
         await this._recipeCorpus.createOrUpdateAll(data.recipes);
       } catch (error) {
-        return this._deferOnWriteFailure(error, storageLayout);
+        return this._deferOnWriteFailure(error, storageLayout, persistedCorpusKey);
       }
     }
     try {
@@ -891,7 +913,7 @@ export class MigrationRunner {
       // disposition. This is a deliberate extension of the seam's own scope: a rejection from
       // any of these already propagates out of `run()` past a caller with no `catch`, which is
       // a partial writeback reachable with no conversion involved at all.
-      return this._deferOnWriteFailure(error, storageLayout);
+      return this._deferOnWriteFailure(error, storageLayout, persistedCorpusKey);
     }
 
     console.log(`Fabricate | Migrations complete: ran ${pending.length} migration(s)`);
@@ -899,6 +921,7 @@ export class MigrationRunner {
     return {
       ran: pending.length,
       aborted: false,
+      persistedCorpusKey,
       migratedCatalystCount,
       unifiedRegionSystems,
       removedResultSelectionProviders,
@@ -921,7 +944,7 @@ export class MigrationRunner {
    * @returns {object} the deferred pass summary.
    * @private
    */
-  _deferOnWriteFailure(error, storageLayout) {
+  _deferOnWriteFailure(error, storageLayout, persistedCorpusKey = false) {
     console.error(
       'Fabricate | Migrations deferred: a migrated setting could not be saved, so the remaining writes and the version bump were abandoned. Nothing was marked as migrated.',
       error
@@ -930,6 +953,7 @@ export class MigrationRunner {
       deferred: true,
       deferredReason: MIGRATION_DEFERRAL_REASONS.WRITEBACK_FAILED,
       deferredError: error,
+      persistedCorpusKey,
       storageLayout,
     });
   }

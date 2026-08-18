@@ -1029,7 +1029,10 @@ test('main.js constructs the MigrationRunner with the real arrangement-aware acc
     'utf8'
   );
 
-  assert.match(source, /import \{ createRecipeCorpus \} from '\.\/systems\/recipeCorpus\.js';/);
+  // Issue 1211 added a second export to the same import line (the post-bridge record
+  // resync), so the match is anchored on the specifier and the named import rather than on
+  // the whole statement.
+  assert.match(source, /import \{ createRecipeCorpus[^}]*\} from '\.\/systems\/recipeCorpus\.js';/);
   assert.match(source, /recipeCorpus: createRecipeCorpus\(\{ getSetting, setSetting \}\)/);
   assert.match(
     source,

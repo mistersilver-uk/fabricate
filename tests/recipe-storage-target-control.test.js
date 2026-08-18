@@ -46,16 +46,25 @@
  *    already pins its other `initialize()` positions, and the failure that ordering prevents
  *    is reproduced separately against the real reconciler and the real manager.
  *
- * ## What claim 2 cannot yet assert
+ * ## What claim 2 does and does not assert, now that the forward conversion exists
  *
- * The forward conversion is issue 1211's and does not exist in this build, so "forward then
- * reverse" is exercised by writing the per-record corpus through
- * `PerRecordCraftingDefinitionRepository#putAll` — which IS the operation a forward
- * conversion's step 2 performs, and is the only per-record writer this build has. When the
- * real forward conversion lands, this round trip should be re-pointed at it. That is stated
- * here rather than left implicit because the difference is real: this proves the two
- * ARRANGEMENTS hold the same corpus, and not that the forward conversion's own step 2 puts
- * it there correctly.
+ * The reverse round trip below still seeds its per-record side with
+ * `PerRecordCraftingDefinitionRepository#putAll` rather than with the real forward
+ * conversion, and that is deliberate rather than stale: this file's subject is the REVERSE
+ * direction, and seeding through the forward conversion would make every failure here
+ * ambiguous between the two. Issue 1211's own suite
+ * (`tests/definition-storage-forward-conversion.test.js`) drives the forward direction end
+ * to end against the same canonical form, including the byte-equivalence assertion this
+ * file's round trip is the mirror of.
+ *
+ * ## What issue 1211 changed in this file
+ *
+ * The forward rows completed the conversion table, so `target-reverted` and
+ * `unsettled-unresolvable` became unreachable FOR RECIPES: every pair of a recognised layout
+ * and a legal target with `layout !== target` now has a conversion. The two cases that
+ * asserted those dispositions assert the conversion instead, and a new case pins the
+ * totality itself — which is the property that decides whether a world can be permanently
+ * gated, and the one that reverts if a row is ever removed.
  */
 
 import assert from 'node:assert/strict';
@@ -78,6 +87,7 @@ import {
   RECIPE_STORAGE_CONVERSIONS,
   recipeStorageConversionFor,
   reconcileRecipeStorageLayout,
+  runForwardRecipeStorageConversion,
   runReverseRecipeStorageConversion,
 } from '../src/systems/definitionStorageConversion.js';
 import {
@@ -297,18 +307,22 @@ describe('the Definition Storage Target is the GM-facing control', () => {
 });
 
 describe('a target no conversion can satisfy never leaves the world permanently gated', () => {
-  it('reverts the target to the settled layout instead of stranding the gate', async () => {
+  it('CONVERTS toward the requested target instead of stranding the gate', async () => {
+    // Issue 1211 changed this case's disposition and not its property. Before the forward
+    // rows existed this transition had no conversion, so the reconciler restored the gate by
+    // reverting the TARGET; now it restores it by performing the conversion the GM asked for.
+    // The assertion is made against `readValidIdBasis` itself for the same reason it always
+    // was: "the gate is satisfied" is the property, and re-deriving the comparison here would
+    // prove only that this file can restate it.
     const { seams } = await world({ layout: SINGLE_ARRAY, target: PER_RECORD, legacy: [recipe('r1')] });
 
     const report = await reconcileRecipeStorageLayout(seams);
 
-    assert.equal(report.action, 'target-reverted');
-    assert.equal(env.settings.get(TARGET_KEY), SINGLE_ARRAY, 'the target is restored to the layout');
-    assert.equal(env.settings.get(LAYOUT_KEY), SINGLE_ARRAY, 'nothing touched the layout');
-    // The claim that matters: the gate is satisfied again, so every destructive startup pass
-    // runs. Asserting the settings alone would restate the comparison rather than test it.
+    assert.equal(report.action, 'converted');
+    assert.equal(env.settings.get(TARGET_KEY), PER_RECORD, 'the requested arrangement stands');
+    assert.equal(env.settings.get(LAYOUT_KEY), PER_RECORD, 'and the layout now describes it');
     assert.equal(
-      recipeBasis({ granular: false, arrangement: SINGLE_ARRAY, layoutAtCorpusRead: SINGLE_ARRAY }),
+      recipeBasis({ granular: true, arrangement: PER_RECORD, layoutAtCorpusRead: PER_RECORD }),
       true
     );
   });
@@ -323,31 +337,53 @@ describe('a target no conversion can satisfy never leaves the world permanently 
     );
   });
 
-  it('reports an unsettled layout it cannot resume rather than writing an illegal target', async () => {
-    // `unsettled` is not a legal target, so this one cannot be repaired by a settings write.
-    // It is a genuinely half-converted corpus — reachable only by downgrading from a build
-    // that ran a forward conversion — and the gate is right to keep refusing it.
-    const { seams } = await world({ layout: UNSETTLED, target: PER_RECORD });
+  it('resumes an unsettled layout toward the requested target', async () => {
+    // `unsettled` is not a legal TARGET, so this world cannot be repaired by a settings write
+    // at all — before issue 1211 it was reported and left refused. The forward resume row is
+    // what makes it recoverable, and a conversion is the only thing that can be: the corpus
+    // really is spread across both arrangements.
+    const { seams } = await world({ layout: UNSETTLED, target: PER_RECORD, legacy: [recipe('r1')] });
 
     const report = await reconcileRecipeStorageLayout(seams);
 
-    assert.equal(report.action, 'unsettled-unresolvable');
+    assert.equal(report.action, 'converted');
     assert.equal(env.settings.get(TARGET_KEY), PER_RECORD, 'no illegal target is laundered in');
-    assert.deepEqual(env.writes, [], 'nothing is written at all');
+    assert.equal(env.settings.get(LAYOUT_KEY), PER_RECORD);
   });
 
   it('declares the reachable transitions rather than deriving them from the target values', () => {
-    // Derived availability would silently start claiming a forward conversion the moment a
-    // value was added to the target enumeration. Issue 1211 adds rows here; until it does,
-    // the forward direction is honestly absent.
+    // Derived availability would silently start claiming a conversion the moment a value was
+    // added to the target enumeration.
     assert.equal(recipeStorageConversionFor(PER_RECORD, SINGLE_ARRAY), runReverseRecipeStorageConversion);
     assert.equal(recipeStorageConversionFor(UNSETTLED, SINGLE_ARRAY), runReverseRecipeStorageConversion);
-    assert.equal(recipeStorageConversionFor(SINGLE_ARRAY, PER_RECORD), null);
-    assert.equal(recipeStorageConversionFor(UNSETTLED, PER_RECORD), null);
+    assert.equal(recipeStorageConversionFor(SINGLE_ARRAY, PER_RECORD), runForwardRecipeStorageConversion);
+    assert.equal(recipeStorageConversionFor(UNSETTLED, PER_RECORD), runForwardRecipeStorageConversion);
     assert.deepEqual(
       RECIPE_STORAGE_CONVERSIONS.map((entry) => `${entry.from}->${entry.to}`),
-      ['perRecord->singleArray', 'unsettled->singleArray']
+      [
+        'perRecord->singleArray',
+        'unsettled->singleArray',
+        'singleArray->perRecord',
+        'unsettled->perRecord',
+      ]
     );
+  });
+
+  it('covers EVERY reachable transition, so neither non-conversion fallback can fire', () => {
+    // The property the two rewritten cases above used to assert directly, stated once where
+    // it cannot rot. The reconciler KEEPS its `target-reverted` and `unsettled-unresolvable`
+    // branches — they are the required disposition for an entity class whose table is not
+    // total, which component extraction (#1212) will be while it is half-built — and issue
+    // 1211 made them unreachable for RECIPES by completing this table. Remove a row and this
+    // fails, naming the transition that has just become permanently gated.
+    const missing = [];
+    for (const layout of [SINGLE_ARRAY, PER_RECORD, UNSETTLED]) {
+      for (const target of [SINGLE_ARRAY, PER_RECORD]) {
+        if (layout === target) continue;
+        if (!recipeStorageConversionFor(layout, target)) missing.push(`${layout}->${target}`);
+      }
+    }
+    assert.deepEqual(missing, [], 'a transition with no conversion leaves that world gated');
   });
 });
 
@@ -431,9 +467,15 @@ describe('the reverse conversion moves the corpus back into the legacy key', () 
 
     const report = await reconcileRecipeStorageLayout(seams);
 
-    assert.equal(report.action, 'failed');
+    assert.equal(report.action, 'refused');
     assert.match(report.error.message, /does not describe this world's storage/);
     assert.equal(env.settings.get(SETTING_KEYS.RECIPES).length, corpus.length, 'the corpus survives');
+    // Issue 1211: a refusal wrote nothing, so nothing is compensated and BOTH keys are left
+    // as found. Compensating a refusal is what turns it into a total loss on the NEXT boot —
+    // `tests/definition-storage-reclaim-refusal.test.js` drives that composition.
+    assert.deepEqual(env.writes, [], 'a refusal issues no setting write of any kind');
+    assert.equal(env.settings.get(LAYOUT_KEY), PER_RECORD, 'the layout is left as found');
+    assert.equal(env.settings.get(TARGET_KEY), SINGLE_ARRAY, 'and so is the target');
   });
 
   it('compensates BOTH keys when a step fails, restoring the layout VALUE', async () => {
@@ -700,7 +742,11 @@ describe('the reconcile runs where the ordering constraint requires (src/main.js
   // here: position IS the property, and no runtime observation of a module that cannot be
   // loaded could make it stronger.
   const initialize = mainMethodSource('  async initialize() {', MAIN_SOURCE);
-  const RECONCILE = 'await this._reconcileDefinitionStorage();';
+  // Issue 1211 gave the call an argument — the migration pass's own report of whether it
+  // wrote a corpus key — so the literal is matched up to its opening parenthesis. Its
+  // ARGUMENT is pinned separately, in `tests/definition-storage-forward-conversion.test.js`,
+  // because the parameter defaults to false and a dropped argument therefore fails OPEN.
+  const RECONCILE = 'await this._reconcileDefinitionStorage(';
   const SELECT_BACKEND = 'this.recipeManager = new RecipeManager({';
 
   /**
@@ -776,7 +822,10 @@ describe('the reconcile runs where the ordering constraint requires (src/main.js
     // assistant GM too, so an `isGM` gate would let the full GM and every assistant convert
     // the same corpus concurrently — last-writer-wins over a half-moved corpus. Same gate,
     // same reason, as `_runMigrations` directly below it.
-    const method = mainMethodSource('  async _reconcileDefinitionStorage() {', MAIN_SOURCE);
+    const method = mainMethodSource(
+      '  async _reconcileDefinitionStorage(migrationPassPersistedCorpusKey = false) {',
+      MAIN_SOURCE
+    );
     const gate = method.indexOf('if (game.users?.activeGM?.id !== game.user?.id) return;');
     assert.ok(gate > -1, 'the primary-GM gate is still the first thing the boot pass does');
     assert.ok(
