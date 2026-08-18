@@ -224,6 +224,60 @@ describe('verification gates step 3, never step 4', () => {
     }
   });
 
+  it('catches a shortfall the per-leg COUNT check is blind to', async () => {
+    // The isolating case for the id-containment verification itself, and it needs its own
+    // fixture: a vetoed create is caught by the create leg's OWN short-return check before
+    // `_verifyEveryRecordLanded` ever runs, so moving that verification past step 3 changes
+    // nothing on the vetoed world and the assertion above would pass either way.
+    //
+    // The shape a count cannot see is a record the differential SKIPPED as already stored,
+    // whose document then disappears — another client's delete, or a partially reclaimed
+    // resume. No leg was asked for it, so no leg can return short for it.
+    //
+    // *Reddens when:* the verification sits between steps 3 and 4 — the layout then claims
+    // `perRecord` over a corpus that is provably missing a record.
+    const fixture = await world({
+      layout: SINGLE_ARRAY,
+      target: PER_RECORD,
+      systems: CORPUS(),
+      // Already stored, byte-identical, so `skipUnchanged` omits it from every leg.
+      records: envelopesFor('sysA', [component('cA1')]),
+    });
+    let created = 0;
+    const vanishing = () => {
+      if (created > 0) {
+        for (const [id, document] of fixture.host.collection.documents) {
+          if (document.key === qualified('component.sysA.cA1')) {
+            fixture.host.collection.documents.delete(id);
+          }
+        }
+      }
+      return fixture.host.collection;
+    };
+    const documentClass = {
+      ...fixture.host.documentClass,
+      createDocuments: async (data, options) => {
+        const result = await fixture.host.documentClass.createDocuments(data, options);
+        created += 1;
+        return result;
+      },
+    };
+    const layoutValues = [];
+    const report = await reconcileComponentStorageLayout({
+      ...fixture.seams,
+      collection: vanishing,
+      documentClass: () => documentClass,
+      setSetting: async (key, value) => {
+        if (key === LAYOUT_KEY) layoutValues.push(value);
+        return fixture.seams.setSetting(key, value);
+      },
+    });
+
+    assert.equal(report.action, 'failed');
+    assert.match(report.error.message, /did not land/, 'the id-containment check is what raised');
+    assert.ok(!layoutValues.includes(PER_RECORD), 'the layout never claimed perRecord');
+  });
+
   it('a resume converges to the uninterrupted result once the veto is lifted', async () => {
     const fixture = await world({ layout: SINGLE_ARRAY, target: PER_RECORD, systems: CORPUS() });
     fixture.host.vetoedKeys.add(qualified('component.sysB.cB2'));
