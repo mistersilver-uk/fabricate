@@ -86,6 +86,12 @@ export function fabricateDevProxy() {
       const root = server.config.root;
       const premiumRoot = premiumSourceRoot();
       if (premiumRoot) {
+        // Vite's watcher covers the project ROOT. Premium's source is outside it and reaches
+        // the browser through `/@fs/`, so without this its files are read once, cached, and
+        // never invalidated -- edits keep serving the transform from first request, which
+        // looks exactly like a change that did not land. Adding the directory to the watcher
+        // puts those files back on the ordinary invalidate-and-HMR path.
+        server.watcher.add(premiumRoot);
         server.config.logger.info(`  ➜  premium:  serving ${premiumRoot} with HMR`);
       }
       // Pre-middleware: runs BEFORE Vite's internal middleware.
