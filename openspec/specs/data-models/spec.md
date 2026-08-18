@@ -3060,10 +3060,33 @@ The helper MUST still yield a readable phrase for every value it can be handed, 
 
 ### Valid Id Basis
 
-A **Valid Id Basis** is the set of live-corpus id sets a destructive pass derives its "still valid" answer from — the valid recipe, system, component and salvage-component id sets a startup cleanup pass builds before pruning anything that names an id outside them.
+A **Valid Id Basis** is the set of live-corpus id sets a destructive pass derives its "still valid" answer from — the valid recipe, system, component and salvage-component id sets a cleanup pass builds before pruning anything that names an id outside them.
 
 **A destructive pass runs only when its Valid Id Basis is known-complete.**
 A pass whose basis is incomplete does not see a live record, concludes the thing naming it is stale, and deletes durable state that was never stale.
+
+**The requirement is scoped to the KIND of prune, not to the moment it runs.**
+A **corpus-derived** prune asks "is this id still in the live corpus?" and removes everything that is not.
+It infers a deletion from an ABSENCE, so it is governed by this requirement wherever it runs — at startup, and equally in the flag cleanup a GM triggers by deleting a recipe, deleting a set of recipes, deleting a crafting system, re-importing a compendium pack, or changing a system's resolution mode.
+Those mutation-time paths recompute the same id sets from the same live managers and call the same destructive collaborators, so the loss is identical and the trigger is more ordinary than a boot.
+A **subject-targeted** prune asks instead "does this name one of the ids the caller just removed?".
+Those ids are positively known, and no missing corpus can make a just-deleted id valid again, so a subject-targeted prune needs no Valid Id Basis and MUST NOT be gated on one.
+
+**A gated mutation-time pass that prunes ACTOR-SCOPED durable state MUST name a subject-targeted fallback whenever the mutation removed something**, and the fallback runs in the refused sweep's place.
+Without it the gate trades a data-loss defect for a flag leak: the actor flags the mutation itself orphaned are the reason the cleanup path exists, nothing else re-derives them, and nothing would detect their absence.
+What a refusal gives up is therefore only the hunt for orphans of UNKNOWN origin, which the startup pass reconciles on the next known-complete boot.
+A mutation that removed nothing — an import, or the public orphaned-flag entry point called with no id set — has no fallback and needs none: an omitted sweep there removes nothing and leaks nothing.
+
+**A pass that prunes only world- or user-scoped PREFERENCES is exempt from the fallback requirement, and the exemption is stated because the obvious justification for it is false.**
+"Nothing there names a subject" is not true of the preference sweep: a crafting-system deletion holds the removed system id and the removed recipe ids, and `lastManagedCraftingSystem`, `lastAlchemySystem` and the `recipe:` / `salvage:` keys of the progressive-order map are all targetable from them.
+The exemption is that the cost of leaving a stale preference is bounded and self-healing where the cost of leaving a stale actor flag is not.
+A preference names something that no longer exists; the next read corrects it, and the startup `stale preferences` pass reconciles it on the next known-complete boot.
+Against that, a targeted preference prune would add a fresh write — to a `user`-scoped replicated document, no less — on a path whose defining condition is that this client cannot describe the world it is writing to.
+A pass claiming this exemption MUST say which of the two reasons it is claiming, so that a future pass cannot inherit it by resembling this one.
+
+**Every id set a corpus-derived pass is given MUST be derived from the corpus, never defaulted away.**
+A pass handed an empty set for one entity class prunes every key scoped to that class on every run, which is this requirement's own failure mode reached with no conversion involved at all.
+A pass that rewrites ONE store keyed by several entity classes is declared on the UNION of those classes and MUST NOT be decomposed, because it replaces the whole store and an incomplete basis for any one class would wipe the keys of the others.
 
 **Five inputs decide it, and any one alone makes the basis NOT known-complete:**
 
@@ -3114,10 +3137,12 @@ It is true on every non-primary client on every boot, including a fully converte
 The primary GM cannot cover for that, because some pruned state is `user`-scoped and only that user's own client can prune it.
 A non-primary client on a fully converted, fully migrated world therefore DOES run the destructive passes.
 
-**The gate is applied by OMITTING the pass from the startup pass list, never by throwing from inside it.**
-The startup maintenance runner catches every throw into a failure label and discards return values, so by the time a throw is observable the destructive work has already landed.
+**The gate is applied by OMITTING the pass from the pass list, never by throwing from inside it.**
+A guard that throws from inside a pass arrives after the destructive work has already landed, and both doors then swallow it: the startup maintenance runner catches every throw into a failure label, and the mutation-time system-scoped cleanup catches each block's throw into a console line so that a teardown is never left half-done.
 The pass list MUST therefore be constructed by a pure, exported builder that the composition site calls, so the omission is directly assertable.
 A pass that declares no basis MUST be omitted, so that a destructive pass cannot ship ungated by omitting its declaration.
+**Both doors MUST share that one builder.**
+Two independently written gates on the same collaborators drift, and the half that drifts is the half nobody is looking at; the mutation-time composition site therefore supplies its own pass-to-entity-kind declarations to the same builder rather than restating the partition.
 
 **The basis facts MUST be sampled where the id sets are built, after the corpus read — and that is necessary rather than sufficient.**
 A conversion sets its layout from inside the corpus-loading path, so a fact sampled earlier in startup — beside settings registration or the migration pass — records the pre-conversion value, and a conversion that then failed mid-flight presents a partial corpus alongside a "settled" fact.
@@ -3125,16 +3150,15 @@ Sampling late does not on its own establish anything, because a conversion can a
 That span is what input 5 covers, and the two requirements are complementary: sample the settings as late as possible, and carry the layout observed at the corpus read forward to be compared against them.
 
 **An omission MUST be reported.**
-The startup maintenance runner returns only FAILED labels and its caller discards them, so a gate that omitted every pass is otherwise indistinguishable from a clean boot.
+Neither door's caller reads what its runner returns — the startup runner returns only FAILED labels and its caller discards them, and the mutation-time callers discard the outcome entirely — so a gate that omitted every pass is otherwise indistinguishable from a run that found nothing to prune.
 The report names the omitted passes and the input that decided them.
-It MUST NOT fail the boot: a partial corpus is what this gate exists to survive, not a reason to stop.
+It MUST NOT fail the operation it reports on: a partial corpus is what this gate exists to survive, so it must not stop a boot and must not fail a GM's delete.
 
-**Two destructive doors are deliberately OUTSIDE this requirement, and neither is safe.**
-This requirement is scoped to STARTUP passes.
-The same id sets are recomputed and the same prunes run from the recipe-mutation flag cleanup reachable from recipe deletion, bulk recipe deletion, orphaned-flag cleanup and system-scoped state cleanup; a GM deleting a recipe in an unsettled world reproduces the loss with no gate near it.
-Separately, the one-shot version-keyed flag auto-stamps are corpus-derived and set their done-marker unconditionally, so a partial corpus burns the one shot and leaves the world permanently under-stamped, repairable only through the manual item-data repair action.
-Both are recorded here so that the startup gate is not read as making either safe.
-The mutation-time door is tracked as issue 1226; the auto-stamp door is a residual of the component extraction and is tracked there.
+**One destructive door remains OUTSIDE this requirement, and it is not safe.**
+The one-shot version-keyed flag auto-stamps are corpus-derived and set their done-marker unconditionally, so a partial corpus burns the one shot and leaves the world permanently under-stamped, repairable only through the manual item-data repair action.
+It is recorded here so that this gate is not read as making it safe.
+That door is a residual of the component extraction and is tracked there.
+The mutation-time door recorded here previously — the flag cleanup reachable from recipe deletion, bulk recipe deletion, the public orphaned-flag entry point, compendium re-import, and system-scoped state cleanup — is now inside the requirement, per the prune-kind scoping above.
 
 **Distinguished from _membership basis_.**
 `ui-integration/spec.md` uses _basis_ only as a qualified noun — **membership basis** (`ui-integration/spec.md:1356`), **routing basis** (`:2110`), **disabled-action basis** (`:2960`) — and in each of those it names the RULE by which something is resolved.

@@ -2185,27 +2185,28 @@ export class RecipeVisibilityService {
   }
 
   /**
-   * Startup maintenance: drop learned-recipe entries naming a deleted recipe.
+   * Forget every learned-recipe entry a caller's predicate rejects, across the actors this
+   * client may write.
    *
-   * Scoped to the actors THIS client may write (issue 970). It runs on every client
-   * at `initialize()` and mutates actor flags directly (there is no GM relay), so an
-   * un-filtered walk had a player attempting `Actor#update` on every other
-   * character in the world.
+   * The shared body of the two prunes below. Scoped to the actors THIS client may write
+   * (issue 970): `cleanupLearnedRecipes` runs on every client at `initialize()` and mutates
+   * actor flags directly (there is no GM relay), so an un-filtered walk had a player
+   * attempting `Actor#update` on every other character in the world.
    *
-   * Stale ids come from the ENTRY-BOUNDARY reader, never from `Object.keys` (issue
-   * 1143). `Document#update` nests a dotted recipe id into a subtree, so the top level
-   * of the persisted map holds the id's FIRST SEGMENT (`imported`) rather than an id.
-   * That segment names no valid recipe, so it read as stale, and the `-=imported`
-   * deletion below removed the whole subtree — every sibling entry whose recipe still
-   * existed with it. See `recipeKeyedFlagEntries.js` for why the walk stops at the
-   * entry and why `flattenObject` is the wrong inverse.
+   * Ids come from the ENTRY-BOUNDARY reader, never from `Object.keys` (issue 1143).
+   * `Document#update` nests a dotted recipe id into a subtree, so the top level of the
+   * persisted map holds the id's FIRST SEGMENT (`imported`) rather than an id. That segment
+   * names no valid recipe, so it read as stale, and the `-=imported` deletion below removed
+   * the whole subtree — every sibling entry whose recipe still existed with it. See
+   * `recipeKeyedFlagEntries.js` for why the walk stops at the entry and why `flattenObject`
+   * is the wrong inverse.
+   *
+   * @param {(recipeId: string) => boolean} isStale
    */
-  async cleanupLearnedRecipes(validRecipeIds = new Set()) {
+  async _forgetLearnedRecipesWhere(isStale) {
     for (const actor of selectWritableActors(game.actors)) {
       const learned = this._getLearnedMap(actor);
-      const staleIds = [...readLearnedRecipeEntries(learned).keys()].filter(
-        (id) => !validRecipeIds.has(id)
-      );
+      const staleIds = [...readLearnedRecipeEntries(learned).keys()].filter(isStale);
       if (staleIds.length === 0) continue;
       // Route through the shared deletion primitive so pruned keys are actually
       // removed with explicit `-=` deletions (the prior filtered-map `_setLearnedMap`
@@ -2214,6 +2215,41 @@ export class RecipeVisibilityService {
       // in-fiction un-learn, so it must not refund any consumed learn budget.
       await this.forgetLearnedRecipes(actor, staleIds, { freeLearnBudget: false });
     }
+  }
+
+  /**
+   * The CORPUS-DERIVED prune: drop learned-recipe entries naming a recipe that is not in
+   * the live corpus.
+   *
+   * It infers a deletion from an ABSENCE, so it is only safe against a known-complete
+   * **Valid Id Basis** (`data-models/spec.md` § Valid Id Basis) — a half-read corpus makes
+   * it forget recipes every actor legitimately knows, and finishing the read afterwards
+   * restores none of it. Both of its callers gate it: `startupPassComposition.js` at boot
+   * and `mutationCleanupComposition.js` after a GM's delete.
+   */
+  async cleanupLearnedRecipes(validRecipeIds = new Set()) {
+    await this._forgetLearnedRecipesWhere((id) => !validRecipeIds.has(id));
+  }
+
+  /**
+   * The SUBJECT-TARGETED prune: drop learned-recipe entries naming one of the recipes the
+   * caller has just deleted (issue 1226).
+   *
+   * The fallback the mutation-time gate runs in {@link cleanupLearnedRecipes}'s place when
+   * the corpus cannot be attested complete. It needs no Valid Id Basis: the ids are
+   * positively known to be gone because the caller removed them, and a corpus missing
+   * records cannot make a deleted id valid again. An entry naming a recipe that was simply
+   * never read is not named here and survives, which is the whole difference from the
+   * sweep above.
+   *
+   * @param {Iterable<string>} recipeIds
+   */
+  async forgetDeletedRecipes(recipeIds) {
+    const targets = new Set(
+      [...(recipeIds || [])].map((id) => String(id ?? '').trim()).filter(Boolean)
+    );
+    if (targets.size === 0) return;
+    await this._forgetLearnedRecipesWhere((id) => targets.has(id));
   }
 
   /**

@@ -445,8 +445,19 @@ export class CompendiumImporter {
       // precedent): reconciles invalid-run and learned-recipe flags against the
       // post-deletion map in O(affected actors), not O(pruned × actors). Independent of
       // the `recipes` write above, so it runs after the single save.
+      //
+      // The pruned ids are NAMED (issue 1226). This is a destructive door the flag-cleanup
+      // gate covers, and the ids are what it prunes when the corpus cannot be attested
+      // complete — without them a reinstall against a half-converted world would leave
+      // every flag its own prune orphaned. `_pruneOrphanedRecipes` records each one it
+      // actually deleted as a `pruned` orphan, so this is derived from what happened rather
+      // than from what was planned.
       if (summary.recipes.pruned > 0) {
-        await this._recipeManager.cleanupOrphanedRecipeFlags?.();
+        await this._recipeManager.cleanupOrphanedRecipeFlags?.({
+          removedRecipeIds: summary.orphans
+            .filter((orphan) => orphan.disposition === 'pruned')
+            .map((orphan) => orphan.recipeId),
+        });
       }
 
       this._recipeManager.notifyRecipesChanged?.({
