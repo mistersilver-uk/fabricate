@@ -44,6 +44,7 @@ import {
   DEFAULT_SEED,
   SCALE_PROFILES,
   SCALE_PROFILE_NAMES,
+  SWEPT_SCALE_PROFILE_NAMES,
   buildScaleFixture,
 } from './helpers/scale/scaleProfiles.js';
 import { createSeededRandom, pickDistinct } from './helpers/scale/scaleRandom.js';
@@ -513,8 +514,19 @@ describe('the case registry is coherent', () => {
       assert.ok(typeof entry.setup === 'function', `case "${entry.id}" has no setup()`);
       assert.ok(entry.description, `case "${entry.id}" has no description`);
     }
-    for (const profile of SCALE_PROFILE_NAMES) {
+    // SWEPT profiles only (issue 1255): a foundry-only profile has no headless cases by
+    // design, and `tests/benchmark-baseline-drift.test.js` pins that set by name so the
+    // exemption cannot widen unnoticed.
+    for (const profile of SWEPT_SCALE_PROFILE_NAMES) {
       assert.ok(casesForProfile(profile).length > 0, `profile "${profile}" has no cases`);
+    }
+    for (const profile of SCALE_PROFILE_NAMES) {
+      if (SWEPT_SCALE_PROFILE_NAMES.includes(profile)) continue;
+      assert.equal(
+        casesForProfile(profile).length,
+        0,
+        `profile "${profile}" opted out of the sweep but registered cases anyway`
+      );
     }
   });
 

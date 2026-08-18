@@ -56,7 +56,14 @@ import {
 } from '../src/systems/PerRecordCraftingDefinitionRepository.js';
 
 import { SETTING_DOCUMENT_ENVELOPE_BYTES } from './helpers/scale/connectPayloadModel.js';
-import { DEFAULT_SEED, SCALE_PROFILE_NAMES } from './helpers/scale/scaleProfiles.js';
+import {
+  DEFAULT_SEED,
+  FOUNDRY_ONLY_SCALE_PROFILE_NAMES,
+  SCALE_PROFILES,
+  SCALE_PROFILE_NAMES,
+  SWEPT_SCALE_PROFILE_NAMES,
+  buildScaleFixture,
+} from './helpers/scale/scaleProfiles.js';
 
 /** The non-profile artifact recording ADR 0001's connect budget and the rate it is spent at. */
 const SETTING_ENVELOPE_ARTIFACT = 'setting-envelope-budget';
@@ -113,8 +120,8 @@ function deriveRecipeKeyPrefix() {
   return key.slice(0, key.length - probeId.length);
 }
 
-test('every profile has a committed class-1 baseline', () => {
-  for (const profile of SCALE_PROFILE_NAMES) {
+test('every SWEPT profile has a committed class-1 baseline', () => {
+  for (const profile of SWEPT_SCALE_PROFILE_NAMES) {
     assert.ok(
       existsSync(baselinePath(profile)),
       `no committed baseline for "${profile}". ${REFRESH_HINT}`
@@ -140,7 +147,7 @@ function readMachineInvariantArtifact(name) {
 }
 
 test('committed baselines carry counts and NEVER wall clock or heap', () => {
-  for (const profile of SCALE_PROFILE_NAMES) {
+  for (const profile of SWEPT_SCALE_PROFILE_NAMES) {
     const raw = readMachineInvariantArtifact(profile);
     const baseline = JSON.parse(raw);
     assert.equal(baseline.profile, profile);
@@ -152,7 +159,7 @@ test('committed baselines carry counts and NEVER wall clock or heap', () => {
 
 // One test per profile: the sweep is the expensive part, and a per-profile failure names the
 // profile in its own title rather than burying it in one aggregate assertion.
-for (const profile of SCALE_PROFILE_NAMES) {
+for (const profile of SWEPT_SCALE_PROFILE_NAMES) {
   test(`${profile} class-1 counts match the committed baseline`, async () => {
     const baseline = JSON.parse(readFileSync(baselinePath(profile), 'utf8'));
     const { class1ByProfile } = await measureProfiles({
@@ -166,6 +173,48 @@ for (const profile of SCALE_PROFILE_NAMES) {
     assert.deepEqual(drift, [], `class-1 drift in ${profile}:\n  ${drift.join('\n  ')}\n\n${REFRESH_HINT}`);
   });
 }
+
+// ---------------------------------------------------------------------------------------------
+// The foundry-only escape hatch (issue 1255). The three loops above dropped from
+// SCALE_PROFILE_NAMES to SWEPT_SCALE_PROFILE_NAMES, so a profile can now legally have no
+// committed baseline. That is exactly the kind of relaxation that widens silently, so the SET
+// that enjoys it is pinned by name here and every member has to justify itself.
+// ---------------------------------------------------------------------------------------------
+
+test('the foundry-only profiles are exactly the one with no headless reader', () => {
+  assert.deepEqual([...FOUNDRY_ONLY_SCALE_PROFILE_NAMES], ['granular-corpus']);
+});
+
+test('the two profile lists partition the registry, with no overlap and nothing dropped', () => {
+  // A profile that fell out of BOTH lists would be swept by nothing and pinned by nothing, and
+  // every assertion in this file would still pass. Checked as a partition rather than as two
+  // memberships for that reason.
+  assert.deepEqual(
+    [...SWEPT_SCALE_PROFILE_NAMES, ...FOUNDRY_ONLY_SCALE_PROFILE_NAMES].sort(),
+    [...SCALE_PROFILE_NAMES].sort()
+  );
+  for (const profile of FOUNDRY_ONLY_SCALE_PROFILE_NAMES) {
+    assert.ok(
+      !SWEPT_SCALE_PROFILE_NAMES.includes(profile),
+      `"${profile}" is both swept and foundry-only`
+    );
+  }
+});
+
+test('a foundry-only profile states why it has no headless cases, and still builds', () => {
+  for (const profile of FOUNDRY_ONLY_SCALE_PROFILE_NAMES) {
+    assert.ok(
+      SCALE_PROFILES[profile].foundryOnlyReason?.length > 0,
+      `"${profile}" opts out of the sweep and must say why`
+    );
+    // The exemption is from the SWEEP, never from being a real fixture. A profile that opted
+    // out and then stopped building would be invisible to every other test in this file.
+    const fixture = buildScaleFixture({ profile, seed: DEFAULT_SEED });
+    assert.equal(fixture.components.length, SCALE_PROFILES[profile].scale.components);
+    assert.equal(fixture.recipes.length, SCALE_PROFILES[profile].scale.recipes);
+    assert.equal(fixture.foundryOnly, true);
+  }
+});
 
 // ---------------------------------------------------------------------------------------------
 // The `setting-envelope-budget` artifact (issue 1080). Read `SETTING_ENVELOPE_GATE_SCOPE` above

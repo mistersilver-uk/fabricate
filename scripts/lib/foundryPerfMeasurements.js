@@ -36,6 +36,25 @@ export const MEASUREMENT_CLASS = Object.freeze({
   TIMING: 2,
 });
 
+/**
+ * WHEN in a run a measurement is produced (issue 1255).
+ *
+ * The storage-arrangement axis walks the same scenario set twice -- once on the combined-record
+ * arrangement, once on the granular one -- with the shipped conversion in between. Almost every
+ * measurement is therefore produced ONCE PER ARM. The conversion's own cost is not: it belongs
+ * to the TRANSITION between the arms and is produced exactly once, whatever the mode.
+ *
+ * Without this distinction {@link reconcileResults} reports the conversion measurements as
+ * missing from BOTH arms, which is the precise failure the reconciler exists to prevent --
+ * a hole in the record that is not a hole in the run.
+ */
+export const MEASUREMENT_PHASE = Object.freeze({
+  /** Produced once per storage-arrangement arm. The default for every measurement. */
+  ARM: 'arm',
+  /** Produced once, by the conversion between the arms. */
+  TRANSITION: 'transition',
+});
+
 /** Why a declared measurement is not implemented by this change. */
 export const MEASUREMENT_STATUS = Object.freeze({
   IMPLEMENTED: 'implemented',
@@ -160,6 +179,39 @@ export const PERF_MEASUREMENTS = Object.freeze([
       'count imported and the resulting corpus size are class 1.',
   },
   {
+    id: 'storage-conversion-recipes',
+    phase: MEASUREMENT_PHASE.TRANSITION,
+    title: 'The one-time cost of converting the recipe corpus to per-record storage',
+    classes: [MEASUREMENT_CLASS.TIMING, MEASUREMENT_CLASS.INVARIANT],
+    status: MEASUREMENT_STATUS.IMPLEMENTED,
+    detail:
+      'THE NUMBER WITH NOTHING BEHIND IT (issue 1255). The forward conversion is ' +
+      'mandatory-by-default work in issue 1252 direction and is what a GM experiences exactly ' +
+      'once, and until this ran nobody knew what it costs on a 20,000-record world. Driven ' +
+      'through the SHIPPED path -- the harness writes the storage TARGET a GM dropdown writes ' +
+      'and answers the shipped consent prompt, and the shipped reconciler writes the LAYOUT. ' +
+      'The elapsed time is class 2. The records moved, the per-record documents that came out, ' +
+      'the document-call count and the legacy key bytes before and after are class 1, and the ' +
+      'document-call count is the load-bearing half: it is what distinguishes "wrote the ' +
+      'corpus" from "wrote the corpus one record at a time". `recordsMoved` is the corpus AS ' +
+      'THE LEGACY WALK LEFT IT, not the seed: the walk before it edits one definition and runs ' +
+      'a bounded import, so it legitimately exceeds the seeded count and is checked against the ' +
+      'documents that came out rather than against the fixture.',
+  },
+  {
+    id: 'storage-conversion-components',
+    phase: MEASUREMENT_PHASE.TRANSITION,
+    title: 'The one-time cost of converting the component corpus to per-record storage',
+    classes: [MEASUREMENT_CLASS.TIMING, MEASUREMENT_CLASS.INVARIANT],
+    status: MEASUREMENT_STATUS.IMPLEMENTED,
+    detail:
+      'The component half of the same one-time cost (issue 1212), declared and measured ' +
+      'SEPARATELY from the recipe half rather than blended into one duration. They are two ' +
+      'independent one-way doors with two independent consent prompts, a GM may take one and ' +
+      'not the other, and a single blended sample would make the ratio between two runs mean ' +
+      'nothing. Same class split as the recipe half.',
+  },
+  {
     id: 'propagation-hydrated',
     title: 'Cross-client propagation to a client holding the data',
     classes: [MEASUREMENT_CLASS.TIMING, MEASUREMENT_CLASS.INVARIANT],
@@ -212,6 +264,20 @@ export const PERF_MEASUREMENTS = Object.freeze([
   },
 ]);
 
+/**
+ * The phase a measurement belongs to, defaulting to {@link MEASUREMENT_PHASE.ARM}.
+ *
+ * A default rather than a required field on all eighteen entries: "produced once per arm" is
+ * what a measurement is unless it says otherwise, and restating it eighteen times would make
+ * the two exceptions harder to see rather than easier.
+ *
+ * @param {object} measurement
+ * @returns {string}
+ */
+export function measurementPhase(measurement) {
+  return measurement?.phase ?? MEASUREMENT_PHASE.ARM;
+}
+
 /** Every measurement id, in report order. */
 export const PERF_MEASUREMENT_IDS = Object.freeze(
   PERF_MEASUREMENTS.map((measurement) => measurement.id)
@@ -249,7 +315,14 @@ export function deferredMeasurements() {
  * nothing, which results nothing declared, and — for every result that did arrive — which of its
  * values may be asserted and which may only be reported.
  *
+ * A `phase` restricts the DECLARED set this reconciliation is answerable for (issue 1255), so
+ * a per-arm reconciliation is not asked to account for the conversion that happened between the
+ * arms, and vice versa. Omit it and every declared measurement is in scope, which is what the
+ * single-arm run has always done.
+ *
  * @param {Record<string, {invariant?: object, timing?: object, unavailable?: string}>} results
+ * @param {object} [options]
+ * @param {string} [options.phase] one of {@link MEASUREMENT_PHASE}; omit for all phases.
  * @returns {{
  *   reconciled: Array<object>,
  *   missing: string[],
@@ -258,7 +331,7 @@ export function deferredMeasurements() {
  *   timing: Record<string, object>
  * }}
  */
-export function reconcileResults(results) {
+export function reconcileResults(results, { phase = null } = {}) {
   const supplied = new Set(Object.keys(results ?? {}));
   const reconciled = [];
   const missing = [];
@@ -268,6 +341,11 @@ export function reconcileResults(results) {
   const timing = {};
 
   for (const measurement of PERF_MEASUREMENTS) {
+    // Out of scope for this phase: not reconciled, and -- crucially -- not `undeclared` either,
+    // because a result for an out-of-phase measurement is a caller mistake worth surfacing
+    // while its ABSENCE is the normal case.
+    if (phase !== null && measurementPhase(measurement) !== phase) continue;
+
     const result = results?.[measurement.id];
     supplied.delete(measurement.id);
 

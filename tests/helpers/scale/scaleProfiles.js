@@ -52,6 +52,24 @@
  * The corpus axis for the SAME path lives on `simple-corpus` as its own 25 / 50 / 100 row
  * series against a token 20-stack inventory. Two orthogonal series over one code path is what
  * makes a regression attributable to an axis instead of merely visible.
+ *
+ * ## Foundry-only profiles, and why the sweep must skip them
+ *
+ * A profile is a fixture, and not every fixture has a headless case worth running. Issue 1255
+ * needs a corpus at 10,000 components AND 10,000 recipes to seed into a LIVE Foundry world,
+ * where the thing under measurement is a storage arrangement the headless harness already
+ * measures with far cheaper fixtures (issues 1212 and 1247). Registering that corpus as an
+ * ordinary profile would oblige `benchmarkCases.js` to invent headless cases for it and
+ * `benchmarks/baselines/` to carry a committed baseline for them, at 20,000 records, inside
+ * `npm test` — cost with no reader.
+ *
+ * So a profile MAY declare `foundryOnly` with a reason, which means exactly one thing: the
+ * headless BENCHMARK sweep does not run it. Everything else still does. It is built by
+ * {@link buildScaleFixture}, it is covered by every fixture-level guard in
+ * `tests/benchmark-harness.test.js` (reproducibility, declared scale, serialization), and
+ * `tests/benchmark-baseline-drift.test.js` pins the foundry-only SET so the escape hatch cannot
+ * quietly widen to a profile that should have had cases. {@link SWEPT_SCALE_PROFILE_NAMES} is
+ * the sweep's list; {@link SCALE_PROFILE_NAMES} remains every registered profile.
  */
 import { buildComponentLibrary, buildToolLibrary } from './scaleComponents.js';
 import { INVENTORY_SERIES, buildHeldInventory } from './scaleInventory.js';
@@ -206,6 +224,65 @@ export const SCALE_PROFILES = Object.freeze({
     build(random) {
       const components = buildComponentLibrary({
         count: 5000,
+        random,
+        systemId: BENCH_SYSTEM_ID,
+      });
+      const recipes = buildRecipeCorpus({
+        shape: 'simple',
+        count: 10_000,
+        systemId: BENCH_SYSTEM_ID,
+        components,
+        random,
+      });
+      const inventory = buildHeldInventory({
+        stacks: CORPUS_AXIS_STACKS,
+        components,
+        systemId: BENCH_SYSTEM_ID,
+        random,
+        sourceActorCount: 1,
+      });
+      return {
+        system: baseSystem({ systemId: BENCH_SYSTEM_ID, components, tools: [] }),
+        components,
+        tools: [],
+        recipes,
+        inventory,
+      };
+    },
+  },
+
+  'granular-corpus': {
+    description:
+      'THE STORAGE-ARRANGEMENT CORPUS (issue 1255). 10,000 simple recipes over a ' +
+      '10,000-component library — 20,000 records of both classes at once — with the same token ' +
+      '20-stack inventory `simple-corpus` carries.',
+    construction: 'literal payloads; identical generators to simple-corpus, one library size up',
+    requiresNodeModules: false,
+    // FOUNDRY-ONLY. Read the module header's "Foundry-only profiles" section before removing
+    // this: the exemption is from the headless benchmark SWEEP alone, and it is pinned as a set.
+    foundryOnly: true,
+    foundryOnlyReason:
+      'Issue 1255 seeds this corpus into a live Foundry world through ' +
+      '`npm run test:foundry:perf -- --fixture=granular-corpus --arrangement=both`, which walks ' +
+      'it on the legacy arrangement, converts it in place through the shipped conversion, and ' +
+      'walks it again. The headless arm of that same claim is already measured by the ' +
+      '`recipeManager.*.perRecord` and `craftingSystemManager.*.perRecord` cases (issues 1212 ' +
+      'and 1247) on much smaller fixtures, so headless cases at 20,000 records would add ' +
+      'minutes to `npm test` and a 20,000-record committed baseline for no additional reader.',
+    ceiling:
+      'Deliberately UNBOUNDED relative to its siblings: 10,000 of both classes is the ' +
+      "performance programme's stated target scale and the point of the profile is to reach it " +
+      'on both classes simultaneously, which no other profile does. `simple-corpus` reaches ' +
+      '10,000 recipes over a 5,000-component library and `component-library` reaches 10,000 ' +
+      'components over a 6-recipe corpus; the conversion cost this profile exists to measure is ' +
+      'a function of BOTH counts, so neither of those can stand in for it.',
+    scale: { components: 10_000, recipes: 10_000, tools: 0, heldStacks: CORPUS_AXIS_STACKS },
+    build(random) {
+      // Generated with the SAME calls and the SAME argument order as `simple-corpus`, with one
+      // number changed. That is what makes the two directly readable against each other: a
+      // difference between them is the library size and nothing else.
+      const components = buildComponentLibrary({
+        count: 10_000,
         random,
         systemId: BENCH_SYSTEM_ID,
       });
@@ -679,6 +756,34 @@ export const SCALE_PROFILES = Object.freeze({
 export const SCALE_PROFILE_NAMES = Object.freeze(Object.keys(SCALE_PROFILES));
 
 /**
+ * The profiles that exist to be seeded into a live Foundry world and have NO headless cases.
+ *
+ * See the module header. Derived from the registry rather than restated, so a profile that
+ * declares `foundryOnly` cannot end up on one list and off the other.
+ *
+ * @type {readonly string[]}
+ */
+export const FOUNDRY_ONLY_SCALE_PROFILE_NAMES = Object.freeze(
+  SCALE_PROFILE_NAMES.filter((profile) => SCALE_PROFILES[profile].foundryOnly === true)
+);
+
+/**
+ * The profiles the HEADLESS benchmark sweep runs: every registered profile that is not
+ * foundry-only.
+ *
+ * This is the list `scripts/benchmark-performance.mjs` defaults to and the list the committed
+ * class-1 baselines are required for. It is deliberately a SUBTRACTION from
+ * {@link SCALE_PROFILE_NAMES} rather than a second hand-maintained list: a new profile is swept
+ * unless it positively opts out, so forgetting to register one is impossible in the direction
+ * that loses coverage.
+ *
+ * @type {readonly string[]}
+ */
+export const SWEPT_SCALE_PROFILE_NAMES = Object.freeze(
+  SCALE_PROFILE_NAMES.filter((profile) => SCALE_PROFILES[profile].foundryOnly !== true)
+);
+
+/**
  * Build one profile's fixture from `{profile, seed}` and nothing else.
  *
  * @param {object} options
@@ -686,6 +791,7 @@ export const SCALE_PROFILE_NAMES = Object.freeze(Object.keys(SCALE_PROFILES));
  * @param {number} [options.seed]
  * @returns {{profile: string, seed: number, harnessVersion: number, description: string,
  *   construction: string, requiresNodeModules: boolean, ceiling: string|null,
+ *   foundryOnly: boolean, foundryOnlyReason: string|null,
  *   scale: object, system: object, components: object[], tools: object[], recipes: object[],
  *   inventory: object, inventorySeries?: object[], componentSeries?: object[][],
  *   graphs?: object}}
@@ -707,6 +813,11 @@ export function buildScaleFixture({ profile, seed = DEFAULT_SEED }) {
     construction: definition.construction,
     requiresNodeModules: definition.requiresNodeModules,
     ceiling: definition.ceiling ?? null,
+    // Carried onto the built fixture so a consumer holding only the fixture — the Foundry perf
+    // runner does — can see which arm of the harness the profile belongs to without importing
+    // the registry.
+    foundryOnly: definition.foundryOnly === true,
+    foundryOnlyReason: definition.foundryOnlyReason ?? null,
     scale: definition.scale,
     ...built,
   };
