@@ -191,3 +191,199 @@ test('the channel refuses a non-function handler and is itself frozen', () => {
   assert.throws(() => channel.onReselect(context, 'pop'), /requires a function/);
   assert.ok(Object.isFrozen(channel));
 });
+
+/**
+ * THE COMPATIBILITY GUARANTEE, and the reason it is asserted against `undefined` rather than
+ * against a boolean.
+ *
+ * Every caller of `confirmNavigation` reads `undefined` as "there is nothing to ask" and takes
+ * the branch it took before this seam existed: no prompt, no `await`, no extra microtask, and
+ * no wrapping of the route-guard promise identity `confirmRouteExit` preserves on purpose. A
+ * channel that answered `true` here would be behaviourally identical AND would cost the
+ * Manager an await on every close and a composed promise on every route exit, for a question
+ * no companion asked. So `undefined` is the contract, not an implementation detail.
+ */
+test('a mount that registers no guard is asked nothing at all', () => {
+  const { channel, errors } = recordingChannel();
+  const context = contextFor('ledger');
+
+  assert.equal(channel.confirmNavigation('route'), undefined, 'with no mount, nothing to ask');
+  channel.beginMount(context);
+  for (const reason of ['tab', 'route', 'close']) {
+    assert.equal(
+      channel.confirmNavigation(reason),
+      undefined,
+      `a mounted companion that never registered a guard is not consulted on ${reason} either`
+    );
+  }
+  assert.deepEqual(errors, []);
+});
+
+test('an explicit false vetoes and anything else allows', () => {
+  const { channel } = recordingChannel();
+  const context = contextFor('ledger');
+  channel.beginMount(context);
+  const seen = [];
+
+  let answer = false;
+  channel.onBeforeNavigate(context, (event) => {
+    seen.push(event);
+    return answer;
+  });
+
+  assert.equal(channel.confirmNavigation('tab'), false, 'false is the veto');
+  assert.deepEqual(seen.at(-1), { reason: 'tab' }, 'the guard is told why its mount is ending');
+  assert.ok(Object.isFrozen(seen.at(-1)), 'and cannot write back through the event');
+
+  // Everything else allows. An OMITTED return is the case that matters: a handler written to
+  // observe a navigation must not be able to trap the GM by forgetting to return a value.
+  for (answer of [undefined, true, null, 0, '', 'no']) {
+    assert.equal(
+      channel.confirmNavigation('route'),
+      true,
+      `only an explicit false vetoes — ${String(answer)} allows`
+    );
+  }
+  assert.equal(seen.length, 7);
+  assert.deepEqual(seen.at(-1), { reason: 'route' });
+});
+
+test('an async guard is awaited, and its answer read the same way', async () => {
+  const { channel } = recordingChannel();
+  const context = contextFor('ledger');
+  channel.beginMount(context);
+  let answer = false;
+  channel.onBeforeNavigate(context, async () => answer);
+
+  const vetoed = channel.confirmNavigation('close');
+  assert.ok(vetoed instanceof Promise, 'a companion may await its own dialog');
+  assert.equal(await vetoed, false);
+
+  answer = undefined;
+  assert.equal(await channel.confirmNavigation('close'), true, 'and an omitted answer allows');
+});
+
+/**
+ * A COMPANION DEFECT MUST NEVER TRAP THE GM.
+ *
+ * A throw is reported and the navigation proceeds. Reading it as a veto instead would leave a
+ * GM in a Manager window they cannot close and a rail that does nothing, recoverable only by
+ * reloading Foundry — and it would do so for exactly the module least able to notice. Allowing
+ * degrades to the behaviour that shipped before this seam existed, where a screen exit neither
+ * wrote nor discarded a companion's draft, so nothing is destroyed that was not already.
+ */
+test('a throwing guard is contained and allows the navigation', async () => {
+  const { channel, errors } = recordingChannel();
+  const context = contextFor('ledger');
+  channel.beginMount(context);
+  let mode = 'throw';
+  channel.onBeforeNavigate(context, () => {
+    if (mode === 'throw') throw new Error('companion exploded');
+    return Promise.reject(new Error('companion exploded later'));
+  });
+
+  assert.equal(
+    channel.confirmNavigation('close'),
+    undefined,
+    'a synchronous throw answers "nothing to ask", so the caller keeps its original path'
+  );
+  assert.equal(errors.length, 1);
+  assert.match(errors[0][0], /Downtime navigation guard failed/);
+
+  mode = 'reject';
+  assert.equal(await channel.confirmNavigation('close'), true, 'a rejection allows too');
+  assert.equal(errors.length, 2, 'and is reported through the same sink');
+});
+
+/**
+ * RE-ENTRANCY. A guard is expected to await a dialog, and a GM can click the rail and then the
+ * window's close button before answering it. The pending answer is SHARED rather than re-asked
+ * (which stacks a second dialog on the first) or refused (which hands the GM a dead click with
+ * nothing to explain it) — the same de-duplication `confirmDiscardDirtyToolsDraft` applies to
+ * Core's own concurrent prompt.
+ */
+test('a second navigation shares the pending answer instead of asking again', async () => {
+  const { channel } = recordingChannel();
+  const context = contextFor('ledger');
+  channel.beginMount(context);
+  let calls = 0;
+  let release;
+  channel.onBeforeNavigate(context, () => {
+    calls += 1;
+    return new Promise((resolve) => {
+      release = resolve;
+    });
+  });
+
+  const first = channel.confirmNavigation('tab');
+  const second = channel.confirmNavigation('close');
+  assert.equal(calls, 1, 'the companion is asked once, so it opens one dialog');
+  assert.equal(second, first, 'and both navigations resolve from the GM’s one decision');
+
+  release(false);
+  assert.equal(await first, false);
+  assert.equal(await second, false);
+
+  // The de-duplication is for the CONCURRENT case only. Once the GM has answered, the next
+  // navigation is a new question and must reach the companion again.
+  const third = channel.confirmNavigation('route');
+  assert.equal(calls, 2, 'a later navigation asks again rather than replaying a stale answer');
+  release(true);
+  assert.equal(await third, true);
+});
+
+test('a navigation guard dies with its mount, and unsubscribing is idempotent', () => {
+  const { channel } = recordingChannel();
+  const ledger = contextFor('ledger');
+  const crew = contextFor('crew');
+  const seen = [];
+
+  channel.beginMount(ledger);
+  const stop = channel.onBeforeNavigate(ledger, () => {
+    seen.push('ledger');
+    return false;
+  });
+  assert.equal(channel.confirmNavigation('tab'), false);
+
+  stop();
+  stop();
+  assert.equal(channel.confirmNavigation('tab'), undefined, 'unsubscribing really stops it');
+  assert.deepEqual(seen, ['ledger']);
+
+  channel.onBeforeNavigate(ledger, () => false);
+  channel.beginMount(crew);
+  assert.equal(
+    channel.confirmNavigation('route'),
+    undefined,
+    'a new mount inherits no guard from the one it replaced'
+  );
+
+  const staleStop = channel.onBeforeNavigate(ledger, () => false);
+  assert.equal(typeof staleStop, 'function', 'a refused registration still returns an unsubscribe');
+  assert.equal(
+    channel.confirmNavigation('route'),
+    undefined,
+    'a retired context registers nothing'
+  );
+
+  // A later registration replaces the earlier one, and an unsubscribe held across that
+  // replacement must not evict the newer guard.
+  const stopFirst = channel.onBeforeNavigate(crew, () => false);
+  channel.onBeforeNavigate(crew, () => {
+    seen.push('second');
+    return true;
+  });
+  stopFirst();
+  assert.equal(channel.confirmNavigation('route'), true);
+  assert.deepEqual(seen, ['ledger', 'second']);
+
+  channel.endMount(crew);
+  assert.equal(channel.confirmNavigation('close'), undefined, 'and it ends with its mount');
+});
+
+test('the channel refuses a non-function navigation guard', () => {
+  const { channel } = recordingChannel();
+  const context = contextFor('ledger');
+  channel.beginMount(context);
+  assert.throws(() => channel.onBeforeNavigate(context, 'nope'), /requires a function/);
+});

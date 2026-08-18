@@ -15365,6 +15365,217 @@ describe('CraftingSystemManager mounted behavior', () => {
     );
   });
 
+  // The mounted-companion fixture every navigation-guard case opens with: a two-tab provider
+  // holding the route, with its first mount's context in hand. Named once because six cases
+  // start from it, and six copies of the same five lines is exactly the near-identical block
+  // the duplication gate counts against `tests/**`.
+  async function mountGuardedCompanion() {
+    const registry = createManagerExtensionsRegistry();
+    const mounts = [];
+    registry.publicApi.registerWorldNavProvider(chromeChannelProvider(mounts));
+    mountManager([], {}, {}, { managerExtensions: registry });
+    worldNavItem('downtime').click();
+    await settleRouteExit();
+    assert.equal(mounts.length, 1);
+    return mounts;
+  }
+
+  const managerRoute = () => target.querySelector('.fabricate-manager').dataset.managerView;
+
+  it('lets a companion with unsaved work refuse a tab switch and a route exit', async () => {
+    const mounts = await mountGuardedCompanion();
+    const asked = [];
+    mounts[0].onBeforeNavigate((event) => {
+      asked.push(event.reason);
+      return false;
+    });
+
+    // A TAB SWITCH. Before this seam the companion could prompt on the controls it owns and on
+    // a rail re-activation, and had no say at all here: the panel was disposed and its draft
+    // went with it.
+    target.querySelector('#manager-downtime-nav-crew').click();
+    await settleRouteExit();
+    assert.deepEqual(asked, ['tab'], 'the guard is told which kind of navigation it is refusing');
+    assert.equal(
+      activeCompanionPanel().dataset.downtimeExtensionPanel,
+      'ledger',
+      'the GM stays on the screen holding the unsaved work'
+    );
+    assert.equal(mounts.length, 1, 'and the mount that owns it is never torn down');
+
+    // A ROUTE EXIT, for a Core route that has nothing to do with Downtime.
+    worldNavItem('parties').click();
+    await settleRouteExit();
+    assert.deepEqual(asked, ['tab', 'route'], 'leaving the route reports as a route exit');
+    assert.equal(managerRoute(), 'world-downtime', 'the GM is still on the companion’s route');
+    assert.equal(mounts.length, 1);
+    assert.ok(Boolean(activeCompanionPanel()), 'and its panel was never disposed');
+  });
+
+  it('gets out of the way the moment the companion allows', async () => {
+    const mounts = await mountGuardedCompanion();
+    const asked = [];
+    let allow = false;
+    mounts[0].onBeforeNavigate((event) => {
+      asked.push(event.reason);
+      return allow;
+    });
+
+    target.querySelector('#manager-downtime-nav-crew').click();
+    await settleRouteExit();
+    assert.equal(activeCompanionPanel().dataset.downtimeExtensionPanel, 'ledger');
+
+    allow = true;
+    target.querySelector('#manager-downtime-nav-crew').click();
+    await settleRouteExit();
+    assert.deepEqual(asked, ['tab', 'tab']);
+    assert.equal(
+      activeCompanionPanel().dataset.downtimeExtensionPanel,
+      'crew',
+      'an allowed navigation is the navigation that shipped, unchanged'
+    );
+    assert.equal(mounts.length, 2, 'and the destination tab mounts normally');
+
+    // The guard died with the mount that registered it, so the new screen answers for itself.
+    worldNavItem('parties').click();
+    await settleRouteExit();
+    assert.deepEqual(asked, ['tab', 'tab'], 'a new mount inherits no guard');
+    assert.equal(managerRoute(), 'world');
+  });
+
+  it('waits for a companion’s own dialog before deciding', async () => {
+    const mounts = await mountGuardedCompanion();
+    let answer;
+    mounts[0].onBeforeNavigate(
+      () =>
+        new Promise((resolve) => {
+          answer = resolve;
+        })
+    );
+
+    worldNavItem('parties').click();
+    await settleRouteExit();
+    assert.equal(managerRoute(), 'world-downtime', 'nothing moves while the GM is being asked');
+
+    // A SECOND navigation arriving mid-dialog resolves from the same answer rather than
+    // stacking a second prompt on the first.
+    target.querySelector('#manager-downtime-nav-crew').click();
+    await settleRouteExit();
+    assert.equal(activeCompanionPanel().dataset.downtimeExtensionPanel, 'ledger');
+
+    answer(false);
+    await settleRouteExit();
+    assert.equal(managerRoute(), 'world-downtime', 'the GM keeps their unsaved work');
+    assert.equal(activeCompanionPanel().dataset.downtimeExtensionPanel, 'ledger');
+    assert.equal(mounts.length, 1);
+  });
+
+  /**
+   * THE COMPATIBILITY GUARANTEE at the Manager level.
+   *
+   * A companion that never calls `onBeforeNavigate` — which is every companion shipped before
+   * this seam, and every future one that has nothing to guard — must navigate exactly as it
+   * did: no prompt, no veto, no changed mount lifecycle. The channel's own suite pins the half
+   * that cannot be seen from here, that Core is handed `undefined` rather than `true` and so
+   * takes its original branch with no added `await`.
+   */
+  it('asks nothing at all of a companion that registered no guard', async () => {
+    const mounts = await mountGuardedCompanion();
+
+    target.querySelector('#manager-downtime-nav-crew').click();
+    await settleRouteExit();
+    assert.equal(activeCompanionPanel().dataset.downtimeExtensionPanel, 'crew');
+    assert.equal(mounts.length, 2);
+
+    worldNavItem('parties').click();
+    await settleRouteExit();
+    assert.equal(managerRoute(), 'world');
+
+    worldNavItem('downtime').click();
+    await settleRouteExit();
+    assert.equal(managerRoute(), 'world-downtime');
+    assert.equal(mounts.length, 3, 'every navigation completed, exactly as it did before');
+  });
+
+  it('never asks about a rail click that leaves the screen it is on', async () => {
+    const mounts = await mountGuardedCompanion();
+    const asked = [];
+    mounts[0].onBeforeNavigate((event) => {
+      asked.push(event.reason);
+      return false;
+    });
+
+    // The PARENT Downtime rail item, clicked while the route is already open. It states no
+    // destination tab, so it navigates nowhere — and a guard that fired here would prompt the
+    // GM about abandoning work they are not being asked to abandon.
+    worldNavItem('downtime').click();
+    await settleRouteExit();
+    assert.deepEqual(asked, [], 're-entering the route the GM is already on is not a navigation');
+
+    // Neither is re-activating the sub-item already on screen: that is `onRouteReselect`, and
+    // whether the companion's unsaved work should block its own pop is its question, inside it.
+    target.querySelector('#manager-downtime-nav-ledger').click();
+    await settleRouteExit();
+    assert.deepEqual(asked, [], 'and neither is a re-activation of the tab already showing');
+    assert.equal(activeCompanionPanel().dataset.downtimeExtensionPanel, 'ledger');
+    assert.equal(mounts.length, 1);
+  });
+
+  it('drops a navigation guard when its mount ends, and when the companion unsubscribes', async () => {
+    const mounts = await mountGuardedCompanion();
+    const asked = [];
+    const stop = mounts[0].onBeforeNavigate(() => {
+      asked.push('ledger');
+      return false;
+    });
+
+    stop();
+    stop();
+    target.querySelector('#manager-downtime-nav-crew').click();
+    await settleRouteExit();
+    assert.deepEqual(asked, [], 'an unsubscribed guard is not consulted, and stopping twice is safe');
+    assert.equal(activeCompanionPanel().dataset.downtimeExtensionPanel, 'crew');
+
+    // The retired mount's context cannot register a new guard over the mount that replaced it.
+    const staleStop = mounts[0].onBeforeNavigate(() => {
+      asked.push('stale');
+      return false;
+    });
+    assert.equal(typeof staleStop, 'function');
+    worldNavItem('parties').click();
+    await settleRouteExit();
+    assert.deepEqual(asked, [], 'a retired context registers nothing');
+    assert.equal(managerRoute(), 'world');
+  });
+
+  /**
+   * A COMPANION DEFECT MUST NEVER TRAP THE GM.
+   *
+   * A guard that throws is reported and the navigation proceeds. The opposite ruling would let
+   * one broken companion leave the GM on a route they cannot leave, in a window they cannot
+   * close, recoverable only by reloading Foundry — and it would do so silently, because a
+   * throwing guard is precisely the module least likely to be watching its own console.
+   */
+  it('contains a throwing navigation guard and lets the GM leave', async () => {
+    const mounts = await mountGuardedCompanion();
+    mounts[0].onBeforeNavigate(() => {
+      throw new Error('companion exploded');
+    });
+
+    const errors = [];
+    const originalError = console.error;
+    console.error = (...args) => errors.push(args);
+    try {
+      assert.doesNotThrow(() => worldNavItem('parties').click());
+      await settleRouteExit();
+    } finally {
+      console.error = originalError;
+    }
+    assert.equal(errors.length, 1);
+    assert.match(errors[0][0], /Downtime navigation guard failed/);
+    assert.equal(managerRoute(), 'world', 'the GM is not stranded by a companion’s bug');
+  });
+
   it('re-points the route when a provider re-registers with a different tab set', async () => {
     useShippedLocalization();
     const registry = createManagerExtensionsRegistry();
@@ -15476,6 +15687,7 @@ describe('CraftingSystemManager mounted behavior', () => {
         // The runtime route-chrome channel is FUNCTIONS on the frozen context, never mutable
         // fields: the context stays frozen and its identity — which is what the host keys a
         // remount on — never moves when a companion restates its chrome.
+        'onBeforeNavigate',
         'onRouteReselect',
         'requestRemount',
         'revision',
@@ -15488,6 +15700,7 @@ describe('CraftingSystemManager mounted behavior', () => {
       ]);
       assert.equal(typeof context.setRouteChrome, 'function');
       assert.equal(typeof context.onRouteReselect, 'function');
+      assert.equal(typeof context.onBeforeNavigate, 'function');
       assert.equal(context.schemaVersion, 1);
       assert.equal(context.surface, 'manager');
       assert.equal(context.surfaceId, 'downtime');

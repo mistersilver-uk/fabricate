@@ -3409,10 +3409,10 @@ Core renders an `href` action as an external anchor with `target="_blank"` and `
 - A conflicting provider on the same surface, an unsupported version, an empty or duplicated tab set, malformed chrome or action, or an asynchronous mount fails with a deterministic error.
 - `mount({ target, tabId, context })` is synchronous and returns a cleanup function or nothing.
 `tabId` is always one of the provider's own tab ids.
-- `context` is frozen and carries `{ schemaVersion, surface, surfaceId, route, tabId, craftingSystemId, isGM, revision, requestRemount, setRouteChrome, onRouteReselect }` and no Core store, document, or component.
+- `context` is frozen and carries `{ schemaVersion, surface, surfaceId, route, tabId, craftingSystemId, isGM, revision, requestRemount, setRouteChrome, onRouteReselect, onBeforeNavigate }` and no Core store, document, or component.
 `craftingSystemId` is `null` when no crafting system is selected, and the route stays reachable in that state.
 `requestRemount()` asks Core to run the current cleanup, clear the target, and call `mount` again with a fresh context whose `revision` has advanced.
-**The two runtime channels below are functions on that frozen context and never mutable fields**, because the context's identity is what a remount is keyed on: a chrome update must move the header without moving the context.
+**The three runtime channels below are functions on that frozen context and never mutable fields**, because the context's identity is what a remount is keyed on: a chrome update must move the header without moving the context.
 - **A companion drives Core's own route chrome at runtime, and this REPLACES the earlier requirement that a drill-down render its identity inside the panel.**
 That requirement was ruled on the grounds that route chrome was fixed at registration and that re-registering per drill-down would flash Core's preview and remount the companion.
 Both remain true of re-registration; the ruling is reversed by widening the seam instead, so a companion that opens an editor no longer has to render a back/delete/save header of its own inside the panel — a visible departure from every other Manager screen — and Core's header is what changes.
@@ -3439,6 +3439,33 @@ Localization stays the companion's: Core renders the strings it is given, as it 
 Core has nothing to navigate to and cannot act on it — the drill-down lives inside the companion's target and Core knows neither the level nor how to restore it — so it invokes the handler the live mount registered through `onRouteReselect(handler)`, which returns an idempotent unsubscribe and dies with its mount.
 It is distinguishable from a first mount because it is a different callback and no mount occurs, which is what lets a companion pop one level rather than re-initialise.
 Core's behaviour is unchanged when no handler is registered, a throwing handler is contained, and the click is deliberately not routed through the unsaved-draft route-exit confirmation, because no route is being exited and any prompt about the companion's own unsaved work belongs inside its handler.
+- **A mounted companion may refuse the navigations that would end its mount, through `onBeforeNavigate(handler)`.**
+Core consults the live mount's registered handler before moving to another of that provider's tabs, before leaving the Downtime route, and before closing the Manager window, and proceeds only when the handler does not refuse.
+The handler may be synchronous or asynchronous, and Core awaits a returned promise, because the answer is expected to come from a dialog.
+Only an explicit `false`, or a promise resolving to `false`, vetoes: any other return, including none at all, allows, so a handler written to OBSERVE a navigation cannot trap the GM by omitting a return.
+`onBeforeNavigate` returns an idempotent unsubscribe, Core drops the handler when the mount ends, and a call from a context whose mount has ended registers nothing — the same lifecycle `onRouteReselect` already has.
+- **Core tells the guard why, and nothing else.**
+The handler receives a frozen event whose `reason` is `'tab'`, `'route'`, or `'close'`.
+The destination is deliberately withheld: Core normalizes a route after the guard has answered, so a companion deciding from a destination would be deciding from a value Core may still change, and its own tab id is already on the context it closed over.
+`reason` is the one thing it cannot derive, and the distinction is real — a draft kept for the session survives a tab or route change and does not survive the window closing.
+- **The companion is asked before Core's own route-exit and window-close guards.**
+Every Core guard is scoped to its own route, so on the Downtime route the Core cascade already answers affirmatively without prompting and the order changes nothing there.
+On the window close it decides an outcome: Core's environment and tool guards can PERSIST world data, and a companion veto must not leave a save landed for a window that then stayed open.
+- **A companion that registers no guard behaves exactly as it did before this channel existed.**
+No prompt is raised, no asynchrony is introduced on a path that was synchronous, and the route-exit result Core already returns keeps its identity rather than being wrapped — which is what keeps every existing discard path one microtask earlier than a wrapped one would be.
+- **A guard that throws, or whose promise rejects, is reported and ALLOWS the navigation.**
+This is the one containment ruling that cannot go the other way: a companion defect read as a veto would leave the GM on a route they cannot leave, in a window they cannot close, recoverable only by reloading Foundry, and it would do so for the module least likely to be watching its own console.
+Allowing degrades to the behaviour that shipped before this channel existed, in which a screen exit neither wrote nor discarded a companion's own draft.
+- **A second navigation arriving while an answer is pending shares that answer rather than asking again.**
+Re-asking would stack a second dialog on the first, and refusing the second navigation outright would hand the GM a click with nothing to explain it; instead the GM's one decision resolves both navigations and each caller then runs its own continuation.
+This is the de-duplication Core already applies to its own concurrent discard prompt.
+- **A forced window close never consults the guard**, exactly as it already skips Core's own dirty-draft guards.
+Foundry's lifecycle teardown and this repository's smoke harness both close with `force`, in contexts where no confirmation dialog can be serviced, and a guard that ran there would hang the window on a question nothing can answer.
+- **What the guard does not cover is stated rather than implied.**
+It does not reach a browser reload, a Foundry logout, or any teardown outside the Manager's own close path.
+It is not consulted on a REMOUNT, whether the companion asked for one through `requestRemount()` or a context value such as the selected crafting system changed, because a remount is not the GM leaving the companion's screen and the companion either asked for it or observes it as a fresh `mount`.
+It is not consulted on re-entering the route or the tab already on screen, which navigate nowhere — re-activating the tab on screen remains `onRouteReselect`'s, and any prompt about the companion's own unsaved work belongs inside that handler.
+For everything this channel does not govern, a companion's own session-scoped handling of its unsaved work remains the only thing standing, unchanged.
 - Core calls cleanup exactly once while the target is connected and before a tab, provider, route, or window removes it.
 - Mount and cleanup faults are reported and contained; partial content is cleared, the Core preview becomes the fallback for the whole surface including its rail entries, and a later registration may mount without navigating away.
 - When a provider registers, unregisters, or re-registers with a different tab set, an active tab id the new set no longer declares falls back to that set's first tab rather than leaving an empty panel.

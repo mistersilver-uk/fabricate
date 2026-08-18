@@ -710,11 +710,12 @@ An action that declares both `primary` and `tone` is refused at registration.
 | `requestRemount()` | Ask Fabricate to re-render this surface. It runs the current cleanup, clears the target, and calls `mount` again with a fresh context. |
 | `setRouteChrome(chrome)` | Restate this mount's route chrome at any time, with no remount. See [Runtime Route Chrome](#runtime-route-chrome). |
 | `onRouteReselect(handler)` | Register a handler for the GM re-activating the rail sub-item this mount is already showing. See [Runtime Route Chrome](#runtime-route-chrome). |
+| `onBeforeNavigate(handler)` | Register a veto over the navigations that would end this mount. See [Guarding Unsaved Work](#guarding-unsaved-work). |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 
 A new context object is created — never mutated — whenever one of its values changes, which also remounts the active tab.
-`setRouteChrome` and `onRouteReselect` are the two exceptions: they are functions carried on that same frozen context, and calling them never changes the context's own identity, so neither one triggers the remount a new context would.
+`setRouteChrome`, `onRouteReselect` and `onBeforeNavigate` are the exceptions: they are functions carried on that same frozen context, and calling them never changes the context's own identity, so none of them triggers the remount a new context would.
 
 ### Runtime Route Chrome
 
@@ -812,6 +813,81 @@ A throwing handler is caught and logged, and never breaks the rail click for any
 `onRouteReselect` is deliberately **not** routed through Fabricate's own route-exit confirmation.
 No Manager route is being exited by this click, so there is nothing for that confirmation to guard.
 Whether your companion's own unsaved editor state should block the pop is your question to answer inside the handler.
+
+### Guarding Unsaved Work
+
+Fabricate's own editors refuse to be navigated away from with unsaved changes: leaving the recipe editor with a dirty draft raises a discard prompt, and so does closing the Manager window.
+A companion could not do the same.
+It could prompt on the controls it owns — its own Back action, and the rail re-activation `onRouteReselect` hands it — but it had no say at all when the GM switched to another tab, left the route, or closed the window.
+The panel was disposed and whatever was in it went with it.
+
+`context.onBeforeNavigate(handler)` registers your mount's veto over exactly those three navigations:
+
+```javascript
+mount({ target, tabId, context }) {
+  const view = mountCompanionDowntime({ target, tabId, context });
+
+  const stop = context.onBeforeNavigate(async ({ reason }) => {
+    if (!view.isDirty()) return true;
+    // `reason` is 'tab', 'route' or 'close'. Keeping a draft for the session is only an
+    // answer for the first two — on 'close' the session is what is ending.
+    const confirmed = await foundry.applications.api.DialogV2.confirm({
+      window: { title: game.i18n.localize('MY_MODULE.Downtime.Discard.Title') },
+      content: `<p>${game.i18n.localize('MY_MODULE.Downtime.Discard.Content')}</p>`,
+    });
+    if (confirmed) view.discardDraft();
+    return confirmed;
+  });
+
+  return () => { stop(); view.destroy(); };
+},
+```
+
+**Return `false` to keep the GM where they are.**
+Anything else allows the navigation, including returning nothing at all.
+That asymmetry is deliberate: a handler you wrote to *watch* navigations cannot trap the GM by forgetting a `return`.
+The handler may be synchronous or `async`, and Fabricate awaits a promise, because the answer normally comes from a dialog.
+
+**Three navigations are covered, and they are named.**
+
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
+
+| `reason` | What the GM did |
+|:---------|:----------------|
+| `'tab'` | Activated the rail sub-item of a **different** tab of your provider. |
+| `'route'` | Left the Downtime route entirely — another rail item, another Manager screen. |
+| `'close'` | Closed the Manager window. |
+
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
+
+The event carries `reason` and nothing else.
+Your own `tabId` is already on the context you closed over, and the destination is withheld on purpose: Fabricate normalizes a route *after* your guard has answered, so a decision made from a destination would be a decision made from a value that can still change.
+
+**Several things are deliberately not covered, and your own fallback still has to hold for them.**
+A browser reload and a Foundry logout never reach this seam at all.
+Neither does a **remount** — whether you asked for one with `requestRemount()` or a context value such as the selected crafting system changed — because a remount is not the GM leaving your screen, and you see it as a fresh `mount` either way.
+Neither does re-entering the route or the tab you are already on: those navigate nowhere, and re-activating the tab on screen stays `onRouteReselect`'s, where any prompt about your unsaved work belongs inside your handler.
+
+**A forced close is never guarded.**
+Foundry's own lifecycle teardown closes the Manager with `force`, in contexts where no dialog can be serviced, and so does Fabricate's smoke harness.
+A guard that ran there would hang the window on a question nothing can answer, so `force` skips it exactly as it already skips Fabricate's own dirty-draft guards.
+
+**A throwing guard allows the navigation.**
+It is caught and logged, and the GM goes where they were going.
+The opposite ruling would let one bug in your module leave a GM on a route they cannot leave and in a window they cannot close, recoverable only by reloading Foundry — and it would do it silently.
+Allowing degrades to exactly the behaviour you had before this seam existed, so nothing is destroyed that was not already at risk.
+
+**A second navigation during a pending answer shares that answer.**
+If the GM clicks the rail and then the window's close button while your dialog is still open, your handler is *not* called again.
+Both navigations resolve from the one decision the GM makes, and each then continues on its own.
+So you never have to defend against your own dialog being opened twice.
+
+**A companion that never calls `onBeforeNavigate` is unaffected.**
+No prompt, no added await, no changed timing: Fabricate takes the same code path it took before this channel existed.
+
+**Your guard dies with your mount.**
+The call returns an idempotent unsubscribe, and Fabricate drops the handler itself when the mount ends, so an unstopped subscription is not a leak.
+A context you kept from an ended mount registers nothing.
 
 ### The Panel's Layout Contract
 

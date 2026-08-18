@@ -128,6 +128,7 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
   _services = null;
   _confirmDiscardDirtyEssenceDraft = null;
   _confirmDiscardDirtyToolDraft = null;
+  _confirmDowntimeCompanionNavigation = null;
   // Foundry user CRUD hook registrations, torn down on close, that keep the
   // per-recipe restriction allow-list current when players change while open.
   _userHooks = null;
@@ -945,6 +946,13 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
         registerToolDirtyGuard: (guard) => {
           this._confirmDiscardDirtyToolDraft = typeof guard === 'function' ? guard : null;
         },
+        // A mounted Downtime companion's veto over the window close. Same registration shape
+        // as the two Core guards above, and one deliberate difference in what it returns:
+        // `undefined` means "no companion holds a guard", which is what lets `close` skip the
+        // await entirely rather than pay a microtask for a question nobody is asking.
+        registerDowntimeCompanionGuard: (guard) => {
+          this._confirmDowntimeCompanionNavigation = typeof guard === 'function' ? guard : null;
+        },
         // Gathering economy authoring + manual state controls (GM-only).
         getGatheringEconomy: (opts = {}) => game?.fabricate?.getGatheringEconomy?.(opts) ?? null,
         // The economy panel persists straight to the gathering-config setting, so
@@ -1429,6 +1437,18 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
     // confirmation dialog cannot be serviced. Normal user-initiated closes keep
     // every dirty-draft guard below.
     if (!options?.force) {
+      // The companion is asked FIRST. Core's own guards below can SAVE — an environment
+      // draft, a tool draft — and a save that lands for a close the companion then refuses
+      // would have written world data for a window that stayed open. Asking the companion
+      // first means a veto writes nothing at all.
+      //
+      // The `undefined` test is not defensive tidying: with no companion guard registered the
+      // call returns `undefined` and this line short-circuits WITHOUT awaiting, so the close
+      // chain is byte-for-byte the chain that shipped for every GM who has no companion
+      // mounted — which is every GM on the free module, on every route but one.
+      const canCloseCompanion = this._confirmDowntimeCompanionNavigation?.();
+      if (canCloseCompanion !== undefined && (await canCloseCompanion) === false) return this;
+
       const canCloseTool = await this._confirmDiscardDirtyToolDraft?.();
       if (canCloseTool === false) return this;
 
@@ -1447,6 +1467,7 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
 
     this._confirmDiscardDirtyEssenceDraft = null;
     this._confirmDiscardDirtyToolDraft = null;
+    this._confirmDowntimeCompanionNavigation = null;
     this._unregisterUserHooks();
     // Companion UI owns its own DOM and cleanup. Dispose it before `super.close()`
     // unmounts the Svelte root, so its mount target is still connected.
