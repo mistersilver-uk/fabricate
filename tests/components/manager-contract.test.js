@@ -2248,6 +2248,49 @@ describe('CraftingSystemManager source contract', () => {
     );
   });
 
+  /**
+   * THE HALF OF THE COMPATIBILITY GUARANTEE THAT IS NOT BEHAVIOURAL.
+   *
+   * `confirmNavigation` answers `undefined` when no companion holds a guard, and its own suite
+   * pins that. What cannot be observed from a mounted test, because a single microtask of
+   * added latency is invisible through Svelte's own flush, is that BOTH callers actually read
+   * `undefined` as "take the branch you took before this seam existed". Written any other way
+   * — awaiting unconditionally, or comparing against `true` — every Manager close would pay an
+   * extra `await` and every route exit would hand `afterTruthyResult` a composed promise, for a
+   * question no companion asked. So the short-circuit is asserted where it lives.
+   */
+  it('costs a companion that registers no navigation guard nothing on either exit path', () => {
+    assert.ok(
+      appSource.includes(
+        'if (canCloseCompanion !== undefined && (await canCloseCompanion) === false) return this;'
+      ),
+      'the window close skips its await entirely when there is no companion guard to ask'
+    );
+    const closeStart = appSource.indexOf('async close(options) {');
+    const forceGate = appSource.indexOf('if (!options?.force) {', closeStart);
+    const companionAsk = appSource.indexOf('_confirmDowntimeCompanionNavigation?.()', closeStart);
+    const toolAsk = appSource.indexOf('_confirmDiscardDirtyToolDraft?.()', closeStart);
+    assert.ok(forceGate > closeStart, 'the close still gates every interactive guard on force');
+    assert.ok(
+      companionAsk > forceGate,
+      'the companion guard sits INSIDE the force gate, so a forced teardown never asks it'
+    );
+    assert.ok(
+      companionAsk < toolAsk,
+      'and is asked before the Core guards that can save, so a veto writes nothing'
+    );
+    assert.ok(
+      rootSource.includes(
+        'if (companion === undefined) return finishRouteExit(nextView, nextRouteId);'
+      ),
+      'the route exit returns its original result untouched when there is nothing to ask'
+    );
+    assert.ok(
+      rootSource.includes("confirmRouteExit('world-downtime', tabId)"),
+      'a Downtime tab switch states its destination tab, so the guard can tell it from a re-entry'
+    );
+  });
+
   it('keeps the recipes browser browser-only and wired to existing callbacks', () => {
     for (const snippet of [
       'store.setRecipeSearch?.',

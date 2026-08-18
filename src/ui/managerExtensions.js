@@ -191,6 +191,25 @@ const DEFAULT_STATUS_TONE = 'warning';
  */
 
 /**
+ * What Core tells a navigation guard about the navigation it is being asked to allow.
+ *
+ * ONE FIELD, deliberately. `reason` is the only thing a companion cannot already work out
+ * for itself: its own `tabId` is on the context it closed over, and the DESTINATION is
+ * Core's business — Core normalizes a route after the guard has answered, so a companion
+ * that decided from a destination would be deciding from a value Core may still change.
+ *
+ * `reason` matters because the three answers are genuinely different. A companion may keep
+ * an unsaved draft for the session across a `'tab'` or `'route'` change and lose nothing;
+ * on `'close'` the session ends, so that fallback is no longer available and the same
+ * companion may want to prompt where it otherwise would not.
+ *
+ * @typedef {object} WorldNavGuardEvent
+ * @property {'tab'|'route'|'close'} reason Why the mount is about to end: the GM moving to
+ *   another of this provider's tabs, leaving the Downtime route entirely, or closing the
+ *   Manager window.
+ */
+
+/**
  * The immutable context Core supplies to a mounted provider.
  *
  * It is frozen, carries no Core store, document or component, and is replaced (never
@@ -217,6 +236,23 @@ const DEFAULT_STATUS_TONE = 'warning';
  * @property {(handler: () => void) => (() => void)} onRouteReselect Register this mount's
  *   handler for the GM activating the rail sub-item of the tab already on screen. Returns an
  *   idempotent unsubscribe; Core drops the handler when the mount ends.
+ * @property {(handler: (event: WorldNavGuardEvent) => (boolean|Promise<boolean>)) => (() => void)}
+ *   onBeforeNavigate Register this mount's veto over the navigations that would END it — a
+ *   move to another of this provider's tabs, an exit from the Downtime route, and the GM
+ *   closing the Manager window. Returns `false`, or a promise resolving to `false`, to keep
+ *   the GM where they are; ANY other return, including none at all, allows. Returns an
+ *   idempotent unsubscribe; Core drops the handler when the mount ends.
+ *
+ *   WHAT IT REFUSES, and why each refusal is deliberate. It refuses to treat a THROW as a
+ *   veto, because a companion defect must never be able to leave a GM in a Manager they
+ *   cannot close; a throwing guard is reported and the navigation proceeds. It refuses to
+ *   run at all on a FORCED close — Foundry's own lifecycle teardown and the smoke harness
+ *   close with `force`, where no dialog can be serviced and a veto would hang the window. It
+ *   refuses to ask a SECOND time while an answer is still pending, sharing the pending answer
+ *   instead, so a companion's dialog is never stacked on itself. And it refuses to cover what
+ *   it cannot: a browser reload, a Foundry logout, and a remount — whether the companion
+ *   asked for one through `requestRemount()` or a context value such as the selected crafting
+ *   system changed — all end the mount without consulting the guard.
  */
 
 /**

@@ -2629,6 +2629,7 @@
       requestRemount: requestDowntimeRemount,
       setRouteChrome: (chrome) => downtimeChromeChannel.setChrome(self.context, chrome),
       onRouteReselect: (handler) => downtimeChromeChannel.onReselect(self.context, handler),
+      onBeforeNavigate: (handler) => downtimeChromeChannel.onBeforeNavigate(self.context, handler),
     });
     self.context = context;
     return context;
@@ -3340,6 +3341,17 @@
   $effect(() => {
     services?.registerToolDirtyGuard?.(() => confirmToolsRouteExit('close'));
     return () => services?.registerToolDirtyGuard?.(null);
+  });
+
+  // The companion's own window-close guard. Registered unconditionally and SELF-SCOPING: the
+  // channel answers `undefined` unless a live mount holds a guard, and a live mount only
+  // exists while the GM is on the Downtime route with a companion panel on screen. Nothing
+  // here needs to know the active route, and nothing fires on any other one.
+  $effect(() => {
+    services?.registerDowntimeCompanionGuard?.(() =>
+      downtimeChromeChannel.confirmNavigation('close')
+    );
+    return () => services?.registerDowntimeCompanionGuard?.(null);
   });
 
   function text(key, fallback) {
@@ -4230,7 +4242,44 @@
     return continueRouteExitAfterEssence(nextView);
   }
 
-  function confirmRouteExit(nextView, nextRouteId = '') {
+  /**
+   * Ask a mounted companion whether the GM may leave the screen it is showing.
+   *
+   * `undefined` — never `true` — means there is nothing to ask, and every caller reads it
+   * as "run the path you ran before this seam existed". That is what makes a companion which
+   * never registers a guard cost exactly nothing: no prompt, no `await`, no extra microtask,
+   * and no change to the promise identity `confirmRouteExit` is careful to preserve.
+   *
+   * The DESTINATION decides whether this is a navigation at all. `nextRouteId` already carries
+   * "the identity of the subject the caller is navigating to, for the routes whose view token
+   * does not change when the subject does" — which is exactly what a Downtime tab is — so the
+   * Downtime tab id travels on the parameter that exists for it rather than on a second one.
+   * Re-entering the route the GM is already on (the parent rail item, which states no tab)
+   * leaves nothing, so it must not prompt.
+   *
+   * @param {string} nextView Route token the caller is navigating to.
+   * @param {string} nextRouteId Destination Downtime tab id, when the caller states one.
+   * @returns {undefined|boolean|Promise<boolean>} `undefined` when there is nothing to ask.
+   */
+  function confirmDowntimeCompanionNavigation(nextView, nextRouteId) {
+    if (activeView !== 'world-downtime') return undefined;
+    if (nextView === 'world-downtime' && (!nextRouteId || nextRouteId === worldDowntimeTabId))
+      return undefined;
+    return downtimeChromeChannel.confirmNavigation(nextView === 'world-downtime' ? 'tab' : 'route');
+  }
+
+  /**
+   * Core's own route-exit cascade, plus the Downtime host disposal that follows it.
+   *
+   * Split out of `confirmRouteExit` so the companion guard can gate the WHOLE of it: a
+   * companion that vetoes must leave Core's drafts untouched and its host mounted, and a
+   * guard placed inside the cascade would have Core prompting — or saving — first.
+   *
+   * @param {string} nextView Route token the caller is navigating to.
+   * @param {string} nextRouteId Destination subject id, for same-token routes.
+   * @returns {boolean|Promise<boolean>} Whether the navigation may proceed.
+   */
+  function finishRouteExit(nextView, nextRouteId) {
     const result = confirmRouteExitGuards(nextView, nextRouteId);
     if (activeView !== 'world-downtime' || nextView === 'world-downtime') return result;
 
@@ -4244,6 +4293,24 @@
     if (isPromise(result)) result.then(disposeDowntime);
     else disposeDowntime(result);
     return result;
+  }
+
+  // The companion is asked FIRST, and only about navigations that end its mount. Every Core
+  // guard below is route-gated, so on `world-downtime` the whole Core cascade is already a
+  // synchronous `true` — asking the companion first therefore reorders nothing, and it means
+  // a veto costs no Core write at all, where asking Core first could persist an environment
+  // or a tool for a navigation the companion then refuses.
+  function confirmRouteExit(nextView, nextRouteId = '') {
+    const companion = confirmDowntimeCompanionNavigation(nextView, nextRouteId);
+    // Returned UNTOUCHED, not wrapped: `afterTruthyResult` subscribes to this value
+    // immediately, and wrapping it would put every existing route activation one microtask
+    // later. Only the new path, where a companion actually holds a guard, composes.
+    if (companion === undefined) return finishRouteExit(nextView, nextRouteId);
+    if (isPromise(companion))
+      return companion.then((allowed) =>
+        allowed === false ? false : finishRouteExit(nextView, nextRouteId)
+      );
+    return companion === false ? false : finishRouteExit(nextView, nextRouteId);
   }
 
   function continueRouteExitAfterEssence(nextView) {
@@ -6643,7 +6710,11 @@
       downtimeChromeChannel.reselect();
       return;
     }
-    return afterTruthyResult(confirmRouteExit('world-downtime'), () => {
+    // The destination TAB travels as the route-exit subject id, because a Downtime tab is
+    // precisely the "same view token, different subject" case that parameter exists for. Without
+    // it a companion's navigation guard could not tell this apart from the parent rail item
+    // re-entering the route the GM is already on, which navigates nowhere and must not prompt.
+    return afterTruthyResult(confirmRouteExit('world-downtime', tabId), () => {
       worldDowntimeTabId = tabId;
       railGroupUserExpanded.worldDowntime = true;
       activeView = 'world-downtime';
