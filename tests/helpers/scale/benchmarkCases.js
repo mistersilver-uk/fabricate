@@ -41,6 +41,9 @@ import {
   findConnectCrossover,
   serializedRecordBytes,
 } from './connectPayloadModel.js';
+import { runForwardComponentStorageConversion } from '../../../src/systems/componentStorageConversion.js';
+import { SettingHost } from '../settingDocumentHost.js';
+
 import { countingEnumerations } from './scaleCounters.js';
 import { INVENTORY_SERIES } from './scaleInventory.js';
 import { COMPONENT_LIBRARY_SERIES } from './scaleProfiles.js';
@@ -129,6 +132,92 @@ const CONNECT_SWEEP_RICH = Object.freeze([1, 100, 1000, 5000]);
 function settingBytes(settings, key) {
   const value = settings.get(key);
   return value === undefined ? 0 : JSON.stringify(value).length;
+}
+
+/**
+ * A crafting-system world whose component storage arrangement can be measured on both arms
+ * (issue 1212).
+ *
+ * The converted arm is converted **through the shipped forward conversion**, never by
+ * hand-setting the layout, so what is measured is the state that actually ships. Hand-setting
+ * would measure a world no conversion produces and would silently stop measuring the moment
+ * the conversion's output changed.
+ *
+ * Every counter it returns is class-1: document call counts, document entry counts and
+ * serialized byte counts. No wall clock, which `tests/benchmark-baseline-drift.test.js`
+ * refuses in a committed baseline anyway.
+ *
+ * @param {object} context
+ * @param {object} options
+ * @param {boolean} options.convert whether to run the forward component conversion first.
+ * @returns {Promise<object>} the bench handle.
+ */
+async function componentStorageWorld(context, { convert }) {
+  const world = worldFor(context);
+  const host = new SettingHost();
+  globalThis.Setting = { implementation: host.documentClass };
+  globalThis.game.settings.storage = { get: () => host.collection };
+  world.settings.set('componentStorageLayout', 'singleArray');
+  world.settings.set('componentStorageTarget', convert ? 'perRecord' : 'singleArray');
+  world.settings.set('craftingSystems', [world.system]);
+
+  if (convert) {
+    await runForwardComponentStorageConversion({
+      getSetting: (key) => world.settings.get(key),
+      setSetting: async (key, value) => {
+        world.settings.set(key, value);
+        return value;
+      },
+      documentClass: () => host.documentClass,
+      collection: () => host.collection,
+    });
+  }
+
+  const manager = new world.modules.CraftingSystemManager(world.recipeManager);
+  await manager.initialize();
+  // SETTLE first, on both arms. The fixture seeds raw payloads and the manager holds
+  // normalized ones, so the first save legitimately rewrites every record once. Measuring
+  // that would measure a one-off catch-up rather than the steady-state single-record edit
+  // this case exists to report.
+  await manager.save();
+  host.calls.length = 0;
+
+  return {
+    world,
+    host,
+    manager,
+    async editOneComponent() {
+      const system = manager.getSystem(world.system.id);
+      const [first, ...rest] = system.components;
+      system.components = [{ ...first, name: `${first.name} (edited)` }, ...rest];
+      await manager.save({ put: system });
+    },
+    async saveWholeCorpus() {
+      await manager.save();
+    },
+    counts() {
+      return {
+        componentDocumentCalls: host.calls.length,
+        componentDocumentsTouched: host.calls.reduce((total, call) => total + call.count, 0),
+        serializedBytes: settingBytes(world.settings, 'craftingSystems'),
+      };
+    },
+    /**
+     * Put the AMBIENT world back, so the cases after this one measure what they think they do.
+     *
+     * The harness shares one settings map and one set of Foundry globals across every case in a
+     * profile. Leaving `componentStorageTarget` on `perRecord` sends every later case's manager
+     * down the granular arm, where it hydrates components from this case's document index — and
+     * the damage surfaces as an unrelated case's candidate counter quietly reporting zero.
+     */
+    teardown() {
+      world.settings.set('componentStorageLayout', 'singleArray');
+      world.settings.set('componentStorageTarget', 'singleArray');
+      world.settings.delete('craftingSystems');
+      delete globalThis.Setting;
+      delete globalThis.game.settings.storage;
+    },
+  };
 }
 
 function worldFor(context, options = {}) {
@@ -416,6 +505,52 @@ function simpleCorpusCases() {
         serializedSystems: manager.systems.size,
         serializedBytes: settingBytes(world.settings, 'craftingSystems'),
       }),
+    },
+    {
+      id: 'craftingSystemManager.singleComponentEdit.singleArray',
+      profile: 'simple-corpus',
+      description:
+        'MEASUREMENT (issue 1212): one component edit under the NESTED arrangement. The ' +
+        'control for the extraction claim — a single-record mutation re-serializes and ' +
+        're-replicates the whole 5,000-component container.',
+      setup: async (context) => componentStorageWorld(context, { convert: false }),
+      run: async (bench) => {
+        await bench.editOneComponent();
+        return bench;
+      },
+      counts: (bench) => bench.counts(),
+      teardown: (bench) => bench.teardown(),
+    },
+    {
+      id: 'craftingSystemManager.singleComponentEdit.perRecord',
+      profile: 'simple-corpus',
+      description:
+        'MEASUREMENT (issue 1212): the SAME one-component edit on a world converted THROUGH ' +
+        'the shipped forward conversion. The load-bearing counter is the DOCUMENT COUNT, ' +
+        'which is what distinguishes "wrote one record" from "wrote the corpus one record ' +
+        'at a time"; the byte count is the replicated payload beside it.',
+      setup: async (context) => componentStorageWorld(context, { convert: true }),
+      run: async (bench) => {
+        await bench.editOneComponent();
+        return bench;
+      },
+      counts: (bench) => bench.counts(),
+      teardown: (bench) => bench.teardown(),
+    },
+    {
+      id: 'craftingSystemManager.save.perRecord',
+      profile: 'simple-corpus',
+      description:
+        'MEASUREMENT (issue 1212): the RESIDUAL container record after extraction. This is ' +
+        'the same whole-corpus save as `craftingSystemManager.save`, on a converted world, ' +
+        'so its `serializedBytes` is directly comparable with that case`s committed number.',
+      setup: async (context) => componentStorageWorld(context, { convert: true }),
+      run: async (bench) => {
+        await bench.saveWholeCorpus();
+        return bench;
+      },
+      counts: (bench) => bench.counts(),
+      teardown: (bench) => bench.teardown(),
     },
     {
       id: 'craftingSystemManager.normalizeImport',

@@ -105,6 +105,15 @@ export async function runProfileCases({ fixture, modules, cases, reps, onProgres
       samples.push(performance.now() - started);
     }
     const heapAfter = process.memoryUsage().heapUsed;
+
+    // A case that installed AMBIENT state — a global, or a shared setting every other case
+    // reads — restores it here (issue 1212). The harness shares one settings map and one set
+    // of Foundry globals across every case in a profile, so a case that leaves an arrangement
+    // flag behind silently changes what the cases AFTER it measure, and the damage shows up
+    // as a counter quietly going to zero somewhere else. `teardown` is optional and runs after
+    // the timed reps, so a case that needs its state for the whole measurement still has it.
+    await benchmarkCase.teardown?.(state);
+
     class2[benchmarkCase.id] = {
       samplesMs: samples,
       // Heap is RECORD-ONLY and must never be asserted: Node reports it after whatever the GC
