@@ -132,6 +132,50 @@
         "serializedBytes": 3114
       }
     },
+    "recipeManager.singleRecipeEdit.singleArray": {
+      "description": "MEASUREMENT (issue 1247): one recipe edit under the WHOLE-ARRAY arrangement. The control for #1070 criterion 9 — a single-record mutation re-serializes and re-replicates the entire 10,000-recipe corpus, and touches no document at all. Built from the same fixture as its `perRecord` twin, so the ratio between the two is read off one baseline rather than inferred across differently-built worlds.",
+      "counts": {
+        "identityCandidatesExamined": 0,
+        "identityIndexBuilds": 0,
+        "recipeDocumentCalls": 0,
+        "recipeDocumentsTouched": 0,
+        "serializedBytes": 7681966,
+        "writtenBytes": 7681966
+      }
+    },
+    "recipeManager.singleRecipeEdit.perRecord": {
+      "description": "MEASUREMENT (issue 1247): the SAME one-recipe edit on a world converted THROUGH the shipped forward recipe Storage Layout Conversion. The load-bearing counter is the DOCUMENT COUNT, which is what distinguishes \"wrote one record\" from \"wrote the corpus one record at a time\"; `writtenBytes` is what the edit replicated, and `serializedBytes` reads the reclaimed whole-array key, which now holds nothing.",
+      "counts": {
+        "identityCandidatesExamined": 0,
+        "identityIndexBuilds": 0,
+        "recipeDocumentCalls": 1,
+        "recipeDocumentsTouched": 1,
+        "serializedBytes": 2,
+        "writtenBytes": 749
+      }
+    },
+    "recipeManager.save.singleArray": {
+      "description": "MEASUREMENT (issue 1247): the whole-corpus `RecipeManager.save()` an import or bulk edit still flushes through, under the WHOLE-ARRAY arrangement. Distinct from the `recipeManager.save` case, which measures the same call on a world built the legacy way against the AMBIENT id counter; this one is the same-fixture control for `recipeManager.save.perRecord` and is the number that pairs with it.",
+      "counts": {
+        "identityCandidatesExamined": 0,
+        "identityIndexBuilds": 0,
+        "recipeDocumentCalls": 0,
+        "recipeDocumentsTouched": 0,
+        "serializedBytes": 7681957,
+        "writtenBytes": 7681957
+      }
+    },
+    "recipeManager.save.perRecord": {
+      "description": "MEASUREMENT (issue 1247): the same whole-corpus save on a converted world. It is DIFFERENTIAL, so a flush over a settled corpus issues no document operation and replicates nothing, where the whole-array arm unconditionally re-replicates every byte. A regression that made the differential rewrite the corpus one record at a time moves `recipeDocumentsTouched` from 0 to the corpus size.",
+      "counts": {
+        "identityCandidatesExamined": 0,
+        "identityIndexBuilds": 0,
+        "recipeDocumentCalls": 0,
+        "recipeDocumentsTouched": 0,
+        "serializedBytes": 2,
+        "writtenBytes": 0
+      }
+    },
     "craftingSystemManager.normalizeImport": {
       "description": "The normalization/import path #1076 targets: initialize() reads the persisted setting and runs _normalizeSystem over the whole 5,000-component library.",
       "counts": {
