@@ -42,6 +42,7 @@ import { RecipeVisibilityService } from './systems/RecipeVisibilityService.js';
 import { runStartupMaintenance } from './systems/startupMaintenance.js';
 import { composeStartupPassList } from './systems/startupPassComposition.js';
 import { reconcileRecipeStorageLayout } from './systems/definitionStorageConversion.js';
+import { createRecipeCorpus } from './systems/recipeCorpus.js';
 import { ResolutionModeService } from './systems/ResolutionModeService.js';
 import { CraftingListingBuilder } from './systems/CraftingListingBuilder.js';
 import { activeRunStepState, buildStepRecipeView, resolveStepIngredientSet } from './systems/stepRecipeView.js';
@@ -102,7 +103,7 @@ import { createRecipeRefreshCoalescer, handleFabricateSettingChange } from './co
 import { configureItemStackQuantityPath, probeStackQuantityPath, stackQuantityAdvisory } from './systems/itemStackQuantity.js';
 import { stackQuantityPathPresetFor } from './config/stackQuantityPathPresets.js';
 import { FABRICATE_HOOKS } from './config/hooks.js';
-import { MigrationRunner } from './migration/MigrationRunner.js';
+import { MIGRATION_DEFERRAL_REASONS, MigrationRunner } from './migration/MigrationRunner.js';
 import { restampOwnedItemComponentIdentity } from './migration/restampOwnedItemComponentIdentity.js';
 import { buildMigrationRecoveryPrompt } from './migration/migrationRecoveryPrompt.js';
 import { buildRetiredCraftingModNotice } from './migration/migrateRetireCraftingModToken.js';
@@ -159,6 +160,17 @@ const gatheringDepletionRateLimiter = createDepletionRateLimiter();
 // Separate budget for the blind-start relay (issue 901) so a burst of gathers and
 // a burst of starts cannot starve one another through a shared allowance.
 const gatheringBlindStartRateLimiter = createBlindStartRateLimiter();
+
+// The GM notice for each way a startup migration pass can DEFER (issue 1242): the recipe
+// corpus was mid-conversion, could not be read, or could not be written. One complete
+// localized sentence per reason, selected by a positive lookup, because the three differ in
+// what the GM must do — only the writeback failure instructs a reload, since only that path
+// leaves this session holding a transformed copy of data that was never saved.
+const MIGRATION_DEFERRAL_NOTICES = Object.freeze({
+  [MIGRATION_DEFERRAL_REASONS.UNSETTLED_STORAGE]: 'FABRICATE.Migration.Deferred.MidConversion',
+  [MIGRATION_DEFERRAL_REASONS.CORPUS_READ_FAILED]: 'FABRICATE.Migration.Deferred.CorpusUnreadable',
+  [MIGRATION_DEFERRAL_REASONS.WRITEBACK_FAILED]: 'FABRICATE.Migration.Deferred.WritebackFailed'
+});
 
 // The GM-only crafting system manager app is deferred to a lazy chunk so
 // non-GM players never download/parse its subtree at module init. The dynamic
@@ -1021,9 +1033,38 @@ class Fabricate {
       // user-initiated — the GM fixes/deletes the failed documents and RELOADS
       // Foundry, at which point migrations re-run automatically because
       // migrationVersion was not advanced. There is NO same-pass auto-retry.
-      promptRecovery: (context) => this._promptMigrationRecovery(context)
+      promptRecovery: (context) => this._promptMigrationRecovery(context),
+      // Issue 1242: the recipe corpus is read and written through an ARRANGEMENT-AWARE seam,
+      // never the raw whole-array key. On a world converted to per-record recipe documents the
+      // raw read returns the registered `[]` default — silently, indistinguishably from an
+      // empty world — and the corpus-global migrations do not skip an empty corpus: they
+      // reduce over it and persist a confidently wrong answer. The seam selects on the recipe
+      // Definition Storage Layout, refuses a mid-conversion corpus outright, and installs the
+      // stale-arrangement write guard on BOTH arms. It is built here, inside the pass, and its
+      // factory is TOTAL so this construction cannot throw into the `ready` callback.
+      recipeCorpus: createRecipeCorpus({ getSetting, setSetting })
     });
     const summary = await runner.run();
+
+    // Deferred pass (issue 1242): the recipe corpus could not be read whole, or a writeback
+    // leg failed, so the pass persisted nothing and left `migrationVersion` where it found it.
+    // This is NOT an abort — there is no failed document to remediate and no downgrade target
+    // to recommend — so it gets its own permanent GM notice rather than the recovery dialog.
+    // Placed ABOVE the abort branch because a deferred summary reports `aborted: false`.
+    if (summary?.deferred === true) {
+      console.error(`Fabricate | migration pass deferred (${summary.deferredReason})`, summary.deferredError ?? '');
+      if (game.user?.isGM) {
+        // A COMPLETE localized sentence per reason; only the writeback failure instructs a
+        // reload, and that distinction is the point. On a writeback failure the migrations
+        // have already transformed this session's live setting values, so a GM who keeps
+        // working writes migrated records back under an un-advanced version. The other two
+        // paths refuse before any migration runs, so nothing in the session was touched.
+        const key = MIGRATION_DEFERRAL_NOTICES[summary.deferredReason] ?? MIGRATION_DEFERRAL_NOTICES[MIGRATION_DEFERRAL_REASONS.CORPUS_READ_FAILED];
+        const message = game.i18n?.localize?.(key) || key;
+        ui.notifications?.error?.(message, { permanent: true });
+      }
+      return;
+    }
 
     // Aborted pass: a fatal migration error rolled the in-memory data back and
     // persisted nothing (migrationVersion is unchanged). Surface a GM-facing error
@@ -1032,7 +1073,7 @@ class Fabricate {
     if (summary?.aborted === true) {
       if (game.user?.isGM) {
         const message = game.i18n?.localize?.('FABRICATE.Migration.Aborted.Notice')
-          || 'Fabricate migration aborted. Your existing data has been kept unchanged. See the console (F12) for per-document recovery guidance.';
+          || "Fabricate migration aborted. This pass saved nothing: your stored data is exactly as it was before this startup. Reload Foundry to discard this session's partly-migrated copy, then see the console (F12) for per-document recovery guidance.";
         ui.notifications?.error?.(message);
       }
       return;

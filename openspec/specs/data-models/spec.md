@@ -2750,7 +2750,8 @@ One shared pair MUST NOT be used: converting one class would then appear to un-s
 **The layout is read, never inferred.**
 A reader deciding whether a class's records live in one array or in per-record documents MUST read that class's layout key.
 It MUST NOT be inferred from any data key's presence, absence or emptiness — an empty corpus and an unwritten corpus are indistinguishable that way, and the inference fails in both directions.
-The layout is the sole discriminator OF THE CONVERSION and of nothing else: outside the conversion, and in particular during a migration writeback, the layout is already `perRecord` and the discriminator is the migration version.
+The layout discriminates the conversion AND every arrangement-aware corpus accessor, including the startup migration pass.
+`migrationVersion` discriminates WHETHER that pass runs, never WHERE it reads: the pass runs before the boot's storage reconcile, so it cannot assume the layout has already settled.
 
 **Key scheme.**
 Under `perRecord`, one `world` setting document holds exactly one record.
@@ -2785,9 +2786,29 @@ The declared order is what makes that state unreachable, so it satisfies the dec
 **Every bulk leg verifies what came back.**
 A create can resolve with FEWER documents than requested — a `preCreateSetting` hook returning `false` drops that one and lets the rest commit — so each leg MUST compare the returned document count against the requested set and treat a shortfall as a failure.
 
-**The legacy key MUST NOT be written after conversion.**
+**The legacy key MUST NOT be written after conversion, and MUST NOT be read either.**
 Once a class's layout is `perRecord`, any write to its former whole-array key silently re-creates that document, restoring both its envelope and a stale whole corpus that later readers may pick up.
 Every writer of the legacy key is therefore either routed through the repository or removed, and this is covered by a test rather than by convention.
+That clause is scoped to the post-conversion state it describes: on a `singleArray` world the legacy-key write IS the correct write.
+The prohibition binds every arrangement-aware corpus accessor rather than only repositories.
+Any component that reads or writes a granularly-stored class's corpus directly MUST do so through an accessor that selects on that class's layout, and MUST NOT read or write the legacy key directly.
+The **read** is the more damaging half: it returns the registered empty default, indistinguishable from an empty world, and a corpus-global reduction over an empty remainder produces a confidently wrong result rather than a skipped one.
+
+**An arrangement-aware accessor MUST refuse an unsettled corpus.**
+When the layout reads `unsettled`, the corpus is spread across both arrangements and neither can be read alone, so a whole-corpus consumer MUST refuse rather than choose an arm.
+It MUST NOT advance any version or completion marker, MUST persist nothing, and MUST report to the GM.
+An unreadable layout is NOT `unsettled`: it takes the legacy arrangement, because refusing there would withhold the operation permanently from every world that has never converted.
+The two directions are stated together because this repository already holds both conventions and a reader must be able to tell which applies where.
+
+**A raw corpus view MUST also be a detached one.**
+A component that carries a record's stored value through a transformation WITHOUT INTERPRETING IT — a conversion, or the startup migration pass — MUST NOT route records through the domain model's deserializer and serializer, for the reason `### Storage Conversion Crash Recovery` gives under "A conversion MUST move records without hydrating them through the domain model".
+The subject is deliberately narrow: a manager that reads records IN ORDER TO interpret them, and whose deserializer is the interpretation, is outside this requirement and stays so.
+Identity hydration alone is insufficient: it yields the stored document's own initialized value, so an in-place transformation mutates the record the differential comparison will later compare against, every record compares equal to itself, and a create/update-only writeback issues nothing while the version records success.
+Such a reader MUST return records detached from their stored documents.
+
+**A create/update-only writeback MUST refuse a shrunk corpus.**
+A writer that issues no delete leg cannot express removal, so a record dropped by the transformation would survive, be read back on the next pass, and have its removal silently undone.
+Such a writer's caller MUST verify that every record id it read is present in the set it is about to write, by id-set containment rather than by count, and MUST refuse otherwise.
 
 **Corpus order is not semantic.**
 No consumer may depend on the order records are returned in.

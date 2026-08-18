@@ -35,6 +35,7 @@ import {
 } from './PerRecordCraftingDefinitionRepository.js';
 import { RecipeActivationError } from './RecipeActivationError.js';
 import { RecipePersistenceError } from './RecipePersistenceError.js';
+import { readRecipeStorageLayout } from './recipeStorageLayout.js';
 import {
   corpusChanged,
   corpusDelta,
@@ -151,27 +152,6 @@ function readRecipeStorageTarget() {
     );
   } catch {
     return DEFINITION_STORAGE_TARGETS.SINGLE_ARRAY;
-  }
-}
-
-/**
- * The **Definition Storage Layout** for recipes, read defensively (issue 1224).
- *
- * The OPPOSITE fail direction from {@link readRecipeStorageTarget} above, and the contrast
- * is the point. That reader answers an unreadable setting with today's arrangement so an
- * unreadable target can never promote a world onto the granular backend. This one feeds the
- * Valid Id Basis, where a defaulted value is a claim that the corpus about to be read is
- * whole — so an unreadable layout is `null`, which no basis clause recognises and which
- * therefore refuses to run a destructive pass.
- *
- * @returns {string|null} a member of `DEFINITION_STORAGE_LAYOUTS`, or `null` when the
- *   setting could not be read at all.
- */
-function readRecipeStorageLayout() {
-  try {
-    return getSetting(SETTING_KEYS.RECIPE_STORAGE_LAYOUT) ?? null;
-  } catch {
-    return null;
   }
 }
 

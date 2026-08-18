@@ -26,6 +26,94 @@
  * (§ "Startup Migration Flow" step 10, § "Migration Abort Recovery Guidance").
  */
 
+import { DEFINITION_STORAGE_LAYOUTS } from '../config/settings.js';
+
+/**
+ * The downgrade advice, selected by the recipe **Definition Storage Layout** the aborted pass
+ * ran against (issue 1242).
+ *
+ * Three facts make this a table of COMPLETE sentences rather than one sentence with the
+ * layout interpolated into it:
+ *
+ * 1. **The advice is false on a converted world.** "Downgrade to keep using your existing
+ *    data" is true only under the combined-record arrangement. An older build has no granular
+ *    reader, serves the registered empty default, and then writes that empty-derived corpus
+ *    back through `game.settings.set` — which finds no legacy document and CREATES one, with
+ *    no arrangement guard in that build to refuse it. The GM then authors into a competing
+ *    legacy corpus that the next upgrade discards. So the downgrade is unsafe there, not
+ *    merely unhelpful.
+ * 2. **The reverse conversion can only be run on the current build.** After a downgrade there
+ *    is no code left to run it with, so the instruction has to come before the downgrade.
+ *    It must also instruct a RELOAD: the bridge that turns a layout change into a reconcile is
+ *    registered AFTER initialization, so a GM who flips the arrangement from this dialog gets
+ *    no mid-session conversion at all.
+ * 3. **No layout token may be interpolated into a GM-facing string.** The layout enumeration
+ *    carries `unsettled`, which the operator-facing choices map has no label for and never
+ *    will, so any labeller fed a LAYOUT leaks the raw token. Selecting a whole sentence makes
+ *    the leak unrepresentable rather than merely detected.
+ *
+ * The vocabulary is the shipped GM vocabulary: the setting is "Recipe Storage Arrangement"
+ * and its combined option is "One combined record", so the dialog and the settings row read
+ * as ONE instruction rather than two.
+ *
+ * @type {Readonly<Record<string, {promptKey: string, promptFallback: (version: string) => string, consoleSentence: (version: string) => string}>>}
+ */
+const DOWNGRADE_ADVICE_BY_LAYOUT = Object.freeze({
+  [DEFINITION_STORAGE_LAYOUTS.SINGLE_ARRAY]: Object.freeze({
+    promptKey: 'FABRICATE.Migration.Recovery.Downgrade',
+    promptFallback: (version) =>
+      `Recommended: downgrade Fabricate to version ${version} to keep using your existing data without manual remediation.`,
+    consoleSentence: (version) =>
+      `downgrade Fabricate to version ${version} to continue using your existing data without manual remediation.`,
+  }),
+  [DEFINITION_STORAGE_LAYOUTS.PER_RECORD]: Object.freeze({
+    promptKey: 'FABRICATE.Migration.Recovery.DowngradeGranular',
+    promptFallback: (version) =>
+      `Do not downgrade yet. This world stores each recipe in its own record, and an older Fabricate — including version ${version} — reads no recipes from it and will start writing over them. Open Settings → Fabricate → Recipe Storage Arrangement, set it back to "One combined record", reload Foundry, and let the conversion finish first — it can only be run on this version, because after a downgrade there is no code left to run it with.`,
+    consoleSentence: (version) =>
+      `do NOT downgrade yet. This world stores each recipe in its own record, and an older Fabricate — including version ${version} — reads no recipes from it and will start writing over them. Open Settings → Fabricate → Recipe Storage Arrangement, set it back to "One combined record", reload Foundry, and let the conversion finish first — it can only be run on this version, because after a downgrade there is no code left to run it with.`,
+  }),
+  [DEFINITION_STORAGE_LAYOUTS.UNSETTLED]: Object.freeze({
+    promptKey: 'FABRICATE.Migration.Recovery.DowngradeMidConversion',
+    promptFallback: (version) =>
+      `Do not downgrade yet. This world's recipes are part-way through a storage change, so they are not all in one place. Open Settings → Fabricate → Recipe Storage Arrangement, set it to "One combined record", reload Foundry, and let the conversion finish before downgrading to Fabricate version ${version} — it can only be run on this version, because after a downgrade there is no code left to run it with.`,
+    consoleSentence: (version) =>
+      `do NOT downgrade yet. This world's recipes are part-way through a storage change, so they are not all in one place. Open Settings → Fabricate → Recipe Storage Arrangement, set it to "One combined record", reload Foundry, and let the conversion finish before downgrading to Fabricate version ${version} — it can only be run on this version, because after a downgrade there is no code left to run it with.`,
+  }),
+});
+
+/**
+ * The safe default for a layout this build could not read at all.
+ *
+ * It cannot promise the downgrade is safe, because it does not know how the recipes are
+ * stored; it names the one thing the GM can check. This is the arm every world with no
+ * readable layout takes, so it must be actionable rather than alarming.
+ */
+const DOWNGRADE_ADVICE_UNKNOWN_LAYOUT = Object.freeze({
+  promptKey: 'FABRICATE.Migration.Recovery.DowngradeCheckArrangement',
+  promptFallback: (version) =>
+    `Before downgrading to Fabricate version ${version}, check Settings → Fabricate → Recipe Storage Arrangement. If it is not "One combined record", set it back, reload Foundry, and let the conversion finish first — an older Fabricate cannot read the other arrangement and will start writing over it, and the conversion can only be run on this version, because after a downgrade there is no code left to run it with.`,
+  consoleSentence: (version) =>
+    `before downgrading to Fabricate version ${version}, check Settings → Fabricate → Recipe Storage Arrangement. If it is not "One combined record", set it back, reload Foundry, and let the conversion finish first — an older Fabricate cannot read the other arrangement and will start writing over it, and the conversion can only be run on this version, because after a downgrade there is no code left to run it with.`,
+});
+
+/**
+ * The downgrade advice for one recipe storage layout.
+ *
+ * A POSITIVE lookup on the three recognised layout values with a safe default, never a
+ * truthiness test: a fixture answering `[]` for the layout key is TRUTHY and must still take
+ * the default.
+ *
+ * @param {string|null} [storageLayout] A member of `DEFINITION_STORAGE_LAYOUTS`, or anything
+ *   else when the layout could not be read.
+ * @returns {{promptKey: string, promptFallback: (version: string) => string, consoleSentence: (version: string) => string}}
+ */
+export function selectDowngradeAdvice(storageLayout) {
+  return Object.hasOwn(DOWNGRADE_ADVICE_BY_LAYOUT, String(storageLayout))
+    ? DOWNGRADE_ADVICE_BY_LAYOUT[String(storageLayout)]
+    : DOWNGRADE_ADVICE_UNKNOWN_LAYOUT;
+}
+
 /**
  * Stable action keys for the two prompt buttons. `KEEP` is the default choice.
  * @type {{ KEEP: string, FIX_AND_RETRY: string }}
@@ -57,13 +145,17 @@ export const MIGRATION_RECOVERY_ACTIONS = Object.freeze({
  * @param {string|null} [context.downgradeTo] recommended downgrade target version
  * @param {Array<object>} [context.documents] per-document remediation details
  * @param {string} [context.label] label of the aborted migration
+ * @param {string|null} [context.storageLayout] the recipe Definition Storage Layout the
+ *   aborted pass ran against, threaded in by the runner rather than read here so the builder
+ *   stays pure and so the message describes the pass that just failed rather than a layout a
+ *   remote conversion may have moved since (issue 1242)
  * @param {(key: string, data?: object) => string} [localize] i18n seam; receives
  *   a key and optional interpolation data and returns the localized string. When
  *   absent, English fallbacks are used so the helper is usable without Foundry.
  * @returns {MigrationRecoveryPromptConfig} a plain, Foundry-free config object.
  */
 export function buildMigrationRecoveryPrompt(
-  { downgradeTo = null, documents = [], label = '' } = {},
+  { downgradeTo = null, documents = [], label = '', storageLayout = null } = {},
   localize
 ) {
   const t = makeLocalizer(localize);
@@ -73,7 +165,13 @@ export function buildMigrationRecoveryPrompt(
       ? downgradeTo.trim()
       : t('FABRICATE.Migration.Recovery.UnknownVersion', {}, 'unknown');
 
-  const content = buildContent({ t, label: String(label ?? ''), downgradeTarget, failures });
+  const content = buildContent({
+    t,
+    label: String(label ?? ''),
+    downgradeTarget,
+    failures,
+    storageLayout,
+  });
 
   // `Keep existing data` is always the default / pre-selected button and is
   // ordered first (spec § "GM prompt defaults"). The fix/retry button is
@@ -111,14 +209,20 @@ export function buildMigrationRecoveryPrompt(
  * @param {string} args.label
  * @param {string} args.downgradeTarget
  * @param {Array<object>} args.failures
+ * @param {string|null} args.storageLayout
  * @returns {string}
  */
-function buildContent({ t, label, downgradeTarget, failures }) {
+function buildContent({ t, label, downgradeTarget, failures, storageLayout }) {
+  // Scoped to THIS PASS, deliberately. "A failed migration leaves your data unchanged" is not
+  // true in general: a NON-FATAL migration error is logged and the pass continues, so the next
+  // migration's success advances the version past the failed one and the pass writes. What is
+  // true here is narrower and still worth saying — the aborted pass returns before the first
+  // write, so nothing was persisted.
   const intro = `<p>${escapeHtml(
     t(
       'FABRICATE.Migration.Recovery.Intro',
       {},
-      'A Fabricate data migration could not complete. Your existing data has been kept unchanged.'
+      "A Fabricate data migration could not complete. This pass saved nothing: your stored data is exactly as it was before this startup. Reload Foundry to discard this session's partly-migrated copy."
     )
   )}</p>`;
 
@@ -128,12 +232,11 @@ function buildContent({ t, label, downgradeTarget, failures }) {
       )}</p>`
     : '';
 
+  // One COMPLETE sentence per layout, never one sentence with the layout interpolated into
+  // it. See DOWNGRADE_ADVICE_BY_LAYOUT for why the leak is closed structurally.
+  const advice = selectDowngradeAdvice(storageLayout);
   const downgrade = `<p>${escapeHtml(
-    t(
-      'FABRICATE.Migration.Recovery.Downgrade',
-      { version: downgradeTarget },
-      `Recommended: downgrade Fabricate to version ${downgradeTarget} to keep using your existing data without manual remediation.`
-    )
+    t(advice.promptKey, { version: downgradeTarget }, advice.promptFallback(downgradeTarget))
   )}</p>`;
 
   let documentsBlock = '';

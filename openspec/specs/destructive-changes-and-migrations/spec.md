@@ -222,6 +222,10 @@ The action's stated purpose and its confirmation prompt must name description re
 - A migration may return a payload containing only the keys it mutates; the runner spread-merges the return over the accumulated payload so untouched keys pass through intact.
 This is what makes partial returns (e.g. the 0.1.0 migration returning only `{ recipes, systems }`, or a gathering migration returning only `{ gatheringConfig }`) safe.
 - Migrations must be idempotent -- running the same migration twice on the same data must produce identical output.
+- A migration MUST NOT depend on corpus order.
+`data-models/spec.md § Granular Definition Storage` already declares corpus order non-semantic; this states the consequence for migrations, whose input order changes with the arrangement.
+A migration MUST derive nothing from record position, and any cross-record reconciliation MUST produce a set-equal result under permutation.
+A migration that accumulates references into a list MAY produce a permuted list; that list is a set and no consumer may depend on its order.
 - Migration metadata SHOULD include a `downgradeTo` (Fabricate module version string) used for GM recovery guidance when migration aborts.
 
 ### Startup Migration Flow
@@ -253,6 +257,17 @@ On module initialization (on the primary-GM client):
 14. Update `fabricate.migrationVersion` to the highest version among successfully executed migrations.
 15. Log a summary of how many migrations ran.
 
+**The granularly-stored setting's writeback is ordered first.**
+When one of the five migrated settings is stored granularly its writeback is more than one operation and is the only one that can partially commit, so it MUST be issued before the other four and the `fabricate.migrationVersion` bump MUST remain the last write of the pass.
+The ordering exists to minimise the set of cross-setting states a tear can produce, not to protect the version: the version bump is unconditionally last in every ordering.
+A tear in the granular leg MUST abandon the remaining writes rather than continue, because a sibling setting written against records that did not land is a dangling reference the re-run cannot reconstruct, its source fields having already been consumed.
+
+**The corpus read and writeback MUST be error-contained.**
+A granular corpus read or write can fail for reasons a whole-array setting write cannot: an unparseable record document, an unavailable document class, a hook vetoing one document in a bulk leg, or a stale index.
+The pass MUST contain those failures, persist nothing further, leave `fabricate.migrationVersion` un-advanced, and report to the GM.
+It MUST NOT let the rejection escape the module's readiness callback: the hook dispatcher's error handling is synchronous, so a rejection from an async callback surfaces only as an unhandled console rejection — no notification, no error hook — and the module is left with no managers and a readiness promise that never settles.
+A write-failure report MUST instruct a reload, because the migrations have already transformed the session's own setting values while nothing was persisted; a refusal that runs before any migration — an unsettled corpus, or a corpus that could not be read — MUST NOT, because nothing in the session was touched.
+
 ### Per-Migration Error Handling
 
 - If an individual migration throws an error, log a warning with the migration label and error message: `Fabricate | Migration "<label>" failed: <message>`.
@@ -266,8 +281,15 @@ On module initialization (on the primary-GM client):
 
 When a migration pass aborts, Fabricate must provide explicit GM guidance:
 
-1. Print a clear console header: `Fabricate | Migration aborted. Existing data has been kept unchanged.`
-2. Print a recommended downgrade target version (`downgradeTo`) so the GM can continue using existing data without immediate manual remediation.
+1. Print a clear console header scoped to the pass that aborted: `Fabricate | Migration aborted. This pass saved nothing: your stored data is exactly as it was before this startup. Reload Foundry to discard this session's partly-migrated copy.`
+The assurance states that THIS PASS persisted nothing.
+It MUST NOT be phrased as a claim that a failed migration leaves data unchanged — a non-fatal migration error is logged and the pass continues, advancing the version past the failed migration and writing — and MUST NOT be phrased so it reads as an assurance about the multi-setting writeback or a storage conversion, neither of which is all-or-nothing.
+It is a claim about STORED data: a setting's value is initialized once and handed back by reference, so an in-place migration transforms the session's own copy and a reload is what discards it.
+The assurance and the downgrade advice MUST be changed together and MUST NOT be split across revisions: "your data is unchanged" beside "downgrade to keep using it" reads as "safe to go back", when on a converted world the truth is "intact, and unreadable by the build you are going back to".
+2. Print a recommended downgrade action, selected by the recipe Definition Storage Layout.
+The recommendation to downgrade in order to keep using existing data is false on a world whose definition storage has been converted: the older build has no granular reader, serves the registered empty default, and then re-creates the legacy document from an empty-derived corpus, so the GM authors into a corpus the next upgrade discards.
+Guidance MUST read the layout and, when it is granular, tell the GM to set the Recipe Storage Arrangement back to the combined-record option, RELOAD, and let the reverse conversion complete BEFORE downgrading — stating that it can only be run on the current build, because after a downgrade there is no code left to run it with.
+It MUST select a complete localized sentence per layout, with a safe default for an unreadable layout, and MUST NOT interpolate a layout value into any GM-facing string: the layout enumeration carries a member (`unsettled`) that the operator-facing choices map has no label for and never will.
 3. Print explicit, per-document fix instructions for each failure:
    - document type (`recipe` or `craftingSystem`)
    - document ID/name
@@ -282,7 +304,8 @@ When a migration pass aborts, Fabricate must provide explicit GM guidance:
 Because `migrationVersion` is unchanged on abort, the pending migrations re-run automatically on the next world reload after the GM fixes or deletes the failed documents; the fix/retry choice is informational and triggers no same-pass retry.
 
 The prompt's DialogV2 configuration (window title, content mirroring the console guidance, both choices, and the `Keep existing data` default) is produced by a pure builder (`src/migration/migrationRecoveryPrompt.js`) so the default choice is unit-testable without Foundry.
-The runner exposes a `promptRecovery` seam invoked with `{ downgradeTo, documents, label }` on abort; `src/main.js` `_runMigrations` wires the thin Foundry edge that opens DialogV2 from that config.
+The runner exposes a `promptRecovery` seam invoked with `{ downgradeTo, documents, label, storageLayout }` on abort; `src/main.js` `_runMigrations` wires the thin Foundry edge that opens DialogV2 from that config.
+The layout reaches both surfaces from the value the pass already resolved, never from a second read: a re-read at guidance time can report a layout a remote conversion moved mid-pass, and the message must describe the pass that just failed.
 
 ### Write-on-Change Persistence
 

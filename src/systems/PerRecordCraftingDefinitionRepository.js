@@ -322,9 +322,16 @@ function defaultSettingDocumentClass() {
  * The world `Setting` collection — a `WorldSettings` instance holding every world-scoped
  * `Setting` document the client received at connect.
  *
- * @returns {Iterable<any>|null}
+ * Exported so a caller that must distinguish "no records" from "could not read the
+ * collection at all" can resolve it itself and refuse (issue 1242). This module cannot make
+ * that distinction for everyone: {@link PerRecordCraftingDefinitionRepository#refreshIndex}
+ * treats an unresolvable collection as empty, which is right for a manager serving a UI and
+ * wrong for a whole-corpus reduction that would then persist a decision made from no
+ * evidence.
+ *
+ * @returns {Iterable<any>|null} `null` when the collection cannot be resolved at all.
  */
-function defaultWorldSettingCollection() {
+export function defaultWorldSettingCollection() {
   return globalThis.game?.settings?.storage?.get('world') ?? null;
 }
 
@@ -597,6 +604,48 @@ export class PerRecordCraftingDefinitionRepository extends CraftingDefinitionRep
       if (!desired.has(id)) removals.add(id);
     }
     await this._writeLegs(this._differential(desired, removals, { skipUnchanged: true }));
+  }
+
+  /**
+   * Persist a record set with **no delete leg**: creates and updates only (issue 1242).
+   *
+   * The startup migration pass is the caller this exists for. It reads a corpus, hands it to
+   * a chain of transformations, and writes the result back — and it is NOT a corpus
+   * reconciler. {@link PerRecordCraftingDefinitionRepository#putAll} derives its removals
+   * from the corpus it is handed, which is exactly right for the whole-corpus reconciler the
+   * reverse Storage Layout Conversion's step 4 relies on and exactly wrong here: the pass
+   * hands over the payload it was given, and any record its read did not observe — a record
+   * created by another client after the index was built, say — would be DELETED by a
+   * whole-corpus write.
+   *
+   * The cost of that choice is that this writer **cannot express removal**. A record dropped
+   * by a transformation keeps its document, is read back on the next pass, and has its
+   * removal silently undone while the version records success. The incapacity is real and
+   * cannot be fixed here, so the caller carries the obligation: a caller MUST verify that
+   * every record id it read is present in the set it is about to write — by id-set
+   * containment, never by count, because a count is blind to a remove-plus-add — and MUST
+   * refuse otherwise. `data-models/spec.md § Granular Definition Storage` states that as a
+   * requirement; `recipeCorpus.js` is where it is enforced.
+   *
+   * `skipUnchanged` is not optional. Without it a migration editing three records of four
+   * thousand issues four thousand update entries, re-stamps four thousand `_stats`, and
+   * broadcasts one `modifyDocument` whose receiver fires four thousand `updateSetting` hooks
+   * synchronously on every connected client — which inverts the goal the granular backend
+   * exists to serve. Note it compares `JSON.stringify` output and is therefore key-order
+   * sensitive: a transformation that REBUILDS a record object with a different key order
+   * defeats the skip and issues an update. That is a cost, never a correctness fault.
+   *
+   * @param {Iterable<object>} records
+   * @returns {Promise<void>}
+   */
+  async createOrUpdateAll(records) {
+    const desired = new Map();
+    for (const record of records) {
+      const id = this._identify(record);
+      if (id == null) throw new Error('Cannot persist a crafting definition with no id');
+      desired.set(String(id), record);
+    }
+    await this._writeLegs(this._differential(desired, new Set(), { skipUnchanged: true }));
   }
 
   /**

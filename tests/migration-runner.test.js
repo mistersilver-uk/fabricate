@@ -889,8 +889,10 @@ test('fatal abort emits GM recovery guidance: header, downgrade target, per-docu
   const out = lines.error.join('\n');
 
   assert.ok(
-    out.includes('Fabricate | Migration aborted. Existing data has been kept unchanged.'),
-    'exact abort header present'
+    out.includes(
+      "Fabricate | Migration aborted. This pass saved nothing: your stored data is exactly as it was before this startup. Reload Foundry to discard this session's partly-migrated copy."
+    ),
+    'exact abort header present, scoped to the pass that aborted (issue 1242)'
   );
   assert.ok(out.includes('1.2.0'), 'recommended downgrade target present');
   assert.ok(out.includes('downgrade'), 'downgrade recommendation phrased as guidance');
