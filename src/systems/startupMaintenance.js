@@ -36,6 +36,11 @@ export const STARTUP_PASS_ENTITY_KINDS = Object.freeze({
  * by throwing. `runStartupMaintenance` below catches every throw into a failure label, so a
  * guard that throws from inside a pass arrives after the destructive work has landed.
  *
+ * **Shared with the mutation-time door.** `mutationCleanupComposition.js` (issue 1226)
+ * calls this same builder with its own `declarations` table, so the startup gate and the
+ * gate on recipe/system deletion cannot drift into two gates with different rules. The
+ * name is historical; nothing in the body is startup-specific.
+ *
  * **An undeclared pass is omitted**, so a future destructive pass cannot ship ungated by
  * forgetting to declare a basis for it. A pass whose declared kind is missing from `basis`
  * is omitted for the same reason: `basis[kind] === true` is required positively, because

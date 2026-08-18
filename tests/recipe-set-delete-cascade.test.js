@@ -22,6 +22,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { installFoundryEnv } from './helpers/foundryEnv.js';
+import { seedKnownCompleteValidIdBasis } from './helpers/validIdBasis.js';
 import { describeRecipeDeleteImpact } from '../src/utils/recipeDeleteImpact.js';
 
 installFoundryEnv();
@@ -172,6 +173,17 @@ function makeFixture({
     SETTING_KEYS.CRAFTING_SYSTEMS,
     JSON.parse(JSON.stringify([...manager.systems.values()]))
   );
+
+  // The **Valid Id Basis** this suite's actor-flag claims depend on (issue 1226). The
+  // corpus-derived sweep behind `deleteRecipes` runs only against a corpus the managers can
+  // attest is whole, and a fixture that seeds its maps directly ran no corpus read to
+  // attest — so without this every "one flag pass" assertion below would be asserting the
+  // gate's CLOSED direction while claiming to assert the cascade. Seeded to a healthy
+  // `singleArray` world, which is what every world reads until a GM converts.
+  seedKnownCompleteValidIdBasis(env.settings, {
+    recipeManager,
+    craftingSystemManager: manager,
+  });
 
   const visibility = new RecipeVisibilityService(recipeManager, manager);
   let flagPasses = 0;

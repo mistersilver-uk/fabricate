@@ -90,6 +90,7 @@ import { createArrangementWriteGuard } from './definitionStorageArrangement.js';
 import { readDefinitionStorageLayout } from './definitionStorageLayout.js';
 import { normalizeGatheringRealmList, normalizeGatheringRealmSettings } from './gatheringRealms.js';
 import { ALL_INVALIDATION_DOMAINS, domainsForSystemFields } from './invalidationDomains.js';
+import { runGatedMutationCleanup } from './mutationCleanupComposition.js';
 import { normalizePreviewSandbox } from './progressiveCheckSandbox.js';
 import { RecipeActivationError } from './RecipeActivationError.js';
 import { RecipePersistenceError } from './RecipePersistenceError.js';
@@ -3845,7 +3846,7 @@ export class CraftingSystemManager {
 
     this._notifySystemsChanged();
     if (resolutionModeChanged) {
-      await this._cleanupCraftingPreferences();
+      await this._cleanupCraftingPreferences({ subject: 'a resolution-mode change' });
     }
     return merged;
   }
@@ -4069,9 +4070,15 @@ export class CraftingSystemManager {
     // system stranded in persisted settings.
     const affected = this.recipeManager.getRecipes({ craftingSystemId: systemId });
     const failedRecipeIds = [];
+    // The ids this deletion actually removed, which is what the mutation-time Valid Id
+    // Basis gate falls back to pruning when the corpus cannot be attested complete
+    // (issue 1226). A recipe whose own delete FAILED is not in here: its flags are not
+    // orphaned, because the recipe is still there.
+    const deletedRecipeIds = [];
     for (const recipe of affected) {
       try {
         await this.recipeManager.deleteRecipe(recipe.id, { notify: false, cleanupFlags: false });
+        deletedRecipeIds.push(recipe.id);
       } catch (error) {
         failedRecipeIds.push(recipe.id);
         console.error(
@@ -4085,7 +4092,7 @@ export class CraftingSystemManager {
     this.systems.delete(systemId);
     await this.save({ delete: systemId, domains: ALL_INVALIDATION_DOMAINS });
 
-    await this._cleanupSystemScopedState(systemId);
+    await this._cleanupSystemScopedState(systemId, { removedRecipeIds: deletedRecipeIds });
 
     this._notifySystemsChanged();
 
@@ -4127,9 +4134,19 @@ export class CraftingSystemManager {
    * this method runs the one bulk pass after the recipes and the system have
    * already been removed, so the derived valid-id set excludes them.
    *
+   * **Which of these prunes needs a Valid Id Basis** (issue 1226). Everything above the
+   * learned-recipe block is SUBJECT-TARGETED — `cleanupByCraftingSystem`,
+   * `removeRunsForSystem`, `removeSystem` each name the system the GM just deleted, so a
+   * partial corpus cannot make them remove anything that was not doomed. Only the
+   * learned-recipe sweep and the preference sweep are CORPUS-DERIVED, and only those two
+   * are gated; see `mutationCleanupComposition.js` for the distinction.
+   *
    * @param {string} systemId
+   * @param {object} [options]
+   * @param {Iterable<string>} [options.removedRecipeIds] The recipes this deletion actually
+   *   removed, pruned directly when the corpus-derived sweep is refused.
    */
-  async _cleanupSystemScopedState(systemId) {
+  async _cleanupSystemScopedState(systemId, { removedRecipeIds = [] } = {}) {
     const environmentStore = this._getGatheringEnvironmentStore();
     if (environmentStore?.cleanupByCraftingSystem) {
       try {
@@ -4181,15 +4198,31 @@ export class CraftingSystemManager {
     const visibilityService = this._getRecipeVisibilityService();
     if (visibilityService?.cleanupLearnedRecipes) {
       try {
+        const removed = [...(removedRecipeIds || [])]
+          .map((id) => String(id ?? '').trim())
+          .filter(Boolean);
         const validRecipeIds = new Set(this.recipeManager.getRecipes({}).map((r) => r.id));
-        await visibilityService.cleanupLearnedRecipes(validRecipeIds);
+        await runGatedMutationCleanup({
+          passes: [
+            {
+              label: 'orphaned learned recipes',
+              sweep: () => visibilityService.cleanupLearnedRecipes(validRecipeIds),
+              targeted:
+                removed.length > 0 ? () => visibilityService.forgetDeletedRecipes?.(removed) : null,
+            },
+          ],
+          recipeManager: this.recipeManager,
+          craftingSystemManager: this,
+          getSetting,
+          subject: 'a crafting-system deletion',
+        });
       } catch (error) {
         console.error('Fabricate | learned-recipe cleanup failed for system', systemId, error);
       }
     }
 
     try {
-      await this._cleanupCraftingPreferences();
+      await this._cleanupCraftingPreferences({ subject: 'a crafting-system deletion' });
     } catch (error) {
       console.error('Fabricate | preference cleanup failed for system', systemId, error);
     }
@@ -6288,7 +6321,7 @@ export class CraftingSystemManager {
     // and then `RecipeVisibilityService.cleanupLearnedRecipes`. Pre-existing and correct —
     // they clear different stores — but it is one clean-up per SET rather than per recipe,
     // which is the batching claim, and "a single actor-flag pass" was never true of it.
-    await this.recipeManager.cleanupOrphanedRecipeFlags?.();
+    await this.recipeManager.cleanupOrphanedRecipeFlags?.({ removedRecipeIds: outcome.recipeIds });
 
     // ---- 4. both change hooks ---------------------------------------------------------
     if (recipeItemsRewritten > 0 && options.notifySystems !== false) this._notifySystemsChanged();
@@ -7115,12 +7148,54 @@ export class CraftingSystemManager {
     }
   }
 
-  async _cleanupCraftingPreferences() {
-    const validSystemIds = new Set(this.getSystems().map((system) => system.id));
+  /**
+   * Reconcile the GM's crafting preferences against the live corpus, gated on the **Valid
+   * Id Basis** (issue 1226).
+   *
+   * Entirely CORPUS-DERIVED and entirely a whole-value replacement: it blanks
+   * `lastManagedCraftingSystem`/`lastAlchemySystem` when the corpus does not name them, and
+   * rewrites the whole `progressiveResultOrder` map. Under `user` scope that map is a
+   * REPLICATED document write, destructive across every device the player uses, so a
+   * partial corpus here is not a cosmetic loss. There is no targeted fallback — nothing
+   * here names a subject the caller removed — and the startup `stale preferences` pass
+   * reconciles it on the next known-complete boot.
+   *
+   * **The component ids are passed** (issue 1226). They never were, so `validComponentIds`
+   * took its empty-set default and every `salvage:<componentId>` progressive-order key was
+   * dropped on every resolution-mode change and every system deletion — a corpus-derived
+   * prune against a basis of nothing, which is this gate's own failure mode reached without
+   * any conversion at all. The union declaration in `MUTATION_CLEANUP_ENTITY_KINDS` is what
+   * keeps the two halves honest: this pass rewrites ONE map holding both key scopes, so it
+   * runs only when recipes, systems and components are all known-complete.
+   *
+   * @param {object} [options]
+   * @param {string} [options.subject] What the GM did, named in an omission warning.
+   */
+  async _cleanupCraftingPreferences({ subject = 'a crafting-system change' } = {}) {
+    const systems = this.getSystems();
+    const validSystemIds = new Set(systems.map((system) => system.id));
     const validRecipeIds = new Set(this.recipeManager.getRecipes({}).map((recipe) => recipe.id));
-    await cleanupStalePreferences(validSystemIds, validRecipeIds, getSetting, setSetting, {
-      resolveGatheringActor: (actorId) => game.actors?.get?.(actorId) ?? null,
-      isSelectableGatheringActor: (actor) => isGatheringActorSelectableByUser(actor, game.user),
+    const validComponentIds = new Set(
+      systems.flatMap((system) => (system.components || []).map((component) => component.id))
+    );
+    await runGatedMutationCleanup({
+      passes: [
+        {
+          label: 'orphaned crafting preferences',
+          sweep: () =>
+            cleanupStalePreferences(validSystemIds, validRecipeIds, getSetting, setSetting, {
+              resolveGatheringActor: (actorId) => game.actors?.get?.(actorId) ?? null,
+              isSelectableGatheringActor: (actor) =>
+                isGatheringActorSelectableByUser(actor, game.user),
+              validComponentIds,
+            }),
+          targeted: null,
+        },
+      ],
+      recipeManager: this.recipeManager,
+      craftingSystemManager: this,
+      getSetting,
+      subject,
     });
   }
 }
