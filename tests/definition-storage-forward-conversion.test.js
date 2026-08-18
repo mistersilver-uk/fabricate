@@ -43,7 +43,11 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { describe, it } from 'node:test';
 
-import { DEFINITION_STORAGE_LAYOUTS, SETTING_KEYS } from '../src/config/settings.js';
+import {
+  DEFINITION_STORAGE_LAYOUTS,
+  DEFINITION_STORAGE_TARGETS,
+  SETTING_KEYS,
+} from '../src/config/settings.js';
 import {
   getHighestRegisteredMigrationVersion,
   MigrationRunner,
@@ -739,10 +743,19 @@ describe('destructive startup passes are omitted throughout the conversion', () 
         recipeManager,
         craftingSystemManager: {
           getSystems: () => [{ id: 'sys-1', components: [{ id: 'c1' }] }],
+          // Issue 1212: the composite reports the CONTAINER and the extracted COMPONENT
+          // class separately, because the two diverge. This world never converts components,
+          // so the component half reports the shipped default arrangement.
           describeDefinitionStorage: () => ({
             granular: false,
             arrangement: null,
             layoutAtCorpusRead: null,
+            systems: { granular: false, arrangement: null, layoutAtCorpusRead: null },
+            components: {
+              granular: false,
+              arrangement: DEFINITION_STORAGE_TARGETS.SINGLE_ARRAY,
+              layoutAtCorpusRead: DEFINITION_STORAGE_LAYOUTS.SINGLE_ARRAY,
+            },
           }),
         },
         craftingRunManager: {

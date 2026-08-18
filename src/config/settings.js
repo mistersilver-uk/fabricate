@@ -79,6 +79,13 @@ export const SETTING_KEYS = Object.freeze({
   // per-record backend registers.
   RECIPE_STORAGE_LAYOUT: 'recipeStorageLayout',
   RECIPE_STORAGE_TARGET: 'recipeStorageTarget',
+  // Issue 1212 (-d): the observed and intended arrangement of COMPONENT definition storage.
+  // An INDEPENDENT pair, never shared with the recipe one: `data-models/spec.md` § Granular
+  // Definition Storage requires one pair per entity class, because converting one class
+  // would otherwise appear to un-settle the other and re-gate every destructive startup pass
+  // for a corpus that is already converted.
+  COMPONENT_STORAGE_LAYOUT: 'componentStorageLayout',
+  COMPONENT_STORAGE_TARGET: 'componentStorageTarget',
 });
 
 /**
@@ -140,7 +147,62 @@ export const RECIPE_STORAGE_ARRANGEMENT_UNKNOWN_LABEL_KEY =
   'FABRICATE.Settings.RecipeStorageTarget.UnknownArrangement';
 
 /**
- * The localization key naming one recipe storage arrangement, for a GM-facing sentence.
+ * The localized labels the COMPONENT Definition Storage Target's `config: true` row offers.
+ *
+ * **Deliberately not copied from the recipe pair** (issue 1212). "One combined record" is
+ * accurate for recipes, whose corpus really does live in one setting key, and misleading for
+ * components: a GM reading it cannot tell WHICH record, and the truthful answer is that a
+ * component sits nested inside the crafting system that owns it. The two enumerations happen
+ * to share their VALUES and share none of their prose.
+ *
+ * The same hand-maintained-mirror hazard applies as to the recipe map above — a `choices` map
+ * missing a stored value renders the raw key in the dropdown and offers the GM no way back to
+ * it — so `tests/component-storage-target-control.test.js` asserts that every target has a
+ * label and that every label resolves in `lang/en.json`.
+ *
+ * @type {Readonly<Record<string, string>>}
+ */
+export const COMPONENT_STORAGE_TARGET_CHOICES = Object.freeze({
+  [DEFINITION_STORAGE_TARGETS.SINGLE_ARRAY]:
+    'FABRICATE.Settings.ComponentStorageTarget.SingleArray',
+  [DEFINITION_STORAGE_TARGETS.PER_RECORD]: 'FABRICATE.Settings.ComponentStorageTarget.PerRecord',
+});
+
+/**
+ * The label for an arrangement {@link COMPONENT_STORAGE_TARGET_CHOICES} has no entry for.
+ *
+ * @see RECIPE_STORAGE_ARRANGEMENT_UNKNOWN_LABEL_KEY for why a miss arm is required at all.
+ */
+export const COMPONENT_STORAGE_ARRANGEMENT_UNKNOWN_LABEL_KEY =
+  'FABRICATE.Settings.ComponentStorageTarget.UnknownArrangement';
+
+/**
+ * One entity class's arrangement-label descriptor: its choices map and its miss arm.
+ *
+ * A descriptor rather than a second copy of the helper (issue 1212). The MISS ARM RULE is
+ * entity-neutral — the LAYOUT enumeration carries `unsettled`, which no operator-facing
+ * choices map has a label for and never will — and a second copy of the helper re-acquires
+ * the `String(value)` leak that issue 1211 repaired. The labels differ per class and are
+ * supplied here.
+ *
+ * @typedef {{choices: Readonly<Record<string, string>>, unknownLabelKey: string}}
+ *   DefinitionStorageArrangementDescriptor
+ */
+
+/** @type {DefinitionStorageArrangementDescriptor} */
+export const RECIPE_STORAGE_ARRANGEMENT_DESCRIPTOR = Object.freeze({
+  choices: RECIPE_STORAGE_TARGET_CHOICES,
+  unknownLabelKey: RECIPE_STORAGE_ARRANGEMENT_UNKNOWN_LABEL_KEY,
+});
+
+/** @type {DefinitionStorageArrangementDescriptor} */
+export const COMPONENT_STORAGE_ARRANGEMENT_DESCRIPTOR = Object.freeze({
+  choices: COMPONENT_STORAGE_TARGET_CHOICES,
+  unknownLabelKey: COMPONENT_STORAGE_ARRANGEMENT_UNKNOWN_LABEL_KEY,
+});
+
+/**
+ * The localization key naming one storage arrangement, for a GM-facing sentence.
  *
  * A TOTAL function, deliberately: `data-models/spec.md` forbids a value-to-label helper from
  * falling back to rendering the raw value, and forbidding the leak says what the helper must
@@ -148,11 +210,32 @@ export const RECIPE_STORAGE_ARRANGEMENT_UNKNOWN_LABEL_KEY =
  * interpolate this label, so it must still yield a readable phrase for every value — which
  * is why the miss arm is a localization key and not an empty string.
  *
+ * @param {DefinitionStorageArrangementDescriptor} descriptor the entity class's labels.
+ * @param {*} value a Definition Storage TARGET, a LAYOUT, or anything unreadable.
+ * @returns {string} a localization key that always resolves.
+ */
+export function definitionStorageArrangementLabelKey(descriptor, value) {
+  return descriptor?.choices?.[value] ?? descriptor?.unknownLabelKey ?? '';
+}
+
+/**
+ * The localization key naming one RECIPE storage arrangement.
+ *
  * @param {*} value a Definition Storage TARGET, a LAYOUT, or anything unreadable.
  * @returns {string} a localization key that always resolves.
  */
 export function recipeStorageArrangementLabelKey(value) {
-  return RECIPE_STORAGE_TARGET_CHOICES[value] ?? RECIPE_STORAGE_ARRANGEMENT_UNKNOWN_LABEL_KEY;
+  return definitionStorageArrangementLabelKey(RECIPE_STORAGE_ARRANGEMENT_DESCRIPTOR, value);
+}
+
+/**
+ * The localization key naming one COMPONENT storage arrangement.
+ *
+ * @param {*} value a Definition Storage TARGET, a LAYOUT, or anything unreadable.
+ * @returns {string} a localization key that always resolves.
+ */
+export function componentStorageArrangementLabelKey(value) {
+  return definitionStorageArrangementLabelKey(COMPONENT_STORAGE_ARRANGEMENT_DESCRIPTOR, value);
 }
 
 // The target version for the one-shot recipe-item flag auto-stamp. When the stored
@@ -456,6 +539,34 @@ const BASE_DEFINITIONS = Object.freeze({
     config: true,
     type: String,
     choices: RECIPE_STORAGE_TARGET_CHOICES,
+    default: DEFINITION_STORAGE_TARGETS.SINGLE_ARRAY,
+  },
+  // Issue 1212 (-d), the COMPONENT pair. Independent of the recipe pair in state (per
+  // `data-models/spec.md` § Granular Definition Storage) and in prose.
+  //
+  // The LAYOUT stays `config: false` permanently, for the reason stated against the recipe
+  // layout above: it records how storage is arranged NOW, it is written by the Storage
+  // Layout Conversion, and it is that conversion's sole crash-recovery discriminator. A
+  // hand-edited layout is indistinguishable from a real one and either direction presents an
+  // empty component library over a corpus that is intact.
+  [SETTING_KEYS.COMPONENT_STORAGE_LAYOUT]: {
+    name: 'Component Definition Storage Layout',
+    scope: 'world',
+    config: false,
+    type: String,
+    default: DEFINITION_STORAGE_LAYOUTS.SINGLE_ARRAY,
+  },
+  // No `onChange`, for the three reasons stated against the recipe target above — the shared
+  // setting listener in `main.js` already routes this key through `settingChangeBridge`, so
+  // registering one would DOUBLE-FIRE, and here that means starting two concurrent Storage
+  // Layout Conversions over the same corpus.
+  [SETTING_KEYS.COMPONENT_STORAGE_TARGET]: {
+    name: 'FABRICATE.Settings.ComponentStorageTarget.Name',
+    hint: 'FABRICATE.Settings.ComponentStorageTarget.Hint',
+    scope: 'world',
+    config: true,
+    type: String,
+    choices: COMPONENT_STORAGE_TARGET_CHOICES,
     default: DEFINITION_STORAGE_TARGETS.SINGLE_ARRAY,
   },
 });

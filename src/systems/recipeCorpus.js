@@ -78,6 +78,7 @@
 
 import { DEFINITION_STORAGE_LAYOUTS, SETTING_KEYS } from '../config/settings.js';
 
+import { memoizeLayout, selectDefinitionCorpusArm } from './definitionCorpusArms.js';
 import { createArrangementWriteGuard } from './definitionStorageArrangement.js';
 import { perRecordRecipeStore } from './definitionStorageConversion.js';
 import { defaultWorldSettingCollection } from './PerRecordCraftingDefinitionRepository.js';
@@ -148,12 +149,8 @@ function recordId(record) {
  */
 export function createRecipeCorpus({ getSetting, setSetting, documentClass, collection }) {
   const readLayout = () => readRecipeStorageLayout(getSetting);
-
-  let memoizedLayout;
-  const layout = () => {
-    if (memoizedLayout === undefined) memoizedLayout = readLayout();
-    return memoizedLayout;
-  };
+  // The memo is what the ARM selection reads; `readLayout` stays LIVE for the write guard.
+  const layout = memoizeLayout(readLayout);
 
   // Captured at read time so the shrink refusal compares against what THIS pass observed
   // rather than against whatever storage holds by the time the writeback runs.
@@ -232,18 +229,10 @@ export function createRecipeCorpus({ getSetting, setSetting, documentClass, coll
     },
   };
 
-  // A POSITIVE lookup keyed on the three recognised layout values, never a truthiness test
-  // and never a `?? null` narrowing. `singleArray` is listed explicitly even though it shares
-  // the legacy arm with the default, because the enumeration is the statement: an arm is
-  // selected by RECOGNISING a layout, and everything else — absent, unrecognised, `[]`,
-  // `null` — falls out of the map to the legacy arrangement.
-  const ARM_BY_LAYOUT = new Map([
-    [DEFINITION_STORAGE_LAYOUTS.SINGLE_ARRAY, legacyArm],
-    [DEFINITION_STORAGE_LAYOUTS.PER_RECORD, granularArm],
-    [DEFINITION_STORAGE_LAYOUTS.UNSETTLED, unsettledArm],
-  ]);
-
-  const selectArm = () => ARM_BY_LAYOUT.get(layout()) ?? legacyArm;
+  // Shared with the crafting-system corpus accessor (issue 1212): the ARMS differ per entity
+  // class and the SELECTION does not, and the selection is the half a copy gets subtly wrong.
+  const selectArm = () =>
+    selectDefinitionCorpusArm(layout(), { legacyArm, granularArm, unsettledArm });
 
   return {
     layout,

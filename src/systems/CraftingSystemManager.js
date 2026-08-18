@@ -12,7 +12,12 @@ import {
   cleanupStalePreferences,
   isGatheringActorSelectableByUser,
 } from '../config/preferencesCleanup.js';
-import { getSetting, setSetting, SETTING_KEYS } from '../config/settings.js';
+import {
+  DEFINITION_STORAGE_TARGETS,
+  getSetting,
+  setSetting,
+  SETTING_KEYS,
+} from '../config/settings.js';
 import { migrateRecipeForModeChange } from '../migration/migrateRecipeForModeChange.js';
 import { deriveToolSourceFromComponents } from '../migration/migrateToolsToFirstClass.js';
 import { Tool, TOOL_BREAKAGE_MODES as TOOL_BREAKAGE_MODE_LIST } from '../models/Tool.js';
@@ -71,6 +76,8 @@ import {
   resolveMaxModifierPicks,
   resolveModifierBounds,
 } from './checkModifierResolver.js';
+import { componentsOf, parseComponentRecordKey } from './componentRecords.js';
+import { CompositeCraftingSystemRepository } from './CompositeCraftingSystemRepository.js';
 import {
   craftingDataChange,
   domainsForRecord,
@@ -79,6 +86,8 @@ import {
 } from './craftingDataChange.js';
 import { applyDefinitionChange } from './CraftingDefinitionRepository.js';
 import { normalizeCurrencyConfig } from './currencyProfile.js';
+import { createArrangementWriteGuard } from './definitionStorageArrangement.js';
+import { readDefinitionStorageLayout } from './definitionStorageLayout.js';
 import { normalizeGatheringRealmList, normalizeGatheringRealmSettings } from './gatheringRealms.js';
 import { ALL_INVALIDATION_DOMAINS, domainsForSystemFields } from './invalidationDomains.js';
 import { normalizePreviewSandbox } from './progressiveCheckSandbox.js';
@@ -90,7 +99,6 @@ import {
   REVISION_SCOPES,
   RevisionRegistry,
 } from './revisionTokens.js';
-import { SettingsCraftingDefinitionRepository } from './SettingsCraftingDefinitionRepository.js';
 import { SignatureValidator } from './SignatureValidator.js';
 
 // Membership sets derived from the canonical Tool model vocabularies, so the
@@ -113,6 +121,39 @@ const RECIPE_ITEM_FACTS = domainsForSystemFields(['recipeItemDefinitions']);
 const ESSENCE_FACTS = domainsForSystemFields(['essenceDefinitions', 'components']);
 // `repairItemData` refreshes definition names, images and descriptions for BOTH libraries.
 const ITEM_METADATA_FACTS = domainsForSystemFields(['components', 'tools']);
+
+/**
+ * The **Definition Storage Target** for components, read defensively (issue 1212).
+ *
+ * The same fail direction as `RecipeManager`'s recipe target reader, and for the same reason:
+ * `game.settings.get` throws for an unregistered key, `game` is absent in a great many unit
+ * fixtures that construct a bare manager, and an unreadable target must never be able to
+ * PROMOTE a world onto the granular backend — only ever leave it where it already is.
+ *
+ * @returns {string} a member of `DEFINITION_STORAGE_TARGETS`.
+ */
+function readComponentStorageTarget() {
+  try {
+    return (
+      getSetting(SETTING_KEYS.COMPONENT_STORAGE_TARGET) ?? DEFINITION_STORAGE_TARGETS.SINGLE_ARRAY
+    );
+  } catch {
+    return DEFINITION_STORAGE_TARGETS.SINGLE_ARRAY;
+  }
+}
+
+/**
+ * The **Definition Storage Layout** for components, read defensively (issue 1212).
+ *
+ * The OPPOSITE fail direction from the target reader above, and the contrast is deliberate:
+ * this one feeds the Valid Id Basis, where a defaulted value is a claim that the corpus about
+ * to be read is whole.
+ *
+ * @returns {string|null}
+ */
+function readComponentStorageLayout() {
+  return readDefinitionStorageLayout(SETTING_KEYS.COMPONENT_STORAGE_LAYOUT, getSetting);
+}
 
 export class CraftingSystemManager {
   /**
@@ -152,15 +193,23 @@ export class CraftingSystemManager {
     // `_normalizeSystem`. That normalizer is a WHITELIST REBUILD — a key it does not
     // emit is dropped from storage on the next save — so the repository must call it
     // rather than carry any approximation of the persisted shape.
-    this._repository =
-      seams.repository ??
-      new SettingsCraftingDefinitionRepository({
-        settingKey: SETTING_KEYS.CRAFTING_SYSTEMS,
-        corpus: () => this.systems,
-        hydrate: (raw) => this._normalizeSystem(raw),
-        serialize: (system) => system,
-        scopeOf: (system) => system?.id ?? null,
-      });
+    //
+    // Issue 1212: the default is now the COMPOSITE, which writes the container record and
+    // the extracted component documents as one declared-order multi-write. Which arm it
+    // selects is decided ONCE, here, by the COMPONENT Definition Storage Target, exactly as
+    // `RecipeManager` selects its own from the recipe target — and under `singleArray`,
+    // which is every world until a GM converts, it delegates to the shipped settings adapter
+    // byte for byte.
+    //
+    // The arrangement that decision was made FOR is recorded alongside it, because it is the
+    // only fact about definition storage captured BEFORE `loadAll()` runs. An INJECTED
+    // repository reports `null`: nothing here knows what arrangement a caller-supplied
+    // adapter was built for, and a guess would be a fail-open guess.
+    this._ownsRepository = !seams.repository;
+    this._componentStorageArrangement = seams.repository ? null : readComponentStorageTarget();
+    /** @type {string|null} the component layout observed across the corpus read. */
+    this._componentLayoutAtCorpusRead = null;
+    this._repository = seams.repository ?? this._buildDefaultRepository();
     this._enrichToHtml = seams.enrichToHtml ?? ((text) => text);
     this._primeEnricherCache = seams.primeEnricherCache ?? (async () => {});
     // Active-GM gate for the un-versioned legacy recipe-item backfill run from
@@ -175,29 +224,116 @@ export class CraftingSystemManager {
   }
 
   /**
+   * The repository this manager builds when the caller injects none — the ONE place the
+   * crafting-system backend is chosen (issue 1212).
+   *
+   * @returns {import('./CraftingDefinitionRepository.js').CraftingDefinitionRepository}
+   * @private
+   */
+  _buildDefaultRepository() {
+    return new CompositeCraftingSystemRepository({
+      corpus: () => this.systems,
+      hydrate: (raw) => this._normalizeSystem(raw),
+      serialize: (system) => system,
+      arrangement: this._componentStorageArrangement,
+      // Issue 1232, generalised to the second class. Installed HERE — the one place the
+      // backend is chosen — so the guard cannot be selected separately from the adapter it
+      // guards, and installed on BOTH arms because the hazard is symmetric: a stale
+      // container adapter re-creates the nested components a forward conversion extracted,
+      // and a stale per-record adapter re-creates the documents a reverse conversion
+      // reclaimed. Before this the manager took the default no-op and neither refusal
+      // existed for components at all.
+      assertWritable: createArrangementWriteGuard({
+        arrangement: this._componentStorageArrangement,
+        readLayout: readComponentStorageLayout,
+      }),
+    });
+  }
+
+  /**
    * What this manager can attest about its own **Definition Storage**, for the Valid Id
    * Basis gate (issue 1224). Mirrors `RecipeManager#describeDefinitionStorage`.
    *
-   * Crafting systems have no layout/target pair and no granular backend today, so the
-   * whole corpus arrives in one read and there is no partial state for the gate to detect.
-   * The point of reporting anyway is that it is asked of the repository OBJECT: a granular
-   * repository injected here, or landed as this manager's default before its settings pair
-   * is registered, reports `granular: true` and the gate refuses to prune against it —
-   * which is the direction component extraction (#1212) trips, and the one a class-name
-   * check in a test cannot see.
+   * **Two reports, because the two classes now diverge** (issue 1212). The crafting-system
+   * CONTAINER has no layout/target pair and arrives in one whole-array read whichever
+   * arrangement components are on; the extracted COMPONENT class has its own pair and is
+   * granular whenever its layout says so. Answering the component basis from the container's
+   * report — which is what shipped while components rode inside `system.components` — would
+   * make a half-written component corpus known-complete BY CONSTRUCTION, and every
+   * destructive startup pass would run against it.
    *
-   * @returns {{granular: boolean, arrangement: string|null, layoutAtCorpusRead: string|null}}
+   * The top-level fields describe the CONTAINER and are unchanged, so a caller that asks only
+   * `granular` still gets the same answer it always did: a granular repository injected here
+   * reports `true` and the gate refuses to prune against it.
+   *
+   * @returns {{granular: boolean, arrangement: string|null, layoutAtCorpusRead: string|null,
+   *   systems: object, components: object}}
    */
   describeDefinitionStorage() {
-    return {
+    const container = {
       granular: this._repository?.storesRecordsGranularly?.() === true,
       arrangement: null,
       layoutAtCorpusRead: null,
     };
+    return {
+      ...container,
+      systems: container,
+      components: {
+        granular: this._repository?.componentsStoreRecordsGranularly?.() === true,
+        arrangement: this._componentStorageArrangement,
+        layoutAtCorpusRead: this._componentLayoutAtCorpusRead,
+      },
+    };
+  }
+
+  /**
+   * Re-choose this manager's backend after a completed component Storage Layout Conversion,
+   * and reload the corpus through it (issue 1212, mirroring #1232's recipe half).
+   *
+   * Without this a GM flipping Component Storage Arrangement mid-session converts the corpus
+   * while this manager stays on the pre-flip arm for the whole session — and either every
+   * later component write is refused by the arrangement guard with no notice, or, with no
+   * guard, the next `save()` re-writes the nested arrays the conversion has just extracted.
+   *
+   * **Only a SETTLED, agreeing pair rebuilds.** Mid-conversion the layout is `unsettled` and,
+   * on the reverse, the target has already moved while the corpus has not — so a rebuild
+   * there would swap in an adapter addressing storage the conversion has not written yet and
+   * present an empty component library until the next signal.
+   *
+   * An INJECTED repository is never replaced: the caller chose it, nothing here knows what it
+   * addresses, and silently discarding it would break every fixture that counts writes
+   * through one.
+   *
+   * @returns {Promise<boolean>} whether a rebuild happened.
+   */
+  async rebuildDefinitionStorage() {
+    if (!this._ownsRepository) return false;
+    const target = readComponentStorageTarget();
+    const layout = readComponentStorageLayout();
+    if (layout !== target) return false;
+    if (target === this._componentStorageArrangement) return false;
+
+    this._componentStorageArrangement = target;
+    this._repository = this._buildDefaultRepository();
+    // Re-sampled for the same reason `initialize()` samples it: the Valid Id Basis needs the
+    // layout as it stood immediately before the read that produced the corpus in hand, and
+    // the value from the previous arrangement's read attests nothing about this one.
+    this._componentLayoutAtCorpusRead = readComponentStorageLayout();
+    this._reloadDelta = null;
+    this.systems.clear();
+    for (const normalized of await this._repository.loadAll()) {
+      this.systems.set(normalized.id, normalized);
+    }
+    this._advanceSystemRevision(...this.systems.keys());
+    return true;
   }
 
   async initialize() {
     if (this.initialized) return;
+    // Sampled BEFORE the read, because that is the only fact about definition storage the
+    // Valid Id Basis cannot reconstruct afterwards: a conversion that overlapped this read
+    // has settled the layout by the time anything else samples it.
+    this._componentLayoutAtCorpusRead = readComponentStorageLayout();
     // Hydration runs inside the repository (issue 1089), so `loadAll()` returns
     // already-normalized systems.
     for (const normalized of await this._repository.loadAll()) {
@@ -2649,6 +2785,66 @@ export class CraftingSystemManager {
       systemId,
       domains: domainsForSystemFields(entry.fields),
     }));
+  }
+
+  /**
+   * Apply ONE replicated component record change to this client's in-memory corpus
+   * (issue 1212).
+   *
+   * The systems-side sibling of `RecipeManager#applyReplicatedRecordChange`, with the one
+   * difference the composite key forces: a component record names its owning system, so the
+   * change is applied to that system's `components` array rather than to a top-level map.
+   *
+   * **It REPLACES that array rather than patching it in place, and only that one.** A
+   * definition index is keyed on the candidate ARRAY object, so a new array is a new
+   * `WeakMap` key and therefore a fresh index for free — while every other system's array
+   * keeps its identity and its retained index, which is the whole property issue 1076 exists
+   * to deliver. Patching in place would instead leave the receiving client serving stale
+   * index entries with no signal, and replacing every system's array would rebuild every
+   * index on every replicated component edit.
+   *
+   * Returns `false` on the WRITING client, whose map already holds the record, which is what
+   * keeps the writer's single change hook single.
+   *
+   * @param {import('./CraftingDefinitionRepository.js').ReplicatedDefinitionChange} change
+   * @returns {boolean} whether this client's corpus actually moved.
+   */
+  applyReplicatedRecordChange(change) {
+    // Every application replaces the pending delta, including one that applies nothing, so a
+    // stale delta can never be consumed after a later replication — exactly as `reload()` does.
+    this._reloadDelta = null;
+    if (this._repository.supportsPerRecordReplication?.() !== true) return false;
+    const applied = this._repository.readReplicatedRecord?.(change);
+    if (!applied) return false;
+    const parsed = parseComponentRecordKey(applied.id);
+    if (!parsed) return false;
+    const system = this.systems.get(parsed.systemId);
+    // A record for a system this client does not hold is not a change it can apply; the next
+    // whole-corpus read picks it up.
+    if (!system) return false;
+
+    const current = componentsOf(system);
+    const position = current.findIndex((component) => String(component?.id) === parsed.componentId);
+    let next;
+    if (applied.record) {
+      next =
+        position === -1 ? [...current, applied.record] : current.with(position, applied.record);
+    } else {
+      // A delete for an id this client never held is not a change; it is a replay.
+      if (position === -1) return false;
+      next = current.toSpliced(position, 1);
+    }
+    // Re-normalized in the OWNING SYSTEM's own context, because a component's normalization
+    // depends on facts the system carries — its essence ids and its salvage resolution mode.
+    // Only `components` is taken from the result, so the system's other definition arrays keep
+    // their identity and their retained indexes.
+    system.components = this._normalizeSystem({ ...system, components: next }).components;
+    this._advanceSystemRevision(parsed.systemId);
+    this._advanceFactScopes(COMPONENT_FACTS, parsed.systemId);
+    // A client whose first sight of a system's components is a replicated record is
+    // initialized by it, mirroring `reload()`.
+    this.initialized = true;
+    return true;
   }
 
   /**

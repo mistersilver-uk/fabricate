@@ -115,15 +115,16 @@ import {
   SETTING_KEYS,
 } from '../config/settings.js';
 
-import { isRecognisedArrangement } from './definitionStorageArrangement.js';
+import {
+  compensateSetting,
+  readSettingDefensively,
+  reconcileDefinitionStorageLayout,
+} from './definitionStorageReconciler.js';
 import {
   defaultWorldSettingCollection,
   PerRecordCraftingDefinitionRepository,
   RECIPE_RECORD_KEY_PREFIX,
 } from './PerRecordCraftingDefinitionRepository.js';
-
-/** Every value a Definition Storage TARGET may legitimately hold. */
-const RECOGNISED_TARGETS = Object.freeze(Object.values(DEFINITION_STORAGE_TARGETS));
 
 /**
  * Which way a completed conversion moved the corpus.
@@ -266,23 +267,6 @@ export function perRecordRecipeStore({
     hydrate,
     assertWritable,
   });
-}
-
-/**
- * Read a setting through the injected accessor without letting an unregistered key or an
- * absent `game` throw.
- *
- * @param {(key: string) => *} getSetting
- * @param {string} key
- * @returns {*} `null` when the value could not be read at all.
- */
-function readSettingDefensively(getSetting, key) {
-  try {
-    const value = getSetting(key);
-    return value === undefined ? null : value;
-  } catch {
-    return null;
-  }
 }
 
 /**
@@ -554,26 +538,6 @@ export function recipeStorageConversionFor(from, to) {
 }
 
 /**
- * Write a setting, swallowing a failure.
- *
- * Only ever used on a COMPENSATION leg, where the operation's own error is the one the
- * caller must see: a compensation failure that replaced it would report the wrong reason for
- * the wrong thing. It is not silent — the caller reports the state it could not leave.
- *
- * @param {(key: string, value: *) => Promise<*>} setSetting
- * @param {string} key
- * @param {*} value
- * @returns {Promise<void>}
- */
-async function compensateSetting(setSetting, key, value) {
-  try {
-    await setSetting(key, value);
-  } catch (error) {
-    console.error(`Fabricate | failed to compensate the setting "${key}"`, error);
-  }
-}
-
-/**
  * Reclaim per-record recipe documents left behind by a conversion whose step 4 did not
  * complete — and refuse any document the settled legacy corpus does not describe.
  *
@@ -741,138 +705,40 @@ export async function reconcileRecipeStorageLayout({
   settingDocuments = worldSettingDocumentAccess({ collection }),
   migrationPassPersistedCorpusKey = false,
 }) {
-  const layout = readSettingDefensively(getSetting, SETTING_KEYS.RECIPE_STORAGE_LAYOUT);
-  const target = readSettingDefensively(getSetting, SETTING_KEYS.RECIPE_STORAGE_TARGET);
-  // Positively established or nothing. An unrecognised value is not something to convert
-  // toward, and writing one back would launder it into the world as though it were.
-  if (!isRecognisedArrangement(layout) || !RECOGNISED_TARGETS.includes(target)) {
-    return { action: 'unreadable', layout, target };
-  }
-
-  if (layout === target) {
-    return _reconcileSettled({
-      layout,
-      target,
-      getSetting,
-      documentClass,
-      collection,
-      settingDocuments,
-    });
-  }
-
-  // The one-boot deferral (issue 1211). Placed here rather than at the top of the reconciler
-  // deliberately: a settled world has no conversion to defer, and returning `deferred` for
-  // one would tell the GM on EVERY migrating boot that a storage change is pending when none
-  // is. Everything below this line either converts or writes a key, and neither may happen
-  // in a boot whose migration pass wrote a corpus key.
-  if (migrationPassPersistedCorpusKey) {
-    return { action: 'deferred', layout, target };
-  }
-
-  const run = recipeStorageConversionFor(layout, target);
-  if (!run) {
-    // No conversion exists for this transition in this build. A SETTLED layout is restored to
-    // by reverting the target, which returns the world to `layout === target` and keeps the
-    // Valid Id Basis gate satisfied — the whole point of routing the flip through here.
-    if (layout !== DEFINITION_STORAGE_LAYOUTS.UNSETTLED) {
-      await setSetting(SETTING_KEYS.RECIPE_STORAGE_TARGET, layout);
-      return { action: 'target-reverted', layout, target };
-    }
-    // An `unsettled` layout cannot be repaired by a settings write: `unsettled` is not a legal
-    // target, and the corpus really is spread across both arrangements. This build has no
-    // resume toward the requested target — it can only arrive by downgrading from a build that
-    // ran a forward conversion — so it is reported, and the gate correctly keeps refusing.
-    return { action: 'unsettled-unresolvable', layout, target };
-  }
-
-  try {
-    const result = await run({
-      getSetting,
-      setSetting,
-      documentClass,
-      collection,
-      settingDocuments,
-    });
-    return { action: 'converted', layout: target, target, ...result };
-  } catch (error) {
-    // A REFUSAL wrote nothing, so there is nothing to compensate and both keys are left
-    // exactly as found (issue 1211, module header change 2). Compensating here is what turns
-    // a refusal into a total loss on the NEXT boot: it reverts the target onto the layout,
-    // and on the forward direction that value is `singleArray`, which is the one value the
-    // envelope reclaimer is armed by. The surviving `layout !== target` world is refused by
-    // Valid Id Basis clause 2 and reported permanently, exactly as `unsettled-unresolvable`
-    // already is — the correct disposition for a client that cannot describe this world's
-    // storage.
-    if (error instanceof RecipeStorageConversionRefusedError) {
-      return { action: 'refused', layout, target, error };
-    }
-    // A conversion that compensated ITSELF is not compensated again. On the forward
-    // direction a second pass would fabricate the very layout document the conversion had
-    // just deleted, and would revert the target as above.
-    if (error instanceof RecipeStorageConversionCompensatedError) {
-      const cause = error.cause;
-      return {
-        action: 'failed',
-        layout,
-        target,
-        error: cause instanceof Error ? cause : new Error(String(cause ?? error.message)),
-      };
-    }
-    // Compensate BOTH keys. Restoring the layout alone would leave exactly the permanently
-    // gate-refused world this reconciler exists to make unreachable, and the layout value is
-    // restorable rather than deletable here — see the header.
-    await compensateSetting(setSetting, SETTING_KEYS.RECIPE_STORAGE_LAYOUT, layout);
-    if (layout !== DEFINITION_STORAGE_LAYOUTS.UNSETTLED) {
-      await compensateSetting(setSetting, SETTING_KEYS.RECIPE_STORAGE_TARGET, layout);
-    }
-    return {
-      action: 'failed',
-      layout,
-      target,
-      error: error instanceof Error ? error : new Error(String(error)),
-    };
-  }
+  return reconcileDefinitionStorageLayout(RECIPE_STORAGE_RECONCILER, {
+    getSetting,
+    setSetting,
+    documentClass,
+    collection,
+    settingDocuments,
+    migrationPassPersistedCorpusKey,
+  });
 }
 
 /**
- * The `layout === target` branch: nothing to convert, but two envelope questions to answer.
+ * The recipe class's three non-neutral reconciler facts (issue 1212).
  *
- * Extracted so {@link reconcileRecipeStorageLayout} stays under the cognitive-complexity bar
- * the SonarCloud gate applies to a CHANGED function, and because the two settled
- * arrangements ask genuinely different questions — see
- * {@link detectSurvivingLegacyRecipeDocument} for why they are not mirror images.
- *
- * @param {object} options
- * @returns {Promise<object>} the reconcile report.
+ * @type {import('./definitionStorageReconciler.js').DefinitionStorageReconcilerDescriptor}
  */
-async function _reconcileSettled({
-  layout,
-  target,
-  getSetting,
-  documentClass,
-  collection,
-  settingDocuments,
-}) {
-  if (layout === DEFINITION_STORAGE_LAYOUTS.SINGLE_ARRAY) {
+const RECIPE_STORAGE_RECONCILER = Object.freeze({
+  layoutKey: SETTING_KEYS.RECIPE_STORAGE_LAYOUT,
+  targetKey: SETTING_KEYS.RECIPE_STORAGE_TARGET,
+  conversionFor: recipeStorageConversionFor,
+  isRefusal: (error) => error instanceof RecipeStorageConversionRefusedError,
+  isSelfCompensated: (error) => error instanceof RecipeStorageConversionCompensatedError,
+  async onSettledLegacy({ getSetting, documentClass, collection }) {
     const reclaim = await reclaimOrphanedRecipeRecords({ getSetting, documentClass, collection });
-    if (reclaim.kept > 0) {
-      return { action: 'reclaim-refused', layout, target, ...reclaim };
-    }
-    return { action: 'settled', layout, target, reclaimed: reclaim.reclaimed };
-  }
-
-  if (layout === DEFINITION_STORAGE_LAYOUTS.PER_RECORD) {
+    if (reclaim.kept > 0) return { action: 'reclaim-refused', ...reclaim };
+    return { reclaimed: reclaim.reclaimed };
+  },
+  async onSettledGranular({ getSetting, documentClass, collection, settingDocuments }) {
     const survivor = await detectSurvivingLegacyRecipeDocument({
       getSetting,
       documentClass,
       collection,
       settingDocuments,
     });
-    if (survivor.diverged) {
-      return { action: 'legacy-survivor-diverged', layout, target, ...survivor };
-    }
-    return { action: 'settled', layout, target, reclaimed: survivor.reclaimed ? 1 : 0 };
-  }
-
-  return { action: 'settled', layout, target, reclaimed: 0 };
-}
+    if (survivor.diverged) return { action: 'legacy-survivor-diverged', ...survivor };
+    return { reclaimed: survivor.reclaimed ? 1 : 0 };
+  },
+});

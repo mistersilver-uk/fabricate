@@ -10,36 +10,29 @@
  * deliberately and for opposite reasons. Two copies of a defensive reader is how one of them
  * silently acquires the other's direction.
  *
- * It lives in a leaf rather than being exported from `RecipeManager.js` so a consumer that
- * needs only the layout does not pull a six-thousand-line manager and its whole model graph
- * into every test that imports it.
+ * Issue 1212 made the reader itself entity-neutral (`./definitionStorageLayout.js`) when
+ * components acquired their own layout key, for exactly that argument at a second scale.
+ * This module survives as the recipe BINDING: it keeps the recipe-named export every shipped
+ * caller and test uses, and it keeps that binding in a leaf rather than exporting it from
+ * `RecipeManager.js`, so a consumer that needs only the layout does not pull a six-thousand
+ * line manager and its whole model graph into every test that imports it.
  *
- * @see readRecipeStorageLayout for the fail direction and why it is the opposite of the
+ * @see readDefinitionStorageLayout for the fail direction and why it is the opposite of the
  *   target reader's.
  */
 
 import { getSetting as defaultGetSetting, SETTING_KEYS } from '../config/settings.js';
 
+import { readDefinitionStorageLayout } from './definitionStorageLayout.js';
+
 /**
  * The **Definition Storage Layout** for recipes, read defensively (issue 1224).
  *
- * The OPPOSITE fail direction from `RecipeManager`'s `readRecipeStorageTarget`, and the
- * contrast is the point. That reader answers an unreadable setting with today's arrangement
- * so an unreadable target can never promote a world onto the granular backend. This one
- * feeds the Valid Id Basis, where a defaulted value is a claim that the corpus about to be
- * read is whole — so an unreadable layout is `null`, which no basis clause recognises and
- * which therefore refuses to run a destructive pass.
- *
  * @param {(key: string) => *} [getSetting] The settings accessor; defaults to the module's
- *   own, so every existing caller keeps calling this with no arguments. Injected by the
- *   startup migration seam, which is handed its accessors rather than importing them.
+ *   own, so every existing caller keeps calling this with no arguments.
  * @returns {string|null} a member of `DEFINITION_STORAGE_LAYOUTS`, or `null` when the
  *   setting could not be read at all.
  */
 export function readRecipeStorageLayout(getSetting = defaultGetSetting) {
-  try {
-    return getSetting(SETTING_KEYS.RECIPE_STORAGE_LAYOUT) ?? null;
-  } catch {
-    return null;
-  }
+  return readDefinitionStorageLayout(SETTING_KEYS.RECIPE_STORAGE_LAYOUT, getSetting);
 }
