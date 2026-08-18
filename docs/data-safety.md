@@ -95,10 +95,11 @@ It asks you to reload afterwards, because the half-migrated copy the module was 
 When the problem comes down to specific recipes or systems, it lists them with the reason each one failed and what to do about it.
 The dialog defaults to keeping your existing data, so the safe choice is the one already selected.
 
-The dialog's rollback advice depends on how this world stores its recipes.
-Under the original **One combined record** arrangement it simply names a Fabricate version you can roll back to and keep working.
-Under **One record per recipe** it tells you _not_ to roll back yet: an older Fabricate cannot read that arrangement at all, and would start writing over it.
-In that case the dialog asks you to set **Settings → Fabricate → Recipe Storage Arrangement** back to "One combined record", reload, and let the conversion finish first — that conversion only exists in the newer build, so once you have rolled back there is nothing left to run it with.
+The dialog's rollback advice depends on how this world stores its recipes AND its crafting components.
+Under the original arrangements it simply names a Fabricate version you can roll back to and keep working.
+Where either has been moved to its own records it tells you _not_ to roll back yet: an older Fabricate cannot read that arrangement at all, and would start writing over it.
+In that case the dialog asks you to set every arrangement it names back to its original option, reload, and let the conversion finish first — that conversion only exists in the newer build, so once you have rolled back there is nothing left to run it with.
+It names only the arrangements you actually have to change, so you get one instruction rather than one instruction and a no-op.
 
 ### When migrations do not run at all
 
@@ -112,7 +113,7 @@ In all three cases nothing is written, the world is not marked as migrated, and 
 Fabricate tells you which of the three happened.
 Only the third asks you to reload straight away: in that one the migrations have already transformed the copy held in this session, so continuing to work from it would save migrated data into a world still recorded as un-migrated.
 
-### Changing how recipes are stored
+### Changing how recipes or components are stored
 
 **Settings → Fabricate → Recipe Storage Arrangement** decides whether your world keeps every recipe in one combined record or gives each recipe a record of its own.
 The second option loads large recipe collections much faster, and it is a one-way door for any older Fabricate: an older version reads no recipes at all from it, reports no error, and starts writing over them.
@@ -135,6 +136,26 @@ A few things Fabricate does around that change, so nothing goes missing:
 - **It never deletes a leftover recipe record it cannot account for.** If Fabricate finds a per-recipe record that the combined record does not describe, it leaves it alone and tells you, because that record is the only place a recipe could be hiding.
 <!-- markdownlint-disable markdownlint-sentences-per-line -->
 - **It tells you if the old combined record survived.** That can happen if the last step of the change did not complete. If the leftover copy matches, Fabricate clears it up; if it does not — which is what a round trip through an older version looks like — Fabricate leaves it alone and reports both counts rather than discarding work you may have done.
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
+
+#### Components have their own arrangement, and their own confirmation
+
+**Settings → Fabricate → Component Storage Arrangement** does the same job for your crafting components, and it is completely independent of the recipe one.
+Its original option is **Nested inside each crafting system**, because that is literally where a component lives today — inside the crafting system that owns it, rather than in a combined record of its own.
+Choosing **One record per component** gives each component a record of its own, which loads large component libraries much faster.
+
+The loss it causes is quieter than the recipe one rather than louder, and it is worth reading carefully.
+An older Fabricate does not fail or complain: every crafting system simply shows an **empty component library**, exactly as if you had never authored a component.
+Recipes, tools, essences, categories and everything else keep working, which is what makes it easy to miss.
+
+So the same confirmation appears, naming that loss and naming the way back — set the arrangement to "Nested inside each crafting system" and reload, and Fabricate moves your components back before you roll anything back.
+Declining one arrangement's confirmation never declines the other: they are separate choices, and answering one says nothing about the other.
+
+Two more things apply only to components:
+
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
+- **A crafting system with an unusual id blocks the change for the whole world.** A component's record is filed under its crafting system's id, so a system whose id contains a dot cannot be filed at all. Fabricate refuses the change outright, names the systems involved, and changes nothing — rather than moving some components and leaving others behind, which would leave your world half in each arrangement with no way to describe it. Recreate or re-import those crafting systems with a valid id and the change goes ahead.
+- **The crafting systems themselves are not moved.** Only the components are. Your crafting systems keep their essences, tools, item tags, categories, checks, realms and character prerequisites in the same place they have always been, which is why a rolled-back Fabricate still shows you the system and only loses sight of the components.
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 
 {: .warning }
