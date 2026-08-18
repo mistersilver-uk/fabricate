@@ -23,8 +23,8 @@
  */
 
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { readdirSync, readFileSync } from 'node:fs';
+import { relative as relativePath, resolve, sep as pathSeparator, dirname } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
@@ -45,6 +45,8 @@ const { MUTATION_CLEANUP_ENTITY_KINDS, runGatedMutationCleanup } = await import(
   '../src/systems/mutationCleanupComposition.js'
 );
 const { STARTUP_PASS_ENTITY_KINDS } = await import('../src/systems/startupMaintenance.js');
+const { readValidIdBasis } = await import('../src/systems/validIdBasis.js');
+const { describeCorpusStorage } = await import('../src/systems/corpusStorageReports.js');
 const { RecipeVisibilityService } = await import('../src/systems/RecipeVisibilityService.js');
 const { CraftingSystemManager } = await import('../src/systems/CraftingSystemManager.js');
 
@@ -416,40 +418,131 @@ test('an import names no removed ids, so its sweep is gated and its fallback is 
 // The declaration table
 // ---------------------------------------------------------------------------
 
+/**
+ * Which startup pass each mutation-time pass is the same prune as.
+ *
+ * The mutation-time table is a SUBSET — `phantom crafting runs` and `salvage runs` have no
+ * mutation-time entrance — so the mirror cannot be a key-set equality against the startup
+ * table. It is a key-set equality against THIS map instead, which is what makes a fourth
+ * mutation-time label fail rather than pass unexamined.
+ */
+const MUTATION_TO_STARTUP_LABEL = Object.freeze({
+  'orphaned crafting runs': 'crafting runs',
+  'orphaned learned recipes': 'learned recipes',
+  'orphaned crafting preferences': 'stale preferences',
+});
+
 test('the mutation-time declarations mirror the startup ones pass for pass', () => {
   // The two doors call the SAME collaborators, so a kind declared on one and not the other
-  // is a gate that disagrees with itself about what a prune reads. Compared as VALUES, so
-  // widening one table without the other reddens here rather than in production.
-  assert.deepEqual(MUTATION_CLEANUP_ENTITY_KINDS['orphaned crafting runs'], [
-    ...STARTUP_PASS_ENTITY_KINDS['crafting runs'],
-  ]);
-  assert.deepEqual(MUTATION_CLEANUP_ENTITY_KINDS['orphaned learned recipes'], [
-    ...STARTUP_PASS_ENTITY_KINDS['learned recipes'],
-  ]);
-  assert.deepEqual(MUTATION_CLEANUP_ENTITY_KINDS['orphaned crafting preferences'], [
-    ...STARTUP_PASS_ENTITY_KINDS['stale preferences'],
-  ]);
+  // is a gate that disagrees with itself about what a prune reads.
+  //
+  // Three assertions, because three things can drift. The key sets catch a mutation-time
+  // pass with no startup counterpart — the case the earlier three-pair comparison could not
+  // see, since it named its pairs and asserted nothing about what else was in the table. The
+  // startup lookup catches a renamed startup pass. The kind arrays catch a widened basis.
+  assert.deepEqual(
+    Object.keys(MUTATION_CLEANUP_ENTITY_KINDS).sort(),
+    Object.keys(MUTATION_TO_STARTUP_LABEL).sort(),
+    'every mutation-time pass must state which startup pass it is the same prune as'
+  );
+  for (const [mutationLabel, startupLabel] of Object.entries(MUTATION_TO_STARTUP_LABEL)) {
+    assert.ok(
+      Array.isArray(STARTUP_PASS_ENTITY_KINDS[startupLabel]),
+      `${startupLabel} is no longer a declared startup pass`
+    );
+    assert.deepEqual(
+      [...MUTATION_CLEANUP_ENTITY_KINDS[mutationLabel]],
+      [...STARTUP_PASS_ENTITY_KINDS[startupLabel]],
+      `${mutationLabel} and ${startupLabel} derive from different entity kinds`
+    );
+  }
+});
+
+/**
+ * A `getSetting` plus manager stand-ins that score KNOWN-COMPLETE for every entity kind.
+ *
+ * Needed because a call with no managers omits every pass — declared or not — so a case
+ * built on one cannot tell "omitted because undeclared" from "omitted because the basis is
+ * unknown", and would keep passing if the undeclared rule were deleted.
+ */
+function knownCompleteGateInputs() {
+  const settings = new Map();
+  seedKnownCompleteValidIdBasis(settings);
+  const attested = {
+    granular: false,
+    arrangement: DEFINITION_STORAGE_TARGETS.SINGLE_ARRAY,
+    layoutAtCorpusRead: DEFINITION_STORAGE_LAYOUTS.SINGLE_ARRAY,
+  };
+  return {
+    getSetting: (key) => settings.get(key),
+    recipeManager: { describeDefinitionStorage: () => ({ ...attested }) },
+    craftingSystemManager: {
+      describeDefinitionStorage: () => ({
+        ...attested,
+        systems: { granular: false, arrangement: null, layoutAtCorpusRead: null },
+        components: { ...attested },
+      }),
+    },
+  };
+}
+
+test('the seeded fixture really does produce a known-complete basis for every kind', () => {
+  // Two jobs, because they are the same assertion.
+  //
+  // It is the precondition the undeclared case below rests on: without it, "the undeclared
+  // pass was omitted" is satisfiable by a basis that omits everything, which is exactly what
+  // the earlier version of that case did.
+  //
+  // And it is the guard on `seedKnownCompleteValidIdBasis`, which three suites now build
+  // their OPEN-direction cases on. Asserting a couple of the settings it writes proves only
+  // that it wrote them; asserting the BASIS VALUE proves the seed states a world the gate
+  // genuinely attests rather than a gate switched off, and it reddens if a sixth input is
+  // added to `validIdBasis.js` that the seed does not satisfy.
+  const inputs = knownCompleteGateInputs();
+  assert.deepEqual(
+    readValidIdBasis({
+      getSetting: inputs.getSetting,
+      getHighestRegisteredMigrationVersion,
+      storage: describeCorpusStorage(inputs),
+    }),
+    { recipes: true, systems: true, components: true }
+  );
+  assert.equal(
+    inputs.getSetting(SETTING_KEYS.MIGRATION_VERSION),
+    HIGHEST_MIGRATION,
+    'and it is the REAL highest registered migration, never a hardcoded version'
+  );
 });
 
 test('an UNDECLARED mutation-time pass is omitted rather than run', async () => {
-  // Inherited from the shared builder, and asserted here because it is the property that
-  // stops a future destructive prune from shipping ungated by forgetting to declare it.
-  let ran = false;
-  const outcome = await runGatedMutationCleanup({
-    passes: [
-      {
-        label: 'a pass nobody declared',
-        sweep: () => {
-          ran = true;
-          return Promise.resolve();
-        },
-      },
-    ],
-    getSetting: () => DEFINITION_STORAGE_LAYOUTS.SINGLE_ARRAY,
-    warn: () => {},
+  // The property that stops a future destructive prune from shipping ungated by forgetting
+  // to declare it — and it is only observable against a KNOWN-COMPLETE basis, where
+  // undeclaredness is the sole remaining reason anything can be omitted. The declared pass
+  // running in the same call is what proves the basis is complete; the `undeclared: true`
+  // flag on the omission is what proves the omission was decided by the declaration table
+  // rather than by an incomplete kind. Asserting only "it did not run" leaves both.
+  const inputs = knownCompleteGateInputs();
+  const ran = [];
+  const warnings = [];
+  const pass = (label) => ({
+    label,
+    sweep: () => {
+      ran.push(label);
+      return Promise.resolve();
+    },
   });
-  assert.equal(ran, false);
+
+  const outcome = await runGatedMutationCleanup({
+    ...inputs,
+    passes: [pass('orphaned learned recipes'), pass('a pass nobody declared')],
+    warn: (message, detail) => warnings.push(detail),
+  });
+
+  assert.deepEqual(ran, ['orphaned learned recipes'], 'the DECLARED pass ran, so the basis is complete');
   assert.deepEqual(outcome.omitted, ['a pass nobody declared']);
+  assert.deepEqual(warnings[0].omitted, [
+    { label: 'a pass nobody declared', incompleteKinds: [], undeclared: true },
+  ]);
 });
 
 // ---------------------------------------------------------------------------
@@ -695,47 +788,134 @@ test('deleteSystem on a PARTIAL corpus forgets only the recipes it actually dele
 const HERE = dirname(fileURLToPath(import.meta.url));
 const readSource = (relative) => readFileSync(resolve(HERE, '..', relative), 'utf8');
 
-test('every corpus-derived prune in the mutation paths is reached through the gate', () => {
-  // A hand-maintained mirror guard. The issue that filed this under-counted its own
-  // reachable sites — it named four and there are six — so the durable protection is a check
-  // that fails when a SEVENTH appears, not a list of fixed call sites.
+/**
+ * The two modules that ARE the gate, and are therefore allowed to call a corpus-derived
+ * prune outside a `sweep:`.
+ *
+ * An allowlist rather than a path filter, so adding a third gate is a deliberate edit here
+ * rather than something a new filename quietly acquires.
+ */
+const GATE_COMPOSITION_SITES = Object.freeze([
+  'src/systems/startupPassComposition.js',
+  'src/systems/mutationCleanupComposition.js',
+]);
+
+/** Repo-relative POSIX form, so an assertion reads the same on Windows and Linux. */
+const toPosix = (value) => value.split(pathSeparator).join('/');
+
+/** Every `.js` under `src/`, so the scan cannot miss a door by living in a new file. */
+function everySourceFile(directory = resolve(HERE, '..', 'src'), collected = []) {
+  for (const entry of readdirSync(directory, { withFileTypes: true })) {
+    const full = resolve(directory, entry.name);
+    if (entry.isDirectory()) everySourceFile(full, collected);
+    else if (entry.name.endsWith('.js')) collected.push(full);
+  }
+  return collected;
+}
+
+test('every corpus-derived prune anywhere under src is reached through a gate', () => {
+  // A hand-maintained mirror guard, and the reason it walks the WHOLE tree: the issue that
+  // filed this under-counted its own reachable sites — it named four and there are seven —
+  // so the durable protection has to fail when an EIGHTH appears in a file nobody thought
+  // to list. An earlier version of this scanned two named managers, which would have said
+  // nothing about a new door in a third.
   //
-  // The rule: inside these two managers, a call to one of the three destructive
-  // corpus-derived collaborators may only appear as the `sweep:` of a pass handed to
-  // `runGatedMutationCleanup`. Anything else is an ungated door.
+  // The rule: a call to one of the three destructive corpus-derived collaborators may only
+  // appear as the `sweep:` of a pass handed to a gate. Three exemptions, all narrow:
+  // the two composition sites that ARE the gate, and the DEFINITION of each collaborator.
   const DESTRUCTIVE = /(cleanupInvalidRuns|cleanupLearnedRecipes|cleanupStalePreferences)\(/;
-  for (const relative of [
-    'src/systems/RecipeManager.js',
-    'src/systems/CraftingSystemManager.js',
-  ]) {
+  const DEFINITION = /^\s*(?:export\s+)?(?:async\s+)?(?:function\s+)?(?:cleanupInvalidRuns|cleanupLearnedRecipes|cleanupStalePreferences)\(/;
+  const root = resolve(HERE, '..');
+  const ungated = [];
+
+  for (const full of everySourceFile()) {
+    const relative = toPosix(relativePath(root, full));
+    if (GATE_COMPOSITION_SITES.includes(relative)) continue;
     // Comment text is BLANKED before the scan, never filtered after it. The `sweep:`
     // exemption is tested against the whole line, so a TRAILING comment carrying that token
     // waives a live ungated call: `cleanupInvalidRuns(new Set(), new Set()); // sweep: n/a`
     // was proven to pass this guard while pruning player-owned run data. A leading-marker
     // filter cannot see it, because the line does not begin with a marker. Same shape as
     // `tests/actor-type-literal-gate.test.js`, which is why `stripComments` is shared.
-    const lines = stripComments(readSource(relative)).split('\n');
-    const ungated = lines
-      .map((line, index) => ({ line, number: index + 1 }))
-      .filter(({ line }) => DESTRUCTIVE.test(line))
-      .filter(({ line, number }) => {
-        // The call may sit on the `sweep:` line itself or be wrapped onto the next one.
-        // `async` is admitted: a legitimate `sweep: async () =>` wrap is not an ungated call.
-        const previous = lines[number - 2] ?? '';
-        return !/sweep:/.test(line) && !/sweep:\s*(?:async\s*)?\(\)\s*=>\s*$/.test(previous);
-      });
-    assert.deepEqual(
-      ungated.map(({ number, line }) => `${relative}:${number} ${line.trim()}`),
-      [],
-      `${relative} reaches a corpus-derived prune without the Valid Id Basis gate`
-    );
+    const lines = stripComments(readFileSync(full, 'utf8')).split('\n');
+    lines.forEach((line, index) => {
+      if (!DESTRUCTIVE.test(line)) return;
+      if (DEFINITION.test(line)) return;
+      // The call may sit on the `sweep:` line itself or be wrapped onto the next one.
+      // `async` is admitted: a legitimate `sweep: async () =>` wrap is not an ungated call.
+      const previous = lines[index - 1] ?? '';
+      if (/sweep:/.test(line) || /sweep:\s*(?:async\s*)?\(\)\s*=>\s*$/.test(previous)) return;
+      ungated.push(`${relative}:${index + 1} ${line.trim()}`);
+    });
   }
+
+  assert.deepEqual(ungated, [], 'a corpus-derived prune is reached without a Valid Id Basis gate');
 });
 
-test('the two batch entry points the issue never listed NAME what they removed', () => {
-  // Both reach the destructive collaborators through the public `cleanupOrphanedRecipeFlags`
-  // wrapper, and a caller that omits its ids gets a gate that protects the world and leaks
-  // its own orphans.
+test('that scan is not vacuous — it sees the calls it exempts', () => {
+  // The scan reports nothing, which is also what a scan reading zero files reports. This
+  // pins the population: the three collaborator definitions and the four gated calls at the
+  // startup composition site are all present in the tree the walk produces.
+  const DESTRUCTIVE = /(cleanupInvalidRuns|cleanupLearnedRecipes|cleanupStalePreferences)\(/;
+  const matched = everySourceFile().filter((full) =>
+    DESTRUCTIVE.test(stripComments(readFileSync(full, 'utf8')))
+  );
+  const root = resolve(HERE, '..');
+  assert.deepEqual(
+    matched.map((full) => toPosix(relativePath(root, full))).sort(),
+    [
+      'src/config/preferencesCleanup.js',
+      'src/systems/CraftingRunManager.js',
+      'src/systems/CraftingSystemManager.js',
+      'src/systems/RecipeManager.js',
+      'src/systems/RecipeVisibilityService.js',
+      'src/systems/SalvageRunManager.js',
+      // `mutationCleanupComposition.js` is deliberately absent: it names these collaborators
+      // only in prose, and `stripComments` blanks prose. That it drops out here is itself
+      // evidence the blanking runs before the scan rather than after it.
+      'src/systems/startupPassComposition.js',
+    ],
+    'the walk must actually reach every file that names a corpus-derived prune'
+  );
+});
+
+test('no caller anywhere under src invokes the orphan sweep without naming its ids', () => {
+  // The public wrapper is the entrance the issue's site list missed TWICE — the compendium
+  // importer's prune phase and `_deleteRecipeSet` — so this walks the whole tree rather than
+  // the two files that happen to hold today's callers. A caller that omits its ids gets a
+  // gate that protects the world and leaks its own orphans.
+  const BARE_CALL = /cleanupOrphanedRecipeFlags\??\.?\(\s*\)/;
+  const root = resolve(HERE, '..');
+  const bare = [];
+  const callers = new Set();
+  for (const full of everySourceFile()) {
+    const source = stripComments(readFileSync(full, 'utf8'));
+    const relative = toPosix(relativePath(root, full));
+    if (!/cleanupOrphanedRecipeFlags/.test(source)) continue;
+    // The DEFINITION is not a call, and it is the one place the name legitimately appears
+    // with an empty-ish parameter list.
+    if (relative === 'src/systems/RecipeManager.js') {
+      callers.add(relative);
+    }
+    source.split('\n').forEach((line, index) => {
+      if (/async cleanupOrphanedRecipeFlags/.test(line)) return;
+      if (!/cleanupOrphanedRecipeFlags/.test(line)) return;
+      callers.add(relative);
+      if (BARE_CALL.test(line)) bare.push(`${relative}:${index + 1} ${line.trim()}`);
+    });
+  }
+
+  assert.deepEqual(bare, [], 'a batch caller invoked the orphan sweep with no id set');
+  // Pins the population, so "no bare calls" cannot be satisfied by a walk that read nothing.
+  assert.deepEqual(
+    [...callers].sort(),
+    [
+      'src/systems/CompendiumImporter.js',
+      'src/systems/CraftingSystemManager.js',
+      'src/systems/RecipeManager.js',
+    ],
+    'the walk must actually reach every file naming the public orphan sweep'
+  );
   assert.match(
     readSource('src/systems/CompendiumImporter.js'),
     /cleanupOrphanedRecipeFlags\?\.\(\{/,
@@ -746,21 +926,5 @@ test('the two batch entry points the issue never listed NAME what they removed',
     /cleanupOrphanedRecipeFlags\?\.\(\{\s*removedRecipeIds/,
     'the recipe-set delete must name its removed recipe ids'
   );
-  assert.equal(
-    /cleanupOrphanedRecipeFlags\?\.\(\)/.test(readSource('src/systems/CompendiumImporter.js')),
-    false,
-    'no caller may invoke the orphan sweep with no id set'
-  );
 });
 
-test('the seeded fixture is a genuine world, not a waived gate', () => {
-  // Guards the helper the other suites now use: it must state a REAL healthy arrangement, so
-  // that a case built on it is a world the gate attests rather than a gate switched off.
-  const settings = new Map();
-  seedKnownCompleteValidIdBasis(settings);
-  assert.equal(
-    settings.get(SETTING_KEYS.RECIPE_STORAGE_LAYOUT),
-    DEFINITION_STORAGE_LAYOUTS.SINGLE_ARRAY
-  );
-  assert.equal(settings.get(SETTING_KEYS.MIGRATION_VERSION), HIGHEST_MIGRATION);
-});

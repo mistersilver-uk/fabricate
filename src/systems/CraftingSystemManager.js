@@ -7156,9 +7156,18 @@ export class CraftingSystemManager {
    * `lastManagedCraftingSystem`/`lastAlchemySystem` when the corpus does not name them, and
    * rewrites the whole `progressiveResultOrder` map. Under `user` scope that map is a
    * REPLICATED document write, destructive across every device the player uses, so a
-   * partial corpus here is not a cosmetic loss. There is no targeted fallback — nothing
-   * here names a subject the caller removed — and the startup `stale preferences` pass
-   * reconciles it on the next known-complete boot.
+   * partial corpus here is not a cosmetic loss.
+   *
+   * **`targeted: null` is the PREFERENCE exemption, not "nothing names a subject".** That
+   * justification would be false on the deletion entrance, which holds both the removed
+   * system id and the removed recipe ids — `lastManagedCraftingSystem`, `lastAlchemySystem`
+   * and the map's `recipe:`/`salvage:` keys are all targetable from them. The reason is the
+   * one `data-models/spec.md` names: a stale PREFERENCE is bounded and self-healing where a
+   * stale ACTOR FLAG is not. It names something that no longer exists, the next read
+   * corrects it, and the startup `stale preferences` pass reconciles it on the next
+   * known-complete boot — while a targeted prune here would add a fresh write to a
+   * replicated `user`-scoped document on a path whose defining condition is that this client
+   * cannot describe the world it is writing to.
    *
    * **The component ids are passed** (issue 1226). They never were, so `validComponentIds`
    * took its empty-set default and every `salvage:<componentId>` progressive-order key was
