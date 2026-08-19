@@ -255,9 +255,14 @@ export function readWoff2Codepoints(filePath) {
  *
  * `-alt`, a bare `-o`, `-lg`/`-sm` and a trailing ordinal are the suffixes the project used before
  * it moved to descriptive compound names, so `fire-alt`, `home-lg` and `battery-5` are the older
- * spellings of `fire-flame-curved`, `house-chimney` and `battery-full`.
+ * spellings of `fire-flame-curved`, `house-chimney` and `battery-full`. `-times`, `-edit` and
+ * `-broken` are the same thing in word form: Font Awesome 6 renamed every one of them to `-xmark`,
+ * `-pen` and `-crack`/`-slash`, and left the old spelling behind as an alias.
+ *
+ * `-alt` is matched wherever it sits rather than only at the end, because `comment-alt-dots` is a
+ * retired spelling of `message-dots` and reads as one in a picker label.
  */
-const RETIRED_NAME_MARKER = /(^|-)alt($|-)|(^|-)(o|lg|sm|h|v|[0-9]+)$/;
+const RETIRED_NAME_MARKER = /(^|-)alt($|-)|(^|-)(broken|edit|times|o|lg|sm|h|v|[0-9]+)$/;
 
 /**
  * How many names in the bundle start with each leading token.

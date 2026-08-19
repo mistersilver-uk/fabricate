@@ -245,7 +245,8 @@ export const EXCLUDED_ICON_CODE_PATTERNS = Object.freeze([
   // block above catches are the ones stuck on a SHAPE, which depicts nothing to make a statement
   // about.
   //
-  // Kept: battery-empty and battery-full; thermometer with temperature-high and temperature-low;
+  // Kept: battery-empty and battery (which is the full cell, and the name the bundle offers it
+  // under); thermometer with temperature-high and temperature-low;
   // gauge-high; shop and store; city; jet-fighter; tower-broadcast and tower-observation; one
   // clock; one hourglass at half; one calendar; one speech bubble and one pair of them.
   /^battery-(half|quarter|three-quarters|low|bolt|exclamation)$/,
