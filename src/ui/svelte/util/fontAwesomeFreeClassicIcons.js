@@ -1420,14 +1420,14 @@ export const FONT_AWESOME_FREE_CLASSIC_ICON_DEFINITIONS = Object.freeze([
 // pictograms, party-political and accessibility symbols); and present-day civic, clinical and
 // domestic furniture that no fiction is reaching for (sanitation, pharmacy, commuter transport,
 // consumer electronics).
-export const FANTASY_BREAKING_ICON_CODE_PATTERNS = Object.freeze([
+export const EXCLUDED_ICON_CODE_PATTERNS = Object.freeze([
 
   // ── Single characters (not real icons) ──
   /^[0-9]$/,
   /^[a-z]$/,
 
   // ── Currency signs ──
-  /.-sign$/,       // austral-sign, dollar-sign, etc. (signs-post is safe — has no hyphen before "sign")
+  /.-sign$/,       // austral-sign, dollar-sign, etc. (signs-post is curated — has no hyphen before "sign")
   /^bitcoin-sign$/,
 
   // ── UI / editor controls ──
@@ -1836,15 +1836,33 @@ export const FANTASY_BREAKING_ICON_CODE_PATTERNS = Object.freeze([
   /^water-ladder$/
 ]);
 
-export function isFantasySafeFontAwesomeClassicFreeIcon(iconCode) {
+/**
+ * Whether an icon code belongs to Fabricate's curated vocabulary.
+ *
+ * Curated means usable in ANY fictional setting — fantasy, science fiction, post-apocalyptic,
+ * industrial or modern alike — rather than fantasy alone, which is what the predecessor of this
+ * function asserted and what its `isFantasySafe…` name claimed.
+ *
+ * @param {string} iconCode a bare Font Awesome icon code, such as `mortar-pestle`
+ * @returns {boolean} true when the code is in the curated vocabulary
+ */
+export function isCuratedFontAwesomeClassicFreeIcon(iconCode) {
   const normalizedIconCode = String(iconCode || '').trim();
   if (!normalizedIconCode) return false;
 
-  return !FANTASY_BREAKING_ICON_CODE_PATTERNS.some((pattern) => pattern.test(normalizedIconCode));
+  return !EXCLUDED_ICON_CODE_PATTERNS.some((pattern) => pattern.test(normalizedIconCode));
 }
 
-export const FONT_AWESOME_FREE_CLASSIC_FANTASY_SAFE_ICON_DEFINITIONS = Object.freeze(
+/**
+ * The curated vocabulary itself: every classic free definition that survives the exclusions above.
+ *
+ * This is the ONE vocabulary Fabricate's pickers draw from. A surface that hand-curates a second
+ * list has created a second vocabulary that drifts from this one.
+ *
+ * @type {ReadonlyArray<{ iconCode: string, label: string, hasRegular: boolean }>}
+ */
+export const FONT_AWESOME_FREE_CLASSIC_CURATED_ICON_DEFINITIONS = Object.freeze(
   FONT_AWESOME_FREE_CLASSIC_ICON_DEFINITIONS.filter(({ iconCode }) =>
-    isFantasySafeFontAwesomeClassicFreeIcon(iconCode)
+    isCuratedFontAwesomeClassicFreeIcon(iconCode)
   )
 );

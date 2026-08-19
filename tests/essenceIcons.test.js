@@ -14,9 +14,9 @@ import {
   normalizeEssenceIcon
 } from '../src/ui/svelte/util/essenceIcons.js';
 import {
-  FONT_AWESOME_FREE_CLASSIC_FANTASY_SAFE_ICON_DEFINITIONS,
+  FONT_AWESOME_FREE_CLASSIC_CURATED_ICON_DEFINITIONS,
   FONT_AWESOME_FREE_CLASSIC_ICON_DEFINITIONS,
-  isFantasySafeFontAwesomeClassicFreeIcon
+  isCuratedFontAwesomeClassicFreeIcon
 } from '../src/ui/svelte/util/fontAwesomeFreeClassicIcons.js';
 
 describe('essence colour tokens (issue 917)', () => {
@@ -57,17 +57,17 @@ describe('essenceIcons utility', () => {
     assert.equal(normalizeEssenceIcon('fa-duotone fa-flask'), 'fa-duotone fa-flask');
   });
 
-  it('exports a fantasy-safe subset that is meaningfully smaller than the full catalog', () => {
-    const safeCount = FONT_AWESOME_FREE_CLASSIC_FANTASY_SAFE_ICON_DEFINITIONS.length;
+  it('exports a curated subset that is meaningfully smaller than the full catalog', () => {
+    const curatedCount = FONT_AWESOME_FREE_CLASSIC_CURATED_ICON_DEFINITIONS.length;
     const totalCount = FONT_AWESOME_FREE_CLASSIC_ICON_DEFINITIONS.length;
 
-    assert.ok(safeCount >= 400, `Expected at least 400 fantasy-safe icons, got ${safeCount}`);
-    assert.ok(safeCount <= 600, `Expected at most 600 fantasy-safe icons, got ${safeCount}`);
-    assert.ok(safeCount < totalCount * 0.5, 'Fantasy-safe subset should be less than half the full catalog');
+    assert.ok(curatedCount >= 400, `Expected at least 400 curated icons, got ${curatedCount}`);
+    assert.ok(curatedCount <= 600, `Expected at most 600 curated icons, got ${curatedCount}`);
+    assert.ok(curatedCount < totalCount * 0.5, 'The curated subset should be less than half the full catalog');
   });
 
   it('includes core fantasy crafting icons', () => {
-    const safeCodes = new Set(FONT_AWESOME_FREE_CLASSIC_FANTASY_SAFE_ICON_DEFINITIONS.map(d => d.iconCode));
+    const curatedCodes = new Set(FONT_AWESOME_FREE_CLASSIC_CURATED_ICON_DEFINITIONS.map(d => d.iconCode));
 
     const expectedFantasyIcons = [
       'mortar-pestle', 'flask', 'flask-vial', 'vial', 'vials',
@@ -100,17 +100,17 @@ describe('essenceIcons utility', () => {
     ];
 
     for (const icon of expectedFantasyIcons) {
-      assert.ok(safeCodes.has(icon), `Expected fantasy icon "${icon}" to be in the safe list`);
+      assert.ok(curatedCodes.has(icon), `Expected fantasy icon "${icon}" to be in the curated list`);
     }
   });
 
   it('excludes single-character icons (letters and digits)', () => {
     for (let i = 0; i <= 9; i++) {
-      assert.equal(isFantasySafeFontAwesomeClassicFreeIcon(String(i)), false, `Digit "${i}" should not be fantasy-safe`);
+      assert.equal(isCuratedFontAwesomeClassicFreeIcon(String(i)), false, `Digit "${i}" should not be curated`);
     }
     for (let c = 97; c <= 122; c++) {
       const letter = String.fromCharCode(c);
-      assert.equal(isFantasySafeFontAwesomeClassicFreeIcon(letter), false, `Letter "${letter}" should not be fantasy-safe`);
+      assert.equal(isCuratedFontAwesomeClassicFreeIcon(letter), false, `Letter "${letter}" should not be curated`);
     }
   });
 
@@ -127,7 +127,7 @@ describe('essenceIcons utility', () => {
     ];
 
     for (const icon of currencyIcons) {
-      assert.equal(isFantasySafeFontAwesomeClassicFreeIcon(icon), false, `Currency icon "${icon}" should not be fantasy-safe`);
+      assert.equal(isCuratedFontAwesomeClassicFreeIcon(icon), false, `Currency icon "${icon}" should not be curated`);
     }
   });
 
@@ -149,7 +149,7 @@ describe('essenceIcons utility', () => {
     ];
 
     for (const icon of consumerElectronics) {
-      assert.equal(isFantasySafeFontAwesomeClassicFreeIcon(icon), false, `Consumer electronics icon "${icon}" should not be curated`);
+      assert.equal(isCuratedFontAwesomeClassicFreeIcon(icon), false, `Consumer electronics icon "${icon}" should not be curated`);
     }
   });
 
@@ -165,7 +165,7 @@ describe('essenceIcons utility', () => {
     ];
 
     for (const icon of fictionTechnology) {
-      assert.equal(isFantasySafeFontAwesomeClassicFreeIcon(icon), true, `Icon "${icon}" should be curated`);
+      assert.equal(isCuratedFontAwesomeClassicFreeIcon(icon), true, `Icon "${icon}" should be curated`);
     }
   });
 
@@ -183,7 +183,7 @@ describe('essenceIcons utility', () => {
     ];
 
     for (const icon of civilianTransport) {
-      assert.equal(isFantasySafeFontAwesomeClassicFreeIcon(icon), false, `Transport icon "${icon}" should not be curated`);
+      assert.equal(isCuratedFontAwesomeClassicFreeIcon(icon), false, `Transport icon "${icon}" should not be curated`);
     }
   });
 
@@ -211,7 +211,7 @@ describe('essenceIcons utility', () => {
     ];
 
     for (const icon of uiIcons) {
-      assert.equal(isFantasySafeFontAwesomeClassicFreeIcon(icon), false, `UI icon "${icon}" should not be fantasy-safe`);
+      assert.equal(isCuratedFontAwesomeClassicFreeIcon(icon), false, `UI icon "${icon}" should not be curated`);
     }
   });
 
@@ -225,7 +225,7 @@ describe('essenceIcons utility', () => {
     ];
 
     for (const icon of faceIcons) {
-      assert.equal(isFantasySafeFontAwesomeClassicFreeIcon(icon), false, `Face icon "${icon}" should not be fantasy-safe`);
+      assert.equal(isCuratedFontAwesomeClassicFreeIcon(icon), false, `Face icon "${icon}" should not be curated`);
     }
   });
 
@@ -249,7 +249,7 @@ describe('essenceIcons utility', () => {
     ];
 
     for (const icon of officeIcons) {
-      assert.equal(isFantasySafeFontAwesomeClassicFreeIcon(icon), false, `Office icon "${icon}" should not be curated`);
+      assert.equal(isCuratedFontAwesomeClassicFreeIcon(icon), false, `Office icon "${icon}" should not be curated`);
     }
   });
 
@@ -262,7 +262,7 @@ describe('essenceIcons utility', () => {
     ];
 
     for (const icon of commerce) {
-      assert.equal(isFantasySafeFontAwesomeClassicFreeIcon(icon), true, `Icon "${icon}" should be curated`);
+      assert.equal(isCuratedFontAwesomeClassicFreeIcon(icon), true, `Icon "${icon}" should be curated`);
     }
   });
 
@@ -282,7 +282,7 @@ describe('essenceIcons utility', () => {
     ];
 
     for (const icon of medicalIcons) {
-      assert.equal(isFantasySafeFontAwesomeClassicFreeIcon(icon), false, `Medical icon "${icon}" should not be curated`);
+      assert.equal(isCuratedFontAwesomeClassicFreeIcon(icon), false, `Medical icon "${icon}" should not be curated`);
     }
   });
 
@@ -298,7 +298,7 @@ describe('essenceIcons utility', () => {
     ];
 
     for (const icon of craftTools) {
-      assert.equal(isFantasySafeFontAwesomeClassicFreeIcon(icon), true, `Icon "${icon}" should be curated`);
+      assert.equal(isCuratedFontAwesomeClassicFreeIcon(icon), true, `Icon "${icon}" should be curated`);
     }
   });
 
@@ -318,7 +318,7 @@ describe('essenceIcons utility', () => {
     ];
 
     for (const icon of humanitarianIcons) {
-      assert.equal(isFantasySafeFontAwesomeClassicFreeIcon(icon), false, `Humanitarian icon "${icon}" should not be fantasy-safe`);
+      assert.equal(isCuratedFontAwesomeClassicFreeIcon(icon), false, `Humanitarian icon "${icon}" should not be curated`);
     }
   });
 
@@ -333,7 +333,7 @@ describe('essenceIcons utility', () => {
     ];
 
     for (const icon of miscIcons) {
-      assert.equal(isFantasySafeFontAwesomeClassicFreeIcon(icon), false, `Icon "${icon}" should not be fantasy-safe`);
+      assert.equal(isCuratedFontAwesomeClassicFreeIcon(icon), false, `Icon "${icon}" should not be curated`);
     }
   });
 
@@ -363,7 +363,7 @@ describe('essenceIcons utility', () => {
     ];
 
     for (const icon of miscModern) {
-      assert.equal(isFantasySafeFontAwesomeClassicFreeIcon(icon), false, `Icon "${icon}" should not be curated`);
+      assert.equal(isCuratedFontAwesomeClassicFreeIcon(icon), false, `Icon "${icon}" should not be curated`);
     }
   });
 
@@ -376,15 +376,15 @@ describe('essenceIcons utility', () => {
     ];
 
     for (const icon of scholarshipAndRenown) {
-      assert.equal(isFantasySafeFontAwesomeClassicFreeIcon(icon), true, `Icon "${icon}" should be curated`);
+      assert.equal(isCuratedFontAwesomeClassicFreeIcon(icon), true, `Icon "${icon}" should be curated`);
     }
   });
 
   it('keeps signs-post despite the -sign$ currency pattern', () => {
-    assert.equal(isFantasySafeFontAwesomeClassicFreeIcon('signs-post'), true);
+    assert.equal(isCuratedFontAwesomeClassicFreeIcon('signs-post'), true);
   });
 
-  it('builds the fantasy-safe picker catalog by default', () => {
+  it('builds the curated picker catalog by default', () => {
     const options = buildEssenceIconOptions();
 
     assert.equal(options, getEssenceIconOptions());
@@ -484,7 +484,7 @@ describe('essenceIcons lazy initialization', () => {
       assert.equal(optionFreezeCount.value, 0, 'importing essenceIcons.js must not build any icon option');
 
       const options = fresh.getEssenceIconOptions();
-      assert.ok(options.length > 0, 'the first accessor call must build the fantasy-safe catalog');
+      assert.ok(options.length > 0, 'the first accessor call must build the curated catalog');
       assert.ok(optionFreezeCount.value > 0, 'building the catalog must freeze option-shaped objects');
 
       // The fresh instance memoizes independently of the shared module under test.
