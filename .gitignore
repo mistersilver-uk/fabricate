@@ -6,6 +6,10 @@ stats.html
 *.log
 .DS_Store
 .vscode/
+# JetBrains AIR agent scratch. The tool excludes this through its own file under AppData, which
+# only git can see -- so without an entry here every repo-level tool that walks the tree (the
+# Markdown gate among them) lints a developer's scratch plans and fails only on their machine.
+.air/
 *.zip
 # Foundry e2e: ignore runtime data but track world fixtures
 .foundry-e2e/worlds/*/data/
