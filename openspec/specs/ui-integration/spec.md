@@ -277,7 +277,7 @@ Because the markup is unchanged, a per-option test or capture hook still resolve
 #### Icon vocabulary
 
 Every Fabricate icon picker offers ONE curated Font Awesome vocabulary, drawn from the classic free icons Foundry bundles, and that vocabulary serves any fictional setting rather than fantasy alone.
-Fabricate ships against every system Foundry supports, so a science-fiction, post-apocalyptic, industrial or modern game is as much its subject as a dungeon, and a curation that excludes a rocket, a robot or a reactor has scoped the module to one genre its code never claimed.
+Fabricate ships against every system Foundry supports, so a science-fiction, post-apocalyptic, industrial or modern game is as much its subject as a dungeon, and a curation that excludes a rocket, a robot or a microchip has scoped the module to one genre its code never claimed.
 
 The curation is therefore stated as what it leaves OUT rather than as a genre it is for.
 Four things stay out.
