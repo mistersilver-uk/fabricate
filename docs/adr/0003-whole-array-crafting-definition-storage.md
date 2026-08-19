@@ -50,7 +50,7 @@ In the MiB the budget below is stated in, the three overheads are **5.60 MB, 6.7
 
 Edit bytes are `writtenBytes` — what the mutation actually put on the wire, counted at the document layer on both arms.
 
-**Only the 10,000 row is reproducible from this repository.** The instrument that produced the 2,000 and 5,000 rows was never merged, and the raw run record is not versioned; § Consequences states exactly what survives and what does not.
+**No row of this table is reproducible from this repository.** The instrument that produced the 2,000 and 5,000 rows was never merged, the raw run records are not versioned, and issue 1265 has since removed the arrangement axis that produced the 10,000 row; § Consequences states exactly what survives and what does not, and why.
 Wall-clock figures were also recorded, and they are **class 2**: single runs on one machine, non-monotonic across the three corpora, and nothing in this decision rests on them.
 They are reported in PR 1256 and deliberately not tabulated here.
 
@@ -103,12 +103,16 @@ Issue 1261 enumerates them as an acceptance criterion precisely so that none is 
   That is why issue 1261 keeps one boot-time detection check after the strip, sized at a log and a notification, protecting this repo's own development worlds rather than any user's.
 - **Issue 1252 is closed `wontfix`.**
   Making the arrangement mandatory is the one option this data rules out.
-- **The instruments only partly survive the thing they measured, and this record should not claim otherwise.**
-  The write-cost benchmark cases (issue 1247) and the Foundry arrangement axis (issue 1255) are both in the tree, so the **10,000-recipe row can be reproduced**.
-  The 2,000 and 5,000 rows cannot.
-  The recipe-count series that produced them (issue 1258) was never merged — `granular-corpus` is a single 10,000-over-10,000 point and the harness has no series flag — and the raw run record lives under `.foundry-perf/`, which `.gitignore` excludes.
-  Issue 1265 then removes the arrangement axis entirely, at which point none of it is reproducible through this harness.
-  So two thirds of the table above is a **historical record rather than a repeatable measurement**, and a future maintainer who wants to re-derive it is rebuilding the instrument, not re-running it.
+- **The live-Foundry instrument did NOT survive the thing it measured, and this record should not claim otherwise.**
+  Issue 1265 removed the Foundry arrangement axis (issue 1255) from this repository, so **no row of the table above is reproducible through this harness** — including the 10,000-recipe row, which an earlier revision of this record said could be reproduced.
+  It was removed rather than kept, because the rule that made it honest is the rule that makes it impossible to keep.
+  The axis reached its converted arm THROUGH the shipped conversion, and issue 1261 strips that conversion out of the product.
+  With no shipped conversion there is no shipped path for the axis to reach anything through, and the only way left to produce a converted arm is to hand-set the layout — which measures the fixture rather than the product, and is what § The measurement rules out.
+  So after 1261 the axis is dead code carrying an obligation nobody can discharge, and an accepted record must not assert an instrument that cannot be run.
+  The 2,000 and 5,000 rows were already unreproducible before that: the recipe-count series that produced them (issue 1258) was never merged — `granular-corpus` was a single 10,000-over-10,000 point and the harness had no series flag — and the raw run records live under `.foundry-perf/`, which `.gitignore` excludes.
+  What DOES survive is the headless write-cost benchmark cases (issue 1247), whose case ids carry `perRecord`.
+  They are committed, cross-machine, machine-invariant and asserted by `npm test`, and they are why this section's first consequence can still start from evidence: they hold the write-cost half of the argument above without needing a live client at all.
+  So the table above is a **historical record rather than a repeatable measurement**, and a future maintainer who wants to re-derive it is rebuilding the instrument, not re-running it.
   That is stated plainly because the alternative is a record whose evidence quietly cannot be checked — which is the failure this ADR exists to correct.
   ADR 0001's condition went unmeasured against a real client for the whole life of the programme, and a decision record that overstates its own reproducibility is how that happens again.
 
@@ -119,7 +123,8 @@ ADR 0001's candidate **A+** — one `JournalEntry` per record in a dedicated wor
 Issue 1088 Q6 established that no API hides a pack from a GM.
 
 That objection is about **presentation**, not about the connect payload, and issue 1088's own measurement is why A+ stays on the table: a compendium delivers an **index** at connect rather than full documents.
-Whether that changes the arithmetic this record turns on has never been measured on a live client, and the instrument to measure it now exists.
+Whether that changes the arithmetic this record turns on has never been measured on a live client.
+The live-Foundry perf harness that would host such a measurement is still here, but the connect-payload census that produced this record's own byte columns went with the arrangement axis (§ Consequences), so a revisit builds that census rather than re-running one.
 
 Revisit A+ if, and only if, the write cost of whole-array storage becomes the binding constraint in practice — a corpus where GM edits are frequent enough that 8,867,523 bytes per edit is felt.
 Any such revisit should measure connect on a real client first, and should treat 452–489 bytes per record as the reference point for what a per-key arrangement costs, not 339.

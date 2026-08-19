@@ -19,21 +19,6 @@ import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 import {
-  ARRANGEMENT_ARMS,
-  ARRANGEMENT_ARM_IDS,
-  ARRANGEMENT_MODES,
-  ARRANGEMENT_RECORD_CLASSES,
-  HARNESS_FORBIDDEN_SETTING_KEYS,
-  HARNESS_WRITABLE_SETTING_KEYS,
-  armsForMode,
-  arrangementConversionWrites,
-  assertHarnessWritableSettingKey,
-  compareArrangementArms,
-  describeObservedArrangement,
-  resolveArrangementMode,
-  summarizeStorageConversion,
-} from '../scripts/lib/foundryPerfArrangement.js';
-import {
   LONG_TASK_THRESHOLD_MS,
   summarizeLongTasks,
   summarizeStartupMeasures,
@@ -41,13 +26,11 @@ import {
 } from '../scripts/lib/foundryPerfCapture.js';
 import {
   MEASUREMENT_CLASS,
-  MEASUREMENT_PHASE,
   MEASUREMENT_STATUS,
   PERF_MEASUREMENTS,
   PERF_MEASUREMENT_IDS,
   deferredMeasurements,
   implementedMeasurements,
-  measurementPhase,
   reconcileResults,
 } from '../scripts/lib/foundryPerfMeasurements.js';
 import {
@@ -87,9 +70,6 @@ import {
 
 const REPOSITORY_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const SYSTEM_ID = 'benchsys';
-
-/** The issue-1255 scale profile the storage-arrangement axis exists to walk. */
-const ARRANGEMENT_FIXTURE_PROFILE = 'granular-corpus';
 
 /**
  * A fixture with the shape issue 1071's `buildScaleFixture` returns, at an arbitrary size.
@@ -720,14 +700,7 @@ test('no GitHub workflow invokes the perf profile', () => {
   const offenders = [];
   for (const file of readdirSync(workflowDir).filter((name) => /\.ya?ml$/.test(name))) {
     const source = readFileSync(join(workflowDir, file), 'utf8');
-    // The issue-1255 opt-in flags are on the list too: the arrangement axis converts a world's
-    // storage in place and doubles an already hour-long run, so it must not become a required
-    // check by way of a workflow nobody read.
-    if (
-      /test:foundry:perf|--check=perf|--profile=perf|foundry-perf-run|--arrangement=|FOUNDRY_PERF_ARRANGEMENT|granular-corpus/.test(
-        source
-      )
-    ) {
+    if (/test:foundry:perf|--check=perf|--profile=perf|foundry-perf-run/.test(source)) {
       offenders.push(file);
     }
   }
@@ -738,378 +711,43 @@ test('no GitHub workflow invokes the perf profile', () => {
   );
 });
 
-// ── The storage-arrangement axis (issue 1255) ──────────────────────────────────────────────
-
-test('the granular-corpus profile really seeds 10,000 of BOTH classes', async () => {
-  // A MIRROR test against the real issue-1071 generator, through the loader the runner uses.
-  // If the fixtures were absent this fails with that loader's own message, which names the
-  // issue and the path -- the failure this file's fixture-shape double exists to keep legible.
-  const scale = await loadScaleFixtureModule();
-  const fixture = scale.buildScaleFixture({
-    profile: ARRANGEMENT_FIXTURE_PROFILE,
-    seed: scale.DEFAULT_SEED,
-  });
-  const seed = buildFoundrySeed(fixture);
-
-  // Asserted as VALUES. "10,000 of both classes" is the profile's whole reason to exist, and a
-  // silently truncated fixture would otherwise be inferred from a suspiciously fast run rather
-  // than seen.
-  assert.equal(seed.invariant.recipes, 10_000, 'recipes seeded');
-  assert.equal(seed.invariant.components, 10_000, 'components seeded');
-  assert.equal(fixture.foundryOnly, true, 'it is a Foundry-only profile');
-
-  // And the write budget still holds at 20,000 records: seeding is setup, and setup that grew
-  // with the corpus would be measuring the defect instead of preparing to.
-  assert.deepEqual(seed.writes, SEED_WRITE_BUDGET);
-});
-
-test('the arms are ordered legacy first, and a mode selects how many are walked', () => {
-  assert.deepEqual(
-    ARRANGEMENT_ARMS.map((arm) => arm.id),
-    [ARRANGEMENT_ARM_IDS.LEGACY, ARRANGEMENT_ARM_IDS.GRANULAR],
-    'the legacy arm must be walked FIRST: a converted world cannot be walked as a control'
-  );
-  assert.equal(armsForMode(ARRANGEMENT_MODES.LEGACY_ONLY).length, 1);
-  assert.equal(armsForMode(ARRANGEMENT_MODES.BOTH).length, 2);
-  for (const arm of ARRANGEMENT_ARMS) {
-    assert.ok(arm.reachedBy.length > 0, `${arm.id} must say how it is reached`);
-  }
-});
-
-test('an unset arrangement keeps the single walk, and a typo is refused by name', () => {
-  assert.equal(resolveArrangementMode(undefined), ARRANGEMENT_MODES.LEGACY_ONLY);
-  assert.equal(resolveArrangementMode(''), ARRANGEMENT_MODES.LEGACY_ONLY);
-  assert.equal(resolveArrangementMode('both'), ARRANGEMENT_MODES.BOTH);
-  // Refused, never silently defaulted. A typo that produced a one-arm run would write a
-  // complete-looking record with the entire point of the run missing from it.
-  assert.throws(() => resolveArrangementMode('yes'), /Unknown FOUNDRY_PERF_ARRANGEMENT="yes"/);
-});
-
-test('the harness may write a storage TARGET and may never write a LAYOUT', () => {
-  // The acceptance criterion turned into a value. "The converted arm is reached through the
-  // shipped conversion" is only true while the harness writes the setting a GM writes and the
-  // shipped reconciler writes the layout.
-  for (const recordClass of ARRANGEMENT_RECORD_CLASSES) {
-    const writes = arrangementConversionWrites(recordClass.id);
-    assert.ok(writes.length > 0, `${recordClass.id} must issue at least one write`);
-    for (const write of writes) {
-      assert.ok(
-        HARNESS_WRITABLE_SETTING_KEYS.includes(write.key),
-        `${recordClass.id} writes "${write.key}", which is not a storage target`
-      );
-      assert.ok(
-        !HARNESS_FORBIDDEN_SETTING_KEYS.includes(write.key),
-        `${recordClass.id} writes the LAYOUT key "${write.key}"`
-      );
-    }
-  }
-  assert.equal(
-    HARNESS_WRITABLE_SETTING_KEYS.filter((key) => HARNESS_FORBIDDEN_SETTING_KEYS.includes(key))
-      .length,
-    0,
-    'the writable and forbidden key sets must be disjoint'
-  );
-});
-
-test('the write choke point refuses every layout key, by name', () => {
-  for (const key of HARNESS_WRITABLE_SETTING_KEYS) {
-    assert.equal(assertHarnessWritableSettingKey(key), key);
-  }
-  for (const key of HARNESS_FORBIDDEN_SETTING_KEYS) {
-    assert.throws(() => assertHarnessWritableSettingKey(key), new RegExp(key));
-  }
-  assert.throws(() => assertHarnessWritableSettingKey('recipes'), /not an arrangement-axis/);
-});
-
-/**
- * Every setting WRITE in a source file that names a storage layout key.
- *
- * A window after each `settings.set(` rather than a whole-file grep, because both files
- * legitimately READ a layout: the whole point of `readObservedArrangement` is to report the
- * layout each arm actually observed. What must never happen is a WRITE.
- *
- * @param {string} source
- * @returns {string[]} the offending call windows.
- */
-function settingWritesNamingALayoutKey(source) {
-  const offenders = [];
-  for (const match of source.matchAll(/settings\.set\(/g)) {
-    const window = source.slice(match.index, match.index + 240);
-    if (/StorageLayout|storageLayout|RECIPE_STORAGE_LAYOUT|COMPONENT_STORAGE_LAYOUT/.test(window)) {
-      offenders.push(window.split('\n')[0]);
-    }
-  }
-  return offenders;
-}
-
-test('the layout-write scan can actually fail', () => {
-  // Prove the gate before trusting it. A scan that matched nothing would report the harness
-  // clean whatever the harness did, which is the failure mode a source scan always has.
-  assert.deepEqual(settingWritesNamingALayoutKey('await game.settings.set(ns, key, value);'), []);
-  assert.equal(
-    settingWritesNamingALayoutKey(
-      "await game.settings.set('fabricate', 'recipeStorageLayout', 'perRecord');"
-    ).length,
-    1
-  );
-  assert.equal(
-    settingWritesNamingALayoutKey(
-      'await game.settings.set(namespace, SETTING_KEYS.COMPONENT_STORAGE_LAYOUT, value);'
-    ).length,
-    1
-  );
-});
-
-test('no setting write in the perf harness names a storage LAYOUT key', () => {
-  for (const file of [
-    join('scripts', 'foundry-perf-run.mjs'),
-    join('scripts', 'lib', 'foundryPerfScenarios.js'),
-    join('scripts', 'lib', 'foundryPerfArrangement.js'),
-  ]) {
-    const source = readFileSync(join(REPOSITORY_ROOT, file), 'utf8');
-    assert.deepEqual(
-      settingWritesNamingALayoutKey(source),
-      [],
-      `${file} writes a storage LAYOUT. The harness writes a TARGET and the shipped ` +
-        `reconciler writes the layout; a fixture that hand-sets the layout measures the fixture.`
-    );
-  }
-});
-
-test('an arm reports the layout it OBSERVED, and drift when it is not what it claims', () => {
-  const [legacyArm, granularArm] = ARRANGEMENT_ARMS;
-  const converted = { recipes: 'perRecord', components: 'perRecord' };
-
-  const honest = describeObservedArrangement({ arm: granularArm, observed: converted });
-  assert.equal(honest.matches, true);
-  assert.deepEqual(honest.drift, []);
-  assert.equal(honest.arm, ARRANGEMENT_ARM_IDS.GRANULAR);
-
-  // The failure this observation exists to catch: a converted-arm walk of a world nothing
-  // converted produces plausible numbers and a ratio of almost exactly 1, which reads as "the
-  // arrangement makes no difference" rather than as "the arrangement never changed".
-  const silent = describeObservedArrangement({
-    arm: granularArm,
-    observed: { recipes: 'singleArray', components: 'perRecord' },
-  });
-  assert.equal(silent.matches, false);
-  assert.equal(silent.drift.length, 1);
-  assert.match(silent.drift[0], /recipes/);
-
-  assert.equal(describeObservedArrangement({ arm: legacyArm, observed: converted }).matches, false);
-
-  // A layout the runner could not read at all is drift too, never a silent pass: the defensive
-  // read in `foundry-perf-run.mjs` reports `null` rather than failing the whole walk, and a
-  // `null` that compared equal to anything would turn that safety into a false clean bill.
-  const unreadable = describeObservedArrangement({
-    arm: legacyArm,
-    observed: { recipes: null, components: null },
-  });
-  assert.equal(unreadable.matches, false);
-  assert.equal(unreadable.drift.length, 2);
-  assert.match(unreadable.drift[0], /reports "nothing"/);
-});
-
-const CONVERSION_BEFORE = Object.freeze({
-  layout: 'singleArray',
-  records: 10_000,
-  recordDocuments: 0,
-  legacyKeyBytes: 7_179_762,
-  legacyDocumentPresent: true,
-});
-
-const CONVERSION_AFTER = Object.freeze({
-  layout: 'perRecord',
-  records: 10_000,
-  recordDocuments: 10_000,
-  legacyKeyBytes: 2,
-  legacyDocumentPresent: false,
-});
-
-test('the conversion splits its classes: counts assertable, milliseconds recorded only', () => {
-  const [recipeClass] = ARRANGEMENT_RECORD_CLASSES;
-  const summary = summarizeStorageConversion({
-    recordClass: recipeClass,
-    before: CONVERSION_BEFORE,
-    after: CONVERSION_AFTER,
-    elapsedMs: 4200,
-    documentCalls: { create: 1, update: 0, delete: 0 },
-    consent: 'granted',
-  });
-
-  // CLASS 1 -- every one of these may be asserted.
-  assert.equal(summary.invariant.recordsMoved, 10_000);
-  assert.equal(summary.invariant.documentsAfter, 10_000);
-  assert.deepEqual(summary.invariant.documentCalls, { create: 1, update: 0, delete: 0 });
-  assert.equal(summary.invariant.documentCallsInstrumented, true);
-  assert.equal(summary.invariant.legacyDocumentPresentBefore, true);
-  assert.equal(summary.invariant.legacyDocumentPresentAfter, false);
-  assert.equal(summary.invariant.reachedShippedLayout, true);
-  assert.deepEqual(summary.invariant.drift, []);
-
-  // CLASS 2 -- present, and NOWHERE NEAR the invariant half. Nothing in this repository ever
-  // asserts its value; this asserts only that it landed on the timing side of the split.
-  assert.deepEqual(summary.timing.samplesMs, [4200]);
-  assert.ok(!('elapsedMs' in summary.invariant), 'a duration must never be a class-1 value');
-  assert.ok(summary.timing.clockBasis.length > 0, 'a duration must state what is inside it');
-});
-
-test('a conversion that did not settle reports no duration at all', () => {
-  const [recipeClass] = ARRANGEMENT_RECORD_CLASSES;
-  const refused = summarizeStorageConversion({
-    recordClass: recipeClass,
-    before: CONVERSION_BEFORE,
-    after: { ...CONVERSION_AFTER, layout: 'singleArray', recordDocuments: 0 },
-    elapsedMs: 90,
-    consent: 'not-prompted',
-  });
-  // 90 ms is the time something ELSE took. Reporting it as the conversion's duration would be a
-  // fabricated measurement, and an unusually persuasive one.
-  assert.equal(refused.timing, undefined);
-  assert.match(refused.unavailable, /singleArray/);
-  assert.equal(refused.invariant.reachedShippedLayout, false);
-  assert.equal(refused.invariant.documentCallsInstrumented, false);
-});
-
-test('a record-count shortfall is reported, never averaged away', () => {
-  const [recipeClass] = ARRANGEMENT_RECORD_CLASSES;
-  const short = summarizeStorageConversion({
-    recordClass: recipeClass,
-    before: CONVERSION_BEFORE,
-    after: { ...CONVERSION_AFTER, recordDocuments: 9_998 },
-    elapsedMs: 4200,
-    documentCalls: { create: 1, update: 0, delete: 0 },
-  });
-  assert.equal(short.invariant.drift.length, 1);
-  assert.match(short.invariant.drift[0], /10000 recipes went in and 9998/);
-  // It still settled, so it still has a duration -- the shortfall is a class-1 finding about
-  // the conversion, not a reason to withhold the class-2 reading.
-  assert.deepEqual(short.timing.samplesMs, [4200]);
-});
-
-test('the conversion measurements belong to the TRANSITION, not to either arm', () => {
-  const transition = PERF_MEASUREMENTS.filter(
-    (measurement) => measurementPhase(measurement) === MEASUREMENT_PHASE.TRANSITION
-  );
-  assert.deepEqual(
-    transition.map((measurement) => measurement.id),
-    ['storage-conversion-recipes', 'storage-conversion-components']
-  );
-  for (const measurement of PERF_MEASUREMENTS) {
-    assert.ok(
-      Object.values(MEASUREMENT_PHASE).includes(measurementPhase(measurement)),
-      `${measurement.id} declares an unknown phase`
-    );
-  }
-});
-
-test('a per-arm reconciliation is not asked to account for the conversion', () => {
-  // Without the phase filter both conversion ids appear in EVERY arm's `missing` list -- a hole
-  // in the record that is not a hole in the run, which is the exact failure the reconciler
-  // exists to surface and must not manufacture.
-  const arm = reconcileResults(
-    { 'manager-open': { timing: { samplesMs: [12] } } },
-    { phase: MEASUREMENT_PHASE.ARM }
-  );
-  assert.deepEqual(
-    arm.missing.filter((id) => id.startsWith('storage-conversion')),
-    []
-  );
-  assert.ok(arm.missing.includes('player-open'), 'a real per-arm hole is still reported');
-
-  const transition = reconcileResults(
-    { 'storage-conversion-recipes': { timing: { samplesMs: [4200] } } },
-    { phase: MEASUREMENT_PHASE.TRANSITION }
-  );
-  assert.deepEqual(transition.missing, ['storage-conversion-components']);
-  assert.ok(!transition.missing.includes('player-open'), 'an arm measurement is out of scope');
-
-  // No filter is the whole-run view, and it still reports both.
-  const everything = reconcileResults({});
-  assert.ok(everything.missing.includes('storage-conversion-recipes'));
-  assert.ok(everything.missing.includes('manager-open'));
-});
-
-test('the between-arms scenarios are exactly the transition measurements', () => {
-  const between = PERF_SCENARIOS.filter((scenario) => scenario.runsBetweenArms === true);
-  assert.deepEqual(
-    between.map((scenario) => scenario.measurementId),
-    ['storage-conversion-recipes', 'storage-conversion-components']
-  );
-  for (const scenario of between) {
-    // `deferredToRunner` is what keeps them OUT of the ordinary arm walk. A between-arms
-    // scenario that also ran inside a walk would convert the world mid-measurement.
-    assert.equal(scenario.deferredToRunner, true, `${scenario.id} must not run inside a walk`);
-    assert.equal(typeof scenario.run, 'function', `${scenario.id} needs a run()`);
-  }
-});
-
-test('the runner actually drives the between-arms scenarios and reloads after them', () => {
-  // The mirror that rots silently: a `runsBetweenArms` scenario nothing invokes leaves the
-  // conversion measurement reported as unavailable while the run still exits zero.
-  const source = readFileSync(join(REPOSITORY_ROOT, 'scripts', 'foundry-perf-run.mjs'), 'utf8');
-  assert.match(source, /scenario\.runsBetweenArms/, 'the runner must select the transition set');
-  assert.match(source, /runTransitionScenarios\(walkContext\)/);
-  // The reload after the conversion is what makes the second arm a BOOT, which is where the
-  // granular arrangement's connect payload and startup attribution can be read at all.
-  const conversionAt = source.indexOf('runTransitionScenarios(walkContext)');
-  const reloadAt = source.indexOf('rejoinAfterReload', conversionAt);
-  assert.ok(conversionAt > 0 && reloadAt > conversionAt, 'the converted arm must reload first');
-});
-
-test('a run record carries both arms, and names the one its top level repeats', () => {
-  const single = buildPerfRunRecord({
-    host: {},
-    foundry: {},
-    seed: {},
-    reconciled: { reconciled: [], missing: [], undeclared: [], invariant: {}, timing: {} },
-  });
-  // Absent rather than empty on a single-arm run, so "no axis" and "the axis found nothing"
-  // are not the same shape.
-  assert.equal(single.arrangements, null);
-  assert.equal(single.baselineArm, null);
-
-  const both = buildPerfRunRecord({
-    host: {},
-    foundry: {},
-    seed: {},
-    reconciled: { reconciled: [], missing: [], undeclared: [], invariant: {}, timing: {} },
-    arrangements: [{ arm: 'singleArray' }, { arm: 'perRecord' }],
-    baselineArm: 'singleArray',
-  });
-  assert.equal(both.arrangements.length, 2);
-  assert.equal(both.baselineArm, 'singleArray');
-});
-
-test('the two arms of ONE record compare as ratios, and a one-sided one yields none', () => {
-  const record = {
-    arrangements: [
-      {
-        arm: ARRANGEMENT_ARM_IDS.LEGACY,
-        timing: {
-          'definition-edit': { samplesMs: [400, 400, 400] },
-          'manager-open': { samplesMs: [100] },
-        },
-      },
-      {
-        arm: ARRANGEMENT_ARM_IDS.GRANULAR,
-        timing: { 'definition-edit': { samplesMs: [100, 100, 100] } },
-      },
-    ],
-  };
-  const rows = compareArrangementArms(record, median);
-  const edit = rows.find((row) => row.measurement === 'definition-edit');
-  assert.equal(edit.ratio, 0.25, 'the granular arm is a quarter of the combined arm here');
-  const open = rows.find((row) => row.measurement === 'manager-open');
-  assert.equal(open.ratio, null, 'a measurement present on one arm only yields no ratio');
-});
-
-test('the perf lifecycle forwards the fixture and the arrangement as flags', () => {
-  // FLAGS, not "export the variable yourself": the one command a maintainer is handed has to
+test('the perf lifecycle forwards the fixture as a flag', () => {
+  // A FLAG, not "export the variable yourself": the one command a maintainer is handed has to
   // work on Windows too, where a POSIX `VAR=value npm run ...` prefix is not a thing.
   const source = readFileSync(join(REPOSITORY_ROOT, 'scripts', 'foundry-test.mjs'), 'utf8');
   assert.match(source, /--fixture=\(\.\+\)\$/);
   assert.match(source, /process\.env\.FOUNDRY_PERF_FIXTURE = fixture\[1\]/);
-  assert.match(source, /--arrangement=\(\.\+\)\$/);
-  assert.match(source, /process\.env\.FOUNDRY_PERF_ARRANGEMENT = arrangement\[1\]/);
+});
+
+test('the scenario registry imports nothing from src/, so a product deletion cannot break it', () => {
+  // THE COUPLING THAT ALREADY BIT (issues 1255, 1261, 1265). A static import of a shipped
+  // `src/systems/` module made a product-side file deletion a LOAD-TIME `Cannot find module` for
+  // this whole registry -- which takes out EVERY scenario, not the one that used the constant.
+  //
+  // Asserted against the import statements rather than against a whole-file grep: prose here
+  // legitimately names `src/` paths, and a grep that matched those would be a gate that can only
+  // fail for the wrong reason.
+  const source = readFileSync(
+    join(REPOSITORY_ROOT, 'scripts', 'lib', 'foundryPerfScenarios.js'),
+    'utf8'
+  );
+  const specifiers = [...source.matchAll(/^\s*import\s[^;]*?from\s+'([^']+)';/gm)].map(
+    (match) => match[1]
+  );
+  assert.deepEqual(
+    specifiers.filter((specifier) => specifier.includes('/src/')),
+    [],
+    'a scenario needs the product from the live PAGE, never from a static import'
+  );
+});
+
+test('the src-import scan can actually fail', () => {
+  // Prove the gate before trusting it. A scan whose regex matched nothing would report the file
+  // clean whatever it imported, which is the failure mode every source scan has.
+  const perturbed = "import { THING } from '../../src/systems/somewhere.js';\n";
+  const specifiers = [...perturbed.matchAll(/^\s*import\s[^;]*?from\s+'([^']+)';/gm)].map(
+    (match) => match[1]
+  );
+  assert.deepEqual(specifiers, ['../../src/systems/somewhere.js']);
+  assert.equal(specifiers.filter((specifier) => specifier.includes('/src/')).length, 1);
 });

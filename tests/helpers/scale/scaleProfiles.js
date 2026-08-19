@@ -55,13 +55,10 @@
  *
  * ## Foundry-only profiles, and why the sweep must skip them
  *
- * A profile is a fixture, and not every fixture has a headless case worth running. Issue 1255
- * needs a corpus at 10,000 components AND 10,000 recipes to seed into a LIVE Foundry world,
- * where the thing under measurement is a storage arrangement the headless harness already
- * measures with far cheaper fixtures (issues 1212 and 1247). Registering that corpus as an
- * ordinary profile would oblige `benchmarkCases.js` to invent headless cases for it and
- * `benchmarks/baselines/` to carry a committed baseline for them, at 20,000 records, inside
- * `npm test` — cost with no reader.
+ * A profile is a fixture, and not every fixture has a headless case worth running. A corpus that
+ * exists ONLY to be seeded into a live Foundry world would oblige `benchmarkCases.js` to invent
+ * headless cases for it and `benchmarks/baselines/` to carry a committed baseline for them,
+ * inside `npm test` — cost with no reader.
  *
  * So a profile MAY declare `foundryOnly` with a reason, which means exactly one thing: the
  * headless BENCHMARK sweep does not run it. Everything else still does. It is built by
@@ -70,6 +67,10 @@
  * `tests/benchmark-baseline-drift.test.js` pins the foundry-only SET so the escape hatch cannot
  * quietly widen to a profile that should have had cases. {@link SWEPT_SCALE_PROFILE_NAMES} is
  * the sweep's list; {@link SCALE_PROFILE_NAMES} remains every registered profile.
+ *
+ * NO profile claims the exemption today. Issue 1255's `granular-corpus` was the only one, and
+ * issue 1265 removed it with the storage-arrangement axis it existed for; the pinned set is now
+ * empty. The mechanism stays because the pin is what makes re-adding a member a visible edit.
  */
 import { buildComponentLibrary, buildToolLibrary } from './scaleComponents.js';
 import { INVENTORY_SERIES, buildHeldInventory } from './scaleInventory.js';
@@ -224,65 +225,6 @@ export const SCALE_PROFILES = Object.freeze({
     build(random) {
       const components = buildComponentLibrary({
         count: 5000,
-        random,
-        systemId: BENCH_SYSTEM_ID,
-      });
-      const recipes = buildRecipeCorpus({
-        shape: 'simple',
-        count: 10_000,
-        systemId: BENCH_SYSTEM_ID,
-        components,
-        random,
-      });
-      const inventory = buildHeldInventory({
-        stacks: CORPUS_AXIS_STACKS,
-        components,
-        systemId: BENCH_SYSTEM_ID,
-        random,
-        sourceActorCount: 1,
-      });
-      return {
-        system: baseSystem({ systemId: BENCH_SYSTEM_ID, components, tools: [] }),
-        components,
-        tools: [],
-        recipes,
-        inventory,
-      };
-    },
-  },
-
-  'granular-corpus': {
-    description:
-      'THE STORAGE-ARRANGEMENT CORPUS (issue 1255). 10,000 simple recipes over a ' +
-      '10,000-component library — 20,000 records of both classes at once — with the same token ' +
-      '20-stack inventory `simple-corpus` carries.',
-    construction: 'literal payloads; identical generators to simple-corpus, one library size up',
-    requiresNodeModules: false,
-    // FOUNDRY-ONLY. Read the module header's "Foundry-only profiles" section before removing
-    // this: the exemption is from the headless benchmark SWEEP alone, and it is pinned as a set.
-    foundryOnly: true,
-    foundryOnlyReason:
-      'Issue 1255 seeds this corpus into a live Foundry world through ' +
-      '`npm run test:foundry:perf -- --fixture=granular-corpus --arrangement=both`, which walks ' +
-      'it on the legacy arrangement, converts it in place through the shipped conversion, and ' +
-      'walks it again. The headless arm of that same claim is already measured by the ' +
-      '`recipeManager.*.perRecord` and `craftingSystemManager.*.perRecord` cases (issues 1212 ' +
-      'and 1247) on much smaller fixtures, so headless cases at 20,000 records would add ' +
-      'minutes to `npm test` and a 20,000-record committed baseline for no additional reader.',
-    ceiling:
-      'Deliberately UNBOUNDED relative to its siblings: 10,000 of both classes is the ' +
-      "performance programme's stated target scale and the point of the profile is to reach it " +
-      'on both classes simultaneously, which no other profile does. `simple-corpus` reaches ' +
-      '10,000 recipes over a 5,000-component library and `component-library` reaches 10,000 ' +
-      'components over a 6-recipe corpus; the conversion cost this profile exists to measure is ' +
-      'a function of BOTH counts, so neither of those can stand in for it.',
-    scale: { components: 10_000, recipes: 10_000, tools: 0, heldStacks: CORPUS_AXIS_STACKS },
-    build(random) {
-      // Generated with the SAME calls and the SAME argument order as `simple-corpus`, with one
-      // number changed. That is what makes the two directly readable against each other: a
-      // difference between them is the library size and nothing else.
-      const components = buildComponentLibrary({
-        count: 10_000,
         random,
         systemId: BENCH_SYSTEM_ID,
       });

@@ -233,9 +233,6 @@ npm run test:foundry:perf                          # seed, measure, record
 npm run test:foundry:perf -- --arm=v13             # the same profile on Foundry 13
 node scripts/foundry-perf-run.mjs --preflight      # preconditions only; starts nothing
 node scripts/foundry-perf-run.mjs                  # against an already-running container
-
-# 10,000 recipes AND 10,000 components, walked on BOTH storage arrangements (issue 1255)
-npm run test:foundry:perf -- --fixture=granular-corpus --arrangement=both
 ```
 
 ### It is opt-in, and it must stay that way
@@ -256,79 +253,6 @@ pulling anything.
 An image pull is hundreds of megabytes and a container boot activates a licence
 against the container hostname; neither should be a side effect of asking for a
 measurement.
-
-### The storage-arrangement axis
-
-Issues 1211 and 1212 moved recipes and components out of one whole-array world
-setting into one `Setting` document per record, and issue 1247 built the headless
-instrument for the claim that follows: a single-record mutation stops
-re-serializing and re-replicating the whole corpus.
-That instrument runs under plain Node against test doubles.
-Issue 1255 is the same claim measured **inside a real Foundry**, on a real world,
-against real replication.
-
-```bash
-npm run test:foundry:perf -- --fixture=granular-corpus --arrangement=both
-```
-
-That walks the scenarios on the combined-record arrangement, converts **that same
-world** in place through the shipped conversion, reloads, and walks them again on
-the granular one.
-It is opt-in and off by default: the second walk roughly doubles a run that
-already costs a licensed container and tens of minutes, and the conversion is a
-one-way door for any build older than the one performing it.
-
-`granular-corpus` is the fixture the axis exists for — 10,000 recipes over a
-10,000-component library, 20,000 records of both classes at once, which no other
-profile reaches.
-It is registered as `foundryOnly`, so the headless sweep
-(`npm run benchmark:performance`) skips it and it carries no committed baseline;
-`tests/benchmark-baseline-drift.test.js` pins that exemption to exactly one
-profile so it cannot widen unnoticed.
-
-Four rules make the axis worth having, and each is enforced rather than promised.
-
-<!-- markdownlint-disable markdownlint-sentences-per-line -->
-
-| Rule | Why | Enforced by |
-|---|---|---|
-| **ONE world, converted in place** | Seeding two worlds and comparing them is a ratio across differently-built worlds, which `openspec/specs/data-models/spec.md` condemns by name. | The runner converts between the two walks and never re-seeds. |
-| **Reached THROUGH the shipped conversion** | A fixture that hand-sets the layout measures the fixture. The harness writes the storage TARGET a GM dropdown writes and answers the shipped consent prompt; the shipped reconciler writes the LAYOUT. | `assertHarnessWritableSettingKey` refuses a layout key, and a source scan in `tests/foundry-perf-profile.test.js` proves no setting write in the harness names one. |
-| **Every arm records the layout it OBSERVED** | A converted-arm walk of an unconverted world produces plausible numbers and a ratio of almost exactly 1, which reads as "the arrangement makes no difference" rather than as "the arrangement never changed". | `describeObservedArrangement`, whose drift is printed during the run and stored on the arm. |
-| **The conversion is itself a measurement** | It is what a GM experiences exactly once, and nothing had ever timed it on a 20,000-record world. | `storage-conversion-recipes` and `storage-conversion-components`, declared in the measurement registry like everything else. |
-
-<!-- markdownlint-enable markdownlint-sentences-per-line -->
-
-The reload between the arms is load-bearing rather than tidiness, and it is not a
-correctness patch: the shipped setting-change bridge already rebuilds each
-manager's storage adapter when its own layout/target pair moves (issues 1212 and
-1232).
-It is there to make the second arm a **boot**.
-`startup-phases` and `first-page-ready` mean nothing taken from a session that was
-rebuilt in place, the granular boot is where 20,000 `Setting` documents arrive in
-the connect payload, and a boot is the state a GM's next session is actually in.
-
-The class split is unchanged.
-The conversion's elapsed time is class 2 like every other duration here.
-Its records moved, resulting per-record document count, bulk document-call count
-and legacy-key bytes before and after are class 1 — and the document-call count is
-the load-bearing half, because it is what distinguishes "wrote the corpus" from
-"wrote the corpus one record at a time", which no clock on one machine can tell
-apart.
-
-The run record grows an `arrangements` array carrying each arm's own
-reconciliation beside the layout it observed.
-Its top-level `measurements`/`invariant`/`timing` stay the **baseline** arm's, and
-`baselineArm` names which that is, so every reader written before this axis existed
-keeps working.
-Both arms come from one machine in one browser process minutes apart, so the ratio
-between them is the one comparison this profile can make honestly without a second
-run; the runner prints it and `compareArrangementArms` derives it.
-
-Two arms plus a 20,000-record conversion can exceed the profile's own hour-plus
-run budget.
-If a run is SIGTERM-killed, raise `FOUNDRY_RUN_TIMEOUT_MS` rather than concluding
-the profile hangs.
 
 ### The two measurement classes
 
