@@ -1,4 +1,9 @@
 // Generated from Font Awesome Free 6.7.2 metadata. Classic free icons only; brands excluded.
+//
+// One entry is a hand correction, not a regeneration: the generated artifact carried "bioevent",
+// which is not a Font Awesome icon in any release, in the alphabetical slot that belongs to
+// "biohazard" (free, solid). Every other entry, including hasRegular, matches the 6.7.2 metadata
+// exactly, and every entry resolves in the Font Awesome build Foundry bundles.
 
 export const FONT_AWESOME_FREE_CLASSIC_ICON_DEFINITIONS = Object.freeze([
   { iconCode: "0", label: "0", hasRegular: false },
@@ -132,7 +137,7 @@ export const FONT_AWESOME_FREE_CLASSIC_ICON_DEFINITIONS = Object.freeze([
   { iconCode: "bezier-curve", label: "Bezier Curve", hasRegular: false },
   { iconCode: "bicycle", label: "Bicycle", hasRegular: false },
   { iconCode: "binoculars", label: "Binoculars", hasRegular: false },
-  { iconCode: "bioevent", label: "Bioevent", hasRegular: false },
+  { iconCode: "biohazard", label: "Biohazard", hasRegular: false },
   { iconCode: "bitcoin-sign", label: "Bitcoin Sign", hasRegular: false },
   { iconCode: "blender", label: "Blender", hasRegular: false },
   { iconCode: "blender-phone", label: "Blender Phone", hasRegular: false },
@@ -1405,16 +1410,31 @@ export const FONT_AWESOME_FREE_CLASSIC_ICON_DEFINITIONS = Object.freeze([
   { iconCode: "z", label: "Z", hasRegular: false }
 ]);
 
-// Patterns that identify icons which break fantasy immersion in a TTRPG crafting context.
-// Anything matched here is excluded from the fantasy-safe subset.
-export const FANTASY_BREAKING_ICON_CODE_PATTERNS = Object.freeze([
+// Patterns that identify icons the curated subset leaves out.
+//
+// The curated subset serves any fictional setting, not fantasy alone: a science-fiction,
+// post-apocalyptic, industrial or modern game is as much in scope as a dungeon. What stays out is
+// therefore not "anything modern" but four narrower things — glyphs whose meaning is a software
+// affordance rather than a depicted object (editor controls, file formats, chart types); glyphs
+// whose SUBJECT is a real-world currency, institution, brand or cause (currency signs, the
+// pictograms of a present-day relief operation, party-political and accessibility symbols), as
+// against a gesture or a symbol a fiction is free to reuse; present-day civic, clinical and
+// domestic furniture that no fiction is reaching for (sanitation, pharmacy, commuter transport,
+// consumer electronics); and redundant variants of a glyph the subset already carries.
+//
+// The institution rule is about what a glyph DEPICTS, never about which Font Awesome release
+// shipped it. A release is not something a GM can see; the drawing is. A crate, a borehole and a
+// cooking burner are therefore curated in even though Font Awesome shipped them alongside the
+// relief pictograms, and a raised-hand Vulcan salute is curated in even though Star Trek owns the
+// gesture's name, because what the glyph depicts is a hand.
+export const EXCLUDED_ICON_CODE_PATTERNS = Object.freeze([
 
   // ── Single characters (not real icons) ──
   /^[0-9]$/,
   /^[a-z]$/,
 
   // ── Currency signs ──
-  /.-sign$/,       // austral-sign, dollar-sign, etc. (signs-post is safe — has no hyphen before "sign")
+  /.-sign$/,       // austral-sign, dollar-sign, etc. (signs-post is curated — has no hyphen before "sign")
   /^bitcoin-sign$/,
 
   // ── UI / editor controls ──
@@ -1451,7 +1471,6 @@ export const FANTASY_BREAKING_ICON_CODE_PATTERNS = Object.freeze([
   /^diagram-/,
   /^down-left-and-up-right-to-center$/,
   /^download$/,
-  /^dolly$/,
   /^draw-polygon$/,
   /^eject$/,
   /^ellipsis(-vertical)?$/,
@@ -1460,7 +1479,6 @@ export const FANTASY_BREAKING_ICON_CODE_PATTERNS = Object.freeze([
   /^filter(-circle-(dollar|xmark))?$/,
   /^font$/,
   /^forward(-fast|-step)?$/,
-  /^gauge(-high|-simple(-high)?)?$/,
   /^grip(-lines(-vertical)?|-vertical)?$/,
   /^group-arrows-rotate$/,
   /^heading$/,
@@ -1501,6 +1519,10 @@ export const FANTASY_BREAKING_ICON_CODE_PATTERNS = Object.freeze([
   /^strikethrough$/,
   /^subscript$/,
   /^superscript$/,
+  // A console prompt and a square-wave chart are the two exceptions this block's own rule catches:
+  // one is a software affordance, the other is literally a chart type. A rack of servers, a stack
+  // of discs and a chip are depicted objects, so they stay curated in.
+  /^terminal$/,
   /^text-/,
   /^thumbtack-slash$/,
   /^timeline$/,
@@ -1511,12 +1533,11 @@ export const FANTASY_BREAKING_ICON_CODE_PATTERNS = Object.freeze([
   /^up-right-from-square$/,
   /^upload$/,
   /^vector-square$/,
+  /^wave-square$/,
 
-  // ── Modern technology & computing ──
-  /^battery-(empty|full|half|quarter|three-quarters)$/,
+  // ── Present-day consumer electronics & telephony ──
   /^compact-disc$/,
   /^computer(-mouse)?$/,
-  /^database$/,
   /^desktop$/,
   /^display$/,
   /^ethernet$/,
@@ -1529,7 +1550,6 @@ export const FANTASY_BREAKING_ICON_CODE_PATTERNS = Object.freeze([
   /^keyboard$/,
   /^laptop/,
   /^memory$/,
-  /^microchip$/,
   /^microphone(-lines|-lines-slash|-slash)?$/,
   /^mobile/,
   /^network-wired$/,
@@ -1541,25 +1561,19 @@ export const FANTASY_BREAKING_ICON_CODE_PATTERNS = Object.freeze([
   /^print$/,
   /^qrcode$/,
   /^record-vinyl$/,
-  /^robot$/,
   /^rss$/,
-  /^satellite(-dish)?$/,
   /^sd-card$/,
-  /^server$/,
   /^signal$/,
   /^sim-card$/,
   /^sitemap$/,
   /^tablet/,
-  /^terminal$/,
   /^tv$/,
   /^voicemail$/,
   /^vr-cardboard$/,
-  /^walkie-talkie$/,
-  /^wave-square$/,
   /^wifi$/,
   /^window-(maximize|minimize|restore)$/,
 
-  // ── Modern transport ──
+  // ── Present-day civilian transport ──
   /^bicycle$/,
   /^bus(-simple)?$/,
   /^car($|-(battery|burst|on|rear|side|tunnel))$/,
@@ -1568,7 +1582,6 @@ export const FANTASY_BREAKING_ICON_CODE_PATTERNS = Object.freeze([
   /^gas-pump$/,
   /^motorcycle$/,
   /^plane($|-)/,
-  /^shuttle-space$/,
   /^snowplow$/,
   /^taxi$/,
   /^tractor$/,
@@ -1576,27 +1589,19 @@ export const FANTASY_BREAKING_ICON_CODE_PATTERNS = Object.freeze([
   /^train($|-)/,
   /^truck($|-)/,
 
-  // ── Modern infrastructure ──
+  // ── Present-day road & forecourt infrastructure ──
   /^charging-station$/,
-  /^city$/,
   /^elevator$/,
-  /^industry$/,
-  /^oil-(can|well)$/,
   /^road($|-)/,
-  /^solar-panel$/,
-  /^tower-(broadcast|cell|observation)$/,
   /^traffic-light$/,
-  /^warehouse$/,
 
-  // ── Modern medicine & healthcare ──
+  // ── Clinical care & pharmacy ──
   /-medical/,
   /^bed-pulse$/,
   /^capsules$/,
-  /^dna$/,
   /^hospital(-user)?$/,
   /^kit-medical$/,
   /^lungs(-virus)?$/,
-  /^microscope$/,
   /^notes-medical$/,
   /^pills$/,
   /^prescription(-bottle(-medical)?)?$/,
@@ -1615,9 +1620,23 @@ export const FANTASY_BREAKING_ICON_CODE_PATTERNS = Object.freeze([
   /^soap$/,
   /^virus/,
 
-  // ── Humanitarian / NGO / crisis response ──
+  // ── Relief-operation iconography ──
+  //
+  // Scoped by what the glyph DEPICTS, not by the Font Awesome release that shipped it. What stays
+  // out is a present-day relief operation's own visual language: the agency-marked buildings and
+  // personnel, the camp and sanitation materiel, the transfers and rations, the figures that stand
+  // for displaced, endangered and injured people, and the disasters an operation responds to.
+  //
+  // A glyph from the same release that depicts an ordinary object or action a character handles is
+  // curated in, and several are — a packed crate, porters carrying one, a cooking burner, a
+  // kitchen set, a borehole, a spilled sack, a lookout tower.
+  //
+  // `people-pulling` is the one member of this cluster that the rule ABOVE would admit and the
+  // list below still excludes, so it is held out on the redundancy rule instead: two figures
+  // hauling a load is an ordinary labour action rather than a figure standing for a displaced,
+  // endangered or injured person — but `people-carry-box` is already curated for exactly that
+  // idea, and a second drawing of two figures moving a load adds a picker row without adding one.
   /^arrow-(down-up-across-line|down-up-lock|right-to-city|up-from-ground-water|up-from-water-pump|up-right-dots)$/,
-  /^boxes-packing$/,
   /^bridge-(circle|lock|water)/,
   /^building-(circle|lock|ngo|shield|un|user|wheat)/,
   /^child-(combatant|dress|reaching)$/,
@@ -1628,12 +1647,10 @@ export const FANTASY_BREAKING_ICON_CODE_PATTERNS = Object.freeze([
   /^helmet-un$/,
   /^hill-(avalanche|rockslide)$/,
   /^house-(circle|flood|lock|signal|tsunami)/,
-  /^jug-detergent$/,
-  /^land-mine-on$/,
   /^locust$/,
   /^money-bill-(wheat|transfer|trend-up)$/,
   /^mosquito(-net)?$/,
-  /^people-/,
+  /^people-(arrows|group|line|pulling|robbery|roof)$/,
   /^person-(arrow|burst|circle|dots-from-line|dress-burst|drowning|falling(-burst)?|half-dress|harassing|military|rays|rifle|shelter|through-window)/,
   /^person-walking-(arrow|dashed|luggage|with-cane)/,
   /^school-(circle|flag|lock)/,
@@ -1662,7 +1679,7 @@ export const FANTASY_BREAKING_ICON_CODE_PATTERNS = Object.freeze([
   /^person-booth$/,
   /^republican$/,
 
-  // ── Modern office / business ──
+  // ── Office paperwork & retail point of sale ──
   /^barcode$/,
   /^briefcase(-medical)?$/,
   /^bullhorn$/,
@@ -1672,7 +1689,10 @@ export const FANTASY_BREAKING_ICON_CODE_PATTERNS = Object.freeze([
   /^cash-register$/,
   /^clipboard(-check|-list|-question|-user)?$/,
   /^credit-card$/,
-  /^envelope(-circle-check|-open(-text)?)?$/,
+  // A sealed letter, an opened one and a letter with a page in it are pre-modern objects, admitted
+  // for the reason coins are. What stays out is the two that mean a mail SYSTEM rather than a
+  // letter: a delivery-confirmation badge and a bulk mailing.
+  /^envelope-circle-check$/,
   /^envelopes-bulk$/,
   /^folder(-closed|-minus|-open|-plus|-tree)?$/,
   /^id-(badge|card|card-clip)$/,
@@ -1680,20 +1700,16 @@ export const FANTASY_BREAKING_ICON_CODE_PATTERNS = Object.freeze([
   /^marker$/,
   /^money-check/,
   /^paperclip$/,
-  /^shop(-lock|-slash)?$/,
   /^stapler$/,
-  /^store(-slash)?$/,
   /^suitcase(-rolling)?$/,
 
-  // ── Modern money / finance ──
+  // ── Banking instruments & fundraising ──
   /^circle-dollar-to-slot$/,
-  /^coins$/,
   /^comment-dollar$/,
   /^comments-dollar$/,
   /^hand-holding-dollar$/,
   /^money-bill/,
   /^piggy-bank$/,
-  /^sack-(dollar|xmark)$/,
 
   // ── Modern symbols / math operators ──
   /^at$/,
@@ -1719,7 +1735,7 @@ export const FANTASY_BREAKING_ICON_CODE_PATTERNS = Object.freeze([
   /^venus(-double|-mars)?$/,
 
   // ── File / document UI ──
-  /^file($|-arrow|-audio|-circle|-contract|-csv|-code|-excel|-export|-fragment|-half-dashed|-image|-import|-invoice|-lines|-pdf|-pen|-powerpoint|-prescription|-shield|-signature|-video|-waveform|-word|-zipper)/,
+  /^file($|-arrow|-audio|-circle|-csv|-code|-excel|-export|-fragment|-half-dashed|-image|-import|-invoice|-lines|-pdf|-pen|-powerpoint|-prescription|-shield|-video|-waveform|-word|-zipper)/,
   /^fill(-drip)?$/,
   /^film$/,
   /^font-awesome$/,
@@ -1760,7 +1776,7 @@ export const FANTASY_BREAKING_ICON_CODE_PATTERNS = Object.freeze([
   /^burger$/,
   /^dumpster(-fire)?$/,
   /^hotdog$/,
-  /^kitchen-set$/,
+  /^jug-detergent$/,
   /^mattress-pillow$/,
   /^pizza-slice$/,
   /^recycle$/,
@@ -1771,20 +1787,13 @@ export const FANTASY_BREAKING_ICON_CODE_PATTERNS = Object.freeze([
   /^toilets-portable$/,
 
   // ── Modern misc ──
+  //
+  // A wicker basket and a flatbed hand cart are pre-modern containers, so both are curated; a
+  // plastic carrier bag and a wheeled supermarket trolley are not, and neither are the trolley's
+  // e-commerce badge variants.
   /^bag-shopping$/,
-  /^basket-shopping$/,
-  /^bioevent$/,
-  /^bomb$/,
-  /^burst$/,
-  /^cart-/,
-  /^chalkboard(-user)?$/,
-  /^circle-radiation$/,
-  /^explosion$/,
+  /^cart-(arrow-down|flatbed-suitcase|plus|shopping)$/,
   /^fingerprint$/,
-  /^graduation-cap$/,
-  /^gun$/,
-  /^handcuffs$/,
-  /^jet-fighter(-up)?$/,
   /^joint$/,
   /^bong$/,
   /^cannabis$/,
@@ -1792,21 +1801,45 @@ export const FANTASY_BREAKING_ICON_CODE_PATTERNS = Object.freeze([
   /^location-(arrow|crosshairs|dot|pin(-lock)?)$/,
   /^object-(group|ungroup)$/,
   /^paint-roller$/,
-  /^pallet$/,
   /^passport$/,
-  /^person-chalkboard$/,
-  /^radiation$/,
   /^ranking-star$/,
   /^rectangle-ad$/,
-  /^rocket$/,
   /^school$/,
-  /^stamp$/,
   /^stopwatch(-20)?$/,
   /^street-view$/,
   /^swatchbook$/,
   /^tachograph-digital$/,
-  /^user-(astronaut|clock|doctor|gear|graduate|nurse|tag|tie)$/,
+  /^user-(doctor|gear|nurse|tag|tie)$/,
   /^volume-(high|low|off|xmark)$/,
+
+  // ── Redundant variants of a curated glyph ──
+  //
+  // A variant that only changes a fill level, a needle position, a rotation, a status badge or the
+  // scenery behind a glyph the subset already carries adds picker rows without adding an idea. The
+  // picker shows seven or eight rows at a time and generates each label from the icon code, so
+  // nine thermometers spend two viewports saying "temperature". What stays is ONE member per
+  // idea — the clearest glyph for it, plus any member of the same family that means something
+  // DIFFERENT rather than more or less of the same thing. The steps between go.
+  //
+  // Deliberately NOT "the ends of a ladder", which is what this said until review measured it
+  // against what ships and found it predicted the opposite on two families of three. Temperature
+  // DROPS both its ends (`-empty`, `-full`) and keeps two middles, because hot and cold are two
+  // conditions while a fill level is one condition drawn nine times; battery keeps its ends only
+  // because a dead cell and a charged one are likewise two conditions rather than two degrees.
+  // And a single member need not be the BARE code: the gauges differ only by needle position, so
+  // the family contributes one dial, and the one worth having is the legible one.
+  //
+  // Kept: battery-empty and battery-full; thermometer with temperature-high and temperature-low;
+  // gauge-high; shop and store; city; jet-fighter; tower-broadcast and tower-observation.
+  /^battery-(half|quarter|three-quarters)$/,
+  /^gauge(-simple(-high)?)?$/,        // keeps gauge-high, the one dial the subset needs
+  /^jet-fighter-up$/,                 // the same aircraft, nose up
+  /^mountain-city$/,                  // a curated skyline with scenery behind it
+  /^shop-(lock|slash)$/,              // a curated shopfront with a status badge on it
+  /^store-slash$/,
+  /^temperature-(arrow-down|arrow-up|empty|full|half|quarter|three-quarters)$/,  // arrows repeat high/low
+  /^tower-cell$/,                     // the same mast as tower-broadcast
+  /^tree-city$/,
 
   // ── Compound anchor variants (keep plain anchor) ──
   /^anchor-(circle|lock)/,
@@ -1817,29 +1850,22 @@ export const FANTASY_BREAKING_ICON_CODE_PATTERNS = Object.freeze([
   // ── Head variants (modern medical) ──
   /^head-side-(cough(-slash)?|mask|virus)$/,
 
-  // ── Remaining non-fantasy icons ──
-  /^award$/,
-  /^bell-concierge$/,
-  /^bore-hole$/,
+  // ── Remaining out-of-scope icons ──
   /^broom-ball$/,
   /^cable-car$/,
   /^candy-cane$/,
-  /^certificate$/,
-  /^champagne-glasses$/,
   /^cloud-meatball$/,
   /^drum-steelpan$/,
   /^dumbbell$/,
   /^faucet(-drip)?$/,
-  /^fire-(burner|extinguisher)$/,
+  /^fire-extinguisher$/,
   /^flag-(checkered|usa)$/,
-  /^hand-(middle-finger|pointer|spock)$/,
-  /^helicopter(-symbol)?$/,
-  /^helmet-safety$/,
+  /^hand-(middle-finger|pointer)$/,
+  /^helicopter-symbol$/,
   /^hot-tub-person$/,
   /^house-laptop$/,
   /^ice-cream$/,
   /^icons$/,
-  /^mountain-city$/,
   /^newspaper$/,
   /^notdef$/,
   /^note-sticky$/,
@@ -1849,13 +1875,10 @@ export const FANTASY_BREAKING_ICON_CODE_PATTERNS = Object.freeze([
   /^person-(biking|skiing|swimming)$/,
   /^poo(-storm)?$/,
   /^poop$/,
-  /^puzzle-piece$/,
   /^radio$/,
   /^receipt$/,
   /^right-(from|to)-bracket$/,
-  /^screwdriver(-wrench)?$/,
   /^sink$/,
-  /^spaghetti-monster-flying$/,
   /^spinner$/,
   /^spray-can(-sparkles)?$/,
   /^square-phone(-flip)?$/,
@@ -1863,9 +1886,6 @@ export const FANTASY_BREAKING_ICON_CODE_PATTERNS = Object.freeze([
   /^stroopwafel$/,
   /^syringe$/,
   /^tape$/,
-  /^temperature-/,
-  /^thermometer$/,
-  /^tree-city$/,
   /^tty$/,
   /^umbrella-beach$/,
   /^van-shuttle$/,
@@ -1874,15 +1894,33 @@ export const FANTASY_BREAKING_ICON_CODE_PATTERNS = Object.freeze([
   /^water-ladder$/
 ]);
 
-export function isFantasySafeFontAwesomeClassicFreeIcon(iconCode) {
+/**
+ * Whether an icon code belongs to Fabricate's curated vocabulary.
+ *
+ * Curated means usable in ANY fictional setting — fantasy, science fiction, post-apocalyptic,
+ * industrial or modern alike — rather than fantasy alone, which is what the predecessor of this
+ * function asserted and what its `isFantasySafe…` name claimed.
+ *
+ * @param {string} iconCode a bare Font Awesome icon code, such as `mortar-pestle`
+ * @returns {boolean} true when the code is in the curated vocabulary
+ */
+export function isCuratedFontAwesomeClassicFreeIcon(iconCode) {
   const normalizedIconCode = String(iconCode || '').trim();
   if (!normalizedIconCode) return false;
 
-  return !FANTASY_BREAKING_ICON_CODE_PATTERNS.some((pattern) => pattern.test(normalizedIconCode));
+  return !EXCLUDED_ICON_CODE_PATTERNS.some((pattern) => pattern.test(normalizedIconCode));
 }
 
-export const FONT_AWESOME_FREE_CLASSIC_FANTASY_SAFE_ICON_DEFINITIONS = Object.freeze(
+/**
+ * The curated vocabulary itself: every classic free definition that survives the exclusions above.
+ *
+ * This is the ONE vocabulary Fabricate's pickers draw from. A surface that hand-curates a second
+ * list has created a second vocabulary that drifts from this one.
+ *
+ * @type {ReadonlyArray<{ iconCode: string, label: string, hasRegular: boolean }>}
+ */
+export const FONT_AWESOME_FREE_CLASSIC_CURATED_ICON_DEFINITIONS = Object.freeze(
   FONT_AWESOME_FREE_CLASSIC_ICON_DEFINITIONS.filter(({ iconCode }) =>
-    isFantasySafeFontAwesomeClassicFreeIcon(iconCode)
+    isCuratedFontAwesomeClassicFreeIcon(iconCode)
   )
 );
