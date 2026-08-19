@@ -1,4 +1,9 @@
 // Generated from Font Awesome Free 6.7.2 metadata. Classic free icons only; brands excluded.
+//
+// One entry is a hand correction, not a regeneration: the generated artifact carried "bioevent",
+// which is not a Font Awesome icon in any release, in the alphabetical slot that belongs to
+// "biohazard" (free, solid). Every other entry, including hasRegular, matches the 6.7.2 metadata
+// exactly, and every entry resolves in the Font Awesome build Foundry bundles.
 
 export const FONT_AWESOME_FREE_CLASSIC_ICON_DEFINITIONS = Object.freeze([
   { iconCode: "0", label: "0", hasRegular: false },
@@ -132,7 +137,7 @@ export const FONT_AWESOME_FREE_CLASSIC_ICON_DEFINITIONS = Object.freeze([
   { iconCode: "bezier-curve", label: "Bezier Curve", hasRegular: false },
   { iconCode: "bicycle", label: "Bicycle", hasRegular: false },
   { iconCode: "binoculars", label: "Binoculars", hasRegular: false },
-  { iconCode: "bioevent", label: "Bioevent", hasRegular: false },
+  { iconCode: "biohazard", label: "Biohazard", hasRegular: false },
   { iconCode: "bitcoin-sign", label: "Bitcoin Sign", hasRegular: false },
   { iconCode: "blender", label: "Blender", hasRegular: false },
   { iconCode: "blender-phone", label: "Blender Phone", hasRegular: false },
@@ -1773,7 +1778,7 @@ export const FANTASY_BREAKING_ICON_CODE_PATTERNS = Object.freeze([
   // ── Modern misc ──
   /^bag-shopping$/,
   /^basket-shopping$/,
-  /^bioevent$/,
+  /^biohazard$/,
   /^bomb$/,
   /^burst$/,
   /^cart-/,
