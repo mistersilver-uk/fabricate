@@ -49,6 +49,8 @@ Every figure is exact and every derived column follows from the two before it, s
 In the MiB the budget below is stated in, the three overheads are **5.60 MB, 6.73 MB and 8.63 MB**; `MB` means `MiB` throughout this record.
 
 Edit bytes are `writtenBytes` — what the mutation actually put on the wire, counted at the document layer on both arms.
+
+**Only the 10,000 row is reproducible from this repository.** The instrument that produced the 2,000 and 5,000 rows was never merged, and the raw run record is not versioned; § Consequences states exactly what survives and what does not.
 Wall-clock figures were also recorded, and they are **class 2**: single runs on one machine, non-monotonic across the three corpora, and nothing in this decision rests on them.
 They are reported in PR 1256 and deliberately not tabulated here.
 
@@ -101,9 +103,14 @@ Issue 1261 enumerates them as an acceptance criterion precisely so that none is 
   That is why issue 1261 keeps one boot-time detection check after the strip, sized at a log and a notification, protecting this repo's own development worlds rather than any user's.
 - **Issue 1252 is closed `wontfix`.**
   Making the arrangement mandatory is the one option this data rules out.
-- **The instruments survive the thing they measured.**
-  The Foundry arrangement axis and the write-cost benchmark cases remain, so this decision is re-testable rather than re-arguable.
-  That is deliberate: ADR 0001's condition went unmeasured against a real client for the whole life of the programme.
+- **The instruments only partly survive the thing they measured, and this record should not claim otherwise.**
+  The write-cost benchmark cases (issue 1247) and the Foundry arrangement axis (issue 1255) are both in the tree, so the **10,000-recipe row can be reproduced**.
+  The 2,000 and 5,000 rows cannot.
+  The recipe-count series that produced them (issue 1258) was never merged — `granular-corpus` is a single 10,000-over-10,000 point and the harness has no series flag — and the raw run record lives under `.foundry-perf/`, which `.gitignore` excludes.
+  Issue 1265 then removes the arrangement axis entirely, at which point none of it is reproducible through this harness.
+  So two thirds of the table above is a **historical record rather than a repeatable measurement**, and a future maintainer who wants to re-derive it is rebuilding the instrument, not re-running it.
+  That is stated plainly because the alternative is a record whose evidence quietly cannot be checked — which is the failure this ADR exists to correct.
+  ADR 0001's condition went unmeasured against a real client for the whole life of the programme, and a decision record that overstates its own reproducibility is how that happens again.
 
 ## What is left open
 
