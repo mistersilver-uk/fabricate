@@ -61,9 +61,20 @@ export const HOST_COMPARABILITY_FIELDS = Object.freeze(['nodeVersion', 'cpuModel
  * @param {object} options.seed The seed's class-1 invariants.
  * @param {object} options.reconciled Output of `reconcileResults`.
  * @param {object} [options.trace] Chrome trace metadata, when one was captured.
+ * @param {Array<object>} [options.arrangements] One entry per storage-arrangement arm walked
+ *   (issue 1255), each carrying that arm's own reconciliation and the LAYOUT it observed.
+ * @param {string|null} [options.baselineArm] The arm the top-level fields repeat.
  * @returns {object}
  */
-export function buildPerfRunRecord({ host, foundry, seed, reconciled, trace = null }) {
+export function buildPerfRunRecord({
+  host,
+  foundry,
+  seed,
+  reconciled,
+  trace = null,
+  arrangements = null,
+  baselineArm = null,
+}) {
   return {
     schema: 'fabricate-foundry-perf/1',
     // Stated in the artefact itself, so a record that escapes into an issue comment carries its own
@@ -73,6 +84,12 @@ export function buildPerfRunRecord({ host, foundry, seed, reconciled, trace = nu
       'or quoted as an absolute. Compare two records from one machine and quote the ratio.',
     envelope: { host, foundry },
     seed,
+    // THE TOP-LEVEL FIELDS ARE THE BASELINE ARM'S (issue 1255), repeated here so that every
+    // reader written before the arrangement axis existed -- `compareTimings`,
+    // `compareInvariants`, and anything that opened one of these files by hand -- keeps working
+    // unchanged. `baselineArm` names which arm they came from rather than leaving it to be
+    // inferred, and `arrangements` carries BOTH arms in full.
+    baselineArm,
     measurements: reconciled.reconciled,
     invariant: reconciled.invariant,
     timing: reconciled.timing,
@@ -80,6 +97,9 @@ export function buildPerfRunRecord({ host, foundry, seed, reconciled, trace = nu
     // absence of a finding.
     missing: reconciled.missing,
     undeclared: reconciled.undeclared,
+    // Defaults to `null` rather than `[]`, so a caller that supplied no arms and a run that
+    // walked the axis and produced nothing are not the same shape in the artefact.
+    arrangements,
     trace,
   };
 }

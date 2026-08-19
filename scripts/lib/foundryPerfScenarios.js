@@ -32,6 +32,18 @@
  * exist would have produced a number for a code path nobody runs.
  */
 
+import {
+  DEFINITION_STORAGE_LAYOUTS,
+  DEFINITION_STORAGE_TARGETS,
+  FABRICATE_SETTINGS_NAMESPACE,
+} from '../../src/config/settings.js';
+import { DEFINITION_STORAGE_CONSENT_ACTIONS } from '../../src/systems/definitionStorageConsentPrompt.js';
+
+import {
+  ARRANGEMENT_RECORD_CLASSES,
+  arrangementConversionWrites,
+  summarizeStorageConversion,
+} from './foundryPerfArrangement.js';
 import { PERF_BRIDGE_KEY } from './foundryPerfCapture.js';
 
 /** How many timed repetitions a repeatable scenario takes, after one untimed warm-up. */
@@ -65,7 +77,25 @@ export const PERF_SELECTORS = Object.freeze({
   paginationSummary: '[data-pagination-summary]',
   sourcesBar: '[data-crafting-sources]',
   sourceEntry: '[data-crafting-sources] [data-source-id]',
+  // The SHIPPED consent prompt's affirmative button (issues 1211, 1212). Built from the shipped
+  // action constant rather than from its LABEL: the label is localized and DialogV2's own
+  // built-in labels differ by Foundry generation, while `data-action` is the stable attribute
+  // `DialogV2` renders each declared button's `action` into.
+  storageConsentConvert: `button[data-action="${DEFINITION_STORAGE_CONSENT_ACTIONS.CONVERT}"]`,
 });
+
+/**
+ * How long one record class's shipped conversion is given to settle.
+ *
+ * Generous on purpose and overridable: nobody has measured this on a 20,000-record world --
+ * that is the entire point of the measurement -- so a budget derived from anything would be
+ * derived from a guess. Fifteen minutes is well inside the profile's own hour-plus run budget
+ * and is long enough that anything hitting it is a hang rather than a slow conversion.
+ */
+export const CONVERSION_SETTLE_TIMEOUT_MS = 900_000;
+
+/** How long the shipped consent prompt is waited for before concluding it will not appear. */
+export const CONVERSION_CONSENT_TIMEOUT_MS = 120_000;
 
 /**
  * Time one asynchronous operation, repeatedly, returning a class-2 sample set.
@@ -582,7 +612,283 @@ export const PERF_SCENARIOS = Object.freeze([
       };
     },
   },
+
+  // ---------------------------------------------------------------------------------------
+  // The STORAGE-ARRANGEMENT TRANSITION (issue 1255).
+  //
+  // `deferredToRunner`, exactly as `long-tasks` and `heap-samples` are, but for the opposite
+  // reason: those are summarized AFTER the walk, and these run BETWEEN two walks. The runner
+  // walks every scenario on the combined-record arrangement, drives these two, reloads, and
+  // walks the same set again on the granular one. `runsBetweenArms` is what tells it which.
+  //
+  // Both go through the SHIPPED path. Each writes the storage TARGET a GM dropdown writes,
+  // answers the shipped consent prompt, and then waits for the shipped reconciler to write the
+  // LAYOUT. Neither ever writes a layout key -- see `foundryPerfArrangement.js` for the choke
+  // point that refuses one, and `tests/foundry-perf-profile.test.js` for the source scan that
+  // proves no setting write in this harness names one.
+  //
+  // They are SEQUENTIAL and separately measured. `_reconcileDefinitionStorage` handles both
+  // classes on every pass, and the mid-session bridge re-enters it on every target write, so
+  // writing both targets at once would run two conversions concurrently over one world.
+  // Writing one, waiting for it to settle, then writing the other is both race-free and
+  // exactly what a GM does with two dropdowns.
+  ...ARRANGEMENT_RECORD_CLASSES.map((recordClass) => ({
+    id: `storage-conversion-${recordClass.id}`,
+    measurementId: `storage-conversion-${recordClass.id}`,
+    deferredToRunner: true,
+    runsBetweenArms: true,
+    recordClassId: recordClass.id,
+    run: (context) => runStorageConversion(context, recordClass),
+  })),
 ]);
+
+/** The page-side slot the bulk document-call counts are accumulated in. */
+export const DOCUMENT_CALL_HANDLE = '__fabricatePerfDocumentCalls';
+
+/**
+ * Drive ONE record class through the shipped forward storage conversion, and measure it.
+ *
+ * @param {object} context the walk context; needs `page` and may carry `log`.
+ * @param {object} recordClass one of `ARRANGEMENT_RECORD_CLASSES`.
+ * @returns {Promise<{invariant: object, timing?: object, unavailable?: string}>}
+ */
+async function runStorageConversion({ page, log = () => {} }, recordClass) {
+  await setScenario(page, `storage-conversion-${recordClass.id}`);
+  // Every Fabricate application closed first. The conversion replaces the backend the open
+  // managers read through, and an app re-rendering mid-conversion would put its own work
+  // inside the measured region.
+  await closeFabricateApps(page);
+
+  const before = await censusRecordClass(page, recordClass);
+  if (before.layout !== DEFINITION_STORAGE_LAYOUTS.SINGLE_ARRAY) {
+    return {
+      invariant: { recordClass: recordClass.id, layoutBefore: before.layout },
+      unavailable:
+        `the ${recordClass.label} layout already reads "${before.layout}"; there is no ` +
+        `forward conversion left to measure`,
+    };
+  }
+
+  const counter = await installDocumentCallCounter(page);
+  let consent = 'not-required';
+  let elapsedMs = null;
+  try {
+    // The GM's own action: write the TARGET, never the layout.
+    await writeStorageTargets(page, arrangementConversionWrites(recordClass.id));
+    consent = await answerStorageConsentPrompt(page);
+    // The clock starts HERE, once the shipped conversion is unblocked, so the harness's dialog
+    // round trip is outside the number. `_reconcileDefinitionStorage` awaits consent before it
+    // converts, so nothing of the conversion has run yet.
+    const started = Date.now();
+    await waitForConversionOutcome(page, recordClass);
+    elapsedMs = Date.now() - started;
+  } catch (error) {
+    // Recorded, never thrown. The walk this sits between is expensive, and the census below
+    // reports what the world actually did whether or not the wait completed.
+    log(`  storage-conversion-${recordClass.id} did not settle: ${error.message}\n`);
+  }
+
+  const documentCalls = await readAndRemoveDocumentCallCounter(page, counter);
+  const after = await censusRecordClass(page, recordClass);
+  return summarizeStorageConversion({
+    recordClass,
+    before,
+    after,
+    elapsedMs,
+    documentCalls,
+    consent,
+  });
+}
+
+/**
+ * Write the arrangement-axis TARGET settings, one at a time.
+ *
+ * @param {object} page
+ * @param {Array<{namespace: string, key: string, value: string}>} writes
+ */
+async function writeStorageTargets(page, writes) {
+  for (const write of writes) {
+    await page.evaluate(
+      async ({ namespace, key, value }) => game.settings.set(namespace, key, value),
+      write
+    );
+  }
+}
+
+/**
+ * Click the shipped consent prompt's affirmative button, if one appears.
+ *
+ * The prompt is a real gate on a real one-way door, so the harness ANSWERS it rather than
+ * bypassing it: what runs is the shipped `DialogV2` the shipped code opened, and the button
+ * clicked is the one a GM clicks. An absent prompt is reported as `not-prompted` and is NOT an
+ * error -- a resume or an already-consented world legitimately shows none, and the layout
+ * census afterwards is what says whether the conversion happened.
+ *
+ * @param {object} page
+ * @returns {Promise<string>}
+ */
+async function answerStorageConsentPrompt(page) {
+  const button = page.locator(PERF_SELECTORS.storageConsentConvert).first();
+  try {
+    await button.waitFor({ state: 'visible', timeout: CONVERSION_CONSENT_TIMEOUT_MS });
+  } catch {
+    return 'not-prompted';
+  }
+  await button.click();
+  await button.waitFor({ state: 'detached' }).catch(() => {});
+  return 'granted';
+}
+
+/**
+ * Wait for the shipped reconciler to reach a TERMINAL state for one record class.
+ *
+ * Terminal is either outcome, not just the happy one. A refusal, a decline or a compensated
+ * failure writes the TARGET back to the observed layout, so waiting only for `perRecord` would
+ * spend the whole settle budget on a run that had already finished and failed -- and would then
+ * report a timeout rather than the outcome it reached.
+ *
+ * @param {object} page
+ * @param {object} recordClass
+ */
+async function waitForConversionOutcome(page, recordClass) {
+  await page.waitForFunction(
+    ({ namespace, layoutKey, targetKey, converted, legacy }) => {
+      if (game.settings.get(namespace, layoutKey) === converted) return true;
+      // The reverted-target shape: the reconciler put the world back and is done.
+      return game.settings.get(namespace, targetKey) === legacy;
+    },
+    {
+      namespace: FABRICATE_SETTINGS_NAMESPACE,
+      layoutKey: recordClass.layoutKey,
+      targetKey: recordClass.targetKey,
+      converted: DEFINITION_STORAGE_LAYOUTS.PER_RECORD,
+      legacy: DEFINITION_STORAGE_TARGETS.SINGLE_ARRAY,
+    },
+    { timeout: CONVERSION_SETTLE_TIMEOUT_MS }
+  );
+}
+
+/**
+ * Everything class-1 about one record class's storage, read from the live world.
+ *
+ * Record counts come from the MANAGERS rather than from a setting key, because the setting key
+ * a class lives in is exactly what the conversion changes: reading `fabricate.recipes` after a
+ * conversion returns the registered empty default, which is indistinguishable from an empty
+ * world. The manager is the arrangement-aware reader, and it is the one that answers the same
+ * question on both arms.
+ *
+ * @param {object} page
+ * @param {object} recordClass
+ */
+async function censusRecordClass(page, recordClass) {
+  return page.evaluate(
+    ({ namespace, layoutKey, targetKey, legacyKey, recordKeyPrefix, id }) => {
+      const documents = [...(globalThis.game?.settings?.storage?.get?.('world') ?? [])];
+      const qualifiedLegacyKey = `${namespace}.${legacyKey}`;
+      const records =
+        id === 'recipes'
+          ? game.fabricate.getRecipeManager().getRecipes().length
+          : game.fabricate
+              .getCraftingSystemManager()
+              .getSystems()
+              .reduce((total, system) => total + (system.components?.length ?? 0), 0);
+      return {
+        layout: game.settings.get(namespace, layoutKey) ?? null,
+        target: game.settings.get(namespace, targetKey) ?? null,
+        records,
+        recordDocuments: documents.filter((setting) =>
+          String(setting?.key ?? '').startsWith(recordKeyPrefix)
+        ).length,
+        legacyKeyBytes: JSON.stringify(game.settings.get(namespace, legacyKey) ?? null).length,
+        legacyDocumentPresent: documents.some(
+          (setting) => String(setting?.key ?? '') === qualifiedLegacyKey
+        ),
+      };
+    },
+    {
+      namespace: FABRICATE_SETTINGS_NAMESPACE,
+      layoutKey: recordClass.layoutKey,
+      targetKey: recordClass.targetKey,
+      legacyKey: recordClass.legacyKey,
+      recordKeyPrefix: recordClass.recordKeyPrefix,
+      id: recordClass.id,
+    }
+  );
+}
+
+/**
+ * Count the BULK `Setting` document calls the conversion makes.
+ *
+ * The load-bearing class-1 half of the measurement: the conversion's own contract is that its
+ * write step costs at most two document calls INDEPENDENT of the record count, and a count is
+ * what distinguishes "wrote the corpus" from "wrote the corpus one record at a time". A
+ * duration alone cannot tell those apart on a machine nobody else has.
+ *
+ * The wrappers are installed on the `Setting` document class's own statics and call through
+ * with the original receiver -- never a detached reference, which is how a wrapped Foundry
+ * static silently starts answering for the wrong class. Restoration deletes the own property
+ * when there was none, so the inherited `foundry.abstract.Document` static comes back rather
+ * than staying shadowed by a copy.
+ *
+ * NOT counted: the legacy envelope reclamation, which is an INSTANCE `document.delete()` rather
+ * than a static bulk call. `legacyDocumentPresentBefore`/`After` is what reports that leg.
+ *
+ * Failure here never fails the run: a missing counter is reported as
+ * `documentCallsInstrumented: false`, which is a far smaller loss than losing a conversion
+ * measurement that costs a container boot to reproduce.
+ *
+ * @param {object} page
+ * @returns {Promise<string|null>} the page-side slot the counts live in, or `null`.
+ */
+async function installDocumentCallCounter(page) {
+  const installed = await page
+    .evaluate((handle) => {
+      const documentClass =
+        globalThis.Setting?.implementation ?? globalThis.CONFIG?.Setting?.documentClass ?? null;
+      if (!documentClass) return false;
+      const state = { counts: { create: 0, update: 0, delete: 0 }, restore: [], documentClass };
+      for (const [method, bucket] of [
+        ['createDocuments', 'create'],
+        ['updateDocuments', 'update'],
+        ['deleteDocuments', 'delete'],
+      ]) {
+        const original = documentClass[method];
+        if (typeof original !== 'function') continue;
+        state.restore.push([method, Object.getOwnPropertyDescriptor(documentClass, method)]);
+        documentClass[method] = function countedDocumentCall(...args) {
+          state.counts[bucket] += 1;
+          return original.apply(this, args);
+        };
+      }
+      Reflect.set(globalThis, handle, state);
+      return true;
+    }, DOCUMENT_CALL_HANDLE)
+    .catch(() => false);
+  return installed ? DOCUMENT_CALL_HANDLE : null;
+}
+
+/**
+ * Read the bulk document-call counts and put the `Setting` statics back.
+ *
+ * @param {object} page
+ * @param {string|null} slot
+ * @returns {Promise<{create: number, update: number, delete: number}|null>}
+ */
+async function readAndRemoveDocumentCallCounter(page, slot) {
+  if (!slot) return null;
+  return page
+    .evaluate((handle) => {
+      const state = Reflect.get(globalThis, handle);
+      if (!state) return null;
+      for (const [method, descriptor] of state.restore) {
+        if (descriptor) Object.defineProperty(state.documentClass, method, descriptor);
+        else delete state.documentClass[method];
+      }
+      Reflect.set(globalThis, handle, null);
+      return { ...state.counts };
+    }, slot)
+    .catch(() => null);
+}
 
 /**
  * Read the GM browser's row census from the manager store's own view state.
