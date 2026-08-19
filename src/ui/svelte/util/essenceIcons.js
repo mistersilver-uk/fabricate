@@ -1,5 +1,5 @@
 import {
-  FONT_AWESOME_FREE_CLASSIC_FANTASY_SAFE_ICON_DEFINITIONS,
+  FONT_AWESOME_FREE_CLASSIC_CURATED_ICON_DEFINITIONS,
   FONT_AWESOME_FREE_CLASSIC_ICON_DEFINITIONS
 } from './fontAwesomeFreeClassicIcons.js';
 
@@ -184,7 +184,7 @@ let essenceIconOptionsCache = null;
 let essenceAllIconOptionsCache = null;
 
 export function getEssenceIconOptions() {
-  essenceIconOptionsCache ??= createEssenceIconOptions(FONT_AWESOME_FREE_CLASSIC_FANTASY_SAFE_ICON_DEFINITIONS);
+  essenceIconOptionsCache ??= createEssenceIconOptions(FONT_AWESOME_FREE_CLASSIC_CURATED_ICON_DEFINITIONS);
   return essenceIconOptionsCache;
 }
 
@@ -211,8 +211,8 @@ export function normalizeEssenceIcon(iconClass) {
   return iconName ? `${prefix} fa-${iconName}` : DEFAULT_ESSENCE_ICON;
 }
 
-export function buildEssenceIconOptions(iconDefinitions = FONT_AWESOME_FREE_CLASSIC_FANTASY_SAFE_ICON_DEFINITIONS) {
-  if (iconDefinitions === FONT_AWESOME_FREE_CLASSIC_FANTASY_SAFE_ICON_DEFINITIONS) {
+export function buildEssenceIconOptions(iconDefinitions = FONT_AWESOME_FREE_CLASSIC_CURATED_ICON_DEFINITIONS) {
+  if (iconDefinitions === FONT_AWESOME_FREE_CLASSIC_CURATED_ICON_DEFINITIONS) {
     return getEssenceIconOptions();
   }
   if (iconDefinitions === FONT_AWESOME_FREE_CLASSIC_ICON_DEFINITIONS) {
@@ -221,7 +221,7 @@ export function buildEssenceIconOptions(iconDefinitions = FONT_AWESOME_FREE_CLAS
 
   const resolvedDefinitions = Array.isArray(iconDefinitions) && iconDefinitions.length > 0
     ? iconDefinitions
-    : FONT_AWESOME_FREE_CLASSIC_FANTASY_SAFE_ICON_DEFINITIONS;
+    : FONT_AWESOME_FREE_CLASSIC_CURATED_ICON_DEFINITIONS;
 
   return createEssenceIconOptions(resolvedDefinitions);
 }
