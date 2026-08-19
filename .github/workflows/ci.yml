@@ -27,7 +27,11 @@ jobs:
     # all other PR events, including `ready_for_review`.
     if: github.event_name != 'pull_request' || github.event.action != 'edited'
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    # 10 was the cap that a hung `playwright install` used to consume in full. The install is
+    # now bounded to ~6 minutes by its own per-attempt timeout, so this bound is about the
+    # tests and the build, which run in about 4 minutes warm. Raising it does not reintroduce
+    # the burn it used to hide: nothing here can now hang for the whole budget unnoticed.
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v6
 
@@ -40,8 +44,40 @@ jobs:
       - name: Install dependencies
         run: npm ci --ignore-scripts
 
-      - name: Install Playwright browsers
-        run: ./node_modules/.bin/playwright install chromium --with-deps
+      # Chromium is a real dependency of this job: the computed-style parity guards in
+      # tests/components/** launch it, because happy-dom cannot compute a cascade. It is
+      # cached rather than installed every run, which is the idiom foundry-integration.yml
+      # and pr-screenshots.yml already use, with the same key so all three share one entry.
+      #
+      # The cache hit is the actual fix for issue 1264. `--with-deps` shells out to apt, and
+      # apt stalling on archive.ubuntu.com hung this job for the full 10 minutes three times
+      # in one hour, reporting as `unit-tests` failing when no test had run. On a hit the
+      # install step does not execute at all, so there is no apt leg to stall. The two
+      # workflows above already skip `--with-deps` on a hit and launch Chromium successfully,
+      # so the runner image carries the system libraries this needs.
+      - name: Cache Playwright Chromium
+        id: cache-playwright
+        uses: actions/cache@v5
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-chromium-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      # Cold cache only. Bounded per attempt rather than only at the step, because a stalled
+      # apt does not fail — it hangs, so a bare retry would never reach its second attempt.
+      # Two 3-minute attempts cap this at ~6 minutes however badly the mirror behaves, which
+      # is what makes the job timeout above a statement about the tests again.
+      - name: Install Playwright Chromium
+        if: steps.cache-playwright.outputs.cache-hit != 'true'
+        timeout-minutes: 7
+        run: |
+          for attempt in 1 2; do
+            if timeout 180 npm run test:foundry:install; then
+              exit 0
+            fi
+            echo "::warning::playwright install attempt $attempt failed or timed out; retrying"
+          done
+          echo "::error::playwright install failed twice; see issue 1264"
+          exit 1
 
       - name: Run unit tests
         run: npm test
