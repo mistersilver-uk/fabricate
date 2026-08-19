@@ -54,6 +54,31 @@ Edit bytes are `writtenBytes` — what the mutation actually put on the wire, co
 Wall-clock figures were also recorded, and they are **class 2**: single runs on one machine, non-monotonic across the three corpora, and nothing in this decision rests on them.
 They are reported in PR 1256 and deliberately not tabulated here.
 
+## The write cost, transcribed from the headless benchmark cases
+
+The table above is the live-client measurement.
+This one is the **headless** write-cost measurement (issue 1247), transcribed here from `benchmarks/baselines/simple-corpus.json` in the same change that deletes the cases that produced it, so that no commit exists where the evidence is neither runnable nor written down.
+The profile is 10,000 recipes over a 5,000-component library.
+Unlike the live table, these figures are machine-invariant and were committed, cross-machine and asserted by `npm test` — which is why they are worth transcribing rather than merely citing.
+
+| case | document calls | documents touched | bytes |
+|:-----|---------------:|------------------:|------:|
+| `recipeManager.singleRecipeEdit.singleArray` | 0 | 0 | `writtenBytes` **7,681,966** |
+| `recipeManager.singleRecipeEdit.perRecord` | 1 | 1 | `writtenBytes` **749** |
+| `recipeManager.save.singleArray` | 0 | 0 | `writtenBytes` **7,681,957** |
+| `recipeManager.save.perRecord` | 0 | 0 | `writtenBytes` **0** |
+| `craftingSystemManager.singleComponentEdit.singleArray` | 0 | 0 | `serializedBytes` **2,744,946** |
+| `craftingSystemManager.singleComponentEdit.perRecord` | 1 | 1 | `serializedBytes` **3,114** |
+| `craftingSystemManager.save.perRecord` | 0 | 0 | `serializedBytes` **3,114** |
+
+One recipe edit: **7,681,966 bytes against 749, a factor of 10,256**.
+
+The counts matter as much as the bytes, and are transcribed for that reason rather than only the ratio.
+The load-bearing counter was always the **document count**: it is what separates "wrote one record" from "wrote the corpus one record at a time", and a regression of the second kind would have moved `recipeDocumentsTouched` from 0 to the corpus size while the byte column still looked plausible.
+`recipeManager.save.perRecord` writes **0 bytes** because the granular save was differential — a flush over a settled corpus issued no document operation at all — and the whole-array arm re-replicated every byte unconditionally.
+`craftingSystemManager.singleComponentEdit.perRecord`'s 3,114 bytes are the **residual container** record left behind after extraction (issue 1212), not the edited component.
+The zero document calls on every `singleArray` row are not an absence of work: whole-array storage writes through the container `Setting` document, so its cost appears in the byte column rather than in a per-record document count.
+
 ## The decision, and the two facts it turns on
 
 **First — ADR 0001's own kill criterion fired at every size measured, including the smallest.**
@@ -88,19 +113,36 @@ Had it pointed the other way it would still not have decided the question, becau
 Fabricate stores crafting definitions in **whole-array `world` settings** — one key per entity class, as it did before issue 1080.
 Granular per-record storage is removed.
 
-The improvements the performance programme landed **independently of arrangement are kept in full**: the retained identity indexes and revision tokens, the per-pass inventory snapshot, the canonical summary projection and paged browsers, the invalidation domains, the bounded import and cascade writes, the Valid Id Basis gate and its mutation-time counterpart, the equivalence oracle, and the measurement instruments.
+The improvements the performance programme landed **independently of arrangement are kept in full**: the retained identity indexes and revision tokens, the per-pass inventory snapshot, the canonical summary projection and paged browsers, the invalidation domains, the bounded import and cascade writes, and the equivalence oracle.
 Issue 1261 enumerates them as an acceptance criterion precisely so that none is discarded by association.
+
+Two entries an earlier revision of this record listed alongside them are **not** kept, because they were not arrangement-independent after all.
+
+The **Valid Id Basis gate** (issue 1224) decided, per entity class at boot, whether the corpus was complete enough to sweep against.
+Every one of its clauses reads a storage layout, a storage target, or a half-finished conversion, and its own exemption returns `true` for any class not stored granularly — so once nothing can be stored granularly the gate answers `true` for every class, on every world, forever, and the assertions on it become tautologies that pass whatever the code does.
+It is deleted rather than kept, because a gate that cannot fail is worse than no gate: it reads as protection while protecting nothing.
+
+What issue 1261 keeps in its place is the structure the gate fed, none of which reads a storage concept: `buildStartupPassList` omits a destructive pass that no entity kind declares and requires a declared kind positively, the pass-to-entity-kind declaration tables including their union rule, and the corpus-derived sweep with its subject-targeted fallback — together with the whole-tree source scans in `tests/mutation-time-valid-id-basis.test.js` that fail if any destructive cleanup call appears outside a corpus-derived sweep, and their non-vacuity control.
+Issue 1261 also makes `cleanupStalePreferences`'s `validComponentIds` a required parameter rather than one defaulting to an empty set, which closes by construction the omitted-argument shape of issue 1196 — a shape the gate never covered, because it stopped a pass on an incomplete corpus, not on an omitted argument.
+
+The **measurement instruments** are not kept either; § Consequences states what happened to each and § The write cost transcribes what the headless ones measured.
 
 ## Consequences
 
 - **A single-record edit again rewrites its whole class.**
   That is the cost this decision accepts, and 8,867,523 bytes per edit at 10,000 recipes is the number to watch.
-  The benchmark cases that measure it stay committed, so a future regression or a future revisit starts from evidence rather than from argument.
+  The benchmark cases that measured it are **transcribed into § The write cost below and then deleted**, in the same change that deletes what they measured.
+  They could not stay: `tests/helpers/scale/benchmarkCases.js` statically imported the forward recipe and component conversions, so keeping the cases would have meant keeping the whole conversion machinery alive to feed a measurement of an arrangement that does not ship.
+  The transcription is why a future regression or a future revisit still starts from evidence rather than from argument — but it starts from a written record, not from a case a maintainer can re-run.
 - **The converted world must come back before anything is deleted, but that is one manual step, not a migration.**
   Per-record storage never reached a public release, so no user's world was ever converted; the only converted world is a synthetic test world.
-  Issue 1260 is therefore a script run once by hand — `scripts/manual/revert-storage-arrangement.js`, which drives the already-shipped reverse conversion — rather than a revert build with a release tail behind it, and issue 1261 strips as soon as that script has run.
+  Issue 1260 is therefore a script run once by hand — a manual reverter driving the already-shipped reverse conversion — rather than a revert build with a release tail behind it, and issue 1261 strips as soon as that script has run.
+  The script itself goes with the strip: it drives a conversion that no longer exists, so it is single-use by construction and its use is discharged.
   The ordering still matters even at a population of one: a build that removed the per-record reader while a converted world existed would present that world as **empty**, silently — the layout says `perRecord`, nothing reads it, and the registered `[]` default is served with no error at all.
-  That is why issue 1261 keeps one boot-time detection check after the strip, sized at a log and a notification, protecting this repo's own development worlds rather than any user's.
+  An earlier revision of this record said issue 1261 would therefore keep one boot-time detection check after the strip, sized at a log and a notification.
+  **It does not, and the reversal is deliberate.**
+  The population that check would protect is the one synthetic world named above, reverted by hand before the strip lands, so after 1260 the check guards a state that nothing left in the product can produce and no world is in.
+  A guard against an impossible state is complexity with no reader, and the ordering argument above is discharged by running 1260 before 1261 rather than by shipping a permanent detector.
 - **Issue 1252 is closed `wontfix`.**
   Making the arrangement mandatory is the one option this data rules out.
 - **The live-Foundry instrument did NOT survive the thing it measured, and this record should not claim otherwise.**
@@ -110,9 +152,10 @@ Issue 1261 enumerates them as an acceptance criterion precisely so that none is 
   With no shipped conversion there is no shipped path for the axis to reach anything through, and the only way left to produce a converted arm is to hand-set the layout — which measures the fixture rather than the product, and is what § The measurement rules out.
   So after 1261 the axis is dead code carrying an obligation nobody can discharge, and an accepted record must not assert an instrument that cannot be run.
   The 2,000 and 5,000 rows were already unreproducible before that: the recipe-count series that produced them (issue 1258) was never merged — `granular-corpus` was a single 10,000-over-10,000 point and the harness had no series flag — and the raw run records live under `.foundry-perf/`, which `.gitignore` excludes.
-  What DOES survive is the headless write-cost benchmark cases (issue 1247), whose case ids carry `perRecord`.
-  They are committed, cross-machine, machine-invariant and asserted by `npm test`, and they are why this section's first consequence can still start from evidence: they hold the write-cost half of the argument above without needing a live client at all.
-  So the table above is a **historical record rather than a repeatable measurement**, and a future maintainer who wants to re-derive it is rebuilding the instrument, not re-running it.
+  **The headless write-cost benchmark cases (issue 1247) did not survive it either.**
+  They were committed, cross-machine and machine-invariant, and they held the write-cost half of the argument above without needing a live client — but their case ids carry `perRecord` because they measured the arrangement through the shipped conversion, which issue 1261 removes.
+  Their numbers are transcribed in § The write cost, which is now the record of what they said.
+  So both tables in this record are a **historical record rather than a repeatable measurement**, and a future maintainer who wants to re-derive either is rebuilding the instrument, not re-running it.
   That is stated plainly because the alternative is a record whose evidence quietly cannot be checked — which is the failure this ADR exists to correct.
   ADR 0001's condition went unmeasured against a real client for the whole life of the programme, and a decision record that overstates its own reproducibility is how that happens again.
 

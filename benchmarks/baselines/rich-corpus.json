@@ -48,31 +48,6 @@
         "identityIndexBuilds": 0,
         "visibleRecipes": 5000
       }
-    },
-    "persistence.connectPayload.richRecipes": {
-      "description": "CONNECT PAYLOAD (#1080): 5,000 alternative/tag/tool/essence-heavy recipes as one whole-array `world` setting versus one `world` setting key per record (ADR 0001's B(1)), including the live-measured 340-byte `Setting` envelope. The overhead is reported at several corpus sizes because ADR 0001 conditioned its choice on corpus size, and the reading barely moves across three orders of magnitude of it. Both layouts are counted exclusive of the container `Setting` document's own envelope, which is how ADR 0001 counts them. Hydrated against a FRESH id space, so the bytes depend on {profile, seed} alone rather than on how many earlier cases hydrated.",
-      "counts": {
-        "identityCandidatesExamined": 0,
-        "identityIndexBuilds": 0,
-        "connectRecords": 5000,
-        "connectEnvelopeBytesPerRecord": 340,
-        "wholeArrayConnectBytes": 18872096,
-        "perRecordKeyConnectBytes": 20567095,
-        "connectDeltaBytes": 1694999,
-        "connectDeltaBytesPerRecord": 339,
-        "connectCrossoverRecords": 1,
-        "connectCrossoverDeltaBytesBelow": -2,
-        "connectCrossoverDeltaBytesAt": 338,
-        "wholeArrayPunctuationModelHolds": 1,
-        "escapedWholeArrayConnectBytes": 22172096,
-        "escapedPerRecordKeyConnectBytes": 23867095,
-        "escapedConnectOverheadBasisPoints": 764,
-        "escapedArrayPunctuationModelHolds": 1,
-        "connectOverheadBasisPoints@1": 921,
-        "connectOverheadBasisPoints@100": 913,
-        "connectOverheadBasisPoints@1000": 905,
-        "connectOverheadBasisPoints@5000": 898
-      }
     }
   }
 }

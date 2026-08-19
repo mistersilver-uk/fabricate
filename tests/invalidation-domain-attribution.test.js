@@ -167,8 +167,8 @@ describe('RecipeManager attributes every map mutation', () => {
 describe('the signal stays UNPUBLISHED', () => {
   it('is absent from the published hook contract', () => {
     // `src/config/hooks.js` is the documented integration surface. This signal deliberately
-    // stays out of it, exactly as `fabricate.recipeStorageLayoutChanged` does: its payload is
-    // an internal delta shape that #1092 will change, and publishing it now would freeze it.
+    // stays out of it: its payload is an internal delta shape that #1092 will change, and
+    // publishing it now would freeze it.
     assert.ok(
       !read('src/config/hooks.js').includes('craftingDataChanged'),
       'promoting this hook owes it a three-segment name, a schemaVersion, an entry here and a ' +

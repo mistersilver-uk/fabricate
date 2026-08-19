@@ -52,32 +52,8 @@ const KEY_ACCESS_ALLOWLIST = new Set([
   // normalizers cannot yet read — and a migration that silently reads nothing is a
   // data-loss bug no test catches.
   'src/migration/MigrationRunner.js',
-  // Issue 1232 — the Storage Layout Conversion. It is the operation that MOVES the corpus
-  // between arrangements, so "go through the repository" is not available to it in either
-  // direction: the repository is chosen BY the arrangement, and asking the single-array
-  // adapter to write the legacy key is exactly what the arrangement guard now refuses. It
-  // also deliberately carries RAW stored values rather than hydrating through the model,
-  // for the same reason the migration runner does — a conversion whose output depends on
-  // today's normalizer drops any field that normalizer has not learned to emit.
-  'src/systems/definitionStorageConversion.js',
-  // Issue 1242 — the arrangement-aware recipe corpus accessor for the startup migration
-  // pass. It is the module that SELECTS between the legacy key and the per-record store, so
-  // "go through the repository" is not available to it either: on a `singleArray` world the
-  // legacy-key access IS the correct access, and on a `perRecord` world it delegates to the
-  // per-record adapter. It carries raw stored values for the same reason the runner and the
-  // conversion do. Adding a module here is a deliberate act: the point of this list is that
-  // every legacy-key reader is enumerated and justified rather than merely permitted.
-  'src/systems/recipeCorpus.js',
-  // Issue 1212 — the COMPONENT Storage Layout Conversion. Same standing as the recipe one,
-  // with one difference that is the whole subject of that change: its step 4 REWRITES
-  // `craftingSystems` without the extracted keys rather than deleting a document, so it
-  // touches the container key by construction and carries raw stored values for it.
-  'src/systems/componentStorageConversion.js',
-  // Issue 1212 — the arrangement-aware CRAFTING-SYSTEM corpus accessor for the startup
-  // migration pass. Same standing as `recipeCorpus.js`: it is the module that SELECTS between
-  // the nested key and the per-record component store, and on a `singleArray` world the
-  // container access IS the correct access.
-  'src/systems/craftingSystemCorpus.js',
+  // Adding a module here is a deliberate act: the point of this list is that every
+  // legacy-key reader is enumerated and justified rather than merely permitted.
 ]);
 
 /** Modules permitted to NAME the two keys at all (a superset of the above). */
@@ -90,9 +66,6 @@ const KEY_MENTION_ALLOWLIST = new Set([
   // Name a key only to construct their repository.
   'src/systems/RecipeManager.js',
   'src/systems/CraftingSystemManager.js',
-  // Issue 1212: IS the crafting-system adapter. It names `CRAFTING_SYSTEMS` to construct the
-  // container half of itself and reaches the key through no other route.
-  'src/systems/CompositeCraftingSystemRepository.js',
 ]);
 
 function recipeData(overrides = {}) {
@@ -347,20 +320,12 @@ describe('the settings adapter', () => {
     );
   });
 
-  it('is untouched by #1080’s per-record replication capability', async () => {
-    // -b adds an OPTIONAL capability to the seam and this adapter opts out of it by
-    // inheriting the defaults, so `reload()` keeps re-reading the whole corpus exactly as
-    // it does today. A whole-corpus backend cannot answer per-record: a replication event
-    // names the one key holding everything.
+  it('answers a replication event with the whole-corpus snapshot', async () => {
+    // A whole-corpus backend has nothing per-record to report: a replication event names the
+    // one key holding everything, so the only correct response is to re-read it.
     const { repository } = makeAdapter();
     await repository.put({ id: 'a', name: 'A' });
 
-    assert.equal(repository.supportsPerRecordReplication(), false);
-    assert.equal(
-      repository.readReplicatedRecord({ key: 'fabricate.recipes', operation: 'update' }),
-      null,
-      'the settings adapter must fall its caller back to the whole-corpus snapshot'
-    );
     assert.deepEqual(repository.readReplicatedSnapshot(), [{ id: 'a', name: 'A' }]);
   });
 });
@@ -431,15 +396,6 @@ describe('the abstract contract', () => {
 
   it('treats readReplicatedSnapshot as optional, defaulting to unsupported', () => {
     assert.equal(new CraftingDefinitionRepository().readReplicatedSnapshot(), null);
-  });
-
-  it('treats per-record replication as optional, defaulting to today’s whole-corpus behaviour', () => {
-    // #1080 -b. Both members exist so a per-record backend can report ONE changed record
-    // instead of forcing a whole-corpus re-read; every backend that cannot simply inherits
-    // these, which is what makes the addition behaviour-neutral.
-    const bare = new CraftingDefinitionRepository();
-    assert.equal(bare.supportsPerRecordReplication(), false);
-    assert.equal(bare.readReplicatedRecord({ key: 'fabricate.recipes', operation: 'update' }), null);
   });
 
   it('falls back to a whole-corpus write only when the caller does not say what changed', async () => {
