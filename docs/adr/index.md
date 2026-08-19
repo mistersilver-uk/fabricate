@@ -23,5 +23,6 @@ reasoning that was current at the time is the thing worth keeping.
 
 | Record | Status | Subject |
 |:-------|:-------|:--------|
-| [0001 — Granular crafting-definition persistence]({% link adr/0001-granular-crafting-definition-persistence.md %}) | Accepted — B(1), one `world` setting key per record | Where Fabricate stores recipes and crafting systems |
+| [0001 — Granular crafting-definition persistence]({% link adr/0001-granular-crafting-definition-persistence.md %}) | **Superseded by 0003** — its own kill criterion fired at every measured corpus size | Where Fabricate stores recipes and crafting systems |
 | [0002 — Fabricate Premium companion architecture]({% link adr/0002-fabricate-premium-companion-architecture.md %}) | Accepted — D6-a and a premium-hosted player window, neither of which this record recommended | How the free module and a paid companion are built, licensed, coupled, distributed and verified |
+| [0003 — Whole-array crafting-definition storage]({% link adr/0003-whole-array-crafting-definition-storage.md %}) | Accepted — whole-array storage, one `world` setting key per entity class | Supersedes 0001 on live-client measurement, and leaves the compendium option open |

@@ -7,7 +7,11 @@ nav_order: 1
 
 # ADR 0001 — Granular crafting-definition persistence
 
-**Status:** Accepted — **B(1), one `world` setting key per record**, which is not the option this spike recommended.
+**Status:** **SUPERSEDED by [ADR 0003]({% link adr/0003-whole-array-crafting-definition-storage.md %})**, on the terms this record set for itself.
+The replacement condition below — 1.41 MB of connect overhead, roughly 4,160 records — was breached by a factor of four at 2,000 recipes, the smallest corpus a live Foundry client was ever measured at, and never came back under.
+Nothing in this record is edited to agree with that outcome; it is preserved as the reasoning the decision was actually taken against.
+
+**Superseded status:** Accepted — **B(1), one `world` setting key per record**, which is not the option this spike recommended.
 The comparison, the measurements and the recommendation below record the evidence; the *Decision* section records the maintainer's selection against it and the condition on which that selection rests.
 
 **Context:** issue 1070 (performance programme), issue 1079 (this spike).
@@ -626,6 +630,13 @@ That is falsifiable, it is stated in the escaping-robust quantity, and the arith
 It is a tolerance a maintainer set against a reference fixed at one scale, and it should be quoted as one rather than as a derivation.
 
 Crossing this bound supersedes the decision rather than amending it again, on the original terms: A+ is measured and waiting, and issue 1092's replacement transport returns to scope with it.
+
+> **The bound was crossed, and this record is superseded.**
+> Issue 1255 measured a real Foundry 14.365 client booting a converted world at 2,000, 5,000 and 10,000 recipes.
+> The connect overhead was **5.60 MB, 6.73 MB and 8.63 MB** — four times the budget at the smallest corpus measured, and rising.
+> The measured per-record constant was **452–489 bytes**, not the 339 modelled here.
+> [ADR 0003]({% link adr/0003-whole-array-crafting-definition-storage.md %}) records the measurement and the reversal.
+> A+ is not taken up with it: it stays as future exploration, unmeasured against a live client.
 
 **What remains unmeasured, and is the real exposure.**
 The module collects no telemetry, and the only field datum in this issue tree is one user with 1,080 components — comfortably inside the bound, at ~366 KB.
