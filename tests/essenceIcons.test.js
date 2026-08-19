@@ -19,6 +19,30 @@ import {
   isCuratedFontAwesomeClassicFreeIcon
 } from '../src/ui/svelte/util/fontAwesomeFreeClassicIcons.js';
 
+const CURATED_ICON_COUNT = 510;
+
+// Every POSITIVE claim below is made against membership, never against the predicate.
+// `isCuratedFontAwesomeClassicFreeIcon` answers "does any exclusion pattern match this string", so
+// it returns true for a typo, a Pro-only code, or any code Font Awesome does not ship — none of
+// which a picker can ever offer. Asserting the predicate would pass while the icon was absent from
+// every picker in the module.
+//
+// Every NEGATIVE claim keeps asserting the predicate, and that is sound in the other direction:
+// these definitions ARE the catalogue filtered by that predicate, so a false answer guarantees
+// absence. The asymmetry is the point.
+const curatedIconCodes = new Set(
+  FONT_AWESOME_FREE_CLASSIC_CURATED_ICON_DEFINITIONS.map(({ iconCode }) => iconCode)
+);
+
+function assertCurated(iconCodes) {
+  for (const iconCode of iconCodes) {
+    assert.ok(
+      curatedIconCodes.has(iconCode),
+      `Expected "${iconCode}" to be in the curated icon definitions`
+    );
+  }
+}
+
 describe('essence colour tokens (issue 917)', () => {
   it('offers exactly the shared --fab-tag-* palette', () => {
     assert.deepEqual(
@@ -57,18 +81,25 @@ describe('essenceIcons utility', () => {
     assert.equal(normalizeEssenceIcon('fa-duotone fa-flask'), 'fa-duotone fa-flask');
   });
 
-  it('exports a curated subset that is meaningfully smaller than the full catalog', () => {
+  // The membership IS this module's product, and it is what the icon-vocabulary API publishes, so
+  // the size is pinned EXACTLY rather than to a band. A band wide enough to hold the pre-widening
+  // 437 and the post-widening 510 is a band a pattern edit can move eighty icons inside without
+  // failing anything.
+  it('pins the curated subset to an exact size', () => {
     const curatedCount = FONT_AWESOME_FREE_CLASSIC_CURATED_ICON_DEFINITIONS.length;
     const totalCount = FONT_AWESOME_FREE_CLASSIC_ICON_DEFINITIONS.length;
 
-    assert.ok(curatedCount >= 400, `Expected at least 400 curated icons, got ${curatedCount}`);
-    assert.ok(curatedCount <= 600, `Expected at most 600 curated icons, got ${curatedCount}`);
+    assert.equal(
+      curatedCount,
+      CURATED_ICON_COUNT,
+      `Expected exactly ${CURATED_ICON_COUNT} curated icons, got ${curatedCount}. `
+        + 'If a pattern change moved the membership deliberately, update this number and say which '
+        + 'icons moved and why in the commit body.'
+    );
     assert.ok(curatedCount < totalCount * 0.5, 'The curated subset should be less than half the full catalog');
   });
 
   it('includes core fantasy crafting icons', () => {
-    const curatedCodes = new Set(FONT_AWESOME_FREE_CLASSIC_CURATED_ICON_DEFINITIONS.map(d => d.iconCode));
-
     const expectedFantasyIcons = [
       'mortar-pestle', 'flask', 'flask-vial', 'vial', 'vials',
       'fire', 'fire-flame-curved', 'fire-flame-simple',
@@ -99,9 +130,7 @@ describe('essenceIcons utility', () => {
       'tag', 'tags'
     ];
 
-    for (const icon of expectedFantasyIcons) {
-      assert.ok(curatedCodes.has(icon), `Expected fantasy icon "${icon}" to be in the curated list`);
-    }
+    assertCurated(expectedFantasyIcons);
   });
 
   it('excludes single-character icons (letters and digits)', () => {
@@ -155,18 +184,53 @@ describe('essenceIcons utility', () => {
 
   it('admits the science-fiction, industrial, and hazard vocabulary', () => {
     const fictionTechnology = [
-      'rocket', 'shuttle-space', 'jet-fighter', 'jet-fighter-up', 'helicopter', 'user-astronaut',
-      'satellite', 'satellite-dish', 'tower-broadcast', 'tower-cell', 'tower-observation',
-      'solar-panel', 'robot', 'microchip', 'server', 'database', 'terminal', 'wave-square',
-      'walkie-talkie',
-      'battery-empty', 'battery-quarter', 'battery-half', 'battery-three-quarters', 'battery-full',
+      'rocket', 'shuttle-space', 'jet-fighter', 'helicopter', 'user-astronaut',
+      'satellite', 'satellite-dish', 'tower-broadcast', 'tower-observation',
+      'solar-panel', 'robot', 'microchip', 'server', 'database', 'walkie-talkie',
+      'battery-empty', 'battery-full',
       'radiation', 'circle-radiation', 'biohazard',
-      'industry', 'city', 'mountain-city', 'tree-city', 'explosion', 'burst'
+      'industry', 'oil-well', 'city', 'explosion', 'burst'
     ];
 
-    for (const icon of fictionTechnology) {
-      assert.equal(isCuratedFontAwesomeClassicFreeIcon(icon), true, `Icon "${icon}" should be curated`);
+    assertCurated(fictionTechnology);
+  });
+
+  // A rack of servers, a stack of discs and a chip are depicted objects, so they are admitted
+  // above. A console prompt and a square wave are not: one is a software affordance and the other
+  // is a chart type, which is the exclusion rule this module states first. Widening the vocabulary
+  // to science fiction is not a reason to break that rule, and these two are what it catches.
+  it('excludes a console prompt and a chart type despite the science-fiction widening', () => {
+    for (const icon of ['terminal', 'wave-square']) {
+      assert.equal(isCuratedFontAwesomeClassicFreeIcon(icon), false, `Icon "${icon}" should not be curated`);
     }
+  });
+
+  // Font Awesome draws several of these glyphs as a ladder: five battery fills, nine temperature
+  // entries, four gauges. The picker shows seven or eight rows at a time and generates each label
+  // from the icon code, so a ladder spends viewports repeating one idea. The ends and the members
+  // that mean something different are curated; the steps between them, the rotations, the status
+  // badges and the scenery variants are not.
+  it('excludes redundant variants of a glyph the subset already carries', () => {
+    const redundantVariants = [
+      'battery-quarter', 'battery-half', 'battery-three-quarters',
+      'temperature-empty', 'temperature-quarter', 'temperature-half',
+      'temperature-three-quarters', 'temperature-full',
+      'temperature-arrow-up', 'temperature-arrow-down',
+      'gauge', 'gauge-simple', 'gauge-simple-high',
+      'shop-lock', 'shop-slash', 'store-slash',
+      'mountain-city', 'tree-city',
+      'jet-fighter-up', 'tower-cell'
+    ];
+
+    for (const icon of redundantVariants) {
+      assert.equal(isCuratedFontAwesomeClassicFreeIcon(icon), false, `Variant "${icon}" should not be curated`);
+    }
+
+    // The glyph each of those is a variant OF stays, so the idea is still expressible.
+    assertCurated([
+      'battery-empty', 'battery-full', 'thermometer', 'temperature-high', 'temperature-low',
+      'gauge-high', 'shop', 'store', 'city', 'jet-fighter', 'tower-broadcast', 'tower-observation'
+    ]);
   });
 
   // A spacecraft, a gunship and a rescue helicopter are vehicles a story can be about, so they are
@@ -238,7 +302,7 @@ describe('essenceIcons utility', () => {
     const officeIcons = [
       'briefcase', 'calculator', 'calendar', 'calendar-days',
       'clipboard', 'clipboard-list', 'credit-card',
-      'envelope', 'envelope-open', 'folder', 'folder-open',
+      'envelope-circle-check', 'envelopes-bulk', 'folder', 'folder-open',
       'id-card', 'id-badge', 'inbox', 'paperclip', 'stapler',
       'receipt', 'cash-register', 'money-check', 'money-check-dollar',
       'suitcase', 'file-invoice', 'file-invoice-dollar',
@@ -253,16 +317,25 @@ describe('essenceIcons utility', () => {
     }
   });
 
+  // A sealed letter, an opened one and a letter with a page in it are all curated: they are
+  // pre-modern objects filed under office paperwork for exactly the reason coins were. Only the
+  // two that mean a mail SYSTEM rather than a letter stay out.
+  //
+  // A wicker basket and a flatbed hand cart are pre-modern containers; a plastic carrier bag and a
+  // wheeled supermarket trolley are not, which is why bag-shopping and cart-shopping stay out.
   it('admits pre-modern commerce, trade, and record keeping', () => {
     const commerce = [
       'coins', 'sack-dollar', 'sack-xmark',
-      'shop', 'shop-lock', 'shop-slash', 'store', 'store-slash', 'warehouse',
-      'basket-shopping', 'cart-flatbed', 'boxes-packing', 'pallet', 'dolly',
-      'certificate', 'stamp', 'file-contract', 'file-signature', 'envelope-open-text'
+      'shop', 'store', 'warehouse',
+      'basket-shopping', 'cart-flatbed', 'boxes-packing', 'people-carry-box', 'pallet', 'dolly',
+      'certificate', 'stamp', 'file-contract', 'file-signature',
+      'envelope', 'envelope-open', 'envelope-open-text'
     ];
 
-    for (const icon of commerce) {
-      assert.equal(isCuratedFontAwesomeClassicFreeIcon(icon), true, `Icon "${icon}" should be curated`);
+    assertCurated(commerce);
+
+    for (const icon of ['bag-shopping', 'cart-shopping', 'envelope-circle-check', 'envelopes-bulk']) {
+      assert.equal(isCuratedFontAwesomeClassicFreeIcon(icon), false, `Icon "${icon}" should not be curated`);
     }
   });
 
@@ -290,36 +363,47 @@ describe('essenceIcons utility', () => {
     const craftTools = [
       'fire-burner', 'kitchen-set', 'oil-can', 'bore-hole',
       'screwdriver', 'screwdriver-wrench', 'helmet-safety',
-      'gauge', 'gauge-high', 'gauge-simple', 'gauge-simple-high',
-      'thermometer', 'temperature-empty', 'temperature-quarter', 'temperature-half',
-      'temperature-three-quarters', 'temperature-full',
-      'temperature-high', 'temperature-low', 'temperature-arrow-up', 'temperature-arrow-down',
+      'gauge-high', 'thermometer', 'temperature-high', 'temperature-low',
       'microscope', 'dna'
     ];
 
-    for (const icon of craftTools) {
-      assert.equal(isCuratedFontAwesomeClassicFreeIcon(icon), true, `Icon "${icon}" should be curated`);
-    }
+    assertCurated(craftTools);
   });
 
-  it('excludes humanitarian, NGO, and crisis response icons', () => {
-    const humanitarianIcons = [
+  // Scoped by what a glyph DEPICTS, never by the Font Awesome release that shipped it. A release is
+  // not a fact a GM can see; the drawing is. What stays out is a present-day relief operation's own
+  // visual language — its agency-marked buildings and personnel, its camp and sanitation materiel,
+  // its transfers and rations, the figures that stand for displaced, endangered and injured people,
+  // and the disasters it responds to.
+  it('excludes the iconography of a present-day relief operation', () => {
+    const reliefOperationIcons = [
       'building-un', 'building-ngo', 'building-shield', 'building-wheat',
       'helmet-un', 'children', 'child-combatant',
       'people-group', 'people-line', 'people-roof',
       'person-rifle', 'person-military-rifle', 'person-shelter',
       'person-drowning', 'person-falling', 'person-burst',
       'house-flood-water', 'house-tsunami', 'house-lock',
-      'land-mine-on', 'mosquito', 'locust',
+      'mosquito', 'mosquito-net', 'locust',
       'tent', 'tents', 'tent-arrows-down',
       'hill-avalanche', 'hill-rockslide',
       'bridge-water', 'bridge-lock',
       'wheat-awn-circle-exclamation'
     ];
 
-    for (const icon of humanitarianIcons) {
-      assert.equal(isCuratedFontAwesomeClassicFreeIcon(icon), false, `Humanitarian icon "${icon}" should not be curated`);
+    for (const icon of reliefOperationIcons) {
+      assert.equal(isCuratedFontAwesomeClassicFreeIcon(icon), false, `Relief-operation icon "${icon}" should not be curated`);
     }
+  });
+
+  // The corollary of scoping that rule by subject: a glyph Font Awesome shipped in the same release
+  // is curated whenever it depicts an ordinary object or action a character handles. Scoping it by
+  // release instead is what let boxes-packing in while people-carry-box — the same depicted action,
+  // the adjacent catalogue entry — stayed out, an inconsistency neither rule could justify.
+  it('admits the ordinary objects that shipped alongside the relief pictograms', () => {
+    assertCurated([
+      'boxes-packing', 'people-carry-box', 'fire-burner', 'kitchen-set',
+      'bore-hole', 'sack-xmark', 'tower-observation', 'explosion', 'burst'
+    ]);
   });
 
   it('excludes accessibility, political, and gender symbol icons', () => {
@@ -338,9 +422,6 @@ describe('essenceIcons utility', () => {
   });
 
   // Sanitation, competitive sport, fast food and consumer packaging stay out whatever the setting.
-  // So do the weapons drawn as instruments of harm to a person — gun, handcuffs, land-mine-on.
-  // Those are a content decision for the maintainer rather than a vocabulary one, and are
-  // deliberately left where they were.
   it('excludes present-day domestic, sporting, and consumer icons', () => {
     const miscModern = [
       'toilet', 'toilet-paper', 'shower', 'bath', 'restroom',
@@ -349,7 +430,7 @@ describe('essenceIcons utility', () => {
       'bowling-ball', 'golf-ball-tee', 'table-tennis-paddle-ball',
       'burger', 'hotdog', 'pizza-slice', 'ice-cream', 'stroopwafel',
       'baby', 'baby-carriage', 'school',
-      'fingerprint', 'passport', 'gun', 'handcuffs', 'land-mine-on', 'bomb',
+      'fingerprint', 'passport',
       'cannabis', 'bong', 'joint', 'smoking', 'ban-smoking',
       'bullhorn', 'rectangle-ad', 'newspaper',
       'stopwatch', 'tachograph-digital',
@@ -367,6 +448,20 @@ describe('essenceIcons utility', () => {
     }
   });
 
+  // Modern arms are curated, and this is a decision rather than an omission. Fabricate's subject is
+  // any fiction, so a modern or post-apocalyptic game needs a firearm, a set of restraints and a
+  // mine as much as a fantasy one needs an axe — and the subset has carried swords, axes and
+  // shields all along. Admitting a jet fighter and leaving the sidearm out was the inconsistency.
+  it('admits modern arms for the settings that need them', () => {
+    assertCurated(['gun', 'handcuffs', 'land-mine-on', 'bomb']);
+  });
+
+  // hand-spock and spaghetti-monster-flying are the two the "brand or cause" exclusion looks like
+  // it should catch — one names a Star Trek trademark in its own icon code, the other is a
+  // real-world parody religion. They are curated anyway, and the rule carries a qualifier saying
+  // so: what stays out is a glyph whose SUBJECT is the institution, not a gesture or a symbol a
+  // fiction is free to reuse. The subset already carries hand-lizard and hand-scissors from the
+  // same drawn family, and every other Font Awesome religion symbol.
   it('admits scholarship, renown, and eldritch icons', () => {
     const scholarshipAndRenown = [
       'user-clock', 'user-graduate', 'graduation-cap',
@@ -375,9 +470,7 @@ describe('essenceIcons utility', () => {
       'spaghetti-monster-flying', 'hand-spock'
     ];
 
-    for (const icon of scholarshipAndRenown) {
-      assert.equal(isCuratedFontAwesomeClassicFreeIcon(icon), true, `Icon "${icon}" should be curated`);
-    }
+    assertCurated(scholarshipAndRenown);
   });
 
   it('keeps signs-post despite the -sign$ currency pattern', () => {

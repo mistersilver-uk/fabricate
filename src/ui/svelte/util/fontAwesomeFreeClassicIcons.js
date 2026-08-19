@@ -1414,12 +1414,19 @@ export const FONT_AWESOME_FREE_CLASSIC_ICON_DEFINITIONS = Object.freeze([
 //
 // The curated subset serves any fictional setting, not fantasy alone: a science-fiction,
 // post-apocalyptic, industrial or modern game is as much in scope as a dungeon. What stays out is
-// therefore not "anything modern" but three narrower things — glyphs whose meaning is a software
+// therefore not "anything modern" but four narrower things — glyphs whose meaning is a software
 // affordance rather than a depicted object (editor controls, file formats, chart types); glyphs
-// naming a real-world currency, institution, brand or cause (currency signs, NGO and humanitarian
-// pictograms, party-political and accessibility symbols); and present-day civic, clinical and
+// whose SUBJECT is a real-world currency, institution, brand or cause (currency signs, the
+// pictograms of a present-day relief operation, party-political and accessibility symbols), as
+// against a gesture or a symbol a fiction is free to reuse; present-day civic, clinical and
 // domestic furniture that no fiction is reaching for (sanitation, pharmacy, commuter transport,
-// consumer electronics).
+// consumer electronics); and redundant variants of a glyph the subset already carries.
+//
+// The institution rule is about what a glyph DEPICTS, never about which Font Awesome release
+// shipped it. A release is not something a GM can see; the drawing is. A crate, a borehole and a
+// cooking burner are therefore curated in even though Font Awesome shipped them alongside the
+// relief pictograms, and a raised-hand Vulcan salute is curated in even though Star Trek owns the
+// gesture's name, because what the glyph depicts is a hand.
 export const EXCLUDED_ICON_CODE_PATTERNS = Object.freeze([
 
   // ── Single characters (not real icons) ──
@@ -1512,6 +1519,10 @@ export const EXCLUDED_ICON_CODE_PATTERNS = Object.freeze([
   /^strikethrough$/,
   /^subscript$/,
   /^superscript$/,
+  // A console prompt and a square-wave chart are the two exceptions this block's own rule catches:
+  // one is a software affordance, the other is literally a chart type. A rack of servers, a stack
+  // of discs and a chip are depicted objects, so they stay curated in.
+  /^terminal$/,
   /^text-/,
   /^thumbtack-slash$/,
   /^timeline$/,
@@ -1522,6 +1533,7 @@ export const EXCLUDED_ICON_CODE_PATTERNS = Object.freeze([
   /^up-right-from-square$/,
   /^upload$/,
   /^vector-square$/,
+  /^wave-square$/,
 
   // ── Present-day consumer electronics & telephony ──
   /^compact-disc$/,
@@ -1580,7 +1592,6 @@ export const EXCLUDED_ICON_CODE_PATTERNS = Object.freeze([
   // ── Present-day road & forecourt infrastructure ──
   /^charging-station$/,
   /^elevator$/,
-  /^oil-well$/,
   /^road($|-)/,
   /^traffic-light$/,
 
@@ -1609,7 +1620,16 @@ export const EXCLUDED_ICON_CODE_PATTERNS = Object.freeze([
   /^soap$/,
   /^virus/,
 
-  // ── Humanitarian / NGO / crisis response ──
+  // ── Relief-operation iconography ──
+  //
+  // Scoped by what the glyph DEPICTS, not by the Font Awesome release that shipped it. What stays
+  // out is a present-day relief operation's own visual language: the agency-marked buildings and
+  // personnel, the camp and sanitation materiel, the transfers and rations, the figures that stand
+  // for displaced, endangered and injured people, and the disasters an operation responds to.
+  //
+  // A glyph from the same release that depicts an ordinary object or action a character handles is
+  // curated in, and several are — a packed crate, porters carrying one, a cooking burner, a
+  // kitchen set, a borehole, a spilled sack, a lookout tower.
   /^arrow-(down-up-across-line|down-up-lock|right-to-city|up-from-ground-water|up-from-water-pump|up-right-dots)$/,
   /^bridge-(circle|lock|water)/,
   /^building-(circle|lock|ngo|shield|un|user|wheat)/,
@@ -1621,12 +1641,10 @@ export const EXCLUDED_ICON_CODE_PATTERNS = Object.freeze([
   /^helmet-un$/,
   /^hill-(avalanche|rockslide)$/,
   /^house-(circle|flood|lock|signal|tsunami)/,
-  /^jug-detergent$/,
-  /^land-mine-on$/,
   /^locust$/,
   /^money-bill-(wheat|transfer|trend-up)$/,
   /^mosquito(-net)?$/,
-  /^people-/,
+  /^people-(arrows|group|line|pulling|robbery|roof)$/,
   /^person-(arrow|burst|circle|dots-from-line|dress-burst|drowning|falling(-burst)?|half-dress|harassing|military|rays|rifle|shelter|through-window)/,
   /^person-walking-(arrow|dashed|luggage|with-cane)/,
   /^school-(circle|flag|lock)/,
@@ -1665,7 +1683,10 @@ export const EXCLUDED_ICON_CODE_PATTERNS = Object.freeze([
   /^cash-register$/,
   /^clipboard(-check|-list|-question|-user)?$/,
   /^credit-card$/,
-  /^envelope(-circle-check|-open)?$/,
+  // A sealed letter, an opened one and a letter with a page in it are pre-modern objects, admitted
+  // for the reason coins are. What stays out is the two that mean a mail SYSTEM rather than a
+  // letter: a delivery-confirmation badge and a bulk mailing.
+  /^envelope-circle-check$/,
   /^envelopes-bulk$/,
   /^folder(-closed|-minus|-open|-plus|-tree)?$/,
   /^id-(badge|card|card-clip)$/,
@@ -1749,6 +1770,7 @@ export const EXCLUDED_ICON_CODE_PATTERNS = Object.freeze([
   /^burger$/,
   /^dumpster(-fire)?$/,
   /^hotdog$/,
+  /^jug-detergent$/,
   /^mattress-pillow$/,
   /^pizza-slice$/,
   /^recycle$/,
@@ -1759,12 +1781,13 @@ export const EXCLUDED_ICON_CODE_PATTERNS = Object.freeze([
   /^toilets-portable$/,
 
   // ── Modern misc ──
+  //
+  // A wicker basket and a flatbed hand cart are pre-modern containers, so both are curated; a
+  // plastic carrier bag and a wheeled supermarket trolley are not, and neither are the trolley's
+  // e-commerce badge variants.
   /^bag-shopping$/,
-  /^bomb$/,
   /^cart-(arrow-down|flatbed-suitcase|plus|shopping)$/,
   /^fingerprint$/,
-  /^gun$/,
-  /^handcuffs$/,
   /^joint$/,
   /^bong$/,
   /^cannabis$/,
@@ -1782,6 +1805,26 @@ export const EXCLUDED_ICON_CODE_PATTERNS = Object.freeze([
   /^tachograph-digital$/,
   /^user-(doctor|gear|nurse|tag|tie)$/,
   /^volume-(high|low|off|xmark)$/,
+
+  // ── Redundant variants of a curated glyph ──
+  //
+  // A variant that only changes a fill level, a needle position, a rotation, a status badge or the
+  // scenery behind a glyph the subset already carries adds picker rows without adding an idea. The
+  // picker shows seven or eight rows at a time and generates each label from the icon code, so
+  // nine thermometers spend two viewports saying "temperature". The ends of a ladder and the
+  // members that mean something different stay; the steps between them go.
+  //
+  // Kept: battery-empty and battery-full; thermometer with temperature-high and temperature-low;
+  // gauge-high; shop and store; city; jet-fighter; tower-broadcast and tower-observation.
+  /^battery-(half|quarter|three-quarters)$/,
+  /^gauge(-simple(-high)?)?$/,        // keeps gauge-high, the one dial the subset needs
+  /^jet-fighter-up$/,                 // the same aircraft, nose up
+  /^mountain-city$/,                  // a curated skyline with scenery behind it
+  /^shop-(lock|slash)$/,              // a curated shopfront with a status badge on it
+  /^store-slash$/,
+  /^temperature-(arrow-down|arrow-up|empty|full|half|quarter|three-quarters)$/,  // arrows repeat high/low
+  /^tower-cell$/,                     // the same mast as tower-broadcast
+  /^tree-city$/,
 
   // ── Compound anchor variants (keep plain anchor) ──
   /^anchor-(circle|lock)/,
