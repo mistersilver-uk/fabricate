@@ -1510,14 +1510,16 @@ class Fabricate {
    * that drifts. The set is drawn from Font Awesome Free 6.7.2 classic (brands excluded) and
    * curated to serve any fictional setting rather than fantasy alone.
    *
-   * Named for its siblings: `list…` is what this facade calls a method returning plain display
-   * data ({@link Fabricate#listSelectableActors}, `listGatheringForActor`), as against `get…`,
-   * which hands back a live service object. `Curated` is the qualifier because the unfiltered
-   * catalogue is deliberately NOT published — no Fabricate picker renders it.
+   * Named for its siblings: `list…` is what this facade calls a method answering with a
+   * collection of plain display records ({@link Fabricate#listSelectableActors},
+   * `listCraftingSourceActors`), as against `get…`, which answers with one thing — a store, a
+   * service, a stored value. `Curated` is the qualifier because the unfiltered catalogue is
+   * deliberately NOT published: no Fabricate picker renders it.
    *
-   * Ready-gated by throwing, like every other accessor here, rather than returning an empty
-   * list: an empty vocabulary is indistinguishable from a vocabulary that lost its contents, and
-   * a companion's composition edge already wraps these calls and degrades on throw.
+   * Ready-gated by throwing, as every other `list…` method on this facade is, rather than
+   * answering with an empty list: an empty vocabulary is indistinguishable from a vocabulary
+   * that lost its contents, and a companion's composition edge already wraps these calls and
+   * degrades on throw.
    *
    * The records are freshly built per call, so a caller may keep, sort or mutate them. The
    * curated array is frozen, but `Object.freeze` is shallow and the entry objects inside it are
@@ -1532,8 +1534,8 @@ class Fabricate {
    * correctly, so the list is the whole seam.
    *
    * @returns {Array<{iconCode: string, label: string, hasRegular: boolean}>} the curated icons in
-   *   picker order; `iconCode` is bare (`mortar-pestle`), and `hasRegular` reports whether the
-   *   `far` weight exists as well as `fas`.
+   *   the set's own order, alphabetical by `iconCode`; the code is bare (`mortar-pestle`), and
+   *   `hasRegular` reports whether the `far` weight exists for it as well as `fas`.
    */
   listCuratedIcons() {
     this._requireReady();

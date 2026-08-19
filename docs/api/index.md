@@ -499,9 +499,11 @@ Hooks.once('fabricate.ready', () => {
   const icons = game.fabricate.listCuratedIcons();
   // -> [{ iconCode: 'anchor', label: 'Anchor', hasRegular: false }, …]
 
-  // `iconCode` is bare, so a render composes the weight itself.
+  // `iconCode` is bare, so a render composes the weight itself. `fas` exists for every
+  // entry; `far` exists only where `hasRegular` says so.
   const [first] = icons;
-  const className = first.hasRegular ? `far fa-${first.iconCode}` : `fas fa-${first.iconCode}`;
+  const solidClass = `fas fa-${first.iconCode}`;
+  const regularClass = first.hasRegular ? `far fa-${first.iconCode}` : null;
 
   // Validating a stored icon is a membership test against this same list.
   const isOffered = icons.some(({ iconCode }) => iconCode === 'mortar-pestle');
@@ -512,8 +514,9 @@ Hooks.once('fabricate.ready', () => {
   Nothing you do to them reaches Fabricate's own pickers.
 - `hasRegular` reports whether Font Awesome ships the `far` (regular) weight for that code as well as `fas` (solid).
   It does not say which weight a stored icon uses.
-- The method throws `Fabricate not initialized` before Fabricate is ready, like every other `game.fabricate` accessor.
-  Call it from `fabricate.ready` (or wrap it and degrade to an empty list, as a composition edge should).
+- The list is in the vocabulary's own order, which is alphabetical by `iconCode`.
+- The method throws `Fabricate not initialized` before Fabricate is ready, as every `game.fabricate.list…` method does.
+  Call it from `fabricate.ready`, or wrap it and degrade to an empty list, as a composition edge should.
 
 <!-- markdownlint-disable markdownlint-sentences-per-line -->
 
