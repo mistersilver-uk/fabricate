@@ -280,12 +280,20 @@ Every Fabricate icon picker offers ONE curated Font Awesome vocabulary, drawn fr
 Fabricate ships against every system Foundry supports, so a science-fiction, post-apocalyptic, industrial or modern game is as much its subject as a dungeon, and a curation that excludes a rocket, a robot or a reactor has scoped the module to one genre its code never claimed.
 
 The curation is therefore stated as what it leaves OUT rather than as a genre it is for.
-Three things stay out: glyphs whose meaning is a software affordance rather than a depicted object, such as editor controls, file formats and chart types; glyphs naming a real-world currency, institution, brand or cause, such as the currency SIGN glyphs, the humanitarian and NGO pictograms, and the party-political and accessibility symbols; and present-day civic, clinical and domestic furniture no setting is reaching for, such as sanitation, pharmacy, commuter transport and consumer electronics.
-Everything else is in, including the pre-modern commerce the curation once miscategorised as modern — coins, a merchant's shop, a warehouse — where a coin is admitted and a currency SIGN glyph is not, because the sign names a real currency and the coin names none.
+Four things stay out.
+Glyphs whose meaning is a software affordance rather than a depicted object, such as editor controls, file formats and chart types.
+Glyphs whose SUBJECT is a real-world currency, institution, brand or cause — the currency SIGN glyphs, the pictograms of a present-day relief operation, the party-political and accessibility symbols — as against a gesture or a symbol a fiction is free to reuse, which stays in.
+Present-day civic, clinical and domestic furniture no setting is reaching for, such as sanitation, pharmacy, commuter transport and consumer electronics.
+And redundant variants of a glyph the set already carries: a fill level, a needle position, a rotation, a status badge or a change of scenery adds a picker row without adding an idea, so the ends of a ladder and the members that mean something different stay while the steps between them go.
 
-That curated set is the one vocabulary every picker draws from: essence, currency-unit, character-prerequisite, character-modifier and category icons alike.
+Membership follows what a glyph DEPICTS, never which Font Awesome release shipped it, because the release is not a fact a GM can see and the drawing is.
+That admits the pre-modern commerce the curation once miscategorised as modern — coins, a merchant's shop, a warehouse — where a coin is admitted and a currency SIGN glyph is not, because the sign names a real currency and the coin names none.
+It equally admits the ordinary objects Font Awesome happened to ship alongside the relief pictograms, such as a packed crate, the porters carrying one, a cooking burner and a borehole.
+
+That curated set is the one vocabulary EVERY icon field in Fabricate draws from, with no per-surface exception.
 A surface that hand-curates a second list has created a second vocabulary that drifts from this one, which is the defect this rule exists to prevent.
-The full classic free catalogue stays available to a caller that asks for it explicitly, and is not what a picker offers by default.
+Its reach is wider than the manager's own screens: an environment's biome icons are chosen from this vocabulary and then rendered to PLAYERS on the gathering environment cards, so the set is part of what a player sees rather than GM-only chrome.
+The full classic free catalogue remains a separate module export, and no picker renders it.
 
 #### Numeric entry
 
