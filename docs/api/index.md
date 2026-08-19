@@ -546,6 +546,11 @@ Companion modules can take over a Fabricate GM Manager navigation **surface** th
 Today Fabricate renders one such surface, `downtime`, whose default content is Core's read-only preview.
 A registered provider replaces that preview's tabs, panel content, route chrome, and header actions.
 
+> **The `downtime` surface may not be present.**
+> While the premium Downtime Studio is unreleased, Fabricate's `World > Downtime` route is gated behind the world setting `fabricate.experimentalFeatures`, which is **off by default**.
+> Registration is unaffected and never fails because of it — but with the setting off your provider is never mounted, so if your panel does not appear, check that setting before you debug your module.
+> See [When the surface is absent](#when-the-surface-is-absent).
+
 Declare Fabricate as a required module dependency in the companion manifest.
 Attempt registration once from the companion's `init` callback.
 If the API is unavailable there, arm one existing Foundry `ready` fallback.
@@ -933,6 +938,39 @@ Content you render *outside* the Manager subtree, such as your own dialogs, inhe
 
 **Keyboard.**
 Once you own the scrolling, the panel is no longer the nearest scrollable ancestor, so any scroll container you create must be reachable and operable from the keyboard.
+
+### When The Surface Is Absent
+
+A Manager surface Fabricate does not render is not an error, and it is not something your module can detect at registration time.
+
+Today this has one cause: the `downtime` surface is gated behind `fabricate.experimentalFeatures`, a **world** setting that is off by default, because the premium Downtime Studio it hosts has not been released yet.
+The gate is temporary and goes away when the Studio ships.
+
+**What still happens, exactly as it would with the gate open.**
+
+- `registerWorldNavProvider(provider)` validates and stores your provider, returns your unregister function, and throws nothing.
+  A GM's world setting is not something a module registering at `ready` could know, so it is never treated as your fault: Fabricate logs no error, raises no warning, and shows no notification.
+- `fabricate.manager.navProviderRegistered` fires with your surface id and tab ids.
+- The Manager title bar's `PREMIUM` badge lights, because it reports that a companion module is registered rather than that any particular route is on screen.
+
+**What you observe instead is an absence.**
+
+- `mount({ target, tabId, context })` is never called, so you receive no context, no target, and no cleanup call.
+- None of `fabricate.manager.surfaceMounted`, `fabricate.manager.surfaceUnmounted` or `fabricate.manager.surfaceTabChanged` fire for the surface.
+- The Manager rail shows no `Downtime` entry, and the route cannot be reached.
+
+**A gate that closes under a live mount does not touch your mount.**
+The setting is a world setting, so a GM can turn it off while your panel is on screen.
+When that happens the rail entry disappears, but your panel stays exactly where it is: your mount is not torn down, your cleanup does not run, your guard is not called, and your unsaved work is untouched.
+Fabricate will not discard a GM's in-progress edit because a setting changed.
+
+The GM leaves that panel whenever they next navigate, and that is the ordinary guarded exit described above — your `onBeforeNavigate` guard is called with `reason: 'route'`, a `false` keeps them there, and an allowed exit runs your cleanup once with the target still connected.
+Once they have left, the route is gated behind them and they cannot come back to it.
+
+**`requestRemount()` does not bring back a surface the gate has removed.**
+Calling it from a context you retained across the gate closing is safe and does nothing; there is no host to re-render.
+
+Nothing here applies to the player window, which hosts no Downtime surface and is not affected by this setting.
 
 ### Lifecycle And Failure
 
