@@ -7245,13 +7245,9 @@ async function main() {
               sourceItemUuid: worldItemByName['Healing Potion']?.uuid ?? null
             },
             {
-              // Deliberately a NEWLY curated glyph (issue 1269). Every other seeded essence icon
-              // was already in the pre-widening subset, so a frame that renders essences proved
-              // nothing about the widening; this one renders an icon the picker could not offer
-              // before, and is the only evidence the biohazard entry resolves at all.
               name: 'Toxic',
               description: 'The essence of venom, corruption, and dangerous decay.',
-              icon: 'fas fa-biohazard',
+              icon: 'fas fa-skull-crossbones',
               sourceItemUuid: null
             },
             {

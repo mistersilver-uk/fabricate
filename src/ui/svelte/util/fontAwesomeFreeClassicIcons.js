@@ -1630,6 +1630,12 @@ export const EXCLUDED_ICON_CODE_PATTERNS = Object.freeze([
   // A glyph from the same release that depicts an ordinary object or action a character handles is
   // curated in, and several are — a packed crate, porters carrying one, a cooking burner, a
   // kitchen set, a borehole, a spilled sack, a lookout tower.
+  //
+  // `people-pulling` is the one member of this cluster that the rule ABOVE would admit and the
+  // list below still excludes, so it is held out on the redundancy rule instead: two figures
+  // hauling a load is an ordinary labour action rather than a figure standing for a displaced,
+  // endangered or injured person — but `people-carry-box` is already curated for exactly that
+  // idea, and a second drawing of two figures moving a load adds a picker row without adding one.
   /^arrow-(down-up-across-line|down-up-lock|right-to-city|up-from-ground-water|up-from-water-pump|up-right-dots)$/,
   /^bridge-(circle|lock|water)/,
   /^building-(circle|lock|ngo|shield|un|user|wheat)/,
@@ -1811,8 +1817,17 @@ export const EXCLUDED_ICON_CODE_PATTERNS = Object.freeze([
   // A variant that only changes a fill level, a needle position, a rotation, a status badge or the
   // scenery behind a glyph the subset already carries adds picker rows without adding an idea. The
   // picker shows seven or eight rows at a time and generates each label from the icon code, so
-  // nine thermometers spend two viewports saying "temperature". The ends of a ladder and the
-  // members that mean something different stay; the steps between them go.
+  // nine thermometers spend two viewports saying "temperature". What stays is ONE member per
+  // idea — the clearest glyph for it, plus any member of the same family that means something
+  // DIFFERENT rather than more or less of the same thing. The steps between go.
+  //
+  // Deliberately NOT "the ends of a ladder", which is what this said until review measured it
+  // against what ships and found it predicted the opposite on two families of three. Temperature
+  // DROPS both its ends (`-empty`, `-full`) and keeps two middles, because hot and cold are two
+  // conditions while a fill level is one condition drawn nine times; battery keeps its ends only
+  // because a dead cell and a charged one are likewise two conditions rather than two degrees.
+  // And a single member need not be the BARE code: the gauges differ only by needle position, so
+  // the family contributes one dial, and the one worth having is the legible one.
   //
   // Kept: battery-empty and battery-full; thermometer with temperature-high and temperature-low;
   // gauge-high; shop and store; city; jet-fighter; tower-broadcast and tower-observation.

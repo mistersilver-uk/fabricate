@@ -284,7 +284,9 @@ Four things stay out.
 Glyphs whose meaning is a software affordance rather than a depicted object, such as editor controls, file formats and chart types.
 Glyphs whose SUBJECT is a real-world currency, institution, brand or cause — the currency SIGN glyphs, the pictograms of a present-day relief operation, the party-political and accessibility symbols — as against a gesture or a symbol a fiction is free to reuse, which stays in.
 Present-day civic, clinical and domestic furniture no setting is reaching for, such as sanitation, pharmacy, commuter transport and consumer electronics.
-And redundant variants of a glyph the set already carries: a fill level, a needle position, a rotation, a status badge or a change of scenery adds a picker row without adding an idea, so the ends of a ladder and the members that mean something different stay while the steps between them go.
+And redundant variants of a glyph the set already carries: a fill level, a needle position, a rotation, a status badge or a change of scenery adds a picker row without adding an idea.
+What stays is ONE member per idea — the clearest glyph for it, plus any member of the same family that means something DIFFERENT rather than more or less of the same thing — and the steps between go.
+So a thermometer keeps hot and cold beside the plain instrument while the seven that only redraw the same reading go, a battery keeps empty and full because a dead cell and a charged one are two conditions rather than two degrees, and a family of dials separated only by needle position contributes a single dial whether or not that dial is the bare code.
 
 Membership follows what a glyph DEPICTS, never which Font Awesome release shipped it, because the release is not a fact a GM can see and the drawing is.
 That admits the pre-modern commerce the curation once miscategorised as modern — coins, a merchant's shop, a warehouse — where a coin is admitted and a currency SIGN glyph is not, because the sign names a real currency and the coin names none.
