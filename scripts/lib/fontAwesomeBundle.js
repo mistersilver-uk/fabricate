@@ -92,7 +92,7 @@ const WOFF2_KNOWN_TABLE_TAGS = [
   'Glat',
   'Gloc',
   'Feat',
-  'Sill'
+  'Sill',
 ];
 
 /**
@@ -107,7 +107,9 @@ const WOFF2_KNOWN_TABLE_TAGS = [
 export function parseFontAwesomeRelease(cssText) {
   const match = /Font Awesome (Free|Pro) (\d+\.\d+\.\d+)/.exec(String(cssText ?? ''));
   if (!match) {
-    throw new Error('The stylesheet carries no Font Awesome banner, so its release cannot be measured.');
+    throw new Error(
+      'The stylesheet carries no Font Awesome banner, so its release cannot be measured.'
+    );
   }
   return { edition: match[1], version: match[2] };
 }
@@ -126,7 +128,7 @@ export function parseGlyphCodepoint(cssValue) {
   const value = String(cssValue ?? '');
   if (!value.startsWith(BACKSLASH)) return value.codePointAt(0);
   const escaped = value.slice(1);
-  return /^[0-9a-f]{2,6}$/i.test(escaped) ? parseInt(escaped, 16) : escaped.codePointAt(0);
+  return /^[0-9a-f]{2,6}$/i.test(escaped) ? Number.parseInt(escaped, 16) : escaped.codePointAt(0);
 }
 
 /**
@@ -146,7 +148,7 @@ export function parseIconGlyphRules(cssText) {
   while ((match = rulePattern.exec(String(cssText ?? ''))) !== null) {
     rules.push({
       names: match[1].split(',').map((selector) => selector.trim().slice('.fa-'.length)),
-      codepoint: parseGlyphCodepoint(match[2])
+      codepoint: parseGlyphCodepoint(match[2]),
     });
   }
   return rules;
@@ -172,7 +174,7 @@ function readCmapSubtable(cmap, subtableOffset, codepoints) {
     for (let segment = 0; segment < segmentsTimesTwo / 2; segment += 1) {
       const end = cmap.readUInt16BE(endBase + segment * 2);
       const start = cmap.readUInt16BE(startBase + segment * 2);
-      if (start === 0xffff && end === 0xffff) continue;
+      if (start === 0xff_ff && end === 0xff_ff) continue;
       for (let codepoint = start; codepoint <= end; codepoint += 1) codepoints.add(codepoint);
     }
     return;
@@ -266,7 +268,7 @@ const RETIRED_NAME_MARKER = /(^|-)alt($|-)|(^|-)(o|lg|sm|h|v|[0-9]+)$/;
 export function countLeadingTokens(iconNames) {
   const counts = new Map();
   for (const name of iconNames) {
-    const token = name.split('-')[0];
+    const token = name.split('-', 1)[0];
     counts.set(token, (counts.get(token) ?? 0) + 1);
   }
   return counts;
@@ -301,8 +303,8 @@ export function preferredIconName(names, leadingTokenCounts) {
     if (right.startsWith(`${left}-`)) return -1;
     if (left.startsWith(`${right}-`)) return 1;
 
-    const leftFamily = leadingTokenCounts.get(left.split('-')[0]) ?? 0;
-    const rightFamily = leadingTokenCounts.get(right.split('-')[0]) ?? 0;
+    const leftFamily = leadingTokenCounts.get(left.split('-', 1)[0]) ?? 0;
+    const rightFamily = leadingTokenCounts.get(right.split('-', 1)[0]) ?? 0;
     if (leftFamily !== rightFamily) return rightFamily - leftFamily;
 
     if (left.length !== right.length) return right.length - left.length;
@@ -353,7 +355,9 @@ export function buildIconCatalogue({ cssText, classicCodepoints, brandCodepoints
       return {
         iconCode,
         label: iconLabelFor(iconCode),
-        aliases: rule.names.filter((name) => name !== iconCode).sort()
+        aliases: rule.names
+          .filter((name) => name !== iconCode)
+          .sort((left, right) => (left < right ? -1 : 1)),
       };
     })
     .sort((left, right) => (left.iconCode < right.iconCode ? -1 : 1));

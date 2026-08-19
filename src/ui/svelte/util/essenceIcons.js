@@ -1,7 +1,7 @@
 import {
-  FONT_AWESOME_FREE_CLASSIC_CURATED_ICON_DEFINITIONS,
-  FONT_AWESOME_FREE_CLASSIC_ICON_DEFINITIONS
-} from './fontAwesomeFreeClassicIcons.js';
+  FOUNDRY_CURATED_ICON_DEFINITIONS,
+  FOUNDRY_ICON_DEFINITIONS
+} from './foundryIconVocabulary.js';
 
 export const DEFAULT_ESSENCE_ICON = 'fas fa-mortar-pestle';
 
@@ -150,16 +150,31 @@ function normalizePrefix(prefix) {
   return PREFIX_ALIASES[trimmed] || (STYLE_PREFIXES.has(trimmed) ? trimmed : DEFAULT_ICON_PREFIX);
 }
 
-function createIconOption({ iconCode, label }, prefix) {
+/**
+ * One picker row for one GLYPH, at the solid weight.
+ *
+ * Solid only, and one row per glyph rather than one per name, for the same reason: Foundry bundles
+ * Font Awesome Pro, whose classic solid and regular faces carry an identical cmap and several of
+ * whose names routinely share a drawing. Offering both weights, or every alias, would spend two
+ * picker rows on one picture — and the picker shows seven or eight rows at a time.
+ *
+ * Nothing is refused by that. The aliases go into `searchText`, so a GM who types `cog` finds the
+ * gear, and `far` is still a prefix `normalizeEssenceIcon` accepts and Foundry still renders.
+ */
+function createIconOption({ iconCode, label, aliases = [] }, prefix) {
   const variant = prefix === 'far' ? 'regular' : 'solid';
   const resolvedLabel = String(label || '').trim() || humanizeIconName(iconCode);
+  const aliasText = aliases.join(' ');
 
   return Object.freeze({
     iconClass: `${prefix} fa-${iconCode}`,
     iconName: iconCode,
     label: resolvedLabel,
     variant,
-    searchText: normalizeSearch(`${resolvedLabel} ${iconCode} fa-${iconCode} ${prefix} ${variant}`)
+    aliases: Object.freeze([...aliases]),
+    searchText: normalizeSearch(
+      `${resolvedLabel} ${iconCode} fa-${iconCode} ${aliasText} ${prefix} ${variant}`
+    )
   });
 }
 
@@ -170,11 +185,8 @@ function createEssenceIconOptions(iconDefinitions) {
     const iconCode = String(definition?.iconCode || definition?.iconName || '').trim();
     if (!iconCode) continue;
 
-    const normalizedDefinition = { iconCode, label: definition.label, hasRegular: definition.hasRegular };
-    options.push(createIconOption(normalizedDefinition, 'fas'));
-    if (normalizedDefinition.hasRegular) {
-      options.push(createIconOption(normalizedDefinition, 'far'));
-    }
+    const aliases = Array.isArray(definition?.aliases) ? definition.aliases : [];
+    options.push(createIconOption({ iconCode, label: definition.label, aliases }, 'fas'));
   }
 
   return Object.freeze(options);
@@ -184,12 +196,12 @@ let essenceIconOptionsCache = null;
 let essenceAllIconOptionsCache = null;
 
 export function getEssenceIconOptions() {
-  essenceIconOptionsCache ??= createEssenceIconOptions(FONT_AWESOME_FREE_CLASSIC_CURATED_ICON_DEFINITIONS);
+  essenceIconOptionsCache ??= createEssenceIconOptions(FOUNDRY_CURATED_ICON_DEFINITIONS);
   return essenceIconOptionsCache;
 }
 
 export function getEssenceAllIconOptions() {
-  essenceAllIconOptionsCache ??= createEssenceIconOptions(FONT_AWESOME_FREE_CLASSIC_ICON_DEFINITIONS);
+  essenceAllIconOptionsCache ??= createEssenceIconOptions(FOUNDRY_ICON_DEFINITIONS);
   return essenceAllIconOptionsCache;
 }
 
@@ -211,21 +223,29 @@ export function normalizeEssenceIcon(iconClass) {
   return iconName ? `${prefix} fa-${iconName}` : DEFAULT_ESSENCE_ICON;
 }
 
-export function buildEssenceIconOptions(iconDefinitions = FONT_AWESOME_FREE_CLASSIC_CURATED_ICON_DEFINITIONS) {
-  if (iconDefinitions === FONT_AWESOME_FREE_CLASSIC_CURATED_ICON_DEFINITIONS) {
+export function buildEssenceIconOptions(iconDefinitions = FOUNDRY_CURATED_ICON_DEFINITIONS) {
+  if (iconDefinitions === FOUNDRY_CURATED_ICON_DEFINITIONS) {
     return getEssenceIconOptions();
   }
-  if (iconDefinitions === FONT_AWESOME_FREE_CLASSIC_ICON_DEFINITIONS) {
+  if (iconDefinitions === FOUNDRY_ICON_DEFINITIONS) {
     return getEssenceAllIconOptions();
   }
 
   const resolvedDefinitions = Array.isArray(iconDefinitions) && iconDefinitions.length > 0
     ? iconDefinitions
-    : FONT_AWESOME_FREE_CLASSIC_CURATED_ICON_DEFINITIONS;
+    : FOUNDRY_CURATED_ICON_DEFINITIONS;
 
   return createEssenceIconOptions(resolvedDefinitions);
 }
 
+/**
+ * The picker row a stored icon class selects.
+ *
+ * Resolves through ALIASES as well as offered names, which is what stops a one-row-per-glyph
+ * vocabulary from refusing a name: a system that persisted `fas fa-cog` before this vocabulary
+ * existed still selects the gear's row, with the gear's label, rather than falling through to a
+ * synthesised option that no list contains.
+ */
 export function getEssenceIconOption(iconClass, options = getEssenceIconOptions()) {
   const normalizedIcon = normalizeEssenceIcon(iconClass);
   const resolvedOptions = Array.isArray(options) && options.length > 0
@@ -237,6 +257,9 @@ export function getEssenceIconOption(iconClass, options = getEssenceIconOptions(
 
   const prefix = getEssenceIconPrefix(normalizedIcon);
   const iconName = getEssenceIconName(normalizedIcon);
+
+  const aliased = resolvedOptions.find(option => option.aliases?.includes(iconName));
+  if (aliased) return aliased;
 
   return Object.freeze({
     label: humanizeIconName(iconName) || normalizedIcon,

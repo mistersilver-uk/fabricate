@@ -120,12 +120,12 @@ export const EXCLUDED_ICON_CODE_PATTERNS = Object.freeze([
   /^objects?-(align|column|exclude|group|intersect|subtract|ungroup|union)/,
   /^(alt|dot|badge-check|brightness|brightness-low|burst-new|delete-left|delete-right|direction-left-right|direction-up-down|circles-overlap|picture-in-picture|screencast|subtitles|open-captioning|pronoun|poll-people|gif|blog|airplay|airplay-audio|podcast|print|rss|voicemail|wireless|watch-apple)($|-)/,
   /^globe-(pointer|wifi|www)$/,
-  /^(wave|waves)-(pulse|sine|square|triangle)$/,
+  /^(wave|waves)-(sine|square|triangle)$/,
 
   // Windows, browsers and the desktop metaphor. The MACHINE is an object and stays; the chrome
   // drawn on its screen is not.
   /^(window|windows|browser|browsers|sidebar|panel|dashboard|screen-users|display-(arrow|chart|code|slash))($|-)/,
-  /^(rectangle|square)-(ad|history|list|pro|terminal|this-way-up|vertical|wide|xmark|kanban|barcode)$/,
+  /^(rectangle|square)-(ad|history|list|pro|terminal|this-way-up|wide|xmark|kanban|barcode)$/,
   /^rectangle-(4k|api|beta|code|hd|high-dynamic-range|history|irc|n-a|new|sd|tall|vertical-history)/,
   /^rectangles-mixed$/,
   /^square-(code|root|rss)$/,
@@ -134,12 +134,12 @@ export const EXCLUDED_ICON_CODE_PATTERNS = Object.freeze([
   // a page in it are pre-modern objects and stay curated; a file format and a
   // delivery-confirmation badge are not.
   /^files?$/,
-  /^file-(aiff|alt|arrow|audio|ban|binary|brackets|cad|caret|chart|check|circle|clipboard|code|csv|css|dashed-line|doc|download|edit|eps|excel|export|fragment|gif|half-dashed|html|icns|image|import|jpg|js|lock|magnifying-glass|midi|minus|mov|mp3|mp4|music|odf|pdf|pen|plus|png|powerpoint|ppt|prescription|search|shield|slash|spreadsheet|svg|tex|text|times|upload|user|vector|video|wav|waveform|word|xls|xmark|xml|zip|zipper)/,
+  /^file-(aiff|arrow|audio|ban|binary|brackets|cad|caret|chart|check|circle|clipboard|code|csv|css|dashed-line|doc|download|edit|eps|excel|export|fragment|gif|half-dashed|html|icns|image|import|jpg|js|lock|magnifying-glass|midi|minus|mov|mp3|mp4|music|odf|pdf|pen|plus|png|powerpoint|ppt|prescription|search|shield|slash|spreadsheet|svg|tex|times|upload|user|vector|video|wav|waveform|word|xls|xmark|xml|zip|zipper)/,
   /^(folder|folders|inbox|inboxes|paperclip|attachment)($|-)/,
   /^envelope-(badge|certificate|circle|dot|ribbon|square)/,
   /^envelopes(-bulk)?$/,
   /^cloud-(arrow|binary|check|code|download|exclamation|minus|music|plus|question|slash|upload|word|xmark)/,
-  /^(download|upload|import|export|sync|refresh|reload|save)($|-)/,
+  /^(download|upload|import|export|sync|refresh|reload)($|-)/,
 
   // Transport controls, search, and the data-visualisation vocabulary.
   /^(play|pause|stop|eject|record|rewind|fast-forward|fast-backward|volume|mute)($|-)/,
@@ -238,7 +238,7 @@ export const EXCLUDED_ICON_CODE_PATTERNS = Object.freeze([
   // Kept: battery-empty and battery-full; thermometer with temperature-high and temperature-low;
   // gauge-high; shop and store; city; jet-fighter; tower-broadcast and tower-observation; one
   // clock; one hourglass at half; one calendar; one speech bubble and one pair of them.
-  /^battery-(half|quarter|three-quarters|low|bolt|exclamation|car)$/,
+  /^battery-(half|quarter|three-quarters|low|bolt|exclamation)$/,
   /^gauge(-simple)?(-(low|med|med-low|med-high|min|max))?$/,
   /^gauge(-simple)?-circle-/,
   /^dial(-(high|low|max|med|med-high|med-low|min|off))?$/,
@@ -263,10 +263,10 @@ export const EXCLUDED_ICON_CODE_PATTERNS = Object.freeze([
   /^grid-(2|3|4|5|round-2|round-4|round-5|dividers|horizontal|vertical)/,
   /^circle-(half-stroke-horizontal|half-horizontal|quarter-stroke|three-quarters-stroke)$/,
   /^gauge-simple-high$/,
-  /^(signal|wifi)-(bars(-(fair|good|slash|weak))?|exclamation|fair|good|strong|weak)$/,
+  /^(signal|wifi)-(bars(-(fair|good|slash|weak))?|exclamation|fair|good|weak)$/,
   /^transporter-([1-7]|empty)$/,
   /^(trash|trash-can)-(arrow|check|clock|list|plus|slash|xmark)/,
-  /^toilet-paper-(blank|check|reverse|slash|under|xmark)/,
+  /^toilet-paper-(blank-under|check|reverse|slash|under|xmark)/,
   /^traffic-light-(go|slow|stop)$/,
   /^(store|shop)-(24|lock|slash)$/,
   /^(stopwatch-20|shuttle-space-vertical)$/,

@@ -23,11 +23,18 @@ import {
   buildIconCatalogue,
   parseFontAwesomeRelease,
   parseIconGlyphRules,
-  readWoff2Codepoints
+  readWoff2Codepoints,
 } from './lib/fontAwesomeBundle.js';
 
 const REPOSITORY_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const OUTPUT_PATH = path.join(REPOSITORY_ROOT, 'src', 'ui', 'svelte', 'util', 'foundryIconCatalogue.js');
+const OUTPUT_PATH = path.join(
+  REPOSITORY_ROOT,
+  'src',
+  'ui',
+  'svelte',
+  'util',
+  'foundryIconCatalogue.js'
+);
 
 const CLASSIC_SOLID_FACE = 'fa-solid-900.woff2';
 const CLASSIC_REGULAR_FACE = 'fa-regular-400.woff2';
@@ -36,12 +43,14 @@ const BRANDS_FACE = 'fa-brands-400.woff2';
 function resolveBundle(argument) {
   if (!argument) {
     throw new Error(
-      'Pass the path to Foundry\'s bundled fontawesome directory, or to the all.min.css inside it.'
+      "Pass the path to Foundry's bundled fontawesome directory, or to the all.min.css inside it."
     );
   }
   const resolved = path.resolve(argument);
   const bundleRoot = resolved.endsWith('.css') ? path.resolve(resolved, '..', '..') : resolved;
-  const stylesheet = resolved.endsWith('.css') ? resolved : path.join(bundleRoot, 'css', 'all.min.css');
+  const stylesheet = resolved.endsWith('.css')
+    ? resolved
+    : path.join(bundleRoot, 'css', 'all.min.css');
   if (!fs.existsSync(stylesheet)) {
     throw new Error(`No stylesheet at ${stylesheet}.`);
   }
@@ -57,7 +66,8 @@ function sameCodepoints(left, right) {
 function renderCatalogueModule({ release, definitions, measurements }) {
   const entries = definitions
     .map(({ iconCode, label, aliases }) => {
-      const aliasList = aliases.length === 0 ? '[]' : `[${aliases.map((alias) => `"${alias}"`).join(', ')}]`;
+      const aliasList =
+        aliases.length === 0 ? '[]' : `[${aliases.map((alias) => `"${alias}"`).join(', ')}]`;
       return `  { iconCode: "${iconCode}", label: "${label}", aliases: ${aliasList} }`;
     })
     .join(',\n');
@@ -147,7 +157,9 @@ function readFoundryVersion(bundleRoot) {
 function main() {
   const args = process.argv.slice(2);
   const checkOnly = args.includes('--check');
-  const { bundleRoot, stylesheet, webfonts } = resolveBundle(args.find((arg) => !arg.startsWith('--')));
+  const { bundleRoot, stylesheet, webfonts } = resolveBundle(
+    args.find((arg) => !arg.startsWith('--'))
+  );
 
   const cssText = fs.readFileSync(stylesheet, 'utf8');
   const release = parseFontAwesomeRelease(cssText);
@@ -173,7 +185,7 @@ function main() {
     multiNameRules: rules.filter((rule) => rule.names.length > 1).length,
     classicGlyphs: definitions.length,
     brandGlyphs: rules.filter((rule) => brandCodepoints.has(rule.codepoint)).length,
-    classicFaceCodepoints: classicCodepoints.size
+    classicFaceCodepoints: classicCodepoints.size,
   };
 
   const rendered = renderCatalogueModule({ release, definitions, measurements });
@@ -181,7 +193,9 @@ function main() {
   if (checkOnly) {
     const committed = fs.existsSync(OUTPUT_PATH) ? fs.readFileSync(OUTPUT_PATH, 'utf8') : '';
     if (committed === rendered) {
-      console.log(`Up to date: ${measurements.classicGlyphs} icons from Font Awesome ${release.edition} ${release.version}.`);
+      console.log(
+        `Up to date: ${measurements.classicGlyphs} icons from Font Awesome ${release.edition} ${release.version}.`
+      );
       return;
     }
     console.error(

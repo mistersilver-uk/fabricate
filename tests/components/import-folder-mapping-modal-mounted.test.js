@@ -18,7 +18,8 @@ const harness = createMountedComponentHarness({
     // dependencies are in this graph even though this modal never sets `showIcon` and so
     // never renders the field. Membership follows the import graph, not the rendered tree.
     'src/ui/svelte/util/essenceIcons.js',
-    'src/ui/svelte/util/fontAwesomeFreeClassicIcons.js',
+    'src/ui/svelte/util/foundryIconVocabulary.js',
+  'src/ui/svelte/util/foundryIconCatalogue.js',
     'src/utils/matchFolderVocabulary.js',
   ],
   compiledModules: [
