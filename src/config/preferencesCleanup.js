@@ -38,17 +38,39 @@ function _isLiveProgressiveOrderKey(key, validRecipeIds, validComponentIds) {
   return false;
 }
 
+/**
+ * Prune the GM's crafting preferences against the live corpus.
+ *
+ * **`validComponentIds` is REQUIRED, and has no default** (issue 1261). It used to default to
+ * an empty set, and a caller that omitted it therefore pruned every `salvage:<componentId>`
+ * progressive-order key — a corpus-derived prune against a basis of nothing, which is issue
+ * 1196's failure mode reached by an omitted ARGUMENT rather than an incomplete corpus. A
+ * default cannot be safe here: this function rewrites one map as a whole-value replacement,
+ * so "no components were supplied" and "this world has no components" are indistinguishable
+ * to it and only the caller can tell them apart. Omitting it now throws.
+ *
+ * @param {Set<string>} validSystemIds
+ * @param {Set<string>} validRecipeIds
+ * @param {(key: string) => *} getSetting
+ * @param {(key: string, value: *) => Promise<*>} setSetting
+ * @param {object} options
+ * @param {Set<string>} options.validComponentIds Every live salvageable component id, across
+ *   every system: the progressive-order map's `salvage:` keys are not system-scoped.
+ * @param {((actorId: string) => object|null)|null} [options.resolveGatheringActor]
+ * @param {((actor: object) => boolean)|null} [options.isSelectableGatheringActor]
+ */
 export async function cleanupStalePreferences(
   validSystemIds,
   validRecipeIds,
   getSetting,
   setSetting,
-  {
-    resolveGatheringActor = null,
-    isSelectableGatheringActor = null,
-    validComponentIds = new Set(),
-  } = {}
+  { resolveGatheringActor = null, isSelectableGatheringActor = null, validComponentIds } = {}
 ) {
+  if (!(validComponentIds instanceof Set)) {
+    throw new TypeError(
+      'cleanupStalePreferences requires validComponentIds: a corpus-derived prune with no component ids drops every salvage: preference key.'
+    );
+  }
   // 1. Validate lastManagedCraftingSystem
   const lastSystem = getSetting(SETTING_KEYS.LAST_MANAGED_CRAFTING_SYSTEM);
   if (lastSystem && !validSystemIds.has(lastSystem)) {

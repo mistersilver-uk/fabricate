@@ -1,55 +1,45 @@
 /**
  * The startup maintenance COMPOSITION SITE (issue 1224).
  *
- * `Fabricate#initialize` used to hold this as an inline array literal, which made the
- * Valid Id Basis gate untestable in principle: `src/main.js` imports the global stylesheet
- * and Svelte UI roots at module load, so it cannot be imported under `node --test` at all.
- * Extracting the composition to this module is what gives the gate a seam — the spec
- * requires the pass list to be "constructed by a pure, exported builder that the
- * composition site calls, so the omission is directly assertable", and an assertion needs
- * something importable to assert against.
+ * `Fabricate#initialize` used to hold this as an inline array literal, which made the pass
+ * list untestable in principle: `src/main.js` imports the global stylesheet and Svelte UI
+ * roots at module load, so it cannot be imported under `node --test` at all. Extracting the
+ * composition to this module is what gives the gate a seam — the spec requires the pass list
+ * to be "constructed by a pure, exported builder that the composition site calls, so the
+ * omission is directly assertable", and an assertion needs something importable to assert
+ * against.
  *
- * ## Why the id sets and the basis facts are read HERE, together
+ * ## Why the id sets are read HERE
  *
- * The valid-id sets and the basis facts are sampled in the same statement group, on
- * purpose. The storage conversion this gate protects against runs from inside
- * `recipeManager.initialize()`, so a basis fact captured earlier in startup — beside
- * `registerSettings()` or `_runMigrations()`, the natural tidy — records the
- * PRE-conversion value, and a conversion that then crashed mid-flight yields a partial
- * corpus here with a "settled" fact in hand. Reading both in one place means the facts
- * cannot be older than the corpus they describe.
- *
- * `src/main.js` therefore passes `getSetting` itself, never a pre-read value, and calls
- * this after both managers' `initialize()`. Both halves of that are pinned by
- * `tests/startup-valid-id-basis.test.js`.
+ * The valid-id sets are derived from the live managers, after both have completed
+ * `initialize()`, so every pass prunes against the corpus this boot actually loaded rather
+ * than one sampled earlier. Each class's corpus arrives as one whole-array read that either
+ * returns the corpus or throws, so a set derived here is complete or the boot failed
+ * (issue 1261) — which is what {@link WHOLE_CORPUS_ID_BASIS} declares to the builder.
  *
  * ## Why it warns
  *
  * `runStartupMaintenance` returns only FAILED labels and the caller discards the return, so
  * a gate that omitted every pass is otherwise indistinguishable from a clean boot — and
  * `tests/startup-cleanup-scoping.test.js` would sit green forever reading as a positive
- * health signal. The warning names the omitted labels and the deciding inputs so a GM
- * whose world is mid-conversion can see why the housekeeping did not run. It does not fail
- * the boot: a partial corpus must never become a boot failure.
+ * health signal. The warning names the omitted labels and the deciding kinds so an omission
+ * is visible rather than silent. It does not fail the boot.
  */
 
 import { cleanupStalePreferences } from '../config/preferencesCleanup.js';
-import { getHighestRegisteredMigrationVersion } from '../migration/MigrationRunner.js';
 
-import { describeCorpusStorage } from './corpusStorageReports.js';
-import { buildStartupPassList } from './startupMaintenance.js';
-import { basisFromInputs, readValidIdBasisInputs } from './validIdBasis.js';
+import { buildStartupPassList, WHOLE_CORPUS_ID_BASIS } from './startupMaintenance.js';
 
 /**
  * Compose the startup housekeeping pass list for this boot.
  *
  * Reads no globals: every collaborator, both setting accessors and the reporter are
- * parameters, so the whole composition — including which passes the Valid Id Basis omits —
- * is drivable from a fixture.
+ * parameters, so the whole composition — including which passes the builder omits — is
+ * drivable from a fixture.
  *
  * @param {object} options
- * @param {object} options.recipeManager Supplies the recipe corpus, the per-id lookup the
- *   phantom-run prune walks, and the arrangement its repository was BUILT for.
+ * @param {object} options.recipeManager Supplies the recipe corpus and the per-id lookup the
+ *   phantom-run prune walks.
  * @param {object} options.craftingSystemManager Supplies the crafting systems and, inside
  *   them, the salvage components.
  * @param {object} options.craftingRunManager
@@ -61,7 +51,7 @@ import { basisFromInputs, readValidIdBasisInputs } from './validIdBasis.js';
  * @param {(actor: object) => boolean} options.isSelectableGatheringActor
  * @param {(message: string, detail: object) => void} [options.warn] Omission reporter.
  * @returns {Array<[string, () => Promise<unknown>]>} labelled thunks for
- *   `runStartupMaintenance`, with every basis-incomplete pass omitted.
+ *   `runStartupMaintenance`, with every undeclared or basis-incomplete pass omitted.
  */
 export function composeStartupPassList({
   recipeManager,
@@ -91,23 +81,6 @@ export function composeStartupPassList({
   const validComponentIds = new Set(
     [...validSalvageComponentsBySystem.values()].flatMap((ids) => [...ids])
   );
-  // Sampled HERE, in the same statement group as the id sets above and after both
-  // managers' `initialize()` — see this module's header for why the position is
-  // load-bearing rather than stylistic.
-  //
-  // The settings are read now; the storage reports are what each manager captured before
-  // and during its own corpus read, which is the half no read at this point can reproduce.
-  //
-  // The per-kind mapping itself lives in `corpusStorageReports.js`, shared with the
-  // mutation-time composition site (issue 1226): it has already drifted once — `components`
-  // used to be answered by the SYSTEM repository's report — and a second hand-written copy
-  // is that regression waiting to happen.
-  const basisInputs = readValidIdBasisInputs({
-    getSetting,
-    getHighestRegisteredMigrationVersion,
-    storage: describeCorpusStorage({ recipeManager, craftingSystemManager }),
-  });
-  const basis = basisFromInputs(basisInputs);
 
   const candidates = [
     ['crafting runs', () => craftingRunManager.cleanupInvalidRuns(validRecipes, validSystems)],
@@ -137,7 +110,7 @@ export function composeStartupPassList({
   const omissions = [];
   const passes = buildStartupPassList({
     candidates,
-    basis,
+    basis: WHOLE_CORPUS_ID_BASIS,
     onOmit: (omission) => {
       omissions.push(omission);
     },
@@ -148,7 +121,7 @@ export function composeStartupPassList({
       'Fabricate | Startup cleanup skipped: the ids it would prune against are not known to be complete. ' +
         'No data was removed. Omitted: ' +
         omissions.map((omission) => omission.label).join(', '),
-      { omitted: omissions, basis, basisInputs }
+      { omitted: omissions, basis: WHOLE_CORPUS_ID_BASIS }
     );
   }
   return passes;

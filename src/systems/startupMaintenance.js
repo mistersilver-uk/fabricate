@@ -26,8 +26,29 @@ export const STARTUP_PASS_ENTITY_KINDS = Object.freeze({
 });
 
 /**
- * Build the startup pass list, omitting any pass whose Valid Id Basis is not
- * known-complete (issue 1224, `data-models/spec.md` § Valid Id Basis).
+ * The id basis a whole-array corpus read yields: every entity kind complete.
+ *
+ * Each entity class's corpus arrives as ONE whole-array read that either returns the corpus
+ * or throws (issue 1261), so no composition site can hold part of a corpus and believe it
+ * holds all of it. Both sites therefore declare completeness with this constant rather than
+ * computing it.
+ *
+ * The `basis` parameter it feeds is kept rather than collapsed, and it is not decorative: it
+ * is what makes {@link buildStartupPassList} require a declared kind POSITIVELY, so a renamed
+ * kind, a threading typo, or a future partial-corpus source omits the pass instead of running
+ * it against ids it cannot vouch for.
+ *
+ * @type {Readonly<Record<string, boolean>>}
+ */
+export const WHOLE_CORPUS_ID_BASIS = Object.freeze({
+  recipes: true,
+  systems: true,
+  components: true,
+});
+
+/**
+ * Build the startup pass list, omitting any pass whose id basis is not known-complete
+ * (issue 1224, `data-models/spec.md` § Valid Id Basis).
  *
  * **Pure.** It reads no globals and performs no work: the candidates arrive as labelled
  * thunks and leave as a subset of the same thunks, unwrapped and uninvoked. That is what
@@ -50,7 +71,7 @@ export const STARTUP_PASS_ENTITY_KINDS = Object.freeze({
  * @param {Array<[string, () => Promise<unknown>]>} options.candidates Every pass this boot
  *   would run if nothing were gated, in run order.
  * @param {Record<string, boolean>} options.basis Per entity kind, whether that kind's id
- *   basis is known-complete. See `validIdBasis.js`.
+ *   basis is known-complete. See {@link WHOLE_CORPUS_ID_BASIS}.
  * @param {Readonly<Record<string, readonly string[]>>} [options.declarations] The pass ->
  *   entity-kinds map. A parameter so a test can inject an undeclared sixth pass.
  * @param {(omission: {label: string, incompleteKinds: string[]}) => void} [options.onOmit]

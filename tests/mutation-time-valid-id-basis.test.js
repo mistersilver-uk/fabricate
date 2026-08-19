@@ -11,15 +11,32 @@
  *
  * **Both directions are asserted, and the open one is not decoration.** A gate that never
  * fires is a data-loss bug; a gate that always fires converts it into an orphaned-flag leak
- * nothing detects. Every closed-direction case here has a positive control in the same
- * shape, and the fixtures reach the gate through the REAL `RecipeManager` driven from
- * SETTINGS — never by injecting a basis — because injecting the answer is how two earlier
- * acceptance sets for #1224 went green against an implementation whose gate never ran.
+ * nothing detects.
  *
  * **The third direction the spec adds here**: refusing the sweep must not itself leak the
  * flags the mutation orphaned. A refused sweep falls back to a SUBJECT-TARGETED prune of
  * exactly the ids the caller removed, so the closed cases assert both that the corpus-wide
  * sweep did NOT run and that the just-deleted recipe's flags went anyway.
+ *
+ * ## What CLOSES the gate after issue 1261, and why the fixtures changed
+ *
+ * Every closed-direction case used to build a PARTIAL CORPUS by moving a Definition Storage
+ * setting after the corpus read, and reach the gate through the real `RecipeManager` driven
+ * from SETTINGS — never by injecting a basis — because injecting the answer is how two
+ * earlier acceptance sets for #1224 went green against an implementation whose gate never ran.
+ *
+ * Issue 1261 removed the storage arrangement, and with it the only mechanism that could
+ * produce a partial corpus: each class now arrives in one whole-array read that either
+ * returns the corpus or throws. So no production seam can drive `basis[kind] !== true`, and
+ * a settings-driven closed case can no longer be written at all. The compromise is forced
+ * rather than chosen, and it is bounded to ONE seam: the closed direction is asserted
+ * directly against {@link buildStartupPassList} with an injected basis, which is the pure
+ * builder both composition sites call, while every case that reaches the real managers is an
+ * OPEN-direction case with no injection anywhere in it.
+ *
+ * The remaining production route to an omission is an UNDECLARED pass, which is not
+ * hypothetical: it is what stops a future destructive prune from shipping ungated by
+ * forgetting to declare its entity kinds. The targeted-fallback cases are driven through it.
  */
 
 import assert from 'node:assert/strict';
@@ -30,30 +47,21 @@ import { fileURLToPath } from 'node:url';
 
 import { installFoundryEnv } from './helpers/foundryEnv.js';
 import { stripComments } from './helpers/sourceScan.js';
-import { seedKnownCompleteValidIdBasis } from './helpers/validIdBasis.js';
 
-const { DEFINITION_STORAGE_LAYOUTS, DEFINITION_STORAGE_TARGETS, SETTING_KEYS } = await import(
-  '../src/config/settings.js'
-);
-const { getHighestRegisteredMigrationVersion } = await import(
-  '../src/migration/MigrationRunner.js'
-);
+const { SETTING_KEYS } = await import('../src/config/settings.js');
 const { Recipe } = await import('../src/models/Recipe.js');
 const { CraftingRunManager } = await import('../src/systems/CraftingRunManager.js');
 const { RecipeManager } = await import('../src/systems/RecipeManager.js');
 const { MUTATION_CLEANUP_ENTITY_KINDS, runGatedMutationCleanup } = await import(
   '../src/systems/mutationCleanupComposition.js'
 );
-const { STARTUP_PASS_ENTITY_KINDS } = await import('../src/systems/startupMaintenance.js');
-const { readValidIdBasis } = await import('../src/systems/validIdBasis.js');
-const { describeCorpusStorage } = await import('../src/systems/corpusStorageReports.js');
+const { STARTUP_PASS_ENTITY_KINDS, buildStartupPassList, WHOLE_CORPUS_ID_BASIS } = await import(
+  '../src/systems/startupMaintenance.js'
+);
 const { RecipeVisibilityService } = await import('../src/systems/RecipeVisibilityService.js');
 const { CraftingSystemManager } = await import('../src/systems/CraftingSystemManager.js');
 
-const HIGHEST_MIGRATION = getHighestRegisteredMigrationVersion();
 const SYSTEM_ID = 'sys-1';
-/** Sentinel for "this setting has no value at all", distinct from a stored `undefined`. */
-const ABSENT = Symbol('absent');
 
 console.debug = () => {};
 
@@ -85,33 +93,16 @@ function recordingVisibilityService(calls) {
   };
 }
 
-/** @param {Map<string, *>} settings @param {Record<string, *>} overrides */
-function applySettings(settings, overrides) {
-  for (const [key, value] of Object.entries(overrides)) {
-    if (value === ABSENT) settings.delete(key);
-    else settings.set(key, value);
-  }
-}
-
 /**
  * A REAL `RecipeManager` that has genuinely read a corpus, plus recording stand-ins for the
  * two destructive collaborators.
  *
- * The order below is the production order and it is what makes the cases mean anything:
- * settings are seeded, the manager is constructed (which is when it commits to an
- * arrangement), and only then does `initialize()` sample the layout ACROSS its corpus read.
- * `afterCorpusRead` is applied last, so a case that moves a setting there is modelling a
- * conversion that landed between this client's read and its next mutation — the widest and
- * least detectable of the five windows, and the one #1211's conversion actually produces.
- *
- * @param {object} [options]
- * @param {Record<string, *>} [options.settings] Applied BEFORE construction.
- * @param {Record<string, *>} [options.afterCorpusRead] Applied AFTER `initialize()`.
+ * Nothing is injected: the manager reads its corpus through the shipped repository and the
+ * gate decides from the pass declarations, so every case built on this fixture observes the
+ * production path end to end.
  */
-async function makeRecipeFixture({ settings: before = {}, afterCorpusRead = {} } = {}) {
+async function makeRecipeFixture() {
   const env = installFoundryEnv();
-  seedKnownCompleteValidIdBasis(env.settings);
-  applySettings(env.settings, before);
   env.settings.set(SETTING_KEYS.RECIPES, [
     new Recipe({ id: 'r-doomed', name: 'Doomed', craftingSystemId: SYSTEM_ID }).toJSON(),
     new Recipe({ id: 'r-kept', name: 'Kept', craftingSystemId: SYSTEM_ID }).toJSON(),
@@ -138,17 +129,6 @@ async function makeRecipeFixture({ settings: before = {}, afterCorpusRead = {} }
   const systemManager = {
     getSystems: () => systems,
     getSystem: (id) => systems.find((system) => system.id === id) ?? null,
-    describeDefinitionStorage: () => ({
-      granular: false,
-      arrangement: null,
-      layoutAtCorpusRead: null,
-      systems: { granular: false, arrangement: null, layoutAtCorpusRead: null },
-      components: {
-        granular: false,
-        arrangement: DEFINITION_STORAGE_TARGETS.SINGLE_ARRAY,
-        layoutAtCorpusRead: DEFINITION_STORAGE_LAYOUTS.SINGLE_ARRAY,
-      },
-    }),
   };
 
   globalThis.game.fabricate = {
@@ -159,7 +139,6 @@ async function makeRecipeFixture({ settings: before = {}, afterCorpusRead = {} }
 
   const recipeManager = new RecipeManager();
   await recipeManager.initialize();
-  applySettings(env.settings, afterCorpusRead);
 
   const warnings = [];
   const originalWarn = console.warn;
@@ -177,69 +156,11 @@ async function makeRecipeFixture({ settings: before = {}, afterCorpusRead = {} }
   };
 }
 
-/**
- * Every partial-corpus state, one Valid Id Basis input each, expressed the way a world
- * actually arrives at it.
- *
- * Named rather than derived so a case that stops reaching its intended input fails as a
- * case rather than quietly joining another one.
- */
-const PARTIAL_CORPUS_CASES = [
-  [
-    'input 1+5 — the layout is UNSETTLED across the corpus read (a conversion in flight)',
-    {
-      settings: { [SETTING_KEYS.RECIPE_STORAGE_LAYOUT]: DEFINITION_STORAGE_LAYOUTS.UNSETTLED },
-      afterCorpusRead: {
-        [SETTING_KEYS.RECIPE_STORAGE_LAYOUT]: DEFINITION_STORAGE_LAYOUTS.SINGLE_ARRAY,
-      },
-    },
-  ],
-  [
-    'input 2 — a FAILED conversion left the layout behind its target',
-    {
-      afterCorpusRead: {
-        [SETTING_KEYS.RECIPE_STORAGE_TARGET]: DEFINITION_STORAGE_TARGETS.PER_RECORD,
-      },
-    },
-  ],
-  [
-    'input 3 — migrationVersion is behind the highest registered migration',
-    { afterCorpusRead: { [SETTING_KEYS.MIGRATION_VERSION]: '0.9.0' } },
-  ],
-  [
-    'input 4 — the repository was BUILT for an arrangement the layout does not equal',
-    {
-      settings: { [SETTING_KEYS.RECIPE_STORAGE_TARGET]: DEFINITION_STORAGE_TARGETS.PER_RECORD },
-      afterCorpusRead: {
-        [SETTING_KEYS.RECIPE_STORAGE_TARGET]: DEFINITION_STORAGE_TARGETS.SINGLE_ARRAY,
-      },
-    },
-  ],
-  [
-    'input 5 — the layout MOVED between the corpus read and the mutation',
-    {
-      afterCorpusRead: {
-        [SETTING_KEYS.RECIPE_STORAGE_LAYOUT]: DEFINITION_STORAGE_LAYOUTS.PER_RECORD,
-      },
-    },
-  ],
-  [
-    'an UNREADABLE layout is not known-complete — the gate fails closed, never open',
-    { afterCorpusRead: { [SETTING_KEYS.RECIPE_STORAGE_LAYOUT]: ABSENT } },
-  ],
-];
-
 // ---------------------------------------------------------------------------
-// The public orphan sweep: every input, both directions
+// The public orphan sweep
 // ---------------------------------------------------------------------------
-//
-// `cleanupOrphanedRecipeFlags` writes NOTHING of its own, so it reaches the gate from every
-// one of the states below. The delete paths issue a `save()` first, and the
-// stale-arrangement write guard (#1232) refuses some of those states before the cleanup is
-// reached — which is why the end-to-end delete cases further down use states that guard
-// admits.
 
-test('the OPEN direction — a known-complete corpus still runs both corpus-derived sweeps', async () => {
+test('the OPEN direction — a whole corpus still runs both corpus-derived sweeps', async () => {
   // The positive control, and it is the assertion that stops this whole change from being a
   // gate that simply never lets anything run. Without it, every case below is satisfied by
   // an implementation that prunes nothing, ever.
@@ -258,51 +179,43 @@ test('the OPEN direction — a known-complete corpus still runs both corpus-deri
   }
 });
 
-for (const [name, options] of PARTIAL_CORPUS_CASES) {
-  test(`the CLOSED direction — ${name}`, async () => {
-    const fixture = await makeRecipeFixture(options);
-    try {
-      await fixture.recipeManager.cleanupOrphanedRecipeFlags();
-      assert.deepEqual(
-        fixture.methods(),
-        [],
-        'no corpus-derived prune runs against a corpus that cannot be attested complete'
-      );
-      assert.equal(fixture.warnings.length, 1, 'and the omission is reported, not silent');
-      assert.match(String(fixture.warnings[0][0]), /not known to be complete/);
-      assert.deepEqual(fixture.warnings[0][1].omitted.map((entry) => entry.label).sort(), [
-        'orphaned crafting runs',
-        'orphaned learned recipes',
-      ]);
-    } finally {
-      fixture.restore();
-    }
-  });
-}
-
-test('a refused sweep still prunes what the caller REMOVED — the gate leaks nothing', async () => {
+test('an omitted sweep still prunes what the caller REMOVED — the gate leaks nothing', async () => {
   // The third direction. Gating alone would trade a data-loss defect for an orphaned-flag
   // leak that nothing detects, because the flags a deletion orphans are the entire reason
   // this cleanup path exists.
-  const fixture = await makeRecipeFixture(PARTIAL_CORPUS_CASES[0][1]);
-  try {
-    await fixture.recipeManager.cleanupOrphanedRecipeFlags({
-      removedRecipeIds: ['r-doomed', 'r-also-gone'],
-    });
-    assert.deepEqual(fixture.methods(), [
-      'targeted:removeRunsForRecipes',
-      'targeted:forgetDeletedRecipes',
-    ]);
-    for (const call of fixture.calls) {
-      assert.deepEqual(
-        call.recipeIds,
-        ['r-also-gone', 'r-doomed'],
-        'the fallback prunes EXACTLY the ids the caller removed, and infers nothing'
-      );
-    }
-  } finally {
-    fixture.restore();
-  }
+  //
+  // Driven through an UNDECLARED pass, which after issue 1261 is the production route to an
+  // omission: a future destructive prune shipped without declaring its entity kinds is
+  // omitted rather than run, and its targeted fallback must still fire.
+  const removed = ['r-also-gone', 'r-doomed'];
+  const targeted = [];
+  const swept = [];
+
+  const outcome = await runGatedMutationCleanup({
+    passes: [
+      {
+        label: 'a pass nobody declared',
+        sweep: () => {
+          swept.push('sweep');
+          return Promise.resolve();
+        },
+        targeted: () => {
+          targeted.push([...removed]);
+          return Promise.resolve();
+        },
+      },
+    ],
+    warn: () => {},
+  });
+
+  assert.deepEqual(swept, [], 'the corpus-derived sweep did not run');
+  assert.deepEqual(outcome.omitted, ['a pass nobody declared']);
+  assert.deepEqual(outcome.targeted, ['a pass nobody declared']);
+  assert.deepEqual(
+    targeted,
+    [['r-also-gone', 'r-doomed']],
+    'the fallback prunes EXACTLY the ids the caller removed, and infers nothing'
+  );
 });
 
 test('a known-complete corpus takes the SWEEP, not the targeted fallback', async () => {
@@ -322,15 +235,23 @@ test('a known-complete corpus takes the SWEEP, not the targeted fallback', async
 
 test('a mutation that removed NOTHING has no fallback, so an omission removes nothing', async () => {
   // The import path. It only adds or replaces records, so its cleanup is a pure orphan hunt
-  // with no subject to target, and a refusal there is a no-op rather than a leak.
-  const fixture = await makeRecipeFixture(PARTIAL_CORPUS_CASES[2][1]);
-  try {
-    await fixture.recipeManager.cleanupOrphanedRecipeFlags();
-    assert.deepEqual(fixture.methods(), []);
-    assert.deepEqual(fixture.warnings[0][1].targetedFallbacks, []);
-  } finally {
-    fixture.restore();
-  }
+  // with no subject to target, and an omission there is a no-op rather than a leak.
+  const warnings = [];
+
+  const outcome = await runGatedMutationCleanup({
+    passes: [
+      {
+        label: 'a pass nobody declared',
+        sweep: () => Promise.reject(new Error('the omitted sweep must not run')),
+        targeted: null,
+      },
+    ],
+    warn: (_message, detail) => warnings.push(detail),
+  });
+
+  assert.deepEqual(outcome.omitted, ['a pass nobody declared']);
+  assert.deepEqual(outcome.targeted, []);
+  assert.deepEqual(warnings[0].targetedFallbacks, []);
 });
 
 // ---------------------------------------------------------------------------
@@ -355,39 +276,6 @@ test('deleteRecipe on a known-complete corpus prunes against the POST-deletion i
   }
 });
 
-test('deleteRecipe on a PARTIAL corpus prunes only the deleted recipe', async () => {
-  // The reported defect, from the direction a GM actually reaches it: this client read the
-  // corpus while a conversion held the layout `unsettled`, the conversion finished, and every
-  // settings clause now reports a settled, converged world. The recipes that did not land are
-  // absent from `getRecipes()`, so the ungated sweep pruned every actor's runs and learned
-  // entries naming them.
-  const fixture = await makeRecipeFixture(PARTIAL_CORPUS_CASES[0][1]);
-  try {
-    await fixture.recipeManager.deleteRecipe('r-doomed');
-    assert.deepEqual(fixture.methods(), [
-      'targeted:removeRunsForRecipes',
-      'targeted:forgetDeletedRecipes',
-    ]);
-    assert.deepEqual(fixture.calls[0].recipeIds, ['r-doomed']);
-  } finally {
-    fixture.restore();
-  }
-});
-
-test('deleteRecipes carries the whole removed SET into the fallback', async () => {
-  const fixture = await makeRecipeFixture(PARTIAL_CORPUS_CASES[2][1]);
-  try {
-    await fixture.recipeManager.deleteRecipes(['r-doomed', 'r-kept']);
-    assert.deepEqual(fixture.methods(), [
-      'targeted:removeRunsForRecipes',
-      'targeted:forgetDeletedRecipes',
-    ]);
-    assert.deepEqual(fixture.calls[1].recipeIds, ['r-doomed', 'r-kept']);
-  } finally {
-    fixture.restore();
-  }
-});
-
 test('deleteRecipes on a known-complete corpus still sweeps', async () => {
   const fixture = await makeRecipeFixture();
   try {
@@ -402,13 +290,28 @@ test('deleteRecipes on a known-complete corpus still sweeps', async () => {
   }
 });
 
-test('an import names no removed ids, so its sweep is gated and its fallback is empty', async () => {
-  const fixture = await makeRecipeFixture(PARTIAL_CORPUS_CASES[2][1]);
+test('an import sweeps against the POST-import corpus and names no removed ids', async () => {
+  const fixture = await makeRecipeFixture();
   try {
     await fixture.recipeManager.importRecipes([
       { id: 'r-new', name: 'New', craftingSystemId: SYSTEM_ID },
     ]);
-    assert.deepEqual(fixture.methods(), []);
+    assert.deepEqual(fixture.methods(), [
+      'sweep:cleanupInvalidRuns',
+      'sweep:cleanupLearnedRecipes',
+    ]);
+    assert.deepEqual(
+      fixture.calls[0].validRecipeIds,
+      fixture.recipeManager
+        .getRecipes({})
+        .map((recipe) => recipe.id)
+        .sort(),
+      'an import adds records, so the sweep prunes against the POST-import corpus'
+    );
+    assert.ok(
+      fixture.calls[0].validRecipeIds.includes('r-kept'),
+      'and the set is really populated, so the comparison is not vacuous'
+    );
   } finally {
     fixture.restore();
   }
@@ -458,70 +361,12 @@ test('the mutation-time declarations mirror the startup ones pass for pass', () 
   }
 });
 
-/**
- * A `getSetting` plus manager stand-ins that score KNOWN-COMPLETE for every entity kind.
- *
- * Needed because a call with no managers omits every pass — declared or not — so a case
- * built on one cannot tell "omitted because undeclared" from "omitted because the basis is
- * unknown", and would keep passing if the undeclared rule were deleted.
- */
-function knownCompleteGateInputs() {
-  const settings = new Map();
-  seedKnownCompleteValidIdBasis(settings);
-  const attested = {
-    granular: false,
-    arrangement: DEFINITION_STORAGE_TARGETS.SINGLE_ARRAY,
-    layoutAtCorpusRead: DEFINITION_STORAGE_LAYOUTS.SINGLE_ARRAY,
-  };
-  return {
-    getSetting: (key) => settings.get(key),
-    recipeManager: { describeDefinitionStorage: () => ({ ...attested }) },
-    craftingSystemManager: {
-      describeDefinitionStorage: () => ({
-        ...attested,
-        systems: { granular: false, arrangement: null, layoutAtCorpusRead: null },
-        components: { ...attested },
-      }),
-    },
-  };
-}
-
-test('the seeded fixture really does produce a known-complete basis for every kind', () => {
-  // Two jobs, because they are the same assertion.
-  //
-  // It is the precondition the undeclared case below rests on: without it, "the undeclared
-  // pass was omitted" is satisfiable by a basis that omits everything, which is exactly what
-  // the earlier version of that case did.
-  //
-  // And it is the guard on `seedKnownCompleteValidIdBasis`, which three suites now build
-  // their OPEN-direction cases on. Asserting a couple of the settings it writes proves only
-  // that it wrote them; asserting the BASIS VALUE proves the seed states a world the gate
-  // genuinely attests rather than a gate switched off, and it reddens if a sixth input is
-  // added to `validIdBasis.js` that the seed does not satisfy.
-  const inputs = knownCompleteGateInputs();
-  assert.deepEqual(
-    readValidIdBasis({
-      getSetting: inputs.getSetting,
-      getHighestRegisteredMigrationVersion,
-      storage: describeCorpusStorage(inputs),
-    }),
-    { recipes: true, systems: true, components: true }
-  );
-  assert.equal(
-    inputs.getSetting(SETTING_KEYS.MIGRATION_VERSION),
-    HIGHEST_MIGRATION,
-    'and it is the REAL highest registered migration, never a hardcoded version'
-  );
-});
-
 test('an UNDECLARED mutation-time pass is omitted rather than run', async () => {
   // The property that stops a future destructive prune from shipping ungated by forgetting
-  // to declare it — and it is only observable against a KNOWN-COMPLETE basis, where
-  // undeclaredness is the sole remaining reason anything can be omitted. The declared pass
-  // running in the same call is what proves the basis is complete; the `undeclared: true`
-  // flag on the omission is what proves the omission was decided by the declaration table
-  // rather than by an incomplete kind. Asserting only "it did not run" leaves both.
-  const inputs = knownCompleteGateInputs();
+  // to declare it. The declared pass running in the same call is what proves the omission was
+  // not a blanket refusal; the `undeclared: true` flag on the omission is what proves it was
+  // decided by the declaration table rather than by an incomplete kind. Asserting only "it
+  // did not run" leaves both.
   const ran = [];
   const warnings = [];
   const pass = (label) => ({
@@ -533,7 +378,6 @@ test('an UNDECLARED mutation-time pass is omitted rather than run', async () => 
   });
 
   const outcome = await runGatedMutationCleanup({
-    ...inputs,
     passes: [pass('orphaned learned recipes'), pass('a pass nobody declared')],
     warn: (message, detail) => warnings.push(detail),
   });
@@ -648,15 +492,10 @@ test('forgetDeletedRecipes forgets the named ids and leaves an unread recipe lea
  * store carrying a progressive-order map with a live and a stale key in BOTH scopes.
  *
  * `_cleanupCraftingPreferences` replaces that map wholesale, so the four keys are what make
- * "which basis governs it" observable at all.
- *
- * @param {object} [options]
- * @param {Record<string, *>} [options.afterCorpusRead] Applied after the managers have
- *   attested their corpus read, modelling a conversion that landed since.
+ * the scope of the prune observable at all.
  */
-function makeSystemFixture({ afterCorpusRead = {} } = {}) {
+function makeSystemFixture() {
   const env = installFoundryEnv();
-  seedKnownCompleteValidIdBasis(env.settings);
   env.settings.set(SETTING_KEYS.PROGRESSIVE_RESULT_ORDER, {
     'recipe:r-kept': ['live recipe'],
     'recipe:r-gone': ['stale recipe'],
@@ -667,11 +506,6 @@ function makeSystemFixture({ afterCorpusRead = {} } = {}) {
   const calls = [];
   const recipeManager = {
     getRecipes: () => [{ id: 'r-kept', craftingSystemId: SYSTEM_ID }],
-    describeDefinitionStorage: () => ({
-      granular: false,
-      arrangement: DEFINITION_STORAGE_TARGETS.SINGLE_ARRAY,
-      layoutAtCorpusRead: DEFINITION_STORAGE_LAYOUTS.SINGLE_ARRAY,
-    }),
     deleteRecipe: async () => {},
   };
   globalThis.game.fabricate = {
@@ -689,10 +523,6 @@ function makeSystemFixture({ afterCorpusRead = {} } = {}) {
       components: [{ id: 'c-1', name: 'Live component' }],
     })
   );
-  // This fixture seeds `systems` directly rather than running the corpus read that stamps
-  // the layout observed across it, so state what that read would have seen.
-  seedKnownCompleteValidIdBasis(new Map(), { craftingSystemManager: manager });
-  applySettings(env.settings, afterCorpusRead);
 
   const warnings = [];
   const originalWarn = console.warn;
@@ -711,18 +541,12 @@ function makeSystemFixture({ afterCorpusRead = {} } = {}) {
   };
 }
 
-/** The component basis alone, moved after the corpus read. */
-const COMPONENT_BASIS_INCOMPLETE = {
-  afterCorpusRead: {
-    [SETTING_KEYS.COMPONENT_STORAGE_LAYOUT]: DEFINITION_STORAGE_LAYOUTS.PER_RECORD,
-  },
-};
-
-test('the preference sweep KEEPS the live salvage key on a known-complete corpus', async () => {
+test('the preference sweep KEEPS the live salvage key while dropping the stale one', async () => {
   // The open direction, and it also pins a defect this gate exposed: the component ids were
   // never passed, so `validComponentIds` took its empty-set default and EVERY
   // `salvage:<componentId>` key was dropped on every resolution-mode change and every system
-  // deletion — a corpus-derived prune against a basis of nothing.
+  // deletion — a corpus-derived prune against a basis of nothing. Issue 1261 closed the
+  // default itself: the parameter is now REQUIRED, so omitting it throws rather than pruning.
   const fixture = makeSystemFixture();
   try {
     await fixture.manager._cleanupCraftingPreferences();
@@ -732,25 +556,56 @@ test('the preference sweep KEEPS the live salvage key on a known-complete corpus
   }
 });
 
-test('the preference sweep is refused when the COMPONENT basis alone is incomplete', async () => {
-  // The union declaration doing its job. This pass rewrites ONE map keyed by both scopes, so
-  // an incomplete component basis must stop the whole thing rather than let the recipe half
-  // proceed and take every `salvage:` key with it.
-  const fixture = makeSystemFixture(COMPONENT_BASIS_INCOMPLETE);
-  try {
-    await fixture.manager._cleanupCraftingPreferences();
-    assert.deepEqual(Object.keys(fixture.order()).sort(), [
-      'recipe:r-gone',
-      'recipe:r-kept',
-      'salvage:c-1',
-      'salvage:c-gone',
-    ]);
-    assert.deepEqual(fixture.warnings[0][1].omitted.map((entry) => entry.label), [
-      'orphaned crafting preferences',
-    ]);
-  } finally {
-    fixture.restore();
-  }
+test('the preference pass is omitted when the COMPONENT basis alone is incomplete', () => {
+  // The union declaration doing its job, asserted at the BUILDER seam because no production
+  // seam can produce an incomplete basis after issue 1261. This pass rewrites ONE map keyed
+  // by both `recipe:` and `salvage:` scopes, so an incomplete component basis must stop the
+  // whole thing rather than let the recipe half proceed and take every `salvage:` key with
+  // it — which is why it is declared on the UNION and must not be decomposed.
+  const ran = [];
+  const omissions = [];
+  const candidates = [
+    ['orphaned learned recipes', () => ran.push('orphaned learned recipes')],
+    ['orphaned crafting preferences', () => ran.push('orphaned crafting preferences')],
+  ];
+
+  const emitted = buildStartupPassList({
+    candidates,
+    basis: { ...WHOLE_CORPUS_ID_BASIS, components: false },
+    declarations: MUTATION_CLEANUP_ENTITY_KINDS,
+    onOmit: (omission) => omissions.push(omission),
+  });
+
+  assert.deepEqual(
+    emitted.map(([label]) => label),
+    ['orphaned learned recipes'],
+    'the recipe-only pass still runs, so the omission is not a blanket refusal'
+  );
+  assert.deepEqual(omissions, [
+    {
+      label: 'orphaned crafting preferences',
+      incompleteKinds: ['components'],
+      undeclared: false,
+    },
+  ]);
+});
+
+test('a declared kind must be positively true, so a renamed key omits rather than runs', () => {
+  // `basis[kind] === true` rather than `!== false`: a threading typo or a renamed entity kind
+  // must omit the pass, never ship it against ids nothing vouched for.
+  const omissions = [];
+
+  const emitted = buildStartupPassList({
+    candidates: [['orphaned learned recipes', () => {}]],
+    basis: { recipesTypo: true, systems: true, components: true },
+    declarations: MUTATION_CLEANUP_ENTITY_KINDS,
+    onOmit: (omission) => omissions.push(omission),
+  });
+
+  assert.deepEqual(emitted, []);
+  assert.deepEqual(omissions, [
+    { label: 'orphaned learned recipes', incompleteKinds: ['recipes'], undeclared: false },
+  ]);
 });
 
 test('deleteSystem sweeps learned recipes on a known-complete corpus', async () => {
@@ -759,23 +614,6 @@ test('deleteSystem sweeps learned recipes on a known-complete corpus', async () 
     await fixture.manager._cleanupSystemScopedState(SYSTEM_ID, { removedRecipeIds: ['r-gone'] });
     assert.deepEqual(fixture.methods(), ['sweep:cleanupLearnedRecipes']);
     assert.deepEqual(fixture.calls[0].validRecipeIds, ['r-kept']);
-  } finally {
-    fixture.restore();
-  }
-});
-
-test('deleteSystem on a PARTIAL corpus forgets only the recipes it actually deleted', async () => {
-  const fixture = makeSystemFixture({
-    afterCorpusRead: {
-      [SETTING_KEYS.RECIPE_STORAGE_LAYOUT]: DEFINITION_STORAGE_LAYOUTS.PER_RECORD,
-    },
-  });
-  try {
-    await fixture.manager._cleanupSystemScopedState(SYSTEM_ID, {
-      removedRecipeIds: ['r-gone', 'r-also-gone'],
-    });
-    assert.deepEqual(fixture.methods(), ['targeted:forgetDeletedRecipes']);
-    assert.deepEqual(fixture.calls[0].recipeIds, ['r-also-gone', 'r-gone']);
   } finally {
     fixture.restore();
   }

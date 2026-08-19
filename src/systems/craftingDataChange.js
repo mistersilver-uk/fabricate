@@ -10,8 +10,9 @@
  * DELIBERATELY absent from `FABRICATE_HOOKS` / `game.fabricate.api.HOOKS`. `src/config/hooks.js`
  * states the convention outright: only hooks intended as a documented integration surface live
  * there, and "lower-level internal signals … are not part of this contract and may change
- * without notice". `fabricate.recipeStorageLayoutChanged` in `src/config/settingChangeBridge.js`
- * is the worked precedent — same shape, same absence, same stated promotion path.
+ * without notice". Anything that promotes this one owes it the three-segment
+ * `fabricate.<domain>.<event>` name, a `schemaVersion`, an entry in `src/config/hooks.js` and
+ * a row in `DOMAIN.md`.
  *
  * Three things a hand-rolled module-local emitter would have cost, and the reason this is a
  * real hook rather than a private listener list:
@@ -138,12 +139,10 @@ export function emitCraftingDataChanged(change, callAll = null) {
  *
  * **Both of today's `save({batch})` callers are genuinely uniform**, so the per-record branch has
  * no production caller yet, and that is stated rather than left to be discovered — this
- * repository has been bitten by a seam value production could not produce (see
- * `settingChangeBridge.js`'s note on the retired `'create'` operation). It is kept rather than
- * deferred because the two callers that need it are named and imminent: #1211's Storage Layout
- * Conversion rewrites many records in one batch, and #1092 replicates a batch delta whose
- * per-record field lists differ by construction. Whichever lands first owes this branch its
- * first real caller; if neither does, delete it rather than leaving it tested and unreachable.
+ * repository has been bitten by a seam value production could not produce. It is kept rather
+ * than deferred because a caller that needs it is named: #1092 replicates a batch delta whose
+ * per-record field lists differ by construction. It owes this branch its first real caller;
+ * if it does not land, delete the branch rather than leaving it tested and unreachable.
  *
  * @param {object|null|undefined} change
  * @param {string|null|undefined} recordId

@@ -1,5 +1,5 @@
 import { getFabricateFlag, isSafeFlagKeySegment } from '../config/flags.js';
-import { DEFINITION_STORAGE_TARGETS, getSetting, SETTING_KEYS } from '../config/settings.js';
+import { SETTING_KEYS } from '../config/settings.js';
 import { matchGatheringTools, classifyGatheringToolStates } from '../gatheringToolRuntime.js';
 import { getIngredientComponentId, getMatchHandler } from '../models/match/matchTypes.js';
 import { DEFAULT_RECIPE_IMAGE, Recipe } from '../models/Recipe.js';
@@ -26,19 +26,12 @@ import {
 import { applyDefinitionChange } from './CraftingDefinitionRepository.js';
 import { buildCurrencyAffordProbe, getCurrencyRequirementConfig } from './currencyAffordance.js';
 import { formatCurrencyRequirement, normalizeCurrencyUnit } from './currencyProfile.js';
-import { createArrangementWriteGuard } from './definitionStorageArrangement.js';
 import { ALL_INVALIDATION_DOMAINS, domainsForRecipeFields } from './invalidationDomains.js';
 import { readStackQuantity } from './itemStackQuantity.js';
 import { runGatedMutationCleanup } from './mutationCleanupComposition.js';
-import {
-  PerRecordCraftingDefinitionRepository,
-  RECIPE_RECORD_KEY_PREFIX,
-} from './PerRecordCraftingDefinitionRepository.js';
 import { RecipeActivationError } from './RecipeActivationError.js';
 import { RecipePersistenceError } from './RecipePersistenceError.js';
-import { readRecipeStorageLayout } from './recipeStorageLayout.js';
 import {
-  corpusChanged,
   corpusDelta,
   patchCorpusInPlace,
   REVISION_SCOPES,
@@ -136,74 +129,24 @@ function importConflictReason(issues) {
 }
 
 /**
- * The **Definition Storage Target** for recipes, read defensively.
- *
- * Issue 1080 (-b). `game.settings.get` throws for a key that is not registered, and `game`
- * itself is absent in a great many unit fixtures that construct a bare `new RecipeManager()`
- * — so a thrown or missing read is answered with `singleArray`, today's arrangement. The
- * failure direction is deliberate: an unreadable target must never be able to promote a
- * world onto the granular backend, only ever leave it where it already is.
- *
- * @returns {string} a member of `DEFINITION_STORAGE_TARGETS`.
- */
-function readRecipeStorageTarget() {
-  try {
-    return (
-      getSetting(SETTING_KEYS.RECIPE_STORAGE_TARGET) ?? DEFINITION_STORAGE_TARGETS.SINGLE_ARRAY
-    );
-  } catch {
-    return DEFINITION_STORAGE_TARGETS.SINGLE_ARRAY;
-  }
-}
-
-/**
  * The repository the manager builds when the caller injects none — the ONE place the
- * recipe backend is chosen (issue 1080 -b).
+ * recipe backend is chosen (issue 1089).
  *
- * `singleArray` (the registered default, and therefore every world today) yields the
- * unchanged {@link SettingsCraftingDefinitionRepository}, which is what makes -b
- * behaviour-neutral: no world reaches the per-record branch until the Storage Layout
- * Conversion in -c flips the target.
- *
- * The two adapters differ in ONE argument, and the difference is the statement of what
- * each backend can do: the settings adapter takes a `corpus` thunk because it can only
- * ever replace the whole array, and the per-record adapter takes none because it addresses
- * a single record. Everything else — hydrate, serialize, scopeOf — is shared, so the two
- * cannot drift into disagreeing about a recipe's persisted form.
+ * The adapter takes a `corpus` thunk because `game.settings.set` REPLACES a value and has no
+ * addressable element, so a single-record `put` necessarily rewrites the whole array. That
+ * parameter's presence IS the statement of what this backend cannot do.
  *
  * @param {object} options
  * @param {() => Map<string, object>} options.corpus The manager's own recipe map.
- * @param {string} options.arrangement The arrangement to build FOR, read once by the
- *   caller so the value the manager records is byte-identical to the one the repository
- *   was selected by. Reading it twice would let a cross-client flip land between the two
- *   reads and make the recorded arrangement a lie about the repository that exists.
  * @returns {import('./CraftingDefinitionRepository.js').CraftingDefinitionRepository}
  */
-function buildDefaultRecipeRepository({ corpus, arrangement }) {
-  const shared = {
-    hydrate: (raw) => Recipe.fromJSON(raw),
-    serialize: (recipe) => recipe.toJSON(),
-    scopeOf: (recipe) => recipe?.craftingSystemId ?? null,
-    // Issue 1232. Both adapters get it, keyed on the arrangement each was BUILT for, because
-    // the hazard is symmetric: a stale settings adapter re-creates the legacy document that a
-    // forward conversion deleted, and a stale per-record adapter re-creates the record
-    // documents a reverse conversion reclaimed. Installed here — the one place the backend is
-    // chosen — so the guard cannot be selected separately from the adapter it guards.
-    assertWritable: createArrangementWriteGuard({
-      arrangement,
-      readLayout: readRecipeStorageLayout,
-    }),
-  };
-  if (arrangement === DEFINITION_STORAGE_TARGETS.PER_RECORD) {
-    return new PerRecordCraftingDefinitionRepository({
-      keyPrefix: RECIPE_RECORD_KEY_PREFIX,
-      ...shared,
-    });
-  }
+function buildDefaultRecipeRepository({ corpus }) {
   return new SettingsCraftingDefinitionRepository({
     settingKey: SETTING_KEYS.RECIPES,
     corpus,
-    ...shared,
+    hydrate: (raw) => Recipe.fromJSON(raw),
+    serialize: (recipe) => recipe.toJSON(),
+    scopeOf: (recipe) => recipe?.craftingSystemId ?? null,
   });
 }
 
@@ -258,117 +201,7 @@ export class RecipeManager {
     // `SettingsCraftingDefinitionRepository` for why a second ordered map would be a
     // silent corruption of the persisted array's order. The manager still owns every
     // in-memory `set`/`delete` on it: the repository is the persistence seam, not the
-    // domain state, and the per-record adapter (#1080 -b) takes no corpus thunk at all,
-    // because it addresses one record and needs nothing else.
-    //
-    // Which of the two is built is decided ONCE, here, by the recipe Definition Storage
-    // Target — see `buildDefaultRecipeRepository`. It reads `singleArray` on every world
-    // today, so this construction is byte-for-byte the one it replaced.
-    //
-    // Issue 1224: the arrangement that decision was made FOR is recorded alongside it,
-    // because it is the only fact about definition storage that is captured BEFORE
-    // `loadAll()` runs. Everything else the Valid Id Basis reads is a setting sampled
-    // after the corpus was already deserialized, and a setting the GM's conversion
-    // flipped in between reads as settled while this client's repository is addressing
-    // the arrangement that no longer exists.
-    //
-    // An INJECTED repository reports `null`: nothing here knows what arrangement a
-    // caller-supplied adapter was built for, and a guess would be a fail-open guess.
-    // Whether this manager CHOSE its backend, which is what decides whether it may re-choose
-    // one — see {@link RecipeManager#rebuildDefinitionStorage}. Recorded as its own fact
-    // rather than inferred from `_definitionStorageArrangement === null`, because a rebuild
-    // sets that field and the inference would silently start to hold for an injected
-    // repository after the first rebuild.
-    this._ownsRepository = !repository;
-    this._definitionStorageArrangement = repository ? null : readRecipeStorageTarget();
-    // The layout observed across the corpus read, set by `initialize()`. `null` until then,
-    // and `null` is not known-complete — a basis sampled before anything read the corpus
-    // has nothing to attest.
-    /** @type {string|null} */
-    this._layoutAtCorpusRead = null;
-    this._repository =
-      repository ??
-      buildDefaultRecipeRepository({
-        corpus: () => this.recipes,
-        arrangement: this._definitionStorageArrangement,
-      });
-  }
-
-  /**
-   * What this manager can attest about its own **Definition Storage**, for the Valid Id
-   * Basis gate (issue 1224).
-   *
-   * All three facts are captured BEFORE or DURING the corpus read, which is the only thing
-   * that makes them useful: every other input the gate has is a setting sampled afterwards,
-   * and a setting another client's conversion moved in between reads as settled while this
-   * client is holding a corpus that arrangement no longer describes.
-   *
-   * - `granular` — whether the repository that was actually BUILT addresses one record at a
-   *   time, asked of the object rather than inferred from its class, so neither a second
-   *   granular class nor a repository injected through the `repository` seam can evade it.
-   * - `arrangement` — the arrangement this client committed to when it chose an adapter.
-   *   `null` for an injected repository: nothing here knows what a caller-supplied adapter
-   *   was built for, and a guess would be a fail-open guess.
-   * - `layoutAtCorpusRead` — the layout as it stood immediately before `loadAll()`. This is
-   *   the decisive one, and the arrangement cannot stand in for it: the arrangement derives
-   *   from the TARGET, which is set before a conversion starts and does not move until it
-   *   is over, so it is constant across the whole conversion window. A conversion sets
-   *   `unsettled` first and clears it last, so a reader whose corpus read overlapped a
-   *   conversion saw `unsettled` here — always — even if the conversion had finished by the
-   *   time the basis was sampled.
-   *
-   * @returns {{granular: boolean, arrangement: string|null, layoutAtCorpusRead: string|null}}
-   */
-  describeDefinitionStorage() {
-    return {
-      granular: this._repository?.storesRecordsGranularly?.() === true,
-      arrangement: this._definitionStorageArrangement,
-      layoutAtCorpusRead: this._layoutAtCorpusRead,
-    };
-  }
-
-  /**
-   * Re-choose this manager's backend after a completed Storage Layout Conversion, and reload
-   * the corpus through it (issue 1232).
-   *
-   * Before this existed nothing rebuilt a repository after a layout flip, so a client that
-   * was open across a conversion kept addressing an arrangement the world had left for the
-   * rest of its session. The write half of that is refused outright by the arrangement guard
-   * in `definitionStorageArrangement.js`; this is the READ half, and the one that makes the
-   * refusal recoverable without a page reload.
-   *
-   * **Only a SETTLED, agreeing pair rebuilds.** Mid-conversion the layout is `unsettled` and,
-   * on the reverse, the target has already moved while the corpus has not — so a rebuild
-   * there would swap in an adapter addressing storage the conversion has not written yet and
-   * present an empty world until the next signal. Waiting for `layout === target` means every
-   * client rebuilds exactly once, at the conversion's final flip, and holds its old adapter
-   * (with writes refused) in between.
-   *
-   * An INJECTED repository is never replaced: the caller chose it, nothing here knows what it
-   * addresses, and silently discarding it would break every fixture that counts writes
-   * through one.
-   *
-   * @returns {Promise<boolean>} whether a rebuild happened.
-   */
-  async rebuildDefinitionStorage() {
-    if (!this._ownsRepository) return false;
-    const target = readRecipeStorageTarget();
-    const layout = readRecipeStorageLayout();
-    if (layout !== target) return false;
-    if (target === this._definitionStorageArrangement) return false;
-
-    this._definitionStorageArrangement = target;
-    this._repository = buildDefaultRecipeRepository({
-      corpus: () => this.recipes,
-      arrangement: target,
-    });
-    // Re-sampled for the same reason `initialize()` samples it: the Valid Id Basis needs the
-    // layout as it stood immediately before the read that produced the corpus in hand, and
-    // the value from the previous arrangement's read attests nothing about this one.
-    this._layoutAtCorpusRead = readRecipeStorageLayout();
-    this._reloadDelta = null;
-    this._adoptCorpus(await this._repository.loadAll());
-    return true;
+    this._repository = repository ?? buildDefaultRecipeRepository({ corpus: () => this.recipes });
   }
 
   /**
@@ -488,15 +321,6 @@ export class RecipeManager {
   async initialize() {
     if (this.initialized) return;
 
-    // Issue 1224: sample the layout IMMEDIATELY before the read, so the basis can later
-    // ask the one question no post-read setting answers — "was the layout settled at the
-    // moment I read the corpus?". A conversion that started before this line reads
-    // `unsettled` here; one that started after it, and finished before the basis is
-    // sampled, leaves a layout that no longer equals this value. Either way the corpus in
-    // hand is partial and the comparison catches it, where every settings clause reports
-    // a fully converted, fully settled world.
-    this._layoutAtCorpusRead = readRecipeStorageLayout();
-
     // Load recipes through the definition repository (issue 1089)
     for (const recipe of await this._repository.loadAll()) {
       this.recipes.set(recipe.id, recipe);
@@ -518,32 +342,27 @@ export class RecipeManager {
    * `save({ put })` / `save({ delete })` / `save({ batch })` name the records a
    * mutation actually touched. Under the settings adapter all four write the same
    * bytes, because `game.settings.set` cannot address one element — but the
-   * information is now carried to the seam instead of being discarded at the call
-   * site, which is the whole point of landing this before the persistence ADR.
+   * information is carried to the seam instead of being discarded at the call site, so a
+   * backend that CAN address one record needs no caller to change.
    *
-   * ## The in-place mutation audit (issue 1080 -b, task B3)
+   * ## The in-place mutation invariant
    *
-   * Under the settings adapter a NAMED `save({put})` still writes `[...corpus().values()]`,
-   * so it flushes every in-memory mutation — including ones made by code paths that never
-   * called `save()` themselves. A per-record `put` writes exactly one document. Any site
-   * that mutated recipe A in place and then issued `save({ put: B })` would therefore stop
-   * persisting A the moment the target flips, silently and with no test failing.
-   *
-   * Every call site was audited, and the invariant that came out of it is stated here
-   * because it is what future work must preserve:
+   * A NAMED `save({put})` writes `[...corpus().values()]` here, so it flushes every
+   * in-memory mutation — including ones made by code paths that never called `save()`
+   * themselves. That is a property of THIS adapter and not of the seam, so every call site
+   * was audited against a backend that writes only what it was named, and the invariant is
+   * stated here because it is what future work must preserve:
    *
    * > **A named `save({put|delete|batch})` may only be issued for records the SAME
    * > operation created, replaced or removed. A site that mutates a stored recipe in place
-   * > must flush through the argument-less whole-corpus `save()`** — which is differential
-   * > under the per-record adapter and so writes exactly the records whose stored value
-   * > actually moved.
+   * > must flush through the argument-less whole-corpus `save()`.**
    *
    * | Site | Shape | Why it is safe |
    * |---|---|---|
    * | {@link RecipeManager#createRecipe} | `save({put})` | The only in-place write is the draft clamp `recipe.enabled = false` on the record being put. |
    * | {@link RecipeManager#updateRecipe} | `save({put})` | `updatedRecipe` is a fresh `Recipe.fromJSON`; nothing else in the map is touched. |
    * | {@link RecipeManager#deleteRecipe} | `save({delete})` | Removes one map entry and mutates no other record. |
-   * | {@link RecipeManager#deleteRecipes} | `save()` | Whole-corpus, so the differential carries any pending in-place mutation as well as the removals. |
+   * | {@link RecipeManager#deleteRecipes} | `save()` | Whole-corpus, so it carries any pending in-place mutation as well as the removals. |
    * | {@link RecipeManager#importRecipes} | `save()` | Whole-corpus, same. |
    * | {@link RecipeManager#disableSignatureConflicts} | `save({batch})` | The ONE in-place writer in this manager (`recipe.enabled = false`), and the batch is derived from the same `disabled` list, so the mutated set and the persisted set are the same array by construction. |
    *
@@ -551,7 +370,7 @@ export class RecipeManager {
    * `CraftingSystemManager` — the recipe-item link repair (`recipe.recipeItemId`, both
    * branches) and `deleteRecipeItemDefinition`
    * (`recipe.recipeItemId` / `recipe.linkedRecipeItemUuid`) — and all three already flush
-   * through the argument-less `recipeManager.save()`. No mutation call site changed shape.
+   * through the argument-less `recipeManager.save()`.
    *
    * @param {import('./CraftingDefinitionRepository.js').DefinitionChange} [change]
    */
@@ -671,94 +490,6 @@ export class RecipeManager {
     // Also drops the cohort index, whose token clause this advance would fail anyway.
     this._advanceRecipeRevision(...touched);
     return true;
-  }
-
-  /**
-   * Apply ONE replicated per-record change to the in-memory map (issue 1080 -b).
-   *
-   * The per-record sibling of {@link RecipeManager#reload}, and the reason the seam grew
-   * {@link CraftingDefinitionRepository#supportsPerRecordReplication}: under the granular
-   * backend a replication event names a single `fabricate.recipe.<id>` key, so re-reading
-   * the whole corpus per event would restore exactly the O(N)-per-edit cost the backend
-   * exists to remove. A repository that does not support it answers `false` here and the
-   * caller falls back to `reload()`, which is today's behaviour and stays correct.
-   *
-   * **The boolean means the same thing `reload()`'s does**, and for the same reason: the
-   * `createSetting` / `updateSetting` / `deleteSetting` hooks fire on the WRITING client
-   * too, where the map already holds the record. Answering `true` there would re-emit
-   * `fabricate.recipesChanged` once per record on top of the single change hook the writer
-   * already emits, which `import-export/spec.md` fixes at one per batch. So an incoming
-   * record structurally equal to the held one is reported as no change, and the held object
-   * is KEPT — preserving the container and record identity that #1076's cohort index and
-   * #1074's signature guard are keyed on.
-   *
-   * Equality is {@link corpusChanged} over the single-record pair, so it cannot drift from
-   * the comparison `reload()` performs over the whole corpus.
-   *
-   * @param {import('./CraftingDefinitionRepository.js').ReplicatedDefinitionChange} change
-   * @returns {boolean} `true` only when this manager's map actually moved.
-   */
-  applyReplicatedRecordChange(change) {
-    // Every application replaces the pending delta, including one that applies nothing, so a
-    // stale delta can never be consumed after a later replication — exactly as `reload()` does.
-    this._reloadDelta = null;
-    if (this._repository.supportsPerRecordReplication?.() !== true) return false;
-    const applied = this._repository.readReplicatedRecord?.(change);
-    if (!applied) return false;
-
-    const { id, record } = applied;
-    const previous = this.recipes.get(id) ?? null;
-    if (!record) {
-      // A delete for an id this client never held is not a change; it is a replay.
-      if (!previous) return false;
-      this.recipes.delete(id);
-      this._mintReplicatedDelta(previous, null);
-      this._advanceRecipeRevision(previous.craftingSystemId);
-      this._advanceFactScopes(ALL_INVALIDATION_DOMAINS, previous.craftingSystemId);
-      return true;
-    }
-
-    if (previous && !corpusChanged([previous], [record], projectRecipe)) return false;
-    this.recipes.set(id, record);
-    // MINTED HERE, and this is what stops the whole of issue 1078 turning itself off the
-    // moment #1211 flips the Definition Storage Target off `singleArray`: this branch never
-    // calls `reload()`, so without a delta of its own `consumeReloadDelta()` would answer
-    // `null` on every remote client and every replicated edit would route through the broad
-    // fallback — the player-side narrowing this issue exists to deliver, silently disabled.
-    const delta = this._mintReplicatedDelta(previous, record);
-    // A replicated edit that MOVED a recipe names both systems, exactly as `updateRecipe`
-    // and `reload()` do.
-    this._advanceRecipeRevision(previous?.craftingSystemId, record.craftingSystemId);
-    const entry = [...delta.perRecord.values()][0];
-    this._advanceFactScopes(
-      domainsForRecipeFields(entry?.fields),
-      previous?.craftingSystemId,
-      record.craftingSystemId
-    );
-    // A client whose first sight of the corpus is a replicated record is initialized by it,
-    // mirroring `reload()`.
-    this.initialized = true;
-    return true;
-  }
-
-  /**
-   * Record ONE replicated record's transition as a {@link corpusDelta}, so
-   * {@link consumeReloadDelta} answers the per-record branch exactly as it answers a reload.
-   *
-   * Built with the same function and the same projection the whole-corpus path uses, so the two
-   * branches cannot disagree about which fields moved.
-   *
-   * @param {object|null} previous
-   * @param {object|null} record
-   * @returns {import('./revisionTokens.js').CorpusDelta}
-   * @private
-   */
-  _mintReplicatedDelta(previous, record) {
-    const delta = corpusDelta(previous ? [previous] : [], record ? [record] : [], {
-      project: projectRecipe,
-    });
-    this._reloadDelta = delta;
-    return delta;
   }
 
   /**
@@ -1173,11 +904,10 @@ export class RecipeManager {
    * O(pruned × actors). Public thin wrapper over `_cleanupFlagsAfterRecipeMutation`.
    *
    * **A batch caller MUST name what it removed** (issue 1226). The corpus-derived sweep
-   * behind this is gated on the **Valid Id Basis**, and the ids passed here are what the
-   * gate falls back to pruning when the corpus cannot be attested complete. A caller that
-   * omits them still gets the sweep on a healthy world and gets NOTHING on a partial one —
-   * which is safe, but leaves the flags its own deletions orphaned until the next
-   * known-complete boot.
+   * behind this is gated, and the ids passed here are what the gate falls back to pruning
+   * when a sweep is omitted. A caller that omits them still gets the sweep today and gets
+   * NOTHING if the sweep is ever omitted — which is safe, but leaves the flags its own
+   * deletions orphaned until the next boot.
    *
    * @param {object} [options]
    * @param {Iterable<string>} [options.removedRecipeIds]
@@ -3659,8 +3389,8 @@ export class RecipeManager {
       // The repository's bulk boundary, on a real multi-record mutation: each disabled
       // recipe announces itself, and the batch coalesces them into exactly one write —
       // the same single write the whole-corpus `save()` issued here before. Naming the
-      // records is what lets a granular backend (#1080) write only these N without any
-      // caller changing.
+      // records is what would let a record-addressing backend write only these N without
+      // any caller changing.
       await this.save({ batch: disabled.map(({ id }) => this.recipes.get(id)) });
       this._notifyRecipesChanged('update', {
         disabledForSignatureConflict: disabled.map((d) => d.id),
@@ -3942,21 +3672,16 @@ export class RecipeManager {
   }
 
   /**
-   * Reconcile the actor flags a recipe mutation orphaned, gated on the **Valid Id Basis**
+   * Reconcile the actor flags a recipe mutation orphaned, through the shared gate
    * (issue 1226, `data-models/spec.md` § Valid Id Basis).
    *
    * Before the gate this recomputed `validRecipes`/`validSystems` from the live managers
-   * and handed them straight to the same destructive collaborators the startup passes call
-   * — with nothing anywhere near it asking whether the corpus those sets were derived from
-   * was whole. A GM deleting a recipe while a Storage Layout Conversion was half-done, had
-   * failed, or had finished during this client's own corpus read therefore pruned every
-   * active run and learned-recipe entry naming a record that had not been read, and
-   * finishing the conversion afterwards restored none of it.
-   *
-   * The corpus-derived sweeps are now gated. What replaces them on an unattestable corpus
-   * is a SUBJECT-TARGETED prune of exactly the ids this mutation removed, which needs no
-   * basis at all — so refusing the sweep costs only the hunt for orphans of unknown origin,
-   * which the next known-complete boot reconciles. See `mutationCleanupComposition.js`.
+   * and handed them straight to the same destructive collaborators the startup passes call,
+   * with nothing declaring what those sets had to be complete over. Every corpus-derived
+   * sweep is now declared and gated, and what replaces an omitted one is a SUBJECT-TARGETED
+   * prune of exactly the ids this mutation removed — which is safe on any corpus, because
+   * no missing record can make a just-deleted id valid again. See
+   * `mutationCleanupComposition.js`.
    *
    * @param {object} [options]
    * @param {Iterable<string>} [options.removedRecipeIds] The recipes this mutation actually
@@ -3994,9 +3719,6 @@ export class RecipeManager {
 
     return runGatedMutationCleanup({
       passes,
-      recipeManager: this,
-      craftingSystemManager: systemManager,
-      getSetting,
       subject: 'a recipe change',
     });
   }
