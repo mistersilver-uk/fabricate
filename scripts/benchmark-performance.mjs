@@ -35,6 +35,7 @@ import {
   HARNESS_VERSION,
   SCALE_PROFILES,
   SCALE_PROFILE_NAMES,
+  SWEPT_SCALE_PROFILE_NAMES,
 } from '../tests/helpers/scale/scaleProfiles.js';
 
 import { diffAgainstBaseline, readBaseline, writeBaseline } from './lib/benchmarkBaselines.js';
@@ -76,7 +77,10 @@ const VALUE_SETTERS = {
 
 function parseArgs(argv) {
   const options = {
-    profiles: [...SCALE_PROFILE_NAMES],
+    // The SWEPT list, not every registered profile. A foundry-only profile (issue 1255) has no
+    // headless cases and no committed baseline by design, so sweeping it would build a fixture,
+    // measure nothing, and then fail `--check` reading a baseline that was never meant to exist.
+    profiles: [...SWEPT_SCALE_PROFILE_NAMES],
     seed: DEFAULT_SEED,
     reps: 5,
     check: false,
@@ -102,6 +106,21 @@ function parseArgs(argv) {
       `Unknown profile(s): ${unknown.join(', ')}. Known: ${SCALE_PROFILE_NAMES.join(', ')}`
     );
   }
+  // Refused BY NAME rather than silently dropped. A foundry-only profile is a real, buildable
+  // fixture, so `--profile=granular-corpus` is a reasonable thing to type; it just has nothing
+  // for THIS harness to run, and a run that measured zero cases and reported success would be
+  // the least useful possible answer.
+  const foundryOnly = options.profiles.filter(
+    (profile) => SCALE_PROFILES[profile].foundryOnly === true
+  );
+  if (foundryOnly.length > 0) {
+    throw new Error(
+      `Profile(s) ${foundryOnly.join(', ')} are Foundry-only and have no headless cases. Run ` +
+        `them against a live world with "npm run test:foundry:perf -- ` +
+        `--fixture=${foundryOnly[0]} --arrangement=both". ` +
+        `Swept here: ${SWEPT_SCALE_PROFILE_NAMES.join(', ')}`
+    );
+  }
   if (!Number.isFinite(options.seed)) throw new Error('--seed must be a number');
   if (!Number.isInteger(options.reps) || options.reps < 1) {
     throw new Error('--reps must be a positive integer');
@@ -110,12 +129,23 @@ function parseArgs(argv) {
 }
 
 function printList() {
-  for (const profile of SCALE_PROFILE_NAMES) {
+  for (const profile of SWEPT_SCALE_PROFILE_NAMES) {
     const cases = casesForProfile(profile);
     console.log(`${profile} (${cases.length} cases) — ${SCALE_PROFILES[profile].description}`);
     for (const entry of cases) console.log(`    ${entry.id}`);
   }
-  console.log(`\n${BENCHMARK_CASES.length} cases across ${SCALE_PROFILE_NAMES.length} profiles.`);
+  console.log(
+    `\n${BENCHMARK_CASES.length} cases across ${SWEPT_SCALE_PROFILE_NAMES.length} profiles.`
+  );
+  // Listed, not hidden. A registered profile this harness will not run must say so where a
+  // reader is already looking for the profile list.
+  const foundryOnly = SCALE_PROFILE_NAMES.filter(
+    (name) => SCALE_PROFILES[name].foundryOnly === true
+  );
+  for (const profile of foundryOnly) {
+    console.log(`\n${profile} (Foundry-only, 0 headless cases)`);
+    console.log(`    ${SCALE_PROFILES[profile].foundryOnlyReason}`);
+  }
 }
 
 function printHumanReport({ class1ByProfile, class2ByProfile, generationMs }) {
