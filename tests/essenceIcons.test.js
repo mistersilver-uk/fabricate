@@ -21,7 +21,7 @@ import {
   isExcludedIconName
 } from '../src/ui/svelte/util/foundryIconVocabulary.js';
 
-const CURATED_ICON_COUNT = 1884;
+const CURATED_ICON_COUNT = 1879;
 const CATALOGUE_ICON_COUNT = 3768;
 
 // EVERY claim below, positive and negative, is made against MEMBERSHIP rather than against the
@@ -339,6 +339,15 @@ describe('essenceIcons utility', () => {
   // levels, needle positions, rotations and status badges and stops there.
   it('keeps a crossed-out glyph, because "no water" is not less water', () => {
     assertCurated(['droplet-slash', 'heart-slash', 'eye-slash', 'bell-slash']);
+  });
+
+  // A tick on a circle is a control saying "done"; a warning on an ear of wheat is a blighted crop
+  // and a cross on a road is a road nobody is getting down. The badge is the point of the drawing
+  // rather than a status light stuck on it, which is the line that keeps the crop failure in while
+  // the shape badges go.
+  it('keeps a badge on a depicted object while excluding one stuck on a shape', () => {
+    assertCurated(['wheat-awn-circle-exclamation', 'road-circle-xmark', 'plane-circle-exclamation']);
+    assertNotCurated(['circle-check', 'square-xmark', 'circle-exclamation'], 'Shape badge');
   });
 
   it('excludes the iconography of a present-day relief operation', () => {

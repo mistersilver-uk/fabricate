@@ -134,7 +134,7 @@ export const EXCLUDED_ICON_CODE_PATTERNS = Object.freeze([
   // a page in it are pre-modern objects and stay curated; a file format and a
   // delivery-confirmation badge are not.
   /^files?$/,
-  /^file-(aiff|arrow|audio|ban|binary|brackets|cad|caret|chart|check|circle|clipboard|code|csv|css|dashed-line|doc|download|edit|eps|excel|export|fragment|gif|half-dashed|html|icns|image|import|jpg|js|lock|magnifying-glass|midi|minus|mov|mp3|mp4|music|odf|pdf|pen|plus|png|powerpoint|ppt|prescription|search|shield|slash|spreadsheet|svg|tex|times|upload|user|vector|video|wav|waveform|word|xls|xmark|xml|zip|zipper)/,
+  /^file-(aiff|arrow|audio|ban|binary|brackets|cad|caret|chart|check|circle|clipboard|code|csv|css|dashed-line|doc|download|edit|eps|excel|export|fragment|gif|half-dashed|html|icns|image|import|jpg|js|lock|magnifying-glass|midi|minus|mov|mp3|mp4|music|odf|pdf|pen|plus|png|powerpoint|ppt|prescription|search|shield|slash|spreadsheet|svg|tex$|times|upload|user|vector|video|wav|waveform|word|xls|xmark|xml|zip|zipper)/,
   /^(folder|folders|inbox|inboxes|paperclip|attachment)($|-)/,
   /^envelope-(badge|certificate|circle|dot|ribbon|square)/,
   /^envelopes(-bulk)?$/,
@@ -161,6 +161,7 @@ export const EXCLUDED_ICON_CODE_PATTERNS = Object.freeze([
   /^(circle|square)-(austral|australian-dollar|baht|bangladeshi-taka|bitcoin|brazilian-real|cedi|cent|chf|cruzeiro|currency|danish-krone|dollar|dong|euro|florin|franc|gf|guarani|hryvnia|indian-rupee|kip|lari|lira|litecoin|malaysian-ringgit|manat|mill|naira|norwegian-krone|peruvian-soles|peseta|peso|polish-zloty|renminbi|ruble|rupee|rupiah|shekel|sterling|swedish-krona|tenge|tugrik|turkish-lira|usd|won|yen)$/,
   /^(circle|square)apore-dollar$/,
   /^money-(bill|check)/,
+  /^money(-simple)?-from-bracket$/,
   /^hexagon-vertical-nft/,
   /^route-(highway|interstate)$/,
   /^(cash-register|credit-card|receipt|circle-dollar-to-slot|donate|barcode-read|barcode-scan|rectangle-ad|billboard|ranking-star)($|-)/,
@@ -186,6 +187,7 @@ export const EXCLUDED_ICON_CODE_PATTERNS = Object.freeze([
   /^glass-water(-droplet)?$/,
   /^hands-(bound|holding-child|holding-circle)$/,
   /^helmet-un$/,
+  /-un$/,
   /^hill-(avalanche|rockslide)$/,
   /^house-(circle|flood|lock|signal|tsunami)/,
   /^locust$/,
@@ -235,6 +237,14 @@ export const EXCLUDED_ICON_CODE_PATTERNS = Object.freeze([
   // A `-slash` is NOT a fill level and is not caught here. A crossed-out droplet means "no water",
   // which is a different statement from "water", and fiction says both.
   //
+  // Neither is a badge on a DEPICTED OBJECT, and that line is what keeps
+  // `wheat-awn-circle-exclamation` in. A tick on a circle is a control saying "done"; a warning on
+  // an ear of wheat is a blighted crop, a warning on an aircraft is a grounded flight, and a cross
+  // on a road is a road nobody is getting down. Those are events a story is made of, so the badge
+  // is the point of the drawing rather than a status light stuck on it. The badges the affordance
+  // block above catches are the ones stuck on a SHAPE, which depicts nothing to make a statement
+  // about.
+  //
   // Kept: battery-empty and battery-full; thermometer with temperature-high and temperature-low;
   // gauge-high; shop and store; city; jet-fighter; tower-broadcast and tower-observation; one
   // clock; one hourglass at half; one calendar; one speech bubble and one pair of them.
@@ -263,14 +273,16 @@ export const EXCLUDED_ICON_CODE_PATTERNS = Object.freeze([
   /^grid-(2|3|4|5|round-2|round-4|round-5|dividers|horizontal|vertical)/,
   /^circle-(half-stroke-horizontal|half-horizontal|quarter-stroke|three-quarters-stroke)$/,
   /^gauge-simple-high$/,
-  /^(signal|wifi)-(bars(-(fair|good|slash|weak))?|exclamation|fair|good|weak)$/,
+  /^signal-(bars(-(fair|good|slash|strong|weak))?|exclamation|fair|good|strong|weak)$/,
+  /^wifi-(exclamation|fair|weak)$/,
   /^transporter-([1-7]|empty)$/,
   /^(trash|trash-can)-(arrow|check|clock|list|plus|slash|xmark)/,
   /^toilet-paper-(blank-under|check|reverse|slash|under|xmark)/,
   /^traffic-light-(go|slow|stop)$/,
   /^(store|shop)-(24|lock|slash)$/,
   /^(stopwatch-20|shuttle-space-vertical)$/,
-  /^temperature-(frigid|hot)$/,
+  /^temperature-(frigid|hot|list)$/,
+  /^360-degrees$/,
   /^eye-dropper-(full|half)$/,
   /^moon-.+-inverse$/,
   /^computer-mouse-(button-left|button-right|scrollwheel)$/,
