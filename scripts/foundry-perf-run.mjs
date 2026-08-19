@@ -17,28 +17,6 @@
  * startup measurement is taken against the seeded corpus. Measuring startup before seeding would
  * report the cost of loading an empty world under a name that claims otherwise.
  *
- * THE STORAGE-ARRANGEMENT AXIS (issue 1255). With `FOUNDRY_PERF_ARRANGEMENT=both` the profile
- * walks the scenarios on the combined-record arrangement, converts THAT SAME WORLD in place
- * through the SHIPPED conversion, reloads, and walks them again on the granular one. Three rules
- * make it worth having, and each is enforced rather than promised:
- *
- *   - ONE world, converted in place. Seeding two worlds and comparing them is a ratio across
- *     differently-built worlds, which `openspec/specs/data-models/spec.md` condemns by name.
- *   - The converted arm is reached THROUGH the shipped conversion: this file writes the storage
- *     TARGET a GM dropdown writes and answers the shipped consent prompt, and the shipped
- *     reconciler writes the LAYOUT. It NEVER writes a layout key -- see
- *     `scripts/lib/foundryPerfArrangement.js` for the choke point and
- *     `tests/foundry-perf-profile.test.js` for the source scan that proves it.
- *   - Every arm records the layout it OBSERVED, so a conversion that silently did not happen
- *     surfaces as a named drift rather than as a suspiciously flat ratio.
- *
- * The reload between the arms is not tidiness, and not a correctness patch either: the shipped
- * setting-change bridge already rebuilds each manager's storage adapter when its own
- * layout/target pair moves. It is there to make the second arm a BOOT. `startup-phases` and
- * `first-page-ready` mean nothing taken from a session rebuilt in place, the granular boot is
- * where 20,000 `Setting` documents arrive in the connect payload, and a boot is the state a GM's
- * next session is actually in.
- *
  * SEEDING IS NOT MEASURED, AND IS NOT DONE THROUGH THE API. `createRecipe()` saves the whole corpus
  * per call; 10,000 of those is hours. The corpus goes in as two `game.settings.set` writes and one
  * batched `Actor.createDocuments`, and the payload is transferred to the page in chunks first
@@ -48,15 +26,11 @@
  * Usage:
  *   npm run test:foundry:perf                      # up + this + down
  *   npm run test:foundry:perf -- --arm=v13         # the same profile on Foundry 13
- *   npm run test:foundry:perf -- --fixture=granular-corpus --arrangement=both
- *                                                  # 10,000 recipes AND 10,000 components,
- *                                                  # walked on BOTH storage arrangements
  *   node scripts/foundry-perf-run.mjs --preflight  # preconditions only; starts nothing
  *   node scripts/foundry-perf-run.mjs              # against an already-running container
  *
  * Environment:
  *   FOUNDRY_PERF_FIXTURE       issue 1071 scale profile to seed (default `simple-corpus`)
- *   FOUNDRY_PERF_ARRANGEMENT   `singleArray` (default, one walk) or `both` (issue 1255)
  *   FOUNDRY_PERF_SEED          fixture seed (default: issue 1071's own default)
  *   FOUNDRY_PERF_INVENTORY     which point of a held-inventory series to seed (default 0)
  *   FOUNDRY_PERF_IMPORT_LIMIT  recipes the import scenario imports (default 200)
@@ -72,8 +46,6 @@ import { fileURLToPath } from 'node:url';
 
 import { chromium } from 'playwright';
 
-import { FABRICATE_SETTINGS_NAMESPACE } from '../src/config/settings.js';
-
 import {
   acceptLicenseIfPresent,
   authenticateIfRequired,
@@ -84,21 +56,13 @@ import {
   launchWorld,
 } from './lib/foundryBrowserBoot.js';
 import {
-  ARRANGEMENT_MODE_ENV_VAR,
-  ARRANGEMENT_RECORD_CLASSES,
-  armsForMode,
-  compareArrangementArms,
-  describeObservedArrangement,
-  resolveArrangementMode,
-} from './lib/foundryPerfArrangement.js';
-import {
   PERF_BRIDGE_KEY,
   installPerfBridge,
   summarizeLongTasks,
   summarizeStartupMeasures,
   traceFilename,
 } from './lib/foundryPerfCapture.js';
-import { MEASUREMENT_PHASE, reconcileResults } from './lib/foundryPerfMeasurements.js';
+import { reconcileResults } from './lib/foundryPerfMeasurements.js';
 import {
   PREFLIGHT_EXIT_CODE,
   checkPerfPreconditions,
@@ -109,7 +73,6 @@ import {
   PERF_RUN_DIR,
   PERF_TRACE_DIR,
   buildPerfRunRecord,
-  median,
   perfRunFilename,
 } from './lib/foundryPerfRecord.js';
 import { PERF_SCENARIOS } from './lib/foundryPerfScenarios.js';
@@ -387,11 +350,6 @@ async function readStartupObservations(page) {
 /**
  * Re-join the world after a reload and wait for Fabricate to report ready.
  *
- * Extracted (issue 1255) because it now happens more than once: after seeding, so startup is
- * measured against the SEEDED world, and again after the storage conversion, so the granular
- * arm is measured from a BOOT rather than from a session that was rebuilt in place. See this
- * file's header for why that distinction is the point rather than a correctness patch.
- *
  * @param {object} page
  * @param {string} userLabel
  */
@@ -404,41 +362,7 @@ async function rejoinAfterReload(page, userLabel) {
 }
 
 /**
- * The storage LAYOUT each record class actually reports, right now.
- *
- * READ, never written. This is the observation that makes "the converted arm was reached
- * through the shipped conversion" checkable from the artefact rather than believed from the
- * code: an arm whose walk ran against an unconverted world produces a full set of plausible
- * numbers and a ratio of almost exactly 1, which reads as "the arrangement makes no
- * difference" rather than as "the arrangement never changed".
- *
- * @param {object} page
- * @returns {Promise<Record<string, string|null>>} layout by record-class id.
- */
-async function readObservedArrangement(page) {
-  // Never allowed to fail the run. A layout this cannot read is reported as `null`, which
-  // `describeObservedArrangement` turns into named drift -- a far better outcome than losing a
-  // completed walk to a settings read.
-  return page
-    .evaluate(
-      ({ namespace, classes }) =>
-        Object.fromEntries(
-          classes.map(({ id, layoutKey }) => [id, game.settings.get(namespace, layoutKey) ?? null])
-        ),
-      {
-        namespace: FABRICATE_SETTINGS_NAMESPACE,
-        classes: ARRANGEMENT_RECORD_CLASSES.map(({ id, layoutKey }) => ({ id, layoutKey })),
-      }
-    )
-    .catch(() => Object.fromEntries(ARRANGEMENT_RECORD_CLASSES.map(({ id }) => [id, null])));
-}
-
-/**
  * Read the page-side bridge's long-task and heap samples into two measurement results.
- *
- * Read PER ARM (issue 1255). The bridge is installed as a context init script, so a reload
- * resets it -- which is exactly right: each arm's long tasks and heap samples belong to that
- * arm's walk and blending them would produce one summary describing neither.
  *
  * @param {object} page
  * @returns {Promise<Record<string, object>>}
@@ -462,91 +386,6 @@ async function readBridgeSummaries(page) {
       invariant: { heapApiSupported: bridge.supported.heap },
     },
   };
-}
-
-/**
- * Walk every arm-phase scenario once, on whatever arrangement the world is currently in, and
- * reconcile the result against the arm this walk claims to be.
- *
- * @param {object} options
- * @param {object} options.context The walk context handed to every scenario.
- * @param {object} options.page
- * @param {object} options.arm One of `ARRANGEMENT_ARMS`.
- * @returns {Promise<{results: Record<string, object>, record: object}>}
- */
-async function walkOneArm({ context, page, arm }) {
-  log(`Walking the scenarios on the ${arm.label} arrangement...\n`);
-  const results = { ...(await walkScenarios(context)), ...(await readBridgeSummaries(page)) };
-  const observed = await readObservedArrangement(page);
-  const arrangement = describeObservedArrangement({ arm, observed });
-  if (!arrangement.matches) {
-    // Loud, immediately, and by name. A drift discovered while reading the JSON a week later is
-    // a wasted container boot; a drift printed here can be acted on in the same session.
-    log(`ARRANGEMENT DRIFT on the "${arm.id}" arm -- these numbers are NOT what they claim:\n`);
-    for (const line of arrangement.drift) log(`  ${line}\n`);
-  }
-  const reconciled = reconcileResults(results, { phase: MEASUREMENT_PHASE.ARM });
-  return {
-    results,
-    record: {
-      ...arrangement,
-      label: arm.label,
-      reachedBy: arm.reachedBy,
-      description: arm.description,
-      measurements: reconciled.reconciled,
-      invariant: reconciled.invariant,
-      timing: reconciled.timing,
-      missing: reconciled.missing,
-      undeclared: reconciled.undeclared,
-    },
-  };
-}
-
-/**
- * Drive the between-arms transition: the shipped storage conversion, one record class at a
- * time, each isolated so a failure in one cannot cost the other or the second walk.
- *
- * @param {object} context
- * @returns {Promise<Record<string, object>>}
- */
-async function runTransitionScenarios(context) {
-  const results = {};
-  for (const scenario of PERF_SCENARIOS) {
-    if (!scenario.runsBetweenArms) continue;
-    log(`  ${scenario.id}\n`);
-    try {
-      results[scenario.measurementId] = await scenario.run(context);
-    } catch (error) {
-      // Isolated exactly as `walkScenarios` isolates its own: this run boots a licensed
-      // container and takes tens of minutes, and the second arm is still worth walking even if
-      // one class's conversion failed -- its observed layout will say so.
-      results[scenario.measurementId] = { unavailable: `conversion failed: ${error.message}` };
-    }
-  }
-  return results;
-}
-
-/**
- * The transition results for a run that walks only ONE arm.
- *
- * Explicitly unavailable rather than absent. The conversion measurements stay declared in the
- * record, with the reason they produced nothing, instead of being reported as holes in a run
- * that never had them.
- *
- * @param {string} mode
- * @returns {Record<string, object>}
- */
-function skippedTransitionResults(mode) {
-  const skipped = {};
-  for (const scenario of PERF_SCENARIOS) {
-    if (!scenario.runsBetweenArms) continue;
-    skipped[scenario.measurementId] = {
-      unavailable:
-        `not run: ${ARRANGEMENT_MODE_ENV_VAR} is "${mode}", so this run walks one ` +
-        `arrangement and performs no conversion`,
-    };
-  }
-  return skipped;
 }
 
 /**
@@ -703,27 +542,10 @@ async function captureFoundryEnvelope(page, browser, fixture) {
 }
 
 async function main() {
-  // Resolved FIRST, before anything is started or downloaded, so a typo in the mode fails in a
-  // second rather than an hour into a container run whose whole point it was.
-  const arrangementMode = resolveArrangementMode(process.env[ARRANGEMENT_MODE_ENV_VAR]);
-  const arms = armsForMode(arrangementMode);
-
   const preflight = runPreflight();
   log(formatPreflight(preflight));
-  log(
-    `Storage arrangement: ${arrangementMode} (${arms.length} arm(s): ` +
-      `${arms.map((arm) => arm.id).join(' -> ')})\n`
-  );
   if (!preflight.ok) process.exit(PREFLIGHT_EXIT_CODE);
   if (process.argv.includes('--preflight')) return;
-
-  if (arms.length > 1) {
-    log(
-      'This run walks the scenarios TWICE with a storage conversion in between, so it is ' +
-        'roughly twice the usual length plus the conversion. If it is SIGTERM-killed, raise ' +
-        'FOUNDRY_RUN_TIMEOUT_MS rather than concluding the profile hangs.\n'
-    );
-  }
 
   const scale = await loadScaleFixtureModule();
   const fixtureProfile = process.env.FOUNDRY_PERF_FIXTURE ?? 'simple-corpus';
@@ -767,57 +589,36 @@ async function main() {
     log('Reloading to measure startup against the seeded corpus...\n');
     await rejoinAfterReload(page, 'Gamemaster');
 
+    // Read after the reload above, before the second client joins, and before the trace starts.
+    // All three matter, and the last one is easy to miss: `fabricateReadyMs` is a
+    // `performance.now()` evaluated on this page when the read RUNS, so it goes on ticking through
+    // anything done first. Reading after the reload is what makes it the SEEDED world's boot;
+    // reading before the join keeps the second context's boot out of it; reading before
+    // `startChromeTrace` keeps the CDP `Tracing.start` round trip out of it, which would otherwise
+    // make a traced run and an untraced run disagree for a reason that has nothing to do with the
+    // corpus. The trace is wanted around the WALK, and the walk is all still below.
+    const startup = await readStartupObservations(page);
+
     const stopTrace =
       process.env.FOUNDRY_PERF_TRACE === '1' ? await startChromeTrace(context, page) : null;
 
     const player = await joinSecondClient(browser);
     playerContext = player.context;
 
-    const walkContext = {
-      page,
-      playerPage: player.page,
-      systemId: seed.invariant.systemId,
-      importRecipeLimit: Number(process.env.FOUNDRY_PERF_IMPORT_LIMIT ?? 200),
-      log,
-    };
-
-    const arrangements = [];
-    let baselineResults = {};
-    let transitionResults = skippedTransitionResults(arrangementMode);
-
-    for (const [index, arm] of arms.entries()) {
-      if (index > 0) {
-        // THE TRANSITION. One world, converted in place -- never a second world seeded on the
-        // other arrangement, which `openspec/specs/data-models/spec.md` condemns by name.
-        log('Converting this world through the SHIPPED storage conversion...\n');
-        transitionResults = await runTransitionScenarios(walkContext);
-        log('Reloading so the managers rebuild against the converted arrangement...\n');
-        await rejoinAfterReload(page, 'Gamemaster');
-        // The player client too: it joined before the conversion, and the second arm's
-        // propagation measurement must be taken against a receiver built the same way the GM
-        // was rather than one still holding the pre-conversion backend.
-        if (player.page) {
-          await rejoinAfterReload(player.page, PERF_PLAYER_NAME).catch((error) =>
-            log(`Second client did not re-join after the conversion (${error.message}).\n`)
-          );
-        }
-      }
-
-      // Startup is re-read PER ARM, after that arm's reload, so `startup-phases` and
-      // `first-page-ready` are the boot of the arrangement the arm claims -- and the granular
-      // arm's boot is the interesting one, because it is where 20,000 `Setting` documents
-      // arrive in the connect payload.
-      const startup = await readStartupObservations(page);
-      Object.assign(walkContext, {
+    log('Walking the scenarios...\n');
+    const results = {
+      ...(await walkScenarios({
+        page,
+        playerPage: player.page,
+        systemId: seed.invariant.systemId,
+        importRecipeLimit: Number(process.env.FOUNDRY_PERF_IMPORT_LIMIT ?? 200),
         startupMeasures: startup.startupMeasures,
         readiness: startup.readiness,
         corpus: startup.corpus,
-      });
-
-      const walked = await walkOneArm({ context: walkContext, page, arm });
-      arrangements.push(walked.record);
-      if (index === 0) baselineResults = walked.results;
-    }
+        log,
+      })),
+      ...(await readBridgeSummaries(page)),
+    };
 
     // The host half of the envelope comes from issue 1071's `captureEnvelope` rather than a second
     // implementation here — commit, branch, dirty flag, Node/V8, OS, arch, CPU and memory are
@@ -850,17 +651,9 @@ async function main() {
 
     record = buildPerfRunRecord({
       host,
-      foundry: {
-        ...(await captureFoundryEnvelope(page, browser, fixture)),
-        arrangementMode,
-        arrangementArms: arms.map((arm) => arm.id),
-      },
+      foundry: await captureFoundryEnvelope(page, browser, fixture),
       seed: { ...seed.invariant, applied: applied.writes, fidelity },
-      // The top level reconciles the BASELINE arm plus the transition, across every phase, so
-      // `missing` answers for the whole run rather than for half of it.
-      reconciled: reconcileResults({ ...baselineResults, ...transitionResults }),
-      arrangements,
-      baselineArm: arms[0].id,
+      reconciled: reconcileResults(results),
       trace,
     });
   } catch (error) {
@@ -884,18 +677,6 @@ async function main() {
   log(`\nFoundry perf run recorded: ${file}\n`);
   if (record.missing.length > 0) {
     log(`Measurements that produced NOTHING: ${record.missing.join(', ')}\n`);
-  }
-  for (const arrangement of record.arrangements ?? []) {
-    if (arrangement.matches) continue;
-    log(`ARM "${arrangement.arm}" did NOT observe the arrangement it claims:\n`);
-    for (const line of arrangement.drift) log(`  ${line}\n`);
-  }
-  if ((record.arrangements ?? []).length > 1) {
-    log('\nArrangement ratios (granular / combined), CLASS 2, this machine only:\n');
-    for (const row of compareArrangementArms(record, median)) {
-      if (row.ratio === null) continue;
-      log(`  ${row.measurement.padEnd(28)} ${row.ratio.toFixed(2)}x\n`);
-    }
   }
   log('Every duration in that file is CLASS 2. Compare two runs on one machine; quote ratios.\n');
 }

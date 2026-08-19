@@ -2850,21 +2850,6 @@ Both arms are required because the claim is a RATIO, and a ratio inferred across
 The whole-corpus flush an import or bulk edit still issues MUST be measured on both arrangements too, because it stays reachable after conversion and its cost there is a differential rather than an unconditional rewrite.
 The converted arm MUST be converted THROUGH the shipped conversion; a fixture that hand-sets the layout measures the fixture.
 
-**A LIVE-FOUNDRY measurement of the same claim converts ONE world in place, and commits nothing.**
-The clause above is discharged by a committed machine-invariant counter, which is necessarily a headless one: a count taken inside a live Foundry is invariant only _given the Foundry build and the game system_, because those decide document schemas, what a `create` call preserves and which hooks fire.
-A live-Foundry instrument for the same claim is therefore permitted and is NOT a second baseline; it MUST write no committed artifact, and the committed cross-machine baseline stays the headless one.
-Where such an instrument exists, three obligations bind it and they are the obligations the headless clause already carries, restated for the arm that cannot commit anything.
-It MUST walk one world on the legacy arrangement, convert THAT SAME WORLD in place, and walk it again, never seeding a second world on the other arrangement — for the reason the clause above gives, which is that a ratio inferred across two differently-built worlds is not a measurement of either.
-It MUST reach the converted arm THROUGH the shipped conversion, by writing a storage TARGET and letting the shipped reconciler write the LAYOUT, and MUST NOT write a storage layout key at all.
-It MUST record, for each arm, the layout that arm OBSERVED, because a converted-arm walk of a world nothing converted yields a complete set of plausible numbers and a ratio near 1, which reads as an arrangement that made no difference rather than as an arrangement that never changed.
-
-**The conversion's OWN cost MUST be measured, per record class.**
-The forward conversion is what a GM experiences once, its cost is a function of the record count, and it is the one number in this section that no other measurement stands in for: the arms either side of it describe the steady state and say nothing about the transition between them.
-The two classes MUST be measured separately rather than as one blended figure, because they are two independent one-way doors with two independent consent prompts and a GM may take one and not the other.
-Each measurement MUST record the records it moved, the per-record documents that resulted, and the bulk document-call count, all machine-invariant; a shortfall between the records that went in and the documents that came out MUST be reported rather than reconciled away.
-The document-call count is the load-bearing half, for the reason the extraction clause gives: it is what distinguishes "wrote the corpus" from "wrote the corpus one record at a time", and no wall clock on a single machine can tell those apart.
-Elapsed time is machine-dependent, is never asserted, and is only ever compared as a ratio between two runs on one machine.
-
 **A bulk or cascade write emits ONE change signal to a receiving client.**
 A write that touches many granular records MUST NOT make a receiving client re-read the corpus once per record or once per leg.
 The writer stamps a batch-close marker on the document operations of one logical write and marks the final leg; document operation options propagate verbatim to every receiver's hook, so the marker needs no new transport.

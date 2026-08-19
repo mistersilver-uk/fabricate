@@ -7,7 +7,7 @@
  *
  * Usage: node scripts/foundry-test.mjs [--profile=<full|rc|ci|screenshots>]
  *                                      [--arm=<v14|v13>] [--check=<full|version|perf>]
- *                                      [--fixture=<scale profile>] [--arrangement=<singleArray|both>]
+ *                                      [--fixture=<scale profile>]
  *
  * `--arm` picks the Foundry generation (issue #1088) and `--check` picks what runs against it.
  * They are deliberately separate axes: the narrow boot-and-assert check is what makes a V13 run
@@ -160,10 +160,8 @@ function runScript(scriptPath, args = [], timeoutMs) {
 /**
  * Read the CLI flags into the environment the child phases inherit, and return the check to run.
  *
- * `--fixture=<scale profile>` and `--arrangement=<singleArray|both>` flow through as
- * FOUNDRY_PERF_FIXTURE and FOUNDRY_PERF_ARRANGEMENT and are read only by `--check=perf`; the
- * perf runner refuses an unknown arrangement by name during its preflight, before anything is
- * started or downloaded.
+ * `--fixture=<scale profile>` flows through as FOUNDRY_PERF_FIXTURE and is read only by
+ * `--check=perf`.
  *
  * `--profile=<full|rc|ci|screenshots>` flows through as FOUNDRY_SMOKE_PROFILE (useful for
  * cross-platform local CI emulation; POSIX users could export it directly). The scoped `screenshots`
@@ -187,14 +185,12 @@ function applyCliArguments(argv) {
     if (arm) process.env[SMOKE_ARM_ENV_VAR] = normalizeSmokeArmName(arm[1]);
     const check = /^--check=(.+)$/.exec(arg);
     if (check) checkName = check[1];
-    // The two `perf` axes (issues 1073 and 1255), forwarded as environment exactly as
-    // `--profile` and `--arm` are. Flags rather than "just export the variable" because the
-    // one command a maintainer is given has to work on Windows too, where a POSIX
-    // `VAR=value npm run ...` prefix is not a thing.
+    // The `perf` fixture axis (issue 1073), forwarded as environment exactly as `--profile` and
+    // `--arm` are. A flag rather than "just export the variable" because the one command a
+    // maintainer is given has to work on Windows too, where a POSIX `VAR=value npm run ...`
+    // prefix is not a thing.
     const fixture = /^--fixture=(.+)$/.exec(arg);
     if (fixture) process.env.FOUNDRY_PERF_FIXTURE = fixture[1];
-    const arrangement = /^--arrangement=(.+)$/.exec(arg);
-    if (arrangement) process.env.FOUNDRY_PERF_ARRANGEMENT = arrangement[1];
   }
   return checkName;
 }

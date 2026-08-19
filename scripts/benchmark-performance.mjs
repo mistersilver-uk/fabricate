@@ -107,9 +107,15 @@ function parseArgs(argv) {
     );
   }
   // Refused BY NAME rather than silently dropped. A foundry-only profile is a real, buildable
-  // fixture, so `--profile=granular-corpus` is a reasonable thing to type; it just has nothing
-  // for THIS harness to run, and a run that measured zero cases and reported success would be
-  // the least useful possible answer.
+  // fixture, so `--profile=<one>` is a reasonable thing to type; it just has nothing for THIS
+  // harness to run, and a run that measured zero cases and reported success would be the least
+  // useful possible answer.
+  //
+  // No profile declares `foundryOnly` today (issue 1265 removed the last one), so this branch is
+  // currently unreachable. It stays because the MECHANISM stays: `scaleProfiles.js` still supports
+  // the flag and `printList` still reports it, so the next profile to declare it would otherwise be
+  // swept in silence — building a fixture, measuring nothing, then failing `--check` against a
+  // baseline that was never meant to exist. An unreachable refusal is cheaper than that.
   const foundryOnly = options.profiles.filter(
     (profile) => SCALE_PROFILES[profile].foundryOnly === true
   );
@@ -117,7 +123,7 @@ function parseArgs(argv) {
     throw new Error(
       `Profile(s) ${foundryOnly.join(', ')} are Foundry-only and have no headless cases. Run ` +
         `them against a live world with "npm run test:foundry:perf -- ` +
-        `--fixture=${foundryOnly[0]} --arrangement=both". ` +
+        `--fixture=${foundryOnly[0]}". ` +
         `Swept here: ${SWEPT_SCALE_PROFILE_NAMES.join(', ')}`
     );
   }
