@@ -1410,8 +1410,16 @@ export const FONT_AWESOME_FREE_CLASSIC_ICON_DEFINITIONS = Object.freeze([
   { iconCode: "z", label: "Z", hasRegular: false }
 ]);
 
-// Patterns that identify icons which break fantasy immersion in a TTRPG crafting context.
-// Anything matched here is excluded from the fantasy-safe subset.
+// Patterns that identify icons the curated subset leaves out.
+//
+// The curated subset serves any fictional setting, not fantasy alone: a science-fiction,
+// post-apocalyptic, industrial or modern game is as much in scope as a dungeon. What stays out is
+// therefore not "anything modern" but three narrower things — glyphs whose meaning is a software
+// affordance rather than a depicted object (editor controls, file formats, chart types); glyphs
+// naming a real-world currency, institution, brand or cause (currency signs, NGO and humanitarian
+// pictograms, party-political and accessibility symbols); and present-day civic, clinical and
+// domestic furniture that no fiction is reaching for (sanitation, pharmacy, commuter transport,
+// consumer electronics).
 export const FANTASY_BREAKING_ICON_CODE_PATTERNS = Object.freeze([
 
   // ── Single characters (not real icons) ──
@@ -1456,7 +1464,6 @@ export const FANTASY_BREAKING_ICON_CODE_PATTERNS = Object.freeze([
   /^diagram-/,
   /^down-left-and-up-right-to-center$/,
   /^download$/,
-  /^dolly$/,
   /^draw-polygon$/,
   /^eject$/,
   /^ellipsis(-vertical)?$/,
@@ -1465,7 +1472,6 @@ export const FANTASY_BREAKING_ICON_CODE_PATTERNS = Object.freeze([
   /^filter(-circle-(dollar|xmark))?$/,
   /^font$/,
   /^forward(-fast|-step)?$/,
-  /^gauge(-high|-simple(-high)?)?$/,
   /^grip(-lines(-vertical)?|-vertical)?$/,
   /^group-arrows-rotate$/,
   /^heading$/,
@@ -1517,11 +1523,9 @@ export const FANTASY_BREAKING_ICON_CODE_PATTERNS = Object.freeze([
   /^upload$/,
   /^vector-square$/,
 
-  // ── Modern technology & computing ──
-  /^battery-(empty|full|half|quarter|three-quarters)$/,
+  // ── Present-day consumer electronics & telephony ──
   /^compact-disc$/,
   /^computer(-mouse)?$/,
-  /^database$/,
   /^desktop$/,
   /^display$/,
   /^ethernet$/,
@@ -1534,7 +1538,6 @@ export const FANTASY_BREAKING_ICON_CODE_PATTERNS = Object.freeze([
   /^keyboard$/,
   /^laptop/,
   /^memory$/,
-  /^microchip$/,
   /^microphone(-lines|-lines-slash|-slash)?$/,
   /^mobile/,
   /^network-wired$/,
@@ -1546,25 +1549,19 @@ export const FANTASY_BREAKING_ICON_CODE_PATTERNS = Object.freeze([
   /^print$/,
   /^qrcode$/,
   /^record-vinyl$/,
-  /^robot$/,
   /^rss$/,
-  /^satellite(-dish)?$/,
   /^sd-card$/,
-  /^server$/,
   /^signal$/,
   /^sim-card$/,
   /^sitemap$/,
   /^tablet/,
-  /^terminal$/,
   /^tv$/,
   /^voicemail$/,
   /^vr-cardboard$/,
-  /^walkie-talkie$/,
-  /^wave-square$/,
   /^wifi$/,
   /^window-(maximize|minimize|restore)$/,
 
-  // ── Modern transport ──
+  // ── Present-day civilian transport ──
   /^bicycle$/,
   /^bus(-simple)?$/,
   /^car($|-(battery|burst|on|rear|side|tunnel))$/,
@@ -1573,7 +1570,6 @@ export const FANTASY_BREAKING_ICON_CODE_PATTERNS = Object.freeze([
   /^gas-pump$/,
   /^motorcycle$/,
   /^plane($|-)/,
-  /^shuttle-space$/,
   /^snowplow$/,
   /^taxi$/,
   /^tractor$/,
@@ -1581,27 +1577,20 @@ export const FANTASY_BREAKING_ICON_CODE_PATTERNS = Object.freeze([
   /^train($|-)/,
   /^truck($|-)/,
 
-  // ── Modern infrastructure ──
+  // ── Present-day road & forecourt infrastructure ──
   /^charging-station$/,
-  /^city$/,
   /^elevator$/,
-  /^industry$/,
-  /^oil-(can|well)$/,
+  /^oil-well$/,
   /^road($|-)/,
-  /^solar-panel$/,
-  /^tower-(broadcast|cell|observation)$/,
   /^traffic-light$/,
-  /^warehouse$/,
 
-  // ── Modern medicine & healthcare ──
+  // ── Clinical care & pharmacy ──
   /-medical/,
   /^bed-pulse$/,
   /^capsules$/,
-  /^dna$/,
   /^hospital(-user)?$/,
   /^kit-medical$/,
   /^lungs(-virus)?$/,
-  /^microscope$/,
   /^notes-medical$/,
   /^pills$/,
   /^prescription(-bottle(-medical)?)?$/,
@@ -1622,7 +1611,6 @@ export const FANTASY_BREAKING_ICON_CODE_PATTERNS = Object.freeze([
 
   // ── Humanitarian / NGO / crisis response ──
   /^arrow-(down-up-across-line|down-up-lock|right-to-city|up-from-ground-water|up-from-water-pump|up-right-dots)$/,
-  /^boxes-packing$/,
   /^bridge-(circle|lock|water)/,
   /^building-(circle|lock|ngo|shield|un|user|wheat)/,
   /^child-(combatant|dress|reaching)$/,
@@ -1667,7 +1655,7 @@ export const FANTASY_BREAKING_ICON_CODE_PATTERNS = Object.freeze([
   /^person-booth$/,
   /^republican$/,
 
-  // ── Modern office / business ──
+  // ── Office paperwork & retail point of sale ──
   /^barcode$/,
   /^briefcase(-medical)?$/,
   /^bullhorn$/,
@@ -1677,7 +1665,7 @@ export const FANTASY_BREAKING_ICON_CODE_PATTERNS = Object.freeze([
   /^cash-register$/,
   /^clipboard(-check|-list|-question|-user)?$/,
   /^credit-card$/,
-  /^envelope(-circle-check|-open(-text)?)?$/,
+  /^envelope(-circle-check|-open)?$/,
   /^envelopes-bulk$/,
   /^folder(-closed|-minus|-open|-plus|-tree)?$/,
   /^id-(badge|card|card-clip)$/,
@@ -1685,20 +1673,16 @@ export const FANTASY_BREAKING_ICON_CODE_PATTERNS = Object.freeze([
   /^marker$/,
   /^money-check/,
   /^paperclip$/,
-  /^shop(-lock|-slash)?$/,
   /^stapler$/,
-  /^store(-slash)?$/,
   /^suitcase(-rolling)?$/,
 
-  // ── Modern money / finance ──
+  // ── Banking instruments & fundraising ──
   /^circle-dollar-to-slot$/,
-  /^coins$/,
   /^comment-dollar$/,
   /^comments-dollar$/,
   /^hand-holding-dollar$/,
   /^money-bill/,
   /^piggy-bank$/,
-  /^sack-(dollar|xmark)$/,
 
   // ── Modern symbols / math operators ──
   /^at$/,
@@ -1724,7 +1708,7 @@ export const FANTASY_BREAKING_ICON_CODE_PATTERNS = Object.freeze([
   /^venus(-double|-mars)?$/,
 
   // ── File / document UI ──
-  /^file($|-arrow|-audio|-circle|-contract|-csv|-code|-excel|-export|-fragment|-half-dashed|-image|-import|-invoice|-lines|-pdf|-pen|-powerpoint|-prescription|-shield|-signature|-video|-waveform|-word|-zipper)/,
+  /^file($|-arrow|-audio|-circle|-csv|-code|-excel|-export|-fragment|-half-dashed|-image|-import|-invoice|-lines|-pdf|-pen|-powerpoint|-prescription|-shield|-video|-waveform|-word|-zipper)/,
   /^fill(-drip)?$/,
   /^film$/,
   /^font-awesome$/,
@@ -1765,7 +1749,6 @@ export const FANTASY_BREAKING_ICON_CODE_PATTERNS = Object.freeze([
   /^burger$/,
   /^dumpster(-fire)?$/,
   /^hotdog$/,
-  /^kitchen-set$/,
   /^mattress-pillow$/,
   /^pizza-slice$/,
   /^recycle$/,
@@ -1777,19 +1760,11 @@ export const FANTASY_BREAKING_ICON_CODE_PATTERNS = Object.freeze([
 
   // ── Modern misc ──
   /^bag-shopping$/,
-  /^basket-shopping$/,
-  /^biohazard$/,
   /^bomb$/,
-  /^burst$/,
-  /^cart-/,
-  /^chalkboard(-user)?$/,
-  /^circle-radiation$/,
-  /^explosion$/,
+  /^cart-(arrow-down|flatbed-suitcase|plus|shopping)$/,
   /^fingerprint$/,
-  /^graduation-cap$/,
   /^gun$/,
   /^handcuffs$/,
-  /^jet-fighter(-up)?$/,
   /^joint$/,
   /^bong$/,
   /^cannabis$/,
@@ -1797,20 +1772,15 @@ export const FANTASY_BREAKING_ICON_CODE_PATTERNS = Object.freeze([
   /^location-(arrow|crosshairs|dot|pin(-lock)?)$/,
   /^object-(group|ungroup)$/,
   /^paint-roller$/,
-  /^pallet$/,
   /^passport$/,
-  /^person-chalkboard$/,
-  /^radiation$/,
   /^ranking-star$/,
   /^rectangle-ad$/,
-  /^rocket$/,
   /^school$/,
-  /^stamp$/,
   /^stopwatch(-20)?$/,
   /^street-view$/,
   /^swatchbook$/,
   /^tachograph-digital$/,
-  /^user-(astronaut|clock|doctor|gear|graduate|nurse|tag|tie)$/,
+  /^user-(doctor|gear|nurse|tag|tie)$/,
   /^volume-(high|low|off|xmark)$/,
 
   // ── Compound anchor variants (keep plain anchor) ──
@@ -1822,29 +1792,22 @@ export const FANTASY_BREAKING_ICON_CODE_PATTERNS = Object.freeze([
   // ── Head variants (modern medical) ──
   /^head-side-(cough(-slash)?|mask|virus)$/,
 
-  // ── Remaining non-fantasy icons ──
-  /^award$/,
-  /^bell-concierge$/,
-  /^bore-hole$/,
+  // ── Remaining out-of-scope icons ──
   /^broom-ball$/,
   /^cable-car$/,
   /^candy-cane$/,
-  /^certificate$/,
-  /^champagne-glasses$/,
   /^cloud-meatball$/,
   /^drum-steelpan$/,
   /^dumbbell$/,
   /^faucet(-drip)?$/,
-  /^fire-(burner|extinguisher)$/,
+  /^fire-extinguisher$/,
   /^flag-(checkered|usa)$/,
-  /^hand-(middle-finger|pointer|spock)$/,
-  /^helicopter(-symbol)?$/,
-  /^helmet-safety$/,
+  /^hand-(middle-finger|pointer)$/,
+  /^helicopter-symbol$/,
   /^hot-tub-person$/,
   /^house-laptop$/,
   /^ice-cream$/,
   /^icons$/,
-  /^mountain-city$/,
   /^newspaper$/,
   /^notdef$/,
   /^note-sticky$/,
@@ -1854,13 +1817,10 @@ export const FANTASY_BREAKING_ICON_CODE_PATTERNS = Object.freeze([
   /^person-(biking|skiing|swimming)$/,
   /^poo(-storm)?$/,
   /^poop$/,
-  /^puzzle-piece$/,
   /^radio$/,
   /^receipt$/,
   /^right-(from|to)-bracket$/,
-  /^screwdriver(-wrench)?$/,
   /^sink$/,
-  /^spaghetti-monster-flying$/,
   /^spinner$/,
   /^spray-can(-sparkles)?$/,
   /^square-phone(-flip)?$/,
@@ -1868,9 +1828,6 @@ export const FANTASY_BREAKING_ICON_CODE_PATTERNS = Object.freeze([
   /^stroopwafel$/,
   /^syringe$/,
   /^tape$/,
-  /^temperature-/,
-  /^thermometer$/,
-  /^tree-city$/,
   /^tty$/,
   /^umbrella-beach$/,
   /^van-shuttle$/,

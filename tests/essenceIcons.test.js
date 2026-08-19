@@ -131,36 +131,59 @@ describe('essenceIcons utility', () => {
     }
   });
 
-  it('excludes modern technology and computing icons', () => {
-    const techIcons = [
+  // The boundary here is no longer "anything electronic" — a science-fiction or cyberpunk game is
+  // as much in scope as a dungeon, and its reactor, data core and droids are objects a fiction
+  // contains. What stays out is the present-day desk: a fax machine, a games console, a mobile
+  // phone. Those read as the GM's own office rather than as anything in play.
+  it('excludes present-day consumer electronics and telephony', () => {
+    const consumerElectronics = [
       'computer', 'computer-mouse', 'desktop', 'display', 'laptop', 'laptop-code',
       'mobile', 'mobile-screen', 'tablet', 'tablet-screen-button',
-      'keyboard', 'microchip', 'memory', 'hard-drive', 'floppy-disk',
-      'server', 'database', 'network-wired', 'ethernet', 'wifi', 'signal',
+      'keyboard', 'memory', 'hard-drive', 'floppy-disk',
+      'network-wired', 'ethernet', 'wifi', 'signal',
       'sim-card', 'sd-card', 'headphones', 'headset', 'microphone',
-      'tv', 'radio', 'gamepad', 'robot', 'vr-cardboard',
-      'plug', 'power-off', 'battery-full', 'battery-half',
-      'satellite', 'satellite-dish', 'walkie-talkie',
+      'tv', 'radio', 'gamepad', 'vr-cardboard', 'plug', 'power-off',
       'camera', 'camera-retro', 'video', 'compact-disc', 'record-vinyl',
       'phone', 'phone-flip', 'fax', 'pager', 'podcast',
-      'terminal', 'rss', 'sitemap', 'qrcode', 'barcode'
+      'rss', 'sitemap', 'qrcode', 'barcode'
     ];
 
-    for (const icon of techIcons) {
-      assert.equal(isFantasySafeFontAwesomeClassicFreeIcon(icon), false, `Tech icon "${icon}" should not be fantasy-safe`);
+    for (const icon of consumerElectronics) {
+      assert.equal(isFantasySafeFontAwesomeClassicFreeIcon(icon), false, `Consumer electronics icon "${icon}" should not be curated`);
     }
   });
 
-  it('excludes modern transport icons', () => {
-    const transportIcons = [
-      'car', 'car-side', 'bus', 'bus-simple', 'truck', 'truck-fast',
-      'train', 'train-subway', 'plane', 'plane-departure',
-      'bicycle', 'motorcycle', 'taxi', 'ferry', 'shuttle-space',
-      'helicopter', 'van-shuttle', 'tractor', 'snowplow', 'trailer', 'caravan'
+  it('admits the science-fiction, industrial, and hazard vocabulary', () => {
+    const fictionTechnology = [
+      'rocket', 'shuttle-space', 'jet-fighter', 'jet-fighter-up', 'helicopter', 'user-astronaut',
+      'satellite', 'satellite-dish', 'tower-broadcast', 'tower-cell', 'tower-observation',
+      'solar-panel', 'robot', 'microchip', 'server', 'database', 'terminal', 'wave-square',
+      'walkie-talkie',
+      'battery-empty', 'battery-quarter', 'battery-half', 'battery-three-quarters', 'battery-full',
+      'radiation', 'circle-radiation', 'biohazard',
+      'industry', 'city', 'mountain-city', 'tree-city', 'explosion', 'burst'
     ];
 
-    for (const icon of transportIcons) {
-      assert.equal(isFantasySafeFontAwesomeClassicFreeIcon(icon), false, `Transport icon "${icon}" should not be fantasy-safe`);
+    for (const icon of fictionTechnology) {
+      assert.equal(isFantasySafeFontAwesomeClassicFreeIcon(icon), true, `Icon "${icon}" should be curated`);
+    }
+  });
+
+  // A spacecraft, a gunship and a rescue helicopter are vehicles a story can be about, so they are
+  // admitted above. The commuter fleet is not: a bus, a taxi and a tractor are street furniture,
+  // and so are the fixtures that serve them, down to the filling station and the traffic light.
+  it('excludes present-day civilian transport', () => {
+    const civilianTransport = [
+      'car', 'car-side', 'bus', 'bus-simple', 'truck', 'truck-fast',
+      'train', 'train-subway', 'plane', 'plane-departure',
+      'bicycle', 'motorcycle', 'taxi', 'ferry',
+      'van-shuttle', 'tractor', 'snowplow', 'trailer', 'caravan', 'truck-monster',
+      'gas-pump', 'charging-station', 'traffic-light', 'elevator',
+      'road', 'road-barrier', 'road-spikes', 'road-bridge'
+    ];
+
+    for (const icon of civilianTransport) {
+      assert.equal(isFantasySafeFontAwesomeClassicFreeIcon(icon), false, `Transport icon "${icon}" should not be curated`);
     }
   });
 
@@ -206,30 +229,52 @@ describe('essenceIcons utility', () => {
     }
   });
 
-  it('excludes modern office, business, and finance icons', () => {
+  // Coins, a merchant's shop and a warehouse are not modern, and excluding them was the defect that
+  // pushed a companion module into keeping a rival list. They are admitted below. What stays out is
+  // the paperwork of a present-day office and the instruments of a present-day bank — a cheque, a
+  // credit card, a till — together with the currency SIGN glyphs, which name a real-world currency
+  // in a way a coin does not.
+  it('excludes office paperwork, banking instruments, and point of sale', () => {
     const officeIcons = [
       'briefcase', 'calculator', 'calendar', 'calendar-days',
       'clipboard', 'clipboard-list', 'credit-card',
       'envelope', 'envelope-open', 'folder', 'folder-open',
       'id-card', 'id-badge', 'inbox', 'paperclip', 'stapler',
       'receipt', 'cash-register', 'money-check', 'money-check-dollar',
-      'store', 'shop', 'suitcase',
-      'coins', 'money-bill', 'money-bill-wave', 'piggy-bank',
-      'sack-dollar', 'wallet', 'hand-holding-dollar',
+      'suitcase', 'file-invoice', 'file-invoice-dollar',
+      'money-bill', 'money-bill-wave', 'piggy-bank',
+      'wallet', 'hand-holding-dollar',
       'dollar-sign', 'euro-sign', 'bitcoin-sign',
       'chart-simple', 'chart-column'
     ];
 
     for (const icon of officeIcons) {
-      assert.equal(isFantasySafeFontAwesomeClassicFreeIcon(icon), false, `Office icon "${icon}" should not be fantasy-safe`);
+      assert.equal(isFantasySafeFontAwesomeClassicFreeIcon(icon), false, `Office icon "${icon}" should not be curated`);
     }
   });
 
-  it('excludes modern medicine, pandemic, and healthcare icons', () => {
+  it('admits pre-modern commerce, trade, and record keeping', () => {
+    const commerce = [
+      'coins', 'sack-dollar', 'sack-xmark',
+      'shop', 'shop-lock', 'shop-slash', 'store', 'store-slash', 'warehouse',
+      'basket-shopping', 'cart-flatbed', 'boxes-packing', 'pallet', 'dolly',
+      'certificate', 'stamp', 'file-contract', 'file-signature', 'envelope-open-text'
+    ];
+
+    for (const icon of commerce) {
+      assert.equal(isFantasySafeFontAwesomeClassicFreeIcon(icon), true, `Icon "${icon}" should be curated`);
+    }
+  });
+
+  // Clinical care, pharmacy and pandemic imagery all stay out. Laboratory instruments do not: a
+  // microscope is a 16th-century object and an alchemist's bench tool, and a double helix is the
+  // genetics glyph a science-fiction setting reaches for. Both were miscategorised as medicine for
+  // the same reason coins was miscategorised as office.
+  it('excludes clinical care, pharmacy, and pandemic icons', () => {
     const medicalIcons = [
       'hospital', 'stethoscope', 'syringe', 'pills', 'capsules',
-      'prescription', 'prescription-bottle', 'x-ray', 'microscope',
-      'dna', 'lungs', 'bed-pulse', 'kit-medical',
+      'prescription', 'prescription-bottle', 'x-ray',
+      'lungs', 'bed-pulse', 'kit-medical', 'suitcase-medical', 'user-doctor', 'user-nurse',
       'virus', 'virus-covid', 'bacteria', 'bacterium',
       'mask-face', 'mask-ventilator', 'pump-soap', 'soap',
       'hand-sparkles', 'hands-bubbles',
@@ -237,7 +282,23 @@ describe('essenceIcons utility', () => {
     ];
 
     for (const icon of medicalIcons) {
-      assert.equal(isFantasySafeFontAwesomeClassicFreeIcon(icon), false, `Medical icon "${icon}" should not be fantasy-safe`);
+      assert.equal(isFantasySafeFontAwesomeClassicFreeIcon(icon), false, `Medical icon "${icon}" should not be curated`);
+    }
+  });
+
+  it('admits the craft, labour, and laboratory tools a crafting module needs', () => {
+    const craftTools = [
+      'fire-burner', 'kitchen-set', 'oil-can', 'bore-hole',
+      'screwdriver', 'screwdriver-wrench', 'helmet-safety',
+      'gauge', 'gauge-high', 'gauge-simple', 'gauge-simple-high',
+      'thermometer', 'temperature-empty', 'temperature-quarter', 'temperature-half',
+      'temperature-three-quarters', 'temperature-full',
+      'temperature-high', 'temperature-low', 'temperature-arrow-up', 'temperature-arrow-down',
+      'microscope', 'dna'
+    ];
+
+    for (const icon of craftTools) {
+      assert.equal(isFantasySafeFontAwesomeClassicFreeIcon(icon), true, `Icon "${icon}" should be curated`);
     }
   });
 
@@ -276,30 +337,46 @@ describe('essenceIcons utility', () => {
     }
   });
 
-  it('excludes modern domestic, sports, and miscellaneous non-fantasy icons', () => {
+  // Sanitation, competitive sport, fast food and consumer packaging stay out whatever the setting.
+  // So do the weapons drawn as instruments of harm to a person — gun, handcuffs, land-mine-on.
+  // Those are a content decision for the maintainer rather than a vocabulary one, and are
+  // deliberately left where they were.
+  it('excludes present-day domestic, sporting, and consumer icons', () => {
     const miscModern = [
       'toilet', 'toilet-paper', 'shower', 'bath', 'restroom',
       'dumpster', 'recycle', 'fire-extinguisher',
       'baseball', 'basketball', 'football', 'volleyball', 'hockey-puck',
       'bowling-ball', 'golf-ball-tee', 'table-tennis-paddle-ball',
       'burger', 'hotdog', 'pizza-slice', 'ice-cream', 'stroopwafel',
-      'baby', 'baby-carriage', 'graduation-cap', 'school',
-      'fingerprint', 'passport', 'gun', 'handcuffs',
-      'jet-fighter', 'bomb', 'explosion', 'biohazard', 'radiation',
+      'baby', 'baby-carriage', 'school',
+      'fingerprint', 'passport', 'gun', 'handcuffs', 'land-mine-on', 'bomb',
       'cannabis', 'bong', 'joint', 'smoking', 'ban-smoking',
       'bullhorn', 'rectangle-ad', 'newspaper',
-      'stopwatch', 'thermometer', 'tachograph-digital',
-      'paint-roller', 'spray-can', 'blender',
+      'stopwatch', 'tachograph-digital',
+      'paint-roller', 'spray-can', 'blender', 'jug-detergent',
       'street-view', 'location-pin', 'location-dot', 'location-arrow',
       'comment', 'comment-dots', 'comments', 'blog',
       'file', 'file-pdf', 'file-code', 'file-excel', 'file-image',
       'image', 'images', 'panorama', 'clapperboard', 'film',
-      'binoculars', 'screwdriver', 'dumbbell',
+      'binoculars', 'dumbbell', 'swatchbook',
       'face-smile', 'face-angry', 'face-grin-tears'
     ];
 
     for (const icon of miscModern) {
-      assert.equal(isFantasySafeFontAwesomeClassicFreeIcon(icon), false, `Icon "${icon}" should not be fantasy-safe`);
+      assert.equal(isFantasySafeFontAwesomeClassicFreeIcon(icon), false, `Icon "${icon}" should not be curated`);
+    }
+  });
+
+  it('admits scholarship, renown, and eldritch icons', () => {
+    const scholarshipAndRenown = [
+      'user-clock', 'user-graduate', 'graduation-cap',
+      'chalkboard', 'chalkboard-user', 'person-chalkboard',
+      'award', 'puzzle-piece', 'bell-concierge', 'champagne-glasses',
+      'spaghetti-monster-flying', 'hand-spock'
+    ];
+
+    for (const icon of scholarshipAndRenown) {
+      assert.equal(isFantasySafeFontAwesomeClassicFreeIcon(icon), true, `Icon "${icon}" should be curated`);
     }
   });
 

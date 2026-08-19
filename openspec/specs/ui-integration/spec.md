@@ -274,6 +274,19 @@ It renders the same DOM as the labelled variant and differs only in CSS: the seg
 The variant additionally titles each tile with that same label, which is the pointer equivalent of the name the clipped text already gives assistive technology; the labelled variant adds no such tooltip, since it would only repeat words already on screen.
 Because the markup is unchanged, a per-option test or capture hook still resolves to the enclosing `<label>` in both variants — the click target a screenshot step depends on.
 
+#### Icon vocabulary
+
+Every Fabricate icon picker offers ONE curated Font Awesome vocabulary, drawn from the classic free icons Foundry bundles, and that vocabulary serves any fictional setting rather than fantasy alone.
+Fabricate ships against every system Foundry supports, so a science-fiction, post-apocalyptic, industrial or modern game is as much its subject as a dungeon, and a curation that excludes a rocket, a robot or a reactor has scoped the module to one genre its code never claimed.
+
+The curation is therefore stated as what it leaves OUT rather than as a genre it is for.
+Three things stay out: glyphs whose meaning is a software affordance rather than a depicted object, such as editor controls, file formats and chart types; glyphs naming a real-world currency, institution, brand or cause, such as the currency SIGN glyphs, the humanitarian and NGO pictograms, and the party-political and accessibility symbols; and present-day civic, clinical and domestic furniture no setting is reaching for, such as sanitation, pharmacy, commuter transport and consumer electronics.
+Everything else is in, including the pre-modern commerce the curation once miscategorised as modern — coins, a merchant's shop, a warehouse — where a coin is admitted and a currency SIGN glyph is not, because the sign names a real currency and the coin names none.
+
+That curated set is the one vocabulary every picker draws from: essence, currency-unit, character-prerequisite, character-modifier and category icons alike.
+A surface that hand-curates a second list has created a second vocabulary that drifts from this one, which is the defect this rule exists to prevent.
+The full classic free catalogue stays available to a caller that asks for it explicitly, and is not what a picker offers by default.
+
 #### Numeric entry
 
 Every editable numeric field in the manager and in the interactable and component editors renders through one shared stepper primitive — a typeable `type="number"` input with `−`/`+` adjuncts, a clamp, and no native spinner — EXCEPT the documented non-conformances recorded below.
