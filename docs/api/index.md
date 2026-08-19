@@ -61,6 +61,7 @@ game.fabricate.submitAlchemyAttempt({ actorId, craftingSystemId, submittedCompon
 game.fabricate.getSelectedAlchemySystemId() // Persisted last-selected alchemy system id
 game.fabricate.setSelectedAlchemySystemId(id) // Persist the last-selected alchemy system id
 game.fabricate.listSelectableActors()       // Player-character actors for the actor-selection bar
+game.fabricate.listCuratedIcons()           // Fabricate's curated Font Awesome icon vocabulary
 game.fabricate.getSelectedGatheringActorId() // Persisted remembered gathering actor id
 game.fabricate.setSelectedGatheringActorId(id) // Persist the remembered gathering actor id
 game.fabricate.getHideUnavailableEnvironments() // Player "hide unavailable environments" toggle (per client/device)
@@ -487,6 +488,52 @@ Hooks.once('fabricate.ready', async () => {
 ```
 
 See [Gathering Realms & Travel]({% link gathering-realms.md %}) for the full feature guide, including the GM Travel route, environment location rules, and the disclosure policy.
+
+### Icon Vocabulary
+
+Fabricate curates ONE Font Awesome vocabulary and draws every icon field in the module from it — essence icons, category icons, and the biome icons players see on gathering environment cards.
+`listCuratedIcons()` publishes that same vocabulary so a companion module can offer its GMs the icons Fabricate already offers, instead of hand-curating a second list that drifts from this one.
+
+```javascript
+Hooks.once('fabricate.ready', () => {
+  const icons = game.fabricate.listCuratedIcons();
+  // -> [{ iconCode: 'anchor', label: 'Anchor', hasRegular: false }, …]
+
+  // `iconCode` is bare, so a render composes the weight itself.
+  const [first] = icons;
+  const className = first.hasRegular ? `far fa-${first.iconCode}` : `fas fa-${first.iconCode}`;
+
+  // Validating a stored icon is a membership test against this same list.
+  const isOffered = icons.some(({ iconCode }) => iconCode === 'mortar-pestle');
+});
+```
+
+- The records are built fresh on every call, so you may keep, sort, filter or mutate them.
+  Nothing you do to them reaches Fabricate's own pickers.
+- `hasRegular` reports whether Font Awesome ships the `far` (regular) weight for that code as well as `fas` (solid).
+  It does not say which weight a stored icon uses.
+- The method throws `Fabricate not initialized` before Fabricate is ready, like every other `game.fabricate` accessor.
+  Call it from `fabricate.ready` (or wrap it and degrade to an empty list, as a composition edge should).
+
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
+
+| Field | Type | Meaning |
+| --- | --- | --- |
+| `iconCode` | `string` | The bare Font Awesome code, such as `mortar-pestle`. No `fa-` prefix and no weight. |
+| `label` | `string` | Font Awesome's own display name, such as `Mortar Pestle`. Not localized. |
+| `hasRegular` | `boolean` | Whether the `far` weight exists for this code. |
+
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
+
+**What is not published, and why.**
+The unfiltered classic catalogue — 1402 entries — stays internal, because no Fabricate picker renders it and publishing it would invite a companion to offer icons Fabricate's own screens will not.
+The module's internal curation predicate stays internal too: it answers "does any exclusion pattern match this string", which returns `true` for a typo, a Pro-only code, or any string Font Awesome never shipped, so it is the wrong tool for validating a stored icon.
+A membership test against the published list, as above, is the right one.
+
+**Provenance.**
+The vocabulary is derived from Font Awesome Free 6.7.2 classic metadata with brands excluded.
+Every entry was verified to resolve in the Font Awesome build Foundry bundles at the time it was published, but that is a fact about that Foundry release rather than a guarantee: Foundry ships its own Font Awesome and nothing re-checks the set when Foundry upgrades it.
+If you render an icon code from this list and get a blank glyph, that is the check to make.
 
 ## Subscribing To Gathering Hooks
 

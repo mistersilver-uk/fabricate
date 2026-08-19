@@ -54,6 +54,7 @@ import { SignatureValidator } from './systems/SignatureValidator.js';
 import { Recipe } from './models/Recipe.js';
 import { Ingredient } from './models/Ingredient.js';
 import { IngredientGroup } from './models/IngredientGroup.js';
+import { listCuratedIconVocabulary } from './utils/iconVocabulary.js';
 import { MacroExecutor } from './utils/MacroExecutor.js';
 import {
   createGatheringResultCreator,
@@ -1499,6 +1500,44 @@ class Fabricate {
       name: actor?.name ?? '',
       img: actor?.img ?? null
     }));
+  }
+
+  /**
+   * List Fabricate's curated Font Awesome icon vocabulary.
+   *
+   * ONE vocabulary serves every icon field in Fabricate — essences, categories, biomes — and it
+   * is published here so a companion module binds to it instead of hand-curating a second list
+   * that drifts. The set is drawn from Font Awesome Free 6.7.2 classic (brands excluded) and
+   * curated to serve any fictional setting rather than fantasy alone.
+   *
+   * Named for its siblings: `list…` is what this facade calls a method returning plain display
+   * data ({@link Fabricate#listSelectableActors}, `listGatheringForActor`), as against `get…`,
+   * which hands back a live service object. `Curated` is the qualifier because the unfiltered
+   * catalogue is deliberately NOT published — no Fabricate picker renders it.
+   *
+   * Ready-gated by throwing, like every other accessor here, rather than returning an empty
+   * list: an empty vocabulary is indistinguishable from a vocabulary that lost its contents, and
+   * a companion's composition edge already wraps these calls and degrades on throw.
+   *
+   * The records are freshly built per call, so a caller may keep, sort or mutate them. The
+   * curated array is frozen, but `Object.freeze` is shallow and the entry objects inside it are
+   * the very objects the full catalogue holds, so handing them out would lend a caller a
+   * writable handle on what every Fabricate picker renders from.
+   *
+   * Only the list is published, deliberately. The module's internal
+   * `isCuratedFontAwesomeClassicFreeIcon` answers "does any exclusion pattern match this
+   * string", which is NOT the membership question a companion validating a stored icon asks: it
+   * answers true for a typo, for a Pro-only code, and for any string Font Awesome never shipped.
+   * `listCuratedIcons().some(({ iconCode }) => iconCode === code)` answers that question
+   * correctly, so the list is the whole seam.
+   *
+   * @returns {Array<{iconCode: string, label: string, hasRegular: boolean}>} the curated icons in
+   *   picker order; `iconCode` is bare (`mortar-pestle`), and `hasRegular` reports whether the
+   *   `far` weight exists as well as `fas`.
+   */
+  listCuratedIcons() {
+    this._requireReady();
+    return listCuratedIconVocabulary();
   }
 
   /**
