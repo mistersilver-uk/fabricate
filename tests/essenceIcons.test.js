@@ -207,9 +207,10 @@ describe('essenceIcons utility', () => {
 
   // Font Awesome draws several of these glyphs as a ladder: five battery fills, nine temperature
   // entries, four gauges. The picker shows seven or eight rows at a time and generates each label
-  // from the icon code, so a ladder spends viewports repeating one idea. The ends and the members
-  // that mean something different are curated; the steps between them, the rotations, the status
-  // badges and the scenery variants are not.
+  // from the icon code, so a ladder spends viewports repeating one idea. One member per idea is
+  // curated -- the clearest glyph for it, which need not be the bare code -- plus any member that
+  // means something different; the steps between them, the rotations, the status badges and the
+  // scenery variants are not.
   it('excludes redundant variants of a glyph the subset already carries', () => {
     const redundantVariants = [
       'battery-quarter', 'battery-half', 'battery-three-quarters',
