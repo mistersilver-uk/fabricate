@@ -38,18 +38,17 @@
  */
 
 /*
- * eslint-disable-next-line unicorn/prefer-top-level-await -- the wrapper is not here for the
- * await. Every refusal below is an early `return`, and `return` is a syntax error at the top
- * level of a pasted console snippet, so a bare top-level form would have to nest the whole
- * script inside its own guards. The IIFE is what keeps the refusals flat and readable.
+ * The wrapper is not here for the await. Every refusal below is an early `return`, and `return`
+ * is a syntax error at the top level of a pasted console snippet, so a bare top-level form would
+ * have to nest the whole script inside its own guards. The IIFE is what keeps the refusals flat.
  */
-/* eslint-disable-next-line unicorn/prefer-top-level-await */
+/* eslint-disable-next-line unicorn/prefer-top-level-await -- see the note directly above */
 (async () => {
   /*
-   * Foundry's globals are read off `globalThis` rather than referenced bare, so this file is
-   * clean under the repo's ESLint config even though it is not in the lint gate's file list
-   * (`eslint.config.js` documents why that list stays narrow). It is pasted into a console, not
-   * imported, so it must not carry an import of its own either.
+   * Foundry's globals are read off `globalThis` rather than referenced bare, because this file is
+   * in the lint gate's file list — `tests/scripts-lint-gate-coverage.test.js` requires every
+   * `scripts/` file to be either linted or recorded as debt, and bare `game` is `no-undef` there.
+   * It is pasted into a console rather than imported, so it must not carry an import of its own.
    */
   const { game, console: out } = globalThis;
 

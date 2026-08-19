@@ -171,6 +171,11 @@ const GATE_TARGETS = [
   // The screenshot-evidence matcher (issue 1133): the pure derivation that decides which
   // published frames answer a PR's changed files, shared by the evidence gate and its workflow.
   'scripts/lib/screenshotEvidenceMatching.js',
+  // The manual storage-revert script (issue 1260): pasted into a browser console rather than
+  // run by any npm script, so nothing else would ever format it, and
+  // `tests/scripts-lint-gate-coverage.test.js` requires every `scripts/` file to be gated or
+  // recorded as debt.
+  'scripts/manual/revert-storage-arrangement.js',
   'eslint.config.js',
 ];
 const FORMAT_ARGV = ['prettier', '--write', ...GATE_TARGETS];
