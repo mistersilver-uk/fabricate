@@ -5,10 +5,6 @@
 // factories in ONE place avoids duplicating ~80 lines across the two delete tests
 // (and the SonarCloud new-code duplication gate that would flag the copy).
 
-import { DEFINITION_STORAGE_LAYOUTS, DEFINITION_STORAGE_TARGETS } from '../../src/config/settings.js';
-
-import { seedKnownCompleteValidIdBasis } from './validIdBasis.js';
-
 let idSeq = 0;
 
 globalThis.foundry = {
@@ -45,12 +41,6 @@ export function defaultRecipes() {
 /**
  * A minimal in-memory RecipeManager stand-in. Pass a custom recipe list to model a
  * multi-recipe system; defaults to {@link defaultRecipes}.
- *
- * `describeDefinitionStorage` is what the **Valid Id Basis** gate asks the manager that
- * owns the recipe corpus (issue 1226). It attests the shipped `singleArray` arrangement and
- * a settled layout across its own corpus read, so this stand-in models a HEALTHY world and
- * the corpus-derived prunes below are permitted to run. A stand-in that answered nothing
- * would be scored not-known-complete, correctly, and every such prune would be refused.
  */
 export function fakeRecipeManager(recipes = defaultRecipes()) {
   return {
@@ -60,13 +50,6 @@ export function fakeRecipeManager(recipes = defaultRecipes()) {
       }
       return recipes;
     },
-    describeDefinitionStorage() {
-      return {
-        granular: false,
-        arrangement: DEFINITION_STORAGE_TARGETS.SINGLE_ARRAY,
-        layoutAtCorpusRead: DEFINITION_STORAGE_LAYOUTS.SINGLE_ARRAY,
-      };
-    },
     async deleteRecipe(id) {
       const idx = recipes.findIndex((r) => r.id === id);
       if (idx >= 0) recipes.splice(idx, 1);
@@ -75,18 +58,16 @@ export function fakeRecipeManager(recipes = defaultRecipes()) {
 }
 
 /**
- * A `game.settings` stand-in seeded so the **Valid Id Basis** reads KNOWN-COMPLETE.
+ * A `game.settings` stand-in backed by a real `Map`.
  *
- * The harness previously answered every setting with `''`, which no clause recognises as a
- * storage arrangement, so after issue 1226 every corpus-derived prune in these fixtures
- * would be refused. Seeding a real store keeps these suites asserting the gate's OPEN
- * direction — that a system deletion on a healthy world still prunes.
+ * The harness previously answered every setting with `''`, which meant a preference cleanup
+ * could not tell an unset key from a stale one. A real store keeps these suites asserting
+ * that a system deletion still prunes.
  *
  * @returns {{store: Map<string, unknown>, accessors: object}}
  */
-export function knownCompleteBasisSettings() {
+export function settingsStore() {
   const store = new Map();
-  seedKnownCompleteValidIdBasis(store);
   return {
     store,
     accessors: {

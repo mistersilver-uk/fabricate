@@ -42,8 +42,6 @@ When `CraftingSystem.resolutionMode` changes:
    Batching how the clean-up runs does not narrow which categories it covers.
    The deliberately-orphaned per-actor `discoveryProgress` flag remains out of scope.
 3. Remove the system from persisted settings.
-   Once a class is extracted into per-record documents, this removes both the system's container record and every granular record scoped to it, as one declared-order multi-write in the cross-class order `data-models/spec.md` § Granular Definition Storage states.
-   The granular removal is expressible as a SINGLE scoped delete leg because the key scheme scopes an extracted record by its owning system, so the cost is one leg however many records the system held.
 4. Emit one summary notification that includes the deleted crafting system name and the number of related entities removed; do not emit one notification per deleted recipe.
 5. A failure to delete an individual recipe must not abort the deletion: the remaining recipes are still deleted, the system is still removed from persisted settings, and clean-up still runs.
    Each failed recipe deletion is logged with its recipe id so a GM can locate and manually remove orphaned recipe data, and the summary notification reflects how many recipes could not be auto-deleted.
@@ -81,8 +79,7 @@ Deleting a vocabulary entry that records still reference is a confirmed destruct
 4. Deleting a referenced item tag strips the tag from the `tags` of every component carrying it, and from every recipe tag-placeholder ingredient (`match.type === 'tags'`) that names it, before the tag is dropped from the vocabulary.
    A placeholder emptied by the strip is persisted as an incomplete ingredient rather than left naming the deleted tag.
 5. Nothing is left dangling: no recipe or component retains a `category` or tag value that no longer exists in the system vocabulary.
-   The guarantee binds across BOTH storage classes once components are extracted.
-6. Reassigning every carrying component to `general`, and stripping a deleted tag from every carrying component, each persist as AT MOST ONE update leg over the extracted records plus the single container write that drops the vocabulary entry, in the declared cross-class order — never one write per carrying component.
+6. Reassigning every carrying component to `general`, and stripping a deleted tag from every carrying component, each persist as part of the single crafting-systems write that drops the vocabulary entry — never one write per carrying component.
 
 ### Delete Essence Definition
 
@@ -102,8 +99,6 @@ It has both a single-essence and a SET form, and the two perform the same cascad
 7. The rewrites run BEFORE the crafting-system write.
    That ordering is only safe because the disabled-essence blocker is an ACTIVATION-only validation and never a persistence one: a persistence-level blocker would abort the cascade partway through, with the essence definitions and component essence maps already mutated in memory and nothing persisted.
 8. The set form issues exactly ONE crafting-systems write and ONE recipes write for the whole operation, computing each recipe's union rewrite once, so a recipe referencing two deleted essences is written once rather than twice.
-   Once components are extracted the same bound holds ACROSS the two storage classes: exactly one recipes write, exactly one crafting-systems write, and AT MOST ONE update leg over the extracted component records — never one write per carrying component.
-   Clause 7's "the rewrites run BEFORE the crafting-system write" is unchanged and is now one half of the declared cross-class order rather than a local ordering note.
 9. A single summary notification is emitted, never one per rewritten recipe.
 10. Alchemy signature uniqueness is reconciled once after the cascade, because stripping essences collapses signatures and can create collisions that did not exist before.
 11. No run clean-up applies: a crafting run records component ingredients and a resolved-essence snapshot, neither of which is invalidated by the definition's removal.
@@ -229,7 +224,7 @@ The action's stated purpose and its confirmation prompt must name description re
 This is what makes partial returns (e.g. the 0.1.0 migration returning only `{ recipes, systems }`, or a gathering migration returning only `{ gatheringConfig }`) safe.
 - Migrations must be idempotent -- running the same migration twice on the same data must produce identical output.
 - A migration MUST NOT depend on corpus order.
-`data-models/spec.md § Granular Definition Storage` already declares corpus order non-semantic; this states the consequence for migrations, whose input order changes with the arrangement.
+`data-models/spec.md` § Destructive Pass Safety already declares corpus order non-semantic; this states the consequence for migrations.
 A migration MUST derive nothing from record position, and any cross-record reconciliation MUST produce a set-equal result under permutation.
 A migration that accumulates references into a list MAY produce a permuted list; that list is a set and no consumer may depend on its order.
 - Migration metadata SHOULD include a `downgradeTo` (Fabricate module version string) used for GM recovery guidance when migration aborts.
@@ -263,33 +258,15 @@ On module initialization (on the primary-GM client):
 14. Update `fabricate.migrationVersion` to the highest version among successfully executed migrations.
 15. Log a summary of how many migrations ran.
 
-**The granularly-stored setting's writeback is ordered first.**
-When one of the five migrated settings is stored granularly its writeback is more than one operation and is the only one that can partially commit, so it MUST be issued before the other four and the `fabricate.migrationVersion` bump MUST remain the last write of the pass.
+**The recipe writeback is ordered first.**
+The 0.6.0 migration writes `toolIds` onto recipes and the tool bodies onto systems, so a systems write issued after a failed recipes write leaves a dangling reference the re-run cannot reconstruct: the source fields have already been consumed.
+A tear in the recipes leg MUST therefore abandon the remaining writes rather than continue.
 The ordering exists to minimise the set of cross-setting states a tear can produce, not to protect the version: the version bump is unconditionally last in every ordering.
-A tear in the granular leg MUST abandon the remaining writes rather than continue, because a sibling setting written against records that did not land is a dangling reference the re-run cannot reconstruct, its source fields having already been consumed.
-
-**A container whose class has been extracted MUST be re-inflated for the pass.**
-When a migrated setting is a CONTAINER for a class stored granularly, the pass MUST see the container payload in its pre-extraction shape: the extracted records are nested back under their container key before the first migration runs and are extracted again before the writeback.
-The re-inflation MUST be an IDENTITY on the container payload — for a container with the key absent, with a legacy alias key, with an empty array, and with a residual non-empty array alike.
-Identity here is BYTE identity, because the pass decides whether to write by comparing serialized payloads, so a restore that removed the key and re-appended it would move it in the key order and rewrite the container on every boot.
-Otherwise the change-detection comparison fires on every boot of a converted world, the pass writes forever, and any audit of what the pass observes is invalidated.
-The extraction step is a RESTORE and never an omission: it puts back exactly what the raw read carried, per record, because a residual nested key is authored data this build is required to leave alone and the pass runs BEFORE the reconcile that would detect it.
-The requirement is not cosmetic: migrations in the registry read the nested key to decide corpus-global outcomes, and one of them reconciles uniqueness across it — a pass that saw an empty remainder would compute against zero records and persist the result.
-
-**The pass MUST report whether it persisted any corpus key.**
-A later step of the same boot decides its own legality from that fact: a storage conversion MUST NOT run in a boot whose migration pass persisted a corpus key, because two clients' passes are not byte-reproducible over the same source (see `data-models/spec.md` § Storage Conversion Crash Recovery).
-The pass therefore reports, as part of its summary, whether any of the five write-on-change legs was ISSUED.
-The report is about writes ISSUED, not about the pass completing.
-A pass that aborted before the writeback, refused an unsettled corpus, or could not read the corpus reports that it persisted nothing, because none of those reaches the writeback.
-A pass that failed DURING the writeback reports that it PERSISTED a corpus key whenever a leg was issued, because the granular leg can partially commit and a partially written corpus is exactly the byte-divergent input a conversion must not consume.
-The report MUST NOT be derived from the count of migrations that ran, which is a different fact: a pass can execute migrations that transform nothing and issue no write at all.
-Without this report the conversion asserts a precondition no specification promises to supply — and with the naive wording it asserts the opposite of the truth on the one path that matters.
 
 **The corpus read and writeback MUST be error-contained.**
-A granular corpus read or write can fail for reasons a whole-array setting write cannot: an unparseable record document, an unavailable document class, a hook vetoing one document in a bulk leg, or a stale index.
-The pass MUST contain those failures, persist nothing further, leave `fabricate.migrationVersion` un-advanced, and report to the GM.
-It MUST NOT let the rejection escape the module's readiness callback: the hook dispatcher's error handling is synchronous, so a rejection from an async callback surfaces only as an unhandled console rejection — no notification, no error hook — and the module is left with no managers and a readiness promise that never settles.
-A write-failure report MUST instruct a reload, because the migrations have already transformed the session's own setting values while nothing was persisted; a refusal that runs before any migration — an unsettled corpus, or a corpus that could not be read — MUST NOT, because nothing in the session was touched.
+The pass MUST contain a read or write failure, persist nothing further, leave `fabricate.migrationVersion` un-advanced, and report to the GM.
+It MUST NOT let the rejection escape the module's readiness callback: the hook dispatcher's error handling is synchronous, so a rejection from an asynchronous callback fires no error hook, shows no notification, and leaves the readiness promise unsettled with no managers constructed.
+A write-failure report MUST instruct a reload, because the migrations have already transformed the session's own setting values while nothing was persisted; a read failure MUST NOT, because it refuses before any migration runs.
 
 ### Per-Migration Error Handling
 
@@ -309,14 +286,8 @@ The assurance states that THIS PASS persisted nothing.
 It MUST NOT be phrased as a claim that a failed migration leaves data unchanged — a non-fatal migration error is logged and the pass continues, advancing the version past the failed migration and writing — and MUST NOT be phrased so it reads as an assurance about the multi-setting writeback or a storage conversion, neither of which is all-or-nothing.
 It is a claim about STORED data: a setting's value is initialized once and handed back by reference, so an in-place migration transforms the session's own copy and a reload is what discards it.
 The assurance and the downgrade advice MUST be changed together and MUST NOT be split across revisions: "your data is unchanged" beside "downgrade to keep using it" reads as "safe to go back", when on a converted world the truth is "intact, and unreadable by the build you are going back to".
-2. Print a recommended downgrade action, selected over the SET of granular Definition Storage Layouts the pass ran against.
-The recommendation to downgrade in order to keep using existing data is false on a world whose definition storage has been converted: the older build has no granular reader, serves the registered empty default, and then re-creates the legacy document from an empty-derived corpus, so the GM authors into a corpus the next upgrade discards.
-Guidance MUST read every granular class's layout and, when any is granular, tell the GM to set that class's storage-arrangement setting back to its combined option, RELOAD, and let the reverse conversion complete BEFORE downgrading — stating that it can only be run on the current build, because after a downgrade there is no code left to run it with.
-Selecting over ONE class is incomplete rather than wrong once a second class can be converted: a GM who follows single-class advice exactly reverses that class, downgrades, and loses sight of every other converted one.
-It MUST name every arrangement the GM has to set back, by the shipped setting NAME and the shipped combined-option LABEL, so the dialog and the settings row read as one instruction.
-It MUST NOT be a concatenation of per-class sentences: a GM with one class granular and another combined needs ONE instruction, not one plus a no-op.
-It MUST select a complete localized sentence, with a safe default for an unreadable layout, and MUST NOT interpolate a layout value into any GM-facing string: the layout enumeration carries a member (`unsettled`) that the operator-facing choices map has no label for and never will.
-Naming the mitigation in the pre-conversion CONSENT prompt is necessary and not sufficient — the consent is read once, potentially months before the downgrade, and this is what the GM reads at the moment they act.
+2. Print a recommended downgrade action: downgrade to the recorded `downgradeTo` version to keep using the existing data without manual remediation.
+It MUST be a complete localized sentence rather than a template with a value interpolated into a GM-facing string, and the console guidance and the GM dialog MUST select it from the same source so the two cannot drift apart.
 3. Print explicit, per-document fix instructions for each failure:
    - document type (`recipe` or `craftingSystem`)
    - document ID/name
@@ -331,7 +302,7 @@ Naming the mitigation in the pre-conversion CONSENT prompt is necessary and not 
 Because `migrationVersion` is unchanged on abort, the pending migrations re-run automatically on the next world reload after the GM fixes or deletes the failed documents; the fix/retry choice is informational and triggers no same-pass retry.
 
 The prompt's DialogV2 configuration (window title, content mirroring the console guidance, both choices, and the `Keep existing data` default) is produced by a pure builder (`src/migration/migrationRecoveryPrompt.js`) so the default choice is unit-testable without Foundry.
-The runner exposes a `promptRecovery` seam invoked with `{ downgradeTo, documents, label, storageLayout }` on abort; `src/main.js` `_runMigrations` wires the thin Foundry edge that opens DialogV2 from that config.
+The runner exposes a `promptRecovery` seam invoked with `{ downgradeTo, documents, label }` on abort; `src/main.js` `_runMigrations` wires the thin Foundry edge that opens DialogV2 from that config.
 The layout reaches both surfaces from the value the pass already resolved, never from a second read: a re-read at guidance time can report a layout a remote conversion moved mid-pass, and the message must describe the pass that just failed.
 
 ### Write-on-Change Persistence

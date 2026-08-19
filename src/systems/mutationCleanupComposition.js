@@ -1,10 +1,10 @@
 /**
  * The MUTATION-TIME maintenance composition site (issue 1226).
  *
- * `startupPassComposition.js` gates the boot-time housekeeping on a known-complete
- * {@link module:validIdBasis Valid Id Basis}. This module is the same gate on the other
- * door: the flag cleanup a GM triggers by deleting a recipe, deleting a set of recipes,
- * deleting a crafting system, re-importing a pack, or switching a system's resolution mode.
+ * `startupPassComposition.js` composes the boot-time housekeeping. This module is the same
+ * gate on the other door: the flag cleanup a GM triggers by deleting a recipe, deleting a
+ * set of recipes, deleting a crafting system, re-importing a pack, or switching a system's
+ * resolution mode.
  *
  * Those paths recompute the SAME valid-id sets from the live managers and call the SAME
  * destructive collaborators — `cleanupInvalidRuns`, `cleanupLearnedRecipes`,
@@ -44,11 +44,7 @@
  * required to be positively `true` rather than merely not `false`.
  */
 
-import { getHighestRegisteredMigrationVersion } from '../migration/MigrationRunner.js';
-
-import { describeCorpusStorage } from './corpusStorageReports.js';
-import { buildStartupPassList } from './startupMaintenance.js';
-import { basisFromInputs, readValidIdBasisInputs } from './validIdBasis.js';
+import { buildStartupPassList, WHOLE_CORPUS_ID_BASIS } from './startupMaintenance.js';
 
 /**
  * The entity kinds each mutation-time sweep derives its "still valid" answer from.
@@ -84,47 +80,30 @@ export const MUTATION_CLEANUP_ENTITY_KINDS = Object.freeze({
  */
 
 /**
- * Run one mutation's flag cleanup, gated on the Valid Id Basis.
+ * Run one mutation's flag cleanup through the shared pass builder.
  *
- * Reads no globals: both managers, the setting accessor and the reporter are parameters,
- * so the whole decision — including which sweeps the basis omitted — is drivable from a
- * fixture that seeds settings rather than one that injects a basis.
+ * Reads no globals: the reporter is a parameter, so the whole decision — including which
+ * sweeps were omitted — is drivable from a fixture.
  *
  * @param {object} options
  * @param {MutationCleanupPass[]} options.passes
- * @param {object|null} [options.recipeManager] Supplies the `recipes` storage report.
- * @param {object|null} [options.craftingSystemManager] Supplies the `systems` and
- *   `components` storage reports.
- * @param {(key: string) => *} options.getSetting Setting reader. A PARAMETER for the
- *   reason `validIdBasis.js` gives: an import here would make a caller's reader decorative.
  * @param {(message: string, detail: object) => void} [options.warn] Omission reporter. An
  *   omission MUST be reported — the callers discard the return value, so an omitted sweep
  *   is otherwise indistinguishable from one that found nothing to prune.
  * @param {string} [options.subject] What the GM did, named in the warning.
  * @returns {Promise<{swept: string[], targeted: string[], omitted: string[],
- *   basis: Record<string, boolean>, basisInputs: Record<string, object>}>} what actually
- *   ran, so the decision is assertable at the call site rather than only observable
- *   through the collaborators.
+ *   basis: Record<string, boolean>}>} what actually ran, so the decision is assertable at
+ *   the call site rather than only observable through the collaborators.
  */
 export async function runGatedMutationCleanup({
   passes = [],
-  recipeManager = null,
-  craftingSystemManager = null,
-  getSetting,
   warn = console.warn,
   subject = 'a content change',
 } = {}) {
-  const basisInputs = readValidIdBasisInputs({
-    getSetting,
-    getHighestRegisteredMigrationVersion,
-    storage: describeCorpusStorage({ recipeManager, craftingSystemManager }),
-  });
-  const basis = basisFromInputs(basisInputs);
-
   const omissions = [];
   const permitted = buildStartupPassList({
     candidates: passes.map((pass) => [pass.label, pass]),
-    basis,
+    basis: WHOLE_CORPUS_ID_BASIS,
     declarations: MUTATION_CLEANUP_ENTITY_KINDS,
     onOmit: (omission) => {
       omissions.push(omission);
@@ -146,8 +125,7 @@ export async function runGatedMutationCleanup({
       {
         omitted: omissions,
         targetedFallbacks: fallbacks.map((pass) => pass.label),
-        basis,
-        basisInputs,
+        basis: WHOLE_CORPUS_ID_BASIS,
       }
     );
   }
@@ -164,5 +142,5 @@ export async function runGatedMutationCleanup({
     targeted.push(pass.label);
   }
 
-  return { swept, targeted, omitted, basis, basisInputs };
+  return { swept, targeted, omitted, basis: WHOLE_CORPUS_ID_BASIS };
 }

@@ -7,7 +7,7 @@
  * migrations newer than that version, in order.
  */
 
-import { DEFINITION_STORAGE_LAYOUTS, SETTING_KEYS } from '../config/settings.js';
+import { SETTING_KEYS } from '../config/settings.js';
 
 import { migrateAlchemyCheckMode } from './migrateAlchemyCheckMode.js';
 import { migrateBreakToolsOnFail } from './migrateBreakToolsOnFail.js';
@@ -44,7 +44,7 @@ import { migrateUnifyGatheringRegions } from './migrateUnifyGatheringRegions.js'
 import { migrateUnifyModifierLibraries } from './migrateUnifyModifierLibraries.js';
 import { migrateVisibilityModeEnum } from './migrateVisibilityModeEnum.js';
 import { isFatalMigrationError } from './migrationErrors.js';
-import { selectDowngradeAdvice } from './migrationRecoveryPrompt.js';
+import { DOWNGRADE_ADVICE } from './migrationRecoveryPrompt.js';
 
 export { FatalMigrationError, isFatalMigrationError } from './migrationErrors.js';
 
@@ -537,14 +537,12 @@ export function getHighestRegisteredMigrationVersion() {
  *
  * A DEFERRAL is not an abort. An abort is a fatal migration error, has per-document
  * remediation and a downgrade target, and gets the recovery dialog. A deferral is a storage
- * fact — the corpus could not be read, could not be written, or is mid-conversion — and its
- * remedy is a reload rather than a document fix, so it gets its own GM notice.
+ * fact — the corpus could not be read, or could not be written — and its remedy is a reload
+ * rather than a document fix, so it gets its own GM notice.
  *
  * @type {Readonly<Record<string, string>>}
  */
 export const MIGRATION_DEFERRAL_REASONS = Object.freeze({
-  /** The recipe corpus is spread across both arrangements and neither can be read alone. */
-  UNSETTLED_STORAGE: 'unsettledStorage',
   /** The recipe corpus could not be read. Distinct from an EMPTY corpus, deliberately. */
   CORPUS_READ_FAILED: 'corpusReadFailed',
   /** A writeback leg failed, so the remaining legs and the version bump were abandoned. */
@@ -554,9 +552,9 @@ export const MIGRATION_DEFERRAL_REASONS = Object.freeze({
 /**
  * The summary shape a pass returns when it persisted nothing.
  *
- * Written once rather than as a fourth copy of the same eleven-key literal: the early
- * return, the abort and the three deferrals all describe "this pass wrote nothing", and four
- * hand-maintained copies drift the moment a summary key is added.
+ * Written once rather than as a fourth copy of the same literal: the early return, the abort
+ * and the two deferrals all describe "this pass wrote nothing", and four hand-maintained
+ * copies drift the moment a summary key is added.
  *
  * @param {object} [overrides]
  * @returns {object}
@@ -565,10 +563,6 @@ function emptyPassSummary(overrides = {}) {
   return {
     ran: 0,
     aborted: false,
-    // Issue 1211. Defaults to "this pass persisted nothing", which is correct for the early
-    // return, the abort and the two deferrals that never reach the writeback. The writeback's
-    // own deferral overrides it, because the granular leg can partially commit.
-    persistedCorpusKey: false,
     migratedCatalystCount: 0,
     unifiedRegionSystems: [],
     removedResultSelectionProviders: {
@@ -593,7 +587,7 @@ export class MigrationRunner {
    *   setSetting: Function,
    *   moduleVersion?: string,
    *   promptRecovery?: Function,
-   *   recipeCorpus?: { layout: Function, loadAll: Function, createOrUpdateAll: Function },
+   *   recipeCorpus?: { loadAll: Function, createOrUpdateAll: Function },
    *   migrations?: Array<{ version: string, label: string, migrate: Function, downgradeTo?: string, downgradeLosesData?: boolean }>
    * }} opts
    *   `promptRecovery` is an optional seam invoked with the abort context so the
@@ -601,14 +595,10 @@ export class MigrationRunner {
    *   registry (used by tests to inject a fatal migration) and defaults to the
    *   production `MIGRATIONS`.
    *
-   *   `recipeCorpus` is the ARRANGEMENT-AWARE recipe corpus accessor (issue 1242).
-   *   `src/systems/recipeCorpus.js` builds the real one and `main.js` wires it; it is
-   *   injected rather than imported so this module keeps importing nothing but
-   *   `../config/settings.js` and its own directory, and so the several dozen fixtures that
-   *   construct a runner keep working untouched. Its DEFAULT is the legacy whole-array
-   *   accessor below, which is byte-for-byte the read and write this runner performed before
-   *   the seam existed — deliberately unguarded, matching the shipped convention that an
-   *   injected repository gets the no-op arrangement guard.
+   *   `recipeCorpus` and `craftingSystemCorpus` are the corpus accessors this pass reads and
+   *   writes through (issue 1242). Both DEFAULT to the whole-array setting accessors below,
+   *   which is what production uses; they stay injectable so a fixture can observe or refuse
+   *   a corpus read or write without patching `game.settings`.
    */
   constructor({
     getSetting,
@@ -625,23 +615,11 @@ export class MigrationRunner {
     this._promptRecovery = promptRecovery;
     this._migrations = Array.isArray(migrations) ? migrations : MIGRATIONS;
     this._recipeCorpus = recipeCorpus ?? {
-      layout: () => null,
       loadAll: async () => this._getSetting(SETTING_KEYS.RECIPES) ?? [],
       createOrUpdateAll: async (records) => {
         await this._setSetting(SETTING_KEYS.RECIPES, records);
       },
     };
-    // Issue 1212: the CRAFTING-SYSTEM corpus is read and written through its own
-    // arrangement-aware seam, because components have been extracted out of `system.components`
-    // and six registry migrations consume that key. Its DEFAULT is the raw whole-array
-    // accessor below, byte-for-byte the read and write this runner performed before the seam
-    // existed, so the several dozen fixtures that construct a runner keep working untouched.
-    //
-    // It DELIBERATELY declares NO `layout` accessor, so `this._craftingSystemCorpus.layout?.()`
-    // answers `undefined` rather than `null`. The difference is load-bearing for the downgrade
-    // advice: `null` means "sampled and unreadable", which is a class it must warn about, and
-    // `undefined` means "this runner never sampled the class at all". A fixture that injects no
-    // crafting-system corpus is the second, not the first.
     this._craftingSystemCorpus = craftingSystemCorpus ?? {
       loadAll: async () => this._getSetting(SETTING_KEYS.CRAFTING_SYSTEMS) ?? [],
       createOrUpdateAll: async (systems) => {
@@ -655,7 +633,7 @@ export class MigrationRunner {
    * Only persists data when changes are detected.
    * Updates migrationVersion to the highest migration version that ran.
    *
-   * @returns {Promise<{ ran: number, aborted: boolean, persistedCorpusKey: boolean, migratedCatalystCount: number, unifiedRegionSystems: string[], removedResultSelectionProviders: { droppedRollTableRecipes: object[], strippedGatheringTasks: object[] }, abortedMigration?: string, downgradeTo?: string|null, failures?: object[] }>}
+   * @returns {Promise<{ ran: number, aborted: boolean, migratedCatalystCount: number, unifiedRegionSystems: string[], removedResultSelectionProviders: { droppedRollTableRecipes: object[], strippedGatheringTasks: object[] }, abortedMigration?: string, downgradeTo?: string|null, failures?: object[] }>}
    *   a summary of the run so the caller can fire one-time edge effects (e.g. the
    *   GM catalyst-migration and region-unification notices) or surface an aborted pass.
    */
@@ -670,56 +648,12 @@ export class MigrationRunner {
       return emptyPassSummary();
     }
 
-    // Read the LAYOUT only now — after the early return above. An up-to-date world therefore
-    // still performs zero corpus reads and zero layout reads, which is the property the
-    // startup-performance programme cares about.
-    const storageLayout = this._recipeCorpus.layout?.() ?? null;
-    if (storageLayout === DEFINITION_STORAGE_LAYOUTS.UNSETTLED) {
-      // Refuse the pass outright. The corpus is spread across both arrangements, so either
-      // arm would reduce over a PARTIAL corpus — and a partial corpus is the worst input to a
-      // corpus-global reduction, not a skipped one. Worse, a pass that wrote and bumped the
-      // version here would then have its records overwritten by the storage reconcile that
-      // runs later in the same boot, resuming the conversion from the still-present legacy
-      // array, with the version claiming success and no detector anywhere. Refusing costs one
-      // boot: the reconcile settles the layout on this same boot and the next boot re-runs
-      // the whole pass over a whole corpus from an un-advanced version.
-      console.error(
-        'Fabricate | Migrations deferred: this world is part-way through a recipe storage conversion, so the recipe corpus cannot be read whole. Nothing was migrated and nothing was saved.'
-      );
-      return emptyPassSummary({
-        deferred: true,
-        deferredReason: MIGRATION_DEFERRAL_REASONS.UNSETTLED_STORAGE,
-        deferredError: null,
-        storageLayout,
-      });
-    }
-
-    // Issue 1212: the COMPONENT class has its own layout and its own `unsettled` refusal. It
-    // is read here rather than beside the recipe one so an up-to-date world still performs
-    // zero layout reads, and it is compared against `undefined` nowhere — only the positive
-    // `unsettled` value refuses.
-    const componentStorageLayout = this._craftingSystemCorpus.layout?.();
-    if (componentStorageLayout === DEFINITION_STORAGE_LAYOUTS.UNSETTLED) {
-      console.error(
-        'Fabricate | Migrations deferred: this world is part-way through a component storage conversion, so the crafting system corpus cannot be read whole. Nothing was migrated and nothing was saved.'
-      );
-      return emptyPassSummary({
-        deferred: true,
-        deferredReason: MIGRATION_DEFERRAL_REASONS.UNSETTLED_STORAGE,
-        deferredError: null,
-        storageLayout,
-        componentStorageLayout,
-      });
-    }
-
     let rawRecipes;
     try {
-      // Contained, because the granular arm adds throw sites a whole-array setting read does
-      // not have: an unparseable record document, an unavailable document class, a collection
-      // this client cannot resolve. An escaping rejection is INVISIBLE — the hook
-      // dispatcher's try/catch is synchronous, so a rejection out of the module's async
-      // `ready` callback fires no error hook and no notification, leaves the readiness promise
-      // unsettled and the module with no managers.
+      // Contained because an escaping rejection is INVISIBLE: the hook dispatcher's try/catch
+      // is synchronous, so a rejection out of the module's async `ready` callback fires no
+      // error hook and no notification, leaves the readiness promise unsettled and the module
+      // with no managers.
       rawRecipes = await this._recipeCorpus.loadAll();
     } catch (error) {
       console.error(
@@ -730,14 +664,11 @@ export class MigrationRunner {
         deferred: true,
         deferredReason: MIGRATION_DEFERRAL_REASONS.CORPUS_READ_FAILED,
         deferredError: error,
-        storageLayout,
       });
     }
     let rawSystems;
     try {
-      // Contained for the same reason the recipe read is: the granular arm adds throw sites a
-      // whole-array setting read does not have, and an escaping rejection out of the module's
-      // async `ready` callback fires no error hook and leaves the module with no managers.
+      // Contained for the same reason the recipe read is.
       rawSystems = await this._craftingSystemCorpus.loadAll();
     } catch (error) {
       console.error(
@@ -748,7 +679,6 @@ export class MigrationRunner {
         deferred: true,
         deferredReason: MIGRATION_DEFERRAL_REASONS.CORPUS_READ_FAILED,
         deferredError: error,
-        storageLayout,
       });
     }
     const rawGatheringConfig = this._getSetting(SETTING_KEYS.GATHERING_CONFIG) ?? {};
@@ -807,21 +737,13 @@ export class MigrationRunner {
             error.downgradeTo ?? migration.downgradeTo ?? this._moduleVersion ?? null;
           const failures = Array.isArray(error.documents) ? error.documents : [];
 
-          // The layout the pass RESOLVED, not a fresh read. The GM's message has to describe
-          // the pass that just failed, and a re-read at guidance time can report a layout a
-          // remote conversion moved mid-pass.
-          this._emitMigrationRecoveryGuidance(migration, error, downgradeTo, {
-            recipes: storageLayout,
-            components: componentStorageLayout,
-          });
+          this._emitMigrationRecoveryGuidance(migration, error, downgradeTo);
 
           // Optional GM decision-prompt seam (defaults to "Keep existing data").
           this._promptRecovery?.({
             downgradeTo,
             documents: failures,
             label: migration.label,
-            storageLayout,
-            componentStorageLayout,
           });
 
           return emptyPassSummary({
@@ -910,44 +832,22 @@ export class MigrationRunner {
     const gatheringPartiesChanged =
       JSON.stringify(data.gatheringParties) !== originalGatheringPartiesJson;
 
-    // Issue 1211: whether this pass ISSUED a write to any corpus key. A later step of the
-    // same boot decides its own legality from it — a Storage Layout Conversion must not run
-    // in a boot whose migration pass persisted a corpus key, because two clients' passes are
-    // not byte-reproducible over the same source, so a conversion whose source read
-    // interleaves with the other client's write converts a state no single pass produced.
-    //
-    // It reports writes ISSUED, not the pass completing, and that distinction is the whole
-    // value: a leg that was issued and then threw may have PARTIALLY committed under the
-    // granular arrangement, which is exactly the byte-divergent input the conversion must not
-    // consume. Deriving it from `ran` instead would report the migrations executed rather than
-    // the writes issued, and would be wrong on every pass that transformed nothing.
-    const persistedCorpusKey =
-      recipesChanged ||
-      systemsChanged ||
-      gatheringConfigChanged ||
-      environmentsChanged ||
-      gatheringPartiesChanged;
-
     // ---------------------------------------------------------------------------
     // Writeback. The recipe corpus goes FIRST, and the order is pinned rather than
     // incidental (`destructive-changes-and-migrations/spec.md` § Startup Migration Flow).
     //
     // The reason is NOT "so a tear leaves the version un-advanced" — that is true in every
-    // ordering, because the version bump is unconditionally last. It is that under a granular
-    // arrangement the recipe corpus is the ONLY leg that can PARTIALLY commit: it is up to two
-    // document calls where every other leg is one atomic whole-array write. Issuing it first
-    // minimises the set of cross-setting states a tear can produce.
-    //
-    // A tear in that leg therefore abandons the rest rather than continuing. The 0.6.0
-    // migration writes `toolIds` onto recipes and the tool bodies onto systems, so a systems
-    // write after a failed recipes write is a dangling reference the re-run cannot
-    // reconstruct: the source fields have already been consumed.
+    // ordering, because the version bump is unconditionally last. A tear in the recipes leg
+    // abandons the rest rather than continuing, because the 0.6.0 migration writes `toolIds`
+    // onto recipes and the tool bodies onto systems: a systems write after a failed recipes
+    // write is a dangling reference the re-run cannot reconstruct, since the source fields
+    // have already been consumed.
     // ---------------------------------------------------------------------------
     if (recipesChanged) {
       try {
         await this._recipeCorpus.createOrUpdateAll(data.recipes);
       } catch (error) {
-        return this._deferOnWriteFailure(error, storageLayout, persistedCorpusKey);
+        return this._deferOnWriteFailure(error);
       }
     }
     try {
@@ -967,10 +867,9 @@ export class MigrationRunner {
       await this._setSetting(SETTING_KEYS.MIGRATION_VERSION, highestVersion);
     } catch (error) {
       // The remaining four legs and the version bump share one containment and one
-      // disposition. This is a deliberate extension of the seam's own scope: a rejection from
-      // any of these already propagates out of `run()` past a caller with no `catch`, which is
-      // a partial writeback reachable with no conversion involved at all.
-      return this._deferOnWriteFailure(error, storageLayout, persistedCorpusKey);
+      // disposition: a rejection from any of them would otherwise propagate out of `run()`
+      // past a caller with no `catch`, leaving a partial writeback with no GM-facing notice.
+      return this._deferOnWriteFailure(error);
     }
 
     console.log(`Fabricate | Migrations complete: ran ${pending.length} migration(s)`);
@@ -978,7 +877,6 @@ export class MigrationRunner {
     return {
       ran: pending.length,
       aborted: false,
-      persistedCorpusKey,
       migratedCatalystCount,
       unifiedRegionSystems,
       removedResultSelectionProviders,
@@ -992,16 +890,13 @@ export class MigrationRunner {
    * Abandon the rest of the writeback and report the pass as deferred.
    *
    * `migrationVersion` is deliberately left where it was found, so the next boot re-runs the
-   * whole pass. That is safe because the granular writeback is convergent — record document
-   * ids are derived from record keys and a create with a kept id is an idempotent upsert —
-   * and because every whole-array leg is a plain replace.
+   * whole pass. That is safe because every writeback leg is a plain whole-array replace.
    *
    * @param {Error} error
-   * @param {string|null} storageLayout
    * @returns {object} the deferred pass summary.
    * @private
    */
-  _deferOnWriteFailure(error, storageLayout, persistedCorpusKey = false) {
+  _deferOnWriteFailure(error) {
     console.error(
       'Fabricate | Migrations deferred: a migrated setting could not be saved, so the remaining writes and the version bump were abandoned. Nothing was marked as migrated.',
       error
@@ -1010,8 +905,6 @@ export class MigrationRunner {
       deferred: true,
       deferredReason: MIGRATION_DEFERRAL_REASONS.WRITEBACK_FAILED,
       deferredError: error,
-      persistedCorpusKey,
-      storageLayout,
     });
   }
 
@@ -1020,22 +913,15 @@ export class MigrationRunner {
    *
    * Output (spec § Migration Abort Recovery Guidance):
    *  - a clear abort header scoped to the pass that aborted,
-   *  - a recommended downgrade action, selected by the recipe storage layout,
+   *  - a recommended downgrade action,
    *  - per-document fix instructions (type, id/name, exact error, required fix),
    *  - macro-oriented remediation hints when present.
    *
    * @param {{ label: string }} migration
    * @param {{ message?: string, documents?: object[] }} error
    * @param {string|null} downgradeTo
-   * @param {{recipes: string|null, components: string|null|undefined}} [storageLayouts] Every
-   *   granular class's Definition Storage Layout as this pass ran against it, resolved once by
-   *   `run()`. They select the downgrade advice TOGETHER (issue 1212): on a world where both
-   *   classes are converted, advice naming only one leaves the GM reversing recipes,
-   *   downgrading, and losing sight of their whole component library. It selects the advice,
-   *   because
-   *   "downgrade to keep using your existing data" is FALSE on a granularly-stored world.
    */
-  _emitMigrationRecoveryGuidance(migration, error, downgradeTo, storageLayouts = null) {
+  _emitMigrationRecoveryGuidance(migration, error, downgradeTo) {
     // Scoped to THIS PASS. It is not a claim that a failed migration leaves data unchanged: a
     // non-fatal migration error is logged and the pass continues, advancing the version past
     // the failed migration and writing. And it is a claim about STORED data — the migrations
@@ -1049,10 +935,9 @@ export class MigrationRunner {
     }
 
     const downgradeTarget = downgradeTo ?? 'unknown';
-    // One complete sentence per layout, from the single table the GM dialog also selects from,
-    // and never a sentence with a layout token interpolated into it.
+    // One complete sentence, from the same source the GM dialog reads.
     console.error(
-      `Fabricate | Recommended action: ${selectDowngradeAdvice(storageLayouts).consoleSentence(downgradeTarget)}`
+      `Fabricate | Recommended action: ${DOWNGRADE_ADVICE.consoleSentence(downgradeTarget)}`
     );
 
     const documents = Array.isArray(error?.documents) ? error.documents : [];

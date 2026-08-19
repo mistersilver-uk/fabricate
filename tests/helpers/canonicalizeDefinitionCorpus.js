@@ -1,12 +1,19 @@
 /**
- * The pinned, versioned canonical form for a crafting-definition corpus (issues 1080, 1233).
+ * The identity-PROVENANCE oracle for a crafting-definition corpus (issues 1080, 1233, 1261).
  *
- * ADR 0001's domain-level equivalence criterion is that, for each fixture world,
- * `JSON.stringify(canonicalize(manager.getRecipes()))` is byte-identical when loaded from
- * the legacy single-array backend and from the migrated per-record backend. That criterion
- * is only meaningful if `canonicalize` is committed rather than improvised per test, which
- * is what this module is — and why it carries {@link CANONICAL_FORM_VERSION}. Storage
- * bytes will and should differ; this asserts at the DOMAIN level.
+ * **Read this header before deleting this file.** It was built as ADR 0001's backend
+ * equivalence criterion — canonicalize a corpus loaded through the whole-array backend and
+ * through the per-record one and compare the two byte for byte — and issue 1261 removed the
+ * second backend, which reads as removing this module's purpose. It does not. What this
+ * canonical form actually pins is the **authored-versus-hydrate-minted identity
+ * distinction** across the eight model call sites named below, and that distinction is
+ * arrangement-independent, load-bearing for referential integrity and durable identity, and
+ * guarded nowhere else. Its stated purpose is therefore restated here rather than left as a
+ * description of a comparison that can no longer be run.
+ *
+ * The form is committed rather than improvised per test, which is why it carries
+ * {@link CANONICAL_FORM_VERSION}. Storage bytes will and should differ from it; it asserts
+ * at the DOMAIN level.
  *
  * It lives in `tests/helpers/` because it is a comparison tool, not shipped behaviour.
  * `tests/helpers/` sits outside the `npm test` glob; the exercising suite is
@@ -42,10 +49,9 @@
  *
  * 1. **Recursive key order.** Every object is rebuilt with its keys sorted, so a
  *    normalizer that emits the same fields in a different order compares equal.
- * 2. **The top-level corpus is sorted by AUTHORED record id.** This is the ONLY ordering the
- *    two backends genuinely disagree about: the legacy array is in the manager map's
- *    insertion order, while the per-record collection arrives in `_id` byte order on one
- *    client and insertion order on another. Corpus order is not semantic, so it is imposed.
+ * 2. **The top-level corpus is sorted by AUTHORED record id.** Corpus order is not semantic
+ *    (`data-models/spec.md` § Destructive Pass Safety), and the whole-array corpus arrives in
+ *    the manager map's insertion order, so an order is imposed rather than inherited.
  *    A record whose own id was minted at hydrate (or is missing) has no stable key to sort
  *    on, so those records sort AFTER the authored ones in input order — sorting them by the
  *    random value would reintroduce the non-determinism this form exists to remove.

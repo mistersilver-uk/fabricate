@@ -71,13 +71,6 @@
  * which the server refuses for a non-GM on a `world`-scoped key. No write moved to a
  * different authority, and no write became reachable by a client that could not
  * already make it.
- *
- * The per-record adapter (#1080 -b) writes `Setting` DOCUMENTS instead of calling
- * `game.settings.set`, and the authority is the same gate one layer down:
- * `BaseSetting.#canModify` -> `user.hasPermission('SETTINGS_MODIFY')` is what refuses a
- * non-GM, and it refuses `Setting.implementation.createDocuments` exactly as it refuses
- * `ClientSettings#set`. Moving off `ClientSettings` changed which API is called, not who
- * may call it.
  */
 
 /**
@@ -212,11 +205,8 @@ export class CraftingDefinitionRepository {
    *
    * **Which error wins when BOTH the body and the mandated flush fail is adapter-specific,
    * and deliberately unspecified here.** The settings adapter flushes inside a `finally`, so
-   * the flush's rejection replaces the body's. The per-record adapter reconciles them
-   * explicitly and lets the BODY's error win, reporting the flush failure on its own
-   * channel — it cannot use a `finally`, because a `throw` there is `no-unsafe-finally` and
-   * abandons any in-flight completion. Both satisfy this contract; a caller that needs one
-   * or the other must not assume, and a future adapter should say which it does.
+   * the flush's rejection replaces the body's. A caller that needs one or the other must
+   * not assume, and a future adapter should say which it does.
    *
    * @abstract
    * @template T
@@ -245,83 +235,7 @@ export class CraftingDefinitionRepository {
   readReplicatedSnapshot() {
     return null;
   }
-
-  /**
-   * Whether this backend can answer a replication event for ONE record.
-   *
-   * **Optional capability, `false` by default — which IS today's behaviour.** A backend
-   * that stores the whole corpus in a single setting has nothing per-record to report: a
-   * replication event names the one key holding everything, and the only correct response
-   * is the whole-corpus {@link CraftingDefinitionRepository#readReplicatedSnapshot} the
-   * managers' `reload()` already performs. So the settings adapter inherits `false` and is
-   * completely unaffected by this member existing.
-   *
-   * A per-record backend (#1080) returns `true`, and its caller then routes each
-   * `createSetting`/`updateSetting`/`deleteSetting` event through
-   * {@link CraftingDefinitionRepository#readReplicatedRecord} instead of re-reading the
-   * corpus. That distinction cannot be inferred from `readReplicatedRecord` alone:
-   * `null` there means "not a key of mine", which a whole-corpus backend would also
-   * answer for its own key, and the two demand opposite fallbacks.
-   *
-   * @returns {boolean}
-   */
-  supportsPerRecordReplication() {
-    return false;
-  }
-
-  /**
-   * Whether this backend stores each record as its own addressable unit.
-   *
-   * **Optional capability, `false` by default — which IS today's behaviour.** Distinct
-   * from {@link CraftingDefinitionRepository#supportsPerRecordReplication}, which is about
-   * how a CHANGE arrives: a backend could in principle store granularly and still have no
-   * per-record replication signal (a pack-backed adapter is exactly that, per #1088), and
-   * the two demand different answers.
-   *
-   * It exists for the Valid Id Basis gate (issue 1224). A granular backend's whole-corpus
-   * read can return PART of the corpus — a conversion that has written some records and
-   * not others — and a destructive pass run against a partial corpus deletes durable state
-   * that was never stale. The gate has to know which entity kinds can be in that state, and
-   * asking the repository that was actually built is the only answer that cannot be evaded:
-   * a class-name check misses both a second granular class and a granular repository
-   * injected through a manager's `repository` seam.
-   *
-   * @returns {boolean}
-   */
-  storesRecordsGranularly() {
-    return false;
-  }
-
-  /**
-   * Synchronously read the ONE record a replication event has already delivered.
-   *
-   * **Optional capability, `null` by default.** Synchronous for the same reason
-   * `readReplicatedSnapshot` is: it is called from a settings hook whose result decides
-   * whether a change hook is re-emitted.
-   *
-   * @param {ReplicatedDefinitionChange} _change The replicated change, as the
-   *   `createSetting` / `updateSetting` / `deleteSetting` hooks describe it.
-   * @returns {{ id: string, record: object|null }|null} `null` when the changed key is not
-   *   one this repository stores. Otherwise the record id, with `record: null` meaning the
-   *   record was removed and must leave the caller's map.
-   */
-  readReplicatedRecord(_change) {
-    return null;
-  }
 }
-
-/**
- * One replicated change to a single stored record.
- *
- * `document` is the `Setting` document the hook delivered. Passing it matters on a delete,
- * where the document is already gone from the collection by the time a listener could look
- * it up, and it avoids a linear lookup on a create the local index has not seen yet.
- *
- * @typedef {object} ReplicatedDefinitionChange
- * @property {string} key The fully-qualified setting key that changed.
- * @property {'create'|'update'|'delete'} operation Which hook fired.
- * @property {object|null} [document] The `Setting` document the hook delivered.
- */
 
 /**
  * One mutation's effect on storage, as the managers describe it.

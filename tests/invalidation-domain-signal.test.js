@@ -40,13 +40,7 @@ import {
   withSystem,
 } from './helpers/scopedInvalidationWorld.js';
 
-const { PerRecordCraftingDefinitionRepository } = await import(
-  '../src/systems/PerRecordCraftingDefinitionRepository.js'
-);
-
-const { handleFabricateSettingChange, createRecipeRefreshCoalescer } = await import(
-  '../src/config/settingChangeBridge.js'
-);
+const { handleFabricateSettingChange } = await import('../src/config/settingChangeBridge.js');
 const { CRAFTING_DATA_CHANGED_HOOK, craftingDataChange, PendingChangeDomains } = await import(
   '../src/systems/craftingDataChange.js'
 );
@@ -328,55 +322,6 @@ describe('publisher 3 — a replicated change on a remote-shaped client', () => 
     assert.equal(bus.fallbackCount(), 0);
   });
 
-  it('mints one on the PER-RECORD branch too, which never calls reload()', () => {
-    // The branch #1211 turns on when it flips the Definition Storage Target off `singleArray`.
-    // `applyReplicatedRecordChange` never touches `reload()`, so without a delta minted here
-    // `consumeReloadDelta()` would answer `null` on every remote client and every replicated
-    // edit would route through the broad fallback — this issue's player-side narrowing,
-    // silently disabled by the very next issue in the programme.
-    const documents = new Map();
-    const repository = new PerRecordCraftingDefinitionRepository({
-      keyPrefix: 'recipe.',
-      hydrate: (raw) => Recipe.fromJSON(raw),
-      serialize: (recipe) => recipe.toJSON(),
-      scopeOf: (recipe) => recipe?.craftingSystemId ?? null,
-      collection: () => documents.values(),
-    });
-    const held = persistedRecipe('r-a1', SYS_A, `${SYS_A}-c0`);
-    // PARSED, not a JSON string. `Setting#value` is a `JSONField` whose `initialize` is
-    // `JSON.parse`, so a hydrated document answers with the parsed value — identical in 13.351
-    // and 14.365 — and `src/main.js` hands the live document straight to the bridge. A string
-    // here would exercise only `_readValue`'s tolerant fallback, and would stay green through a
-    // later simplification of that method to the documented parsed form while replication broke.
-    // It is also the house convention: `per-record-definition-repository.test.js` passes parsed
-    // objects at every one of its five call sites.
-    documents.set('fabricate.recipe.r-a1', { key: 'fabricate.recipe.r-a1', value: held });
-    const recipeManager = new RecipeManager({ repository });
-    recipeManager.reload();
-    const bus = tracked(installCraftingDataBus());
-
-    const replicatedDocument = {
-      key: 'fabricate.recipe.r-a1',
-      value: { ...held, description: 'Replicated per-record prose' },
-    };
-    handleFabricateSettingChange('fabricate.recipe.r-a1', {
-      recipeManager,
-      operation: 'update',
-      document: replicatedDocument,
-      callAll: (name, payload) => bus.hooks.callAll(name, payload),
-    });
-
-    assert.equal(
-      recipeManager.getRecipe('r-a1').description,
-      'Replicated per-record prose',
-      'the premise: the record really was applied'
-    );
-    assert.equal(bus.scopedEmissions().length, 1);
-    assert.deepEqual(scopeSummary(bus.scopedEmissions()[0]), [[SYS_A, ['narrative']]]);
-    assert.equal(bus.reloads.journal, 0, 'and the per-record branch narrows exactly as the other');
-    assert.equal(bus.fallbackCount(), 0);
-  });
-
   it('emits NOTHING when the replicated corpus is identical', () => {
     const { world, bus } = wiredWorld();
     tracked(bus);
@@ -648,43 +593,6 @@ describe('batch and import stay bounded', () => {
       bus.scopedEmissions()[0].scopes.map((scope) => scope.systemId).sort(),
       [SYS_A, SYS_B]
     );
-  });
-
-  it('coalesces a per-record replication batch into one signal carrying EVERY record', () => {
-    // The per-record branch mints one delta per record and the next mint replaces it, so a
-    // coalescer that read the scopes at flush time would report the batch's LAST record alone.
-    const bus = tracked(installCraftingDataBus());
-    const refresh = createRecipeRefreshCoalescer({ schedule: () => {} });
-    const applied = [];
-    const recipeManager = {
-      applyReplicatedRecordChange: ({ key }) => {
-        applied.push(key);
-        return true;
-      },
-      getRecipes: () => [],
-      consumeReplicatedChangeScopes: () => [
-        {
-          systemId: String(applied.at(-1)).replace('fabricate.recipe.', ''),
-          domains: [INVALIDATION_DOMAINS.LABELLING],
-        },
-      ],
-    };
-
-    refresh.open();
-    for (const systemId of [SYS_A, SYS_B]) {
-      handleFabricateSettingChange(`fabricate.recipe.${systemId}`, {
-        recipeManager,
-        recipeRefresh: refresh,
-        callAll: (name, payload) => bus.hooks.callAll(name, payload),
-      });
-    }
-    refresh.close();
-
-    assert.equal(bus.scopedEmissions().length, 1, 'one signal for the whole bracket');
-    assert.deepEqual(scopeSummary(bus.scopedEmissions()[0]), [
-      [SYS_A, ['labelling']],
-      [SYS_B, ['labelling']],
-    ]);
   });
 });
 

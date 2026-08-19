@@ -50,6 +50,10 @@ function makeGatheringActorResolvers({ actorsById = {}, selectableActorIds = [] 
   const selectable = new Set(selectableActorIds);
 
   return {
+    // REQUIRED (issue 1261). `cleanupStalePreferences` throws without it rather than pruning
+    // every `salvage:` key against an empty set, so every fixture must state the component
+    // corpus it is pruning against — here, an empty one.
+    validComponentIds: new Set(),
     resolveGatheringActor: (actorId) => actorsById[actorId] ?? null,
     isSelectableGatheringActor: (actor) => selectable.has(actor?.id)
   };
@@ -64,7 +68,9 @@ test('resets lastManagedCraftingSystem to empty when it references a missing sys
     lastManagedCraftingSystem: 'system-gone'
   });
 
-  await cleanupStalePreferences(new Set(), new Set(), getSetting, setSetting);
+  await cleanupStalePreferences(new Set(), new Set(), getSetting, setSetting, {
+    validComponentIds: new Set()
+  });
 
   assert.equal(store.get('lastManagedCraftingSystem'), '');
   const setCall = calls.set.find(c => c.key === 'lastManagedCraftingSystem');
@@ -77,7 +83,9 @@ test('leaves lastManagedCraftingSystem unchanged when it references a valid syst
     lastManagedCraftingSystem: 'system-a'
   });
 
-  await cleanupStalePreferences(new Set(['system-a', 'system-b']), new Set(), getSetting, setSetting);
+  await cleanupStalePreferences(new Set(['system-a', 'system-b']), new Set(), getSetting, setSetting, {
+    validComponentIds: new Set()
+  });
 
   assert.equal(store.get('lastManagedCraftingSystem'), 'system-a');
   const setCall = calls.set.find(c => c.key === 'lastManagedCraftingSystem');
@@ -89,7 +97,9 @@ test('resets lastAlchemySystem when it references a missing system', async () =>
     lastAlchemySystem: 'system-deleted'
   });
 
-  await cleanupStalePreferences(new Set(['system-other']), new Set(), getSetting, setSetting);
+  await cleanupStalePreferences(new Set(['system-other']), new Set(), getSetting, setSetting, {
+    validComponentIds: new Set()
+  });
 
   assert.equal(store.get('lastAlchemySystem'), '');
   const setCall = calls.set.find(c => c.key === 'lastAlchemySystem');
@@ -102,7 +112,9 @@ test('leaves lastAlchemySystem unchanged when it references a valid system', asy
     lastAlchemySystem: 'system-a'
   });
 
-  await cleanupStalePreferences(new Set(['system-a']), new Set(), getSetting, setSetting);
+  await cleanupStalePreferences(new Set(['system-a']), new Set(), getSetting, setSetting, {
+    validComponentIds: new Set()
+  });
 
   assert.equal(store.get('lastAlchemySystem'), 'system-a');
   const setCall = calls.set.find(c => c.key === 'lastAlchemySystem');
@@ -114,7 +126,9 @@ test('leaves lastManagedCraftingSystem unchanged when it is already empty', asyn
     lastManagedCraftingSystem: ''
   });
 
-  await cleanupStalePreferences(new Set(), new Set(), getSetting, setSetting);
+  await cleanupStalePreferences(new Set(), new Set(), getSetting, setSetting, {
+    validComponentIds: new Set()
+  });
 
   assert.equal(store.get('lastManagedCraftingSystem'), '');
   const setCall = calls.set.find(c => c.key === 'lastManagedCraftingSystem');
@@ -199,7 +213,8 @@ test('preserves lastGatheringActor when cleanup runs without gathering actor res
     new Set(),
     new Set(),
     getSetting,
-    setSetting
+    setSetting,
+    { validComponentIds: new Set() }
   );
 
   assert.equal(store.get('lastGatheringActor'), 'actor-1');
@@ -251,7 +266,9 @@ test('removes progressive-order entries for missing recipes', async () => {
     }
   });
 
-  await cleanupStalePreferences(new Set(), new Set(['recipe-valid']), getSetting, setSetting);
+  await cleanupStalePreferences(new Set(), new Set(['recipe-valid']), getSetting, setSetting, {
+    validComponentIds: new Set()
+  });
 
   const result = store.get('progressiveResultOrder');
   assert.deepEqual(result, { 'recipe:recipe-valid': ['r3', 'r4'] });
@@ -263,7 +280,9 @@ test('retains all progressive-order entries when all recipes are valid', async (
     progressiveResultOrder: order
   });
 
-  await cleanupStalePreferences(new Set(), new Set(['recipe-a', 'recipe-b']), getSetting, setSetting);
+  await cleanupStalePreferences(new Set(), new Set(['recipe-a', 'recipe-b']), getSetting, setSetting, {
+    validComponentIds: new Set()
+  });
 
   assert.deepEqual(store.get('progressiveResultOrder'), order);
   const setCall = calls.set.find(c => c.key === 'progressiveResultOrder');
@@ -277,7 +296,9 @@ test('does not call setSetting for progressiveResultOrder when no entries need r
     progressiveResultOrder: { 'recipe:recipe-x': ['r1', 'r2'] }
   });
 
-  await cleanupStalePreferences(new Set(), new Set(['recipe-x']), getSetting, setSetting);
+  await cleanupStalePreferences(new Set(), new Set(['recipe-x']), getSetting, setSetting, {
+    validComponentIds: new Set()
+  });
 
   const setKeys = calls.set.map(c => c.key);
   assert.ok(!setKeys.includes('progressiveResultOrder'), 'setSetting should not be called for progressiveResultOrder');
@@ -339,7 +360,9 @@ test('drops unknown-prefix and legacy BARE-id keys (D14 policy)', async () => {
     }
   });
 
-  await cleanupStalePreferences(new Set(), new Set(['recipe-valid']), getSetting, setSetting);
+  await cleanupStalePreferences(new Set(), new Set(['recipe-valid']), getSetting, setSetting, {
+    validComponentIds: new Set()
+  });
 
   assert.deepEqual(
     store.get('progressiveResultOrder'),
@@ -365,7 +388,8 @@ test('cleans both stale system and stale recipe preferences in one call', async 
     new Set(['live-system']),
     new Set(['live-recipe']),
     getSetting,
-    setSetting
+    setSetting,
+    { validComponentIds: new Set() }
   );
 
   assert.equal(store.get('lastManagedCraftingSystem'), '');
@@ -386,8 +410,52 @@ test('does nothing when all preferences are valid — no setSetting calls for ei
     new Set(['system-1']),
     new Set(['recipe-1']),
     getSetting,
-    setSetting
+    setSetting,
+    { validComponentIds: new Set() }
   );
 
   assert.equal(calls.set.length, 0, 'setSetting should not be called at all when all preferences are valid');
+});
+
+// ---------------------------------------------------------------------------
+// Group 5: the component id set is REQUIRED (issue 1261)
+// ---------------------------------------------------------------------------
+
+test('omitting validComponentIds throws rather than pruning every salvage: key', async () => {
+  // Issue 1196's shape reached through an omitted ARGUMENT rather than an incomplete corpus.
+  // The parameter used to default to `new Set()`, so a caller that forgot it silently rewrote
+  // the whole progressive-order map with every `salvage:<componentId>` key dropped — a
+  // corpus-derived prune against a basis of nothing, on a healthy world, with no error.
+  const { store, calls, getSetting, setSetting } = makeSettings({
+    progressiveResultOrder: { 'salvage:comp-live': ['r1', 'r2'] }
+  });
+
+  await assert.rejects(
+    () => cleanupStalePreferences(new Set(), new Set(), getSetting, setSetting),
+    /validComponentIds/,
+    'the omission is refused by name'
+  );
+
+  assert.equal(calls.set.length, 0, 'and nothing was written before it refused');
+  assert.deepEqual(
+    store.get('progressiveResultOrder'),
+    { 'salvage:comp-live': ['r1', 'r2'] },
+    'the salvage preference the old default would have dropped is intact'
+  );
+});
+
+test('an explicitly empty validComponentIds still prunes, so the guard is not a blanket refusal', async () => {
+  const { store, getSetting, setSetting } = makeSettings({
+    progressiveResultOrder: { 'salvage:comp-gone': ['r1'] }
+  });
+
+  await cleanupStalePreferences(new Set(), new Set(), getSetting, setSetting, {
+    validComponentIds: new Set()
+  });
+
+  assert.deepEqual(
+    store.get('progressiveResultOrder'),
+    {},
+    'a caller that really means "no live components" still gets the prune'
+  );
 });
