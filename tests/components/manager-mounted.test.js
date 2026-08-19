@@ -892,6 +892,31 @@ async function settleDowntimeProvider() {
   flushSync();
 }
 
+/**
+ * Mount the manager with the World > Downtime surface UNLOCKED (issue 1257).
+ *
+ * The route and its rail group are gated behind `fabricate.experimentalFeatures` until the
+ * premium Downtime Studio ships, and the harness's `createStore` defaults that projection to
+ * `false` — deliberately, because the Graph placeholder's own gate is asserted from the same
+ * default. So every Downtime case opts in, and it does so through ONE named helper rather
+ * than 28 copies of the same store option: the gate is then stated once, and removing it when
+ * the Studio releases is one deletion rather than a sweep.
+ *
+ * @param {Array} [calls] Store call log, as `mountManager` takes it.
+ * @param {object} [storeOptions] Store options; may override the flag to assert the gate.
+ * @param {object} [services] Injected services.
+ * @param {object} [rootProps] Extra root props, e.g. `managerExtensions`.
+ * @returns {HTMLElement} The mounted target.
+ */
+function mountDowntimeManager(calls = [], storeOptions = {}, services = {}, rootProps = {}) {
+  return mountManager(
+    calls,
+    { experimentalFeaturesEnabled: true, ...storeOptions },
+    services,
+    rootProps
+  );
+}
+
 // The three reads every Downtime seam case makes, named once.
 //
 // `downtimeTabIds` is CORE-FALLBACK ONLY (issue 1213). It reads the preview's tab strip, and
@@ -1045,16 +1070,23 @@ async function switchScopeSystemTo(systemId) {
   return target.querySelector('.fabricate-manager').dataset.managerView;
 }
 
+// The store the most recent `mountManager` built. Exposed so a case can drive a WORLD
+// SETTING CHANGE the way production does — the real `adminStore` republishes `viewState`
+// when a setting moves — rather than by remounting, which cannot reproduce a flag flipping
+// under a GM who is already standing somewhere (issue 1257).
+let mountedStore = null;
+
 // Mount the manager against a fresh store on a fresh host element. Assigns the
 // module-level `mounted`/`target` (so afterEach can clean up) and returns the target,
 // so the routing helpers below differ only in where they navigate afterwards.
 function mountManager(calls = [], storeOptions = {}, services = {}, rootProps = {}) {
   target = document.createElement('div');
   document.body.appendChild(target);
+  mountedStore = createStore(calls, storeOptions);
   mounted = mount(Component, {
     target,
     props: {
-      store: createStore(calls, storeOptions),
+      store: mountedStore,
       services: { openCurrentAdmin: () => {}, ...services },
       ...rootProps,
     },
@@ -3120,8 +3152,9 @@ describe('CraftingSystemManager mounted behavior', () => {
         'Tools',
         'Checks',
         'Gathering',
+        // No 'Downtime' (issue 1257): the World > Downtime group is gated behind
+        // `fabricate.experimentalFeatures`, which this store fixture leaves at its default off.
         'Parties',
-        'Downtime',
       ]
     );
     assert.equal(
@@ -6610,7 +6643,9 @@ describe('CraftingSystemManager mounted behavior', () => {
     const navLabels = Array.from(target.querySelectorAll('.manager-nav-label')).map((label) =>
       label.textContent.trim()
     );
-    assert.deepEqual(navLabels, ['Parties', 'Downtime']);
+    // 'Parties' alone: the Downtime group is experimental-gated (issue 1257) and this
+    // fixture leaves `fabricate.experimentalFeatures` at its default off.
+    assert.deepEqual(navLabels, ['Parties']);
     assert.ok(target.textContent.includes('Crafting Systems'));
     assert.ok(target.textContent.includes('No crafting systems yet'));
     assert.ok(target.textContent.includes('Set up your first system'));
@@ -6712,8 +6747,9 @@ describe('CraftingSystemManager mounted behavior', () => {
         'Tags & Categories',
         'Tools',
         'Checks',
+        // No 'Downtime' (issue 1257): the World > Downtime group is gated behind
+        // `fabricate.experimentalFeatures`, which this store fixture leaves at its default off.
         'Parties',
-        'Downtime',
       ]
     );
 
@@ -13928,6 +13964,9 @@ describe('CraftingSystemManager mounted behavior', () => {
       props: {
         store: createStore(calls, {
           gatheringRealmsEnabled: true,
+          // The World nav's Downtime entry is experimental-gated (issue 1257), and this case
+          // asserts the whole World group, so it opts in.
+          experimentalFeaturesEnabled: true,
         }),
         services: { openCurrentAdmin: () => {} },
       },
@@ -14049,7 +14088,7 @@ describe('CraftingSystemManager mounted behavior', () => {
       ],
     ]);
     globalThis.game.i18n.localize = (key) => localized.get(key) ?? originalLocalize(key);
-    mountManager(calls, {}, {}, { managerExtensions: registry });
+    mountDowntimeManager(calls, {}, {}, { managerExtensions: registry });
 
     worldNavItem('downtime').click();
     await settleRouteExit();
@@ -14157,7 +14196,7 @@ describe('CraftingSystemManager mounted behavior', () => {
   it('nests four locked Downtime previews in the rail and drives one navigation from either trigger', async () => {
     useShippedLocalization();
     const calls = [];
-    mountManager(calls, {}, {}, { managerExtensions: createManagerExtensionsRegistry() });
+    mountDowntimeManager(calls, {}, {}, { managerExtensions: createManagerExtensionsRegistry() });
 
     assert.ok(
       !target.querySelector('[data-world-downtime-submenu]'),
@@ -14290,7 +14329,7 @@ describe('CraftingSystemManager mounted behavior', () => {
 
   it('titles the Downtime route after the preview on screen, in the header and the breadcrumb', async () => {
     useShippedLocalization();
-    mountManager([], {}, {}, { managerExtensions: createManagerExtensionsRegistry() });
+    mountDowntimeManager([], {}, {}, { managerExtensions: createManagerExtensionsRegistry() });
     worldNavItem('downtime').click();
     await settleRouteExit();
 
@@ -14332,7 +14371,7 @@ describe('CraftingSystemManager mounted behavior', () => {
 
   it('renders every Downtime board row as thing, detail and reading, with its closing notes', async () => {
     useShippedLocalization();
-    mountManager([], {}, {}, { managerExtensions: createManagerExtensionsRegistry() });
+    mountDowntimeManager([], {}, {}, { managerExtensions: createManagerExtensionsRegistry() });
     worldNavItem('downtime').click();
     await settleRouteExit();
 
@@ -14441,7 +14480,7 @@ describe('CraftingSystemManager mounted behavior', () => {
   it('updates an open Downtime host and cleans each companion mount exactly once', async () => {
     const registry = createManagerExtensionsRegistry();
     const cleanups = [];
-    mountManager([], {}, {}, { managerExtensions: registry });
+    mountDowntimeManager([], {}, {}, { managerExtensions: registry });
     worldNavItem('downtime').click();
     await settleRouteExit();
 
@@ -14500,7 +14539,7 @@ describe('CraftingSystemManager mounted behavior', () => {
   // of the host's own `shell`, so no id scheme on the rail could have fixed it either.
   it('recovers focus onto the companion panel when a provider registers under a focused Core tab', async () => {
     const registry = createManagerExtensionsRegistry();
-    mountManager([], {}, {}, { managerExtensions: registry });
+    mountDowntimeManager([], {}, {}, { managerExtensions: registry });
     worldNavItem('downtime').click();
     await settleRouteExit();
 
@@ -14531,7 +14570,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     useShippedLocalization();
     const registry = createManagerExtensionsRegistry();
     const settingWrites = [];
-    mountManager(
+    mountDowntimeManager(
       [],
       {},
       {
@@ -14581,7 +14620,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     const registry = createManagerExtensionsRegistry();
     const settingWrites = [];
     registry.publicApi.registerWorldNavProvider(downtimeProvider({ ids: ['board'] }));
-    mountManager(
+    mountDowntimeManager(
       [],
       { noSystems: true },
       {
@@ -14625,7 +14664,7 @@ describe('CraftingSystemManager mounted behavior', () => {
       registry.publicApi.registerWorldNavProvider(
         downtimeProvider({ prefix: 'Guild', ids: ['ledger', 'crew'] })
       );
-      mountManager([], {}, {}, { managerExtensions: registry });
+      mountDowntimeManager([], {}, {}, { managerExtensions: registry });
       assert.deepEqual(scrolled, [], 'nothing is revealed while the GM is on another route');
 
       worldNavItem('downtime').click();
@@ -14662,7 +14701,7 @@ describe('CraftingSystemManager mounted behavior', () => {
       scrolled.push(this.id);
     };
     try {
-      mountManager([]);
+      mountDowntimeManager([]);
       worldNavItem('downtime').click();
       await settleRouteExit();
       assert.deepEqual(scrolled, [], 'core-fallback keeps its strip at the top of the panel');
@@ -14678,7 +14717,7 @@ describe('CraftingSystemManager mounted behavior', () => {
   it('moves the premium signal to the title bar when a companion registers', async () => {
     useShippedLocalization();
     const registry = createManagerExtensionsRegistry();
-    mountManager([], {}, {}, { managerExtensions: registry });
+    mountDowntimeManager([], {}, {}, { managerExtensions: registry });
 
     const titlebarPremium = () => target.querySelector('[data-manager-titlebar-premium]');
     const railChip = () => target.querySelector('[data-world-nav-premium]');
@@ -14738,7 +14777,7 @@ describe('CraftingSystemManager mounted behavior', () => {
   it('lights the title-bar premium badge for a surface Core does not host', async () => {
     useShippedLocalization();
     const registry = createManagerExtensionsRegistry();
-    mountManager([], {}, {}, { managerExtensions: registry });
+    mountDowntimeManager([], {}, {}, { managerExtensions: registry });
 
     registry.publicApi.registerWorldNavProvider(downtimeProvider({ id: 'crew-quarters' }));
     await settleDowntimeProvider();
@@ -14767,7 +14806,7 @@ describe('CraftingSystemManager mounted behavior', () => {
   it('lights the title-bar premium badge for a companion registered ONLY in the player registry', async () => {
     useShippedLocalization();
     const playerExtensions = createPlayerExtensionsRegistry({ emitHook: () => {} });
-    mountManager(
+    mountDowntimeManager(
       [],
       {},
       {},
@@ -14812,7 +14851,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     const originalError = console.error;
     console.error = (...args) => errors.push(args);
     try {
-      mountManager([], {}, {}, { managerExtensions: registry });
+      mountDowntimeManager([], {}, {}, { managerExtensions: registry });
       worldNavItem('downtime').click();
       await settleRouteExit();
 
@@ -14878,7 +14917,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     const originalError = console.error;
     console.error = (...args) => errors.push(args);
     try {
-      mountManager([], {}, {}, { managerExtensions: registry });
+      mountDowntimeManager([], {}, {}, { managerExtensions: registry });
       worldNavItem('downtime').click();
       await settleRouteExit();
       const unregister = registry.publicApi.registerWorldNavProvider(
@@ -14908,7 +14947,7 @@ describe('CraftingSystemManager mounted behavior', () => {
         mount: ({ target: mountTarget }) => () => cleanupConnections.push(mountTarget.isConnected),
       })
     );
-    mountManager([], {}, {}, { managerExtensions: registry });
+    mountDowntimeManager([], {}, {}, { managerExtensions: registry });
     worldNavItem('downtime').click();
     await settleRouteExit();
 
@@ -14933,7 +14972,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     registry.publicApi.registerWorldNavProvider(
       downtimeProvider({ prefix: 'Guild', ids: ['ledger', 'crew'] })
     );
-    mountManager([], {}, {}, { managerExtensions: registry });
+    mountDowntimeManager([], {}, {}, { managerExtensions: registry });
     worldNavItem('downtime').click();
     await settleRouteExit();
 
@@ -15052,7 +15091,7 @@ describe('CraftingSystemManager mounted behavior', () => {
         }),
       })
     );
-    mountManager([], {}, {}, { managerExtensions: registry });
+    mountDowntimeManager([], {}, {}, { managerExtensions: registry });
     worldNavItem('downtime').click();
     await settleRouteExit();
 
@@ -15146,7 +15185,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     const registry = createManagerExtensionsRegistry();
     const mounts = [];
     registry.publicApi.registerWorldNavProvider(chromeChannelProvider(mounts));
-    mountManager([], {}, {}, { managerExtensions: registry });
+    mountDowntimeManager([], {}, {}, { managerExtensions: registry });
     worldNavItem('downtime').click();
     await settleRouteExit();
     assert.equal(mounts.length, 1);
@@ -15235,7 +15274,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     const registry = createManagerExtensionsRegistry();
     const mounts = [];
     registry.publicApi.registerWorldNavProvider(chromeChannelProvider(mounts));
-    mountManager([], {}, {}, { managerExtensions: registry });
+    mountDowntimeManager([], {}, {}, { managerExtensions: registry });
     worldNavItem('downtime').click();
     await settleRouteExit();
     mounts[0].setRouteChrome(COMPANION_EDITOR_CHROME);
@@ -15298,7 +15337,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     const mounts = [];
     const events = [];
     registry.publicApi.registerWorldNavProvider(chromeChannelProvider(mounts));
-    mountManager([], {}, {}, { managerExtensions: registry });
+    mountDowntimeManager([], {}, {}, { managerExtensions: registry });
     worldNavItem('downtime').click();
     await settleRouteExit();
     assert.equal(mounts.length, 1);
@@ -15340,7 +15379,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     const registry = createManagerExtensionsRegistry();
     const mounts = [];
     registry.publicApi.registerWorldNavProvider(chromeChannelProvider(mounts));
-    mountManager([], {}, {}, { managerExtensions: registry });
+    mountDowntimeManager([], {}, {}, { managerExtensions: registry });
     worldNavItem('downtime').click();
     await settleRouteExit();
     mounts[0].onRouteReselect(() => {
@@ -15373,7 +15412,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     const registry = createManagerExtensionsRegistry();
     const mounts = [];
     registry.publicApi.registerWorldNavProvider(chromeChannelProvider(mounts));
-    mountManager([], {}, {}, { managerExtensions: registry });
+    mountDowntimeManager([], {}, {}, { managerExtensions: registry });
     worldNavItem('downtime').click();
     await settleRouteExit();
     assert.equal(mounts.length, 1);
@@ -15582,7 +15621,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     const unregisterFirst = registry.publicApi.registerWorldNavProvider(
       downtimeProvider({ prefix: 'First', ids: ['alpha', 'beta'] })
     );
-    mountManager([], {}, {}, { managerExtensions: registry });
+    mountDowntimeManager([], {}, {}, { managerExtensions: registry });
     worldNavItem('downtime').click();
     await settleRouteExit();
     target.querySelector('#manager-downtime-nav-beta').click();
@@ -15619,7 +15658,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     const unregisterProvider = registry.publicApi.registerWorldNavProvider(
       downtimeProvider({ prefix: 'Guild', ids: ['ledger', 'crew'] })
     );
-    mountManager([], {}, {}, { managerExtensions: registry });
+    mountDowntimeManager([], {}, {}, { managerExtensions: registry });
     worldNavItem('downtime').click();
     await settleRouteExit();
     assert.deepEqual(downtimeRailIds(), ['ledger', 'crew']);
@@ -15674,7 +15713,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     );
     globalThis.game.user = { isGM: true };
     try {
-      mountManager([], {}, {}, { managerExtensions: registry });
+      mountDowntimeManager([], {}, {}, { managerExtensions: registry });
       worldNavItem('downtime').click();
       await settleRouteExit();
 
@@ -15731,7 +15770,7 @@ describe('CraftingSystemManager mounted behavior', () => {
         },
       })
     );
-    mountManager([], { noSystems: true }, {}, { managerExtensions: registry });
+    mountDowntimeManager([], { noSystems: true }, {}, { managerExtensions: registry });
     worldNavItem('downtime').click();
     await settleRouteExit();
 
@@ -15745,7 +15784,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     const registry = createManagerExtensionsRegistry({
       emitHook: (name, payload) => hooks.push([name, payload]),
     });
-    mountManager([], {}, {}, { managerExtensions: registry });
+    mountDowntimeManager([], {}, {}, { managerExtensions: registry });
     worldNavItem('downtime').click();
     await settleRouteExit();
 
@@ -15783,6 +15822,263 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(Boolean(unmountEvent), 'leaving the route publishes the unmount hook');
     assert.equal(unmountEvent[1].tabId, 'factions');
     assert.equal(unmountEvent[1].coreFallback, true);
+  });
+
+  // -- The World > Downtime experimental gate (issue 1257) ------------------------------
+  //
+  // The route hosts the unreleased premium Downtime Studio, so until that ships it is visible
+  // and reachable only behind `fabricate.experimentalFeatures`. These cases own the gate
+  // itself; every other Downtime case in this file opens it through `mountDowntimeManager`.
+
+  // Everything the rail renders for Downtime, as one list, so the hidden and shown cases are
+  // literally the same claim with opposite polarity rather than two hand-kept lists that could
+  // drift into asserting different subsets.
+  const DOWNTIME_RAIL_PARTS = [
+    ['[data-world-downtime-section]', 'the group'],
+    ['#manager-world-nav-downtime', 'the parent row'],
+    ['#manager-downtime-toggle', 'the disclosure toggle'],
+    ['.manager-nav-premium', 'the PREMIUM badge'],
+  ];
+
+  function assertDowntimeRailAbsent() {
+    for (const [selector, label] of DOWNTIME_RAIL_PARTS) {
+      assert.ok(!target.querySelector(selector), `${label} must not render behind a shut gate`);
+    }
+    // The submenu, its padlocks and the premium callout are children of the group, so they go
+    // with it; asserted anyway, because "it is a child today" is the sort of fact a later
+    // refactor moves without noticing.
+    assert.ok(!target.querySelector('[data-world-downtime-submenu]'), 'no submenu');
+    assert.ok(!target.querySelector('[data-world-downtime-lock]'), 'no padlocks');
+    assert.ok(!target.querySelector('[data-world-downtime-callout]'), 'no premium callout');
+  }
+
+  it('hides the whole Downtime group behind a shut gate, and leaves World Parties alone', () => {
+    mountManager([], { experimentalFeaturesEnabled: false });
+
+    assertDowntimeRailAbsent();
+    assert.ok(
+      Boolean(target.querySelector('#manager-world-nav-parties')),
+      'Parties is not gated — it is the permanent World entry the gated route redirects to'
+    );
+    assert.ok(
+      Boolean(target.querySelector('[data-world-nav-section]')),
+      'and the World section itself still renders, with a member left in it'
+    );
+  });
+
+  it('renders the whole Downtime group once the GM opts in', () => {
+    mountDowntimeManager([], {}, {}, { managerExtensions: createManagerExtensionsRegistry() });
+
+    for (const [selector, label] of DOWNTIME_RAIL_PARTS) {
+      assert.ok(Boolean(target.querySelector(selector)), `${label} renders behind an open gate`);
+    }
+    // Opened by the parent click, which is what proves the toggle and submenu are the shipped
+    // ones rather than empty shells the negative case above could pass against vacuously.
+    worldNavItem('downtime').click();
+    flushSync();
+    assert.equal(downtimeRailIds().length, 4, 'and the four Core previews are its children');
+    assert.ok(Boolean(target.querySelector('[data-world-downtime-callout]')));
+  });
+
+  it('leaves the gated Manager with no control that reaches the Downtime route', async () => {
+    mountManager([], { experimentalFeaturesEnabled: false });
+
+    for (const control of Array.from(target.querySelectorAll('[data-world-nav-item]'))) {
+      control.click();
+      await settleRouteExit();
+      assert.notEqual(
+        managerRoute(),
+        'world-downtime',
+        `activating ${control.dataset.worldNavItem} must not reach a gated route`
+      );
+    }
+    assertDowntimeRailAbsent();
+  });
+
+  /**
+   * Turn the world setting off underneath the mounted Manager.
+   *
+   * The real `adminStore` republishes `viewState` when a setting moves, so this is the shape
+   * production has — NOT a remount, which could not reproduce a flag flipping under a GM who
+   * is already standing somewhere.
+   *
+   * @param {boolean} enabled The new value of `fabricate.experimentalFeatures`.
+   */
+  async function setExperimentalFeatures(enabled) {
+    mountedStore.viewState.update((state) => ({
+      ...state,
+      experimentalFeaturesEnabled: enabled,
+    }));
+    await settleRouteExit();
+  }
+
+  /**
+   * Put a companion on the Downtime route with the gate open, recording its lifecycle.
+   *
+   * @param {object} [options] Fixture inputs.
+   * @param {object} [options.registry] Registry to register into.
+   * @returns {Promise<{mounts: object[], cleanups: number[]}>} Mount contexts and cleanup log.
+   */
+  async function standOnCompanionDowntime({ registry = createManagerExtensionsRegistry() } = {}) {
+    const mounts = [];
+    const cleanups = [];
+    const unregister = registry.publicApi.registerWorldNavProvider(
+      downtimeProvider({
+        ids: ['ledger', 'crew'],
+        mount({ target: mountTarget, tabId, context }) {
+          mountTarget.textContent = `Mounted ${tabId}`;
+          mounts.push(context);
+          return () => cleanups.push(tabId);
+        },
+      })
+    );
+    mountDowntimeManager([], {}, {}, { managerExtensions: registry });
+    worldNavItem('downtime').click();
+    await settleRouteExit();
+    assert.equal(mounts.length, 1, 'the companion holds the route before the gate moves');
+    return { mounts, cleanups, unregister };
+  }
+
+  /**
+   * THE SETTING MOVING UNDER A STANDING GM MUST NOT TOUCH THE PANEL (issue 1257).
+   *
+   * The gate is read by the rail group and the two route entries, and DELIBERATELY not by
+   * `normalizedActiveView`. That omission is the whole of this behaviour: `currentView` is a
+   * `$derived`, so a gate read in the normalizer would resolve the route away in the same flush
+   * the setting moved in, unmount the extension host, and run a mounted companion's cleanup —
+   * destroying unsaved work without ever consulting the `onBeforeNavigate` guard that every
+   * other exit from this route honours. A GM's in-progress edit is not ours to discard because a
+   * setting changed, so the panel stays put and the GM leaves it by an ordinary guarded exit.
+   *
+   * This case is a REGRESSION FENCE around that omission. Reintroducing the gate read in the
+   * normalizer — which looks like tightening the gate — turns it red.
+   */
+  it('leaves an open companion panel alone when the setting moves under it', async () => {
+    const { mounts, cleanups } = await standOnCompanionDowntime();
+    const asked = [];
+    mounts[0].onBeforeNavigate((event) => {
+      asked.push(event.reason);
+      return false;
+    });
+
+    // THE POSITIVE CONTROL, and the case is worthless without it. "The guard was not consulted"
+    // reads identically to "no guard was ever registered", and `onBeforeNavigate` returns a silent
+    // no-op unsubscribe when it is called from a context whose mount is not live — so prove the
+    // guard is live, and refusing, BEFORE asserting anything about what does or does not reach it.
+    worldNavItem('parties').click();
+    await settleRouteExit();
+    assert.deepEqual(asked, ['route'], 'an ordinary rail exit consults the guard');
+    assert.equal(managerRoute(), 'world-downtime', 'and its refusal holds the GM on the route');
+    asked.length = 0;
+
+    await setExperimentalFeatures(false);
+
+    assert.equal(managerRoute(), 'world-downtime', 'the open route is not yanked out from under it');
+    assert.ok(Boolean(activeCompanionPanel()), 'the companion panel is still on screen');
+    assert.deepEqual(cleanups, [], 'nothing was torn down, so no unsaved work was discarded');
+    assert.deepEqual(asked, [], 'and nothing prompted either — this is not a navigation at all');
+    assertDowntimeRailAbsent();
+
+    // THE WAY OUT IS UNCHANGED. The rail entry is gone, so the GM leaves by any other control,
+    // and that is the ordinary guarded exit it always was — guard consulted, refusal honoured.
+    worldNavItem('parties').click();
+    await settleRouteExit();
+    assert.deepEqual(asked, ['route'], 'the next navigation still consults the same live guard');
+    assert.equal(managerRoute(), 'world-downtime', 'and still honours its refusal');
+    assert.deepEqual(cleanups, []);
+  });
+
+  it('lets the GM leave the de-gated route for good once the companion allows it', async () => {
+    const { mounts, cleanups } = await standOnCompanionDowntime();
+    let allow = false;
+    mounts[0].onBeforeNavigate(() => allow);
+
+    await setExperimentalFeatures(false);
+    assert.equal(managerRoute(), 'world-downtime');
+
+    allow = true;
+    worldNavItem('parties').click();
+    await settleRouteExit();
+
+    assert.equal(managerRoute(), 'world', 'the GM leaves through the exit they chose');
+    assert.deepEqual(cleanups, ['ledger'], 'and the companion is disposed exactly once, on the way');
+    assertDowntimeRailAbsent();
+
+    // AND CANNOT RETURN. The rail entry is gone and both entries refuse, which is what makes the
+    // route unreachable without the normalizer having to police a token nothing can produce.
+    assert.ok(!target.querySelector('[data-world-downtime-item]'), 'no sub-item survives to click');
+    assert.equal(managerRoute(), 'world');
+  });
+
+  it('accepts a provider registered while gated without blaming the module, and never mounts it', async () => {
+    const hooks = [];
+    const registry = createManagerExtensionsRegistry({
+      emitHook: (name, payload) => hooks.push([name, payload]),
+    });
+    mountManager([], { experimentalFeaturesEnabled: false }, {}, { managerExtensions: registry });
+
+    const mounts = [];
+    const errors = [];
+    const warnings = [];
+    const originalError = console.error;
+    const originalWarn = console.warn;
+    console.error = (...args) => errors.push(args);
+    console.warn = (...args) => warnings.push(args);
+    let unregister;
+    try {
+      // A companion registers at `ready` and cannot know this GM's setting, so registration
+      // must behave exactly as it does with the gate open.
+      assert.doesNotThrow(() => {
+        unregister = registry.publicApi.registerWorldNavProvider(
+          downtimeProvider({
+            mount({ context }) {
+              mounts.push(context);
+            },
+          })
+        );
+      }, 'registration is a page-session concern and never consults a per-world setting');
+      await settleRouteExit();
+    } finally {
+      console.error = originalError;
+      console.warn = originalWarn;
+    }
+
+    assert.deepEqual(errors, [], 'nothing is logged as if the module were at fault');
+    assert.deepEqual(warnings, []);
+    assert.deepEqual(
+      hooks.map(([name]) => name),
+      [MANAGER_HOOKS.NAV_PROVIDER_REGISTERED],
+      'the registration hook still fires, and no surface lifecycle hook does'
+    );
+    assert.equal(typeof unregister, 'function', 'and the companion keeps its unregister handle');
+    assert.deepEqual(mounts, [], 'what it observes is an ABSENCE: mount is simply never called');
+    assert.ok(!target.querySelector('[data-world-downtime-host]'), 'no host is rendered');
+    assertDowntimeRailAbsent();
+  });
+
+  it('cannot be resurrected by requestRemount from a context retained across the gate', async () => {
+    const { mounts, cleanups } = await standOnCompanionDowntime();
+    const retained = mounts[0];
+
+    // Close the gate, then leave the panel the ordinary way — the gate does not evict a standing
+    // GM, so reaching the state this case is about takes both steps.
+    await setExperimentalFeatures(false);
+    worldNavItem('parties').click();
+    await settleRouteExit();
+    assert.equal(managerRoute(), 'world');
+    assert.deepEqual(cleanups, ['ledger'], 'the mount ended on the way out');
+
+    // A companion may hold its context past the mount that minted it — a pending promise, a
+    // stray data listener — and `requestRemount()` is the one context method whose whole job is
+    // to bring a surface back. It must not bring back a surface the gate has removed.
+    assert.doesNotThrow(() => retained.requestRemount());
+    await settleRouteExit();
+
+    assert.equal(managerRoute(), 'world', 'the GM is not dragged back onto a gated route');
+    assert.ok(!target.querySelector('[data-world-downtime-host]'), 'and no host is re-rendered');
+    assert.deepEqual(mounts.length, 1, 'the companion is not mounted a second time');
+    assert.deepEqual(cleanups, ['ledger'], 'nor disposed a second time');
+    assertDowntimeRailAbsent();
   });
 
   it('places permanent World navigation after every selected-system entry, including Graph', () => {
@@ -20879,6 +21175,8 @@ describe('CraftingSystemManager mounted behavior', () => {
     const title = kind === 'task' ? 'Task' : 'Event';
     const storeOptions = {
       gatheringRealmsEnabled: true,
+      // The `downtime` destination below is experimental-gated (issue 1257).
+      experimentalFeaturesEnabled: true,
       [`confirmDiscardGathering${title}Result`]: outcome.action,
     };
     if (outcome.saveResult === false) {
@@ -22707,7 +23005,14 @@ describe('CraftingSystemManager mounted behavior', () => {
     }
 
     function mountRail(rootProps = {}) {
-      mountManager([], { gatheringRealmsEnabled: true }, {}, rootProps);
+      // `experimentalFeaturesEnabled` unlocks the World > Downtime group (issue 1257),
+      // which is one of the five groups this suite's disclosure contract covers.
+      mountManager(
+        [],
+        { gatheringRealmsEnabled: true, experimentalFeaturesEnabled: true },
+        {},
+        rootProps
+      );
       assert.equal(currentManagerView(), 'systems', 'the rail starts on a route inside no group');
       assert.deepEqual(expandedGroupIds(), [], 'and with every group collapsed');
     }
