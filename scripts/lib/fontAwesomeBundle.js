@@ -16,14 +16,6 @@ import zlib from 'node:zlib';
 const BACKSLASH = '\\';
 
 /**
- * The `.fa-<name>` classes that are not icons: family names, sizes, and the animation,
- * rotation and layout utilities. They match the same selector shape as an icon class but never
- * appear in a rule that assigns a glyph, so they are filtered out by construction rather than by
- * this list; the list exists only to document what the construction is excluding.
- */
-export const NON_ICON_UTILITY_CLASS_COUNT = 73;
-
-/**
  * The order of woff2's built-in table tags. A woff2 table directory entry names its table by
  * index into this list rather than by tag, unless the index is 63.
  *
@@ -137,6 +129,10 @@ export function parseGlyphCodepoint(cssValue) {
  * A naive `::before` scrape finds almost nothing in Font Awesome 7 because the release moved from
  * a `content` rule to the `--fa` custom property, and several names routinely share one rule:
  * `.fa-baby-carriage,.fa-carriage-baby{--fa:"\f77d"}` is one picture under two names.
+ *
+ * Requiring a glyph assignment is also what drops the seventy-odd `.fa-<name>` classes that are
+ * not icons — the family names, the sizes, and the animation, rotation and layout utilities. They
+ * match the same selector shape and are excluded by construction rather than by a list.
  *
  * @param {string} cssText
  * @returns {Array<{ names: string[], codepoint: number }>}
