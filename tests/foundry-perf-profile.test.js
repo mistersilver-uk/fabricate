@@ -719,35 +719,120 @@ test('the perf lifecycle forwards the fixture as a flag', () => {
   assert.match(source, /process\.env\.FOUNDRY_PERF_FIXTURE = fixture\[1\]/);
 });
 
-test('the scenario registry imports nothing from src/, so a product deletion cannot break it', () => {
-  // THE COUPLING THAT ALREADY BIT (issues 1255, 1261, 1265). A static import of a shipped
-  // `src/systems/` module made a product-side file deletion a LOAD-TIME `Cannot find module` for
-  // this whole registry -- which takes out EVERY scenario, not the one that used the constant.
+/**
+ * Every module specifier a source file statically loads.
+ *
+ * ONE definition, called by both the gate below and its can-fail proof. A proof that re-typed the
+ * gate's regex would stay green while the gate's own pattern rotted, which is the failure mode a
+ * can-fail proof exists to rule out.
+ *
+ * Covers the four forms that all produce the same load-time resolution: `import ... from`,
+ * `export ... from` (a re-export loads the module identically), a bare side-effect `import '...'`,
+ * and either quote style. Prettier normalises quotes, but `format:check` is a separate CI job from
+ * `npm test`, so this gate does not lean on it.
+ */
+function staticImportSpecifiers(source) {
+  const withFrom = [...source.matchAll(/^\s*(?:import|export)\s[^;]*?from\s+['"]([^'"]+)['"]/gm)];
+  const bare = [...source.matchAll(/^\s*import\s+['"]([^'"]+)['"]/gm)];
+  return [...withFrom, ...bare].map((match) => match[1]);
+}
+
+/**
+ * `src/` specifiers reachable from `entry`, following LOCAL `./` hops inside `scripts/lib/`.
+ *
+ * Transitive on purpose. `foundryPerfScenarios.js` imports no `src/` module directly, but it
+ * imports `./foundryPerfCapture.js`, which does -- and a load-time failure does not care how many
+ * hops away it is. A direct-only scan would have reported this registry clean while a deletion two
+ * files away still took out every scenario.
+ */
+function reachableSrcSpecifiers(entry) {
+  const seen = new Set();
+  const found = [];
+  // Resolve a relative specifier against the importing file's directory, honouring `..` — a naive
+  // "drop the last segment and append" loses the `lib/` in `./lib/x.js` and then reads a path that
+  // does not exist, which fails LOUDLY here but would silently under-report in a laxer gate.
+  const resolveFrom = (fileParts, specifier) => {
+    const parts = fileParts.slice(0, -1);
+    for (const segment of specifier.split('/')) {
+      if (segment === '.' || segment === '') continue;
+      if (segment === '..') parts.pop();
+      else parts.push(segment);
+    }
+    return parts;
+  };
+  const visit = (fileParts) => {
+    const key = fileParts.join('/');
+    if (seen.has(key)) return;
+    seen.add(key);
+    const source = readFileSync(join(REPOSITORY_ROOT, ...fileParts), 'utf8');
+    for (const specifier of staticImportSpecifiers(source)) {
+      if (specifier.includes('/src/')) {
+        found.push({ from: key, specifier });
+        continue;
+      }
+      if (!specifier.startsWith('.')) continue;
+      visit(resolveFrom(fileParts, specifier));
+    }
+  };
+  visit(entry);
+  return found;
+}
+
+/*
+ * The one `src/` module the perf harness is allowed to load, with the reason it is safe.
+ *
+ * `src/utils/startupMarks.js` is a leaf of shared constants -- the startup mark prefix and phase
+ * names the harness reads back out of `performance.getEntriesByType`. It is not product surface
+ * that any storage work removes, and the harness cannot read marks it cannot name.
+ */
+const PERMITTED_SRC_IMPORTS = ['../../src/utils/startupMarks.js'];
+
+test('the perf harness reaches no src/ module except one named leaf', () => {
+  // THE COUPLING 1261 WOULD OTHERWISE BREAK (issues 1255, 1261, 1265). Until this PR the registry
+  // statically imported `src/systems/definitionStorageConsentPrompt.js`, which issue 1261 deletes.
+  // That WOULD have been a load-time `Cannot find module` for the whole registry -- taking out
+  // EVERY scenario, not just the one that used the constant. It has not happened in this tree;
+  // this gate is what keeps it from happening.
   //
-  // Asserted against the import statements rather than against a whole-file grep: prose here
-  // legitimately names `src/` paths, and a grep that matched those would be a gate that can only
-  // fail for the wrong reason.
-  const source = readFileSync(
-    join(REPOSITORY_ROOT, 'scripts', 'lib', 'foundryPerfScenarios.js'),
-    'utf8'
-  );
-  const specifiers = [...source.matchAll(/^\s*import\s[^;]*?from\s+'([^']+)';/gm)].map(
-    (match) => match[1]
-  );
+  // Asserted against import statements rather than a whole-file grep: prose here legitimately
+  // names `src/` paths, and a grep matching those would be a gate that can only fail wrongly.
+  const entries = [
+    ['scripts', 'lib', 'foundryPerfScenarios.js'],
+    ['scripts', 'foundry-perf-run.mjs'],
+  ];
+  const offenders = entries
+    .flatMap((entry) => reachableSrcSpecifiers(entry))
+    .filter((hit) => !PERMITTED_SRC_IMPORTS.includes(hit.specifier));
   assert.deepEqual(
-    specifiers.filter((specifier) => specifier.includes('/src/')),
+    offenders,
     [],
-    'a scenario needs the product from the live PAGE, never from a static import'
+    'the harness needs the product from the live PAGE, never from a static import: ' +
+      offenders.map((hit) => `${hit.from} -> ${hit.specifier}`).join(', ')
   );
 });
 
-test('the src-import scan can actually fail', () => {
-  // Prove the gate before trusting it. A scan whose regex matched nothing would report the file
-  // clean whatever it imported, which is the failure mode every source scan has.
-  const perturbed = "import { THING } from '../../src/systems/somewhere.js';\n";
-  const specifiers = [...perturbed.matchAll(/^\s*import\s[^;]*?from\s+'([^']+)';/gm)].map(
-    (match) => match[1]
+test('the src-import scan can actually fail, on every form it claims to cover', () => {
+  // Prove the gate before trusting it, THROUGH the same function the gate calls. Each string below
+  // is a load-time reach into `src/` that a narrower regex would have missed.
+  const forms = [
+    "import { A } from '../../src/systems/x.js';",
+    'import { A } from "../../src/systems/x.js";',
+    "export { A } from '../../src/systems/x.js';",
+    "import '../../src/systems/x.js';",
+  ];
+  for (const form of forms) {
+    assert.deepEqual(
+      staticImportSpecifiers(`${form}
+`),
+      ['../../src/systems/x.js'],
+      `not detected: ${form}`
+    );
+  }
+  // And the transitive walk finds the one real `src/` reach, which is the permitted leaf. If this
+  // ever returns [] the walk has stopped following `./` hops and the gate above is vacuous.
+  const reached = reachableSrcSpecifiers(['scripts', 'lib', 'foundryPerfScenarios.js']);
+  assert.deepEqual(
+    reached.map((hit) => hit.specifier),
+    ['../../src/utils/startupMarks.js']
   );
-  assert.deepEqual(specifiers, ['../../src/systems/somewhere.js']);
-  assert.equal(specifiers.filter((specifier) => specifier.includes('/src/')).length, 1);
 });

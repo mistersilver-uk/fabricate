@@ -186,6 +186,10 @@ test('no profile claims the foundry-only exemption today', () => {
   // built for. Pinned as `[]` rather than deleted: the pin is the whole mechanism, and an empty
   // expectation is what makes re-adding a member a visible edit rather than a silent widening.
   assert.deepEqual([...FOUNDRY_ONLY_SCALE_PROFILE_NAMES], []);
+  // With the list empty, this assertion is the ONLY load-bearing check on it. Every test below
+  // that iterates `FOUNDRY_ONLY_SCALE_PROFILE_NAMES` now iterates nothing and passes
+  // unconditionally, so read them as dormant rather than as live coverage: they start checking
+  // something again on the first commit that adds a member, which is exactly when they are wanted.
 });
 
 test('the two profile lists partition the registry, with no overlap and nothing dropped', () => {

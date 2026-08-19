@@ -589,14 +589,18 @@ async function main() {
     log('Reloading to measure startup against the seeded corpus...\n');
     await rejoinAfterReload(page, 'Gamemaster');
 
+    // Read after the reload above, before the second client joins, and before the trace starts.
+    // All three matter, and the last one is easy to miss: `fabricateReadyMs` is a
+    // `performance.now()` evaluated on this page when the read RUNS, so it goes on ticking through
+    // anything done first. Reading after the reload is what makes it the SEEDED world's boot;
+    // reading before the join keeps the second context's boot out of it; reading before
+    // `startChromeTrace` keeps the CDP `Tracing.start` round trip out of it, which would otherwise
+    // make a traced run and an untraced run disagree for a reason that has nothing to do with the
+    // corpus. The trace is wanted around the WALK, and the walk is all still below.
+    const startup = await readStartupObservations(page);
+
     const stopTrace =
       process.env.FOUNDRY_PERF_TRACE === '1' ? await startChromeTrace(context, page) : null;
-
-    // Read after the reload above and BEFORE the second client joins. Both halves matter:
-    // reading it after the reload is what makes it the SEEDED world's boot, and reading it
-    // before the join is what keeps the second context's boot out of `fabricateReadyMs`, which
-    // is a `performance.now()` on this page and goes on ticking while anything else happens.
-    const startup = await readStartupObservations(page);
 
     const player = await joinSecondClient(browser);
     playerContext = player.context;
