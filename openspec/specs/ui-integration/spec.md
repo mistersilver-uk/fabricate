@@ -320,6 +320,17 @@ A name added BESIDE that filter rather than to the catalogue is worse still: the
 Its reach is wider than the manager's own screens: an environment's biome icons are chosen from this vocabulary and then rendered to PLAYERS on the gathering environment cards, so the set is part of what a player sees rather than GM-only chrome.
 The full catalogue remains a separate module export, and no picker renders it.
 
+Fabricate publishes that curated vocabulary on its module API as `game.fabricate.listCuratedIcons()`, so a companion module offering an icon field of its own draws from it instead of hand-curating the second list the rule above exists to prevent.
+It is the same set, read from the one place it is constructed, so the vocabulary a companion reads and the vocabulary a picker offers are one set rather than two that have to be kept in step.
+Publication is one way — there is no setter — and the call answers with plain records carrying an icon's bare code, its Font Awesome display name, and whether the regular weight exists for it alongside the solid one.
+Each call builds those records afresh, so a caller may keep, sort or mutate what it receives without reaching anything a picker renders from.
+The call throws before Fabricate is ready rather than answering with an empty list, because an empty vocabulary and a vocabulary that lost its contents are the same value and a caller cannot tell them apart.
+
+The published list is the whole seam.
+The full catalogue is not published either: no picker renders it, so publishing it would invite a companion to offer icons Fabricate's own screens will not.
+Neither is the internal curation predicate: it answers whether any exclusion pattern matches a string, not whether Font Awesome ships that icon, so it calls a typo curated.
+Whether an icon is in the vocabulary is therefore a membership test against the published list, which cannot make that mistake.
+
 #### Numeric entry
 
 Every editable numeric field in the manager and in the interactable and component editors renders through one shared stepper primitive — a typeable `type="number"` input with `−`/`+` adjuncts, a clamp, and no native spinner — EXCEPT the documented non-conformances recorded below.
