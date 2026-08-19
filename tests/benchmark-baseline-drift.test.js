@@ -28,7 +28,6 @@
  * its recipe corpus at 6 rows and `rich-corpus` bounds its solver case at 12 — see the ceilings
  * recorded on each profile. Those bounds buy a guard that runs in the normal suite instead of a
  * fuller measurement that would only ever run by hand and would therefore never catch anything.
- *
  */
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';

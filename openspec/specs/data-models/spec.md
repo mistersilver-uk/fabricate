@@ -2779,7 +2779,7 @@ The report names the omitted passes and the entity kinds that decided them.
 It MUST NOT fail the operation it reports on: an omitted pass is what this gate exists to survive, so it must not stop a boot and must not fail a GM's delete.
 
 **One destructive door remains OUTSIDE this requirement, and it is not safe.**
-The one-shot version-keyed flag auto-stamps are corpus-derived and set their done-marker unconditionally, so a partial corpus burns the one shot and leaves the world permanently under-stamped, repairable only through the manual item-data repair action.
+The one-shot version-keyed flag auto-stamps are corpus-derived and set their done-marker unconditionally, so an id set that was defaulted rather than derived — or one built from a corpus read that failed — burns the one shot and leaves the world permanently under-stamped, repairable only through the manual item-data repair action.
 It is recorded here so that this gate is not read as making it safe.
 The mutation-time door recorded here previously — the flag cleanup reachable from recipe deletion, bulk recipe deletion, the public orphaned-flag entry point, compendium re-import, and system-scoped state cleanup — is now inside the requirement, per the prune-kind scoping above.
 

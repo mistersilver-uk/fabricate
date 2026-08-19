@@ -12,7 +12,7 @@
  *   where it would fire no error hook and leave the module with no managers;
  * - `migrationVersion` is not advanced by a deferred pass, so the next boot re-runs it;
  * - a corpus-global reduction reaches the same decision whatever order the corpus is stored
- *   in (`data-models/spec.md` § Corpus Order).
+ *   in (`data-models/spec.md` § Destructive Pass Safety).
  *
  * The tear assertions read the recorded call log rather than the store's contents: the
  * migrations transform their input in place, so the store already carries the migrated field
