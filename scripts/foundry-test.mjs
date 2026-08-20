@@ -246,6 +246,74 @@ function resolveRunBudget(selectedCheck, checkName) {
   return { runTimeoutMs: defaultRunTimeoutMs(profile), budgetSource: `smoke profile ${profile}` };
 }
 
+/**
+ * Run a check's declared preconditions, and stop the whole pipeline when they are not met.
+ *
+ * Deliberately BEFORE the build as well as before `up`: a run that cannot possibly succeed should
+ * not first spend a Vite build. Only `perf` declares preconditions today, and that is its
+ * acceptance criterion rather than a nicety — the felddy image activates a licence and downloads a
+ * Foundry build at container boot, so "start it and see" is an expensive way to discover a missing
+ * password. A preflight starts nothing and downloads nothing.
+ *
+ * @param {{ preflightArgs: string[]|null }} selectedCheck
+ * @param {string} runPath the check's own script, which implements its `--preflight`
+ * @returns {void} exits 2 rather than returning when the preconditions fail
+ */
+function runDeclaredPreflight(selectedCheck, runPath) {
+  if (!selectedCheck.preflightArgs) return;
+
+  process.stdout.write('=== foundry-test: PREFLIGHT ===\n');
+  if (runScript(runPath, selectedCheck.preflightArgs) !== 0) {
+    process.stderr.write('Preconditions not met. Nothing was started or downloaded.\n');
+    process.exit(2);
+  }
+}
+
+/**
+ * Build the module so the smoke always exercises CURRENT source.
+ *
+ * foundry-setup-data.mjs copies dist/ into the Foundry data dir as the module, so a missing dist/
+ * fails to activate and — worse — a STALE dist/ silently tests old code. Building here removes both
+ * failure modes. CI builds in its own dedicated cached step and sets FOUNDRY_SKIP_BUILD=1 to avoid
+ * double-building.
+ *
+ * @returns {void} exits 2 rather than returning when the build fails
+ */
+function buildModuleUnderTest() {
+  if (process.env.FOUNDRY_SKIP_BUILD === '1') return;
+
+  process.stdout.write('=== foundry-test: BUILD ===\n');
+  // `npm run build` is `node scripts/release.js --no-zip`. Invoke it through the
+  // existing runScript helper (absolute process.execPath, no shell, no PATH lookup)
+  // rather than spawning a PATH-resolved `npm`.
+  if (runScript(join(__dirname, 'release.js'), ['--no-zip']) !== 0) {
+    process.stderr.write('Build failed. Aborting.\n');
+    process.exit(2);
+  }
+}
+
+/**
+ * Run a check's companion probes against the still-live container, and report the first failure.
+ *
+ * They run only after the primary check passes: if boot or Fabricate itself failed, repeating
+ * browser work cannot make that result more informative. The version arm uses this for Font Awesome
+ * because its assertion is about Foundry's served bundle, not about Fabricate's own module state.
+ *
+ * @param {{ companionScripts: Array<{ script: string, timeoutMs: number }>|null }} selectedCheck
+ * @param {number} primaryRunCode
+ * @returns {number} the first non-zero companion exit code, or 0
+ */
+function runCompanionProbes(selectedCheck, primaryRunCode) {
+  if (primaryRunCode !== 0 || !selectedCheck.companionScripts?.length) return 0;
+
+  for (const companion of selectedCheck.companionScripts) {
+    process.stdout.write(`=== foundry-test: COMPANION ${companion.script} ===\n`);
+    const companionCode = runScript(join(__dirname, companion.script), [], companion.timeoutMs);
+    if (companionCode !== 0) return companionCode;
+  }
+  return 0;
+}
+
 async function main() {
   const checkName = applyCliArguments(process.argv.slice(2));
 
@@ -267,33 +335,11 @@ async function main() {
   const run = join(__dirname, selectedCheck.script);
   const down = join(__dirname, 'foundry-test-down.mjs');
 
-  // Step -1: preconditions, for a check that declares them. Deliberately BEFORE the build as well
-  // as before `up`: a run that cannot possibly succeed should not first spend a Vite build.
-  if (selectedCheck.preflightArgs) {
-    process.stdout.write('=== foundry-test: PREFLIGHT ===\n');
-    const preflightCode = runScript(run, selectedCheck.preflightArgs);
-    if (preflightCode !== 0) {
-      process.stderr.write('Preconditions not met. Nothing was started or downloaded.\n');
-      process.exit(2);
-    }
-  }
+  // Step -1: preconditions, for a check that declares them.
+  runDeclaredPreflight(selectedCheck, run);
 
-  // Step 0: Build the module so the smoke always exercises CURRENT source.
-  // foundry-setup-data.mjs copies dist/ into the Foundry data dir as the module, so a
-  // missing dist/ fails to activate and — worse — a STALE dist/ silently tests old
-  // code. Building here removes both failure modes. CI builds in its own dedicated
-  // cached step and sets FOUNDRY_SKIP_BUILD=1 to avoid double-building.
-  if (process.env.FOUNDRY_SKIP_BUILD !== '1') {
-    process.stdout.write('=== foundry-test: BUILD ===\n');
-    // `npm run build` is `node scripts/release.js --no-zip`. Invoke it through the
-    // existing runScript helper (absolute process.execPath, no shell, no PATH lookup)
-    // rather than spawning a PATH-resolved `npm`.
-    const buildCode = runScript(join(__dirname, 'release.js'), ['--no-zip']);
-    if (buildCode !== 0) {
-      process.stderr.write('Build failed. Aborting.\n');
-      process.exit(2);
-    }
-  }
+  // Step 0: build, unless CI already did it.
+  buildModuleUnderTest();
 
   // Step 1: Start the environment
   process.stdout.write('=== foundry-test: UP ===\n');
@@ -312,18 +358,9 @@ async function main() {
   process.stdout.write(`Run budget: ${runTimeoutMs}ms (from ${budgetSource})\n`);
   const runCode = runScript(run, [], runTimeoutMs);
 
-  // Step 2b: A check may declare narrow companion probes that need the SAME live Foundry. They run
-  // only after the primary check passes — if boot or Fabricate itself failed, repeating browser work
-  // cannot make that result more informative. The version arm uses this for Font Awesome because
-  // its assertion is about Foundry's served bundle, not about Fabricate's own module state.
-  let companionCode = 0;
-  if (runCode === 0 && selectedCheck.companionScripts?.length) {
-    for (const companion of selectedCheck.companionScripts) {
-      process.stdout.write(`=== foundry-test: COMPANION ${companion.script} ===\n`);
-      companionCode = runScript(join(__dirname, companion.script), [], companion.timeoutMs);
-      if (companionCode !== 0) break;
-    }
-  }
+  // Step 2b: narrow companion probes that need the SAME live Foundry, for a check that declares
+  // them.
+  const companionCode = runCompanionProbes(selectedCheck, runCode);
 
   // Step 3: Tear down regardless of test result
   process.stdout.write('=== foundry-test: DOWN ===\n');
