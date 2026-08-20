@@ -10619,7 +10619,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     flushSync();
     assert.deepEqual(
       calls.find((call) => call[0] === 'setCategoryIcon'),
-      ['setCategoryIcon', 'potions', 'fas fa-flask-vial'],
+      ['setCategoryIcon', 'potions', 'fas fa-vial'],
       'choosing an option commits immediately — no separate save step'
     );
     assert.equal(
@@ -10681,7 +10681,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     flushSync();
     assert.deepEqual(
       calls.find((call) => call[0] === 'addCategory'),
-      ['addCategory', 'Elixirs', 'fas fa-flask-vial'],
+      ['addCategory', 'Elixirs', 'fas fa-vial'],
       'the picked icon rides along with the new category'
     );
   });
