@@ -60,7 +60,7 @@ export const EXCLUDED_ICON_CODE_PATTERNS = Object.freeze([
   // What is NOT here: `asterisk`, `exclamation` and `question`. Those three read as a drawing as
   // readily as a mark — they are what a story hangs over a character's head — and the first of
   // them is a star.
-  /^[0-9]$/,
+  /^\d$/,
   /^[a-z]$/,
   /^(00|100)$/,
   /^h[1-6]$/,

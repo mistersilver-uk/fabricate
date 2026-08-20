@@ -265,18 +265,45 @@ export function readWoff2Codepoints(filePath) {
 }
 
 /**
- * A name carrying one of Font Awesome's retired-variant markers.
+ * The tokens a retired spelling ends in.
  *
- * `-alt`, a bare `-o`, `-lg`/`-sm` and a trailing ordinal are the suffixes the project used before
- * it moved to descriptive compound names, so `fire-alt`, `home-lg` and `battery-5` are the older
- * spellings of `fire-flame-curved`, `house-chimney` and `battery-full`. `-times`, `-edit` and
+ * `-o`, `-lg`/`-sm` and `-h`/`-v` are the suffixes the project used before it moved to descriptive
+ * compound names, so `home-lg` is the older spelling of `house-chimney`. `-times`, `-edit` and
  * `-broken` are the same thing in word form: Font Awesome 6 renamed every one of them to `-xmark`,
  * `-pen` and `-crack`/`-slash`, and left the old spelling behind as an alias.
- *
- * `-alt` is matched wherever it sits rather than only at the end, because `comment-alt-dots` is a
- * retired spelling of `message-dots` and reads as one in a picker label.
  */
-const RETIRED_NAME_MARKER = /(^|-)alt($|-)|(^|-)(broken|edit|times|o|lg|sm|h|v|[0-9]+)$/;
+const RETIRED_VARIANT_TOKENS = new Set(['broken', 'edit', 'times', 'o', 'lg', 'sm', 'h', 'v']);
+
+/**
+ * Whether a name carries one of Font Awesome's retired-variant markers.
+ *
+ * A marker is a whole hyphen-delimited TOKEN, and reading the name as tokens is what says so.
+ * The equivalent `/(^|-)alt($|-)|(^|-)(broken|edit|…|[0-9]+)$/` this replaces was correct, and
+ * correct in a shape whose two anchors each bound to one alternative — legible only to a reader
+ * who had worked that out (`javascript:S5850`), for the rule that decides which of a glyph's
+ * names a GM is offered.
+ *
+ * `alt` counts wherever it sits rather than only at the end, because `comment-alt-dots` is a
+ * retired spelling of `message-dots` and reads as one in a picker label. Every other marker counts
+ * as the FINAL token only, so `times-circle` and `smoke` are names in their own right — and a
+ * token is why `salt-shaker` is not an `alt` name.
+ *
+ * A trailing ordinal is a marker too: `battery-5`, `temperature-0` and `wifi-3` are the older
+ * spellings of `battery-full`, `temperature-empty` and `wifi`. It over-matches, as `-broken` and
+ * `-o` do: the ten digit icons `.fa-0` through `.fa-9`, `image-broken` and `circle-o` are not
+ * retired anything. Every one of those is the only name its glyph carries, so the over-match is
+ * inert — this ranks the names of ONE glyph, and a glyph with a single name has nothing to rank.
+ *
+ * @param {string} iconName
+ * @returns {boolean}
+ */
+export function isRetiredVariantName(iconName) {
+  const tokens = String(iconName ?? '').split('-');
+  if (tokens.includes('alt')) return true;
+
+  const finalToken = tokens.at(-1);
+  return RETIRED_VARIANT_TOKENS.has(finalToken) || /^\d+$/.test(finalToken);
+}
 
 /**
  * How many names in the bundle start with each leading token.
@@ -315,8 +342,8 @@ export function countLeadingTokens(iconNames) {
  */
 export function preferredIconName(names, leadingTokenCounts) {
   return [...names].sort((left, right) => {
-    const leftRetired = RETIRED_NAME_MARKER.test(left) ? 1 : 0;
-    const rightRetired = RETIRED_NAME_MARKER.test(right) ? 1 : 0;
+    const leftRetired = isRetiredVariantName(left) ? 1 : 0;
+    const rightRetired = isRetiredVariantName(right) ? 1 : 0;
     if (leftRetired !== rightRetired) return leftRetired - rightRetired;
 
     if (right.startsWith(`${left}-`)) return -1;

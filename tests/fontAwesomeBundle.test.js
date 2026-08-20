@@ -13,6 +13,7 @@ import {
   buildIconCatalogue,
   countLeadingTokens,
   iconLabelFor,
+  isRetiredVariantName,
   parseFontAwesomeRelease,
   parseGlyphCodepoint,
   parseIconGlyphRules,
@@ -202,6 +203,56 @@ describe('reading a Font Awesome 6 stylesheet', () => {
   });
 });
 
+describe('recognising a retired Font Awesome spelling', () => {
+  // A marker is a whole hyphen-delimited token. Every name below is one the bundle really
+  // declares, on the side of the line its own group puts it: `fire-alt` is an alias of
+  // `fire-flame-curved`, `home-lg` of `house-chimney`, `battery-5` of the same glyph as
+  // `battery-full`, and `comment-alt-dots` of `message-dots`.
+  it('marks the retired spellings the bundle keeps as aliases', () => {
+    for (const name of [
+      'fire-alt',
+      'comment-alt-dots',
+      'home-lg',
+      'battery-5',
+      'temperature-0',
+      'sort-numeric-up-alt',
+      'money-bill-1'
+    ]) {
+      assert.equal(isRetiredVariantName(name), true, `${name} is a retired spelling`);
+    }
+  });
+
+  // The other side of the same line, and the reason this is read as tokens rather than as
+  // characters: `salt-shaker` ends in no marker, `smoke` is not `-sm`, `times-circle` is a name
+  // whose FIRST token happens to be a rename marker, and `dice-d20`'s final token is not an
+  // ordinal however many digits it contains.
+  it('leaves a name alone when a marker is only part of one of its tokens', () => {
+    for (const name of [
+      'bacon',
+      'salt-shaker',
+      'smoke',
+      'times-circle',
+      'dice-d20',
+      'h1',
+      'otter',
+      'battery-full',
+      'house-chimney'
+    ]) {
+      assert.equal(isRetiredVariantName(name), false, `${name} is not a retired spelling`);
+    }
+  });
+
+  // The rule over-matches three shapes, and this pins that it does: a bare ordinal, a trailing
+  // `-broken` and a trailing `-o` are all names in their own right here. It costs nothing because
+  // each is the only name its glyph carries — `preferredIconName` ranks the names of ONE glyph —
+  // and the curated vocabulary excludes single characters for its own reasons anyway.
+  it('over-matches a handful of single-name glyphs, inertly', () => {
+    assert.equal(isRetiredVariantName('0'), true);
+    assert.equal(isRetiredVariantName('image-broken'), true);
+    assert.equal(isRetiredVariantName('circle-o'), true);
+  });
+});
+
 describe('choosing which of a glyph names the vocabulary offers', () => {
   const counts = countLeadingTokens([
     'gear',
@@ -231,6 +282,27 @@ describe('choosing which of a glyph names the vocabulary offers', () => {
   it('drops a retired-variant spelling, including one buried mid-name', () => {
     assert.equal(preferredIconName(['fire-alt', 'fire-flame-curved'], counts), 'fire-flame-curved');
     assert.equal(preferredIconName(['comment-alt-dots', 'message-dots'], counts), 'message-dots');
+  });
+
+  // The groups the bundle really ships, whose offered name the retired rule is what decides.
+  it('offers the descriptive name over the ordinal or size the bundle also carries', () => {
+    const groups = countLeadingTokens([
+      'battery',
+      'battery-5',
+      'battery-full',
+      'house-chimney',
+      'home-lg',
+      'temperature-empty',
+      'temperature-0',
+      'thermometer-empty'
+    ]);
+
+    assert.equal(preferredIconName(['battery-5', 'battery-full'], groups), 'battery-full');
+    assert.equal(preferredIconName(['home-lg', 'house-chimney'], groups), 'house-chimney');
+    assert.equal(
+      preferredIconName(['temperature-0', 'temperature-empty', 'thermometer-empty'], groups),
+      'temperature-empty'
+    );
   });
 
   // The glyph a family is named after keeps its plain name. `clock-four` is four o'clock only in
