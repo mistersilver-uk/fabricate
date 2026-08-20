@@ -18,6 +18,7 @@ import { chromium } from 'playwright';
 import {
   evaluateFontAwesomeBundleObservation,
   fontAwesomeExpectationForArm,
+  fontAwesomeExpectationLabel,
 } from './lib/fontAwesomeSmokeExpectations.js';
 import { deriveRunIdentity, reconcileFoundryEndpoint } from './lib/foundryRunIdentity.js';
 import { resolveSmokeArmFromEnv } from './lib/foundrySmokeArms.js';
@@ -98,7 +99,7 @@ async function observeFontAwesomeBundle(page) {
 
 async function main() {
   process.stdout.write(
-    `Font Awesome smoke arm: ${ARM.id} — expecting ${EXPECTATION.edition} ${EXPECTATION.version}\n`
+    `Font Awesome smoke arm: ${ARM.id} — expecting ${fontAwesomeExpectationLabel(EXPECTATION)}\n`
   );
 
   const browser = await chromium.launch({ headless: true });
