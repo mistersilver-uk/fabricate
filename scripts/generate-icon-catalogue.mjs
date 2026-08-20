@@ -98,9 +98,12 @@ function renderCatalogueModule({ release, definitions, measurements }) {
 // THE ENTRY SHAPE, and the three decisions behind it:
 //
 // \`iconCode\` — the name the vocabulary offers and persists. Several names routinely share one
-// glyph, so there is one entry per GLYPH, not per name. Which name is offered is a presentation
-// choice and not a claim about Font Awesome's canonical spelling: the bundle cannot reliably answer
-// that, and \`preferredIconName\` in scripts/lib/fontAwesomeBundle.js states the tie-break instead.
+// glyph (\`.fa-baby-carriage,.fa-carriage-baby{--fa:"\\f77d"}\` is one picture under two names), so
+// there is one entry per GLYPH, not per name. Which name is offered is a presentation choice and
+// not a claim about Font Awesome's canonical spelling: the bundle cannot answer that, because
+// every one of its ${measurements.multiNameRules} multi-name selector lists is sorted alphabetically and the order
+// therefore carries no information. \`preferredIconName\` in scripts/lib/fontAwesomeBundle.js states
+// the tie-break it uses instead.
 //
 // \`aliases\` — every other name the bundle gives the same glyph, kept rather than discarded. They
 // are searchable and they resolve, so offering one name refuses none: a GM who types \`cog\` finds
@@ -109,19 +112,16 @@ function renderCatalogueModule({ release, definitions, measurements }) {
 // depiction cannot be dodged by spelling: \`automobile\` is the same drawing as \`car\`.
 //
 // \`hasRegular\` — GONE, and deliberately so rather than left stale. It was meaningful under Font
-// Awesome Free, where the regular weight covered a small subset. It is not meaningful for this
-// measured Foundry bundle: its classic solid and regular faces carry the SAME
-// ${measurements.classicFaceCodepoints} codepoints, so the field would read \`true\` for every entry and
-// distinguish nothing, while making a picker offer two rows of the same drawing at two weights.
-// The generator FAILS rather than warns if a future bundle breaks that invariant; a changed cmap
-// requires revisiting this model before a new catalogue can be committed. The \`far\` prefix is still
-// accepted and still renders; it is simply not a second row.
+// Awesome Free, where the regular weight covered a small subset. It is not meaningful here: the
+// classic solid and regular faces Foundry ships carry the SAME ${measurements.classicFaceCodepoints} codepoints, so the field
+// would read \`true\` for every entry and distinguish nothing, while making a picker offer two rows
+// of the same drawing at two weights. The \`far\` prefix is still accepted and still renders; it is
+// simply not a second row.
 //
-// VERSION COUPLING. This generated file describes ONE Foundry release's bundle. Fabricate's picker
-// applies a version-aware view at runtime so Foundry 13 receives only names its own 6.7.2 stylesheet
-// declares while Foundry 14 receives this complete 7.2.0 catalogue. The generator understands both
-// FA6 \`content:\` rules and FA7 \`--fa\` rules, so it can also be pointed directly at either bundle
-// when investigating or refreshing a supported generation.
+// VERSION COUPLING. This file describes ONE Foundry release's bundle. When Foundry bumps Font
+// Awesome, rerun the generator against the new install: names are added, and Font Awesome does
+// retire and re-alias names between majors, so an icon a GM chose can become an alias of another
+// glyph. Running the generator with \`--check\` reports whether the bundle moved without writing.
 
 const definitions = [
 ${entries}
@@ -198,6 +198,7 @@ function main() {
     foundryVersion,
     glyphRules: rules.length,
     declaredNames: rules.reduce((total, rule) => total + rule.names.length, 0),
+    multiNameRules: rules.filter((rule) => rule.names.length > 1).length,
     classicGlyphs: definitions.length,
     brandGlyphs: rules.filter((rule) => brandCodepoints.has(rule.codepoint)).length,
     classicFaceCodepoints: classicCodepoints.size,
@@ -224,7 +225,7 @@ function main() {
   fs.writeFileSync(OUTPUT_PATH, rendered);
   console.log(
     `Wrote ${measurements.classicGlyphs} icons (${measurements.declaredNames} names over ` +
-      `${measurements.glyphRules} glyph rules, ${measurements.brandGlyphs} brand glyphs excluded) from ` +
+      `${measurements.glyphRules} glyphs, ${measurements.brandGlyphs} brand glyphs excluded) from ` +
       `Font Awesome ${release.edition} ${release.version} in Foundry ${measurements.foundryVersion}.`
   );
 }
