@@ -56,7 +56,7 @@ async function observeFontAwesomeBundle(page) {
   const targetNames = [...new Set([...EXPECTATION.present, ...EXPECTATION.absent])];
 
   return page.evaluate(async (targets) => {
-    const loadedStylesheetUrls = [...document.styleSheets]
+    const loadedStylesheetUrls = [...globalThis.document.styleSheets]
       .map((sheet) => sheet.href)
       .filter((href) => typeof href === 'string' && href.includes('/fonts/fontawesome/'));
     const stylesheetUrl =
@@ -89,7 +89,7 @@ async function observeFontAwesomeBundle(page) {
     return {
       edition: release?.[1] ?? null,
       version: release?.[2] ?? null,
-      names: [...foundNames].sort(),
+      names: [...foundNames].sort((left, right) => (left < right ? -1 : 1)),
       stylesheetUrl,
       glyphRuleCount,
     };
@@ -157,7 +157,9 @@ async function main() {
   if (!passed) process.exit(1);
 }
 
-main().catch((error) => {
+try {
+  await main();
+} catch (error) {
   process.stderr.write(`foundry-icon-bundle-assert fatal error: ${error.message}\n`);
   process.exit(1);
-});
+}
