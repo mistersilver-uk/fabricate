@@ -5,10 +5,60 @@ import {
   buildEssenceIconOptions,
   buildIconDefinitionsForMeasuredBundle,
   filterEssenceIconOptions,
+  getFoundryCuratedIconDefinitionsForMajor,
   getFoundryIconDefinitionsForMajor,
   measureLoadedFontAwesomeGlyphs,
 } from '../src/ui/svelte/util/essenceIcons.js';
 import { FOUNDRY_ICON_DEFINITIONS } from '../src/ui/svelte/util/foundryIconVocabulary.js';
+import {
+  findCuratedIconRecord,
+  listCuratedIconVocabulary,
+} from '../src/utils/iconVocabulary.js';
+
+// A stylesheet fixture shaped like the one a Foundry 13 client actually exposes.
+//
+// Foundry 13 declares its Font Awesome stylesheet as a LAYERED core style, and its layout emits a
+// layered style as `@import "…" layer(variables)` inside an inline `<style>` rather than as a
+// `<link>`. `document.styleSheets` therefore holds ONE sheet whose only rule is a `CSSImportRule`,
+// and `CSSImportRule` does not inherit from `CSSGroupingRule`: it exposes `.styleSheet`, not
+// `.cssRules`. A fixture built as a flat rules array cannot see that, which is exactly how a
+// reader that measured zero glyphs on every v13 client passed its tests.
+const makeStyle = (declarations) => ({
+  getPropertyValue: (name) => declarations[name] ?? '',
+});
+
+const makeRule = (selectorText, declarations) => ({
+  selectorText,
+  style: makeStyle(declarations),
+});
+
+const makeImportRule = (rules) => ({
+  href: 'fonts/fontawesome/css/all.min.css',
+  media: { mediaText: '' },
+  layerName: 'variables',
+  styleSheet: { cssRules: rules },
+});
+
+const makeImportingDocument = (rules) => ({
+  styleSheets: [{ href: null, cssRules: [makeImportRule(rules)] }],
+});
+
+// The multi-declaration classic bodies the real bundle carries: `.fa-gear{--fa:"\f013";--fa--fa:"\f013"}`.
+const FOUNDRY_13_CLASSIC_RULES = [
+  makeRule('.fa-gear,.fa-cog', { '--fa': '"\\f013"', '--fa--fa': '"\\f013"' }),
+  makeRule('.fa-flask', { '--fa': '"\\f0c3"', '--fa--fa': '"\\f0c3"' }),
+  makeRule('.fa-spin', {}),
+];
+
+function withDocument(documentObject, run) {
+  const original = globalThis.document;
+  globalThis.document = documentObject;
+  try {
+    return run();
+  } finally {
+    globalThis.document = original;
+  }
+}
 
 describe('version-aware Foundry icon definitions', () => {
   it('uses the committed Foundry 14 catalogue unchanged on v14', () => {
@@ -52,35 +102,206 @@ describe('version-aware Foundry icon definitions', () => {
   });
 
   it('reads both FA7 --fa and FA6 content glyph assignments from a loaded CSSOM', () => {
-    const makeStyle = (values) => ({
-      getPropertyValue: (name) => values[name] ?? '',
-    });
     const documentObject = {
       styleSheets: [
         {
           cssRules: [
-            {
-              selectorText: '.fa-cog,.fa-gear',
-              style: makeStyle({ '--fa': '"\\f013"' }),
-            },
-            {
-              selectorText: '.fa-flask::before',
-              style: makeStyle({ content: '"\\f0c3"' }),
-            },
-            {
-              selectorText: '.fa-spin',
-              style: makeStyle({}),
-            },
+            makeRule('.fa-cog,.fa-gear', { '--fa': '"\\f013"' }),
+            makeRule('.fa-flask::before', { content: '"\\f0c3"' }),
+            makeRule('.fa-spin', {}),
+            makeRule('.fa-li', { content: '"x"' }),
           ],
         },
       ],
     };
 
     assert.deepEqual(measureLoadedFontAwesomeGlyphs(documentObject), new Map([
-      ['cog', 'fa:"\\f013"'],
-      ['gear', 'fa:"\\f013"'],
-      ['flask', 'content:"\\f0c3"'],
-    ]));
+      ['cog', 'u+f013'],
+      ['gear', 'u+f013'],
+      ['flask', 'u+f0c3'],
+    ]), 'a layout rule\'s content is not a glyph: only a ::before assignment is');
+  });
+
+  // The defect this fixture exists for. A flat rules array cannot reach the rules a v13 client
+  // actually serves, so the previous reader measured nothing and every picker rendered zero rows.
+  it('descends the @import a layered core style emits, not just grouping rules', () => {
+    const glyphs = measureLoadedFontAwesomeGlyphs(
+      makeImportingDocument(FOUNDRY_13_CLASSIC_RULES)
+    );
+
+    assert.deepEqual(glyphs, new Map([
+      ['gear', 'u+f013'],
+      ['cog', 'u+f013'],
+      ['flask', 'u+f0c3'],
+    ]), 'the glyph rules live inside the imported sheet, behind `.styleSheet` rather than `.cssRules`');
+  });
+
+  it('descends grouping rules nested inside an imported sheet', () => {
+    const glyphs = measureLoadedFontAwesomeGlyphs(
+      makeImportingDocument([
+        { conditionText: 'screen', cssRules: [makeRule('.fa-gear', { '--fa': '"\\f013"' })] },
+      ])
+    );
+
+    assert.deepEqual(glyphs, new Map([['gear', 'u+f013']]));
+  });
+
+  // Foundry behind a reverse proxy or a CDN is a supported deployment, and a cross-origin sheet
+  // THROWS on access rather than answering null — at the sheet, and at an import inside it.
+  it('skips a sheet it may not read instead of failing the whole measurement', () => {
+    const unreadableSheet = {
+      get cssRules() {
+        throw new DOMException('cross-origin', 'SecurityError');
+      },
+    };
+    const unreadableImport = {
+      styleSheets: [
+        {
+          cssRules: [
+            {
+              href: 'https://cdn.example/all.min.css',
+              get styleSheet() {
+                throw new DOMException('cross-origin', 'SecurityError');
+              },
+            },
+          ],
+        },
+      ],
+    };
+
+    assert.deepEqual(
+      measureLoadedFontAwesomeGlyphs({
+        styleSheets: [
+          unreadableSheet,
+          ...unreadableImport.styleSheets,
+          ...makeImportingDocument(FOUNDRY_13_CLASSIC_RULES).styleSheets,
+        ],
+      }),
+      new Map([['gear', 'u+f013'], ['cog', 'u+f013'], ['flask', 'u+f0c3']]),
+      'an unreadable sheet costs its own rules, never the rest of the document'
+    );
+  });
+
+  // Chromium resolves the escape when it serializes `content` (the literal private-use character)
+  // and preserves the raw token stream of a custom property, and Foundry 13's bundle sets BOTH on
+  // different rules for the same glyph. Keyed on the declaration text, one glyph became two picker
+  // rows; keyed on the CODEPOINT, it is one.
+  it('groups a raw --fa escape and a resolved content character as one glyph', () => {
+    const glyphs = measureLoadedFontAwesomeGlyphs(
+      makeImportingDocument([
+        makeRule('.fa-gear', { '--fa': '"\\f013"', '--fa--fa': '"\\f013"' }),
+        makeRule('.fa-cog::before', { content: '"\uf013"' }),
+      ])
+    );
+
+    assert.equal(glyphs.get('gear'), glyphs.get('cog'), 'one drawing, one key');
+    assert.deepEqual(buildIconDefinitionsForMeasuredBundle(FOUNDRY_ICON_DEFINITIONS, glyphs), [
+      { iconCode: 'gear', label: 'Gear', aliases: ['cog'] },
+    ], 'and therefore one picker row rather than two');
+  });
+
+  // `--fa:"\30 "` is the digit zero: the trailing space TERMINATES the escape rather than
+  // belonging to it, which is how a minifier spells an escape followed by a hex-looking character.
+  it('reads a whitespace-terminated escape as the codepoint it names', () => {
+    const glyphs = measureLoadedFontAwesomeGlyphs(
+      makeImportingDocument([makeRule('.fa-0', { '--fa': '"\\30 "' })])
+    );
+
+    assert.deepEqual(glyphs, new Map([['0', 'u+30']]));
+  });
+});
+
+describe('an unreadable or unparsed bundle never empties a picker', () => {
+  it('falls back to the committed catalogue for an empty injected measurement', () => {
+    assert.equal(
+      getFoundryIconDefinitionsForMajor(13, { glyphsByName: new Map() }),
+      FOUNDRY_ICON_DEFINITIONS,
+      'zero rows is an unusable icon field; a name this client may not draw is one cosmetic row'
+    );
+    assert.equal(
+      getFoundryCuratedIconDefinitionsForMajor(13, { glyphsByName: new Map() }).length,
+      getFoundryCuratedIconDefinitionsForMajor(14).length
+    );
+  });
+
+  // The reason the empty answer must not be memoized: Foundry serves the bundle through an
+  // `@import`, so a picker built before that import resolves measures nothing, and a memoized
+  // empty result would decide every picker for the rest of the session.
+  it('measures again after an early call found an unparsed stylesheet', () => {
+    const documentObject = { styleSheets: [] };
+
+    withDocument(documentObject, () => {
+      assert.equal(
+        getFoundryIconDefinitionsForMajor(13),
+        FOUNDRY_ICON_DEFINITIONS,
+        'before the import resolves, the committed catalogue is the honest answer'
+      );
+
+      documentObject.styleSheets = makeImportingDocument(FOUNDRY_13_CLASSIC_RULES).styleSheets;
+      const measured = getFoundryIconDefinitionsForMajor(13);
+
+      assert.deepEqual(
+        measured.map(({ iconCode }) => iconCode),
+        ['flask', 'gear'],
+        'the retry reads the bundle the earlier call could not'
+      );
+      assert.equal(getFoundryIconDefinitionsForMajor(13), measured, 'and THAT answer is memoized');
+    });
+  });
+
+  // `currentFoundryMajor()` cannot always tell which generation it is on, and v14 is the one
+  // branch that never measures. Defaulting the unknown case to v14 would offer a v13 client the
+  // whole Font Awesome 7 name list, every added name of which draws as a blank square and any of
+  // which a GM can persist into world data.
+  it('measures rather than assuming the newest generation when it cannot tell', () => {
+    const originalGame = globalThis.game;
+    globalThis.game = undefined;
+
+    try {
+      withDocument(makeImportingDocument(FOUNDRY_13_CLASSIC_RULES), () => {
+        assert.deepEqual(
+          getFoundryIconDefinitionsForMajor().map(({ iconCode }) => iconCode),
+          ['flask', 'gear'],
+          'when in doubt, measure'
+        );
+      });
+
+      withDocument({ styleSheets: [] }, () => {
+        assert.equal(
+          getFoundryIconDefinitionsForMajor(),
+          FOUNDRY_ICON_DEFINITIONS,
+          'and when the measurement is empty, use the committed catalogue'
+        );
+      });
+    } finally {
+      globalThis.game = originalGame;
+    }
+  });
+});
+
+// The published API and the pickers must offer ONE vocabulary. Reading the committed catalogue
+// directly published names an older client cannot draw, contradicting what every picker offers.
+describe('the published vocabulary answers for the client that asked', () => {
+  it('lists and resolves the measured vocabulary, not the committed catalogue', () => {
+    withDocument(makeImportingDocument([
+      makeRule('.fa-gear,.fa-cog', { '--fa': '"\\f013"', '--fa--fa': '"\\f013"' }),
+    ]), () => {
+      assert.deepEqual(
+        listCuratedIconVocabulary(),
+        [{ iconCode: 'gear', label: 'Gear', aliases: ['cog'] }],
+        'the published list is the set this client can draw'
+      );
+      assert.deepEqual(findCuratedIconRecord('cog'), {
+        iconCode: 'gear',
+        label: 'Gear',
+        aliases: ['cog'],
+      }, 'an alias still resolves to the row that draws it');
+      assert.equal(
+        findCuratedIconRecord('flask'),
+        null,
+        'and a catalogue name this bundle does not declare resolves to nothing, as the picker offers nothing'
+      );
+    });
   });
 });
 

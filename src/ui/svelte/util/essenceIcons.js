@@ -1,7 +1,7 @@
 import {
   FOUNDRY_CURATED_ICON_DEFINITIONS,
   FOUNDRY_ICON_DEFINITIONS,
-  isCuratedIconEntry
+  findCuratedIcon
 } from './foundryIconVocabulary.js';
 
 export const DEFAULT_ESSENCE_ICON = 'fas fa-mortar-pestle';
@@ -41,8 +41,9 @@ export function normalizeEssenceColorToken(value) {
 }
 
 const DEFAULT_ICON_PREFIX = 'fas';
-const FOUNDRY_13_MAJOR = 13;
 const FOUNDRY_14_MAJOR = 14;
+const UNDETERMINED_FOUNDRY_MAJOR = null;
+const BACKSLASH = '\\';
 
 const STYLE_PREFIXES = Object.freeze(new Set([
   'fas',
@@ -224,7 +225,7 @@ const USER_SEARCH_ALIASES_BY_ICON = Object.freeze({
 function normalizeSearch(value) {
   return String(value || '')
     .toLowerCase()
-    .replace(/[^a-z0-9]+/g, ' ')
+    .replaceAll(/[^a-z0-9]+/g, ' ')
     .trim();
 }
 
@@ -245,32 +246,117 @@ function normalizePrefix(prefix) {
   return PREFIX_ALIASES[trimmed] || (STYLE_PREFIXES.has(trimmed) ? trimmed : DEFAULT_ICON_PREFIX);
 }
 
+/**
+ * The Foundry generation this client is running, or `null` when the client cannot say.
+ *
+ * `null` is a FIRST-CLASS answer rather than a defaulted one, and the reason is what the callers
+ * do with it. The generation selects between a committed catalogue and a measurement of the
+ * client's own stylesheet, and guessing the newest generation resolves "I do not know which
+ * Foundry this is" into "offer every Font Awesome 7 name" — which on a v13 client offers hundreds
+ * of names its font cannot draw, each rendering as a blank square, any of which a GM can persist
+ * into world data. The rule is: WHEN IN DOUBT, MEASURE; when the measurement is empty, fall back
+ * to the committed catalogue.
+ */
 function currentFoundryMajor() {
   const generation = Number(globalThis.game?.release?.generation);
   if (Number.isInteger(generation) && generation > 0) return generation;
 
   const version = String(globalThis.game?.version ?? globalThis.game?.release?.version ?? '').trim();
   const major = Number.parseInt(version.split('.', 1)[0], 10);
-  return Number.isInteger(major) && major > 0 ? major : FOUNDRY_14_MAJOR;
+  return Number.isInteger(major) && major > 0 ? major : UNDETERMINED_FOUNDRY_MAJOR;
 }
 
-function glyphValue(style, selectorText) {
+/**
+ * A CSS escape, per CSS Syntax §4.3.7: one to SIX hex digits, optionally followed by a single
+ * whitespace that terminates the run rather than belonging to it.
+ *
+ * The same rule the catalogue generator reads the bundle with (`scripts/lib/fontAwesomeBundle.js`),
+ * restated here because that module is a build-time Node script and this one runs in the client.
+ * The terminator form is how a minifier spells an escape whose next character would otherwise be
+ * read as a seventh hex digit — `--fa:"\30 "` is the digit zero, not a three — and the one-digit
+ * bound matters because `\a` is a legal escape naming U+000A.
+ */
+const CSS_HEX_ESCAPE = /^([0-9a-f]{1,6})(?:\r\n|[ \n\t\r\f])?$/i;
+const CSS_STRING = /^(["'])(.*)\1$/s;
+
+/**
+ * The codepoint a CSS string value names, as an opaque grouping key.
+ *
+ * A CODEPOINT rather than the declaration's text, because the two ways this bundle assigns a glyph
+ * do not serialize alike. Chromium resolves the escape when it serializes `content` (`"\uf013"`, the
+ * literal private-use character) but preserves a custom property's raw token stream (`"\\f013"`), and
+ * Foundry 13's bundle sets BOTH, on different rules, for the same glyph. Keying on the text would
+ * split one glyph into two picker rows and let a name excluded in one group be re-admitted in the
+ * other.
+ *
+ * @param {string} cssValue the declaration's value, quotes included
+ * @returns {string} a stable key for the glyph, or `''` when the value names none
+ */
+function glyphKeyFromCssString(cssValue) {
+  const string = CSS_STRING.exec(String(cssValue ?? '').trim());
+  const value = string ? string[2] : '';
+  if (!value) return '';
+
+  if (!value.startsWith(BACKSLASH)) return codepointKey(value.codePointAt(0));
+  const escaped = value.slice(1);
+  const hexEscape = CSS_HEX_ESCAPE.exec(escaped);
+  return codepointKey(hexEscape ? Number.parseInt(hexEscape[1], 16) : escaped.codePointAt(0));
+}
+
+function codepointKey(codepoint) {
+  return Number.isInteger(codepoint) ? `u+${codepoint.toString(16)}` : '';
+}
+
+/**
+ * The glyph one rule assigns, whichever way its release spells the assignment.
+ *
+ * Font Awesome 7 assigns with the `--fa` custom property; Font Awesome 6 assigns with a `content`
+ * declaration on a `::before` pseudo-element, and the pseudo-element requirement is what keeps a
+ * layout rule's `content` from being read as a glyph.
+ */
+function glyphKey(style, selectorText) {
   const modern = String(style?.getPropertyValue?.('--fa') ?? '').trim();
-  if (modern) return `fa:${modern}`;
+  if (modern) return glyphKeyFromCssString(modern);
 
   if (!/::?before\b/i.test(selectorText)) return '';
   const legacy = String(style?.getPropertyValue?.('content') ?? '').trim();
-  return legacy && legacy !== 'normal' && legacy !== 'none' ? `content:${legacy}` : '';
+  if (!legacy || legacy === 'normal' || legacy === 'none') return '';
+  return glyphKeyFromCssString(legacy);
+}
+
+/**
+ * The rule lists nested inside one rule.
+ *
+ * `@media` and `@supports` expose theirs as `cssRules`; an `@import` exposes an entire SHEET as
+ * `styleSheet`, and `CSSImportRule` does not inherit from `CSSGroupingRule`, so it has no
+ * `cssRules` of its own. That distinction decides whether Fabricate measures anything at all on
+ * Foundry 13: Foundry serves its Font Awesome stylesheet as a LAYERED core style, which its
+ * layout emits as `@import "…" layer(variables)` inside an inline `<style>` rather than as a
+ * `<link>`. The only rule in the only sheet is then an import, and a reader that descends
+ * `cssRules` alone measures zero glyphs.
+ *
+ * Each read is guarded because a sheet Foundry serves cross-origin — behind a reverse proxy or a
+ * CDN, both supported deployments — throws `SecurityError` on access rather than answering null.
+ */
+function nestedRuleLists(rule) {
+  const lists = [];
+  for (const read of [() => rule?.cssRules, () => rule?.styleSheet?.cssRules]) {
+    try {
+      const rules = read();
+      if (rules) lists.push(rules);
+    } catch {
+      // A cross-origin sheet is unreadable, not fatal: skip it and read the rest.
+    }
+  }
+  return lists;
 }
 
 function collectGlyphsFromRules(rules, glyphsByName) {
   for (const rule of rules ?? []) {
-    if (rule?.cssRules) {
-      collectGlyphsFromRules(rule.cssRules, glyphsByName);
-    }
+    for (const nested of nestedRuleLists(rule)) collectGlyphsFromRules(nested, glyphsByName);
 
     const selectorText = String(rule?.selectorText ?? '');
-    const glyph = glyphValue(rule?.style, selectorText);
+    const glyph = glyphKey(rule?.style, selectorText);
     if (!glyph) continue;
 
     for (const match of selectorText.matchAll(/\.fa-([a-z0-9-]+)/gi)) {
@@ -289,8 +375,13 @@ function collectGlyphsFromRules(rules, glyphsByName) {
  * same-origin, so the client can answer the stronger question directly. The V13/V14 smoke arms
  * independently assert the bundle release and changelog-known presence/absence sentinels.
  *
+ * Every sheet is read through the same guard, because a stylesheet a client loaded from another
+ * origin throws `SecurityError` on `cssRules` rather than answering null, and one such sheet must
+ * not cost the measurement the rest of the document.
+ *
  * @param {Document|null|undefined} [documentObject]
- * @returns {Map<string, string>}
+ * @returns {Map<string, string>} icon name -> an opaque per-GLYPH key, so two names sharing a
+ *   drawing group together however their release spells the assignment
  */
 export function measureLoadedFontAwesomeGlyphs(documentObject = globalThis.document) {
   const glyphsByName = new Map();
@@ -367,60 +458,106 @@ export function buildIconDefinitionsForMeasuredBundle(sourceDefinitions, glyphsB
   return Object.freeze(definitions);
 }
 
-let measuredGlyphsCache = null;
-let foundry13AllDefinitionsCache = null;
-let foundry13CuratedDefinitionsCache = null;
+/**
+ * The committed catalogue, as the vocabulary pair every fallback answers with.
+ *
+ * FAILING OPEN is the whole point of naming it. An empty measurement and a bundle that draws
+ * nothing are the same value to a reader, so a generation whose stylesheet cannot be read offers
+ * the committed catalogue rather than an empty picker: a name the client may not draw is a
+ * cosmetic defect in one row, whereas zero rows is an icon field a GM cannot use at all.
+ */
+const COMMITTED_ICON_DEFINITIONS = Object.freeze({
+  all: FOUNDRY_ICON_DEFINITIONS,
+  curated: FOUNDRY_CURATED_ICON_DEFINITIONS
+});
 
-function getFoundry13Definitions() {
-  measuredGlyphsCache ??= measureLoadedFontAwesomeGlyphs();
-  foundry13AllDefinitionsCache ??= buildIconDefinitionsForMeasuredBundle(
-    FOUNDRY_ICON_DEFINITIONS,
-    measuredGlyphsCache
+/**
+ * The curated subset of a REBUILT vocabulary.
+ *
+ * Membership is resolved against the committed curated index rather than re-applied as the
+ * exclusion predicate, because the exclusions are about what a glyph DEPICTS and are therefore
+ * evaluated over all of a glyph's names. A rebuilt group carries only the names the measured
+ * bundle declares, so re-running the predicate over that shorter list would re-admit a drawing
+ * that was excluded under a name this generation happens to spell differently.
+ */
+function curatedSubsetOf(definitions) {
+  return Object.freeze(
+    definitions.filter((definition) =>
+      definitionNames(definition).every((name) => findCuratedIcon(name) !== null)
+    )
   );
-  foundry13CuratedDefinitionsCache ??= Object.freeze(
-    foundry13AllDefinitionsCache.filter(isCuratedIconEntry)
-  );
-  return {
-    all: foundry13AllDefinitionsCache,
-    curated: foundry13CuratedDefinitionsCache
-  };
+}
+
+function iconDefinitionsForGlyphs(glyphsByName) {
+  const all = buildIconDefinitionsForMeasuredBundle(FOUNDRY_ICON_DEFINITIONS, glyphsByName);
+  return all.length > 0
+    ? Object.freeze({ all, curated: curatedSubsetOf(all) })
+    : COMMITTED_ICON_DEFINITIONS;
 }
 
 /**
- * Full icon list for a supported Foundry generation.
+ * The measured vocabulary for one document, memoized per document and NEVER when it is empty.
  *
- * V14 is the committed generated catalogue measured from Foundry 14.365 / Font Awesome 7.2.0.
- * V13 is reconstructed from the V13 client's own loaded Font Awesome 6.7.2 glyph rules. Tests may
- * inject a measured map to exercise the V13 split without requiring a Foundry installation.
- *
- * @param {number} [major]
- * @param {{glyphsByName?:Map<string,string>}} [options]
+ * An empty measurement is not an answer about the client's font; it is the state of a client
+ * whose stylesheet has not finished parsing, which is reachable because Foundry serves its Font
+ * Awesome bundle through an `@import` and a picker can be built before that import resolves.
+ * Memoizing it would make one early call decide every picker for the rest of the session, so an
+ * empty result falls back for this call only and the next call measures again.
  */
-export function getFoundryIconDefinitionsForMajor(major = currentFoundryMajor(), options = {}) {
-  if (major === FOUNDRY_14_MAJOR) return FOUNDRY_ICON_DEFINITIONS;
-  if (major === FOUNDRY_13_MAJOR) {
-    if (options.glyphsByName) {
-      return buildIconDefinitionsForMeasuredBundle(FOUNDRY_ICON_DEFINITIONS, options.glyphsByName);
-    }
-    return getFoundry13Definitions().all;
-  }
+const measuredDefinitionsByDocument = new WeakMap();
 
-  const measured = options.glyphsByName ?? measureLoadedFontAwesomeGlyphs();
-  return measured.size > 0
-    ? buildIconDefinitionsForMeasuredBundle(FOUNDRY_ICON_DEFINITIONS, measured)
-    : FOUNDRY_ICON_DEFINITIONS;
+function measuredIconDefinitions(documentObject = globalThis.document) {
+  if (!documentObject) return COMMITTED_ICON_DEFINITIONS;
+
+  const memoized = measuredDefinitionsByDocument.get(documentObject);
+  if (memoized) return memoized;
+
+  const glyphsByName = measureLoadedFontAwesomeGlyphs(documentObject);
+  if (glyphsByName.size === 0) return COMMITTED_ICON_DEFINITIONS;
+
+  const definitions = iconDefinitionsForGlyphs(glyphsByName);
+  measuredDefinitionsByDocument.set(documentObject, definitions);
+  return definitions;
 }
 
-/** Curated icon list for a supported Foundry generation. */
+/**
+ * The vocabulary pair one Foundry generation offers.
+ *
+ * V14 is the committed generated catalogue, measured from Foundry 14.365 / Font Awesome 7.2.0 by
+ * the checked-in generator. EVERY OTHER generation — 13, an unreleased one, and the undetermined
+ * one — is measured from the client's own loaded stylesheet and falls back to the committed
+ * catalogue when that measurement is empty. Tests may inject a measured map to exercise the split
+ * without a Foundry installation.
+ */
+function iconDefinitionsForMajor(major, options = {}) {
+  if (major === FOUNDRY_14_MAJOR) return COMMITTED_ICON_DEFINITIONS;
+  if (options.glyphsByName) return iconDefinitionsForGlyphs(options.glyphsByName);
+  return measuredIconDefinitions();
+}
+
+/**
+ * Full icon list for a Foundry generation.
+ *
+ * @param {number|null} [major]
+ * @param {{glyphsByName?:Map<string,string>}} [options]
+ * @returns {ReadonlyArray<{iconCode:string,label:string,aliases:ReadonlyArray<string>}>}
+ */
+export function getFoundryIconDefinitionsForMajor(major = currentFoundryMajor(), options = {}) {
+  return iconDefinitionsForMajor(major, options).all;
+}
+
+/**
+ * Curated icon list for a Foundry generation.
+ *
+ * @param {number|null} [major]
+ * @param {{glyphsByName?:Map<string,string>}} [options]
+ * @returns {ReadonlyArray<{iconCode:string,label:string,aliases:ReadonlyArray<string>}>}
+ */
 export function getFoundryCuratedIconDefinitionsForMajor(
   major = currentFoundryMajor(),
   options = {}
 ) {
-  if (major === FOUNDRY_14_MAJOR) return FOUNDRY_CURATED_ICON_DEFINITIONS;
-  if (major === FOUNDRY_13_MAJOR && !options.glyphsByName) return getFoundry13Definitions().curated;
-  return Object.freeze(
-    getFoundryIconDefinitionsForMajor(major, options).filter(isCuratedIconEntry)
-  );
+  return iconDefinitionsForMajor(major, options).curated;
 }
 
 function buildUserSearchAliases({ iconCode, label, aliases = [] }) {
@@ -430,7 +567,7 @@ function buildUserSearchAliases({ iconCode, label, aliases = [] }) {
   searchAliases.add(normalizeSearch(label || humanizeIconName(iconCode)));
   for (const name of names) {
     searchAliases.add(normalizeSearch(name.replaceAll('-', ' ')));
-    for (const token of name.split('-').filter(Boolean)) {
+    for (const token of name.split('-')) {
       for (const alias of USER_SEARCH_ALIASES_BY_TOKEN[token] ?? []) {
         searchAliases.add(normalizeSearch(alias));
       }
@@ -489,29 +626,32 @@ function createEssenceIconOptions(iconDefinitions) {
   return Object.freeze(options);
 }
 
-const essenceIconOptionsCache = new Map();
-const essenceAllIconOptionsCache = new Map();
+/**
+ * Picker rows memoized against the VOCABULARY they were built from, not against the generation.
+ *
+ * Keying on the generation would re-introduce the hazard the measurement cache above avoids: a
+ * picker built before the client's stylesheet parsed would pin the fallback catalogue's rows to
+ * this generation for the session, and the later, correct measurement would never be rendered.
+ * Keyed on the array instead, the fallback and the measured vocabulary simply memoize separately,
+ * and a caller-supplied array is collectable once the caller drops it.
+ */
+const essenceIconOptionsByDefinitions = new WeakMap();
+
+function essenceIconOptionsFor(iconDefinitions) {
+  const memoized = essenceIconOptionsByDefinitions.get(iconDefinitions);
+  if (memoized) return memoized;
+
+  const options = createEssenceIconOptions(iconDefinitions);
+  essenceIconOptionsByDefinitions.set(iconDefinitions, options);
+  return options;
+}
 
 export function getEssenceIconOptions() {
-  const major = currentFoundryMajor();
-  if (!essenceIconOptionsCache.has(major)) {
-    essenceIconOptionsCache.set(
-      major,
-      createEssenceIconOptions(getFoundryCuratedIconDefinitionsForMajor(major))
-    );
-  }
-  return essenceIconOptionsCache.get(major);
+  return essenceIconOptionsFor(getFoundryCuratedIconDefinitionsForMajor());
 }
 
 export function getEssenceAllIconOptions() {
-  const major = currentFoundryMajor();
-  if (!essenceAllIconOptionsCache.has(major)) {
-    essenceAllIconOptionsCache.set(
-      major,
-      createEssenceIconOptions(getFoundryIconDefinitionsForMajor(major))
-    );
-  }
-  return essenceAllIconOptionsCache.get(major);
+  return essenceIconOptionsFor(getFoundryIconDefinitionsForMajor());
 }
 
 export function getEssenceIconPrefix(iconClass) {
@@ -533,19 +673,11 @@ export function normalizeEssenceIcon(iconClass) {
 }
 
 export function buildEssenceIconOptions(iconDefinitions = null) {
-  if (iconDefinitions === null) return getEssenceIconOptions();
-  if (iconDefinitions === FOUNDRY_CURATED_ICON_DEFINITIONS && currentFoundryMajor() === FOUNDRY_14_MAJOR) {
-    return getEssenceIconOptions();
-  }
-  if (iconDefinitions === FOUNDRY_ICON_DEFINITIONS && currentFoundryMajor() === FOUNDRY_14_MAJOR) {
-    return getEssenceAllIconOptions();
-  }
-
   const resolvedDefinitions = Array.isArray(iconDefinitions) && iconDefinitions.length > 0
     ? iconDefinitions
     : getFoundryCuratedIconDefinitionsForMajor();
 
-  return createEssenceIconOptions(resolvedDefinitions);
+  return essenceIconOptionsFor(resolvedDefinitions);
 }
 
 /**
