@@ -54,7 +54,7 @@ import { SignatureValidator } from './systems/SignatureValidator.js';
 import { Recipe } from './models/Recipe.js';
 import { Ingredient } from './models/Ingredient.js';
 import { IngredientGroup } from './models/IngredientGroup.js';
-import { listCuratedIconVocabulary } from './utils/iconVocabulary.js';
+import { findCuratedIconRecord, listCuratedIconVocabulary } from './utils/iconVocabulary.js';
 import { MacroExecutor } from './utils/MacroExecutor.js';
 import {
   createGatheringResultCreator,
@@ -1503,43 +1503,75 @@ class Fabricate {
   }
 
   /**
-   * List Fabricate's curated Font Awesome icon vocabulary.
+   * List Fabricate's curated icon vocabulary.
    *
    * ONE vocabulary serves every icon field in Fabricate — essences, categories, biomes — and it
    * is published here so a companion module binds to it instead of hand-curating a second list
-   * that drifts. The set is drawn from Font Awesome Free 6.7.2 classic (brands excluded) and
-   * curated to serve any fictional setting rather than fantasy alone.
+   * that drifts. It is measured from the Font Awesome bundle Foundry itself ships, so every name
+   * in it is a name a Foundry client can draw, and it is curated to serve any fiction rather than
+   * fantasy alone.
    *
    * Named for its siblings: `list…` is what this facade calls a method answering with a
    * collection of plain display records ({@link Fabricate#listSelectableActors},
-   * `listCraftingSourceActors`), as against `get…`, which answers with one thing — a store, a
-   * service, a stored value. `Curated` is the qualifier because the unfiltered catalogue is
-   * deliberately NOT published: no Fabricate picker renders it.
+   * `listCraftingSourceActors`), as against `get…`, which answers with one thing.
+   * `Curated` is the qualifier because the unfiltered catalogue is deliberately NOT published:
+   * no Fabricate picker renders it.
    *
    * Ready-gated by throwing, as every other `list…` method on this facade is, rather than
    * answering with an empty list: an empty vocabulary is indistinguishable from a vocabulary
    * that lost its contents, and a companion's composition edge already wraps these calls and
    * degrades on throw.
    *
-   * The records are freshly built per call, so a caller may keep, sort or mutate them. The
-   * curated array is frozen, but `Object.freeze` is shallow and the entry objects inside it are
-   * the very objects the full catalogue holds, so handing them out would lend a caller a
-   * writable handle on what every Fabricate picker renders from.
+   * The records are freshly built per call, down to the `aliases` array, so a caller may keep,
+   * sort or mutate them. The vocabulary's own rows are frozen entry by entry, which is why the
+   * copy is about ownership rather than defence: a frozen row cannot be sorted or appended to,
+   * and that freezing lives in a generated file rather than in this contract.
    *
-   * Only the list is published, deliberately. The module's internal
-   * `isCuratedFontAwesomeClassicFreeIcon` answers "does any exclusion pattern match this
-   * string", which is NOT the membership question a companion validating a stored icon asks: it
-   * answers true for a typo, for a Pro-only code, and for any string Font Awesome never shipped.
-   * `listCuratedIcons().some(({ iconCode }) => iconCode === code)` answers that question
-   * correctly, so the list is the whole seam.
+   * `aliases` is published rather than dropped because there is one entry per GLYPH and not per
+   * name. A GM's saved `fas fa-cog` names the row offered as `gear`, so a record without the
+   * other names would be a lossy view of a deduplicated set, and the lost part is exactly what a
+   * caller needs to read data a GM already saved.
    *
-   * @returns {Array<{iconCode: string, label: string, hasRegular: boolean}>} the curated icons in
+   * @returns {Array<{iconCode: string, label: string, aliases: string[]}>} the curated icons in
    *   the set's own order, alphabetical by `iconCode`; the code is bare (`mortar-pestle`), and
-   *   `hasRegular` reports whether the `far` weight exists for it as well as `fas`.
+   *   `aliases` carries every other name the same glyph answers to.
    */
   listCuratedIcons() {
     this._requireReady();
     return listCuratedIconVocabulary();
+  }
+
+  /**
+   * Resolve one icon name against the curated vocabulary, under its offered name or any alias.
+   *
+   * Answers the question {@link Fabricate#listCuratedIcons} makes possible but awkward: is the
+   * icon a GM saved still one this vocabulary offers, and which row is it? A companion holding
+   * `fas fa-cog` gets the `gear` row back; a companion holding a typo, a name Foundry cannot
+   * draw, or a real icon the curation leaves out gets `null`.
+   *
+   * `find…` rather than `get…` because the lookup can miss, which is what `null` says here and
+   * what `Array.prototype.find` has always meant. It is a third naming family on this facade, and
+   * a deliberate one: a `get…` sibling would suggest a value always comes back.
+   *
+   * Published as well as `aliases`, because the two answer different questions. `aliases` is for
+   * OFFERING and SEARCHING — a companion's own picker needs the names a GM might type, which is
+   * what Fabricate's picker puts in its own search text. This is for INTERPRETING a persisted
+   * value, and it is O(1) against a prebuilt index rather than a scan of 1879 rows with an
+   * `includes` on each. Both are derivable from the list alone; the derivation for THIS one is
+   * the line a caller gets subtly wrong, because the obvious
+   * `list.some(({ iconCode }) => iconCode === name)` reports a valid saved `cog` as unknown.
+   *
+   * The vocabulary's `isExcludedIconName` is still NOT published, and the original reason holds:
+   * it consults no catalogue, so it answers "not excluded" for a name Foundry cannot render. This
+   * resolves against the catalogue and cannot make that mistake.
+   *
+   * @param {string} iconName a bare Font Awesome icon name, such as `cog` or `gear`
+   * @returns {{iconCode: string, label: string, aliases: string[]}|null} the curated record, or
+   *   `null` when the vocabulary does not offer that name.
+   */
+  findCuratedIcon(iconName) {
+    this._requireReady();
+    return findCuratedIconRecord(iconName);
   }
 
   /**
