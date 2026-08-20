@@ -107,11 +107,28 @@ export function parseFontAwesomeRelease(cssText) {
 }
 
 /**
+ * A CSS escape, per CSS Syntax §4.3.7: one to SIX hex digits, optionally followed by a single
+ * whitespace that terminates the run rather than belonging to it.
+ *
+ * Both halves of that are load-bearing against this bundle. The terminator form is how a minifier
+ * spells an escape whose next character would otherwise be read as a seventh hex digit, and it is
+ * the form `.fa-0` through `.fa-9` are written in: `--fa:"\30 "` is the digit zero, not a three.
+ * The one-digit bound matters because `\a` is a legal escape naming U+000A, and a lower bound of
+ * two would read it as the letter `a`.
+ */
+const CSS_HEX_ESCAPE = /^([0-9a-f]{1,6})(?:\r\n|[ \n\t\r\f])?$/i;
+
+/**
  * Turns the `--fa` custom property's value into the codepoint it names.
  *
  * Font Awesome 7 assigns a glyph with `--fa:"\f6bc"` rather than a `content` rule, and the value
  * is a CSS string in which a backslash starts either a hex escape or a literal-character escape.
- * `\f6bc` is a codepoint; `\+` is the character `+`.
+ * `\f6bc` is a codepoint; `\+` is the character `+`; `\30 ` is a codepoint whose trailing space
+ * is the escape's terminator and not part of the value.
+ *
+ * The codepoint is the ONLY input to the classic-and-not-brands filter that decides what the
+ * catalogue contains, so misreading one is not a cosmetic error: it decides an icon's membership
+ * by whichever face happens to carry the wrong number.
  *
  * @param {string} cssValue the raw text between the quotes
  * @returns {number} a Unicode codepoint
@@ -120,7 +137,8 @@ export function parseGlyphCodepoint(cssValue) {
   const value = String(cssValue ?? '');
   if (!value.startsWith(BACKSLASH)) return value.codePointAt(0);
   const escaped = value.slice(1);
-  return /^[0-9a-f]{2,6}$/i.test(escaped) ? Number.parseInt(escaped, 16) : escaped.codePointAt(0);
+  const hexEscape = CSS_HEX_ESCAPE.exec(escaped);
+  return hexEscape ? Number.parseInt(hexEscape[1], 16) : escaped.codePointAt(0);
 }
 
 /**

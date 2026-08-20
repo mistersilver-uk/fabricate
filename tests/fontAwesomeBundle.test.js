@@ -34,7 +34,8 @@ const STYLESHEET_FIXTURE = [
   `.fa-cog,.fa-gear{--fa:"${BACKSLASH}f013"}`,
   `.fa-gears{--fa:"${BACKSLASH}f085"}`,
   `.fa-github{--fa:"${BACKSLASH}f09b"}`,
-  `.fa-plus{--fa:"${BACKSLASH}+"}`
+  `.fa-plus{--fa:"${BACKSLASH}+"}`,
+  `.fa-0{--fa:"${BACKSLASH}30 "}`
 ].join('');
 
 const CANDLE_HOLDER = 0xf6bc;
@@ -43,6 +44,8 @@ const GEAR = 0xf013;
 const GEARS = 0xf085;
 const GITHUB = 0xf09b;
 const PLUS = 0x2b;
+const ZERO = 0x30;
+const NEWLINE = 0xa;
 
 describe('reading the Font Awesome bundle Foundry ships', () => {
   // Measured rather than assumed, because the catalogue describes one Foundry release's font and
@@ -65,7 +68,7 @@ describe('reading the Font Awesome bundle Foundry ships', () => {
     const rules = parseIconGlyphRules(STYLESHEET_FIXTURE);
     const names = rules.flatMap((rule) => rule.names);
 
-    assert.equal(rules.length, 6);
+    assert.equal(rules.length, 7);
     assert.ok(names.includes('candle-holder'));
     assert.ok(!names.includes('spin'), 'an animation utility is not an icon');
     assert.ok(!names.includes('solid'), 'a family class is not an icon');
@@ -84,6 +87,23 @@ describe('reading the Font Awesome bundle Foundry ships', () => {
     assert.equal(parseGlyphCodepoint(`${BACKSLASH}f6bc`), CANDLE_HOLDER);
     assert.equal(parseGlyphCodepoint(`${BACKSLASH}+`), PLUS);
     assert.equal(parseGlyphCodepoint('A'), 0x41);
+  });
+
+  // CSS Syntax §4.3.7 lets an escape end at a single whitespace instead of at six digits, and
+  // that is how the bundle spells `.fa-0` through `.fa-9`: `"\30 "`. Reading the terminator as
+  // part of the value fails the hex test and falls through to the first DIGIT CHARACTER's own
+  // codepoint, so all ten digits come back as `0x33`. They still reach the catalogue today only
+  // because `0x33` happens to sit in the classic face and not in brands — and the codepoint is
+  // the ONLY input to that filter, so ten icons' membership is currently decided by accident.
+  it('ends a hex escape at its whitespace terminator rather than reading the terminator', () => {
+    assert.equal(parseGlyphCodepoint(`${BACKSLASH}30 `), ZERO);
+    assert.equal(parseGlyphCodepoint(`${BACKSLASH}39 `), 0x39);
+  });
+
+  // `\a` is U+000A, not the letter `a`: a hex escape is one to six digits, and a lower bound of
+  // two reads a legal single-digit escape as a literal character.
+  it('reads a single-digit hex escape as hex', () => {
+    assert.equal(parseGlyphCodepoint(`${BACKSLASH}a`), NEWLINE);
   });
 });
 
@@ -148,7 +168,7 @@ describe('choosing which of a glyph names the vocabulary offers', () => {
 });
 
 describe('building the catalogue', () => {
-  const classicCodepoints = new Set([CANDLE_HOLDER, BABY_CARRIAGE, GEAR, GEARS, PLUS]);
+  const classicCodepoints = new Set([CANDLE_HOLDER, BABY_CARRIAGE, GEAR, GEARS, PLUS, ZERO]);
   const brandCodepoints = new Set([GITHUB]);
 
   it('keeps one entry per glyph, sorted by the offered name, with the rest as aliases', () => {
@@ -158,9 +178,12 @@ describe('building the catalogue', () => {
       brandCodepoints
     });
 
+    // `0` is here because its rule is written `--fa:"\30 "`. Misreading that escape hands the
+    // filter `0x33`, which this fixture's classic face does not carry, and the digit silently
+    // leaves the catalogue — which is the whole defect, seen end to end.
     assert.deepEqual(
       catalogue.map((entry) => entry.iconCode),
-      ['baby-carriage', 'candle-holder', 'gear', 'gears', 'plus']
+      ['0', 'baby-carriage', 'candle-holder', 'gear', 'gears', 'plus']
     );
     assert.deepEqual(
       catalogue.find((entry) => entry.iconCode === 'gear').aliases,
