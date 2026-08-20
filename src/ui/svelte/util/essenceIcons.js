@@ -137,29 +137,31 @@ const PREFIX_ALIASES = Object.freeze({
  * They are deliberately broad RPG/plain-language concepts rather than alternate persisted names:
  * searching "potion" should find flasks, "gold" should find coins, and "character" should find a
  * person even though none of those words needs to become an icon code.
+ *
+ * A key here must name something the vocabulary can actually offer, which the drift guard in
+ * `tests/essenceIconCompatibility.test.js` enforces. That bites hardest on the fantasy staples:
+ * Font Awesome Free publishes no `sword`, `axe`, `dagger`, `mace`, `bow`, `castle`, `chest`,
+ * `crystal` or singular `coin` glyph, and Fabricate may reference only Free names (see the
+ * licensing note in `foundryIconCatalogue.js`), so those keys had nothing left to hang on and are
+ * gone rather than left as dead weight. `coins` survives and still carries money and treasure.
+ * `bag` went for a different reason: `bag-shopping` is the only Free member and curation excludes
+ * it as modern shopping. If Font Awesome promotes any of them into the free set, the key comes
+ * back with the glyph.
  */
 const USER_SEARCH_ALIASES_BY_TOKEN = Object.freeze({
-  axe: ['weapon', 'combat', 'chop'],
-  bag: ['container', 'storage', 'inventory'],
   basket: ['container', 'storage', 'market'],
   bell: ['alert', 'notification', 'signal'],
   book: ['lore', 'knowledge', 'journal', 'tome'],
   bottle: ['potion', 'alchemy', 'liquid'],
-  bow: ['weapon', 'archery', 'ranged'],
   bolt: ['lightning', 'electric', 'electricity', 'energy'],
   box: ['container', 'storage', 'crate'],
   brain: ['mind', 'intelligence', 'knowledge', 'psychic'],
   building: ['place', 'location', 'settlement'],
   cart: ['trade', 'commerce', 'market', 'transport'],
-  castle: ['fortress', 'keep', 'settlement', 'place'],
-  chest: ['loot', 'treasure', 'storage', 'container'],
   clock: ['time', 'duration', 'timer'],
   cloud: ['weather', 'sky'],
   cog: ['gear', 'settings', 'options', 'configuration'],
-  coin: ['money', 'currency', 'gold', 'treasure'],
   coins: ['money', 'currency', 'gold', 'treasure'],
-  crystal: ['gem', 'gemstone', 'jewel', 'magic'],
-  dagger: ['weapon', 'knife', 'combat'],
   database: ['data', 'storage', 'technology'],
   dragon: ['monster', 'creature', 'beast'],
   droplet: ['water', 'liquid', 'moisture'],
@@ -179,7 +181,6 @@ const USER_SEARCH_ALIASES_BY_TOKEN = Object.freeze({
   leaf: ['nature', 'plant', 'herb', 'herbal'],
   lightning: ['electric', 'electricity', 'energy', 'storm'],
   lock: ['security', 'access', 'locked'],
-  mace: ['weapon', 'combat'],
   magic: ['spell', 'arcane', 'mystic'],
   mask: ['disguise', 'identity', 'face'],
   moon: ['night', 'lunar'],
@@ -199,7 +200,6 @@ const USER_SEARCH_ALIASES_BY_TOKEN = Object.freeze({
   stopwatch: ['time', 'duration', 'timer'],
   store: ['trade', 'commerce', 'market', 'merchant'],
   sun: ['day', 'daylight', 'solar'],
-  sword: ['weapon', 'blade', 'combat'],
   syringe: ['medicine', 'medical', 'healing', 'injection'],
   tree: ['nature', 'plant', 'forest', 'wood'],
   user: ['character', 'npc', 'actor', 'person'],
@@ -215,7 +215,6 @@ const USER_SEARCH_ALIASES_BY_ICON = Object.freeze({
   'kit-medical': ['health', 'healing', 'medicine', 'first aid'],
   'mortar-pestle': ['alchemy', 'potion', 'ingredients', 'crafting'],
   'sack-dollar': ['money', 'currency', 'gold', 'treasure', 'loot'],
-  'treasure-chest': ['loot', 'treasure', 'reward', 'storage'],
   'user-ninja': ['character', 'npc', 'rogue', 'assassin'],
   'hat-wizard': ['character', 'npc', 'mage', 'magic', 'spellcaster']
 });
