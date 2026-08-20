@@ -14,6 +14,11 @@
  * cheap, but it is equally runnable against V14 — and running it on both is the only way to know
  * that a V13 failure is a V13 failure rather than a broken check.
  *
+ * The `version` check also runs a Font Awesome companion probe BEFORE teardown. The picker now has
+ * generation-aware icon membership, so "Fabricate loads on V13" is no longer sufficient evidence:
+ * the same command must prove which Font Awesome bundle that V13 client actually serves, and prove
+ * a version-discriminating icon is present/absent where expected.
+ *
  * Exit codes:
  *   0 — smoke test passed
  *   1 — smoke test failed (down was still called)
@@ -45,13 +50,26 @@ const ROOT = join(__dirname, '..');
  * generation `module.json` declares as its minimum?". Its budget is a flat 6 minutes: it boots,
  * asserts a handful of version-sensitive shapes and exits, so anything approaching that number is a
  * hang rather than a long run.
+ *
+ * A check may also name COMPANION scripts that run only after its primary script passes and while
+ * the same container is still alive. That is deliberately narrower than making a second `--check`:
+ * a user asking for the V13/V14 version arm should not have to remember a second command to prove
+ * the Font Awesome premise the version-aware picker relies on.
  */
 const CHECKS = Object.freeze({
-  full: Object.freeze({ script: 'foundry-test-run.mjs', timeoutMs: null, preflightArgs: null }),
+  full: Object.freeze({
+    script: 'foundry-test-run.mjs',
+    timeoutMs: null,
+    preflightArgs: null,
+    companionScripts: null
+  }),
   version: Object.freeze({
     script: 'foundry-version-assert.mjs',
     timeoutMs: 360_000,
-    preflightArgs: null
+    preflightArgs: null,
+    companionScripts: Object.freeze([
+      Object.freeze({ script: 'foundry-icon-bundle-assert.mjs', timeoutMs: 120_000 })
+    ])
   }),
   // The performance profile (issue #1073). It takes NO budget of its own, so the `perf` entry in
   // foundryRunBudget.js decides how long it gets — that is the profile axis doing what it is for,
@@ -64,7 +82,8 @@ const CHECKS = Object.freeze({
   perf: Object.freeze({
     script: 'foundry-perf-run.mjs',
     timeoutMs: null,
-    preflightArgs: ['--preflight']
+    preflightArgs: ['--preflight'],
+    companionScripts: null
   })
 });
 
@@ -293,6 +312,19 @@ async function main() {
   process.stdout.write(`Run budget: ${runTimeoutMs}ms (from ${budgetSource})\n`);
   const runCode = runScript(run, [], runTimeoutMs);
 
+  // Step 2b: A check may declare narrow companion probes that need the SAME live Foundry. They run
+  // only after the primary check passes — if boot or Fabricate itself failed, repeating browser work
+  // cannot make that result more informative. The version arm uses this for Font Awesome because
+  // its assertion is about Foundry's served bundle, not about Fabricate's own module state.
+  let companionCode = 0;
+  if (runCode === 0 && selectedCheck.companionScripts?.length) {
+    for (const companion of selectedCheck.companionScripts) {
+      process.stdout.write(`=== foundry-test: COMPANION ${companion.script} ===\n`);
+      companionCode = runScript(join(__dirname, companion.script), [], companion.timeoutMs);
+      if (companionCode !== 0) break;
+    }
+  }
+
   // Step 3: Tear down regardless of test result
   process.stdout.write('=== foundry-test: DOWN ===\n');
   const downCode = runScript(down);
@@ -302,8 +334,8 @@ async function main() {
   }
 
   // Propagate test result
-  if (runCode !== 0) {
-    process.stderr.write('Smoke test failed. See test-results/summary.json\n');
+  if (runCode !== 0 || companionCode !== 0) {
+    process.stderr.write('Smoke test failed. See test-results/ for the primary and companion summaries.\n');
     process.exit(1);
   }
 
