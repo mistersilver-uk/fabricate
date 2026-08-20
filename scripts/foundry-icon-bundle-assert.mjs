@@ -73,14 +73,33 @@ async function observeFontAwesomeBundle(page) {
 
     const targetSet = new Set(targets);
     const foundNames = new Set();
-    let glyphRuleCount = 0;
-    const rulePattern = /([^{}]+)\{([^{}]+)\}/g;
-    let ruleMatch;
-    while ((ruleMatch = rulePattern.exec(cssText)) !== null) {
-      const body = ruleMatch[2];
-      if (!/(?:--fa\s*:|(?:^|;)\s*content\s*:)/.test(body)) continue;
-      glyphRuleCount += 1;
-      for (const selectorMatch of ruleMatch[1].matchAll(/\.fa-([a-z0-9-]+)/gi)) {
+
+    // Read the stylesheet's declaration blocks without a `([^{}]+)\{([^{}]+)\}` splitter. That
+    // pattern says this far more legibly and is quadratic on a quarter-megabyte of minified CSS
+    // (`javascript:S8786`): its two unbounded classes are ambiguous, so every at-rule prelude it
+    // fails on is retried from the next offset. It is spelled out here rather than shared with
+    // scripts/lib/fontAwesomeCompatibility.js because Playwright serialises this function into the
+    // page, so it can reference nothing outside its own body.
+    //
+    // A `}` closes the INNERMOST open block, so within the text it ends, the last `{` opens that
+    // block and the run in front of that `{` is its selector. Splitting on each in turn puts the
+    // body last and the selector second-to-last, which reproduces the splitter's reading exactly:
+    // an at-rule prelude is not a rule (`@media …{.fa-beat{…}}` reports `.fa-beat`), a block needs
+    // a non-empty selector, and the trailing piece is dropped because nothing closed it.
+    const glyphRuleSelectors = cssText
+      .split('}')
+      .slice(0, -1)
+      .map((block) => block.split('{'))
+      .filter(
+        (parts) =>
+          parts.length > 1 &&
+          parts.at(-2) !== '' &&
+          /(?:--fa\s*:|(?:^|;)\s*content\s*:)/.test(parts.at(-1))
+      )
+      .map((parts) => parts.at(-2));
+
+    for (const selectorText of glyphRuleSelectors) {
+      for (const selectorMatch of selectorText.matchAll(/\.fa-([a-z0-9-]+)/gi)) {
         if (targetSet.has(selectorMatch[1])) foundNames.add(selectorMatch[1]);
       }
     }
@@ -90,7 +109,7 @@ async function observeFontAwesomeBundle(page) {
       version: release?.[2] ?? null,
       names: [...foundNames].sort((left, right) => (left < right ? -1 : 1)),
       stylesheetUrl,
-      glyphRuleCount,
+      glyphRuleCount: glyphRuleSelectors.length,
     };
   }, targetNames);
 }

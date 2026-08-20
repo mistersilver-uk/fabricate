@@ -36,6 +36,70 @@ export function assertClassicFaceParity(
 }
 
 /**
+ * The next `{` or `}` at or after `from`, or -1 when the text holds neither.
+ *
+ * A single character sweep rather than two `indexOf` calls: `indexOf('{')` on text whose remaining
+ * braces are all `}` scans to the end of the stylesheet every time it is asked, which is the same
+ * quadratic cost in a different disguise.
+ *
+ * @param {string} text
+ * @param {number} from
+ * @returns {number}
+ */
+function nextBraceIndex(text, from) {
+  for (let index = from; index < text.length; index += 1) {
+    if (text[index] === '{' || text[index] === '}') return index;
+  }
+  return -1;
+}
+
+/**
+ * Every innermost `selector { declarations }` block in a stylesheet, in source order.
+ *
+ * This replaces a `([^{}]+)\{([^{}]*)\}` splitter, which reads naturally and is the wrong tool
+ * for a quarter-megabyte of minified CSS: its two unbounded character classes are ambiguous, so
+ * every at-rule prelude that fails to match costs the engine a retry from the next offset and its
+ * runtime grows super-linearly in the length of a brace-free run (`javascript:S8786`). The walk
+ * below answers the same question by reading each character once.
+ *
+ * It reports the same blocks the splitter did, deliberately, because the callers' behaviour is
+ * defined by that reading:
+ *
+ * - a nested block's PRELUDE is not a rule. `@media …{.fa-beat{…}}` yields `.fa-beat`, because a
+ *   body that opens another block cannot match; the walk resumes inside the outer block.
+ * - a selector must be non-empty, and a run terminated by `}` rather than `{` is not a selector.
+ * - neither form is a CSS parser: a brace inside a quoted value ends a block early in both. That
+ *   is safe against Font Awesome's output, whose only string values are glyph escapes and font
+ *   family names.
+ *
+ * @param {string} cssText
+ * @returns {Generator<{ selectorText: string, declarations: string }>}
+ */
+function* eachDeclarationBlock(cssText) {
+  const text = String(cssText ?? '');
+  let cursor = 0;
+
+  while (cursor < text.length) {
+    const open = nextBraceIndex(text, cursor);
+    if (open === -1) return;
+    if (open === cursor || text[open] === '}') {
+      cursor = open + 1;
+      continue;
+    }
+
+    const close = nextBraceIndex(text, open + 1);
+    if (close === -1) return;
+    if (text[close] === '{') {
+      cursor = open + 1;
+      continue;
+    }
+
+    yield { selectorText: text.slice(cursor, open), declarations: text.slice(open + 1, close) };
+    cursor = close + 1;
+  }
+}
+
+/**
  * Read Font Awesome 6's icon rules.
  *
  * Font Awesome 7 moved icon glyph assignment to `--fa` on the icon class itself. Font Awesome 6
@@ -48,14 +112,12 @@ export function assertClassicFaceParity(
  */
 export function parseLegacyIconGlyphRules(cssText) {
   const rules = [];
-  const rulePattern = /([^{}]+)\{([^{}]*)\}/g;
-  let match;
 
-  while ((match = rulePattern.exec(String(cssText ?? ''))) !== null) {
-    const content = /(?:^|;)\s*content\s*:\s*(["'])(.*?)\1\s*(?:;|$)/.exec(match[2]);
+  for (const { selectorText, declarations } of eachDeclarationBlock(cssText)) {
+    const content = /(?:^|;)\s*content\s*:\s*(["'])(.*?)\1\s*(?:;|$)/.exec(declarations);
     if (!content) continue;
 
-    const names = [...match[1].matchAll(/\.fa-([a-z0-9-]+)\s*::?before\b/gi)].map(
+    const names = [...selectorText.matchAll(/\.fa-([a-z0-9-]+)\s*::?before\b/gi)].map(
       (selector) => selector[1]
     );
     if (names.length === 0) continue;
