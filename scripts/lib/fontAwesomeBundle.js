@@ -179,29 +179,62 @@ function readUIntBase128(buffer, cursor) {
   throw new Error('Malformed UIntBase128 in the woff2 table directory.');
 }
 
+/**
+ * The codepoints a format 4 subtable covers: 16-bit segment mapping, the format every classic
+ * face uses for the Basic Multilingual Plane.
+ *
+ * The final segment is the mandatory 0xFFFF-to-0xFFFF terminator rather than a mapped character,
+ * so it is skipped instead of adding a codepoint no glyph is drawn for.
+ *
+ * @param {Buffer} cmap
+ * @param {number} subtableOffset
+ * @param {Set<number>} codepoints mutated in place
+ */
+function addFormat4SegmentCodepoints(cmap, subtableOffset, codepoints) {
+  const segmentsTimesTwo = cmap.readUInt16BE(subtableOffset + 6);
+  const endBase = subtableOffset + 14;
+  const startBase = endBase + segmentsTimesTwo + 2;
+  for (let segment = 0; segment < segmentsTimesTwo / 2; segment += 1) {
+    const end = cmap.readUInt16BE(endBase + segment * 2);
+    const start = cmap.readUInt16BE(startBase + segment * 2);
+    if (start === 0xff_ff && end === 0xff_ff) continue;
+    for (let codepoint = start; codepoint <= end; codepoint += 1) codepoints.add(codepoint);
+  }
+}
+
+/**
+ * The codepoints a format 12 subtable covers: 32-bit segmented coverage, which is how a face
+ * declares anything above the Basic Multilingual Plane.
+ *
+ * @param {Buffer} cmap
+ * @param {number} subtableOffset
+ * @param {Set<number>} codepoints mutated in place
+ */
+function addFormat12GroupCodepoints(cmap, subtableOffset, codepoints) {
+  const groupCount = cmap.readUInt32BE(subtableOffset + 12);
+  for (let group = 0; group < groupCount; group += 1) {
+    const groupOffset = subtableOffset + 16 + group * 12;
+    const start = cmap.readUInt32BE(groupOffset);
+    const end = cmap.readUInt32BE(groupOffset + 4);
+    for (let codepoint = start; codepoint <= end; codepoint += 1) codepoints.add(codepoint);
+  }
+}
+
+/**
+ * Add one cmap subtable's codepoints, when it is written in a format this reader understands.
+ *
+ * Any other format is skipped rather than guessed at: a face declares several subtables, and the
+ * two above are the ones Font Awesome's woff2 files actually use — so a format nobody ships is a
+ * reason to go on to the next subtable rather than to fail.
+ *
+ * @param {Buffer} cmap
+ * @param {number} subtableOffset
+ * @param {Set<number>} codepoints mutated in place
+ */
 function readCmapSubtable(cmap, subtableOffset, codepoints) {
   const format = cmap.readUInt16BE(subtableOffset);
-  if (format === 4) {
-    const segmentsTimesTwo = cmap.readUInt16BE(subtableOffset + 6);
-    const endBase = subtableOffset + 14;
-    const startBase = endBase + segmentsTimesTwo + 2;
-    for (let segment = 0; segment < segmentsTimesTwo / 2; segment += 1) {
-      const end = cmap.readUInt16BE(endBase + segment * 2);
-      const start = cmap.readUInt16BE(startBase + segment * 2);
-      if (start === 0xff_ff && end === 0xff_ff) continue;
-      for (let codepoint = start; codepoint <= end; codepoint += 1) codepoints.add(codepoint);
-    }
-    return;
-  }
-  if (format === 12) {
-    const groupCount = cmap.readUInt32BE(subtableOffset + 12);
-    for (let group = 0; group < groupCount; group += 1) {
-      const groupOffset = subtableOffset + 16 + group * 12;
-      const start = cmap.readUInt32BE(groupOffset);
-      const end = cmap.readUInt32BE(groupOffset + 4);
-      for (let codepoint = start; codepoint <= end; codepoint += 1) codepoints.add(codepoint);
-    }
-  }
+  if (format === 4) addFormat4SegmentCodepoints(cmap, subtableOffset, codepoints);
+  else if (format === 12) addFormat12GroupCodepoints(cmap, subtableOffset, codepoints);
 }
 
 /**
