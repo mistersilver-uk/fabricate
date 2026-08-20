@@ -43,8 +43,8 @@
     iconOptions.find(
       (option) =>
         option.iconName === selectedOption.iconName ||
-        option.aliases?.includes(selectedOption.iconName),
-    )?.iconClass ?? selectedOption.iconClass,
+        option.aliases?.includes(selectedOption.iconName)
+    )?.iconClass ?? selectedOption.iconClass
   );
   const filteredOptions = $derived(filterEssenceIconOptions(iconOptions, searchTerm));
 
@@ -126,7 +126,7 @@
         horizontalAlign: iconOnly ? 'left' : 'right',
         minLeft: horizontalBounds.minLeft,
         maxRight: horizontalBounds.maxRight,
-      },
+      }
     );
 
     if (!layout) {

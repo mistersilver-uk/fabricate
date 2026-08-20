@@ -32,7 +32,15 @@ const harness = createMountedComponentHarness({
   componentPath: ICON_PICKER,
 });
 
-before(() => harness.setup());
+before(async () => {
+  await harness.setup();
+  // happy-dom's Window is flattened onto `globalThis` by setupDOM() (see
+  // tests/helpers/svelte-dom.js), and `globalThis` itself has no `addEventListener`. The
+  // popover-positioning effect registers `window` resize/scroll listeners whenever the picker
+  // opens; stub them so the effect does not crash when tests open the picker.
+  window.addEventListener ??= () => {};
+  window.removeEventListener ??= () => {};
+});
 after(() => harness.teardown());
 afterEach(() => harness.remount());
 

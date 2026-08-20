@@ -66,9 +66,7 @@ async function observeFontAwesomeBundle(page) {
 
     const response = await fetch(stylesheetUrl, { cache: 'no-store' });
     if (!response.ok) {
-      throw new Error(
-        `Font Awesome stylesheet ${stylesheetUrl} returned HTTP ${response.status}`
-      );
+      throw new Error(`Font Awesome stylesheet ${stylesheetUrl} returned HTTP ${response.status}`);
     }
     const cssText = await response.text();
     const release = /Font Awesome (Free|Pro) (\d+\.\d+\.\d+)/.exec(cssText);

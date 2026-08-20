@@ -65,7 +65,8 @@ export function evaluateFontAwesomeBundleObservation(observation, expectation) {
   const names = new Set(observation.names);
   const missing = expectation.present.filter((name) => !names.has(name));
   const unexpectedlyPresent = expectation.absent.filter((name) => names.has(name));
-  const editionMatches = expectation.edition === null || observation.edition === expectation.edition;
+  const editionMatches =
+    expectation.edition === null || observation.edition === expectation.edition;
 
   return [
     {
