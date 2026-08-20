@@ -62,6 +62,7 @@ game.fabricate.getSelectedAlchemySystemId() // Persisted last-selected alchemy s
 game.fabricate.setSelectedAlchemySystemId(id) // Persist the last-selected alchemy system id
 game.fabricate.listSelectableActors()       // Player-character actors for the actor-selection bar
 game.fabricate.listCuratedIcons()           // Fabricate's curated Font Awesome icon vocabulary
+game.fabricate.findCuratedIcon(name)        // Resolve one icon name (or alias) against that vocabulary
 game.fabricate.getSelectedGatheringActorId() // Persisted remembered gathering actor id
 game.fabricate.setSelectedGatheringActorId(id) // Persist the remembered gathering actor id
 game.fabricate.getHideUnavailableEnvironments() // Player "hide unavailable environments" toggle (per client/device)
@@ -491,52 +492,67 @@ See [Gathering Realms & Travel]({% link gathering-realms.md %}) for the full fea
 
 ### Icon Vocabulary
 
-Fabricate curates ONE Font Awesome vocabulary and draws every icon field in the module from it — essence icons, category icons, and the biome icons players see on gathering environment cards.
+Fabricate curates ONE icon vocabulary and draws every icon field in the module from it — essence icons, category icons, and the biome icons players see on gathering environment cards.
 `listCuratedIcons()` publishes that same vocabulary so a companion module can offer its GMs the icons Fabricate already offers, instead of hand-curating a second list that drifts from this one.
+`findCuratedIcon(name)` resolves one name against it, which is what you want when a GM has already saved an icon and you need to know whether it is still offered.
 
 ```javascript
 Hooks.once('fabricate.ready', () => {
   const icons = game.fabricate.listCuratedIcons();
-  // -> [{ iconCode: 'anchor', label: 'Anchor', hasRegular: false }, …]
+  // -> [{ iconCode: 'abacus', label: 'Abacus', aliases: [] }, …]
 
-  // `iconCode` is bare, so a render composes the weight itself. `fas` exists for every
-  // entry; `far` exists only where `hasRegular` says so.
+  // `iconCode` is bare, so a render composes the weight itself.
   const [first] = icons;
-  const solidClass = `fas fa-${first.iconCode}`;
-  const regularClass = first.hasRegular ? `far fa-${first.iconCode}` : null;
+  const className = `fas fa-${first.iconCode}`;
 
-  // Validating a stored icon is a membership test against this same list.
-  const isOffered = icons.some(({ iconCode }) => iconCode === 'mortar-pestle');
+  // A GM's saved icon may use any of the glyph's names, so resolve rather than scan.
+  const saved = game.fabricate.findCuratedIcon('cog');
+  // -> { iconCode: 'gear', label: 'Gear', aliases: ['cog'] }
+  const stillOffered = saved !== null;
+
+  // Searching: the aliases are the other names a GM might type for the same picture.
+  const matches = icons.filter(({ iconCode, label, aliases }) =>
+    [iconCode, label, ...aliases].some((name) => name.toLowerCase().includes('cog'))
+  );
 });
 ```
 
-- The records are built fresh on every call, so you may keep, sort, filter or mutate them.
-  Nothing you do to them reaches Fabricate's own pickers.
-- `hasRegular` reports whether Font Awesome ships the `far` (regular) weight for that code as well as `fas` (solid).
-  It does not say which weight a stored icon uses.
+- There is one row per GLYPH, not one per name, and one weight.
+  Several names routinely share one drawing, so the vocabulary offers one of them and records the rest as `aliases`.
+  Nothing is refused by that: every other name still resolves, through `findCuratedIcon` or through the `aliases` on the row.
+- Both methods build their records fresh on every call, down to the `aliases` array, so you may keep, sort, filter or mutate what you are handed.
+  Nothing you do to it reaches Fabricate's own pickers.
 - The list is in the vocabulary's own order, which is alphabetical by `iconCode`.
-- The method throws `Fabricate not initialized` before Fabricate is ready, as every `game.fabricate.list…` method does.
-  Call it from `fabricate.ready`, or wrap it and degrade to an empty list, as a composition edge should.
+- `findCuratedIcon(name)` answers `null` for a name the vocabulary does not offer — a typo, a name Foundry cannot draw, or a real icon the curation leaves out.
+  It does not distinguish those cases, because a caller can do nothing different about them.
+- Both methods throw `Fabricate not initialized` before Fabricate is ready, as every `game.fabricate.list…` method does.
+  Call them from `fabricate.ready`, or wrap them and degrade to an empty result, as a composition edge should.
 
 <!-- markdownlint-disable markdownlint-sentences-per-line -->
 
 | Field | Type | Meaning |
 | --- | --- | --- |
-| `iconCode` | `string` | The bare Font Awesome code, such as `mortar-pestle`. No `fa-` prefix and no weight. |
+| `iconCode` | `string` | The bare name the vocabulary offers and you should persist, such as `mortar-pestle`. No `fa-` prefix and no weight. |
 | `label` | `string` | Font Awesome's own display name, such as `Mortar Pestle`. Not localized. |
-| `hasRegular` | `boolean` | Whether the `far` weight exists for this code. |
+| `aliases` | `string[]` | Every other name the same glyph answers to, such as `['cog']` on `gear`. Often empty. |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 
-**What is not published, and why.**
-The unfiltered classic catalogue — 1402 entries — stays internal, because no Fabricate picker renders it and publishing it would invite a companion to offer icons Fabricate's own screens will not.
-The module's internal curation predicate stays internal too: it answers "does any exclusion pattern match this string", which returns `true` for a typo, a Pro-only code, or any string Font Awesome never shipped, so it is the wrong tool for validating a stored icon.
-A membership test against the published list, as above, is the right one.
+**Do not validate a saved icon by scanning `iconCode` alone.**
+`icons.some(({ iconCode }) => iconCode === name)` looks right and is wrong: a GM who saved `fas fa-cog` chose a glyph this vocabulary offers as `gear`, so that scan reports a perfectly good icon as unknown.
+Use `findCuratedIcon(name)`, which resolves aliases and answers from the catalogue rather than from a guess.
 
-**Provenance.**
-The vocabulary is derived from Font Awesome Free 6.7.2 classic metadata with brands excluded.
-Every entry was verified to resolve in the Font Awesome build Foundry bundles at the time it was published, but that is a fact about that Foundry release rather than a guarantee: Foundry ships its own Font Awesome and nothing re-checks the set when Foundry upgrades it.
-If you render an icon code from this list and get a blank glyph, that is the check to make.
+**What is not published, and why.**
+The unfiltered catalogue — 3768 entries against the curated 1879 — stays internal, because no Fabricate picker renders it and publishing it would invite a companion to offer icons Fabricate's own screens will not.
+Fabricate's internal exclusion predicate stays internal too: it answers whether a name matches an exclusion, not whether Foundry can draw it, so it reports a typo as unexcluded.
+That is the mistake `findCuratedIcon` exists not to make.
+
+**Provenance, and what still drifts.**
+The vocabulary is measured from the Font Awesome bundle a Foundry install actually ships — Pro 7.2.0, read from Foundry 14.365.0 — rather than from Font Awesome's published metadata, so a name in this list is a name a Foundry client can render.
+The catalogue is a committed artifact because CI has no Foundry install to read, and `scripts/generate-icon-catalogue.mjs` regenerates it from a given install, with `--check` reporting whether the bundle has moved without writing.
+What that does not do is re-check itself.
+Nothing runs the generator when Foundry bumps its bundled Font Awesome, so the committed snapshot ages: names added in a newer bundle are absent from this vocabulary until someone regenerates it, and Font Awesome does retire and re-alias names between majors, which can turn an icon a GM chose into an alias of a different glyph.
+If you render a name from this list and get a blank glyph, that is the check to make.
 
 ## Subscribing To Gathering Hooks
 
