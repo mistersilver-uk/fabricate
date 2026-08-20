@@ -192,9 +192,12 @@
   // it to the player at roll time (the manager's "manual choice" glyph).
   //
   // These four are in Font Awesome's free release, but that is no longer the test and this
-  // comment used to say it was. The test is whether FOUNDRY can render the glyph, which is
-  // what `foundryIconCatalogue.js` now measures from the bundle Foundry ships; Fabricate
-  // distributes no font and writes a class name that Foundry's own stylesheet resolves.
+  // comment used to say it was -- it claimed a community package is not licensed to use a Pro
+  // glyph. Ruled otherwise: a module IS licensed to write a configuration Foundry resolves to a
+  // premium icon, and is NOT licensed to bundle the icon itself. Fabricate ships no font and
+  // writes a class name that Foundry's own stylesheet resolves against a font the client has
+  // already loaded, so the test is simply whether FOUNDRY can render the glyph -- which is what
+  // `foundryIconCatalogue.js` measures from the bundle Foundry ships.
   //
   // The ORDER mirrors `MODIFIER_POLICIES`, which declares itself to be in
   // authoring-surface order; the two selecting rules therefore sit adjacent, which is

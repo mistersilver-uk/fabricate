@@ -8,6 +8,15 @@
 // therefore unofferable whenever the free release happened to lack it, which is why
 // `candle-holder` — a Pro icon that renders correctly in Foundry today — was absent.
 //
+// WHAT THIS FILE IS AND IS NOT LICENSED TO DO. Font Awesome Pro's font files are Foundry's to
+// ship and Foundry ships them; this file bundles none of them. It records NAMES, and a name is a
+// configuration value that Foundry's own stylesheet resolves against the font a Foundry client has
+// already loaded. Writing `fas fa-candle-holder` and letting Foundry draw it is using Foundry as
+// it is meant to be used; copying a `.woff2` into a module is not, and nothing here does. The
+// generator reads the installed bundle to learn what exists and emits names, never glyph outlines.
+// Ruled by the maintainer, and it governs the whole vocabulary rather than the two glyphs the
+// question was first raised about.
+//
 // Measured from Foundry 14.365.0's bundle:
 //   4318 rules assign a glyph, over 5371 `.fa-` names.
 //   3768 of those glyphs are classic; the rest are the 550 the brands face draws.
