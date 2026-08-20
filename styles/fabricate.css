@@ -8925,6 +8925,14 @@
   flex-direction: column;
   gap: var(--fab-space-2);
   min-width: 0;
+
+  /* A STATIC bound, so the popover is never laid out unbounded. Both popovers get an inline
+     `max-height` from `computeIconPickerPopoverLayout`, but that runs in an effect AFTER the first
+     paint, and the first thing the effect does is call `getBoundingClientRect()` on the trigger —
+     which forces layout of a list hundreds of rows tall. This is the same 380px that util uses as
+     its `preferredMaxHeight` ceiling, so the inline value it later writes is always <= this one and
+     nothing here can loosen it. */
+  max-height: 380px;
   padding: var(--fab-space-3);
   border: 1px solid var(--fab-mv2-border-strong);
   border-radius: 8px;
@@ -8966,6 +8974,13 @@
   min-height: 34px;
   padding: var(--fab-space-1) var(--fab-space-2);
   text-align: left;
+}
+
+/* The pinned resolved row sits directly above the alphabetical list, as a sibling `role="option"`
+   so the listbox keeps a flat option tree. The extra gap is what separates the two groups; the
+   `.selected` rule below already gives it the selected surface. */
+.fabricate-manager .essence-icon-picker-option.pinned {
+  margin-bottom: var(--fab-space-2);
 }
 
 .fabricate-manager .essence-source-picker-option {
