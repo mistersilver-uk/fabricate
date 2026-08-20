@@ -276,26 +276,83 @@ Because the markup is unchanged, a per-option test or capture hook still resolve
 
 #### Icon vocabulary
 
-Every Fabricate icon picker offers ONE curated Font Awesome vocabulary, drawn from the classic free icons Foundry bundles, and that vocabulary serves any fictional setting rather than fantasy alone.
-Fabricate ships against every system Foundry supports, so a science-fiction, post-apocalyptic, industrial or modern game is as much its subject as a dungeon, and a curation that excludes a rocket, a robot or a microchip has scoped the module to one genre its code never claimed.
+THE VOCABULARY IS GOVERNED BY TWO GATES, NOT ONE, AND A GLYPH IS OFFERED ONLY WHEN IT CLEARS BOTH.
+Foundry's bundled Font Awesome decides what a client can draw; Font Awesome's free release decides what Fabricate may NAME IN CODE.
+`candle-holder` is the worked example of the second gate, run in reverse: Foundry renders it, a companion module's own Pro-bundled Foundry could draw it, and Fabricate does not offer it, because Font Awesome's free release does not publish that name.
+Foundry ships Font Awesome Pro under Foundry Gaming LLC's own commercial licence, and that licence forbids a third-party package developer from using, re-packaging, or referencing a Pro-only icon IN CODE without their own Pro licence — a committed catalogue of names is exactly such a reference.
+So the catalogue Fabricate offers from is the INTERSECTION of the glyphs Foundry's bundle can draw with the names Font Awesome's free release publishes, and the committed file records which free release it was narrowed against, so the guard that enforces the intersection can name the release it is checking.
+Measured against Foundry's own bundle: 3768 of its classic glyphs are drawable at all, and 1420 of those also carry a free name and make up the catalogue.
+
+The catalogue is a committed artifact because CI has no Foundry install to read, and a checked-in generator regenerates it from a given install so the derivation is reproducible rather than archaeological.
+Both halves of the intersection move it, and separately: a Foundry upgrade means rerunning the generator against the new bundle, because names are added between releases and Font Awesome does retire and re-alias names between majors; a Font Awesome Free upgrade means rerunning it too, because Font Awesome promotes icons out of Pro and into the free release, and each promotion is a glyph Fabricate may now offer and does not until the generator runs again.
+
+The first gate — what a client can draw — is measured from the stylesheet the RUNNING client actually loaded, never assumed from one fixed Foundry release.
+Foundry serves its bundled Font Awesome as a layered `@import` inside an inline `<style>` rather than as a `<link>`, so the measurement descends `CSSImportRule.styleSheet.cssRules` as well as a sheet's own `cssRules`, and it skips a sheet it may not read — served cross-origin, behind a reverse proxy or a CDN, both supported deployments — rather than treating that sheet as empty.
+That measurement FAILS OPEN, NEVER CLOSED: an empty or unreadable measurement answers with the committed catalogue rather than an empty picker, because a name this client's font cannot draw is a cosmetic defect in one row, while zero rows is an icon field a GM cannot use at all.
+An empty measurement is never memoised, either, because it is reachable before the imported stylesheet has finished parsing rather than only from a client too old to have the glyph — a call made too early is retried on its next call instead of being frozen in for the rest of the session.
+
+Every Fabricate icon picker offers ONE curated subset of that catalogue — 750 of its 1420 names today — and the test for membership is this.
+IF A GLYPH SUITS ANY FICTION — fantasy, science fiction or general fiction — AND FOUNDRY CAN RENDER IT, IT IS AVAILABLE.
+The question to ask of a new icon is never "would a dungeon have one", nor even "would a fictional setting have one", but "is there a story this picture belongs in".
+A syringe is a med-bay; a stopwatch times a training montage; a dumbbell IS the training montage; a checkered flag ends a race, and has ended chariot races for far longer than it has ended motor ones; a blighted ear of wheat is the oldest fantasy plot there is.
 
 The curation is therefore stated as what it leaves OUT rather than as a genre it is for.
-Four things stay out.
-Glyphs whose meaning is a software affordance rather than a depicted object, such as editor controls, file formats and chart types.
-Glyphs whose SUBJECT is a real-world currency, institution, brand or cause — the currency SIGN glyphs, the pictograms of a present-day relief operation, the party-political and accessibility symbols — as against a gesture or a symbol a fiction is free to reuse, which stays in.
-Present-day civic, clinical and domestic furniture no setting is reaching for, such as sanitation, pharmacy, commuter transport and consumer electronics.
+Single characters and emoji reactions stay out, and four narrower things with them.
+Glyphs whose meaning is a software affordance rather than a depicted object, such as editor controls, transport controls, file formats, chart types and the arrows that mean navigate.
+Glyphs whose SUBJECT is a real-world institution, currency or cause — the currency SIGN glyphs, the pictograms of a present-day relief operation, party-political emblems, the symbols of an access provision — as against a gesture or a symbol a fiction is free to reuse, which stays in.
+Present-day SIGNAGE: the pictograms that label a building rather than depict a thing inside it, such as a restroom sign, a no-entry sign or a parking P, while the bath, the toilet and the ambulance those signs point at stay in.
 And redundant variants of a glyph the set already carries: a fill level, a needle position, a rotation, a status badge or a change of scenery adds a picker row without adding an idea.
 What stays is ONE member per idea — the clearest glyph for it, plus any member of the same family that means something DIFFERENT rather than more or less of the same thing — and the steps between go.
 So a thermometer keeps hot and cold beside the plain instrument while the seven that only redraw the same reading go, a battery keeps empty and full because a dead cell and a charged one are two conditions rather than two degrees, and a family of dials separated only by needle position contributes a single dial whether or not that dial is the bare code.
+A crossed-out glyph is NOT such a variant: "no water" is a different statement from "water", not less of it.
+
+That third exclusion is narrow deliberately, and it used to be much wider.
+A clinical, pandemic, consumer-electronics, civilian-transport, fast-food and modern-sports exclusion once held out a syringe, a pair of lungs, a blender, a detergent jug, a plug, a stopwatch and a dumbbell as "present-day furniture no fiction is reaching for".
+General fiction reaches for every one of them and science fiction reaches for the med-bay twice, so those exclusions do not survive the rule above and are gone rather than trimmed.
 
 Membership follows what a glyph DEPICTS, never which Font Awesome release shipped it, because the release is not a fact a GM can see and the drawing is.
 That admits the pre-modern commerce the curation once miscategorised as modern — coins, a merchant's shop, a warehouse — where a coin is admitted and a currency SIGN glyph is not, because the sign names a real currency and the coin names none.
 It equally admits the ordinary objects Font Awesome happened to ship alongside the relief pictograms, such as a packed crate, the porters carrying one, a cooking burner and a borehole.
+Weapons are admitted for the same reason, though what is left to admit under that rule has narrowed.
+Font Awesome Free publishes no `sword`, `axe`, `dagger`, `mace`, `bow`, `castle`, `chest`, `crystal` or singular `coin` glyph, so it is the free-release licence intersection that removed those names from the catalogue, not a curation choice — the depiction rule still admits weapons, there is simply nothing left for it to admit under those spellings.
+What Free still names and the weapons rule still admits: a gun, a bomb and a land mine.
 
-That curated set is the one vocabulary EVERY icon field in Fabricate draws from, with no per-surface exception.
+A depiction cannot be dodged by SPELLING either.
+Several names routinely share one glyph, so an exclusion applies to a glyph when ANY of its names matches: `automobile` is the same drawing as `car`, and a rule that caught only the name it happened to list would offer the picture it had just excluded.
+Brands leave by the same principle and by measurement rather than by a list of company names: a logo is exactly a glyph that only Font Awesome's brands face draws.
+
+AN EXCLUSION PATTERN OUTLIVES ITS MEMBERS.
+A pattern is retained even when the free-release intersection leaves it matching no name currently in the catalogue, because Font Awesome promotes icons out of Pro and into the free release between versions, and a pattern deleted today would silently stop excluding the moment its members are promoted and the catalogue regenerated.
+Nothing else would report that lapse: the exclusion that used to catch a promoted name is the very thing that would have vanished.
+
+The vocabulary offers ONE ROW PER GLYPH, not one per name, and one weight.
+Two names for one drawing is two picker rows for one picture, and Foundry's classic solid and regular faces carry an identical set of codepoints, so a regular row per icon would say the same things again at a lighter weight.
+Neither choice refuses a name: every other name a glyph has is recorded on its entry, searchable, and resolves to that entry, so a GM who types `cog` finds the gear and a system that persisted `fas fa-cog` still selects the gear's row.
+Which name is OFFERED is a presentation choice and not a claim about Font Awesome's canonical spelling, because the bundle cannot answer that — its multi-name selector lists are sorted alphabetically and carry no ordering information.
+
+That curated set is the one vocabulary EVERY icon field in Fabricate draws from, with no per-surface exception, and it is constructed at exactly one site: the catalogue filtered by the exclusions.
 A surface that hand-curates a second list has created a second vocabulary that drifts from this one, which is the defect this rule exists to prevent.
+A name added BESIDE that filter rather than to the catalogue is worse still: the exclusions consult no catalogue, so such a name passes them and is then either absent from the set or present in it and absent from Foundry.
 Its reach is wider than the manager's own screens: an environment's biome icons are chosen from this vocabulary and then rendered to PLAYERS on the gathering environment cards, so the set is part of what a player sees rather than GM-only chrome.
-The full classic free catalogue remains a separate module export, and no picker renders it.
+The full catalogue remains a separate module export, and no picker renders it.
+
+Fabricate publishes that curated vocabulary on its module API as `game.fabricate.listCuratedIcons()`, so a companion module offering an icon field of its own draws from it instead of hand-curating the second list the rule above exists to prevent.
+It is the same set, read from the one place it is constructed, so the vocabulary a companion reads and the vocabulary a picker offers are one set rather than two that have to be kept in step.
+THE PUBLISHED VOCABULARY IS THE OFFERED VOCABULARY: the accessor answers from the same generation-aware set this client's own pickers offer — the committed catalogue on Foundry 14, a measurement of this client's own loaded stylesheet on every other generation, falling back the same way when that measurement is empty — never from a fixed catalogue that ignores what this client can actually draw.
+A companion binding to the API and a GM opening a picker on the same client therefore see one vocabulary, not two that merely happen to usually agree.
+Publication is one way — there is no setter — and the call answers with plain records carrying the name the vocabulary offers, its display name, and the other names that name's glyph answers to.
+Each call builds those records afresh, down to the list of other names, so a caller may keep, sort or mutate what it receives without reaching anything a picker renders from.
+The call throws before Fabricate is ready rather than answering with an empty list, because an empty vocabulary and a vocabulary that lost its contents are the same value and a caller cannot tell them apart.
+
+Publishing those other names is a consequence of offering one row per glyph rather than one per name.
+A record carrying only the offered name would be a lossy view of a deduplicated set, and what is lost is precisely what reads a value a GM already saved: a saved `fas fa-cog` names the row offered as `gear`, and a caller comparing offered names alone would report it unknown.
+So `game.fabricate.findCuratedIcon(name)` is published beside the list and resolves a name — offered or aliased — to that row, answering `null` when the vocabulary does not offer it.
+It does not distinguish a typo from a name Foundry cannot draw from a real icon the curation leaves out, because a caller can do nothing different about them.
+
+Those two are the whole seam.
+The full catalogue is not published: no picker renders it, so publishing it would invite a companion to offer icons Fabricate's own screens will not.
+Neither is the exclusion predicate, and for the reason it is not the membership test — it consults no catalogue, so it reports a name Foundry cannot render as merely unexcluded.
+Both published calls answer from the catalogue and cannot make that mistake.
 
 #### Numeric entry
 

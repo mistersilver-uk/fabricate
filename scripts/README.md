@@ -28,6 +28,25 @@ Useful options:
 | `--no-premium` | Skip the sibling premium config. |
 | `--json` | Print machine-readable JSON instead of a table. |
 
+## Icon catalogue
+
+`generate-icon-catalogue.mjs` regenerates `src/ui/svelte/util/foundryIconCatalogue.js` from the Font Awesome bundle a Foundry install ships.
+
+```bash
+node scripts/generate-icon-catalogue.mjs   "C:/Program Files/Foundry Virtual Tabletop/resources/app/public/fonts/fontawesome"
+```
+
+The argument is the bundled `fontawesome` directory, or the `all.min.css` inside it.
+`--check` compares against the committed file without writing, which is what to run after a Foundry upgrade to find out whether the bundle moved.
+
+The catalogue is committed rather than built because CI has no Foundry install to read.
+It describes ONE Foundry release's bundle, so rerun the generator when Foundry bumps Font Awesome: names are added between releases, and Font Awesome does retire and re-alias names between majors, which can turn an icon a GM chose into an alias of another glyph.
+
+Two things are MEASURED rather than assumed, and both used to be guessed.
+Brands are the glyphs whose codepoint only Font Awesome's brands face carries, read from that face's `cmap`, which is why the exclusion list no longer holds a block of company names.
+The classic solid and regular faces are compared the same way; they carry an identical set of codepoints today, which is why an entry no longer records whether a regular weight exists.
+If a future bundle breaks that, the generator says so on stderr rather than emitting a header claim that has quietly stopped being true.
+
 ## Foundry Integration Smoke Test
 
 The smoke test (`foundry-test-run.mjs`) verifies that Fabricate loads and functions correctly

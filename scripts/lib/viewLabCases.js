@@ -193,6 +193,10 @@ export const BROAD_SIGNAL_PATTERN = new RegExp(
  * case id fails closed through the registry filter if its deliberate state is removed.
  */
 const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
+  // The shared icon picker (issue 1269). Everything it presents — the pinned resolved row, the
+  // row labels, the popover's own geometry — exists ONLY in the open popover, and neither
+  // representative frame opens one. This is the one case whose steps click an icon-picker trigger.
+  'src/ui/svelte/components/IconPicker.svelte': Object.freeze(['manager-system-edit-lists']),
   // BOTH parties pickers, because between them they are the primitive's two modes and
   // neither renders the other's chrome. `inlineSearchTrigger` (the actor picker) replaces
   // its trigger with the search field and suppresses the in-popover search row; the
@@ -706,7 +710,13 @@ export const VIEW_LAB_CASES = Object.freeze([
       ':has([data-system-modifier-bounds] [data-system-modifier-field="min"])',
     position: { width: 1280, height: 980 },
     kinds: ['manager', 'system-edit'],
-    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/SystemEditView\.svelte$/],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/SystemEditView\.svelte$/,
+      // The icon vocabulary the shared picker lists (issue 1269). `IconPicker.svelte`
+      // itself is a BROAD SIGNAL and reaches this case through
+      // `BROAD_SIGNAL_CASE_OVERRIDES`; these are not, so they are claimed here.
+      /^src\/ui\/svelte\/util\/(?:essenceIcons|foundryIconVocabulary|foundryIconCatalogue)\.js$/,
+    ],
   }),
   managerCase({
     id: 'manager-system-edit-modifier-rolls',

@@ -805,11 +805,24 @@ const ESSENCES = [
     // NO `sourceComponentId` on purpose: it is the corpus's only essence with no source at
     // all, so the browser's `Source: none` filter and the row's absent Effects pill both
     // have a subject.
-    // Its ICON is the widening's only rendered evidence (issue 1269). That change took the
-    // curated icon vocabulary from 437 glyphs to 510, and `biohazard` is one of the 73 it added —
-    // specifically, it is the entry that replaced a `bioevent` code which does not exist in Font
-    // Awesome's free classic set. A wrong replacement renders a BLANK medallion, and only a
-    // rendered frame can tell a resolved glyph from a blank one.
+    // Its ICON is the widening's only rendered evidence (issue 1269). It used to carry
+    // `biohazard` because that entry replaced a `bioevent` code Font Awesome's free classic set
+    // does not contain — a correction the regeneration made moot, since the catalogue is no
+    // longer generated from that metadata at all and the phantom entry cannot survive a
+    // generator that reads Foundry's own stylesheet.
+    //
+    // It carried `candle-holder` for a while after that, and cannot any more: Foundry's bundled
+    // Font Awesome licence forbids a third-party package from referencing a Pro icon in code, so
+    // the catalogue is now intersected with the free release and `candle-holder` is not in it.
+    // Naming it here would put a Pro icon code in Fabricate's source under the guise of a
+    // fixture.
+    //
+    // It carries `hand-sparkles` instead, which evidences the same finding within the names
+    // Fabricate may write. It is one of the sixteen icons a companion module offered that the
+    // pre-widening curated vocabulary dropped — held out by rules drawn for "fantasy alone" —
+    // so it is a glyph no Fabricate picker could offer before this change and every picker can
+    // offer now. If the entry is wrong the medallion renders BLANK, and only a rendered frame
+    // can tell a resolved glyph from a blank one.
     //
     // Every lab essence glyph was already curated BEFORE the widening — `mountain`, `fire`,
     // `droplet`, `wind`, `atom` and `circle-dot` alike — so every essence frame was pixel-
@@ -819,12 +832,12 @@ const ESSENCES = [
     // essence, so it is drawn only where the FULL or all-enabled set is drawn — the essence
     // surfaces and the per-enabled-essence quantity cards — and not by the carried-essence
     // renderers that put every other essence on the crafting, inventory and recipe frames: 21
-    // cases move rather than 104. And its authored fiction is the one that a hazard glyph does
+    // cases move rather than 104. And its authored fiction is the one an alchemical glyph does
     // not contradict, since this essence is dust whose nature nobody has established.
     id: 'mote',
     name: 'Mote',
     description: 'Loose motive dust. Useful, and nobody has found a use.',
-    icon: 'fas fa-biohazard',
+    icon: 'fas fa-hand-sparkles',
     colorToken: 'butter',
   },
 ];

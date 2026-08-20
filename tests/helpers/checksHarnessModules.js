@@ -33,7 +33,8 @@
  */
 export const CHECKS_TREE_RAW_MODULES = Object.freeze([
   'src/ui/svelte/util/foundryBridge.js',
-  'src/ui/svelte/util/fontAwesomeFreeClassicIcons.js',
+  'src/ui/svelte/util/foundryIconVocabulary.js',
+  'src/ui/svelte/util/foundryIconCatalogue.js',
   'src/ui/svelte/util/iconPickerPopover.js',
   'src/ui/svelte/util/essenceIcons.js',
   'src/ui/svelte/components/stepperLabels.js',

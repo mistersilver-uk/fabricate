@@ -22,7 +22,8 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/iconPickerPopover.js',
     'src/ui/svelte/util/gatheringFormat.js',
     'src/ui/svelte/util/essenceIcons.js',
-    'src/ui/svelte/util/fontAwesomeFreeClassicIcons.js',
+    'src/ui/svelte/util/foundryIconVocabulary.js',
+  'src/ui/svelte/util/foundryIconCatalogue.js',
     'src/ui/svelte/util/dropUtils.js',
     // The shared colour-token constant + its localized labels (issue 1036). Both colour
     // components import it, and both are compiled below.

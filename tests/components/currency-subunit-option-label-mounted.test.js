@@ -21,7 +21,8 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/actions/dismissOnOutsideClick.js',
     'src/ui/svelte/actions/portal.js',
     'src/ui/svelte/util/essenceIcons.js',
-    'src/ui/svelte/util/fontAwesomeFreeClassicIcons.js',
+    'src/ui/svelte/util/foundryIconVocabulary.js',
+  'src/ui/svelte/util/foundryIconCatalogue.js',
     'src/ui/svelte/util/iconPickerPopover.js',
     'src/systems/characterPrerequisites.js',
     // The expression suggestion chips' derivation (issue 1096) and the per-Foundry-system

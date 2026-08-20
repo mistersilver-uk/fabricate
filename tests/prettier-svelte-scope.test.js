@@ -170,6 +170,15 @@ const GATE_TARGETS = [
   // The screenshot-evidence matcher (issue 1133): the pure derivation that decides which
   // published frames answer a PR's changed files, shared by the evidence gate and its workflow.
   'scripts/lib/screenshotEvidenceMatching.js',
+  // The icon-catalogue generator and its bundle reader (issue 1269). Run by a maintainer against a
+  // Foundry install rather than by CI, which has none, so nothing else would ever format them. The
+  // FA6/FA7 compatibility layer, the smoke-arm bundle expectations and the companion probe (PR
+  // #1276) share the same maintainer-only entry point, so they are pinned together.
+  'scripts/lib/fontAwesomeBundle.js',
+  'scripts/lib/fontAwesomeCompatibility.js',
+  'scripts/lib/fontAwesomeSmokeExpectations.js',
+  'scripts/foundry-icon-bundle-assert.mjs',
+  'scripts/generate-icon-catalogue.mjs',
   'eslint.config.js',
 ];
 const FORMAT_ARGV = ['prettier', '--write', ...GATE_TARGETS];

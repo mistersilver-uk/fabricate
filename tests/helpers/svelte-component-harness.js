@@ -220,7 +220,8 @@ export const CRAFTING_APP_RAW_MODULES = Object.freeze([
   // the compiled graph, so omitting this HANGS every mounted crafting suite (# cancelled)
   // rather than failing one. It imports nothing, so this single entry suffices.
   'src/ui/svelte/util/essenceTint.js',
-  'src/ui/svelte/util/fontAwesomeFreeClassicIcons.js',
+  'src/ui/svelte/util/foundryIconVocabulary.js',
+  'src/ui/svelte/util/foundryIconCatalogue.js',
   'src/ui/svelte/util/craftingRecipeStatus.js',
   'src/ui/svelte/util/ingredientOptionStatus.js',
   // The requirement rail's pure slot/consumption-plan projection (issue 917). IoTable
