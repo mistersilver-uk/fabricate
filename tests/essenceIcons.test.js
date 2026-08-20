@@ -43,8 +43,21 @@ function assertCurated(iconNames) {
   }
 }
 
+// A negative assertion is satisfied by ABSENCE, so a name the catalogue does not carry passes this
+// helper without exercising the rule its test is named for. That is not hypothetical: narrowing the
+// catalogue to the names Font Awesome publishes for free removed 62% of it in one step, and any
+// future narrowing can do the same again silently. So every name is required to be a glyph the
+// catalogue really carries BEFORE its exclusion is asserted — a name that is merely unnameable
+// belongs in the Pro-only test above, which asserts absence deliberately.
 function assertNotCurated(iconNames, description) {
   for (const iconName of iconNames) {
+    assert.ok(
+      FOUNDRY_ICON_DEFINITIONS.some(
+        ({ iconCode, aliases }) => iconCode === iconName || aliases.includes(iconName)
+      ),
+      `${description} "${iconName}" is not in the catalogue at all, so asserting it is uncurated ` +
+        'tests no exclusion rule; drop it or move it to the Pro-only test'
+    );
     assert.equal(
       findCuratedIcon(iconName),
       null,
@@ -101,7 +114,10 @@ describe('the catalogue Foundry can actually render', () => {
   // would keep passing if they came back as uncurated catalogue rows.
   it('declines the Pro-only names Foundry can render but Fabricate may not reference', () => {
     for (const iconName of [
-      'candle-holder', 'cauldron', 'raygun', 'starship', 'treasure-chest', 'scythe'
+      'candle-holder', 'cauldron', 'raygun', 'starship', 'treasure-chest', 'scythe',
+      // Emoji reactions Font Awesome draws only in Pro. The exclusion rule would hold them out
+      // anyway; the licence gets there first, and this is where a name absent by licence belongs.
+      'weary', 'woozy'
     ]) {
       assert.ok(
         FOUNDRY_ICON_DEFINITIONS.every(
@@ -342,7 +358,7 @@ describe('essenceIcons utility', () => {
       'face-smile', 'face-frown', 'face-grin', 'face-angry',
       'face-laugh', 'face-meh', 'face-sad-tear', 'face-surprise',
       'face-dizzy', 'face-grimace', 'face-rolling-eyes', 'face-tired',
-      'grin', 'grin-beam', 'laugh-wink', 'kiss-wink-heart', 'angry', 'weary', 'woozy'
+      'grin', 'grin-beam', 'laugh-wink', 'kiss-wink-heart', 'angry'
     ], 'Emoji reaction');
   });
 

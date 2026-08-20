@@ -88,6 +88,28 @@ describe('version-aware Foundry icon definitions', () => {
     );
   });
 
+  // THE LICENCE CONSTRAINT AT RUNTIME. On any generation the module measures rather than assumes,
+  // the map it measures comes from the CLIENT'S OWN Font Awesome — which is Pro, and declares every
+  // Pro-only name. The only thing keeping those names out of the rebuilt vocabulary is that the
+  // rebuild walks the COMMITTED catalogue's names and looks each one up in the measurement, rather
+  // than walking the measurement. That direction is the whole enforcement, it is one word wide, and
+  // reversing it reads like a tidy-up: iterating the measured map instead passes every other test
+  // in this suite while handing back `candle-holder`.
+  it('never rebuilds a name the committed catalogue may not reference, even when the client draws it', () => {
+    const glyphs = new Map([
+      ['gear', '--fa:"\\f013"'],
+      ['cog', '--fa:"\\f013"'],
+      ['candle-holder', '--fa:"\\f6bc"'],
+      ['treasure-chest', '--fa:"\\f723"'],
+    ]);
+
+    const v13 = getFoundryIconDefinitionsForMajor(13, { glyphsByName: glyphs });
+    const names = v13.flatMap(({ iconCode, aliases }) => [iconCode, ...aliases]);
+
+    assert.deepEqual(names.filter((name) => name === 'candle-holder' || name === 'treasure-chest'), []);
+    assert.ok(names.includes('gear'), 'the free names the client draws are still offered');
+  });
+
   it('regroups aliases by the glyph mapping of the measured generation', () => {
     const source = [
       { iconCode: 'gear', label: 'Gear', aliases: ['cog'] },
