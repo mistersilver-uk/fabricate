@@ -1,6 +1,10 @@
 import { FOUNDRY_ICON_DEFINITIONS } from './foundryIconCatalogue.js';
 
-export { FOUNDRY_ICON_DEFINITIONS, FOUNDRY_ICON_BUNDLE_RELEASE } from './foundryIconCatalogue.js';
+export {
+  FOUNDRY_ICON_DEFINITIONS,
+  FOUNDRY_ICON_BUNDLE_RELEASE,
+  FOUNDRY_ICON_FREE_INTERSECTION
+} from './foundryIconCatalogue.js';
 
 // Patterns that identify the icons the curated vocabulary leaves out.
 //
@@ -49,6 +53,25 @@ export { FOUNDRY_ICON_DEFINITIONS, FOUNDRY_ICON_BUNDLE_RELEASE } from './foundry
 // BRANDS ARE NOT IN THIS LIST any more. They used to be, as a block of company names. They are now
 // excluded where they can be MEASURED rather than guessed: a logo is exactly a glyph that only
 // Font Awesome's brands face draws, and the catalogue generator drops those before this list runs.
+//
+// SOME PATTERNS BELOW NOW MATCH NOTHING, AND THEY STAY. The catalogue this list filters is
+// intersected with Font Awesome Free, because Foundry's Pro licence forbids a third-party package
+// from referencing a Pro icon in code — foundryIconCatalogue.js quotes the clause. When that
+// intersection landed, 39 of the 146 patterns here matched no name left in the catalogue:
+// `/^(circle|square)apore-dollar$/`, the enclosed currency signs, `/^transporter-([1-7]|empty)$/`,
+// the twenty-four clock faces, and others.
+//
+// Pruning them would read as tidying and behave as a trapdoor. Font Awesome PROMOTES icons from
+// Pro into the free set between releases, so a pattern deleted today is a pattern that silently
+// stops excluding the first time its members are promoted and the catalogue is regenerated — and
+// nothing would report it, because the exclusion it used to make is the thing that vanished. Every
+// pattern here describes what a glyph DEPICTS, and a depiction does not change with a licence, so
+// one is retired when the IDEA behind it is retired and never because this release of the free set
+// happens not to ship its members.
+//
+// `circleapore-dollar`, `squareapore-dollar` and `signapore-dollar-sign` are, for the avoidance of
+// the obvious guess, genuine upstream Font Awesome spellings measured in Foundry's own bundle
+// rather than corrupted text. They are not to be "corrected".
 export const EXCLUDED_ICON_CODE_PATTERNS = Object.freeze([
 
   // ── Single characters and typographic marks ──
