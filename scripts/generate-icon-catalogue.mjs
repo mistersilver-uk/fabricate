@@ -41,11 +41,7 @@ import {
   preferredIconName,
   readWoff2Codepoints,
 } from './lib/fontAwesomeBundle.js';
-import {
-  assertClassicFaceParity,
-  buildIconCatalogueFromRules,
-  parseCompatibleIconGlyphRules,
-} from './lib/fontAwesomeCompatibility.js';
+import { assertClassicFaceParity } from './lib/fontAwesomeCompatibility.js';
 
 const REPOSITORY_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const OUTPUT_PATH = path.join(
@@ -79,6 +75,23 @@ export function resolveFreeStylesheetPath() {
 }
 
 /**
+ * How to name a Font Awesome release in prose.
+ *
+ * Foundry 13's rebuild strips the `/*! Font Awesome … *\/` banner, so its bundle states an edition
+ * and a major through its `font-family` literal but no patch version at all. Naming that release
+ * `Pro null` would read as a parse failure rather than as the measurement it is.
+ *
+ * @param {{ edition: string, version: string|null, major?: number|null }} release
+ * @returns {string}
+ */
+function releaseLabel(release) {
+  if (release.version !== null && release.version !== undefined) {
+    return `${release.edition} ${release.version}`;
+  }
+  return `${release.edition} ${release.major ?? 'unknown'}.x (no patch version in the bundle)`;
+}
+
+/**
  * Every icon name a Font Awesome FREE stylesheet publishes.
  *
  * Parsed with `parseIconGlyphRules` — the same reader the Foundry bundle goes through — so the two
@@ -99,11 +112,17 @@ export function freeIconNamesFrom(cssText, source = 'The stylesheet') {
   const release = parseFontAwesomeRelease(cssText);
   if (release.edition !== 'Free') {
     throw new Error(
-      `${source} is Font Awesome ${release.edition} ${release.version}, not a free release; ` +
+      `${source} is Font Awesome ${releaseLabel(release)}, not a free release; ` +
         'it cannot be used as the free-name oracle.'
     );
   }
-  return { release, names: new Set(parseIconGlyphRules(cssText).flatMap((rule) => rule.names)) };
+  return {
+    // Narrowed to the documented pair. `parseFontAwesomeRelease` also reports the major it read
+    // and the evidence it read it from, which the smoke arms need and a committed constant does
+    // not — carrying them here would put them in the generated file by accident.
+    release: { edition: release.edition, version: release.version },
+    names: new Set(parseIconGlyphRules(cssText).flatMap((rule) => rule.names)),
+  };
 }
 
 /**
@@ -223,7 +242,7 @@ export function renderCatalogueModule({ release, freeRelease, definitions, measu
 // from published metadata — the first from the stylesheet a Foundry install serves, the second
 // from the \`@fortawesome/fontawesome-free\` devDependency.
 //
-// Foundry bundles Font Awesome ${release.edition} ${release.version}.
+// Foundry bundles Font Awesome ${releaseLabel(release)}.
 // The free release intersected against is Font Awesome ${freeRelease.edition} ${freeRelease.version}.
 //
 // WHY THE INTERSECTION IS NOT OPTIONAL. Foundry ships Font Awesome Pro under its own commercial
@@ -335,7 +354,7 @@ export const FOUNDRY_ICON_DEFINITIONS = Object.freeze(definitions);
 /** The Font Awesome release Foundry bundles, which this catalogue was measured from. */
 export const FOUNDRY_ICON_BUNDLE_RELEASE = Object.freeze({
   edition: '${release.edition}',
-  version: '${release.version}',
+  version: ${release.version === null ? 'null' : `'${release.version}'`},
   foundryVersion: '${measurements.foundryVersion}',
 });
 
@@ -416,20 +435,16 @@ function main() {
   assertClassicFaceParity(
     classicCodepoints,
     regularCodepoints,
-    `Foundry ${foundryVersion} / Font Awesome ${release.edition} ${release.version}`
+    `Foundry ${foundryVersion} / Font Awesome ${releaseLabel(release)}`
   );
 
-  const modernRules = parseIconGlyphRules(cssText);
-  const rules = parseCompatibleIconGlyphRules(cssText);
+  const rules = parseIconGlyphRules(cssText);
   if (rules.length === 0) {
     throw new Error(
-      `Foundry ${foundryVersion} / Font Awesome ${release.edition} ${release.version} yielded no icon glyph rules.`
+      `Foundry ${foundryVersion} / Font Awesome ${releaseLabel(release)} yielded no icon glyph rules.`
     );
   }
-  const definitions =
-    modernRules.length > 0
-      ? buildIconCatalogue({ cssText, classicCodepoints, brandCodepoints })
-      : buildIconCatalogueFromRules({ rules, classicCodepoints, brandCodepoints });
+  const definitions = buildIconCatalogue({ cssText, classicCodepoints, brandCodepoints });
 
   const { release: freeRelease, names: freeNames } = readFreeIconNames();
   const offered = intersectWithFreeIconNames(definitions, freeNames);
@@ -466,7 +481,7 @@ function main() {
       return;
     }
     console.error(
-      `OUT OF DATE. This bundle is Font Awesome ${release.edition} ${release.version} with ` +
+      `OUT OF DATE. This bundle is Font Awesome ${releaseLabel(release)} with ` +
         `${measurements.classicGlyphs} classic icons, ${measurements.offeredGlyphs} of them named by ` +
         `${freeRelease.edition} ${freeRelease.version}; the committed catalogue does not match it.`
     );

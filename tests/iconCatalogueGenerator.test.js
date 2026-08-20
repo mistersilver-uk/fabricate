@@ -14,10 +14,8 @@ import {
 import {
   assertClassicFaceParity,
   buildIconCatalogueFromRules,
-  iconNamesFromRules,
-  parseCompatibleIconGlyphRules,
-  parseLegacyIconGlyphRules,
 } from '../scripts/lib/fontAwesomeCompatibility.js';
+import { parseIconGlyphRules } from '../scripts/lib/fontAwesomeBundle.js';
 import {
   FOUNDRY_ICON_BUNDLE_RELEASE,
   FOUNDRY_ICON_DEFINITIONS,
@@ -26,18 +24,15 @@ import {
 
 const BACKSLASH = '\\';
 
-const LEGACY_STYLESHEET = [
-  '/*! Font Awesome Pro 6.7.2 */',
-  `.fa-cog::before,.fa-gear::before{content:"${BACKSLASH}f013"}`,
-  `.fa-0:before{content:"${BACKSLASH}30 "}`,
-  `.fa-github::before{content:"${BACKSLASH}f09b"}`,
-  '.fa-spin{animation-name:fa-spin}',
-].join('');
-
+// Every bundle the project has measured — Foundry 13's Font Awesome 6, Foundry 14's 7, and Free
+// 7.3.1 — assigns glyphs with `--fa`, so this fixture carries the two-declaration body Foundry 13
+// ships alongside the single-declaration body Foundry 14 does.
 const MODERN_STYLESHEET = [
   '/*! Font Awesome Pro 7.2.0 */',
-  `.fa-cog,.fa-gear{--fa:"${BACKSLASH}f013"}`,
-  `.fa-lychee{--fa:"${BACKSLASH}e7a5"}`,
+  `.fa-cog,.fa-gear{--fa:"${BACKSLASH}f013";--fa--fa:"${BACKSLASH}f013"}`,
+  `.fa-0{--fa:"${BACKSLASH}30 "}`,
+  `.fa-github{--fa:"${BACKSLASH}f09b"}`,
+  '.fa-spin{animation-name:fa-spin}',
 ].join('');
 
 describe('icon catalogue generator compatibility support', () => {
@@ -51,30 +46,8 @@ describe('icon catalogue generator compatibility support', () => {
     );
   });
 
-  it('parses Font Awesome 6 content rules, including aliases and CSS escapes', () => {
-    assert.deepEqual(parseLegacyIconGlyphRules(LEGACY_STYLESHEET), [
-      { names: ['cog', 'gear'], codepoint: 0xf013 },
-      { names: ['0'], codepoint: 0x30 },
-      { names: ['github'], codepoint: 0xf09b },
-    ]);
-  });
-
-  it('selects the appropriate parser for both supported Foundry generations', () => {
-    assert.deepEqual(iconNamesFromRules(parseCompatibleIconGlyphRules(LEGACY_STYLESHEET)), new Set([
-      'cog',
-      'gear',
-      '0',
-      'github',
-    ]));
-    assert.deepEqual(iconNamesFromRules(parseCompatibleIconGlyphRules(MODERN_STYLESHEET)), new Set([
-      'cog',
-      'gear',
-      'lychee',
-    ]));
-  });
-
-  it('builds a legacy catalogue one glyph at a time and excludes brand codepoints', () => {
-    const rules = parseCompatibleIconGlyphRules(LEGACY_STYLESHEET);
+  it('builds a catalogue one glyph at a time and excludes brand codepoints', () => {
+    const rules = parseIconGlyphRules(MODERN_STYLESHEET);
     const catalogue = buildIconCatalogueFromRules({
       rules,
       classicCodepoints: new Set([0xf013, 0x30]),
@@ -276,7 +249,7 @@ describe('narrowing the catalogue to the names Font Awesome publishes for free',
     assert.throws(() => freeIconNamesFrom('.fa-gear{--fa:"x"}'), /carries no Font Awesome banner/);
     assert.deepEqual(
       freeIconNamesFrom(MODERN_STYLESHEET.replace('Pro', 'Free')).names,
-      new Set(['cog', 'gear', 'lychee'])
+      new Set(['cog', 'gear', '0', 'github'])
     );
   });
 });
