@@ -276,6 +276,12 @@ export const VIEW_RECIPES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/SystemEditView\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/system\/.+\.svelte$/,
       /^src\/systems\/characterModifierPrerequisiteCopy\.js$/,
+      // The shared IconPicker and the vocabulary it lists (issue 1269). Everything those
+      // files change is visible ONLY in the open popover, and this is the one recipe whose
+      // capture clicks the trigger and takes the popover down. Absent here they matched no
+      // recipe at all, so a change to them published frames in which the picker is shut.
+      /^src\/ui\/svelte\/components\/IconPicker\.svelte$/,
+      /^src\/ui\/svelte\/util\/(?:essenceIcons|foundryIconVocabulary|foundryIconCatalogue)\.js$/,
     ],
   },
   {
