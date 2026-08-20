@@ -13,6 +13,8 @@ import {
   buildIconCatalogue,
   countLeadingTokens,
   iconLabelFor,
+  fontAwesomeLicenseEdition,
+  highestFontAwesomeFamilyRelease,
   isRetiredVariantName,
   parseFontAwesomeRelease,
   parseGlyphCodepoint,
@@ -39,6 +41,15 @@ const STYLESHEET_FIXTURE = [
   `.fa-0{--fa:"${BACKSLASH}30 "}`
 ].join('');
 
+// Cut in the shape of Foundry 13.351's file, which opens with `@charset` and carries no comment
+// at all: no banner, no patch version, and the release stated only by the family literals.
+const V13_STYLESHEET_FIXTURE = [
+  '@charset "utf-8";',
+  '.fa{font-family:var(--fa-style-family,"Font Awesome 6 Pro");font-weight:var(--fa-style,900)}',
+  '.fab{font-family:"Font Awesome 6 Brands"}',
+  `.fa-cog,.fa-gear{--fa:"${BACKSLASH}f013";--fa--fa:"${BACKSLASH}f013${BACKSLASH}f013"}`
+].join('');
+
 const CANDLE_HOLDER = 0xf6bc;
 const BABY_CARRIAGE = 0xf77d;
 const GEAR = 0xf013;
@@ -55,12 +66,26 @@ describe('reading the Font Awesome bundle Foundry ships', () => {
   it('reads the edition and version out of the banner', () => {
     assert.deepEqual(parseFontAwesomeRelease(STYLESHEET_FIXTURE), {
       edition: 'Pro',
-      version: '7.2.0'
+      version: '7.2.0',
+      major: 7,
+      evidence: 'banner'
     });
   });
 
-  it('refuses a stylesheet with no banner rather than guessing a release', () => {
-    assert.throws(() => parseFontAwesomeRelease('.fa-gear{--fa:"x"}'), /no Font Awesome banner/);
+  // Foundry 13.351's stylesheet contains no comment at all, so there is no banner and no patch
+  // number in it. Throwing there is what made the generator unrunnable against a Foundry 13
+  // install; the generation and the edition are still stated, just by the family names.
+  it('falls back to the font-family literals when the build stripped the banner', () => {
+    assert.deepEqual(parseFontAwesomeRelease(V13_STYLESHEET_FIXTURE), {
+      edition: 'Pro',
+      version: null,
+      major: 6,
+      evidence: 'font-family'
+    });
+  });
+
+  it('refuses a stylesheet that names no release by either route', () => {
+    assert.throws(() => parseFontAwesomeRelease('.fa-gear{--fa:"x"}'), /names no release to measure/);
   });
 
   // Font Awesome 7 assigns a glyph with the `--fa` custom property rather than a `content` rule, so
@@ -106,6 +131,81 @@ describe('reading the Font Awesome bundle Foundry ships', () => {
   // two reads a legal single-digit escape as a literal character.
   it('reads a single-digit hex escape as hex', () => {
     assert.equal(parseGlyphCodepoint(`${BACKSLASH}a`), NEWLINE);
+  });
+});
+
+// Every `font-family` literal each bundle really declares, in the order its stylesheet emits them.
+// Foundry 14's list is the trap: it carries the Font Awesome 5 aliases the project keeps for
+// stylesheets written against the old family names, so a first-match read of that file answers 5.
+const V13_FONT_FAMILIES = [
+  'Font Awesome 6 Pro',
+  'Font Awesome 6 Duotone',
+  'Font Awesome 6 Brands',
+  'Font Awesome 6 Sharp',
+  'Font Awesome 6 Sharp Duotone'
+];
+const V14_FONT_FAMILIES = [
+  'Font Awesome 7 Pro',
+  'Font Awesome 7 Brands',
+  'Font Awesome 7 Duotone',
+  'Font Awesome 5 Brands',
+  'Font Awesome 5 Pro',
+  'Font Awesome 5 Duotone'
+];
+
+describe('reading a release out of the font-family literals', () => {
+  it('answers with the highest major present, not the first one declared', () => {
+    assert.deepEqual(highestFontAwesomeFamilyRelease(V13_FONT_FAMILIES), {
+      edition: 'Pro',
+      major: 6
+    });
+    assert.deepEqual(highestFontAwesomeFamilyRelease(V14_FONT_FAMILIES), {
+      edition: 'Pro',
+      major: 7
+    });
+  });
+
+  // The minifier's emission order is not a fact about the release. `Font Awesome 7 Brands` names a
+  // face and no edition, so meeting it before `Font Awesome 7 Pro` must not settle the answer.
+  it('gives the same answer whatever order the literals arrive in', () => {
+    assert.deepEqual(
+      highestFontAwesomeFamilyRelease([...V14_FONT_FAMILIES].reverse()),
+      highestFontAwesomeFamilyRelease(V14_FONT_FAMILIES)
+    );
+    assert.deepEqual(highestFontAwesomeFamilyRelease(['Font Awesome 7 Brands', 'Font Awesome 7 Pro']), {
+      edition: 'Pro',
+      major: 7
+    });
+  });
+
+  it('reads the edition when a bundle is the free release', () => {
+    assert.deepEqual(highestFontAwesomeFamilyRelease(['Font Awesome 6 Brands', 'Font Awesome 6 Free']), {
+      edition: 'Free',
+      major: 6
+    });
+  });
+
+  // `FontAwesome` is the version-less Font Awesome 4 family alias, which names no generation.
+  it('answers nothing when no literal names a Font Awesome generation', () => {
+    assert.equal(highestFontAwesomeFamilyRelease(['Signika', 'FontAwesome', '']), null);
+    assert.equal(highestFontAwesomeFamilyRelease([]), null);
+  });
+});
+
+describe("reading the edition out of the bundle's licence", () => {
+  // Both supported generations ship this identical file, and it is where a Foundry 13 install
+  // states its edition in prose rather than as a side effect of a family name.
+  it('reads the edition the licence grants', () => {
+    assert.equal(
+      fontAwesomeLicenseEdition('Font Awesome Pro License\n------------------------\n'),
+      'Pro'
+    );
+    assert.equal(fontAwesomeLicenseEdition('Font Awesome Free License\n'), 'Free');
+  });
+
+  it('reads no edition out of a licence that grants none', () => {
+    assert.equal(fontAwesomeLicenseEdition('SIL Open Font License'), null);
+    assert.equal(fontAwesomeLicenseEdition(null), null);
   });
 });
 

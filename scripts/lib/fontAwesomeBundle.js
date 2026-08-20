@@ -87,23 +87,105 @@ const WOFF2_KNOWN_TABLE_TAGS = [
   'Sill',
 ];
 
+/** A quoted `"Font Awesome <major> <flavour>"` font-family literal, in either quote character. */
+const FONT_FAMILY_LITERAL = /(["'])(Font Awesome \d+[^"']*)\1/g;
+
 /**
- * Reads the edition and version out of the stylesheet's banner comment.
+ * The generation and edition a set of `font-family` literals describes, by HIGHEST MAJOR.
  *
- * The version is MEASURED rather than assumed because the catalogue this bundle generates
- * describes one Foundry release's font and nothing else.
+ * Highest rather than first, and that is the whole point of the function. Foundry 14.360's
+ * stylesheet declares `Font Awesome 7 Pro`, `7 Brands` and `7 Duotone` — and also `Font Awesome 5
+ * Pro`, `5 Brands`, `5 Duotone` and bare `FontAwesome`, which are the backward-compatibility
+ * aliases Font Awesome keeps for stylesheets written against the old family names. A first-match
+ * read of that file answers `5`. Foundry 13.351 declares `Font Awesome 6 Pro`, `6 Brands`,
+ * `6 Duotone`, `6 Sharp` and `6 Sharp Duotone`, with no alias to trip over.
+ *
+ * The edition is read from the literals AT that major, and a named edition beats an unnamed one at
+ * the same major so the answer does not depend on which family the minifier emitted first —
+ * `Font Awesome 6 Brands` names a face, `Font Awesome 6 Pro` names the release.
+ *
+ * @param {Iterable<string>} fontFamilies quoted family names, without their quotes
+ * @returns {{ edition: 'Free'|'Pro'|null, major: number }|null} null when none is a Font Awesome
+ *   family literal
+ */
+export function highestFontAwesomeFamilyRelease(fontFamilies) {
+  let highest = null;
+  for (const family of fontFamilies) {
+    const match = /^Font Awesome (\d+)\b(.*)$/.exec(String(family ?? '').trim());
+    if (!match) continue;
+
+    const major = Number(match[1]);
+    const edition = /\bPro\b/.test(match[2]) ? 'Pro' : /\bFree\b/.test(match[2]) ? 'Free' : null;
+    const supersedes =
+      highest === null ||
+      major > highest.major ||
+      (major === highest.major && highest.edition === null);
+    if (supersedes) highest = { edition, major };
+  }
+  return highest;
+}
+
+/**
+ * The release a stylesheet describes, and WHICH EVIDENCE says so.
+ *
+ * Measured rather than assumed, because the catalogue generated from a bundle describes one
+ * Foundry release's font and nothing else. The two Foundry generations state their release in two
+ * different ways, and a reader that knows only the stronger one cannot read the older bundle at
+ * all:
+ *
+ * - Foundry 14.360 serves the stylesheet with its `/*! Font Awesome Pro 7.2.0 *\/` banner intact,
+ *   so edition AND patch version are both readable.
+ * - Foundry 13.351 serves a stylesheet with NO comments in it whatsoever — its build strips them —
+ *   so there is no banner and no patch version to read. Its `font-family` literals still name the
+ *   generation and the edition, which is less than 14 offers and considerably more than nothing.
+ *
+ * Throwing on the second case is what this function used to do, and it made the generator
+ * unrunnable against a Foundry 13 install for want of a patch number that install does not state.
+ * A null `version` reports that honestly and leaves the caller to decide whether it can proceed;
+ * `evidence` names what the other fields rest on so a caller never has to guess.
  *
  * @param {string} cssText
- * @returns {{ edition: string, version: string }}
+ * @returns {{ edition: 'Free'|'Pro'|null, version: string|null, major: number, evidence: 'banner'|'font-family' }}
+ * @throws {Error} when the text names no Font Awesome release at all, by either route
  */
 export function parseFontAwesomeRelease(cssText) {
-  const match = /Font Awesome (Free|Pro) (\d+\.\d+\.\d+)/.exec(String(cssText ?? ''));
-  if (!match) {
-    throw new Error(
-      'The stylesheet carries no Font Awesome banner, so its release cannot be measured.'
-    );
+  const text = String(cssText ?? '');
+  const banner = /Font Awesome (Free|Pro) (\d+)\.(\d+\.\d+)/.exec(text);
+  if (banner) {
+    return {
+      edition: banner[1],
+      version: `${banner[2]}.${banner[3]}`,
+      major: Number(banner[2]),
+      evidence: 'banner',
+    };
   }
-  return { edition: match[1], version: match[2] };
+
+  const family = highestFontAwesomeFamilyRelease(
+    [...text.matchAll(FONT_FAMILY_LITERAL)].map((match) => match[2])
+  );
+  if (family) {
+    return { edition: family.edition, version: null, major: family.major, evidence: 'font-family' };
+  }
+
+  throw new Error(
+    'The stylesheet carries no Font Awesome banner and no Font Awesome font-family literal, so it ' +
+      'names no release to measure.'
+  );
+}
+
+/**
+ * The edition a bundled `LICENSE.txt` grants.
+ *
+ * Foundry ships this file beside the stylesheet, and it is the only place a Foundry 13 install
+ * states its edition in prose rather than as a side effect of a family name. Both supported
+ * generations ship the identical Pro licence, including the paragraph restricting third-party
+ * package use — which is why Fabricate records icon NAMES and never a glyph.
+ *
+ * @param {string|null|undefined} licenseText
+ * @returns {'Free'|'Pro'|null}
+ */
+export function fontAwesomeLicenseEdition(licenseText) {
+  return /Font Awesome (Free|Pro) License/.exec(String(licenseText ?? ''))?.[1] ?? null;
 }
 
 /**
