@@ -20,16 +20,16 @@ import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 
 import {
-  assertClassicFaceParity,
-  buildIconCatalogueFromRules,
-  parseCompatibleIconGlyphRules,
-} from './lib/fontAwesomeCompatibility.js';
-import {
   buildIconCatalogue,
   parseFontAwesomeRelease,
   parseIconGlyphRules,
   readWoff2Codepoints,
 } from './lib/fontAwesomeBundle.js';
+import {
+  assertClassicFaceParity,
+  buildIconCatalogueFromRules,
+  parseCompatibleIconGlyphRules,
+} from './lib/fontAwesomeCompatibility.js';
 
 const REPOSITORY_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const OUTPUT_PATH = path.join(
