@@ -1507,9 +1507,9 @@ class Fabricate {
    *
    * ONE vocabulary serves every icon field in Fabricate — essences, categories, biomes — and it
    * is published here so a companion module binds to it instead of hand-curating a second list
-   * that drifts. It is measured from the Font Awesome bundle Foundry itself ships, so every name
-   * in it is a name a Foundry client can draw, and it is curated to serve any fiction rather than
-   * fantasy alone.
+   * that drifts. It is measured from the Font Awesome bundle a Foundry install ships rather than
+   * from Font Awesome's published metadata, so its names are the ones that bundle draws, and it
+   * is curated to serve any fiction rather than fantasy alone.
    *
    * Named for its siblings: `list…` is what this facade calls a method answering with a
    * collection of plain display records ({@link Fabricate#listSelectableActors},
@@ -1524,8 +1524,9 @@ class Fabricate {
    *
    * The records are freshly built per call, down to the `aliases` array, so a caller may keep,
    * sort or mutate them. The vocabulary's own rows are frozen entry by entry, which is why the
-   * copy is about ownership rather than defence: a frozen row cannot be sorted or appended to,
-   * and that freezing lives in a generated file rather than in this contract.
+   * copy is about ownership rather than defence: a frozen array cannot be sorted and a frozen
+   * record cannot be edited, and that freezing lives in a generated file rather than in this
+   * contract.
    *
    * `aliases` is published rather than dropped because there is one entry per GLYPH and not per
    * name. A GM's saved `fas fa-cog` names the row offered as `gear`, so a record without the
