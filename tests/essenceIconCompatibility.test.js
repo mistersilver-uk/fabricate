@@ -3,13 +3,19 @@ import { describe, it } from 'node:test';
 
 import {
   buildEssenceIconOptions,
+  USER_SEARCH_ALIAS_KEYS,
   buildIconDefinitionsForMeasuredBundle,
   filterEssenceIconOptions,
+  getEssenceIconOptions,
   getFoundryCuratedIconDefinitionsForMajor,
   getFoundryIconDefinitionsForMajor,
   measureLoadedFontAwesomeGlyphs,
 } from '../src/ui/svelte/util/essenceIcons.js';
-import { FOUNDRY_ICON_DEFINITIONS } from '../src/ui/svelte/util/foundryIconVocabulary.js';
+import {
+  FOUNDRY_CURATED_ICON_DEFINITIONS,
+  FOUNDRY_ICON_DEFINITIONS,
+  findCuratedIcon,
+} from '../src/ui/svelte/util/foundryIconVocabulary.js';
 import {
   findCuratedIconRecord,
   listCuratedIconVocabulary,
@@ -309,7 +315,7 @@ describe('human icon search aliases', () => {
   const options = buildEssenceIconOptions([
     { iconCode: 'flask', label: 'Flask', aliases: [] },
     { iconCode: 'coins', label: 'Coins', aliases: [] },
-    { iconCode: 'user-wizard', label: 'User Wizard', aliases: [] },
+    { iconCode: 'hat-wizard', label: 'Hat Wizard', aliases: [] },
     { iconCode: 'hammer', label: 'Hammer', aliases: [] },
   ]);
 
@@ -331,11 +337,106 @@ describe('human icon search aliases', () => {
     );
     assert.deepEqual(
       filterEssenceIconOptions(options, 'character mage').map((option) => option.iconName),
-      ['user-wizard']
+      ['hat-wizard']
     );
     assert.deepEqual(
       filterEssenceIconOptions(options, 'forge tool').map((option) => option.iconName),
       ['hammer']
     );
+  });
+});
+
+// The search-alias tables are a hand-maintained mirror of a GENERATED catalogue, so a key that
+// resolves to nothing is invisible: it costs nothing at load and simply never fires. Three had
+// already stranded — `user-wizard` (the icon is `hat-wizard`), and the `anvil` and `armor` name
+// tokens, neither of which appears in any name the bundle ships.
+describe('the search-alias tables cannot strand a key', () => {
+  it('hangs every icon-keyed alias list on an icon the vocabulary offers', () => {
+    for (const iconName of USER_SEARCH_ALIAS_KEYS.iconNames) {
+      assert.ok(
+        findCuratedIcon(iconName),
+        `${iconName} carries search aliases but is in no curated row, so none of them can ever match`
+      );
+    }
+  });
+
+  it('hangs every token-keyed alias list on a token some offered name is spelled with', () => {
+    const nameTokens = new Set();
+    for (const definition of FOUNDRY_CURATED_ICON_DEFINITIONS) {
+      for (const name of [definition.iconCode, ...definition.aliases]) {
+        for (const token of name.split('-')) nameTokens.add(token);
+      }
+    }
+
+    for (const token of USER_SEARCH_ALIAS_KEYS.nameTokens) {
+      assert.ok(
+        nameTokens.has(token),
+        `no curated name is spelled with the token \`${token}\`, so its aliases are unreachable`
+      );
+    }
+  });
+});
+
+describe('icon search ranks the row a GM named above the rows that mention it', () => {
+  const options = buildEssenceIconOptions([
+    { iconCode: 'car-key', label: 'Car Key', aliases: [] },
+    { iconCode: 'field-hockey-stick-ball', label: 'Field Hockey Stick Ball', aliases: [] },
+    { iconCode: 'glass-whiskey', label: 'Glass Whiskey', aliases: [] },
+    { iconCode: 'key', label: 'Key', aliases: [] },
+    { iconCode: 'key-skeleton', label: 'Key Skeleton', aliases: [] },
+    { iconCode: 'gear', label: 'Gear', aliases: ['cog'] },
+  ]);
+
+  const filteredNames = (searchTerm) =>
+    filterEssenceIconOptions(options, searchTerm).map((option) => option.iconName);
+
+  it('puts an exact name first, then a name that starts with the query', () => {
+    assert.deepEqual(filteredNames('key'), [
+      'key',
+      'key-skeleton',
+      'car-key',
+      'field-hockey-stick-ball',
+      'glass-whiskey',
+    ]);
+  });
+
+  it('ranks a word inside a name above a bare substring of one', () => {
+    assert.deepEqual(filteredNames('hockey'), ['field-hockey-stick-ball']);
+    assert.deepEqual(filteredNames('whis'), ['glass-whiskey']);
+  });
+
+  it('ranks an alias with the names, since an alias is the name a GM typed', () => {
+    assert.deepEqual(filteredNames('cog'), ['gear']);
+  });
+
+  it('preserves catalogue order inside a tier', () => {
+    assert.deepEqual(filteredNames('e'), [
+      'car-key',
+      'field-hockey-stick-ball',
+      'glass-whiskey',
+      'key',
+      'key-skeleton',
+      'gear',
+    ]);
+  });
+
+  // Every row used to carry the literal `fas solid` in its search text, so the second keystroke of
+  // `solid`, `lightning`, `asterisk` or `astronaut` matched the entire vocabulary. Nothing read it:
+  // a caller filtering by weight reads `variant`.
+  it('does not match every row on the style prefix and weight it shares with them', () => {
+    const curated = getEssenceIconOptions();
+
+    for (const query of ['fas', 'solid']) {
+      assert.ok(
+        filterEssenceIconOptions(curated, query).length < curated.length,
+        `\`${query}\` is on every row, so searching it used to match the whole vocabulary`
+      );
+    }
+    assert.ok(
+      curated.every((option) => !option.searchText.split(' ').includes('solid')),
+      'the weight is a FIELD, and nothing searches it: the picker reads `variant`'
+    );
+    assert.deepEqual(filteredNames('solid'), []);
+    assert.ok(options.every((option) => option.variant === 'solid'), 'the weight is still reported');
   });
 });

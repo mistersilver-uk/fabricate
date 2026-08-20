@@ -139,8 +139,6 @@ const PREFIX_ALIASES = Object.freeze({
  * person even though none of those words needs to become an icon code.
  */
 const USER_SEARCH_ALIASES_BY_TOKEN = Object.freeze({
-  anvil: ['blacksmith', 'smithing', 'forge', 'crafting'],
-  armor: ['armour', 'defence', 'defense', 'protection'],
   axe: ['weapon', 'combat', 'chop'],
   bag: ['container', 'storage', 'inventory'],
   basket: ['container', 'storage', 'market'],
@@ -219,7 +217,21 @@ const USER_SEARCH_ALIASES_BY_ICON = Object.freeze({
   'sack-dollar': ['money', 'currency', 'gold', 'treasure', 'loot'],
   'treasure-chest': ['loot', 'treasure', 'reward', 'storage'],
   'user-ninja': ['character', 'npc', 'rogue', 'assassin'],
-  'user-wizard': ['character', 'npc', 'mage', 'magic', 'spellcaster']
+  'hat-wizard': ['character', 'npc', 'mage', 'magic', 'spellcaster']
+});
+
+/**
+ * The keys the two tables above hang aliases on, published for a drift guard.
+ *
+ * These tables are a hand-maintained MIRROR of the shipped vocabulary, and a mirror rots
+ * silently: a key naming an icon no release ships — `user-wizard`, when the icon is `hat-wizard` —
+ * costs nothing at load and simply never fires, so the concepts it was written to make searchable
+ * are quietly unsearchable. A test that resolves every key against the vocabulary is what turns
+ * that into a failure at the next regeneration rather than a report from a GM.
+ */
+export const USER_SEARCH_ALIAS_KEYS = Object.freeze({
+  nameTokens: Object.freeze(Object.keys(USER_SEARCH_ALIASES_BY_TOKEN)),
+  iconNames: Object.freeze(Object.keys(USER_SEARCH_ALIASES_BY_ICON))
 });
 
 function normalizeSearch(value) {
@@ -606,8 +618,12 @@ function createIconOption({ iconCode, label, aliases = [] }, prefix) {
     variant,
     aliases: Object.freeze([...aliases]),
     searchAliases,
+    // The style prefix and weight are deliberately NOT searchable. Every row carries the same
+    // two words, so baking them in made `s`, `so`, `li`, `as`, `id` and `fa` match the entire
+    // vocabulary — which is the second keystroke of solid, lightning, asterisk and astronaut —
+    // and nothing ever searched for them: a caller filtering by weight reads `variant`.
     searchText: normalizeSearch(
-      `${resolvedLabel} ${iconCode} fa-${iconCode} ${aliasText} ${searchAliases.join(' ')} ${prefix} ${variant}`
+      `${resolvedLabel} ${iconCode} fa-${iconCode} ${aliasText} ${searchAliases.join(' ')}`
     )
   });
 }
@@ -703,26 +719,65 @@ export function getEssenceIconOption(iconClass, options = getEssenceIconOptions(
   const aliased = resolvedOptions.find(option => option.aliases?.includes(iconName));
   if (aliased) return aliased;
 
-  const label = humanizeIconName(iconName) || normalizedIcon;
-  const searchAliases = buildUserSearchAliases({ iconCode: iconName, label, aliases: [] });
-  return Object.freeze({
-    label,
-    iconClass: normalizedIcon,
-    iconName,
-    variant: prefix === 'far' ? 'regular' : 'solid',
-    aliases: Object.freeze([]),
-    searchAliases,
-    searchText: normalizeSearch(`${normalizedIcon} ${searchAliases.join(' ')}`)
-  });
+  // Built the same way a listed row is, so a stored icon the vocabulary does not offer still
+  // carries the same fields, the same aliases and the same search text as one it does.
+  return createIconOption({ iconCode: iconName, label: humanizeIconName(iconName) }, prefix);
 }
 
+const EXACT_NAME_RANK = 0;
+const NAME_PREFIX_RANK = 1;
+const WORD_PREFIX_RANK = 2;
+const SUBSTRING_RANK = 3;
+
+function searchWords(text) {
+  return String(text).split(' ').filter(Boolean);
+}
+
+/**
+ * How well one row answers the whole query, as a relevance TIER rather than a score.
+ *
+ * Tiers rather than a weighted score because the ordering inside a tier is already decided: the
+ * vocabulary is alphabetical, and a stable sort keeps that. What alphabetical order cannot do is
+ * put the icon a GM NAMED above the icons that merely contain its name — the picker shows about
+ * seven rows, and `key` sat tenth behind `car-key` and `glass-whiskey`, `lock` eighteenth, `water`
+ * fifteenth, so typing an icon's exact name left it below the fold.
+ *
+ * Aliases rank with the names because they ARE names here: `cog` is not offered as a row, and a
+ * GM who types it means the gear exactly.
+ */
+function iconOptionSearchRank(option, query) {
+  const name = normalizeSearch(option.iconName);
+  const label = normalizeSearch(option.label);
+  if (query === name || query === label) return EXACT_NAME_RANK;
+
+  const names = [name, ...(option.aliases ?? []).map((alias) => normalizeSearch(alias))];
+  if (names.some((candidate) => candidate.startsWith(query))) return NAME_PREFIX_RANK;
+
+  const words = [...searchWords(label), ...names.flatMap(searchWords)];
+  if (words.some((word) => word.startsWith(query))) return WORD_PREFIX_RANK;
+
+  return SUBSTRING_RANK;
+}
+
+/**
+ * The rows a query matches, most relevant first.
+ *
+ * Matching is unchanged — every whitespace-separated token has to appear somewhere in the row's
+ * search text, so a multi-word query still narrows rather than widens — and only the ORDER is new.
+ */
 export function filterEssenceIconOptions(options = [], searchTerm = '') {
   const resolvedOptions = Array.isArray(options) ? options : [];
   const normalizedSearch = normalizeSearch(searchTerm);
   if (!normalizedSearch) return resolvedOptions;
 
-  const tokens = normalizedSearch.split(' ').filter(Boolean);
-  return resolvedOptions.filter(option =>
-    tokens.every(token => option.searchText.includes(token))
-  );
+  const tokens = searchWords(normalizedSearch);
+  const matches = [];
+  for (const option of resolvedOptions) {
+    if (tokens.some((token) => !option.searchText.includes(token))) continue;
+    matches.push({ option, rank: iconOptionSearchRank(option, normalizedSearch) });
+  }
+
+  return matches
+    .sort((left, right) => left.rank - right.rank)
+    .map((match) => match.option);
 }
