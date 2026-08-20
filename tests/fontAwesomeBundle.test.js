@@ -19,7 +19,6 @@ import {
   parseIconGlyphRules,
   preferredIconName
 } from '../scripts/lib/fontAwesomeBundle.js';
-import { parseLegacyIconGlyphRules } from '../scripts/lib/fontAwesomeCompatibility.js';
 
 const BACKSLASH = '\\';
 
@@ -47,8 +46,6 @@ const GEARS = 0xf085;
 const GITHUB = 0xf09b;
 const PLUS = 0x2b;
 const ZERO = 0x30;
-const DOUBLE_QUOTE = 0x22;
-const FLASK = 0xf0_c3;
 const NEWLINE = 0xa;
 const CLOSING_BRACE = 0x7d;
 
@@ -156,98 +153,6 @@ describe('reading a bundle that assigns each glyph twice', () => {
       rules.every((rule) => !rule.names.includes('spin')),
       'a utility is not an icon'
     );
-  });
-});
-
-// Cut in the shape of a real Font Awesome 6 file, which is the generation that assigns its glyphs
-// with `content` on `::before`: an `@font-face` block, an `@media` block wrapping other rules, a
-// multi-name selector list mixing `:before` and `::before`, both quote characters, an escaped quote
-// as a VALUE, a utility class that assigns no glyph, and an unterminated tail.
-const LEGACY_STYLESHEET_FIXTURE = [
-  '/*! Font Awesome Free 6.7.2 by @fontawesome */',
-  '@font-face{font-family:"Font Awesome 6 Free";font-style:normal;font-weight:900;',
-  'src:url(../webfonts/fa-solid-900.woff2)format("woff2")}',
-  '@media (prefers-reduced-motion:reduce){.fa-beat,.fa-spin{animation-duration:1ms;',
-  'animation-delay:-1ms}}',
-  `.fa-cog:before,.fa-gear::before{content:"${BACKSLASH}f013"}`,
-  `.fa-baby-carriage::before,.fa-carriage-baby::before{content:'${BACKSLASH}f77d'}`,
-  `.fa-quote-left::before{content:"${BACKSLASH}""}`,
-  '.fa-spin{animation-name:fa-spin}',
-  `.fa-0::before{content:"${BACKSLASH}30 "}`,
-  `.fa-unterminated::before{content:"${BACKSLASH}f000"`
-].join('');
-
-describe('reading a Font Awesome 6 stylesheet', () => {
-  // The rules a splitter has to get right, and the reason this is a brace walk rather than a
-  // `([^{}]+)\{([^{}]*)\}` pattern: that pattern is quadratic in the length of a brace-free run,
-  // so a long at-rule prelude — which is exactly what it cannot match — is what it costs most on.
-  it('finds every glyph rule, whatever wraps it', () => {
-    assert.deepEqual(parseLegacyIconGlyphRules(LEGACY_STYLESHEET_FIXTURE), [
-      { names: ['cog', 'gear'], codepoint: GEAR },
-      { names: ['baby-carriage', 'carriage-baby'], codepoint: BABY_CARRIAGE },
-      { names: ['quote-left'], codepoint: DOUBLE_QUOTE },
-      { names: ['0'], codepoint: ZERO }
-    ]);
-  });
-
-  // A nested rule is read under ITS OWN selector, and the at-rule prelude that wraps it is not a
-  // rule. `@font-face` is not one either — it assigns no glyph — and neither is a block nothing
-  // closed.
-  it('reads a nested rule under its own selector and ignores what wraps it', () => {
-    const names = parseLegacyIconGlyphRules(LEGACY_STYLESHEET_FIXTURE).flatMap((rule) => rule.names);
-
-    assert.ok(!names.includes('spin'), 'an animation utility inside @media is not an icon');
-    assert.ok(!names.includes('beat'), 'an animation utility inside @media is not an icon');
-    assert.ok(!names.includes('unterminated'), 'a block nothing closed is not a rule');
-    assert.equal(
-      parseLegacyIconGlyphRules(
-        `@media (min-width:1px){.fa-gear::before{content:"${BACKSLASH}f013"}}`
-      )[0].names[0],
-      'gear'
-    );
-  });
-
-  // The value is a CSS string, so a quote inside one is escaped rather than ending it.
-  it('reads an escaped quote as the character it names', () => {
-    const rules = parseLegacyIconGlyphRules(LEGACY_STYLESHEET_FIXTURE);
-
-    assert.equal(rules.find((rule) => rule.names.includes('quote-left')).codepoint, DOUBLE_QUOTE);
-  });
-
-  // Nothing here may assume minification: the generator takes a stylesheet PATH, so it can be
-  // pointed at `all.css`. The whitespace between a nested rule's `}` and its wrapper's is then a
-  // run of its own, and it is neither a selector nor a rule.
-  it('reads a stylesheet that has not been minified', () => {
-    const pretty = [
-      '@media (min-width: 1px) {',
-      '  .fa-gear::before {',
-      `    content: "${BACKSLASH}f013";`,
-      '  }',
-      '}',
-      '',
-      '.fa-flask::before {',
-      `  content: "${BACKSLASH}f0c3";`,
-      '}'
-    ].join('\n');
-
-    assert.deepEqual(parseLegacyIconGlyphRules(pretty), [
-      { names: ['gear'], codepoint: GEAR },
-      { names: ['flask'], codepoint: FLASK }
-    ]);
-  });
-
-  it('reads nothing out of a stylesheet with no glyph rules', () => {
-    assert.deepEqual(parseLegacyIconGlyphRules('.fa-spin{animation-name:fa-spin}'), []);
-    assert.deepEqual(parseLegacyIconGlyphRules(''), []);
-    assert.deepEqual(parseLegacyIconGlyphRules(null), []);
-  });
-
-  // A rule is opened by `{` and by nothing else. Text no stylesheet would contain is worth pinning
-  // because the walk decides it, where the pattern this replaces decided it by not matching: a
-  // reader that let a stray `}` open a block would invent rules out of the gaps between them.
-  it('never opens a rule on a closing brace', () => {
-    assert.deepEqual(parseLegacyIconGlyphRules(`.fa-a::before}content:"${BACKSLASH}f000"}`), []);
-    assert.deepEqual(parseLegacyIconGlyphRules('}}}'), []);
   });
 });
 

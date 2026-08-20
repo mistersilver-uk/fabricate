@@ -1,18 +1,38 @@
-import {
-  countLeadingTokens,
-  iconLabelFor,
-  parseGlyphCodepoint,
-  parseIconGlyphRules,
-  preferredIconName,
-} from './fontAwesomeBundle.js';
+/**
+ * What a catalogue needs from a Font Awesome bundle beyond reading its glyph rules: the guard on
+ * the one-row-per-glyph model, and the construction of rows from rules a caller has already
+ * parsed and filtered.
+ *
+ * THIS MODULE NO LONGER SPANS TWO FONT AWESOME GENERATIONS, and the reason is worth recording
+ * because the code that did was written against a premise that is false. It carried a
+ * `parseLegacyIconGlyphRules` reader for `content` on `:before`/`::before`, described as the
+ * format "Foundry 13's bundled 6.7.2 uses", behind a `parseCompatibleIconGlyphRules` that fell
+ * back to it whenever the modern reader came up empty. Font Awesome 6 had ALREADY moved glyph
+ * assignment to the `--fa` custom property: Foundry 13.351's bundle declares
+ * `font-family:"Font Awesome 6 Pro"` and assigns every one of its 4,656 icon rules with `--fa`.
+ * Run against the real stylesheets, the legacy reader returns ZERO rules from Foundry 13.351,
+ * zero from Foundry 14.360 and zero from Font Awesome Free 7.3.1 — the only `content` rules in
+ * any of them are the two-to-four family blocks (`.fas:before{content:var(--fa)}`) that render
+ * the custom property, and they name no icon.
+ *
+ * So the fallback never fired, and the reason Foundry 13 looked like a different generation was
+ * not its `content` rules but its SECOND declaration: `.fa-gear{--fa:"\f013";--fa--fa:"…"}`, which
+ * `parseIconGlyphRules` did not read until it stopped requiring `}` after the closing quote.
+ * Deleting the reader is therefore not a narrowing of support — it removes a branch that answered
+ * a question no shipped bundle asks, and whose presence made an unread bundle look supported.
+ */
+
+import { countLeadingTokens, iconLabelFor, preferredIconName } from './fontAwesomeBundle.js';
 
 /**
  * Refuse to regenerate a one-row-per-glyph catalogue when its weight assumption stops being true.
  *
- * PR #1274 deliberately removes `hasRegular` because Foundry 14.365's classic solid and regular
- * faces carry identical cmaps. Continuing after that invariant stops holding would emit a file
- * whose header says the faces are identical while silently throwing away the information needed
- * to represent the difference, so this is a hard failure rather than a warning.
+ * PR #1274 deliberately removes `hasRegular` because the classic solid and regular faces Foundry
+ * ships carry identical cmaps — measured on both supported generations, 4,580 codepoints each in
+ * Foundry 14.360 and 4,118 each in Foundry 13.351, with nothing on either side of either pair.
+ * Continuing after that invariant stops holding would emit a file whose header says the faces are
+ * identical while silently throwing away the information needed to represent the difference, so
+ * this is a hard failure rather than a warning.
  *
  * @param {Set<number>} solidCodepoints
  * @param {Set<number>} regularCodepoints
@@ -36,113 +56,6 @@ export function assertClassicFaceParity(
 }
 
 /**
- * The next `{` or `}` at or after `from`, or -1 when the text holds neither.
- *
- * A single character sweep rather than two `indexOf` calls: `indexOf('{')` on text whose remaining
- * braces are all `}` scans to the end of the stylesheet every time it is asked, which is the same
- * quadratic cost in a different disguise.
- *
- * @param {string} text
- * @param {number} from
- * @returns {number}
- */
-function nextBraceIndex(text, from) {
-  for (let index = from; index < text.length; index += 1) {
-    if (text[index] === '{' || text[index] === '}') return index;
-  }
-  return -1;
-}
-
-/**
- * Every innermost `selector { declarations }` block in a stylesheet, in source order.
- *
- * This replaces a `([^{}]+)\{([^{}]*)\}` splitter, which reads naturally and is the wrong tool
- * for a quarter-megabyte of minified CSS: its two unbounded character classes are ambiguous, so
- * every at-rule prelude that fails to match costs the engine a retry from the next offset and its
- * runtime grows super-linearly in the length of a brace-free run (`javascript:S8786`). The walk
- * below answers the same question by reading each character once.
- *
- * It reports the same blocks the splitter did, deliberately, because the callers' behaviour is
- * defined by that reading:
- *
- * - a nested block's PRELUDE is not a rule. `@media …{.fa-beat{…}}` yields `.fa-beat`, because a
- *   body that opens another block cannot match; the walk resumes inside the outer block.
- * - a selector must be non-empty, and a run terminated by `}` rather than `{` is not a selector.
- * - neither form is a CSS parser: a brace inside a quoted value ends a block early in both. That
- *   is safe against Font Awesome's output, whose only string values are glyph escapes and font
- *   family names.
- *
- * @param {string} cssText
- * @returns {Generator<{ selectorText: string, declarations: string }>}
- */
-function* eachDeclarationBlock(cssText) {
-  const text = String(cssText ?? '');
-  let cursor = 0;
-
-  while (cursor < text.length) {
-    const open = nextBraceIndex(text, cursor);
-    if (open === -1) return;
-    if (open === cursor || text[open] === '}') {
-      cursor = open + 1;
-      continue;
-    }
-
-    const close = nextBraceIndex(text, open + 1);
-    if (close === -1) return;
-    if (text[close] === '{') {
-      cursor = open + 1;
-      continue;
-    }
-
-    yield { selectorText: text.slice(cursor, open), declarations: text.slice(open + 1, close) };
-    cursor = close + 1;
-  }
-}
-
-/**
- * Read Font Awesome 6's icon rules.
- *
- * Font Awesome 7 moved icon glyph assignment to `--fa` on the icon class itself. Font Awesome 6
- * assigns `content` on `:before`/`::before`, which is the format Foundry 13's bundled 6.7.2 uses.
- * Supporting both is what lets the same smoke assertion and regeneration tooling reason about the
- * two Foundry generations instead of treating V13 as a guessed subtraction from V14.
- *
- * @param {string} cssText
- * @returns {Array<{ names: string[], codepoint: number }>}
- */
-export function parseLegacyIconGlyphRules(cssText) {
-  const rules = [];
-
-  for (const { selectorText, declarations } of eachDeclarationBlock(cssText)) {
-    const content = /(?:^|;)\s*content\s*:\s*(["'])(.*?)\1\s*(?:;|$)/.exec(declarations);
-    if (!content) continue;
-
-    const names = [...selectorText.matchAll(/\.fa-([a-z0-9-]+)\s*::?before\b/gi)].map(
-      (selector) => selector[1]
-    );
-    if (names.length === 0) continue;
-
-    rules.push({
-      names: [...new Set(names)],
-      codepoint: parseGlyphCodepoint(content[2]),
-    });
-  }
-
-  return rules;
-}
-
-/**
- * Read icon rules from either Font Awesome generation Fabricate currently supports.
- *
- * @param {string} cssText
- * @returns {Array<{ names: string[], codepoint: number }>}
- */
-export function parseCompatibleIconGlyphRules(cssText) {
-  const modern = parseIconGlyphRules(cssText);
-  return modern.length > 0 ? modern : parseLegacyIconGlyphRules(cssText);
-}
-
-/**
  * Every icon name declared by a parsed bundle, including aliases.
  *
  * @param {Array<{ names: string[] }>} rules
@@ -155,9 +68,16 @@ export function iconNamesFromRules(rules) {
 /**
  * Build one catalogue row per classic glyph from already-parsed rules.
  *
- * This is the legacy counterpart of `buildIconCatalogue`: grouping by codepoint matters because
- * Font Awesome 6 can spell aliases as separate selectors/rules rather than the single grouped rule
- * Font Awesome 7 emits.
+ * The counterpart of `buildIconCatalogue`, which reads a stylesheet itself: this takes rules a
+ * caller has already parsed, so a caller that must FILTER them — by licence, by face, by anything
+ * the stylesheet does not say — can still produce a catalogue.
+ *
+ * It groups by CODEPOINT rather than by rule, and that is load-bearing rather than defensive.
+ * Foundry 13.351 gives 762 of its codepoints more than one rule (`.fa-adjust` and
+ * `.fa-circle-half-stroke` are separate blocks naming one drawing, as are `.fa-address-card`,
+ * `.fa-contact-card` and `.fa-vcard`), so grouping per rule would emit one glyph as several
+ * entries, each claiming the others as no alias of it. Foundry 14.360 does it once, for
+ * `crate-apple`/`apple-crate`.
  *
  * @param {object} bundle
  * @param {Array<{ names: string[], codepoint: number }>} bundle.rules
