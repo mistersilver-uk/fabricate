@@ -5,21 +5,27 @@ import {
   FONT_AWESOME_SMOKE_EXPECTATIONS,
   evaluateFontAwesomeBundleObservation,
   fontAwesomeExpectationForArm,
+  fontAwesomeExpectationLabel,
 } from '../scripts/lib/fontAwesomeSmokeExpectations.js';
 
 describe('Font Awesome smoke expectations', () => {
-  it('pins the bundle release expected for both supported Foundry generations', () => {
+  it('pins the bundle version expected for both supported Foundry generations', () => {
     assert.deepEqual(
       Object.fromEntries(
         Object.entries(FONT_AWESOME_SMOKE_EXPECTATIONS).map(([arm, expectation]) => [
           arm,
-          `${expectation.edition} ${expectation.version}`,
+          fontAwesomeExpectationLabel(expectation),
         ])
       ),
       {
-        v13: 'Pro 6.7.2',
+        v13: 'Font Awesome 6.7.2',
         v14: 'Pro 7.2.0',
       }
+    );
+    assert.equal(
+      FONT_AWESOME_SMOKE_EXPECTATIONS.v13.edition,
+      null,
+      'Foundry pins the V13 version in public release notes; the live smoke should discover its edition'
     );
   });
 
@@ -50,6 +56,21 @@ describe('Font Awesome smoke expectations', () => {
       false,
       'the v14-only sentinel must also make a v14 bundle fail the v13 arm'
     );
+  });
+
+  it('accepts either V13 edition while still pinning its version and icon boundary', () => {
+    for (const edition of ['Free', 'Pro']) {
+      const assertions = evaluateFontAwesomeBundleObservation(
+        {
+          edition,
+          version: '6.7.2',
+          names: ['gear', 'cog'],
+          stylesheetUrl: 'http://foundry/fonts/fontawesome/css/all.min.css',
+        },
+        fontAwesomeExpectationForArm('v13')
+      );
+      assert.ok(assertions.every((assertion) => assertion.passed), `${edition} V13 should pass`);
+    }
   });
 
   it('reports missing and unexpectedly-present icons separately', () => {
