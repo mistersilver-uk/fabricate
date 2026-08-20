@@ -1553,6 +1553,10 @@ class Fabricate {
    * what `Array.prototype.find` has always meant. It is a third naming family on this facade, and
    * a deliberate one: a `get…` sibling would suggest a value always comes back.
    *
+   * Ready-gated by throwing, like its sibling. A miss and a premature call are different answers:
+   * `null` says the vocabulary does not offer that name, and it must not also mean that the
+   * vocabulary was not there to ask.
+   *
    * Published as well as `aliases`, because the two answer different questions. `aliases` is for
    * OFFERING and SEARCHING — a companion's own picker needs the names a GM might type, which is
    * what Fabricate's picker puts in its own search text. This is for INTERPRETING a persisted

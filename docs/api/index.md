@@ -525,7 +525,7 @@ Hooks.once('fabricate.ready', () => {
 - The list is in the vocabulary's own order, which is alphabetical by `iconCode`.
 - `findCuratedIcon(name)` answers `null` for a name the vocabulary does not offer — a typo, a name Foundry cannot draw, or a real icon the curation leaves out.
   It does not distinguish those cases, because a caller can do nothing different about them.
-- Both methods throw `Fabricate not initialized` before Fabricate is ready, as every `game.fabricate.list…` method does.
+- Both methods throw `Fabricate not initialized` before Fabricate is ready, which is how this API refuses a premature call.
   Call them from `fabricate.ready`, or wrap them and degrade to an empty result, as a composition edge should.
 
 <!-- markdownlint-disable markdownlint-sentences-per-line -->
