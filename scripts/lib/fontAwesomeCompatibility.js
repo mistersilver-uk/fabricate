@@ -112,7 +112,7 @@ export function buildIconCatalogueFromRules({ rules, classicCodepoints, brandCod
     namesByCodepoint.set(rule.codepoint, names);
   }
 
-  const classicRules = [...namesByCodepoint.entries()].map(([codepoint, names]) => ({
+  const classicRules = [...namesByCodepoint].map(([codepoint, names]) => ({
     codepoint,
     names: [...names],
   }));
