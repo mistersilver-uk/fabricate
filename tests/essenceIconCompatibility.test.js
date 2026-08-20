@@ -82,9 +82,9 @@ describe('version-aware Foundry icon definitions', () => {
       { iconCode: 'gear', label: 'Gear', aliases: ['cog'] },
     ]);
     assert.equal(
-      v13.some((definition) => definition.iconCode === 'caret-large-left'),
+      v13.some((definition) => definition.iconCode === 'flask'),
       false,
-      'a v14-only name is not offered just because the committed catalogue knows it'
+      'a name the committed catalogue carries is not offered when this client cannot draw it'
     );
   });
 

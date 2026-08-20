@@ -33,7 +33,6 @@ import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 
 import {
-  buildIconCatalogue,
   countLeadingTokens,
   iconLabelFor,
   parseFontAwesomeRelease,
@@ -41,7 +40,10 @@ import {
   preferredIconName,
   readWoff2Codepoints,
 } from './lib/fontAwesomeBundle.js';
-import { assertClassicFaceParity } from './lib/fontAwesomeCompatibility.js';
+import {
+  assertClassicFaceParity,
+  buildIconCatalogueFromRules,
+} from './lib/fontAwesomeCompatibility.js';
 
 const REPOSITORY_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const OUTPUT_PATH = path.join(
@@ -444,7 +446,12 @@ function main() {
       `Foundry ${foundryVersion} / Font Awesome ${releaseLabel(release)} yielded no icon glyph rules.`
     );
   }
-  const definitions = buildIconCatalogue({ cssText, classicCodepoints, brandCodepoints });
+  // Grouped by CODEPOINT, not by rule. Foundry 13.351 declares 762 of its codepoints in more than
+  // one rule (`.fa-adjust` and `.fa-circle-half-stroke` are separate blocks naming one drawing), so
+  // building per rule would emit one glyph as several entries, none listing the others as an alias
+  // — and an exclusion that catches one of those names would leave the identical drawing offered
+  // under another. That is the one invariant the curation rests on.
+  const definitions = buildIconCatalogueFromRules({ rules, classicCodepoints, brandCodepoints });
 
   const { release: freeRelease, names: freeNames } = readFreeIconNames();
   const offered = intersectWithFreeIconNames(definitions, freeNames);
