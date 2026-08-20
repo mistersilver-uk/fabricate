@@ -50,6 +50,7 @@ const ZERO = 0x30;
 const DOUBLE_QUOTE = 0x22;
 const FLASK = 0xf0_c3;
 const NEWLINE = 0xa;
+const CLOSING_BRACE = 0x7d;
 
 describe('reading the Font Awesome bundle Foundry ships', () => {
   // Measured rather than assumed, because the catalogue describes one Foundry release's font and
@@ -108,6 +109,53 @@ describe('reading the Font Awesome bundle Foundry ships', () => {
   // two reads a legal single-digit escape as a literal character.
   it('reads a single-digit hex escape as hex', () => {
     assert.equal(parseGlyphCodepoint(`${BACKSLASH}a`), NEWLINE);
+  });
+});
+
+// Cut in the shape of Foundry 13's bundle, which writes TWO declarations for all but a handful of
+// its icons: `--fa` and the duotone companion `--fa--fa`. 4,159 of that bundle's 4,656 icon rules
+// take this shape and 495 do not, and the 495 are all brands — so a reader that required the
+// closing `"` to be followed by `}` reported a Foundry 13 install as having 495 icons and no
+// classic glyph at all. The last two entries are the two rules whose values contain a brace and a
+// quote; the brace one is the reason the terminator has to be read rather than assumed.
+const TWO_DECLARATION_FIXTURE = [
+  '@charset "utf-8";',
+  '.fa{font-family:var(--fa-style-family,"Font Awesome 6 Pro")}',
+  '.fa-spin{animation-name:fa-spin}',
+  `.fa-cog,.fa-gear{--fa:"${BACKSLASH}f013";--fa--fa:"${BACKSLASH}f013${BACKSLASH}f013"}`,
+  `.fa-gears{--fa:"${BACKSLASH}f085";--fa--fa:"${BACKSLASH}f085${BACKSLASH}f085"}`,
+  `.fa-github{--fa:"${BACKSLASH}f09b"}`,
+  `.fa-0{--fa:"${BACKSLASH}30 ";--fa--fa:"${BACKSLASH}30 ${BACKSLASH}30 "}`,
+  '.fa-bracket-curly-right{--fa:"}";--fa--fa:"}}"}'
+].join('');
+
+describe('reading a bundle that assigns each glyph twice', () => {
+  it('reads the two-declaration form as well as the single-declaration one', () => {
+    const rules = parseIconGlyphRules(TWO_DECLARATION_FIXTURE);
+
+    assert.deepEqual(rules, [
+      { names: ['cog', 'gear'], codepoint: GEAR },
+      { names: ['gears'], codepoint: GEARS },
+      { names: ['github'], codepoint: GITHUB },
+      { names: ['0'], codepoint: ZERO },
+      { names: ['bracket-curly-right'], codepoint: CLOSING_BRACE }
+    ]);
+  });
+
+  // The companion declaration names the SAME glyph twice over, and reading it would put a second
+  // rule on every icon under a codepoint that is two characters rather than one.
+  it('never reads the duotone companion declaration as a second glyph', () => {
+    const rules = parseIconGlyphRules(TWO_DECLARATION_FIXTURE);
+
+    assert.equal(new Set(rules.map((rule) => rule.codepoint)).size, rules.length);
+    assert.ok(
+      rules.every((rule) => !rule.names.includes('fa')),
+      'a family class is not an icon'
+    );
+    assert.ok(
+      rules.every((rule) => !rule.names.includes('spin')),
+      'a utility is not an icon'
+    );
   });
 });
 

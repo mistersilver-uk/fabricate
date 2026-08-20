@@ -152,11 +152,24 @@ export function parseGlyphCodepoint(cssValue) {
  * not icons — the family names, the sizes, and the animation, rotation and layout utilities. They
  * match the same selector shape and are excluded by construction rather than by a list.
  *
+ * THE ASSIGNMENT ENDS AT `;` OR AT `}`, and both forms are shipped. Foundry 14's bundle writes one
+ * declaration per icon (`.fa-gear{--fa:"\f013"}`); Foundry 13's writes two for all but a handful,
+ * `.fa-gear{--fa:"\f013";--fa--fa:"\f013\f013"}` — 4,159 of its 4,656 icon rules take that shape
+ * against 495 that do not. A reader that demanded `}` therefore found 495 rules in Foundry 13's
+ * stylesheet, every one of them a brand, and NOT ONE classic glyph: the entire classic vocabulary
+ * was invisible to it, which reads as "Foundry 13 has no icons" rather than as a parse failure.
+ * Accepting the semicolon is measured bit-identical on Foundry 14 — same count, same names, same
+ * order — and takes Foundry 13 from 495 rules and 0 classic glyphs to 4,655 and 4,088.
+ *
+ * What it does not read, in either bundle, is a value carrying an escaped quote: the `[^"]+` run
+ * in `.fa-ditto{--fa:"\"";…}` cannot cross it. That costs one name per bundle, is the same one on
+ * both, and is not what the terminator decides.
+ *
  * @param {string} cssText
  * @returns {Array<{ names: string[], codepoint: number }>}
  */
 export function parseIconGlyphRules(cssText) {
-  const rulePattern = /((?:\.fa-[a-z0-9-]+,)*\.fa-[a-z0-9-]+)\{--fa:"([^"]+)"\}/g;
+  const rulePattern = /((?:\.fa-[a-z0-9-]+,)*\.fa-[a-z0-9-]+)\{--fa:"([^"]+)"(?:;|\})/g;
   const rules = [];
   let match;
   while ((match = rulePattern.exec(String(cssText ?? ''))) !== null) {
