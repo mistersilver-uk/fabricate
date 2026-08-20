@@ -43,8 +43,12 @@ export {
 // Awesome shipped them alongside the relief pictograms, and a raised-hand Vulcan salute is curated
 // in even though Star Trek owns the gesture's name, because what the glyph depicts is a hand.
 //
-// WEAPONS ARE IN. A sword, an axe, a bow, a gun and a bomb are all things fiction is about. The
-// arrow that is a projectile is in for the same reason the arrows that mean "go that way" are out.
+// WEAPONS ARE IN. A gun, a bomb and a land mine are all things fiction is about. The arrow that is
+// a projectile is in for the same reason the arrows that mean "go that way" are out. The medieval
+// armoury is missing for a reason that is NOT this rule: Font Awesome's free release publishes no
+// sword, axe, dagger, mace or bow at all, and Fabricate may name only what that release publishes
+// (see the licence note in foundryIconCatalogue.js). The rule would admit them; there is nothing
+// to admit.
 //
 // NAMES ARE NOT THE SUBJECT EITHER. A depiction cannot be dodged by spelling, so a glyph is
 // excluded when ANY of its names matches — `automobile` is the same drawing as `car`, and the
