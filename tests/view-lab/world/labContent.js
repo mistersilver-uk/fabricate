@@ -805,17 +805,24 @@ const ESSENCES = [
     // NO `sourceComponentId` on purpose: it is the corpus's only essence with no source at
     // all, so the browser's `Source: none` filter and the row's absent Effects pill both
     // have a subject.
-    // Its ICON is the widening's only rendered evidence (issue 1269), and it now evidences a
-    // stronger claim than it did. It used to carry `biohazard` because that entry replaced a
-    // `bioevent` code Font Awesome's free classic set does not contain — a correction the
-    // regeneration made moot, since the catalogue is no longer generated from that metadata at
-    // all and the phantom entry cannot survive a generator that reads Foundry's own stylesheet.
+    // Its ICON is the widening's only rendered evidence (issue 1269). It used to carry
+    // `biohazard` because that entry replaced a `bioevent` code Font Awesome's free classic set
+    // does not contain — a correction the regeneration made moot, since the catalogue is no
+    // longer generated from that metadata at all and the phantom entry cannot survive a
+    // generator that reads Foundry's own stylesheet.
     //
-    // It carries `candle-holder` instead, which is the finding itself: an icon Foundry renders
-    // perfectly, that the free-metadata catalogue had never heard of, and that no Fabricate
-    // picker could offer until the catalogue started asking the right source. If the entry is
-    // wrong the medallion renders BLANK, and only a rendered frame can tell a resolved glyph
-    // from a blank one.
+    // It carried `candle-holder` for a while after that, and cannot any more: Foundry's bundled
+    // Font Awesome licence forbids a third-party package from referencing a Pro icon in code, so
+    // the catalogue is now intersected with the free release and `candle-holder` is not in it.
+    // Naming it here would put a Pro icon code in Fabricate's source under the guise of a
+    // fixture.
+    //
+    // It carries `hand-sparkles` instead, which evidences the same finding within the names
+    // Fabricate may write. It is one of the sixteen icons a companion module offered that the
+    // pre-widening curated vocabulary dropped — held out by rules drawn for "fantasy alone" —
+    // so it is a glyph no Fabricate picker could offer before this change and every picker can
+    // offer now. If the entry is wrong the medallion renders BLANK, and only a rendered frame
+    // can tell a resolved glyph from a blank one.
     //
     // Every lab essence glyph was already curated BEFORE the widening — `mountain`, `fire`,
     // `droplet`, `wind`, `atom` and `circle-dot` alike — so every essence frame was pixel-
@@ -830,7 +837,7 @@ const ESSENCES = [
     id: 'mote',
     name: 'Mote',
     description: 'Loose motive dust. Useful, and nobody has found a use.',
-    icon: 'fas fa-candle-holder',
+    icon: 'fas fa-hand-sparkles',
     colorToken: 'butter',
   },
 ];

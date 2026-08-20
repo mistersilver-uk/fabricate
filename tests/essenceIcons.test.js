@@ -17,12 +17,13 @@ import {
   FOUNDRY_CURATED_ICON_DEFINITIONS,
   FOUNDRY_ICON_BUNDLE_RELEASE,
   FOUNDRY_ICON_DEFINITIONS,
+  FOUNDRY_ICON_FREE_INTERSECTION,
   findCuratedIcon,
   isExcludedIconName
 } from '../src/ui/svelte/util/foundryIconVocabulary.js';
 
-const CURATED_ICON_COUNT = 1879;
-const CATALOGUE_ICON_COUNT = 3768;
+const CURATED_ICON_COUNT = 750;
+const CATALOGUE_ICON_COUNT = 1420;
 
 // EVERY claim below, positive and negative, is made against MEMBERSHIP rather than against the
 // exclusion predicate.
@@ -30,9 +31,9 @@ const CATALOGUE_ICON_COUNT = 3768;
 // That is stronger than it used to be, and deliberately. `isExcludedIconName` answers "does any
 // exclusion pattern match this string": it consults no catalogue, so it says `false` of a typo and
 // of a name Foundry cannot render. Asserting it in the positive direction would pass while the icon
-// was absent from every picker in the module, and regenerating the catalogue from Foundry's bundle
+// was absent from every picker in the module, and generating the catalogue from Foundry's bundle
 // widens that gap rather than closing it, because the predicate is now the only thing between a
-// typo and a curated entry across three and a half thousand more names.
+// typo and a curated entry across every name the catalogue carries.
 //
 // `findCuratedIcon` answers from the catalogue in both directions, and it resolves ALIASES, which
 // is the only honest way to ask the question of a vocabulary that offers one name per glyph.
@@ -76,19 +77,40 @@ describe('essence colour tokens (issue 917)', () => {
 });
 
 describe('the catalogue Foundry can actually render', () => {
-  // The defect this catalogue was regenerated to fix: it used to be generated from Font Awesome
-  // Free 6.7.2 metadata, which describes a different font from the one a Foundry client loads.
-  it('is drawn from the Font Awesome release Foundry bundles, not from the free metadata', () => {
+  // The catalogue is TWO measurements, and it is worth nothing unless both are true of it. The
+  // glyphs and their aliases come from the bundle a Foundry client loads, which the predecessor of
+  // this file got wrong by reading published free metadata for a different font. The NAMES are
+  // then narrowed to the ones Font Awesome publishes for free, which is a licensing requirement
+  // rather than a preference — see the header of foundryIconCatalogue.js.
+  it('is measured from the bundle Foundry ships and narrowed to the free release', () => {
     assert.equal(FOUNDRY_ICON_BUNDLE_RELEASE.edition, 'Pro');
     assert.equal(FOUNDRY_ICON_BUNDLE_RELEASE.version, '7.2.0');
+    assert.equal(FOUNDRY_ICON_FREE_INTERSECTION.edition, 'Free');
+    assert.equal(FOUNDRY_ICON_FREE_INTERSECTION.version, '7.3.1');
     assert.equal(FOUNDRY_ICON_DEFINITIONS.length, CATALOGUE_ICON_COUNT);
   });
 
-  // `candle-holder` is the worked example. A companion offers it, Foundry renders it correctly, and
-  // the free-metadata catalogue had never heard of it — which a review of this vocabulary read as a
-  // defect in the companion's list rather than in the catalogue.
-  it('carries the Pro icons the free metadata was missing', () => {
-    assertCurated(['candle-holder', 'cauldron', 'raygun', 'starship', 'treasure-chest', 'scythe']);
+  // `candle-holder` is the worked example, and it runs the other way round from the way this file
+  // used to read it. Foundry renders it, a companion module offers it, and Fabricate declines it:
+  // Foundry's own bundled licence forbids a third-party package developer from having Pro icons
+  // "used, re-packaged, or referenced in code", and an icon code in a catalogue is a reference in
+  // code. Every name below is one Foundry can draw and Fabricate may not write.
+  //
+  // Asserted against the CATALOGUE, not only the curated set: these are absent because they are
+  // unnameable, not because a curation rule held them out, and a test that only checked curation
+  // would keep passing if they came back as uncurated catalogue rows.
+  it('declines the Pro-only names Foundry can render but Fabricate may not reference', () => {
+    for (const iconName of [
+      'candle-holder', 'cauldron', 'raygun', 'starship', 'treasure-chest', 'scythe'
+    ]) {
+      assert.ok(
+        FOUNDRY_ICON_DEFINITIONS.every(
+          ({ iconCode, aliases }) => iconCode !== iconName && !aliases.includes(iconName)
+        ),
+        `"${iconName}" is a Pro-only name and must not appear in the catalogue under any spelling`
+      );
+      assert.equal(findCuratedIcon(iconName), null);
+    }
   });
 
   // `Object.freeze` is shallow, and the curated vocabulary is a FILTER of this array, so its
@@ -144,7 +166,7 @@ describe('essenceIcons utility', () => {
 
   // The membership IS this module's product, and it is what the icon-vocabulary API publishes, so
   // the size is pinned EXACTLY rather than to a band. A band wide enough to hold the pre-widening
-  // 510 and the post-widening 1875 is a band a pattern edit can move a thousand icons inside
+  // 510 and the post-widening 750 is a band a pattern edit can move two hundred icons inside
   // without failing anything.
   it('pins the curated vocabulary to an exact size', () => {
     const curatedCount = FOUNDRY_CURATED_ICON_DEFINITIONS.length;
@@ -202,19 +224,30 @@ describe('essenceIcons utility', () => {
   });
 
   // THE NO-REGRESSION CONTRACT. A companion module hand-maintains its own icon list and is going to
-  // bind to this vocabulary. These seventeen are the ones its list offers that the pre-widening
-  // curated set did not: sixteen held out by rules drawn for "fantasy alone", and `candle-holder`
-  // absent from the catalogue entirely. Every one of them renders in Foundry today.
+  // bind to this vocabulary. Seventeen of the icons its list offers were missing from the
+  // pre-widening curated set; these are the SIXTEEN of them Fabricate can now offer, every one
+  // held out before by rules drawn for "fantasy alone" and admitted now by rules that predict
+  // them. A syringe is a med-bay, a stopwatch times a training montage, a dumbbell IS the training
+  // montage, a checkered flag ends a race, and a blighted ear of wheat is the oldest fantasy plot
+  // there is. None of them is here by name on an allow-list.
   //
-  // They are back through RULES that predict them, never through names on an allow-list. A syringe
-  // is a med-bay, a stopwatch times a training montage, a dumbbell IS the training montage, a
-  // checkered flag ends a race, and a blighted ear of wheat is the oldest fantasy plot there is.
-  it('carries every icon a companion offered that the pre-widening vocabulary dropped', () => {
+  // The seventeenth was `candle-holder`, and it is deliberately NOT here. It is a Pro-only name:
+  // Foundry draws it, and offering it would mean Fabricate referencing a Pro icon in code, which
+  // the licence Foundry ships with its own bundle forbids a third-party package developer from
+  // doing. The companion may keep offering it — it is not bound by what Fabricate can write down —
+  // so this contract is sixteen icons wide, not seventeen, and the gap is a licence rather than a
+  // regression.
+  it('carries every icon a companion offered that Fabricate is free to name', () => {
     assertCurated([
       'hand-sparkles', 'virus', 'prescription-bottle', 'pills', 'capsules', 'syringe', 'lungs',
       'blender', 'jug-detergent', 'plug', 'circle-nodes', 'stopwatch', 'flag-checkered',
-      'list-check', 'wheat-awn-circle-exclamation', 'dumbbell', 'candle-holder'
+      'list-check', 'wheat-awn-circle-exclamation', 'dumbbell'
     ]);
+    assert.equal(
+      findCuratedIcon('candle-holder'),
+      null,
+      'candle-holder is Pro-only: it is out on the licence, and re-admitting it needs a Pro licence'
+    );
   });
 
   it('excludes single-character icons and the marks that only punctuate', () => {
@@ -222,9 +255,15 @@ describe('essenceIcons utility', () => {
     for (let digit = 0; digit <= 9; digit += 1) singleCharacters.push(String(digit));
     for (let code = 97; code <= 122; code += 1) singleCharacters.push(String.fromCharCode(code));
     assertNotCurated(singleCharacters, 'Single character');
+    // `comma`, `period`, `semicolon`, `apostrophe`, `tilde`, `pipe`, `accent-grave` and
+    // `brackets-curly` used to stand here and are all Pro-only names, so the catalogue no longer
+    // carries anything for those assertions to be about. These are the free members of the same
+    // two patterns; the bracket family has none left, and that pattern is retained for the reason
+    // foundryIconVocabulary.js gives rather than because anything here still exercises it.
+    assertNotCurated(['at', 'hashtag', 'slash', 'quote-left', 'quote-right'], 'Punctuation mark');
     assertNotCurated(
-      ['comma', 'period', 'semicolon', 'apostrophe', 'tilde', 'pipe', 'accent-grave', 'brackets-curly'],
-      'Punctuation mark'
+      ['divide', 'equals', 'percent', 'plus-minus', 'not-equal'],
+      'Mathematical operator'
     );
   });
 
@@ -238,7 +277,7 @@ describe('essenceIcons utility', () => {
     assertNotCurated([
       'dollar-sign', 'euro-sign', 'sterling-sign', 'yen-sign', 'bitcoin-sign',
       'indian-rupee-sign', 'ruble-sign', 'won-sign', 'turkish-lira-sign',
-      'circle-dollar', 'square-yen', 'circle-bitcoin', 'circle-euro',
+      'circle-dollar-to-slot', 'money-bill-wave', 'money-check',
       'money-bill', 'money-check-dollar', 'credit-card', 'cash-register', 'receipt'
     ], 'Currency icon');
   });
@@ -266,7 +305,8 @@ describe('essenceIcons utility', () => {
       'upload', 'download', 'share', 'share-nodes',
       'backward', 'forward', 'play', 'pause', 'stop',
       'chevron-left', 'chevron-right', 'angle-left', 'caret-up',
-      'arrow-up', 'arrow-down', 'arrows-rotate', 'triple-chevrons-up', 'u-turn-left-up',
+      'arrow-up', 'arrow-down', 'arrows-rotate', 'arrow-right-arrow-left', 'circle-arrow-right',
+      'angles-up', 'caret-down', 'right-from-bracket', 'table-columns',
       'sliders', 'toggle-on', 'toggle-off',
       'arrow-pointer', 'i-cursor', 'spell-check',
       'chart-bar', 'chart-line', 'chart-pie', 'chart-area',
@@ -321,16 +361,16 @@ describe('essenceIcons utility', () => {
       'gauge', 'gauge-simple', 'gauge-simple-high',
       'shop-lock', 'shop-slash', 'store-slash',
       'mountain-city', 'tree-city',
-      'jet-fighter-up', 'tower-cell',
-      'clock-nine', 'clock-two-thirty', 'transporter-3', 'tally-2', 'signal-weak',
-      'user-tie-hair-long', 'mobile-screen-button'
+      'jet-fighter-up', 'tower-cell', 'gauge-med',
+      'hourglass-start', 'hourglass-end', 'calendar-check', 'calendar-days', 'comment-dots',
+      'user-gear', 'mobile-screen-button'
     ], 'Variant');
 
     // The glyph each of those is a variant OF stays, so the idea is still expressible.
     assertCurated([
       'battery-empty', 'battery-full', 'thermometer', 'temperature-high', 'temperature-low',
       'gauge-high', 'shop', 'store', 'city', 'jet-fighter', 'tower-broadcast', 'tower-observation',
-      'clock', 'transporter', 'signal', 'user-tie', 'mobile'
+      'hourglass', 'calendar', 'comment', 'user', 'mobile'
     ]);
   });
 
@@ -338,7 +378,7 @@ describe('essenceIcons utility', () => {
   // statement from "water", and fiction says both — which is why the redundancy rule catches fill
   // levels, needle positions, rotations and status badges and stops there.
   it('keeps a crossed-out glyph, because "no water" is not less water', () => {
-    assertCurated(['droplet-slash', 'heart-slash', 'eye-slash', 'bell-slash']);
+    assertCurated(['droplet-slash', 'user-slash', 'eye-slash', 'bell-slash']);
   });
 
   // A tick on a circle is a control saying "done"; a warning on an ear of wheat is a blighted crop
@@ -397,8 +437,11 @@ describe('essenceIcons utility', () => {
   // What survives of a category that used to hold the whole present-day street: the pictograms that
   // label a building rather than depict a thing inside it. A restroom sign is a drawing of a sign.
   it('excludes present-day signage while admitting what the signs point at', () => {
+    // `do-not-enter` and `escalator` used to stand here and are Pro-only names; `street-view`,
+    // `ban` and `location-dot` are free members of the same pattern.
     assertNotCurated(
-      ['restroom', 'do-not-enter', 'square-parking', 'elevator', 'escalator', 'hospital-symbol'],
+      ['restroom', 'square-parking', 'elevator', 'hospital-symbol', 'street-view', 'ban',
+        'location-dot'],
       'Signage'
     );
     assertCurated(['toilet', 'bath', 'shower', 'ambulance', 'hospital', 'car', 'bus', 'train']);
@@ -409,11 +452,12 @@ describe('essenceIcons utility', () => {
   // fiction reaches for the med-bay twice, so the blocks that held them are gone, not trimmed.
   it('admits the med-bay, the kitchen and the training montage the old rule held out', () => {
     assertCurated([
-      'stethoscope', 'x-ray', 'kit-medical', 'suitcase-medical', 'bandage', 'crutches',
-      'user-doctor', 'user-nurse', 'bed-pulse', 'inhaler', 'scalpel', 'stretcher',
-      'bacteria', 'mask-face', 'soap', 'toothbrush',
-      'burger', 'pizza-slice', 'hotdog', 'ice-cream', 'taco', 'popcorn',
-      'baseball', 'basketball', 'football', 'volleyball', 'hockey-puck', 'kettlebell', 'whistle'
+      'stethoscope', 'x-ray', 'kit-medical', 'suitcase-medical', 'bandage', 'user-injured',
+      'user-doctor', 'user-nurse', 'bed-pulse', 'prescription-bottle-medical', 'notes-medical',
+      'hospital-user', 'bacteria', 'mask-face', 'soap', 'tooth',
+      'burger', 'pizza-slice', 'hotdog', 'ice-cream', 'bowl-food', 'cheese',
+      'baseball', 'basketball', 'football', 'volleyball', 'hockey-puck', 'person-running',
+      'golf-ball-tee'
     ]);
   });
 
@@ -429,9 +473,27 @@ describe('essenceIcons utility', () => {
   // Modern arms are curated, and this is a decision rather than an omission. Fabricate's subject is
   // any fiction, so a modern or post-apocalyptic game needs a firearm, a set of restraints and a
   // mine as much as a fantasy one needs an axe.
-  it('admits modern arms, and the arrow that is a projectile rather than a direction', () => {
-    assertCurated(['gun', 'handcuffs', 'land-mine-on', 'bomb', 'arrow-archery', 'bow-arrow']);
+  it('admits modern arms while excluding the arrows that mean "go that way"', () => {
+    assertCurated(['gun', 'handcuffs', 'land-mine-on', 'bomb', 'explosion']);
     assertNotCurated(['arrow-right', 'arrow-up-long'], 'Directional arrow');
+  });
+
+  // The other half of that rule, and the ONE place in this file where the predicate is the honest
+  // question rather than membership. `/^arrows?-(?!archery)/` sweeps some nine hundred directional
+  // arrows out and pulls one back, because `arrow-archery` draws a projectile rather than a
+  // direction. Both `arrow-archery` and `bow-arrow` are Pro-only names, so Fabricate may not offer
+  // either however well they fit, and there is no catalogue entry left to ask about — asserting
+  // membership here would be asserting the licence, which the catalogue's own guard already does.
+  // The lookahead is still what the rule turns on, and it is still guarded, so that promoting the
+  // icon into the free set is all it would take to get it back.
+  it('keeps the projectile carve-out alive, though no free name exercises it', () => {
+    assert.equal(
+      isExcludedIconName('arrow-archery'),
+      false,
+      'the projectile carve-out must survive: the arrow that is a weapon is not a direction'
+    );
+    assert.equal(isExcludedIconName('arrow-right'), true, 'every other arrow means "go that way"');
+    assert.equal(findCuratedIcon('arrow-archery'), null, 'and it is Pro-only, so it is unofferable');
   });
 
   // hand-spock and spaghetti-monster-flying are the two the "institution or cause" exclusion looks
@@ -459,7 +521,7 @@ describe('essenceIcons utility', () => {
     assert.ok(options.some((option) => option.iconClass === 'fas fa-flask'));
     assert.ok(options.some((option) => option.iconClass === 'fas fa-wine-glass'));
     assert.ok(options.some((option) => option.iconClass === 'fas fa-mortar-pestle'));
-    assert.ok(options.some((option) => option.iconClass === 'fas fa-candle-holder'));
+    assert.ok(options.some((option) => option.iconClass === 'fas fa-hat-wizard'));
     assert.ok(!options.some((option) => option.iconClass === 'fas fa-align-right'));
     assert.ok(!options.some((option) => option.iconClass === 'fas fa-dollar-sign'));
     assert.ok(!options.some((option) => option.iconClass === 'fas fa-face-smile'));
