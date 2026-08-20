@@ -1,18 +1,29 @@
-import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
 
 import {
   assertClassicFaceParity,
-  intersectCompatibleIconCatalogues,
-  parseGeneratorArguments,
+  buildIconCatalogueFromRules,
+  iconNamesFromRules,
+  parseCompatibleIconGlyphRules,
   parseLegacyIconGlyphRules,
-} from '../scripts/generate-icon-catalogue.mjs';
+} from '../scripts/lib/fontAwesomeCompatibility.js';
 
 const BACKSLASH = '\\';
 
-function entry(iconCode, aliases = []) {
-  return { iconCode, label: iconCode, aliases };
-}
+const LEGACY_STYLESHEET = [
+  '/*! Font Awesome Pro 6.7.2 */',
+  `.fa-cog::before,.fa-gear::before{content:"${BACKSLASH}f013"}`,
+  `.fa-0:before{content:"${BACKSLASH}30 "}`,
+  `.fa-github::before{content:"${BACKSLASH}f09b"}`,
+  '.fa-spin{animation-name:fa-spin}',
+].join('');
+
+const MODERN_STYLESHEET = [
+  '/*! Font Awesome Pro 7.2.0 */',
+  `.fa-cog,.fa-gear{--fa:"${BACKSLASH}f013"}`,
+  `.fa-lychee{--fa:"${BACKSLASH}e7a5"}`,
+].join('');
 
 describe('icon catalogue generator compatibility support', () => {
   it('fails closed when the primary solid and regular faces diverge', () => {
@@ -26,71 +37,38 @@ describe('icon catalogue generator compatibility support', () => {
   });
 
   it('parses Font Awesome 6 content rules, including aliases and CSS escapes', () => {
-    const css = [
-      `.fa-cog::before,.fa-gear::before{content:"${BACKSLASH}f013"}`,
-      `.fa-0:before{content:"${BACKSLASH}30 "}`,
-      '.fa-spin{animation-name:fa-spin}',
-    ].join('');
-
-    assert.deepEqual(parseLegacyIconGlyphRules(css), [
+    assert.deepEqual(parseLegacyIconGlyphRules(LEGACY_STYLESHEET), [
       { names: ['cog', 'gear'], codepoint: 0xf013 },
       { names: ['0'], codepoint: 0x30 },
+      { names: ['github'], codepoint: 0xf09b },
     ]);
   });
 
-  it('keeps only names every supported bundle can render', () => {
-    const primary = [
-      entry('candle-holder'),
-      entry('gear', ['cog']),
-      entry('new-spelling', ['old-spelling']),
-    ];
-    const older = [entry('gear', ['cog']), entry('old-spelling')];
+  it('selects the appropriate parser for both supported Foundry generations', () => {
+    assert.deepEqual(iconNamesFromRules(parseCompatibleIconGlyphRules(LEGACY_STYLESHEET)), new Set([
+      'cog',
+      'gear',
+      '0',
+      'github',
+    ]));
+    assert.deepEqual(iconNamesFromRules(parseCompatibleIconGlyphRules(MODERN_STYLESHEET)), new Set([
+      'cog',
+      'gear',
+      'lychee',
+    ]));
+  });
 
-    assert.deepEqual(intersectCompatibleIconCatalogues(primary, [older]), [
+  it('builds a legacy catalogue one glyph at a time and excludes brand codepoints', () => {
+    const rules = parseCompatibleIconGlyphRules(LEGACY_STYLESHEET);
+    const catalogue = buildIconCatalogueFromRules({
+      rules,
+      classicCodepoints: new Set([0xf013, 0x30]),
+      brandCodepoints: new Set([0xf09b]),
+    });
+
+    assert.deepEqual(catalogue, [
+      { iconCode: '0', label: '0', aliases: [] },
       { iconCode: 'gear', label: 'Gear', aliases: ['cog'] },
-      { iconCode: 'old-spelling', label: 'Old Spelling', aliases: [] },
     ]);
-  });
-
-  it('drops aliases whose older bundle maps them to a different glyph', () => {
-    const primary = [entry('merged', ['merged-alt'])];
-    const older = [entry('merged'), entry('merged-alt')];
-
-    assert.deepEqual(intersectCompatibleIconCatalogues(primary, [older]), [
-      { iconCode: 'merged', label: 'Merged', aliases: [] },
-    ]);
-  });
-
-  it('preserves the single-bundle output unchanged until compatibility bundles are supplied', () => {
-    const primary = [entry('gear', ['cog'])];
-    assert.equal(intersectCompatibleIconCatalogues(primary), primary);
-  });
-
-  it('parses repeated compatibility paths without treating them as primary paths', () => {
-    assert.deepEqual(
-      parseGeneratorArguments([
-        'v14/fontawesome',
-        '--compatible-with',
-        'v13/fontawesome',
-        '--compatible-with=v12/fontawesome',
-        '--check',
-      ]),
-      {
-        checkOnly: true,
-        primary: 'v14/fontawesome',
-        compatibleWith: ['v13/fontawesome', 'v12/fontawesome'],
-      }
-    );
-  });
-
-  it('rejects incomplete compatibility options and extra primary paths', () => {
-    assert.throws(
-      () => parseGeneratorArguments(['v14/fontawesome', '--compatible-with']),
-      /requires a Foundry fontawesome bundle path/
-    );
-    assert.throws(
-      () => parseGeneratorArguments(['v14/fontawesome', 'v13/fontawesome']),
-      /Unexpected second primary bundle path/
-    );
   });
 });
