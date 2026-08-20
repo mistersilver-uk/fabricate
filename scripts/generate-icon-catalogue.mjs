@@ -25,6 +25,11 @@ import {
   parseIconGlyphRules,
   readWoff2Codepoints,
 } from './lib/fontAwesomeBundle.js';
+import {
+  assertClassicFaceParity,
+  buildIconCatalogueFromRules,
+  parseCompatibleIconGlyphRules,
+} from './lib/fontAwesomeCompatibility.js';
 
 const REPOSITORY_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const OUTPUT_PATH = path.join(
@@ -55,12 +60,6 @@ function resolveBundle(argument) {
     throw new Error(`No stylesheet at ${stylesheet}.`);
   }
   return { bundleRoot, stylesheet, webfonts: path.join(bundleRoot, 'webfonts') };
-}
-
-function sameCodepoints(left, right) {
-  if (left.size !== right.size) return false;
-  for (const codepoint of left) if (!right.has(codepoint)) return false;
-  return true;
 }
 
 function renderCatalogueModule({ release, definitions, measurements }) {
@@ -172,23 +171,31 @@ function main() {
 
   const cssText = fs.readFileSync(stylesheet, 'utf8');
   const release = parseFontAwesomeRelease(cssText);
+  const foundryVersion = readFoundryVersion(bundleRoot);
 
   const classicCodepoints = readWoff2Codepoints(path.join(webfonts, CLASSIC_SOLID_FACE));
   const regularCodepoints = readWoff2Codepoints(path.join(webfonts, CLASSIC_REGULAR_FACE));
   const brandCodepoints = readWoff2Codepoints(path.join(webfonts, BRANDS_FACE));
 
-  if (!sameCodepoints(classicCodepoints, regularCodepoints)) {
-    console.warn(
-      `WARNING: the classic solid face carries ${classicCodepoints.size} codepoints and the regular face ` +
-        `${regularCodepoints.size}. The catalogue's header claims they are identical, which is why it drops ` +
-        'hasRegular. Re-read that decision before committing this regeneration.'
+  assertClassicFaceParity(
+    classicCodepoints,
+    regularCodepoints,
+    `Foundry ${foundryVersion} / Font Awesome ${release.edition} ${release.version}`
+  );
+
+  const modernRules = parseIconGlyphRules(cssText);
+  const rules = parseCompatibleIconGlyphRules(cssText);
+  if (rules.length === 0) {
+    throw new Error(
+      `Foundry ${foundryVersion} / Font Awesome ${release.edition} ${release.version} yielded no icon glyph rules.`
     );
   }
-
-  const rules = parseIconGlyphRules(cssText);
-  const definitions = buildIconCatalogue({ cssText, classicCodepoints, brandCodepoints });
+  const definitions =
+    modernRules.length > 0
+      ? buildIconCatalogue({ cssText, classicCodepoints, brandCodepoints })
+      : buildIconCatalogueFromRules({ rules, classicCodepoints, brandCodepoints });
   const measurements = {
-    foundryVersion: readFoundryVersion(bundleRoot),
+    foundryVersion,
     glyphRules: rules.length,
     declaredNames: rules.reduce((total, rule) => total + rule.names.length, 0),
     multiNameRules: rules.filter((rule) => rule.names.length > 1).length,

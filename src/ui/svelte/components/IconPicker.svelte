@@ -35,6 +35,17 @@
   const iconOptions = getEssenceIconOptions();
   const selectedIconClass = $derived(normalizeEssenceIcon(value));
   const selectedOption = $derived(getEssenceIconOption(selectedIconClass, iconOptions));
+  // The trigger is allowed to preserve a stored regular-weight class, but the list deliberately
+  // offers one SOLID row per glyph. Resolve the row by glyph name/alias rather than comparing the
+  // raw persisted class, otherwise `fas fa-cog` (alias of gear) and `far fa-bell` both open with no
+  // aria-selected option even though their glyph is present in the list.
+  const selectedRowIconClass = $derived(
+    iconOptions.find(
+      (option) =>
+        option.iconName === selectedOption.iconName ||
+        option.aliases?.includes(selectedOption.iconName)
+    )?.iconClass ?? selectedOption.iconClass
+  );
   const filteredOptions = $derived(filterEssenceIconOptions(iconOptions, searchTerm));
 
   function closePicker() {
@@ -223,10 +234,10 @@
         {#each filteredOptions as option (option.iconClass)}
           <button
             type="button"
-            class:selected={option.iconClass === selectedIconClass}
+            class:selected={option.iconClass === selectedRowIconClass}
             class="essence-icon-picker-option"
             role="option"
-            aria-selected={option.iconClass === selectedIconClass}
+            aria-selected={option.iconClass === selectedRowIconClass}
             title={`${option.label} (${option.variant})`}
             onclick={() => selectIcon(option.iconClass)}
           >
