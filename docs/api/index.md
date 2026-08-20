@@ -543,15 +543,19 @@ Hooks.once('fabricate.ready', () => {
 Use `findCuratedIcon(name)`, which resolves aliases and answers from the catalogue rather than from a guess.
 
 **What is not published, and why.**
-The unfiltered catalogue — 3768 entries against the curated 1879 — stays internal, because no Fabricate picker renders it and publishing it would invite a companion to offer icons Fabricate's own screens will not.
+The unfiltered catalogue stays internal, because no Fabricate picker renders it and publishing it would invite a companion to offer icons Fabricate's own screens will not.
+It holds 1420 entries, narrowed from Foundry's 3768 classic glyphs to the names Font Awesome also publishes for free, against the curated set's 750.
 Fabricate's internal exclusion predicate stays internal too: it answers whether a name matches an exclusion, not whether Foundry can draw it, so it reports a typo as unexcluded.
 That is the mistake `findCuratedIcon` exists not to make.
 
-**Provenance, and what still drifts.**
-The vocabulary is measured from the Font Awesome bundle a Foundry install actually ships — Pro 7.2.0, read from Foundry 14.365.0 — rather than from Font Awesome's published metadata, so a name in this list is a name a Foundry client can render.
-The catalogue is a committed artifact because CI has no Foundry install to read, and `scripts/generate-icon-catalogue.mjs` regenerates it from a given install, with `--check` reporting whether the bundle has moved without writing.
+**Generation awareness, provenance, and what still drifts.**
+`listCuratedIcons()` and `findCuratedIcon()` answer with the same generation-aware vocabulary Fabricate's own icon pickers offer on this client, not a set pinned to whichever Foundry release the catalogue was last generated against.
+On Foundry 14 that vocabulary is the committed catalogue described above, measured from the Font Awesome bundle Foundry 14.365.0 actually ships (Pro 7.2.0) rather than from Font Awesome's published metadata, so a name in this list is a name a Foundry 14 client can render.
+On every other generation, including Foundry 13, Fabricate measures the running client's own loaded Font Awesome stylesheet instead, so a name it offers is a name that client can actually render, and it falls back to the Foundry 14 catalogue only when that measurement comes back empty, such as before the stylesheet has finished loading.
+The Free-only filter applies either way, so a name a measured generation offers is still narrowed to Font Awesome's free release.
+The committed catalogue itself is an artifact because CI has no Foundry install to read, and `scripts/generate-icon-catalogue.mjs` regenerates it from a given install, with `--check` reporting whether the bundle has moved without writing.
 What that does not do is re-check itself.
-Nothing runs the generator when Foundry bumps its bundled Font Awesome, so the committed snapshot ages: names added in a newer bundle are absent from this vocabulary until someone regenerates it, and Font Awesome does retire and re-alias names between majors, which can turn an icon a GM chose into an alias of a different glyph.
+Nothing runs the generator when Foundry bumps its bundled Font Awesome, so the committed snapshot ages: names added in a newer bundle are absent from the Foundry 14 vocabulary until someone regenerates it, and Font Awesome does retire and re-alias names between majors, which can turn an icon a GM chose into an alias of a different glyph.
 If you render a name from this list and get a blank glyph, that is the check to make.
 
 ## Subscribing To Gathering Hooks
