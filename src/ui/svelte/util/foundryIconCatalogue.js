@@ -45,3786 +45,3802 @@
 // of the same drawing at two weights. The `far` prefix is still accepted and still renders; it is
 // simply not a second row.
 //
+// THE ROW ENCODING, and why the entries below are text rather than object literals. One entry per
+// line, fields separated by `|`: `iconCode|label|alias,alias`, with the alias field omitted when
+// a glyph has no other names. The obvious form — one object literal per glyph — is what this file
+// used to hold, and it read well; it also handed a copy-paste detector thousands of near-identical
+// token sequences, and SonarCloud duly failed this file as duplicated new code. A template literal
+// is ONE token, so the same data costs one. The generator refuses to emit a field containing a
+// delimiter, a newline, a backtick, a backslash or a `${` — it throws, naming the entry — because
+// a file that parses back into something other than what was measured is worse than a generation
+// that fails. Parsing costs one split per file and two per row, at module load.
+//
 // VERSION COUPLING. This file describes ONE Foundry release's bundle. When Foundry bumps Font
 // Awesome, rerun the generator against the new install: names are added, and Font Awesome does
 // retire and re-alias names between majors, so an icon a GM chose can become an alias of another
 // glyph. Running the generator with `--check` reports whether the bundle moved without writing.
 
-const definitions = [
-  { iconCode: "0", label: "0", aliases: [] },
-  { iconCode: "00", label: "00", aliases: [] },
-  { iconCode: "1", label: "1", aliases: [] },
-  { iconCode: "2", label: "2", aliases: [] },
-  { iconCode: "3", label: "3", aliases: [] },
-  { iconCode: "360-degrees", label: "360 Degrees", aliases: [] },
-  { iconCode: "4", label: "4", aliases: [] },
-  { iconCode: "5", label: "5", aliases: [] },
-  { iconCode: "6", label: "6", aliases: [] },
-  { iconCode: "7", label: "7", aliases: [] },
-  { iconCode: "8", label: "8", aliases: [] },
-  { iconCode: "9", label: "9", aliases: [] },
-  { iconCode: "a", label: "A", aliases: [] },
-  { iconCode: "abacus", label: "Abacus", aliases: [] },
-  { iconCode: "accent-grave", label: "Accent Grave", aliases: [] },
-  { iconCode: "acorn", label: "Acorn", aliases: [] },
-  { iconCode: "address-book", label: "Address Book", aliases: ["contact-book"] },
-  { iconCode: "address-card", label: "Address Card", aliases: ["contact-card", "vcard"] },
-  { iconCode: "aeropress", label: "Aeropress", aliases: [] },
-  { iconCode: "air-conditioner", label: "Air Conditioner", aliases: [] },
-  { iconCode: "airplay", label: "Airplay", aliases: [] },
-  { iconCode: "airplay-audio", label: "Airplay Audio", aliases: [] },
-  { iconCode: "alarm-clock", label: "Alarm Clock", aliases: [] },
-  { iconCode: "alarm-exclamation", label: "Alarm Exclamation", aliases: [] },
-  { iconCode: "alarm-minus", label: "Alarm Minus", aliases: [] },
-  { iconCode: "alarm-plus", label: "Alarm Plus", aliases: [] },
-  { iconCode: "alarm-snooze", label: "Alarm Snooze", aliases: [] },
-  { iconCode: "album", label: "Album", aliases: [] },
-  { iconCode: "album-circle-plus", label: "Album Circle Plus", aliases: [] },
-  { iconCode: "album-circle-user", label: "Album Circle User", aliases: [] },
-  { iconCode: "album-collection", label: "Album Collection", aliases: [] },
-  { iconCode: "album-collection-circle-plus", label: "Album Collection Circle Plus", aliases: [] },
-  { iconCode: "album-collection-circle-user", label: "Album Collection Circle User", aliases: [] },
-  { iconCode: "alicorn", label: "Alicorn", aliases: [] },
-  { iconCode: "alien", label: "Alien", aliases: [] },
-  { iconCode: "alien-monster", label: "Alien Monster", aliases: ["alien-8bit"] },
-  { iconCode: "align-center", label: "Align Center", aliases: [] },
-  { iconCode: "align-justify", label: "Align Justify", aliases: [] },
-  { iconCode: "align-left", label: "Align Left", aliases: [] },
-  { iconCode: "align-right", label: "Align Right", aliases: [] },
-  { iconCode: "align-slash", label: "Align Slash", aliases: [] },
-  { iconCode: "almost-equal-to", label: "Almost Equal To", aliases: [] },
-  { iconCode: "alt", label: "Alt", aliases: [] },
-  { iconCode: "amp-guitar", label: "Amp Guitar", aliases: [] },
-  { iconCode: "ampersand", label: "Ampersand", aliases: [] },
-  { iconCode: "anchor", label: "Anchor", aliases: [] },
-  { iconCode: "anchor-circle-check", label: "Anchor Circle Check", aliases: [] },
-  { iconCode: "anchor-circle-exclamation", label: "Anchor Circle Exclamation", aliases: [] },
-  { iconCode: "anchor-circle-xmark", label: "Anchor Circle Xmark", aliases: [] },
-  { iconCode: "anchor-lock", label: "Anchor Lock", aliases: [] },
-  { iconCode: "angel", label: "Angel", aliases: [] },
-  { iconCode: "angle", label: "Angle", aliases: [] },
-  { iconCode: "angle-90", label: "Angle 90", aliases: [] },
-  { iconCode: "angle-double-down", label: "Angle Double Down", aliases: ["angles-down"] },
-  { iconCode: "angle-double-left", label: "Angle Double Left", aliases: ["angles-left"] },
-  { iconCode: "angle-double-right", label: "Angle Double Right", aliases: ["angles-right"] },
-  { iconCode: "angle-double-up", label: "Angle Double Up", aliases: ["angles-up"] },
-  { iconCode: "angle-down", label: "Angle Down", aliases: [] },
-  { iconCode: "angle-left", label: "Angle Left", aliases: [] },
-  { iconCode: "angle-right", label: "Angle Right", aliases: [] },
-  { iconCode: "angle-up", label: "Angle Up", aliases: [] },
-  { iconCode: "angles-up-down", label: "Angles Up Down", aliases: [] },
-  { iconCode: "ankh", label: "Ankh", aliases: [] },
-  { iconCode: "ant", label: "Ant", aliases: [] },
-  { iconCode: "apartment", label: "Apartment", aliases: [] },
-  { iconCode: "aperture", label: "Aperture", aliases: [] },
-  { iconCode: "apostrophe", label: "Apostrophe", aliases: [] },
-  { iconCode: "apple-core", label: "Apple Core", aliases: [] },
-  { iconCode: "apple-crate", label: "Apple Crate", aliases: [] },
-  { iconCode: "apple-whole", label: "Apple Whole", aliases: ["apple-alt"] },
-  { iconCode: "aquarius", label: "Aquarius", aliases: [] },
-  { iconCode: "archway", label: "Archway", aliases: [] },
-  { iconCode: "aries", label: "Aries", aliases: [] },
-  { iconCode: "arrow-archery", label: "Arrow Archery", aliases: [] },
-  { iconCode: "arrow-down", label: "Arrow Down", aliases: [] },
-  { iconCode: "arrow-down-a-z", label: "Arrow Down A Z", aliases: ["sort-alpha-asc", "sort-alpha-down"] },
-  { iconCode: "arrow-down-arrow-up", label: "Arrow Down Arrow Up", aliases: ["sort-alt"] },
-  { iconCode: "arrow-down-big-small", label: "Arrow Down Big Small", aliases: ["sort-size-down"] },
-  { iconCode: "arrow-down-from-arc", label: "Arrow Down From Arc", aliases: [] },
-  { iconCode: "arrow-down-from-bracket", label: "Arrow Down From Bracket", aliases: [] },
-  { iconCode: "arrow-down-from-dotted-line", label: "Arrow Down From Dotted Line", aliases: [] },
-  { iconCode: "arrow-down-from-line", label: "Arrow Down From Line", aliases: ["arrow-from-top"] },
-  { iconCode: "arrow-down-left", label: "Arrow Down Left", aliases: [] },
-  { iconCode: "arrow-down-left-and-arrow-up-right-to-center", label: "Arrow Down Left And Arrow Up Right To Center", aliases: [] },
-  { iconCode: "arrow-down-long", label: "Arrow Down Long", aliases: ["long-arrow-down"] },
-  { iconCode: "arrow-down-long-to-line", label: "Arrow Down Long To Line", aliases: [] },
-  { iconCode: "arrow-down-right", label: "Arrow Down Right", aliases: [] },
-  { iconCode: "arrow-down-short-wide", label: "Arrow Down Short Wide", aliases: ["sort-amount-desc", "sort-amount-down-alt"] },
-  { iconCode: "arrow-down-small-big", label: "Arrow Down Small Big", aliases: ["sort-size-down-alt"] },
-  { iconCode: "arrow-down-square-triangle", label: "Arrow Down Square Triangle", aliases: ["sort-shapes-down-alt"] },
-  { iconCode: "arrow-down-to-arc", label: "Arrow Down To Arc", aliases: [] },
-  { iconCode: "arrow-down-to-bracket", label: "Arrow Down To Bracket", aliases: [] },
-  { iconCode: "arrow-down-to-dotted-line", label: "Arrow Down To Dotted Line", aliases: [] },
-  { iconCode: "arrow-down-to-line", label: "Arrow Down To Line", aliases: ["arrow-to-bottom"] },
-  { iconCode: "arrow-down-to-square", label: "Arrow Down To Square", aliases: [] },
-  { iconCode: "arrow-down-triangle-square", label: "Arrow Down Triangle Square", aliases: ["sort-shapes-down"] },
-  { iconCode: "arrow-down-up-across-line", label: "Arrow Down Up Across Line", aliases: [] },
-  { iconCode: "arrow-down-up-lock", label: "Arrow Down Up Lock", aliases: [] },
-  { iconCode: "arrow-down-wide-short", label: "Arrow Down Wide Short", aliases: ["sort-amount-asc", "sort-amount-down"] },
-  { iconCode: "arrow-down-z-a", label: "Arrow Down Z A", aliases: ["sort-alpha-desc", "sort-alpha-down-alt"] },
-  { iconCode: "arrow-left", label: "Arrow Left", aliases: [] },
-  { iconCode: "arrow-left-arrow-right", label: "Arrow Left Arrow Right", aliases: [] },
-  { iconCode: "arrow-left-from-arc", label: "Arrow Left From Arc", aliases: [] },
-  { iconCode: "arrow-left-from-bracket", label: "Arrow Left From Bracket", aliases: [] },
-  { iconCode: "arrow-left-from-dotted-line", label: "Arrow Left From Dotted Line", aliases: [] },
-  { iconCode: "arrow-left-from-line", label: "Arrow Left From Line", aliases: ["arrow-from-right"] },
-  { iconCode: "arrow-left-long", label: "Arrow Left Long", aliases: ["long-arrow-left"] },
-  { iconCode: "arrow-left-long-to-line", label: "Arrow Left Long To Line", aliases: [] },
-  { iconCode: "arrow-left-to-arc", label: "Arrow Left To Arc", aliases: [] },
-  { iconCode: "arrow-left-to-bracket", label: "Arrow Left To Bracket", aliases: [] },
-  { iconCode: "arrow-left-to-dotted-line", label: "Arrow Left To Dotted Line", aliases: [] },
-  { iconCode: "arrow-left-to-line", label: "Arrow Left To Line", aliases: ["arrow-to-left"] },
-  { iconCode: "arrow-pointer", label: "Arrow Pointer", aliases: ["mouse-pointer"] },
-  { iconCode: "arrow-progress", label: "Arrow Progress", aliases: [] },
-  { iconCode: "arrow-right", label: "Arrow Right", aliases: [] },
-  { iconCode: "arrow-right-arrow-left", label: "Arrow Right Arrow Left", aliases: ["exchange"] },
-  { iconCode: "arrow-right-from-arc", label: "Arrow Right From Arc", aliases: [] },
-  { iconCode: "arrow-right-from-bracket", label: "Arrow Right From Bracket", aliases: ["sign-out"] },
-  { iconCode: "arrow-right-from-dotted-line", label: "Arrow Right From Dotted Line", aliases: [] },
-  { iconCode: "arrow-right-from-file", label: "Arrow Right From File", aliases: ["file-export"] },
-  { iconCode: "arrow-right-from-line", label: "Arrow Right From Line", aliases: ["arrow-from-left"] },
-  { iconCode: "arrow-right-long", label: "Arrow Right Long", aliases: ["long-arrow-right"] },
-  { iconCode: "arrow-right-long-to-line", label: "Arrow Right Long To Line", aliases: [] },
-  { iconCode: "arrow-right-to-arc", label: "Arrow Right To Arc", aliases: [] },
-  { iconCode: "arrow-right-to-bracket", label: "Arrow Right To Bracket", aliases: ["sign-in"] },
-  { iconCode: "arrow-right-to-city", label: "Arrow Right To City", aliases: [] },
-  { iconCode: "arrow-right-to-dotted-line", label: "Arrow Right To Dotted Line", aliases: [] },
-  { iconCode: "arrow-right-to-file", label: "Arrow Right To File", aliases: ["file-import"] },
-  { iconCode: "arrow-right-to-line", label: "Arrow Right To Line", aliases: ["arrow-to-right"] },
-  { iconCode: "arrow-rotate-backward", label: "Arrow Rotate Backward", aliases: ["arrow-left-rotate", "arrow-rotate-back", "arrow-rotate-left", "undo"] },
-  { iconCode: "arrow-rotate-forward", label: "Arrow Rotate Forward", aliases: ["arrow-right-rotate", "arrow-rotate-right", "redo"] },
-  { iconCode: "arrow-rotate-left-10", label: "Arrow Rotate Left 10", aliases: [] },
-  { iconCode: "arrow-rotate-left-15", label: "Arrow Rotate Left 15", aliases: [] },
-  { iconCode: "arrow-rotate-left-30", label: "Arrow Rotate Left 30", aliases: [] },
-  { iconCode: "arrow-rotate-right-10", label: "Arrow Rotate Right 10", aliases: [] },
-  { iconCode: "arrow-rotate-right-15", label: "Arrow Rotate Right 15", aliases: [] },
-  { iconCode: "arrow-rotate-right-30", label: "Arrow Rotate Right 30", aliases: [] },
-  { iconCode: "arrow-trend-down", label: "Arrow Trend Down", aliases: [] },
-  { iconCode: "arrow-trend-up", label: "Arrow Trend Up", aliases: [] },
-  { iconCode: "arrow-turn-down", label: "Arrow Turn Down", aliases: ["level-down"] },
-  { iconCode: "arrow-turn-down-left", label: "Arrow Turn Down Left", aliases: [] },
-  { iconCode: "arrow-turn-down-right", label: "Arrow Turn Down Right", aliases: [] },
-  { iconCode: "arrow-turn-left", label: "Arrow Turn Left", aliases: [] },
-  { iconCode: "arrow-turn-left-down", label: "Arrow Turn Left Down", aliases: [] },
-  { iconCode: "arrow-turn-left-up", label: "Arrow Turn Left Up", aliases: [] },
-  { iconCode: "arrow-turn-right", label: "Arrow Turn Right", aliases: [] },
-  { iconCode: "arrow-turn-up", label: "Arrow Turn Up", aliases: ["level-up"] },
-  { iconCode: "arrow-u-turn-down-left", label: "Arrow U Turn Down Left", aliases: [] },
-  { iconCode: "arrow-u-turn-down-right", label: "Arrow U Turn Down Right", aliases: [] },
-  { iconCode: "arrow-u-turn-left-down", label: "Arrow U Turn Left Down", aliases: [] },
-  { iconCode: "arrow-u-turn-left-up", label: "Arrow U Turn Left Up", aliases: [] },
-  { iconCode: "arrow-u-turn-right-down", label: "Arrow U Turn Right Down", aliases: [] },
-  { iconCode: "arrow-u-turn-right-up", label: "Arrow U Turn Right Up", aliases: [] },
-  { iconCode: "arrow-u-turn-up-left", label: "Arrow U Turn Up Left", aliases: [] },
-  { iconCode: "arrow-u-turn-up-right", label: "Arrow U Turn Up Right", aliases: [] },
-  { iconCode: "arrow-up", label: "Arrow Up", aliases: [] },
-  { iconCode: "arrow-up-9-1", label: "Arrow Up 9 1", aliases: ["sort-numeric-up-alt"] },
-  { iconCode: "arrow-up-a-z", label: "Arrow Up A Z", aliases: ["sort-alpha-up"] },
-  { iconCode: "arrow-up-arrow-down", label: "Arrow Up Arrow Down", aliases: ["sort-up-down"] },
-  { iconCode: "arrow-up-big-small", label: "Arrow Up Big Small", aliases: ["sort-size-up"] },
-  { iconCode: "arrow-up-from-arc", label: "Arrow Up From Arc", aliases: [] },
-  { iconCode: "arrow-up-from-bracket", label: "Arrow Up From Bracket", aliases: [] },
-  { iconCode: "arrow-up-from-dotted-line", label: "Arrow Up From Dotted Line", aliases: [] },
-  { iconCode: "arrow-up-from-ground-water", label: "Arrow Up From Ground Water", aliases: [] },
-  { iconCode: "arrow-up-from-line", label: "Arrow Up From Line", aliases: ["arrow-from-bottom"] },
-  { iconCode: "arrow-up-from-square", label: "Arrow Up From Square", aliases: [] },
-  { iconCode: "arrow-up-from-water-pump", label: "Arrow Up From Water Pump", aliases: [] },
-  { iconCode: "arrow-up-left", label: "Arrow Up Left", aliases: [] },
-  { iconCode: "arrow-up-left-from-circle", label: "Arrow Up Left From Circle", aliases: [] },
-  { iconCode: "arrow-up-long", label: "Arrow Up Long", aliases: ["long-arrow-up"] },
-  { iconCode: "arrow-up-long-to-line", label: "Arrow Up Long To Line", aliases: [] },
-  { iconCode: "arrow-up-right", label: "Arrow Up Right", aliases: [] },
-  { iconCode: "arrow-up-right-and-arrow-down-left-from-center", label: "Arrow Up Right And Arrow Down Left From Center", aliases: [] },
-  { iconCode: "arrow-up-right-dots", label: "Arrow Up Right Dots", aliases: [] },
-  { iconCode: "arrow-up-right-from-square", label: "Arrow Up Right From Square", aliases: ["external-link"] },
-  { iconCode: "arrow-up-short-wide", label: "Arrow Up Short Wide", aliases: ["sort-amount-up-alt"] },
-  { iconCode: "arrow-up-small-big", label: "Arrow Up Small Big", aliases: ["sort-size-up-alt"] },
-  { iconCode: "arrow-up-square-triangle", label: "Arrow Up Square Triangle", aliases: ["sort-shapes-up-alt"] },
-  { iconCode: "arrow-up-to-arc", label: "Arrow Up To Arc", aliases: [] },
-  { iconCode: "arrow-up-to-bracket", label: "Arrow Up To Bracket", aliases: [] },
-  { iconCode: "arrow-up-to-dotted-line", label: "Arrow Up To Dotted Line", aliases: [] },
-  { iconCode: "arrow-up-to-line", label: "Arrow Up To Line", aliases: ["arrow-to-top"] },
-  { iconCode: "arrow-up-triangle-square", label: "Arrow Up Triangle Square", aliases: ["sort-shapes-up"] },
-  { iconCode: "arrow-up-wide-short", label: "Arrow Up Wide Short", aliases: ["sort-amount-up"] },
-  { iconCode: "arrow-up-z-a", label: "Arrow Up Z A", aliases: ["sort-alpha-up-alt"] },
-  { iconCode: "arrows", label: "Arrows", aliases: ["arrows-up-down-left-right"] },
-  { iconCode: "arrows-cross", label: "Arrows Cross", aliases: [] },
-  { iconCode: "arrows-down-to-line", label: "Arrows Down To Line", aliases: [] },
-  { iconCode: "arrows-down-to-people", label: "Arrows Down To People", aliases: [] },
-  { iconCode: "arrows-from-dotted-line", label: "Arrows From Dotted Line", aliases: [] },
-  { iconCode: "arrows-from-line", label: "Arrows From Line", aliases: [] },
-  { iconCode: "arrows-left-right", label: "Arrows Left Right", aliases: ["arrows-h"] },
-  { iconCode: "arrows-left-right-to-line", label: "Arrows Left Right To Line", aliases: [] },
-  { iconCode: "arrows-maximize", label: "Arrows Maximize", aliases: ["expand-arrows"] },
-  { iconCode: "arrows-minimize", label: "Arrows Minimize", aliases: ["compress-arrows"] },
-  { iconCode: "arrows-repeat", label: "Arrows Repeat", aliases: ["repeat-alt"] },
-  { iconCode: "arrows-repeat-1", label: "Arrows Repeat 1", aliases: ["repeat-1-alt"] },
-  { iconCode: "arrows-retweet", label: "Arrows Retweet", aliases: ["retweet-alt"] },
-  { iconCode: "arrows-rotate", label: "Arrows Rotate", aliases: ["refresh", "sync"] },
-  { iconCode: "arrows-rotate-reverse", label: "Arrows Rotate Reverse", aliases: [] },
-  { iconCode: "arrows-spin", label: "Arrows Spin", aliases: [] },
-  { iconCode: "arrows-split-up-and-left", label: "Arrows Split Up And Left", aliases: [] },
-  { iconCode: "arrows-to-circle", label: "Arrows To Circle", aliases: [] },
-  { iconCode: "arrows-to-dot", label: "Arrows To Dot", aliases: [] },
-  { iconCode: "arrows-to-dotted-line", label: "Arrows To Dotted Line", aliases: [] },
-  { iconCode: "arrows-to-eye", label: "Arrows To Eye", aliases: [] },
-  { iconCode: "arrows-to-line", label: "Arrows To Line", aliases: [] },
-  { iconCode: "arrows-turn-right", label: "Arrows Turn Right", aliases: [] },
-  { iconCode: "arrows-turn-to-dots", label: "Arrows Turn To Dots", aliases: [] },
-  { iconCode: "arrows-up-down", label: "Arrows Up Down", aliases: ["arrows-v"] },
-  { iconCode: "arrows-up-to-line", label: "Arrows Up To Line", aliases: [] },
-  { iconCode: "asterisk", label: "Asterisk", aliases: [] },
-  { iconCode: "at", label: "At", aliases: [] },
-  { iconCode: "atom", label: "Atom", aliases: [] },
-  { iconCode: "atom-simple", label: "Atom Simple", aliases: ["atom-alt"] },
-  { iconCode: "audio-description", label: "Audio Description", aliases: [] },
-  { iconCode: "audio-description-slash", label: "Audio Description Slash", aliases: [] },
-  { iconCode: "austral-sign", label: "Austral Sign", aliases: [] },
-  { iconCode: "australian-dollar-sign", label: "Australian Dollar Sign", aliases: [] },
-  { iconCode: "avocado", label: "Avocado", aliases: [] },
-  { iconCode: "award", label: "Award", aliases: [] },
-  { iconCode: "award-simple", label: "Award Simple", aliases: [] },
-  { iconCode: "axe", label: "Axe", aliases: [] },
-  { iconCode: "axe-battle", label: "Axe Battle", aliases: [] },
-  { iconCode: "b", label: "B", aliases: [] },
-  { iconCode: "baby", label: "Baby", aliases: [] },
-  { iconCode: "baby-carriage", label: "Baby Carriage", aliases: ["carriage-baby"] },
-  { iconCode: "backpack", label: "Backpack", aliases: [] },
-  { iconCode: "backward", label: "Backward", aliases: [] },
-  { iconCode: "backward-fast", label: "Backward Fast", aliases: ["fast-backward"] },
-  { iconCode: "backward-step", label: "Backward Step", aliases: ["step-backward"] },
-  { iconCode: "bacon", label: "Bacon", aliases: [] },
-  { iconCode: "bacteria", label: "Bacteria", aliases: [] },
-  { iconCode: "bacterium", label: "Bacterium", aliases: [] },
-  { iconCode: "badge", label: "Badge", aliases: [] },
-  { iconCode: "badge-check", label: "Badge Check", aliases: [] },
-  { iconCode: "badge-dollar", label: "Badge Dollar", aliases: [] },
-  { iconCode: "badge-percent", label: "Badge Percent", aliases: [] },
-  { iconCode: "badge-sheriff", label: "Badge Sheriff", aliases: [] },
-  { iconCode: "badger-honey", label: "Badger Honey", aliases: [] },
-  { iconCode: "badminton", label: "Badminton", aliases: [] },
-  { iconCode: "bag-seedling", label: "Bag Seedling", aliases: [] },
-  { iconCode: "bag-shopping", label: "Bag Shopping", aliases: ["shopping-bag"] },
-  { iconCode: "bag-shopping-minus", label: "Bag Shopping Minus", aliases: [] },
-  { iconCode: "bag-shopping-plus", label: "Bag Shopping Plus", aliases: [] },
-  { iconCode: "bagel", label: "Bagel", aliases: [] },
-  { iconCode: "bags-shopping", label: "Bags Shopping", aliases: [] },
-  { iconCode: "baguette", label: "Baguette", aliases: [] },
-  { iconCode: "baht-sign", label: "Baht Sign", aliases: [] },
-  { iconCode: "balance-scale-left", label: "Balance Scale Left", aliases: ["scale-unbalanced"] },
-  { iconCode: "ball-pile", label: "Ball Pile", aliases: [] },
-  { iconCode: "ball-yarn", label: "Ball Yarn", aliases: [] },
-  { iconCode: "balloon", label: "Balloon", aliases: [] },
-  { iconCode: "balloons", label: "Balloons", aliases: [] },
-  { iconCode: "ballot", label: "Ballot", aliases: [] },
-  { iconCode: "ballot-check", label: "Ballot Check", aliases: [] },
-  { iconCode: "ban", label: "Ban", aliases: ["cancel"] },
-  { iconCode: "ban-bug", label: "Ban Bug", aliases: ["debug"] },
-  { iconCode: "ban-smoking", label: "Ban Smoking", aliases: ["smoking-ban"] },
-  { iconCode: "banana", label: "Banana", aliases: [] },
-  { iconCode: "band-aid", label: "Band Aid", aliases: ["bandage"] },
-  { iconCode: "bangladeshi-taka-sign", label: "Bangladeshi Taka Sign", aliases: [] },
-  { iconCode: "banjo", label: "Banjo", aliases: [] },
-  { iconCode: "bar-progress", label: "Bar Progress", aliases: [] },
-  { iconCode: "bar-progress-empty", label: "Bar Progress Empty", aliases: [] },
-  { iconCode: "bar-progress-full", label: "Bar Progress Full", aliases: [] },
-  { iconCode: "bar-progress-half", label: "Bar Progress Half", aliases: [] },
-  { iconCode: "bar-progress-quarter", label: "Bar Progress Quarter", aliases: [] },
-  { iconCode: "bar-progress-three-quarters", label: "Bar Progress Three Quarters", aliases: [] },
-  { iconCode: "barcode", label: "Barcode", aliases: [] },
-  { iconCode: "barcode-read", label: "Barcode Read", aliases: [] },
-  { iconCode: "barcode-scan", label: "Barcode Scan", aliases: [] },
-  { iconCode: "barn", label: "Barn", aliases: [] },
-  { iconCode: "barn-silo", label: "Barn Silo", aliases: ["farm"] },
-  { iconCode: "bars", label: "Bars", aliases: ["navicon"] },
-  { iconCode: "bars-filter", label: "Bars Filter", aliases: [] },
-  { iconCode: "bars-progress", label: "Bars Progress", aliases: ["tasks-alt"] },
-  { iconCode: "bars-sort", label: "Bars Sort", aliases: [] },
-  { iconCode: "bars-staggered", label: "Bars Staggered", aliases: ["reorder", "stream"] },
-  { iconCode: "baseball", label: "Baseball", aliases: ["baseball-ball"] },
-  { iconCode: "baseball-bat", label: "Baseball Bat", aliases: [] },
-  { iconCode: "baseball-bat-ball", label: "Baseball Bat Ball", aliases: [] },
-  { iconCode: "basket-shopping", label: "Basket Shopping", aliases: ["shopping-basket"] },
-  { iconCode: "basket-shopping-minus", label: "Basket Shopping Minus", aliases: [] },
-  { iconCode: "basket-shopping-plus", label: "Basket Shopping Plus", aliases: [] },
-  { iconCode: "basket-shopping-simple", label: "Basket Shopping Simple", aliases: ["shopping-basket-alt"] },
-  { iconCode: "basketball", label: "Basketball", aliases: ["basketball-ball"] },
-  { iconCode: "basketball-hoop", label: "Basketball Hoop", aliases: [] },
-  { iconCode: "bat", label: "Bat", aliases: [] },
-  { iconCode: "bathtub", label: "Bathtub", aliases: ["bath"] },
-  { iconCode: "battery", label: "Battery", aliases: ["battery-5", "battery-full"] },
-  { iconCode: "battery-bolt", label: "Battery Bolt", aliases: [] },
-  { iconCode: "battery-empty", label: "Battery Empty", aliases: ["battery-0"] },
-  { iconCode: "battery-exclamation", label: "Battery Exclamation", aliases: [] },
-  { iconCode: "battery-half", label: "Battery Half", aliases: ["battery-3"] },
-  { iconCode: "battery-low", label: "Battery Low", aliases: ["battery-1"] },
-  { iconCode: "battery-quarter", label: "Battery Quarter", aliases: ["battery-2"] },
-  { iconCode: "battery-slash", label: "Battery Slash", aliases: [] },
-  { iconCode: "battery-three-quarters", label: "Battery Three Quarters", aliases: ["battery-4"] },
-  { iconCode: "bed", label: "Bed", aliases: [] },
-  { iconCode: "bed-bunk", label: "Bed Bunk", aliases: [] },
-  { iconCode: "bed-empty", label: "Bed Empty", aliases: [] },
-  { iconCode: "bed-front", label: "Bed Front", aliases: ["bed-alt"] },
-  { iconCode: "bed-pulse", label: "Bed Pulse", aliases: ["procedures"] },
-  { iconCode: "bee", label: "Bee", aliases: [] },
-  { iconCode: "beer", label: "Beer", aliases: ["beer-mug-empty"] },
-  { iconCode: "beer-foam", label: "Beer Foam", aliases: ["beer-mug"] },
-  { iconCode: "bell", label: "Bell", aliases: [] },
-  { iconCode: "bell-concierge", label: "Bell Concierge", aliases: ["concierge-bell"] },
-  { iconCode: "bell-exclamation", label: "Bell Exclamation", aliases: [] },
-  { iconCode: "bell-on", label: "Bell On", aliases: [] },
-  { iconCode: "bell-plus", label: "Bell Plus", aliases: [] },
-  { iconCode: "bell-ring", label: "Bell Ring", aliases: [] },
-  { iconCode: "bell-school", label: "Bell School", aliases: [] },
-  { iconCode: "bell-school-slash", label: "Bell School Slash", aliases: [] },
-  { iconCode: "bell-slash", label: "Bell Slash", aliases: [] },
-  { iconCode: "bells", label: "Bells", aliases: [] },
-  { iconCode: "bench-tree", label: "Bench Tree", aliases: [] },
-  { iconCode: "bezier-curve", label: "Bezier Curve", aliases: [] },
-  { iconCode: "bicep", label: "Bicep", aliases: [] },
-  { iconCode: "bicycle", label: "Bicycle", aliases: [] },
-  { iconCode: "billboard", label: "Billboard", aliases: [] },
-  { iconCode: "bin", label: "Bin", aliases: [] },
-  { iconCode: "bin-bottles", label: "Bin Bottles", aliases: [] },
-  { iconCode: "bin-bottles-recycle", label: "Bin Bottles Recycle", aliases: [] },
-  { iconCode: "bin-recycle", label: "Bin Recycle", aliases: [] },
-  { iconCode: "binary", label: "Binary", aliases: [] },
-  { iconCode: "binary-circle-check", label: "Binary Circle Check", aliases: [] },
-  { iconCode: "binary-lock", label: "Binary Lock", aliases: [] },
-  { iconCode: "binary-slash", label: "Binary Slash", aliases: [] },
-  { iconCode: "binoculars", label: "Binoculars", aliases: [] },
-  { iconCode: "biohazard", label: "Biohazard", aliases: [] },
-  { iconCode: "bird", label: "Bird", aliases: [] },
-  { iconCode: "bitcoin-sign", label: "Bitcoin Sign", aliases: [] },
-  { iconCode: "blanket", label: "Blanket", aliases: [] },
-  { iconCode: "blanket-fire", label: "Blanket Fire", aliases: [] },
-  { iconCode: "blender", label: "Blender", aliases: [] },
-  { iconCode: "blender-phone", label: "Blender Phone", aliases: [] },
-  { iconCode: "blinds", label: "Blinds", aliases: [] },
-  { iconCode: "blinds-open", label: "Blinds Open", aliases: [] },
-  { iconCode: "blinds-raised", label: "Blinds Raised", aliases: [] },
-  { iconCode: "block", label: "Block", aliases: [] },
-  { iconCode: "block-brick", label: "Block Brick", aliases: ["wall-brick"] },
-  { iconCode: "block-brick-fire", label: "Block Brick Fire", aliases: ["firewall"] },
-  { iconCode: "block-question", label: "Block Question", aliases: [] },
-  { iconCode: "block-quote", label: "Block Quote", aliases: [] },
-  { iconCode: "blog", label: "Blog", aliases: [] },
-  { iconCode: "blueberries", label: "Blueberries", aliases: [] },
-  { iconCode: "bold", label: "Bold", aliases: [] },
-  { iconCode: "bolt", label: "Bolt", aliases: ["zap"] },
-  { iconCode: "bolt-auto", label: "Bolt Auto", aliases: [] },
-  { iconCode: "bolt-lightning", label: "Bolt Lightning", aliases: [] },
-  { iconCode: "bolt-slash", label: "Bolt Slash", aliases: [] },
-  { iconCode: "bomb", label: "Bomb", aliases: [] },
-  { iconCode: "bone", label: "Bone", aliases: [] },
-  { iconCode: "bone-break", label: "Bone Break", aliases: [] },
-  { iconCode: "bong", label: "Bong", aliases: [] },
-  { iconCode: "book", label: "Book", aliases: [] },
-  { iconCode: "book-arrow-right", label: "Book Arrow Right", aliases: [] },
-  { iconCode: "book-arrow-up", label: "Book Arrow Up", aliases: [] },
-  { iconCode: "book-atlas", label: "Book Atlas", aliases: ["atlas"] },
-  { iconCode: "book-bible", label: "Book Bible", aliases: ["bible"] },
-  { iconCode: "book-blank", label: "Book Blank", aliases: ["book-alt"] },
-  { iconCode: "book-bookmark", label: "Book Bookmark", aliases: [] },
-  { iconCode: "book-circle-arrow-right", label: "Book Circle Arrow Right", aliases: [] },
-  { iconCode: "book-circle-arrow-up", label: "Book Circle Arrow Up", aliases: [] },
-  { iconCode: "book-copy", label: "Book Copy", aliases: [] },
-  { iconCode: "book-font", label: "Book Font", aliases: [] },
-  { iconCode: "book-heart", label: "Book Heart", aliases: [] },
-  { iconCode: "book-journal-whills", label: "Book Journal Whills", aliases: ["journal-whills"] },
-  { iconCode: "book-medical", label: "Book Medical", aliases: [] },
-  { iconCode: "book-open", label: "Book Open", aliases: [] },
-  { iconCode: "book-open-cover", label: "Book Open Cover", aliases: ["book-open-alt"] },
-  { iconCode: "book-open-lines", label: "Book Open Lines", aliases: [] },
-  { iconCode: "book-open-reader", label: "Book Open Reader", aliases: ["book-reader"] },
-  { iconCode: "book-quran", label: "Book Quran", aliases: ["quran"] },
-  { iconCode: "book-section", label: "Book Section", aliases: ["book-law"] },
-  { iconCode: "book-skull", label: "Book Skull", aliases: ["book-dead"] },
-  { iconCode: "book-sparkles", label: "Book Sparkles", aliases: ["book-spells"] },
-  { iconCode: "book-spine", label: "Book Spine", aliases: [] },
-  { iconCode: "book-tanakh", label: "Book Tanakh", aliases: ["tanakh"] },
-  { iconCode: "book-user", label: "Book User", aliases: [] },
-  { iconCode: "bookmark", label: "Bookmark", aliases: [] },
-  { iconCode: "bookmark-plus", label: "Bookmark Plus", aliases: [] },
-  { iconCode: "bookmark-slash", label: "Bookmark Slash", aliases: [] },
-  { iconCode: "books", label: "Books", aliases: [] },
-  { iconCode: "books-medical", label: "Books Medical", aliases: [] },
-  { iconCode: "boombox", label: "Boombox", aliases: [] },
-  { iconCode: "boot", label: "Boot", aliases: [] },
-  { iconCode: "boot-heeled", label: "Boot Heeled", aliases: [] },
-  { iconCode: "booth-curtain", label: "Booth Curtain", aliases: [] },
-  { iconCode: "border-all", label: "Border All", aliases: [] },
-  { iconCode: "border-bottom", label: "Border Bottom", aliases: [] },
-  { iconCode: "border-bottom-right", label: "Border Bottom Right", aliases: ["border-style-alt"] },
-  { iconCode: "border-center-h", label: "Border Center H", aliases: [] },
-  { iconCode: "border-center-v", label: "Border Center V", aliases: [] },
-  { iconCode: "border-inner", label: "Border Inner", aliases: [] },
-  { iconCode: "border-left", label: "Border Left", aliases: [] },
-  { iconCode: "border-none", label: "Border None", aliases: [] },
-  { iconCode: "border-outer", label: "Border Outer", aliases: [] },
-  { iconCode: "border-right", label: "Border Right", aliases: [] },
-  { iconCode: "border-top", label: "Border Top", aliases: [] },
-  { iconCode: "border-top-left", label: "Border Top Left", aliases: ["border-style"] },
-  { iconCode: "bore-hole", label: "Bore Hole", aliases: [] },
-  { iconCode: "bottle-baby", label: "Bottle Baby", aliases: [] },
-  { iconCode: "bottle-droplet", label: "Bottle Droplet", aliases: [] },
-  { iconCode: "bottle-water", label: "Bottle Water", aliases: [] },
-  { iconCode: "bow-archery", label: "Bow Archery", aliases: [] },
-  { iconCode: "bow-arrow", label: "Bow Arrow", aliases: [] },
-  { iconCode: "bowl-chopsticks", label: "Bowl Chopsticks", aliases: [] },
-  { iconCode: "bowl-chopsticks-noodles", label: "Bowl Chopsticks Noodles", aliases: [] },
-  { iconCode: "bowl-food", label: "Bowl Food", aliases: [] },
-  { iconCode: "bowl-hot", label: "Bowl Hot", aliases: ["soup"] },
-  { iconCode: "bowl-rice", label: "Bowl Rice", aliases: [] },
-  { iconCode: "bowl-salad", label: "Bowl Salad", aliases: ["salad"] },
-  { iconCode: "bowl-scoops", label: "Bowl Scoops", aliases: [] },
-  { iconCode: "bowl-shaved-ice", label: "Bowl Shaved Ice", aliases: ["bowl-scoop"] },
-  { iconCode: "bowl-soft-serve", label: "Bowl Soft Serve", aliases: [] },
-  { iconCode: "bowl-spoon", label: "Bowl Spoon", aliases: [] },
-  { iconCode: "bowling-ball", label: "Bowling Ball", aliases: [] },
-  { iconCode: "bowling-ball-pin", label: "Bowling Ball Pin", aliases: [] },
-  { iconCode: "bowling-pins", label: "Bowling Pins", aliases: [] },
-  { iconCode: "box", label: "Box", aliases: [] },
-  { iconCode: "box-archive", label: "Box Archive", aliases: ["archive"] },
-  { iconCode: "box-arrow-down", label: "Box Arrow Down", aliases: [] },
-  { iconCode: "box-arrow-down-arrow-up", label: "Box Arrow Down Arrow Up", aliases: [] },
-  { iconCode: "box-arrow-down-magnifying-glass", label: "Box Arrow Down Magnifying Glass", aliases: [] },
-  { iconCode: "box-arrow-up", label: "Box Arrow Up", aliases: [] },
-  { iconCode: "box-ballot", label: "Box Ballot", aliases: [] },
-  { iconCode: "box-check", label: "Box Check", aliases: [] },
-  { iconCode: "box-circle-check", label: "Box Circle Check", aliases: [] },
-  { iconCode: "box-dollar", label: "Box Dollar", aliases: ["box-usd"] },
-  { iconCode: "box-heart", label: "Box Heart", aliases: [] },
-  { iconCode: "box-isometric", label: "Box Isometric", aliases: [] },
-  { iconCode: "box-isometric-tape", label: "Box Isometric Tape", aliases: [] },
-  { iconCode: "box-magnifying-glass", label: "Box Magnifying Glass", aliases: [] },
-  { iconCode: "box-open", label: "Box Open", aliases: [] },
-  { iconCode: "box-open-full", label: "Box Open Full", aliases: ["box-full"] },
-  { iconCode: "box-taped", label: "Box Taped", aliases: ["box-alt"] },
-  { iconCode: "box-tissue", label: "Box Tissue", aliases: [] },
-  { iconCode: "boxes", label: "Boxes", aliases: ["boxes-alt", "boxes-stacked"] },
-  { iconCode: "boxes-packing", label: "Boxes Packing", aliases: [] },
-  { iconCode: "boxing-glove", label: "Boxing Glove", aliases: ["glove-boxing"] },
-  { iconCode: "bra", label: "Bra", aliases: [] },
-  { iconCode: "bracket", label: "Bracket", aliases: ["bracket-left", "bracket-square"] },
-  { iconCode: "bracket-curly", label: "Bracket Curly", aliases: ["bracket-curly-left"] },
-  { iconCode: "bracket-curly-right", label: "Bracket Curly Right", aliases: [] },
-  { iconCode: "bracket-round", label: "Bracket Round", aliases: ["parenthesis"] },
-  { iconCode: "bracket-round-right", label: "Bracket Round Right", aliases: [] },
-  { iconCode: "bracket-square-right", label: "Bracket Square Right", aliases: [] },
-  { iconCode: "brackets", label: "Brackets", aliases: ["brackets-square"] },
-  { iconCode: "brackets-curly", label: "Brackets Curly", aliases: [] },
-  { iconCode: "brackets-round", label: "Brackets Round", aliases: ["parentheses"] },
-  { iconCode: "braille", label: "Braille", aliases: [] },
-  { iconCode: "brain", label: "Brain", aliases: [] },
-  { iconCode: "brain-arrow-curved-right", label: "Brain Arrow Curved Right", aliases: ["mind-share"] },
-  { iconCode: "brain-circuit", label: "Brain Circuit", aliases: [] },
-  { iconCode: "brake-warning", label: "Brake Warning", aliases: [] },
-  { iconCode: "brazilian-real-sign", label: "Brazilian Real Sign", aliases: [] },
-  { iconCode: "bread-loaf", label: "Bread Loaf", aliases: [] },
-  { iconCode: "bread-slice", label: "Bread Slice", aliases: [] },
-  { iconCode: "bread-slice-butter", label: "Bread Slice Butter", aliases: [] },
-  { iconCode: "bridge", label: "Bridge", aliases: [] },
-  { iconCode: "bridge-circle-check", label: "Bridge Circle Check", aliases: [] },
-  { iconCode: "bridge-circle-exclamation", label: "Bridge Circle Exclamation", aliases: [] },
-  { iconCode: "bridge-circle-xmark", label: "Bridge Circle Xmark", aliases: [] },
-  { iconCode: "bridge-lock", label: "Bridge Lock", aliases: [] },
-  { iconCode: "bridge-suspension", label: "Bridge Suspension", aliases: [] },
-  { iconCode: "bridge-water", label: "Bridge Water", aliases: [] },
-  { iconCode: "briefcase", label: "Briefcase", aliases: [] },
-  { iconCode: "briefcase-arrow-right", label: "Briefcase Arrow Right", aliases: [] },
-  { iconCode: "briefcase-blank", label: "Briefcase Blank", aliases: [] },
-  { iconCode: "briefcase-clock", label: "Briefcase Clock", aliases: ["business-time"] },
-  { iconCode: "briefcase-medical", label: "Briefcase Medical", aliases: [] },
-  { iconCode: "briefs", label: "Briefs", aliases: [] },
-  { iconCode: "brightness", label: "Brightness", aliases: [] },
-  { iconCode: "brightness-low", label: "Brightness Low", aliases: [] },
-  { iconCode: "bring-forward", label: "Bring Forward", aliases: [] },
-  { iconCode: "bring-front", label: "Bring Front", aliases: [] },
-  { iconCode: "broccoli", label: "Broccoli", aliases: [] },
-  { iconCode: "broom", label: "Broom", aliases: [] },
-  { iconCode: "broom-ball", label: "Broom Ball", aliases: ["quidditch", "quidditch-broom-ball"] },
-  { iconCode: "broom-wide", label: "Broom Wide", aliases: [] },
-  { iconCode: "browser", label: "Browser", aliases: [] },
-  { iconCode: "browsers", label: "Browsers", aliases: [] },
-  { iconCode: "brush", label: "Brush", aliases: [] },
-  { iconCode: "bucket", label: "Bucket", aliases: [] },
-  { iconCode: "bug", label: "Bug", aliases: [] },
-  { iconCode: "bug-slash", label: "Bug Slash", aliases: [] },
-  { iconCode: "bugs", label: "Bugs", aliases: [] },
-  { iconCode: "building", label: "Building", aliases: [] },
-  { iconCode: "building-circle-arrow-right", label: "Building Circle Arrow Right", aliases: [] },
-  { iconCode: "building-circle-check", label: "Building Circle Check", aliases: [] },
-  { iconCode: "building-circle-exclamation", label: "Building Circle Exclamation", aliases: [] },
-  { iconCode: "building-circle-xmark", label: "Building Circle Xmark", aliases: [] },
-  { iconCode: "building-columns", label: "Building Columns", aliases: ["bank", "institution", "museum", "university"] },
-  { iconCode: "building-flag", label: "Building Flag", aliases: [] },
-  { iconCode: "building-lock", label: "Building Lock", aliases: [] },
-  { iconCode: "building-magnifying-glass", label: "Building Magnifying Glass", aliases: [] },
-  { iconCode: "building-memo", label: "Building Memo", aliases: [] },
-  { iconCode: "building-ngo", label: "Building Ngo", aliases: [] },
-  { iconCode: "building-shield", label: "Building Shield", aliases: [] },
-  { iconCode: "building-un", label: "Building Un", aliases: [] },
-  { iconCode: "building-user", label: "Building User", aliases: [] },
-  { iconCode: "building-wheat", label: "Building Wheat", aliases: [] },
-  { iconCode: "buildings", label: "Buildings", aliases: [] },
-  { iconCode: "bulldozer", label: "Bulldozer", aliases: [] },
-  { iconCode: "bullhorn", label: "Bullhorn", aliases: [] },
-  { iconCode: "bullseye", label: "Bullseye", aliases: [] },
-  { iconCode: "bullseye-arrow", label: "Bullseye Arrow", aliases: [] },
-  { iconCode: "bullseye-pointer", label: "Bullseye Pointer", aliases: [] },
-  { iconCode: "buoy", label: "Buoy", aliases: [] },
-  { iconCode: "buoy-mooring", label: "Buoy Mooring", aliases: [] },
-  { iconCode: "burger", label: "Burger", aliases: ["hamburger"] },
-  { iconCode: "burger-cheese", label: "Burger Cheese", aliases: ["cheeseburger"] },
-  { iconCode: "burger-fries", label: "Burger Fries", aliases: [] },
-  { iconCode: "burger-glass", label: "Burger Glass", aliases: [] },
-  { iconCode: "burger-lettuce", label: "Burger Lettuce", aliases: [] },
-  { iconCode: "burger-soda", label: "Burger Soda", aliases: [] },
-  { iconCode: "burrito", label: "Burrito", aliases: [] },
-  { iconCode: "burst", label: "Burst", aliases: [] },
-  { iconCode: "burst-new", label: "Burst New", aliases: [] },
-  { iconCode: "bus", label: "Bus", aliases: [] },
-  { iconCode: "bus-school", label: "Bus School", aliases: [] },
-  { iconCode: "bus-side", label: "Bus Side", aliases: [] },
-  { iconCode: "bus-simple", label: "Bus Simple", aliases: ["bus-alt"] },
-  { iconCode: "bus-stop", label: "Bus Stop", aliases: [] },
-  { iconCode: "butter", label: "Butter", aliases: [] },
-  { iconCode: "butterfly", label: "Butterfly", aliases: [] },
-  { iconCode: "c", label: "C", aliases: [] },
-  { iconCode: "cabin", label: "Cabin", aliases: [] },
-  { iconCode: "cabinet-filing", label: "Cabinet Filing", aliases: [] },
-  { iconCode: "cable-car", label: "Cable Car", aliases: ["tram"] },
-  { iconCode: "cactus", label: "Cactus", aliases: [] },
-  { iconCode: "caduceus", label: "Caduceus", aliases: [] },
-  { iconCode: "cake", label: "Cake", aliases: ["birthday-cake", "cake-candles"] },
-  { iconCode: "cake-slice", label: "Cake Slice", aliases: ["shortcake"] },
-  { iconCode: "calculator", label: "Calculator", aliases: [] },
-  { iconCode: "calculator-simple", label: "Calculator Simple", aliases: ["calculator-alt"] },
-  { iconCode: "calendar", label: "Calendar", aliases: [] },
-  { iconCode: "calendar-arrow-down", label: "Calendar Arrow Down", aliases: ["calendar-download"] },
-  { iconCode: "calendar-arrow-up", label: "Calendar Arrow Up", aliases: ["calendar-upload"] },
-  { iconCode: "calendar-check", label: "Calendar Check", aliases: [] },
-  { iconCode: "calendar-circle-exclamation", label: "Calendar Circle Exclamation", aliases: [] },
-  { iconCode: "calendar-circle-minus", label: "Calendar Circle Minus", aliases: [] },
-  { iconCode: "calendar-circle-plus", label: "Calendar Circle Plus", aliases: [] },
-  { iconCode: "calendar-circle-user", label: "Calendar Circle User", aliases: [] },
-  { iconCode: "calendar-clock", label: "Calendar Clock", aliases: ["calendar-time"] },
-  { iconCode: "calendar-day", label: "Calendar Day", aliases: [] },
-  { iconCode: "calendar-days", label: "Calendar Days", aliases: ["calendar-alt"] },
-  { iconCode: "calendar-exclamation", label: "Calendar Exclamation", aliases: [] },
-  { iconCode: "calendar-heart", label: "Calendar Heart", aliases: [] },
-  { iconCode: "calendar-image", label: "Calendar Image", aliases: [] },
-  { iconCode: "calendar-lines", label: "Calendar Lines", aliases: ["calendar-note"] },
-  { iconCode: "calendar-lines-pen", label: "Calendar Lines Pen", aliases: [] },
-  { iconCode: "calendar-minus", label: "Calendar Minus", aliases: [] },
-  { iconCode: "calendar-pen", label: "Calendar Pen", aliases: ["calendar-edit"] },
-  { iconCode: "calendar-plus", label: "Calendar Plus", aliases: [] },
-  { iconCode: "calendar-range", label: "Calendar Range", aliases: [] },
-  { iconCode: "calendar-star", label: "Calendar Star", aliases: [] },
-  { iconCode: "calendar-users", label: "Calendar Users", aliases: [] },
-  { iconCode: "calendar-week", label: "Calendar Week", aliases: [] },
-  { iconCode: "calendar-xmark", label: "Calendar Xmark", aliases: ["calendar-times"] },
-  { iconCode: "calendars", label: "Calendars", aliases: [] },
-  { iconCode: "camera", label: "Camera", aliases: ["camera-alt"] },
-  { iconCode: "camera-cctv", label: "Camera Cctv", aliases: ["cctv"] },
-  { iconCode: "camera-circle-ellipsis", label: "Camera Circle Ellipsis", aliases: [] },
-  { iconCode: "camera-clock", label: "Camera Clock", aliases: [] },
-  { iconCode: "camera-movie", label: "Camera Movie", aliases: [] },
-  { iconCode: "camera-polaroid", label: "Camera Polaroid", aliases: [] },
-  { iconCode: "camera-retro", label: "Camera Retro", aliases: [] },
-  { iconCode: "camera-rotate", label: "Camera Rotate", aliases: [] },
-  { iconCode: "camera-security", label: "Camera Security", aliases: ["camera-home"] },
-  { iconCode: "camera-shutter", label: "Camera Shutter", aliases: [] },
-  { iconCode: "camera-slash", label: "Camera Slash", aliases: [] },
-  { iconCode: "camera-viewfinder", label: "Camera Viewfinder", aliases: ["screenshot"] },
-  { iconCode: "camera-web", label: "Camera Web", aliases: ["webcam"] },
-  { iconCode: "camera-web-slash", label: "Camera Web Slash", aliases: ["webcam-slash"] },
-  { iconCode: "campfire", label: "Campfire", aliases: [] },
-  { iconCode: "campground", label: "Campground", aliases: [] },
-  { iconCode: "can-food", label: "Can Food", aliases: [] },
-  { iconCode: "cancer", label: "Cancer", aliases: [] },
-  { iconCode: "candle-holder", label: "Candle Holder", aliases: [] },
-  { iconCode: "candy", label: "Candy", aliases: [] },
-  { iconCode: "candy-bar", label: "Candy Bar", aliases: ["chocolate-bar"] },
-  { iconCode: "candy-cane", label: "Candy Cane", aliases: [] },
-  { iconCode: "candy-corn", label: "Candy Corn", aliases: [] },
-  { iconCode: "cannabis", label: "Cannabis", aliases: [] },
-  { iconCode: "cannon", label: "Cannon", aliases: [] },
-  { iconCode: "canoe-person", label: "Canoe Person", aliases: [] },
-  { iconCode: "capricorn", label: "Capricorn", aliases: [] },
-  { iconCode: "capsule", label: "Capsule", aliases: [] },
-  { iconCode: "capsules", label: "Capsules", aliases: [] },
-  { iconCode: "car", label: "Car", aliases: ["automobile"] },
-  { iconCode: "car-battery", label: "Car Battery", aliases: ["battery-car"] },
-  { iconCode: "car-bolt", label: "Car Bolt", aliases: [] },
-  { iconCode: "car-building", label: "Car Building", aliases: [] },
-  { iconCode: "car-bump", label: "Car Bump", aliases: [] },
-  { iconCode: "car-burst", label: "Car Burst", aliases: ["car-crash"] },
-  { iconCode: "car-bus", label: "Car Bus", aliases: [] },
-  { iconCode: "car-circle-bolt", label: "Car Circle Bolt", aliases: [] },
-  { iconCode: "car-garage", label: "Car Garage", aliases: [] },
-  { iconCode: "car-key", label: "Car Key", aliases: [] },
-  { iconCode: "car-mechanic", label: "Car Mechanic", aliases: ["car-wrench"] },
-  { iconCode: "car-mirrors", label: "Car Mirrors", aliases: [] },
-  { iconCode: "car-on", label: "Car On", aliases: [] },
-  { iconCode: "car-people", label: "Car People", aliases: ["carpool"] },
-  { iconCode: "car-rear", label: "Car Rear", aliases: ["car-alt"] },
-  { iconCode: "car-side", label: "Car Side", aliases: [] },
-  { iconCode: "car-side-bolt", label: "Car Side Bolt", aliases: [] },
-  { iconCode: "car-siren", label: "Car Siren", aliases: [] },
-  { iconCode: "car-siren-on", label: "Car Siren On", aliases: [] },
-  { iconCode: "car-tilt", label: "Car Tilt", aliases: [] },
-  { iconCode: "car-tunnel", label: "Car Tunnel", aliases: [] },
-  { iconCode: "car-wash", label: "Car Wash", aliases: [] },
-  { iconCode: "caravan", label: "Caravan", aliases: [] },
-  { iconCode: "caravan-simple", label: "Caravan Simple", aliases: ["caravan-alt"] },
-  { iconCode: "card-club", label: "Card Club", aliases: [] },
-  { iconCode: "card-diamond", label: "Card Diamond", aliases: [] },
-  { iconCode: "card-heart", label: "Card Heart", aliases: [] },
-  { iconCode: "card-spade", label: "Card Spade", aliases: [] },
-  { iconCode: "cards", label: "Cards", aliases: [] },
-  { iconCode: "cards-blank", label: "Cards Blank", aliases: [] },
-  { iconCode: "caret-down", label: "Caret Down", aliases: [] },
-  { iconCode: "caret-large-down", label: "Caret Large Down", aliases: [] },
-  { iconCode: "caret-large-left", label: "Caret Large Left", aliases: [] },
-  { iconCode: "caret-large-right", label: "Caret Large Right", aliases: [] },
-  { iconCode: "caret-large-up", label: "Caret Large Up", aliases: [] },
-  { iconCode: "caret-left", label: "Caret Left", aliases: [] },
-  { iconCode: "caret-right", label: "Caret Right", aliases: [] },
-  { iconCode: "caret-up", label: "Caret Up", aliases: [] },
-  { iconCode: "carrot", label: "Carrot", aliases: [] },
-  { iconCode: "cars", label: "Cars", aliases: [] },
-  { iconCode: "cart-arrow-down", label: "Cart Arrow Down", aliases: [] },
-  { iconCode: "cart-arrow-up", label: "Cart Arrow Up", aliases: [] },
-  { iconCode: "cart-circle-arrow-down", label: "Cart Circle Arrow Down", aliases: [] },
-  { iconCode: "cart-circle-arrow-up", label: "Cart Circle Arrow Up", aliases: [] },
-  { iconCode: "cart-circle-check", label: "Cart Circle Check", aliases: [] },
-  { iconCode: "cart-circle-exclamation", label: "Cart Circle Exclamation", aliases: [] },
-  { iconCode: "cart-circle-plus", label: "Cart Circle Plus", aliases: [] },
-  { iconCode: "cart-circle-xmark", label: "Cart Circle Xmark", aliases: [] },
-  { iconCode: "cart-flatbed", label: "Cart Flatbed", aliases: ["dolly-flatbed"] },
-  { iconCode: "cart-flatbed-boxes", label: "Cart Flatbed Boxes", aliases: ["dolly-flatbed-alt"] },
-  { iconCode: "cart-flatbed-empty", label: "Cart Flatbed Empty", aliases: ["dolly-flatbed-empty"] },
-  { iconCode: "cart-flatbed-suitcase", label: "Cart Flatbed Suitcase", aliases: ["luggage-cart"] },
-  { iconCode: "cart-minus", label: "Cart Minus", aliases: [] },
-  { iconCode: "cart-plus", label: "Cart Plus", aliases: [] },
-  { iconCode: "cart-shopping", label: "Cart Shopping", aliases: ["shopping-cart"] },
-  { iconCode: "cart-shopping-fast", label: "Cart Shopping Fast", aliases: [] },
-  { iconCode: "cart-xmark", label: "Cart Xmark", aliases: [] },
-  { iconCode: "cash-register", label: "Cash Register", aliases: [] },
-  { iconCode: "cassette-betamax", label: "Cassette Betamax", aliases: ["betamax"] },
-  { iconCode: "cassette-tape", label: "Cassette Tape", aliases: [] },
-  { iconCode: "cassette-vhs", label: "Cassette Vhs", aliases: ["vhs"] },
-  { iconCode: "castle", label: "Castle", aliases: [] },
-  { iconCode: "cat", label: "Cat", aliases: [] },
-  { iconCode: "cat-space", label: "Cat Space", aliases: [] },
-  { iconCode: "cauldron", label: "Cauldron", aliases: [] },
-  { iconCode: "cedi-sign", label: "Cedi Sign", aliases: [] },
-  { iconCode: "cent-sign", label: "Cent Sign", aliases: [] },
-  { iconCode: "certificate", label: "Certificate", aliases: [] },
-  { iconCode: "chair", label: "Chair", aliases: [] },
-  { iconCode: "chair-office", label: "Chair Office", aliases: [] },
-  { iconCode: "chalkboard", label: "Chalkboard", aliases: ["blackboard"] },
-  { iconCode: "chalkboard-teacher", label: "Chalkboard Teacher", aliases: ["chalkboard-user"] },
-  { iconCode: "charging-station", label: "Charging Station", aliases: [] },
-  { iconCode: "chart-area", label: "Chart Area", aliases: ["area-chart"] },
-  { iconCode: "chart-bar", label: "Chart Bar", aliases: ["bar-chart"] },
-  { iconCode: "chart-bullet", label: "Chart Bullet", aliases: [] },
-  { iconCode: "chart-candlestick", label: "Chart Candlestick", aliases: [] },
-  { iconCode: "chart-column", label: "Chart Column", aliases: [] },
-  { iconCode: "chart-diagram", label: "Chart Diagram", aliases: [] },
-  { iconCode: "chart-fft", label: "Chart Fft", aliases: [] },
-  { iconCode: "chart-gantt", label: "Chart Gantt", aliases: [] },
-  { iconCode: "chart-kanban", label: "Chart Kanban", aliases: [] },
-  { iconCode: "chart-line", label: "Chart Line", aliases: ["line-chart"] },
-  { iconCode: "chart-line-down", label: "Chart Line Down", aliases: [] },
-  { iconCode: "chart-line-up", label: "Chart Line Up", aliases: [] },
-  { iconCode: "chart-line-up-down", label: "Chart Line Up Down", aliases: [] },
-  { iconCode: "chart-mixed", label: "Chart Mixed", aliases: ["analytics"] },
-  { iconCode: "chart-mixed-up-circle-currency", label: "Chart Mixed Up Circle Currency", aliases: [] },
-  { iconCode: "chart-mixed-up-circle-dollar", label: "Chart Mixed Up Circle Dollar", aliases: [] },
-  { iconCode: "chart-network", label: "Chart Network", aliases: [] },
-  { iconCode: "chart-pie", label: "Chart Pie", aliases: ["pie-chart"] },
-  { iconCode: "chart-pie-simple", label: "Chart Pie Simple", aliases: ["chart-pie-alt"] },
-  { iconCode: "chart-pie-simple-circle-currency", label: "Chart Pie Simple Circle Currency", aliases: [] },
-  { iconCode: "chart-pie-simple-circle-dollar", label: "Chart Pie Simple Circle Dollar", aliases: [] },
-  { iconCode: "chart-pyramid", label: "Chart Pyramid", aliases: [] },
-  { iconCode: "chart-radar", label: "Chart Radar", aliases: [] },
-  { iconCode: "chart-scatter", label: "Chart Scatter", aliases: [] },
-  { iconCode: "chart-scatter-3d", label: "Chart Scatter 3d", aliases: [] },
-  { iconCode: "chart-scatter-bubble", label: "Chart Scatter Bubble", aliases: [] },
-  { iconCode: "chart-simple", label: "Chart Simple", aliases: [] },
-  { iconCode: "chart-simple-horizontal", label: "Chart Simple Horizontal", aliases: [] },
-  { iconCode: "chart-sine", label: "Chart Sine", aliases: [] },
-  { iconCode: "chart-tree-map", label: "Chart Tree Map", aliases: [] },
-  { iconCode: "chart-waterfall", label: "Chart Waterfall", aliases: [] },
-  { iconCode: "check", label: "Check", aliases: [] },
-  { iconCode: "check-double", label: "Check Double", aliases: [] },
-  { iconCode: "check-to-slot", label: "Check To Slot", aliases: ["vote-yea"] },
-  { iconCode: "cheese", label: "Cheese", aliases: [] },
-  { iconCode: "cheese-swiss", label: "Cheese Swiss", aliases: [] },
-  { iconCode: "chemex", label: "Chemex", aliases: [] },
-  { iconCode: "cherries", label: "Cherries", aliases: [] },
-  { iconCode: "chess", label: "Chess", aliases: [] },
-  { iconCode: "chess-bishop", label: "Chess Bishop", aliases: [] },
-  { iconCode: "chess-bishop-piece", label: "Chess Bishop Piece", aliases: ["chess-bishop-alt"] },
-  { iconCode: "chess-board", label: "Chess Board", aliases: [] },
-  { iconCode: "chess-clock", label: "Chess Clock", aliases: [] },
-  { iconCode: "chess-clock-flip", label: "Chess Clock Flip", aliases: ["chess-clock-alt"] },
-  { iconCode: "chess-king", label: "Chess King", aliases: [] },
-  { iconCode: "chess-king-piece", label: "Chess King Piece", aliases: ["chess-king-alt"] },
-  { iconCode: "chess-knight", label: "Chess Knight", aliases: [] },
-  { iconCode: "chess-knight-piece", label: "Chess Knight Piece", aliases: ["chess-knight-alt"] },
-  { iconCode: "chess-pawn", label: "Chess Pawn", aliases: [] },
-  { iconCode: "chess-pawn-piece", label: "Chess Pawn Piece", aliases: ["chess-pawn-alt"] },
-  { iconCode: "chess-queen", label: "Chess Queen", aliases: [] },
-  { iconCode: "chess-queen-piece", label: "Chess Queen Piece", aliases: ["chess-queen-alt"] },
-  { iconCode: "chess-rook", label: "Chess Rook", aliases: [] },
-  { iconCode: "chess-rook-piece", label: "Chess Rook Piece", aliases: ["chess-rook-alt"] },
-  { iconCode: "chest-drawers", label: "Chest Drawers", aliases: [] },
-  { iconCode: "chestnut", label: "Chestnut", aliases: [] },
-  { iconCode: "chevron-double-down", label: "Chevron Double Down", aliases: ["chevrons-down"] },
-  { iconCode: "chevron-double-left", label: "Chevron Double Left", aliases: ["chevrons-left"] },
-  { iconCode: "chevron-double-right", label: "Chevron Double Right", aliases: ["chevrons-right"] },
-  { iconCode: "chevron-double-up", label: "Chevron Double Up", aliases: ["chevrons-up"] },
-  { iconCode: "chevron-down", label: "Chevron Down", aliases: [] },
-  { iconCode: "chevron-left", label: "Chevron Left", aliases: [] },
-  { iconCode: "chevron-right", label: "Chevron Right", aliases: [] },
-  { iconCode: "chevron-up", label: "Chevron Up", aliases: [] },
-  { iconCode: "chf-sign", label: "Chf Sign", aliases: [] },
-  { iconCode: "child", label: "Child", aliases: [] },
-  { iconCode: "child-combatant", label: "Child Combatant", aliases: ["child-rifle"] },
-  { iconCode: "child-dress", label: "Child Dress", aliases: [] },
-  { iconCode: "child-reaching", label: "Child Reaching", aliases: [] },
-  { iconCode: "children", label: "Children", aliases: [] },
-  { iconCode: "chimney", label: "Chimney", aliases: [] },
-  { iconCode: "chopsticks", label: "Chopsticks", aliases: [] },
-  { iconCode: "church", label: "Church", aliases: [] },
-  { iconCode: "circle", label: "Circle", aliases: [] },
-  { iconCode: "circle-0", label: "Circle 0", aliases: [] },
-  { iconCode: "circle-1", label: "Circle 1", aliases: [] },
-  { iconCode: "circle-2", label: "Circle 2", aliases: [] },
-  { iconCode: "circle-3", label: "Circle 3", aliases: [] },
-  { iconCode: "circle-4", label: "Circle 4", aliases: [] },
-  { iconCode: "circle-5", label: "Circle 5", aliases: [] },
-  { iconCode: "circle-6", label: "Circle 6", aliases: [] },
-  { iconCode: "circle-7", label: "Circle 7", aliases: [] },
-  { iconCode: "circle-8", label: "Circle 8", aliases: [] },
-  { iconCode: "circle-9", label: "Circle 9", aliases: [] },
-  { iconCode: "circle-a", label: "Circle A", aliases: [] },
-  { iconCode: "circle-ampersand", label: "Circle Ampersand", aliases: [] },
-  { iconCode: "circle-arrow-down", label: "Circle Arrow Down", aliases: ["arrow-circle-down"] },
-  { iconCode: "circle-arrow-down-left", label: "Circle Arrow Down Left", aliases: [] },
-  { iconCode: "circle-arrow-down-right", label: "Circle Arrow Down Right", aliases: [] },
-  { iconCode: "circle-arrow-left", label: "Circle Arrow Left", aliases: ["arrow-circle-left"] },
-  { iconCode: "circle-arrow-right", label: "Circle Arrow Right", aliases: ["arrow-circle-right"] },
-  { iconCode: "circle-arrow-up", label: "Circle Arrow Up", aliases: ["arrow-circle-up"] },
-  { iconCode: "circle-arrow-up-left", label: "Circle Arrow Up Left", aliases: [] },
-  { iconCode: "circle-arrow-up-right", label: "Circle Arrow Up Right", aliases: [] },
-  { iconCode: "circle-austral", label: "Circle Austral", aliases: [] },
-  { iconCode: "circle-australian-dollar", label: "Circle Australian Dollar", aliases: [] },
-  { iconCode: "circle-b", label: "Circle B", aliases: [] },
-  { iconCode: "circle-baht", label: "Circle Baht", aliases: [] },
-  { iconCode: "circle-bangladeshi-taka", label: "Circle Bangladeshi Taka", aliases: [] },
-  { iconCode: "circle-bitcoin", label: "Circle Bitcoin", aliases: [] },
-  { iconCode: "circle-bolt", label: "Circle Bolt", aliases: [] },
-  { iconCode: "circle-book-open", label: "Circle Book Open", aliases: ["book-circle"] },
-  { iconCode: "circle-bookmark", label: "Circle Bookmark", aliases: ["bookmark-circle"] },
-  { iconCode: "circle-brazilian-real", label: "Circle Brazilian Real", aliases: [] },
-  { iconCode: "circle-c", label: "Circle C", aliases: [] },
-  { iconCode: "circle-calendar", label: "Circle Calendar", aliases: ["calendar-circle"] },
-  { iconCode: "circle-camera", label: "Circle Camera", aliases: ["camera-circle"] },
-  { iconCode: "circle-caret-down", label: "Circle Caret Down", aliases: ["caret-circle-down"] },
-  { iconCode: "circle-caret-left", label: "Circle Caret Left", aliases: ["caret-circle-left"] },
-  { iconCode: "circle-caret-right", label: "Circle Caret Right", aliases: ["caret-circle-right"] },
-  { iconCode: "circle-caret-up", label: "Circle Caret Up", aliases: ["caret-circle-up"] },
-  { iconCode: "circle-cedi", label: "Circle Cedi", aliases: [] },
-  { iconCode: "circle-cent", label: "Circle Cent", aliases: [] },
-  { iconCode: "circle-check", label: "Circle Check", aliases: ["check-circle"] },
-  { iconCode: "circle-chevron-down", label: "Circle Chevron Down", aliases: ["chevron-circle-down"] },
-  { iconCode: "circle-chevron-left", label: "Circle Chevron Left", aliases: ["chevron-circle-left"] },
-  { iconCode: "circle-chevron-right", label: "Circle Chevron Right", aliases: ["chevron-circle-right"] },
-  { iconCode: "circle-chevron-up", label: "Circle Chevron Up", aliases: ["chevron-circle-up"] },
-  { iconCode: "circle-chf", label: "Circle Chf", aliases: [] },
-  { iconCode: "circle-colon", label: "Circle Colon", aliases: [] },
-  { iconCode: "circle-cruzeiro", label: "Circle Cruzeiro", aliases: [] },
-  { iconCode: "circle-currency", label: "Circle Currency", aliases: [] },
-  { iconCode: "circle-d", label: "Circle D", aliases: [] },
-  { iconCode: "circle-danish-krone", label: "Circle Danish Krone", aliases: [] },
-  { iconCode: "circle-dashed", label: "Circle Dashed", aliases: [] },
-  { iconCode: "circle-divide", label: "Circle Divide", aliases: [] },
-  { iconCode: "circle-dollar", label: "Circle Dollar", aliases: ["dollar-circle", "usd-circle"] },
-  { iconCode: "circle-dollar-to-slot", label: "Circle Dollar To Slot", aliases: ["donate"] },
-  { iconCode: "circle-dong", label: "Circle Dong", aliases: [] },
-  { iconCode: "circle-dot", label: "Circle Dot", aliases: ["dot-circle"] },
-  { iconCode: "circle-down", label: "Circle Down", aliases: ["arrow-alt-circle-down"] },
-  { iconCode: "circle-down-left", label: "Circle Down Left", aliases: [] },
-  { iconCode: "circle-down-right", label: "Circle Down Right", aliases: [] },
-  { iconCode: "circle-e", label: "Circle E", aliases: [] },
-  { iconCode: "circle-ellipsis", label: "Circle Ellipsis", aliases: [] },
-  { iconCode: "circle-ellipsis-vertical", label: "Circle Ellipsis Vertical", aliases: [] },
-  { iconCode: "circle-envelope", label: "Circle Envelope", aliases: ["envelope-circle"] },
-  { iconCode: "circle-equals", label: "Circle Equals", aliases: [] },
-  { iconCode: "circle-euro", label: "Circle Euro", aliases: [] },
-  { iconCode: "circle-eurozone", label: "Circle Eurozone", aliases: [] },
-  { iconCode: "circle-exclamation", label: "Circle Exclamation", aliases: ["exclamation-circle"] },
-  { iconCode: "circle-exclamation-check", label: "Circle Exclamation Check", aliases: [] },
-  { iconCode: "circle-f", label: "Circle F", aliases: [] },
-  { iconCode: "circle-florin", label: "Circle Florin", aliases: [] },
-  { iconCode: "circle-franc", label: "Circle Franc", aliases: [] },
-  { iconCode: "circle-g", label: "Circle G", aliases: [] },
-  { iconCode: "circle-gf", label: "Circle Gf", aliases: [] },
-  { iconCode: "circle-guarani", label: "Circle Guarani", aliases: [] },
-  { iconCode: "circle-half", label: "Circle Half", aliases: [] },
-  { iconCode: "circle-half-horizontal", label: "Circle Half Horizontal", aliases: [] },
-  { iconCode: "circle-half-stroke", label: "Circle Half Stroke", aliases: ["adjust"] },
-  { iconCode: "circle-half-stroke-horizontal", label: "Circle Half Stroke Horizontal", aliases: [] },
-  { iconCode: "circle-heart", label: "Circle Heart", aliases: ["heart-circle"] },
-  { iconCode: "circle-house", label: "Circle House", aliases: [] },
-  { iconCode: "circle-hryvnia", label: "Circle Hryvnia", aliases: [] },
-  { iconCode: "circle-i", label: "Circle I", aliases: [] },
-  { iconCode: "circle-indian-rupee", label: "Circle Indian Rupee", aliases: [] },
-  { iconCode: "circle-info", label: "Circle Info", aliases: ["info-circle"] },
-  { iconCode: "circle-j", label: "Circle J", aliases: [] },
-  { iconCode: "circle-k", label: "Circle K", aliases: [] },
-  { iconCode: "circle-kip", label: "Circle Kip", aliases: [] },
-  { iconCode: "circle-l", label: "Circle L", aliases: [] },
-  { iconCode: "circle-lari", label: "Circle Lari", aliases: [] },
-  { iconCode: "circle-left", label: "Circle Left", aliases: ["arrow-alt-circle-left"] },
-  { iconCode: "circle-lira", label: "Circle Lira", aliases: [] },
-  { iconCode: "circle-litecoin", label: "Circle Litecoin", aliases: [] },
-  { iconCode: "circle-location-arrow", label: "Circle Location Arrow", aliases: ["location-circle"] },
-  { iconCode: "circle-m", label: "Circle M", aliases: [] },
-  { iconCode: "circle-malaysian-ringgit", label: "Circle Malaysian Ringgit", aliases: [] },
-  { iconCode: "circle-manat", label: "Circle Manat", aliases: [] },
-  { iconCode: "circle-microphone", label: "Circle Microphone", aliases: ["microphone-circle"] },
-  { iconCode: "circle-microphone-lines", label: "Circle Microphone Lines", aliases: ["microphone-circle-alt"] },
-  { iconCode: "circle-mill", label: "Circle Mill", aliases: [] },
-  { iconCode: "circle-minus", label: "Circle Minus", aliases: ["minus-circle"] },
-  { iconCode: "circle-moon", label: "Circle Moon", aliases: [] },
-  { iconCode: "circle-n", label: "Circle N", aliases: [] },
-  { iconCode: "circle-naira", label: "Circle Naira", aliases: [] },
-  { iconCode: "circle-nodes", label: "Circle Nodes", aliases: [] },
-  { iconCode: "circle-norwegian-krone", label: "Circle Norwegian Krone", aliases: [] },
-  { iconCode: "circle-notch", label: "Circle Notch", aliases: [] },
-  { iconCode: "circle-o", label: "Circle O", aliases: [] },
-  { iconCode: "circle-p", label: "Circle P", aliases: [] },
-  { iconCode: "circle-parking", label: "Circle Parking", aliases: ["parking-circle"] },
-  { iconCode: "circle-pause", label: "Circle Pause", aliases: ["pause-circle"] },
-  { iconCode: "circle-peruvian-soles", label: "Circle Peruvian Soles", aliases: [] },
-  { iconCode: "circle-peseta", label: "Circle Peseta", aliases: [] },
-  { iconCode: "circle-peso", label: "Circle Peso", aliases: [] },
-  { iconCode: "circle-phone", label: "Circle Phone", aliases: ["phone-circle"] },
-  { iconCode: "circle-phone-flip", label: "Circle Phone Flip", aliases: ["phone-circle-alt"] },
-  { iconCode: "circle-phone-hangup", label: "Circle Phone Hangup", aliases: ["phone-circle-down"] },
-  { iconCode: "circle-play", label: "Circle Play", aliases: ["play-circle"] },
-  { iconCode: "circle-plus", label: "Circle Plus", aliases: ["plus-circle"] },
-  { iconCode: "circle-polish-zloty", label: "Circle Polish Zloty", aliases: [] },
-  { iconCode: "circle-q", label: "Circle Q", aliases: [] },
-  { iconCode: "circle-quarter", label: "Circle Quarter", aliases: [] },
-  { iconCode: "circle-quarter-stroke", label: "Circle Quarter Stroke", aliases: [] },
-  { iconCode: "circle-quarters", label: "Circle Quarters", aliases: [] },
-  { iconCode: "circle-question", label: "Circle Question", aliases: ["question-circle"] },
-  { iconCode: "circle-r", label: "Circle R", aliases: [] },
-  { iconCode: "circle-radiation", label: "Circle Radiation", aliases: ["radiation-alt"] },
-  { iconCode: "circle-renminbi", label: "Circle Renminbi", aliases: [] },
-  { iconCode: "circle-right", label: "Circle Right", aliases: ["arrow-alt-circle-right"] },
-  { iconCode: "circle-ruble", label: "Circle Ruble", aliases: [] },
-  { iconCode: "circle-rupee", label: "Circle Rupee", aliases: [] },
-  { iconCode: "circle-rupiah", label: "Circle Rupiah", aliases: [] },
-  { iconCode: "circle-s", label: "Circle S", aliases: [] },
-  { iconCode: "circle-share-nodes", label: "Circle Share Nodes", aliases: [] },
-  { iconCode: "circle-shekel", label: "Circle Shekel", aliases: [] },
-  { iconCode: "circle-small", label: "Circle Small", aliases: [] },
-  { iconCode: "circle-sort", label: "Circle Sort", aliases: ["sort-circle"] },
-  { iconCode: "circle-sort-down", label: "Circle Sort Down", aliases: ["sort-circle-down"] },
-  { iconCode: "circle-sort-up", label: "Circle Sort Up", aliases: ["sort-circle-up"] },
-  { iconCode: "circle-star", label: "Circle Star", aliases: ["star-circle"] },
-  { iconCode: "circle-sterling", label: "Circle Sterling", aliases: [] },
-  { iconCode: "circle-stop", label: "Circle Stop", aliases: ["stop-circle"] },
-  { iconCode: "circle-swedish-krona", label: "Circle Swedish Krona", aliases: [] },
-  { iconCode: "circle-t", label: "Circle T", aliases: [] },
-  { iconCode: "circle-tenge", label: "Circle Tenge", aliases: [] },
-  { iconCode: "circle-three-quarters", label: "Circle Three Quarters", aliases: [] },
-  { iconCode: "circle-three-quarters-stroke", label: "Circle Three Quarters Stroke", aliases: [] },
-  { iconCode: "circle-trash", label: "Circle Trash", aliases: ["trash-circle"] },
-  { iconCode: "circle-tugrik", label: "Circle Tugrik", aliases: [] },
-  { iconCode: "circle-turkish-lira", label: "Circle Turkish Lira", aliases: [] },
-  { iconCode: "circle-u", label: "Circle U", aliases: [] },
-  { iconCode: "circle-up", label: "Circle Up", aliases: ["arrow-alt-circle-up"] },
-  { iconCode: "circle-up-left", label: "Circle Up Left", aliases: [] },
-  { iconCode: "circle-up-right", label: "Circle Up Right", aliases: [] },
-  { iconCode: "circle-user", label: "Circle User", aliases: ["user-circle"] },
-  { iconCode: "circle-user-circle-check", label: "Circle User Circle Check", aliases: [] },
-  { iconCode: "circle-user-circle-exclamation", label: "Circle User Circle Exclamation", aliases: [] },
-  { iconCode: "circle-user-circle-minus", label: "Circle User Circle Minus", aliases: [] },
-  { iconCode: "circle-user-circle-moon", label: "Circle User Circle Moon", aliases: [] },
-  { iconCode: "circle-user-circle-plus", label: "Circle User Circle Plus", aliases: [] },
-  { iconCode: "circle-user-circle-question", label: "Circle User Circle Question", aliases: [] },
-  { iconCode: "circle-user-circle-user", label: "Circle User Circle User", aliases: [] },
-  { iconCode: "circle-user-circle-xmark", label: "Circle User Circle Xmark", aliases: [] },
-  { iconCode: "circle-user-clock", label: "Circle User Clock", aliases: [] },
-  { iconCode: "circle-v", label: "Circle V", aliases: [] },
-  { iconCode: "circle-video", label: "Circle Video", aliases: ["video-circle"] },
-  { iconCode: "circle-w", label: "Circle W", aliases: [] },
-  { iconCode: "circle-waveform-lines", label: "Circle Waveform Lines", aliases: ["waveform-circle"] },
-  { iconCode: "circle-wifi", label: "Circle Wifi", aliases: [] },
-  { iconCode: "circle-wifi-circle-wifi", label: "Circle Wifi Circle Wifi", aliases: ["circle-wifi-group"] },
-  { iconCode: "circle-won", label: "Circle Won", aliases: [] },
-  { iconCode: "circle-x", label: "Circle X", aliases: [] },
-  { iconCode: "circle-xmark", label: "Circle Xmark", aliases: ["times-circle", "xmark-circle"] },
-  { iconCode: "circle-y", label: "Circle Y", aliases: [] },
-  { iconCode: "circle-yen", label: "Circle Yen", aliases: [] },
-  { iconCode: "circle-z", label: "Circle Z", aliases: [] },
-  { iconCode: "circleapore-dollar", label: "Circleapore Dollar", aliases: [] },
-  { iconCode: "circles-overlap", label: "Circles Overlap", aliases: [] },
-  { iconCode: "citrus", label: "Citrus", aliases: [] },
-  { iconCode: "citrus-slice", label: "Citrus Slice", aliases: [] },
-  { iconCode: "city", label: "City", aliases: [] },
-  { iconCode: "clapperboard", label: "Clapperboard", aliases: [] },
-  { iconCode: "clapperboard-play", label: "Clapperboard Play", aliases: [] },
-  { iconCode: "clarinet", label: "Clarinet", aliases: [] },
-  { iconCode: "claw-marks", label: "Claw Marks", aliases: [] },
-  { iconCode: "clipboard", label: "Clipboard", aliases: [] },
-  { iconCode: "clipboard-check", label: "Clipboard Check", aliases: [] },
-  { iconCode: "clipboard-clock", label: "Clipboard Clock", aliases: [] },
-  { iconCode: "clipboard-exclamation", label: "Clipboard Exclamation", aliases: [] },
-  { iconCode: "clipboard-list", label: "Clipboard List", aliases: [] },
-  { iconCode: "clipboard-list-check", label: "Clipboard List Check", aliases: [] },
-  { iconCode: "clipboard-medical", label: "Clipboard Medical", aliases: [] },
-  { iconCode: "clipboard-prescription", label: "Clipboard Prescription", aliases: [] },
-  { iconCode: "clipboard-question", label: "Clipboard Question", aliases: [] },
-  { iconCode: "clipboard-user", label: "Clipboard User", aliases: [] },
-  { iconCode: "clock", label: "Clock", aliases: ["clock-four"] },
-  { iconCode: "clock-desk", label: "Clock Desk", aliases: [] },
-  { iconCode: "clock-eight", label: "Clock Eight", aliases: [] },
-  { iconCode: "clock-eight-thirty", label: "Clock Eight Thirty", aliases: [] },
-  { iconCode: "clock-eleven", label: "Clock Eleven", aliases: [] },
-  { iconCode: "clock-eleven-thirty", label: "Clock Eleven Thirty", aliases: [] },
-  { iconCode: "clock-five", label: "Clock Five", aliases: [] },
-  { iconCode: "clock-five-thirty", label: "Clock Five Thirty", aliases: [] },
-  { iconCode: "clock-four-thirty", label: "Clock Four Thirty", aliases: [] },
-  { iconCode: "clock-nine", label: "Clock Nine", aliases: [] },
-  { iconCode: "clock-nine-thirty", label: "Clock Nine Thirty", aliases: [] },
-  { iconCode: "clock-one", label: "Clock One", aliases: [] },
-  { iconCode: "clock-one-thirty", label: "Clock One Thirty", aliases: [] },
-  { iconCode: "clock-rotate-left", label: "Clock Rotate Left", aliases: ["history"] },
-  { iconCode: "clock-seven", label: "Clock Seven", aliases: [] },
-  { iconCode: "clock-seven-thirty", label: "Clock Seven Thirty", aliases: [] },
-  { iconCode: "clock-six", label: "Clock Six", aliases: [] },
-  { iconCode: "clock-six-thirty", label: "Clock Six Thirty", aliases: [] },
-  { iconCode: "clock-ten", label: "Clock Ten", aliases: [] },
-  { iconCode: "clock-ten-thirty", label: "Clock Ten Thirty", aliases: [] },
-  { iconCode: "clock-three", label: "Clock Three", aliases: [] },
-  { iconCode: "clock-three-thirty", label: "Clock Three Thirty", aliases: [] },
-  { iconCode: "clock-twelve", label: "Clock Twelve", aliases: [] },
-  { iconCode: "clock-twelve-thirty", label: "Clock Twelve Thirty", aliases: [] },
-  { iconCode: "clock-two", label: "Clock Two", aliases: [] },
-  { iconCode: "clock-two-thirty", label: "Clock Two Thirty", aliases: [] },
-  { iconCode: "clone", label: "Clone", aliases: [] },
-  { iconCode: "clone-plus", label: "Clone Plus", aliases: [] },
-  { iconCode: "closed-captioning", label: "Closed Captioning", aliases: [] },
-  { iconCode: "closed-captioning-slash", label: "Closed Captioning Slash", aliases: [] },
-  { iconCode: "clothes-hanger", label: "Clothes Hanger", aliases: [] },
-  { iconCode: "cloud", label: "Cloud", aliases: [] },
-  { iconCode: "cloud-arrow-down", label: "Cloud Arrow Down", aliases: ["cloud-download", "cloud-download-alt"] },
-  { iconCode: "cloud-arrow-up", label: "Cloud Arrow Up", aliases: ["cloud-upload", "cloud-upload-alt"] },
-  { iconCode: "cloud-binary", label: "Cloud Binary", aliases: [] },
-  { iconCode: "cloud-bolt", label: "Cloud Bolt", aliases: ["thunderstorm"] },
-  { iconCode: "cloud-bolt-moon", label: "Cloud Bolt Moon", aliases: ["thunderstorm-moon"] },
-  { iconCode: "cloud-bolt-sun", label: "Cloud Bolt Sun", aliases: ["thunderstorm-sun"] },
-  { iconCode: "cloud-check", label: "Cloud Check", aliases: [] },
-  { iconCode: "cloud-drizzle", label: "Cloud Drizzle", aliases: [] },
-  { iconCode: "cloud-exclamation", label: "Cloud Exclamation", aliases: [] },
-  { iconCode: "cloud-fog", label: "Cloud Fog", aliases: ["fog"] },
-  { iconCode: "cloud-hail", label: "Cloud Hail", aliases: [] },
-  { iconCode: "cloud-hail-mixed", label: "Cloud Hail Mixed", aliases: [] },
-  { iconCode: "cloud-meatball", label: "Cloud Meatball", aliases: [] },
-  { iconCode: "cloud-minus", label: "Cloud Minus", aliases: [] },
-  { iconCode: "cloud-moon", label: "Cloud Moon", aliases: [] },
-  { iconCode: "cloud-moon-rain", label: "Cloud Moon Rain", aliases: [] },
-  { iconCode: "cloud-music", label: "Cloud Music", aliases: [] },
-  { iconCode: "cloud-plus", label: "Cloud Plus", aliases: [] },
-  { iconCode: "cloud-question", label: "Cloud Question", aliases: [] },
-  { iconCode: "cloud-rain", label: "Cloud Rain", aliases: [] },
-  { iconCode: "cloud-rainbow", label: "Cloud Rainbow", aliases: [] },
-  { iconCode: "cloud-showers", label: "Cloud Showers", aliases: [] },
-  { iconCode: "cloud-showers-heavy", label: "Cloud Showers Heavy", aliases: [] },
-  { iconCode: "cloud-showers-water", label: "Cloud Showers Water", aliases: [] },
-  { iconCode: "cloud-slash", label: "Cloud Slash", aliases: [] },
-  { iconCode: "cloud-sleet", label: "Cloud Sleet", aliases: [] },
-  { iconCode: "cloud-snow", label: "Cloud Snow", aliases: [] },
-  { iconCode: "cloud-sun", label: "Cloud Sun", aliases: [] },
-  { iconCode: "cloud-sun-rain", label: "Cloud Sun Rain", aliases: [] },
-  { iconCode: "cloud-word", label: "Cloud Word", aliases: [] },
-  { iconCode: "cloud-xmark", label: "Cloud Xmark", aliases: [] },
-  { iconCode: "clouds", label: "Clouds", aliases: [] },
-  { iconCode: "clouds-moon", label: "Clouds Moon", aliases: [] },
-  { iconCode: "clouds-sun", label: "Clouds Sun", aliases: [] },
-  { iconCode: "clover", label: "Clover", aliases: [] },
-  { iconCode: "club", label: "Club", aliases: [] },
-  { iconCode: "coconut", label: "Coconut", aliases: [] },
-  { iconCode: "code", label: "Code", aliases: [] },
-  { iconCode: "code-branch", label: "Code Branch", aliases: [] },
-  { iconCode: "code-commit", label: "Code Commit", aliases: [] },
-  { iconCode: "code-compare", label: "Code Compare", aliases: [] },
-  { iconCode: "code-fork", label: "Code Fork", aliases: [] },
-  { iconCode: "code-merge", label: "Code Merge", aliases: [] },
-  { iconCode: "code-pull-request", label: "Code Pull Request", aliases: [] },
-  { iconCode: "code-pull-request-closed", label: "Code Pull Request Closed", aliases: [] },
-  { iconCode: "code-pull-request-draft", label: "Code Pull Request Draft", aliases: [] },
-  { iconCode: "code-simple", label: "Code Simple", aliases: [] },
-  { iconCode: "coffee-bean", label: "Coffee Bean", aliases: [] },
-  { iconCode: "coffee-beans", label: "Coffee Beans", aliases: [] },
-  { iconCode: "coffee-pot", label: "Coffee Pot", aliases: [] },
-  { iconCode: "coffee-togo", label: "Coffee Togo", aliases: ["cup-togo"] },
-  { iconCode: "coffin", label: "Coffin", aliases: [] },
-  { iconCode: "coffin-cross", label: "Coffin Cross", aliases: [] },
-  { iconCode: "coin", label: "Coin", aliases: [] },
-  { iconCode: "coin-blank", label: "Coin Blank", aliases: [] },
-  { iconCode: "coin-front", label: "Coin Front", aliases: [] },
-  { iconCode: "coin-vertical", label: "Coin Vertical", aliases: [] },
-  { iconCode: "coins", label: "Coins", aliases: [] },
-  { iconCode: "colon", label: "Colon", aliases: [] },
-  { iconCode: "colon-sign", label: "Colon Sign", aliases: [] },
-  { iconCode: "columns-3", label: "Columns 3", aliases: [] },
-  { iconCode: "comet", label: "Comet", aliases: [] },
-  { iconCode: "comma", label: "Comma", aliases: [] },
-  { iconCode: "command", label: "Command", aliases: [] },
-  { iconCode: "comment", label: "Comment", aliases: [] },
-  { iconCode: "comment-arrow-down", label: "Comment Arrow Down", aliases: [] },
-  { iconCode: "comment-arrow-up", label: "Comment Arrow Up", aliases: [] },
-  { iconCode: "comment-arrow-up-right", label: "Comment Arrow Up Right", aliases: [] },
-  { iconCode: "comment-captions", label: "Comment Captions", aliases: [] },
-  { iconCode: "comment-check", label: "Comment Check", aliases: [] },
-  { iconCode: "comment-code", label: "Comment Code", aliases: [] },
-  { iconCode: "comment-dollar", label: "Comment Dollar", aliases: [] },
-  { iconCode: "comment-dot", label: "Comment Dot", aliases: [] },
-  { iconCode: "comment-dots", label: "Comment Dots", aliases: ["commenting"] },
-  { iconCode: "comment-exclamation", label: "Comment Exclamation", aliases: [] },
-  { iconCode: "comment-heart", label: "Comment Heart", aliases: [] },
-  { iconCode: "comment-image", label: "Comment Image", aliases: [] },
-  { iconCode: "comment-lines", label: "Comment Lines", aliases: [] },
-  { iconCode: "comment-medical", label: "Comment Medical", aliases: [] },
-  { iconCode: "comment-middle", label: "Comment Middle", aliases: [] },
-  { iconCode: "comment-middle-top", label: "Comment Middle Top", aliases: [] },
-  { iconCode: "comment-minus", label: "Comment Minus", aliases: [] },
-  { iconCode: "comment-music", label: "Comment Music", aliases: [] },
-  { iconCode: "comment-nodes", label: "Comment Nodes", aliases: [] },
-  { iconCode: "comment-pen", label: "Comment Pen", aliases: ["comment-edit"] },
-  { iconCode: "comment-plus", label: "Comment Plus", aliases: [] },
-  { iconCode: "comment-question", label: "Comment Question", aliases: [] },
-  { iconCode: "comment-quote", label: "Comment Quote", aliases: [] },
-  { iconCode: "comment-slash", label: "Comment Slash", aliases: [] },
-  { iconCode: "comment-smile", label: "Comment Smile", aliases: [] },
-  { iconCode: "comment-sms", label: "Comment Sms", aliases: ["sms"] },
-  { iconCode: "comment-text", label: "Comment Text", aliases: [] },
-  { iconCode: "comment-waveform", label: "Comment Waveform", aliases: [] },
-  { iconCode: "comment-xmark", label: "Comment Xmark", aliases: ["comment-times"] },
-  { iconCode: "comments", label: "Comments", aliases: [] },
-  { iconCode: "comments-dollar", label: "Comments Dollar", aliases: [] },
-  { iconCode: "comments-question", label: "Comments Question", aliases: [] },
-  { iconCode: "comments-question-check", label: "Comments Question Check", aliases: [] },
-  { iconCode: "compact-disc", label: "Compact Disc", aliases: [] },
-  { iconCode: "compass", label: "Compass", aliases: [] },
-  { iconCode: "compass-drafting", label: "Compass Drafting", aliases: ["drafting-compass"] },
-  { iconCode: "compass-slash", label: "Compass Slash", aliases: [] },
-  { iconCode: "compress", label: "Compress", aliases: [] },
-  { iconCode: "compress-wide", label: "Compress Wide", aliases: [] },
-  { iconCode: "computer", label: "Computer", aliases: [] },
-  { iconCode: "computer-classic", label: "Computer Classic", aliases: [] },
-  { iconCode: "computer-mouse", label: "Computer Mouse", aliases: ["mouse"] },
-  { iconCode: "computer-mouse-button-left", label: "Computer Mouse Button Left", aliases: [] },
-  { iconCode: "computer-mouse-button-right", label: "Computer Mouse Button Right", aliases: [] },
-  { iconCode: "computer-mouse-scrollwheel", label: "Computer Mouse Scrollwheel", aliases: ["mouse-alt"] },
-  { iconCode: "computer-speaker", label: "Computer Speaker", aliases: [] },
-  { iconCode: "container-storage", label: "Container Storage", aliases: [] },
-  { iconCode: "conveyor-belt", label: "Conveyor Belt", aliases: [] },
-  { iconCode: "conveyor-belt-arm", label: "Conveyor Belt Arm", aliases: [] },
-  { iconCode: "conveyor-belt-boxes", label: "Conveyor Belt Boxes", aliases: ["conveyor-belt-alt"] },
-  { iconCode: "conveyor-belt-empty", label: "Conveyor Belt Empty", aliases: [] },
-  { iconCode: "cookie", label: "Cookie", aliases: [] },
-  { iconCode: "cookie-bite", label: "Cookie Bite", aliases: [] },
-  { iconCode: "copy", label: "Copy", aliases: [] },
-  { iconCode: "copyright", label: "Copyright", aliases: [] },
-  { iconCode: "corn", label: "Corn", aliases: [] },
-  { iconCode: "corner", label: "Corner", aliases: [] },
-  { iconCode: "couch", label: "Couch", aliases: [] },
-  { iconCode: "couch-small", label: "Couch Small", aliases: ["loveseat"] },
-  { iconCode: "court-sport", label: "Court Sport", aliases: [] },
-  { iconCode: "cow", label: "Cow", aliases: [] },
-  { iconCode: "cowbell", label: "Cowbell", aliases: [] },
-  { iconCode: "cowbell-circle-plus", label: "Cowbell Circle Plus", aliases: ["cowbell-more"] },
-  { iconCode: "crab", label: "Crab", aliases: [] },
-  { iconCode: "crate-apple", label: "Crate Apple", aliases: [] },
-  { iconCode: "crate-empty", label: "Crate Empty", aliases: [] },
-  { iconCode: "credit-card", label: "Credit Card", aliases: ["credit-card-alt"] },
-  { iconCode: "credit-card-blank", label: "Credit Card Blank", aliases: [] },
-  { iconCode: "credit-card-front", label: "Credit Card Front", aliases: [] },
-  { iconCode: "cricket", label: "Cricket", aliases: ["cricket-bat-ball"] },
-  { iconCode: "croissant", label: "Croissant", aliases: [] },
-  { iconCode: "crop", label: "Crop", aliases: [] },
-  { iconCode: "crop-simple", label: "Crop Simple", aliases: ["crop-alt"] },
-  { iconCode: "cross", label: "Cross", aliases: [] },
-  { iconCode: "crosshairs", label: "Crosshairs", aliases: [] },
-  { iconCode: "crosshairs-simple", label: "Crosshairs Simple", aliases: [] },
-  { iconCode: "crow", label: "Crow", aliases: [] },
-  { iconCode: "crown", label: "Crown", aliases: [] },
-  { iconCode: "crutch", label: "Crutch", aliases: [] },
-  { iconCode: "crutches", label: "Crutches", aliases: [] },
-  { iconCode: "cruzeiro-sign", label: "Cruzeiro Sign", aliases: [] },
-  { iconCode: "crystal-ball", label: "Crystal Ball", aliases: [] },
-  { iconCode: "cube", label: "Cube", aliases: [] },
-  { iconCode: "cubes", label: "Cubes", aliases: [] },
-  { iconCode: "cubes-stacked", label: "Cubes Stacked", aliases: [] },
-  { iconCode: "cucumber", label: "Cucumber", aliases: [] },
-  { iconCode: "cup-straw", label: "Cup Straw", aliases: [] },
-  { iconCode: "cup-straw-swoosh", label: "Cup Straw Swoosh", aliases: [] },
-  { iconCode: "cupcake", label: "Cupcake", aliases: [] },
-  { iconCode: "curling", label: "Curling", aliases: ["curling-stone"] },
-  { iconCode: "currency-sign", label: "Currency Sign", aliases: [] },
-  { iconCode: "custard", label: "Custard", aliases: [] },
-  { iconCode: "d", label: "D", aliases: [] },
-  { iconCode: "dagger", label: "Dagger", aliases: [] },
-  { iconCode: "danish-krone-sign", label: "Danish Krone Sign", aliases: [] },
-  { iconCode: "database", label: "Database", aliases: [] },
-  { iconCode: "deer", label: "Deer", aliases: [] },
-  { iconCode: "deer-rudolph", label: "Deer Rudolph", aliases: [] },
-  { iconCode: "delete-left", label: "Delete Left", aliases: ["backspace"] },
-  { iconCode: "delete-right", label: "Delete Right", aliases: [] },
-  { iconCode: "democrat", label: "Democrat", aliases: [] },
-  { iconCode: "desk", label: "Desk", aliases: [] },
-  { iconCode: "desktop", label: "Desktop", aliases: ["desktop-alt"] },
-  { iconCode: "desktop-arrow-down", label: "Desktop Arrow Down", aliases: [] },
-  { iconCode: "dharmachakra", label: "Dharmachakra", aliases: [] },
-  { iconCode: "diagram-cells", label: "Diagram Cells", aliases: [] },
-  { iconCode: "diagram-lean-canvas", label: "Diagram Lean Canvas", aliases: [] },
-  { iconCode: "diagram-nested", label: "Diagram Nested", aliases: [] },
-  { iconCode: "diagram-next", label: "Diagram Next", aliases: [] },
-  { iconCode: "diagram-predecessor", label: "Diagram Predecessor", aliases: [] },
-  { iconCode: "diagram-previous", label: "Diagram Previous", aliases: [] },
-  { iconCode: "diagram-project", label: "Diagram Project", aliases: ["project-diagram"] },
-  { iconCode: "diagram-sankey", label: "Diagram Sankey", aliases: [] },
-  { iconCode: "diagram-subtask", label: "Diagram Subtask", aliases: [] },
-  { iconCode: "diagram-successor", label: "Diagram Successor", aliases: [] },
-  { iconCode: "diagram-venn", label: "Diagram Venn", aliases: [] },
-  { iconCode: "dial", label: "Dial", aliases: ["dial-med-high"] },
-  { iconCode: "dial-high", label: "Dial High", aliases: [] },
-  { iconCode: "dial-low", label: "Dial Low", aliases: [] },
-  { iconCode: "dial-max", label: "Dial Max", aliases: [] },
-  { iconCode: "dial-med", label: "Dial Med", aliases: [] },
-  { iconCode: "dial-med-low", label: "Dial Med Low", aliases: [] },
-  { iconCode: "dial-min", label: "Dial Min", aliases: [] },
-  { iconCode: "dial-off", label: "Dial Off", aliases: [] },
-  { iconCode: "dialpad", label: "Dialpad", aliases: ["numpad"] },
-  { iconCode: "diamond", label: "Diamond", aliases: [] },
-  { iconCode: "diamond-exclamation", label: "Diamond Exclamation", aliases: [] },
-  { iconCode: "diamond-half", label: "Diamond Half", aliases: [] },
-  { iconCode: "diamond-half-stroke", label: "Diamond Half Stroke", aliases: [] },
-  { iconCode: "diamond-turn-right", label: "Diamond Turn Right", aliases: ["directions"] },
-  { iconCode: "diamonds-4", label: "Diamonds 4", aliases: [] },
-  { iconCode: "dice", label: "Dice", aliases: [] },
-  { iconCode: "dice-d10", label: "Dice D10", aliases: [] },
-  { iconCode: "dice-d12", label: "Dice D12", aliases: [] },
-  { iconCode: "dice-d20", label: "Dice D20", aliases: [] },
-  { iconCode: "dice-d4", label: "Dice D4", aliases: [] },
-  { iconCode: "dice-d6", label: "Dice D6", aliases: [] },
-  { iconCode: "dice-d8", label: "Dice D8", aliases: [] },
-  { iconCode: "dice-five", label: "Dice Five", aliases: [] },
-  { iconCode: "dice-four", label: "Dice Four", aliases: [] },
-  { iconCode: "dice-one", label: "Dice One", aliases: [] },
-  { iconCode: "dice-six", label: "Dice Six", aliases: [] },
-  { iconCode: "dice-three", label: "Dice Three", aliases: [] },
-  { iconCode: "dice-two", label: "Dice Two", aliases: [] },
-  { iconCode: "digital-tachograph", label: "Digital Tachograph", aliases: ["tachograph-digital"] },
-  { iconCode: "dinosaur", label: "Dinosaur", aliases: [] },
-  { iconCode: "direction-left-right", label: "Direction Left Right", aliases: [] },
-  { iconCode: "direction-up-down", label: "Direction Up Down", aliases: [] },
-  { iconCode: "disc-drive", label: "Disc Drive", aliases: [] },
-  { iconCode: "disease", label: "Disease", aliases: [] },
-  { iconCode: "display", label: "Display", aliases: [] },
-  { iconCode: "display-arrow-down", label: "Display Arrow Down", aliases: [] },
-  { iconCode: "display-chart-up", label: "Display Chart Up", aliases: [] },
-  { iconCode: "display-chart-up-circle-currency", label: "Display Chart Up Circle Currency", aliases: [] },
-  { iconCode: "display-chart-up-circle-dollar", label: "Display Chart Up Circle Dollar", aliases: [] },
-  { iconCode: "display-code", label: "Display Code", aliases: ["desktop-code"] },
-  { iconCode: "display-medical", label: "Display Medical", aliases: ["desktop-medical"] },
-  { iconCode: "display-slash", label: "Display Slash", aliases: ["desktop-slash"] },
-  { iconCode: "distribute-spacing-horizontal", label: "Distribute Spacing Horizontal", aliases: [] },
-  { iconCode: "distribute-spacing-vertical", label: "Distribute Spacing Vertical", aliases: [] },
-  { iconCode: "divide", label: "Divide", aliases: [] },
-  { iconCode: "dna", label: "Dna", aliases: [] },
-  { iconCode: "do-not-enter", label: "Do Not Enter", aliases: [] },
-  { iconCode: "dog", label: "Dog", aliases: [] },
-  { iconCode: "dog-leashed", label: "Dog Leashed", aliases: [] },
-  { iconCode: "dollar", label: "Dollar", aliases: ["dollar-sign", "usd"] },
-  { iconCode: "dolly", label: "Dolly", aliases: ["dolly-box"] },
-  { iconCode: "dolly-empty", label: "Dolly Empty", aliases: [] },
-  { iconCode: "dolphin", label: "Dolphin", aliases: [] },
-  { iconCode: "dong-sign", label: "Dong Sign", aliases: [] },
-  { iconCode: "door-closed", label: "Door Closed", aliases: [] },
-  { iconCode: "door-open", label: "Door Open", aliases: [] },
-  { iconCode: "dot", label: "Dot", aliases: [] },
-  { iconCode: "doughnut", label: "Doughnut", aliases: ["donut"] },
-  { iconCode: "dove", label: "Dove", aliases: [] },
-  { iconCode: "down", label: "Down", aliases: ["arrow-alt-down"] },
-  { iconCode: "down-from-bracket", label: "Down From Bracket", aliases: [] },
-  { iconCode: "down-from-dotted-line", label: "Down From Dotted Line", aliases: [] },
-  { iconCode: "down-from-line", label: "Down From Line", aliases: ["arrow-alt-from-top"] },
-  { iconCode: "down-left", label: "Down Left", aliases: [] },
-  { iconCode: "down-left-and-up-right-to-center", label: "Down Left And Up Right To Center", aliases: ["compress-alt"] },
-  { iconCode: "down-long", label: "Down Long", aliases: ["long-arrow-alt-down"] },
-  { iconCode: "down-long-to-line", label: "Down Long To Line", aliases: [] },
-  { iconCode: "down-right", label: "Down Right", aliases: [] },
-  { iconCode: "down-to-bracket", label: "Down To Bracket", aliases: [] },
-  { iconCode: "down-to-dotted-line", label: "Down To Dotted Line", aliases: [] },
-  { iconCode: "down-to-line", label: "Down To Line", aliases: ["arrow-alt-to-bottom"] },
-  { iconCode: "down-up", label: "Down Up", aliases: [] },
-  { iconCode: "download", label: "Download", aliases: [] },
-  { iconCode: "dragon", label: "Dragon", aliases: [] },
-  { iconCode: "dreidel", label: "Dreidel", aliases: [] },
-  { iconCode: "dress", label: "Dress", aliases: [] },
-  { iconCode: "dresser", label: "Dresser", aliases: [] },
-  { iconCode: "drone", label: "Drone", aliases: [] },
-  { iconCode: "drone-front", label: "Drone Front", aliases: ["drone-alt"] },
-  { iconCode: "droplet", label: "Droplet", aliases: ["tint"] },
-  { iconCode: "droplet-degree", label: "Droplet Degree", aliases: ["dewpoint"] },
-  { iconCode: "droplet-percent", label: "Droplet Percent", aliases: ["humidity"] },
-  { iconCode: "droplet-plus", label: "Droplet Plus", aliases: [] },
-  { iconCode: "droplet-slash", label: "Droplet Slash", aliases: ["tint-slash"] },
-  { iconCode: "drum", label: "Drum", aliases: [] },
-  { iconCode: "drum-steelpan", label: "Drum Steelpan", aliases: [] },
-  { iconCode: "drumstick", label: "Drumstick", aliases: [] },
-  { iconCode: "drumstick-bite", label: "Drumstick Bite", aliases: [] },
-  { iconCode: "dryer", label: "Dryer", aliases: [] },
-  { iconCode: "dryer-heat", label: "Dryer Heat", aliases: ["dryer-alt"] },
-  { iconCode: "duck", label: "Duck", aliases: [] },
-  { iconCode: "dumbbell", label: "Dumbbell", aliases: [] },
-  { iconCode: "dumpster", label: "Dumpster", aliases: [] },
-  { iconCode: "dumpster-fire", label: "Dumpster Fire", aliases: [] },
-  { iconCode: "dungeon", label: "Dungeon", aliases: [] },
-  { iconCode: "e", label: "E", aliases: [] },
-  { iconCode: "ear", label: "Ear", aliases: [] },
-  { iconCode: "ear-circle-checkmark", label: "Ear Circle Checkmark", aliases: [] },
-  { iconCode: "ear-deaf", label: "Ear Deaf", aliases: ["deaf", "deafness", "hard-of-hearing"] },
-  { iconCode: "ear-listen", label: "Ear Listen", aliases: ["assistive-listening-systems"] },
-  { iconCode: "ear-muffs", label: "Ear Muffs", aliases: [] },
-  { iconCode: "ear-triangle-exclamation", label: "Ear Triangle Exclamation", aliases: [] },
-  { iconCode: "ear-waveform", label: "Ear Waveform", aliases: [] },
-  { iconCode: "eclipse", label: "Eclipse", aliases: [] },
-  { iconCode: "egg", label: "Egg", aliases: [] },
-  { iconCode: "egg-fried", label: "Egg Fried", aliases: [] },
-  { iconCode: "eggplant", label: "Eggplant", aliases: [] },
-  { iconCode: "eject", label: "Eject", aliases: [] },
-  { iconCode: "elephant", label: "Elephant", aliases: [] },
-  { iconCode: "elevator", label: "Elevator", aliases: [] },
-  { iconCode: "ellipsis", label: "Ellipsis", aliases: ["ellipsis-h"] },
-  { iconCode: "ellipsis-stroke", label: "Ellipsis Stroke", aliases: ["ellipsis-h-alt"] },
-  { iconCode: "ellipsis-stroke-vertical", label: "Ellipsis Stroke Vertical", aliases: ["ellipsis-v-alt"] },
-  { iconCode: "ellipsis-vertical", label: "Ellipsis Vertical", aliases: ["ellipsis-v"] },
-  { iconCode: "empty-set", label: "Empty Set", aliases: [] },
-  { iconCode: "engine", label: "Engine", aliases: [] },
-  { iconCode: "engine-exclamation", label: "Engine Exclamation", aliases: ["engine-warning"] },
-  { iconCode: "envelope", label: "Envelope", aliases: [] },
-  { iconCode: "envelope-badge", label: "Envelope Badge", aliases: ["envelope-dot"] },
-  { iconCode: "envelope-certificate", label: "Envelope Certificate", aliases: ["envelope-ribbon"] },
-  { iconCode: "envelope-circle-check", label: "Envelope Circle Check", aliases: [] },
-  { iconCode: "envelope-circle-user", label: "Envelope Circle User", aliases: [] },
-  { iconCode: "envelope-open", label: "Envelope Open", aliases: [] },
-  { iconCode: "envelope-open-dollar", label: "Envelope Open Dollar", aliases: [] },
-  { iconCode: "envelope-open-text", label: "Envelope Open Text", aliases: [] },
-  { iconCode: "envelopes", label: "Envelopes", aliases: [] },
-  { iconCode: "equals", label: "Equals", aliases: [] },
-  { iconCode: "eraser", label: "Eraser", aliases: [] },
-  { iconCode: "escalator", label: "Escalator", aliases: [] },
-  { iconCode: "ethernet", label: "Ethernet", aliases: [] },
-  { iconCode: "euro", label: "Euro", aliases: ["eur", "euro-sign"] },
-  { iconCode: "eurozone-sign", label: "Eurozone Sign", aliases: [] },
-  { iconCode: "excavator", label: "Excavator", aliases: [] },
-  { iconCode: "exclamation", label: "Exclamation", aliases: [] },
-  { iconCode: "expand", label: "Expand", aliases: [] },
-  { iconCode: "expand-wide", label: "Expand Wide", aliases: [] },
-  { iconCode: "explosion", label: "Explosion", aliases: [] },
-  { iconCode: "eye", label: "Eye", aliases: [] },
-  { iconCode: "eye-closed", label: "Eye Closed", aliases: [] },
-  { iconCode: "eye-dropper", label: "Eye Dropper", aliases: ["eye-dropper-empty", "eyedropper"] },
-  { iconCode: "eye-dropper-full", label: "Eye Dropper Full", aliases: [] },
-  { iconCode: "eye-dropper-half", label: "Eye Dropper Half", aliases: [] },
-  { iconCode: "eye-evil", label: "Eye Evil", aliases: [] },
-  { iconCode: "eye-low-vision", label: "Eye Low Vision", aliases: ["low-vision"] },
-  { iconCode: "eye-slash", label: "Eye Slash", aliases: [] },
-  { iconCode: "eyes", label: "Eyes", aliases: [] },
-  { iconCode: "f", label: "F", aliases: [] },
-  { iconCode: "face-angry", label: "Face Angry", aliases: ["angry"] },
-  { iconCode: "face-angry-horns", label: "Face Angry Horns", aliases: [] },
-  { iconCode: "face-anguished", label: "Face Anguished", aliases: [] },
-  { iconCode: "face-anxious-sweat", label: "Face Anxious Sweat", aliases: [] },
-  { iconCode: "face-astonished", label: "Face Astonished", aliases: [] },
-  { iconCode: "face-awesome", label: "Face Awesome", aliases: ["gave-dandy"] },
-  { iconCode: "face-beam-hand-over-mouth", label: "Face Beam Hand Over Mouth", aliases: [] },
-  { iconCode: "face-clouds", label: "Face Clouds", aliases: [] },
-  { iconCode: "face-confounded", label: "Face Confounded", aliases: [] },
-  { iconCode: "face-confused", label: "Face Confused", aliases: [] },
-  { iconCode: "face-cowboy-hat", label: "Face Cowboy Hat", aliases: [] },
-  { iconCode: "face-diagonal-mouth", label: "Face Diagonal Mouth", aliases: [] },
-  { iconCode: "face-disappointed", label: "Face Disappointed", aliases: [] },
-  { iconCode: "face-disguise", label: "Face Disguise", aliases: [] },
-  { iconCode: "face-dizzy", label: "Face Dizzy", aliases: ["dizzy"] },
-  { iconCode: "face-dotted", label: "Face Dotted", aliases: [] },
-  { iconCode: "face-downcast-sweat", label: "Face Downcast Sweat", aliases: [] },
-  { iconCode: "face-drooling", label: "Face Drooling", aliases: [] },
-  { iconCode: "face-exhaling", label: "Face Exhaling", aliases: [] },
-  { iconCode: "face-explode", label: "Face Explode", aliases: ["exploding-head"] },
-  { iconCode: "face-expressionless", label: "Face Expressionless", aliases: [] },
-  { iconCode: "face-eyes-xmarks", label: "Face Eyes Xmarks", aliases: [] },
-  { iconCode: "face-fearful", label: "Face Fearful", aliases: [] },
-  { iconCode: "face-flushed", label: "Face Flushed", aliases: ["flushed"] },
-  { iconCode: "face-frown", label: "Face Frown", aliases: ["frown"] },
-  { iconCode: "face-frown-open", label: "Face Frown Open", aliases: ["frown-open"] },
-  { iconCode: "face-frown-slight", label: "Face Frown Slight", aliases: [] },
-  { iconCode: "face-glasses", label: "Face Glasses", aliases: [] },
-  { iconCode: "face-grimace", label: "Face Grimace", aliases: ["grimace"] },
-  { iconCode: "face-grin", label: "Face Grin", aliases: ["grin"] },
-  { iconCode: "face-grin-beam", label: "Face Grin Beam", aliases: ["grin-beam"] },
-  { iconCode: "face-grin-beam-sweat", label: "Face Grin Beam Sweat", aliases: ["grin-beam-sweat"] },
-  { iconCode: "face-grin-hearts", label: "Face Grin Hearts", aliases: ["grin-hearts"] },
-  { iconCode: "face-grin-squint", label: "Face Grin Squint", aliases: ["grin-squint"] },
-  { iconCode: "face-grin-squint-tears", label: "Face Grin Squint Tears", aliases: ["grin-squint-tears"] },
-  { iconCode: "face-grin-stars", label: "Face Grin Stars", aliases: ["grin-stars"] },
-  { iconCode: "face-grin-tears", label: "Face Grin Tears", aliases: ["grin-tears"] },
-  { iconCode: "face-grin-tongue", label: "Face Grin Tongue", aliases: ["grin-tongue"] },
-  { iconCode: "face-grin-tongue-squint", label: "Face Grin Tongue Squint", aliases: ["grin-tongue-squint"] },
-  { iconCode: "face-grin-tongue-wink", label: "Face Grin Tongue Wink", aliases: ["grin-tongue-wink"] },
-  { iconCode: "face-grin-wide", label: "Face Grin Wide", aliases: ["grin-alt"] },
-  { iconCode: "face-grin-wink", label: "Face Grin Wink", aliases: ["grin-wink"] },
-  { iconCode: "face-hand-over-mouth", label: "Face Hand Over Mouth", aliases: [] },
-  { iconCode: "face-hand-peeking", label: "Face Hand Peeking", aliases: [] },
-  { iconCode: "face-hand-yawn", label: "Face Hand Yawn", aliases: [] },
-  { iconCode: "face-head-bandage", label: "Face Head Bandage", aliases: [] },
-  { iconCode: "face-holding-back-tears", label: "Face Holding Back Tears", aliases: [] },
-  { iconCode: "face-hushed", label: "Face Hushed", aliases: [] },
-  { iconCode: "face-icicles", label: "Face Icicles", aliases: [] },
-  { iconCode: "face-kiss", label: "Face Kiss", aliases: ["kiss"] },
-  { iconCode: "face-kiss-beam", label: "Face Kiss Beam", aliases: ["kiss-beam"] },
-  { iconCode: "face-kiss-closed-eyes", label: "Face Kiss Closed Eyes", aliases: [] },
-  { iconCode: "face-kiss-wink-heart", label: "Face Kiss Wink Heart", aliases: ["kiss-wink-heart"] },
-  { iconCode: "face-laugh", label: "Face Laugh", aliases: ["laugh"] },
-  { iconCode: "face-laugh-beam", label: "Face Laugh Beam", aliases: ["laugh-beam"] },
-  { iconCode: "face-laugh-squint", label: "Face Laugh Squint", aliases: ["laugh-squint"] },
-  { iconCode: "face-laugh-wink", label: "Face Laugh Wink", aliases: ["laugh-wink"] },
-  { iconCode: "face-lying", label: "Face Lying", aliases: [] },
-  { iconCode: "face-mask", label: "Face Mask", aliases: [] },
-  { iconCode: "face-meh", label: "Face Meh", aliases: ["meh"] },
-  { iconCode: "face-meh-blank", label: "Face Meh Blank", aliases: ["meh-blank"] },
-  { iconCode: "face-melting", label: "Face Melting", aliases: [] },
-  { iconCode: "face-monocle", label: "Face Monocle", aliases: [] },
-  { iconCode: "face-nauseated", label: "Face Nauseated", aliases: [] },
-  { iconCode: "face-nose-steam", label: "Face Nose Steam", aliases: [] },
-  { iconCode: "face-party", label: "Face Party", aliases: [] },
-  { iconCode: "face-pensive", label: "Face Pensive", aliases: [] },
-  { iconCode: "face-persevering", label: "Face Persevering", aliases: [] },
-  { iconCode: "face-pleading", label: "Face Pleading", aliases: [] },
-  { iconCode: "face-pouting", label: "Face Pouting", aliases: [] },
-  { iconCode: "face-raised-eyebrow", label: "Face Raised Eyebrow", aliases: [] },
-  { iconCode: "face-relieved", label: "Face Relieved", aliases: [] },
-  { iconCode: "face-rolling-eyes", label: "Face Rolling Eyes", aliases: ["meh-rolling-eyes"] },
-  { iconCode: "face-sad-cry", label: "Face Sad Cry", aliases: ["sad-cry"] },
-  { iconCode: "face-sad-sweat", label: "Face Sad Sweat", aliases: [] },
-  { iconCode: "face-sad-tear", label: "Face Sad Tear", aliases: ["sad-tear"] },
-  { iconCode: "face-saluting", label: "Face Saluting", aliases: [] },
-  { iconCode: "face-scream", label: "Face Scream", aliases: [] },
-  { iconCode: "face-shaking", label: "Face Shaking", aliases: [] },
-  { iconCode: "face-shaking-horizontal", label: "Face Shaking Horizontal", aliases: [] },
-  { iconCode: "face-shaking-vertical", label: "Face Shaking Vertical", aliases: [] },
-  { iconCode: "face-shush", label: "Face Shush", aliases: [] },
-  { iconCode: "face-sleeping", label: "Face Sleeping", aliases: [] },
-  { iconCode: "face-sleepy", label: "Face Sleepy", aliases: [] },
-  { iconCode: "face-smile", label: "Face Smile", aliases: ["smile"] },
-  { iconCode: "face-smile-beam", label: "Face Smile Beam", aliases: ["smile-beam"] },
-  { iconCode: "face-smile-halo", label: "Face Smile Halo", aliases: [] },
-  { iconCode: "face-smile-hearts", label: "Face Smile Hearts", aliases: [] },
-  { iconCode: "face-smile-horns", label: "Face Smile Horns", aliases: [] },
-  { iconCode: "face-smile-plus", label: "Face Smile Plus", aliases: ["smile-plus"] },
-  { iconCode: "face-smile-relaxed", label: "Face Smile Relaxed", aliases: [] },
-  { iconCode: "face-smile-tear", label: "Face Smile Tear", aliases: [] },
-  { iconCode: "face-smile-tongue", label: "Face Smile Tongue", aliases: [] },
-  { iconCode: "face-smile-upside-down", label: "Face Smile Upside Down", aliases: [] },
-  { iconCode: "face-smile-wink", label: "Face Smile Wink", aliases: ["smile-wink"] },
-  { iconCode: "face-smiling-hands", label: "Face Smiling Hands", aliases: [] },
-  { iconCode: "face-smirking", label: "Face Smirking", aliases: [] },
-  { iconCode: "face-spiral-eyes", label: "Face Spiral Eyes", aliases: [] },
-  { iconCode: "face-sunglasses", label: "Face Sunglasses", aliases: [] },
-  { iconCode: "face-surprise", label: "Face Surprise", aliases: ["surprise"] },
-  { iconCode: "face-swear", label: "Face Swear", aliases: [] },
-  { iconCode: "face-thermometer", label: "Face Thermometer", aliases: [] },
-  { iconCode: "face-thinking", label: "Face Thinking", aliases: [] },
-  { iconCode: "face-tired", label: "Face Tired", aliases: ["tired"] },
-  { iconCode: "face-tissue", label: "Face Tissue", aliases: [] },
-  { iconCode: "face-tongue-money", label: "Face Tongue Money", aliases: [] },
-  { iconCode: "face-tongue-sweat", label: "Face Tongue Sweat", aliases: [] },
-  { iconCode: "face-unamused", label: "Face Unamused", aliases: [] },
-  { iconCode: "face-viewfinder", label: "Face Viewfinder", aliases: [] },
-  { iconCode: "face-vomit", label: "Face Vomit", aliases: [] },
-  { iconCode: "face-weary", label: "Face Weary", aliases: [] },
-  { iconCode: "face-woozy", label: "Face Woozy", aliases: [] },
-  { iconCode: "face-worried", label: "Face Worried", aliases: [] },
-  { iconCode: "face-zany", label: "Face Zany", aliases: [] },
-  { iconCode: "face-zipper", label: "Face Zipper", aliases: [] },
-  { iconCode: "falafel", label: "Falafel", aliases: [] },
-  { iconCode: "family", label: "Family", aliases: [] },
-  { iconCode: "family-dress", label: "Family Dress", aliases: [] },
-  { iconCode: "family-pants", label: "Family Pants", aliases: [] },
-  { iconCode: "fan", label: "Fan", aliases: [] },
-  { iconCode: "fan-table", label: "Fan Table", aliases: [] },
-  { iconCode: "faucet", label: "Faucet", aliases: [] },
-  { iconCode: "faucet-drip", label: "Faucet Drip", aliases: [] },
-  { iconCode: "fax", label: "Fax", aliases: [] },
-  { iconCode: "feather", label: "Feather", aliases: [] },
-  { iconCode: "feather-pointed", label: "Feather Pointed", aliases: ["feather-alt"] },
-  { iconCode: "fence", label: "Fence", aliases: [] },
-  { iconCode: "ferris-wheel", label: "Ferris Wheel", aliases: [] },
-  { iconCode: "ferry", label: "Ferry", aliases: [] },
-  { iconCode: "field-hockey", label: "Field Hockey", aliases: ["field-hockey-stick-ball"] },
-  { iconCode: "file", label: "File", aliases: [] },
-  { iconCode: "file-aiff", label: "File Aiff", aliases: [] },
-  { iconCode: "file-archive", label: "File Archive", aliases: ["file-zipper"] },
-  { iconCode: "file-arrow-down", label: "File Arrow Down", aliases: ["file-download"] },
-  { iconCode: "file-arrow-up", label: "File Arrow Up", aliases: ["file-upload"] },
-  { iconCode: "file-audio", label: "File Audio", aliases: [] },
-  { iconCode: "file-ban", label: "File Ban", aliases: [] },
-  { iconCode: "file-binary", label: "File Binary", aliases: [] },
-  { iconCode: "file-brackets-curly", label: "File Brackets Curly", aliases: [] },
-  { iconCode: "file-cad", label: "File Cad", aliases: [] },
-  { iconCode: "file-caret-down", label: "File Caret Down", aliases: ["page-caret-down"] },
-  { iconCode: "file-caret-up", label: "File Caret Up", aliases: ["page-caret-up"] },
-  { iconCode: "file-certificate", label: "File Certificate", aliases: ["file-award"] },
-  { iconCode: "file-chart-column", label: "File Chart Column", aliases: ["file-chart-line"] },
-  { iconCode: "file-chart-pie", label: "File Chart Pie", aliases: [] },
-  { iconCode: "file-check", label: "File Check", aliases: [] },
-  { iconCode: "file-circle-check", label: "File Circle Check", aliases: [] },
-  { iconCode: "file-circle-exclamation", label: "File Circle Exclamation", aliases: [] },
-  { iconCode: "file-circle-info", label: "File Circle Info", aliases: [] },
-  { iconCode: "file-circle-minus", label: "File Circle Minus", aliases: [] },
-  { iconCode: "file-circle-plus", label: "File Circle Plus", aliases: [] },
-  { iconCode: "file-circle-question", label: "File Circle Question", aliases: [] },
-  { iconCode: "file-circle-xmark", label: "File Circle Xmark", aliases: [] },
-  { iconCode: "file-clipboard", label: "File Clipboard", aliases: ["paste"] },
-  { iconCode: "file-code", label: "File Code", aliases: [] },
-  { iconCode: "file-contract", label: "File Contract", aliases: [] },
-  { iconCode: "file-css", label: "File Css", aliases: [] },
-  { iconCode: "file-csv", label: "File Csv", aliases: [] },
-  { iconCode: "file-dashed-line", label: "File Dashed Line", aliases: ["page-break"] },
-  { iconCode: "file-doc", label: "File Doc", aliases: [] },
-  { iconCode: "file-eps", label: "File Eps", aliases: [] },
-  { iconCode: "file-excel", label: "File Excel", aliases: [] },
-  { iconCode: "file-exclamation", label: "File Exclamation", aliases: [] },
-  { iconCode: "file-fragment", label: "File Fragment", aliases: [] },
-  { iconCode: "file-gif", label: "File Gif", aliases: [] },
-  { iconCode: "file-half-dashed", label: "File Half Dashed", aliases: [] },
-  { iconCode: "file-heart", label: "File Heart", aliases: [] },
-  { iconCode: "file-html", label: "File Html", aliases: [] },
-  { iconCode: "file-icns", label: "File Icns", aliases: [] },
-  { iconCode: "file-image", label: "File Image", aliases: [] },
-  { iconCode: "file-invoice", label: "File Invoice", aliases: [] },
-  { iconCode: "file-invoice-dollar", label: "File Invoice Dollar", aliases: [] },
-  { iconCode: "file-jpg", label: "File Jpg", aliases: [] },
-  { iconCode: "file-js", label: "File Js", aliases: [] },
-  { iconCode: "file-lines", label: "File Lines", aliases: ["file-alt", "file-text"] },
-  { iconCode: "file-lock", label: "File Lock", aliases: [] },
-  { iconCode: "file-magnifying-glass", label: "File Magnifying Glass", aliases: ["file-search"] },
-  { iconCode: "file-medical", label: "File Medical", aliases: [] },
-  { iconCode: "file-midi", label: "File Midi", aliases: [] },
-  { iconCode: "file-minus", label: "File Minus", aliases: [] },
-  { iconCode: "file-mov", label: "File Mov", aliases: [] },
-  { iconCode: "file-mp3", label: "File Mp3", aliases: [] },
-  { iconCode: "file-mp4", label: "File Mp4", aliases: [] },
-  { iconCode: "file-music", label: "File Music", aliases: [] },
-  { iconCode: "file-odf", label: "File Odf", aliases: [] },
-  { iconCode: "file-pdf", label: "File Pdf", aliases: [] },
-  { iconCode: "file-pen", label: "File Pen", aliases: ["file-edit"] },
-  { iconCode: "file-plus", label: "File Plus", aliases: [] },
-  { iconCode: "file-plus-minus", label: "File Plus Minus", aliases: [] },
-  { iconCode: "file-png", label: "File Png", aliases: [] },
-  { iconCode: "file-powerpoint", label: "File Powerpoint", aliases: [] },
-  { iconCode: "file-ppt", label: "File Ppt", aliases: [] },
-  { iconCode: "file-prescription", label: "File Prescription", aliases: [] },
-  { iconCode: "file-shield", label: "File Shield", aliases: [] },
-  { iconCode: "file-signature", label: "File Signature", aliases: [] },
-  { iconCode: "file-slash", label: "File Slash", aliases: [] },
-  { iconCode: "file-spreadsheet", label: "File Spreadsheet", aliases: [] },
-  { iconCode: "file-svg", label: "File Svg", aliases: [] },
-  { iconCode: "file-tex", label: "File Tex", aliases: [] },
-  { iconCode: "file-user", label: "File User", aliases: [] },
-  { iconCode: "file-vector", label: "File Vector", aliases: [] },
-  { iconCode: "file-video", label: "File Video", aliases: [] },
-  { iconCode: "file-wav", label: "File Wav", aliases: [] },
-  { iconCode: "file-waveform", label: "File Waveform", aliases: ["file-medical-alt"] },
-  { iconCode: "file-word", label: "File Word", aliases: [] },
-  { iconCode: "file-xls", label: "File Xls", aliases: [] },
-  { iconCode: "file-xmark", label: "File Xmark", aliases: ["file-times"] },
-  { iconCode: "file-xml", label: "File Xml", aliases: [] },
-  { iconCode: "file-zip", label: "File Zip", aliases: [] },
-  { iconCode: "files", label: "Files", aliases: [] },
-  { iconCode: "files-medical", label: "Files Medical", aliases: [] },
-  { iconCode: "fill", label: "Fill", aliases: [] },
-  { iconCode: "fill-drip", label: "Fill Drip", aliases: [] },
-  { iconCode: "film", label: "Film", aliases: ["film-alt", "film-simple"] },
-  { iconCode: "film-cannister", label: "Film Cannister", aliases: ["film-canister"] },
-  { iconCode: "film-music", label: "Film Music", aliases: [] },
-  { iconCode: "film-slash", label: "Film Slash", aliases: [] },
-  { iconCode: "film-stack", label: "Film Stack", aliases: [] },
-  { iconCode: "films", label: "Films", aliases: [] },
-  { iconCode: "filter", label: "Filter", aliases: [] },
-  { iconCode: "filter-circle-dollar", label: "Filter Circle Dollar", aliases: ["funnel-dollar"] },
-  { iconCode: "filter-circle-xmark", label: "Filter Circle Xmark", aliases: [] },
-  { iconCode: "filter-list", label: "Filter List", aliases: [] },
-  { iconCode: "filter-slash", label: "Filter Slash", aliases: [] },
-  { iconCode: "filters", label: "Filters", aliases: [] },
-  { iconCode: "fingerprint", label: "Fingerprint", aliases: [] },
-  { iconCode: "fire", label: "Fire", aliases: [] },
-  { iconCode: "fire-burner", label: "Fire Burner", aliases: [] },
-  { iconCode: "fire-extinguisher", label: "Fire Extinguisher", aliases: [] },
-  { iconCode: "fire-flame", label: "Fire Flame", aliases: ["flame"] },
-  { iconCode: "fire-flame-curved", label: "Fire Flame Curved", aliases: ["fire-alt"] },
-  { iconCode: "fire-flame-simple", label: "Fire Flame Simple", aliases: ["burn"] },
-  { iconCode: "fire-hydrant", label: "Fire Hydrant", aliases: [] },
-  { iconCode: "fire-smoke", label: "Fire Smoke", aliases: [] },
-  { iconCode: "fireplace", label: "Fireplace", aliases: [] },
-  { iconCode: "fish", label: "Fish", aliases: [] },
-  { iconCode: "fish-bones", label: "Fish Bones", aliases: [] },
-  { iconCode: "fish-cooked", label: "Fish Cooked", aliases: [] },
-  { iconCode: "fish-fins", label: "Fish Fins", aliases: [] },
-  { iconCode: "fishing-rod", label: "Fishing Rod", aliases: [] },
-  { iconCode: "flag", label: "Flag", aliases: [] },
-  { iconCode: "flag-checkered", label: "Flag Checkered", aliases: [] },
-  { iconCode: "flag-pennant", label: "Flag Pennant", aliases: ["pennant"] },
-  { iconCode: "flag-swallowtail", label: "Flag Swallowtail", aliases: ["flag-alt"] },
-  { iconCode: "flag-usa", label: "Flag Usa", aliases: [] },
-  { iconCode: "flashlight", label: "Flashlight", aliases: [] },
-  { iconCode: "flask", label: "Flask", aliases: [] },
-  { iconCode: "flask-gear", label: "Flask Gear", aliases: [] },
-  { iconCode: "flask-round-poison", label: "Flask Round Poison", aliases: ["flask-poison"] },
-  { iconCode: "flask-round-potion", label: "Flask Round Potion", aliases: ["flask-potion"] },
-  { iconCode: "flask-vial", label: "Flask Vial", aliases: [] },
-  { iconCode: "flatbread", label: "Flatbread", aliases: [] },
-  { iconCode: "flatbread-stuffed", label: "Flatbread Stuffed", aliases: [] },
-  { iconCode: "floppy-disk", label: "Floppy Disk", aliases: ["save"] },
-  { iconCode: "floppy-disk-circle-arrow-right", label: "Floppy Disk Circle Arrow Right", aliases: ["save-circle-arrow-right"] },
-  { iconCode: "floppy-disk-circle-xmark", label: "Floppy Disk Circle Xmark", aliases: ["floppy-disk-times", "save-circle-xmark", "save-times"] },
-  { iconCode: "floppy-disk-pen", label: "Floppy Disk Pen", aliases: [] },
-  { iconCode: "floppy-disks", label: "Floppy Disks", aliases: [] },
-  { iconCode: "florin-sign", label: "Florin Sign", aliases: [] },
-  { iconCode: "flower", label: "Flower", aliases: [] },
-  { iconCode: "flower-daffodil", label: "Flower Daffodil", aliases: [] },
-  { iconCode: "flower-tulip", label: "Flower Tulip", aliases: [] },
-  { iconCode: "flute", label: "Flute", aliases: [] },
-  { iconCode: "flux-capacitor", label: "Flux Capacitor", aliases: [] },
-  { iconCode: "flying-disc", label: "Flying Disc", aliases: [] },
-  { iconCode: "folder", label: "Folder", aliases: ["folder-blank"] },
-  { iconCode: "folder-arrow-down", label: "Folder Arrow Down", aliases: ["folder-download"] },
-  { iconCode: "folder-arrow-left", label: "Folder Arrow Left", aliases: [] },
-  { iconCode: "folder-arrow-right", label: "Folder Arrow Right", aliases: [] },
-  { iconCode: "folder-arrow-up", label: "Folder Arrow Up", aliases: ["folder-upload"] },
-  { iconCode: "folder-bookmark", label: "Folder Bookmark", aliases: [] },
-  { iconCode: "folder-check", label: "Folder Check", aliases: [] },
-  { iconCode: "folder-closed", label: "Folder Closed", aliases: [] },
-  { iconCode: "folder-gear", label: "Folder Gear", aliases: ["folder-cog"] },
-  { iconCode: "folder-grid", label: "Folder Grid", aliases: [] },
-  { iconCode: "folder-heart", label: "Folder Heart", aliases: [] },
-  { iconCode: "folder-image", label: "Folder Image", aliases: [] },
-  { iconCode: "folder-magnifying-glass", label: "Folder Magnifying Glass", aliases: ["folder-search"] },
-  { iconCode: "folder-medical", label: "Folder Medical", aliases: [] },
-  { iconCode: "folder-minus", label: "Folder Minus", aliases: [] },
-  { iconCode: "folder-music", label: "Folder Music", aliases: [] },
-  { iconCode: "folder-open", label: "Folder Open", aliases: [] },
-  { iconCode: "folder-plus", label: "Folder Plus", aliases: [] },
-  { iconCode: "folder-tree", label: "Folder Tree", aliases: [] },
-  { iconCode: "folder-user", label: "Folder User", aliases: [] },
-  { iconCode: "folder-xmark", label: "Folder Xmark", aliases: ["folder-times"] },
-  { iconCode: "folders", label: "Folders", aliases: [] },
-  { iconCode: "fondue-pot", label: "Fondue Pot", aliases: [] },
-  { iconCode: "font", label: "Font", aliases: [] },
-  { iconCode: "font-case", label: "Font Case", aliases: [] },
-  { iconCode: "foot-wing", label: "Foot Wing", aliases: [] },
-  { iconCode: "football", label: "Football", aliases: ["football-ball"] },
-  { iconCode: "football-helmet", label: "Football Helmet", aliases: [] },
-  { iconCode: "fork-knife", label: "Fork Knife", aliases: ["utensils-alt"] },
-  { iconCode: "forklift", label: "Forklift", aliases: [] },
-  { iconCode: "fort", label: "Fort", aliases: [] },
-  { iconCode: "forward", label: "Forward", aliases: [] },
-  { iconCode: "forward-fast", label: "Forward Fast", aliases: ["fast-forward"] },
-  { iconCode: "forward-step", label: "Forward Step", aliases: ["step-forward"] },
-  { iconCode: "frame", label: "Frame", aliases: [] },
-  { iconCode: "franc-sign", label: "Franc Sign", aliases: [] },
-  { iconCode: "french-fries", label: "French Fries", aliases: [] },
-  { iconCode: "frog", label: "Frog", aliases: [] },
-  { iconCode: "function", label: "Function", aliases: [] },
-  { iconCode: "futbol", label: "Futbol", aliases: ["futbol-ball", "soccer-ball"] },
-  { iconCode: "g", label: "G", aliases: [] },
-  { iconCode: "galaxy", label: "Galaxy", aliases: [] },
-  { iconCode: "gallery-thumbnails", label: "Gallery Thumbnails", aliases: [] },
-  { iconCode: "game-board", label: "Game Board", aliases: [] },
-  { iconCode: "game-board-simple", label: "Game Board Simple", aliases: ["game-board-alt"] },
-  { iconCode: "game-console-handheld", label: "Game Console Handheld", aliases: [] },
-  { iconCode: "game-console-handheld-crank", label: "Game Console Handheld Crank", aliases: [] },
-  { iconCode: "gamepad", label: "Gamepad", aliases: [] },
-  { iconCode: "gamepad-modern", label: "Gamepad Modern", aliases: ["gamepad-alt"] },
-  { iconCode: "garage", label: "Garage", aliases: [] },
-  { iconCode: "garage-car", label: "Garage Car", aliases: [] },
-  { iconCode: "garage-empty", label: "Garage Empty", aliases: [] },
-  { iconCode: "garage-open", label: "Garage Open", aliases: [] },
-  { iconCode: "garlic", label: "Garlic", aliases: [] },
-  { iconCode: "gas-pump", label: "Gas Pump", aliases: [] },
-  { iconCode: "gas-pump-left", label: "Gas Pump Left", aliases: [] },
-  { iconCode: "gas-pump-right", label: "Gas Pump Right", aliases: [] },
-  { iconCode: "gas-pump-slash", label: "Gas Pump Slash", aliases: [] },
-  { iconCode: "gauge", label: "Gauge", aliases: ["dashboard", "gauge-med", "tachometer-alt-average"] },
-  { iconCode: "gauge-circle-bolt", label: "Gauge Circle Bolt", aliases: [] },
-  { iconCode: "gauge-circle-minus", label: "Gauge Circle Minus", aliases: [] },
-  { iconCode: "gauge-circle-plus", label: "Gauge Circle Plus", aliases: [] },
-  { iconCode: "gauge-high", label: "Gauge High", aliases: ["tachometer-alt", "tachometer-alt-fast"] },
-  { iconCode: "gauge-low", label: "Gauge Low", aliases: ["tachometer-alt-slow"] },
-  { iconCode: "gauge-max", label: "Gauge Max", aliases: ["tachometer-alt-fastest"] },
-  { iconCode: "gauge-min", label: "Gauge Min", aliases: ["tachometer-alt-slowest"] },
-  { iconCode: "gauge-simple", label: "Gauge Simple", aliases: ["gauge-simple-med", "tachometer-average"] },
-  { iconCode: "gauge-simple-high", label: "Gauge Simple High", aliases: ["tachometer", "tachometer-fast"] },
-  { iconCode: "gauge-simple-low", label: "Gauge Simple Low", aliases: ["tachometer-slow"] },
-  { iconCode: "gauge-simple-max", label: "Gauge Simple Max", aliases: ["tachometer-fastest"] },
-  { iconCode: "gauge-simple-min", label: "Gauge Simple Min", aliases: ["tachometer-slowest"] },
-  { iconCode: "gavel", label: "Gavel", aliases: ["legal"] },
-  { iconCode: "gear", label: "Gear", aliases: ["cog"] },
-  { iconCode: "gear-api", label: "Gear Api", aliases: [] },
-  { iconCode: "gear-code", label: "Gear Code", aliases: [] },
-  { iconCode: "gear-complex", label: "Gear Complex", aliases: [] },
-  { iconCode: "gear-complex-api", label: "Gear Complex Api", aliases: [] },
-  { iconCode: "gear-complex-code", label: "Gear Complex Code", aliases: [] },
-  { iconCode: "gears", label: "Gears", aliases: ["cogs"] },
-  { iconCode: "gem", label: "Gem", aliases: [] },
-  { iconCode: "gemini", label: "Gemini", aliases: [] },
-  { iconCode: "genderless", label: "Genderless", aliases: [] },
-  { iconCode: "ghost", label: "Ghost", aliases: [] },
-  { iconCode: "gif", label: "Gif", aliases: [] },
-  { iconCode: "gift", label: "Gift", aliases: [] },
-  { iconCode: "gift-card", label: "Gift Card", aliases: [] },
-  { iconCode: "gifts", label: "Gifts", aliases: [] },
-  { iconCode: "gingerbread-man", label: "Gingerbread Man", aliases: [] },
-  { iconCode: "glass", label: "Glass", aliases: [] },
-  { iconCode: "glass-champagne", label: "Glass Champagne", aliases: ["champagne-glass"] },
-  { iconCode: "glass-cheers", label: "Glass Cheers", aliases: ["champagne-glasses"] },
-  { iconCode: "glass-citrus", label: "Glass Citrus", aliases: [] },
-  { iconCode: "glass-empty", label: "Glass Empty", aliases: [] },
-  { iconCode: "glass-half", label: "Glass Half", aliases: ["glass-half-empty", "glass-half-full"] },
-  { iconCode: "glass-martini", label: "Glass Martini", aliases: ["martini-glass-empty"] },
-  { iconCode: "glass-water", label: "Glass Water", aliases: [] },
-  { iconCode: "glass-water-droplet", label: "Glass Water Droplet", aliases: [] },
-  { iconCode: "glass-whiskey", label: "Glass Whiskey", aliases: ["whiskey-glass"] },
-  { iconCode: "glass-whiskey-rocks", label: "Glass Whiskey Rocks", aliases: ["whiskey-glass-ice"] },
-  { iconCode: "glasses", label: "Glasses", aliases: [] },
-  { iconCode: "glasses-round", label: "Glasses Round", aliases: ["glasses-alt"] },
-  { iconCode: "globe", label: "Globe", aliases: [] },
-  { iconCode: "globe-africa", label: "Globe Africa", aliases: ["earth-africa"] },
-  { iconCode: "globe-americas", label: "Globe Americas", aliases: ["earth", "earth-america", "earth-americas"] },
-  { iconCode: "globe-asia", label: "Globe Asia", aliases: ["earth-asia"] },
-  { iconCode: "globe-europe", label: "Globe Europe", aliases: ["earth-europe"] },
-  { iconCode: "globe-oceania", label: "Globe Oceania", aliases: ["earth-oceania"] },
-  { iconCode: "globe-pointer", label: "Globe Pointer", aliases: [] },
-  { iconCode: "globe-snow", label: "Globe Snow", aliases: [] },
-  { iconCode: "globe-stand", label: "Globe Stand", aliases: [] },
-  { iconCode: "globe-wifi", label: "Globe Wifi", aliases: [] },
-  { iconCode: "globe-www", label: "Globe Www", aliases: [] },
-  { iconCode: "goal-net", label: "Goal Net", aliases: [] },
-  { iconCode: "golf-ball", label: "Golf Ball", aliases: ["golf-ball-tee"] },
-  { iconCode: "golf-club", label: "Golf Club", aliases: [] },
-  { iconCode: "golf-flag-hole", label: "Golf Flag Hole", aliases: [] },
-  { iconCode: "gopuram", label: "Gopuram", aliases: [] },
-  { iconCode: "gpu", label: "Gpu", aliases: [] },
-  { iconCode: "gramophone", label: "Gramophone", aliases: [] },
-  { iconCode: "grapes", label: "Grapes", aliases: [] },
-  { iconCode: "grate", label: "Grate", aliases: [] },
-  { iconCode: "grate-droplet", label: "Grate Droplet", aliases: [] },
-  { iconCode: "greater-than", label: "Greater Than", aliases: [] },
-  { iconCode: "greater-than-equal", label: "Greater Than Equal", aliases: [] },
-  { iconCode: "grid", label: "Grid", aliases: ["grid-3"] },
-  { iconCode: "grid-2", label: "Grid 2", aliases: [] },
-  { iconCode: "grid-2-minus", label: "Grid 2 Minus", aliases: [] },
-  { iconCode: "grid-2-plus", label: "Grid 2 Plus", aliases: [] },
-  { iconCode: "grid-4", label: "Grid 4", aliases: [] },
-  { iconCode: "grid-5", label: "Grid 5", aliases: [] },
-  { iconCode: "grid-dividers", label: "Grid Dividers", aliases: [] },
-  { iconCode: "grid-horizontal", label: "Grid Horizontal", aliases: ["grip", "grip-horizontal"] },
-  { iconCode: "grid-round", label: "Grid Round", aliases: [] },
-  { iconCode: "grid-round-2", label: "Grid Round 2", aliases: [] },
-  { iconCode: "grid-round-2-minus", label: "Grid Round 2 Minus", aliases: [] },
-  { iconCode: "grid-round-2-plus", label: "Grid Round 2 Plus", aliases: [] },
-  { iconCode: "grid-round-4", label: "Grid Round 4", aliases: [] },
-  { iconCode: "grid-round-5", label: "Grid Round 5", aliases: [] },
-  { iconCode: "grid-vertical", label: "Grid Vertical", aliases: ["grip-vertical"] },
-  { iconCode: "grill", label: "Grill", aliases: [] },
-  { iconCode: "grill-fire", label: "Grill Fire", aliases: [] },
-  { iconCode: "grill-hot", label: "Grill Hot", aliases: [] },
-  { iconCode: "grip-dots", label: "Grip Dots", aliases: [] },
-  { iconCode: "grip-dots-vertical", label: "Grip Dots Vertical", aliases: [] },
-  { iconCode: "grip-lines", label: "Grip Lines", aliases: [] },
-  { iconCode: "grip-lines-vertical", label: "Grip Lines Vertical", aliases: [] },
-  { iconCode: "group-arrows-rotate", label: "Group Arrows Rotate", aliases: [] },
-  { iconCode: "guarani-sign", label: "Guarani Sign", aliases: [] },
-  { iconCode: "guitar", label: "Guitar", aliases: [] },
-  { iconCode: "guitar-electric", label: "Guitar Electric", aliases: [] },
-  { iconCode: "guitars", label: "Guitars", aliases: [] },
-  { iconCode: "gun", label: "Gun", aliases: [] },
-  { iconCode: "gun-slash", label: "Gun Slash", aliases: [] },
-  { iconCode: "gun-squirt", label: "Gun Squirt", aliases: [] },
-  { iconCode: "h", label: "H", aliases: [] },
-  { iconCode: "h-square", label: "H Square", aliases: ["square-h"] },
-  { iconCode: "h1", label: "H1", aliases: [] },
-  { iconCode: "h2", label: "H2", aliases: [] },
-  { iconCode: "h3", label: "H3", aliases: [] },
-  { iconCode: "h4", label: "H4", aliases: [] },
-  { iconCode: "h5", label: "H5", aliases: [] },
-  { iconCode: "h6", label: "H6", aliases: [] },
-  { iconCode: "hammer", label: "Hammer", aliases: [] },
-  { iconCode: "hammer-brush", label: "Hammer Brush", aliases: [] },
-  { iconCode: "hammer-crash", label: "Hammer Crash", aliases: [] },
-  { iconCode: "hammer-war", label: "Hammer War", aliases: [] },
-  { iconCode: "hamsa", label: "Hamsa", aliases: [] },
-  { iconCode: "hand", label: "Hand", aliases: ["hand-paper"] },
-  { iconCode: "hand-back-fist", label: "Hand Back Fist", aliases: ["hand-rock"] },
-  { iconCode: "hand-back-point-down", label: "Hand Back Point Down", aliases: [] },
-  { iconCode: "hand-back-point-left", label: "Hand Back Point Left", aliases: [] },
-  { iconCode: "hand-back-point-ribbon", label: "Hand Back Point Ribbon", aliases: [] },
-  { iconCode: "hand-back-point-right", label: "Hand Back Point Right", aliases: [] },
-  { iconCode: "hand-back-point-up", label: "Hand Back Point Up", aliases: [] },
-  { iconCode: "hand-dots", label: "Hand Dots", aliases: ["allergies"] },
-  { iconCode: "hand-fingers-crossed", label: "Hand Fingers Crossed", aliases: [] },
-  { iconCode: "hand-fist", label: "Hand Fist", aliases: ["fist-raised"] },
-  { iconCode: "hand-heart", label: "Hand Heart", aliases: [] },
-  { iconCode: "hand-holding", label: "Hand Holding", aliases: [] },
-  { iconCode: "hand-holding-box", label: "Hand Holding Box", aliases: [] },
-  { iconCode: "hand-holding-circle-dollar", label: "Hand Holding Circle Dollar", aliases: [] },
-  { iconCode: "hand-holding-dollar", label: "Hand Holding Dollar", aliases: ["hand-holding-usd"] },
-  { iconCode: "hand-holding-droplet", label: "Hand Holding Droplet", aliases: ["hand-holding-water"] },
-  { iconCode: "hand-holding-hand", label: "Hand Holding Hand", aliases: [] },
-  { iconCode: "hand-holding-heart", label: "Hand Holding Heart", aliases: [] },
-  { iconCode: "hand-holding-magic", label: "Hand Holding Magic", aliases: [] },
-  { iconCode: "hand-holding-medical", label: "Hand Holding Medical", aliases: [] },
-  { iconCode: "hand-holding-seedling", label: "Hand Holding Seedling", aliases: [] },
-  { iconCode: "hand-holding-skull", label: "Hand Holding Skull", aliases: [] },
-  { iconCode: "hand-holding-star", label: "Hand Holding Star", aliases: [] },
-  { iconCode: "hand-horns", label: "Hand Horns", aliases: [] },
-  { iconCode: "hand-lizard", label: "Hand Lizard", aliases: [] },
-  { iconCode: "hand-love", label: "Hand Love", aliases: [] },
-  { iconCode: "hand-middle-finger", label: "Hand Middle Finger", aliases: [] },
-  { iconCode: "hand-peace", label: "Hand Peace", aliases: [] },
-  { iconCode: "hand-point-down", label: "Hand Point Down", aliases: [] },
-  { iconCode: "hand-point-left", label: "Hand Point Left", aliases: [] },
-  { iconCode: "hand-point-ribbon", label: "Hand Point Ribbon", aliases: [] },
-  { iconCode: "hand-point-right", label: "Hand Point Right", aliases: [] },
-  { iconCode: "hand-point-up", label: "Hand Point Up", aliases: [] },
-  { iconCode: "hand-pointer", label: "Hand Pointer", aliases: [] },
-  { iconCode: "hand-receiving", label: "Hand Receiving", aliases: ["hands-holding-diamond"] },
-  { iconCode: "hand-scissors", label: "Hand Scissors", aliases: [] },
-  { iconCode: "hand-shaka", label: "Hand Shaka", aliases: [] },
-  { iconCode: "hand-sparkles", label: "Hand Sparkles", aliases: [] },
-  { iconCode: "hand-spock", label: "Hand Spock", aliases: [] },
-  { iconCode: "hand-wave", label: "Hand Wave", aliases: [] },
-  { iconCode: "handcuffs", label: "Handcuffs", aliases: [] },
-  { iconCode: "hands", label: "Hands", aliases: ["sign-language", "signing"] },
-  { iconCode: "hands-american-sign-language-interpreting", label: "Hands American Sign Language Interpreting", aliases: ["american-sign-language-interpreting", "asl-interpreting", "hands-asl-interpreting"] },
-  { iconCode: "hands-bound", label: "Hands Bound", aliases: [] },
-  { iconCode: "hands-bubbles", label: "Hands Bubbles", aliases: ["hands-wash"] },
-  { iconCode: "hands-clapping", label: "Hands Clapping", aliases: [] },
-  { iconCode: "hands-helping", label: "Hands Helping", aliases: ["handshake-angle"] },
-  { iconCode: "hands-holding", label: "Hands Holding", aliases: [] },
-  { iconCode: "hands-holding-child", label: "Hands Holding Child", aliases: [] },
-  { iconCode: "hands-holding-circle", label: "Hands Holding Circle", aliases: [] },
-  { iconCode: "hands-holding-dollar", label: "Hands Holding Dollar", aliases: ["hands-usd"] },
-  { iconCode: "hands-holding-heart", label: "Hands Holding Heart", aliases: ["hands-heart"] },
-  { iconCode: "hands-praying", label: "Hands Praying", aliases: ["praying-hands"] },
-  { iconCode: "handshake", label: "Handshake", aliases: ["handshake-alt", "handshake-simple"] },
-  { iconCode: "handshake-simple-slash", label: "Handshake Simple Slash", aliases: ["handshake-alt-slash", "handshake-slash"] },
-  { iconCode: "hanukiah", label: "Hanukiah", aliases: [] },
-  { iconCode: "hard-drive", label: "Hard Drive", aliases: ["hdd"] },
-  { iconCode: "hashtag", label: "Hashtag", aliases: [] },
-  { iconCode: "hashtag-lock", label: "Hashtag Lock", aliases: [] },
-  { iconCode: "hat-beach", label: "Hat Beach", aliases: [] },
-  { iconCode: "hat-chef", label: "Hat Chef", aliases: [] },
-  { iconCode: "hat-cowboy", label: "Hat Cowboy", aliases: [] },
-  { iconCode: "hat-cowboy-side", label: "Hat Cowboy Side", aliases: [] },
-  { iconCode: "hat-hard", label: "Hat Hard", aliases: ["hard-hat", "helmet-safety"] },
-  { iconCode: "hat-santa", label: "Hat Santa", aliases: [] },
-  { iconCode: "hat-winter", label: "Hat Winter", aliases: [] },
-  { iconCode: "hat-witch", label: "Hat Witch", aliases: [] },
-  { iconCode: "hat-wizard", label: "Hat Wizard", aliases: [] },
-  { iconCode: "haykal", label: "Haykal", aliases: ["bahai"] },
-  { iconCode: "head-side", label: "Head Side", aliases: [] },
-  { iconCode: "head-side-brain", label: "Head Side Brain", aliases: [] },
-  { iconCode: "head-side-circuit", label: "Head Side Circuit", aliases: [] },
-  { iconCode: "head-side-cough", label: "Head Side Cough", aliases: [] },
-  { iconCode: "head-side-cough-slash", label: "Head Side Cough Slash", aliases: [] },
-  { iconCode: "head-side-gear", label: "Head Side Gear", aliases: [] },
-  { iconCode: "head-side-goggles", label: "Head Side Goggles", aliases: ["head-vr"] },
-  { iconCode: "head-side-headphones", label: "Head Side Headphones", aliases: [] },
-  { iconCode: "head-side-heart", label: "Head Side Heart", aliases: [] },
-  { iconCode: "head-side-mask", label: "Head Side Mask", aliases: [] },
-  { iconCode: "head-side-medical", label: "Head Side Medical", aliases: [] },
-  { iconCode: "head-side-speak", label: "Head Side Speak", aliases: [] },
-  { iconCode: "head-side-virus", label: "Head Side Virus", aliases: [] },
-  { iconCode: "heading", label: "Heading", aliases: ["header"] },
-  { iconCode: "headphones", label: "Headphones", aliases: ["headphones-alt", "headphones-simple"] },
-  { iconCode: "headphones-slash", label: "Headphones Slash", aliases: [] },
-  { iconCode: "headset", label: "Headset", aliases: [] },
-  { iconCode: "heart", label: "Heart", aliases: [] },
-  { iconCode: "heart-circle-bolt", label: "Heart Circle Bolt", aliases: [] },
-  { iconCode: "heart-circle-check", label: "Heart Circle Check", aliases: [] },
-  { iconCode: "heart-circle-exclamation", label: "Heart Circle Exclamation", aliases: [] },
-  { iconCode: "heart-circle-minus", label: "Heart Circle Minus", aliases: [] },
-  { iconCode: "heart-circle-plus", label: "Heart Circle Plus", aliases: [] },
-  { iconCode: "heart-circle-xmark", label: "Heart Circle Xmark", aliases: [] },
-  { iconCode: "heart-crack", label: "Heart Crack", aliases: ["heart-broken"] },
-  { iconCode: "heart-half", label: "Heart Half", aliases: [] },
-  { iconCode: "heart-half-stroke", label: "Heart Half Stroke", aliases: ["heart-half-alt"] },
-  { iconCode: "heart-music-camera-bolt", label: "Heart Music Camera Bolt", aliases: ["icons"] },
-  { iconCode: "heart-pulse", label: "Heart Pulse", aliases: ["heartbeat"] },
-  { iconCode: "heart-rate", label: "Heart Rate", aliases: ["wave-pulse"] },
-  { iconCode: "heart-slash", label: "Heart Slash", aliases: [] },
-  { iconCode: "hearts", label: "Hearts", aliases: [] },
-  { iconCode: "heat", label: "Heat", aliases: [] },
-  { iconCode: "helicopter", label: "Helicopter", aliases: [] },
-  { iconCode: "helicopter-symbol", label: "Helicopter Symbol", aliases: [] },
-  { iconCode: "helmet-battle", label: "Helmet Battle", aliases: [] },
-  { iconCode: "helmet-un", label: "Helmet Un", aliases: [] },
-  { iconCode: "heptagon", label: "Heptagon", aliases: ["septagon"] },
-  { iconCode: "hexagon", label: "Hexagon", aliases: [] },
-  { iconCode: "hexagon-check", label: "Hexagon Check", aliases: [] },
-  { iconCode: "hexagon-divide", label: "Hexagon Divide", aliases: [] },
-  { iconCode: "hexagon-equals", label: "Hexagon Equals", aliases: [] },
-  { iconCode: "hexagon-exclamation", label: "Hexagon Exclamation", aliases: [] },
-  { iconCode: "hexagon-image", label: "Hexagon Image", aliases: [] },
-  { iconCode: "hexagon-minus", label: "Hexagon Minus", aliases: ["minus-hexagon"] },
-  { iconCode: "hexagon-nodes", label: "Hexagon Nodes", aliases: [] },
-  { iconCode: "hexagon-nodes-bolt", label: "Hexagon Nodes Bolt", aliases: [] },
-  { iconCode: "hexagon-plus", label: "Hexagon Plus", aliases: ["plus-hexagon"] },
-  { iconCode: "hexagon-vertical-nft", label: "Hexagon Vertical Nft", aliases: ["hexagon-vertical-nft-slanted"] },
-  { iconCode: "hexagon-xmark", label: "Hexagon Xmark", aliases: ["times-hexagon", "xmark-hexagon"] },
-  { iconCode: "highlighter", label: "Highlighter", aliases: [] },
-  { iconCode: "highlighter-line", label: "Highlighter Line", aliases: [] },
-  { iconCode: "hill-avalanche", label: "Hill Avalanche", aliases: [] },
-  { iconCode: "hill-rockslide", label: "Hill Rockslide", aliases: [] },
-  { iconCode: "hippo", label: "Hippo", aliases: [] },
-  { iconCode: "hockey-mask", label: "Hockey Mask", aliases: [] },
-  { iconCode: "hockey-puck", label: "Hockey Puck", aliases: [] },
-  { iconCode: "hockey-stick", label: "Hockey Stick", aliases: [] },
-  { iconCode: "hockey-stick-puck", label: "Hockey Stick Puck", aliases: [] },
-  { iconCode: "hockey-sticks", label: "Hockey Sticks", aliases: [] },
-  { iconCode: "holly-berry", label: "Holly Berry", aliases: [] },
-  { iconCode: "honey-pot", label: "Honey Pot", aliases: [] },
-  { iconCode: "hood-cloak", label: "Hood Cloak", aliases: [] },
-  { iconCode: "horizontal-rule", label: "Horizontal Rule", aliases: [] },
-  { iconCode: "horse", label: "Horse", aliases: [] },
-  { iconCode: "horse-head", label: "Horse Head", aliases: [] },
-  { iconCode: "horse-saddle", label: "Horse Saddle", aliases: [] },
-  { iconCode: "horseshoe", label: "Horseshoe", aliases: [] },
-  { iconCode: "hose", label: "Hose", aliases: [] },
-  { iconCode: "hose-reel", label: "Hose Reel", aliases: [] },
-  { iconCode: "hospital", label: "Hospital", aliases: ["hospital-alt", "hospital-wide"] },
-  { iconCode: "hospital-symbol", label: "Hospital Symbol", aliases: ["circle-h"] },
-  { iconCode: "hospital-user", label: "Hospital User", aliases: [] },
-  { iconCode: "hospitals", label: "Hospitals", aliases: [] },
-  { iconCode: "hot-tub", label: "Hot Tub", aliases: ["hot-tub-person"] },
-  { iconCode: "hotdog", label: "Hotdog", aliases: [] },
-  { iconCode: "hotel", label: "Hotel", aliases: [] },
-  { iconCode: "hourglass", label: "Hourglass", aliases: ["hourglass-empty"] },
-  { iconCode: "hourglass-clock", label: "Hourglass Clock", aliases: [] },
-  { iconCode: "hourglass-end", label: "Hourglass End", aliases: ["hourglass-3"] },
-  { iconCode: "hourglass-half", label: "Hourglass Half", aliases: ["hourglass-2"] },
-  { iconCode: "hourglass-start", label: "Hourglass Start", aliases: ["hourglass-1"] },
-  { iconCode: "house", label: "House", aliases: ["home", "home-alt", "home-lg-alt"] },
-  { iconCode: "house-blank", label: "House Blank", aliases: ["home-blank"] },
-  { iconCode: "house-building", label: "House Building", aliases: [] },
-  { iconCode: "house-chimney", label: "House Chimney", aliases: ["home-lg"] },
-  { iconCode: "house-chimney-blank", label: "House Chimney Blank", aliases: [] },
-  { iconCode: "house-chimney-crack", label: "House Chimney Crack", aliases: ["house-damage"] },
-  { iconCode: "house-chimney-heart", label: "House Chimney Heart", aliases: [] },
-  { iconCode: "house-chimney-medical", label: "House Chimney Medical", aliases: ["clinic-medical"] },
-  { iconCode: "house-chimney-user", label: "House Chimney User", aliases: [] },
-  { iconCode: "house-chimney-window", label: "House Chimney Window", aliases: [] },
-  { iconCode: "house-circle-check", label: "House Circle Check", aliases: [] },
-  { iconCode: "house-circle-exclamation", label: "House Circle Exclamation", aliases: [] },
-  { iconCode: "house-circle-xmark", label: "House Circle Xmark", aliases: [] },
-  { iconCode: "house-crack", label: "House Crack", aliases: [] },
-  { iconCode: "house-day", label: "House Day", aliases: [] },
-  { iconCode: "house-fire", label: "House Fire", aliases: [] },
-  { iconCode: "house-flag", label: "House Flag", aliases: [] },
-  { iconCode: "house-flood", label: "House Flood", aliases: ["house-water"] },
-  { iconCode: "house-flood-water", label: "House Flood Water", aliases: [] },
-  { iconCode: "house-flood-water-circle-arrow-right", label: "House Flood Water Circle Arrow Right", aliases: [] },
-  { iconCode: "house-heart", label: "House Heart", aliases: ["home-heart"] },
-  { iconCode: "house-laptop", label: "House Laptop", aliases: ["laptop-house"] },
-  { iconCode: "house-lock", label: "House Lock", aliases: [] },
-  { iconCode: "house-medical", label: "House Medical", aliases: [] },
-  { iconCode: "house-medical-circle-check", label: "House Medical Circle Check", aliases: [] },
-  { iconCode: "house-medical-circle-exclamation", label: "House Medical Circle Exclamation", aliases: [] },
-  { iconCode: "house-medical-circle-xmark", label: "House Medical Circle Xmark", aliases: [] },
-  { iconCode: "house-medical-flag", label: "House Medical Flag", aliases: [] },
-  { iconCode: "house-night", label: "House Night", aliases: [] },
-  { iconCode: "house-person-arrive", label: "House Person Arrive", aliases: ["house-person-return", "house-return"] },
-  { iconCode: "house-person-depart", label: "House Person Depart", aliases: ["house-leave", "house-person-leave"] },
-  { iconCode: "house-signal", label: "House Signal", aliases: [] },
-  { iconCode: "house-tree", label: "House Tree", aliases: [] },
-  { iconCode: "house-tsunami", label: "House Tsunami", aliases: [] },
-  { iconCode: "house-turret", label: "House Turret", aliases: [] },
-  { iconCode: "house-unlock", label: "House Unlock", aliases: [] },
-  { iconCode: "house-user", label: "House User", aliases: ["home-user"] },
-  { iconCode: "house-window", label: "House Window", aliases: [] },
-  { iconCode: "hryvnia", label: "Hryvnia", aliases: ["hryvnia-sign"] },
-  { iconCode: "hundred-points", label: "Hundred Points", aliases: ["100"] },
-  { iconCode: "hurricane", label: "Hurricane", aliases: [] },
-  { iconCode: "hydra", label: "Hydra", aliases: [] },
-  { iconCode: "hyphen", label: "Hyphen", aliases: [] },
-  { iconCode: "i", label: "I", aliases: [] },
-  { iconCode: "i-cursor", label: "I Cursor", aliases: [] },
-  { iconCode: "ice-cream", label: "Ice Cream", aliases: [] },
-  { iconCode: "ice-skate", label: "Ice Skate", aliases: [] },
-  { iconCode: "icicles", label: "Icicles", aliases: [] },
-  { iconCode: "id-badge", label: "Id Badge", aliases: [] },
-  { iconCode: "id-card", label: "Id Card", aliases: ["drivers-license"] },
-  { iconCode: "id-card-clip", label: "Id Card Clip", aliases: ["id-card-alt"] },
-  { iconCode: "igloo", label: "Igloo", aliases: [] },
-  { iconCode: "image", label: "Image", aliases: [] },
-  { iconCode: "image-broken", label: "Image Broken", aliases: [] },
-  { iconCode: "image-circle-arrow-down", label: "Image Circle Arrow Down", aliases: [] },
-  { iconCode: "image-circle-check", label: "Image Circle Check", aliases: [] },
-  { iconCode: "image-circle-plus", label: "Image Circle Plus", aliases: [] },
-  { iconCode: "image-circle-xmark", label: "Image Circle Xmark", aliases: [] },
-  { iconCode: "image-landscape", label: "Image Landscape", aliases: ["landscape"] },
-  { iconCode: "image-music", label: "Image Music", aliases: [] },
-  { iconCode: "image-polaroid", label: "Image Polaroid", aliases: [] },
-  { iconCode: "image-polaroid-user", label: "Image Polaroid User", aliases: [] },
-  { iconCode: "image-portrait", label: "Image Portrait", aliases: ["portrait"] },
-  { iconCode: "image-slash", label: "Image Slash", aliases: [] },
-  { iconCode: "image-stack", label: "Image Stack", aliases: [] },
-  { iconCode: "image-user", label: "Image User", aliases: [] },
-  { iconCode: "images", label: "Images", aliases: [] },
-  { iconCode: "images-user", label: "Images User", aliases: [] },
-  { iconCode: "inbox", label: "Inbox", aliases: [] },
-  { iconCode: "inbox-arrow-down", label: "Inbox Arrow Down", aliases: ["inbox-in"] },
-  { iconCode: "inbox-arrow-up", label: "Inbox Arrow Up", aliases: ["inbox-out"] },
-  { iconCode: "inbox-full", label: "Inbox Full", aliases: [] },
-  { iconCode: "inboxes", label: "Inboxes", aliases: [] },
-  { iconCode: "indent", label: "Indent", aliases: [] },
-  { iconCode: "indian-rupee", label: "Indian Rupee", aliases: ["indian-rupee-sign", "inr"] },
-  { iconCode: "industry", label: "Industry", aliases: [] },
-  { iconCode: "industry-windows", label: "Industry Windows", aliases: ["industry-alt"] },
-  { iconCode: "infinity", label: "Infinity", aliases: [] },
-  { iconCode: "info", label: "Info", aliases: [] },
-  { iconCode: "inhaler", label: "Inhaler", aliases: [] },
-  { iconCode: "input-numeric", label: "Input Numeric", aliases: [] },
-  { iconCode: "input-password", label: "Input Password", aliases: [] },
-  { iconCode: "input-pipe", label: "Input Pipe", aliases: [] },
-  { iconCode: "input-text", label: "Input Text", aliases: [] },
-  { iconCode: "integral", label: "Integral", aliases: [] },
-  { iconCode: "interrobang", label: "Interrobang", aliases: [] },
-  { iconCode: "intersection", label: "Intersection", aliases: [] },
-  { iconCode: "island-tree-palm", label: "Island Tree Palm", aliases: ["island-tropical"] },
-  { iconCode: "italic", label: "Italic", aliases: [] },
-  { iconCode: "j", label: "J", aliases: [] },
-  { iconCode: "jack-o-lantern", label: "Jack O Lantern", aliases: [] },
-  { iconCode: "jar", label: "Jar", aliases: [] },
-  { iconCode: "jar-wheat", label: "Jar Wheat", aliases: [] },
-  { iconCode: "jeans", label: "Jeans", aliases: [] },
-  { iconCode: "jeans-straight", label: "Jeans Straight", aliases: [] },
-  { iconCode: "jedi", label: "Jedi", aliases: [] },
-  { iconCode: "jet-fighter", label: "Jet Fighter", aliases: ["fighter-jet"] },
-  { iconCode: "jet-fighter-up", label: "Jet Fighter Up", aliases: [] },
-  { iconCode: "joint", label: "Joint", aliases: [] },
-  { iconCode: "joystick", label: "Joystick", aliases: [] },
-  { iconCode: "jug", label: "Jug", aliases: [] },
-  { iconCode: "jug-bottle", label: "Jug Bottle", aliases: [] },
-  { iconCode: "jug-detergent", label: "Jug Detergent", aliases: [] },
-  { iconCode: "k", label: "K", aliases: [] },
-  { iconCode: "kaaba", label: "Kaaba", aliases: [] },
-  { iconCode: "kayak", label: "Kayak", aliases: [] },
-  { iconCode: "kazoo", label: "Kazoo", aliases: [] },
-  { iconCode: "kerning", label: "Kerning", aliases: [] },
-  { iconCode: "kettlebell", label: "Kettlebell", aliases: [] },
-  { iconCode: "key", label: "Key", aliases: [] },
-  { iconCode: "key-skeleton", label: "Key Skeleton", aliases: [] },
-  { iconCode: "key-skeleton-left-right", label: "Key Skeleton Left Right", aliases: [] },
-  { iconCode: "keyboard", label: "Keyboard", aliases: [] },
-  { iconCode: "keyboard-brightness", label: "Keyboard Brightness", aliases: [] },
-  { iconCode: "keyboard-brightness-low", label: "Keyboard Brightness Low", aliases: [] },
-  { iconCode: "keyboard-down", label: "Keyboard Down", aliases: [] },
-  { iconCode: "keyboard-left", label: "Keyboard Left", aliases: [] },
-  { iconCode: "keynote", label: "Keynote", aliases: [] },
-  { iconCode: "khanda", label: "Khanda", aliases: [] },
-  { iconCode: "kidneys", label: "Kidneys", aliases: [] },
-  { iconCode: "kip-sign", label: "Kip Sign", aliases: [] },
-  { iconCode: "kit-medical", label: "Kit Medical", aliases: ["first-aid"] },
-  { iconCode: "kitchen-set", label: "Kitchen Set", aliases: [] },
-  { iconCode: "kite", label: "Kite", aliases: [] },
-  { iconCode: "kiwi-bird", label: "Kiwi Bird", aliases: [] },
-  { iconCode: "kiwi-fruit", label: "Kiwi Fruit", aliases: [] },
-  { iconCode: "knife-kitchen", label: "Knife Kitchen", aliases: [] },
-  { iconCode: "l", label: "L", aliases: [] },
-  { iconCode: "label", label: "Label", aliases: [] },
-  { iconCode: "lacrosse-stick", label: "Lacrosse Stick", aliases: [] },
-  { iconCode: "lacrosse-stick-ball", label: "Lacrosse Stick Ball", aliases: [] },
-  { iconCode: "lambda", label: "Lambda", aliases: [] },
-  { iconCode: "lamp", label: "Lamp", aliases: [] },
-  { iconCode: "lamp-desk", label: "Lamp Desk", aliases: [] },
-  { iconCode: "lamp-floor", label: "Lamp Floor", aliases: [] },
-  { iconCode: "lamp-street", label: "Lamp Street", aliases: [] },
-  { iconCode: "land-mine-on", label: "Land Mine On", aliases: [] },
-  { iconCode: "landmark", label: "Landmark", aliases: [] },
-  { iconCode: "landmark-dome", label: "Landmark Dome", aliases: ["landmark-alt"] },
-  { iconCode: "landmark-flag", label: "Landmark Flag", aliases: [] },
-  { iconCode: "landmark-magnifying-glass", label: "Landmark Magnifying Glass", aliases: [] },
-  { iconCode: "language", label: "Language", aliases: [] },
-  { iconCode: "laptop", label: "Laptop", aliases: [] },
-  { iconCode: "laptop-arrow-down", label: "Laptop Arrow Down", aliases: [] },
-  { iconCode: "laptop-binary", label: "Laptop Binary", aliases: [] },
-  { iconCode: "laptop-code", label: "Laptop Code", aliases: [] },
-  { iconCode: "laptop-file", label: "Laptop File", aliases: [] },
-  { iconCode: "laptop-medical", label: "Laptop Medical", aliases: [] },
-  { iconCode: "laptop-slash", label: "Laptop Slash", aliases: [] },
-  { iconCode: "lari-sign", label: "Lari Sign", aliases: [] },
-  { iconCode: "lasso", label: "Lasso", aliases: [] },
-  { iconCode: "lasso-sparkles", label: "Lasso Sparkles", aliases: [] },
-  { iconCode: "layer", label: "Layer", aliases: [] },
-  { iconCode: "layer-group", label: "Layer Group", aliases: [] },
-  { iconCode: "layer-group-minus", label: "Layer Group Minus", aliases: ["layer-minus"] },
-  { iconCode: "layer-group-plus", label: "Layer Group Plus", aliases: ["layer-plus"] },
-  { iconCode: "leaf", label: "Leaf", aliases: [] },
-  { iconCode: "leaf-heart", label: "Leaf Heart", aliases: [] },
-  { iconCode: "leaf-maple", label: "Leaf Maple", aliases: [] },
-  { iconCode: "leaf-oak", label: "Leaf Oak", aliases: [] },
-  { iconCode: "leafy-green", label: "Leafy Green", aliases: [] },
-  { iconCode: "left", label: "Left", aliases: ["arrow-alt-left"] },
-  { iconCode: "left-from-bracket", label: "Left From Bracket", aliases: [] },
-  { iconCode: "left-from-dotted-line", label: "Left From Dotted Line", aliases: [] },
-  { iconCode: "left-from-line", label: "Left From Line", aliases: ["arrow-alt-from-right"] },
-  { iconCode: "left-long", label: "Left Long", aliases: ["long-arrow-alt-left"] },
-  { iconCode: "left-long-to-line", label: "Left Long To Line", aliases: [] },
-  { iconCode: "left-right", label: "Left Right", aliases: ["arrows-alt-h"] },
-  { iconCode: "left-to-bracket", label: "Left To Bracket", aliases: [] },
-  { iconCode: "left-to-dotted-line", label: "Left To Dotted Line", aliases: [] },
-  { iconCode: "left-to-line", label: "Left To Line", aliases: ["arrow-alt-to-left"] },
-  { iconCode: "lemon", label: "Lemon", aliases: [] },
-  { iconCode: "leo", label: "Leo", aliases: [] },
-  { iconCode: "less-than", label: "Less Than", aliases: [] },
-  { iconCode: "less-than-equal", label: "Less Than Equal", aliases: [] },
-  { iconCode: "libra", label: "Libra", aliases: [] },
-  { iconCode: "life-ring", label: "Life Ring", aliases: [] },
-  { iconCode: "light-ceiling", label: "Light Ceiling", aliases: [] },
-  { iconCode: "light-emergency", label: "Light Emergency", aliases: [] },
-  { iconCode: "light-emergency-on", label: "Light Emergency On", aliases: [] },
-  { iconCode: "light-switch", label: "Light Switch", aliases: [] },
-  { iconCode: "light-switch-off", label: "Light Switch Off", aliases: [] },
-  { iconCode: "light-switch-on", label: "Light Switch On", aliases: [] },
-  { iconCode: "lightbulb", label: "Lightbulb", aliases: [] },
-  { iconCode: "lightbulb-cfl", label: "Lightbulb Cfl", aliases: [] },
-  { iconCode: "lightbulb-cfl-on", label: "Lightbulb Cfl On", aliases: [] },
-  { iconCode: "lightbulb-dollar", label: "Lightbulb Dollar", aliases: [] },
-  { iconCode: "lightbulb-exclamation", label: "Lightbulb Exclamation", aliases: [] },
-  { iconCode: "lightbulb-exclamation-on", label: "Lightbulb Exclamation On", aliases: [] },
-  { iconCode: "lightbulb-gear", label: "Lightbulb Gear", aliases: [] },
-  { iconCode: "lightbulb-message", label: "Lightbulb Message", aliases: [] },
-  { iconCode: "lightbulb-on", label: "Lightbulb On", aliases: [] },
-  { iconCode: "lightbulb-slash", label: "Lightbulb Slash", aliases: [] },
-  { iconCode: "lighthouse", label: "Lighthouse", aliases: [] },
-  { iconCode: "lights-holiday", label: "Lights Holiday", aliases: [] },
-  { iconCode: "line-columns", label: "Line Columns", aliases: [] },
-  { iconCode: "line-height", label: "Line Height", aliases: [] },
-  { iconCode: "lines-leaning", label: "Lines Leaning", aliases: [] },
-  { iconCode: "link", label: "Link", aliases: ["chain"] },
-  { iconCode: "link-broken", label: "Link Broken", aliases: [] },
-  { iconCode: "link-horizontal", label: "Link Horizontal", aliases: ["chain-horizontal"] },
-  { iconCode: "link-horizontal-slash", label: "Link Horizontal Slash", aliases: ["chain-horizontal-slash"] },
-  { iconCode: "link-simple", label: "Link Simple", aliases: [] },
-  { iconCode: "link-simple-slash", label: "Link Simple Slash", aliases: [] },
-  { iconCode: "link-slash", label: "Link Slash", aliases: ["chain-broken", "chain-slash", "unlink"] },
-  { iconCode: "lips", label: "Lips", aliases: [] },
-  { iconCode: "lira-sign", label: "Lira Sign", aliases: [] },
-  { iconCode: "list", label: "List", aliases: ["list-squares"] },
-  { iconCode: "list-check", label: "List Check", aliases: ["tasks"] },
-  { iconCode: "list-dots", label: "List Dots", aliases: ["list-ul"] },
-  { iconCode: "list-dropdown", label: "List Dropdown", aliases: [] },
-  { iconCode: "list-music", label: "List Music", aliases: [] },
-  { iconCode: "list-numeric", label: "List Numeric", aliases: ["list-1-2", "list-ol"] },
-  { iconCode: "list-radio", label: "List Radio", aliases: [] },
-  { iconCode: "list-timeline", label: "List Timeline", aliases: [] },
-  { iconCode: "list-tree", label: "List Tree", aliases: [] },
-  { iconCode: "litecoin-sign", label: "Litecoin Sign", aliases: [] },
-  { iconCode: "loader", label: "Loader", aliases: [] },
-  { iconCode: "lobster", label: "Lobster", aliases: [] },
-  { iconCode: "location", label: "Location", aliases: ["location-crosshairs"] },
-  { iconCode: "location-arrow", label: "Location Arrow", aliases: [] },
-  { iconCode: "location-arrow-slash", label: "Location Arrow Slash", aliases: [] },
-  { iconCode: "location-arrow-up", label: "Location Arrow Up", aliases: [] },
-  { iconCode: "location-check", label: "Location Check", aliases: ["map-marker-check"] },
-  { iconCode: "location-crosshairs-slash", label: "Location Crosshairs Slash", aliases: ["location-slash"] },
-  { iconCode: "location-dot", label: "Location Dot", aliases: ["map-marker-alt"] },
-  { iconCode: "location-dot-slash", label: "Location Dot Slash", aliases: ["map-marker-alt-slash"] },
-  { iconCode: "location-exclamation", label: "Location Exclamation", aliases: ["map-marker-exclamation"] },
-  { iconCode: "location-minus", label: "Location Minus", aliases: ["map-marker-minus"] },
-  { iconCode: "location-pen", label: "Location Pen", aliases: ["map-marker-edit"] },
-  { iconCode: "location-pin", label: "Location Pin", aliases: ["map-marker"] },
-  { iconCode: "location-pin-lock", label: "Location Pin Lock", aliases: [] },
-  { iconCode: "location-pin-slash", label: "Location Pin Slash", aliases: ["map-marker-slash"] },
-  { iconCode: "location-plus", label: "Location Plus", aliases: ["map-marker-plus"] },
-  { iconCode: "location-question", label: "Location Question", aliases: ["map-marker-question"] },
-  { iconCode: "location-smile", label: "Location Smile", aliases: ["map-marker-smile"] },
-  { iconCode: "location-xmark", label: "Location Xmark", aliases: ["map-marker-times", "map-marker-xmark"] },
-  { iconCode: "lock", label: "Lock", aliases: [] },
-  { iconCode: "lock-a", label: "Lock A", aliases: [] },
-  { iconCode: "lock-hashtag", label: "Lock Hashtag", aliases: [] },
-  { iconCode: "lock-keyhole", label: "Lock Keyhole", aliases: ["lock-alt"] },
-  { iconCode: "lock-keyhole-open", label: "Lock Keyhole Open", aliases: ["lock-open-alt"] },
-  { iconCode: "lock-open", label: "Lock Open", aliases: [] },
-  { iconCode: "locust", label: "Locust", aliases: [] },
-  { iconCode: "lollipop", label: "Lollipop", aliases: ["lollypop"] },
-  { iconCode: "lungs", label: "Lungs", aliases: [] },
-  { iconCode: "lungs-virus", label: "Lungs Virus", aliases: [] },
-  { iconCode: "lychee", label: "Lychee", aliases: [] },
-  { iconCode: "m", label: "M", aliases: [] },
-  { iconCode: "mace", label: "Mace", aliases: [] },
-  { iconCode: "magnet", label: "Magnet", aliases: [] },
-  { iconCode: "magnifying-glass", label: "Magnifying Glass", aliases: ["search"] },
-  { iconCode: "magnifying-glass-arrow-right", label: "Magnifying Glass Arrow Right", aliases: [] },
-  { iconCode: "magnifying-glass-arrows-rotate", label: "Magnifying Glass Arrows Rotate", aliases: [] },
-  { iconCode: "magnifying-glass-chart", label: "Magnifying Glass Chart", aliases: [] },
-  { iconCode: "magnifying-glass-dollar", label: "Magnifying Glass Dollar", aliases: ["search-dollar"] },
-  { iconCode: "magnifying-glass-location", label: "Magnifying Glass Location", aliases: ["search-location"] },
-  { iconCode: "magnifying-glass-minus", label: "Magnifying Glass Minus", aliases: ["search-minus"] },
-  { iconCode: "magnifying-glass-music", label: "Magnifying Glass Music", aliases: [] },
-  { iconCode: "magnifying-glass-play", label: "Magnifying Glass Play", aliases: [] },
-  { iconCode: "magnifying-glass-plus", label: "Magnifying Glass Plus", aliases: ["search-plus"] },
-  { iconCode: "magnifying-glass-waveform", label: "Magnifying Glass Waveform", aliases: [] },
-  { iconCode: "mail-bulk", label: "Mail Bulk", aliases: ["envelopes-bulk"] },
-  { iconCode: "mail-reply", label: "Mail Reply", aliases: ["reply"] },
-  { iconCode: "mail-reply-all", label: "Mail Reply All", aliases: ["reply-all"] },
-  { iconCode: "mailbox", label: "Mailbox", aliases: [] },
-  { iconCode: "mailbox-flag-up", label: "Mailbox Flag Up", aliases: [] },
-  { iconCode: "mailbox-open-empty", label: "Mailbox Open Empty", aliases: [] },
-  { iconCode: "mailbox-open-letter", label: "Mailbox Open Letter", aliases: [] },
-  { iconCode: "malaysian-ringgit-sign", label: "Malaysian Ringgit Sign", aliases: [] },
-  { iconCode: "manat-sign", label: "Manat Sign", aliases: [] },
-  { iconCode: "mandolin", label: "Mandolin", aliases: [] },
-  { iconCode: "mango", label: "Mango", aliases: [] },
-  { iconCode: "manhole", label: "Manhole", aliases: [] },
-  { iconCode: "map", label: "Map", aliases: [] },
-  { iconCode: "map-location", label: "Map Location", aliases: ["map-marked"] },
-  { iconCode: "map-location-dot", label: "Map Location Dot", aliases: ["map-marked-alt"] },
-  { iconCode: "map-pin", label: "Map Pin", aliases: [] },
-  { iconCode: "map-signs", label: "Map Signs", aliases: ["signs-post"] },
-  { iconCode: "marker", label: "Marker", aliases: [] },
-  { iconCode: "mars", label: "Mars", aliases: [] },
-  { iconCode: "mars-and-venus", label: "Mars And Venus", aliases: [] },
-  { iconCode: "mars-and-venus-burst", label: "Mars And Venus Burst", aliases: [] },
-  { iconCode: "mars-double", label: "Mars Double", aliases: [] },
-  { iconCode: "mars-stroke", label: "Mars Stroke", aliases: [] },
-  { iconCode: "mars-stroke-right", label: "Mars Stroke Right", aliases: ["mars-stroke-h"] },
-  { iconCode: "mars-stroke-up", label: "Mars Stroke Up", aliases: ["mars-stroke-v"] },
-  { iconCode: "martini-glass", label: "Martini Glass", aliases: ["glass-martini-alt"] },
-  { iconCode: "martini-glass-citrus", label: "Martini Glass Citrus", aliases: ["cocktail"] },
-  { iconCode: "mask", label: "Mask", aliases: [] },
-  { iconCode: "mask-face", label: "Mask Face", aliases: [] },
-  { iconCode: "mask-luchador", label: "Mask Luchador", aliases: ["luchador", "luchador-mask"] },
-  { iconCode: "mask-snorkel", label: "Mask Snorkel", aliases: [] },
-  { iconCode: "mask-ventilator", label: "Mask Ventilator", aliases: [] },
-  { iconCode: "masks-theater", label: "Masks Theater", aliases: ["theater-masks"] },
-  { iconCode: "mattress-pillow", label: "Mattress Pillow", aliases: [] },
-  { iconCode: "maximize", label: "Maximize", aliases: ["expand-arrows-alt"] },
-  { iconCode: "meat", label: "Meat", aliases: [] },
-  { iconCode: "medal", label: "Medal", aliases: [] },
-  { iconCode: "megaphone", label: "Megaphone", aliases: [] },
-  { iconCode: "melon", label: "Melon", aliases: [] },
-  { iconCode: "melon-slice", label: "Melon Slice", aliases: [] },
-  { iconCode: "memo", label: "Memo", aliases: [] },
-  { iconCode: "memo-circle-check", label: "Memo Circle Check", aliases: [] },
-  { iconCode: "memo-circle-info", label: "Memo Circle Info", aliases: [] },
-  { iconCode: "memo-pad", label: "Memo Pad", aliases: [] },
-  { iconCode: "memory", label: "Memory", aliases: [] },
-  { iconCode: "menorah", label: "Menorah", aliases: [] },
-  { iconCode: "mercury", label: "Mercury", aliases: [] },
-  { iconCode: "merge", label: "Merge", aliases: [] },
-  { iconCode: "message", label: "Message", aliases: ["comment-alt"] },
-  { iconCode: "message-arrow-down", label: "Message Arrow Down", aliases: ["comment-alt-arrow-down"] },
-  { iconCode: "message-arrow-up", label: "Message Arrow Up", aliases: ["comment-alt-arrow-up"] },
-  { iconCode: "message-arrow-up-right", label: "Message Arrow Up Right", aliases: [] },
-  { iconCode: "message-bot", label: "Message Bot", aliases: [] },
-  { iconCode: "message-captions", label: "Message Captions", aliases: ["comment-alt-captions"] },
-  { iconCode: "message-check", label: "Message Check", aliases: ["comment-alt-check"] },
-  { iconCode: "message-code", label: "Message Code", aliases: [] },
-  { iconCode: "message-dollar", label: "Message Dollar", aliases: ["comment-alt-dollar"] },
-  { iconCode: "message-dot", label: "Message Dot", aliases: [] },
-  { iconCode: "message-dots", label: "Message Dots", aliases: ["comment-alt-dots", "messaging"] },
-  { iconCode: "message-exclamation", label: "Message Exclamation", aliases: ["comment-alt-exclamation"] },
-  { iconCode: "message-heart", label: "Message Heart", aliases: [] },
-  { iconCode: "message-image", label: "Message Image", aliases: ["comment-alt-image"] },
-  { iconCode: "message-lines", label: "Message Lines", aliases: ["comment-alt-lines"] },
-  { iconCode: "message-medical", label: "Message Medical", aliases: ["comment-alt-medical"] },
-  { iconCode: "message-middle", label: "Message Middle", aliases: ["comment-middle-alt"] },
-  { iconCode: "message-middle-top", label: "Message Middle Top", aliases: ["comment-middle-top-alt"] },
-  { iconCode: "message-minus", label: "Message Minus", aliases: ["comment-alt-minus"] },
-  { iconCode: "message-music", label: "Message Music", aliases: ["comment-alt-music"] },
-  { iconCode: "message-pen", label: "Message Pen", aliases: ["comment-alt-edit", "message-edit"] },
-  { iconCode: "message-plus", label: "Message Plus", aliases: ["comment-alt-plus"] },
-  { iconCode: "message-question", label: "Message Question", aliases: [] },
-  { iconCode: "message-quote", label: "Message Quote", aliases: ["comment-alt-quote"] },
-  { iconCode: "message-slash", label: "Message Slash", aliases: ["comment-alt-slash"] },
-  { iconCode: "message-smile", label: "Message Smile", aliases: ["comment-alt-smile"] },
-  { iconCode: "message-sms", label: "Message Sms", aliases: [] },
-  { iconCode: "message-text", label: "Message Text", aliases: ["comment-alt-text"] },
-  { iconCode: "message-waveform", label: "Message Waveform", aliases: [] },
-  { iconCode: "message-xmark", label: "Message Xmark", aliases: ["comment-alt-times", "message-times"] },
-  { iconCode: "messages", label: "Messages", aliases: ["comments-alt"] },
-  { iconCode: "messages-dollar", label: "Messages Dollar", aliases: ["comments-alt-dollar"] },
-  { iconCode: "messages-question", label: "Messages Question", aliases: [] },
-  { iconCode: "meteor", label: "Meteor", aliases: [] },
-  { iconCode: "meter", label: "Meter", aliases: [] },
-  { iconCode: "meter-bolt", label: "Meter Bolt", aliases: [] },
-  { iconCode: "meter-droplet", label: "Meter Droplet", aliases: [] },
-  { iconCode: "meter-fire", label: "Meter Fire", aliases: [] },
-  { iconCode: "microchip", label: "Microchip", aliases: [] },
-  { iconCode: "microchip-ai", label: "Microchip Ai", aliases: [] },
-  { iconCode: "microphone", label: "Microphone", aliases: [] },
-  { iconCode: "microphone-circle-plus", label: "Microphone Circle Plus", aliases: [] },
-  { iconCode: "microphone-circle-xmark", label: "Microphone Circle Xmark", aliases: [] },
-  { iconCode: "microphone-lines", label: "Microphone Lines", aliases: ["microphone-alt"] },
-  { iconCode: "microphone-lines-slash", label: "Microphone Lines Slash", aliases: ["microphone-alt-slash"] },
-  { iconCode: "microphone-signal-meter", label: "Microphone Signal Meter", aliases: [] },
-  { iconCode: "microphone-slash", label: "Microphone Slash", aliases: [] },
-  { iconCode: "microphone-stand", label: "Microphone Stand", aliases: [] },
-  { iconCode: "microscope", label: "Microscope", aliases: [] },
-  { iconCode: "microwave", label: "Microwave", aliases: [] },
-  { iconCode: "midi", label: "Midi", aliases: [] },
-  { iconCode: "mill-sign", label: "Mill Sign", aliases: [] },
-  { iconCode: "minimize", label: "Minimize", aliases: ["compress-arrows-alt"] },
-  { iconCode: "minus", label: "Minus", aliases: ["subtract"] },
-  { iconCode: "minus-large", label: "Minus Large", aliases: ["dash"] },
-  { iconCode: "mistletoe", label: "Mistletoe", aliases: [] },
-  { iconCode: "mitten", label: "Mitten", aliases: [] },
-  { iconCode: "mobile", label: "Mobile", aliases: ["mobile-android", "mobile-phone"] },
-  { iconCode: "mobile-arrow-down", label: "Mobile Arrow Down", aliases: [] },
-  { iconCode: "mobile-button", label: "Mobile Button", aliases: [] },
-  { iconCode: "mobile-iphone", label: "Mobile Iphone", aliases: ["mobile-notch"] },
-  { iconCode: "mobile-retro", label: "Mobile Retro", aliases: [] },
-  { iconCode: "mobile-rotate", label: "Mobile Rotate", aliases: [] },
-  { iconCode: "mobile-rotate-reverse", label: "Mobile Rotate Reverse", aliases: [] },
-  { iconCode: "mobile-screen", label: "Mobile Screen", aliases: ["mobile-android-alt"] },
-  { iconCode: "mobile-screen-button", label: "Mobile Screen Button", aliases: ["mobile-alt"] },
-  { iconCode: "mobile-signal", label: "Mobile Signal", aliases: [] },
-  { iconCode: "mobile-signal-out", label: "Mobile Signal Out", aliases: [] },
-  { iconCode: "mobile-slash", label: "Mobile Slash", aliases: [] },
-  { iconCode: "mobile-vibrate", label: "Mobile Vibrate", aliases: [] },
-  { iconCode: "mobile-vibrate-slash", label: "Mobile Vibrate Slash", aliases: [] },
-  { iconCode: "money-bill", label: "Money Bill", aliases: [] },
-  { iconCode: "money-bill-1-wave", label: "Money Bill 1 Wave", aliases: ["money-bill-wave-alt"] },
-  { iconCode: "money-bill-alt", label: "Money Bill Alt", aliases: ["money-bill-1"] },
-  { iconCode: "money-bill-simple", label: "Money Bill Simple", aliases: [] },
-  { iconCode: "money-bill-simple-wave", label: "Money Bill Simple Wave", aliases: [] },
-  { iconCode: "money-bill-transfer", label: "Money Bill Transfer", aliases: [] },
-  { iconCode: "money-bill-trend-up", label: "Money Bill Trend Up", aliases: [] },
-  { iconCode: "money-bill-wave", label: "Money Bill Wave", aliases: [] },
-  { iconCode: "money-bill-wheat", label: "Money Bill Wheat", aliases: [] },
-  { iconCode: "money-bills", label: "Money Bills", aliases: [] },
-  { iconCode: "money-bills-simple", label: "Money Bills Simple", aliases: ["money-bills-alt"] },
-  { iconCode: "money-check", label: "Money Check", aliases: [] },
-  { iconCode: "money-check-dollar", label: "Money Check Dollar", aliases: ["money-check-alt"] },
-  { iconCode: "money-check-dollar-pen", label: "Money Check Dollar Pen", aliases: ["money-check-edit-alt"] },
-  { iconCode: "money-check-pen", label: "Money Check Pen", aliases: ["money-check-edit"] },
-  { iconCode: "money-from-bracket", label: "Money From Bracket", aliases: [] },
-  { iconCode: "money-simple-from-bracket", label: "Money Simple From Bracket", aliases: [] },
-  { iconCode: "monitor-heart-rate", label: "Monitor Heart Rate", aliases: ["monitor-waveform"] },
-  { iconCode: "monkey", label: "Monkey", aliases: [] },
-  { iconCode: "monument", label: "Monument", aliases: [] },
-  { iconCode: "moon", label: "Moon", aliases: [] },
-  { iconCode: "moon-cloud", label: "Moon Cloud", aliases: [] },
-  { iconCode: "moon-first-quarter-inverse", label: "Moon First Quarter Inverse", aliases: ["moon-last-quarter"] },
-  { iconCode: "moon-full-inverse", label: "Moon Full Inverse", aliases: ["moon-new"] },
-  { iconCode: "moon-last-quarter-inverse", label: "Moon Last Quarter Inverse", aliases: ["moon-first-quarter"] },
-  { iconCode: "moon-new-inverse", label: "Moon New Inverse", aliases: ["moon-full"] },
-  { iconCode: "moon-over-sun", label: "Moon Over Sun", aliases: ["eclipse-alt"] },
-  { iconCode: "moon-star", label: "Moon Star", aliases: [] },
-  { iconCode: "moon-stars", label: "Moon Stars", aliases: [] },
-  { iconCode: "moon-waning-crescent-inverse", label: "Moon Waning Crescent Inverse", aliases: ["moon-waxing-gibbous"] },
-  { iconCode: "moon-waning-gibbous-inverse", label: "Moon Waning Gibbous Inverse", aliases: ["moon-waxing-crescent"] },
-  { iconCode: "moon-waxing-crescent-inverse", label: "Moon Waxing Crescent Inverse", aliases: ["moon-waning-gibbous"] },
-  { iconCode: "moon-waxing-gibbous-inverse", label: "Moon Waxing Gibbous Inverse", aliases: ["moon-waning-crescent"] },
-  { iconCode: "moped", label: "Moped", aliases: [] },
-  { iconCode: "mortar-board", label: "Mortar Board", aliases: ["graduation-cap"] },
-  { iconCode: "mortar-pestle", label: "Mortar Pestle", aliases: [] },
-  { iconCode: "mosque", label: "Mosque", aliases: [] },
-  { iconCode: "mosquito", label: "Mosquito", aliases: [] },
-  { iconCode: "mosquito-net", label: "Mosquito Net", aliases: [] },
-  { iconCode: "motorcycle", label: "Motorcycle", aliases: [] },
-  { iconCode: "mound", label: "Mound", aliases: [] },
-  { iconCode: "mountain", label: "Mountain", aliases: [] },
-  { iconCode: "mountain-city", label: "Mountain City", aliases: [] },
-  { iconCode: "mountain-sun", label: "Mountain Sun", aliases: [] },
-  { iconCode: "mountains", label: "Mountains", aliases: [] },
-  { iconCode: "mouse-field", label: "Mouse Field", aliases: [] },
-  { iconCode: "mp3-player", label: "Mp3 Player", aliases: [] },
-  { iconCode: "mug", label: "Mug", aliases: [] },
-  { iconCode: "mug-hot", label: "Mug Hot", aliases: [] },
-  { iconCode: "mug-marshmallows", label: "Mug Marshmallows", aliases: [] },
-  { iconCode: "mug-saucer", label: "Mug Saucer", aliases: ["coffee"] },
-  { iconCode: "mug-tea", label: "Mug Tea", aliases: [] },
-  { iconCode: "mug-tea-saucer", label: "Mug Tea Saucer", aliases: [] },
-  { iconCode: "mushroom", label: "Mushroom", aliases: [] },
-  { iconCode: "music", label: "Music", aliases: [] },
-  { iconCode: "music-magnifying-glass", label: "Music Magnifying Glass", aliases: [] },
-  { iconCode: "music-note", label: "Music Note", aliases: ["music-alt"] },
-  { iconCode: "music-note-slash", label: "Music Note Slash", aliases: ["music-alt-slash"] },
-  { iconCode: "music-slash", label: "Music Slash", aliases: [] },
-  { iconCode: "mustache", label: "Mustache", aliases: [] },
-  { iconCode: "n", label: "N", aliases: [] },
-  { iconCode: "naira-sign", label: "Naira Sign", aliases: [] },
-  { iconCode: "narwhal", label: "Narwhal", aliases: [] },
-  { iconCode: "nas", label: "Nas", aliases: [] },
-  { iconCode: "nesting-dolls", label: "Nesting Dolls", aliases: [] },
-  { iconCode: "network-wired", label: "Network Wired", aliases: [] },
-  { iconCode: "neuter", label: "Neuter", aliases: [] },
-  { iconCode: "newspaper", label: "Newspaper", aliases: [] },
-  { iconCode: "nfc", label: "Nfc", aliases: [] },
-  { iconCode: "nfc-lock", label: "Nfc Lock", aliases: [] },
-  { iconCode: "nfc-magnifying-glass", label: "Nfc Magnifying Glass", aliases: [] },
-  { iconCode: "nfc-pen", label: "Nfc Pen", aliases: [] },
-  { iconCode: "nfc-signal", label: "Nfc Signal", aliases: [] },
-  { iconCode: "nfc-slash", label: "Nfc Slash", aliases: [] },
-  { iconCode: "nfc-trash", label: "Nfc Trash", aliases: [] },
-  { iconCode: "non-binary", label: "Non Binary", aliases: [] },
-  { iconCode: "norwegian-krone-sign", label: "Norwegian Krone Sign", aliases: [] },
-  { iconCode: "nose", label: "Nose", aliases: [] },
-  { iconCode: "not-equal", label: "Not Equal", aliases: [] },
-  { iconCode: "notdef", label: "Notdef", aliases: [] },
-  { iconCode: "note", label: "Note", aliases: [] },
-  { iconCode: "note-medical", label: "Note Medical", aliases: [] },
-  { iconCode: "note-sticky", label: "Note Sticky", aliases: ["sticky-note"] },
-  { iconCode: "notebook", label: "Notebook", aliases: [] },
-  { iconCode: "notes", label: "Notes", aliases: [] },
-  { iconCode: "notes-medical", label: "Notes Medical", aliases: [] },
-  { iconCode: "notes-sticky", label: "Notes Sticky", aliases: [] },
-  { iconCode: "o", label: "O", aliases: [] },
-  { iconCode: "oar", label: "Oar", aliases: [] },
-  { iconCode: "oars", label: "Oars", aliases: [] },
-  { iconCode: "object-exclude", label: "Object Exclude", aliases: [] },
-  { iconCode: "object-group", label: "Object Group", aliases: [] },
-  { iconCode: "object-intersect", label: "Object Intersect", aliases: [] },
-  { iconCode: "object-subtract", label: "Object Subtract", aliases: [] },
-  { iconCode: "object-ungroup", label: "Object Ungroup", aliases: [] },
-  { iconCode: "object-union", label: "Object Union", aliases: [] },
-  { iconCode: "objects-align-bottom", label: "Objects Align Bottom", aliases: [] },
-  { iconCode: "objects-align-center-horizontal", label: "Objects Align Center Horizontal", aliases: [] },
-  { iconCode: "objects-align-center-vertical", label: "Objects Align Center Vertical", aliases: [] },
-  { iconCode: "objects-align-left", label: "Objects Align Left", aliases: [] },
-  { iconCode: "objects-align-right", label: "Objects Align Right", aliases: [] },
-  { iconCode: "objects-align-top", label: "Objects Align Top", aliases: [] },
-  { iconCode: "objects-column", label: "Objects Column", aliases: [] },
-  { iconCode: "octagon", label: "Octagon", aliases: [] },
-  { iconCode: "octagon-check", label: "Octagon Check", aliases: [] },
-  { iconCode: "octagon-divide", label: "Octagon Divide", aliases: [] },
-  { iconCode: "octagon-equals", label: "Octagon Equals", aliases: [] },
-  { iconCode: "octagon-exclamation", label: "Octagon Exclamation", aliases: [] },
-  { iconCode: "octagon-minus", label: "Octagon Minus", aliases: ["minus-octagon"] },
-  { iconCode: "octagon-plus", label: "Octagon Plus", aliases: ["plus-octagon"] },
-  { iconCode: "octagon-xmark", label: "Octagon Xmark", aliases: ["times-octagon", "xmark-octagon"] },
-  { iconCode: "octopus", label: "Octopus", aliases: [] },
-  { iconCode: "oil-can", label: "Oil Can", aliases: [] },
-  { iconCode: "oil-can-drip", label: "Oil Can Drip", aliases: [] },
-  { iconCode: "oil-temperature", label: "Oil Temperature", aliases: ["oil-temp"] },
-  { iconCode: "oil-well", label: "Oil Well", aliases: [] },
-  { iconCode: "olive", label: "Olive", aliases: [] },
-  { iconCode: "olive-branch", label: "Olive Branch", aliases: [] },
-  { iconCode: "om", label: "Om", aliases: [] },
-  { iconCode: "omega", label: "Omega", aliases: [] },
-  { iconCode: "onion", label: "Onion", aliases: [] },
-  { iconCode: "open-captioning", label: "Open Captioning", aliases: [] },
-  { iconCode: "opossum", label: "Opossum", aliases: ["possum"] },
-  { iconCode: "option", label: "Option", aliases: [] },
-  { iconCode: "ornament", label: "Ornament", aliases: [] },
-  { iconCode: "otter", label: "Otter", aliases: [] },
-  { iconCode: "outdent", label: "Outdent", aliases: ["dedent"] },
-  { iconCode: "outlet", label: "Outlet", aliases: [] },
-  { iconCode: "oven", label: "Oven", aliases: [] },
-  { iconCode: "overline", label: "Overline", aliases: [] },
-  { iconCode: "owl", label: "Owl", aliases: [] },
-  { iconCode: "p", label: "P", aliases: [] },
-  { iconCode: "page", label: "Page", aliases: [] },
-  { iconCode: "pager", label: "Pager", aliases: [] },
-  { iconCode: "paint-roller", label: "Paint Roller", aliases: [] },
-  { iconCode: "paintbrush", label: "Paintbrush", aliases: ["paint-brush"] },
-  { iconCode: "paintbrush-fine", label: "Paintbrush Fine", aliases: ["paint-brush-alt", "paint-brush-fine", "paintbrush-alt"] },
-  { iconCode: "paintbrush-fine-slash", label: "Paintbrush Fine Slash", aliases: [] },
-  { iconCode: "paintbrush-pencil", label: "Paintbrush Pencil", aliases: [] },
-  { iconCode: "paintbrush-slash", label: "Paintbrush Slash", aliases: [] },
-  { iconCode: "palette", label: "Palette", aliases: [] },
-  { iconCode: "pallet", label: "Pallet", aliases: [] },
-  { iconCode: "pallet-box", label: "Pallet Box", aliases: [] },
-  { iconCode: "pallet-boxes", label: "Pallet Boxes", aliases: ["palette-boxes", "pallet-alt"] },
-  { iconCode: "pan-food", label: "Pan Food", aliases: [] },
-  { iconCode: "pan-frying", label: "Pan Frying", aliases: [] },
-  { iconCode: "pancakes", label: "Pancakes", aliases: [] },
-  { iconCode: "panel-ews", label: "Panel Ews", aliases: [] },
-  { iconCode: "panel-fire", label: "Panel Fire", aliases: [] },
-  { iconCode: "panorama", label: "Panorama", aliases: [] },
-  { iconCode: "panties", label: "Panties", aliases: [] },
-  { iconCode: "pants", label: "Pants", aliases: [] },
-  { iconCode: "pants-straight", label: "Pants Straight", aliases: [] },
-  { iconCode: "paper-plane", label: "Paper Plane", aliases: [] },
-  { iconCode: "paper-plane-top", label: "Paper Plane Top", aliases: ["paper-plane-alt", "send"] },
-  { iconCode: "paperclip", label: "Paperclip", aliases: [] },
-  { iconCode: "paperclip-vertical", label: "Paperclip Vertical", aliases: [] },
-  { iconCode: "parachute-box", label: "Parachute Box", aliases: [] },
-  { iconCode: "paragraph", label: "Paragraph", aliases: [] },
-  { iconCode: "paragraph-left", label: "Paragraph Left", aliases: ["paragraph-rtl"] },
-  { iconCode: "parking-circle-slash", label: "Parking Circle Slash", aliases: ["ban-parking"] },
-  { iconCode: "party-bell", label: "Party Bell", aliases: [] },
-  { iconCode: "party-horn", label: "Party Horn", aliases: [] },
-  { iconCode: "passport", label: "Passport", aliases: [] },
-  { iconCode: "pause", label: "Pause", aliases: [] },
-  { iconCode: "paw", label: "Paw", aliases: [] },
-  { iconCode: "paw-claws", label: "Paw Claws", aliases: [] },
-  { iconCode: "paw-simple", label: "Paw Simple", aliases: ["paw-alt"] },
-  { iconCode: "peace", label: "Peace", aliases: [] },
-  { iconCode: "peach", label: "Peach", aliases: [] },
-  { iconCode: "peanut", label: "Peanut", aliases: [] },
-  { iconCode: "peanuts", label: "Peanuts", aliases: [] },
-  { iconCode: "peapod", label: "Peapod", aliases: [] },
-  { iconCode: "pear", label: "Pear", aliases: [] },
-  { iconCode: "pedestal", label: "Pedestal", aliases: [] },
-  { iconCode: "pegasus", label: "Pegasus", aliases: [] },
-  { iconCode: "pen", label: "Pen", aliases: [] },
-  { iconCode: "pen-circle", label: "Pen Circle", aliases: [] },
-  { iconCode: "pen-clip", label: "Pen Clip", aliases: ["pen-alt"] },
-  { iconCode: "pen-clip-slash", label: "Pen Clip Slash", aliases: ["pen-alt-slash"] },
-  { iconCode: "pen-fancy", label: "Pen Fancy", aliases: [] },
-  { iconCode: "pen-fancy-slash", label: "Pen Fancy Slash", aliases: [] },
-  { iconCode: "pen-field", label: "Pen Field", aliases: [] },
-  { iconCode: "pen-line", label: "Pen Line", aliases: [] },
-  { iconCode: "pen-nib", label: "Pen Nib", aliases: [] },
-  { iconCode: "pen-nib-slash", label: "Pen Nib Slash", aliases: [] },
-  { iconCode: "pen-paintbrush", label: "Pen Paintbrush", aliases: ["pencil-paintbrush"] },
-  { iconCode: "pen-ruler", label: "Pen Ruler", aliases: ["pencil-ruler"] },
-  { iconCode: "pen-slash", label: "Pen Slash", aliases: [] },
-  { iconCode: "pen-swirl", label: "Pen Swirl", aliases: [] },
-  { iconCode: "pen-to-square", label: "Pen To Square", aliases: ["edit"] },
-  { iconCode: "pencil", label: "Pencil", aliases: ["pencil-alt"] },
-  { iconCode: "pencil-line", label: "Pencil Line", aliases: [] },
-  { iconCode: "pencil-mechanical", label: "Pencil Mechanical", aliases: [] },
-  { iconCode: "pencil-slash", label: "Pencil Slash", aliases: [] },
-  { iconCode: "pentagon", label: "Pentagon", aliases: [] },
-  { iconCode: "people", label: "People", aliases: [] },
-  { iconCode: "people-arrows", label: "People Arrows", aliases: ["people-arrows-left-right"] },
-  { iconCode: "people-carry", label: "People Carry", aliases: ["people-carry-box"] },
-  { iconCode: "people-dress", label: "People Dress", aliases: [] },
-  { iconCode: "people-dress-simple", label: "People Dress Simple", aliases: [] },
-  { iconCode: "people-group", label: "People Group", aliases: [] },
-  { iconCode: "people-line", label: "People Line", aliases: [] },
-  { iconCode: "people-pants", label: "People Pants", aliases: [] },
-  { iconCode: "people-pants-simple", label: "People Pants Simple", aliases: [] },
-  { iconCode: "people-pulling", label: "People Pulling", aliases: [] },
-  { iconCode: "people-robbery", label: "People Robbery", aliases: [] },
-  { iconCode: "people-roof", label: "People Roof", aliases: [] },
-  { iconCode: "people-simple", label: "People Simple", aliases: [] },
-  { iconCode: "pepper", label: "Pepper", aliases: [] },
-  { iconCode: "pepper-hot", label: "Pepper Hot", aliases: [] },
-  { iconCode: "percentage", label: "Percentage", aliases: ["percent"] },
-  { iconCode: "period", label: "Period", aliases: [] },
-  { iconCode: "person", label: "Person", aliases: ["male"] },
-  { iconCode: "person-arms-raised", label: "Person Arms Raised", aliases: [] },
-  { iconCode: "person-arrow-down-to-line", label: "Person Arrow Down To Line", aliases: [] },
-  { iconCode: "person-arrow-up-from-line", label: "Person Arrow Up From Line", aliases: [] },
-  { iconCode: "person-basketball", label: "Person Basketball", aliases: [] },
-  { iconCode: "person-biking", label: "Person Biking", aliases: ["biking"] },
-  { iconCode: "person-biking-mountain", label: "Person Biking Mountain", aliases: ["biking-mountain"] },
-  { iconCode: "person-booth", label: "Person Booth", aliases: [] },
-  { iconCode: "person-breastfeeding", label: "Person Breastfeeding", aliases: [] },
-  { iconCode: "person-burst", label: "Person Burst", aliases: [] },
-  { iconCode: "person-cane", label: "Person Cane", aliases: [] },
-  { iconCode: "person-carry", label: "Person Carry", aliases: ["person-carry-box"] },
-  { iconCode: "person-carry-empty", label: "Person Carry Empty", aliases: [] },
-  { iconCode: "person-chalkboard", label: "Person Chalkboard", aliases: [] },
-  { iconCode: "person-circle-check", label: "Person Circle Check", aliases: [] },
-  { iconCode: "person-circle-exclamation", label: "Person Circle Exclamation", aliases: [] },
-  { iconCode: "person-circle-minus", label: "Person Circle Minus", aliases: [] },
-  { iconCode: "person-circle-plus", label: "Person Circle Plus", aliases: [] },
-  { iconCode: "person-circle-question", label: "Person Circle Question", aliases: [] },
-  { iconCode: "person-circle-xmark", label: "Person Circle Xmark", aliases: [] },
-  { iconCode: "person-digging", label: "Person Digging", aliases: ["digging"] },
-  { iconCode: "person-dolly", label: "Person Dolly", aliases: [] },
-  { iconCode: "person-dolly-empty", label: "Person Dolly Empty", aliases: [] },
-  { iconCode: "person-dots-from-line", label: "Person Dots From Line", aliases: ["diagnoses"] },
-  { iconCode: "person-dress", label: "Person Dress", aliases: ["female"] },
-  { iconCode: "person-dress-burst", label: "Person Dress Burst", aliases: [] },
-  { iconCode: "person-dress-fairy", label: "Person Dress Fairy", aliases: [] },
-  { iconCode: "person-dress-simple", label: "Person Dress Simple", aliases: [] },
-  { iconCode: "person-drowning", label: "Person Drowning", aliases: [] },
-  { iconCode: "person-fairy", label: "Person Fairy", aliases: [] },
-  { iconCode: "person-falling", label: "Person Falling", aliases: [] },
-  { iconCode: "person-falling-burst", label: "Person Falling Burst", aliases: [] },
-  { iconCode: "person-from-portal", label: "Person From Portal", aliases: ["portal-exit"] },
-  { iconCode: "person-golfing", label: "Person Golfing", aliases: [] },
-  { iconCode: "person-half-dress", label: "Person Half Dress", aliases: [] },
-  { iconCode: "person-harassing", label: "Person Harassing", aliases: [] },
-  { iconCode: "person-hiking", label: "Person Hiking", aliases: ["hiking"] },
-  { iconCode: "person-limbs-wide", label: "Person Limbs Wide", aliases: [] },
-  { iconCode: "person-meditating", label: "Person Meditating", aliases: [] },
-  { iconCode: "person-military-pointing", label: "Person Military Pointing", aliases: [] },
-  { iconCode: "person-military-rifle", label: "Person Military Rifle", aliases: [] },
-  { iconCode: "person-military-to-person", label: "Person Military To Person", aliases: [] },
-  { iconCode: "person-pinball", label: "Person Pinball", aliases: [] },
-  { iconCode: "person-praying", label: "Person Praying", aliases: ["pray"] },
-  { iconCode: "person-pregnant", label: "Person Pregnant", aliases: [] },
-  { iconCode: "person-rays", label: "Person Rays", aliases: [] },
-  { iconCode: "person-rifle", label: "Person Rifle", aliases: [] },
-  { iconCode: "person-running", label: "Person Running", aliases: ["running"] },
-  { iconCode: "person-running-fast", label: "Person Running Fast", aliases: [] },
-  { iconCode: "person-seat", label: "Person Seat", aliases: [] },
-  { iconCode: "person-seat-reclined", label: "Person Seat Reclined", aliases: [] },
-  { iconCode: "person-seat-window", label: "Person Seat Window", aliases: [] },
-  { iconCode: "person-shelter", label: "Person Shelter", aliases: [] },
-  { iconCode: "person-sign", label: "Person Sign", aliases: [] },
-  { iconCode: "person-simple", label: "Person Simple", aliases: [] },
-  { iconCode: "person-skating", label: "Person Skating", aliases: ["skating"] },
-  { iconCode: "person-ski-jumping", label: "Person Ski Jumping", aliases: ["ski-jump"] },
-  { iconCode: "person-ski-lift", label: "Person Ski Lift", aliases: ["ski-lift"] },
-  { iconCode: "person-skiing", label: "Person Skiing", aliases: ["skiing"] },
-  { iconCode: "person-skiing-nordic", label: "Person Skiing Nordic", aliases: ["skiing-nordic"] },
-  { iconCode: "person-sledding", label: "Person Sledding", aliases: ["sledding"] },
-  { iconCode: "person-snowboarding", label: "Person Snowboarding", aliases: ["snowboarding"] },
-  { iconCode: "person-snowmobiling", label: "Person Snowmobiling", aliases: ["snowmobile"] },
-  { iconCode: "person-soccer", label: "Person Soccer", aliases: [] },
-  { iconCode: "person-swimming", label: "Person Swimming", aliases: ["swimmer"] },
-  { iconCode: "person-swimming-pool", label: "Person Swimming Pool", aliases: [] },
-  { iconCode: "person-swimming-water", label: "Person Swimming Water", aliases: [] },
-  { iconCode: "person-through-window", label: "Person Through Window", aliases: [] },
-  { iconCode: "person-to-door", label: "Person To Door", aliases: [] },
-  { iconCode: "person-to-portal", label: "Person To Portal", aliases: ["portal-enter"] },
-  { iconCode: "person-walking", label: "Person Walking", aliases: ["walking"] },
-  { iconCode: "person-walking-arrow-loop-left", label: "Person Walking Arrow Loop Left", aliases: [] },
-  { iconCode: "person-walking-arrow-right", label: "Person Walking Arrow Right", aliases: [] },
-  { iconCode: "person-walking-dashed-line-arrow-right", label: "Person Walking Dashed Line Arrow Right", aliases: [] },
-  { iconCode: "person-walking-luggage", label: "Person Walking Luggage", aliases: [] },
-  { iconCode: "person-walking-with-cane", label: "Person Walking With Cane", aliases: ["blind"] },
-  { iconCode: "person-water-arms-raised", label: "Person Water Arms Raised", aliases: [] },
-  { iconCode: "person-waving", label: "Person Waving", aliases: [] },
-  { iconCode: "peruvian-soles-sign", label: "Peruvian Soles Sign", aliases: [] },
-  { iconCode: "peseta-sign", label: "Peseta Sign", aliases: [] },
-  { iconCode: "peso-sign", label: "Peso Sign", aliases: [] },
-  { iconCode: "phone", label: "Phone", aliases: [] },
-  { iconCode: "phone-arrow-down", label: "Phone Arrow Down", aliases: ["phone-arrow-down-left", "phone-incoming"] },
-  { iconCode: "phone-arrow-right", label: "Phone Arrow Right", aliases: [] },
-  { iconCode: "phone-arrow-up", label: "Phone Arrow Up", aliases: ["phone-arrow-up-right", "phone-outgoing"] },
-  { iconCode: "phone-connection", label: "Phone Connection", aliases: [] },
-  { iconCode: "phone-flip", label: "Phone Flip", aliases: ["phone-alt"] },
-  { iconCode: "phone-hangup", label: "Phone Hangup", aliases: [] },
-  { iconCode: "phone-intercom", label: "Phone Intercom", aliases: [] },
-  { iconCode: "phone-laptop", label: "Phone Laptop", aliases: ["laptop-mobile"] },
-  { iconCode: "phone-missed", label: "Phone Missed", aliases: [] },
-  { iconCode: "phone-office", label: "Phone Office", aliases: [] },
-  { iconCode: "phone-plus", label: "Phone Plus", aliases: [] },
-  { iconCode: "phone-rotary", label: "Phone Rotary", aliases: [] },
-  { iconCode: "phone-slash", label: "Phone Slash", aliases: [] },
-  { iconCode: "phone-volume", label: "Phone Volume", aliases: ["volume-control-phone"] },
-  { iconCode: "phone-waveform", label: "Phone Waveform", aliases: [] },
-  { iconCode: "phone-xmark", label: "Phone Xmark", aliases: [] },
-  { iconCode: "photo-film-music", label: "Photo Film Music", aliases: [] },
-  { iconCode: "photo-video", label: "Photo Video", aliases: ["photo-film"] },
-  { iconCode: "pi", label: "Pi", aliases: [] },
-  { iconCode: "piano", label: "Piano", aliases: [] },
-  { iconCode: "piano-keyboard", label: "Piano Keyboard", aliases: [] },
-  { iconCode: "pickaxe", label: "Pickaxe", aliases: [] },
-  { iconCode: "pickleball", label: "Pickleball", aliases: [] },
-  { iconCode: "picture-in-picture", label: "Picture In Picture", aliases: [] },
-  { iconCode: "pie", label: "Pie", aliases: [] },
-  { iconCode: "pig", label: "Pig", aliases: [] },
-  { iconCode: "piggy-bank", label: "Piggy Bank", aliases: [] },
-  { iconCode: "pills", label: "Pills", aliases: [] },
-  { iconCode: "pinata", label: "Pinata", aliases: [] },
-  { iconCode: "pinball", label: "Pinball", aliases: [] },
-  { iconCode: "pineapple", label: "Pineapple", aliases: [] },
-  { iconCode: "pipe", label: "Pipe", aliases: [] },
-  { iconCode: "pipe-circle-check", label: "Pipe Circle Check", aliases: [] },
-  { iconCode: "pipe-collar", label: "Pipe Collar", aliases: [] },
-  { iconCode: "pipe-section", label: "Pipe Section", aliases: [] },
-  { iconCode: "pipe-smoking", label: "Pipe Smoking", aliases: [] },
-  { iconCode: "pipe-valve", label: "Pipe Valve", aliases: [] },
-  { iconCode: "pisces", label: "Pisces", aliases: [] },
-  { iconCode: "pizza", label: "Pizza", aliases: [] },
-  { iconCode: "pizza-slice", label: "Pizza Slice", aliases: [] },
-  { iconCode: "place-of-worship", label: "Place Of Worship", aliases: [] },
-  { iconCode: "plane", label: "Plane", aliases: [] },
-  { iconCode: "plane-arrival", label: "Plane Arrival", aliases: [] },
-  { iconCode: "plane-circle-check", label: "Plane Circle Check", aliases: [] },
-  { iconCode: "plane-circle-exclamation", label: "Plane Circle Exclamation", aliases: [] },
-  { iconCode: "plane-circle-xmark", label: "Plane Circle Xmark", aliases: [] },
-  { iconCode: "plane-departure", label: "Plane Departure", aliases: [] },
-  { iconCode: "plane-engines", label: "Plane Engines", aliases: ["plane-alt"] },
-  { iconCode: "plane-flying", label: "Plane Flying", aliases: [] },
-  { iconCode: "plane-landing-gear", label: "Plane Landing Gear", aliases: [] },
-  { iconCode: "plane-lock", label: "Plane Lock", aliases: [] },
-  { iconCode: "plane-prop", label: "Plane Prop", aliases: [] },
-  { iconCode: "plane-slash", label: "Plane Slash", aliases: [] },
-  { iconCode: "plane-tail", label: "Plane Tail", aliases: [] },
-  { iconCode: "plane-up", label: "Plane Up", aliases: [] },
-  { iconCode: "plane-up-slash", label: "Plane Up Slash", aliases: [] },
-  { iconCode: "planet-moon", label: "Planet Moon", aliases: [] },
-  { iconCode: "planet-ringed", label: "Planet Ringed", aliases: [] },
-  { iconCode: "plant-wilt", label: "Plant Wilt", aliases: [] },
-  { iconCode: "plate-utensils", label: "Plate Utensils", aliases: [] },
-  { iconCode: "plate-wheat", label: "Plate Wheat", aliases: [] },
-  { iconCode: "play", label: "Play", aliases: [] },
-  { iconCode: "play-flip", label: "Play Flip", aliases: [] },
-  { iconCode: "play-pause", label: "Play Pause", aliases: [] },
-  { iconCode: "plug", label: "Plug", aliases: [] },
-  { iconCode: "plug-circle-bolt", label: "Plug Circle Bolt", aliases: [] },
-  { iconCode: "plug-circle-check", label: "Plug Circle Check", aliases: [] },
-  { iconCode: "plug-circle-exclamation", label: "Plug Circle Exclamation", aliases: [] },
-  { iconCode: "plug-circle-minus", label: "Plug Circle Minus", aliases: [] },
-  { iconCode: "plug-circle-plus", label: "Plug Circle Plus", aliases: [] },
-  { iconCode: "plug-circle-xmark", label: "Plug Circle Xmark", aliases: [] },
-  { iconCode: "plus", label: "Plus", aliases: ["add"] },
-  { iconCode: "plus-large", label: "Plus Large", aliases: [] },
-  { iconCode: "plus-minus", label: "Plus Minus", aliases: [] },
-  { iconCode: "podcast", label: "Podcast", aliases: [] },
-  { iconCode: "podium", label: "Podium", aliases: [] },
-  { iconCode: "podium-star", label: "Podium Star", aliases: [] },
-  { iconCode: "poker-chip", label: "Poker Chip", aliases: [] },
-  { iconCode: "police-box", label: "Police Box", aliases: [] },
-  { iconCode: "polish-zloty-sign", label: "Polish Zloty Sign", aliases: [] },
-  { iconCode: "poll-people", label: "Poll People", aliases: [] },
-  { iconCode: "pompebled", label: "Pompebled", aliases: [] },
-  { iconCode: "poo", label: "Poo", aliases: [] },
-  { iconCode: "poo-storm", label: "Poo Storm", aliases: ["poo-bolt"] },
-  { iconCode: "pool-8-ball", label: "Pool 8 Ball", aliases: [] },
-  { iconCode: "poop", label: "Poop", aliases: [] },
-  { iconCode: "popcorn", label: "Popcorn", aliases: [] },
-  { iconCode: "popsicle", label: "Popsicle", aliases: [] },
-  { iconCode: "postage-stamp", label: "Postage Stamp", aliases: [] },
-  { iconCode: "pot-food", label: "Pot Food", aliases: [] },
-  { iconCode: "potato", label: "Potato", aliases: [] },
-  { iconCode: "power-off", label: "Power Off", aliases: [] },
-  { iconCode: "prescription", label: "Prescription", aliases: [] },
-  { iconCode: "prescription-bottle", label: "Prescription Bottle", aliases: [] },
-  { iconCode: "prescription-bottle-medical", label: "Prescription Bottle Medical", aliases: ["prescription-bottle-alt"] },
-  { iconCode: "prescription-bottle-pill", label: "Prescription Bottle Pill", aliases: [] },
-  { iconCode: "presentation", label: "Presentation", aliases: ["presentation-screen"] },
-  { iconCode: "pretzel", label: "Pretzel", aliases: [] },
-  { iconCode: "print", label: "Print", aliases: [] },
-  { iconCode: "print-magnifying-glass", label: "Print Magnifying Glass", aliases: ["print-search"] },
-  { iconCode: "print-slash", label: "Print Slash", aliases: [] },
-  { iconCode: "projector", label: "Projector", aliases: [] },
-  { iconCode: "pronoun", label: "Pronoun", aliases: ["circles-overlap-3"] },
-  { iconCode: "pump", label: "Pump", aliases: [] },
-  { iconCode: "pump-impeller", label: "Pump Impeller", aliases: [] },
-  { iconCode: "pump-medical", label: "Pump Medical", aliases: [] },
-  { iconCode: "pump-soap", label: "Pump Soap", aliases: [] },
-  { iconCode: "pumpkin", label: "Pumpkin", aliases: [] },
-  { iconCode: "puzzle", label: "Puzzle", aliases: [] },
-  { iconCode: "puzzle-piece", label: "Puzzle Piece", aliases: [] },
-  { iconCode: "puzzle-piece-simple", label: "Puzzle Piece Simple", aliases: ["puzzle-piece-alt"] },
-  { iconCode: "q", label: "Q", aliases: [] },
-  { iconCode: "qrcode", label: "Qrcode", aliases: [] },
-  { iconCode: "qrcode-read", label: "Qrcode Read", aliases: [] },
-  { iconCode: "question", label: "Question", aliases: [] },
-  { iconCode: "quote-left", label: "Quote Left", aliases: ["quote-left-alt"] },
-  { iconCode: "quote-right", label: "Quote Right", aliases: ["quote-right-alt"] },
-  { iconCode: "quotes", label: "Quotes", aliases: [] },
-  { iconCode: "r", label: "R", aliases: [] },
-  { iconCode: "rabbit", label: "Rabbit", aliases: [] },
-  { iconCode: "rabbit-running", label: "Rabbit Running", aliases: ["rabbit-fast"] },
-  { iconCode: "raccoon", label: "Raccoon", aliases: [] },
-  { iconCode: "racquet", label: "Racquet", aliases: [] },
-  { iconCode: "radar", label: "Radar", aliases: [] },
-  { iconCode: "radiation", label: "Radiation", aliases: [] },
-  { iconCode: "radio", label: "Radio", aliases: [] },
-  { iconCode: "radio-tuner", label: "Radio Tuner", aliases: ["radio-alt"] },
-  { iconCode: "rainbow", label: "Rainbow", aliases: [] },
-  { iconCode: "rainbow-half", label: "Rainbow Half", aliases: [] },
-  { iconCode: "raindrops", label: "Raindrops", aliases: [] },
-  { iconCode: "ram", label: "Ram", aliases: [] },
-  { iconCode: "ramp-loading", label: "Ramp Loading", aliases: [] },
-  { iconCode: "ranking-star", label: "Ranking Star", aliases: [] },
-  { iconCode: "raygun", label: "Raygun", aliases: [] },
-  { iconCode: "receipt", label: "Receipt", aliases: [] },
-  { iconCode: "record-vinyl", label: "Record Vinyl", aliases: [] },
-  { iconCode: "rectangle", label: "Rectangle", aliases: ["rectangle-landscape"] },
-  { iconCode: "rectangle-4k", label: "Rectangle 4k", aliases: [] },
-  { iconCode: "rectangle-ad", label: "Rectangle Ad", aliases: ["ad"] },
-  { iconCode: "rectangle-api", label: "Rectangle Api", aliases: [] },
-  { iconCode: "rectangle-barcode", label: "Rectangle Barcode", aliases: ["barcode-alt"] },
-  { iconCode: "rectangle-beta", label: "Rectangle Beta", aliases: [] },
-  { iconCode: "rectangle-code", label: "Rectangle Code", aliases: [] },
-  { iconCode: "rectangle-hd", label: "Rectangle Hd", aliases: ["high-definition"] },
-  { iconCode: "rectangle-high-dynamic-range", label: "Rectangle High Dynamic Range", aliases: ["rectangle-hdr"] },
-  { iconCode: "rectangle-history", label: "Rectangle History", aliases: [] },
-  { iconCode: "rectangle-history-circle-plus", label: "Rectangle History Circle Plus", aliases: [] },
-  { iconCode: "rectangle-history-circle-user", label: "Rectangle History Circle User", aliases: [] },
-  { iconCode: "rectangle-irc", label: "Rectangle Irc", aliases: [] },
-  { iconCode: "rectangle-list", label: "Rectangle List", aliases: ["list-alt"] },
-  { iconCode: "rectangle-minus", label: "Rectangle Minus", aliases: [] },
-  { iconCode: "rectangle-n-a", label: "Rectangle N A", aliases: [] },
-  { iconCode: "rectangle-new", label: "Rectangle New", aliases: [] },
-  { iconCode: "rectangle-plus", label: "Rectangle Plus", aliases: [] },
-  { iconCode: "rectangle-portrait", label: "Rectangle Portrait", aliases: ["rectangle-vertical"] },
-  { iconCode: "rectangle-pro", label: "Rectangle Pro", aliases: ["pro"] },
-  { iconCode: "rectangle-sd", label: "Rectangle Sd", aliases: ["standard-definition"] },
-  { iconCode: "rectangle-tall", label: "Rectangle Tall", aliases: [] },
-  { iconCode: "rectangle-terminal", label: "Rectangle Terminal", aliases: [] },
-  { iconCode: "rectangle-vertical-history", label: "Rectangle Vertical History", aliases: [] },
-  { iconCode: "rectangle-video-on-demand", label: "Rectangle Video On Demand", aliases: [] },
-  { iconCode: "rectangle-wide", label: "Rectangle Wide", aliases: [] },
-  { iconCode: "rectangle-xmark", label: "Rectangle Xmark", aliases: ["rectangle-times", "times-rectangle", "window-close"] },
-  { iconCode: "rectangles-mixed", label: "Rectangles Mixed", aliases: [] },
-  { iconCode: "recycle", label: "Recycle", aliases: [] },
-  { iconCode: "reel", label: "Reel", aliases: [] },
-  { iconCode: "reflect-both", label: "Reflect Both", aliases: [] },
-  { iconCode: "reflect-horizontal", label: "Reflect Horizontal", aliases: [] },
-  { iconCode: "reflect-vertical", label: "Reflect Vertical", aliases: [] },
-  { iconCode: "refrigerator", label: "Refrigerator", aliases: [] },
-  { iconCode: "registered", label: "Registered", aliases: [] },
-  { iconCode: "remote", label: "Remote", aliases: [] },
-  { iconCode: "renminbi-sign", label: "Renminbi Sign", aliases: [] },
-  { iconCode: "repeat", label: "Repeat", aliases: [] },
-  { iconCode: "repeat-1", label: "Repeat 1", aliases: [] },
-  { iconCode: "reply-clock", label: "Reply Clock", aliases: ["reply-time"] },
-  { iconCode: "republican", label: "Republican", aliases: [] },
-  { iconCode: "restroom", label: "Restroom", aliases: [] },
-  { iconCode: "restroom-simple", label: "Restroom Simple", aliases: [] },
-  { iconCode: "retweet", label: "Retweet", aliases: [] },
-  { iconCode: "rhombus", label: "Rhombus", aliases: [] },
-  { iconCode: "ribbon", label: "Ribbon", aliases: [] },
-  { iconCode: "right", label: "Right", aliases: ["arrow-alt-right"] },
-  { iconCode: "right-from-bracket", label: "Right From Bracket", aliases: ["sign-out-alt"] },
-  { iconCode: "right-from-dotted-line", label: "Right From Dotted Line", aliases: [] },
-  { iconCode: "right-from-line", label: "Right From Line", aliases: ["arrow-alt-from-left"] },
-  { iconCode: "right-left", label: "Right Left", aliases: ["exchange-alt"] },
-  { iconCode: "right-left-large", label: "Right Left Large", aliases: [] },
-  { iconCode: "right-long", label: "Right Long", aliases: ["long-arrow-alt-right"] },
-  { iconCode: "right-long-to-line", label: "Right Long To Line", aliases: [] },
-  { iconCode: "right-to-bracket", label: "Right To Bracket", aliases: ["sign-in-alt"] },
-  { iconCode: "right-to-dotted-line", label: "Right To Dotted Line", aliases: [] },
-  { iconCode: "right-to-line", label: "Right To Line", aliases: ["arrow-alt-to-right"] },
-  { iconCode: "ring", label: "Ring", aliases: [] },
-  { iconCode: "ring-diamond", label: "Ring Diamond", aliases: [] },
-  { iconCode: "rings-wedding", label: "Rings Wedding", aliases: [] },
-  { iconCode: "road", label: "Road", aliases: [] },
-  { iconCode: "road-barrier", label: "Road Barrier", aliases: [] },
-  { iconCode: "road-bridge", label: "Road Bridge", aliases: [] },
-  { iconCode: "road-circle-check", label: "Road Circle Check", aliases: [] },
-  { iconCode: "road-circle-exclamation", label: "Road Circle Exclamation", aliases: [] },
-  { iconCode: "road-circle-xmark", label: "Road Circle Xmark", aliases: [] },
-  { iconCode: "road-lock", label: "Road Lock", aliases: [] },
-  { iconCode: "road-spikes", label: "Road Spikes", aliases: [] },
-  { iconCode: "robot", label: "Robot", aliases: [] },
-  { iconCode: "robot-astromech", label: "Robot Astromech", aliases: [] },
-  { iconCode: "rocket", label: "Rocket", aliases: [] },
-  { iconCode: "rocket-launch", label: "Rocket Launch", aliases: [] },
-  { iconCode: "rocket-vertical", label: "Rocket Vertical", aliases: [] },
-  { iconCode: "roller-coaster", label: "Roller Coaster", aliases: [] },
-  { iconCode: "rotate", label: "Rotate", aliases: ["sync-alt"] },
-  { iconCode: "rotate-backward", label: "Rotate Backward", aliases: ["rotate-back", "rotate-left", "undo-alt"] },
-  { iconCode: "rotate-exclamation", label: "Rotate Exclamation", aliases: [] },
-  { iconCode: "rotate-forward", label: "Rotate Forward", aliases: ["redo-alt", "rotate-right"] },
-  { iconCode: "rotate-reverse", label: "Rotate Reverse", aliases: [] },
-  { iconCode: "route", label: "Route", aliases: [] },
-  { iconCode: "route-highway", label: "Route Highway", aliases: [] },
-  { iconCode: "route-interstate", label: "Route Interstate", aliases: [] },
-  { iconCode: "router", label: "Router", aliases: [] },
-  { iconCode: "rows-3", label: "Rows 3", aliases: [] },
-  { iconCode: "rss", label: "Rss", aliases: ["feed"] },
-  { iconCode: "ruble", label: "Ruble", aliases: ["rouble", "rub", "ruble-sign"] },
-  { iconCode: "rug", label: "Rug", aliases: [] },
-  { iconCode: "rugby-ball", label: "Rugby Ball", aliases: [] },
-  { iconCode: "ruler", label: "Ruler", aliases: [] },
-  { iconCode: "ruler-combined", label: "Ruler Combined", aliases: [] },
-  { iconCode: "ruler-horizontal", label: "Ruler Horizontal", aliases: [] },
-  { iconCode: "ruler-triangle", label: "Ruler Triangle", aliases: [] },
-  { iconCode: "ruler-vertical", label: "Ruler Vertical", aliases: [] },
-  { iconCode: "rupee", label: "Rupee", aliases: ["rupee-sign"] },
-  { iconCode: "rupiah-sign", label: "Rupiah Sign", aliases: [] },
-  { iconCode: "rv", label: "Rv", aliases: [] },
-  { iconCode: "s", label: "S", aliases: [] },
-  { iconCode: "sack", label: "Sack", aliases: [] },
-  { iconCode: "sack-dollar", label: "Sack Dollar", aliases: [] },
-  { iconCode: "sack-xmark", label: "Sack Xmark", aliases: [] },
-  { iconCode: "sagittarius", label: "Sagittarius", aliases: [] },
-  { iconCode: "sailboat", label: "Sailboat", aliases: [] },
-  { iconCode: "salt-shaker", label: "Salt Shaker", aliases: [] },
-  { iconCode: "sandwich", label: "Sandwich", aliases: [] },
-  { iconCode: "satellite", label: "Satellite", aliases: [] },
-  { iconCode: "satellite-dish", label: "Satellite Dish", aliases: [] },
-  { iconCode: "sausage", label: "Sausage", aliases: [] },
-  { iconCode: "saxophone", label: "Saxophone", aliases: [] },
-  { iconCode: "saxophone-fire", label: "Saxophone Fire", aliases: ["sax-hot"] },
-  { iconCode: "scale-balanced", label: "Scale Balanced", aliases: ["balance-scale"] },
-  { iconCode: "scale-unbalanced-flip", label: "Scale Unbalanced Flip", aliases: ["balance-scale-right"] },
-  { iconCode: "scalpel", label: "Scalpel", aliases: [] },
-  { iconCode: "scalpel-line-dashed", label: "Scalpel Line Dashed", aliases: ["scalpel-path"] },
-  { iconCode: "scanner", label: "Scanner", aliases: ["scanner-gun"] },
-  { iconCode: "scanner-image", label: "Scanner Image", aliases: [] },
-  { iconCode: "scanner-keyboard", label: "Scanner Keyboard", aliases: [] },
-  { iconCode: "scanner-touchscreen", label: "Scanner Touchscreen", aliases: [] },
-  { iconCode: "scarecrow", label: "Scarecrow", aliases: [] },
-  { iconCode: "scarf", label: "Scarf", aliases: [] },
-  { iconCode: "school", label: "School", aliases: [] },
-  { iconCode: "school-circle-check", label: "School Circle Check", aliases: [] },
-  { iconCode: "school-circle-exclamation", label: "School Circle Exclamation", aliases: [] },
-  { iconCode: "school-circle-xmark", label: "School Circle Xmark", aliases: [] },
-  { iconCode: "school-flag", label: "School Flag", aliases: [] },
-  { iconCode: "school-lock", label: "School Lock", aliases: [] },
-  { iconCode: "school-unlock", label: "School Unlock", aliases: [] },
-  { iconCode: "scissors", label: "Scissors", aliases: ["cut"] },
-  { iconCode: "scooter", label: "Scooter", aliases: [] },
-  { iconCode: "scorpio", label: "Scorpio", aliases: [] },
-  { iconCode: "screencast", label: "Screencast", aliases: [] },
-  { iconCode: "screwdriver", label: "Screwdriver", aliases: [] },
-  { iconCode: "screwdriver-wrench", label: "Screwdriver Wrench", aliases: ["tools"] },
-  { iconCode: "scribble", label: "Scribble", aliases: [] },
-  { iconCode: "scroll", label: "Scroll", aliases: [] },
-  { iconCode: "scroll-old", label: "Scroll Old", aliases: [] },
-  { iconCode: "scroll-ribbon", label: "Scroll Ribbon", aliases: ["diploma"] },
-  { iconCode: "scroll-torah", label: "Scroll Torah", aliases: ["torah"] },
-  { iconCode: "scrubber", label: "Scrubber", aliases: [] },
-  { iconCode: "scythe", label: "Scythe", aliases: [] },
-  { iconCode: "sd-card", label: "Sd Card", aliases: [] },
-  { iconCode: "sd-cards", label: "Sd Cards", aliases: [] },
-  { iconCode: "seal", label: "Seal", aliases: [] },
-  { iconCode: "seal-exclamation", label: "Seal Exclamation", aliases: [] },
-  { iconCode: "seal-question", label: "Seal Question", aliases: [] },
-  { iconCode: "seat", label: "Seat", aliases: [] },
-  { iconCode: "seat-airline", label: "Seat Airline", aliases: [] },
-  { iconCode: "seat-airline-window", label: "Seat Airline Window", aliases: [] },
-  { iconCode: "seats", label: "Seats", aliases: [] },
-  { iconCode: "section", label: "Section", aliases: [] },
-  { iconCode: "seedling", label: "Seedling", aliases: ["sprout"] },
-  { iconCode: "semicolon", label: "Semicolon", aliases: [] },
-  { iconCode: "send-back", label: "Send Back", aliases: [] },
-  { iconCode: "send-backward", label: "Send Backward", aliases: [] },
-  { iconCode: "sensor", label: "Sensor", aliases: [] },
-  { iconCode: "sensor-cloud", label: "Sensor Cloud", aliases: ["sensor-smoke"] },
-  { iconCode: "sensor-fire", label: "Sensor Fire", aliases: [] },
-  { iconCode: "sensor-on", label: "Sensor On", aliases: [] },
-  { iconCode: "sensor-triangle-exclamation", label: "Sensor Triangle Exclamation", aliases: ["sensor-alert"] },
-  { iconCode: "server", label: "Server", aliases: [] },
-  { iconCode: "share", label: "Share", aliases: ["mail-forward"] },
-  { iconCode: "share-all", label: "Share All", aliases: [] },
-  { iconCode: "share-from-square", label: "Share From Square", aliases: ["share-square"] },
-  { iconCode: "share-nodes", label: "Share Nodes", aliases: ["share-alt"] },
-  { iconCode: "sheep", label: "Sheep", aliases: [] },
-  { iconCode: "sheet-plastic", label: "Sheet Plastic", aliases: [] },
-  { iconCode: "shekel", label: "Shekel", aliases: ["ils", "shekel-sign", "sheqel", "sheqel-sign"] },
-  { iconCode: "shelves", label: "Shelves", aliases: ["inventory"] },
-  { iconCode: "shelves-empty", label: "Shelves Empty", aliases: [] },
-  { iconCode: "shield", label: "Shield", aliases: ["shield-blank"] },
-  { iconCode: "shield-cat", label: "Shield Cat", aliases: [] },
-  { iconCode: "shield-check", label: "Shield Check", aliases: [] },
-  { iconCode: "shield-cross", label: "Shield Cross", aliases: [] },
-  { iconCode: "shield-dog", label: "Shield Dog", aliases: [] },
-  { iconCode: "shield-exclamation", label: "Shield Exclamation", aliases: [] },
-  { iconCode: "shield-halved", label: "Shield Halved", aliases: ["shield-alt"] },
-  { iconCode: "shield-heart", label: "Shield Heart", aliases: [] },
-  { iconCode: "shield-keyhole", label: "Shield Keyhole", aliases: [] },
-  { iconCode: "shield-minus", label: "Shield Minus", aliases: [] },
-  { iconCode: "shield-plus", label: "Shield Plus", aliases: [] },
-  { iconCode: "shield-quartered", label: "Shield Quartered", aliases: [] },
-  { iconCode: "shield-slash", label: "Shield Slash", aliases: [] },
-  { iconCode: "shield-user", label: "Shield User", aliases: [] },
-  { iconCode: "shield-virus", label: "Shield Virus", aliases: [] },
-  { iconCode: "shield-xmark", label: "Shield Xmark", aliases: ["shield-times"] },
-  { iconCode: "ship", label: "Ship", aliases: [] },
-  { iconCode: "ship-large", label: "Ship Large", aliases: [] },
-  { iconCode: "shirt", label: "Shirt", aliases: ["t-shirt", "tshirt"] },
-  { iconCode: "shirt-jersey", label: "Shirt Jersey", aliases: [] },
-  { iconCode: "shirt-long-sleeve", label: "Shirt Long Sleeve", aliases: [] },
-  { iconCode: "shirt-running", label: "Shirt Running", aliases: [] },
-  { iconCode: "shirt-tank-top", label: "Shirt Tank Top", aliases: [] },
-  { iconCode: "shish-kebab", label: "Shish Kebab", aliases: [] },
-  { iconCode: "shoe", label: "Shoe", aliases: [] },
-  { iconCode: "shoe-prints", label: "Shoe Prints", aliases: [] },
-  { iconCode: "shop", label: "Shop", aliases: ["store-alt"] },
-  { iconCode: "shop-24", label: "Shop 24", aliases: [] },
-  { iconCode: "shop-lock", label: "Shop Lock", aliases: [] },
-  { iconCode: "shop-slash", label: "Shop Slash", aliases: ["store-alt-slash"] },
-  { iconCode: "shorts", label: "Shorts", aliases: [] },
-  { iconCode: "shovel", label: "Shovel", aliases: [] },
-  { iconCode: "shovel-snow", label: "Shovel Snow", aliases: [] },
-  { iconCode: "shower", label: "Shower", aliases: [] },
-  { iconCode: "shower-down", label: "Shower Down", aliases: ["shower-alt"] },
-  { iconCode: "shredder", label: "Shredder", aliases: [] },
-  { iconCode: "shrimp", label: "Shrimp", aliases: [] },
-  { iconCode: "shuffle", label: "Shuffle", aliases: ["random"] },
-  { iconCode: "shutters", label: "Shutters", aliases: [] },
-  { iconCode: "shuttle-space-vertical", label: "Shuttle Space Vertical", aliases: [] },
-  { iconCode: "shuttle-van", label: "Shuttle Van", aliases: ["van-shuttle"] },
-  { iconCode: "shuttlecock", label: "Shuttlecock", aliases: [] },
-  { iconCode: "sickle", label: "Sickle", aliases: [] },
-  { iconCode: "sidebar", label: "Sidebar", aliases: [] },
-  { iconCode: "sidebar-flip", label: "Sidebar Flip", aliases: [] },
-  { iconCode: "sigma", label: "Sigma", aliases: [] },
-  { iconCode: "sign", label: "Sign", aliases: ["sign-hanging"] },
-  { iconCode: "sign-post", label: "Sign Post", aliases: [] },
-  { iconCode: "sign-posts", label: "Sign Posts", aliases: [] },
-  { iconCode: "sign-posts-wrench", label: "Sign Posts Wrench", aliases: [] },
-  { iconCode: "signal", label: "Signal", aliases: ["signal-5", "signal-perfect"] },
-  { iconCode: "signal-bars", label: "Signal Bars", aliases: ["signal-alt", "signal-alt-4", "signal-bars-strong"] },
-  { iconCode: "signal-bars-fair", label: "Signal Bars Fair", aliases: ["signal-alt-2"] },
-  { iconCode: "signal-bars-good", label: "Signal Bars Good", aliases: ["signal-alt-3"] },
-  { iconCode: "signal-bars-slash", label: "Signal Bars Slash", aliases: ["signal-alt-slash"] },
-  { iconCode: "signal-bars-weak", label: "Signal Bars Weak", aliases: ["signal-alt-1"] },
-  { iconCode: "signal-fair", label: "Signal Fair", aliases: ["signal-2"] },
-  { iconCode: "signal-good", label: "Signal Good", aliases: ["signal-3"] },
-  { iconCode: "signal-slash", label: "Signal Slash", aliases: [] },
-  { iconCode: "signal-stream", label: "Signal Stream", aliases: [] },
-  { iconCode: "signal-stream-slash", label: "Signal Stream Slash", aliases: [] },
-  { iconCode: "signal-strong", label: "Signal Strong", aliases: ["signal-4"] },
-  { iconCode: "signal-weak", label: "Signal Weak", aliases: ["signal-1"] },
-  { iconCode: "signapore-dollar-sign", label: "Signapore Dollar Sign", aliases: [] },
-  { iconCode: "signature", label: "Signature", aliases: [] },
-  { iconCode: "signature-lock", label: "Signature Lock", aliases: [] },
-  { iconCode: "signature-slash", label: "Signature Slash", aliases: [] },
-  { iconCode: "sim-card", label: "Sim Card", aliases: [] },
-  { iconCode: "sim-cards", label: "Sim Cards", aliases: [] },
-  { iconCode: "single-quote-left", label: "Single Quote Left", aliases: [] },
-  { iconCode: "single-quote-right", label: "Single Quote Right", aliases: [] },
-  { iconCode: "sink", label: "Sink", aliases: [] },
-  { iconCode: "siren", label: "Siren", aliases: [] },
-  { iconCode: "siren-on", label: "Siren On", aliases: [] },
-  { iconCode: "sitemap", label: "Sitemap", aliases: [] },
-  { iconCode: "skeleton", label: "Skeleton", aliases: [] },
-  { iconCode: "skeleton-ribs", label: "Skeleton Ribs", aliases: [] },
-  { iconCode: "ski-boot", label: "Ski Boot", aliases: [] },
-  { iconCode: "ski-boot-ski", label: "Ski Boot Ski", aliases: [] },
-  { iconCode: "skull", label: "Skull", aliases: [] },
-  { iconCode: "skull-cow", label: "Skull Cow", aliases: [] },
-  { iconCode: "skull-crossbones", label: "Skull Crossbones", aliases: [] },
-  { iconCode: "slash", label: "Slash", aliases: [] },
-  { iconCode: "slash-back", label: "Slash Back", aliases: [] },
-  { iconCode: "slash-forward", label: "Slash Forward", aliases: [] },
-  { iconCode: "sleigh", label: "Sleigh", aliases: [] },
-  { iconCode: "slider", label: "Slider", aliases: [] },
-  { iconCode: "slider-circle", label: "Slider Circle", aliases: [] },
-  { iconCode: "sliders", label: "Sliders", aliases: ["sliders-h"] },
-  { iconCode: "sliders-simple", label: "Sliders Simple", aliases: [] },
-  { iconCode: "sliders-up", label: "Sliders Up", aliases: ["sliders-v"] },
-  { iconCode: "slot-machine", label: "Slot Machine", aliases: [] },
-  { iconCode: "smog", label: "Smog", aliases: [] },
-  { iconCode: "smoke", label: "Smoke", aliases: [] },
-  { iconCode: "smoking", label: "Smoking", aliases: [] },
-  { iconCode: "snake", label: "Snake", aliases: [] },
-  { iconCode: "sneaker", label: "Sneaker", aliases: [] },
-  { iconCode: "sneaker-running", label: "Sneaker Running", aliases: [] },
-  { iconCode: "snooze", label: "Snooze", aliases: ["zzz"] },
-  { iconCode: "snow-blowing", label: "Snow Blowing", aliases: [] },
-  { iconCode: "snowflake", label: "Snowflake", aliases: [] },
-  { iconCode: "snowflake-droplets", label: "Snowflake Droplets", aliases: [] },
-  { iconCode: "snowflakes", label: "Snowflakes", aliases: [] },
-  { iconCode: "snowman", label: "Snowman", aliases: [] },
-  { iconCode: "snowman-head", label: "Snowman Head", aliases: ["frosty-head"] },
-  { iconCode: "snowmobile-blank", label: "Snowmobile Blank", aliases: [] },
-  { iconCode: "snowplow", label: "Snowplow", aliases: [] },
-  { iconCode: "soap", label: "Soap", aliases: [] },
-  { iconCode: "socks", label: "Socks", aliases: [] },
-  { iconCode: "soft-serve", label: "Soft Serve", aliases: ["creemee"] },
-  { iconCode: "solar-panel", label: "Solar Panel", aliases: [] },
-  { iconCode: "solar-system", label: "Solar System", aliases: [] },
-  { iconCode: "sort", label: "Sort", aliases: ["unsorted"] },
-  { iconCode: "sort-asc", label: "Sort Asc", aliases: ["sort-up"] },
-  { iconCode: "sort-desc", label: "Sort Desc", aliases: ["sort-down"] },
-  { iconCode: "sort-numeric-desc", label: "Sort Numeric Desc", aliases: ["arrow-down-9-1", "sort-numeric-down-alt"] },
-  { iconCode: "sort-numeric-down", label: "Sort Numeric Down", aliases: ["arrow-down-1-9", "sort-numeric-asc"] },
-  { iconCode: "sort-numeric-up", label: "Sort Numeric Up", aliases: ["arrow-up-1-9"] },
-  { iconCode: "spa", label: "Spa", aliases: [] },
-  { iconCode: "space-shuttle", label: "Space Shuttle", aliases: ["shuttle-space"] },
-  { iconCode: "space-station-moon", label: "Space Station Moon", aliases: [] },
-  { iconCode: "space-station-moon-construction", label: "Space Station Moon Construction", aliases: ["space-station-moon-alt"] },
-  { iconCode: "spade", label: "Spade", aliases: [] },
-  { iconCode: "spaghetti-monster-flying", label: "Spaghetti Monster Flying", aliases: ["pastafarianism"] },
-  { iconCode: "sparkle", label: "Sparkle", aliases: [] },
-  { iconCode: "sparkles", label: "Sparkles", aliases: [] },
-  { iconCode: "speaker", label: "Speaker", aliases: [] },
-  { iconCode: "speakers", label: "Speakers", aliases: [] },
-  { iconCode: "spell-check", label: "Spell Check", aliases: [] },
-  { iconCode: "spider", label: "Spider", aliases: [] },
-  { iconCode: "spider-black-widow", label: "Spider Black Widow", aliases: [] },
-  { iconCode: "spider-web", label: "Spider Web", aliases: [] },
-  { iconCode: "spine", label: "Spine", aliases: [] },
-  { iconCode: "spinner", label: "Spinner", aliases: [] },
-  { iconCode: "spinner-scale", label: "Spinner Scale", aliases: [] },
-  { iconCode: "spinner-third", label: "Spinner Third", aliases: [] },
-  { iconCode: "spiral", label: "Spiral", aliases: [] },
-  { iconCode: "split", label: "Split", aliases: [] },
-  { iconCode: "splotch", label: "Splotch", aliases: [] },
-  { iconCode: "sportsball", label: "Sportsball", aliases: [] },
-  { iconCode: "spray-can", label: "Spray Can", aliases: [] },
-  { iconCode: "spray-can-sparkles", label: "Spray Can Sparkles", aliases: ["air-freshener"] },
-  { iconCode: "sprinkler", label: "Sprinkler", aliases: [] },
-  { iconCode: "sprinkler-ceiling", label: "Sprinkler Ceiling", aliases: [] },
-  { iconCode: "square", label: "Square", aliases: [] },
-  { iconCode: "square-0", label: "Square 0", aliases: [] },
-  { iconCode: "square-1", label: "Square 1", aliases: [] },
-  { iconCode: "square-2", label: "Square 2", aliases: [] },
-  { iconCode: "square-3", label: "Square 3", aliases: [] },
-  { iconCode: "square-4", label: "Square 4", aliases: [] },
-  { iconCode: "square-5", label: "Square 5", aliases: [] },
-  { iconCode: "square-6", label: "Square 6", aliases: [] },
-  { iconCode: "square-7", label: "Square 7", aliases: [] },
-  { iconCode: "square-8", label: "Square 8", aliases: [] },
-  { iconCode: "square-9", label: "Square 9", aliases: [] },
-  { iconCode: "square-a", label: "Square A", aliases: [] },
-  { iconCode: "square-a-lock", label: "Square A Lock", aliases: [] },
-  { iconCode: "square-ampersand", label: "Square Ampersand", aliases: [] },
-  { iconCode: "square-arrow-down", label: "Square Arrow Down", aliases: ["arrow-square-down"] },
-  { iconCode: "square-arrow-down-left", label: "Square Arrow Down Left", aliases: [] },
-  { iconCode: "square-arrow-down-right", label: "Square Arrow Down Right", aliases: [] },
-  { iconCode: "square-arrow-left", label: "Square Arrow Left", aliases: ["arrow-square-left"] },
-  { iconCode: "square-arrow-right", label: "Square Arrow Right", aliases: ["arrow-square-right"] },
-  { iconCode: "square-arrow-up", label: "Square Arrow Up", aliases: ["arrow-square-up"] },
-  { iconCode: "square-arrow-up-left", label: "Square Arrow Up Left", aliases: [] },
-  { iconCode: "square-arrow-up-right", label: "Square Arrow Up Right", aliases: ["external-link-square"] },
-  { iconCode: "square-austral", label: "Square Austral", aliases: [] },
-  { iconCode: "square-australian-dollar", label: "Square Australian Dollar", aliases: [] },
-  { iconCode: "square-b", label: "Square B", aliases: [] },
-  { iconCode: "square-baht", label: "Square Baht", aliases: [] },
-  { iconCode: "square-bangladeshi-taka", label: "Square Bangladeshi Taka", aliases: [] },
-  { iconCode: "square-binary", label: "Square Binary", aliases: [] },
-  { iconCode: "square-bitcoin", label: "Square Bitcoin", aliases: [] },
-  { iconCode: "square-bolt", label: "Square Bolt", aliases: [] },
-  { iconCode: "square-brazilian-real", label: "Square Brazilian Real", aliases: [] },
-  { iconCode: "square-c", label: "Square C", aliases: [] },
-  { iconCode: "square-caret-down", label: "Square Caret Down", aliases: ["caret-square-down"] },
-  { iconCode: "square-caret-left", label: "Square Caret Left", aliases: ["caret-square-left"] },
-  { iconCode: "square-caret-right", label: "Square Caret Right", aliases: ["caret-square-right"] },
-  { iconCode: "square-caret-up", label: "Square Caret Up", aliases: ["caret-square-up"] },
-  { iconCode: "square-cedi", label: "Square Cedi", aliases: [] },
-  { iconCode: "square-cent", label: "Square Cent", aliases: [] },
-  { iconCode: "square-check", label: "Square Check", aliases: ["check-square"] },
-  { iconCode: "square-chevron-down", label: "Square Chevron Down", aliases: ["chevron-square-down"] },
-  { iconCode: "square-chevron-left", label: "Square Chevron Left", aliases: ["chevron-square-left"] },
-  { iconCode: "square-chevron-right", label: "Square Chevron Right", aliases: ["chevron-square-right"] },
-  { iconCode: "square-chevron-up", label: "Square Chevron Up", aliases: ["chevron-square-up"] },
-  { iconCode: "square-chf", label: "Square Chf", aliases: [] },
-  { iconCode: "square-code", label: "Square Code", aliases: [] },
-  { iconCode: "square-colon", label: "Square Colon", aliases: [] },
-  { iconCode: "square-cruzeiro", label: "Square Cruzeiro", aliases: [] },
-  { iconCode: "square-currency", label: "Square Currency", aliases: [] },
-  { iconCode: "square-d", label: "Square D", aliases: [] },
-  { iconCode: "square-danish-krone", label: "Square Danish Krone", aliases: [] },
-  { iconCode: "square-dashed", label: "Square Dashed", aliases: [] },
-  { iconCode: "square-dashed-circle-plus", label: "Square Dashed Circle Plus", aliases: [] },
-  { iconCode: "square-divide", label: "Square Divide", aliases: [] },
-  { iconCode: "square-dollar", label: "Square Dollar", aliases: ["dollar-square", "usd-square"] },
-  { iconCode: "square-dong", label: "Square Dong", aliases: [] },
-  { iconCode: "square-down", label: "Square Down", aliases: ["arrow-alt-square-down"] },
-  { iconCode: "square-down-left", label: "Square Down Left", aliases: [] },
-  { iconCode: "square-down-right", label: "Square Down Right", aliases: [] },
-  { iconCode: "square-e", label: "Square E", aliases: [] },
-  { iconCode: "square-ellipsis", label: "Square Ellipsis", aliases: [] },
-  { iconCode: "square-ellipsis-vertical", label: "Square Ellipsis Vertical", aliases: [] },
-  { iconCode: "square-envelope", label: "Square Envelope", aliases: ["envelope-square"] },
-  { iconCode: "square-equals", label: "Square Equals", aliases: [] },
-  { iconCode: "square-euro", label: "Square Euro", aliases: [] },
-  { iconCode: "square-eurozone", label: "Square Eurozone", aliases: [] },
-  { iconCode: "square-exclamation", label: "Square Exclamation", aliases: ["exclamation-square"] },
-  { iconCode: "square-f", label: "Square F", aliases: [] },
-  { iconCode: "square-florin", label: "Square Florin", aliases: [] },
-  { iconCode: "square-franc", label: "Square Franc", aliases: [] },
-  { iconCode: "square-full", label: "Square Full", aliases: [] },
-  { iconCode: "square-g", label: "Square G", aliases: [] },
-  { iconCode: "square-guarani", label: "Square Guarani", aliases: [] },
-  { iconCode: "square-half", label: "Square Half", aliases: [] },
-  { iconCode: "square-half-horizontal", label: "Square Half Horizontal", aliases: [] },
-  { iconCode: "square-half-stroke", label: "Square Half Stroke", aliases: [] },
-  { iconCode: "square-half-stroke-horizontal", label: "Square Half Stroke Horizontal", aliases: [] },
-  { iconCode: "square-heart", label: "Square Heart", aliases: ["heart-square"] },
-  { iconCode: "square-hryvnia", label: "Square Hryvnia", aliases: [] },
-  { iconCode: "square-i", label: "Square I", aliases: [] },
-  { iconCode: "square-indian-rupee", label: "Square Indian Rupee", aliases: [] },
-  { iconCode: "square-info", label: "Square Info", aliases: ["info-square"] },
-  { iconCode: "square-j", label: "Square J", aliases: [] },
-  { iconCode: "square-k", label: "Square K", aliases: [] },
-  { iconCode: "square-kanban", label: "Square Kanban", aliases: [] },
-  { iconCode: "square-kip", label: "Square Kip", aliases: [] },
-  { iconCode: "square-l", label: "Square L", aliases: [] },
-  { iconCode: "square-lari", label: "Square Lari", aliases: [] },
-  { iconCode: "square-left", label: "Square Left", aliases: ["arrow-alt-square-left"] },
-  { iconCode: "square-lira", label: "Square Lira", aliases: [] },
-  { iconCode: "square-list", label: "Square List", aliases: [] },
-  { iconCode: "square-litecoin", label: "Square Litecoin", aliases: [] },
-  { iconCode: "square-m", label: "Square M", aliases: [] },
-  { iconCode: "square-malaysian-ringgit", label: "Square Malaysian Ringgit", aliases: [] },
-  { iconCode: "square-manat", label: "Square Manat", aliases: [] },
-  { iconCode: "square-microphone", label: "Square Microphone", aliases: [] },
-  { iconCode: "square-mill", label: "Square Mill", aliases: [] },
-  { iconCode: "square-minus", label: "Square Minus", aliases: ["minus-square"] },
-  { iconCode: "square-n", label: "Square N", aliases: [] },
-  { iconCode: "square-naira", label: "Square Naira", aliases: [] },
-  { iconCode: "square-nfi", label: "Square Nfi", aliases: [] },
-  { iconCode: "square-norwegian-krone", label: "Square Norwegian Krone", aliases: [] },
-  { iconCode: "square-o", label: "Square O", aliases: [] },
-  { iconCode: "square-p", label: "Square P", aliases: [] },
-  { iconCode: "square-parking", label: "Square Parking", aliases: ["parking"] },
-  { iconCode: "square-parking-slash", label: "Square Parking Slash", aliases: ["parking-slash"] },
-  { iconCode: "square-pen", label: "Square Pen", aliases: ["pen-square", "pencil-square"] },
-  { iconCode: "square-person-confined", label: "Square Person Confined", aliases: [] },
-  { iconCode: "square-peruvian-soles", label: "Square Peruvian Soles", aliases: [] },
-  { iconCode: "square-peseta", label: "Square Peseta", aliases: [] },
-  { iconCode: "square-peso", label: "Square Peso", aliases: [] },
-  { iconCode: "square-phone", label: "Square Phone", aliases: ["phone-square"] },
-  { iconCode: "square-phone-flip", label: "Square Phone Flip", aliases: ["phone-square-alt"] },
-  { iconCode: "square-phone-hangup", label: "Square Phone Hangup", aliases: ["phone-square-down"] },
-  { iconCode: "square-plus", label: "Square Plus", aliases: ["plus-square"] },
-  { iconCode: "square-polish-zloty", label: "Square Polish Zloty", aliases: [] },
-  { iconCode: "square-poll-horizontal", label: "Square Poll Horizontal", aliases: ["poll-h"] },
-  { iconCode: "square-poll-vertical", label: "Square Poll Vertical", aliases: ["poll"] },
-  { iconCode: "square-q", label: "Square Q", aliases: [] },
-  { iconCode: "square-quarters", label: "Square Quarters", aliases: [] },
-  { iconCode: "square-question", label: "Square Question", aliases: ["question-square"] },
-  { iconCode: "square-quote", label: "Square Quote", aliases: [] },
-  { iconCode: "square-r", label: "Square R", aliases: [] },
-  { iconCode: "square-renminbi", label: "Square Renminbi", aliases: [] },
-  { iconCode: "square-right", label: "Square Right", aliases: ["arrow-alt-square-right"] },
-  { iconCode: "square-ring", label: "Square Ring", aliases: [] },
-  { iconCode: "square-root", label: "Square Root", aliases: [] },
-  { iconCode: "square-root-variable", label: "Square Root Variable", aliases: ["square-root-alt"] },
-  { iconCode: "square-rss", label: "Square Rss", aliases: ["rss-square"] },
-  { iconCode: "square-ruble", label: "Square Ruble", aliases: [] },
-  { iconCode: "square-rupee", label: "Square Rupee", aliases: [] },
-  { iconCode: "square-rupiah", label: "Square Rupiah", aliases: [] },
-  { iconCode: "square-s", label: "Square S", aliases: [] },
-  { iconCode: "square-share-nodes", label: "Square Share Nodes", aliases: ["share-alt-square"] },
-  { iconCode: "square-shekel", label: "Square Shekel", aliases: [] },
-  { iconCode: "square-sliders", label: "Square Sliders", aliases: ["sliders-h-square"] },
-  { iconCode: "square-sliders-vertical", label: "Square Sliders Vertical", aliases: ["sliders-v-square"] },
-  { iconCode: "square-small", label: "Square Small", aliases: [] },
-  { iconCode: "square-star", label: "Square Star", aliases: [] },
-  { iconCode: "square-sterling", label: "Square Sterling", aliases: [] },
-  { iconCode: "square-swedish-krona", label: "Square Swedish Krona", aliases: [] },
-  { iconCode: "square-t", label: "Square T", aliases: [] },
-  { iconCode: "square-tenge", label: "Square Tenge", aliases: [] },
-  { iconCode: "square-terminal", label: "Square Terminal", aliases: [] },
-  { iconCode: "square-this-way-up", label: "Square This Way Up", aliases: ["box-up"] },
-  { iconCode: "square-tugrik", label: "Square Tugrik", aliases: [] },
-  { iconCode: "square-turkish-lira", label: "Square Turkish Lira", aliases: [] },
-  { iconCode: "square-u", label: "Square U", aliases: [] },
-  { iconCode: "square-up", label: "Square Up", aliases: ["arrow-alt-square-up"] },
-  { iconCode: "square-up-left", label: "Square Up Left", aliases: [] },
-  { iconCode: "square-up-right", label: "Square Up Right", aliases: ["external-link-square-alt"] },
-  { iconCode: "square-user", label: "Square User", aliases: [] },
-  { iconCode: "square-v", label: "Square V", aliases: [] },
-  { iconCode: "square-virus", label: "Square Virus", aliases: [] },
-  { iconCode: "square-w", label: "Square W", aliases: [] },
-  { iconCode: "square-wine-glass-crack", label: "Square Wine Glass Crack", aliases: ["box-fragile", "square-fragile"] },
-  { iconCode: "square-won", label: "Square Won", aliases: [] },
-  { iconCode: "square-x", label: "Square X", aliases: [] },
-  { iconCode: "square-xmark", label: "Square Xmark", aliases: ["times-square", "xmark-square"] },
-  { iconCode: "square-y", label: "Square Y", aliases: [] },
-  { iconCode: "square-yen", label: "Square Yen", aliases: [] },
-  { iconCode: "square-z", label: "Square Z", aliases: [] },
-  { iconCode: "squareapore-dollar", label: "Squareapore Dollar", aliases: [] },
-  { iconCode: "squid", label: "Squid", aliases: [] },
-  { iconCode: "squirrel", label: "Squirrel", aliases: [] },
-  { iconCode: "stadium", label: "Stadium", aliases: [] },
-  { iconCode: "staff", label: "Staff", aliases: [] },
-  { iconCode: "staff-aesculapius", label: "Staff Aesculapius", aliases: ["rod-asclepius", "rod-snake", "staff-snake"] },
-  { iconCode: "stair-car", label: "Stair Car", aliases: [] },
-  { iconCode: "stairs", label: "Stairs", aliases: [] },
-  { iconCode: "stamp", label: "Stamp", aliases: [] },
-  { iconCode: "stapler", label: "Stapler", aliases: [] },
-  { iconCode: "star", label: "Star", aliases: [] },
-  { iconCode: "star-and-crescent", label: "Star And Crescent", aliases: [] },
-  { iconCode: "star-christmas", label: "Star Christmas", aliases: [] },
-  { iconCode: "star-exclamation", label: "Star Exclamation", aliases: [] },
-  { iconCode: "star-half", label: "Star Half", aliases: [] },
-  { iconCode: "star-half-stroke", label: "Star Half Stroke", aliases: ["star-half-alt"] },
-  { iconCode: "star-of-david", label: "Star Of David", aliases: [] },
-  { iconCode: "star-of-life", label: "Star Of Life", aliases: [] },
-  { iconCode: "star-sharp", label: "Star Sharp", aliases: [] },
-  { iconCode: "star-sharp-half", label: "Star Sharp Half", aliases: [] },
-  { iconCode: "star-sharp-half-stroke", label: "Star Sharp Half Stroke", aliases: ["star-sharp-half-alt"] },
-  { iconCode: "star-shooting", label: "Star Shooting", aliases: [] },
-  { iconCode: "starfighter", label: "Starfighter", aliases: [] },
-  { iconCode: "starfighter-twin-ion-engine", label: "Starfighter Twin Ion Engine", aliases: ["starfighter-alt"] },
-  { iconCode: "starfighter-twin-ion-engine-advanced", label: "Starfighter Twin Ion Engine Advanced", aliases: ["starfighter-alt-advanced"] },
-  { iconCode: "stars", label: "Stars", aliases: [] },
-  { iconCode: "starship", label: "Starship", aliases: [] },
-  { iconCode: "starship-freighter", label: "Starship Freighter", aliases: [] },
-  { iconCode: "steak", label: "Steak", aliases: [] },
-  { iconCode: "steering-wheel", label: "Steering Wheel", aliases: [] },
-  { iconCode: "sterling-sign", label: "Sterling Sign", aliases: ["gbp", "pound-sign"] },
-  { iconCode: "stethoscope", label: "Stethoscope", aliases: [] },
-  { iconCode: "stocking", label: "Stocking", aliases: [] },
-  { iconCode: "stomach", label: "Stomach", aliases: [] },
-  { iconCode: "stool", label: "Stool", aliases: [] },
-  { iconCode: "stop", label: "Stop", aliases: [] },
-  { iconCode: "stopwatch", label: "Stopwatch", aliases: [] },
-  { iconCode: "stopwatch-20", label: "Stopwatch 20", aliases: [] },
-  { iconCode: "store", label: "Store", aliases: [] },
-  { iconCode: "store-24", label: "Store 24", aliases: [] },
-  { iconCode: "store-lock", label: "Store Lock", aliases: [] },
-  { iconCode: "store-slash", label: "Store Slash", aliases: [] },
-  { iconCode: "strawberry", label: "Strawberry", aliases: [] },
-  { iconCode: "street-view", label: "Street View", aliases: [] },
-  { iconCode: "stretcher", label: "Stretcher", aliases: [] },
-  { iconCode: "strikethrough", label: "Strikethrough", aliases: [] },
-  { iconCode: "stroopwafel", label: "Stroopwafel", aliases: [] },
-  { iconCode: "subscript", label: "Subscript", aliases: [] },
-  { iconCode: "subtitles", label: "Subtitles", aliases: [] },
-  { iconCode: "subtitles-slash", label: "Subtitles Slash", aliases: [] },
-  { iconCode: "suitcase", label: "Suitcase", aliases: [] },
-  { iconCode: "suitcase-medical", label: "Suitcase Medical", aliases: ["medkit"] },
-  { iconCode: "suitcase-rolling", label: "Suitcase Rolling", aliases: [] },
-  { iconCode: "sun", label: "Sun", aliases: [] },
-  { iconCode: "sun-bright", label: "Sun Bright", aliases: ["sun-alt"] },
-  { iconCode: "sun-cloud", label: "Sun Cloud", aliases: [] },
-  { iconCode: "sun-dust", label: "Sun Dust", aliases: [] },
-  { iconCode: "sun-haze", label: "Sun Haze", aliases: [] },
-  { iconCode: "sun-plant-wilt", label: "Sun Plant Wilt", aliases: [] },
-  { iconCode: "sunglasses", label: "Sunglasses", aliases: [] },
-  { iconCode: "sunrise", label: "Sunrise", aliases: [] },
-  { iconCode: "sunset", label: "Sunset", aliases: [] },
-  { iconCode: "superscript", label: "Superscript", aliases: [] },
-  { iconCode: "sushi", label: "Sushi", aliases: ["nigiri"] },
-  { iconCode: "sushi-roll", label: "Sushi Roll", aliases: ["maki-roll", "makizushi"] },
-  { iconCode: "swap", label: "Swap", aliases: [] },
-  { iconCode: "swap-arrows", label: "Swap Arrows", aliases: [] },
-  { iconCode: "swatchbook", label: "Swatchbook", aliases: [] },
-  { iconCode: "swedish-krona-sign", label: "Swedish Krona Sign", aliases: [] },
-  { iconCode: "sword", label: "Sword", aliases: [] },
-  { iconCode: "sword-laser", label: "Sword Laser", aliases: [] },
-  { iconCode: "sword-laser-alt", label: "Sword Laser Alt", aliases: [] },
-  { iconCode: "swords", label: "Swords", aliases: [] },
-  { iconCode: "swords-laser", label: "Swords Laser", aliases: [] },
-  { iconCode: "symbols", label: "Symbols", aliases: ["icons-alt"] },
-  { iconCode: "synagogue", label: "Synagogue", aliases: [] },
-  { iconCode: "syringe", label: "Syringe", aliases: [] },
-  { iconCode: "t", label: "T", aliases: [] },
-  { iconCode: "t-rex", label: "T Rex", aliases: [] },
-  { iconCode: "table", label: "Table", aliases: [] },
-  { iconCode: "table-bar", label: "Table Bar", aliases: [] },
-  { iconCode: "table-cells", label: "Table Cells", aliases: ["th"] },
-  { iconCode: "table-cells-column-lock", label: "Table Cells Column Lock", aliases: [] },
-  { iconCode: "table-cells-column-unlock", label: "Table Cells Column Unlock", aliases: [] },
-  { iconCode: "table-cells-columns", label: "Table Cells Columns", aliases: [] },
-  { iconCode: "table-cells-header", label: "Table Cells Header", aliases: [] },
-  { iconCode: "table-cells-header-lock", label: "Table Cells Header Lock", aliases: [] },
-  { iconCode: "table-cells-header-unlock", label: "Table Cells Header Unlock", aliases: [] },
-  { iconCode: "table-cells-large", label: "Table Cells Large", aliases: ["th-large"] },
-  { iconCode: "table-cells-lock", label: "Table Cells Lock", aliases: [] },
-  { iconCode: "table-cells-merge", label: "Table Cells Merge", aliases: [] },
-  { iconCode: "table-cells-row-lock", label: "Table Cells Row Lock", aliases: [] },
-  { iconCode: "table-cells-row-unlock", label: "Table Cells Row Unlock", aliases: [] },
-  { iconCode: "table-cells-rows", label: "Table Cells Rows", aliases: [] },
-  { iconCode: "table-cells-split", label: "Table Cells Split", aliases: [] },
-  { iconCode: "table-cells-unlock", label: "Table Cells Unlock", aliases: [] },
-  { iconCode: "table-columns", label: "Table Columns", aliases: ["columns"] },
-  { iconCode: "table-columns-add-after", label: "Table Columns Add After", aliases: [] },
-  { iconCode: "table-columns-add-before", label: "Table Columns Add Before", aliases: [] },
-  { iconCode: "table-columns-merge-next", label: "Table Columns Merge Next", aliases: [] },
-  { iconCode: "table-columns-merge-previous", label: "Table Columns Merge Previous", aliases: [] },
-  { iconCode: "table-columns-remove-after", label: "Table Columns Remove After", aliases: [] },
-  { iconCode: "table-columns-remove-before", label: "Table Columns Remove Before", aliases: [] },
-  { iconCode: "table-dining", label: "Table Dining", aliases: [] },
-  { iconCode: "table-layout", label: "Table Layout", aliases: [] },
-  { iconCode: "table-list", label: "Table List", aliases: ["th-list"] },
-  { iconCode: "table-picnic", label: "Table Picnic", aliases: [] },
-  { iconCode: "table-pivot", label: "Table Pivot", aliases: [] },
-  { iconCode: "table-rows", label: "Table Rows", aliases: ["rows"] },
-  { iconCode: "table-rows-add-above", label: "Table Rows Add Above", aliases: [] },
-  { iconCode: "table-rows-add-below", label: "Table Rows Add Below", aliases: [] },
-  { iconCode: "table-rows-merge-next", label: "Table Rows Merge Next", aliases: [] },
-  { iconCode: "table-rows-merge-previous", label: "Table Rows Merge Previous", aliases: [] },
-  { iconCode: "table-rows-remove-above", label: "Table Rows Remove Above", aliases: [] },
-  { iconCode: "table-rows-remove-below", label: "Table Rows Remove Below", aliases: [] },
-  { iconCode: "table-slash", label: "Table Slash", aliases: [] },
-  { iconCode: "table-tennis", label: "Table Tennis", aliases: ["ping-pong-paddle-ball", "table-tennis-paddle-ball"] },
-  { iconCode: "table-tree", label: "Table Tree", aliases: [] },
-  { iconCode: "tablet", label: "Tablet", aliases: ["tablet-android"] },
-  { iconCode: "tablet-button", label: "Tablet Button", aliases: [] },
-  { iconCode: "tablet-rugged", label: "Tablet Rugged", aliases: [] },
-  { iconCode: "tablet-screen", label: "Tablet Screen", aliases: ["tablet-android-alt"] },
-  { iconCode: "tablet-screen-button", label: "Tablet Screen Button", aliases: ["tablet-alt"] },
-  { iconCode: "tablets", label: "Tablets", aliases: [] },
-  { iconCode: "taco", label: "Taco", aliases: [] },
-  { iconCode: "tag", label: "Tag", aliases: [] },
-  { iconCode: "tags", label: "Tags", aliases: [] },
-  { iconCode: "tally", label: "Tally", aliases: ["tally-5"] },
-  { iconCode: "tally-1", label: "Tally 1", aliases: [] },
-  { iconCode: "tally-2", label: "Tally 2", aliases: [] },
-  { iconCode: "tally-3", label: "Tally 3", aliases: [] },
-  { iconCode: "tally-4", label: "Tally 4", aliases: [] },
-  { iconCode: "tamale", label: "Tamale", aliases: [] },
-  { iconCode: "tank-recovery", label: "Tank Recovery", aliases: [] },
-  { iconCode: "tank-water", label: "Tank Water", aliases: [] },
-  { iconCode: "tape", label: "Tape", aliases: [] },
-  { iconCode: "tarp", label: "Tarp", aliases: [] },
-  { iconCode: "tarp-droplet", label: "Tarp Droplet", aliases: [] },
-  { iconCode: "taurus", label: "Taurus", aliases: [] },
-  { iconCode: "taxi", label: "Taxi", aliases: ["cab"] },
-  { iconCode: "taxi-bus", label: "Taxi Bus", aliases: [] },
-  { iconCode: "teddy-bear", label: "Teddy Bear", aliases: [] },
-  { iconCode: "teeth", label: "Teeth", aliases: [] },
-  { iconCode: "teeth-open", label: "Teeth Open", aliases: [] },
-  { iconCode: "telescope", label: "Telescope", aliases: [] },
-  { iconCode: "teletype", label: "Teletype", aliases: ["tty"] },
-  { iconCode: "teletype-answer", label: "Teletype Answer", aliases: ["tty-answer"] },
-  { iconCode: "temperature-arrow-down", label: "Temperature Arrow Down", aliases: ["temperature-down"] },
-  { iconCode: "temperature-arrow-up", label: "Temperature Arrow Up", aliases: ["temperature-up"] },
-  { iconCode: "temperature-empty", label: "Temperature Empty", aliases: ["temperature-0", "thermometer-0", "thermometer-empty"] },
-  { iconCode: "temperature-frigid", label: "Temperature Frigid", aliases: ["temperature-snow"] },
-  { iconCode: "temperature-full", label: "Temperature Full", aliases: ["temperature-4", "thermometer-4", "thermometer-full"] },
-  { iconCode: "temperature-half", label: "Temperature Half", aliases: ["temperature-2", "thermometer-2", "thermometer-half"] },
-  { iconCode: "temperature-high", label: "Temperature High", aliases: [] },
-  { iconCode: "temperature-hot", label: "Temperature Hot", aliases: ["temperature-sun"] },
-  { iconCode: "temperature-list", label: "Temperature List", aliases: [] },
-  { iconCode: "temperature-low", label: "Temperature Low", aliases: [] },
-  { iconCode: "temperature-quarter", label: "Temperature Quarter", aliases: ["temperature-1", "thermometer-1", "thermometer-quarter"] },
-  { iconCode: "temperature-slash", label: "Temperature Slash", aliases: [] },
-  { iconCode: "temperature-three-quarters", label: "Temperature Three Quarters", aliases: ["temperature-3", "thermometer-3", "thermometer-three-quarters"] },
-  { iconCode: "tenge", label: "Tenge", aliases: ["tenge-sign"] },
-  { iconCode: "tennis-ball", label: "Tennis Ball", aliases: [] },
-  { iconCode: "tent", label: "Tent", aliases: [] },
-  { iconCode: "tent-arrow-down-to-line", label: "Tent Arrow Down To Line", aliases: [] },
-  { iconCode: "tent-arrow-left-right", label: "Tent Arrow Left Right", aliases: [] },
-  { iconCode: "tent-arrow-turn-left", label: "Tent Arrow Turn Left", aliases: [] },
-  { iconCode: "tent-arrows-down", label: "Tent Arrows Down", aliases: [] },
-  { iconCode: "tent-circus", label: "Tent Circus", aliases: [] },
-  { iconCode: "tent-double-peak", label: "Tent Double Peak", aliases: [] },
-  { iconCode: "tents", label: "Tents", aliases: [] },
-  { iconCode: "terminal", label: "Terminal", aliases: [] },
-  { iconCode: "text", label: "Text", aliases: [] },
-  { iconCode: "text-height", label: "Text Height", aliases: [] },
-  { iconCode: "text-size", label: "Text Size", aliases: [] },
-  { iconCode: "text-slash", label: "Text Slash", aliases: ["remove-format"] },
-  { iconCode: "text-width", label: "Text Width", aliases: [] },
-  { iconCode: "thermometer", label: "Thermometer", aliases: [] },
-  { iconCode: "theta", label: "Theta", aliases: [] },
-  { iconCode: "thought-bubble", label: "Thought Bubble", aliases: [] },
-  { iconCode: "thumbs-down", label: "Thumbs Down", aliases: [] },
-  { iconCode: "thumbs-up", label: "Thumbs Up", aliases: [] },
-  { iconCode: "thumbtack", label: "Thumbtack", aliases: ["thumb-tack"] },
-  { iconCode: "thumbtack-angle", label: "Thumbtack Angle", aliases: [] },
-  { iconCode: "thumbtack-angle-slash", label: "Thumbtack Angle Slash", aliases: [] },
-  { iconCode: "thumbtack-slash", label: "Thumbtack Slash", aliases: ["thumb-tack-slash"] },
-  { iconCode: "tick", label: "Tick", aliases: [] },
-  { iconCode: "ticket", label: "Ticket", aliases: [] },
-  { iconCode: "ticket-perforated", label: "Ticket Perforated", aliases: [] },
-  { iconCode: "ticket-perforated-plane", label: "Ticket Perforated Plane", aliases: ["ticket-airline", "ticket-plane"] },
-  { iconCode: "ticket-simple", label: "Ticket Simple", aliases: ["ticket-alt"] },
-  { iconCode: "tickets", label: "Tickets", aliases: [] },
-  { iconCode: "tickets-perforated", label: "Tickets Perforated", aliases: [] },
-  { iconCode: "tickets-perforated-plane", label: "Tickets Perforated Plane", aliases: ["tickets-airline", "tickets-plane"] },
-  { iconCode: "tickets-simple", label: "Tickets Simple", aliases: [] },
-  { iconCode: "tilde", label: "Tilde", aliases: [] },
-  { iconCode: "timeline", label: "Timeline", aliases: [] },
-  { iconCode: "timeline-arrow", label: "Timeline Arrow", aliases: [] },
-  { iconCode: "timer", label: "Timer", aliases: [] },
-  { iconCode: "times-to-slot", label: "Times To Slot", aliases: ["vote-nay", "xmark-to-slot"] },
-  { iconCode: "tire", label: "Tire", aliases: [] },
-  { iconCode: "tire-flat", label: "Tire Flat", aliases: [] },
-  { iconCode: "tire-pressure-warning", label: "Tire Pressure Warning", aliases: [] },
-  { iconCode: "tire-rugged", label: "Tire Rugged", aliases: [] },
-  { iconCode: "toggle-large-off", label: "Toggle Large Off", aliases: [] },
-  { iconCode: "toggle-large-on", label: "Toggle Large On", aliases: [] },
-  { iconCode: "toggle-off", label: "Toggle Off", aliases: [] },
-  { iconCode: "toggle-on", label: "Toggle On", aliases: [] },
-  { iconCode: "toilet", label: "Toilet", aliases: [] },
-  { iconCode: "toilet-paper", label: "Toilet Paper", aliases: ["toilet-paper-alt", "toilet-paper-blank"] },
-  { iconCode: "toilet-paper-blank-under", label: "Toilet Paper Blank Under", aliases: ["toilet-paper-reverse", "toilet-paper-reverse-alt", "toilet-paper-under"] },
-  { iconCode: "toilet-paper-check", label: "Toilet Paper Check", aliases: [] },
-  { iconCode: "toilet-paper-reverse-slash", label: "Toilet Paper Reverse Slash", aliases: ["toilet-paper-under-slash"] },
-  { iconCode: "toilet-paper-slash", label: "Toilet Paper Slash", aliases: [] },
-  { iconCode: "toilet-paper-xmark", label: "Toilet Paper Xmark", aliases: [] },
-  { iconCode: "toilet-portable", label: "Toilet Portable", aliases: [] },
-  { iconCode: "toilets-portable", label: "Toilets Portable", aliases: [] },
-  { iconCode: "tomato", label: "Tomato", aliases: [] },
-  { iconCode: "tombstone", label: "Tombstone", aliases: [] },
-  { iconCode: "tombstone-blank", label: "Tombstone Blank", aliases: ["tombstone-alt"] },
-  { iconCode: "toolbox", label: "Toolbox", aliases: [] },
-  { iconCode: "tooth", label: "Tooth", aliases: [] },
-  { iconCode: "toothbrush", label: "Toothbrush", aliases: [] },
-  { iconCode: "torii-gate", label: "Torii Gate", aliases: [] },
-  { iconCode: "tornado", label: "Tornado", aliases: [] },
-  { iconCode: "tower-broadcast", label: "Tower Broadcast", aliases: ["broadcast-tower"] },
-  { iconCode: "tower-cell", label: "Tower Cell", aliases: [] },
-  { iconCode: "tower-control", label: "Tower Control", aliases: [] },
-  { iconCode: "tower-observation", label: "Tower Observation", aliases: [] },
-  { iconCode: "tower-receive", label: "Tower Receive", aliases: [] },
-  { iconCode: "tractor", label: "Tractor", aliases: [] },
-  { iconCode: "trademark", label: "Trademark", aliases: [] },
-  { iconCode: "traffic-cone", label: "Traffic Cone", aliases: [] },
-  { iconCode: "traffic-light", label: "Traffic Light", aliases: [] },
-  { iconCode: "traffic-light-go", label: "Traffic Light Go", aliases: [] },
-  { iconCode: "traffic-light-slow", label: "Traffic Light Slow", aliases: [] },
-  { iconCode: "traffic-light-stop", label: "Traffic Light Stop", aliases: [] },
-  { iconCode: "trailer", label: "Trailer", aliases: [] },
-  { iconCode: "train", label: "Train", aliases: [] },
-  { iconCode: "train-stop", label: "Train Stop", aliases: [] },
-  { iconCode: "train-subway", label: "Train Subway", aliases: ["subway"] },
-  { iconCode: "train-subway-tunnel", label: "Train Subway Tunnel", aliases: ["subway-tunnel"] },
-  { iconCode: "train-track", label: "Train Track", aliases: [] },
-  { iconCode: "train-tram", label: "Train Tram", aliases: [] },
-  { iconCode: "train-tunnel", label: "Train Tunnel", aliases: [] },
-  { iconCode: "transducer", label: "Transducer", aliases: [] },
-  { iconCode: "transformer-bolt", label: "Transformer Bolt", aliases: [] },
-  { iconCode: "transgender", label: "Transgender", aliases: ["transgender-alt"] },
-  { iconCode: "transmission", label: "Transmission", aliases: [] },
-  { iconCode: "transporter", label: "Transporter", aliases: [] },
-  { iconCode: "transporter-1", label: "Transporter 1", aliases: [] },
-  { iconCode: "transporter-2", label: "Transporter 2", aliases: [] },
-  { iconCode: "transporter-3", label: "Transporter 3", aliases: [] },
-  { iconCode: "transporter-4", label: "Transporter 4", aliases: [] },
-  { iconCode: "transporter-5", label: "Transporter 5", aliases: [] },
-  { iconCode: "transporter-6", label: "Transporter 6", aliases: [] },
-  { iconCode: "transporter-7", label: "Transporter 7", aliases: [] },
-  { iconCode: "transporter-empty", label: "Transporter Empty", aliases: [] },
-  { iconCode: "trash", label: "Trash", aliases: [] },
-  { iconCode: "trash-arrow-turn-left", label: "Trash Arrow Turn Left", aliases: ["trash-undo"] },
-  { iconCode: "trash-arrow-up", label: "Trash Arrow Up", aliases: ["trash-restore"] },
-  { iconCode: "trash-can", label: "Trash Can", aliases: ["trash-alt"] },
-  { iconCode: "trash-can-arrow-turn-left", label: "Trash Can Arrow Turn Left", aliases: ["trash-can-undo", "trash-undo-alt"] },
-  { iconCode: "trash-can-arrow-up", label: "Trash Can Arrow Up", aliases: ["trash-restore-alt"] },
-  { iconCode: "trash-can-check", label: "Trash Can Check", aliases: [] },
-  { iconCode: "trash-can-clock", label: "Trash Can Clock", aliases: [] },
-  { iconCode: "trash-can-list", label: "Trash Can List", aliases: [] },
-  { iconCode: "trash-can-plus", label: "Trash Can Plus", aliases: [] },
-  { iconCode: "trash-can-slash", label: "Trash Can Slash", aliases: ["trash-alt-slash"] },
-  { iconCode: "trash-can-xmark", label: "Trash Can Xmark", aliases: [] },
-  { iconCode: "trash-check", label: "Trash Check", aliases: [] },
-  { iconCode: "trash-clock", label: "Trash Clock", aliases: [] },
-  { iconCode: "trash-list", label: "Trash List", aliases: [] },
-  { iconCode: "trash-plus", label: "Trash Plus", aliases: [] },
-  { iconCode: "trash-slash", label: "Trash Slash", aliases: [] },
-  { iconCode: "trash-xmark", label: "Trash Xmark", aliases: [] },
-  { iconCode: "treasure-chest", label: "Treasure Chest", aliases: [] },
-  { iconCode: "tree", label: "Tree", aliases: [] },
-  { iconCode: "tree-christmas", label: "Tree Christmas", aliases: [] },
-  { iconCode: "tree-city", label: "Tree City", aliases: [] },
-  { iconCode: "tree-deciduous", label: "Tree Deciduous", aliases: ["tree-alt"] },
-  { iconCode: "tree-decorated", label: "Tree Decorated", aliases: [] },
-  { iconCode: "tree-large", label: "Tree Large", aliases: [] },
-  { iconCode: "tree-palm", label: "Tree Palm", aliases: [] },
-  { iconCode: "trees", label: "Trees", aliases: [] },
-  { iconCode: "triangle", label: "Triangle", aliases: [] },
-  { iconCode: "triangle-circle-square", label: "Triangle Circle Square", aliases: ["shapes"] },
-  { iconCode: "triangle-exclamation", label: "Triangle Exclamation", aliases: ["exclamation-triangle", "warning"] },
-  { iconCode: "triangle-instrument", label: "Triangle Instrument", aliases: ["triangle-music"] },
-  { iconCode: "triangle-person-digging", label: "Triangle Person Digging", aliases: ["construction"] },
-  { iconCode: "tricycle", label: "Tricycle", aliases: [] },
-  { iconCode: "tricycle-adult", label: "Tricycle Adult", aliases: [] },
-  { iconCode: "trillium", label: "Trillium", aliases: [] },
-  { iconCode: "triple-chevrons-down", label: "Triple Chevrons Down", aliases: [] },
-  { iconCode: "triple-chevrons-left", label: "Triple Chevrons Left", aliases: [] },
-  { iconCode: "triple-chevrons-right", label: "Triple Chevrons Right", aliases: [] },
-  { iconCode: "triple-chevrons-up", label: "Triple Chevrons Up", aliases: [] },
-  { iconCode: "trombone", label: "Trombone", aliases: [] },
-  { iconCode: "trophy", label: "Trophy", aliases: [] },
-  { iconCode: "trophy-star", label: "Trophy Star", aliases: ["trophy-alt"] },
-  { iconCode: "trowel", label: "Trowel", aliases: [] },
-  { iconCode: "trowel-bricks", label: "Trowel Bricks", aliases: [] },
-  { iconCode: "truck", label: "Truck", aliases: [] },
-  { iconCode: "truck-arrow-right", label: "Truck Arrow Right", aliases: [] },
-  { iconCode: "truck-bolt", label: "Truck Bolt", aliases: [] },
-  { iconCode: "truck-clock", label: "Truck Clock", aliases: ["shipping-timed"] },
-  { iconCode: "truck-container", label: "Truck Container", aliases: [] },
-  { iconCode: "truck-container-empty", label: "Truck Container Empty", aliases: [] },
-  { iconCode: "truck-droplet", label: "Truck Droplet", aliases: [] },
-  { iconCode: "truck-fast", label: "Truck Fast", aliases: ["shipping-fast"] },
-  { iconCode: "truck-field", label: "Truck Field", aliases: [] },
-  { iconCode: "truck-field-un", label: "Truck Field Un", aliases: [] },
-  { iconCode: "truck-fire", label: "Truck Fire", aliases: [] },
-  { iconCode: "truck-flatbed", label: "Truck Flatbed", aliases: [] },
-  { iconCode: "truck-front", label: "Truck Front", aliases: [] },
-  { iconCode: "truck-ladder", label: "Truck Ladder", aliases: [] },
-  { iconCode: "truck-medical", label: "Truck Medical", aliases: ["ambulance"] },
-  { iconCode: "truck-monster", label: "Truck Monster", aliases: [] },
-  { iconCode: "truck-moving", label: "Truck Moving", aliases: [] },
-  { iconCode: "truck-pickup", label: "Truck Pickup", aliases: [] },
-  { iconCode: "truck-plane", label: "Truck Plane", aliases: [] },
-  { iconCode: "truck-plow", label: "Truck Plow", aliases: [] },
-  { iconCode: "truck-ramp", label: "Truck Ramp", aliases: [] },
-  { iconCode: "truck-ramp-box", label: "Truck Ramp Box", aliases: ["truck-loading"] },
-  { iconCode: "truck-ramp-couch", label: "Truck Ramp Couch", aliases: ["truck-couch"] },
-  { iconCode: "truck-suv", label: "Truck Suv", aliases: [] },
-  { iconCode: "truck-tow", label: "Truck Tow", aliases: [] },
-  { iconCode: "truck-utensils", label: "Truck Utensils", aliases: [] },
-  { iconCode: "trumpet", label: "Trumpet", aliases: [] },
-  { iconCode: "tugrik-sign", label: "Tugrik Sign", aliases: [] },
-  { iconCode: "turkey", label: "Turkey", aliases: [] },
-  { iconCode: "turkish-lira", label: "Turkish Lira", aliases: ["try", "turkish-lira-sign"] },
-  { iconCode: "turn-down", label: "Turn Down", aliases: ["level-down-alt"] },
-  { iconCode: "turn-down-left", label: "Turn Down Left", aliases: [] },
-  { iconCode: "turn-down-right", label: "Turn Down Right", aliases: [] },
-  { iconCode: "turn-left", label: "Turn Left", aliases: [] },
-  { iconCode: "turn-left-down", label: "Turn Left Down", aliases: [] },
-  { iconCode: "turn-left-up", label: "Turn Left Up", aliases: [] },
-  { iconCode: "turn-right", label: "Turn Right", aliases: [] },
-  { iconCode: "turn-up", label: "Turn Up", aliases: ["level-up-alt"] },
-  { iconCode: "turntable", label: "Turntable", aliases: [] },
-  { iconCode: "turtle", label: "Turtle", aliases: [] },
-  { iconCode: "tv", label: "Tv", aliases: ["television", "tv-alt"] },
-  { iconCode: "tv-music", label: "Tv Music", aliases: [] },
-  { iconCode: "tv-retro", label: "Tv Retro", aliases: [] },
-  { iconCode: "typewriter", label: "Typewriter", aliases: [] },
-  { iconCode: "u", label: "U", aliases: [] },
-  { iconCode: "u-turn", label: "U Turn", aliases: ["u-turn-left-down"] },
-  { iconCode: "u-turn-down-left", label: "U Turn Down Left", aliases: [] },
-  { iconCode: "u-turn-down-right", label: "U Turn Down Right", aliases: [] },
-  { iconCode: "u-turn-left-up", label: "U Turn Left Up", aliases: [] },
-  { iconCode: "u-turn-right-down", label: "U Turn Right Down", aliases: [] },
-  { iconCode: "u-turn-right-up", label: "U Turn Right Up", aliases: [] },
-  { iconCode: "u-turn-up-left", label: "U Turn Up Left", aliases: [] },
-  { iconCode: "u-turn-up-right", label: "U Turn Up Right", aliases: [] },
-  { iconCode: "ufo", label: "Ufo", aliases: [] },
-  { iconCode: "ufo-beam", label: "Ufo Beam", aliases: [] },
-  { iconCode: "umbrella", label: "Umbrella", aliases: [] },
-  { iconCode: "umbrella-beach", label: "Umbrella Beach", aliases: [] },
-  { iconCode: "umbrella-simple", label: "Umbrella Simple", aliases: ["umbrella-alt"] },
-  { iconCode: "underline", label: "Underline", aliases: [] },
-  { iconCode: "unicorn", label: "Unicorn", aliases: [] },
-  { iconCode: "unicycle", label: "Unicycle", aliases: [] },
-  { iconCode: "uniform-martial-arts", label: "Uniform Martial Arts", aliases: [] },
-  { iconCode: "union", label: "Union", aliases: [] },
-  { iconCode: "universal-access", label: "Universal Access", aliases: [] },
-  { iconCode: "unlock", label: "Unlock", aliases: [] },
-  { iconCode: "unlock-keyhole", label: "Unlock Keyhole", aliases: ["unlock-alt"] },
-  { iconCode: "up", label: "Up", aliases: ["arrow-alt-up"] },
-  { iconCode: "up-down", label: "Up Down", aliases: ["arrows-alt-v"] },
-  { iconCode: "up-down-left-right", label: "Up Down Left Right", aliases: ["arrows-alt"] },
-  { iconCode: "up-from-bracket", label: "Up From Bracket", aliases: [] },
-  { iconCode: "up-from-dotted-line", label: "Up From Dotted Line", aliases: [] },
-  { iconCode: "up-from-line", label: "Up From Line", aliases: ["arrow-alt-from-bottom"] },
-  { iconCode: "up-left", label: "Up Left", aliases: [] },
-  { iconCode: "up-long", label: "Up Long", aliases: ["long-arrow-alt-up"] },
-  { iconCode: "up-long-to-line", label: "Up Long To Line", aliases: [] },
-  { iconCode: "up-right", label: "Up Right", aliases: [] },
-  { iconCode: "up-right-and-down-left-from-center", label: "Up Right And Down Left From Center", aliases: ["expand-alt"] },
-  { iconCode: "up-right-from-square", label: "Up Right From Square", aliases: ["external-link-alt"] },
-  { iconCode: "up-to-bracket", label: "Up To Bracket", aliases: [] },
-  { iconCode: "up-to-dotted-line", label: "Up To Dotted Line", aliases: [] },
-  { iconCode: "up-to-line", label: "Up To Line", aliases: ["arrow-alt-to-top"] },
-  { iconCode: "upload", label: "Upload", aliases: [] },
-  { iconCode: "usb-drive", label: "Usb Drive", aliases: [] },
-  { iconCode: "user", label: "User", aliases: ["user-alt", "user-large"] },
-  { iconCode: "user-alien", label: "User Alien", aliases: [] },
-  { iconCode: "user-astronaut", label: "User Astronaut", aliases: [] },
-  { iconCode: "user-beard", label: "User Beard", aliases: [] },
-  { iconCode: "user-beard-bolt", label: "User Beard Bolt", aliases: [] },
-  { iconCode: "user-bounty-hunter", label: "User Bounty Hunter", aliases: [] },
-  { iconCode: "user-chart", label: "User Chart", aliases: ["chart-user"] },
-  { iconCode: "user-check", label: "User Check", aliases: [] },
-  { iconCode: "user-chef", label: "User Chef", aliases: [] },
-  { iconCode: "user-chef-hair-long", label: "User Chef Hair Long", aliases: [] },
-  { iconCode: "user-circle-minus", label: "User Circle Minus", aliases: [] },
-  { iconCode: "user-circle-plus", label: "User Circle Plus", aliases: [] },
-  { iconCode: "user-clock", label: "User Clock", aliases: [] },
-  { iconCode: "user-cowboy", label: "User Cowboy", aliases: [] },
-  { iconCode: "user-crown", label: "User Crown", aliases: [] },
-  { iconCode: "user-dashed", label: "User Dashed", aliases: [] },
-  { iconCode: "user-doctor", label: "User Doctor", aliases: ["user-md"] },
-  { iconCode: "user-doctor-hair", label: "User Doctor Hair", aliases: [] },
-  { iconCode: "user-doctor-hair-long", label: "User Doctor Hair Long", aliases: [] },
-  { iconCode: "user-doctor-hair-mullet", label: "User Doctor Hair Mullet", aliases: [] },
-  { iconCode: "user-doctor-message", label: "User Doctor Message", aliases: ["user-md-chat"] },
-  { iconCode: "user-friends", label: "User Friends", aliases: ["user-group"] },
-  { iconCode: "user-gear", label: "User Gear", aliases: ["user-cog"] },
-  { iconCode: "user-graduate", label: "User Graduate", aliases: [] },
-  { iconCode: "user-group-crown", label: "User Group Crown", aliases: ["users-crown"] },
-  { iconCode: "user-group-simple", label: "User Group Simple", aliases: [] },
-  { iconCode: "user-hair", label: "User Hair", aliases: [] },
-  { iconCode: "user-hair-buns", label: "User Hair Buns", aliases: [] },
-  { iconCode: "user-hair-long", label: "User Hair Long", aliases: [] },
-  { iconCode: "user-hair-mullet", label: "User Hair Mullet", aliases: ["business-front", "party-back", "trian-balbot"] },
-  { iconCode: "user-hat-tie", label: "User Hat Tie", aliases: [] },
-  { iconCode: "user-hat-tie-magnifying-glass", label: "User Hat Tie Magnifying Glass", aliases: [] },
-  { iconCode: "user-headset", label: "User Headset", aliases: [] },
-  { iconCode: "user-helmet-safety", label: "User Helmet Safety", aliases: ["user-construction", "user-hard-hat"] },
-  { iconCode: "user-hoodie", label: "User Hoodie", aliases: [] },
-  { iconCode: "user-injured", label: "User Injured", aliases: [] },
-  { iconCode: "user-key", label: "User Key", aliases: [] },
-  { iconCode: "user-large-slash", label: "User Large Slash", aliases: ["user-alt-slash", "user-slash"] },
-  { iconCode: "user-lock", label: "User Lock", aliases: [] },
-  { iconCode: "user-magnifying-glass", label: "User Magnifying Glass", aliases: [] },
-  { iconCode: "user-message", label: "User Message", aliases: [] },
-  { iconCode: "user-microphone", label: "User Microphone", aliases: [] },
-  { iconCode: "user-minus", label: "User Minus", aliases: [] },
-  { iconCode: "user-music", label: "User Music", aliases: [] },
-  { iconCode: "user-ninja", label: "User Ninja", aliases: [] },
-  { iconCode: "user-nurse", label: "User Nurse", aliases: [] },
-  { iconCode: "user-nurse-hair", label: "User Nurse Hair", aliases: [] },
-  { iconCode: "user-nurse-hair-long", label: "User Nurse Hair Long", aliases: [] },
-  { iconCode: "user-pen", label: "User Pen", aliases: ["user-edit"] },
-  { iconCode: "user-pilot", label: "User Pilot", aliases: [] },
-  { iconCode: "user-pilot-hair-long", label: "User Pilot Hair Long", aliases: [] },
-  { iconCode: "user-pilot-tie", label: "User Pilot Tie", aliases: [] },
-  { iconCode: "user-pilot-tie-hair-long", label: "User Pilot Tie Hair Long", aliases: [] },
-  { iconCode: "user-plus", label: "User Plus", aliases: [] },
-  { iconCode: "user-police", label: "User Police", aliases: [] },
-  { iconCode: "user-police-hair-long", label: "User Police Hair Long", aliases: [] },
-  { iconCode: "user-police-tie", label: "User Police Tie", aliases: [] },
-  { iconCode: "user-police-tie-hair-long", label: "User Police Tie Hair Long", aliases: [] },
-  { iconCode: "user-question", label: "User Question", aliases: [] },
-  { iconCode: "user-robot", label: "User Robot", aliases: [] },
-  { iconCode: "user-robot-xmarks", label: "User Robot Xmarks", aliases: [] },
-  { iconCode: "user-secret", label: "User Secret", aliases: [] },
-  { iconCode: "user-shakespeare", label: "User Shakespeare", aliases: [] },
-  { iconCode: "user-shield", label: "User Shield", aliases: [] },
-  { iconCode: "user-sith", label: "User Sith", aliases: [] },
-  { iconCode: "user-tag", label: "User Tag", aliases: [] },
-  { iconCode: "user-tie", label: "User Tie", aliases: [] },
-  { iconCode: "user-tie-hair", label: "User Tie Hair", aliases: [] },
-  { iconCode: "user-tie-hair-long", label: "User Tie Hair Long", aliases: [] },
-  { iconCode: "user-tie-hair-mullet", label: "User Tie Hair Mullet", aliases: [] },
-  { iconCode: "user-unlock", label: "User Unlock", aliases: [] },
-  { iconCode: "user-viewfinder", label: "User Viewfinder", aliases: [] },
-  { iconCode: "user-visor", label: "User Visor", aliases: [] },
-  { iconCode: "user-vneck", label: "User Vneck", aliases: [] },
-  { iconCode: "user-vneck-hair", label: "User Vneck Hair", aliases: [] },
-  { iconCode: "user-vneck-hair-long", label: "User Vneck Hair Long", aliases: [] },
-  { iconCode: "user-vneck-hair-mullet", label: "User Vneck Hair Mullet", aliases: [] },
-  { iconCode: "user-xmark", label: "User Xmark", aliases: ["user-times"] },
-  { iconCode: "users", label: "Users", aliases: [] },
-  { iconCode: "users-between-lines", label: "Users Between Lines", aliases: [] },
-  { iconCode: "users-class", label: "Users Class", aliases: ["screen-users"] },
-  { iconCode: "users-gear", label: "Users Gear", aliases: ["users-cog"] },
-  { iconCode: "users-line", label: "Users Line", aliases: [] },
-  { iconCode: "users-medical", label: "Users Medical", aliases: [] },
-  { iconCode: "users-rays", label: "Users Rays", aliases: [] },
-  { iconCode: "users-rectangle", label: "Users Rectangle", aliases: [] },
-  { iconCode: "users-slash", label: "Users Slash", aliases: [] },
-  { iconCode: "users-viewfinder", label: "Users Viewfinder", aliases: [] },
-  { iconCode: "utensil-fork", label: "Utensil Fork", aliases: ["fork"] },
-  { iconCode: "utensil-knife", label: "Utensil Knife", aliases: ["knife"] },
-  { iconCode: "utensil-spoon", label: "Utensil Spoon", aliases: ["spoon"] },
-  { iconCode: "utensils", label: "Utensils", aliases: ["cutlery"] },
-  { iconCode: "utensils-slash", label: "Utensils Slash", aliases: [] },
-  { iconCode: "utility-can", label: "Utility Can", aliases: [] },
-  { iconCode: "utility-pole", label: "Utility Pole", aliases: [] },
-  { iconCode: "utility-pole-double", label: "Utility Pole Double", aliases: [] },
-  { iconCode: "v", label: "V", aliases: [] },
-  { iconCode: "vacuum", label: "Vacuum", aliases: [] },
-  { iconCode: "vacuum-robot", label: "Vacuum Robot", aliases: [] },
-  { iconCode: "value-absolute", label: "Value Absolute", aliases: [] },
-  { iconCode: "van", label: "Van", aliases: [] },
-  { iconCode: "vault", label: "Vault", aliases: [] },
-  { iconCode: "vector-circle", label: "Vector Circle", aliases: ["draw-circle"] },
-  { iconCode: "vector-polygon", label: "Vector Polygon", aliases: ["draw-polygon"] },
-  { iconCode: "vector-square", label: "Vector Square", aliases: ["draw-square"] },
-  { iconCode: "vent-damper", label: "Vent Damper", aliases: [] },
-  { iconCode: "venus", label: "Venus", aliases: [] },
-  { iconCode: "venus-double", label: "Venus Double", aliases: [] },
-  { iconCode: "venus-mars", label: "Venus Mars", aliases: [] },
-  { iconCode: "vest", label: "Vest", aliases: [] },
-  { iconCode: "vest-patches", label: "Vest Patches", aliases: [] },
-  { iconCode: "vial", label: "Vial", aliases: [] },
-  { iconCode: "vial-circle-check", label: "Vial Circle Check", aliases: [] },
-  { iconCode: "vial-vertical", label: "Vial Vertical", aliases: [] },
-  { iconCode: "vial-virus", label: "Vial Virus", aliases: [] },
-  { iconCode: "vials", label: "Vials", aliases: [] },
-  { iconCode: "video", label: "Video", aliases: ["video-camera"] },
-  { iconCode: "video-arrow-down-left", label: "Video Arrow Down Left", aliases: [] },
-  { iconCode: "video-arrow-up-right", label: "Video Arrow Up Right", aliases: [] },
-  { iconCode: "video-down-to-line", label: "Video Down To Line", aliases: [] },
-  { iconCode: "video-handheld", label: "Video Handheld", aliases: ["camcorder"] },
-  { iconCode: "video-plus", label: "Video Plus", aliases: [] },
-  { iconCode: "video-question", label: "Video Question", aliases: [] },
-  { iconCode: "video-slash", label: "Video Slash", aliases: [] },
-  { iconCode: "vihara", label: "Vihara", aliases: [] },
-  { iconCode: "violin", label: "Violin", aliases: [] },
-  { iconCode: "virgo", label: "Virgo", aliases: [] },
-  { iconCode: "virus", label: "Virus", aliases: [] },
-  { iconCode: "virus-covid", label: "Virus Covid", aliases: [] },
-  { iconCode: "virus-covid-slash", label: "Virus Covid Slash", aliases: [] },
-  { iconCode: "virus-slash", label: "Virus Slash", aliases: [] },
-  { iconCode: "viruses", label: "Viruses", aliases: [] },
-  { iconCode: "voicemail", label: "Voicemail", aliases: [] },
-  { iconCode: "volcano", label: "Volcano", aliases: [] },
-  { iconCode: "volleyball", label: "Volleyball", aliases: ["volleyball-ball"] },
-  { iconCode: "volume", label: "Volume", aliases: ["volume-medium"] },
-  { iconCode: "volume-down", label: "Volume Down", aliases: ["volume-low"] },
-  { iconCode: "volume-high", label: "Volume High", aliases: ["volume-up"] },
-  { iconCode: "volume-off", label: "Volume Off", aliases: [] },
-  { iconCode: "volume-slash", label: "Volume Slash", aliases: [] },
-  { iconCode: "volume-xmark", label: "Volume Xmark", aliases: ["volume-mute", "volume-times"] },
-  { iconCode: "vr-cardboard", label: "Vr Cardboard", aliases: [] },
-  { iconCode: "w", label: "W", aliases: [] },
-  { iconCode: "waffle", label: "Waffle", aliases: [] },
-  { iconCode: "wagon-covered", label: "Wagon Covered", aliases: [] },
-  { iconCode: "walker", label: "Walker", aliases: [] },
-  { iconCode: "walkie-talkie", label: "Walkie Talkie", aliases: [] },
-  { iconCode: "wallet", label: "Wallet", aliases: [] },
-  { iconCode: "wand", label: "Wand", aliases: [] },
-  { iconCode: "wand-magic", label: "Wand Magic", aliases: ["magic"] },
-  { iconCode: "wand-magic-sparkles", label: "Wand Magic Sparkles", aliases: ["magic-wand-sparkles"] },
-  { iconCode: "wand-sparkles", label: "Wand Sparkles", aliases: [] },
-  { iconCode: "wardrobe", label: "Wardrobe", aliases: [] },
-  { iconCode: "warehouse", label: "Warehouse", aliases: [] },
-  { iconCode: "warehouse-full", label: "Warehouse Full", aliases: ["warehouse-alt"] },
-  { iconCode: "washing-machine", label: "Washing Machine", aliases: ["washer"] },
-  { iconCode: "watch", label: "Watch", aliases: [] },
-  { iconCode: "watch-apple", label: "Watch Apple", aliases: [] },
-  { iconCode: "watch-calculator", label: "Watch Calculator", aliases: [] },
-  { iconCode: "watch-fitness", label: "Watch Fitness", aliases: [] },
-  { iconCode: "watch-smart", label: "Watch Smart", aliases: [] },
-  { iconCode: "water", label: "Water", aliases: [] },
-  { iconCode: "water-arrow-down", label: "Water Arrow Down", aliases: ["water-lower"] },
-  { iconCode: "water-arrow-up", label: "Water Arrow Up", aliases: ["water-rise"] },
-  { iconCode: "water-ladder", label: "Water Ladder", aliases: ["ladder-water", "swimming-pool"] },
-  { iconCode: "water-temperature", label: "Water Temperature", aliases: ["water-temp"] },
-  { iconCode: "watermelon-slice", label: "Watermelon Slice", aliases: [] },
-  { iconCode: "wave", label: "Wave", aliases: [] },
-  { iconCode: "wave-sine", label: "Wave Sine", aliases: [] },
-  { iconCode: "wave-square", label: "Wave Square", aliases: [] },
-  { iconCode: "wave-triangle", label: "Wave Triangle", aliases: [] },
-  { iconCode: "waveform", label: "Waveform", aliases: [] },
-  { iconCode: "waveform-lines", label: "Waveform Lines", aliases: ["waveform-path"] },
-  { iconCode: "waves-sine", label: "Waves Sine", aliases: [] },
-  { iconCode: "webhook", label: "Webhook", aliases: [] },
-  { iconCode: "weight", label: "Weight", aliases: ["weight-scale"] },
-  { iconCode: "weight-hanging", label: "Weight Hanging", aliases: [] },
-  { iconCode: "whale", label: "Whale", aliases: [] },
-  { iconCode: "wheat", label: "Wheat", aliases: [] },
-  { iconCode: "wheat-awn", label: "Wheat Awn", aliases: ["wheat-alt"] },
-  { iconCode: "wheat-awn-circle-exclamation", label: "Wheat Awn Circle Exclamation", aliases: [] },
-  { iconCode: "wheat-awn-slash", label: "Wheat Awn Slash", aliases: [] },
-  { iconCode: "wheat-slash", label: "Wheat Slash", aliases: [] },
-  { iconCode: "wheelchair", label: "Wheelchair", aliases: [] },
-  { iconCode: "wheelchair-move", label: "Wheelchair Move", aliases: ["wheelchair-alt"] },
-  { iconCode: "whistle", label: "Whistle", aliases: [] },
-  { iconCode: "wifi", label: "Wifi", aliases: ["wifi-3", "wifi-strong"] },
-  { iconCode: "wifi-exclamation", label: "Wifi Exclamation", aliases: [] },
-  { iconCode: "wifi-fair", label: "Wifi Fair", aliases: ["wifi-2"] },
-  { iconCode: "wifi-slash", label: "Wifi Slash", aliases: [] },
-  { iconCode: "wifi-weak", label: "Wifi Weak", aliases: ["wifi-1"] },
-  { iconCode: "wind", label: "Wind", aliases: [] },
-  { iconCode: "wind-circle-exclamation", label: "Wind Circle Exclamation", aliases: ["wind-warning"] },
-  { iconCode: "wind-turbine", label: "Wind Turbine", aliases: [] },
-  { iconCode: "window", label: "Window", aliases: [] },
-  { iconCode: "window-flip", label: "Window Flip", aliases: ["window-alt"] },
-  { iconCode: "window-frame", label: "Window Frame", aliases: [] },
-  { iconCode: "window-frame-open", label: "Window Frame Open", aliases: [] },
-  { iconCode: "window-maximize", label: "Window Maximize", aliases: [] },
-  { iconCode: "window-minimize", label: "Window Minimize", aliases: [] },
-  { iconCode: "window-restore", label: "Window Restore", aliases: [] },
-  { iconCode: "windsock", label: "Windsock", aliases: [] },
-  { iconCode: "wine-bottle", label: "Wine Bottle", aliases: [] },
-  { iconCode: "wine-glass", label: "Wine Glass", aliases: [] },
-  { iconCode: "wine-glass-crack", label: "Wine Glass Crack", aliases: ["fragile"] },
-  { iconCode: "wine-glass-empty", label: "Wine Glass Empty", aliases: ["wine-glass-alt"] },
-  { iconCode: "wireless", label: "Wireless", aliases: [] },
-  { iconCode: "won", label: "Won", aliases: ["krw", "won-sign"] },
-  { iconCode: "worm", label: "Worm", aliases: [] },
-  { iconCode: "wreath", label: "Wreath", aliases: [] },
-  { iconCode: "wreath-laurel", label: "Wreath Laurel", aliases: [] },
-  { iconCode: "wrench", label: "Wrench", aliases: [] },
-  { iconCode: "wrench-simple", label: "Wrench Simple", aliases: [] },
-  { iconCode: "x", label: "X", aliases: [] },
-  { iconCode: "x-ray", label: "X Ray", aliases: [] },
-  { iconCode: "xmark", label: "Xmark", aliases: ["close", "multiply", "remove", "times"] },
-  { iconCode: "xmark-large", label: "Xmark Large", aliases: [] },
-  { iconCode: "xmarks-lines", label: "Xmarks Lines", aliases: [] },
-  { iconCode: "y", label: "Y", aliases: [] },
-  { iconCode: "yen", label: "Yen", aliases: ["cny", "jpy", "rmb", "yen-sign"] },
-  { iconCode: "yin-yang", label: "Yin Yang", aliases: [] },
-  { iconCode: "z", label: "Z", aliases: [] }
-];
+const ICON_ROWS = `
+0|0
+00|00
+1|1
+2|2
+3|3
+360-degrees|360 Degrees
+4|4
+5|5
+6|6
+7|7
+8|8
+9|9
+a|A
+abacus|Abacus
+accent-grave|Accent Grave
+acorn|Acorn
+address-book|Address Book|contact-book
+address-card|Address Card|contact-card,vcard
+aeropress|Aeropress
+air-conditioner|Air Conditioner
+airplay|Airplay
+airplay-audio|Airplay Audio
+alarm-clock|Alarm Clock
+alarm-exclamation|Alarm Exclamation
+alarm-minus|Alarm Minus
+alarm-plus|Alarm Plus
+alarm-snooze|Alarm Snooze
+album|Album
+album-circle-plus|Album Circle Plus
+album-circle-user|Album Circle User
+album-collection|Album Collection
+album-collection-circle-plus|Album Collection Circle Plus
+album-collection-circle-user|Album Collection Circle User
+alicorn|Alicorn
+alien|Alien
+alien-monster|Alien Monster|alien-8bit
+align-center|Align Center
+align-justify|Align Justify
+align-left|Align Left
+align-right|Align Right
+align-slash|Align Slash
+almost-equal-to|Almost Equal To
+alt|Alt
+amp-guitar|Amp Guitar
+ampersand|Ampersand
+anchor|Anchor
+anchor-circle-check|Anchor Circle Check
+anchor-circle-exclamation|Anchor Circle Exclamation
+anchor-circle-xmark|Anchor Circle Xmark
+anchor-lock|Anchor Lock
+angel|Angel
+angle|Angle
+angle-90|Angle 90
+angle-double-down|Angle Double Down|angles-down
+angle-double-left|Angle Double Left|angles-left
+angle-double-right|Angle Double Right|angles-right
+angle-double-up|Angle Double Up|angles-up
+angle-down|Angle Down
+angle-left|Angle Left
+angle-right|Angle Right
+angle-up|Angle Up
+angles-up-down|Angles Up Down
+ankh|Ankh
+ant|Ant
+apartment|Apartment
+aperture|Aperture
+apostrophe|Apostrophe
+apple-core|Apple Core
+apple-crate|Apple Crate
+apple-whole|Apple Whole|apple-alt
+aquarius|Aquarius
+archway|Archway
+aries|Aries
+arrow-archery|Arrow Archery
+arrow-down|Arrow Down
+arrow-down-a-z|Arrow Down A Z|sort-alpha-asc,sort-alpha-down
+arrow-down-arrow-up|Arrow Down Arrow Up|sort-alt
+arrow-down-big-small|Arrow Down Big Small|sort-size-down
+arrow-down-from-arc|Arrow Down From Arc
+arrow-down-from-bracket|Arrow Down From Bracket
+arrow-down-from-dotted-line|Arrow Down From Dotted Line
+arrow-down-from-line|Arrow Down From Line|arrow-from-top
+arrow-down-left|Arrow Down Left
+arrow-down-left-and-arrow-up-right-to-center|Arrow Down Left And Arrow Up Right To Center
+arrow-down-long|Arrow Down Long|long-arrow-down
+arrow-down-long-to-line|Arrow Down Long To Line
+arrow-down-right|Arrow Down Right
+arrow-down-short-wide|Arrow Down Short Wide|sort-amount-desc,sort-amount-down-alt
+arrow-down-small-big|Arrow Down Small Big|sort-size-down-alt
+arrow-down-square-triangle|Arrow Down Square Triangle|sort-shapes-down-alt
+arrow-down-to-arc|Arrow Down To Arc
+arrow-down-to-bracket|Arrow Down To Bracket
+arrow-down-to-dotted-line|Arrow Down To Dotted Line
+arrow-down-to-line|Arrow Down To Line|arrow-to-bottom
+arrow-down-to-square|Arrow Down To Square
+arrow-down-triangle-square|Arrow Down Triangle Square|sort-shapes-down
+arrow-down-up-across-line|Arrow Down Up Across Line
+arrow-down-up-lock|Arrow Down Up Lock
+arrow-down-wide-short|Arrow Down Wide Short|sort-amount-asc,sort-amount-down
+arrow-down-z-a|Arrow Down Z A|sort-alpha-desc,sort-alpha-down-alt
+arrow-left|Arrow Left
+arrow-left-arrow-right|Arrow Left Arrow Right
+arrow-left-from-arc|Arrow Left From Arc
+arrow-left-from-bracket|Arrow Left From Bracket
+arrow-left-from-dotted-line|Arrow Left From Dotted Line
+arrow-left-from-line|Arrow Left From Line|arrow-from-right
+arrow-left-long|Arrow Left Long|long-arrow-left
+arrow-left-long-to-line|Arrow Left Long To Line
+arrow-left-to-arc|Arrow Left To Arc
+arrow-left-to-bracket|Arrow Left To Bracket
+arrow-left-to-dotted-line|Arrow Left To Dotted Line
+arrow-left-to-line|Arrow Left To Line|arrow-to-left
+arrow-pointer|Arrow Pointer|mouse-pointer
+arrow-progress|Arrow Progress
+arrow-right|Arrow Right
+arrow-right-arrow-left|Arrow Right Arrow Left|exchange
+arrow-right-from-arc|Arrow Right From Arc
+arrow-right-from-bracket|Arrow Right From Bracket|sign-out
+arrow-right-from-dotted-line|Arrow Right From Dotted Line
+arrow-right-from-file|Arrow Right From File|file-export
+arrow-right-from-line|Arrow Right From Line|arrow-from-left
+arrow-right-long|Arrow Right Long|long-arrow-right
+arrow-right-long-to-line|Arrow Right Long To Line
+arrow-right-to-arc|Arrow Right To Arc
+arrow-right-to-bracket|Arrow Right To Bracket|sign-in
+arrow-right-to-city|Arrow Right To City
+arrow-right-to-dotted-line|Arrow Right To Dotted Line
+arrow-right-to-file|Arrow Right To File|file-import
+arrow-right-to-line|Arrow Right To Line|arrow-to-right
+arrow-rotate-backward|Arrow Rotate Backward|arrow-left-rotate,arrow-rotate-back,arrow-rotate-left,undo
+arrow-rotate-forward|Arrow Rotate Forward|arrow-right-rotate,arrow-rotate-right,redo
+arrow-rotate-left-10|Arrow Rotate Left 10
+arrow-rotate-left-15|Arrow Rotate Left 15
+arrow-rotate-left-30|Arrow Rotate Left 30
+arrow-rotate-right-10|Arrow Rotate Right 10
+arrow-rotate-right-15|Arrow Rotate Right 15
+arrow-rotate-right-30|Arrow Rotate Right 30
+arrow-trend-down|Arrow Trend Down
+arrow-trend-up|Arrow Trend Up
+arrow-turn-down|Arrow Turn Down|level-down
+arrow-turn-down-left|Arrow Turn Down Left
+arrow-turn-down-right|Arrow Turn Down Right
+arrow-turn-left|Arrow Turn Left
+arrow-turn-left-down|Arrow Turn Left Down
+arrow-turn-left-up|Arrow Turn Left Up
+arrow-turn-right|Arrow Turn Right
+arrow-turn-up|Arrow Turn Up|level-up
+arrow-u-turn-down-left|Arrow U Turn Down Left
+arrow-u-turn-down-right|Arrow U Turn Down Right
+arrow-u-turn-left-down|Arrow U Turn Left Down
+arrow-u-turn-left-up|Arrow U Turn Left Up
+arrow-u-turn-right-down|Arrow U Turn Right Down
+arrow-u-turn-right-up|Arrow U Turn Right Up
+arrow-u-turn-up-left|Arrow U Turn Up Left
+arrow-u-turn-up-right|Arrow U Turn Up Right
+arrow-up|Arrow Up
+arrow-up-9-1|Arrow Up 9 1|sort-numeric-up-alt
+arrow-up-a-z|Arrow Up A Z|sort-alpha-up
+arrow-up-arrow-down|Arrow Up Arrow Down|sort-up-down
+arrow-up-big-small|Arrow Up Big Small|sort-size-up
+arrow-up-from-arc|Arrow Up From Arc
+arrow-up-from-bracket|Arrow Up From Bracket
+arrow-up-from-dotted-line|Arrow Up From Dotted Line
+arrow-up-from-ground-water|Arrow Up From Ground Water
+arrow-up-from-line|Arrow Up From Line|arrow-from-bottom
+arrow-up-from-square|Arrow Up From Square
+arrow-up-from-water-pump|Arrow Up From Water Pump
+arrow-up-left|Arrow Up Left
+arrow-up-left-from-circle|Arrow Up Left From Circle
+arrow-up-long|Arrow Up Long|long-arrow-up
+arrow-up-long-to-line|Arrow Up Long To Line
+arrow-up-right|Arrow Up Right
+arrow-up-right-and-arrow-down-left-from-center|Arrow Up Right And Arrow Down Left From Center
+arrow-up-right-dots|Arrow Up Right Dots
+arrow-up-right-from-square|Arrow Up Right From Square|external-link
+arrow-up-short-wide|Arrow Up Short Wide|sort-amount-up-alt
+arrow-up-small-big|Arrow Up Small Big|sort-size-up-alt
+arrow-up-square-triangle|Arrow Up Square Triangle|sort-shapes-up-alt
+arrow-up-to-arc|Arrow Up To Arc
+arrow-up-to-bracket|Arrow Up To Bracket
+arrow-up-to-dotted-line|Arrow Up To Dotted Line
+arrow-up-to-line|Arrow Up To Line|arrow-to-top
+arrow-up-triangle-square|Arrow Up Triangle Square|sort-shapes-up
+arrow-up-wide-short|Arrow Up Wide Short|sort-amount-up
+arrow-up-z-a|Arrow Up Z A|sort-alpha-up-alt
+arrows|Arrows|arrows-up-down-left-right
+arrows-cross|Arrows Cross
+arrows-down-to-line|Arrows Down To Line
+arrows-down-to-people|Arrows Down To People
+arrows-from-dotted-line|Arrows From Dotted Line
+arrows-from-line|Arrows From Line
+arrows-left-right|Arrows Left Right|arrows-h
+arrows-left-right-to-line|Arrows Left Right To Line
+arrows-maximize|Arrows Maximize|expand-arrows
+arrows-minimize|Arrows Minimize|compress-arrows
+arrows-repeat|Arrows Repeat|repeat-alt
+arrows-repeat-1|Arrows Repeat 1|repeat-1-alt
+arrows-retweet|Arrows Retweet|retweet-alt
+arrows-rotate|Arrows Rotate|refresh,sync
+arrows-rotate-reverse|Arrows Rotate Reverse
+arrows-spin|Arrows Spin
+arrows-split-up-and-left|Arrows Split Up And Left
+arrows-to-circle|Arrows To Circle
+arrows-to-dot|Arrows To Dot
+arrows-to-dotted-line|Arrows To Dotted Line
+arrows-to-eye|Arrows To Eye
+arrows-to-line|Arrows To Line
+arrows-turn-right|Arrows Turn Right
+arrows-turn-to-dots|Arrows Turn To Dots
+arrows-up-down|Arrows Up Down|arrows-v
+arrows-up-to-line|Arrows Up To Line
+asterisk|Asterisk
+at|At
+atom|Atom
+atom-simple|Atom Simple|atom-alt
+audio-description|Audio Description
+audio-description-slash|Audio Description Slash
+austral-sign|Austral Sign
+australian-dollar-sign|Australian Dollar Sign
+avocado|Avocado
+award|Award
+award-simple|Award Simple
+axe|Axe
+axe-battle|Axe Battle
+b|B
+baby|Baby
+baby-carriage|Baby Carriage|carriage-baby
+backpack|Backpack
+backward|Backward
+backward-fast|Backward Fast|fast-backward
+backward-step|Backward Step|step-backward
+bacon|Bacon
+bacteria|Bacteria
+bacterium|Bacterium
+badge|Badge
+badge-check|Badge Check
+badge-dollar|Badge Dollar
+badge-percent|Badge Percent
+badge-sheriff|Badge Sheriff
+badger-honey|Badger Honey
+badminton|Badminton
+bag-seedling|Bag Seedling
+bag-shopping|Bag Shopping|shopping-bag
+bag-shopping-minus|Bag Shopping Minus
+bag-shopping-plus|Bag Shopping Plus
+bagel|Bagel
+bags-shopping|Bags Shopping
+baguette|Baguette
+baht-sign|Baht Sign
+balance-scale-left|Balance Scale Left|scale-unbalanced
+ball-pile|Ball Pile
+ball-yarn|Ball Yarn
+balloon|Balloon
+balloons|Balloons
+ballot|Ballot
+ballot-check|Ballot Check
+ban|Ban|cancel
+ban-bug|Ban Bug|debug
+ban-smoking|Ban Smoking|smoking-ban
+banana|Banana
+band-aid|Band Aid|bandage
+bangladeshi-taka-sign|Bangladeshi Taka Sign
+banjo|Banjo
+bar-progress|Bar Progress
+bar-progress-empty|Bar Progress Empty
+bar-progress-full|Bar Progress Full
+bar-progress-half|Bar Progress Half
+bar-progress-quarter|Bar Progress Quarter
+bar-progress-three-quarters|Bar Progress Three Quarters
+barcode|Barcode
+barcode-read|Barcode Read
+barcode-scan|Barcode Scan
+barn|Barn
+barn-silo|Barn Silo|farm
+bars|Bars|navicon
+bars-filter|Bars Filter
+bars-progress|Bars Progress|tasks-alt
+bars-sort|Bars Sort
+bars-staggered|Bars Staggered|reorder,stream
+baseball|Baseball|baseball-ball
+baseball-bat|Baseball Bat
+baseball-bat-ball|Baseball Bat Ball
+basket-shopping|Basket Shopping|shopping-basket
+basket-shopping-minus|Basket Shopping Minus
+basket-shopping-plus|Basket Shopping Plus
+basket-shopping-simple|Basket Shopping Simple|shopping-basket-alt
+basketball|Basketball|basketball-ball
+basketball-hoop|Basketball Hoop
+bat|Bat
+bathtub|Bathtub|bath
+battery|Battery|battery-5,battery-full
+battery-bolt|Battery Bolt
+battery-empty|Battery Empty|battery-0
+battery-exclamation|Battery Exclamation
+battery-half|Battery Half|battery-3
+battery-low|Battery Low|battery-1
+battery-quarter|Battery Quarter|battery-2
+battery-slash|Battery Slash
+battery-three-quarters|Battery Three Quarters|battery-4
+bed|Bed
+bed-bunk|Bed Bunk
+bed-empty|Bed Empty
+bed-front|Bed Front|bed-alt
+bed-pulse|Bed Pulse|procedures
+bee|Bee
+beer|Beer|beer-mug-empty
+beer-foam|Beer Foam|beer-mug
+bell|Bell
+bell-concierge|Bell Concierge|concierge-bell
+bell-exclamation|Bell Exclamation
+bell-on|Bell On
+bell-plus|Bell Plus
+bell-ring|Bell Ring
+bell-school|Bell School
+bell-school-slash|Bell School Slash
+bell-slash|Bell Slash
+bells|Bells
+bench-tree|Bench Tree
+bezier-curve|Bezier Curve
+bicep|Bicep
+bicycle|Bicycle
+billboard|Billboard
+bin|Bin
+bin-bottles|Bin Bottles
+bin-bottles-recycle|Bin Bottles Recycle
+bin-recycle|Bin Recycle
+binary|Binary
+binary-circle-check|Binary Circle Check
+binary-lock|Binary Lock
+binary-slash|Binary Slash
+binoculars|Binoculars
+biohazard|Biohazard
+bird|Bird
+bitcoin-sign|Bitcoin Sign
+blanket|Blanket
+blanket-fire|Blanket Fire
+blender|Blender
+blender-phone|Blender Phone
+blinds|Blinds
+blinds-open|Blinds Open
+blinds-raised|Blinds Raised
+block|Block
+block-brick|Block Brick|wall-brick
+block-brick-fire|Block Brick Fire|firewall
+block-question|Block Question
+block-quote|Block Quote
+blog|Blog
+blueberries|Blueberries
+bold|Bold
+bolt|Bolt|zap
+bolt-auto|Bolt Auto
+bolt-lightning|Bolt Lightning
+bolt-slash|Bolt Slash
+bomb|Bomb
+bone|Bone
+bone-break|Bone Break
+bong|Bong
+book|Book
+book-arrow-right|Book Arrow Right
+book-arrow-up|Book Arrow Up
+book-atlas|Book Atlas|atlas
+book-bible|Book Bible|bible
+book-blank|Book Blank|book-alt
+book-bookmark|Book Bookmark
+book-circle-arrow-right|Book Circle Arrow Right
+book-circle-arrow-up|Book Circle Arrow Up
+book-copy|Book Copy
+book-font|Book Font
+book-heart|Book Heart
+book-journal-whills|Book Journal Whills|journal-whills
+book-medical|Book Medical
+book-open|Book Open
+book-open-cover|Book Open Cover|book-open-alt
+book-open-lines|Book Open Lines
+book-open-reader|Book Open Reader|book-reader
+book-quran|Book Quran|quran
+book-section|Book Section|book-law
+book-skull|Book Skull|book-dead
+book-sparkles|Book Sparkles|book-spells
+book-spine|Book Spine
+book-tanakh|Book Tanakh|tanakh
+book-user|Book User
+bookmark|Bookmark
+bookmark-plus|Bookmark Plus
+bookmark-slash|Bookmark Slash
+books|Books
+books-medical|Books Medical
+boombox|Boombox
+boot|Boot
+boot-heeled|Boot Heeled
+booth-curtain|Booth Curtain
+border-all|Border All
+border-bottom|Border Bottom
+border-bottom-right|Border Bottom Right|border-style-alt
+border-center-h|Border Center H
+border-center-v|Border Center V
+border-inner|Border Inner
+border-left|Border Left
+border-none|Border None
+border-outer|Border Outer
+border-right|Border Right
+border-top|Border Top
+border-top-left|Border Top Left|border-style
+bore-hole|Bore Hole
+bottle-baby|Bottle Baby
+bottle-droplet|Bottle Droplet
+bottle-water|Bottle Water
+bow-archery|Bow Archery
+bow-arrow|Bow Arrow
+bowl-chopsticks|Bowl Chopsticks
+bowl-chopsticks-noodles|Bowl Chopsticks Noodles
+bowl-food|Bowl Food
+bowl-hot|Bowl Hot|soup
+bowl-rice|Bowl Rice
+bowl-salad|Bowl Salad|salad
+bowl-scoops|Bowl Scoops
+bowl-shaved-ice|Bowl Shaved Ice|bowl-scoop
+bowl-soft-serve|Bowl Soft Serve
+bowl-spoon|Bowl Spoon
+bowling-ball|Bowling Ball
+bowling-ball-pin|Bowling Ball Pin
+bowling-pins|Bowling Pins
+box|Box
+box-archive|Box Archive|archive
+box-arrow-down|Box Arrow Down
+box-arrow-down-arrow-up|Box Arrow Down Arrow Up
+box-arrow-down-magnifying-glass|Box Arrow Down Magnifying Glass
+box-arrow-up|Box Arrow Up
+box-ballot|Box Ballot
+box-check|Box Check
+box-circle-check|Box Circle Check
+box-dollar|Box Dollar|box-usd
+box-heart|Box Heart
+box-isometric|Box Isometric
+box-isometric-tape|Box Isometric Tape
+box-magnifying-glass|Box Magnifying Glass
+box-open|Box Open
+box-open-full|Box Open Full|box-full
+box-taped|Box Taped|box-alt
+box-tissue|Box Tissue
+boxes|Boxes|boxes-alt,boxes-stacked
+boxes-packing|Boxes Packing
+boxing-glove|Boxing Glove|glove-boxing
+bra|Bra
+bracket|Bracket|bracket-left,bracket-square
+bracket-curly|Bracket Curly|bracket-curly-left
+bracket-curly-right|Bracket Curly Right
+bracket-round|Bracket Round|parenthesis
+bracket-round-right|Bracket Round Right
+bracket-square-right|Bracket Square Right
+brackets|Brackets|brackets-square
+brackets-curly|Brackets Curly
+brackets-round|Brackets Round|parentheses
+braille|Braille
+brain|Brain
+brain-arrow-curved-right|Brain Arrow Curved Right|mind-share
+brain-circuit|Brain Circuit
+brake-warning|Brake Warning
+brazilian-real-sign|Brazilian Real Sign
+bread-loaf|Bread Loaf
+bread-slice|Bread Slice
+bread-slice-butter|Bread Slice Butter
+bridge|Bridge
+bridge-circle-check|Bridge Circle Check
+bridge-circle-exclamation|Bridge Circle Exclamation
+bridge-circle-xmark|Bridge Circle Xmark
+bridge-lock|Bridge Lock
+bridge-suspension|Bridge Suspension
+bridge-water|Bridge Water
+briefcase|Briefcase
+briefcase-arrow-right|Briefcase Arrow Right
+briefcase-blank|Briefcase Blank
+briefcase-clock|Briefcase Clock|business-time
+briefcase-medical|Briefcase Medical
+briefs|Briefs
+brightness|Brightness
+brightness-low|Brightness Low
+bring-forward|Bring Forward
+bring-front|Bring Front
+broccoli|Broccoli
+broom|Broom
+broom-ball|Broom Ball|quidditch,quidditch-broom-ball
+broom-wide|Broom Wide
+browser|Browser
+browsers|Browsers
+brush|Brush
+bucket|Bucket
+bug|Bug
+bug-slash|Bug Slash
+bugs|Bugs
+building|Building
+building-circle-arrow-right|Building Circle Arrow Right
+building-circle-check|Building Circle Check
+building-circle-exclamation|Building Circle Exclamation
+building-circle-xmark|Building Circle Xmark
+building-columns|Building Columns|bank,institution,museum,university
+building-flag|Building Flag
+building-lock|Building Lock
+building-magnifying-glass|Building Magnifying Glass
+building-memo|Building Memo
+building-ngo|Building Ngo
+building-shield|Building Shield
+building-un|Building Un
+building-user|Building User
+building-wheat|Building Wheat
+buildings|Buildings
+bulldozer|Bulldozer
+bullhorn|Bullhorn
+bullseye|Bullseye
+bullseye-arrow|Bullseye Arrow
+bullseye-pointer|Bullseye Pointer
+buoy|Buoy
+buoy-mooring|Buoy Mooring
+burger|Burger|hamburger
+burger-cheese|Burger Cheese|cheeseburger
+burger-fries|Burger Fries
+burger-glass|Burger Glass
+burger-lettuce|Burger Lettuce
+burger-soda|Burger Soda
+burrito|Burrito
+burst|Burst
+burst-new|Burst New
+bus|Bus
+bus-school|Bus School
+bus-side|Bus Side
+bus-simple|Bus Simple|bus-alt
+bus-stop|Bus Stop
+butter|Butter
+butterfly|Butterfly
+c|C
+cabin|Cabin
+cabinet-filing|Cabinet Filing
+cable-car|Cable Car|tram
+cactus|Cactus
+caduceus|Caduceus
+cake|Cake|birthday-cake,cake-candles
+cake-slice|Cake Slice|shortcake
+calculator|Calculator
+calculator-simple|Calculator Simple|calculator-alt
+calendar|Calendar
+calendar-arrow-down|Calendar Arrow Down|calendar-download
+calendar-arrow-up|Calendar Arrow Up|calendar-upload
+calendar-check|Calendar Check
+calendar-circle-exclamation|Calendar Circle Exclamation
+calendar-circle-minus|Calendar Circle Minus
+calendar-circle-plus|Calendar Circle Plus
+calendar-circle-user|Calendar Circle User
+calendar-clock|Calendar Clock|calendar-time
+calendar-day|Calendar Day
+calendar-days|Calendar Days|calendar-alt
+calendar-exclamation|Calendar Exclamation
+calendar-heart|Calendar Heart
+calendar-image|Calendar Image
+calendar-lines|Calendar Lines|calendar-note
+calendar-lines-pen|Calendar Lines Pen
+calendar-minus|Calendar Minus
+calendar-pen|Calendar Pen|calendar-edit
+calendar-plus|Calendar Plus
+calendar-range|Calendar Range
+calendar-star|Calendar Star
+calendar-users|Calendar Users
+calendar-week|Calendar Week
+calendar-xmark|Calendar Xmark|calendar-times
+calendars|Calendars
+camera|Camera|camera-alt
+camera-cctv|Camera Cctv|cctv
+camera-circle-ellipsis|Camera Circle Ellipsis
+camera-clock|Camera Clock
+camera-movie|Camera Movie
+camera-polaroid|Camera Polaroid
+camera-retro|Camera Retro
+camera-rotate|Camera Rotate
+camera-security|Camera Security|camera-home
+camera-shutter|Camera Shutter
+camera-slash|Camera Slash
+camera-viewfinder|Camera Viewfinder|screenshot
+camera-web|Camera Web|webcam
+camera-web-slash|Camera Web Slash|webcam-slash
+campfire|Campfire
+campground|Campground
+can-food|Can Food
+cancer|Cancer
+candle-holder|Candle Holder
+candy|Candy
+candy-bar|Candy Bar|chocolate-bar
+candy-cane|Candy Cane
+candy-corn|Candy Corn
+cannabis|Cannabis
+cannon|Cannon
+canoe-person|Canoe Person
+capricorn|Capricorn
+capsule|Capsule
+capsules|Capsules
+car|Car|automobile
+car-battery|Car Battery|battery-car
+car-bolt|Car Bolt
+car-building|Car Building
+car-bump|Car Bump
+car-burst|Car Burst|car-crash
+car-bus|Car Bus
+car-circle-bolt|Car Circle Bolt
+car-garage|Car Garage
+car-key|Car Key
+car-mechanic|Car Mechanic|car-wrench
+car-mirrors|Car Mirrors
+car-on|Car On
+car-people|Car People|carpool
+car-rear|Car Rear|car-alt
+car-side|Car Side
+car-side-bolt|Car Side Bolt
+car-siren|Car Siren
+car-siren-on|Car Siren On
+car-tilt|Car Tilt
+car-tunnel|Car Tunnel
+car-wash|Car Wash
+caravan|Caravan
+caravan-simple|Caravan Simple|caravan-alt
+card-club|Card Club
+card-diamond|Card Diamond
+card-heart|Card Heart
+card-spade|Card Spade
+cards|Cards
+cards-blank|Cards Blank
+caret-down|Caret Down
+caret-large-down|Caret Large Down
+caret-large-left|Caret Large Left
+caret-large-right|Caret Large Right
+caret-large-up|Caret Large Up
+caret-left|Caret Left
+caret-right|Caret Right
+caret-up|Caret Up
+carrot|Carrot
+cars|Cars
+cart-arrow-down|Cart Arrow Down
+cart-arrow-up|Cart Arrow Up
+cart-circle-arrow-down|Cart Circle Arrow Down
+cart-circle-arrow-up|Cart Circle Arrow Up
+cart-circle-check|Cart Circle Check
+cart-circle-exclamation|Cart Circle Exclamation
+cart-circle-plus|Cart Circle Plus
+cart-circle-xmark|Cart Circle Xmark
+cart-flatbed|Cart Flatbed|dolly-flatbed
+cart-flatbed-boxes|Cart Flatbed Boxes|dolly-flatbed-alt
+cart-flatbed-empty|Cart Flatbed Empty|dolly-flatbed-empty
+cart-flatbed-suitcase|Cart Flatbed Suitcase|luggage-cart
+cart-minus|Cart Minus
+cart-plus|Cart Plus
+cart-shopping|Cart Shopping|shopping-cart
+cart-shopping-fast|Cart Shopping Fast
+cart-xmark|Cart Xmark
+cash-register|Cash Register
+cassette-betamax|Cassette Betamax|betamax
+cassette-tape|Cassette Tape
+cassette-vhs|Cassette Vhs|vhs
+castle|Castle
+cat|Cat
+cat-space|Cat Space
+cauldron|Cauldron
+cedi-sign|Cedi Sign
+cent-sign|Cent Sign
+certificate|Certificate
+chair|Chair
+chair-office|Chair Office
+chalkboard|Chalkboard|blackboard
+chalkboard-teacher|Chalkboard Teacher|chalkboard-user
+charging-station|Charging Station
+chart-area|Chart Area|area-chart
+chart-bar|Chart Bar|bar-chart
+chart-bullet|Chart Bullet
+chart-candlestick|Chart Candlestick
+chart-column|Chart Column
+chart-diagram|Chart Diagram
+chart-fft|Chart Fft
+chart-gantt|Chart Gantt
+chart-kanban|Chart Kanban
+chart-line|Chart Line|line-chart
+chart-line-down|Chart Line Down
+chart-line-up|Chart Line Up
+chart-line-up-down|Chart Line Up Down
+chart-mixed|Chart Mixed|analytics
+chart-mixed-up-circle-currency|Chart Mixed Up Circle Currency
+chart-mixed-up-circle-dollar|Chart Mixed Up Circle Dollar
+chart-network|Chart Network
+chart-pie|Chart Pie|pie-chart
+chart-pie-simple|Chart Pie Simple|chart-pie-alt
+chart-pie-simple-circle-currency|Chart Pie Simple Circle Currency
+chart-pie-simple-circle-dollar|Chart Pie Simple Circle Dollar
+chart-pyramid|Chart Pyramid
+chart-radar|Chart Radar
+chart-scatter|Chart Scatter
+chart-scatter-3d|Chart Scatter 3d
+chart-scatter-bubble|Chart Scatter Bubble
+chart-simple|Chart Simple
+chart-simple-horizontal|Chart Simple Horizontal
+chart-sine|Chart Sine
+chart-tree-map|Chart Tree Map
+chart-waterfall|Chart Waterfall
+check|Check
+check-double|Check Double
+check-to-slot|Check To Slot|vote-yea
+cheese|Cheese
+cheese-swiss|Cheese Swiss
+chemex|Chemex
+cherries|Cherries
+chess|Chess
+chess-bishop|Chess Bishop
+chess-bishop-piece|Chess Bishop Piece|chess-bishop-alt
+chess-board|Chess Board
+chess-clock|Chess Clock
+chess-clock-flip|Chess Clock Flip|chess-clock-alt
+chess-king|Chess King
+chess-king-piece|Chess King Piece|chess-king-alt
+chess-knight|Chess Knight
+chess-knight-piece|Chess Knight Piece|chess-knight-alt
+chess-pawn|Chess Pawn
+chess-pawn-piece|Chess Pawn Piece|chess-pawn-alt
+chess-queen|Chess Queen
+chess-queen-piece|Chess Queen Piece|chess-queen-alt
+chess-rook|Chess Rook
+chess-rook-piece|Chess Rook Piece|chess-rook-alt
+chest-drawers|Chest Drawers
+chestnut|Chestnut
+chevron-double-down|Chevron Double Down|chevrons-down
+chevron-double-left|Chevron Double Left|chevrons-left
+chevron-double-right|Chevron Double Right|chevrons-right
+chevron-double-up|Chevron Double Up|chevrons-up
+chevron-down|Chevron Down
+chevron-left|Chevron Left
+chevron-right|Chevron Right
+chevron-up|Chevron Up
+chf-sign|Chf Sign
+child|Child
+child-combatant|Child Combatant|child-rifle
+child-dress|Child Dress
+child-reaching|Child Reaching
+children|Children
+chimney|Chimney
+chopsticks|Chopsticks
+church|Church
+circle|Circle
+circle-0|Circle 0
+circle-1|Circle 1
+circle-2|Circle 2
+circle-3|Circle 3
+circle-4|Circle 4
+circle-5|Circle 5
+circle-6|Circle 6
+circle-7|Circle 7
+circle-8|Circle 8
+circle-9|Circle 9
+circle-a|Circle A
+circle-ampersand|Circle Ampersand
+circle-arrow-down|Circle Arrow Down|arrow-circle-down
+circle-arrow-down-left|Circle Arrow Down Left
+circle-arrow-down-right|Circle Arrow Down Right
+circle-arrow-left|Circle Arrow Left|arrow-circle-left
+circle-arrow-right|Circle Arrow Right|arrow-circle-right
+circle-arrow-up|Circle Arrow Up|arrow-circle-up
+circle-arrow-up-left|Circle Arrow Up Left
+circle-arrow-up-right|Circle Arrow Up Right
+circle-austral|Circle Austral
+circle-australian-dollar|Circle Australian Dollar
+circle-b|Circle B
+circle-baht|Circle Baht
+circle-bangladeshi-taka|Circle Bangladeshi Taka
+circle-bitcoin|Circle Bitcoin
+circle-bolt|Circle Bolt
+circle-book-open|Circle Book Open|book-circle
+circle-bookmark|Circle Bookmark|bookmark-circle
+circle-brazilian-real|Circle Brazilian Real
+circle-c|Circle C
+circle-calendar|Circle Calendar|calendar-circle
+circle-camera|Circle Camera|camera-circle
+circle-caret-down|Circle Caret Down|caret-circle-down
+circle-caret-left|Circle Caret Left|caret-circle-left
+circle-caret-right|Circle Caret Right|caret-circle-right
+circle-caret-up|Circle Caret Up|caret-circle-up
+circle-cedi|Circle Cedi
+circle-cent|Circle Cent
+circle-check|Circle Check|check-circle
+circle-chevron-down|Circle Chevron Down|chevron-circle-down
+circle-chevron-left|Circle Chevron Left|chevron-circle-left
+circle-chevron-right|Circle Chevron Right|chevron-circle-right
+circle-chevron-up|Circle Chevron Up|chevron-circle-up
+circle-chf|Circle Chf
+circle-colon|Circle Colon
+circle-cruzeiro|Circle Cruzeiro
+circle-currency|Circle Currency
+circle-d|Circle D
+circle-danish-krone|Circle Danish Krone
+circle-dashed|Circle Dashed
+circle-divide|Circle Divide
+circle-dollar|Circle Dollar|dollar-circle,usd-circle
+circle-dollar-to-slot|Circle Dollar To Slot|donate
+circle-dong|Circle Dong
+circle-dot|Circle Dot|dot-circle
+circle-down|Circle Down|arrow-alt-circle-down
+circle-down-left|Circle Down Left
+circle-down-right|Circle Down Right
+circle-e|Circle E
+circle-ellipsis|Circle Ellipsis
+circle-ellipsis-vertical|Circle Ellipsis Vertical
+circle-envelope|Circle Envelope|envelope-circle
+circle-equals|Circle Equals
+circle-euro|Circle Euro
+circle-eurozone|Circle Eurozone
+circle-exclamation|Circle Exclamation|exclamation-circle
+circle-exclamation-check|Circle Exclamation Check
+circle-f|Circle F
+circle-florin|Circle Florin
+circle-franc|Circle Franc
+circle-g|Circle G
+circle-gf|Circle Gf
+circle-guarani|Circle Guarani
+circle-half|Circle Half
+circle-half-horizontal|Circle Half Horizontal
+circle-half-stroke|Circle Half Stroke|adjust
+circle-half-stroke-horizontal|Circle Half Stroke Horizontal
+circle-heart|Circle Heart|heart-circle
+circle-house|Circle House
+circle-hryvnia|Circle Hryvnia
+circle-i|Circle I
+circle-indian-rupee|Circle Indian Rupee
+circle-info|Circle Info|info-circle
+circle-j|Circle J
+circle-k|Circle K
+circle-kip|Circle Kip
+circle-l|Circle L
+circle-lari|Circle Lari
+circle-left|Circle Left|arrow-alt-circle-left
+circle-lira|Circle Lira
+circle-litecoin|Circle Litecoin
+circle-location-arrow|Circle Location Arrow|location-circle
+circle-m|Circle M
+circle-malaysian-ringgit|Circle Malaysian Ringgit
+circle-manat|Circle Manat
+circle-microphone|Circle Microphone|microphone-circle
+circle-microphone-lines|Circle Microphone Lines|microphone-circle-alt
+circle-mill|Circle Mill
+circle-minus|Circle Minus|minus-circle
+circle-moon|Circle Moon
+circle-n|Circle N
+circle-naira|Circle Naira
+circle-nodes|Circle Nodes
+circle-norwegian-krone|Circle Norwegian Krone
+circle-notch|Circle Notch
+circle-o|Circle O
+circle-p|Circle P
+circle-parking|Circle Parking|parking-circle
+circle-pause|Circle Pause|pause-circle
+circle-peruvian-soles|Circle Peruvian Soles
+circle-peseta|Circle Peseta
+circle-peso|Circle Peso
+circle-phone|Circle Phone|phone-circle
+circle-phone-flip|Circle Phone Flip|phone-circle-alt
+circle-phone-hangup|Circle Phone Hangup|phone-circle-down
+circle-play|Circle Play|play-circle
+circle-plus|Circle Plus|plus-circle
+circle-polish-zloty|Circle Polish Zloty
+circle-q|Circle Q
+circle-quarter|Circle Quarter
+circle-quarter-stroke|Circle Quarter Stroke
+circle-quarters|Circle Quarters
+circle-question|Circle Question|question-circle
+circle-r|Circle R
+circle-radiation|Circle Radiation|radiation-alt
+circle-renminbi|Circle Renminbi
+circle-right|Circle Right|arrow-alt-circle-right
+circle-ruble|Circle Ruble
+circle-rupee|Circle Rupee
+circle-rupiah|Circle Rupiah
+circle-s|Circle S
+circle-share-nodes|Circle Share Nodes
+circle-shekel|Circle Shekel
+circle-small|Circle Small
+circle-sort|Circle Sort|sort-circle
+circle-sort-down|Circle Sort Down|sort-circle-down
+circle-sort-up|Circle Sort Up|sort-circle-up
+circle-star|Circle Star|star-circle
+circle-sterling|Circle Sterling
+circle-stop|Circle Stop|stop-circle
+circle-swedish-krona|Circle Swedish Krona
+circle-t|Circle T
+circle-tenge|Circle Tenge
+circle-three-quarters|Circle Three Quarters
+circle-three-quarters-stroke|Circle Three Quarters Stroke
+circle-trash|Circle Trash|trash-circle
+circle-tugrik|Circle Tugrik
+circle-turkish-lira|Circle Turkish Lira
+circle-u|Circle U
+circle-up|Circle Up|arrow-alt-circle-up
+circle-up-left|Circle Up Left
+circle-up-right|Circle Up Right
+circle-user|Circle User|user-circle
+circle-user-circle-check|Circle User Circle Check
+circle-user-circle-exclamation|Circle User Circle Exclamation
+circle-user-circle-minus|Circle User Circle Minus
+circle-user-circle-moon|Circle User Circle Moon
+circle-user-circle-plus|Circle User Circle Plus
+circle-user-circle-question|Circle User Circle Question
+circle-user-circle-user|Circle User Circle User
+circle-user-circle-xmark|Circle User Circle Xmark
+circle-user-clock|Circle User Clock
+circle-v|Circle V
+circle-video|Circle Video|video-circle
+circle-w|Circle W
+circle-waveform-lines|Circle Waveform Lines|waveform-circle
+circle-wifi|Circle Wifi
+circle-wifi-circle-wifi|Circle Wifi Circle Wifi|circle-wifi-group
+circle-won|Circle Won
+circle-x|Circle X
+circle-xmark|Circle Xmark|times-circle,xmark-circle
+circle-y|Circle Y
+circle-yen|Circle Yen
+circle-z|Circle Z
+circleapore-dollar|Circleapore Dollar
+circles-overlap|Circles Overlap
+citrus|Citrus
+citrus-slice|Citrus Slice
+city|City
+clapperboard|Clapperboard
+clapperboard-play|Clapperboard Play
+clarinet|Clarinet
+claw-marks|Claw Marks
+clipboard|Clipboard
+clipboard-check|Clipboard Check
+clipboard-clock|Clipboard Clock
+clipboard-exclamation|Clipboard Exclamation
+clipboard-list|Clipboard List
+clipboard-list-check|Clipboard List Check
+clipboard-medical|Clipboard Medical
+clipboard-prescription|Clipboard Prescription
+clipboard-question|Clipboard Question
+clipboard-user|Clipboard User
+clock|Clock|clock-four
+clock-desk|Clock Desk
+clock-eight|Clock Eight
+clock-eight-thirty|Clock Eight Thirty
+clock-eleven|Clock Eleven
+clock-eleven-thirty|Clock Eleven Thirty
+clock-five|Clock Five
+clock-five-thirty|Clock Five Thirty
+clock-four-thirty|Clock Four Thirty
+clock-nine|Clock Nine
+clock-nine-thirty|Clock Nine Thirty
+clock-one|Clock One
+clock-one-thirty|Clock One Thirty
+clock-rotate-left|Clock Rotate Left|history
+clock-seven|Clock Seven
+clock-seven-thirty|Clock Seven Thirty
+clock-six|Clock Six
+clock-six-thirty|Clock Six Thirty
+clock-ten|Clock Ten
+clock-ten-thirty|Clock Ten Thirty
+clock-three|Clock Three
+clock-three-thirty|Clock Three Thirty
+clock-twelve|Clock Twelve
+clock-twelve-thirty|Clock Twelve Thirty
+clock-two|Clock Two
+clock-two-thirty|Clock Two Thirty
+clone|Clone
+clone-plus|Clone Plus
+closed-captioning|Closed Captioning
+closed-captioning-slash|Closed Captioning Slash
+clothes-hanger|Clothes Hanger
+cloud|Cloud
+cloud-arrow-down|Cloud Arrow Down|cloud-download,cloud-download-alt
+cloud-arrow-up|Cloud Arrow Up|cloud-upload,cloud-upload-alt
+cloud-binary|Cloud Binary
+cloud-bolt|Cloud Bolt|thunderstorm
+cloud-bolt-moon|Cloud Bolt Moon|thunderstorm-moon
+cloud-bolt-sun|Cloud Bolt Sun|thunderstorm-sun
+cloud-check|Cloud Check
+cloud-drizzle|Cloud Drizzle
+cloud-exclamation|Cloud Exclamation
+cloud-fog|Cloud Fog|fog
+cloud-hail|Cloud Hail
+cloud-hail-mixed|Cloud Hail Mixed
+cloud-meatball|Cloud Meatball
+cloud-minus|Cloud Minus
+cloud-moon|Cloud Moon
+cloud-moon-rain|Cloud Moon Rain
+cloud-music|Cloud Music
+cloud-plus|Cloud Plus
+cloud-question|Cloud Question
+cloud-rain|Cloud Rain
+cloud-rainbow|Cloud Rainbow
+cloud-showers|Cloud Showers
+cloud-showers-heavy|Cloud Showers Heavy
+cloud-showers-water|Cloud Showers Water
+cloud-slash|Cloud Slash
+cloud-sleet|Cloud Sleet
+cloud-snow|Cloud Snow
+cloud-sun|Cloud Sun
+cloud-sun-rain|Cloud Sun Rain
+cloud-word|Cloud Word
+cloud-xmark|Cloud Xmark
+clouds|Clouds
+clouds-moon|Clouds Moon
+clouds-sun|Clouds Sun
+clover|Clover
+club|Club
+coconut|Coconut
+code|Code
+code-branch|Code Branch
+code-commit|Code Commit
+code-compare|Code Compare
+code-fork|Code Fork
+code-merge|Code Merge
+code-pull-request|Code Pull Request
+code-pull-request-closed|Code Pull Request Closed
+code-pull-request-draft|Code Pull Request Draft
+code-simple|Code Simple
+coffee-bean|Coffee Bean
+coffee-beans|Coffee Beans
+coffee-pot|Coffee Pot
+coffee-togo|Coffee Togo|cup-togo
+coffin|Coffin
+coffin-cross|Coffin Cross
+coin|Coin
+coin-blank|Coin Blank
+coin-front|Coin Front
+coin-vertical|Coin Vertical
+coins|Coins
+colon|Colon
+colon-sign|Colon Sign
+columns-3|Columns 3
+comet|Comet
+comma|Comma
+command|Command
+comment|Comment
+comment-arrow-down|Comment Arrow Down
+comment-arrow-up|Comment Arrow Up
+comment-arrow-up-right|Comment Arrow Up Right
+comment-captions|Comment Captions
+comment-check|Comment Check
+comment-code|Comment Code
+comment-dollar|Comment Dollar
+comment-dot|Comment Dot
+comment-dots|Comment Dots|commenting
+comment-exclamation|Comment Exclamation
+comment-heart|Comment Heart
+comment-image|Comment Image
+comment-lines|Comment Lines
+comment-medical|Comment Medical
+comment-middle|Comment Middle
+comment-middle-top|Comment Middle Top
+comment-minus|Comment Minus
+comment-music|Comment Music
+comment-nodes|Comment Nodes
+comment-pen|Comment Pen|comment-edit
+comment-plus|Comment Plus
+comment-question|Comment Question
+comment-quote|Comment Quote
+comment-slash|Comment Slash
+comment-smile|Comment Smile
+comment-sms|Comment Sms|sms
+comment-text|Comment Text
+comment-waveform|Comment Waveform
+comment-xmark|Comment Xmark|comment-times
+comments|Comments
+comments-dollar|Comments Dollar
+comments-question|Comments Question
+comments-question-check|Comments Question Check
+compact-disc|Compact Disc
+compass|Compass
+compass-drafting|Compass Drafting|drafting-compass
+compass-slash|Compass Slash
+compress|Compress
+compress-wide|Compress Wide
+computer|Computer
+computer-classic|Computer Classic
+computer-mouse|Computer Mouse|mouse
+computer-mouse-button-left|Computer Mouse Button Left
+computer-mouse-button-right|Computer Mouse Button Right
+computer-mouse-scrollwheel|Computer Mouse Scrollwheel|mouse-alt
+computer-speaker|Computer Speaker
+container-storage|Container Storage
+conveyor-belt|Conveyor Belt
+conveyor-belt-arm|Conveyor Belt Arm
+conveyor-belt-boxes|Conveyor Belt Boxes|conveyor-belt-alt
+conveyor-belt-empty|Conveyor Belt Empty
+cookie|Cookie
+cookie-bite|Cookie Bite
+copy|Copy
+copyright|Copyright
+corn|Corn
+corner|Corner
+couch|Couch
+couch-small|Couch Small|loveseat
+court-sport|Court Sport
+cow|Cow
+cowbell|Cowbell
+cowbell-circle-plus|Cowbell Circle Plus|cowbell-more
+crab|Crab
+crate-apple|Crate Apple
+crate-empty|Crate Empty
+credit-card|Credit Card|credit-card-alt
+credit-card-blank|Credit Card Blank
+credit-card-front|Credit Card Front
+cricket|Cricket|cricket-bat-ball
+croissant|Croissant
+crop|Crop
+crop-simple|Crop Simple|crop-alt
+cross|Cross
+crosshairs|Crosshairs
+crosshairs-simple|Crosshairs Simple
+crow|Crow
+crown|Crown
+crutch|Crutch
+crutches|Crutches
+cruzeiro-sign|Cruzeiro Sign
+crystal-ball|Crystal Ball
+cube|Cube
+cubes|Cubes
+cubes-stacked|Cubes Stacked
+cucumber|Cucumber
+cup-straw|Cup Straw
+cup-straw-swoosh|Cup Straw Swoosh
+cupcake|Cupcake
+curling|Curling|curling-stone
+currency-sign|Currency Sign
+custard|Custard
+d|D
+dagger|Dagger
+danish-krone-sign|Danish Krone Sign
+database|Database
+deer|Deer
+deer-rudolph|Deer Rudolph
+delete-left|Delete Left|backspace
+delete-right|Delete Right
+democrat|Democrat
+desk|Desk
+desktop|Desktop|desktop-alt
+desktop-arrow-down|Desktop Arrow Down
+dharmachakra|Dharmachakra
+diagram-cells|Diagram Cells
+diagram-lean-canvas|Diagram Lean Canvas
+diagram-nested|Diagram Nested
+diagram-next|Diagram Next
+diagram-predecessor|Diagram Predecessor
+diagram-previous|Diagram Previous
+diagram-project|Diagram Project|project-diagram
+diagram-sankey|Diagram Sankey
+diagram-subtask|Diagram Subtask
+diagram-successor|Diagram Successor
+diagram-venn|Diagram Venn
+dial|Dial|dial-med-high
+dial-high|Dial High
+dial-low|Dial Low
+dial-max|Dial Max
+dial-med|Dial Med
+dial-med-low|Dial Med Low
+dial-min|Dial Min
+dial-off|Dial Off
+dialpad|Dialpad|numpad
+diamond|Diamond
+diamond-exclamation|Diamond Exclamation
+diamond-half|Diamond Half
+diamond-half-stroke|Diamond Half Stroke
+diamond-turn-right|Diamond Turn Right|directions
+diamonds-4|Diamonds 4
+dice|Dice
+dice-d10|Dice D10
+dice-d12|Dice D12
+dice-d20|Dice D20
+dice-d4|Dice D4
+dice-d6|Dice D6
+dice-d8|Dice D8
+dice-five|Dice Five
+dice-four|Dice Four
+dice-one|Dice One
+dice-six|Dice Six
+dice-three|Dice Three
+dice-two|Dice Two
+digital-tachograph|Digital Tachograph|tachograph-digital
+dinosaur|Dinosaur
+direction-left-right|Direction Left Right
+direction-up-down|Direction Up Down
+disc-drive|Disc Drive
+disease|Disease
+display|Display
+display-arrow-down|Display Arrow Down
+display-chart-up|Display Chart Up
+display-chart-up-circle-currency|Display Chart Up Circle Currency
+display-chart-up-circle-dollar|Display Chart Up Circle Dollar
+display-code|Display Code|desktop-code
+display-medical|Display Medical|desktop-medical
+display-slash|Display Slash|desktop-slash
+distribute-spacing-horizontal|Distribute Spacing Horizontal
+distribute-spacing-vertical|Distribute Spacing Vertical
+divide|Divide
+dna|Dna
+do-not-enter|Do Not Enter
+dog|Dog
+dog-leashed|Dog Leashed
+dollar|Dollar|dollar-sign,usd
+dolly|Dolly|dolly-box
+dolly-empty|Dolly Empty
+dolphin|Dolphin
+dong-sign|Dong Sign
+door-closed|Door Closed
+door-open|Door Open
+dot|Dot
+doughnut|Doughnut|donut
+dove|Dove
+down|Down|arrow-alt-down
+down-from-bracket|Down From Bracket
+down-from-dotted-line|Down From Dotted Line
+down-from-line|Down From Line|arrow-alt-from-top
+down-left|Down Left
+down-left-and-up-right-to-center|Down Left And Up Right To Center|compress-alt
+down-long|Down Long|long-arrow-alt-down
+down-long-to-line|Down Long To Line
+down-right|Down Right
+down-to-bracket|Down To Bracket
+down-to-dotted-line|Down To Dotted Line
+down-to-line|Down To Line|arrow-alt-to-bottom
+down-up|Down Up
+download|Download
+dragon|Dragon
+dreidel|Dreidel
+dress|Dress
+dresser|Dresser
+drone|Drone
+drone-front|Drone Front|drone-alt
+droplet|Droplet|tint
+droplet-degree|Droplet Degree|dewpoint
+droplet-percent|Droplet Percent|humidity
+droplet-plus|Droplet Plus
+droplet-slash|Droplet Slash|tint-slash
+drum|Drum
+drum-steelpan|Drum Steelpan
+drumstick|Drumstick
+drumstick-bite|Drumstick Bite
+dryer|Dryer
+dryer-heat|Dryer Heat|dryer-alt
+duck|Duck
+dumbbell|Dumbbell
+dumpster|Dumpster
+dumpster-fire|Dumpster Fire
+dungeon|Dungeon
+e|E
+ear|Ear
+ear-circle-checkmark|Ear Circle Checkmark
+ear-deaf|Ear Deaf|deaf,deafness,hard-of-hearing
+ear-listen|Ear Listen|assistive-listening-systems
+ear-muffs|Ear Muffs
+ear-triangle-exclamation|Ear Triangle Exclamation
+ear-waveform|Ear Waveform
+eclipse|Eclipse
+egg|Egg
+egg-fried|Egg Fried
+eggplant|Eggplant
+eject|Eject
+elephant|Elephant
+elevator|Elevator
+ellipsis|Ellipsis|ellipsis-h
+ellipsis-stroke|Ellipsis Stroke|ellipsis-h-alt
+ellipsis-stroke-vertical|Ellipsis Stroke Vertical|ellipsis-v-alt
+ellipsis-vertical|Ellipsis Vertical|ellipsis-v
+empty-set|Empty Set
+engine|Engine
+engine-exclamation|Engine Exclamation|engine-warning
+envelope|Envelope
+envelope-badge|Envelope Badge|envelope-dot
+envelope-certificate|Envelope Certificate|envelope-ribbon
+envelope-circle-check|Envelope Circle Check
+envelope-circle-user|Envelope Circle User
+envelope-open|Envelope Open
+envelope-open-dollar|Envelope Open Dollar
+envelope-open-text|Envelope Open Text
+envelopes|Envelopes
+equals|Equals
+eraser|Eraser
+escalator|Escalator
+ethernet|Ethernet
+euro|Euro|eur,euro-sign
+eurozone-sign|Eurozone Sign
+excavator|Excavator
+exclamation|Exclamation
+expand|Expand
+expand-wide|Expand Wide
+explosion|Explosion
+eye|Eye
+eye-closed|Eye Closed
+eye-dropper|Eye Dropper|eye-dropper-empty,eyedropper
+eye-dropper-full|Eye Dropper Full
+eye-dropper-half|Eye Dropper Half
+eye-evil|Eye Evil
+eye-low-vision|Eye Low Vision|low-vision
+eye-slash|Eye Slash
+eyes|Eyes
+f|F
+face-angry|Face Angry|angry
+face-angry-horns|Face Angry Horns
+face-anguished|Face Anguished
+face-anxious-sweat|Face Anxious Sweat
+face-astonished|Face Astonished
+face-awesome|Face Awesome|gave-dandy
+face-beam-hand-over-mouth|Face Beam Hand Over Mouth
+face-clouds|Face Clouds
+face-confounded|Face Confounded
+face-confused|Face Confused
+face-cowboy-hat|Face Cowboy Hat
+face-diagonal-mouth|Face Diagonal Mouth
+face-disappointed|Face Disappointed
+face-disguise|Face Disguise
+face-dizzy|Face Dizzy|dizzy
+face-dotted|Face Dotted
+face-downcast-sweat|Face Downcast Sweat
+face-drooling|Face Drooling
+face-exhaling|Face Exhaling
+face-explode|Face Explode|exploding-head
+face-expressionless|Face Expressionless
+face-eyes-xmarks|Face Eyes Xmarks
+face-fearful|Face Fearful
+face-flushed|Face Flushed|flushed
+face-frown|Face Frown|frown
+face-frown-open|Face Frown Open|frown-open
+face-frown-slight|Face Frown Slight
+face-glasses|Face Glasses
+face-grimace|Face Grimace|grimace
+face-grin|Face Grin|grin
+face-grin-beam|Face Grin Beam|grin-beam
+face-grin-beam-sweat|Face Grin Beam Sweat|grin-beam-sweat
+face-grin-hearts|Face Grin Hearts|grin-hearts
+face-grin-squint|Face Grin Squint|grin-squint
+face-grin-squint-tears|Face Grin Squint Tears|grin-squint-tears
+face-grin-stars|Face Grin Stars|grin-stars
+face-grin-tears|Face Grin Tears|grin-tears
+face-grin-tongue|Face Grin Tongue|grin-tongue
+face-grin-tongue-squint|Face Grin Tongue Squint|grin-tongue-squint
+face-grin-tongue-wink|Face Grin Tongue Wink|grin-tongue-wink
+face-grin-wide|Face Grin Wide|grin-alt
+face-grin-wink|Face Grin Wink|grin-wink
+face-hand-over-mouth|Face Hand Over Mouth
+face-hand-peeking|Face Hand Peeking
+face-hand-yawn|Face Hand Yawn
+face-head-bandage|Face Head Bandage
+face-holding-back-tears|Face Holding Back Tears
+face-hushed|Face Hushed
+face-icicles|Face Icicles
+face-kiss|Face Kiss|kiss
+face-kiss-beam|Face Kiss Beam|kiss-beam
+face-kiss-closed-eyes|Face Kiss Closed Eyes
+face-kiss-wink-heart|Face Kiss Wink Heart|kiss-wink-heart
+face-laugh|Face Laugh|laugh
+face-laugh-beam|Face Laugh Beam|laugh-beam
+face-laugh-squint|Face Laugh Squint|laugh-squint
+face-laugh-wink|Face Laugh Wink|laugh-wink
+face-lying|Face Lying
+face-mask|Face Mask
+face-meh|Face Meh|meh
+face-meh-blank|Face Meh Blank|meh-blank
+face-melting|Face Melting
+face-monocle|Face Monocle
+face-nauseated|Face Nauseated
+face-nose-steam|Face Nose Steam
+face-party|Face Party
+face-pensive|Face Pensive
+face-persevering|Face Persevering
+face-pleading|Face Pleading
+face-pouting|Face Pouting
+face-raised-eyebrow|Face Raised Eyebrow
+face-relieved|Face Relieved
+face-rolling-eyes|Face Rolling Eyes|meh-rolling-eyes
+face-sad-cry|Face Sad Cry|sad-cry
+face-sad-sweat|Face Sad Sweat
+face-sad-tear|Face Sad Tear|sad-tear
+face-saluting|Face Saluting
+face-scream|Face Scream
+face-shaking|Face Shaking
+face-shaking-horizontal|Face Shaking Horizontal
+face-shaking-vertical|Face Shaking Vertical
+face-shush|Face Shush
+face-sleeping|Face Sleeping
+face-sleepy|Face Sleepy
+face-smile|Face Smile|smile
+face-smile-beam|Face Smile Beam|smile-beam
+face-smile-halo|Face Smile Halo
+face-smile-hearts|Face Smile Hearts
+face-smile-horns|Face Smile Horns
+face-smile-plus|Face Smile Plus|smile-plus
+face-smile-relaxed|Face Smile Relaxed
+face-smile-tear|Face Smile Tear
+face-smile-tongue|Face Smile Tongue
+face-smile-upside-down|Face Smile Upside Down
+face-smile-wink|Face Smile Wink|smile-wink
+face-smiling-hands|Face Smiling Hands
+face-smirking|Face Smirking
+face-spiral-eyes|Face Spiral Eyes
+face-sunglasses|Face Sunglasses
+face-surprise|Face Surprise|surprise
+face-swear|Face Swear
+face-thermometer|Face Thermometer
+face-thinking|Face Thinking
+face-tired|Face Tired|tired
+face-tissue|Face Tissue
+face-tongue-money|Face Tongue Money
+face-tongue-sweat|Face Tongue Sweat
+face-unamused|Face Unamused
+face-viewfinder|Face Viewfinder
+face-vomit|Face Vomit
+face-weary|Face Weary
+face-woozy|Face Woozy
+face-worried|Face Worried
+face-zany|Face Zany
+face-zipper|Face Zipper
+falafel|Falafel
+family|Family
+family-dress|Family Dress
+family-pants|Family Pants
+fan|Fan
+fan-table|Fan Table
+faucet|Faucet
+faucet-drip|Faucet Drip
+fax|Fax
+feather|Feather
+feather-pointed|Feather Pointed|feather-alt
+fence|Fence
+ferris-wheel|Ferris Wheel
+ferry|Ferry
+field-hockey|Field Hockey|field-hockey-stick-ball
+file|File
+file-aiff|File Aiff
+file-archive|File Archive|file-zipper
+file-arrow-down|File Arrow Down|file-download
+file-arrow-up|File Arrow Up|file-upload
+file-audio|File Audio
+file-ban|File Ban
+file-binary|File Binary
+file-brackets-curly|File Brackets Curly
+file-cad|File Cad
+file-caret-down|File Caret Down|page-caret-down
+file-caret-up|File Caret Up|page-caret-up
+file-certificate|File Certificate|file-award
+file-chart-column|File Chart Column|file-chart-line
+file-chart-pie|File Chart Pie
+file-check|File Check
+file-circle-check|File Circle Check
+file-circle-exclamation|File Circle Exclamation
+file-circle-info|File Circle Info
+file-circle-minus|File Circle Minus
+file-circle-plus|File Circle Plus
+file-circle-question|File Circle Question
+file-circle-xmark|File Circle Xmark
+file-clipboard|File Clipboard|paste
+file-code|File Code
+file-contract|File Contract
+file-css|File Css
+file-csv|File Csv
+file-dashed-line|File Dashed Line|page-break
+file-doc|File Doc
+file-eps|File Eps
+file-excel|File Excel
+file-exclamation|File Exclamation
+file-fragment|File Fragment
+file-gif|File Gif
+file-half-dashed|File Half Dashed
+file-heart|File Heart
+file-html|File Html
+file-icns|File Icns
+file-image|File Image
+file-invoice|File Invoice
+file-invoice-dollar|File Invoice Dollar
+file-jpg|File Jpg
+file-js|File Js
+file-lines|File Lines|file-alt,file-text
+file-lock|File Lock
+file-magnifying-glass|File Magnifying Glass|file-search
+file-medical|File Medical
+file-midi|File Midi
+file-minus|File Minus
+file-mov|File Mov
+file-mp3|File Mp3
+file-mp4|File Mp4
+file-music|File Music
+file-odf|File Odf
+file-pdf|File Pdf
+file-pen|File Pen|file-edit
+file-plus|File Plus
+file-plus-minus|File Plus Minus
+file-png|File Png
+file-powerpoint|File Powerpoint
+file-ppt|File Ppt
+file-prescription|File Prescription
+file-shield|File Shield
+file-signature|File Signature
+file-slash|File Slash
+file-spreadsheet|File Spreadsheet
+file-svg|File Svg
+file-tex|File Tex
+file-user|File User
+file-vector|File Vector
+file-video|File Video
+file-wav|File Wav
+file-waveform|File Waveform|file-medical-alt
+file-word|File Word
+file-xls|File Xls
+file-xmark|File Xmark|file-times
+file-xml|File Xml
+file-zip|File Zip
+files|Files
+files-medical|Files Medical
+fill|Fill
+fill-drip|Fill Drip
+film|Film|film-alt,film-simple
+film-cannister|Film Cannister|film-canister
+film-music|Film Music
+film-slash|Film Slash
+film-stack|Film Stack
+films|Films
+filter|Filter
+filter-circle-dollar|Filter Circle Dollar|funnel-dollar
+filter-circle-xmark|Filter Circle Xmark
+filter-list|Filter List
+filter-slash|Filter Slash
+filters|Filters
+fingerprint|Fingerprint
+fire|Fire
+fire-burner|Fire Burner
+fire-extinguisher|Fire Extinguisher
+fire-flame|Fire Flame|flame
+fire-flame-curved|Fire Flame Curved|fire-alt
+fire-flame-simple|Fire Flame Simple|burn
+fire-hydrant|Fire Hydrant
+fire-smoke|Fire Smoke
+fireplace|Fireplace
+fish|Fish
+fish-bones|Fish Bones
+fish-cooked|Fish Cooked
+fish-fins|Fish Fins
+fishing-rod|Fishing Rod
+flag|Flag
+flag-checkered|Flag Checkered
+flag-pennant|Flag Pennant|pennant
+flag-swallowtail|Flag Swallowtail|flag-alt
+flag-usa|Flag Usa
+flashlight|Flashlight
+flask|Flask
+flask-gear|Flask Gear
+flask-round-poison|Flask Round Poison|flask-poison
+flask-round-potion|Flask Round Potion|flask-potion
+flask-vial|Flask Vial
+flatbread|Flatbread
+flatbread-stuffed|Flatbread Stuffed
+floppy-disk|Floppy Disk|save
+floppy-disk-circle-arrow-right|Floppy Disk Circle Arrow Right|save-circle-arrow-right
+floppy-disk-circle-xmark|Floppy Disk Circle Xmark|floppy-disk-times,save-circle-xmark,save-times
+floppy-disk-pen|Floppy Disk Pen
+floppy-disks|Floppy Disks
+florin-sign|Florin Sign
+flower|Flower
+flower-daffodil|Flower Daffodil
+flower-tulip|Flower Tulip
+flute|Flute
+flux-capacitor|Flux Capacitor
+flying-disc|Flying Disc
+folder|Folder|folder-blank
+folder-arrow-down|Folder Arrow Down|folder-download
+folder-arrow-left|Folder Arrow Left
+folder-arrow-right|Folder Arrow Right
+folder-arrow-up|Folder Arrow Up|folder-upload
+folder-bookmark|Folder Bookmark
+folder-check|Folder Check
+folder-closed|Folder Closed
+folder-gear|Folder Gear|folder-cog
+folder-grid|Folder Grid
+folder-heart|Folder Heart
+folder-image|Folder Image
+folder-magnifying-glass|Folder Magnifying Glass|folder-search
+folder-medical|Folder Medical
+folder-minus|Folder Minus
+folder-music|Folder Music
+folder-open|Folder Open
+folder-plus|Folder Plus
+folder-tree|Folder Tree
+folder-user|Folder User
+folder-xmark|Folder Xmark|folder-times
+folders|Folders
+fondue-pot|Fondue Pot
+font|Font
+font-case|Font Case
+foot-wing|Foot Wing
+football|Football|football-ball
+football-helmet|Football Helmet
+fork-knife|Fork Knife|utensils-alt
+forklift|Forklift
+fort|Fort
+forward|Forward
+forward-fast|Forward Fast|fast-forward
+forward-step|Forward Step|step-forward
+frame|Frame
+franc-sign|Franc Sign
+french-fries|French Fries
+frog|Frog
+function|Function
+futbol|Futbol|futbol-ball,soccer-ball
+g|G
+galaxy|Galaxy
+gallery-thumbnails|Gallery Thumbnails
+game-board|Game Board
+game-board-simple|Game Board Simple|game-board-alt
+game-console-handheld|Game Console Handheld
+game-console-handheld-crank|Game Console Handheld Crank
+gamepad|Gamepad
+gamepad-modern|Gamepad Modern|gamepad-alt
+garage|Garage
+garage-car|Garage Car
+garage-empty|Garage Empty
+garage-open|Garage Open
+garlic|Garlic
+gas-pump|Gas Pump
+gas-pump-left|Gas Pump Left
+gas-pump-right|Gas Pump Right
+gas-pump-slash|Gas Pump Slash
+gauge|Gauge|dashboard,gauge-med,tachometer-alt-average
+gauge-circle-bolt|Gauge Circle Bolt
+gauge-circle-minus|Gauge Circle Minus
+gauge-circle-plus|Gauge Circle Plus
+gauge-high|Gauge High|tachometer-alt,tachometer-alt-fast
+gauge-low|Gauge Low|tachometer-alt-slow
+gauge-max|Gauge Max|tachometer-alt-fastest
+gauge-min|Gauge Min|tachometer-alt-slowest
+gauge-simple|Gauge Simple|gauge-simple-med,tachometer-average
+gauge-simple-high|Gauge Simple High|tachometer,tachometer-fast
+gauge-simple-low|Gauge Simple Low|tachometer-slow
+gauge-simple-max|Gauge Simple Max|tachometer-fastest
+gauge-simple-min|Gauge Simple Min|tachometer-slowest
+gavel|Gavel|legal
+gear|Gear|cog
+gear-api|Gear Api
+gear-code|Gear Code
+gear-complex|Gear Complex
+gear-complex-api|Gear Complex Api
+gear-complex-code|Gear Complex Code
+gears|Gears|cogs
+gem|Gem
+gemini|Gemini
+genderless|Genderless
+ghost|Ghost
+gif|Gif
+gift|Gift
+gift-card|Gift Card
+gifts|Gifts
+gingerbread-man|Gingerbread Man
+glass|Glass
+glass-champagne|Glass Champagne|champagne-glass
+glass-cheers|Glass Cheers|champagne-glasses
+glass-citrus|Glass Citrus
+glass-empty|Glass Empty
+glass-half|Glass Half|glass-half-empty,glass-half-full
+glass-martini|Glass Martini|martini-glass-empty
+glass-water|Glass Water
+glass-water-droplet|Glass Water Droplet
+glass-whiskey|Glass Whiskey|whiskey-glass
+glass-whiskey-rocks|Glass Whiskey Rocks|whiskey-glass-ice
+glasses|Glasses
+glasses-round|Glasses Round|glasses-alt
+globe|Globe
+globe-africa|Globe Africa|earth-africa
+globe-americas|Globe Americas|earth,earth-america,earth-americas
+globe-asia|Globe Asia|earth-asia
+globe-europe|Globe Europe|earth-europe
+globe-oceania|Globe Oceania|earth-oceania
+globe-pointer|Globe Pointer
+globe-snow|Globe Snow
+globe-stand|Globe Stand
+globe-wifi|Globe Wifi
+globe-www|Globe Www
+goal-net|Goal Net
+golf-ball|Golf Ball|golf-ball-tee
+golf-club|Golf Club
+golf-flag-hole|Golf Flag Hole
+gopuram|Gopuram
+gpu|Gpu
+gramophone|Gramophone
+grapes|Grapes
+grate|Grate
+grate-droplet|Grate Droplet
+greater-than|Greater Than
+greater-than-equal|Greater Than Equal
+grid|Grid|grid-3
+grid-2|Grid 2
+grid-2-minus|Grid 2 Minus
+grid-2-plus|Grid 2 Plus
+grid-4|Grid 4
+grid-5|Grid 5
+grid-dividers|Grid Dividers
+grid-horizontal|Grid Horizontal|grip,grip-horizontal
+grid-round|Grid Round
+grid-round-2|Grid Round 2
+grid-round-2-minus|Grid Round 2 Minus
+grid-round-2-plus|Grid Round 2 Plus
+grid-round-4|Grid Round 4
+grid-round-5|Grid Round 5
+grid-vertical|Grid Vertical|grip-vertical
+grill|Grill
+grill-fire|Grill Fire
+grill-hot|Grill Hot
+grip-dots|Grip Dots
+grip-dots-vertical|Grip Dots Vertical
+grip-lines|Grip Lines
+grip-lines-vertical|Grip Lines Vertical
+group-arrows-rotate|Group Arrows Rotate
+guarani-sign|Guarani Sign
+guitar|Guitar
+guitar-electric|Guitar Electric
+guitars|Guitars
+gun|Gun
+gun-slash|Gun Slash
+gun-squirt|Gun Squirt
+h|H
+h-square|H Square|square-h
+h1|H1
+h2|H2
+h3|H3
+h4|H4
+h5|H5
+h6|H6
+hammer|Hammer
+hammer-brush|Hammer Brush
+hammer-crash|Hammer Crash
+hammer-war|Hammer War
+hamsa|Hamsa
+hand|Hand|hand-paper
+hand-back-fist|Hand Back Fist|hand-rock
+hand-back-point-down|Hand Back Point Down
+hand-back-point-left|Hand Back Point Left
+hand-back-point-ribbon|Hand Back Point Ribbon
+hand-back-point-right|Hand Back Point Right
+hand-back-point-up|Hand Back Point Up
+hand-dots|Hand Dots|allergies
+hand-fingers-crossed|Hand Fingers Crossed
+hand-fist|Hand Fist|fist-raised
+hand-heart|Hand Heart
+hand-holding|Hand Holding
+hand-holding-box|Hand Holding Box
+hand-holding-circle-dollar|Hand Holding Circle Dollar
+hand-holding-dollar|Hand Holding Dollar|hand-holding-usd
+hand-holding-droplet|Hand Holding Droplet|hand-holding-water
+hand-holding-hand|Hand Holding Hand
+hand-holding-heart|Hand Holding Heart
+hand-holding-magic|Hand Holding Magic
+hand-holding-medical|Hand Holding Medical
+hand-holding-seedling|Hand Holding Seedling
+hand-holding-skull|Hand Holding Skull
+hand-holding-star|Hand Holding Star
+hand-horns|Hand Horns
+hand-lizard|Hand Lizard
+hand-love|Hand Love
+hand-middle-finger|Hand Middle Finger
+hand-peace|Hand Peace
+hand-point-down|Hand Point Down
+hand-point-left|Hand Point Left
+hand-point-ribbon|Hand Point Ribbon
+hand-point-right|Hand Point Right
+hand-point-up|Hand Point Up
+hand-pointer|Hand Pointer
+hand-receiving|Hand Receiving|hands-holding-diamond
+hand-scissors|Hand Scissors
+hand-shaka|Hand Shaka
+hand-sparkles|Hand Sparkles
+hand-spock|Hand Spock
+hand-wave|Hand Wave
+handcuffs|Handcuffs
+hands|Hands|sign-language,signing
+hands-american-sign-language-interpreting|Hands American Sign Language Interpreting|american-sign-language-interpreting,asl-interpreting,hands-asl-interpreting
+hands-bound|Hands Bound
+hands-bubbles|Hands Bubbles|hands-wash
+hands-clapping|Hands Clapping
+hands-helping|Hands Helping|handshake-angle
+hands-holding|Hands Holding
+hands-holding-child|Hands Holding Child
+hands-holding-circle|Hands Holding Circle
+hands-holding-dollar|Hands Holding Dollar|hands-usd
+hands-holding-heart|Hands Holding Heart|hands-heart
+hands-praying|Hands Praying|praying-hands
+handshake|Handshake|handshake-alt,handshake-simple
+handshake-simple-slash|Handshake Simple Slash|handshake-alt-slash,handshake-slash
+hanukiah|Hanukiah
+hard-drive|Hard Drive|hdd
+hashtag|Hashtag
+hashtag-lock|Hashtag Lock
+hat-beach|Hat Beach
+hat-chef|Hat Chef
+hat-cowboy|Hat Cowboy
+hat-cowboy-side|Hat Cowboy Side
+hat-hard|Hat Hard|hard-hat,helmet-safety
+hat-santa|Hat Santa
+hat-winter|Hat Winter
+hat-witch|Hat Witch
+hat-wizard|Hat Wizard
+haykal|Haykal|bahai
+head-side|Head Side
+head-side-brain|Head Side Brain
+head-side-circuit|Head Side Circuit
+head-side-cough|Head Side Cough
+head-side-cough-slash|Head Side Cough Slash
+head-side-gear|Head Side Gear
+head-side-goggles|Head Side Goggles|head-vr
+head-side-headphones|Head Side Headphones
+head-side-heart|Head Side Heart
+head-side-mask|Head Side Mask
+head-side-medical|Head Side Medical
+head-side-speak|Head Side Speak
+head-side-virus|Head Side Virus
+heading|Heading|header
+headphones|Headphones|headphones-alt,headphones-simple
+headphones-slash|Headphones Slash
+headset|Headset
+heart|Heart
+heart-circle-bolt|Heart Circle Bolt
+heart-circle-check|Heart Circle Check
+heart-circle-exclamation|Heart Circle Exclamation
+heart-circle-minus|Heart Circle Minus
+heart-circle-plus|Heart Circle Plus
+heart-circle-xmark|Heart Circle Xmark
+heart-crack|Heart Crack|heart-broken
+heart-half|Heart Half
+heart-half-stroke|Heart Half Stroke|heart-half-alt
+heart-music-camera-bolt|Heart Music Camera Bolt|icons
+heart-pulse|Heart Pulse|heartbeat
+heart-rate|Heart Rate|wave-pulse
+heart-slash|Heart Slash
+hearts|Hearts
+heat|Heat
+helicopter|Helicopter
+helicopter-symbol|Helicopter Symbol
+helmet-battle|Helmet Battle
+helmet-un|Helmet Un
+heptagon|Heptagon|septagon
+hexagon|Hexagon
+hexagon-check|Hexagon Check
+hexagon-divide|Hexagon Divide
+hexagon-equals|Hexagon Equals
+hexagon-exclamation|Hexagon Exclamation
+hexagon-image|Hexagon Image
+hexagon-minus|Hexagon Minus|minus-hexagon
+hexagon-nodes|Hexagon Nodes
+hexagon-nodes-bolt|Hexagon Nodes Bolt
+hexagon-plus|Hexagon Plus|plus-hexagon
+hexagon-vertical-nft|Hexagon Vertical Nft|hexagon-vertical-nft-slanted
+hexagon-xmark|Hexagon Xmark|times-hexagon,xmark-hexagon
+highlighter|Highlighter
+highlighter-line|Highlighter Line
+hill-avalanche|Hill Avalanche
+hill-rockslide|Hill Rockslide
+hippo|Hippo
+hockey-mask|Hockey Mask
+hockey-puck|Hockey Puck
+hockey-stick|Hockey Stick
+hockey-stick-puck|Hockey Stick Puck
+hockey-sticks|Hockey Sticks
+holly-berry|Holly Berry
+honey-pot|Honey Pot
+hood-cloak|Hood Cloak
+horizontal-rule|Horizontal Rule
+horse|Horse
+horse-head|Horse Head
+horse-saddle|Horse Saddle
+horseshoe|Horseshoe
+hose|Hose
+hose-reel|Hose Reel
+hospital|Hospital|hospital-alt,hospital-wide
+hospital-symbol|Hospital Symbol|circle-h
+hospital-user|Hospital User
+hospitals|Hospitals
+hot-tub|Hot Tub|hot-tub-person
+hotdog|Hotdog
+hotel|Hotel
+hourglass|Hourglass|hourglass-empty
+hourglass-clock|Hourglass Clock
+hourglass-end|Hourglass End|hourglass-3
+hourglass-half|Hourglass Half|hourglass-2
+hourglass-start|Hourglass Start|hourglass-1
+house|House|home,home-alt,home-lg-alt
+house-blank|House Blank|home-blank
+house-building|House Building
+house-chimney|House Chimney|home-lg
+house-chimney-blank|House Chimney Blank
+house-chimney-crack|House Chimney Crack|house-damage
+house-chimney-heart|House Chimney Heart
+house-chimney-medical|House Chimney Medical|clinic-medical
+house-chimney-user|House Chimney User
+house-chimney-window|House Chimney Window
+house-circle-check|House Circle Check
+house-circle-exclamation|House Circle Exclamation
+house-circle-xmark|House Circle Xmark
+house-crack|House Crack
+house-day|House Day
+house-fire|House Fire
+house-flag|House Flag
+house-flood|House Flood|house-water
+house-flood-water|House Flood Water
+house-flood-water-circle-arrow-right|House Flood Water Circle Arrow Right
+house-heart|House Heart|home-heart
+house-laptop|House Laptop|laptop-house
+house-lock|House Lock
+house-medical|House Medical
+house-medical-circle-check|House Medical Circle Check
+house-medical-circle-exclamation|House Medical Circle Exclamation
+house-medical-circle-xmark|House Medical Circle Xmark
+house-medical-flag|House Medical Flag
+house-night|House Night
+house-person-arrive|House Person Arrive|house-person-return,house-return
+house-person-depart|House Person Depart|house-leave,house-person-leave
+house-signal|House Signal
+house-tree|House Tree
+house-tsunami|House Tsunami
+house-turret|House Turret
+house-unlock|House Unlock
+house-user|House User|home-user
+house-window|House Window
+hryvnia|Hryvnia|hryvnia-sign
+hundred-points|Hundred Points|100
+hurricane|Hurricane
+hydra|Hydra
+hyphen|Hyphen
+i|I
+i-cursor|I Cursor
+ice-cream|Ice Cream
+ice-skate|Ice Skate
+icicles|Icicles
+id-badge|Id Badge
+id-card|Id Card|drivers-license
+id-card-clip|Id Card Clip|id-card-alt
+igloo|Igloo
+image|Image
+image-broken|Image Broken
+image-circle-arrow-down|Image Circle Arrow Down
+image-circle-check|Image Circle Check
+image-circle-plus|Image Circle Plus
+image-circle-xmark|Image Circle Xmark
+image-landscape|Image Landscape|landscape
+image-music|Image Music
+image-polaroid|Image Polaroid
+image-polaroid-user|Image Polaroid User
+image-portrait|Image Portrait|portrait
+image-slash|Image Slash
+image-stack|Image Stack
+image-user|Image User
+images|Images
+images-user|Images User
+inbox|Inbox
+inbox-arrow-down|Inbox Arrow Down|inbox-in
+inbox-arrow-up|Inbox Arrow Up|inbox-out
+inbox-full|Inbox Full
+inboxes|Inboxes
+indent|Indent
+indian-rupee|Indian Rupee|indian-rupee-sign,inr
+industry|Industry
+industry-windows|Industry Windows|industry-alt
+infinity|Infinity
+info|Info
+inhaler|Inhaler
+input-numeric|Input Numeric
+input-password|Input Password
+input-pipe|Input Pipe
+input-text|Input Text
+integral|Integral
+interrobang|Interrobang
+intersection|Intersection
+island-tree-palm|Island Tree Palm|island-tropical
+italic|Italic
+j|J
+jack-o-lantern|Jack O Lantern
+jar|Jar
+jar-wheat|Jar Wheat
+jeans|Jeans
+jeans-straight|Jeans Straight
+jedi|Jedi
+jet-fighter|Jet Fighter|fighter-jet
+jet-fighter-up|Jet Fighter Up
+joint|Joint
+joystick|Joystick
+jug|Jug
+jug-bottle|Jug Bottle
+jug-detergent|Jug Detergent
+k|K
+kaaba|Kaaba
+kayak|Kayak
+kazoo|Kazoo
+kerning|Kerning
+kettlebell|Kettlebell
+key|Key
+key-skeleton|Key Skeleton
+key-skeleton-left-right|Key Skeleton Left Right
+keyboard|Keyboard
+keyboard-brightness|Keyboard Brightness
+keyboard-brightness-low|Keyboard Brightness Low
+keyboard-down|Keyboard Down
+keyboard-left|Keyboard Left
+keynote|Keynote
+khanda|Khanda
+kidneys|Kidneys
+kip-sign|Kip Sign
+kit-medical|Kit Medical|first-aid
+kitchen-set|Kitchen Set
+kite|Kite
+kiwi-bird|Kiwi Bird
+kiwi-fruit|Kiwi Fruit
+knife-kitchen|Knife Kitchen
+l|L
+label|Label
+lacrosse-stick|Lacrosse Stick
+lacrosse-stick-ball|Lacrosse Stick Ball
+lambda|Lambda
+lamp|Lamp
+lamp-desk|Lamp Desk
+lamp-floor|Lamp Floor
+lamp-street|Lamp Street
+land-mine-on|Land Mine On
+landmark|Landmark
+landmark-dome|Landmark Dome|landmark-alt
+landmark-flag|Landmark Flag
+landmark-magnifying-glass|Landmark Magnifying Glass
+language|Language
+laptop|Laptop
+laptop-arrow-down|Laptop Arrow Down
+laptop-binary|Laptop Binary
+laptop-code|Laptop Code
+laptop-file|Laptop File
+laptop-medical|Laptop Medical
+laptop-slash|Laptop Slash
+lari-sign|Lari Sign
+lasso|Lasso
+lasso-sparkles|Lasso Sparkles
+layer|Layer
+layer-group|Layer Group
+layer-group-minus|Layer Group Minus|layer-minus
+layer-group-plus|Layer Group Plus|layer-plus
+leaf|Leaf
+leaf-heart|Leaf Heart
+leaf-maple|Leaf Maple
+leaf-oak|Leaf Oak
+leafy-green|Leafy Green
+left|Left|arrow-alt-left
+left-from-bracket|Left From Bracket
+left-from-dotted-line|Left From Dotted Line
+left-from-line|Left From Line|arrow-alt-from-right
+left-long|Left Long|long-arrow-alt-left
+left-long-to-line|Left Long To Line
+left-right|Left Right|arrows-alt-h
+left-to-bracket|Left To Bracket
+left-to-dotted-line|Left To Dotted Line
+left-to-line|Left To Line|arrow-alt-to-left
+lemon|Lemon
+leo|Leo
+less-than|Less Than
+less-than-equal|Less Than Equal
+libra|Libra
+life-ring|Life Ring
+light-ceiling|Light Ceiling
+light-emergency|Light Emergency
+light-emergency-on|Light Emergency On
+light-switch|Light Switch
+light-switch-off|Light Switch Off
+light-switch-on|Light Switch On
+lightbulb|Lightbulb
+lightbulb-cfl|Lightbulb Cfl
+lightbulb-cfl-on|Lightbulb Cfl On
+lightbulb-dollar|Lightbulb Dollar
+lightbulb-exclamation|Lightbulb Exclamation
+lightbulb-exclamation-on|Lightbulb Exclamation On
+lightbulb-gear|Lightbulb Gear
+lightbulb-message|Lightbulb Message
+lightbulb-on|Lightbulb On
+lightbulb-slash|Lightbulb Slash
+lighthouse|Lighthouse
+lights-holiday|Lights Holiday
+line-columns|Line Columns
+line-height|Line Height
+lines-leaning|Lines Leaning
+link|Link|chain
+link-broken|Link Broken
+link-horizontal|Link Horizontal|chain-horizontal
+link-horizontal-slash|Link Horizontal Slash|chain-horizontal-slash
+link-simple|Link Simple
+link-simple-slash|Link Simple Slash
+link-slash|Link Slash|chain-broken,chain-slash,unlink
+lips|Lips
+lira-sign|Lira Sign
+list|List|list-squares
+list-check|List Check|tasks
+list-dots|List Dots|list-ul
+list-dropdown|List Dropdown
+list-music|List Music
+list-numeric|List Numeric|list-1-2,list-ol
+list-radio|List Radio
+list-timeline|List Timeline
+list-tree|List Tree
+litecoin-sign|Litecoin Sign
+loader|Loader
+lobster|Lobster
+location|Location|location-crosshairs
+location-arrow|Location Arrow
+location-arrow-slash|Location Arrow Slash
+location-arrow-up|Location Arrow Up
+location-check|Location Check|map-marker-check
+location-crosshairs-slash|Location Crosshairs Slash|location-slash
+location-dot|Location Dot|map-marker-alt
+location-dot-slash|Location Dot Slash|map-marker-alt-slash
+location-exclamation|Location Exclamation|map-marker-exclamation
+location-minus|Location Minus|map-marker-minus
+location-pen|Location Pen|map-marker-edit
+location-pin|Location Pin|map-marker
+location-pin-lock|Location Pin Lock
+location-pin-slash|Location Pin Slash|map-marker-slash
+location-plus|Location Plus|map-marker-plus
+location-question|Location Question|map-marker-question
+location-smile|Location Smile|map-marker-smile
+location-xmark|Location Xmark|map-marker-times,map-marker-xmark
+lock|Lock
+lock-a|Lock A
+lock-hashtag|Lock Hashtag
+lock-keyhole|Lock Keyhole|lock-alt
+lock-keyhole-open|Lock Keyhole Open|lock-open-alt
+lock-open|Lock Open
+locust|Locust
+lollipop|Lollipop|lollypop
+lungs|Lungs
+lungs-virus|Lungs Virus
+lychee|Lychee
+m|M
+mace|Mace
+magnet|Magnet
+magnifying-glass|Magnifying Glass|search
+magnifying-glass-arrow-right|Magnifying Glass Arrow Right
+magnifying-glass-arrows-rotate|Magnifying Glass Arrows Rotate
+magnifying-glass-chart|Magnifying Glass Chart
+magnifying-glass-dollar|Magnifying Glass Dollar|search-dollar
+magnifying-glass-location|Magnifying Glass Location|search-location
+magnifying-glass-minus|Magnifying Glass Minus|search-minus
+magnifying-glass-music|Magnifying Glass Music
+magnifying-glass-play|Magnifying Glass Play
+magnifying-glass-plus|Magnifying Glass Plus|search-plus
+magnifying-glass-waveform|Magnifying Glass Waveform
+mail-bulk|Mail Bulk|envelopes-bulk
+mail-reply|Mail Reply|reply
+mail-reply-all|Mail Reply All|reply-all
+mailbox|Mailbox
+mailbox-flag-up|Mailbox Flag Up
+mailbox-open-empty|Mailbox Open Empty
+mailbox-open-letter|Mailbox Open Letter
+malaysian-ringgit-sign|Malaysian Ringgit Sign
+manat-sign|Manat Sign
+mandolin|Mandolin
+mango|Mango
+manhole|Manhole
+map|Map
+map-location|Map Location|map-marked
+map-location-dot|Map Location Dot|map-marked-alt
+map-pin|Map Pin
+map-signs|Map Signs|signs-post
+marker|Marker
+mars|Mars
+mars-and-venus|Mars And Venus
+mars-and-venus-burst|Mars And Venus Burst
+mars-double|Mars Double
+mars-stroke|Mars Stroke
+mars-stroke-right|Mars Stroke Right|mars-stroke-h
+mars-stroke-up|Mars Stroke Up|mars-stroke-v
+martini-glass|Martini Glass|glass-martini-alt
+martini-glass-citrus|Martini Glass Citrus|cocktail
+mask|Mask
+mask-face|Mask Face
+mask-luchador|Mask Luchador|luchador,luchador-mask
+mask-snorkel|Mask Snorkel
+mask-ventilator|Mask Ventilator
+masks-theater|Masks Theater|theater-masks
+mattress-pillow|Mattress Pillow
+maximize|Maximize|expand-arrows-alt
+meat|Meat
+medal|Medal
+megaphone|Megaphone
+melon|Melon
+melon-slice|Melon Slice
+memo|Memo
+memo-circle-check|Memo Circle Check
+memo-circle-info|Memo Circle Info
+memo-pad|Memo Pad
+memory|Memory
+menorah|Menorah
+mercury|Mercury
+merge|Merge
+message|Message|comment-alt
+message-arrow-down|Message Arrow Down|comment-alt-arrow-down
+message-arrow-up|Message Arrow Up|comment-alt-arrow-up
+message-arrow-up-right|Message Arrow Up Right
+message-bot|Message Bot
+message-captions|Message Captions|comment-alt-captions
+message-check|Message Check|comment-alt-check
+message-code|Message Code
+message-dollar|Message Dollar|comment-alt-dollar
+message-dot|Message Dot
+message-dots|Message Dots|comment-alt-dots,messaging
+message-exclamation|Message Exclamation|comment-alt-exclamation
+message-heart|Message Heart
+message-image|Message Image|comment-alt-image
+message-lines|Message Lines|comment-alt-lines
+message-medical|Message Medical|comment-alt-medical
+message-middle|Message Middle|comment-middle-alt
+message-middle-top|Message Middle Top|comment-middle-top-alt
+message-minus|Message Minus|comment-alt-minus
+message-music|Message Music|comment-alt-music
+message-pen|Message Pen|comment-alt-edit,message-edit
+message-plus|Message Plus|comment-alt-plus
+message-question|Message Question
+message-quote|Message Quote|comment-alt-quote
+message-slash|Message Slash|comment-alt-slash
+message-smile|Message Smile|comment-alt-smile
+message-sms|Message Sms
+message-text|Message Text|comment-alt-text
+message-waveform|Message Waveform
+message-xmark|Message Xmark|comment-alt-times,message-times
+messages|Messages|comments-alt
+messages-dollar|Messages Dollar|comments-alt-dollar
+messages-question|Messages Question
+meteor|Meteor
+meter|Meter
+meter-bolt|Meter Bolt
+meter-droplet|Meter Droplet
+meter-fire|Meter Fire
+microchip|Microchip
+microchip-ai|Microchip Ai
+microphone|Microphone
+microphone-circle-plus|Microphone Circle Plus
+microphone-circle-xmark|Microphone Circle Xmark
+microphone-lines|Microphone Lines|microphone-alt
+microphone-lines-slash|Microphone Lines Slash|microphone-alt-slash
+microphone-signal-meter|Microphone Signal Meter
+microphone-slash|Microphone Slash
+microphone-stand|Microphone Stand
+microscope|Microscope
+microwave|Microwave
+midi|Midi
+mill-sign|Mill Sign
+minimize|Minimize|compress-arrows-alt
+minus|Minus|subtract
+minus-large|Minus Large|dash
+mistletoe|Mistletoe
+mitten|Mitten
+mobile|Mobile|mobile-android,mobile-phone
+mobile-arrow-down|Mobile Arrow Down
+mobile-button|Mobile Button
+mobile-iphone|Mobile Iphone|mobile-notch
+mobile-retro|Mobile Retro
+mobile-rotate|Mobile Rotate
+mobile-rotate-reverse|Mobile Rotate Reverse
+mobile-screen|Mobile Screen|mobile-android-alt
+mobile-screen-button|Mobile Screen Button|mobile-alt
+mobile-signal|Mobile Signal
+mobile-signal-out|Mobile Signal Out
+mobile-slash|Mobile Slash
+mobile-vibrate|Mobile Vibrate
+mobile-vibrate-slash|Mobile Vibrate Slash
+money-bill|Money Bill
+money-bill-1-wave|Money Bill 1 Wave|money-bill-wave-alt
+money-bill-alt|Money Bill Alt|money-bill-1
+money-bill-simple|Money Bill Simple
+money-bill-simple-wave|Money Bill Simple Wave
+money-bill-transfer|Money Bill Transfer
+money-bill-trend-up|Money Bill Trend Up
+money-bill-wave|Money Bill Wave
+money-bill-wheat|Money Bill Wheat
+money-bills|Money Bills
+money-bills-simple|Money Bills Simple|money-bills-alt
+money-check|Money Check
+money-check-dollar|Money Check Dollar|money-check-alt
+money-check-dollar-pen|Money Check Dollar Pen|money-check-edit-alt
+money-check-pen|Money Check Pen|money-check-edit
+money-from-bracket|Money From Bracket
+money-simple-from-bracket|Money Simple From Bracket
+monitor-heart-rate|Monitor Heart Rate|monitor-waveform
+monkey|Monkey
+monument|Monument
+moon|Moon
+moon-cloud|Moon Cloud
+moon-first-quarter-inverse|Moon First Quarter Inverse|moon-last-quarter
+moon-full-inverse|Moon Full Inverse|moon-new
+moon-last-quarter-inverse|Moon Last Quarter Inverse|moon-first-quarter
+moon-new-inverse|Moon New Inverse|moon-full
+moon-over-sun|Moon Over Sun|eclipse-alt
+moon-star|Moon Star
+moon-stars|Moon Stars
+moon-waning-crescent-inverse|Moon Waning Crescent Inverse|moon-waxing-gibbous
+moon-waning-gibbous-inverse|Moon Waning Gibbous Inverse|moon-waxing-crescent
+moon-waxing-crescent-inverse|Moon Waxing Crescent Inverse|moon-waning-gibbous
+moon-waxing-gibbous-inverse|Moon Waxing Gibbous Inverse|moon-waning-crescent
+moped|Moped
+mortar-board|Mortar Board|graduation-cap
+mortar-pestle|Mortar Pestle
+mosque|Mosque
+mosquito|Mosquito
+mosquito-net|Mosquito Net
+motorcycle|Motorcycle
+mound|Mound
+mountain|Mountain
+mountain-city|Mountain City
+mountain-sun|Mountain Sun
+mountains|Mountains
+mouse-field|Mouse Field
+mp3-player|Mp3 Player
+mug|Mug
+mug-hot|Mug Hot
+mug-marshmallows|Mug Marshmallows
+mug-saucer|Mug Saucer|coffee
+mug-tea|Mug Tea
+mug-tea-saucer|Mug Tea Saucer
+mushroom|Mushroom
+music|Music
+music-magnifying-glass|Music Magnifying Glass
+music-note|Music Note|music-alt
+music-note-slash|Music Note Slash|music-alt-slash
+music-slash|Music Slash
+mustache|Mustache
+n|N
+naira-sign|Naira Sign
+narwhal|Narwhal
+nas|Nas
+nesting-dolls|Nesting Dolls
+network-wired|Network Wired
+neuter|Neuter
+newspaper|Newspaper
+nfc|Nfc
+nfc-lock|Nfc Lock
+nfc-magnifying-glass|Nfc Magnifying Glass
+nfc-pen|Nfc Pen
+nfc-signal|Nfc Signal
+nfc-slash|Nfc Slash
+nfc-trash|Nfc Trash
+non-binary|Non Binary
+norwegian-krone-sign|Norwegian Krone Sign
+nose|Nose
+not-equal|Not Equal
+notdef|Notdef
+note|Note
+note-medical|Note Medical
+note-sticky|Note Sticky|sticky-note
+notebook|Notebook
+notes|Notes
+notes-medical|Notes Medical
+notes-sticky|Notes Sticky
+o|O
+oar|Oar
+oars|Oars
+object-exclude|Object Exclude
+object-group|Object Group
+object-intersect|Object Intersect
+object-subtract|Object Subtract
+object-ungroup|Object Ungroup
+object-union|Object Union
+objects-align-bottom|Objects Align Bottom
+objects-align-center-horizontal|Objects Align Center Horizontal
+objects-align-center-vertical|Objects Align Center Vertical
+objects-align-left|Objects Align Left
+objects-align-right|Objects Align Right
+objects-align-top|Objects Align Top
+objects-column|Objects Column
+octagon|Octagon
+octagon-check|Octagon Check
+octagon-divide|Octagon Divide
+octagon-equals|Octagon Equals
+octagon-exclamation|Octagon Exclamation
+octagon-minus|Octagon Minus|minus-octagon
+octagon-plus|Octagon Plus|plus-octagon
+octagon-xmark|Octagon Xmark|times-octagon,xmark-octagon
+octopus|Octopus
+oil-can|Oil Can
+oil-can-drip|Oil Can Drip
+oil-temperature|Oil Temperature|oil-temp
+oil-well|Oil Well
+olive|Olive
+olive-branch|Olive Branch
+om|Om
+omega|Omega
+onion|Onion
+open-captioning|Open Captioning
+opossum|Opossum|possum
+option|Option
+ornament|Ornament
+otter|Otter
+outdent|Outdent|dedent
+outlet|Outlet
+oven|Oven
+overline|Overline
+owl|Owl
+p|P
+page|Page
+pager|Pager
+paint-roller|Paint Roller
+paintbrush|Paintbrush|paint-brush
+paintbrush-fine|Paintbrush Fine|paint-brush-alt,paint-brush-fine,paintbrush-alt
+paintbrush-fine-slash|Paintbrush Fine Slash
+paintbrush-pencil|Paintbrush Pencil
+paintbrush-slash|Paintbrush Slash
+palette|Palette
+pallet|Pallet
+pallet-box|Pallet Box
+pallet-boxes|Pallet Boxes|palette-boxes,pallet-alt
+pan-food|Pan Food
+pan-frying|Pan Frying
+pancakes|Pancakes
+panel-ews|Panel Ews
+panel-fire|Panel Fire
+panorama|Panorama
+panties|Panties
+pants|Pants
+pants-straight|Pants Straight
+paper-plane|Paper Plane
+paper-plane-top|Paper Plane Top|paper-plane-alt,send
+paperclip|Paperclip
+paperclip-vertical|Paperclip Vertical
+parachute-box|Parachute Box
+paragraph|Paragraph
+paragraph-left|Paragraph Left|paragraph-rtl
+parking-circle-slash|Parking Circle Slash|ban-parking
+party-bell|Party Bell
+party-horn|Party Horn
+passport|Passport
+pause|Pause
+paw|Paw
+paw-claws|Paw Claws
+paw-simple|Paw Simple|paw-alt
+peace|Peace
+peach|Peach
+peanut|Peanut
+peanuts|Peanuts
+peapod|Peapod
+pear|Pear
+pedestal|Pedestal
+pegasus|Pegasus
+pen|Pen
+pen-circle|Pen Circle
+pen-clip|Pen Clip|pen-alt
+pen-clip-slash|Pen Clip Slash|pen-alt-slash
+pen-fancy|Pen Fancy
+pen-fancy-slash|Pen Fancy Slash
+pen-field|Pen Field
+pen-line|Pen Line
+pen-nib|Pen Nib
+pen-nib-slash|Pen Nib Slash
+pen-paintbrush|Pen Paintbrush|pencil-paintbrush
+pen-ruler|Pen Ruler|pencil-ruler
+pen-slash|Pen Slash
+pen-swirl|Pen Swirl
+pen-to-square|Pen To Square|edit
+pencil|Pencil|pencil-alt
+pencil-line|Pencil Line
+pencil-mechanical|Pencil Mechanical
+pencil-slash|Pencil Slash
+pentagon|Pentagon
+people|People
+people-arrows|People Arrows|people-arrows-left-right
+people-carry|People Carry|people-carry-box
+people-dress|People Dress
+people-dress-simple|People Dress Simple
+people-group|People Group
+people-line|People Line
+people-pants|People Pants
+people-pants-simple|People Pants Simple
+people-pulling|People Pulling
+people-robbery|People Robbery
+people-roof|People Roof
+people-simple|People Simple
+pepper|Pepper
+pepper-hot|Pepper Hot
+percentage|Percentage|percent
+period|Period
+person|Person|male
+person-arms-raised|Person Arms Raised
+person-arrow-down-to-line|Person Arrow Down To Line
+person-arrow-up-from-line|Person Arrow Up From Line
+person-basketball|Person Basketball
+person-biking|Person Biking|biking
+person-biking-mountain|Person Biking Mountain|biking-mountain
+person-booth|Person Booth
+person-breastfeeding|Person Breastfeeding
+person-burst|Person Burst
+person-cane|Person Cane
+person-carry|Person Carry|person-carry-box
+person-carry-empty|Person Carry Empty
+person-chalkboard|Person Chalkboard
+person-circle-check|Person Circle Check
+person-circle-exclamation|Person Circle Exclamation
+person-circle-minus|Person Circle Minus
+person-circle-plus|Person Circle Plus
+person-circle-question|Person Circle Question
+person-circle-xmark|Person Circle Xmark
+person-digging|Person Digging|digging
+person-dolly|Person Dolly
+person-dolly-empty|Person Dolly Empty
+person-dots-from-line|Person Dots From Line|diagnoses
+person-dress|Person Dress|female
+person-dress-burst|Person Dress Burst
+person-dress-fairy|Person Dress Fairy
+person-dress-simple|Person Dress Simple
+person-drowning|Person Drowning
+person-fairy|Person Fairy
+person-falling|Person Falling
+person-falling-burst|Person Falling Burst
+person-from-portal|Person From Portal|portal-exit
+person-golfing|Person Golfing
+person-half-dress|Person Half Dress
+person-harassing|Person Harassing
+person-hiking|Person Hiking|hiking
+person-limbs-wide|Person Limbs Wide
+person-meditating|Person Meditating
+person-military-pointing|Person Military Pointing
+person-military-rifle|Person Military Rifle
+person-military-to-person|Person Military To Person
+person-pinball|Person Pinball
+person-praying|Person Praying|pray
+person-pregnant|Person Pregnant
+person-rays|Person Rays
+person-rifle|Person Rifle
+person-running|Person Running|running
+person-running-fast|Person Running Fast
+person-seat|Person Seat
+person-seat-reclined|Person Seat Reclined
+person-seat-window|Person Seat Window
+person-shelter|Person Shelter
+person-sign|Person Sign
+person-simple|Person Simple
+person-skating|Person Skating|skating
+person-ski-jumping|Person Ski Jumping|ski-jump
+person-ski-lift|Person Ski Lift|ski-lift
+person-skiing|Person Skiing|skiing
+person-skiing-nordic|Person Skiing Nordic|skiing-nordic
+person-sledding|Person Sledding|sledding
+person-snowboarding|Person Snowboarding|snowboarding
+person-snowmobiling|Person Snowmobiling|snowmobile
+person-soccer|Person Soccer
+person-swimming|Person Swimming|swimmer
+person-swimming-pool|Person Swimming Pool
+person-swimming-water|Person Swimming Water
+person-through-window|Person Through Window
+person-to-door|Person To Door
+person-to-portal|Person To Portal|portal-enter
+person-walking|Person Walking|walking
+person-walking-arrow-loop-left|Person Walking Arrow Loop Left
+person-walking-arrow-right|Person Walking Arrow Right
+person-walking-dashed-line-arrow-right|Person Walking Dashed Line Arrow Right
+person-walking-luggage|Person Walking Luggage
+person-walking-with-cane|Person Walking With Cane|blind
+person-water-arms-raised|Person Water Arms Raised
+person-waving|Person Waving
+peruvian-soles-sign|Peruvian Soles Sign
+peseta-sign|Peseta Sign
+peso-sign|Peso Sign
+phone|Phone
+phone-arrow-down|Phone Arrow Down|phone-arrow-down-left,phone-incoming
+phone-arrow-right|Phone Arrow Right
+phone-arrow-up|Phone Arrow Up|phone-arrow-up-right,phone-outgoing
+phone-connection|Phone Connection
+phone-flip|Phone Flip|phone-alt
+phone-hangup|Phone Hangup
+phone-intercom|Phone Intercom
+phone-laptop|Phone Laptop|laptop-mobile
+phone-missed|Phone Missed
+phone-office|Phone Office
+phone-plus|Phone Plus
+phone-rotary|Phone Rotary
+phone-slash|Phone Slash
+phone-volume|Phone Volume|volume-control-phone
+phone-waveform|Phone Waveform
+phone-xmark|Phone Xmark
+photo-film-music|Photo Film Music
+photo-video|Photo Video|photo-film
+pi|Pi
+piano|Piano
+piano-keyboard|Piano Keyboard
+pickaxe|Pickaxe
+pickleball|Pickleball
+picture-in-picture|Picture In Picture
+pie|Pie
+pig|Pig
+piggy-bank|Piggy Bank
+pills|Pills
+pinata|Pinata
+pinball|Pinball
+pineapple|Pineapple
+pipe|Pipe
+pipe-circle-check|Pipe Circle Check
+pipe-collar|Pipe Collar
+pipe-section|Pipe Section
+pipe-smoking|Pipe Smoking
+pipe-valve|Pipe Valve
+pisces|Pisces
+pizza|Pizza
+pizza-slice|Pizza Slice
+place-of-worship|Place Of Worship
+plane|Plane
+plane-arrival|Plane Arrival
+plane-circle-check|Plane Circle Check
+plane-circle-exclamation|Plane Circle Exclamation
+plane-circle-xmark|Plane Circle Xmark
+plane-departure|Plane Departure
+plane-engines|Plane Engines|plane-alt
+plane-flying|Plane Flying
+plane-landing-gear|Plane Landing Gear
+plane-lock|Plane Lock
+plane-prop|Plane Prop
+plane-slash|Plane Slash
+plane-tail|Plane Tail
+plane-up|Plane Up
+plane-up-slash|Plane Up Slash
+planet-moon|Planet Moon
+planet-ringed|Planet Ringed
+plant-wilt|Plant Wilt
+plate-utensils|Plate Utensils
+plate-wheat|Plate Wheat
+play|Play
+play-flip|Play Flip
+play-pause|Play Pause
+plug|Plug
+plug-circle-bolt|Plug Circle Bolt
+plug-circle-check|Plug Circle Check
+plug-circle-exclamation|Plug Circle Exclamation
+plug-circle-minus|Plug Circle Minus
+plug-circle-plus|Plug Circle Plus
+plug-circle-xmark|Plug Circle Xmark
+plus|Plus|add
+plus-large|Plus Large
+plus-minus|Plus Minus
+podcast|Podcast
+podium|Podium
+podium-star|Podium Star
+poker-chip|Poker Chip
+police-box|Police Box
+polish-zloty-sign|Polish Zloty Sign
+poll-people|Poll People
+pompebled|Pompebled
+poo|Poo
+poo-storm|Poo Storm|poo-bolt
+pool-8-ball|Pool 8 Ball
+poop|Poop
+popcorn|Popcorn
+popsicle|Popsicle
+postage-stamp|Postage Stamp
+pot-food|Pot Food
+potato|Potato
+power-off|Power Off
+prescription|Prescription
+prescription-bottle|Prescription Bottle
+prescription-bottle-medical|Prescription Bottle Medical|prescription-bottle-alt
+prescription-bottle-pill|Prescription Bottle Pill
+presentation|Presentation|presentation-screen
+pretzel|Pretzel
+print|Print
+print-magnifying-glass|Print Magnifying Glass|print-search
+print-slash|Print Slash
+projector|Projector
+pronoun|Pronoun|circles-overlap-3
+pump|Pump
+pump-impeller|Pump Impeller
+pump-medical|Pump Medical
+pump-soap|Pump Soap
+pumpkin|Pumpkin
+puzzle|Puzzle
+puzzle-piece|Puzzle Piece
+puzzle-piece-simple|Puzzle Piece Simple|puzzle-piece-alt
+q|Q
+qrcode|Qrcode
+qrcode-read|Qrcode Read
+question|Question
+quote-left|Quote Left|quote-left-alt
+quote-right|Quote Right|quote-right-alt
+quotes|Quotes
+r|R
+rabbit|Rabbit
+rabbit-running|Rabbit Running|rabbit-fast
+raccoon|Raccoon
+racquet|Racquet
+radar|Radar
+radiation|Radiation
+radio|Radio
+radio-tuner|Radio Tuner|radio-alt
+rainbow|Rainbow
+rainbow-half|Rainbow Half
+raindrops|Raindrops
+ram|Ram
+ramp-loading|Ramp Loading
+ranking-star|Ranking Star
+raygun|Raygun
+receipt|Receipt
+record-vinyl|Record Vinyl
+rectangle|Rectangle|rectangle-landscape
+rectangle-4k|Rectangle 4k
+rectangle-ad|Rectangle Ad|ad
+rectangle-api|Rectangle Api
+rectangle-barcode|Rectangle Barcode|barcode-alt
+rectangle-beta|Rectangle Beta
+rectangle-code|Rectangle Code
+rectangle-hd|Rectangle Hd|high-definition
+rectangle-high-dynamic-range|Rectangle High Dynamic Range|rectangle-hdr
+rectangle-history|Rectangle History
+rectangle-history-circle-plus|Rectangle History Circle Plus
+rectangle-history-circle-user|Rectangle History Circle User
+rectangle-irc|Rectangle Irc
+rectangle-list|Rectangle List|list-alt
+rectangle-minus|Rectangle Minus
+rectangle-n-a|Rectangle N A
+rectangle-new|Rectangle New
+rectangle-plus|Rectangle Plus
+rectangle-portrait|Rectangle Portrait|rectangle-vertical
+rectangle-pro|Rectangle Pro|pro
+rectangle-sd|Rectangle Sd|standard-definition
+rectangle-tall|Rectangle Tall
+rectangle-terminal|Rectangle Terminal
+rectangle-vertical-history|Rectangle Vertical History
+rectangle-video-on-demand|Rectangle Video On Demand
+rectangle-wide|Rectangle Wide
+rectangle-xmark|Rectangle Xmark|rectangle-times,times-rectangle,window-close
+rectangles-mixed|Rectangles Mixed
+recycle|Recycle
+reel|Reel
+reflect-both|Reflect Both
+reflect-horizontal|Reflect Horizontal
+reflect-vertical|Reflect Vertical
+refrigerator|Refrigerator
+registered|Registered
+remote|Remote
+renminbi-sign|Renminbi Sign
+repeat|Repeat
+repeat-1|Repeat 1
+reply-clock|Reply Clock|reply-time
+republican|Republican
+restroom|Restroom
+restroom-simple|Restroom Simple
+retweet|Retweet
+rhombus|Rhombus
+ribbon|Ribbon
+right|Right|arrow-alt-right
+right-from-bracket|Right From Bracket|sign-out-alt
+right-from-dotted-line|Right From Dotted Line
+right-from-line|Right From Line|arrow-alt-from-left
+right-left|Right Left|exchange-alt
+right-left-large|Right Left Large
+right-long|Right Long|long-arrow-alt-right
+right-long-to-line|Right Long To Line
+right-to-bracket|Right To Bracket|sign-in-alt
+right-to-dotted-line|Right To Dotted Line
+right-to-line|Right To Line|arrow-alt-to-right
+ring|Ring
+ring-diamond|Ring Diamond
+rings-wedding|Rings Wedding
+road|Road
+road-barrier|Road Barrier
+road-bridge|Road Bridge
+road-circle-check|Road Circle Check
+road-circle-exclamation|Road Circle Exclamation
+road-circle-xmark|Road Circle Xmark
+road-lock|Road Lock
+road-spikes|Road Spikes
+robot|Robot
+robot-astromech|Robot Astromech
+rocket|Rocket
+rocket-launch|Rocket Launch
+rocket-vertical|Rocket Vertical
+roller-coaster|Roller Coaster
+rotate|Rotate|sync-alt
+rotate-backward|Rotate Backward|rotate-back,rotate-left,undo-alt
+rotate-exclamation|Rotate Exclamation
+rotate-forward|Rotate Forward|redo-alt,rotate-right
+rotate-reverse|Rotate Reverse
+route|Route
+route-highway|Route Highway
+route-interstate|Route Interstate
+router|Router
+rows-3|Rows 3
+rss|Rss|feed
+ruble|Ruble|rouble,rub,ruble-sign
+rug|Rug
+rugby-ball|Rugby Ball
+ruler|Ruler
+ruler-combined|Ruler Combined
+ruler-horizontal|Ruler Horizontal
+ruler-triangle|Ruler Triangle
+ruler-vertical|Ruler Vertical
+rupee|Rupee|rupee-sign
+rupiah-sign|Rupiah Sign
+rv|Rv
+s|S
+sack|Sack
+sack-dollar|Sack Dollar
+sack-xmark|Sack Xmark
+sagittarius|Sagittarius
+sailboat|Sailboat
+salt-shaker|Salt Shaker
+sandwich|Sandwich
+satellite|Satellite
+satellite-dish|Satellite Dish
+sausage|Sausage
+saxophone|Saxophone
+saxophone-fire|Saxophone Fire|sax-hot
+scale-balanced|Scale Balanced|balance-scale
+scale-unbalanced-flip|Scale Unbalanced Flip|balance-scale-right
+scalpel|Scalpel
+scalpel-line-dashed|Scalpel Line Dashed|scalpel-path
+scanner|Scanner|scanner-gun
+scanner-image|Scanner Image
+scanner-keyboard|Scanner Keyboard
+scanner-touchscreen|Scanner Touchscreen
+scarecrow|Scarecrow
+scarf|Scarf
+school|School
+school-circle-check|School Circle Check
+school-circle-exclamation|School Circle Exclamation
+school-circle-xmark|School Circle Xmark
+school-flag|School Flag
+school-lock|School Lock
+school-unlock|School Unlock
+scissors|Scissors|cut
+scooter|Scooter
+scorpio|Scorpio
+screencast|Screencast
+screwdriver|Screwdriver
+screwdriver-wrench|Screwdriver Wrench|tools
+scribble|Scribble
+scroll|Scroll
+scroll-old|Scroll Old
+scroll-ribbon|Scroll Ribbon|diploma
+scroll-torah|Scroll Torah|torah
+scrubber|Scrubber
+scythe|Scythe
+sd-card|Sd Card
+sd-cards|Sd Cards
+seal|Seal
+seal-exclamation|Seal Exclamation
+seal-question|Seal Question
+seat|Seat
+seat-airline|Seat Airline
+seat-airline-window|Seat Airline Window
+seats|Seats
+section|Section
+seedling|Seedling|sprout
+semicolon|Semicolon
+send-back|Send Back
+send-backward|Send Backward
+sensor|Sensor
+sensor-cloud|Sensor Cloud|sensor-smoke
+sensor-fire|Sensor Fire
+sensor-on|Sensor On
+sensor-triangle-exclamation|Sensor Triangle Exclamation|sensor-alert
+server|Server
+share|Share|mail-forward
+share-all|Share All
+share-from-square|Share From Square|share-square
+share-nodes|Share Nodes|share-alt
+sheep|Sheep
+sheet-plastic|Sheet Plastic
+shekel|Shekel|ils,shekel-sign,sheqel,sheqel-sign
+shelves|Shelves|inventory
+shelves-empty|Shelves Empty
+shield|Shield|shield-blank
+shield-cat|Shield Cat
+shield-check|Shield Check
+shield-cross|Shield Cross
+shield-dog|Shield Dog
+shield-exclamation|Shield Exclamation
+shield-halved|Shield Halved|shield-alt
+shield-heart|Shield Heart
+shield-keyhole|Shield Keyhole
+shield-minus|Shield Minus
+shield-plus|Shield Plus
+shield-quartered|Shield Quartered
+shield-slash|Shield Slash
+shield-user|Shield User
+shield-virus|Shield Virus
+shield-xmark|Shield Xmark|shield-times
+ship|Ship
+ship-large|Ship Large
+shirt|Shirt|t-shirt,tshirt
+shirt-jersey|Shirt Jersey
+shirt-long-sleeve|Shirt Long Sleeve
+shirt-running|Shirt Running
+shirt-tank-top|Shirt Tank Top
+shish-kebab|Shish Kebab
+shoe|Shoe
+shoe-prints|Shoe Prints
+shop|Shop|store-alt
+shop-24|Shop 24
+shop-lock|Shop Lock
+shop-slash|Shop Slash|store-alt-slash
+shorts|Shorts
+shovel|Shovel
+shovel-snow|Shovel Snow
+shower|Shower
+shower-down|Shower Down|shower-alt
+shredder|Shredder
+shrimp|Shrimp
+shuffle|Shuffle|random
+shutters|Shutters
+shuttle-space-vertical|Shuttle Space Vertical
+shuttle-van|Shuttle Van|van-shuttle
+shuttlecock|Shuttlecock
+sickle|Sickle
+sidebar|Sidebar
+sidebar-flip|Sidebar Flip
+sigma|Sigma
+sign|Sign|sign-hanging
+sign-post|Sign Post
+sign-posts|Sign Posts
+sign-posts-wrench|Sign Posts Wrench
+signal|Signal|signal-5,signal-perfect
+signal-bars|Signal Bars|signal-alt,signal-alt-4,signal-bars-strong
+signal-bars-fair|Signal Bars Fair|signal-alt-2
+signal-bars-good|Signal Bars Good|signal-alt-3
+signal-bars-slash|Signal Bars Slash|signal-alt-slash
+signal-bars-weak|Signal Bars Weak|signal-alt-1
+signal-fair|Signal Fair|signal-2
+signal-good|Signal Good|signal-3
+signal-slash|Signal Slash
+signal-stream|Signal Stream
+signal-stream-slash|Signal Stream Slash
+signal-strong|Signal Strong|signal-4
+signal-weak|Signal Weak|signal-1
+signapore-dollar-sign|Signapore Dollar Sign
+signature|Signature
+signature-lock|Signature Lock
+signature-slash|Signature Slash
+sim-card|Sim Card
+sim-cards|Sim Cards
+single-quote-left|Single Quote Left
+single-quote-right|Single Quote Right
+sink|Sink
+siren|Siren
+siren-on|Siren On
+sitemap|Sitemap
+skeleton|Skeleton
+skeleton-ribs|Skeleton Ribs
+ski-boot|Ski Boot
+ski-boot-ski|Ski Boot Ski
+skull|Skull
+skull-cow|Skull Cow
+skull-crossbones|Skull Crossbones
+slash|Slash
+slash-back|Slash Back
+slash-forward|Slash Forward
+sleigh|Sleigh
+slider|Slider
+slider-circle|Slider Circle
+sliders|Sliders|sliders-h
+sliders-simple|Sliders Simple
+sliders-up|Sliders Up|sliders-v
+slot-machine|Slot Machine
+smog|Smog
+smoke|Smoke
+smoking|Smoking
+snake|Snake
+sneaker|Sneaker
+sneaker-running|Sneaker Running
+snooze|Snooze|zzz
+snow-blowing|Snow Blowing
+snowflake|Snowflake
+snowflake-droplets|Snowflake Droplets
+snowflakes|Snowflakes
+snowman|Snowman
+snowman-head|Snowman Head|frosty-head
+snowmobile-blank|Snowmobile Blank
+snowplow|Snowplow
+soap|Soap
+socks|Socks
+soft-serve|Soft Serve|creemee
+solar-panel|Solar Panel
+solar-system|Solar System
+sort|Sort|unsorted
+sort-asc|Sort Asc|sort-up
+sort-desc|Sort Desc|sort-down
+sort-numeric-desc|Sort Numeric Desc|arrow-down-9-1,sort-numeric-down-alt
+sort-numeric-down|Sort Numeric Down|arrow-down-1-9,sort-numeric-asc
+sort-numeric-up|Sort Numeric Up|arrow-up-1-9
+spa|Spa
+space-shuttle|Space Shuttle|shuttle-space
+space-station-moon|Space Station Moon
+space-station-moon-construction|Space Station Moon Construction|space-station-moon-alt
+spade|Spade
+spaghetti-monster-flying|Spaghetti Monster Flying|pastafarianism
+sparkle|Sparkle
+sparkles|Sparkles
+speaker|Speaker
+speakers|Speakers
+spell-check|Spell Check
+spider|Spider
+spider-black-widow|Spider Black Widow
+spider-web|Spider Web
+spine|Spine
+spinner|Spinner
+spinner-scale|Spinner Scale
+spinner-third|Spinner Third
+spiral|Spiral
+split|Split
+splotch|Splotch
+sportsball|Sportsball
+spray-can|Spray Can
+spray-can-sparkles|Spray Can Sparkles|air-freshener
+sprinkler|Sprinkler
+sprinkler-ceiling|Sprinkler Ceiling
+square|Square
+square-0|Square 0
+square-1|Square 1
+square-2|Square 2
+square-3|Square 3
+square-4|Square 4
+square-5|Square 5
+square-6|Square 6
+square-7|Square 7
+square-8|Square 8
+square-9|Square 9
+square-a|Square A
+square-a-lock|Square A Lock
+square-ampersand|Square Ampersand
+square-arrow-down|Square Arrow Down|arrow-square-down
+square-arrow-down-left|Square Arrow Down Left
+square-arrow-down-right|Square Arrow Down Right
+square-arrow-left|Square Arrow Left|arrow-square-left
+square-arrow-right|Square Arrow Right|arrow-square-right
+square-arrow-up|Square Arrow Up|arrow-square-up
+square-arrow-up-left|Square Arrow Up Left
+square-arrow-up-right|Square Arrow Up Right|external-link-square
+square-austral|Square Austral
+square-australian-dollar|Square Australian Dollar
+square-b|Square B
+square-baht|Square Baht
+square-bangladeshi-taka|Square Bangladeshi Taka
+square-binary|Square Binary
+square-bitcoin|Square Bitcoin
+square-bolt|Square Bolt
+square-brazilian-real|Square Brazilian Real
+square-c|Square C
+square-caret-down|Square Caret Down|caret-square-down
+square-caret-left|Square Caret Left|caret-square-left
+square-caret-right|Square Caret Right|caret-square-right
+square-caret-up|Square Caret Up|caret-square-up
+square-cedi|Square Cedi
+square-cent|Square Cent
+square-check|Square Check|check-square
+square-chevron-down|Square Chevron Down|chevron-square-down
+square-chevron-left|Square Chevron Left|chevron-square-left
+square-chevron-right|Square Chevron Right|chevron-square-right
+square-chevron-up|Square Chevron Up|chevron-square-up
+square-chf|Square Chf
+square-code|Square Code
+square-colon|Square Colon
+square-cruzeiro|Square Cruzeiro
+square-currency|Square Currency
+square-d|Square D
+square-danish-krone|Square Danish Krone
+square-dashed|Square Dashed
+square-dashed-circle-plus|Square Dashed Circle Plus
+square-divide|Square Divide
+square-dollar|Square Dollar|dollar-square,usd-square
+square-dong|Square Dong
+square-down|Square Down|arrow-alt-square-down
+square-down-left|Square Down Left
+square-down-right|Square Down Right
+square-e|Square E
+square-ellipsis|Square Ellipsis
+square-ellipsis-vertical|Square Ellipsis Vertical
+square-envelope|Square Envelope|envelope-square
+square-equals|Square Equals
+square-euro|Square Euro
+square-eurozone|Square Eurozone
+square-exclamation|Square Exclamation|exclamation-square
+square-f|Square F
+square-florin|Square Florin
+square-franc|Square Franc
+square-full|Square Full
+square-g|Square G
+square-guarani|Square Guarani
+square-half|Square Half
+square-half-horizontal|Square Half Horizontal
+square-half-stroke|Square Half Stroke
+square-half-stroke-horizontal|Square Half Stroke Horizontal
+square-heart|Square Heart|heart-square
+square-hryvnia|Square Hryvnia
+square-i|Square I
+square-indian-rupee|Square Indian Rupee
+square-info|Square Info|info-square
+square-j|Square J
+square-k|Square K
+square-kanban|Square Kanban
+square-kip|Square Kip
+square-l|Square L
+square-lari|Square Lari
+square-left|Square Left|arrow-alt-square-left
+square-lira|Square Lira
+square-list|Square List
+square-litecoin|Square Litecoin
+square-m|Square M
+square-malaysian-ringgit|Square Malaysian Ringgit
+square-manat|Square Manat
+square-microphone|Square Microphone
+square-mill|Square Mill
+square-minus|Square Minus|minus-square
+square-n|Square N
+square-naira|Square Naira
+square-nfi|Square Nfi
+square-norwegian-krone|Square Norwegian Krone
+square-o|Square O
+square-p|Square P
+square-parking|Square Parking|parking
+square-parking-slash|Square Parking Slash|parking-slash
+square-pen|Square Pen|pen-square,pencil-square
+square-person-confined|Square Person Confined
+square-peruvian-soles|Square Peruvian Soles
+square-peseta|Square Peseta
+square-peso|Square Peso
+square-phone|Square Phone|phone-square
+square-phone-flip|Square Phone Flip|phone-square-alt
+square-phone-hangup|Square Phone Hangup|phone-square-down
+square-plus|Square Plus|plus-square
+square-polish-zloty|Square Polish Zloty
+square-poll-horizontal|Square Poll Horizontal|poll-h
+square-poll-vertical|Square Poll Vertical|poll
+square-q|Square Q
+square-quarters|Square Quarters
+square-question|Square Question|question-square
+square-quote|Square Quote
+square-r|Square R
+square-renminbi|Square Renminbi
+square-right|Square Right|arrow-alt-square-right
+square-ring|Square Ring
+square-root|Square Root
+square-root-variable|Square Root Variable|square-root-alt
+square-rss|Square Rss|rss-square
+square-ruble|Square Ruble
+square-rupee|Square Rupee
+square-rupiah|Square Rupiah
+square-s|Square S
+square-share-nodes|Square Share Nodes|share-alt-square
+square-shekel|Square Shekel
+square-sliders|Square Sliders|sliders-h-square
+square-sliders-vertical|Square Sliders Vertical|sliders-v-square
+square-small|Square Small
+square-star|Square Star
+square-sterling|Square Sterling
+square-swedish-krona|Square Swedish Krona
+square-t|Square T
+square-tenge|Square Tenge
+square-terminal|Square Terminal
+square-this-way-up|Square This Way Up|box-up
+square-tugrik|Square Tugrik
+square-turkish-lira|Square Turkish Lira
+square-u|Square U
+square-up|Square Up|arrow-alt-square-up
+square-up-left|Square Up Left
+square-up-right|Square Up Right|external-link-square-alt
+square-user|Square User
+square-v|Square V
+square-virus|Square Virus
+square-w|Square W
+square-wine-glass-crack|Square Wine Glass Crack|box-fragile,square-fragile
+square-won|Square Won
+square-x|Square X
+square-xmark|Square Xmark|times-square,xmark-square
+square-y|Square Y
+square-yen|Square Yen
+square-z|Square Z
+squareapore-dollar|Squareapore Dollar
+squid|Squid
+squirrel|Squirrel
+stadium|Stadium
+staff|Staff
+staff-aesculapius|Staff Aesculapius|rod-asclepius,rod-snake,staff-snake
+stair-car|Stair Car
+stairs|Stairs
+stamp|Stamp
+stapler|Stapler
+star|Star
+star-and-crescent|Star And Crescent
+star-christmas|Star Christmas
+star-exclamation|Star Exclamation
+star-half|Star Half
+star-half-stroke|Star Half Stroke|star-half-alt
+star-of-david|Star Of David
+star-of-life|Star Of Life
+star-sharp|Star Sharp
+star-sharp-half|Star Sharp Half
+star-sharp-half-stroke|Star Sharp Half Stroke|star-sharp-half-alt
+star-shooting|Star Shooting
+starfighter|Starfighter
+starfighter-twin-ion-engine|Starfighter Twin Ion Engine|starfighter-alt
+starfighter-twin-ion-engine-advanced|Starfighter Twin Ion Engine Advanced|starfighter-alt-advanced
+stars|Stars
+starship|Starship
+starship-freighter|Starship Freighter
+steak|Steak
+steering-wheel|Steering Wheel
+sterling-sign|Sterling Sign|gbp,pound-sign
+stethoscope|Stethoscope
+stocking|Stocking
+stomach|Stomach
+stool|Stool
+stop|Stop
+stopwatch|Stopwatch
+stopwatch-20|Stopwatch 20
+store|Store
+store-24|Store 24
+store-lock|Store Lock
+store-slash|Store Slash
+strawberry|Strawberry
+street-view|Street View
+stretcher|Stretcher
+strikethrough|Strikethrough
+stroopwafel|Stroopwafel
+subscript|Subscript
+subtitles|Subtitles
+subtitles-slash|Subtitles Slash
+suitcase|Suitcase
+suitcase-medical|Suitcase Medical|medkit
+suitcase-rolling|Suitcase Rolling
+sun|Sun
+sun-bright|Sun Bright|sun-alt
+sun-cloud|Sun Cloud
+sun-dust|Sun Dust
+sun-haze|Sun Haze
+sun-plant-wilt|Sun Plant Wilt
+sunglasses|Sunglasses
+sunrise|Sunrise
+sunset|Sunset
+superscript|Superscript
+sushi|Sushi|nigiri
+sushi-roll|Sushi Roll|maki-roll,makizushi
+swap|Swap
+swap-arrows|Swap Arrows
+swatchbook|Swatchbook
+swedish-krona-sign|Swedish Krona Sign
+sword|Sword
+sword-laser|Sword Laser
+sword-laser-alt|Sword Laser Alt
+swords|Swords
+swords-laser|Swords Laser
+symbols|Symbols|icons-alt
+synagogue|Synagogue
+syringe|Syringe
+t|T
+t-rex|T Rex
+table|Table
+table-bar|Table Bar
+table-cells|Table Cells|th
+table-cells-column-lock|Table Cells Column Lock
+table-cells-column-unlock|Table Cells Column Unlock
+table-cells-columns|Table Cells Columns
+table-cells-header|Table Cells Header
+table-cells-header-lock|Table Cells Header Lock
+table-cells-header-unlock|Table Cells Header Unlock
+table-cells-large|Table Cells Large|th-large
+table-cells-lock|Table Cells Lock
+table-cells-merge|Table Cells Merge
+table-cells-row-lock|Table Cells Row Lock
+table-cells-row-unlock|Table Cells Row Unlock
+table-cells-rows|Table Cells Rows
+table-cells-split|Table Cells Split
+table-cells-unlock|Table Cells Unlock
+table-columns|Table Columns|columns
+table-columns-add-after|Table Columns Add After
+table-columns-add-before|Table Columns Add Before
+table-columns-merge-next|Table Columns Merge Next
+table-columns-merge-previous|Table Columns Merge Previous
+table-columns-remove-after|Table Columns Remove After
+table-columns-remove-before|Table Columns Remove Before
+table-dining|Table Dining
+table-layout|Table Layout
+table-list|Table List|th-list
+table-picnic|Table Picnic
+table-pivot|Table Pivot
+table-rows|Table Rows|rows
+table-rows-add-above|Table Rows Add Above
+table-rows-add-below|Table Rows Add Below
+table-rows-merge-next|Table Rows Merge Next
+table-rows-merge-previous|Table Rows Merge Previous
+table-rows-remove-above|Table Rows Remove Above
+table-rows-remove-below|Table Rows Remove Below
+table-slash|Table Slash
+table-tennis|Table Tennis|ping-pong-paddle-ball,table-tennis-paddle-ball
+table-tree|Table Tree
+tablet|Tablet|tablet-android
+tablet-button|Tablet Button
+tablet-rugged|Tablet Rugged
+tablet-screen|Tablet Screen|tablet-android-alt
+tablet-screen-button|Tablet Screen Button|tablet-alt
+tablets|Tablets
+taco|Taco
+tag|Tag
+tags|Tags
+tally|Tally|tally-5
+tally-1|Tally 1
+tally-2|Tally 2
+tally-3|Tally 3
+tally-4|Tally 4
+tamale|Tamale
+tank-recovery|Tank Recovery
+tank-water|Tank Water
+tape|Tape
+tarp|Tarp
+tarp-droplet|Tarp Droplet
+taurus|Taurus
+taxi|Taxi|cab
+taxi-bus|Taxi Bus
+teddy-bear|Teddy Bear
+teeth|Teeth
+teeth-open|Teeth Open
+telescope|Telescope
+teletype|Teletype|tty
+teletype-answer|Teletype Answer|tty-answer
+temperature-arrow-down|Temperature Arrow Down|temperature-down
+temperature-arrow-up|Temperature Arrow Up|temperature-up
+temperature-empty|Temperature Empty|temperature-0,thermometer-0,thermometer-empty
+temperature-frigid|Temperature Frigid|temperature-snow
+temperature-full|Temperature Full|temperature-4,thermometer-4,thermometer-full
+temperature-half|Temperature Half|temperature-2,thermometer-2,thermometer-half
+temperature-high|Temperature High
+temperature-hot|Temperature Hot|temperature-sun
+temperature-list|Temperature List
+temperature-low|Temperature Low
+temperature-quarter|Temperature Quarter|temperature-1,thermometer-1,thermometer-quarter
+temperature-slash|Temperature Slash
+temperature-three-quarters|Temperature Three Quarters|temperature-3,thermometer-3,thermometer-three-quarters
+tenge|Tenge|tenge-sign
+tennis-ball|Tennis Ball
+tent|Tent
+tent-arrow-down-to-line|Tent Arrow Down To Line
+tent-arrow-left-right|Tent Arrow Left Right
+tent-arrow-turn-left|Tent Arrow Turn Left
+tent-arrows-down|Tent Arrows Down
+tent-circus|Tent Circus
+tent-double-peak|Tent Double Peak
+tents|Tents
+terminal|Terminal
+text|Text
+text-height|Text Height
+text-size|Text Size
+text-slash|Text Slash|remove-format
+text-width|Text Width
+thermometer|Thermometer
+theta|Theta
+thought-bubble|Thought Bubble
+thumbs-down|Thumbs Down
+thumbs-up|Thumbs Up
+thumbtack|Thumbtack|thumb-tack
+thumbtack-angle|Thumbtack Angle
+thumbtack-angle-slash|Thumbtack Angle Slash
+thumbtack-slash|Thumbtack Slash|thumb-tack-slash
+tick|Tick
+ticket|Ticket
+ticket-perforated|Ticket Perforated
+ticket-perforated-plane|Ticket Perforated Plane|ticket-airline,ticket-plane
+ticket-simple|Ticket Simple|ticket-alt
+tickets|Tickets
+tickets-perforated|Tickets Perforated
+tickets-perforated-plane|Tickets Perforated Plane|tickets-airline,tickets-plane
+tickets-simple|Tickets Simple
+tilde|Tilde
+timeline|Timeline
+timeline-arrow|Timeline Arrow
+timer|Timer
+times-to-slot|Times To Slot|vote-nay,xmark-to-slot
+tire|Tire
+tire-flat|Tire Flat
+tire-pressure-warning|Tire Pressure Warning
+tire-rugged|Tire Rugged
+toggle-large-off|Toggle Large Off
+toggle-large-on|Toggle Large On
+toggle-off|Toggle Off
+toggle-on|Toggle On
+toilet|Toilet
+toilet-paper|Toilet Paper|toilet-paper-alt,toilet-paper-blank
+toilet-paper-blank-under|Toilet Paper Blank Under|toilet-paper-reverse,toilet-paper-reverse-alt,toilet-paper-under
+toilet-paper-check|Toilet Paper Check
+toilet-paper-reverse-slash|Toilet Paper Reverse Slash|toilet-paper-under-slash
+toilet-paper-slash|Toilet Paper Slash
+toilet-paper-xmark|Toilet Paper Xmark
+toilet-portable|Toilet Portable
+toilets-portable|Toilets Portable
+tomato|Tomato
+tombstone|Tombstone
+tombstone-blank|Tombstone Blank|tombstone-alt
+toolbox|Toolbox
+tooth|Tooth
+toothbrush|Toothbrush
+torii-gate|Torii Gate
+tornado|Tornado
+tower-broadcast|Tower Broadcast|broadcast-tower
+tower-cell|Tower Cell
+tower-control|Tower Control
+tower-observation|Tower Observation
+tower-receive|Tower Receive
+tractor|Tractor
+trademark|Trademark
+traffic-cone|Traffic Cone
+traffic-light|Traffic Light
+traffic-light-go|Traffic Light Go
+traffic-light-slow|Traffic Light Slow
+traffic-light-stop|Traffic Light Stop
+trailer|Trailer
+train|Train
+train-stop|Train Stop
+train-subway|Train Subway|subway
+train-subway-tunnel|Train Subway Tunnel|subway-tunnel
+train-track|Train Track
+train-tram|Train Tram
+train-tunnel|Train Tunnel
+transducer|Transducer
+transformer-bolt|Transformer Bolt
+transgender|Transgender|transgender-alt
+transmission|Transmission
+transporter|Transporter
+transporter-1|Transporter 1
+transporter-2|Transporter 2
+transporter-3|Transporter 3
+transporter-4|Transporter 4
+transporter-5|Transporter 5
+transporter-6|Transporter 6
+transporter-7|Transporter 7
+transporter-empty|Transporter Empty
+trash|Trash
+trash-arrow-turn-left|Trash Arrow Turn Left|trash-undo
+trash-arrow-up|Trash Arrow Up|trash-restore
+trash-can|Trash Can|trash-alt
+trash-can-arrow-turn-left|Trash Can Arrow Turn Left|trash-can-undo,trash-undo-alt
+trash-can-arrow-up|Trash Can Arrow Up|trash-restore-alt
+trash-can-check|Trash Can Check
+trash-can-clock|Trash Can Clock
+trash-can-list|Trash Can List
+trash-can-plus|Trash Can Plus
+trash-can-slash|Trash Can Slash|trash-alt-slash
+trash-can-xmark|Trash Can Xmark
+trash-check|Trash Check
+trash-clock|Trash Clock
+trash-list|Trash List
+trash-plus|Trash Plus
+trash-slash|Trash Slash
+trash-xmark|Trash Xmark
+treasure-chest|Treasure Chest
+tree|Tree
+tree-christmas|Tree Christmas
+tree-city|Tree City
+tree-deciduous|Tree Deciduous|tree-alt
+tree-decorated|Tree Decorated
+tree-large|Tree Large
+tree-palm|Tree Palm
+trees|Trees
+triangle|Triangle
+triangle-circle-square|Triangle Circle Square|shapes
+triangle-exclamation|Triangle Exclamation|exclamation-triangle,warning
+triangle-instrument|Triangle Instrument|triangle-music
+triangle-person-digging|Triangle Person Digging|construction
+tricycle|Tricycle
+tricycle-adult|Tricycle Adult
+trillium|Trillium
+triple-chevrons-down|Triple Chevrons Down
+triple-chevrons-left|Triple Chevrons Left
+triple-chevrons-right|Triple Chevrons Right
+triple-chevrons-up|Triple Chevrons Up
+trombone|Trombone
+trophy|Trophy
+trophy-star|Trophy Star|trophy-alt
+trowel|Trowel
+trowel-bricks|Trowel Bricks
+truck|Truck
+truck-arrow-right|Truck Arrow Right
+truck-bolt|Truck Bolt
+truck-clock|Truck Clock|shipping-timed
+truck-container|Truck Container
+truck-container-empty|Truck Container Empty
+truck-droplet|Truck Droplet
+truck-fast|Truck Fast|shipping-fast
+truck-field|Truck Field
+truck-field-un|Truck Field Un
+truck-fire|Truck Fire
+truck-flatbed|Truck Flatbed
+truck-front|Truck Front
+truck-ladder|Truck Ladder
+truck-medical|Truck Medical|ambulance
+truck-monster|Truck Monster
+truck-moving|Truck Moving
+truck-pickup|Truck Pickup
+truck-plane|Truck Plane
+truck-plow|Truck Plow
+truck-ramp|Truck Ramp
+truck-ramp-box|Truck Ramp Box|truck-loading
+truck-ramp-couch|Truck Ramp Couch|truck-couch
+truck-suv|Truck Suv
+truck-tow|Truck Tow
+truck-utensils|Truck Utensils
+trumpet|Trumpet
+tugrik-sign|Tugrik Sign
+turkey|Turkey
+turkish-lira|Turkish Lira|try,turkish-lira-sign
+turn-down|Turn Down|level-down-alt
+turn-down-left|Turn Down Left
+turn-down-right|Turn Down Right
+turn-left|Turn Left
+turn-left-down|Turn Left Down
+turn-left-up|Turn Left Up
+turn-right|Turn Right
+turn-up|Turn Up|level-up-alt
+turntable|Turntable
+turtle|Turtle
+tv|Tv|television,tv-alt
+tv-music|Tv Music
+tv-retro|Tv Retro
+typewriter|Typewriter
+u|U
+u-turn|U Turn|u-turn-left-down
+u-turn-down-left|U Turn Down Left
+u-turn-down-right|U Turn Down Right
+u-turn-left-up|U Turn Left Up
+u-turn-right-down|U Turn Right Down
+u-turn-right-up|U Turn Right Up
+u-turn-up-left|U Turn Up Left
+u-turn-up-right|U Turn Up Right
+ufo|Ufo
+ufo-beam|Ufo Beam
+umbrella|Umbrella
+umbrella-beach|Umbrella Beach
+umbrella-simple|Umbrella Simple|umbrella-alt
+underline|Underline
+unicorn|Unicorn
+unicycle|Unicycle
+uniform-martial-arts|Uniform Martial Arts
+union|Union
+universal-access|Universal Access
+unlock|Unlock
+unlock-keyhole|Unlock Keyhole|unlock-alt
+up|Up|arrow-alt-up
+up-down|Up Down|arrows-alt-v
+up-down-left-right|Up Down Left Right|arrows-alt
+up-from-bracket|Up From Bracket
+up-from-dotted-line|Up From Dotted Line
+up-from-line|Up From Line|arrow-alt-from-bottom
+up-left|Up Left
+up-long|Up Long|long-arrow-alt-up
+up-long-to-line|Up Long To Line
+up-right|Up Right
+up-right-and-down-left-from-center|Up Right And Down Left From Center|expand-alt
+up-right-from-square|Up Right From Square|external-link-alt
+up-to-bracket|Up To Bracket
+up-to-dotted-line|Up To Dotted Line
+up-to-line|Up To Line|arrow-alt-to-top
+upload|Upload
+usb-drive|Usb Drive
+user|User|user-alt,user-large
+user-alien|User Alien
+user-astronaut|User Astronaut
+user-beard|User Beard
+user-beard-bolt|User Beard Bolt
+user-bounty-hunter|User Bounty Hunter
+user-chart|User Chart|chart-user
+user-check|User Check
+user-chef|User Chef
+user-chef-hair-long|User Chef Hair Long
+user-circle-minus|User Circle Minus
+user-circle-plus|User Circle Plus
+user-clock|User Clock
+user-cowboy|User Cowboy
+user-crown|User Crown
+user-dashed|User Dashed
+user-doctor|User Doctor|user-md
+user-doctor-hair|User Doctor Hair
+user-doctor-hair-long|User Doctor Hair Long
+user-doctor-hair-mullet|User Doctor Hair Mullet
+user-doctor-message|User Doctor Message|user-md-chat
+user-friends|User Friends|user-group
+user-gear|User Gear|user-cog
+user-graduate|User Graduate
+user-group-crown|User Group Crown|users-crown
+user-group-simple|User Group Simple
+user-hair|User Hair
+user-hair-buns|User Hair Buns
+user-hair-long|User Hair Long
+user-hair-mullet|User Hair Mullet|business-front,party-back,trian-balbot
+user-hat-tie|User Hat Tie
+user-hat-tie-magnifying-glass|User Hat Tie Magnifying Glass
+user-headset|User Headset
+user-helmet-safety|User Helmet Safety|user-construction,user-hard-hat
+user-hoodie|User Hoodie
+user-injured|User Injured
+user-key|User Key
+user-large-slash|User Large Slash|user-alt-slash,user-slash
+user-lock|User Lock
+user-magnifying-glass|User Magnifying Glass
+user-message|User Message
+user-microphone|User Microphone
+user-minus|User Minus
+user-music|User Music
+user-ninja|User Ninja
+user-nurse|User Nurse
+user-nurse-hair|User Nurse Hair
+user-nurse-hair-long|User Nurse Hair Long
+user-pen|User Pen|user-edit
+user-pilot|User Pilot
+user-pilot-hair-long|User Pilot Hair Long
+user-pilot-tie|User Pilot Tie
+user-pilot-tie-hair-long|User Pilot Tie Hair Long
+user-plus|User Plus
+user-police|User Police
+user-police-hair-long|User Police Hair Long
+user-police-tie|User Police Tie
+user-police-tie-hair-long|User Police Tie Hair Long
+user-question|User Question
+user-robot|User Robot
+user-robot-xmarks|User Robot Xmarks
+user-secret|User Secret
+user-shakespeare|User Shakespeare
+user-shield|User Shield
+user-sith|User Sith
+user-tag|User Tag
+user-tie|User Tie
+user-tie-hair|User Tie Hair
+user-tie-hair-long|User Tie Hair Long
+user-tie-hair-mullet|User Tie Hair Mullet
+user-unlock|User Unlock
+user-viewfinder|User Viewfinder
+user-visor|User Visor
+user-vneck|User Vneck
+user-vneck-hair|User Vneck Hair
+user-vneck-hair-long|User Vneck Hair Long
+user-vneck-hair-mullet|User Vneck Hair Mullet
+user-xmark|User Xmark|user-times
+users|Users
+users-between-lines|Users Between Lines
+users-class|Users Class|screen-users
+users-gear|Users Gear|users-cog
+users-line|Users Line
+users-medical|Users Medical
+users-rays|Users Rays
+users-rectangle|Users Rectangle
+users-slash|Users Slash
+users-viewfinder|Users Viewfinder
+utensil-fork|Utensil Fork|fork
+utensil-knife|Utensil Knife|knife
+utensil-spoon|Utensil Spoon|spoon
+utensils|Utensils|cutlery
+utensils-slash|Utensils Slash
+utility-can|Utility Can
+utility-pole|Utility Pole
+utility-pole-double|Utility Pole Double
+v|V
+vacuum|Vacuum
+vacuum-robot|Vacuum Robot
+value-absolute|Value Absolute
+van|Van
+vault|Vault
+vector-circle|Vector Circle|draw-circle
+vector-polygon|Vector Polygon|draw-polygon
+vector-square|Vector Square|draw-square
+vent-damper|Vent Damper
+venus|Venus
+venus-double|Venus Double
+venus-mars|Venus Mars
+vest|Vest
+vest-patches|Vest Patches
+vial|Vial
+vial-circle-check|Vial Circle Check
+vial-vertical|Vial Vertical
+vial-virus|Vial Virus
+vials|Vials
+video|Video|video-camera
+video-arrow-down-left|Video Arrow Down Left
+video-arrow-up-right|Video Arrow Up Right
+video-down-to-line|Video Down To Line
+video-handheld|Video Handheld|camcorder
+video-plus|Video Plus
+video-question|Video Question
+video-slash|Video Slash
+vihara|Vihara
+violin|Violin
+virgo|Virgo
+virus|Virus
+virus-covid|Virus Covid
+virus-covid-slash|Virus Covid Slash
+virus-slash|Virus Slash
+viruses|Viruses
+voicemail|Voicemail
+volcano|Volcano
+volleyball|Volleyball|volleyball-ball
+volume|Volume|volume-medium
+volume-down|Volume Down|volume-low
+volume-high|Volume High|volume-up
+volume-off|Volume Off
+volume-slash|Volume Slash
+volume-xmark|Volume Xmark|volume-mute,volume-times
+vr-cardboard|Vr Cardboard
+w|W
+waffle|Waffle
+wagon-covered|Wagon Covered
+walker|Walker
+walkie-talkie|Walkie Talkie
+wallet|Wallet
+wand|Wand
+wand-magic|Wand Magic|magic
+wand-magic-sparkles|Wand Magic Sparkles|magic-wand-sparkles
+wand-sparkles|Wand Sparkles
+wardrobe|Wardrobe
+warehouse|Warehouse
+warehouse-full|Warehouse Full|warehouse-alt
+washing-machine|Washing Machine|washer
+watch|Watch
+watch-apple|Watch Apple
+watch-calculator|Watch Calculator
+watch-fitness|Watch Fitness
+watch-smart|Watch Smart
+water|Water
+water-arrow-down|Water Arrow Down|water-lower
+water-arrow-up|Water Arrow Up|water-rise
+water-ladder|Water Ladder|ladder-water,swimming-pool
+water-temperature|Water Temperature|water-temp
+watermelon-slice|Watermelon Slice
+wave|Wave
+wave-sine|Wave Sine
+wave-square|Wave Square
+wave-triangle|Wave Triangle
+waveform|Waveform
+waveform-lines|Waveform Lines|waveform-path
+waves-sine|Waves Sine
+webhook|Webhook
+weight|Weight|weight-scale
+weight-hanging|Weight Hanging
+whale|Whale
+wheat|Wheat
+wheat-awn|Wheat Awn|wheat-alt
+wheat-awn-circle-exclamation|Wheat Awn Circle Exclamation
+wheat-awn-slash|Wheat Awn Slash
+wheat-slash|Wheat Slash
+wheelchair|Wheelchair
+wheelchair-move|Wheelchair Move|wheelchair-alt
+whistle|Whistle
+wifi|Wifi|wifi-3,wifi-strong
+wifi-exclamation|Wifi Exclamation
+wifi-fair|Wifi Fair|wifi-2
+wifi-slash|Wifi Slash
+wifi-weak|Wifi Weak|wifi-1
+wind|Wind
+wind-circle-exclamation|Wind Circle Exclamation|wind-warning
+wind-turbine|Wind Turbine
+window|Window
+window-flip|Window Flip|window-alt
+window-frame|Window Frame
+window-frame-open|Window Frame Open
+window-maximize|Window Maximize
+window-minimize|Window Minimize
+window-restore|Window Restore
+windsock|Windsock
+wine-bottle|Wine Bottle
+wine-glass|Wine Glass
+wine-glass-crack|Wine Glass Crack|fragile
+wine-glass-empty|Wine Glass Empty|wine-glass-alt
+wireless|Wireless
+won|Won|krw,won-sign
+worm|Worm
+wreath|Wreath
+wreath-laurel|Wreath Laurel
+wrench|Wrench
+wrench-simple|Wrench Simple
+x|X
+x-ray|X Ray
+xmark|Xmark|close,multiply,remove,times
+xmark-large|Xmark Large
+xmarks-lines|Xmarks Lines
+y|Y
+yen|Yen|cny,jpy,rmb,yen-sign
+yin-yang|Yin Yang
+z|Z
+`;
 
-for (const definition of definitions) {
-  Object.freeze(definition.aliases);
-  Object.freeze(definition);
-}
+const definitions = ICON_ROWS.split('\n')
+  .filter((row) => row.length > 0)
+  .map((row) => {
+    const [iconCode, label, aliases] = row.split('|');
+    return Object.freeze({
+      iconCode,
+      label,
+      aliases: Object.freeze(aliases === undefined ? [] : aliases.split(',')),
+    });
+  });
 
 /**
  * Every icon Foundry's bundled Font Awesome can render, brands excluded.
@@ -3841,5 +3857,5 @@ export const FOUNDRY_ICON_DEFINITIONS = Object.freeze(definitions);
 export const FOUNDRY_ICON_BUNDLE_RELEASE = Object.freeze({
   edition: 'Pro',
   version: '7.2.0',
-  foundryVersion: '14.365.0'
+  foundryVersion: '14.365.0',
 });

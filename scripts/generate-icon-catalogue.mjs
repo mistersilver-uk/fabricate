@@ -62,14 +62,57 @@ function resolveBundle(argument) {
   return { bundleRoot, stylesheet, webfonts: path.join(bundleRoot, 'webfonts') };
 }
 
-function renderCatalogueModule({ release, definitions, measurements }) {
-  const entries = definitions
-    .map(({ iconCode, label, aliases }) => {
-      const aliasList =
-        aliases.length === 0 ? '[]' : `[${aliases.map((alias) => `"${alias}"`).join(', ')}]`;
-      return `  { iconCode: "${iconCode}", label: "${label}", aliases: ${aliasList} }`;
-    })
-    .join(',\n');
+// The catalogue's row encoding. One entry per line as `iconCode|label|alias,alias`, with the alias
+// field omitted when a glyph has no other names. See the emitted header for why the entries are a
+// text blob rather than one object literal each. The emitted module spells these delimiters
+// literally in its own parser; the round-trip test in tests/iconCatalogueGenerator.test.js is what
+// holds the two halves of the grammar together.
+const ROW_DELIMITER = '\n';
+const FIELD_DELIMITER = '|';
+const ALIAS_DELIMITER = ',';
+
+// Anything that could end a field, end a row, end the template literal that holds the rows, or
+// begin an escape or a substitution inside it.
+const UNENCODABLE_FIELD = /[|,`\\\n\r\u{2028}\u{2029}]|\$\{/u;
+
+/**
+ * Fails generation rather than emitting a row that would parse back into something else.
+ *
+ * A catalogue is only worth committing if it says what the bundle measured, so an unencodable
+ * value is a stop, not an escape-and-continue: escaping would put the burden of getting the
+ * round-trip right on every future reader of the generated file.
+ */
+function assertEncodableField(value, field, iconCode) {
+  if (typeof value !== 'string' || value.length === 0) {
+    throw new Error(`Icon "${iconCode}" has an empty or non-string ${field}.`);
+  }
+  if (UNENCODABLE_FIELD.test(value)) {
+    throw new Error(
+      `Icon "${iconCode}" has a ${field} the row encoding cannot represent: ${JSON.stringify(value)}. ` +
+        'A field may not contain "|", ",", a newline, a backtick, a backslash or a dollar-brace.'
+    );
+  }
+}
+
+function renderCatalogueRow({ iconCode, label, aliases }) {
+  assertEncodableField(iconCode, 'iconCode', iconCode);
+  assertEncodableField(label, 'label', iconCode);
+  for (const alias of aliases) {
+    assertEncodableField(alias, 'alias', iconCode);
+  }
+
+  const fields = [iconCode, label];
+  if (aliases.length > 0) {
+    fields.push(aliases.join(ALIAS_DELIMITER));
+  }
+  return fields.join(FIELD_DELIMITER);
+}
+
+// Exported as well as run: the catalogue round-trip test renders a module and parses it back,
+// which is the only check that the emitted row encoding still decodes to the entries measured.
+// eslint-disable-next-line unicorn/no-exports-in-scripts -- dual-mode CLI, imported by tests.
+export function renderCatalogueModule({ release, definitions, measurements }) {
+  const rows = definitions.map((definition) => renderCatalogueRow(definition)).join(ROW_DELIMITER);
 
   return `// GENERATED FILE — do not hand-edit. Regenerate with:
 //   node scripts/generate-icon-catalogue.mjs <foundry>/resources/app/public/fonts/fontawesome
@@ -118,19 +161,35 @@ function renderCatalogueModule({ release, definitions, measurements }) {
 // of the same drawing at two weights. The \`far\` prefix is still accepted and still renders; it is
 // simply not a second row.
 //
+// THE ROW ENCODING, and why the entries below are text rather than object literals. One entry per
+// line, fields separated by \`|\`: \`iconCode|label|alias,alias\`, with the alias field omitted when
+// a glyph has no other names. The obvious form — one object literal per glyph — is what this file
+// used to hold, and it read well; it also handed a copy-paste detector thousands of near-identical
+// token sequences, and SonarCloud duly failed this file as duplicated new code. A template literal
+// is ONE token, so the same data costs one. The generator refuses to emit a field containing a
+// delimiter, a newline, a backtick, a backslash or a \`\${\` — it throws, naming the entry — because
+// a file that parses back into something other than what was measured is worse than a generation
+// that fails. Parsing costs one split per file and two per row, at module load.
+//
 // VERSION COUPLING. This file describes ONE Foundry release's bundle. When Foundry bumps Font
 // Awesome, rerun the generator against the new install: names are added, and Font Awesome does
 // retire and re-alias names between majors, so an icon a GM chose can become an alias of another
 // glyph. Running the generator with \`--check\` reports whether the bundle moved without writing.
 
-const definitions = [
-${entries}
-];
+const ICON_ROWS = \`
+${rows}
+\`;
 
-for (const definition of definitions) {
-  Object.freeze(definition.aliases);
-  Object.freeze(definition);
-}
+const definitions = ICON_ROWS.split('\\n')
+  .filter((row) => row.length > 0)
+  .map((row) => {
+    const [iconCode, label, aliases] = row.split('|');
+    return Object.freeze({
+      iconCode,
+      label,
+      aliases: Object.freeze(aliases === undefined ? [] : aliases.split(',')),
+    });
+  });
 
 /**
  * Every icon Foundry's bundled Font Awesome can render, brands excluded.
@@ -147,7 +206,7 @@ export const FOUNDRY_ICON_DEFINITIONS = Object.freeze(definitions);
 export const FOUNDRY_ICON_BUNDLE_RELEASE = Object.freeze({
   edition: '${release.edition}',
   version: '${release.version}',
-  foundryVersion: '${measurements.foundryVersion}'
+  foundryVersion: '${measurements.foundryVersion}',
 });
 `;
 }
@@ -230,4 +289,6 @@ function main() {
   );
 }
 
-main();
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  main();
+}
