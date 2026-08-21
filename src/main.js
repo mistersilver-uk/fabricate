@@ -20,6 +20,7 @@ import { SalvageRunManager } from './systems/SalvageRunManager.js';
 import { runContainersChanged } from './systems/runFlagInvalidation.js';
 import { GatheringEnvironmentStore } from './systems/GatheringEnvironmentStore.js';
 import { GatheringRealmStore } from './systems/GatheringRealmStore.js';
+import { CurrencyConfigStore } from './systems/CurrencyConfigStore.js';
 import { GatheringPartyStore } from './systems/GatheringPartyStore.js';
 import { GatheringLocationService } from './systems/GatheringLocationService.js';
 import { revealGatheringRealm, hideGatheringRealm, getDiscoveredRealmIdsForSystem } from './systems/gatheringRealmDiscovery.js';
@@ -614,9 +615,20 @@ class Fabricate {
     // to be resolved late. `getCraftingSystemManager` (issue 1072) is what the twelve
     // paths inside RecipeManager that used to read `game.fabricate` directly now go
     // through, which is why they no longer depend on the `ready`-hook global at all.
+    // The world currency configuration (issue 1278). Constructed FIRST because both the
+    // recipe manager and the crafting engine take it as a collaborator: currency is world
+    // scope, so the ladder is resolved once here rather than per crafting system. It reads
+    // only settings, so it has no dependency of its own to wait for.
+    this.currencyConfigStore = new CurrencyConfigStore({
+      getSetting,
+      setSetting,
+      randomID: () => foundry.utils.randomID()
+    });
+    this.currencyConfigStore.load();
     this.recipeManager = new RecipeManager({
       getCraftingSystem: (systemId) => this.craftingSystemManager?.getSystem?.(systemId) ?? null,
       getCraftingSystemManager: () => this.craftingSystemManager ?? null,
+      currencyConfigStore: this.currencyConfigStore,
     });
     // Issue 800: the manager RESOLVES source descriptions through Foundry's own
     // enricher at its async ingestion boundaries, so a content link is stored as the
@@ -688,7 +700,8 @@ class Fabricate {
       {
         getPlayerResultOrder: entry => this._readPlayerResultOrder(entry),
         getCraftingSystem: systemId => this.craftingSystemManager.getSystem(systemId),
-        resolveItemUuid: uuid => fromUuid(uuid)
+        resolveItemUuid: uuid => fromUuid(uuid),
+        currencyConfigStore: this.currencyConfigStore
       }
     );
 
@@ -1205,6 +1218,24 @@ class Fabricate {
   getGatheringPartyStore() {
     this._requireReady();
     return this.gatheringPartyStore;
+  }
+
+  /**
+   * Get the world currency configuration store (issue 1278).
+   *
+   * World scope, not per crafting system: a world runs one Foundry game system and so has
+   * one way actors store coins. A crafting system decides only whether it participates.
+   *
+   * DELIBERATELY NOT `_requireReady()`-gated, matching the coin-spender accessors below and
+   * for the same reason: this is the global fallback `getCurrencyRequirementConfig` reads when
+   * no seam was injected. That resolver guards the call with optional chaining, which catches an
+   * absent accessor but NOT a thrown error, so a readiness throw here would surface as a crash on
+   * the craftability path rather than the empty ladder the resolver is written to tolerate.
+   *
+   * @returns {CurrencyConfigStore|null}
+   */
+  getCurrencyConfigStore() {
+    return this.currencyConfigStore ?? null;
   }
 
   /**
@@ -3345,6 +3376,7 @@ function bindFabricateGlobal() {
     // DEPRECATED alias for backwards compatibility — same class.
     GatheringRegionStore: GatheringRealmStore,
     GatheringPartyStore,
+    CurrencyConfigStore,
     GatheringLocationService,
     GatheringRunManager,
     GatheringGateAndCheckEvaluator,
@@ -3384,12 +3416,18 @@ function bindFabricateGlobal() {
     // export lossy versus the import path (issue #642).
     const gatheringEnvironments = fabricate.gatheringEnvironmentStore?.list?.() ?? [];
     const gatheringConfig = getSetting(SETTING_KEYS.GATHERING_CONFIG) || {};
+    // The world currency ladder rides along too (issue 1278). It is WORLD scope, so unlike the
+    // gathering slice there is nothing on the system to fall back on: omit it and the export
+    // carries an empty ladder, and every currency cost in it lands in the destination world as
+    // an unresolvable unit id.
+    const currencyConfig = fabricate.currencyConfigStore?.get?.() ?? {};
     return CraftingSystemExporter.buildExportPayload(
       system,
       recipes,
       version,
       gatheringEnvironments,
-      gatheringConfig
+      gatheringConfig,
+      currencyConfig
     );
   };
 
@@ -3674,6 +3712,7 @@ Hooks.once('ready', async () => {
     craftingSystemManager: fabricate.craftingSystemManager,
     recipeManager: fabricate.recipeManager,
     gatheringEnvironmentStore: fabricate.gatheringEnvironmentStore,
+    currencyConfigStore: fabricate.currencyConfigStore,
     callAll: (hook, payload) => Hooks.callAll(hook, payload)
   });
   const handleFabricateSettingDocumentChange = (setting) => {

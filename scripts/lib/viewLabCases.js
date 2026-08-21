@@ -63,7 +63,7 @@ const LAB_MOUNT_PATH = 'tests/view-lab/mount.js';
  *
  * It used to carry a sentinel instead, `EVERY_PUBLISHABLE_CASE`, which each level returned the
  * moment any child produced it. That was correct only because the value it stood for CONTAINED
- * every selection it discarded on the way out. It stands for {@link LAB_SURFACE_CASES} now — 34
+ * every selection it discarded on the way out. It stands for {@link LAB_SURFACE_CASES} now — 35
  * frames a reviewer reads instead of 246 they scroll past — which contains no detailed state at
  * all, so discarding became dropping: a change that edited one case literal and also touched
  * shared code published coverage and no frame of the case it edited.
@@ -688,7 +688,6 @@ export const VIEW_LAB_CASES = Object.freeze([
     steps: [
       'System Overview',
       { selector: '#system-tab-settings' },
-      { selector: '[data-section-collapse="currency"]' },
       { selector: '[data-system-modifier] [data-toggle-modifier]' },
       { selector: '[data-system-modifier] .essence-icon-picker-trigger' },
       // Anchored on the card's TITLE, not the card. `scrollIntoViewIfNeeded` lands an
@@ -739,7 +738,6 @@ export const VIEW_LAB_CASES = Object.freeze([
     steps: [
       'System Overview',
       { selector: '#system-tab-settings' },
-      { selector: '[data-section-collapse="currency"]' },
       { selector: '[data-system-modifier="hb-mod-luck"] [data-toggle-modifier]' },
       { selector: '[data-system-modifier="hb-mod-luck"]', scroll: true },
     ],
@@ -755,63 +753,57 @@ export const VIEW_LAB_CASES = Object.freeze([
   }),
   managerCase({
     id: 'currency-actor-property',
-    label: 'Manager — Currency actor property',
+    label: 'Manager — World Currency actor property',
     smokeLabels: ['currency-actor-property'],
     reaches: 'exact',
-    // The Currency Units card renders only for a system with `requirements.currency.enabled`, and
-    // the lab authors that on Runework alone — see the fixture note there for why not the default
-    // system. `scroll` is load-bearing and not a convenience: the card sits below the settings
-    // panel's own fold, and `frame.screenshot()` on the outer `.application` does not scroll
-    // nested overflow containers, so without it every assertion passes and the card is simply
+    // World > Currency (issue 1278). The ladder is WORLD scope, so this route needs no selected
+    // system and is ungated — the card renders whether or not any crafting system has switched
+    // currency on. `scroll` is load-bearing and not a convenience: the ladder runs below the
+    // page's own fold, and `frame.screenshot()` on the outer `.application` does not scroll
+    // nested overflow containers, so without it every assertion passes and the units are simply
     // absent from the PNG.
-    query: { system: 'lab-runework' },
     steps: [
-      'System Overview',
-      { selector: '#system-tab-settings' },
-      { selector: '[data-system-currency-units]', scroll: true },
+      { selector: '#manager-world-nav-currency', press: 'Enter' },
+      { selector: '[data-world-currency-units]', scroll: true },
     ],
-    expectView: 'system-edit',
+    expectView: 'world-currency',
     position: { width: 1280, height: 900 },
-    kinds: ['manager', 'system-edit'],
-    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/SystemEditView\.svelte$/],
+    kinds: ['manager', 'world'],
+    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/world\/WorldCurrencyTab\.svelte$/],
   }),
   managerCase({
     id: 'currency-macro',
-    label: 'Manager — Currency macro',
+    label: 'Manager — World Currency macro',
     smokeLabels: ['currency-macro'],
     reaches: 'exact',
-    query: { system: 'lab-runework' },
     // The macro branch is a `<select>` value, so `select` is the only verb that reaches it.
     steps: [
-      'System Overview',
-      { selector: '#system-tab-settings' },
-      { selector: '[data-system-currency-strategy-select]', select: 'macro' },
-      { selector: '[data-system-currency-units]', scroll: true },
+      { selector: '#manager-world-nav-currency', press: 'Enter' },
+      { selector: '[data-world-currency-strategy-select]', select: 'macro' },
+      { selector: '[data-world-currency-units]', scroll: true },
     ],
-    expectView: 'system-edit',
+    expectView: 'world-currency',
     position: { width: 1280, height: 900 },
-    kinds: ['manager', 'system-edit'],
-    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/SystemEditView\.svelte$/],
+    kinds: ['manager', 'world'],
+    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/world\/WorldCurrencyTab\.svelte$/],
   }),
   managerCase({
     id: 'currency-actor-inventory',
-    label: 'Manager — Currency actor inventory',
+    label: 'Manager — World Currency actor inventory',
     smokeLabels: ['currency-actor-inventory'],
     reaches: 'exact',
-    query: { system: 'lab-runework' },
     // dnd5e registers no inventory currency provider, so this strategy resolves to the
     // no-provider callout steering the GM to macro mode — which is the state the smoke's
     // counterpart photographs too, for the same reason.
     steps: [
-      'System Overview',
-      { selector: '#system-tab-settings' },
-      { selector: '[data-system-currency-strategy-select]', select: 'actorInventory' },
-      { selector: '[data-system-currency-units]', scroll: true },
+      { selector: '#manager-world-nav-currency', press: 'Enter' },
+      { selector: '[data-world-currency-strategy-select]', select: 'actorInventory' },
+      { selector: '[data-world-currency-units]', scroll: true },
     ],
-    expectView: 'system-edit',
+    expectView: 'world-currency',
     position: { width: 1280, height: 900 },
-    kinds: ['manager', 'system-edit'],
-    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/SystemEditView\.svelte$/],
+    kinds: ['manager', 'world'],
+    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/world\/WorldCurrencyTab\.svelte$/],
   }),
   managerCase({
     id: 'manager-recipes-normal',

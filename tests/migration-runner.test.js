@@ -286,7 +286,7 @@ test('migrationVersion setting is updated to the highest migration version after
 
   const versionCall = settings.calls.set.find(c => c.key === 'migrationVersion');
   assert.ok(versionCall, 'migrationVersion should be persisted');
-  assert.equal(versionCall.value, '1.25.0');
+  assert.equal(versionCall.value, '1.26.0');
 });
 
 // ---------------------------------------------------------------------------
@@ -354,7 +354,7 @@ test('0.2.0 clears stale top-level gatheringConfig.vocabularies.regions', async 
   assert.deepEqual(saved.systems, { 'sys-a': { tools: [{ id: 't1' }] } }, 'systems preserved');
 
   const versionCall = settings.calls.set.find(c => c.key === 'migrationVersion');
-  assert.equal(versionCall.value, '1.25.0');
+  assert.equal(versionCall.value, '1.26.0');
 });
 
 test('0.2.0 is a no-op when gatheringConfig.vocabularies.regions is already empty', async () => {
@@ -466,7 +466,7 @@ test('0.3.0 strips env economyMode + task attemptLimit and preserves legacy mode
   assert.equal(config.systems['sys-1'].economy.stamina.enabled, false);
   assert.equal(config.systems['sys-1'].economy.nodes.enabled, true);
 
-  assert.equal(settings.store.get('migrationVersion'), '1.25.0');
+  assert.equal(settings.store.get('migrationVersion'), '1.26.0');
 });
 
 test('0.4.0 collapses legacy node respawn policies in library tasks and environments', async () => {
@@ -495,7 +495,7 @@ test('0.4.0 collapses legacy node respawn policies in library tasks and environm
   assert.deepEqual(envs[0].tasks[0].nodes.respawn, { policy: 'overTime', gainMode: 'chance', chance: 0.4, intervalUnit: 'hours', intervalAmount: 2 });
   assert.deepEqual(envs[0].nodeRuntime['t1'].respawn, { policy: 'overTime', gainMode: 'chance', chance: 0.2, intervalUnit: 'minutes', intervalAmount: 1 });
 
-  assert.equal(settings.store.get('migrationVersion'), '1.25.0');
+  assert.equal(settings.store.get('migrationVersion'), '1.26.0');
 });
 
 test('0.3.0 maps legacy hybrid/time and is idempotent', async () => {
@@ -567,7 +567,7 @@ test('0.8.0 rewrites legacy economy.mode into independent stamina/nodes flags', 
   assert.equal(systems['sys-none'].economy.stamina.enabled, false);
   assert.equal(systems['sys-none'].economy.nodes.enabled, false);
 
-  assert.equal(settings.store.get('migrationVersion'), '1.25.0');
+  assert.equal(settings.store.get('migrationVersion'), '1.26.0');
 });
 
 test('0.8.0 is idempotent and leaves already-migrated economies untouched', async () => {
@@ -611,7 +611,7 @@ test('0.3.0 -> 0.8.0 compose: env-level economyMode becomes the two flags', asyn
   assert.equal('mode' in economy, false, '0.8.0 drops the mode 0.3.0 seeded');
   assert.equal(economy.stamina.enabled, true);
   assert.equal(economy.nodes.enabled, false);
-  assert.equal(settings.store.get('migrationVersion'), '1.25.0');
+  assert.equal(settings.store.get('migrationVersion'), '1.26.0');
 });
 
 // ---------------------------------------------------------------------------
@@ -638,7 +638,7 @@ test('1.2.0 rewrites a legacy elapsedTime stamina-regen policy to overTime', asy
   assert.equal(stamina.regen.unit, 'days');
   assert.equal(stamina.regen.amount, 5);
   assert.equal(stamina.max, '20');
-  assert.equal(settings.store.get('migrationVersion'), '1.25.0');
+  assert.equal(settings.store.get('migrationVersion'), '1.26.0');
 });
 
 test('1.2.0 is idempotent and leaves already-overTime economies untouched (no re-persist)', async () => {
@@ -1100,4 +1100,118 @@ test('every migration whose downgrade LOSES DATA names that in its own label', (
       `${migration.version}: a lossy downgrade still has to name the version it downgrades TO`
     );
   }
+});
+
+// ---------------------------------------------------------------------------
+// Group 8: the world currency leg (issue 1278)
+//
+// The runner's settings payload went from FIVE keys to six. Every one of the five points that
+// key must appear at — read, snapshot, payload literal, change detection, writeback — is silent
+// when omitted: the migration still runs, every other setting still writes, and the whole suite
+// stays green while every upgraded world loses its currency configuration. These pin the leg
+// end to end through the real runner rather than through the pure transform.
+// ---------------------------------------------------------------------------
+
+test('1.26.0 lifts per-system currency into the currencyConfig setting', async () => {
+  const { runner, settings } = makeRunner({
+    initial: {
+      migrationVersion: '1.25.0',
+      craftingSystems: [
+        {
+          id: 'alchemy',
+          requirements: {
+            currency: {
+              enabled: true,
+              spendStrategy: 'macro',
+              units: [{ id: 'gp', label: 'Gold' }]
+            }
+          }
+        },
+        {
+          id: 'smithing',
+          requirements: { currency: { enabled: false, units: [{ id: 'sp', label: 'Silver' }] } }
+        }
+      ]
+    }
+  });
+
+  await runner.run();
+
+  const written = settings.store.get('currencyConfig');
+  assert.deepEqual(
+    written.units.map(unit => unit.id),
+    ['gp', 'sp'],
+    "a disabled system's units are lifted too: its recipes may still reference them"
+  );
+  assert.equal(written.spendStrategy, 'macro', 'scalars come from the first ENABLED system');
+
+  const systems = settings.store.get('craftingSystems');
+  assert.deepEqual(systems[0].requirements.currency, { enabled: true });
+  assert.deepEqual(systems[1].requirements.currency, { enabled: false });
+});
+
+test('the currencyConfig write PRECEDES the craftingSystems write, so a tear is recoverable', async () => {
+  // Systems are the SOURCE of the lift and currencyConfig is the DESTINATION. Writing the source
+  // first and then tearing would leave systems shrunk with an empty world ladder, and the re-run
+  // would find nothing to lift — the configuration would be gone with no error and no copy.
+  const { runner, settings } = makeRunner({
+    initial: {
+      migrationVersion: '1.25.0',
+      craftingSystems: [
+        { id: 'alchemy', requirements: { currency: { enabled: true, units: [{ id: 'gp' }] } } }
+      ]
+    }
+  });
+
+  await runner.run();
+
+  const order = settings.calls.set.map(call => call.key);
+  assert.ok(
+    order.indexOf('currencyConfig') < order.indexOf('craftingSystems'),
+    `currencyConfig must be written before craftingSystems, got ${order.join(' -> ')}`
+  );
+});
+
+test('a world that never used currency acquires no currencyConfig write at all', async () => {
+  // The no-churn guard. Emitting a freshly-built `{ units: [] }` over a stored `{}` would
+  // register as a change and write the setting in every world on earth during an upgrade that
+  // otherwise did nothing — an unexplained write with no cause a maintainer could trace.
+  const { runner, settings } = makeRunner({
+    initial: {
+      migrationVersion: '1.25.0',
+      craftingSystems: [{ id: 'alchemy', requirements: { time: { enabled: false } } }]
+    }
+  });
+
+  await runner.run();
+
+  assert.equal(
+    settings.calls.set.some(call => call.key === 'currencyConfig'),
+    false,
+    'no currency write for a world with nothing to lift'
+  );
+});
+
+test('a populated world ladder is authoritative: a re-run never re-merges stale system blocks', async () => {
+  const { runner, settings } = makeRunner({
+    initial: {
+      migrationVersion: '1.25.0',
+      // The GM has since deleted `sp`; the stale system block still names it.
+      currencyConfig: { units: [{ id: 'gp', label: 'Gold' }] },
+      craftingSystems: [
+        {
+          id: 'alchemy',
+          requirements: { currency: { enabled: true, units: [{ id: 'gp' }, { id: 'sp' }] } }
+        }
+      ]
+    }
+  });
+
+  await runner.run();
+
+  assert.deepEqual(
+    settings.store.get('currencyConfig').units.map(unit => unit.id),
+    ['gp'],
+    'the deleted unit must not come back'
+  );
 });

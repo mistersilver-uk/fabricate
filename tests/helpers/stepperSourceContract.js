@@ -289,7 +289,9 @@ export const BARE_NUMBER_FIELD_REGISTER = Object.freeze([
     spinnerSuppressed: true,
   }),
   Object.freeze({
-    path: 'src/ui/svelte/apps/manager/SystemEditView.svelte',
+    // Issue 1278 moved the currency ladder out of the crafting system editor and into the
+    // world-scoped World > Currency tab; the chip and its bare field went with it.
+    path: 'src/ui/svelte/apps/manager/world/WorldCurrencyTab.svelte',
     register: 'R2',
     reason:
       'a bare field inside a bordered currency chip, which is not a form row; it has no other '

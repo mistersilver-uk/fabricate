@@ -87,13 +87,14 @@ test('ActorPropertyCoinSpender.refund applies the refund via a single actor.upda
 });
 
 test('refundCurrencySpends restores every spend against the system currency profile', async () => {
-  const system = {
-    id: 'sys-cur',
-    requirements: { currency: { enabled: true, spendStrategy: 'actorProperty', units: UNITS } },
-  };
+  // Issue 1278: the system carries only participation; the ladder is WORLD scope.
+  const system = { id: 'sys-cur', requirements: { currency: { enabled: true } } };
   globalThis.game = {
     fabricate: {
       getCraftingSystemManager: () => ({ getSystem: (id) => (id === system.id ? system : null) }),
+      getCurrencyConfigStore: () => ({
+        get: () => ({ spendStrategy: 'actorProperty', providerId: '', macros: {}, units: UNITS }),
+      }),
     },
   };
   const actor = makeActor(0, 0);
@@ -174,19 +175,18 @@ const TWO_TERMINAL_SPENDS = [
 // downstream money assertion meaningful: a typo'd unit id or a shared terminal collapses
 // the fixture to ONE group silently.
 function setupTwoTerminalRefund() {
-  const system = {
-    id: 'sys-two-terminal',
-    requirements: {
-      currency: {
-        enabled: true,
-        spendStrategy: 'actorProperty',
-        units: TWO_TERMINAL_CURRENCY_UNITS,
-      },
-    },
-  };
+  const system = { id: 'sys-two-terminal', requirements: { currency: { enabled: true } } };
   globalThis.game = {
     fabricate: {
       getCraftingSystemManager: () => ({ getSystem: (id) => (id === system.id ? system : null) }),
+      getCurrencyConfigStore: () => ({
+        get: () => ({
+          spendStrategy: 'actorProperty',
+          providerId: '',
+          macros: {},
+          units: TWO_TERMINAL_CURRENCY_UNITS,
+        }),
+      }),
     },
   };
   const profile = validateProfile(TWO_TERMINAL_CURRENCY_UNITS, {

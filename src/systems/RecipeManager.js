@@ -172,7 +172,12 @@ export class RecipeManager {
     getCraftingSystem = null,
     getCraftingSystemManager = null,
     repository = null,
+    // The world currency configuration (issue 1278). Optional for the same reason the
+    // manager seam is: when absent the shared affordance resolver falls back to the
+    // `game.fabricate` global, so no existing construction site changes.
+    currencyConfigStore = null,
   } = {}) {
+    this.currencyConfigStore = currencyConfigStore;
     this.recipes = new Map();
     this.initialized = false;
     // The revision-token registry this manager mints from (issue 1076). Per manager, never
@@ -239,7 +244,10 @@ export class RecipeManager {
    * @private
    */
   _currencySeams() {
-    return { getCraftingSystemManager: () => this._systemManager() };
+    return {
+      getCraftingSystemManager: () => this._systemManager(),
+      getCurrencyConfig: () => this.currencyConfigStore?.get(),
+    };
   }
 
   /**

@@ -2,11 +2,15 @@
  * Orchestrates importing crafting systems and recipes from pack JSON data.
  * Handles UUID remapping with deterministic precedence and fallback item ID management.
  */
+import { normalizeWorldCurrencyConfig } from './currencyProfile.js';
 import { validateGatheringDropReferences } from './GatheringDropReferenceValidator.js';
 import { resolveImportReferences, REFERENCE_KINDS } from './importReferenceResolver.js';
 
 /** World-setting key for the per-system gathering config (mirrors SETTING_KEYS.GATHERING_CONFIG). */
 const GATHERING_CONFIG_KEY = 'gatheringConfig';
+
+/** World-setting key for the currency config (mirrors SETTING_KEYS.CURRENCY_CONFIG). */
+const CURRENCY_CONFIG_KEY = 'currencyConfig';
 
 /** How often (in recipes processed) Phase 4 emits an interim progress tick. */
 const RECIPE_PROGRESS_INTERVAL = 10;
@@ -606,6 +610,64 @@ export class CompendiumImporter {
 
     await this._persistEnvironments(system.id, resolvedEnvironments);
     await this._persistGatheringConfig(system.id, resolvedConfig);
+    await this._persistCurrencyConfig(packData.currencyConfig);
+  }
+
+  /**
+   * Merge the imported world currency config into this world's own (issue 1278).
+   *
+   * NON-DESTRUCTIVE, and the direction matters: currency is WORLD scope, so unlike the
+   * per-system gathering slice there is no key under which an import may simply replace what is
+   * there. Overwriting would destroy a ladder the destination GM authored for systems that have
+   * nothing to do with this import.
+   *
+   * So units merge by `id` with the DESTINATION winning a collision — an id already in this world
+   * keeps its own definition, and only genuinely new denominations are appended. That is what
+   * makes an import safe to run twice, and it is also what keeps existing recipe currency costs
+   * resolving to the units their author meant.
+   *
+   * The scalars (spend strategy, provider, macros) are seeded ONLY into an unconfigured world.
+   * A world that already has a ladder has already answered "how do actors here store coins", and
+   * an imported system does not get to overrule it.
+   * @private
+   */
+  async _persistCurrencyConfig(incoming) {
+    if (!this._getSetting || !this._setSetting) return;
+    if (!incoming || typeof incoming !== 'object') return;
+
+    const current = this._getSetting(CURRENCY_CONFIG_KEY) || {};
+    const currentUnits = Array.isArray(current.units) ? current.units : [];
+    const incomingUnits = Array.isArray(incoming.units) ? incoming.units : [];
+    if (incomingUnits.length === 0) return;
+
+    const seen = new Set(currentUnits.map((unit) => String(unit?.id || '').trim()).filter(Boolean));
+    const added = [];
+    for (const unit of incomingUnits) {
+      const id = String(unit?.id || '').trim();
+      if (!id || seen.has(id)) continue;
+      seen.add(id);
+      added.push(structuredClone(unit));
+    }
+
+    const worldWasUnconfigured = currentUnits.length === 0;
+    if (added.length === 0 && !worldWasUnconfigured) return;
+
+    const next = {
+      ...current,
+      units: [...currentUnits, ...added],
+    };
+    if (worldWasUnconfigured) {
+      if (incoming.spendStrategy) next.spendStrategy = incoming.spendStrategy;
+      if (incoming.providerId) next.providerId = incoming.providerId;
+      if (incoming.macros && typeof incoming.macros === 'object') next.macros = incoming.macros;
+    }
+
+    // Normalize before writing. Every other writer of this setting goes through
+    // `CurrencyConfigStore`, which normalizes on write; this one does not have the store, so
+    // without this a hand-edited export could persist a shape the readers only repair on read —
+    // and a unit that arrived without an id would be minted a FRESH id on every `load()`,
+    // changing its identity from one reload to the next.
+    await this._setSetting(CURRENCY_CONFIG_KEY, normalizeWorldCurrencyConfig(next));
   }
 
   /**

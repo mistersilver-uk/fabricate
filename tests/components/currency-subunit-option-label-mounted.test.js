@@ -22,47 +22,19 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/actions/portal.js',
     'src/ui/svelte/util/essenceIcons.js',
     'src/ui/svelte/util/foundryIconVocabulary.js',
-  'src/ui/svelte/util/foundryIconCatalogue.js',
-    'src/ui/svelte/util/iconPickerPopover.js',
-    'src/systems/characterPrerequisites.js',
-    // The expression suggestion chips' derivation (issue 1096) and the per-Foundry-system
-    // preset bundle it reads. Both are pure leaves; SystemEditView imports the first,
-    // which imports the second.
-    'src/config/modifierExpressionSuggestions.js',
-    'src/config/gatheringCharacterModifierPresets.js',
-    // SystemEditView imports the pure copy-mapping helpers (issue 768); omitting it
-    // HANGS this mount (reported as `# cancelled`).
-    'src/systems/characterModifierPrerequisiteCopy.js',
-    // The unified modifier library's bounds pair and roll classification (issue 1117).
-    'src/systems/checkModifierResolver.js',
-    'src/systems/salvageCheckUsability.js',
-    'src/systems/toolCheckBonus.js',
-    'src/utils/checkModifierPicks.js',
-    'src/utils/craftingCheckExpression.js',
-    'src/utils/rollExpressionAverage.js',
-    'src/ui/svelte/components/stepperLabels.js'
+    'src/ui/svelte/util/foundryIconCatalogue.js',
+    'src/ui/svelte/util/iconPickerPopover.js'
   ],
   compiledModules: [
     // The manager's ONE chip (issue 883). A `.svelte` the tree renders but the
     // harness omits HANGS the suite (# cancelled) rather than failing it.
     'src/ui/svelte/apps/manager/Chip.svelte',
-    // The shared no-state primitive (issue 785). A `.svelte` the tree renders but
-    // the harness omits HANGS the suite (# cancelled) rather than failing it.
+    // The shared no-state primitive (issue 785). Same rule, same consequence.
     'src/ui/svelte/apps/manager/EmptyState.svelte',
     'src/ui/svelte/components/IconPicker.svelte',
-    // THE manager's labelled push-button (issue 1096). The Modifiers card and the Tool
-    // Studio header both render through it; an omission HANGS this suite rather than
-    // failing it.
-    'src/ui/svelte/components/ManagerButton.svelte',
-    // The Modifiers section's min/max pair and `@`-sigil expression field (issue 1117).
-    'src/ui/svelte/components/Stepper.svelte',
-    'src/ui/svelte/apps/manager/RollDataExpressionInput.svelte',
-    'src/ui/svelte/apps/manager/system/SystemEditorTabs.svelte',
-    'src/ui/svelte/apps/manager/system/CharacterPrerequisitesCard.svelte',
-    'src/ui/svelte/apps/manager/SystemOverviewView.svelte',
-    'src/ui/svelte/apps/manager/SystemEditView.svelte'
+    'src/ui/svelte/apps/manager/world/WorldCurrencyTab.svelte'
   ],
-  componentPath: 'src/ui/svelte/apps/manager/SystemEditView.svelte'
+  componentPath: 'src/ui/svelte/apps/manager/world/WorldCurrencyTab.svelte'
 });
 
 // Let Svelte's scheduler flush DOM updates triggered by an event handler.
@@ -73,16 +45,6 @@ function flushRender() {
 const GOLD_ID = 'gold-unit-id';
 const COPPER_ID = 'K9grZcOMgO9Xbm41';
 
-function makeSystem() {
-  return {
-    id: 'system-under-test',
-    name: 'Mythwright',
-    description: '',
-    features: {},
-    requirements: { currency: { enabled: true } }
-  };
-}
-
 // Two contains-less units: gold carries an authored abbreviation, copper's is
 // unauthored (empty). Each is an eligible sub-unit of the other (disjoint
 // reachable sets), so expanding one reveals the other in the sub-unit builder.
@@ -92,7 +54,7 @@ const CURRENCY_UNITS = Object.freeze([
 ]);
 
 function expandUnit(root, unitId) {
-  const row = root.querySelector(`[data-system-currency-unit="${unitId}"]`);
+  const row = root.querySelector(`[data-world-currency-unit="${unitId}"]`);
   assert.ok(row, `currency row for ${unitId} exists`);
   // Target the Edit control by its accessible name: the summary row also carries
   // the Move up/down reorder chevrons (issue 768), so "first icon button" is no
@@ -106,7 +68,7 @@ function expandUnit(root, unitId) {
 
 function subUnitOptionTexts(root, unitId) {
   const select = root.querySelector(
-    `[data-system-currency-unit="${unitId}"] .manager-currency-subunit-builder select`
+    `[data-world-currency-unit="${unitId}"] .manager-currency-subunit-builder select`
   );
   assert.ok(select, `sub-unit builder select for ${unitId} exists`);
   return [...select.querySelectorAll('option')].map((option) => ({
@@ -121,7 +83,7 @@ afterEach(() => harness.remount());
 
 describe('currency sub-unit option label (mounted)', () => {
   it('renders an unauthored-abbreviation unit as its label only — no parenthetical, no id (issue 788)', async () => {
-    const root = await harness.mount({ selectedSystem: makeSystem(), currencyUnits: CURRENCY_UNITS });
+    const root = await harness.mount({ currencyUnits: CURRENCY_UNITS });
 
     // Expand gold; its sub-unit builder offers copper, whose abbreviation is empty.
     expandUnit(root, GOLD_ID);
@@ -137,7 +99,7 @@ describe('currency sub-unit option label (mounted)', () => {
   });
 
   it('still renders an authored abbreviation as "Label (abbr)"', async () => {
-    const root = await harness.mount({ selectedSystem: makeSystem(), currencyUnits: CURRENCY_UNITS });
+    const root = await harness.mount({ currencyUnits: CURRENCY_UNITS });
 
     // Expand copper; its sub-unit builder offers gold, whose abbreviation is authored.
     expandUnit(root, COPPER_ID);

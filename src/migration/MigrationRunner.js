@@ -13,6 +13,7 @@ import { migrateAlchemyCheckMode } from './migrateAlchemyCheckMode.js';
 import { migrateBreakToolsOnFail } from './migrateBreakToolsOnFail.js';
 import { migrateCatalystsToTools } from './migrateCatalystsToTools.js';
 import { migrateRecipes, migrateCraftingSystems } from './migrateComponentId.js';
+import { migrateCurrencyToWorldScope } from './migrateCurrencyToWorldScope.js';
 import { migrateDefaultOnTimeRequirements } from './migrateDefaultOnTimeRequirements.js';
 import { migrateEssencesToIngredientGroups } from './migrateEssencesToIngredientGroups.js';
 import { migrateGatheringChecksToSystem } from './migrateGatheringChecksToSystem.js';
@@ -507,6 +508,25 @@ const MIGRATIONS = [
     // its entire observable effect is that nothing observable changes.
     migrate: (data) => migrateSeedFailureResultPolicy(data),
   },
+  {
+    version: '1.26.0',
+    label:
+      'Move the currency configuration from each crafting system to WORLD scope. The coin ' +
+      'ladder, spend strategy, provider and macro set now live once per world, because a ' +
+      'world runs exactly one game system and so has exactly one way actors store coins; a ' +
+      'crafting system keeps only whether it participates. Units from every system are ' +
+      'UNIONED by unit id (the first system wins an id collision) because recipe and salvage ' +
+      'currency requirements reference units by id, so dropping any unit would orphan them. ' +
+      'The strategy, provider and macros cannot be unioned, so they are taken from the first ' +
+      'system that had currency ENABLED. If two of your systems configured DIFFERENT ' +
+      'strategies or providers, only one survives — check World > Currency afterwards. ' +
+      'DOWNGRADING IS NOT LOSSLESS: 1.25.0 reads currency only from the crafting system, so it ' +
+      'would find no configuration at all and every authored currency cost would stop ' +
+      'resolving until you re-authored it per system',
+    downgradeTo: '1.25.0',
+    downgradeLosesData: true,
+    migrate: (data) => migrateCurrencyToWorldScope(data),
+  },
   // Future migrations added here in version order
 ];
 
@@ -684,12 +704,14 @@ export class MigrationRunner {
     const rawGatheringConfig = this._getSetting(SETTING_KEYS.GATHERING_CONFIG) ?? {};
     const rawEnvironments = this._getSetting(SETTING_KEYS.GATHERING_ENVIRONMENTS) ?? [];
     const rawGatheringParties = this._getSetting(SETTING_KEYS.GATHERING_PARTIES) ?? [];
+    const rawCurrencyConfig = this._getSetting(SETTING_KEYS.CURRENCY_CONFIG) ?? {};
 
     const originalRecipesJson = JSON.stringify(rawRecipes);
     const originalSystemsJson = JSON.stringify(rawSystems);
     const originalGatheringConfigJson = JSON.stringify(rawGatheringConfig);
     const originalEnvironmentsJson = JSON.stringify(rawEnvironments);
     const originalGatheringPartiesJson = JSON.stringify(rawGatheringParties);
+    const originalCurrencyConfigJson = JSON.stringify(rawCurrencyConfig);
 
     let data = {
       recipes: rawRecipes,
@@ -697,6 +719,7 @@ export class MigrationRunner {
       gatheringConfig: rawGatheringConfig,
       environments: rawEnvironments,
       gatheringParties: rawGatheringParties,
+      currencyConfig: rawCurrencyConfig,
     };
     let highestVersion = lastRunVersion;
     let migratedCatalystCount = 0;
@@ -831,6 +854,8 @@ export class MigrationRunner {
     const environmentsChanged = JSON.stringify(data.environments) !== originalEnvironmentsJson;
     const gatheringPartiesChanged =
       JSON.stringify(data.gatheringParties) !== originalGatheringPartiesJson;
+    const currencyConfigChanged =
+      JSON.stringify(data.currencyConfig) !== originalCurrencyConfigJson;
 
     // ---------------------------------------------------------------------------
     // Writeback. The recipe corpus goes FIRST, and the order is pinned rather than
@@ -851,6 +876,19 @@ export class MigrationRunner {
       }
     }
     try {
+      // ORDER IS LOAD-BEARING: `currencyConfig` is written BEFORE `craftingSystems`.
+      //
+      // The 1.26.0 migration LIFTS the currency ladder out of the systems and then shrinks each
+      // system's block to `{ enabled }`, so systems are the SOURCE and this setting is the
+      // DESTINATION. Write the source first and a tear between the two — any rejection below
+      // abandons the rest and leaves `migrationVersion` behind — destroys the ladder
+      // irrecoverably: the re-run finds systems already shrunk, lifts nothing, and the
+      // idempotence guard keeps the still-empty world config. Writing the destination first
+      // makes the same tear fully recoverable, because the re-run finds a populated world
+      // ladder, keeps it, and re-applies a shrink that is idempotent by construction.
+      if (currencyConfigChanged) {
+        await this._setSetting(SETTING_KEYS.CURRENCY_CONFIG, data.currencyConfig);
+      }
       if (systemsChanged) {
         await this._craftingSystemCorpus.createOrUpdateAll(data.systems);
       }
@@ -866,7 +904,7 @@ export class MigrationRunner {
 
       await this._setSetting(SETTING_KEYS.MIGRATION_VERSION, highestVersion);
     } catch (error) {
-      // The remaining four legs and the version bump share one containment and one
+      // The remaining five legs and the version bump share one containment and one
       // disposition: a rejection from any of them would otherwise propagate out of `run()`
       // past a caller with no `catch`, leaving a partial writeback with no GM-facing notice.
       return this._deferOnWriteFailure(error);

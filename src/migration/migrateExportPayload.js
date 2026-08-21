@@ -2,16 +2,26 @@
  * Pure, idempotent upcast of a Fabricate export payload to the current schema.
  *
  * A legacy export carries no `schemaVersion` and only `{ fabricateVersion,
- * system, recipes }`; it is treated as schema 1 and upcast to schema 2 by adding
- * the gathering-authoring fields and the envelope markers. The migrator is
- * idempotent: `migrate(migrate(v1))` deep-equals `migrate(v1)`, and `migrate(v2)`
- * is a no-op.
+ * system, recipes }`; it is treated as schema 1 and upcast by adding the
+ * gathering-authoring fields and the envelope markers (schema 2), then by hoisting the currency
+ * ladder out of the system and into an envelope-level `currencyConfig` (schema 3, issue 1278).
+ * The migrator is idempotent: `migrate(migrate(v1))` deep-equals `migrate(v1)`.
+ *
+ * A payload ALREADY at the current schema is not a no-op: it still runs every field-level upcast,
+ * because an export stamped with the current version can predate a field-level change. Any
+ * derivation added here must therefore be written branch-independently — reachable from the
+ * early return as well as from the main path — which is why `liftCurrencyToWorldScope` is called
+ * from both.
  *
  * Foundry-free (no globals) so it runs before validation/import and in tests.
  */
 
 import { FABRICATE_EXPORT_SCHEMA_VERSION } from '../systems/authoringExport.js';
 
+import {
+  buildWorldCurrencyConfig,
+  stripSystemCurrencyConfig,
+} from './migrateCurrencyToWorldScope.js';
 import { applyMaxModifierPicks } from './migrateMaxModifierPicks.js';
 import { applyRetireCraftingModToken } from './migrateRetireCraftingModToken.js';
 import { applySeededFailureResultPolicy } from './migrateSeedFailureResultPolicy.js';
@@ -170,6 +180,39 @@ function unifyModifierLibraries(migrated) {
  * export/import round trip from resetting a GM's `always` back to `never`.
  * @private
  */
+/**
+ * Lift a pre-1278 export's per-system currency block up to the envelope-level `currencyConfig`
+ * (issue 1278), and reduce the system's own block to the participation flag.
+ *
+ * BRANCH-INDEPENDENT ON PURPOSE. `migrateExportPayload` returns early once `schemaVersion` is
+ * already current, so a derivation reachable only from the schema-bump path would silently skip
+ * every payload authored at the current schema. This one runs from BOTH branches, exactly like
+ * `upcastLegacyTools` and its siblings, and is idempotent: once the envelope carries units, the
+ * lift is a no-op, and a system already reduced to `{ enabled }` has nothing left to strip.
+ *
+ * An export carries one system, so the "union across systems" the world migration performs
+ * degenerates here to that system's own ladder — but it is the SAME function, so the two paths
+ * cannot drift on how a unit is carried across.
+ */
+function liftCurrencyToWorldScope(migrated) {
+  const system = migrated?.system;
+  if (!system || typeof system !== 'object' || Array.isArray(system)) return;
+
+  const existing = migrated.currencyConfig;
+  // Gate on the envelope carrying ANY world config, not on it carrying UNITS. A schema-3 export
+  // whose world picked the macro spend strategy before authoring a ladder has scalars and an
+  // empty `units`; a units-count guard would rebuild over it from a system block already reduced
+  // to `{ enabled }`, discarding the strategy, provider and macro UUIDs — and making this
+  // module's own idempotence claim false for that payload.
+  const alreadyLifted =
+    existing && typeof existing === 'object' && Object.keys(existing).length > 0;
+
+  if (!alreadyLifted) {
+    migrated.currencyConfig = buildWorldCurrencyConfig([system]);
+  }
+  migrated.system = stripSystemCurrencyConfig([system])[0];
+}
+
 function seedFailureResultPolicy(migrated) {
   const system = migrated?.system;
   if (!system || typeof system !== 'object' || Array.isArray(system)) return;
@@ -186,8 +229,8 @@ export function migrateExportPayload(payload) {
   }
 
   // Already current — no-op for the schema envelope, but still run every field-level
-  // upcast, because a schema-2 export can predate #561's first-class tool fields or
-  // #1055's modifier pick cap. Clone so callers never alias the input.
+  // upcast, because an export stamped at the current schema can predate #561's first-class tool
+  // fields, #1055's modifier pick cap, or #1278's world currency slice. Clone so callers never alias the input.
   if (payload.schemaVersion === FABRICATE_EXPORT_SCHEMA_VERSION) {
     const current = structuredClone(payload);
     upcastLegacyTools(current);
@@ -196,6 +239,7 @@ export function migrateExportPayload(payload) {
     liftCheckModifierCatalogue(current);
     unifyModifierLibraries(current);
     seedFailureResultPolicy(current);
+    liftCurrencyToWorldScope(current);
     return current;
   }
 
@@ -231,6 +275,7 @@ export function migrateExportPayload(payload) {
   liftCheckModifierCatalogue(migrated);
   unifyModifierLibraries(migrated);
   seedFailureResultPolicy(migrated);
+  liftCurrencyToWorldScope(migrated);
 
   return migrated;
 }

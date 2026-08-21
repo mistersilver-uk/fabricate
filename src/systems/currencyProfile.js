@@ -1,3 +1,4 @@
+import { getCurrencyPresetsForAdapter } from '../config/currencyPresets.js';
 import { getByPath } from '../utils/objectPath.js';
 
 function defaultRandomID() {
@@ -76,7 +77,8 @@ export function normalizeCurrencyUnit(entry = {}, randomID = defaultRandomID) {
 }
 
 /**
- * The three peer top-level currency spend strategies (`requirements.currency.spendStrategy`):
+ * The three peer top-level currency spend strategies (`currencyConfig.spendStrategy`, world
+ * scope since issue 1278):
  *
  * - `actorProperty` (default) — units located by `actorPath`, spent via `actor.update`.
  * - `actorInventory` — a preconfigured provider (filtered by `game.system.id`) owns the
@@ -124,7 +126,12 @@ function resolveSpendStrategy(currency = {}) {
 }
 
 /**
- * Normalize a crafting system's `requirements.currency` config block.
+ * Normalize a raw currency config block.
+ *
+ * Since issue 1278 this describes no PERSISTED shape of its own: the only production caller is
+ * `normalizeWorldCurrencyConfig` below, which strips `enabled` and hands the rest to the world
+ * `currencyConfig` setting. It still accepts a legacy per-system block verbatim, which is what
+ * lets the migration and the export upcast feed it one.
  *
  * `spendStrategy` is one of `actorProperty` (default), `actorInventory`, or `macro`; any other
  * value falls back to `actorProperty`. A legacy `actorInventory` + `inventoryMode: 'macro'` config
@@ -153,6 +160,45 @@ export function normalizeCurrencyConfig(currency = {}, options = {}) {
     macros,
     units,
   };
+}
+
+/**
+ * Normalize the WORLD currency configuration (the `currencyConfig` world setting).
+ *
+ * Identical to {@link normalizeCurrencyConfig} except that it carries no `enabled` flag.
+ * Participation is a per-crafting-system decision (`requirements.currency.enabled`); the world
+ * config only describes WHAT the currency is — the coin ladder, how coins are read and spent, the
+ * selected provider, and the GM macro set. Keeping `enabled` out of this shape is what stops a
+ * world-level flag and a system-level flag from ever disagreeing.
+ *
+ * @param {object} [config]
+ * @param {{ randomID?: () => string }} [options]
+ * @returns {{ spendStrategy: string, providerId: string,
+ *   macros: { canAfford: string, increment: string, decrement: string }, units: object[] }}
+ */
+export function normalizeWorldCurrencyConfig(config = {}, options = {}) {
+  // Legacy `provider: 'system'` + `systemAdapter` configs used to be resolved by
+  // CraftingSystemManager, back when currency lived on the crafting system. That block can now
+  // only reach normalization here — carried up by the 1.26.0 world migration or by the export
+  // upcast — so the resolution moved with it rather than being dropped.
+  const legacyAdapter =
+    config?.provider === 'system' && ['dnd5e', 'pf2e'].includes(config?.systemAdapter)
+      ? config.systemAdapter
+      : '';
+  const units = Array.isArray(config?.units) ? config.units : [];
+  const seededUnits = units.length > 0 ? units : getCurrencyPresetsForAdapter(legacyAdapter);
+  // A legacy pf2e adapter seeded units that read and spend through the actor INVENTORY rather
+  // than a flat actor property, so carry that intent forward as the actorInventory strategy when
+  // no explicit strategy was persisted. A legacy dnd5e adapter maps to the default actorProperty.
+  const legacyAdapterSpendStrategy = { pf2e: 'actorInventory', dnd5e: 'actorProperty' };
+  const spendStrategy =
+    config?.spendStrategy || legacyAdapterSpendStrategy[legacyAdapter] || undefined;
+
+  const { enabled: _ignored, ...rest } = normalizeCurrencyConfig(
+    { ...config, spendStrategy, units: seededUnits },
+    options
+  );
+  return rest;
 }
 
 export function findCurrencyUnit(units = [], unitId = '') {

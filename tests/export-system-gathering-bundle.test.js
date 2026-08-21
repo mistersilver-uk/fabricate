@@ -126,11 +126,18 @@ test('source contract: game.fabricate.exportSystem passes the gathering args to 
     'exportSystem should resolve gatheringConfig from the GATHERING_CONFIG setting'
   );
 
-  // The five-arg call is the mutation-sensitive assertion: the pre-fix 3-arg
-  // `buildExportPayload(system, recipes, version)` does NOT match and fails here.
+  // The SIX-arg call is the mutation-sensitive assertion: the pre-fix 3-arg
+  // `buildExportPayload(system, recipes, version)` does NOT match and fails here, and neither
+  // does the five-arg call that dropped the world currency ladder (issue 1278). Every parameter
+  // of `buildExportPayload` after `version` is defaulted, so a dropped argument is silent — an
+  // export that simply carries an empty slice rather than one that throws.
   assert.match(
     closure,
-    /buildExportPayload\(\s*system,\s*recipes,\s*version,\s*gatheringEnvironments,\s*gatheringConfig\s*\)/,
-    'exportSystem must hand gatheringEnvironments + gatheringConfig to buildExportPayload'
+    /buildExportPayload\(\s*system,\s*recipes,\s*version,\s*gatheringEnvironments,\s*gatheringConfig,\s*currencyConfig\s*\)/,
+    'exportSystem must hand gatheringEnvironments + gatheringConfig + currencyConfig to buildExportPayload'
+  );
+  assert.ok(
+    closure.includes('fabricate.currencyConfigStore?.get?.() ?? {}'),
+    'exportSystem should resolve the ladder from the world currency config store'
   );
 });

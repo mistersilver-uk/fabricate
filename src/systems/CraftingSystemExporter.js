@@ -7,6 +7,7 @@ import { migrateExportPayload } from '../migration/migrateExportPayload.js';
 
 import {
   FABRICATE_EXPORT_SCHEMA_VERSION,
+  assembleCurrencyAuthoringBundle,
   assembleGatheringAuthoringBundle,
 } from './authoringExport.js';
 import {
@@ -38,7 +39,10 @@ export function buildExportPayload(
   recipes,
   fabricateVersion,
   gatheringEnvironments = [],
-  gatheringConfig = {}
+  gatheringConfig = {},
+  // The world currency configuration (issue 1278). Defaulted so every existing call site keeps
+  // working; an export produced without it simply carries an empty ladder.
+  currencyConfig = {}
 ) {
   if (!system || !system.id) {
     throw new Error('Cannot export: system is missing or has no id');
@@ -72,6 +76,7 @@ export function buildExportPayload(
     recipes: exportRecipes,
     gatheringEnvironments: bundle.gatheringEnvironments,
     gatheringConfig: bundle.gatheringConfig,
+    currencyConfig: assembleCurrencyAuthoringBundle(currencyConfig),
   };
 }
 
@@ -180,7 +185,18 @@ export function prepareForImport(rawData, mode = 'keep') {
       ? structuredClone(data.gatheringConfig)
       : { system: {}, shared: {} };
 
-  const prepared = { system, recipes, gatheringEnvironments, gatheringConfig };
+  // The WORLD currency ladder (issue 1278). It rides the envelope rather than the system, so
+  // unlike every other slice above there is nothing on `system` to fall back on: drop it here
+  // and `CompendiumImporter._persistCurrencyConfig` receives `undefined` and returns
+  // immediately, which lands every imported currency cost in the destination world as an
+  // unresolvable unit id. Deliberately NOT rebound under `copy` mode: unit ids are world scope,
+  // shared by every crafting system, and the merge already lets the destination win a collision.
+  const currencyConfig =
+    data.currencyConfig && typeof data.currencyConfig === 'object'
+      ? structuredClone(data.currencyConfig)
+      : {};
+
+  const prepared = { system, recipes, gatheringEnvironments, gatheringConfig, currencyConfig };
 
   if (mode === 'copy') {
     delete system.id;

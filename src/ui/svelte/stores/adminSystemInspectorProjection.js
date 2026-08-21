@@ -425,9 +425,12 @@ export function buildSelectedSystemViewData(
       selectedSystem.characterPrerequisites
     ),
 
+    // The currency fallback carries participation ONLY: the ladder is world scope since issue
+    // 1278, so a `units` array here would be a second, always-empty source of truth for a
+    // consumer that reached for it.
     requirements: selectedSystem.requirements || {
       time: { enabled: true },
-      currency: { enabled: false, units: [] },
+      currency: { enabled: false },
     },
 
     craftingCheck: {

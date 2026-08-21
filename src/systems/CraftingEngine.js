@@ -341,6 +341,10 @@ export class CraftingEngine {
       getPlayerResultOrder = () => null,
       getCraftingSystem = () => null,
       resolveItemUuid = async () => null,
+      // The world currency configuration (issue 1278). Optional: when absent, the shared
+      // affordance resolver falls back to the `game.fabricate` global, which keeps every
+      // existing construction site — production and fixture alike — working unchanged.
+      currencyConfigStore = null,
     } = {}
   ) {
     this.recipeManager = recipeManager;
@@ -354,6 +358,7 @@ export class CraftingEngine {
     // shared currency-affordance resolver as the spend-strategy → spender seams.
     this.actorInventoryCoinSpender = actorInventoryCoinSpender;
     this.actorPropertyCoinSpender = actorPropertyCoinSpender;
+    this.currencyConfigStore = currencyConfigStore;
     this.getPlayerResultOrder = getPlayerResultOrder;
     this.getCraftingSystem = getCraftingSystem;
     this.resolveItemUuid = resolveItemUuid;
@@ -368,6 +373,7 @@ export class CraftingEngine {
     return {
       actorInventoryCoinSpender: this.actorInventoryCoinSpender,
       actorPropertyCoinSpender: this.actorPropertyCoinSpender,
+      getCurrencyConfig: () => this.currencyConfigStore?.get(),
     };
   }
 
