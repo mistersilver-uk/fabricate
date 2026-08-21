@@ -32,7 +32,7 @@ test('round-trip: export → import(keep) → export is deep-equal modulo volati
   const first = exportCurrent(h, FIXTURE_SYSTEM_ID);
 
   // Envelope carries the explicit schema markers.
-  assert.equal(first.schemaVersion, 3);
+  assert.equal(first.schemaVersion, 4);
   assert.equal(first.runtimeStateIncluded, false);
   // Runtime state stripped on export.
   for (const env of first.gatheringEnvironments) {
@@ -168,15 +168,23 @@ test('copy-mode: id rebind is self-consistent (env→task linkage preserved)', (
 
   const copy = prepareForImport(first, 'copy');
 
-  // System + realm + environment container ids regenerated.
+  // System + environment container ids regenerated.
   assert.equal(copy.system.id, undefined, 'system id stripped for copy');
-  const newRealmId = copy.system.gatheringRealms[0].id;
-  assert.notEqual(newRealmId, FIXTURE_REALM_ID, 'realm id regenerated');
 
-  // Env realm refs rewired to the new realm id.
+  // REALM ids are NOT regenerated (issue 1282). Realms are world scope and ride the envelope,
+  // so a copy that minted fresh ids would duplicate the world's whole geography rather than
+  // recognising it — and the copy's environments would gate on the duplicates while every other
+  // system kept gating on the originals.
+  assert.deepEqual(
+    copy.travelConfig.realms.map((realm) => realm.id),
+    [FIXTURE_REALM_ID],
+    'a copy import shares the world’s realms rather than forking them'
+  );
+
+  // Env realm refs therefore stay exactly as authored: they still name the same places.
   for (const env of copy.gatheringEnvironments) {
     if (env.includedRealmIds?.length) {
-      assert.deepEqual(env.includedRealmIds, [newRealmId]);
+      assert.deepEqual(env.includedRealmIds, [FIXTURE_REALM_ID]);
     }
   }
 

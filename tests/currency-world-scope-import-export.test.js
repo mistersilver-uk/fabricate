@@ -16,21 +16,14 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { CompendiumImporter } from '../src/systems/CompendiumImporter.js';
 import { buildExportPayload, prepareForImport } from '../src/systems/CraftingSystemExporter.js';
 import { migrateExportPayload } from '../src/migration/migrateExportPayload.js';
 import { FABRICATE_EXPORT_SCHEMA_VERSION } from '../src/systems/authoringExport.js';
 
+import { importerOverSettings } from './helpers/worldConfigImporterHarness.js';
+
 function importerOver(seedCurrencyConfig) {
-  const settings = { currencyConfig: seedCurrencyConfig };
-  // Seams are the THIRD constructor argument; the currency merge touches neither manager.
-  const importer = new CompendiumImporter(null, null, {
-    getSetting: (key) => settings[key],
-    setSetting: async (key, value) => {
-      settings[key] = value;
-    },
-  });
-  return { importer, settings };
+  return importerOverSettings({ currencyConfig: seedCurrencyConfig });
 }
 
 describe('importing the world currency config', () => {

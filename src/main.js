@@ -3433,13 +3433,19 @@ function bindFabricateGlobal() {
     // carries an empty ladder, and every currency cost in it lands in the destination world as
     // an unresolvable unit id.
     const currencyConfig = fabricate.currencyConfigStore?.get?.() ?? {};
+    // The world realm library rides along too (issue 1282), for the same reason and with the
+    // same consequence: realms are WORLD scope, so omitting this exports an empty library and
+    // every realm-gated environment in the payload lands in the destination world citing realm
+    // ids that name nothing.
+    const travelConfig = fabricate.gatheringRealmStore?.get?.() ?? {};
     return CraftingSystemExporter.buildExportPayload(
       system,
       recipes,
       version,
       gatheringEnvironments,
       gatheringConfig,
-      currencyConfig
+      currencyConfig,
+      travelConfig
     );
   };
 

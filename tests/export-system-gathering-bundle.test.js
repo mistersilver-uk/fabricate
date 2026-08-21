@@ -38,7 +38,15 @@ const mainSource = readFileSync(resolve(__dirname, '../src/main.js'), 'utf8');
 
 // The comparison the acceptance calls for: every authoring-bearing field EXCEPT
 // the volatile `exportedAt` timestamp (which differs between two invocations).
-const COMPARED_FIELDS = ['schemaVersion', 'system', 'recipes', 'gatheringEnvironments', 'gatheringConfig'];
+const COMPARED_FIELDS = [
+  'schemaVersion',
+  'system',
+  'recipes',
+  'gatheringEnvironments',
+  'gatheringConfig',
+  'currencyConfig',
+  'travelConfig',
+];
 function pickComparedFields(envelope) {
   return Object.fromEntries(COMPARED_FIELDS.map((key) => [key, envelope[key]]));
 }
@@ -126,18 +134,23 @@ test('source contract: game.fabricate.exportSystem passes the gathering args to 
     'exportSystem should resolve gatheringConfig from the GATHERING_CONFIG setting'
   );
 
-  // The SIX-arg call is the mutation-sensitive assertion: the pre-fix 3-arg
+  // The SEVEN-arg call is the mutation-sensitive assertion: the pre-fix 3-arg
   // `buildExportPayload(system, recipes, version)` does NOT match and fails here, and neither
-  // does the five-arg call that dropped the world currency ladder (issue 1278). Every parameter
-  // of `buildExportPayload` after `version` is defaulted, so a dropped argument is silent — an
+  // does the five-arg call that dropped the world currency ladder (issue 1278) nor the six-arg
+  // call that dropped the world realm library (issue 1282). Every parameter of
+  // `buildExportPayload` after `version` is defaulted, so a dropped argument is silent — an
   // export that simply carries an empty slice rather than one that throws.
   assert.match(
     closure,
-    /buildExportPayload\(\s*system,\s*recipes,\s*version,\s*gatheringEnvironments,\s*gatheringConfig,\s*currencyConfig\s*\)/,
-    'exportSystem must hand gatheringEnvironments + gatheringConfig + currencyConfig to buildExportPayload'
+    /buildExportPayload\(\s*system,\s*recipes,\s*version,\s*gatheringEnvironments,\s*gatheringConfig,\s*currencyConfig,\s*travelConfig\s*\)/,
+    'exportSystem must hand gatheringEnvironments + gatheringConfig + currencyConfig + travelConfig to buildExportPayload'
   );
   assert.ok(
     closure.includes('fabricate.currencyConfigStore?.get?.() ?? {}'),
     'exportSystem should resolve the ladder from the world currency config store'
+  );
+  assert.ok(
+    closure.includes('fabricate.gatheringRealmStore?.get?.() ?? {}'),
+    'exportSystem should resolve the realm library from the world travel store'
   );
 });

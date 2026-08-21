@@ -133,7 +133,8 @@ A component's salvage result and catalyst references are owned by that COMPONENT
 
 ### Copy-mode identifier rebinding
 
-Copy-mode import MUST rebind record-container identifiers: the system identifier, realm identifiers, and environment record identifiers.
+Copy-mode import MUST rebind record-container identifiers: the system identifier and environment record identifiers.
+Realm identifiers are deliberately NOT among them since issue 1282 (see the travel-configuration merge above): they are world scope, and a copy that minted fresh ones would duplicate the world's geography rather than recognise it.
 Copy-mode import MUST regenerate component identifiers in addition to the record-container identifiers, and MUST atomically remap every within-payload reference to a regenerated component id.
 The remapped references are: recipe ingredient-option and result component refs including the `systemItemId` alias, the recursive `alternatives[]` refs, and the legacy flat `ingredients`/`results` aliases; `tool.componentId` in both the system and gathering-library tool slices; tool `onBreak.replacementComponentId`; essence `sourceComponentId`/`associatedSystemItemId`; component salvage result refs; gathering task/event drop-row `componentId`; and legacy `catalysts[]` component refs when present in a legacy or hand-edited payload.
 Copy-mode import MUST also regenerate recipe identifiers, and MUST atomically remap every within-payload recipe-book membership reference (`recipeItemDefinitions[].recipeIds` entries) to the regenerated recipe id, so a copy's books resolve to the copy's recipes.

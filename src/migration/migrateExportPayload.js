@@ -4,14 +4,16 @@
  * A legacy export carries no `schemaVersion` and only `{ fabricateVersion,
  * system, recipes }`; it is treated as schema 1 and upcast by adding the
  * gathering-authoring fields and the envelope markers (schema 2), then by hoisting the currency
- * ladder out of the system and into an envelope-level `currencyConfig` (schema 3, issue 1278).
+ * ladder out of the system and into an envelope-level `currencyConfig` (schema 3, issue 1278),
+ * then by hoisting the realm library out of the system and into an envelope-level
+ * `travelConfig` (schema 4, issue 1282).
  * The migrator is idempotent: `migrate(migrate(v1))` deep-equals `migrate(v1)`.
  *
  * A payload ALREADY at the current schema is not a no-op: it still runs every field-level upcast,
  * because an export stamped with the current version can predate a field-level change. Any
  * derivation added here must therefore be written branch-independently — reachable from the
- * early return as well as from the main path — which is why `liftCurrencyToWorldScope` is called
- * from both.
+ * early return as well as from the main path — which is why `liftCurrencyToWorldScope` and
+ * `liftTravelToWorldScope` are called from both.
  *
  * Foundry-free (no globals) so it runs before validation/import and in tests.
  */
@@ -27,6 +29,7 @@ import { applyRetireCraftingModToken } from './migrateRetireCraftingModToken.js'
 import { applySeededFailureResultPolicy } from './migrateSeedFailureResultPolicy.js';
 import { applySystemCheckModifierCatalogue } from './migrateSystemCheckModifierCatalogue.js';
 import { deriveToolSourceFromComponents } from './migrateToolsToFirstClass.js';
+import { buildWorldTravelConfig, stripSystemTravelConfig } from './migrateTravelToWorldScope.js';
 import { applyUnifiedModifierLibrary } from './migrateUnifyModifierLibraries.js';
 
 /**
@@ -213,6 +216,48 @@ function liftCurrencyToWorldScope(migrated) {
   migrated.system = stripSystemCurrencyConfig([system])[0];
 }
 
+/**
+ * Lift a pre-1282 export's per-system realm library up to the envelope-level `travelConfig`
+ * (issue 1282), and reduce the system's own block to the participation flag.
+ *
+ * BRANCH-INDEPENDENT ON PURPOSE, exactly like `liftCurrencyToWorldScope` above and every
+ * sibling before it. `migrateExportPayload` returns early once `schemaVersion` is already
+ * current, so a derivation reachable only from the schema-bump path would silently skip every
+ * payload authored at the current schema — including a hand-edited or force-stamped one that
+ * still carries realms on the system. Idempotent: once the envelope carries a travel config the
+ * lift is a no-op, and a system already reduced to `{ enabled }` has nothing left to strip.
+ *
+ * An export carries one system, so the "union across systems" the world migration performs
+ * degenerates here to that system's own library — but it is the SAME function, so the export
+ * path and the world path cannot drift on how a realm (or its nested `sceneMappings[]`) is
+ * carried across.
+ */
+function liftTravelToWorldScope(migrated) {
+  const system = migrated?.system;
+  if (!system || typeof system !== 'object' || Array.isArray(system)) return;
+
+  const existing = migrated.travelConfig;
+  // Gate on the envelope carrying ANY travel config, not on it carrying REALMS — the same
+  // reasoning as the currency lift. A v4 export from a world that chose `alwaysVisible` before
+  // authoring a single realm has scalars and an empty `realms`; a realm-count guard would
+  // rebuild over it from a system block already reduced to `{ enabled }`, discarding the reveal
+  // mode and modifier visibility the GM set.
+  const alreadyLifted =
+    existing &&
+    typeof existing === 'object' &&
+    !Array.isArray(existing) &&
+    Object.keys(existing).length > 0;
+
+  if (!alreadyLifted) {
+    // `_collisions` is diagnostic output for the WORLD migration's GM notice, which unions many
+    // systems. One system cannot collide with another, so it is dropped rather than persisted
+    // into an envelope no reader of it would ever consult.
+    const { _collisions: _diagnostics, ...built } = buildWorldTravelConfig([system]);
+    migrated.travelConfig = built;
+  }
+  migrated.system = stripSystemTravelConfig([system])[0];
+}
+
 function seedFailureResultPolicy(migrated) {
   const system = migrated?.system;
   if (!system || typeof system !== 'object' || Array.isArray(system)) return;
@@ -230,7 +275,8 @@ export function migrateExportPayload(payload) {
 
   // Already current — no-op for the schema envelope, but still run every field-level
   // upcast, because an export stamped at the current schema can predate #561's first-class tool
-  // fields, #1055's modifier pick cap, or #1278's world currency slice. Clone so callers never alias the input.
+  // fields, #1055's modifier pick cap, #1278's world currency slice, or #1282's world travel
+  // slice. Clone so callers never alias the input.
   if (payload.schemaVersion === FABRICATE_EXPORT_SCHEMA_VERSION) {
     const current = structuredClone(payload);
     upcastLegacyTools(current);
@@ -240,6 +286,7 @@ export function migrateExportPayload(payload) {
     unifyModifierLibraries(current);
     seedFailureResultPolicy(current);
     liftCurrencyToWorldScope(current);
+    liftTravelToWorldScope(current);
     return current;
   }
 
@@ -276,6 +323,7 @@ export function migrateExportPayload(payload) {
   unifyModifierLibraries(migrated);
   seedFailureResultPolicy(migrated);
   liftCurrencyToWorldScope(migrated);
+  liftTravelToWorldScope(migrated);
 
   return migrated;
 }
