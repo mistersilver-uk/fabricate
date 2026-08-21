@@ -20715,6 +20715,26 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.match(subtitle, /No coins yet/, subtitle);
   });
 
+  it('offers NO crafting-system actions on the World Currency page (issue 1278)', async () => {
+    // The page-header actions fall through to Import / Export / Create for any route without a
+    // branch of its own. Those act on CRAFTING SYSTEMS, so on a route that has no selected system
+    // "Create" would create one and "Export" would sit permanently disabled. The route's own two
+    // actions live on the card header, where the provider read-only gating that hides them is.
+    await mountCurrencyEditor();
+
+    assertNoElement(
+      target,
+      '.manager-header-actions',
+      'the currency page must not offer crafting-system actions'
+    );
+    assert.ok(
+      [...target.querySelectorAll('button')].some((button) =>
+        button.textContent.includes('Add currency unit')
+      ),
+      'its own actions still render, on the card'
+    );
+  });
+
   it('renders World Currency full width, with no inspector aside (issue 1278)', async () => {
     // The shell's shared `.manager-inspector` falls through to a generic "Select a system" panel
     // for any route it is not explicitly excluded from. Omitting this route from that exclusion

@@ -3983,8 +3983,6 @@
       return text('FABRICATE.Admin.Manager.Environment.Tasks.Actions', 'Gathering task actions');
     if (currentView === 'world')
       return text('FABRICATE.Admin.Manager.World.PartiesActions', 'World party actions');
-    if (currentView === 'world-currency')
-      return text('FABRICATE.Admin.Manager.World.CurrencyActions', 'World currency actions');
     if (currentView === 'world-downtime')
       return downtimeChrome(
         'actionsLabel',
@@ -8132,7 +8130,16 @@
           </div>
         {/if}
       </div>
-      {#if currentView !== 'tools' && currentView !== 'tool-edit'}
+      <!--
+        World > Currency renders NO page-header actions (issue 1278). Its own two actions, Add
+        currency unit and Seed presets, live on the card header where they always did and where
+        the read-only provider gating that hides them is computed. Without this exclusion the
+        route falls through to the final `{:else}` below and offers Import / Export / Create —
+        which act on CRAFTING SYSTEMS, so "Create" on the currency page would create a crafting
+        system and "Export" would sit disabled against a selected-system id the route does not
+        even have.
+      -->
+      {#if currentView !== 'tools' && currentView !== 'tool-edit' && !isWorldCurrencyRoute}
         <div class="manager-header-actions" aria-label={headerActionsLabel()}>
           {#if currentView === 'world-downtime'}
             {#if downtimeCoreFallback}
