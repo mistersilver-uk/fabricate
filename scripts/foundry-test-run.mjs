@@ -3945,7 +3945,18 @@ async function seedSmokeAlchemyFixtures(page, craftingSetup, crafterId) {
     await csm.updateSystem(benchId, {
       resolutionMode: 'alchemy',
       enabled: true,
-      alchemy: { learnOnCraft: true, consumeOnFail: true, showAttemptHistoryToPlayers: false }
+      // `checkMode: 'simple'` is LOAD-BEARING for the manager alchemy-settings capture, not
+      // decoration. The capture photographs the Alchemy behaviour card, which `ChecksView`
+      // renders only inside the crafting route's ON FAILURE section. An alchemy system whose
+      // `alchemy.checkMode` is `none` reads as `routeIsOff`, and an off route collapses the
+      // section strip to `roll` alone — so with the default mode neither the section button the
+      // capture clicks nor the card it frames can ever render, and the step times out.
+      alchemy: {
+        checkMode: 'simple',
+        learnOnCraft: true,
+        consumeOnFail: true,
+        showAttemptHistoryToPlayers: false
+      }
     });
     const benchMap = {
       'Smoke Bench Reagent': await registerComponent(benchId, productByName['Smoke Bench Reagent']),
