@@ -1235,6 +1235,30 @@ function applySystemCraftingModes(systemDetails, modesById) {
   }
 }
 
+/**
+ * Fill a test's `worldRealms` override out to the shape `adminStore` actually projects.
+ *
+ * The travel inspector reads the `environments` and `parties` ARRAYS, not only their counts, so a
+ * fixture carrying counts alone makes it throw during render. That failure is not loud: Svelte
+ * unwinds and the manager falls back to the systems route, so the assertion that fires is a
+ * confusing "expected world-travel, got systems" several lines later. Normalizing here means a
+ * future override cannot reintroduce it by omission.
+ */
+function projectedWorldRealms(realms) {
+  return realms.map((realm) => ({
+    description: '',
+    img: null,
+    enabled: true,
+    secret: false,
+    biomes: [],
+    environmentCount: Array.isArray(realm.environments) ? realm.environments.length : 0,
+    partyCount: Array.isArray(realm.parties) ? realm.parties.length : 0,
+    environments: [],
+    parties: [],
+    ...realm,
+  }));
+}
+
 function createStore(calls = [], options = {}) {
   const selectedFeatures = options.selectedFeatures || {
     essences: true,
@@ -2062,15 +2086,18 @@ function createStore(calls = [], options = {}) {
     partyRealmOverridesAvailable:
       options.partyRealmOverridesAvailable ?? options.gatheringRealmsEnabled === true,
     // The WORLD's realm library (issue 1282) — one library, whichever system is selected.
-    worldRealms: options.worldRealms || [
-      {
-        id: 'realm-forest',
-        name: 'Green March',
-        enabled: true,
-        environmentCount: 1,
-        partyCount: 1,
-      },
-    ],
+    worldRealms: projectedWorldRealms(
+      options.worldRealms || [
+        {
+          id: 'realm-forest',
+          name: 'Green March',
+          environmentCount: 1,
+          partyCount: 1,
+          environments: [{ id: 'env-forest', name: 'Green March Woods', enabled: true }],
+          parties: [{ id: 'party-1', name: 'The Wayfarers' }],
+        },
+      ]
+    ),
     currentSceneRegions: options.currentSceneRegions || [],
     currentSceneUuid: options.currentSceneUuid || '',
     foundrySystemId: options.foundrySystemId || '',
@@ -14135,6 +14162,16 @@ describe('CraftingSystemManager mounted behavior', () => {
       target.querySelector('.manager-header-actions').getAttribute('aria-label'),
       'Realm actions'
     );
+    // The INSPECTOR, not just the panel. World > Travel renders its own `manager-main`, but its
+    // detail pane is a branch of the chain nested inside the shared inspector aside — so a route
+    // missing from that chain's outer condition makes the branch unreachable and the aside falls
+    // through to nothing. The failure is silent: the route commits, the panel renders, and only
+    // the detail pane is absent, which is why every assertion above stayed green through it.
+    assert.equal(
+      target.querySelector('.manager-travel-inspector')?.getAttribute('aria-label'),
+      'Selected realm',
+      'the Realms route must render its detail pane, not only its list panel'
+    );
     worldTravelItem('map').click();
     await settleRouteExit();
     assert.equal(
@@ -14144,6 +14181,11 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.equal(
       target.querySelector('.manager-header-actions').getAttribute('aria-label'),
       'Map region link actions'
+    );
+    assert.equal(
+      target.querySelector('.manager-travel-inspector')?.getAttribute('aria-label'),
+      'Selected map region link',
+      'and the Map Region Links route must render its own detail pane too'
     );
     worldNavItem('parties').click();
     await tick();

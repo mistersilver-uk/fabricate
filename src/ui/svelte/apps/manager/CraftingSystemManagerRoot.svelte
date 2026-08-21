@@ -10237,7 +10237,12 @@
             dataAttr="data-tags-evidence"
             dataValue="reference-safe"
           />
-        {:else if currentView === 'world' || currentView === 'environments' || currentView === 'environment-edit' || currentView === 'gathering-task-edit' || currentView === 'gathering-event-edit'}
+          <!-- `world-travel` belongs in this list even though it renders its own `manager-main`:
+             the travel inspector is a BRANCH of the chain nested inside here, so leaving the
+             route out makes that branch unreachable and the aside falls through to nothing.
+             The symptom is silent — the route commits, its panel renders, and only the detail
+             pane is missing, which is why only the view lab caught it. -->
+        {:else if currentView === 'world' || currentView === 'environments' || currentView === 'environment-edit' || currentView === 'gathering-task-edit' || currentView === 'gathering-event-edit' || isWorldTravelRoute}
           {#if (currentView === 'environments' && displayedGatheringTab === 'tasks') || currentView === 'gathering-task-edit'}
             {#if selectedGatheringTask}
               {#if currentView !== 'gathering-task-edit'}
